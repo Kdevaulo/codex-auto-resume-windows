@@ -67,7 +67,7 @@ LAYER = {_q(name): layer for layer, names in {
                "domain.power_vocabulary",
                # v0.6.14-beta.2: the reasons and a Codex home's states, out of it at its budget too.
                "domain.reason_vocabulary"),
-    "policy": ("", "settings", "continuation", "l10n", "messages", "interface", "config", "logbook",
+    "policy": ("", "settings", "settings_schema", "continuation", "l10n", "messages", "interface", "config", "logbook",
                # v0.6.11: which edition this is, found by looking beside the package; and quiet
                # hours and a postponement's times, on the local clock.
                "edition", "quiet",

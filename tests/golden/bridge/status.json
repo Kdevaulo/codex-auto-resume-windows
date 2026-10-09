@@ -130,7 +130,8 @@
             "keep_awake_hours": "h6",
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
-            "status_file": false
+            "status_file": false,
+            "codex_homes": []
           }
         }
       }
@@ -264,7 +265,8 @@
             "keep_awake_hours": "h6",
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
-            "status_file": false
+            "status_file": false,
+            "codex_homes": []
           },
           "managed": [
             "DisableAutoResume",
@@ -404,7 +406,8 @@
             "keep_awake_hours": "h6",
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
-            "status_file": false
+            "status_file": false,
+            "codex_homes": []
           },
           "power_action": {
             "armed": {

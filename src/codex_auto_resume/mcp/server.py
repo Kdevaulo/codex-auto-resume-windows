@@ -43,8 +43,22 @@ import sys
 from .. import config, controlcli, l10n, reasons as _reasons
 from ..control import Control, ControlError
 from ..domain.plug import DEFER, Surface
+from ..settings import DASHBOARD_ONLY
 from .tools import (PANEL_DISPLAY_MODES, PANEL_PREFERRED_MODE, RESOURCES, SETTINGS_UI, TOOLS, plugged_tools,
                     settings_schema)
+
+
+
+def _no_homes(value):
+    """`value` with the Codex homes taken out of every settings mapping in it (v0.6.14-beta.2): their folders
+    are paths, which may hold the Windows user name, and this reply is part of what Codex sends on. A record's
+    home is said by its alias alone (control/records.py)."""
+    if isinstance(value, dict):
+        return {key: _no_homes(item) for key, item in value.items() if key not in DASHBOARD_ONLY}
+    if isinstance(value, list):
+        return [_no_homes(item) for item in value]
+    return value
+
 
 PROTOCOL_VERSION = "2025-06-18"
 SUPPORTED_PROTOCOLS = (PROTOCOL_VERSION, "2025-03-26", "2024-11-05")
@@ -222,7 +236,7 @@ class Server:
 
     @staticmethod
     def _reply(summary: str, data: dict, meta=None) -> dict:
-        result = {"content": [{"type": "text", "text": summary}], "structuredContent": data}
+        result = {"content": [{"type": "text", "text": summary}], "structuredContent": _no_homes(data)}
         if meta:
             result["_meta"] = meta
         return result
@@ -343,6 +357,10 @@ class Server:
     def _tool_update_settings(self, arguments) -> dict:
         if not arguments:
             raise ControlError("name at least one setting to change")
+        # v0.6.14-beta.2: the Codex homes are the Dashboard's alone, refused by name whatever a schema offers.
+        dashboard = sorted(set(arguments) & DASHBOARD_ONLY)
+        if dashboard:
+            raise ControlError("not changeable from Codex: %s" % ", ".join(dashboard))
         # The schema already omits them; a client that ignores the schema is refused here.
         offered = set(settings_schema()["properties"])
         refused = sorted(set(arguments) - offered)

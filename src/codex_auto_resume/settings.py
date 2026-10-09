@@ -18,10 +18,11 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import sys
 import tempfile
 
-from . import (continuation, failures, guards, l10n, ladder, memguard, needsyou, ownvalues, power, projects,
-               quiet, reasons, statusfile)
+from . import (continuation, failures, guards, homes, l10n, ladder, memguard, needsyou, ownvalues, power,
+               projects, quiet, reasons, settings_schema, statusfile)
 from .domain.vocabulary import (Design, ImportanceTier, NewConversationPolicy, NotifyEvent,
                                 ProjectPolicy, Theme)
 
@@ -282,6 +283,9 @@ MEMORY_GUARD_MODES, MEMORY_LIMITS = memguard.MODES, memguard.LIMITS
 FIELDS[memguard.GUARD_FIELD] = (memguard.DEFAULT_MODE, lambda v, d: _choice(v, d, MEMORY_GUARD_MODES))
 FIELDS[memguard.LIMIT_FIELD] = (memguard.DEFAULT_LIMIT, ownvalues.coercer(MEMORY_LIMITS, OWN[memguard.LIMIT_FIELD]))
 FIELDS[statusfile.FIELD] = (False, _boolean)
+# v0.6.14-beta.2: the Codex homes watched beside the default one (homes.py) - none by default, the default
+# home alone, as before. Written in the Dashboard alone (DASHBOARD_ONLY), where each is checked (homes.strict).
+FIELDS[homes.FIELD] = ([], homes.coerce)
 
 
 def is_custom_text(name) -> bool:
@@ -353,7 +357,7 @@ NEEDS_YOU_FIELDS = tuple(needsyou.KIND_FIELDS.values()) + (needsyou.STALL_FIELD,
 # number - and nothing takes a boolean but a boolean, because `bool` is an `int` in
 # Python and is not one in JSON, so a tick box is not a count.
 _ACCEPTED_TYPES = {"boolean": (bool,), "integer": (int,), "number": (int, float),
-                   "string": (str,), "object": (dict,)}
+                   "string": (str,), "object": (dict,), "array": (list,)}
 
 
 def field_type(name: str) -> str:
@@ -364,7 +368,8 @@ def field_type(name: str) -> str:
     validator will not take.
     """
     default = FIELDS[name][0]
-    return ("object" if name == continuation.BY_THREAD_FIELD else "boolean" if isinstance(default, bool)
+    return ("object" if name == continuation.BY_THREAD_FIELD else "array" if isinstance(default, list)
+            else "boolean" if isinstance(default, bool)
             else "integer" if isinstance(default, int)
             else "number" if isinstance(default, float)
             else "string")
@@ -628,73 +633,13 @@ NOT_YET_OFFERED = frozenset({"start_with_codex"})
 # as it refuses every field its schema does not offer; Restore defaults empties them with the rest.
 ROW_ACTION_FIELDS = frozenset({projects.ALWAYS, projects.NEVER, continuation.BY_THREAD_FIELD})
 
+# Fields only the Dashboard's own section writes (v0.6.14-beta.2): the Codex homes, each checked against the
+# folders on this PC when it is written (control/policy.py). `describe()` leaves them out, so no generated
+# editor draws them and MCP's schema never offers them - and update_settings refuses them by name besides.
+DASHBOARD_ONLY = frozenset({homes.FIELD})
+
 
 def describe() -> list:
-    """Machine-readable schema for the settings interfaces.
-
-    The user interfaces render themselves from this, so a field added here appears in
-    every front end at once instead of being wired up three times. A field in
-    NOT_YET_OFFERED is not described: it has no front end until something reads it.
-    """
-    described = []
-    for name, (default, _coerce) in FIELDS.items():
-        if name in NOT_YET_OFFERED or name in ROW_ACTION_FIELDS:
-            continue
-        entry = {"name": name, "default": default, "type": field_type(name)}
-        if name in RANGES:
-            entry.update(RANGES[name])
-        if name in OWN:
-            entry["custom"] = ownvalues.published(OWN[name])
-        if name.startswith("recover_"):
-            entry["group"] = "recovery"
-            entry["category"] = name[len("recover_"):]
-        elif (name.startswith("notify_") or name == "notifications"
-              or name in NEEDS_YOU_FIELDS):
-            # v0.6.11: the needs-you notice's kinds, its stall and its sound under its own switch.
-            entry["group"] = "notifications"
-            entry["master"] = name == "notifications"
-        elif name in ("theme", "panel_theme", "design", "reduce_motion"):
-            # How the surfaces look. Both themes are offered in the window and in the panel. The
-            # design and Reduce motion are offered only in the window: both decide what moves, and
-            # what moves is not Codex's to change (mcp.tools.PANEL_APPEARANCE). The panel draws in
-            # both since v0.6.10, as well as following the host's own reduced-motion preference.
-            entry["group"] = "appearance"
-        elif name in ("show_tray", "notification_card", "start_with_codex", power.KEEP_AWAKE_FIELD,
-                      power.AWAKE_CAP_FIELD, memguard.GUARD_FIELD, memguard.LIMIT_FIELD, statusfile.FIELD):
-            # A desktop preference, beside "run at sign-in" - not a notification, and
-            # not something the notifications switch governs. The card only chooses how a
-            # notification looks on this desktop, so it lives here too, and like the icon it is
-            # outside what the Codex panel and MCP may change (mcpserver.USER_GROUPS). v0.6.11: so is
-            # keeping this PC awake while a task waits - a question of this PC's power, not of recovery -
-            # and the watcher's own memory guard, and a status file written for other tools.
-            entry["group"] = "windows"
-        elif name in ("max_recovery_attempts", "max_no_progress", "max_chain_continuations",
-                      "retry_timing", "quiet_hours_start", "quiet_hours_end", "quiet_hours_days",
-                      "default_tier", "objection_minutes", "new_conversation_policy",
-                      "project_policy", *ladder.STEP_FIELDS, "retry_jitter", "chain_time_ceiling",
-                      "task_changed_guard", "context_guard", power.SLEEP_FIELD, power.NETWORK_FIELD):
-            # v0.6.11: quiet hours and the tier a conversation has by default join the limits -
-            # how hard, and when, recovery tries - in the window and in the panel alike; and beside
-            # the tier, what a new conversation gets and which projects resume without a person;
-            # and after them the Custom waits, jitter, the time ceiling and the two guards; and last,
-            # what waits after a long sleep, and whether a due recovery waits for the internet.
-            entry["group"] = "limits"
-        elif name == "observe_only":
-            # v0.6.11: a switch of automatic recovery itself, under the kinds it recovers.
-            entry["group"] = "recovery"
-        elif name == "interface_language":
-            entry["group"] = "general"
-        elif name in ("continuation_language", "continuation_style", "custom_message_mode"):
-            entry["group"] = "continuation"
-        elif is_custom_text(name):
-            # Free text. The surfaces need to know that before they draw a one-line box
-            # for it, and they need the limit before a person types past it.
-            entry["group"] = "continuation"
-            entry["multiline"] = True
-            entry["max_length"] = continuation.MAX_CUSTOM_LENGTH
-            if name != "custom_message":
-                entry["category"] = name[len("custom_message_"):]
-        else:
-            entry["group"] = "advanced"
-        described.append(entry)
-    return described
+    """Machine-readable schema for the settings interfaces (settings_schema.py, out of this module at
+    its line budget in v0.6.14-beta.2)."""
+    return settings_schema.describe(sys.modules[__name__])

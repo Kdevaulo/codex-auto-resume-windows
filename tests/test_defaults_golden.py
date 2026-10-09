@@ -68,6 +68,7 @@ ADDED: dict = {
     "memory_guard_limit": ("mb1024", "inert while memory_guard is off, which is the default"),
     "status_file": (False, "off: no status file is written"),
     "custom_message_by_thread": (None, "no conversation has a message of its own: each gets the style's, as in v0.6.10"),
+    "codex_homes": ([], "none: the default Codex home alone is watched, as v0.6.10 watched it"),
 }
 
 

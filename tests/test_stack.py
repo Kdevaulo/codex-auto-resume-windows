@@ -83,7 +83,7 @@ ITEM = {_q(name): item for item, names in {
                "engine.resend",
                # and records of the edition's own, tried like core's.
                "engine.plugrecords"),
-    "policy": ("failures", "reasons", "settings", "continuation", "openstate", "domain.gates",
+    "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",
                # v0.6.11: what an edition may change about a decision, and which edition this

@@ -9,9 +9,9 @@ applied after the settings are read, never written into the file.
 """
 from __future__ import annotations
 
-from .. import config, managed, settings
+from .. import config, homes, managed, settings
 from ..store import StoreError
-from ..win import policykeys
+from ..win import folderid, policykeys
 from .errors import ControlError, _thread_id
 
 
@@ -53,6 +53,7 @@ class SettingsMixin:
                 changes, refused = managed.admit(changes, effective, held)
                 if refused is not None:
                     raise ControlError("%s is set by your administrator" % refused, code="managed_by_policy")
+            self._strict_homes(changes)
             saved = settings.update(self.settings_path(), changes)
         except settings.SettingsError as exc:
             # The sentence is the validator's own and names the setting it refused. The
@@ -111,9 +112,23 @@ class SettingsMixin:
         except settings.SettingsError as exc:
             raise ControlError(str(exc), code="request_failed") from None
 
+    @staticmethod
+    def _strict_homes(changes) -> None:
+        """v0.6.14-beta.2: the Codex homes as written, checked against the folders on this PC (homes.strict):
+        each one that can be watched, none the default home or another under a second name."""
+        if not isinstance(changes, dict) or homes.FIELD not in changes:
+            return
+        try:
+            homes.strict(changes[homes.FIELD], config.codex_home(), folderid.identity)
+        except ValueError as exc:
+            raise settings.SettingsError(str(exc)) from None
+
     def restore_defaults(self) -> dict:
         try:
-            saved = settings.save(self.settings_path(), settings.defaults())
+            # The Codex homes are where to watch, not a preference: Restore defaults keeps them, and with them
+            # every recovery waiting there (removing a home cancels those, homes.py).
+            kept = {homes.FIELD: settings.load(self.settings_path())[homes.FIELD]}
+            saved = settings.save(self.settings_path(), dict(settings.defaults(), **kept))
         except settings.SettingsError as exc:
             # Generic for the same reason as `update_settings` above.
             raise ControlError(str(exc), code="request_failed") from None
