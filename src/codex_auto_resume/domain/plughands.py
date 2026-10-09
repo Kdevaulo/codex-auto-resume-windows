@@ -14,6 +14,7 @@ Pure, as the rest of domain/: the standard library only, and nothing read or wri
 from __future__ import annotations
 
 from contextlib import nullcontext
+from enum import StrEnum
 
 from . import ids
 from .states import EPOCH_STORE, epoch
@@ -30,13 +31,45 @@ def workers(answer) -> int:
     and 1, one send after another as always, for anything else: DEFER, 0, 5, True, "2", a list."""
     return answer if type(answer) is int and 2 <= answer <= MAX_WORKERS else 1
 # What one of them is, exactly: no more keys and no fewer.
-RECORD_KEYS = frozenset({"record_id", "thread_id", "marker", "state", "words", "sent_at"})
+BASE_RECORD_KEYS = frozenset({"record_id", "thread_id", "marker", "state", "words", "sent_at"})
+# v0.6.14-beta.2: and what the words are (RecordPurpose), the turn a continuation follows, the queue item Codex said it
+# took and whether a person asked for it back - each optional, a record without it being what one was before.
+RECORD_KEYS = BASE_RECORD_KEYS | {"purpose", "ordinal", "queue_id", "withdraw"}
 # How long the words of one may be, at most: what core's one send carries, less the blank line and the
 # marker it ends with (continuation.validate_prompt checks them again, as text).
 WORDS_LIMIT = 8192
 # How many guards one errand may ask for in one tick: one for each capability whose errand the plug
 # joins into it, and no more. A guard asked for past this is refused without a transaction.
 ERRAND_GUARDS = 8
+
+
+class RecordPurpose(StrEnum):
+    """What a record of the plug's says (v0.6.14-beta.2): a person's own MESSAGE (continuation.validate_prompt, product
+    text refused), or a CONTINUATION in the edition's own catalog words (continuation.validate_continuation), sent only
+    while the turn it follows is still its conversation's latest."""
+    MESSAGE = "message"
+    CONTINUATION = "continuation"
+
+
+class RecordMove(StrEnum):
+    """What core did with a record of the plug's own (P2, v0.6.14), as P14 tells it (RECORD_MOVES): it
+    waits, at a gate and for a reason core names; it was handed back before its send, or its process
+    never started, and waits again with its words; it was sent - its words gone from the plug's state -
+    and is watched; its marker was found in Codex's history; or none was a day after it was sent, and
+    it is never sent again. From v0.6.14-beta.2: a continuation whose turn is no longer the latest is
+    SUPERSEDED and never sent; one a person edited in Codex's queue is HANDED_OVER, theirs; one taken back
+    out of Codex's queue on a Cancel or a Pause is WITHDRAWN; and one Codex would not give back is
+    WITHDRAW_REFUSED - left there, watched, and never sent twice."""
+    WAITING = "waiting"
+    RELEASED = "released"
+    NOT_STARTED = "not_started"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    UNPROVEN = "unproven"
+    SUPERSEDED = "superseded"
+    HANDED_OVER = "handed_over"
+    WITHDRAWN = "withdrawn"
+    WITHDRAW_REFUSED = "withdraw_refused"
 
 
 class Channel:
@@ -145,23 +178,35 @@ class Errand:
 
 def _record(found):
     """One record the plug handed over, as core takes it - a copy - or None for anything else."""
-    if type(found) is not dict or set(found) != RECORD_KEYS:
+    if type(found) is not dict or not BASE_RECORD_KEYS <= set(found) <= RECORD_KEYS:
         return None
     key, thread, state, words, sent = (found["record_id"], found["thread_id"], found["state"], found["words"],
                                        found["sent_at"])
+    # v0.6.14-beta.2's keys, each with what a record that names none of them is: a person's message, queued nowhere
+    # Codex said, and no one asking for it back.
+    purpose, ordinal = found.get("purpose", RecordPurpose.MESSAGE), found.get("ordinal")
+    queue_id, withdraw = found.get("queue_id"), found.get("withdraw", False)
     if (type(key) is not str or not ids.is_interruption_id(key) or ids.uuid_problem(thread) is not None
-            or found["marker"] != ids.short_marker(key)):
+            or found["marker"] != ids.short_marker(key) or purpose not in tuple(RecordPurpose)):
+        return None
+    if purpose == RecordPurpose.CONTINUATION:
+        if type(ordinal) is not int or ordinal < 0:
+            return None
+    elif ordinal is not None:
         return None
     if state == "waiting":
-        if type(words) is not str or not 0 < len(words) <= WORDS_LIMIT or sent is not None:
+        if (type(words) is not str or not 0 < len(words) <= WORDS_LIMIT or sent is not None or queue_id is not None
+                or withdraw is not False):
             return None
     elif state == "in_flight":
-        if words is not None or not (sent is None or epoch(sent, *EPOCH_STORE, exact=True)):
+        if (words is not None or not (sent is None or epoch(sent, *EPOCH_STORE, exact=True))
+                or not (queue_id is None or ids.uuid_problem(queue_id) is None) or type(withdraw) is not bool):
             return None
     else:
         return None
     return {"record_id": key, "thread_id": thread, "marker": str(found["marker"]), "state": state,
-            "words": words, "sent_at": None if sent is None else float(sent)}
+            "words": words, "sent_at": None if sent is None else float(sent), "purpose": str(purpose),
+            "ordinal": ordinal, "queue_id": queue_id, "withdraw": withdraw}
 
 
 def records_of(answer) -> tuple:

@@ -336,7 +336,7 @@ class ClosedWordTests(StateCase):
         state.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
         connection = self.raw(state)
         for statement in ("UPDATE arming SET state='on'",
-                          "INSERT INTO records VALUES ('%s','test_wake','%s','sent',1,NULL,0,NULL)"
+                          "INSERT INTO records VALUES ('%s','test_wake','%s','sent',1,NULL,0,NULL,NULL,0)"
                           % (ac.KEY, ac.THREAD),
                           "INSERT INTO overrides VALUES ('%s','test_wake','forever',1,NULL)" % ac.KEY,
                           "UPDATE meta SET global_hourly=13",
@@ -936,7 +936,7 @@ class BoundTests(StateCase):
                                [(old,)] * 10 + [(recent,)] * (EVENT_LIMIT + 50))
         connection.executemany("INSERT INTO spend (at, capability, thread_id) VALUES (?, 'test_wake', ?)",
                                [(old, ac.THREAD)] * 10 + [(recent, ac.THREAD)] * 30)
-        connection.executemany("INSERT INTO records VALUES (?, 'test_wake', ?, ?, ?, NULL, 0, ?)",
+        connection.executemany("INSERT INTO records VALUES (?, 'test_wake', ?, ?, ?, NULL, 0, ?, NULL, 0)",
                                [("%064x" % n, ac.THREAD, "finished", old, old) for n in range(5)]
                                + [("%064x" % (100 + n), ac.THREAD, "waiting", old, None) for n in range(3)])
         connection.executemany("INSERT INTO overrides VALUES (?, 'test_wake', 'force_once', ?, NULL)",

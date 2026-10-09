@@ -65,6 +65,8 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         # v0.6.11: an administrator's DisableAutoResume is a Pause here too, even before the watcher
         # has written it into the state (runtime/app.py), so a write that failed sends nothing.
         if not self.store.settings()["enabled"] or self.managed.disable_auto_resume:
+            # v0.6.14-beta.2: what the plug sent that Codex still holds is taken back, the plug asked nothing.
+            self.paused_records()
             return
         # The plug is asked nothing more while recovery is paused: a Pause beats every
         # capability, as it beats core. P8 is once a tick, after everything is observed; what it

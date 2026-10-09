@@ -569,7 +569,8 @@ class Runtime:
         as a send it paid for gone submission_unknown does (K7)."""
         try:
             moved = self.state.record_moved(record.get("record_id"), move, gate=record.get("gate"),
-                                            reason=record.get("reason"), at=self.clock())
+                                            reason=record.get("reason"), at=self.clock(),
+                                            queue_id=record.get("queue_id"))
         except StateError:
             return DEFER                                 # repaired from the next P2 (resetmessage.records)
         if moved is None:

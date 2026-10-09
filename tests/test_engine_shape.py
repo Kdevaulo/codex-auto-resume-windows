@@ -99,7 +99,7 @@ METHODS = {
     "_errand", "errand_held",
     # and P2 carried out: the records of the plug's own, their words, their gates and moves, their claim
     # and the look before their send, what came of it, and those in flight watched (engine/plugrecords.py).
-    "plug_records", "_worded", "_record_told", "_record_waits", "_try_record", "_record_would_send",
+    "plug_records", "_worded", "_record_told", "_record_waits", "_try_record", "_record_would_send", "_not_ones_own", "_take_back", "_flying", "paused_records",
     "_record_claim", "_record_problem", "_record_sent", "_watch_record",
 }
 

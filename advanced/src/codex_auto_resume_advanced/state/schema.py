@@ -64,7 +64,7 @@ TABLES = {
                "engine_version", "warnings"),
     "spend": ("spend_id", "at", "capability", "thread_id", "interruption_id"),
     "records": ("record_id", "capability", "thread_id", "state", "created_at", "claimed_at",
-                "claims", "finished_at"),
+                "claims", "finished_at", "queue_id", "withdraw"),
     "overrides": ("interruption_id", "capability", "kind", "created_at", "used_at"),
     "journal": ("event_id", "at", "capability", "code", "reason", "actor", "point", "answer"),
     "sampler": ("capability", "code", "day", "count"),
@@ -91,8 +91,10 @@ RESET_TABLES = ("windows", "readings", "reset_rules", "credit_spends")
 BUCKETS = ("codex", "premium", "legacy", "other")
 RESET_CAPABILITIES = ("reset_credit", "reset_message")
 # The tables version 2 had: v0.6.11's and v0.6.12's file.
-TABLES_V2 = {name: TABLES[name] for name in ("meta", "arming", "spend", "records", "overrides",
-                                             "journal", "sampler")}
+# `records` before version 4 added its last two columns (queue_id, withdraw).
+RECORDS_V3 = TABLES["records"][:-2]
+TABLES_V2 = dict({name: TABLES[name] for name in ("meta", "arming", "spend", "overrides", "journal", "sampler")},
+                 records=RECORDS_V3)
 
 
 def _one_of(column, words) -> str:
@@ -337,7 +339,14 @@ _STATEMENTS_RESETS = (
 )
 _STATEMENTS_V3 = _STATEMENTS_V3 + _STATEMENTS_RESETS
 
-STATEMENTS = _STATEMENTS_V2 + _STATEMENTS_V3 + ("PRAGMA user_version=%d" % SCHEMA_VERSION,)
+# Version 4's own columns (v0.6.14-beta.2): the queue item a record's send was taken as, and a person's Cancel of one
+# already in Codex's queue, for core to take back (the owner's answer of 2026-10-09).
+_STATEMENTS_V4 = (
+    "ALTER TABLE records ADD COLUMN queue_id TEXT CHECK (queue_id IS NULL OR (length(queue_id) = 36 AND "
+    "queue_id NOT GLOB '*[^0-9a-f-]*'))",
+    "ALTER TABLE records ADD COLUMN withdraw INTEGER NOT NULL DEFAULT 0 CHECK (withdraw IN (0, 1))",
+)
+STATEMENTS = _STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + ("PRAGMA user_version=%d" % SCHEMA_VERSION,)
 # Version 2's file exactly as v0.6.11 and v0.6.12 made it: what a test builds an older file from.
 STATEMENTS_V2 = _STATEMENTS_V2 + ("PRAGMA user_version=2",)
 
@@ -352,18 +361,26 @@ UPGRADE_FROM_2 = _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 STATEMENTS_V3 = _STATEMENTS_V2 + _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 # A version-3 file a pre-release build made before the reset actions' tables (v0.6.14): those four
 # added, every row kept, its version unchanged.
-TABLES_V3_BEFORE_RESETS = {name: TABLES[name] for name in TABLES if name not in RESET_TABLES}
+TABLES_V3_BEFORE_RESETS = dict({name: TABLES[name] for name in TABLES if name not in RESET_TABLES}, records=RECORDS_V3)
 ADD_RESETS = _STATEMENTS_RESETS
 # Version 4 (v0.6.14-beta.2): the tables whose CHECKs name a closed list that grew are made again with the new list, every
 # row kept - SQLite cannot change a CHECK in place - and the tables of 3c added. A version-3 file is brought to it.
-TABLES_V3 = dict(TABLES)
+TABLES_V3 = dict(TABLES, records=RECORDS_V3)
 # The choices version 4 added to `options` (OptionKey): what a version-3 file's CHECK refuses.
 V4_OPTION_WORDS = ("workers",)
-_OPTIONS = _STATEMENTS_V3[0]
+
+
+def _remade(statement, table, columns, index=None) -> tuple:
+    """The statements that make `table` again from `statement`, its CREATE as this version writes it, every row kept."""
+    made = (statement.replace("CREATE TABLE %s (" % table, "CREATE TABLE %s_v4 (" % table, 1),
+            "INSERT INTO %s_v4 (%s) SELECT %s FROM %s" % (table, ", ".join(columns), ", ".join(columns), table),
+            "DROP TABLE %s" % table,
+            "ALTER TABLE %s_v4 RENAME TO %s" % (table, table))
+    return made + ((index,) if index else ())
+
+
 UPGRADE_FROM_3 = (
-    _OPTIONS.replace("CREATE TABLE options (", "CREATE TABLE options_v4 (", 1),
-    "INSERT INTO options_v4 (capability, choice, value) SELECT capability, choice, value FROM options",
-    "DROP TABLE options",
-    "ALTER TABLE options_v4 RENAME TO options",
-    "PRAGMA user_version=4",
-)
+    _remade(_STATEMENTS_V3[0], "options", TABLES["options"])
+    + _remade(next(s for s in _STATEMENTS_RESETS if s.lstrip().startswith("CREATE TABLE reset_rules")), "reset_rules",
+              TABLES["reset_rules"], "CREATE INDEX reset_rules_state ON reset_rules(state)")
+    + _STATEMENTS_V4 + ("PRAGMA user_version=4",))

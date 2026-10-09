@@ -70,12 +70,15 @@ class _Errand:
 def handed(rule) -> dict | None:
     """What core is handed of one message (P2: plughands.records_of), or None for one not to hand."""
     key = rule["record_id"]
+    # A person's own message (P2's MESSAGE, v0.6.14-beta.2): no turn it follows, the queue item Codex took it as, and
+    # whether a person's Cancel asked for it back out of Codex's queue.
+    own = {"record_id": key, "thread_id": rule["thread_id"], "marker": ids.short_marker(key),
+           "purpose": "message", "ordinal": None}
     if rule["record_state"] == RecordState.IN_FLIGHT:
-        return {"record_id": key, "thread_id": rule["thread_id"], "marker": ids.short_marker(key),
-                "state": "in_flight", "words": None, "sent_at": rule["sent_at"]}
+        return dict(own, state="in_flight", words=None, sent_at=rule["sent_at"], queue_id=rule.get("queue_id"),
+                    withdraw=bool(rule.get("withdraw")))
     if rule["state"] == RuleState.READY and rule["record_state"] == RecordState.WAITING and rule["words"]:
-        return {"record_id": key, "thread_id": rule["thread_id"], "marker": ids.short_marker(key),
-                "state": "waiting", "words": rule["words"], "sent_at": None}
+        return dict(own, state="waiting", words=rule["words"], sent_at=None, queue_id=None, withdraw=False)
     return None
 
 

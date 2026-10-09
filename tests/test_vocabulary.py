@@ -43,6 +43,7 @@ import srcscan  # noqa: E402
 from codex_auto_resume.domain import compat_vocabulary as c, plug as p, vocabulary as v  # noqa: E402
 from codex_auto_resume.domain import power_vocabulary as pw  # noqa: E402
 from codex_auto_resume.domain import reason_vocabulary as rv  # noqa: E402
+from codex_auto_resume.domain import plughands  # noqa: E402
 
 # "module.NAME" -> (kind, length, digest), or the text of a single word.
 LISTS = {
@@ -211,7 +212,8 @@ LISTS = {
     "domain.plug.FAILURE_FORMS": ("tuple", 5, "bcc0ad1bd6f81009"),
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
     # v0.6.14: what core did with a record of the plug's own (P2), as P14 tells it.
-    "domain.plug.RECORD_MOVES": ("tuple", 6, "714a23886c2dd85c"),
+    "domain.plug.RECORD_MOVES": ("tuple", 10, "b4dae164afc55dd3"),
+    "domain.plug.RECORD_PURPOSES": ("tuple", 2, "d9b26e6afdae8bdb"),
     "domain.plug.EXTRA": "advanced",
 }
 
@@ -395,6 +397,7 @@ HOMES = {
     p.Surface: ("list", "domain.plug.SURFACES"),
     p.FailureForm: ("list", "domain.plug.FAILURE_FORMS"),
     p.RecordMove: ("list", "domain.plug.RECORD_MOVES"),
+    p.RecordPurpose: ("list", "domain.plug.RECORD_PURPOSES"),
     # v0.6.12: the power action's own words, beside domain/vocabulary.py at its line budget.
     pw.PowerAction: ("list", "poweraction.ACTIONS"),
     pw.PowerAfter: ("list", "poweraction.AFTERS"),
@@ -412,9 +415,10 @@ def enums():
     """Every vocabulary the four modules define: `domain/vocabulary.py`; `domain/compat_vocabulary.py`,
     the registry's, out of it since v0.6.11 and named through it still; `domain/plug.py`, whose six
     are the plug interface's own; `domain/power_vocabulary.py`, the power action's (v0.6.12); and
-    `domain/reason_vocabulary.py`, the reasons and a Codex home's states (v0.6.14-beta.2). Each
+    `domain/reason_vocabulary.py`, the reasons and a Codex home's states (v0.6.14-beta.2); and
+    `domain/plughands.py`, P2's moves and purposes beside the hands core holds (v0.6.14-beta.2). Each
     is held to every rule here all the same."""
-    return [value for module in (v, c, p, pw, rv) for value in vars(module).values()
+    return [value for module in (v, c, p, pw, rv, plughands) for value in vars(module).values()
             if inspect.isclass(value) and issubclass(value, StrEnum) and value is not StrEnum
             and value.__module__ == module.__name__]
 

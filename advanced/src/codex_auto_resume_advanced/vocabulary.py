@@ -341,6 +341,12 @@ class RuleReason(StrEnum):
     BY_PERSON = "by_person"
     TURNED_OFF = "turned_off"
     CONVERSATION_OFF = "conversation_off"    # its conversation was switched off (H5)
+    # v0.6.14-beta.2: edited by a person in Codex's queue, theirs now; its turn no longer the latest (a continuation);
+    # taken back out of Codex's queue on a Cancel or a Pause; and Codex would not give it back, so it is left there.
+    HANDED_OVER = "handed_over"
+    SUPERSEDED = "superseded"
+    WITHDRAWN = "withdrawn"
+    WITHDRAW_REFUSED = "withdraw_refused"
 
 
 class SpendOutcome(StrEnum):

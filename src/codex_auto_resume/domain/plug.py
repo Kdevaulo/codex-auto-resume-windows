@@ -45,7 +45,9 @@ import copy
 from enum import StrEnum
 import json
 
-from .plughands import Channel, Errand, Route, records_of, workers
+# RecordMove and RecordPurpose (P2's) are beside the hands core holds, and named here as before.
+from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, records_of,  # noqa: F401
+                        workers)
 
 # The interface's version. The advanced package writes out the number it was written for, and
 # edition.py takes its plug only when the two agree: otherwise a hook renamed, or given another
@@ -150,20 +152,6 @@ class FailureForm(StrEnum):
     ABSENT = "absent"                        # nothing at all
 
 
-class RecordMove(StrEnum):
-    """What core did with a record of the plug's own (P2, v0.6.14), as P14 tells it (RECORD_MOVES): it
-    waits, at a gate and for a reason core names; it was handed back before its send, or its process
-    never started, and waits again with its words; it was sent - its words gone from the plug's state -
-    and is watched; its marker was found in Codex's history; or none was a day after it was sent, and
-    it is never sent again."""
-    WAITING = "waiting"
-    RELEASED = "released"
-    NOT_STARTED = "not_started"
-    SENT = "sent"
-    DELIVERED = "delivered"
-    UNPROVEN = "unproven"
-
-
 class Surface(StrEnum):
     """What a plug may add to at P10 (SURFACES). What it adds sits under the one key EXTRA,
     beside everything core shows there and never in place of any of it."""
@@ -177,6 +165,7 @@ class Surface(StrEnum):
 POINTS = tuple(Point)
 SURFACES = tuple(Surface)
 RECORD_MOVES = tuple(RecordMove)
+RECORD_PURPOSES = tuple(RecordPurpose)
 FAILURE_FORMS = tuple(FailureForm)
 # The key a surface puts a plug's fields under. NULL never adds any, so no standard surface
 # carries it.

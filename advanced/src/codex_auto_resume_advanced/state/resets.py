@@ -69,6 +69,7 @@ def _gate_word(value):
 def _rule(row) -> dict:
     found = dict(row)
     found["repeat"], found["ask_first"] = bool(found["repeat"]), bool(found["ask_first"])
+    found["withdraw"] = bool(found.get("withdraw"))
     return found
 
 
@@ -138,7 +139,8 @@ class ResetsMixin:
         with self._read() as connection:
             if connection is None:
                 return []
-            rows = connection.execute("SELECT r.*, c.thread_id AS thread_id, c.state AS record_state "
+            rows = connection.execute("SELECT r.*, c.thread_id AS thread_id, c.state AS record_state, "
+                                      "c.queue_id AS queue_id, c.withdraw AS withdraw "
                                       "FROM reset_rules r LEFT JOIN records c ON c.record_id = r.record_id%s "
                                       "ORDER BY r.rule_id" % ((" WHERE " + " AND ".join("r." + w for w in where))
                                                               if where else ""), arguments).fetchall()
@@ -150,7 +152,8 @@ class ResetsMixin:
         with self._read() as connection:
             if connection is None:
                 return None
-            row = connection.execute("SELECT r.*, c.thread_id AS thread_id, c.state AS record_state FROM reset_rules r "
+            row = connection.execute("SELECT r.*, c.thread_id AS thread_id, c.state AS record_state, "
+                                     "c.queue_id AS queue_id, c.withdraw AS withdraw FROM reset_rules r "
                                      "LEFT JOIN records c ON c.record_id = r.record_id WHERE r.rule_id=?",
                                      (rule_id,)).fetchone()
         return _rule(row) if row is not None else None
@@ -254,18 +257,24 @@ class ResetsMixin:
                                     row["record_id"], RecordState.FINISHED))
             return True
 
-    def cancel_reset_rule(self, rule_id, at=None) -> None:
+    def cancel_reset_rule(self, rule_id, at=None) -> str:
         """A person's Cancel of one rule (by_person), its words gone - refused (Refused) for a rule that is
-        not there or has finished, and for a message being sent: claimed, or its launch begun. A cancel and
-        a claim serialise on this file's write lock, so one of them is first."""
+        not there or has finished, and for a message whose launch is under way. A cancel and a claim serialise
+        on this file's write lock, so one of them is first. From v0.6.14-beta.2 a message already in Codex's queue
+        (sent) is asked back instead: core takes it out of the queue at its next look and ends it (the owner's
+        answer of 2026-10-09). "cancelled", or "withdrawing" for that one."""
         now = self._now(at)
         with self._transaction(create=False) as connection:
             row = None if connection is None else connection.execute(
-                "SELECT r.state, r.record_id, r.launching_at, c.state AS record_state FROM reset_rules r "
+                "SELECT r.state, r.record_id, r.launching_at, r.sent_at, c.state AS record_state FROM reset_rules r "
                 "LEFT JOIN records c ON c.record_id = r.record_id WHERE r.rule_id=?",
                 (rule_id if type(rule_id) is int else -1,)).fetchone()
             if row is None or row["state"] not in [str(state) for state in PENDING]:
                 raise Refused(Refusal.UNKNOWN_RULE)
+            if row["record_state"] == RecordState.IN_FLIGHT and row["sent_at"] is not None:
+                connection.execute("UPDATE records SET withdraw=1 WHERE record_id=? AND state=?",
+                                   (row["record_id"], RecordState.IN_FLIGHT))
+                return "withdrawing"
             if row["launching_at"] is not None or row["record_state"] == RecordState.IN_FLIGHT:
                 raise Refused(Refusal.BEING_SENT)
             connection.execute("UPDATE reset_rules SET state=?, reason=?, words=NULL, finished_at=? WHERE rule_id=?",
@@ -273,6 +282,7 @@ class ResetsMixin:
             if row["record_id"] is not None:
                 connection.execute("UPDATE records SET state=?, finished_at=? WHERE record_id=?",
                                    (RecordState.CANCELLED, now, row["record_id"]))
+            return "cancelled"
 
     def end_messages_in(self, thread_id, at=None) -> int:
         """Every message still to be sent to `thread_id`, cancelled with its words (conversation_off) - its
@@ -295,7 +305,7 @@ class ResetsMixin:
             return len(rows)
 
     # ------------------------------------------------------------------ what core did with a message (P14)
-    def record_moved(self, record_id, move, *, gate=None, reason=None, at=None):
+    def record_moved(self, record_id, move, *, gate=None, reason=None, at=None, queue_id=None):
         """What core told of a message's record (P14, RecordMove), written in one transaction across its rule and
         its record: the capability whose rule it is and whether it turns that capability off (UNPROVEN) - or
         None where it is no message of this file's. A wait keeps the gate and the reason core named; handed back
@@ -327,6 +337,25 @@ class ResetsMixin:
             elif move == "sent":
                 connection.execute("UPDATE reset_rules SET words=NULL, sent_at=coalesce(launching_at, ?), "
                                    "launching_at=coalesce(launching_at, ?) WHERE rule_id=?", (now, now, rule))
+                if isinstance(queue_id, str) and len(queue_id) == 36:
+                    connection.execute("UPDATE records SET queue_id=? WHERE record_id=?", (queue_id, record_id))
+            elif move in ("handed_over", "superseded"):
+                # Edited by a person in Codex's queue - theirs - or its turn no longer the latest: done, never sent
+                # again, and no trip.
+                reason = RuleReason.HANDED_OVER if move == "handed_over" else RuleReason.SUPERSEDED
+                connection.execute("UPDATE reset_rules SET state=?, reason=?, words=NULL, finished_at=? WHERE rule_id=?",
+                                   (RuleState.DONE, reason, now, rule))
+                connection.execute("UPDATE records SET state=?, finished_at=? WHERE record_id=?",
+                                   (RecordState.FINISHED, now, record_id))
+            elif move == "withdrawn":
+                connection.execute("UPDATE reset_rules SET state=?, reason=?, words=NULL, finished_at=? WHERE rule_id=?",
+                                   (RuleState.CANCELLED, RuleReason.WITHDRAWN, now, rule))
+                connection.execute("UPDATE records SET state=?, finished_at=?, withdraw=0 WHERE record_id=?",
+                                   (RecordState.CANCELLED, now, record_id))
+            elif move == "withdraw_refused":
+                # Codex would not give it back: it stays in flight, watched, said on its row, and is never sent again.
+                connection.execute("UPDATE reset_rules SET reason=? WHERE rule_id=?", (RuleReason.WITHDRAW_REFUSED, rule))
+                connection.execute("UPDATE records SET withdraw=0 WHERE record_id=?", (record_id,))
             elif move in ("delivered", "unproven"):
                 reason = RuleReason.DELIVERED if move == "delivered" else RuleReason.UNKNOWN
                 connection.execute("UPDATE reset_rules SET state=?, reason=?, words=NULL, finished_at=? WHERE rule_id=?",

@@ -79,6 +79,8 @@ NOT_SCENARIOS = {
     "test_screenshots": "draws the settings window's pictures, one GUI module at a time",
     "test_plug_points": "gives every engine a plug of its own, to hold each point where it stands",
     "test_plug_records": "gives every engine a plug with records of its own (P2), to hold each of their moves",
+    "test_plug_record_purposes": "gives every engine a plug with continuations and messages of its own (P2), to hold "
+                                 "what each purpose may and may not be sent as",
     "test_power_action": "builds an engine with no store or backend only to ask engine.activity, which reads a "
                          "codexsim home through the source alone; it ticks, dispatches and claims nothing",
     "test_released_calls": "runs the scenarios above against v0.6.10's tagged package and this one, "
