@@ -87,7 +87,10 @@ LAYER = {_q(name): layer for layer, names in {
                # and a value of a person's own beside a drop-down's choices, Custom... and Unlimited.
                "ownvalues",
                # v0.6.12: when the power action after usage-limit recoveries may act - pure.
-               "poweraction"),
+               "poweraction",
+               # v0.6.14-beta.2: the Codex homes a watcher is set to watch, as Settings keep them - pure
+               # but for the look at a folder; its identity is handed in from win/folderid.py.
+               "homes"),
     "adapters": ("store", "openstate", "codex", "windows", "compat", "compatio", "startup", "shortcut",
                  # v0.6.10-alpha: compat.py and compatio.py became compat/.
                  "compat.model", "compat.standing", "compat.report", "compat.permits", "compat.files", "compat.cache", "compat.probes", "compat.views", "compat.evaluator",
@@ -124,6 +127,8 @@ LAYER = {_q(name): layer for layer, names in {
                  "win.typeface",
                  # v0.6.12: the power action's calls - may this account, is anyone here, and doing it.
                  "win.powerdown",
+                 # v0.6.14-beta.2: which folder a path names, whatever its spelling (the home's second lock).
+                 "win.folderid",
                  # v0.6.10-alpha: source.py became source/, and every part of it reads Codex;
                  # windows.py's other half - the CLI, the App Server, the pairing - joined it.
                  "codex.appserver", "codex.errors", "codex.history", "codex.labels",

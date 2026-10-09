@@ -108,7 +108,9 @@ ITEM = {_q(name): item for item, names in {
                # and a value of a person's own beside a drop-down's choices, which the settings coerce with.
                "ownvalues",
                # v0.6.12: when the power action after usage-limit recoveries may act, which a person arms.
-               "poweraction"),
+               "poweraction",
+               # v0.6.14-beta.2: the Codex homes a watcher is set to watch, as Settings keep them.
+               "homes"),
     "machine": ("machine", "domain", "domain.errors", "domain.ids", "domain.public",
                 "domain.states", "domain.vocabulary",
                 # v0.6.11: the registry's vocabularies, out of domain/vocabulary.py.
@@ -178,6 +180,8 @@ ITEM = {_q(name): item for item, names in {
                  "win.textsize", "win.typeface",
                  # v0.6.12: the power action's calls: offering, who is here, and doing it.
                  "win.powerdown",
+                 # v0.6.14-beta.2: which folder a path names, whatever its spelling.
+                 "win.folderid",
                  "pwsh", "shortcut", "startup"),
     "config": ("", "config", "logbook"),
 }.items() for name in names}
