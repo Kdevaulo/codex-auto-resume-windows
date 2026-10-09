@@ -77,6 +77,8 @@ METHODS = {
     "errand_guard",
     # and a record of the plug's own claimed, and the guard its launch is made in (P2).
     "reserve_record", "record_guard",
+    # v0.6.14-beta.2: a conversation's day and spacing read again inside the claim (store/ledger.py).
+    "_caps_refusal",
 }
 
 # Reachable as `store.<name>` before the split, and still.

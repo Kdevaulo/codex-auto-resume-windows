@@ -26,6 +26,10 @@ NOTIFY_ON_STATE = {
     "terminal_failure": "stopped",
 }
 
+# The two refusals of a claim that read the conversation's day and spacing again (v0.6.14-beta.2,
+# store/claims.py): waits, as at the gates, never the attempt budget's stop.
+CAP_WAITS = frozenset({"daily_submission_cap", "thread_submission_cooldown"})
+
 
 class AnnounceMixin:
     # ----------------------------------------------------------------- helpers
@@ -123,6 +127,12 @@ class AnnounceMixin:
 
     def _refused(self, row, gate, reason):
         """A claim the store refused. Recorded as a wait or a stop, never silently."""
+        if gate == "attempt_budget" and reason in CAP_WAITS:
+            # The conversation's day or spacing, counted again inside the claim (v0.6.14-beta.2): a
+            # claim committed after the gates read them. A wait, as at the gate, never a stop.
+            if self._early_look != row["interruption_id"]:
+                self.transition(row, "waiting_retry", reason, delay=self._cap_delay(row, reason))
+            return
         if self._early_look == row["interruption_id"] and gate not in (
                 "chain_budget", "attempt_budget", "no_progress_budget"):
             return                     # looked at early: the claim kept its vector, nothing else moves
@@ -144,6 +154,15 @@ class AnnounceMixin:
             # for one more poll, as a gate the plug holds does.
             self.transition(row, row["state"], row.get("last_error"),
                             delay=self.options["state_poll_seconds"])
+
+    def _cap_delay(self, row, reason):
+        """How long a record waits that the claim found over its conversation's day or within its
+        spacing: as the gates would have had it wait (engine/dispatch.py)."""
+        now = self.clock()
+        if reason == "daily_submission_cap":
+            recent = self.store.recent_claims(row["thread_id"], now - 86400)
+            return max(60, min(recent) + 86400 - now + 5) if recent else 60
+        return self.caps()[1]
 
     def _quiet(self, row, vector, delay):
         """A record that fell due in quiet hours (v0.6.11), parked until they end, keeping its state

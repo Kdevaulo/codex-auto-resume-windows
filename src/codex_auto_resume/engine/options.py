@@ -243,6 +243,14 @@ class OptionsMixin:
             found["max_chain_seconds"] = self.options["max_chain_seconds"]
         return found
 
+    def caps(self, relaxed=None) -> tuple:
+        """(claims a day, seconds between two) for one conversation: core's, or a capacity error's that
+        the plug vouches for (ladder.py). Read by the gates and again inside the claim (v0.6.14-beta.2,
+        store/claims.py `_caps_refusal`), so a claim committed between the two is counted."""
+        if relaxed == "capacity":
+            return ladder.CAPACITY_PER_DAY, ladder.CAPACITY_SPACING
+        return self.options["max_submissions_per_thread_per_day"], self.options["thread_cooldown_seconds"]
+
     def recovers(self, category) -> bool:
         """Whether the user has left this category of failure switched on.
 

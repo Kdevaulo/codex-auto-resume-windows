@@ -158,7 +158,7 @@ class DispatchMixin:
             return
         vector["no_newer_user_work"] = machine.gate(machine.PASS)
         recent = self.store.recent_claims(row["thread_id"], now - 86400)
-        per_day = ladder.CAPACITY_PER_DAY if capacity else self.options["max_submissions_per_thread_per_day"]
+        per_day, cooldown = self.caps(relaxed)
         if self.store.recent_claim_count(row["thread_id"], now - 86400) >= per_day:
             # Defer until the oldest claim rolls out of the 24h window rather than
             # permanently abandoning a still-valid interruption. Bounded to N/day per thread.
@@ -166,7 +166,6 @@ class DispatchMixin:
             self._wait(row, "waiting_retry", "daily_submission_cap",
                        max(60, min(recent) + 86400 - now + 5), vector)
             return
-        cooldown = ladder.CAPACITY_SPACING if capacity else self.options["thread_cooldown_seconds"]
         if recent and now - max(recent) < cooldown and not forced:
             vector["attempt_budget"] = machine.gate(machine.WAIT, "thread_submission_cooldown")
             self._wait(row, "waiting_retry", "thread_submission_cooldown", cooldown, vector)
@@ -302,7 +301,8 @@ class DispatchMixin:
                 claimed, gate, reason = self.store.reserve_detailed(
                     key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector,
                     ledger=self.plug, carried=carried, quiet_until=self.quiet_until(at), relaxed=relaxed,
-                    resend=self.resend_window() if resend else None, forced=forced)
+                    resend=self.resend_window() if resend else None, forced=forced,
+                    caps=None if resend else self.caps(relaxed))
                 if not claimed:
                     if not resend:                          # a resend refused stays as it was
                         self._refused(current, gate, reason)

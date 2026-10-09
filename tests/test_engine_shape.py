@@ -87,6 +87,9 @@ METHODS = {
     # and a person's Send now (SEND_NOW, engine/relaxed.py): the schedule it passes, an attempt budget
     # of the person's own, and the administrator's ceiling the claim is told.
     "_send_now", "_own_budget", "forced_limits",
+    # v0.6.14-beta.2: a conversation's day and spacing, read by the gates and again in the claim, and how
+    # long a record the claim refused for them waits.
+    "caps", "_cap_delay",
     # and P8's errand of the plug, run last in the tick, and what holds back its one write.
     "_errand", "errand_held",
     # and P2 carried out: the records of the plug's own, their words, their gates and moves, their claim

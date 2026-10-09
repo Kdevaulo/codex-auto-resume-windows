@@ -118,6 +118,9 @@ class App(WatchLoop):
         self._settings_stamp_seen = self._settings_stamp()
         self._home_lock = None
         self._plug = None
+        # v0.6.14-beta.2: the one dispatch lock of this watcher, handed to every engine it builds (one per
+        # Codex home it watches, runtime/homes.py): a send and the watch of a record are never made at once.
+        self._dispatch_lock = threading.RLock()
 
     @property
     def plug(self):
@@ -280,13 +283,20 @@ class App(WatchLoop):
                   "home_lock": lambda: self._home_lock is not None and self._home_lock.held,
                   # v0.6.11: asked only while Wait for an internet connection is on (power.py).
                   "connectivity": network.internet}
-        if dispatch_lock is not None:
-            kwargs["dispatch_lock"] = dispatch_lock
+        kwargs["dispatch_lock"] = dispatch_lock if dispatch_lock is not None else self.dispatch_lock
         engine = Engine(store, source, self.backend(), plug=self.plug, **kwargs)
         engine.apply_policy(self._stored, self.managed)
         self._observe_only(engine)
         self._managed_pause(engine)
         return engine
+
+    def dispatch_lock(self):
+        """The watcher's one dispatch lock (v0.6.14-beta.2), as an engine asks for it: the same
+        `threading.RLock` for every engine of this process, made once."""
+        lock = getattr(self, "_dispatch_lock", None)
+        if lock is None:
+            lock = self._dispatch_lock = threading.RLock()
+        return lock
 
     @staticmethod
     def _read_managed():

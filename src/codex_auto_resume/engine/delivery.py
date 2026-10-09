@@ -199,7 +199,7 @@ class DeliveryMixin:
             key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector, ledger=self.plug,
             carried=frozenset({Point.UNLOADED}) | self.relaxed_points(relaxed)
             | self.relaxed_points("forced" if forced else None),
-            quiet_until=self.quiet_until(at), relaxed=relaxed, forced=forced)
+            quiet_until=self.quiet_until(at), relaxed=relaxed, forced=forced, caps=self.caps(relaxed))
         if not claimed:
             self._refused(current, gate, reason)
             return
