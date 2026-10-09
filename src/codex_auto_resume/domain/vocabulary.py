@@ -37,6 +37,9 @@ from .compat_vocabulary import (  # noqa: F401
     CompatState, LocalResult, Tier, CompatCheck, Capability, ResolutionReason, ViewReason,
     RegistryReason, ImportReason, PermitReason, CompatSource, BundledState, CacheState, DataSource,
     ViewStatus, CacheOrigin, ReportedState, RefreshAnswer)
+# The reasons a record waits, stops or is taken back, and (v0.6.14-beta.2) what a watcher found of each
+# Codex home, beside this file since v0.6.14-beta.2 (reason_vocabulary.py), named here as before.
+from .reason_vocabulary import HomeState, ReasonCode, WithdrawReason  # noqa: F401
 
 
 # ------------------------------------------------------------------------------ records
@@ -99,107 +102,6 @@ class PublicCode(StrEnum):
     EXHAUSTED = "exhausted"
     FAILED_TERMINAL = "failed_terminal"
     SUBMISSION_UNKNOWN = "submission_unknown"
-
-
-class WithdrawReason(StrEnum):
-    """Why a continuation was taken back out of Codex's queue (machine.WITHDRAW_REASONS)."""
-    CANCEL = "cancel"
-    PAUSED = "paused"
-    PAUSED_UNKNOWN = "paused_unknown"
-    THREAD_DISABLED = "thread_disabled"
-    SUPERSEDED = "superseded"
-    SUPERSEDED_BY_USER = "superseded_by_user"
-    USER_QUEUED_INPUT = "user_queued_input"
-    NOT_LOADED = "not_loaded"
-    EXPIRED = "expired"
-    PROJECTION_STALE = "projection_stale"
-    DUPLICATE_OWNER = "duplicate_owner"
-    # v0.6.11: taken back because Observe only is on - a Pause's promise, under words of its own.
-    OBSERVE_ONLY = "observe_only"
-    OBSERVE_ONLY_UNKNOWN = "observe_only_unknown"
-
-
-class ReasonCode(StrEnum):
-    """Every reason the engine or the store writes, a withdrawal's among them (machine.REASONS)."""
-    # waiting
-    DESKTOP_APP_UNAVAILABLE = "desktop_app_unavailable"
-    NOTLOADED = "notLoaded"
-    LOADED_STATE_UNKNOWN = "loaded_state_unknown"
-    LOADED_RECHECK_FAILED = "loaded_recheck_failed"
-    USAGE_UNAVAILABLE = "usage_unavailable"
-    USAGE_UNKNOWN = "usage_unknown"
-    USAGE_RECHECK_FAILED = "usage_recheck_failed"
-    # v0.6.11: Windows reports no internet connection, so usage is not read (power.py; off by default).
-    OFFLINE = "offline"
-    DAILY_SUBMISSION_CAP = "daily_submission_cap"
-    THREAD_SUBMISSION_COOLDOWN = "thread_submission_cooldown"
-    QUEUE_PROCESS_NOT_STARTED = "queue_process_not_started"
-    PROJECTION_STALE = "projection_stale"
-    USER_INPUT_QUEUED = "user_input_queued"
-    WAITING_RESET = "waiting_reset"
-    OTHER_RECOVERY_IN_FLIGHT = "other_recovery_in_flight"
-    RELEASED_BEFORE_SEND = "released_before_send"
-    RELEASED_AFTER_WITHDRAWAL = "released_after_withdrawal"
-    BUDGET_RESTORED = "budget_restored"
-    RETRY_NOW = "retry_now"
-    # stops
-    RECOVERY_BUDGET = "recovery_budget"
-    NO_PROGRESS_BUDGET = "no_progress_budget"
-    CHAIN_CAP = "chain_cap"
-    # v0.6.11: a transient task kept failing for longer than its time ceiling (ladder.py).
-    CHAIN_TIME_CAP = "chain_time_cap"
-    QUEUE_LAUNCH_RETRY_LIMIT = "queue_launch_retry_limit"
-    LATER_TURN_EXISTS = "later_turn_exists"
-    LATEST_TURN_CHANGED = "latest_turn_changed"
-    PARENT_CANCELLED = "parent_cancelled"
-    PARENT_HANDED_OVER = "parent_handed_over"
-    USER_CANCELLED = "user_cancelled"
-    USAGE_NEVER_AVAILABLE = "usage_never_available"
-    USAGE_NOT_RESTORED_AFTER_RESET = "usage_not_restored_after_reset"
-    DUPLICATE_OWNER = "duplicate_owner"
-    CATEGORY_DISABLED = "category_disabled"
-    NOT_RECOVERABLE = "not_recoverable"      # v0.6.14: a failure taken up (P17) nothing takes up now
-    ADMISSION_EXPIRED = "admission_expired"  # and one taken up a day ago on the clock, ended unsent
-    CAPACITY_WINDOW = "capacity_window"      # and capacity retries past twelve hours on the clock
-    # sending and receipts
-    AWAITING_DELIVERY_RECEIPT = "awaiting_delivery_receipt"
-    QUEUE_RESULT_UNKNOWN_DO_NOT_RESEND = "queue_result_unknown_do_not_resend"
-    NO_RECEIPT_DO_NOT_RESEND = "no_receipt_do_not_resend"
-    MULTIPLE_MATCHING_QUEUE_ITEMS = "multiple_matching_queue_items"
-    QUEUE_CLEANUP_UNCONFIRMED = "queue_cleanup_unconfirmed"
-    WITHDRAW_UNCONFIRMED = "withdraw_unconfirmed"
-    DUPLICATE_MARKER = "duplicate_marker"
-    AMBIGUOUS_RECEIPT = "ambiguous_receipt"
-    QUEUED_ITEM_EDITED = "queued_item_edited"
-    OWNED_QUEUE_REMOVED = "owned_queue_removed"
-    TURN_WITHOUT_USER_ITEM = "turn_without_user_item"
-    POST_SEND_BOOKKEEPING_FAILED = "post_send_bookkeeping_failed"
-    # outcomes
-    MARKER_NOT_TURN_INITIATOR = "marker_not_turn_initiator"
-    USER_JOINED = "user_joined"
-    STALE_TURN_ROW = "stale_turn_row"
-    UNKNOWN_TURN_STATUS = "unknown_turn_status"
-    OUTCOME_DEADLINE = "outcome_deadline"
-    CORRELATION_CONFLICT = "correlation_conflict"
-    PROGRESS_OBSERVED = "progress_observed"
-    NO_PROGRESS_OBSERVED = "no_progress_observed"
-    TURN_FAILED = "turn_failed"
-    # A recovery that worked and was interrupted again, usually by the next usage limit: the record is
-    # `recovered`, because it was, and this reason keeps that the turn itself did not end cleanly.
-    PROGRESS_THEN_TURN_FAILED = "progress_then_turn_failed"
-    TURN_INTERRUPTED = "turn_interrupted"
-    # a withdrawal's, as WithdrawReason
-    CANCEL = "cancel"
-    PAUSED = "paused"
-    PAUSED_UNKNOWN = "paused_unknown"
-    THREAD_DISABLED = "thread_disabled"
-    SUPERSEDED = "superseded"
-    SUPERSEDED_BY_USER = "superseded_by_user"
-    USER_QUEUED_INPUT = "user_queued_input"
-    NOT_LOADED = "not_loaded"
-    EXPIRED = "expired"
-    OBSERVE_ONLY = "observe_only"
-    OBSERVE_ONLY_UNKNOWN = "observe_only_unknown"
 
 
 class EventCode(StrEnum):

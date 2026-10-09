@@ -6,7 +6,7 @@ names are drawn from, which is why nothing here reads settings or the clock.
 """
 from __future__ import annotations
 
-from .vocabulary import (Actor, EventCode, GateName, GateResult, HoldKind, ImportanceTier,
+from .vocabulary import (Actor, EventCode, GateName, GateResult, HoldKind, HomeState, ImportanceTier,
                          Overlay, Page, PublicCode, ReasonCode, RecordState, TurnStatus,
                          WithdrawReason)
 from .states import CLAIMED, IN_FLIGHT, OBSERVING, TERMINAL, WAITING, waiting_state
@@ -19,6 +19,8 @@ SUPERSEDE_WITHDRAWALS = frozenset({"superseded", "superseded_by_user", "user_que
 # handed back to waiting once nothing ran; the same two over an uncertain submission end it final.
 RELEASABLE_WITHDRAWALS = frozenset({"paused", "observe_only"})
 TURN_STATUSES = frozenset(TurnStatus)
+# v0.6.14-beta.2: what a watcher found of each Codex home it is set to watch (runtime/homes.py).
+HOME_STATES = tuple(HomeState)
 ACTORS = frozenset(Actor)
 # Schema 4 (v0.6.11). Why a record waits for a person (`interruptions.hold`), and how much a
 # conversation asks first (`threads.tier`). Neither is ever set at the defaults: a record with no

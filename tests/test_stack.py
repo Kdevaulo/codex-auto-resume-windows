@@ -116,7 +116,9 @@ ITEM = {_q(name): item for item, names in {
                 # and what a usage reading keeps of Codex's reply.
                 "domain.usage",
                 # v0.6.12: the power action's words, out of domain/vocabulary.py.
-                "domain.power_vocabulary"),
+                "domain.power_vocabulary",
+                # v0.6.14-beta.2: the reasons and a Codex home's states, out of it too.
+                "domain.reason_vocabulary"),
     "scheduler": ("engine.reconcile",),
     "store": ("store", "store.actions", "store.claims", "store.columns", "store.downgrade",
               "store.errors", "store.journal", "store.legacy", "store.migrations", "store.policy",

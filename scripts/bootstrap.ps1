@@ -278,9 +278,10 @@ $PolicyPath = 'Software\Policies\CodexAutoResume'
 $PolicyValues = @('DisableAutoResume', 'ForceObserveOnly', 'DisableUpdateCheck', 'DisableStatusFile',
                   'MaxRecoveryAttempts', 'QuietHours')
 # The state's schema from each version on, newest first; the first row is this version's own. A
-# target on the schema before it is offered with the state converted first (downgrade-state --to 3);
-# a target on any other is not offered at all.
-$StateSchemaSince = @(@('0.6.11-beta', 4), @('0.6.0', 3))
+# target on schema 4 or 3 is offered with the state converted first (downgrade-state --to <its schema>,
+# the word `convert3` on its row, which has meant "converted first" since schema 3 was the only older
+# one); a target on any other is not offered at all.
+$StateSchemaSince = @(@('0.6.14-beta.2', 5), @('0.6.11-beta', 4), @('0.6.0', 3))
 # The advanced settings' form from each version on, newest first; the first row is this version's
 # own. An advanced target on an older form cannot read them: every advanced feature is off there.
 $AdvancedStateSince = @(@('0.6.11-beta.2', 2), @('0.6.11-alpha', 1))
@@ -807,7 +808,8 @@ function Get-VersionVerdict {
           refused not-offered    a pre-release, not older than what is installed, that is not the
                                  update check's own offer (the version installed, in the other
                                  edition, never is)
-          offered <words>        newer|older|same, release|prerelease, kept|convert3, and any of
+          offered <words>        newer|older|same, release|prerelease, kept|convert3 (converted first,
+                                 to the target's schema), and any of
                                  latest, edition, advanced-off - comma-joined, in that order
     #>
     param($Entry, [string]$Edition, [string]$Installed, [string]$InstalledEdition, $Release,
@@ -816,7 +818,7 @@ function Get-VersionVerdict {
     if ((Compare-ProductVersion -Left $number -Right $PickFloor) -lt 0) { return $null }
     if ($Edition -eq 'advanced' -and (Compare-ProductVersion -Left $number -Right $EditionsSince) -lt 0) { return $null }
     $schema = Get-SinceValue -Version $number -Table $StateSchemaSince
-    if ($schema -ne $StateSchemaSince[0][1] -and $schema -ne 3) { return $null }
+    if ($schema -ne $StateSchemaSince[0][1] -and $schema -ne 4 -and $schema -ne 3) { return $null }
     $order = Compare-ProductVersion -Left $number -Right $Installed
     $other = $Edition -ne $InstalledEdition
     $row = [pscustomobject]@{ Version = $number; Edition = $Edition; Answer = 'refused'; Detail = '' }
@@ -1186,15 +1188,16 @@ function Invoke-InstalledSetup {
 
 function Convert-StateForOlder {
     <#
-        The state converted for a version on schema 3, before that version's installer runs: the
-        installed version's own `downgrade-state --to 3 --stop-watcher`, which asks the watcher to
+        The state converted for a version on schema 4 or 3 (-To), before that version's installer runs: the
+        installed version's own `downgrade-state --to <-To> --stop-watcher`, which asks the watcher to
         stop, waits for it a minute at most and never kills it. Its one `downgrade:` line has to
         agree with its exit code, and the answer is that line's: 'converted <rows> <made_final>
         <conversations_off> <unfollowed_off> <0|1>', 'nothing', 'watcher-running' - or 'failed',
         which is also what a line and a code that disagree, no line, or two lines are.
     #>
-    param([string]$Home_)
-    $done = Invoke-InstalledSetup -Home_ $Home_ -Arguments @('downgrade-state', '--to', '3', '--stop-watcher')
+    param([string]$Home_, [int]$To = 3)
+    if ($To -ne 3 -and $To -ne 4) { return 'failed' }
+    $done = Invoke-InstalledSetup -Home_ $Home_ -Arguments @('downgrade-state', '--to', [string]$To, '--stop-watcher')
     $lines = @($done.Printed | Where-Object { $_.StartsWith('downgrade: ', [StringComparison]::Ordinal) })
     if ($lines.Count -ne 1) { return 'failed' }
     $line = $lines[0]
@@ -1354,6 +1357,7 @@ if ($Pick) {
     }
     Write-Host ('pick: offered ' + $rows[0].Detail)
     $pickConvert = $words -ccontains 'convert3'
+    $pickSchema = Get-SinceValue -Version $picked -Table $StateSchemaSince
 }
 
 # ------------------------------------------------- the Codex compatibility data only
@@ -1718,7 +1722,7 @@ try {
         if ($pickConvert) {
             Step 'Converting the state for the older version, after asking the watcher to stop. A copy of it'
             Step 'as it is now is kept beside it.'
-            $converted = Convert-StateForOlder -Home_ $installHome
+            $converted = Convert-StateForOlder -Home_ $installHome -To $pickSchema
             if ($converted -ceq 'watcher-running') {
                 Fail 'The watcher did not stop within a minute; it was asked to, and was not stopped any other way.'
                 Write-Host 'pick: refused watcher-running'

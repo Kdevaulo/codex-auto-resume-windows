@@ -64,7 +64,9 @@ LAYER = {_q(name): layer for layer, names in {
                # and what a usage reading keeps of Codex's reply, and nothing else.
                "domain.usage",
                # v0.6.12: the power action's words, out of domain/vocabulary.py at its line budget.
-               "domain.power_vocabulary"),
+               "domain.power_vocabulary",
+               # v0.6.14-beta.2: the reasons and a Codex home's states, out of it at its budget too.
+               "domain.reason_vocabulary"),
     "policy": ("", "settings", "continuation", "l10n", "messages", "interface", "config", "logbook",
                # v0.6.11: which edition this is, found by looking beside the package; and quiet
                # hours and a postponement's times, on the local clock.

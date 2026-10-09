@@ -42,6 +42,7 @@ if _HERE not in sys.path:
 import srcscan  # noqa: E402
 from codex_auto_resume.domain import compat_vocabulary as c, plug as p, vocabulary as v  # noqa: E402
 from codex_auto_resume.domain import power_vocabulary as pw  # noqa: E402
+from codex_auto_resume.domain import reason_vocabulary as rv  # noqa: E402
 
 # "module.NAME" -> (kind, length, digest), or the text of a single word.
 LISTS = {
@@ -318,6 +319,7 @@ HOMES = {
     v.PublicCode: ("list", "machine.PUBLIC_CODES"),
     v.WithdrawReason: ("list", "machine.WITHDRAW_REASONS"),
     v.ReasonCode: ("list", "machine.REASONS"),
+    rv.HomeState: ("list", "machine.HOME_STATES"),
     v.EventCode: ("list", "machine.EVENT_CODES"),
     v.Actor: ("list", "machine.ACTORS"),
     v.TurnStatus: ("list", "machine.TURN_STATUSES"),
@@ -407,9 +409,10 @@ HOMES = {
 def enums():
     """Every vocabulary the four modules define: `domain/vocabulary.py`; `domain/compat_vocabulary.py`,
     the registry's, out of it since v0.6.11 and named through it still; `domain/plug.py`, whose six
-    are the plug interface's own; and `domain/power_vocabulary.py`, the power action's (v0.6.12). Each
+    are the plug interface's own; `domain/power_vocabulary.py`, the power action's (v0.6.12); and
+    `domain/reason_vocabulary.py`, the reasons and a Codex home's states (v0.6.14-beta.2). Each
     is held to every rule here all the same."""
-    return [value for module in (v, c, p, pw) for value in vars(module).values()
+    return [value for module in (v, c, p, pw, rv) for value in vars(module).values()
             if inspect.isclass(value) and issubclass(value, StrEnum) and value is not StrEnum
             and value.__module__ == module.__name__]
 

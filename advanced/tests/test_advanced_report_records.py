@@ -169,7 +169,7 @@ class ReadOnlyTests(Case):
                 before = home.snapshot()
                 read(home, asked)
                 self.assertEqual(home.snapshot(), before)
-        for given, code in ((dict(state=5), ReadRefusal.STATE_NEWER),
+        for given, code in ((dict(state=CORE_SCHEMA + 1), ReadRefusal.STATE_NEWER),
                             (dict(ledger=ledger_schema.SCHEMA_VERSION + 1), ReadRefusal.LEDGER_NEWER),
                             (dict(state=None), ReadRefusal.NO_STATE)):
             with self.subTest(code):
@@ -225,7 +225,7 @@ class ReadOnlyTests(Case):
 class RefusalTests(Case):
     def test_a_state_the_reader_does_not_know_is_refused(self):
         self.refused(ReadRefusal.NO_STATE, self.home(state=None))
-        self.refused(ReadRefusal.STATE_NEWER, self.home(fixtures.BASE, state=5))
+        self.refused(ReadRefusal.STATE_NEWER, self.home(fixtures.BASE, state=CORE_SCHEMA + 1))
         self.refused(ReadRefusal.STATE_OLDER, self.home(fixtures.BASE, state=2))
         self.refused(ReadRefusal.STATE_UNREADABLE, self.home(fixtures.BASE, columns=["gate_eval"]))
         damaged = self.home(state=None)

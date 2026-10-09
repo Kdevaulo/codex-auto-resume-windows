@@ -97,8 +97,21 @@ _SCHEMA_4_COLUMNS = (
     ("watcher_status", "booted_at", "REAL"),
 )
 
-_RECORD_COLUMNS = _V3_COLUMNS + tuple(name for table, name, _ in _SCHEMA_4_COLUMNS
-                                      if table == "interruptions")
+_V4_RECORD_COLUMNS = _V3_COLUMNS + tuple(name for table, name, _ in _SCHEMA_4_COLUMNS
+                                         if table == "interruptions")
+
+# Columns added in schema 5 (v0.6.14-beta.2): which Codex home a record is of, and what the watcher
+# found of each home it was set to watch. `home_key` is '' - the default home, every record before -
+# or the SHA-256 a home's lock is named by (win/homelock.py); `homes` a JSON array of ids and closed
+# words (store/watcher.py), empty with one home. A migrated state means exactly what it meant.
+HOME_KEY_CHECK = "home_key = '' OR (length(home_key) = 64 AND home_key NOT GLOB '*[^0-9a-f]*')"
+_SCHEMA_5_COLUMNS = (
+    ("interruptions", "home_key", "TEXT NOT NULL DEFAULT '' CHECK (%s)" % HOME_KEY_CHECK),
+    ("watcher_status", "homes", "TEXT"),
+)
+
+_RECORD_COLUMNS = _V4_RECORD_COLUMNS + tuple(name for table, name, _ in _SCHEMA_5_COLUMNS
+                                             if table == "interruptions")
 
 _SETTINGS_COLUMNS = ("singleton", "enabled", "armed_at", "poll_seconds", "observe_only")
 
@@ -116,9 +129,11 @@ _UNREAD_BY_DISPATCH = frozenset({"notices"})
 _EVENT_COLUMNS = ("event_id", "at", "interruption_id", "chain_origin_id", "code", "from_state",
                   "to_state", "reason", "actor", "turn_ref", "flags", "value")
 
-_WATCHER_COLUMNS = ("singleton", "pid", "session_id", "started_at", "last_tick_at",
-                    "last_tick_ok", "engine_state", "code_version", "usage_at", "usage", "awake_since",
-                    "memory_peak", "end_mark", "ended_at", "sign_in", "booted_at")
+_V4_WATCHER_COLUMNS = ("singleton", "pid", "session_id", "started_at", "last_tick_at",
+                       "last_tick_ok", "engine_state", "code_version", "usage_at", "usage", "awake_since",
+                       "memory_peak", "end_mark", "ended_at", "sign_in", "booted_at")
+
+_WATCHER_COLUMNS = _V4_WATCHER_COLUMNS + ("homes",)
 
 # Fields a plain `update` may write. Chain linkage, the claim time and the history
 # flag are written only by the operations that own them.

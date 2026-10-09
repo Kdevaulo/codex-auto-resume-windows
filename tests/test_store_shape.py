@@ -79,6 +79,8 @@ METHODS = {
     "reserve_record", "record_guard",
     # v0.6.14-beta.2: a conversation's day and spacing read again inside the claim (store/ledger.py).
     "_caps_refusal",
+    # v0.6.14-beta.2: schema 5 - which Codex home a record is of - made and migrated to (store/migrations.py).
+    "_add_schema_5", "_migrate_4_to_5",
 }
 
 # Reachable as `store.<name>` before the split, and still.

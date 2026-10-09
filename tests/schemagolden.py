@@ -39,6 +39,8 @@ GOLDEN = HERE / "fixtures" / "schema.json"
 # The releases whose state files are still out there and still upgraded on open. v0.6.10's
 # store is a package, so it is run whole in a process of its own (tests/released.py).
 V1_TAG, V2_TAG, V3_TAG = "v0.5.0", "v0.5.7", "v0.6.10"
+# v0.6.14-beta.2: schema 4's last published final, which `downgrade-state --to 4` must match.
+V4_TAG = "v0.6.13"
 
 
 def legacy_store(tag):
@@ -106,18 +108,19 @@ def upgraded(folder: Path, tag: str) -> dict:
     return shape(folder / "state.sqlite")
 
 
-def released_fresh(folder: Path) -> dict:
-    """A fresh state as the tagged v0.6.10 makes it: what `downgrade-state --to 3` must match."""
+def released_fresh(folder: Path, tag: str = V3_TAG) -> dict:
+    """A fresh state as a tagged release makes it: v0.6.10's is what `downgrade-state --to 3` must
+    match, v0.6.13's what `--to 4` must."""
     import released
-    released.run(V3_TAG, "import sys\nfrom codex_auto_resume.store import Store\n"
+    released.run(tag, "import sys\nfrom codex_auto_resume.store import Store\n"
                          "Store(sys.argv[1]).close()\nprint(0)", folder)
     return shape(folder / "state.sqlite")
 
 
-def upgraded_from_released(folder: Path) -> dict:
-    """A state the tagged v0.6.10 made, then opened by today's store, which upgrades it."""
+def upgraded_from_released(folder: Path, tag: str = V3_TAG) -> dict:
+    """A state a tagged release made, then opened by today's store, which upgrades it."""
     from codex_auto_resume.store import Store
-    released_fresh(folder)
+    released_fresh(folder, tag)
     with Store(folder, migrate=True):
         pass
     return shape(folder / "state.sqlite")
@@ -138,6 +141,9 @@ PATHS = {
     "upgraded-from-%s" % V2_TAG: lambda folder: upgraded(folder, V2_TAG),
     "upgraded-from-%s" % V3_TAG: upgraded_from_released,
     "fresh-%s" % V3_TAG: released_fresh,
+    "upgraded-from-%s" % V4_TAG: lambda folder: upgraded_from_released(folder, V4_TAG),
+    "fresh-%s" % V4_TAG: lambda folder: released_fresh(folder, V4_TAG),
+    "downgraded-to-v4": lambda folder: downgraded(folder, 4),
     "downgraded-to-v3": lambda folder: downgraded(folder, 3),
     "downgraded-to-v2": downgraded,
 }

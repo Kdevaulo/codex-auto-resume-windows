@@ -67,7 +67,7 @@ class FreshStateTests(Case):
     def test_a_fresh_state_is_schema_4_and_nothing_in_it_is_set(self):
         with Store(self.root) as store:
             self.assertEqual(store.schema_version(), SCHEMA_VERSION)
-            self.assertEqual(SCHEMA_VERSION, 4)
+            self.assertGreaterEqual(SCHEMA_VERSION, 4, "schema 4's additions are in every schema since")
             self.assertIs(store.settings()["observe_only"], False)
             store.register(detection(), 100.0)
             record = store.get(KEY)

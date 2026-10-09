@@ -113,6 +113,9 @@ def _validated_record(row: dict[str, Any]) -> dict[str, Any]:
         raise StoreError("Invalid recovery_client_id")
     _choice(row["recovery_turn_status"], "recovery_turn_status", machine.TURN_STATUSES)
     _choice(row["withdraw_reason"], "withdraw_reason", machine.WITHDRAW_REASONS)
+    # Schema 5: the default Codex home's '' or the SHA-256 an extra home's lock is named by.
+    if not is_home_key(row["home_key"]):
+        raise StoreError("Invalid home_key")
     parent = row["parent_interruption_id"]
     if parent is not None and not ids.is_interruption_id(parent, as_stored=True):
         raise StoreError("Invalid parent_interruption_id")
@@ -126,6 +129,11 @@ def _validated_record(row: dict[str, Any]) -> dict[str, Any]:
     if state == "withdrawn_unconfirmed" and (row["withdraw_reason"] is None or row["withdrawn_at"] is None):
         raise StoreError("Missing withdrawal details")
     return row
+
+
+def is_home_key(value) -> bool:
+    """A record's Codex home as schema 5 keeps it: '' for the default home, or 64 lowercase hex digits."""
+    return value == "" or ids.is_digest(value)
 
 
 def _validated_tier(value):

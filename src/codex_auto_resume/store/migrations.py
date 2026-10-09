@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import sqlite3
 from ..machine import STATES, TERMINAL
-from .columns import (_SCHEMA_2_COLUMNS, _SCHEMA_3_COLUMNS, _SCHEMA_4_COLUMNS, _V2_COLUMNS,
-                      _V3_COLUMNS)
+from .columns import (_SCHEMA_2_COLUMNS, _SCHEMA_3_COLUMNS, _SCHEMA_4_COLUMNS, _SCHEMA_5_COLUMNS,
+                      _V2_COLUMNS, _V3_COLUMNS, _V4_RECORD_COLUMNS, _V4_WATCHER_COLUMNS)
 from .errors import StoreError
-from .schema import _TABLES_V2, _TABLES_V3
+from .schema import _TABLES_V2, _TABLES_V3, _TABLES_V4
 from .session import SessionMixin
 
 
@@ -132,8 +132,31 @@ class MigrationsMixin:
             self._event(connection, self.clock(), "migrated", value=count)
         connection.execute("PRAGMA user_version=4")
 
+    @staticmethod
+    def _add_schema_5(connection: sqlite3.Connection) -> None:
+        """Schema 5's two columns (v0.6.14-beta.2): every record of the default Codex home ('') - which is
+        every record there was - and no homes written until a watcher watches more than one."""
+        for table, name, definition in _SCHEMA_5_COLUMNS:
+            found = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+            if name not in found:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
+    def _migrate_4_to_5(self, connection: sqlite3.Connection) -> None:
+        if self._tables(connection) != _TABLES_V4:
+            raise StoreError("Unsupported or malformed state schema")
+        shapes = {"interruptions": set(_V4_RECORD_COLUMNS), "watcher_status": set(_V4_WATCHER_COLUMNS)}
+        for table, columns in shapes.items():
+            if {row[1] for row in connection.execute(f"PRAGMA table_info({table})")} != columns:
+                raise StoreError("Malformed state schema")
+        self._add_schema_5(connection)
+        # No backfill: every record is the default home's, as it was. One `migrated` entry per upgrade.
+        if self.migrated_from == 4:
+            count = connection.execute("SELECT count(*) FROM interruptions").fetchone()[0]
+            self._event(connection, self.clock(), "migrated", value=count)
+        connection.execute("PRAGMA user_version=5")
+
     def _migrate(self, connection, version: int) -> None:
-        """A linear chain with literal targets: 1 -> 2 -> 3 -> 4, each checking its source."""
+        """A linear chain with literal targets: 1 -> 2 -> 3 -> 4 -> 5, each checking its source."""
         self.migrated_from = version
         if version == 1:
             self._migrate_1_to_2(connection)
@@ -143,3 +166,6 @@ class MigrationsMixin:
             version = 3
         if version == 3:
             self._migrate_3_to_4(connection)
+            version = 4
+        if version == 4:
+            self._migrate_4_to_5(connection)

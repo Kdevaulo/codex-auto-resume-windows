@@ -23,7 +23,7 @@ class RecordsMixin:
                  owner_id: str | None = None, failed_turn_progress: bool | None = None,
                  legacy_carry: int | None = None, limits: dict | None = None,
                  hold: str | None = None, task_print: str | None = None,
-                 context_tokens: int | None = None) -> bool:
+                 context_tokens: int | None = None, home_key: str = "") -> bool:
         """Create the record WITH its real schedule and its chain, in one transaction.
 
         Writing the schedule, or the counters inherited from the record whose own
@@ -42,6 +42,7 @@ class RecordsMixin:
         `hold` (schema 4) is the hold its conversation's tier puts on it (machine.hold_for_tier):
         None at the defaults, where every conversation is resumed automatically. `task_print` and
         `context_tokens` are what the two guards keep of it (guards.py): None while they are off.
+        `home_key` (schema 5) is the Codex home it is of: '' for the default, every record before.
         """
         _timestamp(now, "now")
         required = {"thread_id", "turn_id", "completed_at", "started_at", "ordinal",
@@ -71,7 +72,7 @@ class RecordsMixin:
             "usage_probe_at": None, "gate_eval": None, "gate_eval_at": None,
             "history_hidden_at": None, "not_before": None, "hold": hold,
             "task_print": task_print, "context_tokens": context_tokens, "objection_at": None,
-            "objection_until": None,
+            "objection_until": None, "home_key": home_key,
         }
         _validated_record(dict(row))
         with self._transaction() as connection:
@@ -88,8 +89,8 @@ class RecordsMixin:
                                   (row["thread_id"], row["marker"])).fetchone() is not None:
                 row["marker"] = ids.marker(key)
             drift = connection.execute(
-                "SELECT interruption_id FROM interruptions WHERE thread_id=? AND turn_id=? "
-                "AND interruption_id<>? LIMIT 1", (row["thread_id"], row["turn_id"], key)).fetchone()
+                "SELECT interruption_id FROM interruptions WHERE thread_id=? AND turn_id=? AND home_key=? "
+                "AND interruption_id<>? LIMIT 1", (row["thread_id"], row["turn_id"], home_key, key)).fetchone()
             if drift is not None:
                 # The same Codex turn under a new identity (its completion time or
                 # position changed). Recovering it again would be a second recovery of

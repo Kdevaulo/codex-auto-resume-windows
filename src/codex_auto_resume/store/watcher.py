@@ -1,13 +1,14 @@
 """The watcher's heartbeat, and what it says about itself."""
 from __future__ import annotations
 
+import json
 import re
 
 from .. import machine
 from ..domain import usage as readings
 from ..domain.vocabulary import WatcherEnd
 from ..machine import STATES
-from .validate import ENGINE_STATES, WATCHER_ENDS, _finite, _short_text, _timestamp
+from .validate import ENGINE_STATES, WATCHER_ENDS, _finite, _short_text, _timestamp, is_home_key
 
 # The number Windows gives a sign-in (win/ownprocess.py), as the heartbeat keeps it.
 _SIGN_IN = re.compile(r"^[0-9a-f]{16}$")
@@ -23,11 +24,41 @@ def _sign_in(value):
     return value if isinstance(value, str) and _SIGN_IN.match(value) else None
 
 
+# v0.6.14-beta.2: the Codex homes a watcher is set to watch - the default and up to three more.
+MAX_HOMES = 4
+
+
+def homes_text(homes):
+    """What the heartbeat keeps of each Codex home (schema 5): compact JSON of at most MAX_HOMES
+    {"key", "state"} - the home's key ('' for the default, else 64 hex digits) and a HomeState word,
+    ids and a closed word only (D2) - or None: with one home, or for anything that is not exactly that."""
+    if not isinstance(homes, (list, tuple)) or not 1 < len(homes) <= MAX_HOMES:
+        return None
+    kept = []
+    for home in homes:
+        if (not isinstance(home, dict) or set(home) != {"key", "state"} or not is_home_key(home["key"])
+                or home["state"] not in machine.HOME_STATES):
+            return None
+        kept.append({"key": home["key"], "state": str(home["state"])})
+    if len({home["key"] for home in kept}) != len(kept):
+        return None
+    return json.dumps(kept, separators=(",", ":"), allow_nan=False)
+
+
+def homes_read(text):
+    """The homes a heartbeat kept, as homes_text wrote them, or None."""
+    try:
+        value = json.loads(text) if isinstance(text, str) and len(text) <= 2000 else None
+    except ValueError:
+        return None
+    return json.loads(homes_text(value)) if homes_text(value) is not None else None
+
+
 class WatcherMixin:
     # ------------------------------------------------------------ the watcher
     def heartbeat(self, now: float, *, pid: int, session_id: str, started_at: float, ok: bool,
                   engine_state: str, code_version: str, usage=None, awake_since=None,
-                  memory_peak=None, sign_in=None, booted_at=None) -> None:
+                  memory_peak=None, sign_in=None, booted_at=None, homes=None) -> None:
         """The watcher's proof of life, written every tick.
 
         `usage` (v0.6.11) is the last usage reading the engine made, as (time, windows) - None when it
@@ -37,7 +68,8 @@ class WatcherMixin:
         tick, so a watcher that stopped keeping it awake says so at once. `memory_peak` (v0.6.11) is the
         most private memory the watcher has committed, in bytes, and `sign_in` and `booted_at` the sign-in
         it runs in and when Windows started (win/ownprocess.py). Every beat says the watcher is running
-        (WatcherEnd.RUNNING) until one that stops on purpose says otherwise (`watcher_ended`)."""
+        (WatcherEnd.RUNNING) until one that stops on purpose says otherwise (`watcher_ended`). `homes`
+        (v0.6.14-beta.2) is what it found of each Codex home it is set to watch (homes_text): NULL with one."""
         _timestamp(now, "now")
         state = engine_state if engine_state in ENGINE_STATES else "unknown"
         reading = self._reading(usage)
@@ -47,17 +79,17 @@ class WatcherMixin:
             connection.execute(
                 "INSERT INTO watcher_status (singleton, pid, session_id, started_at, last_tick_at, "
                 "last_tick_ok, engine_state, code_version, awake_since, memory_peak, end_mark, ended_at, "
-                "sign_in, booted_at) VALUES (1,?,?,?,?,?,?,?,?,?,?,NULL,?,?) "
+                "sign_in, booted_at, homes) VALUES (1,?,?,?,?,?,?,?,?,?,?,NULL,?,?,?) "
                 "ON CONFLICT(singleton) DO UPDATE SET "
                 "pid=excluded.pid, session_id=excluded.session_id, started_at=excluded.started_at, "
                 "last_tick_at=excluded.last_tick_at, last_tick_ok=excluded.last_tick_ok, "
                 "engine_state=excluded.engine_state, code_version=excluded.code_version, "
                 "awake_since=excluded.awake_since, memory_peak=excluded.memory_peak, "
                 "end_mark=excluded.end_mark, ended_at=NULL, sign_in=excluded.sign_in, "
-                "booted_at=excluded.booted_at",
+                "booted_at=excluded.booted_at, homes=excluded.homes",
                 (int(pid), _short_text(str(session_id)[:64], "session_id", 64), _finite(started_at),
                  now, int(bool(ok)), state, _short_text(str(code_version)[:32], "code_version", 32), awake,
-                 _bytes(memory_peak), WatcherEnd.RUNNING.value, _sign_in(sign_in), booted))
+                 _bytes(memory_peak), WatcherEnd.RUNNING.value, _sign_in(sign_in), booted, homes_text(homes)))
             if reading is not None:
                 connection.execute("UPDATE watcher_status SET usage_at=?, usage=? WHERE singleton=1", reading)
 
@@ -113,4 +145,6 @@ class WatcherMixin:
             "ended_at": _finite(row.get("ended_at")),
             "sign_in": _sign_in(row.get("sign_in")),
             "booted_at": _finite(row.get("booted_at")),
+            # v0.6.14-beta.2: each Codex home it is set to watch and what it found of it, or None with one.
+            "homes": homes_read(row.get("homes")),
         }

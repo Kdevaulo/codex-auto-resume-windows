@@ -496,9 +496,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="also delete settings, pending recoveries and logs")
     p = sub.add_parser("logs")
     p.add_argument("-n", "--lines", type=int, default=30)
-    p = sub.add_parser("downgrade-state", help="convert the state for an older release (v0.6.0 to v0.6.11-alpha)")
-    p.add_argument("--to", type=int, required=True, choices=[3],
-                   help="the schema to write: 3, what v0.6.0 to v0.6.11-alpha read")
+    p = sub.add_parser("downgrade-state", help="convert the state for an older release (v0.6.0 to v0.6.14-beta)")
+    p.add_argument("--to", type=int, required=True, choices=[3, 4],
+                   help="the schema to write: 4, what v0.6.11-beta to v0.6.14-beta read, or 3, what v0.6.0 to "
+                        "v0.6.11-alpha read")
     p.add_argument("--stop-watcher", action="store_true",
                    help="ask a running watcher to stop and wait for it, at most a minute")
     return parser
