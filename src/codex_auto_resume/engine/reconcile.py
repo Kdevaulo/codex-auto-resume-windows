@@ -42,7 +42,7 @@ class ReconcileMixin:
         window in which a person can start work ahead of our queued item is seconds long.
         """
         return any(machine.may_be_queued(row["state"], row["queue_id"])
-                   for row in self.store.records_in(WATCHED))
+                   for row in self._records(WATCHED))
 
     def watch(self):
         """One pass over everything that may be in Codex's queue. Runs paused or not.
@@ -54,7 +54,7 @@ class ReconcileMixin:
         slow delete cannot keep the others waiting pass after pass.
         """
         now = self.clock()
-        rows = self.store.records_in(WATCHED)
+        rows = self._records(WATCHED)
         if rows:
             start = self._watch_offset % len(rows)
             rows = rows[start:] + rows[:start]

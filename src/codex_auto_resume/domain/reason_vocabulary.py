@@ -71,6 +71,10 @@ class ReasonCode(StrEnum):
     NOT_RECOVERABLE = "not_recoverable"      # v0.6.14: a failure taken up (P17) nothing takes up now
     ADMISSION_EXPIRED = "admission_expired"  # and one taken up a day ago on the clock, ended unsent
     CAPACITY_WINDOW = "capacity_window"      # and capacity retries past twelve hours on the clock
+    # v0.6.14-beta.2: a Codex home taken out of Settings, its waiting records cancelled (runtime/homes.py); and,
+    # going back to a version that watches one home, another home's waiting records (store/downgrade.py).
+    HOME_REMOVED = "home_removed"
+    HOME_NOT_WATCHED = "home_not_watched"
     # sending and receipts
     AWAITING_DELIVERY_RECEIPT = "awaiting_delivery_receipt"
     QUEUE_RESULT_UNKNOWN_DO_NOT_RESEND = "queue_result_unknown_do_not_resend"

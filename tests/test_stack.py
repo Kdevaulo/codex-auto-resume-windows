@@ -68,7 +68,9 @@ ITEM = {_q(name): item for item, names in {
                 # and of its own memory, how it ended and the status file.
                 "runtime.health",
                 # v0.6.12: and of the power action after usage-limit recoveries.
-                "runtime.afterwork"),
+                "runtime.afterwork",
+                # v0.6.14-beta.2: the other Codex homes a watcher holds.
+                "runtime.homes"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch", "engine.freshness",
                "engine.options", "engine.outcome",
                # v0.6.11: the waits and the two guards, as the engine asks them.

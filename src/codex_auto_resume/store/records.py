@@ -180,14 +180,44 @@ class RecordsMixin:
                 "SELECT * FROM interruptions ORDER BY detected_at, interruption_id"
             )]
 
-    def records_in(self, states) -> list[dict[str, Any]]:
+    def records_in(self, states, home_key=None) -> list[dict[str, Any]]:
+        """The records in `states`, oldest first - of one Codex home only when `home_key` is given (schema 5):
+        each engine asks for its own home's, so it never sees, claims or watches another's."""
         wanted = tuple(sorted(set(states) & STATES))
         if not wanted:
             return []
+        home = "" if home_key is None else " AND home_key=?"
         with self._read() as connection:
             return [_validated_record(dict(row)) for row in connection.execute(
-                "SELECT * FROM interruptions WHERE state IN (%s) ORDER BY detected_at, interruption_id"
-                % ",".join("?" for _ in wanted), wanted)]
+                "SELECT * FROM interruptions WHERE state IN (%s)%s ORDER BY detected_at, interruption_id"
+                % (",".join("?" for _ in wanted), home), wanted + (() if home_key is None else (home_key,)))]
+
+    def home_keys(self) -> set:
+        """The Codex homes other than the default that records waiting now are of (schema 5)."""
+        waiting = tuple(sorted(WAITING))
+        with self._read() as connection:
+            return {row[0] for row in connection.execute(
+                "SELECT DISTINCT home_key FROM interruptions WHERE home_key<>'' AND state IN (%s)"
+                % ",".join("?" for _ in waiting), waiting)}
+
+    def cancel_home(self, home_key: str, now: float, reason: str) -> int:
+        """Every record waiting in one Codex home other than the default, cancelled and final (v0.6.14-beta.2):
+        the home was taken out of Settings, or no Settings name it. What may be in Codex's queue there is left
+        to its watch. Returns how many were cancelled."""
+        _timestamp(now, "now")
+        if not home_key:
+            raise StoreError("The default Codex home is never removed")
+        with self._transaction() as connection:
+            rows = [_validated_record(dict(row)) for row in connection.execute(
+                "SELECT * FROM interruptions WHERE home_key=? AND state IN (%s)"
+                % ",".join("?" for _ in WAITING), (home_key,) + tuple(sorted(WAITING)))]
+            for row in rows:
+                connection.execute(
+                    "UPDATE interruptions SET state='cancelled', cancel_requested=1, last_error=?, outcome_at=? "
+                    "WHERE interruption_id=?", (reason, now, row["interruption_id"]))
+                self._event(connection, now, "state", record=row, from_state=row["state"], to_state="cancelled",
+                            reason=reason, actor="engine")
+            return len(rows)
 
     def pending(self) -> list[dict[str, Any]]:
         return self.records_in(STATES - TERMINAL)

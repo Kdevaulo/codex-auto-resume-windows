@@ -179,7 +179,7 @@ class ResendMixin:
             return
         self._resent_looked_at = now
         window = self.options["unknown_reconcile_window_seconds"]
-        for row in self.store.records_in(OBSERVING | OUTCOMES):
+        for row in self._records(OBSERVING | OUTCOMES):
             if (not machine.was_resent(row) or row["last_error"] == "duplicate_marker"
                     or now - (row["last_claim_at"] or 0) > window):
                 continue

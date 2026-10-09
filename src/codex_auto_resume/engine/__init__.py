@@ -56,6 +56,9 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         self.watch()
         self.observe_all()
         self.watch_resent()             # v0.6.14: a resend found twice; nothing for the standard edition
+        # v0.6.14-beta.2: a Codex home taken out of Settings only watches what it sent until that settles.
+        if self.retiring:
+            return
         # v0.6.11: an administrator's DisableAutoResume is a Pause here too, even before the watcher
         # has written it into the state (runtime/app.py), so a write that failed sends nothing.
         if not self.store.settings()["enabled"] or self.managed.disable_auto_resume:
@@ -63,7 +66,7 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         # The plug is asked nothing more while recovery is paused: a Pause beats every
         # capability, as it beats core. P8 is once a tick, after everything is observed; what it
         # answers to run (v0.6.14, an errand) runs last, after P2, whatever the tick met before it.
-        view = StoreView(self.store, self.clock(), self.last_usage)
+        view = StoreView(self.store, self.clock(), self.last_usage, home_key=self.home_key)
         errand = self.plug.tick(view)
         try:
             try:
@@ -71,7 +74,7 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
             except Exception:
                 self.log(None, "detection_unavailable_no_submission", None)
                 return
-            due = self.store.records_in(UNSENT)
+            due = self._records(UNSENT)
             # P12: how the due records are divided for dispatch. Core carries out no division but
             # its own - one record after another, in this thread - so nothing is taken from the
             # answer yet (domain/plug.py, ALTERNATIVES).

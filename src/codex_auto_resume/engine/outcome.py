@@ -70,7 +70,7 @@ class OutcomeMixin:
                 self.transition(row, "stopped_by_user", "turn_interrupted", recovery_turn_status=status)
 
     def observe_all(self):
-        for row in self.store.records_in(OBSERVING):
+        for row in self._records(OBSERVING):
             try:
                 self.observe(row)
             except Exception:

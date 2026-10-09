@@ -67,7 +67,8 @@ LISTS = {
     # v0.6.14: not_recoverable (a gate reason until then) and admission_expired - a failure the plug
     # took up (P17) that nothing takes up now, and one taken up a day ago; and capacity_window, capacity
     # retries past their twelve hours on the clock.
-    "machine.REASONS": ("set", 70, "baf0da759f937514"),
+    # v0.6.14-beta.2: home_removed and home_not_watched - a Codex home's waiting records cancelled.
+    "machine.REASONS": ("set", 72, "0212d8ad384bd7a9"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -87,7 +88,8 @@ LISTS = {
     # v0.6.14: admission_expired and capacity_window, reasons now (not_recoverable was a gate reason);
     # and `resend`, submission_safe passed for an uncertain submission sent once more (engine/resend.py),
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
-    "machine.GATE_REASONS": ("set", 87, "e561b7a5a3de8661"),
+    # v0.6.14-beta.2: and home_removed and home_not_watched, as every reason is.
+    "machine.GATE_REASONS": ("set", 89, "0b551e7947a69cfb"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",

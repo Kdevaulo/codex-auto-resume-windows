@@ -168,6 +168,8 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.health",
               # v0.6.12: and of the power action after usage-limit recoveries.
               "runtime.afterwork",
+              # v0.6.14-beta.2: and the other Codex homes it holds, each with an engine of its own.
+              "runtime.homes",
               # v0.6.10-alpha: cli.py's command bodies became commands/; cli.py is the parser.
               "commands", "commands.base", "commands.install", "commands.records",
               "commands.status", "commands.watcher",

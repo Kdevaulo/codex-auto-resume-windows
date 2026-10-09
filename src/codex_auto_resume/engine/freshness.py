@@ -108,7 +108,7 @@ class FreshnessMixin:
     def observe_projections(self):
         """Look at the history of every thread with something pending, so a lag that
         starts long before a record is due is already known when it becomes due."""
-        threads = {row["thread_id"] for row in self.store.records_in(WAITING | WATCHED)}
+        threads = {row["thread_id"] for row in self._records(WAITING | WATCHED)}
         for thread in threads:
             self._projection_now(thread)
 
@@ -153,7 +153,7 @@ class FreshnessMixin:
         if threshold is None or not slept or slept < threshold:
             return 0
         now = self.clock()
-        due = [row["interruption_id"] for row in self.store.records_in(WAITING)
+        due = [row["interruption_id"] for row in self._records(WAITING)
                if power.fell_due(row, since, now)]
         held = self.store.hold_waiting(due, power.HOLD, now, actor="engine") if due else 0
         if held:

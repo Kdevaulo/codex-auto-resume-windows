@@ -90,6 +90,8 @@ METHODS = {
     # v0.6.14-beta.2: a conversation's day and spacing, read by the gates and again in the claim, and how
     # long a record the claim refused for them waits.
     "caps", "_cap_delay",
+    # and the engine's own Codex home: its records, its claimed ones and its ids (engine/detect.py).
+    "_records", "_claimed", "_keyed",
     # and P8's errand of the plug, run last in the tick, and what holds back its one write.
     "_errand", "errand_held",
     # and P2 carried out: the records of the plug's own, their words, their gates and moves, their claim

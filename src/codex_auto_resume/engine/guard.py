@@ -30,7 +30,7 @@ class GuardMixin:
     def _next_attempt(self, thread_id, turn_id, owner) -> int:
         """Which attempt at its task an interruption is: one more than the record whose own continuation
         started the turn that failed, or 1 for a task's first. Asked only under the Custom ladder."""
-        for row in self.store.claimed_on_thread(thread_id):
+        for row in self._claimed(thread_id):
             if row["recovery_turn_id"] == turn_id or row["interruption_id"] == owner:
                 return row["recovery_attempts"] + 1
         return 1

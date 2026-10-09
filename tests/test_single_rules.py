@@ -148,7 +148,7 @@ class _OneRecord:
     def __init__(self, row):
         self.row = row
 
-    def records_in(self, states):
+    def records_in(self, states, home_key=None):
         return [dict(self.row)] if self.row["state"] in states else []
 
 

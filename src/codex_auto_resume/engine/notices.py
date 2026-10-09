@@ -30,7 +30,7 @@ class NoticeMixin:
                 if (failure.get("category") in kinds and done is not None
                         and now - done <= needsyou.WINDOW_SECONDS
                         and self.store.thread_enabled(failure["thread_id"])
-                        and self.store.get(failure["interruption_id"]) is None):
+                        and self.store.get(self._keyed(dict(failure))["interruption_id"]) is None):
                     self._notice(failure["interruption_id"], failure["thread_id"], failure["category"], now)
             quiet = needsyou.stall_seconds(self.policy_values)
             if quiet is None:
@@ -38,7 +38,7 @@ class NoticeMixin:
             start = max(since, now - needsyou.WINDOW_SECONDS)
             for turn in self.source.stalled_turns(start, quiet, now):
                 if self.store.thread_enabled(turn["thread_id"]):
-                    self._notice(ids.stalled_id(turn["thread_id"], turn["turn_id"]), turn["thread_id"],
+                    self._notice(ids.stalled_id(turn["thread_id"], turn["turn_id"], self.home_key), turn["thread_id"],
                                  needsyou.STALLED, now, minutes=needsyou.minutes(quiet))
         except Exception:
             self.log(None, "needs_you_unavailable", None)

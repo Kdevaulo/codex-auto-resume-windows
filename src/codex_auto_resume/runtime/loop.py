@@ -27,6 +27,7 @@ from ..store import (SCHEMA_VERSION, RecordSchemaMismatch, StateFromNewerVersion
 from ..windows import AdapterError, Mutex, StopEvent, wait_any
 from .afterwork import AfterWork
 from .health import Health
+from .homes import Homes
 from .waking import Waking
 
 
@@ -161,12 +162,14 @@ class WatchLoop:
             delay = min(delay * 2, OPEN_RETRY_MAX_SECONDS)
 
     def _heartbeat(self, store, session, started, ok, engine=None, awake=None, health=None):
+        homes = getattr(self, "_homes", None)
         try:
             store.heartbeat(time.time(), pid=os.getpid(), session_id=session, started_at=started,
                             ok=ok, engine_state=self.engine_state(), code_version=config.version(),
                             usage=self._new_reading(engine), awake_since=awake,
                             memory_peak=getattr(health, "peak", None), sign_in=getattr(health, "sign_in", None),
-                            booted_at=getattr(health, "booted_at", None))
+                            booted_at=getattr(health, "booted_at", None),
+                            homes=homes.heartbeat() if homes is not None else None)
         except Exception:
             pass    # the heartbeat reports health; it must never be the thing that fails
 
@@ -282,8 +285,10 @@ class WatchLoop:
             if remaining <= 0:
                 return None
             watching = False
+            homes = getattr(self, "_homes", None)
             try:
                 watching = bool(getattr(engine, "watch_needed", lambda: False)())
+                watching = watching or bool(homes is not None and homes.watch_needed())
             except Exception:
                 watching = False
             fired = self._wait_for(stop, wake, min(remaining, WATCH_SECONDS) if watching else remaining)
@@ -300,6 +305,8 @@ class WatchLoop:
                 engine.watch()
             except Exception:
                 self._record_failure("watch")
+            if homes is not None:
+                homes.watch()
 
     def _loop(self, mutex: Mutex, stop: StopEvent, wake=None, *, once: bool, poll: int | None) -> int:
         self.logger.info("watcher started (pid %d, state %s)", os.getpid(), self.paths.state_dir)
@@ -332,6 +339,8 @@ class WatchLoop:
         # v0.6.12: the power action after usage-limit recoveries, which reads nothing but its own file
         # until a person arms it - and is never asked in a single tick.
         afterwork = None if once else self._new_afterwork()
+        # v0.6.14-beta.2: the Codex homes Settings name beside the default one, each ticked after it (runtime/homes.py).
+        self._homes = Homes(self)
         try:
             while True:
                 ok = False
@@ -364,6 +373,7 @@ class WatchLoop:
                         waking.before(engine, self.settings)
                     engine.tick()
                     ok = True
+                    self._other_homes(store)
                 except (StateFromNewerVersion, RecordSchemaMismatch):
                     # A newer version's state, or its rows met mid-tick: never a corruption,
                     # and never something this version should keep trying to read.
@@ -417,10 +427,22 @@ class WatchLoop:
                     self._record_failure("letting this PC sleep")
             if icon is not None:
                 icon.stop()
+            self._homes.close()
             self._ended(health, store, end)
             store.close()
             self.logger.info("watcher stopped")
         return exit_code
+
+    def _other_homes(self, store):
+        """v0.6.14-beta.2: the other Codex homes' tick, after the default home's. What fails there costs that
+        home its tick alone (runtime/homes.py), never the default home's."""
+        try:
+            self._homes.sync(store)
+            self._homes.tick()
+        except (StateFromNewerVersion, RecordSchemaMismatch):
+            raise
+        except Exception:
+            self._record_failure("other Codex homes")
 
     # ------------------------------------------------------------------ tray
     def _failure_baseline(self):
