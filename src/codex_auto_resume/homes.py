@@ -122,3 +122,30 @@ def strict(value, default_home, identity) -> None:
             raise ValueError("invalid value for codex_homes: %s: that is the same folder as %s" % (
                 entry["alias"], "the default Codex home" if seen[folder] is None else seen[folder]))
         seen[folder] = entry["alias"]
+
+
+# MH - the Codex app run on a second home - passed on codex-cli 0.158.0-alpha.2.1 (2026-09-28). On a Codex newer
+# than 0.158 it is unproven until measured again, which Settings say beside the homes (the owner, 2026-10-09).
+MEASURED = (0, 158)
+
+
+def unmeasured(version) -> bool:
+    """Whether a second home is unproven on the Codex in force: its version newer than MEASURED, or not known."""
+    found = re.search(r"(\d+)\.(\d+)\.(\d+)", version) if isinstance(version, str) else None
+    return found is None or (int(found.group(1)), int(found.group(2))) > MEASURED
+
+
+def view(configured, found, version, asked=True) -> dict:
+    """What Settings show of the homes (control/watcher.py get_status, only while any is added): the default home and
+    each added one - its alias, its folder, its key and what the watcher's last beat found of it (store/watcher.py
+    homes) - and whether watching more than one is unproven on the Codex in force, never with the default home alone
+    (`asked` False). Never handed to MCP: the folders are paths (mcp/server.py)."""
+    states = {entry["key"]: entry["state"] for entry in (found or []) if isinstance(entry, dict)}
+    listed = [{"key": "", "alias": None, "path": None, "state": states.get("", "watched")}]
+    for entry in coerce(configured, []):
+        try:
+            name = key(entry["path"])
+        except (OSError, ValueError, RuntimeError):
+            name = None
+        listed.append({"key": name, "alias": entry["alias"], "path": entry["path"], "state": states.get(name)})
+    return {"homes": listed, "unmeasured": bool(asked) and unmeasured(version)}

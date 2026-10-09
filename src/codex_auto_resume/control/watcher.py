@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import time
 
-from .. import config, edition, machine, managed, settings, startup, windows
+from .. import config, edition, homes, machine, managed, settings, startup, windows
 from ..domain.plug import DEFER, EXTRA, Surface
 from ..domain.vocabulary import WatcherEnd
 from ..store import TERMINAL, LegacyStore, Store, StoreError
@@ -361,6 +361,19 @@ class WatcherMixin:
         result["signalled"] = signalled
         return result
 
+    def homes_view(self, configured, found) -> dict:
+        """The Codex homes as Settings show them (homes.view), with the Codex version in force read where the
+        Dashboard reads it (the compatibility report) - for whether watching more than one is unproven there."""
+        if not configured:
+            return homes.view(configured, found, None, asked=False)
+        try:
+            from .. import compatio
+            engine = compatio.reader_view(self.paths, settings=settings.load(self.settings_path())).get("engine")
+            version = engine.get("version") if isinstance(engine, dict) else None
+        except Exception:
+            version = None
+        return homes.view(configured, found, version)
+
     def get_status(self) -> dict:
         held = self.managed()
         values = managed.clamp(settings.load(self.settings_path()), held)
@@ -369,6 +382,7 @@ class WatcherMixin:
             counts = store.status_counts()
             legacy = isinstance(store, LegacyStore)
             watcher = self._watcher(store)
+            watcher_homes = None if legacy else (store.watcher_status() or {}).get("homes")
             codes: dict[str, int] = {}
             pending = 0
             marks = None
@@ -406,6 +420,9 @@ class WatcherMixin:
         # no administrator manages is told exactly what it was told before.
         if held.active:
             status["managed"] = held.codes()
+        # v0.6.14-beta.2: the Codex homes watched - the default one, and those added beside it - and what the watcher
+        # found of each (homes.view), for Settings. Never to MCP: their folders are paths (mcp/server.py).
+        status["codex_homes"] = self.homes_view(values.get(homes.FIELD) or [], watcher_homes)
         # v0.6.12: the power action (poweraction.view), only while its file is there - so at the
         # defaults, where it has never been armed, the status is exactly what it was.
         power = self.power_view()

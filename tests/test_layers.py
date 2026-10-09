@@ -271,6 +271,9 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     # Reaching `ui.tray` loads `ui/__init__.py` with it, and since v0.6.10-alpha the icon
     # is inside `ui/`, so the package above it is an edge these two did not have before.
     ("runtime.app", "ui"): ("cost", "the package above the icon, loaded with it"),
+    # v0.6.14-beta.2: the Codex version in force, read only while another Codex home is added (homes.unmeasured).
+    ("control.watcher", "compatio"): ("cost", "the compatibility report's Codex version, read only while another "
+                                              "Codex home is added"),
     ("commands.watcher", "ui"): ("cost", "the package above the icon, loaded with it"),
     ("runtime.app", "ui.popup"): ("cost", "the popup's theme and motion, adopted only by a running watcher"),
     ("commands.install", "control"): ("cost", "the diagnostics command is the only one that goes through control"),

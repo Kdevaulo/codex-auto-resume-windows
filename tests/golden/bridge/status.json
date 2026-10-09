@@ -132,6 +132,17 @@
             "memory_guard_limit": "mb1024",
             "status_file": false,
             "codex_homes": []
+          },
+          "codex_homes": {
+            "homes": [
+              {
+                "key": "",
+                "alias": null,
+                "path": null,
+                "state": "watched"
+              }
+            ],
+            "unmeasured": false
           }
         }
       }
@@ -273,7 +284,18 @@
             "DisableUpdateCheck",
             "MaxRecoveryAttempts",
             "QuietHours"
-          ]
+          ],
+          "codex_homes": {
+            "homes": [
+              {
+                "key": "",
+                "alias": null,
+                "path": null,
+                "state": "watched"
+              }
+            ],
+            "unmeasured": false
+          }
         }
       }
     },
@@ -408,6 +430,17 @@
             "memory_guard_limit": "mb1024",
             "status_file": false,
             "codex_homes": []
+          },
+          "codex_homes": {
+            "homes": [
+              {
+                "key": "",
+                "alias": null,
+                "path": null,
+                "state": "watched"
+              }
+            ],
+            "unmeasured": false
           },
           "power_action": {
             "armed": {

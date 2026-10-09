@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 
-from .. import machine
+from .. import homes, machine
 from ..store import MAX_BUDGET_RESETS
 from .errors import ControlError, _identifier
 
@@ -86,6 +86,26 @@ def describe_record(row, *, enabled=True, thread_enabled=True, watcher=None) -> 
     }
 
 
+def _other_homes(configured) -> dict:
+    """home_key -> (alias, folder) for each Codex home Settings add (homes.py); empty with the default alone."""
+    found = {}
+    for entry in homes.coerce(configured or [], []):
+        try:
+            found[homes.key(entry["path"])] = (entry["alias"], entry["path"])
+        except (OSError, ValueError, RuntimeError):
+            continue
+    return found
+
+
+def _reader(source, path):
+    """A read-only reader of another Codex home, for its records' labels alone: one like the reader handed in
+    (codex.LocalSource.elsewhere), so this layer never builds one of its own - or None."""
+    try:
+        return source.elsewhere(path)
+    except Exception:
+        return None
+
+
 class RecordsMixin:
     """Pending, history, the timeline and the statistics."""
 
@@ -97,13 +117,24 @@ class RecordsMixin:
         watcher = self._watcher(store)
         # v0.6.11: the attempts a temporary failure may have now, beside what it has used - which may
         # be more, after the limit was lowered ("19/6"): a count is never cut down to the limit.
-        attempts = self.get_settings().get("max_recovery_attempts")
+        values = self.get_settings()
+        attempts = values.get("max_recovery_attempts")
+        # v0.6.14-beta.2: the Codex homes added beside the default one - each record of one of them labelled through
+        # that home's reader, and with its alias as `home`; None for every record while there is one home.
+        others = _other_homes(values.get(homes.FIELD))
+        readers = {}
         listed = []
         for row in rows:
             identity = {}
-            if source is not None:
+            home = others.get(row.get("home_key") or "")
+            reader = source
+            if home is not None and source is not None:
+                reader = readers.get(home[1])
+                if reader is None:
+                    reader = readers[home[1]] = _reader(source, home[1])
+            if reader is not None:
                 try:
-                    identity = source.identity(row["thread_id"]) or {}
+                    identity = reader.identity(row["thread_id"]) or {}
                 except Exception:
                     identity = {}
             item = describe_record(row, enabled=settings_row["enabled"],
@@ -115,7 +146,8 @@ class RecordsMixin:
                          # None for a usage limit, which spends no attempt.
                          "attempt_limit": None if row["category"] == "usage_limit" else attempts,
                          "name": identity.get("name"), "project": identity.get("project"),
-                         "cwd_basename": identity.get("cwd_basename")})
+                         "cwd_basename": identity.get("cwd_basename"),
+                         "home": home[0] if home is not None else None})
             listed.append(item)
         return listed
 

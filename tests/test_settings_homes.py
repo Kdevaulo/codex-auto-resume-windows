@@ -103,6 +103,40 @@ class FieldTests(Case):
         self.assertEqual(restored["max_no_progress"], settings.DEFAULTS["max_no_progress"])
 
 
+class SurfaceTests(Case):
+    """Pending, History and the status say which home a record is of, only while there is more than one."""
+
+    def record(self, home_key):
+        from codex_auto_resume.store import Store
+        from codex_auto_resume.domain import ids
+        thread, turn = "0a1b2c3d-0001-7000-8000-000000000001", "0a1b2c3d-0002-7000-8000-000000000002"
+        key = ids.interruption_id(thread, turn, 110.0, 2, home_key=home_key)
+        with Store(self.paths.state_dir) as store:
+            store.register({"thread_id": thread, "turn_id": turn, "completed_at": 110.0, "started_at": 105.0,
+                            "ordinal": 2, "interruption_id": key, "reset_at": None, "limit_type": "x",
+                            "uncertain": False, "category": "server_5xx"}, 120.0, home_key=home_key)
+        return key
+
+    def test_a_record_of_another_home_carries_its_alias_and_none_with_one_home(self):
+        work = self.codex_home("work")
+        default_key, other_key = self.record(""), self.record(homes.key(work))
+        rows = {row["interruption_id"]: row for row in self.control.list_pending()}
+        self.assertEqual({key: row["home"] for key, row in rows.items()}, {default_key: None, other_key: None})
+        self.assertEqual(self.control.get_status()["codex_homes"],
+                         {"homes": [{"key": "", "alias": None, "path": None, "state": "watched"}], "unmeasured": False})
+        self.control.update_settings({homes.FIELD: [self.entry(work, "Work")]})
+        rows = {row["interruption_id"]: row for row in self.control.list_pending()}
+        self.assertEqual({key: row["home"] for key, row in rows.items()}, {default_key: None, other_key: "Work"})
+        view = self.control.get_status()["codex_homes"]
+        self.assertEqual([(home["alias"], home["path"]) for home in view["homes"]], [(None, None), ("Work", str(work))])
+
+    def test_unproven_on_a_codex_newer_than_the_one_measured(self):
+        self.assertFalse(homes.unmeasured("0.158.0-alpha.2.1"))
+        self.assertTrue(homes.unmeasured("0.159.0"))
+        self.assertTrue(homes.unmeasured("1.0.0"))
+        self.assertTrue(homes.unmeasured(None))
+
+
 class McpRefusalTests(Case):
     def call(self, arguments):
         from codex_auto_resume.mcp import server

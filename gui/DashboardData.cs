@@ -439,6 +439,14 @@ namespace CodexAutoResume
             return name ?? (thread.Length >= 8 ? thread.Substring(0, 8) : thread);
         }
 
+        /// v0.6.14-beta.2: a row's label line in Pending and History - its conversation and, with more than one Codex home
+        /// watched, the alias of the one a record of another home is of (`home`, null with the default alone).
+        private string Labelled(Dictionary<string, object> row)
+        {
+            string home = Str(row, "home");
+            return string.IsNullOrEmpty(home) ? Conversation(row) : Conversation(row) + " · " + home;
+        }
+
         private string CodeLabel(Dictionary<string, object> row)
         {
             string code = Str(row, "code") ?? Str(row, "state") ?? "";
@@ -716,8 +724,8 @@ namespace CodexAutoResume
         private string[] Cells(Dictionary<string, object> row, bool pending)
         {
             return pending
-                ? new[] { Conversation(row), CodeLabel(row), KindLabel(row), null, Attempts(row), "" }
-                : new[] { Conversation(row), CodeLabel(row), KindLabel(row),
+                ? new[] { Labelled(row), CodeLabel(row), KindLabel(row), null, Attempts(row), "" }
+                : new[] { Labelled(row), CodeLabel(row), KindLabel(row),
                           When(Number(row, "detected_at")), When(Number(row, "outcome_at")) };
         }
 
