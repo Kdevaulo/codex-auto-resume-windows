@@ -45,13 +45,13 @@ import copy
 from enum import StrEnum
 import json
 
-from .plughands import Channel, Errand, Route, records_of
+from .plughands import Channel, Errand, Route, records_of, workers
 
 # The interface's version. The advanced package writes out the number it was written for, and
 # edition.py takes its plug only when the two agree: otherwise a hook renamed, or given another
 # argument, would be called the old way or not at all, and nothing would say so. 2: P17 and `wants`.
 # 3 (v0.6.14): P8's errand, and P2's records carried out.
-PLUG_API = 3
+PLUG_API = 4
 
 
 class Edition(StrEnum):
@@ -399,7 +399,6 @@ ALTERNATIVES = {
     Point.OUTCOME: frozenset(),
     Point.SCHEDULE: RESTRICTIONS | {Alternative.EARLY, Alternative.RESEND, Alternative.SEND_NOW},
     Point.CLAIM_LEDGER: RESTRICTIONS,
-    Point.CONCURRENCY: frozenset(),
     Point.SUPERVISION: frozenset(),
     Point.DELIVERY: frozenset({Alternative.CLIENT_ID}),
     Point.ADMISSION: TAKE_UP,
@@ -620,7 +619,9 @@ class Guarded:
         return answer, bool(broke)
 
     def partition(self, records):
-        return self._ask(Point.CONCURRENCY, records)
+        """P12 (v0.6.14-beta.2): how many sends may wait for their receipts at once (plughands.workers), 1 for anything
+        but a whole number 2 to MAX_WORKERS - DEFER, NULL and a hook that raised included."""
+        return workers(self._ask(Point.CONCURRENCY, records))
 
     def supervise(self, facts):
         return self._ask(Point.SUPERVISION, facts)

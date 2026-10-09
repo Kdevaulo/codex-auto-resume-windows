@@ -23,6 +23,8 @@ package does, and reading it should not mean opening seven files.
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from ..domain.plug import DEFER
 from .announce import NOTIFY_ON_STATE, AnnounceMixin  # noqa: F401
 from .delivery import DeliveryMixin
@@ -30,6 +32,7 @@ from .detect import DetectMixin
 from .dispatch import DispatchMixin
 from .freshness import FreshnessMixin
 from .guard import GuardMixin
+from .launches import LaunchPool
 from .notices import NoticeMixin
 from .options import (BACKOFF_LADDER, TRANSIENT_BACKOFF, OptionsMixin,  # noqa: F401
                       StoreView, backoff_delay, transient_delay)
@@ -75,15 +78,20 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
                 self.log(None, "detection_unavailable_no_submission", None)
                 return
             due = self._records(UNSENT)
-            # P12: how the due records are divided for dispatch. Core carries out no division but
-            # its own - one record after another, in this thread - so nothing is taken from the
-            # answer yet (domain/plug.py, ALTERNATIVES).
-            self.plug.partition(due)
-            for row in due:
+            # P12 (v0.6.14-beta.2): how many sends may wait for their receipts at once - 1, one after another in
+            # this thread, unless the plug answers 2 to 4. Every claim and look stays here; a worker only waits for
+            # a receipt, and every one is joined and settled before the tick goes on (engine/launches.py).
+            workers = self._workers(due)
+            with LaunchPool(workers, self.open_store, self._settle_launch) if workers > 1 else nullcontext() as pool:
+                self._pool = pool
                 try:
-                    self.attempt(row)
-                except Exception:
-                    self.log(row["thread_id"], "eligibility_check_failed_no_submission", None)
+                    for row in due:
+                        try:
+                            self.attempt(row)
+                        except Exception:
+                            self.log(row["thread_id"], "eligibility_check_failed_no_submission", None)
+                finally:
+                    self._pool = None
             # v0.6.14: what the watch found no trace of, put to the plug for one more send (P7).
             if not self.plug.null:
                 self.resend_uncertain()

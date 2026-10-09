@@ -83,6 +83,8 @@ NOT_SCENARIOS = {
                          "codexsim home through the source alone; it ticks, dispatches and claims nothing",
     "test_released_calls": "runs the scenarios above against v0.6.10's tagged package and this one, "
                            "in workers of its own; it builds no engine itself",
+    "test_launch_pool": "gives every engine a plug that answers P12 and nothing else, so its sends wait for their "
+                        "receipts on workers - which the neutral plug, answering 1, never asks for",
     "test_homes": "builds one engine per Codex home over codexsim homes, the default home's with a recording plug "
                   "and every other's with the NULL plug by design (runtime/homes.py) - the neutral plug is the "
                   "point it holds the other homes to",

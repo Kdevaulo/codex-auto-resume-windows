@@ -106,8 +106,9 @@ class NullPlugTests(unittest.TestCase):
     def test_the_interface_has_a_version(self):
         self.assertIs(type(plug.PLUG_API), int)
         self.assertGreaterEqual(plug.PLUG_API, 1)
-        # 3 (v0.6.14): P8's errand, and P2's records carried out - a package written for 2 is refused.
-        self.assertEqual(plug.PLUG_API, 3)
+        # 3 (v0.6.14): P8's errand, and P2's records carried out - a package written for 2 is refused. 4
+        # (v0.6.14-beta.2): P12's whole number of workers carried out, P2's purposes and moves.
+        self.assertEqual(plug.PLUG_API, 4)
 
 
 class RecordingPlug(Plug):
@@ -177,7 +178,10 @@ class ClosedAlternativeTests(unittest.TestCase):
                          {Point.GATES, Point.SCHEDULE, Point.CLAIM_LEDGER, Point.DELIVERY,
                           Point.ADMISSION})
         self.assertEqual({point for point, accepted in plug.ALTERNATIVES.items() if not accepted},
-                         {Point.OUTCOME, Point.CONCURRENCY, Point.SUPERVISION})
+                         {Point.OUTCOME, Point.SUPERVISION})
+        # v0.6.14-beta.2: P12 has left the table for a value core checks - a whole number of workers, 2 to
+        # MAX_WORKERS (plughands.workers), carried out by core (engine/launches.py).
+        self.assertNotIn(Point.CONCURRENCY, plug.ALTERNATIVES)
         # v0.6.14: P2 has left the table for a value core checks - the records a plug hands over, each
         # checked (plughands.records_of) and carried out by core (engine/plugrecords.py).
         self.assertNotIn(Point.RECORDS, plug.ALTERNATIVES)
@@ -245,6 +249,8 @@ class GuardTests(unittest.TestCase):
                     self.assertIsNone(answer, "a move's answer is not read")
                 elif point is Point.RECORDS:
                     self.assertEqual(answer, (), "no record of the plug's own")
+                elif point is Point.CONCURRENCY:
+                    self.assertEqual(answer, 1, "one send after another (v0.6.14-beta.2, plughands.workers)")
                 else:
                     self.assertIs(answer, DEFER)
         self.assertEqual(guarded.failures, 0)

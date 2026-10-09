@@ -101,7 +101,8 @@ class StoreView:
 class OptionsMixin:
     def __init__(self, store, source, backend, *, dispatch_lock=nullcontext,
                  clock=time.time, log=None, options=None, notify=None, language=None,
-                 home_lock=None, engine_state=None, plug=None, connectivity=None, home_key=""):
+                 home_lock=None, engine_state=None, plug=None, connectivity=None, home_key="",
+                 open_store=None):
         self.store, self.source, self.backend = store, source, backend
         # The edition's plug, as core holds one (domain/plug.py): NULL, the standard edition's,
         # unless the watcher was given another. Every point is asked through this and nothing
@@ -112,6 +113,10 @@ class OptionsMixin:
         # lock is named by (runtime/homes.py) - and whether that home was taken out of Settings, after which it
         # only watches what it sent until that settles (`tick`).
         self.home_key, self.retiring = home_key, False
+        # v0.6.14-beta.2 (P12): what opens a store of the engine's own state for a worker that waits for a receipt
+        # (engine/launches.py) - None, and every send is made inline as always - the pool open for this tick, the
+        # worker taken for the record being dispatched, and whether its send goes to that worker.
+        self.open_store, self._pool, self._held_slot, self._pooling = open_store, None, None, False
         self.log = log or (lambda *args: None)
         self.notify = notify or (lambda *args: None)
         self.language = language or "en"

@@ -284,11 +284,18 @@ class App(WatchLoop):
                   # v0.6.11: asked only while Wait for an internet connection is on (power.py).
                   "connectivity": network.internet}
         kwargs["dispatch_lock"] = dispatch_lock if dispatch_lock is not None else self.dispatch_lock
+        # v0.6.14-beta.2 (P12): a store of its own for each worker that waits for a receipt (engine/launches.py).
+        kwargs["open_store"] = self.worker_store
         engine = Engine(store, source, self.backend(), plug=self.plug, **kwargs)
         engine.apply_policy(self._stored, self.managed)
         self._observe_only(engine)
         self._managed_pause(engine)
         return engine
+
+    def worker_store(self) -> Store:
+        """A connection of its own to the watcher's state, for one worker's launch guard (engine/launches.py): the
+        state the watcher has already opened and upgraded, so it is not checked again."""
+        return Store(self.paths.state_dir, check=False)
 
     def dispatch_lock(self):
         """The watcher's one dispatch lock (v0.6.14-beta.2), as an engine asks for it: the same

@@ -20,6 +20,15 @@ from .states import EPOCH_STORE, epoch
 
 # How many records of the plug's own core takes in one tick (P2), at most: more is a plug's mistake.
 RECORDS_LIMIT = 8
+# P12 (v0.6.14-beta.2): at most this many sends wait for their receipts at once, whatever a plug answers - one in each
+# conversation, the claim refusing a second (engine/launches.py).
+MAX_WORKERS = 4
+
+
+def workers(answer) -> int:
+    """What core takes of P12's answer: a whole number 2 to MAX_WORKERS as it is - `type(x) is int`, so never True -
+    and 1, one send after another as always, for anything else: DEFER, 0, 5, True, "2", a list."""
+    return answer if type(answer) is int and 2 <= answer <= MAX_WORKERS else 1
 # What one of them is, exactly: no more keys and no fewer.
 RECORD_KEYS = frozenset({"record_id", "thread_id", "marker", "state", "words", "sent_at"})
 # How long the words of one may be, at most: what core's one send carries, less the blank line and the

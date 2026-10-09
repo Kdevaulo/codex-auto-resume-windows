@@ -149,7 +149,9 @@ LAYER = {_q(name): layer for layer, names in {
                # and an uncertain continuation sent once more, where the plug asks and core may.
                "engine.resend",
                # and records of the edition's own, tried like core's.
-               "engine.plugrecords"),
+               "engine.plugrecords",
+               # v0.6.14-beta.2: several sends waiting for their receipts at once, on workers.
+               "engine.launches"),
     # v0.6.10-alpha: control.py became control/, ten files, `Control` composed from eight
     # mixins. `layer` is where the composition lives, so that the front holds no code.
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
