@@ -83,7 +83,7 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "tripped.statement_changed", "tripped.engine_changed",
     # v0.6.14: a capability's own choices, the rules for Codex's error codes and the samples of what nothing
     # classified, and what the page says of each.
-    "options", "option.attempts", "option.ceiling_hours", "option.hours", "done.option", "refused.option",
+    "options", "option.attempts", "option.ceiling_hours", "option.workers", "option.hours", "done.option", "refused.option",
     "refused.choice", "rules", "rules.none", "rules.full", "rule.code", "rule.sampled", "rule.status",
     "rule.any_status", "rule.kind", "rule.hits", "rule.add", "rule.remove", "rule.known", "done.rule_added",
     "done.rule_removed", "refused.rule_shape", "refused.rule_known", "refused.rule_decision",
@@ -107,6 +107,7 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "watchlog.answer.as_server_5xx", "watchlog.answer.as_stream_interrupted", "watchlog.answer.capacity",
     "watchlog.answer.early", "watchlog.answer.resend", "watchlog.answer.send_now", "watchlog.answer.text",
     "watchlog.answer.sender", "watchlog.answer.tick", "watchlog.answer.start_route", "watchlog.answer.unloaded",
+    "watchlog.answer.concurrency",
     "watchlog.answer.other",
     # v0.6.14: the reset actions (advanced/gui/AdvancedResets.cs) - the rules of a reset credit and of a message at a
     # reset, the form they are added with, each word a rule's state and reason can be said in, the questions, notes

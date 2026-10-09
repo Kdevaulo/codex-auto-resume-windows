@@ -64,6 +64,8 @@ MEASUREMENT_METHODS = {
     Measurement.MU: ("account/rateLimits/read",),
     Measurement.MN: ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
     Measurement.MR: ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
+    # v0.6.14-beta.2: MQ lists what the app holds, before core's backend sends to two to four of them at once.
+    Measurement.MQ: ("thread/loaded/list",),
 }
 
 # The methods a capability's own route may call, beyond `initialize` - each one a measurement

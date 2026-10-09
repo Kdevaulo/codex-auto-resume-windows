@@ -51,8 +51,8 @@ CHANGES = frozenset({"thread/queue/add", "thread/goal/set",
 class ShippedTests(unittest.TestCase):
     SHIPPED = ("start_with_codex", "goal_continuation", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
-               "reset_message", "early_reset", "once_more_when_unsure", "send_now", "long_reset_message",
-               "compat_report")
+               "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
+               "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
         self.assertEqual([d.id for d in registry.DEFINITIONS], list(self.SHIPPED))
@@ -78,7 +78,9 @@ class ShippedTests(unittest.TestCase):
                      Point.ADMISSION: ("capacity_retry", "structured_rules", "unknown_failure_budget",
                                        "codex_gave_up", "sign_in_retry"),
                      Point.SENDER: ("goal_continuation", "marker_free_continuation"),
-                     Point.DELIVERY: ("marker_free_continuation",)}
+                     Point.DELIVERY: ("marker_free_continuation",),
+                     # v0.6.14-beta.2: several sends waiting for their receipts at once.
+                     Point.CONCURRENCY: ("parallel_dispatch",)}
         for point in Point:
             self.assertEqual(tuple(d.id for d in registry.REGISTRY.at(point)), answering.get(point, ()))
 

@@ -86,7 +86,9 @@ class TableTests(unittest.TestCase):
         self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4, Measurement.M5})
         self.assertEqual(set(Measurement) - passed - failed,
                          {Measurement.M2B, Measurement.MP1, Measurement.MP2, Measurement.MP3,
-                          Measurement.MU, Measurement.MN, Measurement.MR})
+                          Measurement.MU, Measurement.MN, Measurement.MR,
+                          # v0.6.14-beta.2's: several conversations at once.
+                          Measurement.MQ})
 
 
 if __name__ == "__main__":

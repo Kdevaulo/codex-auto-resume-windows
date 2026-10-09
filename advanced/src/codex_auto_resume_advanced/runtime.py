@@ -56,6 +56,7 @@ import time
 from codex_auto_resume import continuation, failures
 from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, RECORD_MOVES, RESTRICTIONS,
                                            TAKE_UP, Alternative, Point, RecordMove)
+from codex_auto_resume.domain.plughands import workers
 
 from .arming import Arming
 from .ledger import ClaimLedger, ceiling_reached
@@ -584,6 +585,41 @@ class Runtime:
             self.states(fresh=True)
         return DEFER
 
+    def partition(self, records):
+        """P12 (v0.6.14-beta.2): how many sends may wait for their receipts at once - an armed capability's whole
+        number, which core holds to 2 to 4 (domain/plughands.workers), or NULL's. Each due record its ceilings leave a
+        unit for is remembered as acted at CONCURRENCY, so the claim of a pooled send pays exactly one (`claim`)."""
+        definitions = self.registry.at(Point.CONCURRENCY)
+        if not definitions or not isinstance(records, list):
+            return DEFER
+        states = self.states()
+        for definition in definitions:
+            state = states.get(definition.id, ArmingState.OFF)
+            if state == ArmingState.OFF:
+                continue
+            try:
+                answer = self._code_of(definition).partition(records)
+            except Exception:
+                self._tripped(definition)
+                continue
+            if workers(answer) == 1:
+                continue
+            if state == ArmingState.SHADOW:
+                self._once(JournalCode.WOULD_HAVE, definition, Point.CONCURRENCY, answer, None)
+                continue
+            paid = [record for record in records if isinstance(record, dict)
+                    and (definition.id, record.get("interruption_id")) not in self._skipped
+                    and self._ceiling(definition, record) is None]
+            if not paid:
+                self._once(JournalCode.CEILING, definition, Point.CONCURRENCY, answer, None)
+                continue
+            for record in paid:
+                self._acted.setdefault(record.get("interruption_id"), set()).add(
+                    (Point.CONCURRENCY, definition.id, None))
+            self._once(JournalCode.ACTED, definition, Point.CONCURRENCY, answer, None)
+            return answer
+        return DEFER
+
     def claim(self, connection, record, now, carried):
         """P11: the ledger, told which capabilities' answers this claim carries.
 
@@ -604,7 +640,10 @@ class Runtime:
                 return Alternative.HOLD                  # a record that cannot be paid for is not sent
         key = record.get("interruption_id") if isinstance(record, dict) else None
         acted = {}
-        for point, capability, word in self._acted.pop(key, ()):
+        entries = self._acted.pop(key, ())
+        if Point.CONCURRENCY in carried and not any(point == Point.CONCURRENCY for point, _c, _w in entries):
+            return Alternative.HOLD                      # pooled, and nothing left to pay for it: one poll
+        for point, capability, word in entries:
             if point in carried:
                 words = acted.setdefault(capability, set())
                 if word in ANSWERS:

@@ -75,7 +75,7 @@ class AdvancedPlug(Plug):
         return self.runtime.claim(connection, record, now, carried)
 
     def partition(self, records):
-        return self.runtime.ask(Point.CONCURRENCY, records)
+        return self.runtime.partition(records)
 
     def supervise(self, facts):
         return self.runtime.ask(Point.SUPERVISION, facts)

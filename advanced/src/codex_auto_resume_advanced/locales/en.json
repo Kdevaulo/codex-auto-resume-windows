@@ -397,5 +397,13 @@
   "warning.measurement_failed": "A measurement of what it relies on failed. It may not work with your Codex.",
   "warning.note": "None of these stops you turning it on. Turning it on confirms you have read them, and if a new problem appears later, it turns itself off.",
   "warning.title": "Warnings",
-  "warning.unmeasured": "What it relies on has not been measured with this version of Codex."
+  "warning.unmeasured": "What it relies on has not been measured with this version of Codex.",
+  "name.parallel_dispatch": "Several conversations at once",
+  "page.option.workers": "At once",
+  "page.watchlog.answer.concurrency": "Sent several at once",
+  "statement.parallel_dispatch.does": "Lets the watcher wait for Codex to take two to four continuations at once, each in a conversation of its own, instead of one after another. Every check, every claim and the last look before each send still run one at a time; only the wait for Codex's answer to each send overlaps. You choose how many at once (2 by default); until this has been measured on the Codex you have (MQ), never more than 2. One conversation still never has two continuations on their way.",
+  "statement.parallel_dispatch.departs": "0.5 (one recovery is dispatched at a time) and A19 (continuations are dispatched in sequence, under one lock).",
+  "statement.parallel_dispatch.instead": "The standard edition sends one continuation at a time and waits for Codex's answer, up to 45 seconds, before it looks at the next one.",
+  "statement.parallel_dispatch.risks": "Several Codex queue processes start close together, which a busy or slow Codex may answer late or not at all. A continuation whose delivery cannot be proven is never sent again, and this feature turns itself off.",
+  "statement.parallel_dispatch.stop": "Turn it off here or turn every advanced feature off; from the next look every continuation is sent one at a time again."
 }

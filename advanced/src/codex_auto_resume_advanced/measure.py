@@ -325,6 +325,17 @@ def _ma(ctx):
                     "and set the verdict", **observed)
 
 
+def _mq(ctx):
+    """Several conversations at once (parallel_dispatch): the owner names two to four throwaway conversations the app
+    holds, and core's backend sends one short message to each at once; that each receipt is matched and each marker is
+    in its own conversation's history once, and nowhere else, is the person's to confirm."""
+    with ctx.open() as session:
+        loaded = session.call("thread/loaded/list")
+    observed = {"loaded_listed": isinstance(loaded, dict)}
+    return _blocked("send one short message to each of two to four throwaway conversations at once, confirm each "
+                    "receipt is matched and each marker is in its own history once, then set the verdict", **observed)
+
+
 def _mw(ctx):
     """Re-proof of the WMI escape, with the heartbeat's job words. The launcher starts a watcher
     outside Codex's job through WMI and hands back the job words its heartbeat recorded."""
@@ -610,6 +621,7 @@ PROBES = {
     Measurement.MH: _mh, Measurement.MA: _ma, Measurement.MW: _mw,
     Measurement.MP1: _mp1, Measurement.MP2: _mp2, Measurement.MP3: _mp3,
     Measurement.MU: _mu, Measurement.MN: _mn, Measurement.MR: _mr,
+    Measurement.MQ: _mq,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe

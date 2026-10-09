@@ -177,6 +177,8 @@ class OptionKey(StrEnum):
     """A choice a capability offers a person (registry.Option), stored in `options` by this key."""
     ATTEMPTS = "attempts"                    # how many tries a task gets
     CEILING_HOURS = "ceiling_hours"          # for how long, in hours on the clock, it keeps trying
+    # v0.6.14-beta.2: how many sends may wait for their receipts at once (parallel_dispatch, 2 to 4).
+    WORKERS = "workers"
 
 
 class KeepOn(StrEnum):
@@ -302,6 +304,9 @@ class Measurement(StrEnum):
     MU = "mu"
     MN = "mn"
     MR = "mr"
+    # v0.6.14-beta.2: two to four throwaway conversations sent to at once through core's backend - each receipt
+    # matched, each marker in its own history once and nowhere else (parallel_dispatch).
+    MQ = "mq"
 
 
 class RuleState(StrEnum):

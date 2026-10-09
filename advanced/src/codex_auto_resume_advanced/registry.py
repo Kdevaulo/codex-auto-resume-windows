@@ -72,6 +72,7 @@ from .engine.earlyreset import make as make_early_reset
 from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
+from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
 from .vocabulary import CapabilityKind, Measurement, OptionKey
@@ -579,6 +580,26 @@ SEND_NOW = CapabilityDef(
     codes=("requested",),
 )
 
+# Several conversations at once (v0.6.14-beta.2; the plan's row: parallel processing across conversations). At P12 it
+# answers how many sends may wait for their receipts at once - the Workers option, 2 by default, 2 at most until MQ
+# passes on the Codex in force - and core lets that many wait on workers, one in each conversation, while every gate,
+# claim and look stays on the tick (core's engine/launches.py). Each pooled claim pays one unit, so a pooled send whose
+# fate cannot be known turns it off (K7). It departs from 0.5 (one recovery dispatched at a time) and A19 (in sequence,
+# under one lock) - and keeps A19's one continuation in flight per conversation - and stands on exact_thread_recovery.
+# Ceilings: core's five a conversation a day, 48 a day in all.
+PARALLEL_DISPATCH = CapabilityDef(
+    id="parallel_dispatch",
+    points=frozenset({Point.CONCURRENCY}),
+    revision=1,
+    departs_from=("0.5", "A19"),
+    compat="exact_thread_recovery",
+    ceilings=Ceilings(per_day=48, per_conversation=CORE_DAILY_CAP),
+    journal_prefix="par",
+    make=make_parallel,
+    options=(Option(OptionKey.WORKERS, WORKERS, DEFAULT_WORKERS),),
+    measurements=(Measurement.MQ,),
+)
+
 # Longer reset messages (v0.6.14, the owner's answer of 2026-10-08): a message sent at a reset may be up to what one
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
@@ -625,5 +646,5 @@ COMPAT_REPORT = CapabilityDef(
 # answers at none, last.
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
-               ONCE_MORE, SEND_NOW, LONG_RESET_MESSAGE, COMPAT_REPORT)
+               ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, LONG_RESET_MESSAGE, COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)

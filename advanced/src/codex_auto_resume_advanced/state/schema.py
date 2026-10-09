@@ -53,7 +53,7 @@ from ..registry import GLOBAL_HOURLY
 from ..vocabulary import (ArmingState, KeepOn, OptionKey, OverrideKind, RecordState, RuleReason, RuleState,
                           SpendOutcome)
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 FILE_NAME = "advanced.sqlite"
 # The name the file is attached under on core's connection, inside the one claim (ledger.py).
 ATTACHED = "advanced"
@@ -349,7 +349,21 @@ UPGRADE_FROM_1 = (
     "PRAGMA user_version=2",
 )
 UPGRADE_FROM_2 = _STATEMENTS_V3 + ("PRAGMA user_version=3",)
+STATEMENTS_V3 = _STATEMENTS_V2 + _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 # A version-3 file a pre-release build made before the reset actions' tables (v0.6.14): those four
 # added, every row kept, its version unchanged.
 TABLES_V3_BEFORE_RESETS = {name: TABLES[name] for name in TABLES if name not in RESET_TABLES}
 ADD_RESETS = _STATEMENTS_RESETS
+# Version 4 (v0.6.14-beta.2): the tables whose CHECKs name a closed list that grew are made again with the new list, every
+# row kept - SQLite cannot change a CHECK in place - and the tables of 3c added. A version-3 file is brought to it.
+TABLES_V3 = dict(TABLES)
+# The choices version 4 added to `options` (OptionKey): what a version-3 file's CHECK refuses.
+V4_OPTION_WORDS = ("workers",)
+_OPTIONS = _STATEMENTS_V3[0]
+UPGRADE_FROM_3 = (
+    _OPTIONS.replace("CREATE TABLE options (", "CREATE TABLE options_v4 (", 1),
+    "INSERT INTO options_v4 (capability, choice, value) SELECT capability, choice, value FROM options",
+    "DROP TABLE options",
+    "ALTER TABLE options_v4 RENAME TO options",
+    "PRAGMA user_version=4",
+)

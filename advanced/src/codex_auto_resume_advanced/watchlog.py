@@ -55,7 +55,7 @@ from .vocabulary import ArmingState, JournalCode, Refusal
 
 WINDOW_DAYS = RECENT_DAYS                      # 30, as the samples and the rules' hits
 # The points whose answer is a value, not a word: the journal writes the point's name instead.
-VALUE_POINTS = (Point.TEXT, Point.SENDER, Point.TICK, Point.START_ROUTE, Point.UNLOADED)
+VALUE_POINTS = (Point.TEXT, Point.SENDER, Point.TICK, Point.START_ROUTE, Point.UNLOADED, Point.CONCURRENCY)
 # Every answer the log names; anything else reads as null.
 WORDS = tuple(Alternative) + VALUE_POINTS
 _WORDS = frozenset(str(word) for word in WORDS)
