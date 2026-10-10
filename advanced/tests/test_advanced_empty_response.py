@@ -1,4 +1,4 @@
-"""Empty-response recovery (v0.6.14-beta.2): a turn that ended with no reply is continued once, and a chain of them twice,
+"""Empty-response recovery (v0.6.15-beta): a turn that ended with no reply is continued once, and a chain of them twice,
 judged only by the kinds of item it left; a goal Codex keeps going or stopped is left alone.
 
 Held against the shipped definition and statement and against core's own engine, store and simulated Codex home

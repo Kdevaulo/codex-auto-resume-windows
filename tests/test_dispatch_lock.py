@@ -1,6 +1,6 @@
 """One dispatch lock for the whole watcher, and a conversation's day and spacing counted in the claim.
 
-v0.6.14-beta.2 gives a watcher several engines (one per Codex home it watches) and lets the receipt of a
+v0.6.15-beta gives a watcher several engines (one per Codex home it watches) and lets the receipt of a
 send wait on a worker. Both stay safe on two things this file holds:
 
 - every engine the App builds is handed the same `threading.RLock` as its dispatch lock - not the

@@ -68,7 +68,7 @@ LISTS = {
     # v0.6.14: not_recoverable (a gate reason until then) and admission_expired - a failure the plug
     # took up (P17) that nothing takes up now, and one taken up a day ago; and capacity_window, capacity
     # retries past their twelve hours on the clock.
-    # v0.6.14-beta.2: home_removed and home_not_watched - a Codex home's waiting records cancelled.
+    # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
     "machine.REASONS": ("set", 74, "5c6aa62cce9a0415"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
@@ -89,7 +89,7 @@ LISTS = {
     # v0.6.14: admission_expired and capacity_window, reasons now (not_recoverable was a gate reason);
     # and `resend`, submission_safe passed for an uncertain submission sent once more (engine/resend.py),
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
-    # v0.6.14-beta.2: and home_removed and home_not_watched, as every reason is.
+    # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
     "machine.GATE_REASONS": ("set", 91, "409337d90aa93a63"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
@@ -415,8 +415,8 @@ def enums():
     """Every vocabulary the four modules define: `domain/vocabulary.py`; `domain/compat_vocabulary.py`,
     the registry's, out of it since v0.6.11 and named through it still; `domain/plug.py`, whose six
     are the plug interface's own; `domain/power_vocabulary.py`, the power action's (v0.6.12); and
-    `domain/reason_vocabulary.py`, the reasons and a Codex home's states (v0.6.14-beta.2); and
-    `domain/plughands.py`, P2's moves and purposes beside the hands core holds (v0.6.14-beta.2). Each
+    `domain/reason_vocabulary.py`, the reasons and a Codex home's states (v0.6.15-beta); and
+    `domain/plughands.py`, P2's moves and purposes beside the hands core holds (v0.6.15-beta). Each
     is held to every rule here all the same."""
     return [value for module in (v, c, p, pw, rv, plughands) for value in vars(module).values()
             if inspect.isclass(value) and issubclass(value, StrEnum) and value is not StrEnum

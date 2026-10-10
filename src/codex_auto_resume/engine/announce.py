@@ -26,7 +26,7 @@ NOTIFY_ON_STATE = {
     "terminal_failure": "stopped",
 }
 
-# The two refusals of a claim that read the conversation's day and spacing again (v0.6.14-beta.2,
+# The two refusals of a claim that read the conversation's day and spacing again (v0.6.15-beta,
 # store/claims.py): waits, as at the gates, never the attempt budget's stop.
 CAP_WAITS = frozenset({"daily_submission_cap", "thread_submission_cooldown"})
 
@@ -128,7 +128,7 @@ class AnnounceMixin:
     def _refused(self, row, gate, reason):
         """A claim the store refused. Recorded as a wait or a stop, never silently."""
         if gate == "attempt_budget" and reason in CAP_WAITS:
-            # The conversation's day or spacing, counted again inside the claim (v0.6.14-beta.2): a
+            # The conversation's day or spacing, counted again inside the claim (v0.6.15-beta): a
             # claim committed after the gates read them. A wait, as at the gate, never a stop.
             if self._early_look != row["interruption_id"]:
                 self.transition(row, "waiting_retry", reason, delay=self._cap_delay(row, reason))

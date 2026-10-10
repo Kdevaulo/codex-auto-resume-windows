@@ -114,7 +114,7 @@ class SettingsMixin:
 
     @staticmethod
     def _strict_homes(changes) -> None:
-        """v0.6.14-beta.2: the Codex homes as written, checked against the folders on this PC (homes.strict):
+        """v0.6.15-beta: the Codex homes as written, checked against the folders on this PC (homes.strict):
         each one that can be watched, none the default home or another under a second name."""
         if not isinstance(changes, dict) or homes.FIELD not in changes:
             return

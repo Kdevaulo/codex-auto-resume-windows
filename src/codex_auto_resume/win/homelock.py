@@ -61,7 +61,7 @@ class HomeLock:
     same user - could otherwise both recover the same Codex conversations. The files are
     ours, under the user's local application data, never anything of Codex's.
 
-    Two files since v0.6.14-beta.2: the one named by the home's resolved path (as homes.key), as since
+    Two files since v0.6.15-beta: the one named by the home's resolved path (as homes.key), as since
     v0.6.0, taken first - so a watcher of an earlier version, which takes that one alone, is still
     excluded by the same spelling - and one named by the folder's identity (win/folderid.py), which no
     spelling changes, so one folder named twice - a subst drive, a share of the same disk - is one home.

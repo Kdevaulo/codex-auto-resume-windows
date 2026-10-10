@@ -1,4 +1,4 @@
-"""Which folder a path names, whatever it is spelled as (v0.6.14-beta.2).
+"""Which folder a path names, whatever it is spelled as (v0.6.15-beta).
 
 A Codex home's lock is named by its path (win/homelock.py), and one folder can be spelled more than one
 way - a junction, a subst drive, a symbolic link, a share of the same disk. Windows gives every folder on

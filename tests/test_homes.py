@@ -1,4 +1,4 @@
-"""One watcher recovers in every Codex home it holds, and a record goes only to its own home (v0.6.14-beta.2).
+"""One watcher recovers in every Codex home it holds, and a record goes only to its own home (v0.6.15-beta).
 
 Each home is a codexsim home of its own - a scratch folder, never the real CODEX_HOME - with its own reader,
 its own simulated backend and its own engine; the two engines share one store and the watcher's one dispatch

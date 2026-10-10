@@ -260,7 +260,7 @@ class ResetsMixin:
     def cancel_reset_rule(self, rule_id, at=None) -> str:
         """A person's Cancel of one rule (by_person), its words gone - refused (Refused) for a rule that is
         not there or has finished, and for a message whose launch is under way. A cancel and a claim serialise
-        on this file's write lock, so one of them is first. From v0.6.14-beta.2 a message already in Codex's queue
+        on this file's write lock, so one of them is first. From v0.6.15-beta a message already in Codex's queue
         (sent) is asked back instead: core takes it out of the queue at its next look and ends it (the owner's
         answer of 2026-10-09). "cancelled", or "withdrawing" for that one."""
         now = self._now(at)

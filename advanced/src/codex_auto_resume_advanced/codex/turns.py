@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Codex's turn history, read-only (v0.6.14-beta.2): what kinds of item a conversation's latest turn left, which
+"""Codex's turn history, read-only (v0.6.15-beta): what kinds of item a conversation's latest turn left, which
 conversations finished a turn lately, and the statuses of a plan's steps - never what any of it says.
 
 The empty-response recovery (engine/emptyreply.py) and keep going (engine/keepgoing.py) judge a turn by the kinds of

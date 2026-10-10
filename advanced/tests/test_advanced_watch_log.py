@@ -319,7 +319,7 @@ class GuardTests(WatchCase):
                     and isinstance(node.args[0].value, ast.Name) and node.args[0].value.id == "Point":
                 asked.add(Point[node.args[0].attr])
         self.assertIn(Point.GATES, asked)
-        # P12 (v0.6.14-beta.2) is asked through the runtime's own partition, whose answer is a number: a value too.
+        # P12 (v0.6.15-beta) is asked through the runtime's own partition, whose answer is a number: a value too.
         self.assertEqual((asked | {Point.TICK, Point.CONCURRENCY}) - set(ALTERNATIVES), set(watchlog.VALUE_POINTS))
         self.assertEqual(set(watchlog.WORDS), set(Alternative) | set(watchlog.VALUE_POINTS))
         self.assertEqual(len(watchlog.WORDS), len(set(watchlog.WORDS)))

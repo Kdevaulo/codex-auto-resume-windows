@@ -1,4 +1,4 @@
-"""P2's purposes and the moves of v0.6.14-beta.2: a record of the plug's goes only to a person's own conversation, a
+"""P2's purposes and the moves of v0.6.15-beta: a record of the plug's goes only to a person's own conversation, a
 continuation of the edition's own only while its turn is still the latest, a queued message a person edited is theirs,
 and one a person cancelled - or any, while recovery is paused - is taken back out of Codex's queue, never sent twice.
 

@@ -36,7 +36,7 @@ def record(key=KEY, thread=T1, words=WORDS, state="waiting", sent_at=None, **cha
 
 
 def taken(made):
-    """What core takes of `made`, a record naming none of v0.6.14-beta.2's keys: a person's message, queued nowhere
+    """What core takes of `made`, a record naming none of v0.6.15-beta's keys: a person's message, queued nowhere
     Codex said, and no one asking for it back."""
     return dict(made, purpose="message", ordinal=None, queue_id=None, withdraw=False)
 

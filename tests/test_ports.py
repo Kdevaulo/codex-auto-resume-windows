@@ -86,7 +86,7 @@ ENGINE_TO_STORE = {
     # and a record the task-changed guard holds for a person when it falls due (engine/guard.py) -
     # never at the defaults, where the guard is off.
     "hold_changed",
-    # v0.6.14-beta.2: a worker's own store closed once its receipt came (engine/launches.py) - never the engine's.
+    # v0.6.15-beta: a worker's own store closed once its receipt came (engine/launches.py) - never the engine's.
     "close",
     # and a needs-you notice kept so it is told once (engine/notices.py) - never at the defaults.
     "raise_notice",

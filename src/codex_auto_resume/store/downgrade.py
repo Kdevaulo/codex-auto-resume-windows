@@ -1,4 +1,4 @@
-"""Putting the state back for an older release: schema 4 for v0.6.11 to v0.6.14-beta, schema 3 for
+"""Putting the state back for an older release: schema 4 for v0.6.11 to v0.6.14, schema 3 for
 v0.6.0 to v0.6.10, schema 2 for v0.5.
 
 It is asked for by hand (`codex-auto-resume downgrade-state --to 4`, `--to 3` or `--to 2`) and never done on
@@ -32,7 +32,7 @@ _DOWNGRADE_STATES = {
 
 TARGETS = (2, 3, 4)
 
-# Withdrawal reasons a schema-4 reader does not know (v0.6.14-beta.2), as the one it settles the same way.
+# Withdrawal reasons a schema-4 reader does not know (v0.6.15-beta), as the one it settles the same way.
 _NEW_WITHDRAWALS = {"window_ended": "expired", "not_delivered_on_open": "not_loaded"}
 
 # A withdrawal for Observe only (v0.6.11), as the Pause's v0.6.10 knows: the same promise, its words.
@@ -109,7 +109,7 @@ def downgrade_to_v2(state_dir: Path) -> dict:
 
 
 def _to_v4(connection, now: float) -> dict:
-    """Schema 5 as schema 4, inside the caller's transaction (for v0.6.11 to v0.6.14-beta).
+    """Schema 5 as schema 4, inside the caller's transaction (for v0.6.11 to v0.6.14).
 
     An older release watches one Codex home and reads every record as that home's. So:
 

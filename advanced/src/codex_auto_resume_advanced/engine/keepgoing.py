@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Keep going (v0.6.14-beta.2, the plan's item 6): a conversation a person picked keeps going after a turn that ended
+"""Keep going (v0.6.15-beta, the plan's item 6): a conversation a person picked keeps going after a turn that ended
 well, up to the count they chose, and stops on no progress, a finished plan or an active goal - at P8 and P2.
 
 The standard edition recovers failures alone: a turn Codex completed well is never continued (A13). With this on, a

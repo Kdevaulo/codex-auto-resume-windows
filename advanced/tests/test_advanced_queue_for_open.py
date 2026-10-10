@@ -1,4 +1,4 @@
-"""Queue for opening (v0.6.14-beta.2): a usage-limited conversation the app does not hold is queued in Codex for when the
+"""Queue for opening (v0.6.15-beta): a usage-limited conversation the app does not hold is queued in Codex for when the
 person opens it, for the Days they chose, once - and the capability turns off where Codex did not run it on open.
 
 Held against the shipped definition and statement and against core's own engine, store and simulated Codex home

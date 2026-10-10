@@ -1,4 +1,4 @@
-"""The Codex homes a watcher holds beside the default one (v0.6.14-beta.2), each recovered by an engine of its own.
+"""The Codex homes a watcher holds beside the default one (v0.6.15-beta), each recovered by an engine of its own.
 
 The default home is the watcher's as it always was: locked at the start (runtime/loop.py), its engine built
 by `App.engine` with the edition's plug. Up to three more are named in Settings (homes.py), and each one this

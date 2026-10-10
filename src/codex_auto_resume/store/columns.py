@@ -100,7 +100,7 @@ _SCHEMA_4_COLUMNS = (
 _V4_RECORD_COLUMNS = _V3_COLUMNS + tuple(name for table, name, _ in _SCHEMA_4_COLUMNS
                                          if table == "interruptions")
 
-# Columns added in schema 5 (v0.6.14-beta.2): which Codex home a record is of, and what the watcher
+# Columns added in schema 5 (v0.6.15-beta): which Codex home a record is of, and what the watcher
 # found of each home it was set to watch. `home_key` is '' - the default home, every record before -
 # or the SHA-256 a home's lock is named by (win/homelock.py); `homes` a JSON array of ids and closed
 # words (store/watcher.py), empty with one home. A migrated state means exactly what it meant.

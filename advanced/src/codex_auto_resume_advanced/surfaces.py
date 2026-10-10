@@ -100,11 +100,11 @@ RESET_COMMANDS = frozenset({BridgeCommand.ADVANCED_RESETS, BridgeCommand.ADVANCE
                             BridgeCommand.ADVANCED_RESET_CANCEL, BridgeCommand.ADVANCED_RESET_GO_ON,
                             BridgeCommand.ADVANCED_CREDIT_NOW})
 
-# Keep going's commands (control/keepgoing.py, v0.6.14-beta.2), the Dashboard's alone.
+# Keep going's commands (control/keepgoing.py, v0.6.15-beta), the Dashboard's alone.
 KEEP_GOING_COMMANDS = frozenset({BridgeCommand.ADVANCED_KEEP_GOING, BridgeCommand.ADVANCED_KEEP_GOING_SET,
                                  BridgeCommand.ADVANCED_KEEP_GOING_STOP})
 
-# The prompt queue's commands (control/prompts.py, v0.6.14-beta.2), the Dashboard's alone.
+# The prompt queue's commands (control/prompts.py, v0.6.15-beta), the Dashboard's alone.
 PROMPT_COMMANDS = frozenset({BridgeCommand.ADVANCED_PROMPTS, BridgeCommand.ADVANCED_PROMPT_ADD,
                              BridgeCommand.ADVANCED_PROMPT_CANCEL, BridgeCommand.ADVANCED_PROMPT_GO_ON})
 

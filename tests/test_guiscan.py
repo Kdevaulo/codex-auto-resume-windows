@@ -152,7 +152,7 @@ class SliceTests(unittest.TestCase):
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,
-        # the power action's card, a fourteenth part in a fifteenth. v0.6.14-beta.2: SettingsHomes.cs, the Codex
+        # the power action's card, a fourteenth part in a fifteenth. v0.6.15-beta: SettingsHomes.cs, the Codex
         # homes' card, a fifteenth part in a sixteenth.
         self.assertEqual(len(declared) - len(set(declared)), 14,
                          "`partial class SettingsForm` written once per file that holds part "

@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""The prompt queue (v0.6.14-beta.2, the plan's item 7, on reset_message's way): a person's queued messages go after the
+"""The prompt queue (v0.6.15-beta, the plan's item 7, on reset_message's way): a person's queued messages go after the
 current turn, at a time or on a schedule, in order, each once, and their words go once they are sent - at P2.
 
 The standard edition sends one thing of its own, a continuation for a recovery that is due (A26, C4). With this on, a

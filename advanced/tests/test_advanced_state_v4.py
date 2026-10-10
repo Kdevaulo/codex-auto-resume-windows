@@ -1,4 +1,4 @@
-"""The advanced state's version 4 (v0.6.14-beta.2): the continuations, the conversations kept going and the queued
+"""The advanced state's version 4 (v0.6.15-beta): the continuations, the conversations kept going and the queued
 prompts - their tables, the closed words the file holds them to, and the ways they are written.
 
     PYTHONPATH=src python -m unittest discover -s advanced/tests

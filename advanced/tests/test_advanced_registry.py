@@ -74,7 +74,7 @@ class ShippedTests(unittest.TestCase):
                                   "keep_going"),
                      Point.RECORDS: ("reset_message", "prompt_queue", "empty_response", "subagent_parent",
                                      "keep_going"),
-                     # v0.6.14-beta.2: the lines a parent's continuation is given of its subagents' stops (5a).
+                     # v0.6.15-beta: the lines a parent's continuation is given of its subagents' stops (5a).
                      Point.TEXT: ("subagent_parent",),
                      Point.UNLOADED: ("goal_continuation", "queue_for_open"),
                      Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
@@ -84,7 +84,7 @@ class ShippedTests(unittest.TestCase):
                                        "codex_gave_up", "sign_in_retry"),
                      Point.SENDER: ("goal_continuation", "marker_free_continuation"),
                      Point.DELIVERY: ("marker_free_continuation",),
-                     # v0.6.14-beta.2: several sends waiting for their receipts at once.
+                     # v0.6.15-beta: several sends waiting for their receipts at once.
                      Point.CONCURRENCY: ("parallel_dispatch",)}
         for point in Point:
             self.assertEqual(tuple(d.id for d in registry.REGISTRY.at(point)), answering.get(point, ()))

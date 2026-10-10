@@ -199,12 +199,12 @@ def validate_prompt(text) -> str:
     return text
 
 
-# The edition's own continuation words (P2's CONTINUATION, v0.6.14-beta.2): at most this long, filled in with nothing.
+# The edition's own continuation words (P2's CONTINUATION, v0.6.15-beta): at most this long, filled in with nothing.
 CONTINUATION_LIMIT = MAX_CUSTOM_LENGTH
 
 
 def validate_continuation(text) -> str:
-    """Words of the edition's own catalog that continue a conversation (P2's CONTINUATION, v0.6.14-beta.2): the text
+    """Words of the edition's own catalog that continue a conversation (P2's CONTINUATION, v0.6.15-beta): the text
     unchanged, or a PromptError. 1 to CONTINUATION_LIMIT characters, not whitespace alone, no control character but a
     tab and the ends of a line, no marker of this product's and no `{` or `}` - nothing in them is filled in, and
     nothing a person wrote is ever one of these."""

@@ -241,7 +241,7 @@ STOP_WAIT_SECONDS = 60.0
 
 
 def cmd_downgrade_state(args) -> int:
-    """Rewrite the state so an older release can read it - schema 4 for v0.6.11 to v0.6.14-beta,
+    """Rewrite the state so an older release can read it - schema 4 for v0.6.11 to v0.6.14,
     schema 3 for v0.6.0 to v0.6.10, schema 2 for v0.5 - keeping every record.
 
     Needs the watcher stopped: it runs only while holding the watcher's mutex, so a

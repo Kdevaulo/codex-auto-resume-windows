@@ -946,7 +946,7 @@ The Settings page is split into five sections:
 | Automatic recovery | Which classified kinds of interruption are recovered, one check box each, and from v0.6.11 Observe only |
 | Continuation message | The language and style of the message sent to Codex, your own Custom message, and a Preview of the exact text |
 | Appearance | The theme - Use system setting, Light or Dark - the panel's Theme in Codex, the Design - Soft, Classic (v0.6.2) or Plain - and Reduce motion |
-| Advanced | Attempts per interruption, when to give up after recoveries that produce nothing, continuations per task, retry timing, and from v0.6.11 quiet hours, how a conversation resumes, what a conversation seen for the first time gets, which projects may resume, the Custom retry waits and jitter, a time ceiling, the task-changed and context-cost guards, what waits after a long sleep, and waiting for an internet connection - and from v0.6.14-beta.2 the [Codex homes](#several-codex-homes) it watches |
+| Advanced | Attempts per interruption, when to give up after recoveries that produce nothing, continuations per task, retry timing, and from v0.6.11 quiet hours, how a conversation resumes, what a conversation seen for the first time gets, which projects may resume, the Custom retry waits and jitter, a time ceiling, the task-changed and context-cost guards, what waits after a long sleep, and waiting for an internet connection - and from v0.6.15-beta the [Codex homes](#several-codex-homes) it watches |
 
 Every kind of interruption the watcher recovers has a check box, ticked by default. From v0.6.3 to
 v0.6.9 there was one more, **Sign-in service failures**, for a sign-in service that is temporarily
@@ -1303,7 +1303,7 @@ list of versions, not a `bootstrap.ps1` you run yourself.
 
 ### Several Codex homes
 
-From v0.6.14-beta.2 one watcher can recover in up to three more Codex homes besides the one it finds
+From v0.6.15-beta one watcher can recover in up to three more Codex homes besides the one it finds
 first (`CODEX_HOME`, or `%USERPROFILE%\.codex`). *Settings > Advanced > Codex homes* lists them: add a
 folder - a Codex home with its `state_<N>.sqlite` in it - and give it a short alias. A home is refused
 when it is a network (UNC) path, a link, a folder with no state database, or the same folder as one

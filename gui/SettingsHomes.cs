@@ -1,4 +1,4 @@
-// Codex Auto Resume - the Codex homes watched (v0.6.14-beta.2): a card of Settings > Advanced, after the limits.
+// Codex Auto Resume - the Codex homes watched (v0.6.15-beta): a card of Settings > Advanced, after the limits.
 //
 // The default Codex home is always watched. Up to three more can be added here and only here - MCP refuses the
 // setting by name, and no generated editor draws it - each a folder and an alias of 1 to 32 characters, which

@@ -107,7 +107,7 @@ class NullPlugTests(unittest.TestCase):
         self.assertIs(type(plug.PLUG_API), int)
         self.assertGreaterEqual(plug.PLUG_API, 1)
         # 3 (v0.6.14): P8's errand, and P2's records carried out - a package written for 2 is refused. 4
-        # (v0.6.14-beta.2): P12's whole number of workers carried out, P2's purposes and moves.
+        # (v0.6.15-beta): P12's whole number of workers carried out, P2's purposes and moves.
         self.assertEqual(plug.PLUG_API, 4)
 
 
@@ -158,7 +158,7 @@ class ClosedAlternativeTests(unittest.TestCase):
         an uncertain submission sent once more where core proves it may (engine/resend.py), and
         SEND_NOW, a person's request that passes a waiting record's own wait (engine/relaxed.py).
 
-        v0.6.14-beta.2: and P16 takes QUEUE_FOR_OPEN, which no point's alternatives list: core's ordinary send,
+        v0.6.15-beta: and P16 takes QUEUE_FOR_OPEN, which no point's alternatives list: core's ordinary send,
         left in Codex's queue for when the conversation is opened, kept only while the plug says so and seven
         days and an hour at most (engine/foropen.py)."""
         take_up = {Alternative.ADMIT, Alternative.CAPACITY} | set(plug.PACED_AS)
@@ -184,7 +184,7 @@ class ClosedAlternativeTests(unittest.TestCase):
                           Point.ADMISSION})
         self.assertEqual({point for point, accepted in plug.ALTERNATIVES.items() if not accepted},
                          {Point.OUTCOME, Point.SUPERVISION})
-        # v0.6.14-beta.2: P12 has left the table for a value core checks - a whole number of workers, 2 to
+        # v0.6.15-beta: P12 has left the table for a value core checks - a whole number of workers, 2 to
         # MAX_WORKERS (plughands.workers), carried out by core (engine/launches.py).
         self.assertNotIn(Point.CONCURRENCY, plug.ALTERNATIVES)
         # v0.6.14: P2 has left the table for a value core checks - the records a plug hands over, each
@@ -255,7 +255,7 @@ class GuardTests(unittest.TestCase):
                 elif point is Point.RECORDS:
                     self.assertEqual(answer, (), "no record of the plug's own")
                 elif point is Point.CONCURRENCY:
-                    self.assertEqual(answer, 1, "one send after another (v0.6.14-beta.2, plughands.workers)")
+                    self.assertEqual(answer, 1, "one send after another (v0.6.15-beta, plughands.workers)")
                 else:
                     self.assertIs(answer, DEFER)
         self.assertEqual(guarded.failures, 0)

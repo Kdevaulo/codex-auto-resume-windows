@@ -41,7 +41,7 @@ from codex_auto_resume.logbook import BACKUP_COUNT
 from . import evidence
 
 # The state database's user_versions read, and no others: 3 (v0.6.0 to v0.6.11-alpha), 4 (v0.6.11-beta
-# to v0.6.14-beta) and 5 (from v0.6.14-beta.2; store/schema.py SCHEMA_VERSION). Schemas 4 and 5 added
+# to v0.6.14) and 5 (from v0.6.15-beta; store/schema.py SCHEMA_VERSION). Schemas 4 and 5 added
 # columns and changed none of these.
 STATE_SCHEMAS = (3, 4, 5)
 # The columns read from the state, in schema 3, 4 and 5 alike, and nothing else. thread_id and

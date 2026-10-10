@@ -115,7 +115,7 @@ def interruption_id(thread_id, turn_id, completed_at, ordinal, home_key="") -> I
     """The id of a failed turn: SHA-256, as lowercase hex, of the compact JSON array
     `[thread_id, turn_id, float(completed_at).hex(), ordinal]`, ASCII-encoded.
 
-    v0.6.14-beta.2: of a Codex home other than the default (`home_key`, the SHA-256 its lock is named
+    v0.6.15-beta: of a Codex home other than the default (`home_key`, the SHA-256 its lock is named
     by), the six-member array `["home", home_key, thread_id, turn_id, float(completed_at).hex(),
     ordinal]` - never equal to a four-member one - so one conversation copied into two homes is two
     records, each sent to its own home. The default home's ids are what they always were.
@@ -135,7 +135,7 @@ def stalled_id(thread_id, turn_id, home_key="") -> InterruptionId:
     """The key a needs-you notice about a turn that stopped moving is kept under (v0.6.11): SHA-256,
     as lowercase hex, of the compact JSON array `["stalled", thread_id, turn_id]`. Three members where
     an interruption's id has four, so it is never one; and one turn is told once, however long it
-    stays still. Of a Codex home other than the default (v0.6.14-beta.2), four members:
+    stays still. Of a Codex home other than the default (v0.6.15-beta), four members:
     `["stalled", home_key, thread_id, turn_id]`."""
     identity = ["stalled", home_key, thread_id, turn_id] if home_key else ["stalled", thread_id, turn_id]
     text = json.dumps(identity, separators=(",", ":"), allow_nan=False)

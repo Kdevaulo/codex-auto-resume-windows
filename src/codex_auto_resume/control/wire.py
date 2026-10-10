@@ -77,7 +77,7 @@ class PendingRow(RecordView):
     name: str | None
     project: str | None
     cwd_basename: str | None
-    # v0.6.14-beta.2: the alias of the Codex home a record of another home than the default is of, or None.
+    # v0.6.15-beta: the alias of the Codex home a record of another home than the default is of, or None.
     home: str | None
 
 
@@ -234,7 +234,7 @@ class PowerDisarmed(TypedDict):
 
 
 class HomeView(TypedDict):
-    """One Codex home as Settings show it (v0.6.14-beta.2, homes.view): the default's key '' and no alias or folder."""
+    """One Codex home as Settings show it (v0.6.15-beta, homes.view): the default's key '' and no alias or folder."""
     key: str | None
     alias: str | None
     path: str | None
@@ -242,7 +242,7 @@ class HomeView(TypedDict):
 
 
 class HomesView(TypedDict):
-    """`codex_homes` (v0.6.14-beta.2): every home watched, the default first, and whether more than one is unproven
+    """`codex_homes` (v0.6.15-beta): every home watched, the default first, and whether more than one is unproven
     on the Codex in force."""
     homes: list[HomeView]
     unmeasured: bool
@@ -269,7 +269,7 @@ class StatusSnapshot(TypedDict):
     managed: NotRequired[list[str]]
     # v0.6.12: the power action after usage-limit recoveries - only while its file exists.
     power_action: NotRequired[PowerView]
-    # v0.6.14-beta.2: the Codex homes watched (homes.view); taken out of every MCP reply.
+    # v0.6.15-beta: the Codex homes watched (homes.view); taken out of every MCP reply.
     codex_homes: HomesView
 
 

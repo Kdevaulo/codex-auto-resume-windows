@@ -1,4 +1,4 @@
-"""Settings name up to three more Codex homes with an alias, and only the Dashboard writes them (v0.6.14-beta.2).
+"""Settings name up to three more Codex homes with an alias, and only the Dashboard writes them (v0.6.15-beta).
 
 `codex_homes` is a list of {"path", "alias"}: none by default, which is the default home alone, as before. A
 hand-edited file in any other shape reads as none (settings.coerce); the Dashboard's write is strict - the

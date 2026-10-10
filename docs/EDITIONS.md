@@ -479,7 +479,7 @@ recover no failure), [C4](STANDARDS.md#c-network) (it sends at a time you chose)
 [C9](STANDARDS.md#c-network) (it reads usage when no recovery is due),
 [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps) (your words are kept until they are sent),
 [H4](STANDARDS.md#h-user-control) (a Pause takes back a message Codex already holds and cancels it, rather
-than returning it to waiting; revision 2, from v0.6.14-beta.2) and
+than returning it to waiting; revision 2, from v0.6.15-beta) and
 [H6](STANDARDS.md#h-user-control) (Cancel no longer reaches a message being sent). It keeps A27: a
 message is at most 2,000 characters, as the Custom message is, unless Longer reset messages is on.
 Switching its conversation off cancels it (H5).
@@ -492,7 +492,7 @@ so it rests on MU; until MU is made on your version of Codex, the statement carr
 ### Longer messages
 
 **What it does.** An action: it sends nothing and answers at no point of a recovery. While it is on, a
-message you schedule for a reset, and from v0.6.14-beta.2 (revision 2) a message you queue, may be up to
+message you schedule for a reset, and from v0.6.15-beta (revision 2) a message you queue, may be up to
 8,154 characters - the most one continuation can carry - instead of 2,000. Turned off, every waiting
 message longer than 2,000 characters is cancelled.
 
@@ -750,7 +750,8 @@ as below.
 - **Recovery through the channels already in use** - several conversations at once,
   empty-response recovery, an unloaded conversation through a queue that waits for it, a subagent
   through its parent, keep going after a normal completion, and a prompt queue and recurring
-  wakes.
+  wakes - all six built in its first pre-release, v0.6.15-beta, and described
+  [above](#todays-capabilities).
 - **A route of its own, and other kinds of session** - a conversation nothing holds, run through
   Codex's app server; CLI, TUI and IDE sessions; a full context compacted, then continued; another
   model at capacity; a continuation with no words; a continuation inside the turn through a Codex
@@ -760,5 +761,6 @@ as below.
   outbound network code; a local API and web view, remote control over Telegram and a read-only view
   of other PCs; switching the Codex account on your command; a weekly update check while idle; crash
   supervision, a wake timer for a reset and *Open Codex* on the card.
-- **Also moved here** - watching several Codex homes, which the standard edition gains; Arabic and
+- **Also moved here** - watching several Codex homes, which the standard edition gains and
+  v0.6.15-beta built; Arabic and
   Hebrew; winget manifests for both editions.

@@ -1,4 +1,4 @@
-"""Subagent recovery through the parent (v0.6.14-beta.2): a parent hears, in fixed words, which of its subagents stopped
+"""Subagent recovery through the parent (v0.6.15-beta): a parent hears, in fixed words, which of its subagents stopped
 and why - added to the continuation core sends it (5a), or, once MS passed, in one of its own after the parent finished
 normally (5b) - and nothing is ever sent to a subagent.
 

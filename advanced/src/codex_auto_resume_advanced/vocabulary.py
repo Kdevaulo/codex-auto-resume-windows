@@ -61,7 +61,7 @@ class OffReason(StrEnum):
     # once-more capability, or Keep on's Send again alone (arming.py).
     DUPLICATE_SEEN = "duplicate_seen"
     # A conversation queued for opening was opened and Codex did not run the item within core's delivery window
-    # (v0.6.14-beta.2, queue_for_open): what M1 measured did not hold on this Codex.
+    # (v0.6.15-beta, queue_for_open): what M1 measured did not hold on this Codex.
     NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
 
 
@@ -131,7 +131,7 @@ class Refusal(StrEnum):
     ALREADY_SCHEDULED = "already_scheduled"
     BEING_SENT = "being_sent"
     CONVERSATION_OFF = "conversation_off"
-    # Stage 3c (v0.6.14-beta.2, state/prompts.py, state/continuations.py): a prompt the check refuses or too long;
+    # Stage 3c (v0.6.15-beta, state/prompts.py, state/continuations.py): a prompt the check refuses or too long;
     # twenty waiting, or five in that conversation; one that waits for the one before it where there is none; and
     # a count of continuations to keep going that is not one on offer.
     PROMPT_REFUSED = "prompt_refused"
@@ -181,7 +181,7 @@ class OverrideKind(StrEnum):
     EARLY_RESET = "early_reset"
     CAPACITY_LADDER = "capacity_ladder"
     RESEND_ONCE = "resend_once"
-    # v0.6.14-beta.2: a continuation queued for when its conversation is opened, paid for in the claim - once for
+    # v0.6.15-beta: a continuation queued for when its conversation is opened, paid for in the claim - once for
     # each interruption, so one released from that queue is never queued for opening again.
     QUEUE_FOR_OPEN = "queue_for_open"
 
@@ -190,7 +190,7 @@ class OptionKey(StrEnum):
     """A choice a capability offers a person (registry.Option), stored in `options` by this key."""
     ATTEMPTS = "attempts"                    # how many tries a task gets
     CEILING_HOURS = "ceiling_hours"          # for how long, in hours on the clock, it keeps trying
-    # v0.6.14-beta.2: how many sends may wait for their receipts at once (parallel_dispatch, 2 to 4), and how many
+    # v0.6.15-beta: how many sends may wait for their receipts at once (parallel_dispatch, 2 to 4), and how many
     # days a continuation is kept in Codex's queue for when its conversation is opened (queue_for_open, 3 to 7).
     WORKERS = "workers"
     DAYS = "days"
@@ -274,7 +274,7 @@ class BridgeCommand(StrEnum):
     ADVANCED_RESET_CANCEL = "advanced-reset-cancel"
     ADVANCED_RESET_GO_ON = "advanced-reset-go-on"
     ADVANCED_CREDIT_NOW = "advanced-credit-now"
-    # v0.6.14-beta.2: keep going (control/keepgoing.py) - the conversations kept going read, one picked, one stopped.
+    # v0.6.15-beta: keep going (control/keepgoing.py) - the conversations kept going read, one picked, one stopped.
     ADVANCED_KEEP_GOING = "advanced-keep-going"
     ADVANCED_KEEP_GOING_SET = "advanced-keep-going-set"
     ADVANCED_KEEP_GOING_STOP = "advanced-keep-going-stop"
@@ -328,7 +328,7 @@ class Measurement(StrEnum):
     MU = "mu"
     MN = "mn"
     MR = "mr"
-    # v0.6.14-beta.2: two to four throwaway conversations sent to at once through core's backend - each receipt
+    # v0.6.15-beta: two to four throwaway conversations sent to at once through core's backend - each receipt
     # matched, each marker in its own history once and nowhere else (parallel_dispatch).
     MQ = "mq"
     # A turn that ended with no reply, when Codex produces one: its item kinds (closed words) and its final agent item
@@ -376,7 +376,7 @@ class RuleReason(StrEnum):
     BY_PERSON = "by_person"
     TURNED_OFF = "turned_off"
     CONVERSATION_OFF = "conversation_off"    # its conversation was switched off (H5)
-    # v0.6.14-beta.2: edited by a person in Codex's queue, theirs now; its turn no longer the latest (a continuation);
+    # v0.6.15-beta: edited by a person in Codex's queue, theirs now; its turn no longer the latest (a continuation);
     # taken back out of Codex's queue on a Cancel or a Pause; and Codex would not give it back, so it is left there.
     HANDED_OVER = "handed_over"
     SUPERSEDED = "superseded"
@@ -512,7 +512,7 @@ class McpTool(StrEnum):
     DISARM_ALL_ADVANCED = "disarm_all_advanced"
 
 
-# ------------------------------------------------------------------ stage 3c (v0.6.14-beta.2)
+# ------------------------------------------------------------------ stage 3c (v0.6.15-beta)
 class ContinuationKind(StrEnum):
     """What one of the edition's own continuations answers (state/continuations.py): a turn that ended with no reply,
     a subagent that stopped, or a conversation a person asked to keep going."""

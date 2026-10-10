@@ -1,4 +1,4 @@
-"""What the edition reads of Codex's turn history and spawn edges (v0.6.14-beta.2, codex/turns.py and codex/lineage.py):
+"""What the edition reads of Codex's turn history and spawn edges (v0.6.15-beta, codex/turns.py and codex/lineage.py):
 kinds and counts, statuses and category words - never a word anyone wrote - from synthetic databases.
 
     PYTHONPATH=src python -m unittest discover -s advanced/tests

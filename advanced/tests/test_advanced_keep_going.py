@@ -1,4 +1,4 @@
-"""Keep going (v0.6.14-beta.2): a conversation a person picked keeps going after a turn that ended well, up to the count
+"""Keep going (v0.6.15-beta): a conversation a person picked keeps going after a turn that ended well, up to the count
 they chose - three at most until MK passes - and stops on no progress, a finished plan, an unreadable one, an active
 goal, a failed or interrupted turn and the count used; picked in the Dashboard's bridge alone.
 

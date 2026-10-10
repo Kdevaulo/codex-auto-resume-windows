@@ -588,7 +588,7 @@ namespace CodexAutoResume
         private void ReadAdvancedKept(string id, MethodInvoker done)
         {
             Dictionary<string, object> item = AdvancedItem(id);
-            // The reset actions' rules (advanced-resets) last, for the two that have them - and (v0.6.14-beta.2) the
+            // The reset actions' rules (advanced-resets) last, for the two that have them - and (v0.6.15-beta) the
             // conversations kept going (advanced-keep-going) and the queued prompts (advanced-prompts), for theirs.
             if (IsResets(id))
             {
@@ -993,7 +993,7 @@ namespace CodexAutoResume
             BuildKeepOn(item);
             BuildSendNow(item);
             // The reset actions' rules and the form they are added with, while one is on (AdvancedResets.cs); the
-            // conversations kept going and the queued prompts, each while its capability is on (v0.6.14-beta.2).
+            // conversations kept going and the queued prompts, each while its capability is on (v0.6.15-beta).
             BuildResets(item);
             BuildKeepGoing(item);
             BuildQueue(item);

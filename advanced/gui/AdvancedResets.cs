@@ -86,7 +86,7 @@ namespace CodexAutoResume
             {
                 Dictionary<string, object> result = AdvancedResult(reply);
                 advancedResets = AdvancedDone(result) ? result : null;
-                // The queued prompts join Pending's group too (v0.6.14-beta.2): read after the rules.
+                // The queued prompts join Pending's group too (v0.6.15-beta): read after the rules.
                 ReadPrompts(done);
             });
         }

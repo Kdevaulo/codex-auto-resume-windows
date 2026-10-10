@@ -1,4 +1,4 @@
-"""A message sent at a reset, and the moves of v0.6.14-beta.2 (the owner's answer 6): its queue item kept, a Cancel of one
+"""A message sent at a reset, and the moves of v0.6.15-beta (the owner's answer 6): its queue item kept, a Cancel of one
 already in Codex's queue asking core to take it back, and HANDED_OVER, SUPERSEDED, WITHDRAWN and WITHDRAW_REFUSED each
 ending it - or, refused, leaving it where it is - and none of them turning reset_message off.
 

@@ -119,7 +119,7 @@ class RecordsMixin:
         # be more, after the limit was lowered ("19/6"): a count is never cut down to the limit.
         values = self.get_settings()
         attempts = values.get("max_recovery_attempts")
-        # v0.6.14-beta.2: the Codex homes added beside the default one - each record of one of them labelled through
+        # v0.6.15-beta: the Codex homes added beside the default one - each record of one of them labelled through
         # that home's reader, and with its alias as `home`; None for every record while there is one home.
         others = _other_homes(values.get(homes.FIELD))
         readers = {}

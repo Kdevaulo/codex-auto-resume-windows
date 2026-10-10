@@ -1,9 +1,9 @@
-"""State schema 5 (v0.6.14-beta.2): which Codex home a record is of, and what the watcher found of each home.
+"""State schema 5 (v0.6.15-beta): which Codex home a record is of, and what the watcher found of each home.
 
 One column on a record - `home_key`, '' for the default home, which is every record there was, else the
 SHA-256 an extra home's lock is named by - and one on the heartbeat, `homes`. A migrated state means what
 it meant; an id of the default home is the id it always was, and the same conversation in two homes is
-two records; `downgrade-state --to 4` gives v0.6.11 to v0.6.14-beta a state they read, keeping every row
+two records; `downgrade-state --to 4` gives v0.6.11 to v0.6.14 a state they read, keeping every row
 and leaving none of another home for them to act on. Temporary folders only.
 """
 from __future__ import annotations
@@ -125,7 +125,7 @@ class HomesTests(Case):
         two = [{"key": "", "state": "watched"}, {"key": HOME_C, "state": "unavailable"}]
         with Store(self.root) as store:
             beat = dict(pid=1, session_id="s", started_at=100.0, ok=True, engine_state="verified",
-                        code_version="0.6.14-beta.2")
+                        code_version="0.6.15-beta")
             store.heartbeat(120.0, **beat, homes=two)
             self.assertEqual(store.watcher_status()["homes"], two)
             store.heartbeat(121.0, **beat)
@@ -149,7 +149,7 @@ class IdTests(unittest.TestCase):
 
 
 class DowngradeToV4Tests(Case):
-    """`downgrade-state --to 4`: for v0.6.11 to v0.6.14-beta, which watch one home."""
+    """`downgrade-state --to 4`: for v0.6.11 to v0.6.14, which watch one home."""
 
     def state(self, other_state="waiting_backoff"):
         with Store(self.root) as store:

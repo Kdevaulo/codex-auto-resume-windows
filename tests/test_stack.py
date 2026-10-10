@@ -69,7 +69,7 @@ ITEM = {_q(name): item for item, names in {
                 "runtime.health",
                 # v0.6.12: and of the power action after usage-limit recoveries.
                 "runtime.afterwork",
-                # v0.6.14-beta.2: the other Codex homes a watcher holds.
+                # v0.6.15-beta: the other Codex homes a watcher holds.
                 "runtime.homes"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch", "engine.freshness",
                "engine.options", "engine.outcome",
@@ -85,7 +85,7 @@ ITEM = {_q(name): item for item, names in {
                "engine.resend",
                # and records of the edition's own, tried like core's.
                "engine.plugrecords",
-               # v0.6.14-beta.2: several sends waiting for their receipts at once, on workers.
+               # v0.6.15-beta: several sends waiting for their receipts at once, on workers.
                "engine.launches",
                # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
                "engine.foropen"),
@@ -115,7 +115,7 @@ ITEM = {_q(name): item for item, names in {
                "ownvalues",
                # v0.6.12: when the power action after usage-limit recoveries may act, which a person arms.
                "poweraction",
-               # v0.6.14-beta.2: the Codex homes a watcher is set to watch, as Settings keep them.
+               # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them.
                "homes"),
     "machine": ("machine", "domain", "domain.errors", "domain.ids", "domain.public",
                 "domain.states", "domain.vocabulary",
@@ -125,7 +125,7 @@ ITEM = {_q(name): item for item, names in {
                 "domain.usage",
                 # v0.6.12: the power action's words, out of domain/vocabulary.py.
                 "domain.power_vocabulary",
-                # v0.6.14-beta.2: the reasons and a Codex home's states, out of it too.
+                # v0.6.15-beta: the reasons and a Codex home's states, out of it too.
                 "domain.reason_vocabulary"),
     "scheduler": ("engine.reconcile",),
     "store": ("store", "store.actions", "store.claims", "store.columns", "store.downgrade",
@@ -186,7 +186,7 @@ ITEM = {_q(name): item for item, names in {
                  "win.textsize", "win.typeface",
                  # v0.6.12: the power action's calls: offering, who is here, and doing it.
                  "win.powerdown",
-                 # v0.6.14-beta.2: which folder a path names, whatever its spelling.
+                 # v0.6.15-beta: which folder a path names, whatever its spelling.
                  "win.folderid",
                  "pwsh", "shortcut", "startup"),
     "config": ("", "config", "logbook"),

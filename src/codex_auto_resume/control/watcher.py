@@ -420,7 +420,7 @@ class WatcherMixin:
         # no administrator manages is told exactly what it was told before.
         if held.active:
             status["managed"] = held.codes()
-        # v0.6.14-beta.2: the Codex homes watched - the default one, and those added beside it - and what the watcher
+        # v0.6.15-beta: the Codex homes watched - the default one, and those added beside it - and what the watcher
         # found of each (homes.view), for Settings. Never to MCP: their folders are paths (mcp/server.py).
         status["codex_homes"] = self.homes_view(values.get(homes.FIELD) or [], watcher_homes)
         # v0.6.12: the power action (poweraction.view), only while its file is there - so at the

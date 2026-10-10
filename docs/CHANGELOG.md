@@ -1,20 +1,22 @@
 # Changelog
 
-## v0.6.14-beta.2 — Several conversations at once, several Codex homes, and five more ways to go on
+## v0.6.15-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
-[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14-beta...v0.6.14-beta.2)
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15-beta)
 
-**A pre-release, the second of v0.6.14 (stage 3c).** The standard edition gains one thing - watching up to three
+**A pre-release, the first of v0.6.15 (stage 3c).** It is a GitHub pre-release, so `releases/latest` stays
+v0.6.14; an installation of v0.6.14 is offered it by *Check for updates*, which asks first and says it is tested
+less, and *Install another version...* lists it. The standard edition gains one thing - watching up to three
 more Codex homes - and keeps every standard. The advanced edition gains six capabilities, each off until you turn it
 on in the Dashboard's **Advanced features** page, with a statement in your language that names the standards it
 departs from ([EDITIONS.md](EDITIONS.md#todays-capabilities)).
 
 **Going back.** The watcher's state is now schema 5: each record says which Codex home it is of. It is brought up
-from schema 4 the first time it is opened, every row kept. To go back to v0.6.14-beta or v0.6.13, *Install another
+from schema 4 the first time it is opened, every row kept. To go back to v0.6.14 or v0.6.13, *Install another
 version...* converts it down first (`downgrade-state --to 4`): it is refused while an extra home is watched; an extra
 home's waiting recoveries are cancelled and its finished rows kept. The advanced edition's own file is now version 4
 - the continuations, the conversations kept going and the queued prompts - brought up from version 3 when it is first
-opened; v0.6.14-beta cannot read version 4 and fails closed: every capability off.
+opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
 
 ### Several Codex homes (standard edition)
 

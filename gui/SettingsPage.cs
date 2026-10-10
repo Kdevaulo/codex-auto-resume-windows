@@ -458,7 +458,7 @@ namespace CodexAutoResume
             TableLayoutPanel look = NewGroup(S("group.appearance", "Appearance"), sections["appearance"]);
             TableLayoutPanel limits = NewGroup(S("group.limits", "Limits"), sections["advanced"]);
             limits.Controls.Add(HelpText(S("help.limits", "Sets how hard recovery tries before it stops and leaves the task to you.")));
-            // v0.6.14-beta.2: the Codex homes watched, after the limits - never an editor (SettingsHomes.cs).
+            // v0.6.15-beta: the Codex homes watched, after the limits - never an editor (SettingsHomes.cs).
             BuildHomes(sections["advanced"]);
 
             CheckBox master = null;

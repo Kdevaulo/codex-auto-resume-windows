@@ -31,6 +31,6 @@ class LocalSource(SchemaMixin, HistoryMixin):
     """
 
     def elsewhere(self, codex_home) -> "LocalSource":
-        """A reader of another Codex home, made as this one is (v0.6.14-beta.2): for the labels of that home's records,
+        """A reader of another Codex home, made as this one is (v0.6.15-beta): for the labels of that home's records,
         where the control layer, which builds no reader of its own, is handed this one."""
         return type(self)(codex_home)

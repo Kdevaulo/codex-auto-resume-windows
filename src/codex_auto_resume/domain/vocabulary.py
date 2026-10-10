@@ -37,8 +37,8 @@ from .compat_vocabulary import (  # noqa: F401
     CompatState, LocalResult, Tier, CompatCheck, Capability, ResolutionReason, ViewReason,
     RegistryReason, ImportReason, PermitReason, CompatSource, BundledState, CacheState, DataSource,
     ViewStatus, CacheOrigin, ReportedState, RefreshAnswer)
-# The reasons a record waits, stops or is taken back, and (v0.6.14-beta.2) what a watcher found of each
-# Codex home, beside this file since v0.6.14-beta.2 (reason_vocabulary.py), named here as before.
+# The reasons a record waits, stops or is taken back, and (v0.6.15-beta) what a watcher found of each
+# Codex home, beside this file since v0.6.15-beta (reason_vocabulary.py), named here as before.
 from .reason_vocabulary import HomeState, ReasonCode, WithdrawReason  # noqa: F401
 
 

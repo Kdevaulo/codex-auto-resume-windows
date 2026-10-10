@@ -703,8 +703,8 @@ class PickerFloorTests(unittest.TestCase):
                                      self.schema_for(tag[1:]))
 
     def test_every_schema_4_tag_opens_what_to_4_wrote_with_every_row(self):
-        """v0.6.14-beta.2: the picker converts with `--to 4` for every offered tag on schema 4, v0.6.11-beta to
-        v0.6.14-beta - so each of them, its own store, opens the result and reads every record as it was."""
+        """v0.6.15-beta: the picker converts with `--to 4` for every offered tag on schema 4, v0.6.11-beta to
+        v0.6.14 - so each of them, its own store, opens the result and reads every record as it was."""
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.state = Path(temporary.name) / "state"

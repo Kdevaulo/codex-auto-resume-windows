@@ -439,7 +439,7 @@ namespace CodexAutoResume
             return name ?? (thread.Length >= 8 ? thread.Substring(0, 8) : thread);
         }
 
-        /// v0.6.14-beta.2: a row's label line in Pending and History - its conversation and, with more than one Codex home
+        /// v0.6.15-beta: a row's label line in Pending and History - its conversation and, with more than one Codex home
         /// watched, the alias of the one a record of another home is of (`home`, null with the default alone).
         private string Labelled(Dictionary<string, object> row)
         {

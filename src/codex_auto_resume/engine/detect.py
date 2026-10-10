@@ -27,7 +27,7 @@ class DetectMixin:
         return machine.waiting_state(row, self.clock())
 
     def _records(self, states):
-        """This engine's own home's records in `states` (v0.6.14-beta.2): never another home's."""
+        """This engine's own home's records in `states` (v0.6.15-beta): never another home's."""
         return self.store.records_in(states, home_key=self.home_key)
 
     def _claimed(self, thread_id):
@@ -35,7 +35,7 @@ class DetectMixin:
         return [row for row in self.store.claimed_on_thread(thread_id) if row["home_key"] == self.home_key]
 
     def _keyed(self, found):
-        """A failure as this engine's home knows it (v0.6.14-beta.2): its id derived with the home's key, which
+        """A failure as this engine's home knows it (v0.6.15-beta): its id derived with the home's key, which
         the default home's never is - so the same turn in two homes is two interruptions."""
         if found is not None and self.home_key:
             found["interruption_id"] = ids.interruption_id(

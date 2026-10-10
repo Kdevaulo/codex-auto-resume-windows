@@ -104,11 +104,11 @@ anywhere else, and do not present one as active unless `list_advanced_capabiliti
   a rule, a message's words or a reset credit: never write, schedule or cancel one for the user, and
   never claim to have, or promise that a credit will be spent. `get_status` shows only how many wait.
   A credit spent cannot be given back; if they ask, tell them where it is done.
-- **Keep going and queued messages** (v0.6.14-beta.2) - the conversations the user keeps going after a
+- **Keep going and queued messages** (v0.6.15-beta) - the conversations the user keeps going after a
   turn that ended well, and their own messages queued for after this turn, a time or a schedule - are
   picked, listed, stopped and cancelled only in the Dashboard. No tool reaches them: never pick a
   conversation, queue, schedule or cancel a message for the user, and never claim to have.
-  `get_status` shows only how many messages are queued. The others of v0.6.14-beta.2 - several
+  `get_status` shows only how many messages are queued. The others of v0.6.15-beta - several
   conversations at once, a conversation queued in Codex for when it is opened, a turn that ended with
   no reply continued once, a parent told which of its subagents stopped - act on their own once the
   user turned them on; nothing is ever written to a subagent.

@@ -76,7 +76,7 @@ class VocabularyTests(unittest.TestCase):
         self.assertEqual({str(word) for word in vocabulary.TRIPWIRES},
                          {"submission_unknown", "local_check_failed", "failed_here", "incompatible",
                           "hook_exception", "statement_changed", "measurement_failed", "duplicate_seen",
-                          # v0.6.14-beta.2: queue_for_open's, Codex not running on open what was queued for it.
+                          # v0.6.15-beta: queue_for_open's, Codex not running on open what was queued for it.
                           "not_delivered_on_open"})
 
 
@@ -871,7 +871,7 @@ class ResetStateTests(StateCase):
         self.assertEqual([spend["occasion"] for spend in state.credit_spends()], [2])
 
     def version_three(self, *, resets=True):
-        """A file exactly as v0.6.14-beta made it - version 3, its `options` CHECK without the choices version 4 added -
+        """A file exactly as v0.6.14 made it - version 3, its `options` CHECK without the choices version 4 added -
         with an option a person chose, and (with `resets`) the reset actions' four tables."""
         self.paths.advanced_dir.mkdir(parents=True)
         (self.paths.advanced_dir / config.OWNER_MARKER).write_text(config.OWNER_TEXT, encoding="utf-8")
@@ -897,7 +897,7 @@ class ResetStateTests(StateCase):
         return path
 
     def test_a_version_three_file_is_brought_to_version_four_and_keeps_every_row(self):
-        """v0.6.14-beta's file: its tables whose CHECK names a list that grew are made again, every row kept - SQLite
+        """v0.6.14's file: its tables whose CHECK names a list that grew are made again, every row kept - SQLite
         cannot change a CHECK in place - and version 4's columns and tables are added."""
         path = self.version_three()
         state = self.state()
@@ -968,7 +968,7 @@ class BoundTests(StateCase):
 
     def test_the_watch_bound_sits_inside_the_journal_s(self):
         from codex_auto_resume_advanced import registry
-        self.assertEqual(WATCH_LIMIT, 200, "250 until v0.6.14-beta.2, when the capabilities grew to 21")
+        self.assertEqual(WATCH_LIMIT, 200, "250 until v0.6.15-beta, when the capabilities grew to 21")
         # Every capability watched at once, each at its bound, still fits inside the journal's.
         self.assertLess(len(registry.DEFINITIONS) * WATCH_LIMIT, EVENT_LIMIT)
         # The journal's own bound cuts every other line first: newer lines of another capability,

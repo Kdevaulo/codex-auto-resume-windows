@@ -61,13 +61,13 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         self.watch()
         self.observe_all()
         self.watch_resent()             # v0.6.14: a resend found twice; nothing for the standard edition
-        # v0.6.14-beta.2: a Codex home taken out of Settings only watches what it sent until that settles.
+        # v0.6.15-beta: a Codex home taken out of Settings only watches what it sent until that settles.
         if self.retiring:
             return
         # v0.6.11: an administrator's DisableAutoResume is a Pause here too, even before the watcher
         # has written it into the state (runtime/app.py), so a write that failed sends nothing.
         if not self.store.settings()["enabled"] or self.managed.disable_auto_resume:
-            # v0.6.14-beta.2: what the plug sent that Codex still holds is taken back, the plug asked nothing.
+            # v0.6.15-beta: what the plug sent that Codex still holds is taken back, the plug asked nothing.
             self.paused_records()
             return
         # The plug is asked nothing more while recovery is paused: a Pause beats every
@@ -82,7 +82,7 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
                 self.log(None, "detection_unavailable_no_submission", None)
                 return
             due = self._records(UNSENT)
-            # P12 (v0.6.14-beta.2): how many sends may wait for their receipts at once - 1, one after another in
+            # P12 (v0.6.15-beta): how many sends may wait for their receipts at once - 1, one after another in
             # this thread, unless the plug answers 2 to 4. Every claim and look stays here; a worker only waits for
             # a receipt, and every one is joined and settled before the tick goes on (engine/launches.py).
             workers = self._workers(due)

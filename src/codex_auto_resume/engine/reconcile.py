@@ -221,7 +221,7 @@ class ReconcileMixin:
                               state="withdrawn_unconfirmed", withdraw_reason=reason,
                               withdrawn_at=now, withdraw_deleted=True, queue_id=queue_ids[0],
                               last_error=reason, next_retry_at=now + 1)
-            # P14 is told why (v0.6.14-beta.2): a tripwire reads not_delivered_on_open there.
+            # P14 is told why (v0.6.15-beta): a tripwire reads not_delivered_on_open there.
             self.moved(dict(row, withdraw_reason=reason), "withdrawn_unconfirmed")
             self.log(thread, "withdrawn_unconfirmed", reason)
             return

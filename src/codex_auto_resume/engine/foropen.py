@@ -1,4 +1,4 @@
-"""A continuation queued for when its conversation is opened (v0.6.14-beta.2, P16's QUEUE_FOR_OPEN).
+"""A continuation queued for when its conversation is opened (v0.6.15-beta, P16's QUEUE_FOR_OPEN).
 
 A conversation the Codex app does not hold may be sent the ordinary continuation - core's backend, its marker, its
 claim - and left in Codex's queue for when a person opens it, where the plug answers QUEUE_FOR_OPEN at P16
@@ -19,7 +19,7 @@ DEFERRED_LONGEST = 7 * 86400 + 3600
 
 class ForOpenMixin:
     def _not_for_open(self, current, route, sender, client, vector) -> bool:
-        """P16's QUEUE_FOR_OPEN (v0.6.14-beta.2) goes the ordinary way - core's backend, its marker - or not at all: a
+        """P16's QUEUE_FOR_OPEN (v0.6.15-beta) goes the ordinary way - core's backend, its marker - or not at all: a
         channel or a client id the plug named waits for the conversation to be opened, as A11 says. True if it waits."""
         if route is not Alternative.QUEUE_FOR_OPEN or (sender is self.backend and client is None):
             return False
@@ -29,7 +29,7 @@ class ForOpenMixin:
 
     @staticmethod
     def for_open(row) -> bool:
-        """Whether `row` was sent for its conversation to be opened (P16's QUEUE_FOR_OPEN, v0.6.14-beta.2): its claim's
+        """Whether `row` was sent for its conversation to be opened (P16's QUEUE_FOR_OPEN, v0.6.15-beta): its claim's
         gate vector - core's own validated column - passed thread_available as the plug's doing, and only that answer
         leaves a queue item with that word (a route queues nothing)."""
         return ((machine.may_be_queued(row["state"], row.get("queue_id")) or row["state"] == "submitting")
@@ -59,7 +59,7 @@ class ForOpenMixin:
         return None
 
     def _for_open_rests(self, row) -> bool:
-        """Whether the one-second watch leaves a continuation queued for opening alone this pass (v0.6.14-beta.2): its
+        """Whether the one-second watch leaves a continuation queued for opening alone this pass (v0.6.15-beta): its
         last look read it not held less than a poll ago, and nothing a person did since - a Pause, Observe only, a
         cancel, its conversation off - asks for it back, which the store alone says. Days of waiting cost one look at
         Codex a minute, not one a second, and a Pause is still taken back within a second."""

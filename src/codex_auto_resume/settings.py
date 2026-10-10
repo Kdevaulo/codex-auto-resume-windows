@@ -283,7 +283,7 @@ MEMORY_GUARD_MODES, MEMORY_LIMITS = memguard.MODES, memguard.LIMITS
 FIELDS[memguard.GUARD_FIELD] = (memguard.DEFAULT_MODE, lambda v, d: _choice(v, d, MEMORY_GUARD_MODES))
 FIELDS[memguard.LIMIT_FIELD] = (memguard.DEFAULT_LIMIT, ownvalues.coercer(MEMORY_LIMITS, OWN[memguard.LIMIT_FIELD]))
 FIELDS[statusfile.FIELD] = (False, _boolean)
-# v0.6.14-beta.2: the Codex homes watched beside the default one (homes.py) - none by default, the default
+# v0.6.15-beta: the Codex homes watched beside the default one (homes.py) - none by default, the default
 # home alone, as before. Written in the Dashboard alone (DASHBOARD_ONLY), where each is checked (homes.strict).
 FIELDS[homes.FIELD] = ([], homes.coerce)
 
@@ -633,7 +633,7 @@ NOT_YET_OFFERED = frozenset({"start_with_codex"})
 # as it refuses every field its schema does not offer; Restore defaults empties them with the rest.
 ROW_ACTION_FIELDS = frozenset({projects.ALWAYS, projects.NEVER, continuation.BY_THREAD_FIELD})
 
-# Fields only the Dashboard's own section writes (v0.6.14-beta.2): the Codex homes, each checked against the
+# Fields only the Dashboard's own section writes (v0.6.15-beta): the Codex homes, each checked against the
 # folders on this PC when it is written (control/policy.py). `describe()` leaves them out, so no generated
 # editor draws them and MCP's schema never offers them - and update_settings refuses them by name besides.
 DASHBOARD_ONLY = frozenset({homes.FIELD})
@@ -641,5 +641,5 @@ DASHBOARD_ONLY = frozenset({homes.FIELD})
 
 def describe() -> list:
     """Machine-readable schema for the settings interfaces (settings_schema.py, out of this module at
-    its line budget in v0.6.14-beta.2)."""
+    its line budget in v0.6.15-beta)."""
     return settings_schema.describe(sys.modules[__name__])

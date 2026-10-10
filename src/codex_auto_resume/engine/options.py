@@ -70,7 +70,7 @@ class StoreView:
 
     def __init__(self, store, now, last_usage=None, home_key=None):
         self.now = now
-        # v0.6.14-beta.2: the engine's own Codex home, so a plug is shown the records of that home alone - the
+        # v0.6.15-beta: the engine's own Codex home, so a plug is shown the records of that home alone - the
         # default home's, for the one engine a plug is given (runtime/homes.py) - however it asks.
         mine = (lambda rows: rows) if home_key is None else (
             lambda rows: [row for row in rows if row["home_key"] == home_key])
@@ -109,11 +109,11 @@ class OptionsMixin:
         # else, and it is fixed for the engine's life, so no edition changes under a tick.
         self.plug = guard(plug)
         self.dispatch_lock, self.clock = dispatch_lock, clock
-        # v0.6.14-beta.2: the Codex home this engine recovers in - '' for the default, else the key an extra home's
+        # v0.6.15-beta: the Codex home this engine recovers in - '' for the default, else the key an extra home's
         # lock is named by (runtime/homes.py) - and whether that home was taken out of Settings, after which it
         # only watches what it sent until that settles (`tick`).
         self.home_key, self.retiring = home_key, False
-        # v0.6.14-beta.2 (P12): what opens a store of the engine's own state for a worker that waits for a receipt
+        # v0.6.15-beta (P12): what opens a store of the engine's own state for a worker that waits for a receipt
         # (engine/launches.py) - None, and every send is made inline as always - the pool open for this tick, the
         # worker taken for the record being dispatched, and whether its send goes to that worker.
         self.open_store, self._pool, self._held_slot, self._pooling = open_store, None, None, False
@@ -258,7 +258,7 @@ class OptionsMixin:
 
     def caps(self, relaxed=None) -> tuple:
         """(claims a day, seconds between two) for one conversation: core's, or a capacity error's that
-        the plug vouches for (ladder.py). Read by the gates and again inside the claim (v0.6.14-beta.2,
+        the plug vouches for (ladder.py). Read by the gates and again inside the claim (v0.6.15-beta,
         store/claims.py `_caps_refusal`), so a claim committed between the two is counted."""
         if relaxed == "capacity":
             return ladder.CAPACITY_PER_DAY, ladder.CAPACITY_SPACING

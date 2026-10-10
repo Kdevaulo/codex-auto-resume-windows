@@ -1,6 +1,6 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
 """Queue for opening: a conversation the Codex app does not hold is sent core's ordinary continuation, left in Codex's
-queue for when the person opens it, for the days they chose (v0.6.14-beta.2, P16's QUEUE_FOR_OPEN).
+queue for when the person opens it, for the days they chose (v0.6.15-beta, P16's QUEUE_FOR_OPEN).
 
 The standard edition waits for the app to hold a conversation before it sends anything there (A11: nothing is queued
 on the off chance). With this on, P16 answers QUEUE_FOR_OPEN for a usage-limited conversation the app does not hold

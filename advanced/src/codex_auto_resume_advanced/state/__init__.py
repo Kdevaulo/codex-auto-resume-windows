@@ -14,8 +14,8 @@ it at all: a secret goes to Windows Credential Manager (credentials.py).
     journal   what happened, the sampler's counts, and the bounds on every table
     choices   the capabilities' choices and rules, what they took up, and what they keep of it
     resets    the reset actions' windows, last reading, rules and spends (v0.6.14)
-    continuations  the edition's own continuations, and the conversations kept going (v0.6.14-beta.2)
-    prompts   a person's queued prompts (v0.6.14-beta.2)
+    continuations  the edition's own continuations, and the conversations kept going (v0.6.15-beta)
+    prompts   a person's queued prompts (v0.6.15-beta)
 """
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""The Codex homes a watcher is set to watch beside the default one (v0.6.14-beta.2), as Settings keep them.
+"""The Codex homes a watcher is set to watch beside the default one (v0.6.15-beta), as Settings keep them.
 
 The default home is what it always was: `--codex-home`, else CODEX_HOME, else %USERPROFILE%\\.codex
 (config.codex_home). Up to MAX_EXTRA more are named in the settings' `codex_homes`, each a folder and an

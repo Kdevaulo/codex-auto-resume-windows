@@ -1,4 +1,4 @@
-"""P16's QUEUE_FOR_OPEN (v0.6.14-beta.2): a conversation the app does not hold is sent the ordinary continuation, left in
+"""P16's QUEUE_FOR_OPEN (v0.6.15-beta): a conversation the app does not hold is sent the ordinary continuation, left in
 Codex's queue for when it is opened - kept only while the plug says so, and seven days and an hour at most - and every
 withdrawal core makes of a queued item still fires at once.
 

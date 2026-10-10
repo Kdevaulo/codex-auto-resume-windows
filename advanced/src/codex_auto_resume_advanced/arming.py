@@ -76,7 +76,7 @@ from .state import Refused, StaleGeneration, StateError
 from .state.spend import CHANNELS
 from .state.choices import DAY, RECENT_DAYS, RULES_LIMIT, aggregated, tag_problem
 from .statement import CATALOGS
-from .vocabulary import ContinuationReason, PromptReason  # noqa: E402  (v0.6.14-beta.2)
+from .vocabulary import ContinuationReason, PromptReason  # noqa: E402  (v0.6.15-beta)
 from .vocabulary import (KEPT_NOTICES, TRIPWIRES, Actor, ArmingState, ArmingWarning, CapabilityKind,
                          KeepOn, Measurement, OffReason, OverrideKind, RecordState, Refusal, RuleReason,
                          RuleState, Verdict)
@@ -507,7 +507,7 @@ class Arming:
             if (states.get(CREDIT, ArmingState.OFF) != ArmingState.ARMED
                     and self.state.reading().get("credits") is not None):
                 self.state.set_reading(credits=None, expiry_known=None, nearest_expiry=None)
-            # v0.6.14-beta.2: every queued prompt not in Codex's queue while prompt_queue does not stand on, and every
+            # v0.6.15-beta: every queued prompt not in Codex's queue while prompt_queue does not stand on, and every
             # continuation still waiting of one that does not stand on (state/continuations).
             if states.get("prompt_queue", ArmingState.OFF) != ArmingState.ARMED:
                 self.state.end_prompts(PromptReason.TURNED_OFF, at=self.clock())

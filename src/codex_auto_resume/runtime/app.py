@@ -118,7 +118,7 @@ class App(WatchLoop):
         self._settings_stamp_seen = self._settings_stamp()
         self._home_lock = None
         self._plug = None
-        # v0.6.14-beta.2: the one dispatch lock of this watcher, handed to every engine it builds (one per
+        # v0.6.15-beta: the one dispatch lock of this watcher, handed to every engine it builds (one per
         # Codex home it watches, runtime/homes.py): a send and the watch of a record are never made at once.
         self._dispatch_lock = threading.RLock()
 
@@ -284,7 +284,7 @@ class App(WatchLoop):
                   # v0.6.11: asked only while Wait for an internet connection is on (power.py).
                   "connectivity": network.internet}
         kwargs["dispatch_lock"] = dispatch_lock if dispatch_lock is not None else self.dispatch_lock
-        # v0.6.14-beta.2 (P12): a store of its own for each worker that waits for a receipt (engine/launches.py).
+        # v0.6.15-beta (P12): a store of its own for each worker that waits for a receipt (engine/launches.py).
         kwargs["open_store"] = self.worker_store
         engine = Engine(store, source, self.backend(), plug=self.plug, **kwargs)
         engine.apply_policy(self._stored, self.managed)
@@ -298,7 +298,7 @@ class App(WatchLoop):
         return Store(self.paths.state_dir, check=False)
 
     def dispatch_lock(self):
-        """The watcher's one dispatch lock (v0.6.14-beta.2), as an engine asks for it: the same
+        """The watcher's one dispatch lock (v0.6.15-beta), as an engine asks for it: the same
         `threading.RLock` for every engine of this process, made once."""
         lock = getattr(self, "_dispatch_lock", None)
         if lock is None:
@@ -484,7 +484,7 @@ class App(WatchLoop):
     def home_lock(self) -> HomeLock:
         return HomeLock(self.codex_home, self.lock_dir)
 
-    # ------------------------------------------------------------ other Codex homes (v0.6.14-beta.2)
+    # ------------------------------------------------------------ other Codex homes (v0.6.15-beta)
     def extra_home_lock(self, path) -> HomeLock:
         """The lock of a Codex home Settings add: by its path and its folder's identity, never by one alone."""
         return HomeLock(path, self.lock_dir, require_identity=True)

@@ -197,7 +197,7 @@ class Scoped:
         from .resets import ResetsHandle
         self._reads.update({
             "resets": ResetsHandle(state, capability, on),
-            # v0.6.14-beta.2: a continuation capability's own continuations (state/continuations.py).
+            # v0.6.15-beta: a continuation capability's own continuations (state/continuations.py).
             "continuations": ContinuationsHandle(state, capability, on),
             # and prompt_queue's prompts (state/prompts.py).
             "prompts": PromptsHandle(state, capability, on),

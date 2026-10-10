@@ -1,6 +1,6 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
 """What the edition keeps of its own continuations and of the conversations a person asked to keep going
-(version 4, v0.6.14-beta.2).
+(version 4, v0.6.15-beta).
 
     continuations  one row for each turn the edition answered or chose not to - a turn that ended with no reply
                    (empty_response), a subagent's stop (subagent_parent), a conversation kept going
@@ -272,7 +272,7 @@ def prune(connection, now, max_age, limit) -> None:
 
 
 class ContinuationsHandle:
-    """What one continuation capability's code is given of the state (state.Scoped's `continuations`, v0.6.14-beta.2):
+    """What one continuation capability's code is given of the state (state.Scoped's `continuations`, v0.6.15-beta):
     its own continuations and, for keep_going, the conversations kept going - reads always, writes only while the
     runtime has it on. Held in a closure, as the Scoped view is: against a capability's mistakes, not its intent."""
     __slots__ = ("capability", "_calls")

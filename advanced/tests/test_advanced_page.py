@@ -75,7 +75,7 @@ WINDOW = "CodexAutoResumeSettings.exe"
 SCALES = (1.0, 1.25, 1.5, 1.75, 2.0)
 IDS = [definition.id for definition in registry.DEFINITIONS]
 # The capability the turn-on scenario opens: one whose statement carries a warning (M7 unmeasured there), named
-# rather than counted, since the registry grew (v0.6.14-beta.2 put queue_for_open third).
+# rather than counted, since the registry grew (v0.6.15-beta put queue_for_open third).
 MARKER_FREE = "marker_free_continuation"
 # Every measurement the shipped capabilities rest on, passed on the Codex in force: no warning of that kind.
 PASSED = {measurement: (Verdict.PASS, ac.ENGINE) for measurement in Measurement}

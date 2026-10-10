@@ -1,6 +1,6 @@
 // ADVANCED-EDITION-CODE: in the advanced edition's window, never the standard one's.
 //
-// Codex Auto Resume - the prompt queue on the Advanced features page, and on Pending's Scheduled group (v0.6.14-beta.2).
+// Codex Auto Resume - the prompt queue on the Advanced features page, and on Pending's Scheduled group (v0.6.15-beta).
 //
 // While prompt_queue is on, its column has a card under its limits: each message queued, a flat line saying for which
 // conversation, when it goes and where it stands, with Cancel under it - and Go on for one held - then the form one is

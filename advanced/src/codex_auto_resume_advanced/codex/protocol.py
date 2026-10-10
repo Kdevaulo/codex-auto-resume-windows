@@ -64,7 +64,7 @@ MEASUREMENT_METHODS = {
     Measurement.MU: ("account/rateLimits/read",),
     Measurement.MN: ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
     Measurement.MR: ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
-    # v0.6.14-beta.2: MQ lists what the app holds, before core's backend sends to two to four of them at once.
+    # v0.6.15-beta: MQ lists what the app holds, before core's backend sends to two to four of them at once.
     Measurement.MQ: ("thread/loaded/list",),
     # ME reads the turn history from its database (codex/turns.py) and calls nothing.
     Measurement.ME: (),

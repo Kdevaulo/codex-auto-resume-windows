@@ -1,8 +1,8 @@
-"""One folder is one Codex home however it is spelled, and what a home to watch must be (v0.6.14-beta.2).
+"""One folder is one Codex home however it is spelled, and what a home to watch must be (v0.6.15-beta).
 
 A watcher's lock on a Codex home has been a file named by the SHA-256 of the home's resolved path since
 v0.6.0 (win/homelock.py). Path.resolve() follows a junction or a symbolic link, but a folder has spellings
-it does not canonicalise - a subst drive, a share of the same disk - so from v0.6.14-beta.2 the lock is
+it does not canonicalise - a subst drive, a share of the same disk - so from v0.6.15-beta the lock is
 two files: the path's, then one named by the folder's identity (win/folderid.py: the volume's serial number
 and the folder's index, which no spelling changes). Either busy is busy. A folder whose identity cannot be
 read - the default home before Codex made it - is locked by its path alone, as before; a home a person
@@ -103,7 +103,7 @@ class FolderLockTests(Case):
             HomeLock(link, self.locks).__enter__()
 
     def test_the_path_lock_alone_still_excludes_the_same_spelling(self):
-        """A v0.6.14-beta watcher takes the path lock only: it and this one still exclude each other."""
+        """A v0.6.14 watcher takes the path lock only: it and this one still exclude each other."""
         with patch.object(folderid, "identity", return_value=None):
             self.held(HomeLock(self.home, self.locks))
         with self.assertRaises(AdapterError):

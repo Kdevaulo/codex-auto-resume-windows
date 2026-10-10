@@ -749,6 +749,9 @@ the web's steps without it. The project's check takes a report the product wrote
 
 ## v0.6.15 — The rest of the advanced edition
 
+**In development: v0.6.15-beta ✅, its first pre-release, is out: stage 3c and watching several Codex
+homes. Stage 4 is next.**
+
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
 v0.6.14's. It comes in as many pre-releases as it needs, from **v0.6.15-beta** on: each finished
@@ -768,7 +771,7 @@ confirms, and does not drop the capability.
 - a prompt queue and recurring wakes, carrying the person's own words only (its *at the next reset*
   part is v0.6.14's Send your own message when a limit resets).
 
-  **Built for v0.6.14-beta.2 (stage 3c):** these six, as Several conversations at once, Queue for when a
+  **Built for v0.6.15-beta (stage 3c):** these six, as Several conversations at once, Queue for when a
   conversation is opened, Continue a turn that ended with no reply, Tell a parent which of its subagents
   stopped, Keep a conversation going and Queue messages for later - each described in
   [EDITIONS.md](EDITIONS.md#todays-capabilities). The measurements they rest on that are new - MQ, ME, MS,
@@ -806,7 +809,7 @@ confirms, and does not drop the capability.
 ### Also moved here
 
 - **Watching several Codex homes**, a standard-edition addition that waited on measurement MH, which
-  passed on 2026-09-28. Built for v0.6.14-beta.2: up to three more homes, in the
+  passed on 2026-09-28. Built for v0.6.15-beta: up to three more homes, in the
   [guide](GUIDE.md#several-codex-homes); MH is to be measured again on the Codex in force.
 - **Arabic and Hebrew**, translated and held since v0.6.11-beta, offered once the window is mirrored
   for right-to-left.
@@ -1104,4 +1107,5 @@ This document records the current direction; v0.6.14 is out, as a final with no 
 the advanced edition eight more ways to recover, Keep it on, the watch log, the reset actions and a
 compatibility report sent from the app, and the panel beside the chat; in both editions, a window that
 no longer hangs while a recovery waits. Before it, v0.6.13 found Codex's engine again wherever an
-update puts it. The rest of the advanced edition, v0.6.15, is next.
+update puts it. The rest of the advanced edition, v0.6.15, is being built: its first pre-release,
+v0.6.15-beta, is out, with stage 3c and watching several Codex homes.

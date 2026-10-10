@@ -24,7 +24,7 @@ def _sign_in(value):
     return value if isinstance(value, str) and _SIGN_IN.match(value) else None
 
 
-# v0.6.14-beta.2: the Codex homes a watcher is set to watch - the default and up to three more.
+# v0.6.15-beta: the Codex homes a watcher is set to watch - the default and up to three more.
 MAX_HOMES = 4
 
 
@@ -69,7 +69,7 @@ class WatcherMixin:
         most private memory the watcher has committed, in bytes, and `sign_in` and `booted_at` the sign-in
         it runs in and when Windows started (win/ownprocess.py). Every beat says the watcher is running
         (WatcherEnd.RUNNING) until one that stops on purpose says otherwise (`watcher_ended`). `homes`
-        (v0.6.14-beta.2) is what it found of each Codex home it is set to watch (homes_text): NULL with one."""
+        (v0.6.15-beta) is what it found of each Codex home it is set to watch (homes_text): NULL with one."""
         _timestamp(now, "now")
         state = engine_state if engine_state in ENGINE_STATES else "unknown"
         reading = self._reading(usage)
@@ -145,6 +145,6 @@ class WatcherMixin:
             "ended_at": _finite(row.get("ended_at")),
             "sign_in": _sign_in(row.get("sign_in")),
             "booted_at": _finite(row.get("booted_at")),
-            # v0.6.14-beta.2: each Codex home it is set to watch and what it found of it, or None with one.
+            # v0.6.15-beta: each Codex home it is set to watch and what it found of it, or None with one.
             "homes": homes_read(row.get("homes")),
         }

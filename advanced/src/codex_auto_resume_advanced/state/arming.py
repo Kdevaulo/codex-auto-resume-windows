@@ -138,7 +138,7 @@ class ArmingMixin:
                 (capability, state, now, actor, reason, revision, engine_version, warnings))
             if state != ArmingState.ARMED:
                 end_pending(connection, (capability,), now)      # a reset action's rules end with it
-                end_continuations(connection, (capability,), now)  # and (v0.6.14-beta.2) its continuations
+                end_continuations(connection, (capability,), now)  # and (v0.6.15-beta) its continuations
                 end_prompts(connection, (capability,), now)        # and its queued prompts
             connection.execute("UPDATE meta SET generation = generation + 1")
             code = _CODES.get(state) or (JournalCode.TRIPPED if actor == Actor.TRIPWIRE

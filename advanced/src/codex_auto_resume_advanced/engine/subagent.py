@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Subagent recovery through the parent (v0.6.14-beta.2, the plan's item 5): a parent hears, in fixed words, which of
+"""Subagent recovery through the parent (v0.6.15-beta, the plan's item 5): a parent hears, in fixed words, which of
 its subagents stopped and why - and nothing is ever written to a subagent. At P4, P8 and P2.
 
 The standard edition recovers a person's own conversations alone: a subagent's conversation is never detected and

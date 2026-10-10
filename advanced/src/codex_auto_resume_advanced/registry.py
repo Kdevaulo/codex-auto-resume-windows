@@ -355,7 +355,7 @@ GOAL_CONTINUATION = CapabilityDef(
     measurements=(Measurement.M2,),
 )
 
-# Queue for opening (v0.6.14-beta.2; the plan's item 4: an unloaded conversation through the deferred queue). At P16,
+# Queue for opening (v0.6.15-beta; the plan's item 4: an unloaded conversation through the deferred queue). At P16,
 # for a usage-limited conversation the Codex app does not hold (notLoaded, never unknown), it answers QUEUE_FOR_OPEN:
 # core sends its own words with its marker through its own backend, under the one claim - which writes this
 # capability's override, one per interruption (ledger.py) - and leaves the item in Codex's queue for when the
@@ -532,7 +532,7 @@ RESET_CREDIT = CapabilityDef(
 RESET_MESSAGE = CapabilityDef(
     id="reset_message",
     points=frozenset({Point.TICK, Point.RECORDS, Point.GATES}),
-    # Revision 2 (v0.6.14-beta.2): a Pause takes back a message Codex already holds and cancels it (core's
+    # Revision 2 (v0.6.15-beta): a Pause takes back a message Codex already holds and cancels it (core's
     # engine/plugrecords.py), which its statement's H4 now says.
     revision=2,
     departs_from=("A8", "A17", "A26", "C4", "C9", "D2", "H4", "H6"),
@@ -614,7 +614,7 @@ SEND_NOW = CapabilityDef(
     codes=("requested",),
 )
 
-# Several conversations at once (v0.6.14-beta.2; the plan's row: parallel processing across conversations). At P12 it
+# Several conversations at once (v0.6.15-beta; the plan's row: parallel processing across conversations). At P12 it
 # answers how many sends may wait for their receipts at once - the Workers option, 2 by default, 2 at most until MQ
 # passes on the Codex in force - and core lets that many wait on workers, one in each conversation, while every gate,
 # claim and look stays on the tick (core's engine/launches.py). Each pooled claim pays one unit, so a pooled send whose
@@ -634,7 +634,7 @@ PARALLEL_DISPATCH = CapabilityDef(
     measurements=(Measurement.MQ,),
 )
 
-# The prompt queue (v0.6.14-beta.2; the plan's item 7, on reset_message's way). A person queues messages of their own
+# The prompt queue (v0.6.15-beta; the plan's item 7, on reset_message's way). A person queues messages of their own
 # for one conversation in the Dashboard - after the turn now running, at a time, or every day or week from a time, 30
 # times and 30 days at most - and at P2 each conversation's first one still to go is made due and handed core with its
 # words, a P2 MESSAGE core sends exactly as typed: in order, each once, one waiting for the one before it to arrive
@@ -655,7 +655,7 @@ PROMPT_QUEUE = CapabilityDef(
     measurements=(Measurement.MT,),
 )
 
-# Empty-response recovery (v0.6.14-beta.2; the plan's item 3). At P8, at most once a minute, it looks at the
+# Empty-response recovery (v0.6.15-beta; the plan's item 3). At P8, at most once a minute, it looks at the
 # conversations with a turn completed in the last hour: one switched on whose latest turn Codex completed with no
 # error, no final agent item and only a message of the person's and Codex's reasoning in it - judged by kinds alone
 # (codex/turns.py) - seen so twice, thirty seconds apart and ten after it ended, is continued once in the edition's
@@ -677,7 +677,7 @@ EMPTY_RESPONSE = CapabilityDef(
     measurements=(Measurement.ME,),
 )
 
-# Subagent recovery through the parent (v0.6.14-beta.2; the plan's item 5). At P4, for a core continuation of a parent
+# Subagent recovery through the parent (v0.6.15-beta; the plan's item 5). At P4, for a core continuation of a parent
 # whose subagents stopped on a failure, it adds one line a subagent, at most five, in fixed words with only the
 # subagent's id and a closed kind word varying (5a); at P8 and P2, once MS passes on the Codex in force, one
 # continuation of its own to a parent that finished normally after a subagent stopped (5b). Every record is the
@@ -697,7 +697,7 @@ SUBAGENT_PARENT = CapabilityDef(
     measurements=(Measurement.MS,),
 )
 
-# Keep going (v0.6.14-beta.2; the plan's item 6). A person picks conversations in the Dashboard, each with a count of 1
+# Keep going (v0.6.15-beta; the plan's item 6). A person picks conversations in the Dashboard, each with a count of 1
 # to 10; at P8, at most once a minute, a picked conversation whose latest turn ended well and that has been idle a
 # minute is sent one continuation of the edition's own words, a P2 CONTINUATION core sends only while that turn is the
 # latest. It stops on no progress, a finished plan (its steps' statuses alone), an unreadable plan, the count used, an
@@ -726,7 +726,7 @@ LONG_RESET_MESSAGE = CapabilityDef(
     id="long_reset_message",
     kind=CapabilityKind.ACTION,
     points=frozenset(),
-    # Revision 2 (v0.6.14-beta.2): "Longer messages" - a queued prompt's too (engine/promptqueue.py).
+    # Revision 2 (v0.6.15-beta): "Longer messages" - a queued prompt's too (engine/promptqueue.py).
     revision=2,
     departs_from=("A27",),
     compat=None,

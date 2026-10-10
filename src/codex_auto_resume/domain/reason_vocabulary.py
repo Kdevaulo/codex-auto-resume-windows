@@ -1,6 +1,6 @@
 """The reasons a record waits, stops or is taken back, and what a watcher found of each Codex home.
 
-Out of domain/vocabulary.py, which is at its line budget, in v0.6.14-beta.2 and named through it still:
+Out of domain/vocabulary.py, which is at its line budget, in v0.6.15-beta and named through it still:
 `from .vocabulary import ReasonCode` reads as it did. Each list is a contract as every other there is -
 the store validates against it, the catalogs carry a sentence for each member (tests/test_vocabulary.py).
 
@@ -27,7 +27,7 @@ class WithdrawReason(StrEnum):
     # v0.6.11: taken back because Observe only is on - a Pause's promise, under words of its own.
     OBSERVE_ONLY = "observe_only"
     OBSERVE_ONLY_UNKNOWN = "observe_only_unknown"
-    # v0.6.14-beta.2: one queued for when its conversation is opened (P16's QUEUE_FOR_OPEN) - the plug no longer
+    # v0.6.15-beta: one queued for when its conversation is opened (P16's QUEUE_FOR_OPEN) - the plug no longer
     # keeps it there, or seven days and an hour passed; or the conversation was opened and Codex did not deliver it.
     WINDOW_ENDED = "window_ended"
     NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
@@ -75,7 +75,7 @@ class ReasonCode(StrEnum):
     NOT_RECOVERABLE = "not_recoverable"      # v0.6.14: a failure taken up (P17) nothing takes up now
     ADMISSION_EXPIRED = "admission_expired"  # and one taken up a day ago on the clock, ended unsent
     CAPACITY_WINDOW = "capacity_window"      # and capacity retries past twelve hours on the clock
-    # v0.6.14-beta.2: a Codex home taken out of Settings, its waiting records cancelled (runtime/homes.py); and,
+    # v0.6.15-beta: a Codex home taken out of Settings, its waiting records cancelled (runtime/homes.py); and,
     # going back to a version that watches one home, another home's waiting records (store/downgrade.py).
     HOME_REMOVED = "home_removed"
     HOME_NOT_WATCHED = "home_not_watched"
@@ -123,7 +123,7 @@ class ReasonCode(StrEnum):
 
 
 class HomeState(StrEnum):
-    """What a watcher found of one Codex home it is set to watch (v0.6.14-beta.2, runtime/homes.py), as the
+    """What a watcher found of one Codex home it is set to watch (v0.6.15-beta, runtime/homes.py), as the
     heartbeat keeps it (store/watcher.py) and Settings words it: watched; another watcher holds its lock;
     its folder cannot be read; the ChatGPT app runs on another home; the same folder as a home already
     watched; removed, and kept only until what was sent there settles."""

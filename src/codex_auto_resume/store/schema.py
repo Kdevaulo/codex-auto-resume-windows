@@ -19,7 +19,7 @@ _TABLES_V3 = _TABLES_V2 | {"events", "watcher_status"}
 
 _TABLES_V4 = _TABLES_V3 | {"notices"}
 
-# Schema 5 (v0.6.14-beta.2) adds two columns and no table.
+# Schema 5 (v0.6.15-beta) adds two columns and no table.
 _TABLES_V5 = _TABLES_V4
 
 

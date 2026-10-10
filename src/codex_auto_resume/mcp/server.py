@@ -50,7 +50,7 @@ from .tools import (PANEL_DISPLAY_MODES, PANEL_PREFERRED_MODE, RESOURCES, SETTIN
 
 
 def _no_homes(value):
-    """`value` with the Codex homes taken out of every settings mapping in it (v0.6.14-beta.2): their folders
+    """`value` with the Codex homes taken out of every settings mapping in it (v0.6.15-beta): their folders
     are paths, which may hold the Windows user name, and this reply is part of what Codex sends on. A record's
     home is said by its alias alone (control/records.py)."""
     if isinstance(value, dict):
@@ -357,7 +357,7 @@ class Server:
     def _tool_update_settings(self, arguments) -> dict:
         if not arguments:
             raise ControlError("name at least one setting to change")
-        # v0.6.14-beta.2: the Codex homes are the Dashboard's alone, refused by name whatever a schema offers.
+        # v0.6.15-beta: the Codex homes are the Dashboard's alone, refused by name whatever a schema offers.
         dashboard = sorted(set(arguments) & DASHBOARD_ONLY)
         if dashboard:
             raise ControlError("not changeable from Codex: %s" % ", ".join(dashboard))

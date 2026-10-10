@@ -1,4 +1,4 @@
-"""The settings' schema, as every surface draws it (settings.describe): out of settings.py in v0.6.14-beta.2,
+"""The settings' schema, as every surface draws it (settings.describe): out of settings.py in v0.6.15-beta,
 when that module reached its line budget.
 
 The user interfaces render themselves from this, so a field added to settings.FIELDS appears in every

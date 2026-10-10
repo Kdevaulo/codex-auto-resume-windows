@@ -17,12 +17,12 @@ WITHDRAW_REASONS = frozenset(WithdrawReason)
 SUPERSEDE_WITHDRAWALS = frozenset({"superseded", "superseded_by_user", "user_queued_input"})
 # Taken back because nothing may go to Codex for now - a Pause, or (v0.6.11) Observe only - and so
 # handed back to waiting once nothing ran; the same two over an uncertain submission end it final.
-# v0.6.14-beta.2: and one queued for when its conversation is opened (P16's QUEUE_FOR_OPEN), taken back when the plug
+# v0.6.15-beta: and one queued for when its conversation is opened (P16's QUEUE_FOR_OPEN), taken back when the plug
 # no longer keeps it there or seven days and an hour passed, or when the conversation was opened and Codex did not
 # deliver it: given back to waiting once nothing ran, to go the ordinary way.
 RELEASABLE_WITHDRAWALS = frozenset({"paused", "observe_only", "window_ended", "not_delivered_on_open"})
 TURN_STATUSES = frozenset(TurnStatus)
-# v0.6.14-beta.2: what a watcher found of each Codex home it is set to watch (runtime/homes.py).
+# v0.6.15-beta: what a watcher found of each Codex home it is set to watch (runtime/homes.py).
 HOME_STATES = tuple(HomeState)
 ACTORS = frozenset(Actor)
 # Schema 4 (v0.6.11). Why a record waits for a person (`interruptions.hold`), and how much a

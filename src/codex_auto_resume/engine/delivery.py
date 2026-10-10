@@ -163,7 +163,7 @@ class DeliveryMixin:
         else:
             self.transition(reserved, "submission_unknown", "queue_result_unknown_do_not_resend", delay=1)
 
-    # --------------------------------------------------------------- receipts on workers (P12, v0.6.14-beta.2)
+    # --------------------------------------------------------------- receipts on workers (P12, v0.6.15-beta)
     def _workers(self, due) -> int:
         """How many sends of this tick may wait for their receipts at once: P12's answer (domain/plughands.py), and 1
         - every send inline, as always - for another Codex home than the default, a retiring one, or an engine that

@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""What the edition's own continuations share (v0.6.14-beta.2): the key one is kept under, and what core is handed of
+"""What the edition's own continuations share (v0.6.15-beta): the key one is kept under, and what core is handed of
 one (P2's CONTINUATION).
 
 An empty reply continued (engine/emptyreply.py), a subagent's stop told to its parent (engine/subagent.py) and a

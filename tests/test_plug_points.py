@@ -1343,7 +1343,7 @@ MOVERS = frozenset({"reserve_detailed", "release_claim", "release_withdrawn", "c
 # The store calls a person's action makes that move a record (store/actions.py): cancelling one,
 # cancelling a conversation, giving the attempts back. The engine never makes them, and no plug
 # is told of them: P14 tells what the engine writes.
-# v0.6.14-beta.2: and a Codex home a person took out of Settings, its waiting records cancelled by the watcher
+# v0.6.15-beta: and a Codex home a person took out of Settings, its waiting records cancelled by the watcher
 # (store/records.py cancel_home) - records of a home other than the default, whose engine's plug is NULL.
 PERSONS = frozenset({"cancel_interruption", "cancel_thread", "restore_budget_detailed", "cancel_home"})
 # Where the engine makes those calls today - so a new one is seen, and has to tell the plug too.

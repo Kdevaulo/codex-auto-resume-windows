@@ -345,13 +345,13 @@ VERDICT_CASES = [
     row("0.6.12-beta.3", "offered newer,prerelease,convert3", offer="0.6.12-beta.2", newer=True),
     row("0.6.12-beta.2", "offered newer,prerelease,convert3,edition", edition="advanced", offer="0.6.12-beta.2",
         newer=True),
-    # The schema: converted for 0.6.0 to 0.6.11-alpha (to 3) and 0.6.11-beta to 0.6.14-beta (to 4), kept from
-    # 0.6.14-beta.2, which is schema 5.
+    # The schema: converted for 0.6.0 to 0.6.11-alpha (to 3) and 0.6.11-beta to 0.6.14 (to 4), kept from
+    # 0.6.15-beta, which is schema 5.
     row("0.6.9", "offered older,release,convert3"),
     row("0.6.11-alpha.2", "offered older,prerelease,convert3", older=True),
     row("0.6.11-beta", "offered older,prerelease,convert3", older=True),
     row("0.6.14-beta", "offered newer,prerelease,convert3", offer="0.6.14-beta"),
-    row("0.6.14-beta.2", "offered newer,prerelease,kept", offer="0.6.14-beta.2"),
+    row("0.6.15-beta", "offered newer,prerelease,kept", offer="0.6.15-beta"),
     # The advanced settings: an advanced target before 0.6.11-beta.2 cannot read them.
     row("0.6.11-beta", "offered older,prerelease,convert3,advanced-off", edition="advanced",
         installed_edition="advanced", older=True),
@@ -506,7 +506,7 @@ class ListingTests(unittest.TestCase):
         self.assertEqual((c["PickFloor"], c["EditionsSince"], c["PolicySince"]), ("0.6.2", "0.6.11-alpha", "0.6.11-beta"))
         self.assertEqual(c["EditionsSince"], RELEASE["advanced"]["since"] + "-alpha")
         from codex_auto_resume.store import SCHEMA_VERSION
-        self.assertEqual(c["StateSchemaSince"], [["0.6.14-beta.2", 5], ["0.6.11-beta", 4], ["0.6.0", 3]])
+        self.assertEqual(c["StateSchemaSince"], [["0.6.15-beta", 5], ["0.6.11-beta", 4], ["0.6.0", 3]])
         self.assertEqual(c["StateSchemaSince"][0][1], SCHEMA_VERSION, "the first row is this version's own schema")
         self.assertEqual(c["AdvancedStateSince"], [["0.6.11-beta.2", 2], ["0.6.11-alpha", 1]])
         # I12 as the owner amended it on 2026-10-03 (design Q1): a pre-release picked by name and
@@ -807,7 +807,7 @@ $answers = @(foreach ($case in $cases) {
     $answer = Convert-StateForOlder -Home_ 'C:\scratch-home'
     [ordered]@{ answer = $answer; asked = @($script:asked | ForEach-Object { $_ -join ' ' }) }
 })
-# v0.6.14-beta.2: a target on schema 4 is converted with --to 4; nothing else but 3 and 4 is asked for at all.
+# v0.6.15-beta: a target on schema 4 is converted with --to 4; nothing else but 3 and 4 is asked for at all.
 $script:case = $cases[0]
 $targets = @(foreach ($to in @(4, 5)) {
     $script:asked = @()
@@ -1006,7 +1006,7 @@ class PickRunTests(PickerRun):
 
     # -------------------------------------------------------------- what is installed
     def test_a_newer_release_is_installed_checked_against_its_pin(self):
-        # v0.6.14-beta.2: a target on this version's schema (5) - every earlier one converts the state first.
+        # v0.6.15-beta: a target on this version's schema (5) - every earlier one converts the state first.
         self.serve([entry("0.6.15"), entry(INSTALLED), entry("0.6.11")])
         self.published("0.6.15", pin=True)
         code, output, asked = self.pick("0.6.15")

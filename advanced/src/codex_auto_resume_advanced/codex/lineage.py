@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Which subagents a conversation spawned, and how each one's latest turn ended, read-only (v0.6.14-beta.2) - never
+"""Which subagents a conversation spawned, and how each one's latest turn ended, read-only (v0.6.15-beta) - never
 what either says.
 
 Codex keeps who spawned whom in `thread_spawn_edges` of the newest state_<N>.sqlite (parent, child, status - the

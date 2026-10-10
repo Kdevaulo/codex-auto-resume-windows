@@ -130,7 +130,7 @@ def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False):
     The app's Codex server is the one child of that main running the configured engine; where
     the main has several such children, the one of them holding Codex's queue or state database
     in `codex_home` open (`_state_holder`), and without a `codex_home` none. With `require_holder`
-    (v0.6.14-beta.2, a Codex home other than the default), even one such child must hold that home's
+    (v0.6.15-beta, a Codex home other than the default), even one such child must hold that home's
     database open: an app started on another home holds none of this one's, and its recoveries wait.
     """
     mains = [_app_main(rows)]

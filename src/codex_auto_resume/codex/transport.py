@@ -68,7 +68,7 @@ class Backend:
     def __init__(self, codex_home: Path, codex_exe: Path, require_holder: bool = False):
         self.codex_home = Path(codex_home).resolve()
         self.codex_exe = Path(codex_exe).resolve()
-        # v0.6.14-beta.2: a Codex home other than the default is the app's only while its server holds that
+        # v0.6.15-beta: a Codex home other than the default is the app's only while its server holds that
         # home's database open (codex/pairing.py); the default home is paired as it always was.
         self.require_holder = require_holder
         self._version_signature = None

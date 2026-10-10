@@ -39,7 +39,7 @@ GOLDEN = HERE / "fixtures" / "schema.json"
 # The releases whose state files are still out there and still upgraded on open. v0.6.10's
 # store is a package, so it is run whole in a process of its own (tests/released.py).
 V1_TAG, V2_TAG, V3_TAG = "v0.5.0", "v0.5.7", "v0.6.10"
-# v0.6.14-beta.2: schema 4's last published final, which `downgrade-state --to 4` must match.
+# v0.6.15-beta: schema 4's last published final, which `downgrade-state --to 4` must match.
 V4_TAG = "v0.6.13"
 
 

@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""The Dashboard's keep going (v0.6.14-beta.2): the conversations kept going read, one picked with a count, one stopped.
+"""The Dashboard's keep going (v0.6.15-beta): the conversations kept going read, one picked with a count, one stopped.
 
 Each is the long-lived bridge's, the Dashboard's alone (surfaces.py), against the generation the page read: a page
 that had not seen something turned off is refused, as an arm is. No MCP tool reaches any of them. A conversation is

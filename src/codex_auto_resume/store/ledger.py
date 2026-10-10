@@ -148,7 +148,7 @@ class LedgerMixin:
     @staticmethod
     def _caps_refusal(connection, row, now, vector, caps, forced):
         """`reserve_detailed`'s caps, (claims a day, spacing): the conversation's day and spacing, read inside
-        the claim (v0.6.14-beta.2), a Send now passing the spacing as at the gate - the same two
+        the claim (v0.6.15-beta), a Send now passing the spacing as at the gate - the same two
         reads as the gates' (`recent_claim_count`, `recent_claims`), so a claim of the same conversation
         committed after the gates read them - by another engine or a worker's settling - is counted.
         The refusal is a wait (engine/announce.py `_refused`), never a stop: `attempt_budget` with the

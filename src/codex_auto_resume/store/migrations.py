@@ -134,7 +134,7 @@ class MigrationsMixin:
 
     @staticmethod
     def _add_schema_5(connection: sqlite3.Connection) -> None:
-        """Schema 5's two columns (v0.6.14-beta.2): every record of the default Codex home ('') - which is
+        """Schema 5's two columns (v0.6.15-beta): every record of the default Codex home ('') - which is
         every record there was - and no homes written until a watcher watches more than one."""
         for table, name, definition in _SCHEMA_5_COLUMNS:
             found = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}

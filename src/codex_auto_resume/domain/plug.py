@@ -129,7 +129,7 @@ class Alternative(StrEnum):
     # P15: no marker; queued under the client id core derives from the interruption
     # (ids.continuation_client_id), which is what proves it arrived.
     CLIENT_ID = "client_id"
-    # P16 (v0.6.14-beta.2): the ordinary send to a conversation the app does not hold, left in Codex's queue for
+    # P16 (v0.6.15-beta): the ordinary send to a conversation the app does not hold, left in Codex's queue for
     # when it is opened - kept there only while the plug says so, and seven days and an hour at most.
     QUEUE_FOR_OPEN = "queue_for_open"
     # P17, and P3 at known_failure: take a failure up, waiting as core waits for an admitted one
@@ -611,7 +611,7 @@ class Guarded:
         return answer, bool(broke)
 
     def partition(self, records):
-        """P12 (v0.6.14-beta.2): how many sends may wait for their receipts at once (plughands.workers), 1 for anything
+        """P12 (v0.6.15-beta): how many sends may wait for their receipts at once (plughands.workers), 1 for anything
         but a whole number 2 to MAX_WORKERS - DEFER, NULL and a hook that raised included."""
         return workers(self._ask(Point.CONCURRENCY, records))
 
@@ -638,7 +638,7 @@ class Guarded:
         if answer is DEFER:
             return DEFER
         try:
-            # v0.6.14-beta.2: or QUEUE_FOR_OPEN - the ordinary send, left in Codex's queue for when it is opened.
+            # v0.6.15-beta: or QUEUE_FOR_OPEN - the ordinary send, left in Codex's queue for when it is opened.
             if type(answer) in (str, Alternative) and answer == Alternative.QUEUE_FOR_OPEN:
                 return Alternative.QUEUE_FOR_OPEN
         except Exception:

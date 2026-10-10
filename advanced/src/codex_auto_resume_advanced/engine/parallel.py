@@ -1,6 +1,6 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
 """Parallel dispatch: the advanced edition's answer at P12, how many sends may wait for their receipts at once
-(v0.6.14-beta.2).
+(v0.6.15-beta).
 
 The standard edition sends one continuation after another on one thread, each waiting up to 45 seconds for Codex's
 receipt before the next is looked at (A19: in sequence, under one lock). With this on, core lets two to four of them

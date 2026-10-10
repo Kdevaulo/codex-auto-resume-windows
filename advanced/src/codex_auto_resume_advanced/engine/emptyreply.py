@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Empty-response recovery (v0.6.14-beta.2, the plan's item 3): a turn that ended with no reply is continued once, and a
+"""Empty-response recovery (v0.6.15-beta, the plan's item 3): a turn that ended with no reply is continued once, and a
 chain of them twice, judged only by the kinds of item it left - at P8 and P2.
 
 The standard edition recovers failed turns alone: a turn Codex completed is never one it continues (0.5, A13). With

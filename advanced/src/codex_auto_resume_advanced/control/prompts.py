@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""The Dashboard's prompt queue (v0.6.14-beta.2): the queued prompts read, one added, one cancelled, one held let go on.
+"""The Dashboard's prompt queue (v0.6.15-beta): the queued prompts read, one added, one cancelled, one held let go on.
 
 Each is the long-lived bridge's, the Dashboard's alone (surfaces.py), against the generation the page read. No MCP
 tool reaches any of them. A prompt is added only while prompt_queue stands on and its conversation is switched on,

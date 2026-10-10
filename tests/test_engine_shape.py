@@ -88,7 +88,7 @@ METHODS = {
     # and a person's Send now (SEND_NOW, engine/relaxed.py): the schedule it passes, an attempt budget
     # of the person's own, and the administrator's ceiling the claim is told.
     "_send_now", "_own_budget", "forced_limits",
-    # v0.6.14-beta.2: a conversation's day and spacing, read by the gates and again in the claim, and how
+    # v0.6.15-beta: a conversation's day and spacing, read by the gates and again in the claim, and how
     # long a record the claim refused for them waits.
     "caps", "_cap_delay",
     # and the engine's own Codex home: its records, its claimed ones and its ids (engine/detect.py).
@@ -101,7 +101,7 @@ METHODS = {
     # and P2 carried out: the records of the plug's own, their words, their gates and moves, their claim
     # and the look before their send, what came of it, and those in flight watched (engine/plugrecords.py).
     "plug_records", "_worded", "_record_told", "_record_waits", "_try_record", "_record_would_send", "_not_ones_own", "_take_back", "_flying", "paused_records",
-    # v0.6.14-beta.2: one queued for when its conversation is opened (engine/foropen.py).
+    # v0.6.15-beta: one queued for when its conversation is opened (engine/foropen.py).
     "for_open", "_open_reason", "_for_open_rests", "_not_for_open",
     "_record_claim", "_record_problem", "_record_sent", "_watch_record",
 }

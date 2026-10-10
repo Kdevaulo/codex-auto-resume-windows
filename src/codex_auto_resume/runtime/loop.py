@@ -339,7 +339,7 @@ class WatchLoop:
         # v0.6.12: the power action after usage-limit recoveries, which reads nothing but its own file
         # until a person arms it - and is never asked in a single tick.
         afterwork = None if once else self._new_afterwork()
-        # v0.6.14-beta.2: the Codex homes Settings name beside the default one, each ticked after it (runtime/homes.py).
+        # v0.6.15-beta: the Codex homes Settings name beside the default one, each ticked after it (runtime/homes.py).
         self._homes = Homes(self)
         try:
             while True:
@@ -434,7 +434,7 @@ class WatchLoop:
         return exit_code
 
     def _other_homes(self, store):
-        """v0.6.14-beta.2: the other Codex homes' tick, after the default home's. What fails there costs that
+        """v0.6.15-beta: the other Codex homes' tick, after the default home's. What fails there costs that
         home its tick alone (runtime/homes.py), never the default home's."""
         try:
             self._homes.sync(store)

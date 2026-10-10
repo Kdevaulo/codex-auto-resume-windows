@@ -1,5 +1,5 @@
 """Up to four sends wait for their receipts at once, one in each conversation, while every claim and look stays on the
-tick (v0.6.14-beta.2, P12, engine/launches.py).
+tick (v0.6.15-beta, P12, engine/launches.py).
 
 The scenarios run the real engine and store over a codexsim home, with a simulated backend whose send - entered
 through the worker's own launch guard, as Backend.send enters it - waits on an event before it answers, so two

@@ -145,7 +145,7 @@ class OneSenderTests(unittest.TestCase):
         self.assertEqual(other, [])
 
     def test_the_one_send_is_handed_to_a_worker_only_from_the_dispatch(self):
-        """P12 (v0.6.14-beta.2): a send's receipt may be waited for on a worker. The send handed there is still the
+        """P12 (v0.6.15-beta): a send's receipt may be waited for on a worker. The send handed there is still the
         one, bound in the dispatch: exactly one reference to `sender.send` that is not a call, in the whole package,
         and it is an argument of the dispatch's one hand-over (`self._launched`), after the claim and the look."""
         innermost = {}
@@ -199,7 +199,7 @@ class OneSenderTests(unittest.TestCase):
     def test_a_route_for_a_conversation_not_held_is_asked_once_and_carried_out_once(self):
         """P16 (v0.6.11 stage 3b): the route a plug names where core would wait for the app is
         asked in one place and called in one place - after the one claim and the pre-send look,
-        inside the launch guard - and core's own backend is never handed one. From v0.6.14-beta.2 it is asked
+        inside the launch guard - and core's own backend is never handed one. From v0.6.15-beta it is asked
         in one more place, the watch, only whether a continuation queued for opening stays queued: there it is
         compared with QUEUE_FOR_OPEN, and nothing it answers is ever called."""
         asked = calls(lambda node: isinstance(node.func, ast.Attribute) and node.func.attr == "unloaded")
@@ -212,7 +212,7 @@ class OneSenderTests(unittest.TestCase):
         self.assertEqual(ast.unparse(resumed[0][2].func.value), "route")
 
     def test_nothing_injects_items_into_a_conversation(self):
-        """v0.6.14-beta.2: Codex's thread/inject_items writes items into a conversation - a subagent's among them - and
+        """v0.6.15-beta: Codex's thread/inject_items writes items into a conversation - a subagent's among them - and
         neither edition ever calls it: a parent hears of its subagents in its own continuation (the advanced
         engine/subagent.py), and nothing is ever written to a subagent. No source file of either names it."""
         root = Path(__file__).resolve().parents[1]

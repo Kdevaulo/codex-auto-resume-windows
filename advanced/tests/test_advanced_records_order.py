@@ -1,4 +1,4 @@
-"""P2's eight (v0.6.14-beta.2, design 11c): what the runtime hands core of the edition's own records, in order - those in
+"""P2's eight (v0.6.15-beta, design 11c): what the runtime hands core of the edition's own records, in order - those in
 flight first, the longest in flight first, from a place that moves on each tick when there are more than core takes;
 then one due record of each capability in the registry's order; then the rest - so no capability waits behind another
 for more than a tick.

@@ -1,4 +1,4 @@
-"""The prompt queue (v0.6.14-beta.2): a person's queued messages go after the current turn, at a time or on a schedule, in
+"""The prompt queue (v0.6.15-beta): a person's queued messages go after the current turn, at a time or on a schedule, in
 order, each once, and their words go once each has ended; Cancel and Pause take back one Codex already holds.
 
 Held against the shipped definition and statement and against core's own engine, store and simulated Codex home

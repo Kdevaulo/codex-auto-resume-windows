@@ -27,7 +27,7 @@ Core carries each out as it carries out its own, and nothing of it is the plug's
 * in flight: its marker found in Codex's history is delivered; none a day after it was sent is unproven,
   and never sent again (A6).
 
-From v0.6.14-beta.2 a record says what its words are (plughands.RecordPurpose): a person's MESSAGE, or a
+From v0.6.15-beta a record says what its words are (plughands.RecordPurpose): a person's MESSAGE, or a
 CONTINUATION in the edition's own catalog words (continuation.validate_continuation). Either goes only to a
 person's own desktop conversation - one `LocalSource.latest` reads: not archived, not a subagent's, the
 predicate detection uses (A15) - else it waits (identity, not_user_conversation); nothing is ever written
@@ -90,7 +90,7 @@ class PlugRecordsMixin:
         return True
 
     def _not_ones_own(self, record):
-        """(move, gate, reason) for a record that may not go to its conversation now, or None (v0.6.14-beta.2): not a
+        """(move, gate, reason) for a record that may not go to its conversation now, or None (v0.6.15-beta): not a
         person's own desktop conversation - archived, a subagent's, nothing the history reader takes - waits; a
         CONTINUATION whose turn is no longer the latest, not ended, or has anything after it is SUPERSEDED."""
         thread = record["thread_id"]
@@ -112,7 +112,7 @@ class PlugRecordsMixin:
         self.plug.moved(told, move)
 
     def _flying(self) -> dict:
-        """The plug's records this engine watched in flight (v0.6.14-beta.2), by id, until each ends: what a Pause
+        """The plug's records this engine watched in flight (v0.6.15-beta), by id, until each ends: what a Pause
         takes back out of Codex's queue while the plug is asked nothing (`paused_records`)."""
         found = self.__dict__.setdefault("_records_flying", {})
         if len(found) > NOTED_LIMIT:

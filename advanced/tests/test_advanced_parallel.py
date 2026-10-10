@@ -1,4 +1,4 @@
-"""Several conversations at once (v0.6.14-beta.2): P12's answer, how many sends may wait for their receipts at once,
+"""Several conversations at once (v0.6.15-beta): P12's answer, how many sends may wait for their receipts at once,
 and what turns it off.
 
 Held against the shipped definition and statement and against core's own engine, store and simulated Codex home

@@ -84,7 +84,7 @@ TABLES = {
                     "due_at", "launching_at", "sent_at", "finished_at"),
     "credit_spends": ("spend_id", "rule_id", "bucket", "minutes", "occasion", "attempt_id", "created_at", "tries",
                       "outcome", "finished_at"),
-    # Version 4 (v0.6.14-beta.2): the edition's own continuations, the conversations kept going, the queued prompts.
+    # Version 4 (v0.6.15-beta): the edition's own continuations, the conversations kept going, the queued prompts.
     "continuations": ("answer_id", "capability", "kind", "thread_id", "record_id", "ordinal", "words", "chain",
                       "created_at", "finished_at", "reason", "launching_at"),
     "keep_going": ("thread_id", "count", "used", "armed_at", "state", "reason", "finished_at"),
@@ -99,7 +99,7 @@ RESET_TABLES = ("windows", "readings", "reset_rules", "credit_spends")
 # rules `reset_rules` holds (registry.RESET_CREDIT, RESET_MESSAGE).
 BUCKETS = ("codex", "premium", "legacy", "other")
 RESET_CAPABILITIES = ("reset_credit", "reset_message")
-# The capabilities whose continuations `continuations` holds (v0.6.14-beta.2).
+# The capabilities whose continuations `continuations` holds (v0.6.15-beta).
 CONTINUATION_CAPABILITIES = ("empty_response", "subagent_parent", "keep_going")
 # The tables version 2 had: v0.6.11's and v0.6.12's file.
 # `records` before version 4 added its last two columns (queue_id, withdraw).
@@ -350,7 +350,7 @@ _STATEMENTS_RESETS = (
 )
 _STATEMENTS_V3 = _STATEMENTS_V3 + _STATEMENTS_RESETS
 
-# Version 4's own columns (v0.6.14-beta.2): the queue item a record's send was taken as, and a person's Cancel of one
+# Version 4's own columns (v0.6.15-beta): the queue item a record's send was taken as, and a person's Cancel of one
 # already in Codex's queue, for core to take back (the owner's answer of 2026-10-09).
 _KEY = "CHECK (%s IS NULL OR (length(%s) = 64 AND %s NOT GLOB '*[^0-9a-f]*'))"
 _UUID = "CHECK (length(thread_id) = 36 AND thread_id NOT GLOB '*[^0-9a-f-]*')"
@@ -451,7 +451,7 @@ STATEMENTS_V3 = _STATEMENTS_V2 + _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 TABLES_V3_BEFORE_RESETS = dict({name: TABLES[name] for name in TABLES if name not in RESET_TABLES + V4_TABLES},
                                records=RECORDS_V3)
 ADD_RESETS = _STATEMENTS_RESETS
-# Version 4 (v0.6.14-beta.2): the tables whose CHECKs name a closed list that grew are made again with the new list, every
+# Version 4 (v0.6.15-beta): the tables whose CHECKs name a closed list that grew are made again with the new list, every
 # row kept - SQLite cannot change a CHECK in place - and the tables of 3c added. A version-3 file is brought to it.
 TABLES_V3 = {name: columns for name, columns in dict(TABLES, records=RECORDS_V3).items() if name not in V4_TABLES}
 # The choices version 4 added to `options` (OptionKey): what a version-3 file's CHECK refuses.

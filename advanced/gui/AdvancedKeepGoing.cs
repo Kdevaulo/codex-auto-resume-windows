@@ -1,6 +1,6 @@
 // ADVANCED-EDITION-CODE: in the advanced edition's window, never the standard one's.
 //
-// Codex Auto Resume - keep going on the Advanced features page (v0.6.14-beta.2).
+// Codex Auto Resume - keep going on the Advanced features page (v0.6.15-beta).
 //
 // While keep_going is on, its column has a card under its limits: each conversation kept going, a flat line saying how
 // many continuations it has had of how many it may have now, with Stop under it; then the form one is picked with - the

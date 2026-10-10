@@ -201,7 +201,7 @@ class RecordsMixin:
                 % ",".join("?" for _ in waiting), waiting)}
 
     def cancel_home(self, home_key: str, now: float, reason: str) -> int:
-        """Every record waiting in one Codex home other than the default, cancelled and final (v0.6.14-beta.2):
+        """Every record waiting in one Codex home other than the default, cancelled and final (v0.6.15-beta):
         the home was taken out of Settings, or no Settings name it. What may be in Codex's queue there is left
         to its watch. Returns how many were cancelled."""
         _timestamp(now, "now")

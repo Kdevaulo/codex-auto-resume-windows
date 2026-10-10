@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""A person's queued prompts (version 4, v0.6.14-beta.2): their own words for one conversation, to go after the turn
+"""A person's queued prompts (version 4, v0.6.15-beta): their own words for one conversation, to go after the turn
 now running, at a time, or on a schedule - in order, each once.
 
     prompts   one row a prompt: its conversation, its words while one is still to go, when it goes (after_turn,

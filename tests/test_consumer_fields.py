@@ -155,7 +155,7 @@ _RECEIVERS = {
         "powerView": POWER_VIEW,
         "armed": _under(POWER_VIEW, ".armed"), "shown": _under(POWER_VIEW, ".shown"), "last": _under(POWER_VIEW, ".last"),
     },
-    # v0.6.14-beta.2: the Codex homes' card, beside what it has as a part of the Settings half (_spread).
+    # v0.6.15-beta: the Codex homes' card, beside what it has as a part of the Settings half (_spread).
     "gui/SettingsHomes.cs": {
         "view": [("bridge:status", "status.codex_homes"), ("bridge:dashboard", "status.codex_homes")],
         "home": [("bridge:status", "status.codex_homes.homes[]"), ("bridge:dashboard", "status.codex_homes.homes[]")],
@@ -178,7 +178,7 @@ _LOCAL = {
     "gui/Dashboard.cs": {"pages", "EnvironmentVariables", "map"},
     "gui/SettingsApp.cs": {"pages", "editors", "sections", "entry", "empty", "baseline"},
     "gui/SoftTheme.cs": {"MOTION"},
-    # v0.6.14-beta.2: the homes the card writes back - their folders and aliases - and the request it writes them in.
+    # v0.6.15-beta: the homes the card writes back - their folders and aliases - and the request it writes them in.
     "gui/SettingsHomes.cs": {"entry", "changes"},
 }
 
