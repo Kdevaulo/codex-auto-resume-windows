@@ -41,4 +41,6 @@ MEASURED = {
     Measurement.MP3: (Verdict.PASS, CLI_0162_ALPHA_17_2),
     # 2026-10-11, at the owner's word that one reset credit may be spent.
     Measurement.MR: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    # 2026-10-11, once that credit was spent and the account had none left.
+    Measurement.MN: (Verdict.PASS, CLI_0162_ALPHA_17_2),
 }

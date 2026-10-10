@@ -83,15 +83,17 @@ class TableTests(unittest.TestCase):
         no reset credit (this one has some): neither is settled. 2026-10-11, the owner allowed one credit: MR
         passed - at a real limit one consume said reset, spent exactly one credit, spent none on the retry
         with its key, and the app ran a message afterwards (the usage read right after still showed the
-        limit and no window changed)."""
+        limit and no window changed). With none left, MN passed: both consumes said no_credit and the count
+        stayed at zero."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
                                   Measurement.M6, Measurement.M7, Measurement.MA, Measurement.MH,
-                                  Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR})
+                                  Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR,
+                                  Measurement.MN})
         self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4})
         self.assertEqual(set(Measurement) - passed - failed,
-                         {Measurement.MU, Measurement.MN})
+                         {Measurement.MU})
 
 
 if __name__ == "__main__":
