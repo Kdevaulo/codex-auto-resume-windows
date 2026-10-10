@@ -222,6 +222,7 @@ DEFAULT_FILE = """{
   "ask_after_sleep_minutes": "off",
   "chain_time_ceiling": "off",
   "codex_exe": null,
+  "codex_homes": [],
   "config_version": 2,
   "context_guard": "off",
   "continuation_language": "follow",
