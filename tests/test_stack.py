@@ -97,6 +97,8 @@ ITEM = {_q(name): item for item, names in {
                "domain.plug", "edition",
                # v0.6.14: what core holds of a channel, a route and an errand a plug names.
                "domain.plughands",
+               # v0.6.15-beta.3: the plug of a package that could not be loaded, and the asking.
+               "domain.plugdamaged",
                # v0.6.11: quiet hours and a postponement's times - when, by the local clock - and
                # which projects may resume without a person; the retry ladders, which a person
                # chooses; and the two guards that may hold a waiting recovery.
