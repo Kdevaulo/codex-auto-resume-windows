@@ -114,6 +114,8 @@ class ClaimLedger:
                 return Alternative.HOLD
             if Alternative.SEND_NOW in acted[capability] and not self._sent_now(connection, capability, key, row[1], now):
                 return Alternative.HOLD
+            if Alternative.QUEUE_FOR_OPEN in acted[capability] and not self._for_open(connection, definition, key, now):
+                return Alternative.HOLD
             self.state.record_spend(connection, ATTACHED, capability, thread_id, key, now)
         return DEFER
 
@@ -145,6 +147,18 @@ class ClaimLedger:
         connection.execute("INSERT OR REPLACE INTO %s.overrides (interruption_id, capability, kind, created_at, "
                            "used_at) VALUES (?,?,?,?,NULL)" % ATTACHED,
                            (key, definition.id, OverrideKind.RESEND_ONCE, now))
+        return True
+
+    @staticmethod
+    def _for_open(connection, definition, key, now) -> bool:
+        """Whether `definition` may pay for queueing standard record `key` for when its conversation is opened
+        (v0.6.14-beta.2), written if so: once for each interruption - its QUEUE_FOR_OPEN override, written in the claim,
+        is what the watch keeps the item queued by, and what refuses a second (engine/foropen.py)."""
+        if connection.execute("SELECT 1 FROM %s.overrides WHERE interruption_id=? AND capability=?" % ATTACHED,
+                              (key, definition.id)).fetchone() is not None:
+            return False
+        connection.execute("INSERT INTO %s.overrides (interruption_id, capability, kind, created_at, used_at) "
+                           "VALUES (?,?,?,?,NULL)" % ATTACHED, (key, definition.id, OverrideKind.QUEUE_FOR_OPEN, now))
         return True
 
     def record(self, connection, record, now) -> object:

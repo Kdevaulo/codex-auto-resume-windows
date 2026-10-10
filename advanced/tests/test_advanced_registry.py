@@ -24,7 +24,7 @@ from codex_auto_resume.domain.plug import Point  # noqa: E402
 from codex_auto_resume_advanced import registry, standards, statement  # noqa: E402
 from codex_auto_resume_advanced.registry import (CAPABILITY_POINTS, Ceilings, Registry,  # noqa: E402
                                                  RegistryError, problems)
-from codex_auto_resume_advanced.vocabulary import ArmingWarning, CapabilityKind, Field, Measurement  # noqa: E402
+from codex_auto_resume_advanced.vocabulary import ArmingWarning, CapabilityKind, Field, Measurement, OptionKey  # noqa: E402
 
 # The standards file, public in the repository: each rule a line `**A1** <sentence>`, under its
 # family's heading `## A. <title>`, then the line that says how it is held and which tests hold it.
@@ -49,7 +49,7 @@ CHANGES = frozenset({"thread/queue/add", "thread/goal/set",
 
 
 class ShippedTests(unittest.TestCase):
-    SHIPPED = ("start_with_codex", "goal_continuation", "marker_free_continuation", "capacity_retry",
+    SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
                "long_reset_message", "compat_report")
@@ -71,7 +71,7 @@ class ShippedTests(unittest.TestCase):
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
                      Point.TICK: ("reset_credit", "reset_message"),
                      Point.RECORDS: ("reset_message",),
-                     Point.UNLOADED: ("goal_continuation",),
+                     Point.UNLOADED: ("goal_continuation", "queue_for_open"),
                      Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
                                    "early_reset"),
@@ -275,6 +275,20 @@ class ShippedTests(unittest.TestCase):
         self.assertEqual([definition.id for definition in registry.DEFINITIONS if definition.resends],
                          ["once_more_when_unsure"])
         self.assertIs(registry.ONCE_MORE, once)
+
+    def test_queue_for_open_departs_and_rests_on_what_the_design_says(self):
+        """A11 (nothing is queued on the off chance); it stands on loaded_state_detection, what decides that a
+        conversation is not held, and rests on M1; a dozen a day, three a conversation; at P16 alone, its one choice
+        the Days, 3 to 7."""
+        found = registry.REGISTRY.get("queue_for_open")
+        self.assertEqual(found.departs_from, ("A11",))
+        self.assertEqual((found.compat, found.measurements, found.revision, found.journal_prefix),
+                         ("loaded_state_detection", (Measurement.M1,), 1, "qfo"))
+        self.assertEqual(found.points, frozenset({Point.UNLOADED}))
+        self.assertEqual((found.ceilings.per_day, found.ceilings.per_conversation), (12, 3))
+        self.assertEqual([(option.key, option.choices, option.default) for option in found.options],
+                         [(OptionKey.DAYS, (3, 4, 5, 6, 7), 3)])
+        self.assertIs(registry.QUEUE_FOR_OPEN, found)
 
     def test_send_now_departs_and_rests_on_what_the_design_says(self):
         """A8 (the claim's re-check passes nothing), A20 (fifteen minutes between two continuations), A21 (the attempt

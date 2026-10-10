@@ -75,7 +75,9 @@ class VocabularyTests(unittest.TestCase):
     def test_every_tripwire_is_a_reason_a_capability_is_off(self):
         self.assertEqual({str(word) for word in vocabulary.TRIPWIRES},
                          {"submission_unknown", "local_check_failed", "failed_here", "incompatible",
-                          "hook_exception", "statement_changed", "measurement_failed", "duplicate_seen"})
+                          "hook_exception", "statement_changed", "measurement_failed", "duplicate_seen",
+                          # v0.6.14-beta.2: queue_for_open's, Codex not running on open what was queued for it.
+                          "not_delivered_on_open"})
 
 
 class FileTests(StateCase):

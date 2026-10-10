@@ -60,17 +60,20 @@ class OffReason(StrEnum):
     # harm a resend risks. It turns off what sent it again whether or not it is kept on - the
     # once-more capability, or Keep on's Send again alone (arming.py).
     DUPLICATE_SEEN = "duplicate_seen"
+    # A conversation queued for opening was opened and Codex did not run the item within core's delivery window
+    # (v0.6.14-beta.2, queue_for_open): what M1 measured did not hold on this Codex.
+    NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
 
 
 TRIPWIRES = frozenset({OffReason.SUBMISSION_UNKNOWN, OffReason.LOCAL_CHECK_FAILED,
                        OffReason.FAILED_HERE, OffReason.INCOMPATIBLE, OffReason.HOOK_EXCEPTION,
                        OffReason.STATEMENT_CHANGED, OffReason.MEASUREMENT_FAILED,
-                       OffReason.DUPLICATE_SEEN})
+                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN})
 # What a capability kept on (KeepOn, K8) notes instead of turning off, most serious first: the order
 # in which one notice gives way to another (state/arming.py, note_kept). A notice only ever rises.
 KEPT_NOTICES = (OffReason.DUPLICATE_SEEN, OffReason.STATEMENT_CHANGED, OffReason.FAILED_HERE,
                 OffReason.LOCAL_CHECK_FAILED, OffReason.INCOMPATIBLE, OffReason.MEASUREMENT_FAILED,
-                OffReason.ENGINE_CHANGED, OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
+                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.ENGINE_CHANGED, OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
 
 
 class ArmingWarning(StrEnum):

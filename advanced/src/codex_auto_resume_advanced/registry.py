@@ -49,7 +49,9 @@ rules for Codex's error codes, the retries of failures nothing classified, of Co
 of a sign-in failure (engine/admitted.py); at P8 and P7, a reset credit used at the limit a person picked
 (engine/credits.py), and at P8, P2 and P3 a message of a person's own sent when the window they picked resets
 (engine/resetmessage.py); and, at P7 and P3, the notice of a usage limit that lifts early (engine/earlyreset.py); at P7, an uncertain continuation sent once more (engine/oncemore.py),
-and one waiting recovery a person asks to send now (control/sendnow.py); and, at no point, two actions: longer
+and one waiting recovery a person asks to send now (control/sendnow.py); at P12, several conversations at once
+(engine/parallel.py); at P16, a conversation queued in Codex for when it is opened (engine/foropen.py); and, at no
+point, two actions: longer
 reset messages, and the compatibility report (report/). The tests define one of their own to hold every
 rule here.
 """
@@ -69,6 +71,7 @@ from .engine.capacity import CEILING_HOURS, DEFAULT_HOURS, make as make_capacity
 from .engine.credits import make as make_reset_credit
 from .engine.resetmessage import make as make_reset_message, make_long as make_long_messages
 from .engine.earlyreset import make as make_early_reset
+from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
 from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
@@ -346,6 +349,31 @@ GOAL_CONTINUATION = CapabilityDef(
     journal_prefix="goal",
     make=make_goal_continuation,
     measurements=(Measurement.M2,),
+)
+
+# Queue for opening (v0.6.14-beta.2; the plan's item 4: an unloaded conversation through the deferred queue). At P16,
+# for a usage-limited conversation the Codex app does not hold (notLoaded, never unknown), it answers QUEUE_FOR_OPEN:
+# core sends its own words with its marker through its own backend, under the one claim - which writes this
+# capability's override, one per interruption (ledger.py) - and leaves the item in Codex's queue for when the
+# conversation is opened. In the watch it keeps the item queued while the override is within the person's Days (3 to
+# 7, 3 by default); core takes it back at seven days and an hour whatever it answers, and at once when it is turned
+# off. Opened and not delivered within core's 180 seconds, the item is taken back, given back to waiting and sent the
+# ordinary way, and this turns off (NOT_DELIVERED_ON_OPEN). It departs from A11 (nothing is queued on the off chance)
+# and keeps A17, H4 and H6 - every withdrawal still fires at once - and stands on loaded_state_detection, what decides
+# that a conversation is not held. Its route rests on M1, passed on codex-cli 0.158 and a warning on any other.
+# Ceilings: three a conversation a day, a dozen a day in all. After the goal continuation, whose route comes first
+# where both are on and a goal applies.
+QUEUE_FOR_OPEN = CapabilityDef(
+    id="queue_for_open",
+    points=frozenset({Point.UNLOADED}),
+    revision=1,
+    departs_from=("A11",),
+    compat="loaded_state_detection",
+    ceilings=Ceilings(per_day=12, per_conversation=3),
+    journal_prefix="qfo",
+    make=make_queue_for_open,
+    options=(Option(OptionKey.DAYS, DAYS, DEFAULT_DAYS),),
+    measurements=(Measurement.M1,),
 )
 
 # Short retries when Codex is at capacity (v0.6.14 stage 3b; the plan's row: serverOverloaded alone,
@@ -644,7 +672,7 @@ COMPAT_REPORT = CapabilityDef(
 
 # In this order, which is also which answers first where two answer at one point; the action, which
 # answers at none, last.
-DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
+DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, LONG_RESET_MESSAGE, COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)

@@ -83,7 +83,7 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "tripped.statement_changed", "tripped.engine_changed",
     # v0.6.14: a capability's own choices, the rules for Codex's error codes and the samples of what nothing
     # classified, and what the page says of each.
-    "options", "option.attempts", "option.ceiling_hours", "option.workers", "option.hours", "done.option", "refused.option",
+    "options", "option.attempts", "option.ceiling_hours", "option.workers", "option.days", "option.hours", "done.option", "refused.option",
     "refused.choice", "rules", "rules.none", "rules.full", "rule.code", "rule.sampled", "rule.status",
     "rule.any_status", "rule.kind", "rule.hits", "rule.add", "rule.remove", "rule.known", "done.rule_added",
     "done.rule_removed", "refused.rule_shape", "refused.rule_known", "refused.rule_decision",
@@ -94,7 +94,7 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "keep_on.turn_off", "confirm.keep_on", "confirm.send_again", "done.keep_on", "done.keep_on_off",
     "refused.not_on", "kept.statement_changed", "kept.measurement_failed", "kept.failed_here", "kept.incompatible",
     "kept.local_check_failed", "kept.hook_exception", "kept.submission_unknown", "kept.engine_changed",
-    "kept.duplicate_seen", "tripped.duplicate_seen", "send_now.title", "send_now.none", "send_now.button",
+    "kept.duplicate_seen", "tripped.duplicate_seen", "kept.not_delivered_on_open", "tripped.not_delivered_on_open", "send_now.title", "send_now.none", "send_now.button",
     "confirm.send_now", "done.send_now",
     # In place of the limits, for an action (the compatibility report), which sends nothing to Codex: what bounds it.
     "action_limits",

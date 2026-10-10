@@ -59,10 +59,11 @@ from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, 
 from codex_auto_resume.domain.plughands import workers
 
 from .arming import Arming
+from .engine import foropen
 from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
-from .vocabulary import TRIPWIRES, ArmingState, CapabilityKind, JournalCode, OffReason
+from .vocabulary import TRIPWIRES, ArmingState, CapabilityKind, JournalCode, OffReason, OverrideKind
 
 # How long what every capability stands at is taken as read, between ticks. A tick reads it
 # again; a process that has no ticks - the bridge, the MCP server - reads it at most this often.
@@ -86,6 +87,10 @@ HELD_AT_CEILING = TAKE_UP - {Alternative.CAPACITY}
 NOTED_LIMIT = 4096
 # The state core holds a record in whose send may or may not have reached Codex.
 SUBMISSION_UNKNOWN = "submission_unknown"
+# Core's word for a queued item it took back, and (v0.6.14-beta.2) the reason one queued for opening was taken back
+# because Codex did not run it when the conversation was opened (core's engine/foropen.py).
+WITHDRAWN_UNCONFIRMED = "withdrawn_unconfirmed"
+NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
 
 
 def _taken(point, answer) -> bool:
@@ -99,6 +104,10 @@ def _taken(point, answer) -> bool:
         if point == Point.SENDER:
             return callable(getattr(answer, "send", None))
         if point == Point.UNLOADED:
+            # A route core resumes the conversation with, or (v0.6.14-beta.2) QUEUE_FOR_OPEN: core's own send left in
+            # Codex's queue for when the conversation is opened.
+            if isinstance(answer, str):
+                return answer == Alternative.QUEUE_FOR_OPEN
             return callable(getattr(answer, "resume", None))
     except Exception:                              # unhashable, refused, a `send` that raises
         return False
@@ -261,6 +270,9 @@ class Runtime:
         relaxing = point == Point.GATES and _known_failure(arguments[0]) and isinstance(record, dict)
         admission = self._admission_of(record) if relaxing else None
         key = record.get("interruption_id") if isinstance(record, dict) else None
+        # P16 in the watch (v0.6.14-beta.2): whether a continuation queued for opening stays queued. It was paid for at
+        # its claim; nothing is spent or carried again, so neither a ceiling nor the claim is asked.
+        kept = point == Point.UNLOADED and foropen.watching(record)
         chosen = chooser = None
         for definition in definitions:
             state = states.get(definition.id, ArmingState.OFF)
@@ -282,7 +294,7 @@ class Runtime:
                 return answer
             if chooser is not None:
                 continue
-            if point in SENDING:
+            if point in SENDING and not kept:
                 if not isinstance(record, dict) or self._ceiling(definition, record) is not None:
                     self._once(JournalCode.CEILING, definition, point, answer, record)
                     if relaxing and answer in HELD_AT_CEILING:
@@ -299,7 +311,7 @@ class Runtime:
             return getattr(NULL, HOOKS[point])(*arguments)
         if relaxing and _relaxes(chosen) and not self._first(chooser, chosen, arguments, admission):
             return getattr(NULL, HOOKS[point])(*arguments)
-        if point in SENDING:
+        if point in SENDING and not kept:
             self._acted.setdefault(record.get("interruption_id"), set()).add(
                 (point, chooser.id, _word(chosen, point)))
         self._once(JournalCode.ACTED, chooser, point, chosen, record)
@@ -559,9 +571,27 @@ class Runtime:
             return DEFER
         if _own_record(record) and state in RECORD_MOVES:
             return self._record_moved(record, RecordMove(state))
+        if self._not_delivered_on_open(record, state):
+            self.states(fresh=True)
         if self.arming.moved(record, state):
             self.states(fresh=True)
         return DEFER
+
+    def _not_delivered_on_open(self, record, state) -> bool:
+        """The tripwire NOT_DELIVERED_ON_OPEN (v0.6.14-beta.2): core took back a continuation queued for opening because
+        the conversation was opened and Codex did not run it - the capability whose override queued it turns off, or,
+        kept on, notes it (K8). Whether it was turned off."""
+        if (state != WITHDRAWN_UNCONFIRMED or not isinstance(record, dict)
+                or record.get("withdraw_reason") != NOT_DELIVERED_ON_OPEN):
+            return False
+        key = record.get("interruption_id")
+        try:
+            found = self.state.override(key, foropen.CAPABILITY)
+        except StateError:
+            return False
+        if found is None or found.get("kind") != OverrideKind.QUEUE_FOR_OPEN:
+            return False
+        return self.arming.trip(foropen.CAPABILITY, OffReason.NOT_DELIVERED_ON_OPEN)
 
     def _record_moved(self, record, move):
         """P14 for a record of this edition's own (v0.6.14): its rule and its record as core says they are now,
