@@ -760,6 +760,31 @@ def lane_gain(files: list[str], count: int, current: dict, fresh: dict) -> tuple
             longest_part(deal(files, count, after), after))
 
 
+# The longest part of a lane, at most this many times its shortest, by the lane's own table:
+# tests/test_split_runs.py holds the tracked table to it, and --refresh-seconds refuses a table that
+# breaks it. Dealt by one table for every lane, the parts were 1.21 to 1.45 times apart; by each lane's
+# own, under 1.01 (tests/test_split_runs.py, LaneDurationsTests, says where those figures came from).
+SPREAD = 1.2
+
+
+def uneven_lanes(counts, path: Path | None = None) -> list[str]:
+    """A sentence for each lane and count in `counts` whose parts, dealt by the table at `path`, break
+    SPREAD, naming the file that takes most of its longest part. None when every lane is even."""
+    found = []
+    for lane in LANES:
+        seconds = load_durations(lane, path)
+        for count in counts:
+            dealt = deal(lane_files(lane), count, seconds)
+            totals = [sum(seconds.get(name, 0.0) for name in part) for part in dealt]
+            if max(totals) > SPREAD * min(totals):
+                longest = dealt[totals.index(max(totals))]
+                heaviest = max(longest, key=lambda name: (seconds.get(name, 0.0), name))
+                found.append("the %s lane's %d parts would take %s s, more than %.1f times apart: %s alone "
+                             "takes %.0f s" % (lane, count, [round(total) for total in totals], SPREAD,
+                                               heaviest, seconds.get(heaviest, 0.0)))
+    return found
+
+
 def worth_refreshing(before: float, after: float) -> bool:
     """Whether a lane's longest part shrinks by REFRESH_FRACTION of itself and by REFRESH_SECONDS, both."""
     shrink = before - after
@@ -780,8 +805,10 @@ def gains(medians: dict, count: int, path: Path | None = None) -> dict:
 
 
 def refresh_seconds(paths, count: int, path: Path | None = None) -> tuple[bool, list[str]]:
-    """merge_seconds, only when some lane's longest part shrinks enough (worth_refreshing). Returns whether
-    the durations were written, and a line for each lane saying what its longest part would be."""
+    """merge_seconds, only when some lane's longest part shrinks enough (worth_refreshing) and the table it
+    would write keeps every lane within SPREAD (uneven_lanes); a table the suite would reject is never
+    written. Returns whether the durations were written, and a line for each lane saying what its longest
+    part would be, then a `refused:` line for each lane the fresh table leaves uneven."""
     medians, files, runs = read_seconds(paths)
     lines, worth = [], False
     for lane, (before, after) in gains(medians, count, path).items():
@@ -789,9 +816,22 @@ def refresh_seconds(paths, count: int, path: Path | None = None) -> tuple[bool, 
         worth = worth or enough
         lines.append("lane %s: longest of %d parts %.1f min under the current table, %.1f min under the "
                      "fresh one%s" % (lane, count, before / 60, after / 60, " - enough" if enough else ""))
-    if worth:
-        write_medians(medians, files, runs, path)
-    return worth, lines
+    if not worth:
+        return False, lines
+    path = path or DURATIONS
+    fresh = path.with_name(path.name + ".fresh")
+    try:
+        if path.is_file():
+            shutil.copyfile(path, fresh)
+        write_medians(medians, files, runs, fresh)
+        refused = uneven_lanes([count], fresh)
+        if refused:
+            return False, lines + ["refused: %s" % sentence for sentence in refused]
+        os.replace(fresh, path)
+    finally:
+        if fresh.exists():
+            fresh.unlink()
+    return True, lines
 
 
 def summary(merged: dict, seconds: float, parts=None) -> str:
@@ -859,9 +899,13 @@ def main(argv=None) -> int:
         written, lines = refresh_seconds(options.refresh_seconds, options.parts)
         for line in lines:
             say(line)
-        say("written: %s" % DURATIONS if written else
-            "kept: no lane's longest part shrinks by %d%% and %d minutes" % (round(REFRESH_FRACTION * 100),
-                                                                             round(REFRESH_SECONDS / 60)))
+        if written:
+            say("written: %s" % DURATIONS)
+        elif any(line.startswith("refused: ") for line in lines):
+            say("kept: the fresh table would leave a lane's parts uneven")
+        else:
+            say("kept: no lane's longest part shrinks by %d%% and %d minutes" % (round(REFRESH_FRACTION * 100),
+                                                                                 round(REFRESH_SECONDS / 60)))
         return 0
     if options.check:
         ok, answers = check([int(value) for value in options.counts.split(",") if value.strip()])

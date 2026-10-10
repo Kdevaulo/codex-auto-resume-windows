@@ -94,7 +94,7 @@ class DealComparisonTests(unittest.TestCase):
         return folder / "downloaded"
 
     def refresh(self, fresh: dict):
-        folder = Path(tempfile.mkdtemp())
+        folder = self.folder = Path(tempfile.mkdtemp())
         self.addCleanup(__import__("shutil").rmtree, folder, True)
         table = folder / "durations.json"
         before = {"seconds": {name: 1.0 for name in self.FILES}, "lanes": {"standard": {name: 1.0 for name in self.FILES}}}
@@ -119,6 +119,25 @@ class DealComparisonTests(unittest.TestCase):
         after, before, said = self.refresh({"tests/test_a.py": 600.0, "tests/test_c.py": 600.0, "tests/test_d.py": 500.0})
         self.assertEqual(after, before)
         self.assertEqual(said[-1], "kept: no lane's longest part shrinks by 10% and 3 minutes")
+
+    def test_a_table_that_leaves_a_lane_uneven_is_refused_and_not_written(self):
+        # A gain - 4000 s to 3500 s - but test_a and test_b, 3500 s, against 2010 s: past SPREAD.
+        after, before, said = self.refresh({"tests/test_a.py": 2000.0, "tests/test_c.py": 2000.0,
+                                            "tests/test_b.py": 1500.0, "tests/test_d.py": 10.0})
+        self.assertEqual(after, before)
+        self.assertIn("refused: the standard lane's 2 parts would take [3500, 2010] s, more than 1.2 times apart: "
+                      "tests/test_a.py alone takes 2000 s", said)
+        self.assertEqual(said[-1], "kept: the fresh table would leave a lane's parts uneven")
+
+    def test_the_refusal_leaves_no_fresh_table_behind(self):
+        self.refresh({"tests/test_a.py": 2000.0, "tests/test_c.py": 2000.0, "tests/test_b.py": 1500.0,
+                      "tests/test_d.py": 10.0})
+        self.assertEqual(sorted(path.name for path in self.folder.iterdir()), ["downloaded", "durations.json"])
+
+    def test_the_tracked_table_and_a_refresh_share_one_spread_check(self):
+        source = (ROOT / "tests" / "test_split_runs.py").read_text(encoding="utf-8")
+        self.assertIn("parts.uneven_lanes(counts)", source)
+        self.assertNotRegex(source, r"SPREAD = ")
 
 
 class WorkflowShapeTests(unittest.TestCase):
@@ -150,6 +169,12 @@ class WorkflowShapeTests(unittest.TestCase):
         for name in ("Read the run's seconds", "Set up Python", "Weigh a new deal"):
             self.assertIn("if: steps.check.outputs.go == 'yes'", self.measure_steps[name])
         self.assertIn("needs.measure.outputs.refresh == 'yes'", self.write)
+
+    def test_a_refused_table_is_a_warning_and_nothing_committed(self):
+        weigh = self.measure_steps["Weigh a new deal"]
+        self.assertIn("grep '^refused: ' \"$out/report.txt\" | sed 's/^refused: /::warning::nothing committed: /' "
+                      "|| true", weigh)
+        self.assertLess(weigh.index("--refresh-seconds"), weigh.index("git diff --quiet -- tests/data/durations.json"))
 
     def test_the_commit_it_writes_carries_the_trailer_it_stops_at(self):
         self.assertIn("\\n\\n%s' \"$RUN\"" % TRAILER, self.commit)

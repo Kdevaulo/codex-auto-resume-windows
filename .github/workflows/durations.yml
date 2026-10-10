@@ -105,6 +105,8 @@ jobs:
           mkdir -p "$out"
           python scripts/test_parts.py --refresh-seconds "$RUNNER_TEMP/seconds" --parts 4 > "$out/report.txt"
           cat "$out/report.txt"
+          # A table that would leave a lane's parts past SPREAD is refused and not written: say which file.
+          grep '^refused: ' "$out/report.txt" | sed 's/^refused: /::warning::nothing committed: /' || true
           if git diff --quiet -- tests/data/durations.json; then
             echo "refresh=no" >> "$GITHUB_OUTPUT"
           else
