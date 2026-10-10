@@ -6,15 +6,22 @@ still card's PNG itself, and whose later frames are only the head's changed rect
 and APNG specifications and sharing no code with the writer - chunks, CRCs, sequence numbers, inflate, the five
 row filters, dispose - and hold it to what the owner asked: the mark moving as the real icon moves, looping
 forever, every pixel kept (no palette and no dither, which a GIF had needed), frame 1 the card exactly.
+
+The reader is pure Python, so its work is kept to what changes: the still card is decoded once for the module,
+the motion's default image is not decoded again when its IDAT chunks are the still's byte for byte, and the frames
+are composited on a canvas the size of the mark's box only. CAR_SOCIAL_MOTION points the committed-motion tests
+at another file (a mutated copy, to prove they fail).
 """
 from __future__ import annotations
 
 from fractions import Fraction
+import os
 from pathlib import Path
 import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,8 +32,16 @@ import make_social        # noqa: E402
 from codex_auto_resume import brand     # noqa: E402
 from codex_auto_resume.ui import tray   # noqa: E402
 
-MOTION = ROOT / "docs" / "images" / "social-preview-motion.png"
+MOTION = Path(os.environ.get("CAR_SOCIAL_MOTION") or ROOT / "docs" / "images" / "social-preview-motion.png")
 STILL = ROOT / "docs" / "images" / "social-preview.png"
+CARD = {}
+
+
+def setUpModule():
+    """The still card, decoded once: its raw bytes, its IDAT chunks and its pixels."""
+    raw = STILL.read_bytes()
+    apng = read_apng(raw)
+    CARD.update(raw=raw, idat=apng["idat"], pixels=apng["default"])
 
 
 def chunks(raw: bytes) -> list:
@@ -81,8 +96,13 @@ def unfilter(data: bytes, width: int, height: int, channels: int = 3) -> bytes:
     return bytes(out)
 
 
-def read_apng(raw: bytes) -> dict:
-    """The picture's size, its plays, its default image and its frames: [{box, delay, dispose, blend, pixels}]."""
+def read_apng(raw: bytes, known=None) -> dict:
+    """The picture's size, its plays, its default image and its frames: [{box, delay, dispose, blend, pixels}].
+
+    `known` is (IDAT chunks, pixels) of a picture decoded before. When this one's IDAT chunks are those byte for
+    byte, its default image is those pixels without decoding them again: equal compressed bytes inflate to equal
+    scanlines, and equal scanlines unfilter to equal pixels. Likewise a frame whose data is the IDAT's own (frame 1,
+    when its fcTL comes before the IDAT) at the picture's size is the default image."""
     parts = chunks(raw)
     width, height, depth, colour, _c, _f, interlace = struct.unpack(">IIBBBBB", dict(parts)[b"IHDR"])
     if (depth, colour, interlace) != (8, 2, 0):
@@ -109,34 +129,74 @@ def read_apng(raw: bytes) -> dict:
                 raise ValueError("fdAT out of sequence")
             sequence += 1
             current["data"] += data[4:]
-    default = unfilter(zlib.decompress(bytes(idat)), width, height)
+    idats = [data for kind, data in parts if kind == b"IDAT"]
+    if known is not None and known[0] == idats:
+        default = known[1]
+    else:
+        default = unfilter(zlib.decompress(bytes(idat)), width, height)
     for frame in frames:
         _, _, w, h = frame["box"]
-        frame["pixels"] = unfilter(zlib.decompress(bytes(frame.pop("data"))), w, h)
+        data = bytes(frame.pop("data"))
+        if data == idat and (w, h) == (width, height):
+            frame["pixels"] = default
+        else:
+            frame["pixels"] = unfilter(zlib.decompress(data), w, h)
     if count is not None and count != len(frames):
         raise ValueError("acTL says %d frames, %d are there" % (count, len(frames)))
     return {"width": width, "height": height, "plays": plays, "default": default, "frames": frames,
-            "idat": [data for kind, data in parts if kind == b"IDAT"]}
+            "idat": idats}
 
 
-def composite(apng: dict):
-    """Each frame's whole picture, RGB, as a viewer shows it: dispose 0 keeps the frame, 1 clears its rectangle,
-    2 restores what was before it; an opaque frame's blend 'over' is its 'source'."""
-    width = apng["width"]
-    canvas = bytearray(width * apng["height"] * 3)
-    for frame in apng["frames"]:
+def composite(apng: dict, box=None):
+    """Each frame's picture, RGB, as a viewer shows it: dispose 0 keeps the frame, 1 clears its rectangle,
+    2 restores what was before it; an opaque frame's blend 'over' is its 'source'.
+
+    With `box` (left, top, width, height) only that crop of each picture is made: frame 1 may cover more than the
+    box (its part inside is drawn), but every later frame must lie inside it, or this raises - so outside the box
+    every picture is frame 1's, and the crops hold everything that changes."""
+    left, top, wide, tall = box or (0, 0, apng["width"], apng["height"])
+    if left < 0 or top < 0 or left + wide > apng["width"] or top + tall > apng["height"]:
+        raise ValueError("the box %r is not inside the picture" % (box,))
+    canvas = bytearray(wide * tall * 3)
+    for index, frame in enumerate(apng["frames"]):
         x, y, w, h = frame["box"]
+        if index and not (x >= left and y >= top and x + w <= left + wide and y + h <= top + tall):
+            raise ValueError("frame %d's rectangle %r is outside the box %r" % (index + 1, frame["box"], box))
+        x0, y0, x1, y1 = max(x, left), max(y, top), min(x + w, left + wide), min(y + h, top + tall)
         before = bytes(canvas)
-        for row in range(h):
-            at = ((y + row) * width + x) * 3
-            canvas[at:at + w * 3] = frame["pixels"][row * w * 3:(row + 1) * w * 3]
+        for row in range(y0, y1):
+            at, source = ((row - top) * wide + x0 - left) * 3, ((row - y) * w + x0 - x) * 3
+            canvas[at:at + (x1 - x0) * 3] = frame["pixels"][source:source + (x1 - x0) * 3]
         yield bytes(canvas)
         if frame["dispose"] == 1:
-            for row in range(h):
-                at = ((y + row) * width + x) * 3
-                canvas[at:at + w * 3] = bytes(w * 3)
+            for row in range(y0, y1):
+                at = ((row - top) * wide + x0 - left) * 3
+                canvas[at:at + (x1 - x0) * 3] = bytes((x1 - x0) * 3)
         elif frame["dispose"] == 2:
             canvas[:] = before
+
+
+def same(test, first, second, message="they differ"):
+    """assertEqual for pictures: a failing assertEqual on megabytes of bytes, or lists of them, has unittest diff
+    their reprs, which takes minutes; this says where they first differ instead."""
+    if first == second:
+        return
+    if isinstance(first, (list, tuple)) and isinstance(second, (list, tuple)):
+        if len(first) != len(second):
+            test.fail("%s: %d items, not %d" % (message, len(first), len(second)))
+        index = next(i for i, (one, other) in enumerate(zip(first, second)) if one != other)
+        test.fail("%s: item %d of %d differs" % (message, index, len(first)))
+    if len(first) != len(second):
+        test.fail("%s: %d bytes, not %d" % (message, len(first), len(second)))
+    index = next(i for i, (one, other) in enumerate(zip(first, second)) if one != other)
+    test.fail("%s: first at byte %d of %d" % (message, index, len(first)))
+
+
+def crop(picture: bytes, width: int, box: tuple) -> bytes:
+    """The (left, top, width, height) rectangle of a picture `width` px wide."""
+    left, top, wide, tall = box
+    return b"".join(picture[((top + row) * width + left) * 3:((top + row) * width + left + wide) * 3]
+                    for row in range(tall))
 
 
 def still_png(width: int, height: int, rgb: bytes) -> bytes:
@@ -154,14 +214,18 @@ def still_png(width: int, height: int, rgb: bytes) -> bytes:
 
 
 class TheReaderReadsTheWriter(unittest.TestCase):
-    """The reader and make_social.write_motion agree on pictures made up here."""
+    """The reader and make_social.write_motion agree on pictures made up here - on a small card, so the pure-Python
+    filters cost what its few pixels do: the writer takes its size from make_social.WIDTH and HEIGHT, the reader
+    from the IHDR, and the committed motion is read at the card's own size below."""
 
+    @mock.patch.object(make_social, "HEIGHT", 64)
+    @mock.patch.object(make_social, "WIDTH", 96)
     def test_a_small_motion_round_trips_frame_by_frame(self):
         width, height = make_social.WIDTH, make_social.HEIGHT
         first = bytes((i // 3 % width + i // 3 // width + i % 3 * 40) % 256 for i in range(width * height * 3))
         second = bytearray(first)
-        for x in range(400, 420):
-            second[(300 * width + x) * 3:(300 * width + x) * 3 + 3] = b"\x10\x20\x30"
+        for x in range(40, 60):
+            second[(30 * width + x) * 3:(30 * width + x) * 3 + 3] = b"\x10\x20\x30"
         third = bytearray(second)
         third[(5 * width + 7) * 3] = 255
         pictures = [(Fraction(31, 100), first), (Fraction(6, 100), bytes(second)),
@@ -173,12 +237,12 @@ class TheReaderReadsTheWriter(unittest.TestCase):
             apng = read_apng(path.read_bytes())
         self.assertEqual(count, 4)
         self.assertEqual(apng["plays"], 0, "an APNG that does not loop forever")
-        self.assertEqual(apng["idat"], [data for kind, data in chunks(still) if kind == b"IDAT"],
+        same(self, apng["idat"], [data for kind, data in chunks(still) if kind == b"IDAT"],
                          "the default image is not the still PNG's own")
-        self.assertEqual(apng["default"], first)
+        same(self, apng["default"], first, "the default image")
         self.assertEqual([frame["delay"] for frame in apng["frames"]], [delay for delay, _ in pictures])
-        self.assertEqual(list(composite(apng)), [picture for _, picture in pictures])
-        self.assertEqual(apng["frames"][1]["box"], (400, 300, 20, 1), "a later frame is more than what changed")
+        same(self, list(composite(apng)), [picture for _, picture in pictures], "the pictures")
+        self.assertEqual(apng["frames"][1]["box"], (40, 30, 20, 1), "a later frame is more than what changed")
 
 
 class TheScheduleIsTheIcons(unittest.TestCase):
@@ -235,15 +299,33 @@ class TheCommittedMotion(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.raw = MOTION.read_bytes()
-        cls.apng = read_apng(cls.raw)
+        cls.card = CARD["pixels"]
+        cls.apng = read_apng(cls.raw, (CARD["idat"], cls.card))
         cls.plan = make_social.schedule()
-        cls.card = read_apng(STILL.read_bytes())["default"]
-        cls.pictures = list(composite(cls.apng))
-        cls.head = make_social.mark_box(cls.card)[2]
+        try:
+            left, top, cls.head = make_social.mark_box(cls.card)
+        except SystemExit as error:   # the builder's way to stop; here it is a failure, not the end of the run
+            raise AssertionError("the card's mark is not found: %s" % error) from None
+        cls.box = (left, top, make_social.cell_size(), make_social.cell_size())
+        cls.card_crop = crop(cls.card, make_social.WIDTH, cls.box)
+        try:
+            cls.pictures, cls.outside = list(composite(cls.apng, cls.box)), None
+        except ValueError as error:
+            cls.pictures, cls.outside = [], str(error)
 
     def pixel(self, picture, x, y):
-        at = (int(y) * make_social.WIDTH + int(x)) * 3
+        """A picture's pixel at the card's (x, y): `picture` is the crop of the mark's box, outside which every
+        picture is the card."""
+        left, top, wide, tall = self.box
+        x, y = int(x), int(y)
+        if not (left <= x < left + wide and top <= y < top + tall):
+            return tuple(self.card[(y * make_social.WIDTH + x) * 3:(y * make_social.WIDTH + x) * 3 + 3])
+        at = ((y - top) * wide + x - left) * 3
         return tuple(picture[at:at + 3])
+
+    def test_every_later_frame_lies_in_the_marks_box(self):
+        """So outside the box every picture is frame 1, and comparing the box's crops compares the pictures."""
+        self.assertIsNone(self.outside)
 
     def test_it_is_under_githubs_megabyte(self):
         self.assertLess(len(self.raw), make_social.MOTION_LIMIT)
@@ -253,11 +335,14 @@ class TheCommittedMotion(unittest.TestCase):
         self.assertEqual(self.apng["plays"], 0)
 
     def test_its_default_image_and_frame_one_are_the_still_card_exactly(self):
-        self.assertEqual(self.apng["idat"], [data for kind, data in chunks(STILL.read_bytes()) if kind == b"IDAT"])
-        self.assertEqual(self.apng["default"], self.card, "a viewer without APNG does not show the card")
+        same(self, self.apng["idat"], [data for kind, data in chunks(CARD["raw"]) if kind == b"IDAT"],
+             "the IDAT chunks are not the still's")
+        same(self, self.apng["default"], self.card, "a viewer without APNG does not show the card")
         self.assertEqual(self.apng["frames"][0]["box"], (0, 0, make_social.WIDTH, make_social.HEIGHT))
-        self.assertEqual(self.pictures[0], self.card)
-        self.assertEqual(self.pictures[-1], self.card, "the cycle does not end on the card it starts with")
+        same(self, self.apng["frames"][0]["pixels"], self.card, "frame 1 is not the card")
+        self.assertIsNone(self.outside)
+        same(self, self.pictures[0], self.card_crop, "frame 1's mark is not the card's")
+        same(self, self.pictures[-1], self.card_crop, "the cycle does not end on the card it starts with")
 
     def test_its_frames_and_delays_are_the_schedules(self):
         self.assertEqual(len(self.apng["frames"]), len(self.plan))
@@ -287,6 +372,8 @@ class TheCommittedMotion(unittest.TestCase):
         rest = brand.icon_head_centre()
         scale = make_social.MARK_PX / 2.0
         accent = tuple(brand.rgb(brand.ICON_ACCENT))
+        self.assertIsNone(self.outside)
+        self.assertEqual(len(self.pictures), len(self.plan))
         for (_, position, level), picture in zip(self.plan, self.pictures):
             there = brand.icon_head_centre(brand.ICON_SHAPE["arc_end"]
                                            - 360.0 * position / tray.ICON_MOTION["positions"])
