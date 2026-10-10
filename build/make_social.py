@@ -22,23 +22,25 @@ build/make_screenshots.py uses for the Codex panel - so the committed picture ca
 from the palette, the mark or the sentence without somebody running this. Pass --page-only
 to write the HTML and stop, which is what to do on a machine with no Chromium.
 
-It also writes docs/images/social-preview.gif: the same card, its mark moving exactly as the
-notification-area icon moves while the product is watching - three breaths of the head, then a
-sweep out clockwise along the white stroke and back - one whole cycle of it, looping forever.
-The motion is not drawn here: every frame's moment, head position and brightness is the icon's
-own (ui.tray.icon_frame, stepped by icon_frame_ms as the icon's timer steps, through
-make_screenshots.icon_timeline), and every picture of the mark is Edge's, from the card's own
-page with the head's circle placed and tinted per frame - all of them in one headless run, a
-sprite sheet of the card clipped round the mark. The encoder is the one the README's GIFs use
-(make_screenshots.write_gif): the first frame whole, each later one only the rectangle that
-changed, so it stays well under GitHub's 1 MB; its 255 colours are dithered on a fixed 8x8 pattern
-so the card's gradients do not band, and the colours the card holds exactly - the text, the ring,
-the head - are kept exact.
+It also writes docs/images/social-preview-motion.png, an animated PNG: the same card, its mark
+moving exactly as the notification-area icon moves while the product is watching - three breaths
+of the head, then a sweep out clockwise along the white stroke and back - one whole cycle of it,
+22 s, looping forever. The motion is not drawn here: every frame's moment, head position and
+brightness is the icon's own (ui.tray.icon_frame, stepped by icon_frame_ms as the icon's timer
+steps, through make_screenshots.icon_timeline), and every picture of the head is Edge's, from the
+card's own page with the head's circle placed and tinted per frame - all of them in one headless
+run, a sprite sheet of the card clipped round the mark.
 
-Most link unfurlers - chat apps, social sites, search results - show only a GIF's first frame,
-so frame 1 is the finished card exactly: the mark at rest, its head in its place at full
-brightness. To use it, upload the GIF in place of the PNG the same way (Settings -> General ->
-Social preview -> Edit -> Upload an image). Pass --png-only to make only the PNG.
+An APNG and not a GIF: a GIF holds 256 colours, and the card is two soft gradients and anti-aliased
+text, which a palette and its dither visibly degrade (the owner, on a first cut as a GIF). An APNG
+keeps every pixel: its default image is the card's PNG itself, chunk for chunk, so a viewer that
+does not animate PNGs - and most link unfurlers, which show one still picture anyway - shows
+exactly docs/images/social-preview.png, the mark at rest at full brightness. Each later frame is
+only the rectangle round the head that changed, so the whole cycle stays under GitHub's 1 MB.
+
+Upload either the same way (Settings -> General -> Social preview -> Edit -> Upload an image; it
+takes a PNG of less than 1 MB): the motion file to have it move where it can, the still one for a
+card that never does. Pass --png-only to make only the still card.
 """
 from __future__ import annotations
 
@@ -57,13 +59,13 @@ from codex_auto_resume import brand      # noqa: E402
 
 PAGE = ROOT / "build" / "dist" / "social.html"
 TARGET = ROOT / "docs" / "images" / "social-preview.png"
-MOTION = ROOT / "docs" / "images" / "social-preview.gif"
+MOTION = ROOT / "docs" / "images" / "social-preview-motion.png"
 WIDTH, HEIGHT = 1280, 640
 # The mark's side on the card (TEMPLATE's .mark) and in its SVG's own units.
 MARK_PX, SVG_BOX = 264, 512
 # GitHub takes a social preview of less than a megabyte.
 MOTION_LIMIT = 1000000
-# The shortest a GIF frame is held, in hundredths: browsers show 10 ms or less for 100 ms.
+# The shortest a frame is held, in hundredths of a second: browsers show 10 ms or less for 100 ms.
 SHORTEST = 2
 # Room round the mark in each sprite cell, so its rounded corners' edges are inside the cell.
 CELL_PAD = 6
@@ -163,9 +165,9 @@ def watching_loop_ms() -> float:
 def schedule() -> list:
     """[(delay in hundredths of a second, head position, breathing level)] for one cycle of watching from the
     moment it is entered: the frames the icon's own timer shows (make_screenshots.icon_timeline), each held until
-    the next, on the hundredths a GIF counts in. Each frame starts on its own moment rounded, so rounding never
-    adds up and the delays sum to the cycle exactly; a frame due less than SHORTEST after the one before takes that
-    one's place, and a frame the same as the one before only lengthens it."""
+    the next, in the hundredths of a second browsers keep best. Each frame starts on its own moment rounded, so
+    rounding never adds up and the delays sum to the cycle exactly; a frame due less than SHORTEST after the one
+    before takes that one's place, and a frame the same as the one before only lengthens it."""
     import make_screenshots
     loop = watching_loop_ms()
     total = int(round(loop / 10.0))
@@ -303,75 +305,73 @@ def card_region(rgb: bytes, left: int, top: int) -> bytes:
                     for row in range(cell))
 
 
-# An 8x8 Bayer matrix: the ordered dither that keeps the card's two gradients from banding in 255 colours. Ordered,
-# not diffused, so a pixel's index depends on its colour and its place alone - the same in every frame wherever the
-# frame did not change, which is what keeps every frame after the first to the head's few pixels.
-BAYER = ((0, 32, 8, 40, 2, 34, 10, 42), (48, 16, 56, 24, 50, 18, 58, 26), (12, 44, 4, 36, 14, 46, 6, 38),
-         (60, 28, 52, 20, 62, 30, 54, 22), (3, 35, 11, 43, 1, 33, 9, 41), (51, 19, 59, 27, 49, 17, 57, 25),
-         (15, 47, 7, 39, 13, 45, 5, 37), (63, 31, 55, 23, 61, 29, 53, 21))
-# How far the dither moves a colour, in levels of a channel, end to end: about the palette's step along a gradient.
-DITHER_LEVELS = 10
-
-
-class Quantiser:
-    """A pixel's palette index from its colour and its place: a colour the palette holds exactly keeps it - the
-    text, the ring, the head - and any other is moved by BAYER at its place, then matched to its nearest colour (on
-    a grid of two levels, so the matching stays quick)."""
-
-    def __init__(self, palette):
-        self.palette = palette
-        self.exact = {}
-        for index, colour in enumerate(palette):
-            self.exact.setdefault(tuple(colour), index)
-        self.nearest = {}
-
-    def __call__(self, colour, x, y) -> int:
-        found = self.exact.get(tuple(colour))
-        if found is not None:
-            return found
-        shift = ((BAYER[y & 7][x & 7] + 0.5) / 64.0 - 0.5) * DITHER_LEVELS
-        key = tuple(max(0, min(255, int(channel + shift + 0.5))) >> 1 for channel in colour)
-        found = self.nearest.get(key)
-        if found is None:
-            red, green, blue = (value * 2 + 1 for value in key)
-            palette = self.palette
-            found = min(range(len(palette)), key=lambda i: ((palette[i][0] - red) ** 2 + (palette[i][1] - green) ** 2
-                                                            + (palette[i][2] - blue) ** 2, i))
-            self.nearest[key] = found
-        return found
-
-
-def motion_frames(card: bytes, cells: dict, plan: list, box: tuple) -> tuple:
-    """(palette, [(delay, palette indices)]): the card with each frame's head laid over it from its cell
-    (head_mask), in at most 255 colours (make_screenshots._median_cut, weighted by how much of the card and of the
-    heads each colour covers), dithered (Quantiser). Outside a frame's mask every pixel is frame 1's, index and
-    all, so only the head's pixels ever change between frames."""
-    import make_screenshots
+def motion_pictures(card: bytes, cells: dict, plan: list, box: tuple):
+    """(delay as a Fraction of a second, the whole frame's RGB) for each frame of `plan`, one at a time: the card,
+    with the pixels of the frame's head_mask taken from its cell. Every other pixel is the card's own, so only the
+    head ever changes, and the frame at rest is the card exactly."""
+    from fractions import Fraction
     cell = cell_size()
     left, top, head = box
-    masks = {each: head_mask(head, each[0], left, top) for each in cells}
-    weights = {}
-    for at in range(0, len(card), 3):
-        colour = card[at:at + 3]
-        weights[colour] = weights.get(colour, 0) + 1
-    for each, picture in cells.items():
-        for offset in masks[each]:
-            colour = picture[offset * 3:offset * 3 + 3]
-            weights[colour] = weights.get(colour, 0) + 1
-    palette = make_screenshots._median_cut({tuple(colour): weight for colour, weight in weights.items()}, 255)
-    index_of = Quantiser(palette)
-    base = bytes(index_of(card[at * 3:at * 3 + 3], at % WIDTH, at // WIDTH) for at in range(WIDTH * HEIGHT))
     rest = (0, top_level())
-    out = []
     for delay, position, level in plan:
-        canvas = bytearray(base)
+        picture = bytearray(card)
         if (position, level) != rest:
-            picture = cells[(position, level)]
-            for offset in masks[(position, level)]:
-                x, y = left + offset % cell, top + offset // cell
-                canvas[y * WIDTH + x] = index_of(picture[offset * 3:offset * 3 + 3], x, y)
-        out.append((delay, bytes(canvas)))
-    return palette, out
+            source = cells[(position, level)]
+            for offset in head_mask(head, position, left, top):
+                at = ((top + offset // cell) * WIDTH + left + offset % cell) * 3
+                picture[at:at + 3] = source[offset * 3:offset * 3 + 3]
+        yield Fraction(delay, 100), bytes(picture)
+
+
+def png_chunks(raw: bytes) -> list:
+    """[(kind, data)] of a PNG's chunks, in order."""
+    if raw[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit("not a PNG")
+    chunks, at = [], 8
+    while at < len(raw):
+        length, kind = struct.unpack(">I4s", raw[at:at + 8])
+        chunks.append((kind, raw[at + 8:at + 8 + length]))
+        at += 12 + length
+    return chunks
+
+
+def write_motion(path: Path, still: bytes, pictures) -> int:
+    """An APNG that loops forever, whose default image is `still` - the card's PNG - chunk for chunk, so a viewer
+    without APNG shows exactly the card; returns its frame count. `pictures` is motion_pictures': the first is the
+    card, each later one is written as the rectangle that differs from the frame before, drawn over it with the
+    frame before kept (APNG_KEEP, APNG_OVER - every pixel of the rectangle is opaque, so it is exact). The writing is
+    make_screenshots.write_apng_patches', but for the default image, which that writes from pixels again."""
+    import zlib
+    import make_screenshots as shots
+    chunks = png_chunks(still)
+    header = dict(chunks)[b"IHDR"]
+    if struct.unpack(">IIBBBBB", header)[2:] != (8, 2, 0, 0, 0):
+        raise SystemExit("the card is not an 8-bit RGB PNG, the only kind its frames are written as")
+    pictures = iter(pictures)
+    delay, previous = next(pictures)
+    numerator, denominator = shots._delay_parts(delay)
+    body, sequence, count = bytearray(), 1, 1
+    for delay, picture in pictures:
+        box = shots._apng_changed(previous, picture, WIDTH, HEIGHT) or (0, 0, 1, 1)
+        left, top, wide, tall = box
+        later = shots._delay_parts(delay)
+        body += shots._png_chunk(b"fcTL", struct.pack(">IIIIIHHBB", sequence, wide, tall, left, top,
+                                                      later[0], later[1], shots.APNG_KEEP, shots.APNG_OVER))
+        rows = shots._png_rows(shots._region(picture, WIDTH, box), wide, tall, wide, 0, 0)
+        body += shots._png_chunk(b"fdAT", struct.pack(">I", sequence + 1) + zlib.compress(rows, 9))
+        sequence += 2
+        count += 1
+        previous = picture
+    out = bytearray(b"\x89PNG\r\n\x1a\n")
+    out += shots._png_chunk(b"IHDR", header)
+    out += shots._png_chunk(b"acTL", struct.pack(">II", count, 0))
+    out += shots._png_chunk(b"fcTL", struct.pack(">IIIIIHHBB", 0, WIDTH, HEIGHT, 0, 0, numerator, denominator,
+                                                 shots.APNG_KEEP, shots.APNG_OVER))
+    out += b"".join(shots._png_chunk(kind, data) for kind, data in chunks if kind == b"IDAT")
+    out += body
+    out += shots._png_chunk(b"IEND", b"")
+    shots.write_file(path, bytes(out))
+    return count
 
 
 def top_level() -> int:
@@ -381,9 +381,8 @@ def top_level() -> int:
 
 
 def render_motion(svg: str) -> list:
-    """docs/images/social-preview.gif, from the card as committed and one sprite sheet of its mark; the plan."""
+    """docs/images/social-preview-motion.png, from the card as it is and one sprite sheet of its mark; the plan."""
     import make_screenshots
-    from codex_auto_resume.ui import tray
     width, height, card = make_screenshots.read_png_rgb(TARGET)
     if (width, height) != (WIDTH, HEIGHT):
         raise SystemExit("the card is %dx%d" % (width, height))
@@ -397,8 +396,9 @@ def render_motion(svg: str) -> list:
     drift = max(abs(one - other) for one, other in zip(cells[plan[0][1:]], card_region(card, left, top)))
     if drift > SPRITE_DRIFT:
         raise SystemExit("the sprite sheet's mark at rest is %d levels off the card's: not the same picture" % drift)
-    palette, frames = motion_frames(card, cells, plan, box)
-    make_screenshots.write_gif(MOTION, WIDTH, HEIGHT, palette, frames)
+    count = write_motion(MOTION, TARGET.read_bytes(), motion_pictures(card, cells, plan, box))
+    if count != len(plan):
+        raise SystemExit("%d frames written of %d" % (count, len(plan)))
     size = MOTION.stat().st_size
     if size >= MOTION_LIMIT:
         raise SystemExit("%s is %d bytes: GitHub takes less than %d" % (MOTION, size, MOTION_LIMIT))
@@ -423,7 +423,7 @@ def main(argv=None) -> int:
         print("motion: %s (%d frames, %.2f s a cycle, %d bytes)"
               % (MOTION.relative_to(ROOT), len(plan), sum(each[0] for each in plan) / 100.0,
                  MOTION.stat().st_size))
-    print("upload: Settings -> General -> Social preview -> Edit -> Upload an image")
+    print("upload: Settings -> General -> Social preview -> Edit -> Upload an image (either PNG)")
     return 0
 
 
