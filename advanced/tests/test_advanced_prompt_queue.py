@@ -1,5 +1,5 @@
 """The prompt queue (v0.6.14-beta.2): a person's queued messages go after the current turn, at a time or on a schedule, in
-order, each once, and their words go once they are sent; Cancel and Pause take back one Codex already holds.
+order, each once, and their words go once each has ended; Cancel and Pause take back one Codex already holds.
 
 Held against the shipped definition and statement and against core's own engine, store and simulated Codex home
 (takingcase.py); the Dashboard's bridge adds them (surfaces.bridge), as the page does.
@@ -189,6 +189,25 @@ class TakeBackTests(QueueCase):
         self.h.tick(advance=1)
         self.assertEqual(self.h.home.queued(T1), [])
         self.assertEqual(plug.runtime.state.prompt(prompt)["state"], PromptState.HELD)
+
+    def test_go_on_after_a_pause_sends_the_persons_words_once_more(self):
+        plug, prompt = self.held_in_codex()
+        self.h.store.set_enabled(False, self.h.now)
+        self.h.tick(advance=1)
+        self.h.tick(advance=1)
+        self.assertEqual(plug.runtime.state.prompt(prompt)["words"], SENTINEL, "kept while held for the person")
+        self.h.store.set_enabled(True, self.h.now)
+        self.h.backend.after_accept = "dispatch"
+        answer = surfaces.bridge(plug.runtime, "advanced-prompt-go-on",
+                                 {"prompt": prompt, "generation": plug.runtime.state.meta()["generation"]})
+        self.assertTrue(answer["done"])
+        for _ in range(3):
+            self.h.tick(advance=1000)
+        row = plug.runtime.state.prompt(prompt)
+        self.assertNotEqual(row["reason"], PromptReason.TOO_LONG)
+        self.assertEqual(len(self.sends()), 2, "sent again on Go on, once")
+        self.assertTrue(self.sends()[1].startswith(SENTINEL + "\n\n"))
+        self.assertEqual((row["state"], row["reason"], row["words"]), (PromptState.DONE, PromptReason.DELIVERED, None))
 
 
 if __name__ == "__main__":

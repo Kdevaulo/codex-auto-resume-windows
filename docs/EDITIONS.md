@@ -622,8 +622,8 @@ the official way to schedule work; these wait for usage and go to one exact conv
 
 **What it risks.** A queued message can go when you no longer want it: cancel it. One Codex already holds
 is taken back out of its queue; if Codex will not give it back, its row says so and it is never sent again.
-Your words are kept in the advanced edition's state until they are sent, cancelled or ended, and then
-deleted.
+Your words are kept in the advanced edition's state until each has arrived, been cancelled or ended -
+while Codex holds one, so that Go on after a Pause can send it again - and then deleted.
 
 **Departs from** [A8](STANDARDS.md#a-what-it-may-send-to-codex-and-when),
 [A17](STANDARDS.md#a-what-it-may-send-to-codex-and-when), [A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when),
