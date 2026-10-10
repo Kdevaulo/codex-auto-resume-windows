@@ -487,7 +487,7 @@ v0.6.10 다음 릴리스에 새로 생겼습니다. 고급판은 표준판에, �
   때는 보여 준 Codex 버전입니다. 다른 화면은 기능을 끌 수만 있고, 클라이언트가 무엇을 보내든 기능을 켜는 MCP
   tool은 없습니다 (`advanced/tests/test_advanced_arming.py`, `advanced/tests/test_advanced_surfaces.py`). 그
   요청을 하는 것은 대시보드의 **고급 기능** 페이지이며, 보여 준 것을 그대로 보냅니다
-  (`advanced/tests/test_advanced_page.py`). 그 브리지의 다른 요청과 마찬가지로, 사용자 권한으로
+  (`advanced/tests/test_advanced_page_arming.py`). 그 브리지의 다른 요청과 마찬가지로, 사용자 권한으로
   도는 것이면 무엇이든 이 요청을 할 수 있습니다. 할 수 없는 것은 플러그인의 MCP tool을 쓰는 모델입니다. 먼저
   지켜보는 기능은 무엇을 했을지 기록만 하고 아무것도 하지 않으며, 지켜보기에서 켜짐으로 옮기는 것은 이런
   요청뿐입니다.
