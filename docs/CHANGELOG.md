@@ -76,6 +76,12 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
 - **A watched capability's log** keeps its newest 200 lines (was 250), so every capability watched at once still fits
   inside the journal.
 
+### Fixes
+
+- **The product's icon in every window's title bar.** *Install another version...*, the Timeline and the Log
+  showed Windows' default form icon - red, blue and yellow squares - in their title bars; they show the Dashboard's
+  own icon now, in both editions (owner, 2026-10-10).
+
 ### Known limits
 
 - MQ, ME, MS, MK and MT are not measured yet, and MH is to be measured again on the Codex in force: every capability

@@ -94,6 +94,9 @@ namespace CodexAutoResume
             dialog.ClientSize = new Size(Px(740), Px(460));
             dialog.MinimizeBox = false;
             dialog.ShowInTaskbar = false;
+            // The product's icon in the title bar, as the window has it: without one Windows draws its
+            // default form icon there (owner, 2026-10-10).
+            dialog.Icon = Icon;
 
             // Flat hairline rows, owner-drawn as every list here is (DrawCell): 660 px of columns in the 716 the
             // padding leaves, shared out by FitColumns.

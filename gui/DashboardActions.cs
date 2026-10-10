@@ -1087,6 +1087,9 @@ namespace CodexAutoResume
                 dialog.ClientSize = new Size(Px(640), Px(420));
                 dialog.MinimizeBox = false;
                 dialog.ShowInTaskbar = false;
+                // The product's icon in the title bar, as the window has it: without one Windows draws its
+                // default form icon there (owner, 2026-10-10).
+                dialog.Icon = Icon;
                 var view = List(S("timeline.title", "Timeline"),
                                 Col(S("timeline.col_time", "Time"), 140),
                                 Col(S("timeline.col_event", "Event"), 250),
