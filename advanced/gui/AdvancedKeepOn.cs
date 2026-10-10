@@ -89,6 +89,8 @@ namespace CodexAutoResume
                 return Word("page.kept.submission_unknown", "It stayed on although it could not prove that a continuation it sent arrived.");
             if (notice == "engine_changed")
                 return Word("page.kept.engine_changed", "It stayed on although the version of Codex changed. Turn it on again to confirm this version.");
+            if (notice == "not_delivered_on_open")
+                return Word("page.kept.not_delivered_on_open", "It stayed on although Codex did not run a message queued for a conversation when it was opened.");
             return null;
         }
 

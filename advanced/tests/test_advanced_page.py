@@ -74,6 +74,9 @@ OVERLAY = ROOT / "advanced" / "gui" / "window.sources"
 WINDOW = "CodexAutoResumeSettings.exe"
 SCALES = (1.0, 1.25, 1.5, 1.75, 2.0)
 IDS = [definition.id for definition in registry.DEFINITIONS]
+# The capability the turn-on scenario opens: one whose statement carries a warning (M7 unmeasured there), named
+# rather than counted, since the registry grew (v0.6.14-beta.2 put queue_for_open third).
+MARKER_FREE = "marker_free_continuation"
 # Every measurement the shipped capabilities rest on, passed on the Codex in force: no warning of that kind.
 PASSED = {measurement: (Verdict.PASS, ac.ENGINE) for measurement in Measurement}
 
@@ -330,11 +333,11 @@ class PageTests(unittest.TestCase):
         """Turn on, answered yes - with a warning the statement carries, which the request confirms."""
         bridge.measured = {}
         script = cls.opening(bridge, "en")
-        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": IDS[2]},
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": MARKER_FREE},
                  {"do": "look"}, {"do": "reply", "key": "advanced-arm", "with": [{"ok": True, "result": {"done": True}}]},
                  {"do": "press", "button": "on"}]
         return "en", {"answers": [True], "script": script, "steps": steps}, {
-            "statement": script["advanced-statement " + IDS[2]][0]["result"],
+            "statement": script["advanced-statement " + MARKER_FREE][0]["result"],
             "generation": script["advanced-list"][0]["result"]["generation"]}
 
     @classmethod
@@ -972,7 +975,7 @@ class PageTests(unittest.TestCase):
         words = expected["words"]
         self.assertEqual([row[:2] for row in result["rows"]],
                          [[words["name." + capability], words["state.off"]] for capability in IDS])
-        self.assertEqual(len(IDS), 15)
+        self.assertEqual(len(IDS), 21)
         self.assertEqual(result["page"], "advanced")
         # The row chosen is the capability open, and nothing else is.
         self.assertEqual(result["open"], IDS[1])
@@ -1019,7 +1022,7 @@ class PageTests(unittest.TestCase):
             self.assertIn(field["text"], question)
         self.assertIn(shown["engine_version"], question)
         (arm,) = sent(result, "advanced-arm")
-        self.assertEqual(arm, {"capability": IDS[2], "state": "armed", "revision": shown["revision"],
+        self.assertEqual(arm, {"capability": MARKER_FREE, "state": "armed", "revision": shown["revision"],
                                "generation": expected["generation"], "engine_version": shown["engine_version"],
                                "warnings": [item["warning"] for item in shown["warnings"]["items"]]})
         self.assertEqual(result["note"], "%s is on." % "Marker-free continuation")
@@ -1039,7 +1042,7 @@ class PageTests(unittest.TestCase):
                 reply = bridge.request(arm_line)["result"]
                 self.assertTrue(reply["done"], reply)
                 listed = bridge("advanced-list", {})["result"]
-                item = next(entry for entry in listed["capabilities"] if entry["id"] == IDS[2])
+                item = next(entry for entry in listed["capabilities"] if entry["id"] == MARKER_FREE)
                 self.assertEqual((item["state"], item["by"]), ("armed", "dashboard"))
                 self.assertEqual(item["confirmed_warnings"], json.loads(arm_line.split(" ", 1)[1])["warnings"])
             finally:

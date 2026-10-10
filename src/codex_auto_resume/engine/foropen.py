@@ -42,7 +42,7 @@ class ForOpenMixin:
         window after core first saw it held (in memory; after a restart, from the first look then) - then Codex did
         not deliver it on open, not_delivered_on_open. Both are given back to waiting once nothing ran."""
         key = row["interruption_id"]
-        opened = self.__dict__.setdefault("_opened", {})
+        opened = self.__dict__.setdefault("_loaded_since", {})
         if loaded == "loaded":
             first = opened.setdefault(key, now)
             return ("not_delivered_on_open" if now - first >= self.options["delivery_timeout_seconds"] else None)

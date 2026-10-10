@@ -175,9 +175,10 @@ def status(runtime) -> dict:
     """The status's badge, and - only where a reset rule waits (v0.6.14) - how many messages and credit rules wait
     and how many of them are due: counts, never a word of a message or a conversation (control/resets.counts)."""
     shown = badge(runtime)
-    from .control import resets as reset_actions
+    from .control import prompts as prompt_queue, resets as reset_actions
     try:
         shown.update(reset_actions.counts(runtime))
+        shown.update(prompt_queue.counts(runtime))
     except Exception:
         pass
     return shown

@@ -24,6 +24,16 @@ SHOWN = ("prompt_id", "thread_id", "trigger", "at", "every", "occurrences", "sen
          "position", "state", "reason", "gate", "gate_reason", "created_at", "due_at", "sent_at", "finished_at")
 
 
+def counts(runtime) -> dict:
+    """What P10's status shows of the prompt queue: how many prompts are still to go - a count, and nothing else (no
+    words, no conversation). Empty where none is."""
+    try:
+        rows = runtime.state.prompts()
+    except Exception:
+        return {}
+    return {"prompts": len(rows)} if rows else {}
+
+
 def words_limit(runtime) -> int:
     return continuation.PROMPT_LIMIT if _on(runtime, LONG) else SHORT_LIMIT
 

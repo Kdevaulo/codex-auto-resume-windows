@@ -86,18 +86,18 @@ namespace CodexAutoResume
             {
                 Dictionary<string, object> result = AdvancedResult(reply);
                 advancedResets = AdvancedDone(result) ? result : null;
-                ShowAdvancedDetail();
-                FillScheduled();
-                if (done != null) done();
+                // The queued prompts join Pending's group too (v0.6.14-beta.2): read after the rules.
+                ReadPrompts(done);
             });
         }
 
         /// The status's counts of the reset rules waiting (surfaces.status), written to compare: "" where none waits.
         private static string ResetCounts(Dictionary<string, object> advanced)
         {
-            if (advanced == null || !(Get(advanced, "messages") is double || Get(advanced, "credit_rules") is double)) return "";
+            if (advanced == null || !(Get(advanced, "messages") is double || Get(advanced, "credit_rules") is double ||
+                                      Get(advanced, "prompts") is double)) return "";
             return AdvancedWritten(Get(advanced, "messages")) + "," + AdvancedWritten(Get(advanced, "credit_rules")) + "," +
-                   AdvancedWritten(Get(advanced, "ready"));
+                   AdvancedWritten(Get(advanced, "ready")) + "," + AdvancedWritten(Get(advanced, "prompts"));
         }
 
         /// A snapshot's counts read: the rules read again when they changed - one added, due or ended, here or anywhere.
@@ -765,7 +765,8 @@ namespace CodexAutoResume
             if (scheduledCard == null || scheduledCard.IsDisposed) return;
             List<object> rules = ResetRules(null, true);
             string heading = Word("page.scheduled", "Scheduled");
-            string shown = heading + "|" + AdvancedWritten(rules) + "|" + AdvancedWritten(ConversationsWritten());
+            string shown = heading + "|" + AdvancedWritten(rules) + "|" + AdvancedWritten(PendingPrompts()) + "|" +
+                           AdvancedWritten(ConversationsWritten());
             if (shown == scheduledShown)
             {
                 UpdateResetButtons(busy == 0);
@@ -803,8 +804,9 @@ namespace CodexAutoResume
                 cancel.AccessibleName = Word("page.resets.cancel", "Cancel") + " " + text;
                 scheduledCancels.Add(cancel);
             }
+            int prompts = AddScheduledPrompts(scheduledLines);
             scheduledLines.ResumeLayout(true);
-            if (scheduledHolder != null) scheduledHolder.Visible = rules.Count > 0;
+            if (scheduledHolder != null) scheduledHolder.Visible = rules.Count + prompts > 0;
             FitScheduled();
             UpdateResetButtons(busy == 0);
         }

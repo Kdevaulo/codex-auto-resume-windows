@@ -584,11 +584,22 @@ namespace CodexAutoResume
         private void ReadAdvancedKept(string id, MethodInvoker done)
         {
             Dictionary<string, object> item = AdvancedItem(id);
-            // The reset actions' rules (advanced-resets) last, for the two that have them.
+            // The reset actions' rules (advanced-resets) last, for the two that have them - and (v0.6.14-beta.2) the
+            // conversations kept going (advanced-keep-going) and the queued prompts (advanced-prompts), for theirs.
             if (IsResets(id))
             {
                 MethodInvoker after = done;
                 done = delegate { ReadResets(after); };
+            }
+            if (id == KeepGoingId)
+            {
+                MethodInvoker after = done;
+                done = delegate { ReadKeepGoing(after); };
+            }
+            if (id == PromptQueueId)
+            {
+                MethodInvoker after = done;
+                done = delegate { ReadPrompts(after); };
             }
             bool rules = Equals(Get(item, "rules_editor"), true), samples = Equals(Get(item, "samples"), true);
             MethodInvoker readWatch = delegate
@@ -808,7 +819,7 @@ namespace CodexAutoResume
                            WatchShown(advancedOpen) + "|" +
                            KeptShown(item) + "|" +
                            (IsReport(item) ? ReportShown() : "") + "|" +
-                           ResetsShown(item);
+                           ResetsShown(item) + "|" + KeepGoingShown(item) + "|" + QueueShown(item);
             if (shown == advancedShown)
             {
                 UpdateAdvancedButtons();
@@ -833,6 +844,8 @@ namespace CodexAutoResume
             sendNowButtons.Clear();
             ForgetReportCard();
             ForgetResetCard();
+            ForgetKeepGoingCard();
+            ForgetQueueCard();
             if (item == null)
             {
                 TableLayoutPanel card = NewGroup(Word("page.nav", "Advanced features"), advancedStack);
@@ -965,8 +978,11 @@ namespace CodexAutoResume
             // Under its limits (v0.6.14): whether it is kept on, while it is on or watched; and Send now's waiting recoveries.
             BuildKeepOn(item);
             BuildSendNow(item);
-            // The reset actions' rules and the form they are added with, while one is on (AdvancedResets.cs).
+            // The reset actions' rules and the form they are added with, while one is on (AdvancedResets.cs); the
+            // conversations kept going and the queued prompts, each while its capability is on (v0.6.14-beta.2).
             BuildResets(item);
+            BuildKeepGoing(item);
+            BuildQueue(item);
 
             // Its own choices, the rules a person writes for Codex's error codes and the samples of what nothing classified,
             // each only for a capability that has them - the last two once they have been read.
@@ -1329,6 +1345,8 @@ namespace CodexAutoResume
                 said = Word("page.tripped.engine_changed", "It turned itself off because the version of Codex changed. Turn it on again for this version if you want it.");
             else if (reason == "duplicate_seen")
                 said = Word("page.tripped.duplicate_seen", "It turned itself off because a continuation it sent again was found twice.");
+            else if (reason == "not_delivered_on_open")
+                said = Word("page.tripped.not_delivered_on_open", "Turned off: a conversation was opened and Codex did not run the message queued for it.");
             return said ?? Word("page.tripped", "It turned itself off.");
         }
 
@@ -1362,6 +1380,8 @@ namespace CodexAutoResume
             if (ruleAdd != null) ruleAdd.Enabled = listed;
             UpdateKeptButtons(idle);
             UpdateResetButtons(idle);
+            UpdateKeepGoingButtons(idle);
+            UpdateQueueButtons(idle);
             UpdateReportButtons();
         }
 

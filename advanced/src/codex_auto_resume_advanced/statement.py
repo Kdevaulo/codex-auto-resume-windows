@@ -144,6 +144,17 @@ REPORT_KEYS = (tuple(REPORT_PREFIX + name for name in (
     + tuple(REPORT_PREFIX + "web." + str(reason) for reason in WebReason)
     + tuple(REPORT_PREFIX + "refused." + str(code) for code in ReportRefusal))
 PAGE_KEYS = PAGE_KEYS + REPORT_KEYS
+# Keep going's card and the prompt queue's, on the page and Pending (v0.6.14-beta.2: advanced/gui/AdvancedKeepGoing.cs,
+# AdvancedQueue.cs).
+PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
+    "keep.title", "keep.none", "keep.count", "keep.button", "keep.line",
+    "keep.stop", "keep.capped", "confirm.keep_going", "done.keep_going", "refused.keep_count_invalid",
+    "queue.title", "queue.none", "queue.add", "queue.when", "queue.when.after_turn",
+    "queue.when.at_time", "queue.when.daily", "queue.when.weekly", "queue.hour", "queue.times",
+    "queue.depends", "queue.depends.no", "queue.depends.yes", "queue.button", "queue.line",
+    "queue.at", "queue.series", "queue.state.waiting", "queue.state.held", "queue.state.in_codex",
+    "queue.state.being_sent", "queue.state.refused", "queue.unproven", "queue.go_on", "confirm.prompt",
+    "done.prompt_added", "refused.prompt_refused", "refused.queue_full", "refused.dependency_unknown",))
 # The edition's own continuations' words (v0.6.14-beta.2): what empty_response, subagent_parent and keep_going send -
 # fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
 # subagent's line, its id and a closed kind word).
