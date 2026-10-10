@@ -761,7 +761,10 @@ installed, to reach GitHub, and only when you start it (*What it sends to GitHub
   capabilities are listed, over that bridge or by `list_advanced_capabilities`, when one is being
   turned on, and at each look while one is on or watched. While the goal continuation is on or
   watched, from Codex's goals database, opened read-only: which goal a conversation has, its status
-  and when it changed. The goal's words are never selected.
+  and when it changed. The goal's words are never selected. From v0.6.14-beta.2, while the capabilities
+  that use them are on: from Codex's turn history, the kinds and counts of the items a turn left, whether
+  it recorded a final reply, a plan's step statuses (never a step's words), and from the state database
+  which subagents a conversation spawned and how each one's latest turn ended, as a category word.
 - **What it runs.** While start with Codex is on, when Codex starts the plugin's MCP server and
   Codex's job would end what the server starts: one constant PowerShell script, by its full path,
   that asks WMI (`Win32_Process.Create`) to start this installation's own launcher, windowless, and
@@ -785,12 +788,16 @@ installed, to reach GitHub, and only when you start it (*What it sends to GitHub
   capability spent, with the ids of the conversation and interruption it spent it on; the edition's
   own records and what a capability asked of a standard one, as ids, states and times; the global
   ceiling a person set; a journal and per-day counts of closed codes, bounded as the standard
-  journal is, and what a watched capability would have done at most 250 lines each; and, for the
+  journal is, and what a watched capability would have done at most 200 lines each (250 before
+  v0.6.14-beta.2); and, for the
   capabilities that use them, the choices you made, the rules you wrote (an
   error code, status numbers, a kind), which capability took up which interruption, and samples of
   failures it could not classify: Codex's error code, the status number, the form of the error, item
   counts, a time rounded to the minute and a duration - never a word of the error or the
-  conversation, and kept 90 days at most. No prompt, reply, error text, title, path or secret. `Uninstall.cmd -Purge` removes it
+  conversation, and kept 90 days at most. A message you wrote for a reset (from v0.6.14) or queue (from
+  v0.6.14-beta.2) is kept there until it is sent - a series until its last occurrence - cancelled or ended,
+  and then deleted; the edition's own continuations, in its fixed words, until they are sent; and which
+  conversations you keep going, with their counts. No reply, error text, title, path or secret. `Uninstall.cmd -Purge` removes it
   with the rest of `config\`. A diagnostics export you ask for adds, for each capability watched or
   with answers in the last 30 days, the capability's own id, the minute it has been watched since,
   the minute its answers are counted from and whether older ones were cut; and the word of each

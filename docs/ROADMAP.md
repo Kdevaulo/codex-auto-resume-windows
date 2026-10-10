@@ -715,7 +715,13 @@ the route, or becomes a warning the person confirms, and does not drop the capab
   limit resets (the owner, 2026-10-06): a message of the person's own, for one conversation, sent once
   when the window they pick resets - at most 2,000 characters, or what one continuation carries with
   Longer reset messages on - described in [EDITIONS.md](EDITIONS.md#todays-capabilities). A queue of
-  several prompts and the recurring wakes stay planned.
+  several prompts and the recurring wakes followed in v0.6.14-beta.2, below.
+
+  **Built for v0.6.14-beta.2 (stage 3c):** these six, as Several conversations at once, Queue for when a
+  conversation is opened, Continue a turn that ended with no reply, Tell a parent which of its subagents
+  stopped, Keep a conversation going and Queue messages for later - each described in
+  [EDITIONS.md](EDITIONS.md#todays-capabilities). The measurements they rest on that are new - MQ, ME, MS,
+  MK and MT - are not made yet, and each capability says so as a warning.
 - recording and sending a compatibility report from the app, below.
 
 ### A route of its own, and other kinds of session
@@ -754,7 +760,8 @@ the route, or becomes a warning the person confirms, and does not drop the capab
 ### Also moved here
 
 - **Watching several Codex homes**, a standard-edition addition that waited on measurement MH, which
-  passed on 2026-09-28.
+  passed on 2026-09-28. Built for v0.6.14-beta.2: up to three more homes, in the
+  [guide](GUIDE.md#several-codex-homes); MH is to be measured again on the Codex in force.
 - **Arabic and Hebrew**, translated and held since v0.6.11-beta, offered once the window is mirrored
   for right-to-left.
 - **winget** manifests for both editions, pointing at the pinned archives; submitting them is a

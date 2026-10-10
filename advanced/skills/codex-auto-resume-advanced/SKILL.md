@@ -98,13 +98,22 @@ anywhere else, and do not present one as active unless `list_advanced_capabiliti
   capability on or sent a recovery now; `list_advanced_capabilities` shows whether one is kept on.
   Turning a capability off always works, kept on or not.
 - **The reset actions** - a reset credit used when a limit the user picked is reached, and a message
-  of the user's own sent to a conversation when the window they picked resets (with *Longer reset
+  of the user's own sent to a conversation when the window they picked resets (with *Longer
   messages*, an action that only lets such a message be longer) - are set, listed, cancelled and used
   now only in the Dashboard, on the Advanced features page or under Scheduled on Pending. No tool reaches
   a rule, a message's words or a reset credit: never write, schedule or cancel one for the user, and
   never claim to have, or promise that a credit will be spent. `get_status` shows only how many wait.
   A credit spent cannot be given back; if they ask, tell them where it is done.
-- Pause stops every capability along with everything else.
+- **Keep going and queued messages** (v0.6.14-beta.2) - the conversations the user keeps going after a
+  turn that ended well, and their own messages queued for after this turn, a time or a schedule - are
+  picked, listed, stopped and cancelled only in the Dashboard. No tool reaches them: never pick a
+  conversation, queue, schedule or cancel a message for the user, and never claim to have.
+  `get_status` shows only how many messages are queued. The others of v0.6.14-beta.2 - several
+  conversations at once, a conversation queued in Codex for when it is opened, a turn that ended with
+  no reply continued once, a parent told which of its subagents stopped - act on their own once the
+  user turned them on; nothing is ever written to a subagent.
+- Pause stops every capability along with everything else, and takes back a message of the edition's
+  already in Codex's queue.
 
 ## Moving between editions
 
