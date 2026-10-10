@@ -146,7 +146,9 @@ ENGINE_TO_PLUG = {"admission", "delivery", "gate", "moved", "null", "outcome", "
 # `claim_ledger_checked` is how the claim asks: it says whether that one call raised, so a
 # failure on another thread holding the same plug is not read as this claim's (domain/plug.py).
 STORE_TO_LEDGER = {"claim_ledger_checked", "null"}
-CONTROL_TO_PLUG = {"start_route", "surface"}
+# `conversation_off`: a person switched a conversation off, so what the edition holds for it ends at that
+# switch (a reset message, a queued prompt) - told by the control layer that wrote the switch.
+CONTROL_TO_PLUG = {"conversation_off", "start_route", "surface"}
 # What the one layer a front end calls asks of the state: what to show, and the four things a
 # person can ask for - pause, cancel, retry now, give the attempts back.
 CONTROL_TO_STORE = {
