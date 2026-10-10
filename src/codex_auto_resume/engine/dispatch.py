@@ -25,6 +25,10 @@ from ..domain.plug import Alternative, Point
 from ..machine import OBSERVING, TERMINAL, WAITING, WATCHED
 from .reconcile import UNSENT
 
+# What the app said of a conversation it does not hold, and the reason a record waits for it with: one it could not
+# tell of is UNKNOWN, loaded_state_unknown.
+_WAITS = {"notLoaded": "notLoaded", "elsewhere": "held_by_other_session"}
+
 
 class DispatchMixin:
     def attempt(self, row):
@@ -140,9 +144,9 @@ class DispatchMixin:
         # plug names a route that continues it otherwise, which core carries out (engine/delivery.py).
         route = self._unloaded(row, loaded, vector)
         if route is None and loaded != "loaded":
-            reason = "notLoaded" if loaded == "notLoaded" else "loaded_state_unknown"
-            vector["thread_available"] = machine.gate(
-                machine.WAIT if loaded == "notLoaded" else machine.UNKNOWN, reason)
+            # v0.6.15-beta.3: one another Codex session holds - a terminal or VS Code - waits with a reason of its own.
+            reason = _WAITS.get(loaded, "loaded_state_unknown")
+            vector["thread_available"] = machine.gate(machine.WAIT if loaded in _WAITS else machine.UNKNOWN, reason)
             self._wait(row, "waiting_for_loaded_thread", reason, poll, vector)
             return
         if route is None:

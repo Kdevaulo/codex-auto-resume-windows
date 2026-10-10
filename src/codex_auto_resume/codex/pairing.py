@@ -124,6 +124,48 @@ def engines_instead(rows, codex_exe) -> frozenset:
     return frozenset() if any(path.lower() == held for path in served) else served
 
 
+def _extension_engine(path) -> bool:
+    """Whether `path` is a codex.exe of the VS Code extension's own (`%USERPROFILE%\\.vscode\\extensions\\
+    openai.chatgpt-*\\...\\codex.exe`): compared here, and never kept."""
+    profile = os.environ.get("USERPROFILE")
+    if not profile or not isinstance(path, str):
+        return False
+    pattern = re.compile(re.escape(str(Path(profile) / ".vscode" / "extensions")) + r"\\openai\.chatgpt-[^\\]+\\(?:[^\\]+\\)*codex\.exe",
+                         re.I)
+    return bool(pattern.fullmatch(path))
+
+
+def session_kind(rows, user, codex_exe) -> bool:
+    """v0.6.15-beta.3: whether the one Restart Manager holder `user` of a conversation's writer lock is another Codex
+    session - a terminal's TUI or the VS Code extension's server - rather than the app's, ours or anything unknown.
+
+    Its inventory row, matched by pid, is a codex.exe that is either (a) the configured engine `codex_exe` run by
+    neither the one app main nor this process (a TUI the app's bundled engine runs with --no-daemon, M5; our own
+    headless app server is this process's child and never counts), or (b) the VS Code extension's own engine
+    (`_extension_engine`); and the process is still that image, created when the holder says - a reused pid fails
+    closed, as the app's server does. Anything else - another install, two rows, an unreadable path or a pid gone -
+    is no. Paths are compared, never kept (D2)."""
+    if not isinstance(user, dict) or not isinstance(rows, list):
+        return False
+    found = [row for row in rows if isinstance(row, dict) and row.get("pid") == user.get("pid")
+             and isinstance(row.get("path"), str) and PureWindowsPath(row["path"]).name.lower() == "codex.exe"]
+    if len(found) != 1 or found[0].get("parent") == os.getpid():
+        return False
+    row = found[0]
+    try:
+        main = _app_main(rows)["pid"]
+    except (AdapterError, KeyError, TypeError):
+        main = None
+    configured = row["path"].lower() == str(codex_exe).lower() and row.get("parent") != main
+    if not (configured or _extension_engine(row["path"])):
+        return False
+    try:
+        held = process_identity(row["pid"])
+    except (AdapterError, OSError):
+        return False
+    return held["path"] == row["path"].lower() and held["created"] == user.get("created")
+
+
 def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False):
     """Bind the configured official engine to exactly one Windows Store app main.
 

@@ -69,7 +69,8 @@ LISTS = {
     # took up (P17) that nothing takes up now, and one taken up a day ago; and capacity_window, capacity
     # retries past their twelve hours on the clock.
     # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
-    "machine.REASONS": ("set", 74, "5c6aa62cce9a0415"),
+    # v0.6.15-beta.3: held_by_other_session - open in a terminal's or VS Code's Codex session.
+    "machine.REASONS": ("set", 75, "13fd39ec1495fdbf"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -90,7 +91,8 @@ LISTS = {
     # and `resend`, submission_safe passed for an uncertain submission sent once more (engine/resend.py),
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
     # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
-    "machine.GATE_REASONS": ("set", 91, "409337d90aa93a63"),
+    # v0.6.15-beta.3: and held_by_other_session.
+    "machine.GATE_REASONS": ("set", 92, "d8674e27ded3617b"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",
@@ -223,7 +225,8 @@ RETURNED = {
     ("Backend.send", "outcome"): {"accepted", "not_started", "unknown"},
     ("Backend.send", "error_code"): {"queue_preflight_failed", "queue_consent_refused", "queue_spawn_failed",
                                      "queue_response_unconfirmed", "queue_timeout", "queue_result_unknown"},
-    ("Backend.loaded", None): {"loaded", "notLoaded", "unknown"},
+    # v0.6.15-beta.3: elsewhere - another Codex session (a terminal or VS Code) holds it.
+    ("Backend.loaded", None): {"loaded", "notLoaded", "unknown", "elsewhere"},
     ("WatcherMixin.start_watcher", "state"): {"already-running"},
     ("await_watcher", "state"): {"running", "exited", "unconfirmed"},
     ("WatcherMixin.stop_watcher", "state"): {"not-running"},

@@ -17,7 +17,7 @@ from .. import machine
 from ..domain import ids, vocabulary
 from ..win.inventory import resource_users
 from ..win.kernel import NO_WINDOW
-from .pairing import desktop_pair, engines_instead, inventory
+from .pairing import desktop_pair, engines_instead, inventory, session_kind
 from .appserver import PROTOCOL_METHODS, Protocol
 from .errors import AdapterError
 from .usage import parse_usage
@@ -79,6 +79,9 @@ class Backend:
         # none of them ran this engine - an update that started the app's server from another
         # build - and nothing whenever that is not what the last pairing saw (app_identity).
         self.served_elsewhere = frozenset()
+        # v0.6.15-beta.3: the inventory rows the last app_identity() read - in memory only, for loaded() to tell
+        # another Codex session holding a conversation from anything unknown without reading them again.
+        self._rows = []
 
     def _environment(self):
         env = os.environ.copy()
@@ -186,7 +189,8 @@ class Backend:
         self.served_elsewhere = frozenset()
         try:
             self._compatible()
-            rows = inventory()
+            self._rows = []
+            rows = self._rows = inventory()
             try:
                 if self.require_holder:
                     return desktop_pair(rows, self.codex_exe, self.codex_home, require_holder=True)
@@ -222,9 +226,15 @@ class Backend:
             # open" already means "the app server holds the writer lock". We deliberately
             # do NOT probe with LockFileEx: on a momentarily free range that call would
             # ACQUIRE the app's own exclusive lock and could make the app's try_lock fail.
-            if users != [expected] or self.app_identity() != app_identity:
-                return "unknown"
-            return "loaded"
+            if users == [expected] and self.app_identity() == app_identity:
+                return "loaded"
+            # v0.6.15-beta.3: one holder that is another Codex session - a terminal's TUI or VS Code's server
+            # (pairing.session_kind), with the app identity still the same - is "elsewhere": it waits with its
+            # own reason, and nothing is sent. Anything else fails closed, as always.
+            if (len(users) == 1 and users != [expected] and self.app_identity() == app_identity
+                    and session_kind(self._rows, users[0], self.codex_exe)):
+                return "elsewhere"
+            return "unknown"
         except (AdapterError, ValueError, OSError, KeyError, TypeError):
             return "unknown"
 

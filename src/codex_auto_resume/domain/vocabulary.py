@@ -561,6 +561,8 @@ class LoadedState(StrEnum):
     LOADED = "loaded"
     NOTLOADED = "notLoaded"
     UNKNOWN = "unknown"
+    # v0.6.15-beta.3: another Codex session - a terminal's TUI or VS Code's server - holds it (codex/pairing.py).
+    ELSEWHERE = "elsewhere"
 
 
 # ------------------------------------------------------------------------- the surfaces

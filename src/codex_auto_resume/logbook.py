@@ -80,6 +80,8 @@ _MESSAGES = {
     ("waiting_for_app", "desktop_app_unavailable"): "ChatGPT app or its Codex server not running; waiting",
     ("waiting_for_loaded_thread", "notLoaded"): "notLoaded\nwaiting until user opens this thread in ChatGPT app",
     ("waiting_for_loaded_thread", "loaded_state_unknown"): "loaded state unknown; waiting safely without queueing",
+    ("waiting_for_loaded_thread", "held_by_other_session"):
+        "open in another Codex session (a terminal or VS Code); waiting until Codex holds it",
     ("waiting_for_loaded_thread", "loaded_recheck_failed"): "loaded re-check failed at dispatch time; waiting",
     ("waiting_for_usage", "usage_unavailable"): "usage still unavailable; waiting for reset",
     ("waiting_for_usage", "usage_unknown"): "usage status unknown; waiting without queueing",
