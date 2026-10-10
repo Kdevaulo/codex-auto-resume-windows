@@ -196,7 +196,9 @@ conversation on, the standard continuation waits, for up to ten minutes, so the 
 conversation open: in the standard edition the goal stays paused until you resume it yourself.
 
 **What it risks.** Measurement M2 found that a goal set active this way is not taken up while the app
-has the conversation open, which is why it acts only where the app does not. In the same measurement
+has the conversation open, which is why, unless M2b passed for your version of Codex, it acts only
+where the app does not; where M2b passed it acts there too, setting the goal active and then queueing
+the continuation. In the same measurement
 the goal was live again once the app loaded the conversation, as its statement says, though the
 record in [`docs/evidence/live/`](evidence/live/) keeps only the failing verdict; nobody has yet
 followed Codex carrying such a goal on by itself as the app opens the conversation. Another version

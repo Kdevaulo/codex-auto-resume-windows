@@ -346,7 +346,8 @@ MARKER_FREE = CapabilityDef(
 GOAL_CONTINUATION = CapabilityDef(
     id="goal_continuation",
     points=frozenset({Point.UNLOADED, Point.GATES, Point.SENDER}),
-    revision=1,
+    # Revision 2 (v0.6.15-beta): its risks say it acts on a conversation the app holds where M2b passed.
+    revision=2,
     departs_from=("0.5", "A2", "A11", "B3", "B4"),
     compat="loaded_state_detection",
     ceilings=Ceilings(per_day=12, per_conversation=3),

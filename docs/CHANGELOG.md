@@ -91,7 +91,8 @@ What follows from it:
 
 - **Several Codex homes** no longer say they are unmeasured on this Codex (MH).
 - **The goal continuation** also acts on a conversation the app holds where M2b passed: it sets the paused goal
-  active, then adds the continuation to the conversation's queue.
+  active, then adds the continuation to the conversation's queue. Its statement says so at revision 2, and one you
+  turned on asks to be confirmed again.
 - **The panel beside the chat** passed MP1 to MP3, so the [guide](GUIDE.md#the-panel-beside-the-chat) describes it now.
 - A capability whose measurement passed on this Codex shows no warning for it here; on any other version it still
   does.

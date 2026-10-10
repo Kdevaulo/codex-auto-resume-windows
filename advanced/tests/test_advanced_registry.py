@@ -24,7 +24,7 @@ from codex_auto_resume.domain.plug import Point  # noqa: E402
 from codex_auto_resume_advanced import registry, standards, statement  # noqa: E402
 from codex_auto_resume_advanced.registry import (CAPABILITY_POINTS, Ceilings, Registry,  # noqa: E402
                                                  RegistryError, problems)
-from codex_auto_resume_advanced.vocabulary import ArmingWarning, CapabilityKind, Field, Measurement, OptionKey  # noqa: E402
+from codex_auto_resume_advanced.vocabulary import ArmingWarning, CapabilityKind, Field, Measurement, OptionKey, Verdict  # noqa: E402
 
 # The standards file, public in the repository: each rule a line `**A1** <sentence>`, under its
 # family's heading `## A. <title>`, then the line that says how it is held and which tests hold it.
@@ -343,6 +343,20 @@ class ShippedTests(unittest.TestCase):
         for capability in taking:
             with self.subTest(capability):
                 self.assertIn("H2", registry.REGISTRY.get(capability).departs_from)
+
+    def test_the_goal_continuations_risks_say_it_acts_where_the_app_holds_the_conversation_once_m2b_passed(self):
+        """While M2b's recorded verdict is a pass (measured.py), engine/goal.py's P5 acts on a conversation the app
+        holds, so no language may still say it acts only on one the app does not have open: every one names M2b in
+        its risks, at revision 2."""
+        from codex_auto_resume_advanced import measured
+        self.assertEqual(measured.MEASURED[Measurement.M2B][0], Verdict.PASS)
+        goal = registry.REGISTRY.get("goal_continuation")
+        self.assertEqual(goal.revision, 2)
+        for locale in l10n.LOCALES:
+            with self.subTest(locale):
+                risks = statement.CATALOGS.own(locale)[statement.key(goal.id, Field.RISKS)]
+                self.assertIn("M2b", risks)
+                self.assertNotIn("that is why it acts only on a conversation the app does not have open.", risks)
 
     def test_once_more_when_unsure_departs_and_rests_on_what_the_design_says(self):
         """0.2 (never again when the first may have been delivered), A6 (an uncertain delivery is never
