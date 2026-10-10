@@ -75,21 +75,23 @@ class TableTests(unittest.TestCase):
                 self.assertTrue(isinstance(version, str) and version)
 
     def test_the_readings_the_owner_recorded(self):
-        """2026-09-26: MW, M1, M6 and M7 passed; M2, M3, M4 and M5 failed. 2026-09-28: the owner completed
-        MA and MH at the app, both passing. M2b, added that day for the goal continuation, has not been
-        run yet, nor have MP1, MP2 and MP3, added on 2026-10-09 for the settings panel beside the chat, nor
-        MU, MN and MR, added that day for the reset actions: the owner measures them, an agent never."""
+        """2026-10-10, everything made again on codex-cli 0.162.0-alpha.17.2 by the main session at the
+        owner's word, the owner signing in where MA and MH needed it: MW, M1, M2b, M5 (TUI with --no-daemon,
+        as the app's bundled engine runs it, and the VS Code extension), M6, M7, MA, MH and MP1-MP3 passed;
+        M2 (a goal set elsewhere is not seen while the app holds the thread), M3 and M4 (no Stop-hook plugin
+        yet) failed. MU was probed but waits for a 5-hour reset with no Codex use, MN needs an account with
+        no reset credit (this one has some), and MR spends a credit: none of the three is settled."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
-        self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M6, Measurement.M7,
-                                  Measurement.MA, Measurement.MH})
-        self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4, Measurement.M5})
+        self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
+                                  Measurement.M6, Measurement.M7, Measurement.MA, Measurement.MH,
+                                  Measurement.MP1, Measurement.MP2, Measurement.MP3})
+        self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4})
         self.assertEqual(set(Measurement) - passed - failed,
-                         {Measurement.M2B, Measurement.MP1, Measurement.MP2, Measurement.MP3,
-                          Measurement.MU, Measurement.MN, Measurement.MR,
-                          # v0.6.15-beta's: several conversations at once.
+                         {Measurement.MU, Measurement.MN, Measurement.MR,
+                          # v0.6.15-beta's own, for several conversations at once: not made yet.
                           Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK,
-                      Measurement.MT})
+                          Measurement.MT})
 
 
 if __name__ == "__main__":
