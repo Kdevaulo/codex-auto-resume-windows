@@ -29,7 +29,7 @@ import secrets
 import sys
 import time
 
-from . import config, interface, logbook, machine, startup
+from . import config, homes, interface, logbook, machine, startup
 from .domain import ids
 from .domain.plug import DEFER, EXTRA, Surface
 from .settings import is_custom_text
@@ -230,6 +230,11 @@ def collect(control, *, now=None, redact=None) -> dict:
     }
     settings = control.get_settings()
     settings = dict(settings, codex_exe="<set>" if settings.get("codex_exe") else None)
+    # Each further Codex home is a folder (with the Windows user name in it) and an alias the person wrote:
+    # the bundle records only how many there are.
+    if homes.FIELD in settings:
+        named = settings[homes.FIELD]
+        settings[homes.FIELD] = len(named) if isinstance(named, list) else None
     # A Custom message is the user's own writing and may say anything, so the bundle records
     # only whether each one is set. What was sent is not something a bug report needs.
     for name in list(settings):
