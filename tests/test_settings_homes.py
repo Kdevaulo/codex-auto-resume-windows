@@ -132,7 +132,8 @@ class SurfaceTests(Case):
 
     def test_unproven_on_a_codex_newer_than_the_one_measured(self):
         self.assertFalse(homes.unmeasured("0.158.0-alpha.2.1"))
-        self.assertTrue(homes.unmeasured("0.159.0"))
+        self.assertFalse(homes.unmeasured("0.162.0-alpha.17.2"))
+        self.assertTrue(homes.unmeasured("0.163.0"))
         self.assertTrue(homes.unmeasured("1.0.0"))
         self.assertTrue(homes.unmeasured(None))
 

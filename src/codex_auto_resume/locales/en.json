@@ -999,7 +999,7 @@
   "pick.watcher_same": "The watcher that is running is still the one from before, so version {version} is not running yet. Stop it and start it again from this page.",
   "homes.title": "Codex homes",
   "homes.help": "Your default Codex home is always watched. Add up to three more; a conversation in one is resumed only while the Codex app was started on that home (CODEX_HOME set before it starts). It applies at once; Save does not change it.",
-  "homes.unmeasured": "Watching a second Codex home was proven on Codex 0.158; on this Codex it is unproven.",
+  "homes.unmeasured": "Watching a second Codex home was proven on Codex 0.162; on this Codex it is unproven.",
   "homes.default": "Default",
   "homes.add": "Add a Codex home...",
   "homes.rename": "Rename...",

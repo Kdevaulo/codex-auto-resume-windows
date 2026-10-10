@@ -532,7 +532,7 @@
   "homes.state.waiting": "아직 확인하지 않음",
   "homes.state.watched": "감시 중",
   "homes.title": "Codex 홈",
-  "homes.unmeasured": "두 번째 Codex 홈 감시는 Codex 0.158에서 확인되었습니다. 지금의 Codex에서는 확인되지 않았습니다.",
+  "homes.unmeasured": "두 번째 Codex 홈 감시는 Codex 0.162에서 확인되었습니다. 지금의 Codex에서는 확인되지 않았습니다.",
   "logs.col_entry": "내용",
   "logs.col_time": "시각",
   "logs.none": "일치하는 줄이 없습니다.",
