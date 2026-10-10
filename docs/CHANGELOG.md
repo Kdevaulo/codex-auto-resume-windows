@@ -13,8 +13,10 @@ departs from ([EDITIONS.md](EDITIONS.md#todays-capabilities)).
 
 **Going back.** The watcher's state is now schema 5: each record says which Codex home it is of. It is brought up
 from schema 4 the first time it is opened, every row kept. To go back to v0.6.14 or v0.6.13, *Install another
-version...* converts it down first (`downgrade-state --to 4`): it is refused while an extra home is watched; an extra
-home's waiting recoveries are cancelled and its finished rows kept. The advanced edition's own file is now version 4
+version...* converts it down first (`downgrade-state --to 4`): it is refused while a continuation sent in an extra
+home may still be in that home's Codex queue. Every row is kept, and none of an extra home's is left for the older
+release to act on: its waiting recoveries are cancelled, one whose recovery turn is running ends unverified, and its
+finished rows stay as they are. The advanced edition's own file is now version 4
 - the continuations, the conversations kept going and the queued prompts - brought up from version 3 when it is first
 opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
 
