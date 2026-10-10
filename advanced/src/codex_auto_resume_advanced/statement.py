@@ -144,6 +144,11 @@ REPORT_KEYS = (tuple(REPORT_PREFIX + name for name in (
     + tuple(REPORT_PREFIX + "web." + str(reason) for reason in WebReason)
     + tuple(REPORT_PREFIX + "refused." + str(code) for code in ReportRefusal))
 PAGE_KEYS = PAGE_KEYS + REPORT_KEYS
+# The edition's own continuations' words (v0.6.14-beta.2): what empty_response, subagent_parent and keep_going send -
+# fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
+# subagent's line, its id and a closed kind word).
+CONTINUE_PREFIX = "continue."
+CONTINUATION_KEYS = (CONTINUE_PREFIX + "empty_response",)
 
 
 def name_key(capability) -> str:

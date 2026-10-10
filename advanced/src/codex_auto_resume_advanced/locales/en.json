@@ -415,5 +415,12 @@
   "statement.queue_for_open.stop": "Turn it off here or turn every advanced feature off; at its next look a queued message is taken back out of Codex's queue and waits for the app as usual.",
   "page.option.days": "Days to keep it queued",
   "page.tripped.not_delivered_on_open": "Turned off: a conversation was opened and Codex did not run the message queued for it.",
-  "page.kept.not_delivered_on_open": "It stayed on although Codex did not run a message queued for a conversation when it was opened."
+  "page.kept.not_delivered_on_open": "It stayed on although Codex did not run a message queued for a conversation when it was opened.",
+  "name.empty_response": "Continue a turn that ended with no reply",
+  "statement.empty_response.does": "When a turn in a conversation of yours ended with no reply - only your message and Codex's reasoning in it, which is all it judges by, never the words - sends one short continuation of its own: \"The last turn ended without a reply. Please continue from where you stopped.\" It looks twice, half a minute apart, before it decides, and leaves alone a conversation whose goal Codex is keeping going or has stopped. Each such turn is answered once, and a run of them twice at most. Until this has been measured on the Codex you have (ME), it says so.",
+  "statement.empty_response.departs": "0.5 (only failed turns are recovered), A13 (only failures the product can classify) and A26 (the product's continuations are its fixed templates or your Custom message).",
+  "statement.empty_response.instead": "The standard edition leaves a turn Codex completed alone, with or without a reply.",
+  "statement.empty_response.risks": "Codex may have meant to end the turn quietly, and the continuation starts work you did not ask for. It is sent only while that turn is still the conversation's latest, and never twice for one turn.",
+  "statement.empty_response.stop": "Turn it off here or turn every advanced feature off; a continuation not yet sent is dropped at once.",
+  "continue.empty_response": "The last turn ended without a reply. Please continue from where you stopped."
 }

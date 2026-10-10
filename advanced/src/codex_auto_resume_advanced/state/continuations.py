@@ -18,6 +18,8 @@ from __future__ import annotations
 from ..vocabulary import (ContinuationKind, ContinuationReason, KeepReason, KeepState, RecordState, Refusal)
 from .choices import Refused
 from .schema import CONTINUATION_CAPABILITIES
+
+KEEP_GOING = "keep_going"
 from .session import StateError, _key, _thread, _word
 
 # A continuation's words at most: P2's CONTINUATION (core's continuation.CONTINUATION_LIMIT).
@@ -148,6 +150,7 @@ class ContinuationsMixin:
             elif move in ("released", "not_started"):
                 connection.execute("UPDATE records SET state=?, finished_at=NULL WHERE record_id=? AND state=?",
                                    (RecordState.WAITING, record_id, RecordState.IN_FLIGHT))
+                connection.execute("UPDATE continuations SET launching_at=NULL WHERE record_id=?", (record_id,))
             elif move in _ENDS:
                 reason, record_state = _ENDS[move]
                 connection.execute("UPDATE continuations SET words=NULL, finished_at=?, reason=? WHERE record_id=?",
@@ -185,6 +188,17 @@ class ContinuationsMixin:
                 connection.execute("UPDATE records SET state=?, finished_at=? WHERE record_id=?",
                                    (RecordState.CANCELLED, now, key))
             return len(keys)
+
+    def continuations_in_flight(self) -> list:
+        """Every continuation whose record is in flight, whatever its capability stands at now: core watches each to
+        its end (runtime.records)."""
+        return [row for row in self.continuations(pending=True) if row["record_state"] == RecordState.IN_FLIGHT]
+
+    def release_unlaunched_continuations(self, after, at=None) -> int:
+        """Every continuation claimed `after` seconds ago whose launch never began, handed back (release_unlaunched)."""
+        now = self._now(at)
+        with self._transaction(create=False) as connection:
+            return 0 if connection is None else release_unlaunched(connection, now, after)
 
     # ------------------------------------------------------------------ keep going
     def keep_going(self, thread_id=None):
@@ -255,3 +269,86 @@ def prune(connection, now, max_age, limit) -> None:
         connection.execute("DELETE FROM continuations WHERE answer_id IN (SELECT answer_id FROM continuations WHERE finished_at "
                            "IS NOT NULL ORDER BY finished_at LIMIT ?)", (excess,))
     connection.execute("DELETE FROM keep_going WHERE state=? AND finished_at < ?", (KeepState.DONE, old))
+
+
+class ContinuationsHandle:
+    """What one continuation capability's code is given of the state (state.Scoped's `continuations`, v0.6.14-beta.2):
+    its own continuations and, for keep_going, the conversations kept going - reads always, writes only while the
+    runtime has it on. Held in a closure, as the Scoped view is: against a capability's mistakes, not its intent."""
+    __slots__ = ("capability", "_calls")
+
+    def __init__(self, state, capability, on):
+        self.capability = capability
+
+        def is_on():
+            return on is not None and on() is True
+
+        def writing(call):
+            def written(*arguments, **keywords):
+                if not is_on():
+                    raise StateError("the capability is not on")
+                return call(*arguments, **keywords)
+            return written
+
+        def get(key):
+            row = state.continuation(key)
+            return row if row is not None and row["capability"] == capability else None
+
+        self._calls = {
+            "on": is_on,
+            "get": get,
+            "mine": lambda thread_id=None, pending=True: state.continuations(capability=capability,
+                                                                               thread_id=thread_id, pending=pending),
+            "last": lambda thread_id: state.last_continuation(thread_id, capability),
+            "add": writing(lambda key, kind, thread_id, words, *, ordinal, chain=1:
+                           state.add_continuation(key, capability, kind, thread_id, words, ordinal=ordinal,
+                                                  chain=chain)),
+            "note": writing(lambda key, kind, thread_id, reason, *, ordinal=None, chain=0:
+                            state.note_continuation(key, capability, kind, thread_id, reason, ordinal=ordinal,
+                                                    chain=chain)),
+            "end": writing(lambda reason, *, thread_id=None: state.end_continuations(reason, capability=capability,
+                                                                                     thread_id=thread_id)),
+            # keep_going's own (engine/keepgoing.py).
+            "kept": state.keep_going,
+            "kept_used": writing(state.keep_going_used),
+            "stop_kept": writing(lambda reason, *, thread_id=None: state.stop_keep_going(reason, thread_id=thread_id)),
+        }
+
+    def __getattr__(self, name):
+        calls = object.__getattribute__(self, "_calls")
+        if name in calls:
+            return calls[name]
+        raise AttributeError(name)
+
+
+def end_pending(connection, capabilities, now) -> None:
+    """Every continuation still waiting of `capabilities`, ended (turned_off) with its words, and - for keep_going -
+    every conversation kept going stopped, in the caller's transaction: a move off on (state/arming.py), so turning
+    one on again revives none. One in flight is its watch's to end."""
+    ended = [capability for capability in capabilities if capability in CONTINUATION_CAPABILITIES]
+    if not ended:
+        return
+    rows = connection.execute(
+        "SELECT n.record_id FROM continuations n JOIN records c ON c.record_id = n.record_id WHERE n.capability IN (%s) "
+        "AND n.finished_at IS NULL AND c.state=?" % ", ".join("?" for _ in ended), (*ended, RecordState.WAITING)).fetchall()
+    for (record,) in rows:
+        connection.execute("UPDATE continuations SET words=NULL, finished_at=?, reason=? WHERE record_id=?",
+                           (now, ContinuationReason.TURNED_OFF, record))
+        connection.execute("UPDATE records SET state=?, finished_at=? WHERE record_id=?",
+                           (RecordState.CANCELLED, now, record))
+    if KEEP_GOING in ended:
+        connection.execute("UPDATE keep_going SET state=?, reason=?, finished_at=? WHERE state=?",
+                           (KeepState.DONE, KeepReason.TURNED_OFF, now, KeepState.ON))
+
+
+def release_unlaunched(connection, now, after) -> int:
+    """Every continuation claimed `after` seconds ago or more whose launch never began, handed back to waiting with its
+    words - one claimed whose watcher stopped before it launched (as state/resets.release_unlaunched). How many."""
+    keys = [row[0] for row in connection.execute(
+        "SELECT c.record_id FROM continuations n JOIN records c ON c.record_id = n.record_id WHERE n.finished_at IS NULL "
+        "AND n.launching_at IS NULL AND n.words IS NOT NULL AND c.state=? AND c.claimed_at IS NOT NULL "
+        "AND c.claimed_at <= ?", (RecordState.IN_FLIGHT, now - after)).fetchall()]
+    for key in keys:
+        connection.execute("UPDATE records SET state=? WHERE record_id=? AND state=?",
+                           (RecordState.WAITING, key, RecordState.IN_FLIGHT))
+    return len(keys)

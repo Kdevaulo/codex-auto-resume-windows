@@ -322,6 +322,9 @@ class Measurement(StrEnum):
     # v0.6.14-beta.2: two to four throwaway conversations sent to at once through core's backend - each receipt
     # matched, each marker in its own history once and nowhere else (parallel_dispatch).
     MQ = "mq"
+    # A turn that ended with no reply, when Codex produces one: its item kinds (closed words) and its final agent item
+    # absent (empty_response).
+    ME = "me"
 
 
 class RuleState(StrEnum):

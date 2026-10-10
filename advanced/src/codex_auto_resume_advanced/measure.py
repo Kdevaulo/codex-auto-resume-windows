@@ -336,6 +336,27 @@ def _mq(ctx):
                     "receipt is matched and each marker is in its own history once, then set the verdict", **observed)
 
 
+def _me(ctx):
+    """An empty reply (empty_response): the owner names a conversation whose last turn Codex ended with no reply, when
+    Codex produces one; whether that turn's items are only the person's message and reasoning, and whether a final
+    agent item is recorded, are read from the history of the Codex home the backend drives (codex/turns.py) - booleans and a closed word, never a word of
+    the turn's. That this is a turn with no reply is the person's to say."""
+    from .codex import turns
+    from .engine.emptyreply import EMPTY_KINDS
+    home = getattr(ctx.backend, "codex_home", None)
+    if not ctx.thread_given or home is None:
+        return _blocked("name a conversation whose last turn ended with no reply", history_read=False)
+    try:
+        found = turns.Turns(home).latest(ctx.probe_thread)
+    except Exception:
+        return _blocked("the turn history could not be read", history_read=False)
+    observed = {"history_read": True, "turn_found": found is not None}
+    if found is not None:
+        observed.update(completed=found.status == "completed", final_agent=found.final_agent,
+                        empty_kinds_only=set(found.kinds) <= EMPTY_KINDS)
+    return _blocked("confirm the turn ended with no reply, then set the verdict", **observed)
+
+
 def _mw(ctx):
     """Re-proof of the WMI escape, with the heartbeat's job words. The launcher starts a watcher
     outside Codex's job through WMI and hands back the job words its heartbeat recorded."""
@@ -621,7 +642,7 @@ PROBES = {
     Measurement.MH: _mh, Measurement.MA: _ma, Measurement.MW: _mw,
     Measurement.MP1: _mp1, Measurement.MP2: _mp2, Measurement.MP3: _mp3,
     Measurement.MU: _mu, Measurement.MN: _mn, Measurement.MR: _mr,
-    Measurement.MQ: _mq,
+    Measurement.MQ: _mq, Measurement.ME: _me,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe

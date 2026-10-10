@@ -56,14 +56,15 @@ import time
 from codex_auto_resume import continuation, failures
 from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, RECORD_MOVES, RESTRICTIONS,
                                            TAKE_UP, Alternative, Point, RecordMove)
-from codex_auto_resume.domain.plughands import workers
+from codex_auto_resume.domain.plughands import RECORDS_LIMIT, workers
 
 from .arming import Arming
 from .engine import foropen
 from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
-from .vocabulary import TRIPWIRES, ArmingState, CapabilityKind, JournalCode, OffReason, OverrideKind
+from .vocabulary import (TRIPWIRES, ArmingState, CapabilityKind, ContinuationReason, JournalCode, KeepReason,
+                         OffReason, OverrideKind)
 
 # How long what every capability stands at is taken as read, between ticks. A tick reads it
 # again; a process that has no ticks - the bridge, the MCP server - reads it at most this often.
@@ -188,6 +189,7 @@ class Runtime:
         self._noted = set()
         # (capability, record) a kept-on capability's hook raised for: passed over for it (K8).
         self._skipped = set()
+        self._records_turn = 0
         # The measurement harness's seams (measure.py). A person runs a measurement; production
         # opens a real one-turn session against the installed Codex and records to the source
         # tree, and a test gives a fake session and a temporary directory, so no test opens a
@@ -523,17 +525,29 @@ class Runtime:
         flight, whatever its capability stands at now - core watches each to its end - but one claimed whose launch
         never began, which is handed back, and what each capability that is on answers. Core checks what it is handed (domain/plughands.records_of) and carries each out
         itself. A watched capability is not asked: it holds no message (arming.py, sweep)."""
+        from .engine import continued
         from .engine.resetmessage import handed
+        from .state.resets import UNLAUNCHED_AFTER
         found, seen = [], set()
         try:
             # A claim whose launch never began is handed back first (state/resets.release_unlaunched).
             self.state.release_unlaunched(at=self.clock())
+            self.state.release_unlaunched_continuations(UNLAUNCHED_AFTER, at=self.clock())
         except StateError:
             pass                                         # tried again at the next P2
         try:
             flying = [handed(rule) for rule in self.state.messages_in_flight()]
+            flying += [continued.handed(row) for row in self.state.continuations_in_flight()]
         except StateError:
             flying = []
+        # P2's eight (v0.6.14-beta.2): those in flight first, the longest in flight first, from a place that moves on
+        # each tick when there are more than core takes; then one due of each capability in the registry's order, then
+        # the rest - so none waits behind another for more than a tick.
+        flying = sorted((record for record in flying if record is not None), key=lambda record: record["sent_at"] or 0)
+        if len(flying) > RECORDS_LIMIT:
+            start = (self._records_turn * RECORDS_LIMIT) % len(flying)
+            flying = flying[start:] + flying[:start]
+        self._records_turn += 1
         states = self.states()
         answers = [flying]
         for definition in self.registry.at(Point.RECORDS):
@@ -545,7 +559,9 @@ class Runtime:
                 self._tripped(definition)
                 continue
             if isinstance(answer, (list, tuple)):
-                answers.append(answer)
+                answers.append(list(answer))
+        due = answers[1:]
+        answers = [flying, [answer[0] for answer in due if answer], [record for answer in due for record in answer[1:]]]
         for answer in answers:
             for record in answer:
                 key = record.get("record_id") if isinstance(record, dict) else None
@@ -561,6 +577,9 @@ class Runtime:
         end. What cannot be written now, P2 cancels when it finds the conversation off."""
         try:
             self.state.end_messages_in(thread_id, at=self.clock())
+            # v0.6.14-beta.2: and every continuation of the edition's own still waiting there, and keep going for it.
+            self.state.end_continuations(ContinuationReason.CONVERSATION_OFF, thread_id=thread_id, at=self.clock())
+            self.state.stop_keep_going(KeepReason.CONVERSATION_OFF, thread_id=thread_id, at=self.clock())
         except StateError:
             pass
 
@@ -601,6 +620,10 @@ class Runtime:
             moved = self.state.record_moved(record.get("record_id"), move, gate=record.get("gate"),
                                             reason=record.get("reason"), at=self.clock(),
                                             queue_id=record.get("queue_id"))
+            if moved is None:
+                # v0.6.14-beta.2: one of the edition's own continuations (state/continuations.py).
+                moved = self.state.continuation_moved(record.get("record_id"), move, at=self.clock(),
+                                                      queue_id=record.get("queue_id"))
         except StateError:
             return DEFER                                 # repaired from the next P2 (resetmessage.records)
         if moved is None:

@@ -86,7 +86,7 @@ TABLES = {
                       "outcome", "finished_at"),
     # Version 4 (v0.6.14-beta.2): the edition's own continuations, the conversations kept going, the queued prompts.
     "continuations": ("answer_id", "capability", "kind", "thread_id", "record_id", "ordinal", "words", "chain",
-                      "created_at", "finished_at", "reason"),
+                      "created_at", "finished_at", "reason", "launching_at"),
     "keep_going": ("thread_id", "count", "used", "armed_at", "state", "reason", "finished_at"),
     "prompts": ("prompt_id", "thread_id", "words", "trigger", "at", "every", "occurrences", "sent_count", "until",
                 "depends", "position", "state", "reason", "record_id", "gate", "gate_reason", "created_at", "due_at",
@@ -375,6 +375,7 @@ _STATEMENTS_V4 = (
         created_at REAL NOT NULL,
         finished_at REAL,
         reason TEXT CHECK (reason IS NULL OR reason IN (%s)),
+        launching_at REAL,
         CHECK (words IS NULL OR finished_at IS NULL)
     )""" % (_KEY % ("answer_id", "answer_id", "answer_id"), _one_of("capability", CONTINUATION_CAPABILITIES),
             _one_of("kind", ContinuationKind), _UUID,

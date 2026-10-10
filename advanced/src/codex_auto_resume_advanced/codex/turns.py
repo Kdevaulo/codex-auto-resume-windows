@@ -36,7 +36,8 @@ HAS_PLAN = "SELECT EXISTS(SELECT 1 FROM thread_items WHERE thread_id=? AND item_
 PLAN = ("SELECT json_extract(step.value, '$.status') FROM (SELECT item_json FROM thread_items WHERE thread_id=? "
         "AND item_type=? ORDER BY rollout_ordinal DESC LIMIT 1) AS newest, json_each(newest.item_json, '$.steps') "
         "AS step")
-STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN)
+BETWEEN = "SELECT count(*) FROM thread_turns WHERE thread_id=? AND rollout_ordinal > ? AND rollout_ordinal < ?"
+STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN, BETWEEN)
 # A plan step's statuses as Codex writes them; anything else reads "unknown".
 STEP_STATUSES = frozenset({"pending", "in_progress", "completed"})
 UNKNOWN = "unknown"
@@ -136,6 +137,13 @@ class Turns:
         most RECENT_LIMIT - the candidates the edition looks at, never a list of every conversation."""
         rows = self._read(lambda connection: connection.execute(RECENT, (int(since), RECENT_LIMIT)).fetchall())
         return [row[0] for row in rows if ids.is_uuid(row[0])]
+
+    def between(self, thread_id, after, before) -> int:
+        """How many turns of `thread_id` lie strictly between the turns at ordinals `after` and `before` - 0 where
+        the second is the very next turn after the first (a chain, engine/emptyreply.py)."""
+        if not ids.is_uuid(thread_id) or type(after) is not int or type(before) is not int:
+            raise TurnsUnavailable("not a conversation")
+        return int(self._read(lambda connection: connection.execute(BETWEEN, (thread_id, after, before)).fetchone()[0]))
 
     def plan_statuses(self, thread_id) -> tuple | None:
         """The statuses of the newest plan item's steps in `thread_id`, in order, each a STEP_STATUSES word or

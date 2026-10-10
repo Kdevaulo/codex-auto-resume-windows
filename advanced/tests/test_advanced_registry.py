@@ -52,6 +52,7 @@ class ShippedTests(unittest.TestCase):
     SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
+               "empty_response",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -69,8 +70,8 @@ class ShippedTests(unittest.TestCase):
         # answer at P17 and again at P3, in the order that is precedence where two would answer.
         answering = {Point.START_ROUTE: ("start_with_codex",),
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
-                     Point.TICK: ("reset_credit", "reset_message"),
-                     Point.RECORDS: ("reset_message",),
+                     Point.TICK: ("reset_credit", "reset_message", "empty_response"),
+                     Point.RECORDS: ("reset_message", "empty_response"),
                      Point.UNLOADED: ("goal_continuation", "queue_for_open"),
                      Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
@@ -289,6 +290,17 @@ class ShippedTests(unittest.TestCase):
         self.assertEqual([(option.key, option.choices, option.default) for option in found.options],
                          [(OptionKey.DAYS, (3, 4, 5, 6, 7), 3)])
         self.assertIs(registry.QUEUE_FOR_OPEN, found)
+
+    def test_the_empty_response_recovery_departs_and_rests_on_what_the_design_says(self):
+        """0.5 (a completed turn is no failure), A13 and A26; it stands on outcome_observation and rests on ME; two a
+        conversation, a dozen a day; at P8 and P2."""
+        found = registry.REGISTRY.get("empty_response")
+        self.assertEqual(found.departs_from, ("0.5", "A13", "A26"))
+        self.assertEqual((found.compat, found.measurements, found.journal_prefix),
+                         ("outcome_observation", (Measurement.ME,), "empty"))
+        self.assertEqual(found.points, frozenset({Point.TICK, Point.RECORDS}))
+        self.assertEqual((found.ceilings.per_day, found.ceilings.per_conversation), (12, 2))
+        self.assertIs(registry.EMPTY_RESPONSE, found)
 
     def test_send_now_departs_and_rests_on_what_the_design_says(self):
         """A8 (the claim's re-check passes nothing), A20 (fifteen minutes between two continuations), A21 (the attempt
@@ -674,6 +686,7 @@ class ShippedCatalogTests(unittest.TestCase):
                          | {"state.off", "state.shadow", "state.armed"}
                          | set(statement.WARNING_KEYS)
                          | set(statement.PAGE_KEYS)
+                         | set(statement.CONTINUATION_KEYS)
                          | {statement.name_key(definition.id) for definition in registry.DEFINITIONS}
                          | shipped_statements)
         self.assertEqual(len(statement.WARNING_KEYS), 2 + len(ArmingWarning))
