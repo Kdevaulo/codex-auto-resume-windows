@@ -8,8 +8,8 @@ is one this test hands it, made by this edition's real bridge (controlcli, surfa
 temporary home with a policy, a compatibility view and measurements of the test's own - so nothing here
 reads the real installation, the real Software\\Policies keys or a real Codex.
 
-Held here: the page's rows are every capability in the registry's order, by name and state in the
-person's language; the open one shows its statement's five fields, its warnings, what a policy refuses
+Held here: the page's rows are every capability in the owner's order (registry.SHOWN_ORDER), by name and state in
+the person's language; the open one shows its statement's five fields, its warnings, what a policy refuses
 and its limits; Turn on and Watch first ask in the dialog with the statement and every warning, send
 exactly what the page showed - which the real bridge then accepts - and ask again, with what holds now,
 when the bridge says something changed, or say why they cannot (it could not be read again, or a policy
@@ -74,6 +74,9 @@ OVERLAY = ROOT / "advanced" / "gui" / "window.sources"
 WINDOW = "CodexAutoResumeSettings.exe"
 SCALES = (1.0, 1.25, 1.5, 1.75, 2.0)
 IDS = [definition.id for definition in registry.DEFINITIONS]
+# The order the rows are in (the owner's, 2026-10-10): the compatibility report first, and so the one open before any
+# is chosen - an action, so a scenario that turns the first route on or off chooses it.
+SHOWN = list(registry.SHOWN_ORDER)
 # The capability the turn-on scenario opens: one whose statement carries a warning (M7 unmeasured there), named
 # rather than counted, since the registry grew (v0.6.15-beta put queue_for_open third).
 MARKER_FREE = "marker_free_continuation"
@@ -344,8 +347,8 @@ class PageTests(unittest.TestCase):
     def scenario_declined(cls, bridge):
         """Turn on and Watch first, both answered Cancel: nothing is sent."""
         script = cls.opening(bridge, "de")
-        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "press", "button": "on"},
-                 {"do": "press", "button": "watch"}]
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": IDS[0]},
+                 {"do": "press", "button": "on"}, {"do": "press", "button": "watch"}]
         return "de", {"answers": [False, False], "script": script, "steps": steps}, {}
 
     @classmethod
@@ -361,7 +364,7 @@ class PageTests(unittest.TestCase):
                                         "generation": 0, "engine_version": before["engine_version"], "warnings": []})
         after = bridge("advanced-statement", {"capability": capability, "locale": "en"})
         listing = bridge("advanced-list", {})
-        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"},
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": capability},
                  {"do": "reply", "key": "advanced-list", "with": [listing]},
                  {"do": "reply", "key": "advanced-statement " + capability, "with": [after]},
                  {"do": "reply", "key": "advanced-arm", "with": [stale, {"ok": True, "result": {"done": True}}]},
@@ -386,8 +389,8 @@ class PageTests(unittest.TestCase):
         turned on or watched; the allowed one can only be watched."""
         bridge.policy = policy.Policy(force_shadow=True, allowed=frozenset({IDS[1]}))
         script = cls.opening(bridge, "en")
-        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "look"},
-                 {"do": "choose", "id": IDS[1]}, {"do": "look"}]
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": IDS[0]},
+                 {"do": "look"}, {"do": "choose", "id": IDS[1]}, {"do": "look"}]
         return "en", {"script": script, "steps": steps}, {"words": script["advanced-words"][0]["result"]["words"]}
 
     @classmethod
@@ -461,7 +464,7 @@ class PageTests(unittest.TestCase):
         """Turn on, answered yes; the bridge says the confirmation is stale, and the statement read again cannot be
         read. Nothing can be asked again: the person is told so, and the page says why it cannot be turned on."""
         script = cls.opening(bridge, "en")
-        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"},
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": IDS[0]},
                  {"do": "reply", "key": "advanced-statement " + IDS[0], "with": [{"ok": False, "error": "timed out"}]},
                  {"do": "reply", "key": "advanced-arm",
                   "with": [{"ok": True, "result": {"done": False, "refusal": "stale_confirmation"}}]},
@@ -988,16 +991,20 @@ class PageTests(unittest.TestCase):
                          ["advanced-words", "advanced-list", "advanced-statement"])
         self.assertEqual(sent(result, "advanced-words")[0], {"locale": "ko"})
 
-    def test_every_capability_is_a_row_in_the_registry_s_order_by_name_and_state(self):
+    def test_every_capability_is_a_row_in_the_owner_s_order_by_name_and_state(self):
+        """Fails with the list in the registry's order again (arming.listing walking the registry): the owner's order
+        of 2026-10-10, the compatibility report first, and every capability once."""
         result, expected = self.of("scenario_reading")
         words = expected["words"]
         self.assertEqual([row[:2] for row in result["rows"]],
-                         [[words["name." + capability], words["state.off"]] for capability in IDS])
+                         [[words["name." + capability], words["state.off"]] for capability in SHOWN])
+        self.assertEqual(SHOWN[:3], ["compat_report", "start_with_codex", "queue_for_open"])
+        self.assertEqual(sorted(SHOWN), sorted(IDS))
         self.assertEqual(len(IDS), 21)
         self.assertEqual(result["page"], "advanced")
         # The row chosen is the capability open, and nothing else is.
         self.assertEqual(result["open"], IDS[1])
-        self.assertEqual([row[2] for row in result["rows"]], [capability == IDS[1] for capability in IDS])
+        self.assertEqual([row[2] for row in result["rows"]], [capability == IDS[1] for capability in SHOWN])
 
     def test_the_open_capability_shows_its_statement_in_the_person_s_language(self):
         result, expected = self.of("scenario_reading")
@@ -1130,7 +1137,7 @@ class PageTests(unittest.TestCase):
         result, expected = self.of("scenario_off")
         words = expected["words"]
         watched, off = result["looks"]
-        self.assertEqual(watched["rows"][1][1], words["state.shadow"])
+        self.assertEqual(watched["rows"][SHOWN.index(IDS[1])][1], words["state.shadow"])
         self.assertEqual(watched["buttons"], {"on": True, "watch": False, "off": True, "all_off": True})
         self.assertEqual(sent(result, "advanced-disarm"), [{"capability": IDS[1]}])
         self.assertEqual(off["note"], words["page.done.off"].replace("{name}", words["name." + IDS[1]]))
@@ -1162,9 +1169,9 @@ class PageTests(unittest.TestCase):
         result, _ = self.of("scenario_followed")
         commands = [line.split(" ", 1)[0] for line in result["sent"]]
         counts = [int(look["requests"]) for look in result["looks"]]
-        read = ["advanced-list", "advanced-statement", "advanced-watch-log"]
-        # The words, the list, the statement and (v0.6.14) the watch log once this edition answers; then, with the first
-        # badge seen, read again.
+        # The open capability is the first row, the compatibility report: an action, which has no watch log to read.
+        read = ["advanced-list", "advanced-statement"]
+        # The words, the list and the statement once this edition answers; then, with the first badge seen, read again.
         self.assertEqual(commands[:counts[0]], ["advanced-words"] + read + read)
         # Away from the page, the same badge: nothing read.
         self.assertEqual(counts[1], counts[0])
@@ -1186,7 +1193,8 @@ class PageTests(unittest.TestCase):
         self.assertGreaterEqual(int(first["measures"]), 1, "the rows that came were not measured")
         self.assertEqual([int(look["measures"]) for look in (again, third)], [int(first["measures"])] * 2,
                          "the same list in the same words was measured again")
-        self.assertNotEqual(changed["rows"][1][1], third["rows"][1][1])
+        row = SHOWN.index(IDS[1])
+        self.assertNotEqual(changed["rows"][row][1], third["rows"][row][1])
         self.assertEqual(int(changed["measures"]), int(first["measures"]) + 1, "a state's new word was not measured")
 
     def test_ctrl_tab_goes_from_settings_to_this_page_and_on(self):
@@ -1567,13 +1575,14 @@ class PageTests(unittest.TestCase):
         self.assertNotIn(said, result["looks"][0]["cards"][-1], "a log the bound has not cut says nothing of it")
 
     def test_what_the_watch_log_asks_is_one_the_real_bridge_takes(self):
-        """Every request names one capability, the one whose cards are open - the first one too, before any is chosen -
-        and never an action; put to this edition's real bridge, each is answered."""
+        """Every request names one capability, the one whose cards are open, and never an action - not the report,
+        open first before any is chosen; put to this edition's real bridge, each is answered."""
         result, _ = self.of("scenario_watch_log")
         asked = sent(result, "advanced-watch-log")
         self.assertTrue(asked)
         self.assertIn({"capability": "early_reset"}, asked)
-        self.assertIn({"capability": IDS[0]}, asked, "the first capability's cards are open before any is chosen")
+        # Before any is chosen the first row is open, the compatibility report: an action, never asked.
+        self.assertEqual({item["capability"] for item in asked}, {"early_reset"})
         self.assertNotIn({"capability": REPORT}, asked)
         with tempfile.TemporaryDirectory() as home:
             bridge = Bridge(Path(home))
@@ -1598,7 +1607,7 @@ class PageTests(unittest.TestCase):
         self.assertEqual((answered["page"], answered["tab_visible"], answered["focus"]),
                          ("advanced", True, "page.advanced"))
         self.assertEqual([row[0] for row in answered["rows"]],
-                         [statement.CATALOGS.words("en")["name." + capability] for capability in IDS])
+                         [statement.CATALOGS.words("en")["name." + capability] for capability in SHOWN])
 
     # ---------------------------------------------------------------- the compatibility report
     def report_card(self, look, words) -> list:

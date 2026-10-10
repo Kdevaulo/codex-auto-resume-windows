@@ -75,6 +75,9 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
   against the capability that sent it.
 - **A watched capability's log** keeps its newest 200 lines (was 250), so every capability watched at once still fits
   inside the journal.
+- **The Advanced features page lists them by importance**, the compatibility report first: then what gets work going
+  again after a usage limit by itself, what saves you work, the other common failures, and last the rare cases and
+  expert settings (the owner's order). A capability's warnings never move it down.
 
 ### Fixes
 

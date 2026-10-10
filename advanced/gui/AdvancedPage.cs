@@ -5,8 +5,9 @@
 // Every capability of this edition starts off, and stays off until a person turns it on - or has it
 // watched first - one at a time, here and nowhere else, after reading its statement (the owner's rules of
 // 2026-09-26). The bridge refuses every other actor (advanced/src/codex_auto_resume_advanced/arming.py);
-// this page is the Dashboard that rule names. It lists every capability in the registry's order, one flat
-// row each - its name and its state in the registry's words - and the one that is open shows its statement
+// this page is the Dashboard that rule names. It lists every capability in the order advanced-list answers
+// (registry.SHOWN_ORDER, the owner's of 2026-10-10: the compatibility report first), one flat row each - its
+// name and its state in the registry's words - and the one that is open shows its statement
 // in the person's language, what an administrator's Windows policy refuses of it, the warnings its statement
 // carries now, and its limits, with the one limit a person may set: lower, and never above the registry's. Under its
 // limits (v0.6.14), where it has them: its own choices, one drop-down each (advanced-option); the rules a person writes
@@ -732,8 +733,8 @@ namespace CodexAutoResume
         }
 
         // ---------------------------------------------------------------- the list
-        /// Every capability in the registry's order, one row each: its name, and its state in a chip. Rows are only
-        /// rewritten where they changed, so the selection and the focus stay where the person left them.
+        /// Every capability in the order advanced-list answers (registry.SHOWN_ORDER), one row each: its name, and its
+        /// state in a chip. Rows are only rewritten where they changed, so the selection and the focus stay where the person left them.
         private void FillAdvancedList()
         {
             if (advancedList == null) return;

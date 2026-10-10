@@ -89,6 +89,30 @@ class ShippedTests(unittest.TestCase):
         for point in Point:
             self.assertEqual(tuple(d.id for d in registry.REGISTRY.at(point)), answering.get(point, ()))
 
+    # The order a person reads them in (the owner's, 2026-10-10): the compatibility report first, then by importance.
+    SHOWN = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
+             "early_reset", "parallel_dispatch", "reset_message", "long_reset_message", "keep_going", "prompt_queue",
+             "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "codex_gave_up",
+             "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules")
+
+    def test_the_shown_order_names_every_capability_of_the_registry_exactly_once(self):
+        order, ids = registry.SHOWN_ORDER, registry.REGISTRY.ids
+        twice = sorted({capability for capability in order if order.count(capability) > 1})
+        self.assertEqual(twice, [], "named more than once in SHOWN_ORDER: %s" % twice)
+        missing = sorted(set(ids) - set(order))
+        self.assertEqual(missing, [], "in the registry but not in SHOWN_ORDER: %s" % missing)
+        unknown = sorted(set(order) - set(ids))
+        self.assertEqual(unknown, [], "in SHOWN_ORDER but not in the registry: %s" % unknown)
+
+    def test_the_capabilities_are_shown_in_the_owner_s_order_and_answer_in_the_registry_s(self):
+        self.assertEqual(registry.SHOWN_ORDER, self.SHOWN)
+        self.assertEqual(tuple(d.id for d in registry.shown(registry.REGISTRY)), self.SHOWN)
+        # Presentation only: the registry itself, which decides who answers first, keeps its own order.
+        self.assertEqual(registry.REGISTRY.ids, self.SHIPPED)
+        # A registry of some of them (one a test makes) shows those in the owner's order too.
+        made = [registry.REGISTRY.get(capability) for capability in ("structured_rules", "compat_report")]
+        self.assertEqual([d.id for d in registry.shown(made)], ["compat_report", "structured_rules"])
+
     def test_every_shipped_capability_keeps_every_rule_and_has_a_complete_statement(self):
         """The shipped definitions - not a test's own - each pass the registry's rules and have a
         statement in every language (owner rule: ar/he ship held, so the key is present too)."""

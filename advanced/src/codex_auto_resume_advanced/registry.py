@@ -769,3 +769,25 @@ DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE,
                LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)
+
+# The order a person sees them in - the Dashboard's Advanced features page and every list arming.listing
+# answers - which is not the order above: that one decides which answers first, and this one only what is
+# read first. The owner's order, 2026-10-10 ("고급 기능 순서를 중요하고 많이 쓸만한거 순서대로 해줘. 그리고
+# 호환성 보고서를 제일 위로 해줘"): the compatibility report at the top, then 1) what gets work going again
+# after a usage limit with no hands, 2) what saves the person work, 3) the other common failures, 4) rare
+# cases and expert settings. A measurement's warning never pushes a capability down. Every capability of
+# DEFINITIONS appears here exactly once (test_advanced_registry holds it).
+SHOWN_ORDER = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
+               "early_reset", "parallel_dispatch", "reset_message", "long_reset_message", "keep_going",
+               "prompt_queue", "empty_response", "once_more_when_unsure", "send_now", "capacity_retry",
+               "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
+               "structured_rules")
+
+
+def shown(registry) -> tuple:
+    """`registry`'s capabilities in SHOWN_ORDER; any it does not name (a registry a test made) after
+    them, in the registry's own order."""
+    place = {capability: index for index, capability in enumerate(SHOWN_ORDER)}
+    definitions = tuple(registry)
+    return tuple(sorted(definitions, key=lambda definition: (place.get(definition.id, len(place)),
+                                                             definitions.index(definition))))
