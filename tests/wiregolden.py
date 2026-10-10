@@ -576,7 +576,12 @@ BRIDGE_CASES = {
                           "custom_message": LONG_CUSTOM}}),
         Case("a kind that is never recovered", {"category": "unclassified"}),
         Case("a setting that does not exist", {"category": "usage_limit",
-                                               "changes": {"no_such_setting": 1}})],
+                                               "changes": {"no_such_setting": 1}}),
+        # v0.6.15-beta.2: one waiting recovery's words for this time, after the continuation - and refused ones.
+        Case("words for this time after the continuation", {"category": "usage_limit",
+                                                             "once_words": "Then run the tests, please."}),
+        Case("words for this time that could not be stored are reported", {"category": "usage_limit",
+                                                                           "once_words": "{prompt}"})],
     "interruption-recovery": [
         Case("one task switched off",
              {"interruption_id": WAITING_RESET, "thread_id": T1, "enabled": False}),
@@ -633,6 +638,19 @@ BRIDGE_CASES = {
         Case("the text must be named, even to take it away", {"thread_id": T1}),
         Case("taken away", {"thread_id": T1, "text": None}),
         Case("not a conversation id", {"thread_id": "latest", "text": "go"})],
+    # v0.6.15-beta.2: one waiting recovery's words for this time, from its row in the Dashboard only.
+    "once-words": [
+        Case("none yet", {"interruption_id": WAITING_RESET}),
+        Case("words for one waiting recovery",
+             {"interruption_id": WAITING_RESET, "thread_id": T1, "text": "Then run the tests, please."}),
+        Case("read back, as checked again", {"interruption_id": WAITING_RESET}),
+        Case("a placeholder that would leak the conversation is refused",
+             {"interruption_id": WAITING_RESET, "thread_id": T1, "text": "{prompt}"}),
+        Case("a task that belongs to another conversation",
+             {"interruption_id": WAITING_RESET, "thread_id": T2, "text": "go"}),
+        Case("a finished task", {"interruption_id": RECOVERED, "thread_id": T3, "text": "go"}),
+        Case("taken away", {"interruption_id": WAITING_RESET, "thread_id": T1, "text": None}),
+        Case("not an interruption id", {"interruption_id": "latest", "thread_id": T1, "text": "go"})],
     # v0.6.11: whether a setting takes a value of the person's own (Custom...): the validator's answer, and
     # the value as it would be stored; nothing is written.
     "check-setting": [

@@ -15,11 +15,15 @@ class PreviewMixin:
     """Showing the message without sending it."""
 
     # ------------------------------------------------------------ continuation
-    def preview_continuation(self, category, changes=None, *, now=None, thread_id=None) -> dict:
+    def preview_continuation(self, category, changes=None, *, now=None, thread_id=None, once_words=None) -> dict:
         """The exact continuation the watcher would send, under the settings being edited.
 
         `thread_id` previews it for one conversation (v0.6.11), with that conversation's own
         message - the one stored, or one in `changes` under `custom_message_by_thread`.
+
+        `once_words` (v0.6.15-beta.2, the bridge's alone) are one waiting recovery's words for this time, being
+        written: shown after the continuation as the watcher would add them, or reported as a Custom message's
+        refusal is and left out.
 
         `changes` are unsaved edits layered over the stored settings, so a Preview follows
         what somebody is choosing or typing before anything is saved. A Custom message that
@@ -81,6 +85,13 @@ class PreviewMixin:
             sample["thread_id"] = _thread_id(thread_id)
         limits = {"max_recovery_attempts": values["max_recovery_attempts"]}
         text = continuation.for_settings(category, values, row=sample, limits=limits)
+        if once_words is not None and not (isinstance(once_words, str) and not once_words.strip()):
+            try:
+                continuation.validate_custom(once_words)
+                text = continuation.with_once_words(text, once_words, category, values, row=sample, limits=limits)
+            except continuation.CustomMessageError as exc:
+                if refusal is None:
+                    refusal, refusal_code, refusal_detail = str(exc), exc.code, exc.detail
         return {"category": category, "locale": continuation.resolve_locale(values),
                 "style": continuation.style_from(values),
                 "source": continuation.source_for(category, values, row=sample, limits=limits),

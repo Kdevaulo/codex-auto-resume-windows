@@ -28,6 +28,7 @@ from __future__ import annotations
 from .. import continuation as _message, failures, machine
 from ..domain import ids
 from ..domain.plug import DEFER, Alternative, Point
+from ..machine import CLAIMED, WAITING
 from .options import backoff_delay
 
 
@@ -129,11 +130,54 @@ class DeliveryMixin:
         except Exception:
             return message, False
 
+    # --------------------------------------------------------------- words for this time (v0.6.15-beta.2)
+    def _once_words(self, row, message, limits):
+        """(the continuation with this interruption's words for this time after it, the words), or (`message`,
+        None): no words, words that fail the Custom message's check as they are read again (A27), or a record not
+        waiting. Built before the claim, as every word of a continuation is (A26); they change no gate."""
+        if self.once_words is None or row.get("state") not in WAITING:
+            return message, None
+        try:
+            words = self.once_words.words(row["interruption_id"])
+            joined = _message.with_once_words(message, words, row["category"], self.policy_values, row=row,
+                                              limits=limits)
+        except Exception:
+            return message, None
+        return (joined, words) if joined != message else (message, None)
+
+    def _spend_once_words(self, claim, words) -> bool:
+        """The words taken off the file as the continuation carrying them is handed to Codex, so they are never sent
+        twice: True, and they go; False - the file could not be written - and this continuation goes without them."""
+        try:
+            spent = self.once_words.remove(claim["interruption_id"])
+        except Exception:
+            spent = False
+        if spent:
+            self._once_sent[claim["interruption_id"]] = words
+        self.log(claim["thread_id"], "once_words_sent" if spent else "once_words_kept", None)
+        return spent
+
+    def _prune_once_words(self):
+        """Words of an interruption that is no longer waiting - recovered otherwise, cancelled, expired, superseded,
+        gone - deleted (the default home's engine only; every home's records are in its one store)."""
+        if self.once_words is None or self.home_key:
+            return
+        try:
+            self.once_words.prune(lambda key: (self.store.get(key) or {}).get("state") in WAITING | CLAIMED)
+        except Exception:
+            self.log(None, "once_words_unavailable", None)
+
     def _after_send(self, row, response, resend=False):
         """What came of a send: queued, given back or tried again for one that never started, and
         an uncertain submission for anything else - and, for a resend, never a wait (engine/resend.py)."""
         reserved = self.store.get(row["interruption_id"])
         outcome = response.get("outcome")
+        words = self._once_sent.pop(row["interruption_id"], None)
+        if words is not None and outcome == "not_started":     # never handed over: they wait for the next one
+            try:
+                self.once_words.restore(row["interruption_id"], words)
+            except Exception:
+                pass
         if resend and outcome != "accepted":
             self._after_resend(reserved, outcome)
         elif outcome == "accepted":

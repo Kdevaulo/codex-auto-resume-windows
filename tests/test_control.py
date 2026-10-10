@@ -604,7 +604,10 @@ class BridgeTests(ControlTestCase):
             "check-setting",
             # v0.6.12: the power action after usage-limit recoveries - what Windows offers, armed from the
             # Dashboard, turned off. A file write each, and nothing sent.
-            "power-action", "power-arm", "power-disarm"]))
+            "power-action", "power-arm", "power-disarm",
+            # v0.6.15-beta.2: one waiting recovery's words for this time - a file write, sent later
+            # by the watcher once, under every check, as a Custom message is.
+            "once-words"]))
 
     def test_serve_answers_every_line_with_exactly_one_line(self):
         requests = "\n".join([

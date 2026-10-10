@@ -102,7 +102,7 @@ class OptionsMixin:
     def __init__(self, store, source, backend, *, dispatch_lock=nullcontext,
                  clock=time.time, log=None, options=None, notify=None, language=None,
                  home_lock=None, engine_state=None, plug=None, connectivity=None, home_key="",
-                 open_store=None):
+                 open_store=None, once_words=None):
         self.store, self.source, self.backend = store, source, backend
         # The edition's plug, as core holds one (domain/plug.py): NULL, the standard edition's,
         # unless the watcher was given another. Every point is asked through this and nothing
@@ -117,6 +117,8 @@ class OptionsMixin:
         # (engine/launches.py) - None, and every send is made inline as always - the pool open for this tick, the
         # worker taken for the record being dispatched, and whether its send goes to that worker.
         self.open_store, self._pool, self._held_slot, self._pooling = open_store, None, None, False
+        # v0.6.15-beta.2: the words for this time (oncewords.py), None for none, and what each send spent.
+        self.once_words, self._once_sent = once_words, {}
         self.log = log or (lambda *args: None)
         self.notify = notify or (lambda *args: None)
         self.language = language or "en"

@@ -92,6 +92,8 @@ LAYER = {_q(name): layer for layer, names in {
                # but for the look at a folder; its identity is handed in from win/folderid.py.
                "homes"),
     "adapters": ("store", "openstate", "codex", "windows", "compat", "compatio", "startup", "shortcut",
+                 # v0.6.15-beta.2: the words for this time's file beside the state, written under its lock.
+                 "oncewords",
                  # v0.6.10-alpha: compat.py and compatio.py became compat/.
                  "compat.model", "compat.standing", "compat.report", "compat.permits", "compat.files", "compat.cache", "compat.probes", "compat.views", "compat.evaluator",
                  # v0.6.10: what others report, read beside the registry and never by it.
