@@ -122,11 +122,13 @@ changed).
 **A25** Retry now only moves the schedule. It sends nothing, skips no gate and opens no usage window.  
 *tested*: `test_mcp.py`, `test_store.py`
 
-**A26** The continuation text comes only from shipped templates or the Custom message, only for a recoverable category, and is decided before the claim; it cannot change what is recovered.  
-*tested*: `test_continuation.py`
+**A26** The continuation text comes only from shipped templates or the Custom message - and the words a person added for one waiting interruption, once, after it - only for a recoverable category, and is decided before the claim; it cannot change what is recovered (amended by the owner on 2026-10-10).  
+*tested*: `test_continuation.py`, `test_once_words_engine.py`
+<!-- A26 amended at the owner's word, 2026-10-10: "대기 중인 메시지 중 하나를 골라서 이번 한번만 한도가 풀렸을 때 기존 재시도 메시지에 추가로 보내고 싶은 말을 보내고 싶은거야" - words for this time, added once to one waiting recovery's continuation. -->
 
-**A27** The Custom message, and a conversation's own message, are written only in the Dashboard; MCP update_settings refuses both and the preview tool takes no text. Each is at most 2000 characters and sent exactly as typed. Placeholders come from a whitelist ({reason},{category},{attempt},{max_attempts},{reset_time}); dangerous ones are refused by name. It is re-checked on read, and text that fails the check is treated as not set.  
-*tested*: `test_continuation.py`, `test_mcp.py`, `test_conversation_message.py`
+**A27** The Custom message, a conversation's own message, and the words a person added for one waiting interruption are written only in the Dashboard; MCP update_settings refuses them and the preview tool takes no text. Each is at most 2000 characters and sent exactly as typed. Placeholders come from a whitelist ({reason},{category},{attempt},{max_attempts},{reset_time}); dangerous ones are refused by name. It is re-checked on read, and text that fails the check is treated as not set (amended by the owner on 2026-10-10).  
+*tested*: `test_continuation.py`, `test_mcp.py`, `test_conversation_message.py`, `test_once_words.py`
+<!-- A27 amended at the owner's word, 2026-10-10: the words for this time are a Custom message in every way, kept in config/once-words.json beside the state. -->
 
 **A28** A notification or card button can only cancel one exact interruption (an opaque 64-hex id), stop the power action for one batch (named by that batch's opaque 16-hex id, which every batch end replaces), or open one page from a fixed list; anything else is ignored and logged, and a button never causes a send (amended by the owner on 2026-10-03).  
 *tested*: `test_notify.py`, `test_notice_card.py`, `test_cli.py`
