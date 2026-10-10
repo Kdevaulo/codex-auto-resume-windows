@@ -1,0 +1,200 @@
+name: durations
+
+# Keep the CI parts even, without a person remembering to.
+#
+# scripts/test_parts.py deals each lane's test files into the parts test.yml runs, balanced by
+# tests/data/durations.json. Every part keeps what each of its files took (`seconds-*` artifacts), but
+# folding them back in was a hand job, so the deal drifted: on 2026-10-10 a dev run's advanced lane took
+# 33, 28, 15 and 62 minutes. This reads the seconds of every green tests run on dev and, when a new deal
+# would make some lane's longest part shorter by enough (scripts/test_parts.py REFRESH_FRACTION and
+# REFRESH_SECONDS, both), commits the refreshed table to dev and runs the tests there again, so the
+# commit it made has a run of its own.
+#
+# Why it cannot loop: the run it asks for tests its own commit, and a run of that commit wakes this
+# again, which sees its own trailer on the head commit and stops. Why it never fights a person: it
+# writes only while dev is still the commit whose seconds it read, moves dev by compare-and-swap and
+# only forward, and never touches main or ko. tests/test_durations_refresh.py holds each of those.
+#
+# `workflow_run` runs the copy of this file on the default branch: nothing here wakes until it is on
+# main; the code it runs is the tested dev commit's scripts/test_parts.py.
+
+on:
+  workflow_run:
+    workflows: ["tests"]
+    types: [completed]
+    branches: [dev]
+
+permissions: {}
+
+# One at a time, and never one cancelled half way; a newer pending run stands in for an older one.
+concurrency:
+  group: durations
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    # A green run of dev's own push or dispatch, from this repository, whose head is not a refresh this
+    # workflow made. A fork's pull request cannot satisfy head_repository, and a red run the conclusion.
+    if: >-
+      github.repository == 'songyb111-gachon/codex-auto-resume-windows' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'dev' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
+      !contains(github.event.workflow_run.head_commit.message, 'Refreshed-by: .github/workflows/durations.yml')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      refresh: ${{ steps.weigh.outputs.refresh }}
+    steps:
+      # The commit the run tested, not dev's head: the seconds are that commit's.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      # Nothing is weighed for a dev that has moved on (its own run brings fresher seconds) or for a
+      # commit this workflow made.
+      - name: Check what the run tested
+        id: check
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          go=yes
+          [ "$(git rev-parse HEAD)" = "$HEAD_SHA" ] || { echo "::error::the checkout is not the tested commit"; exit 1; }
+          dev=$(git ls-remote "https://github.com/$GITHUB_REPOSITORY.git" refs/heads/dev | cut -f1)
+          if [ "$dev" != "$HEAD_SHA" ]; then
+            echo "dev moved past the tested commit ($dev); its own run brings fresher seconds"
+            go=no
+          fi
+          if git log -1 --format=%B | grep -qx 'Refreshed-by: .github/workflows/durations.yml'; then
+            echo "the tested commit is a refresh this workflow made"
+            go=no
+          fi
+          echo "go=$go" >> "$GITHUB_OUTPUT"
+
+      # The token here only reads the run's artifacts; nothing is run but gh.
+      - name: Read the run's seconds
+        if: steps.check.outputs.go == 'yes'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN: ${{ github.event.workflow_run.id }}
+        run: gh run download "$RUN" -R "$GITHUB_REPOSITORY" -p 'seconds-*' -D "$RUNNER_TEMP/seconds"
+
+      - name: Set up Python
+        if: steps.check.outputs.go == 'yes'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # The tested commit's own merge, with no token: it writes the table only on enough of a gain.
+      # --parts is test.yml's PARTS.
+      - name: Weigh a new deal
+        id: weigh
+        if: steps.check.outputs.go == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/refresh"
+          mkdir -p "$out"
+          python scripts/test_parts.py --refresh-seconds "$RUNNER_TEMP/seconds" --parts 4 > "$out/report.txt"
+          cat "$out/report.txt"
+          # A table that would leave a lane's parts past SPREAD is refused and not written: say which file.
+          grep '^refused: ' "$out/report.txt" | sed 's/^refused: /::warning::nothing committed: /' || true
+          if git diff --quiet -- tests/data/durations.json; then
+            echo "refresh=no" >> "$GITHUB_OUTPUT"
+          else
+            cp tests/data/durations.json "$out/durations.json"
+            echo "refresh=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Keep the refreshed table
+        if: steps.weigh.outputs.refresh == 'yes'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: durations-refresh
+          path: ${{ runner.temp }}/refresh
+          retention-days: 1
+
+  write:
+    needs: measure
+    if: github.repository == 'songyb111-gachon/codex-auto-resume-windows' && needs.measure.outputs.refresh == 'yes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: durations-refresh
+          path: ${{ runner.temp }}/refresh
+
+      # The only step that writes. It runs gh and jq by absolute path and none of the repository's code,
+      # reads the table as data, and moves dev only from the tested commit (or, if dev moved while this
+      # ran and left the table as it was, once more from the new dev), only forward, never by force.
+      - name: Commit to dev and test it
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          gh=/usr/bin/gh
+          jq=/usr/bin/jq
+          repo="$GITHUB_REPOSITORY"
+          export GH_REPO="$repo"
+          refresh="$RUNNER_TEMP/refresh"
+          table=tests/data/durations.json
+          sha='^[0-9a-f]{40}$'
+          fail() { echo "::error::$1; nothing more was written"; exit 1; }
+          api() { "$gh" api "$@"; }
+
+          [[ $HEAD_SHA =~ $sha ]] || fail "no tested commit"
+          [[ $RUN =~ ^[0-9]+$ ]] || fail "no run"
+          [ "$(stat -c %s "$refresh/durations.json")" -le 1000000 ] || fail "the table is over 1 MB"
+          "$jq" -e '(keys == ["about", "lanes", "seconds"]) and (.lanes | type == "object") and (.seconds | type == "object")' \
+            "$refresh/durations.json" > /dev/null || fail "the refresh is not a durations table"
+          mapfile -t lines < <(grep -E '^lane [a-z]+: longest of [0-9]+ parts [0-9]+[.][0-9] min under the current table, [0-9]+[.][0-9] min under the fresh one( - enough)?$' "$refresh/report.txt" || true)
+          [ "${#lines[@]}" -ge 1 ] || fail "the refresh names no lane's longest part"
+          message=$(printf 'The CI parts are dealt by the seconds of tests run %s\n\nMade by .github/workflows/durations.yml from the seconds every part of that run kept. For each lane, its longest part as those seconds predict it, under the table before and after:\n\n%s\n\nRefreshed-by: .github/workflows/durations.yml' "$RUN" "$(printf '%s\n' "${lines[@]}")")
+
+          blob=$("$jq" -n --rawfile content "$refresh/durations.json" '{content: $content, encoding: "utf-8"}' \
+            | api -X POST "repos/$repo/git/blobs" --input - --jq .sha)
+          commit_on() {
+            local tree
+            tree=$(api "repos/$repo/git/commits/$1" --jq .tree.sha)
+            tree=$("$jq" -n --arg base "$tree" --arg path "$table" --arg blob "$blob" \
+              '{base_tree: $base, tree: [{path: $path, mode: "100644", type: "blob", sha: $blob}]}' \
+              | api -X POST "repos/$repo/git/trees" --input - --jq .sha)
+            "$jq" -n --arg message "$message" --arg tree "$tree" --arg parent "$1" \
+              '{message: $message, tree: $tree, parents: [$parent]}' \
+              | api -X POST "repos/$repo/git/commits" --input - --jq .sha
+          }
+          move() { api -X PATCH "repos/$repo/git/refs/heads/dev" -f sha="$1" -F force=false > /dev/null 2>&1; }
+
+          dev=$(api "repos/$repo/git/ref/heads/dev" --jq .object.sha)
+          if [ "$dev" != "$HEAD_SHA" ]; then
+            echo "dev moved past the tested commit; nothing was written, and its own run brings fresher seconds"
+            exit 0
+          fi
+          commit=$(commit_on "$dev")
+          if ! move "$commit"; then
+            dev=$(api "repos/$repo/git/ref/heads/dev" --jq .object.sha)
+            [[ $dev =~ $sha ]] || fail "dev cannot be read"
+            if [ "$(api "repos/$repo/contents/$table?ref=$dev" --jq .sha)" != "$(api "repos/$repo/contents/$table?ref=$HEAD_SHA" --jq .sha)" ]; then
+              echo "dev moved and changed the table itself; nothing was written"
+              exit 0
+            fi
+            commit=$(commit_on "$dev")
+            move "$commit" || { echo "dev moved twice while this ran; nothing was written"; exit 0; }
+          fi
+          echo "dev: the refreshed table, now $commit"
+          "$gh" workflow run test.yml --ref dev

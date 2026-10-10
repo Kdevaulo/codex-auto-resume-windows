@@ -33,7 +33,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 # Every workflow, named: a new one is looked at here before anything else.
-KNOWN = ["community-file.yml", "community-report.yml", "ko-watch.yml", "release.yml", "sync-ko.yml", "test.yml"]
+KNOWN = ["community-file.yml", "community-report.yml", "durations.yml", "ko-watch.yml", "release.yml",
+         "sync-ko.yml", "test.yml"]
 
 
 def text(name):
@@ -584,6 +585,11 @@ class YamlShapeTests(unittest.TestCase):
                 self.assertIn("jobs", document)
 
 
+# A job runs the suite when it runs scripts/test_parts.py, unless all it asks is --refresh-seconds: that
+# merges a run's seconds into the durations and runs no test (durations.yml, tests/test_durations_refresh.py).
+RUNS_PARTS = re.compile(r"python scripts/test_parts\.py(?! --refresh-seconds)")
+
+
 class TagsAreFetchedWhereTheSuiteRunsTests(unittest.TestCase):
     """A job that runs the suite has to check out the tags the suite reads.
 
@@ -603,7 +609,7 @@ class TagsAreFetchedWhereTheSuiteRunsTests(unittest.TestCase):
         found = []
         for path in sorted(WORKFLOWS.glob("*.yml")):
             text = path.read_text(encoding="utf-8")
-            if "unittest discover" in text or "loadTestsFromNames" in text or "scripts/test_parts.py" in text:
+            if "unittest discover" in text or "loadTestsFromNames" in text or RUNS_PARTS.search(text):
                 found.append((path.name, text))
         return found
 
@@ -626,7 +632,7 @@ class TagsAreFetchedWhereTheSuiteRunsTests(unittest.TestCase):
             jobs = source[re.search(r"(?m)^jobs:\s*$", source).end():]
             for key in re.findall(r"(?m)^  ([A-Za-z0-9_-]+):\s*$", jobs):
                 body = job(source, key)
-                if not re.search(r"unittest discover|loadTestsFromNames|scripts/test_parts\.py", body):
+                if not (re.search(r"unittest discover|loadTestsFromNames", body) or RUNS_PARTS.search(body)):
                     continue
                 running += 1
                 with self.subTest(workflow=name, job=key):
