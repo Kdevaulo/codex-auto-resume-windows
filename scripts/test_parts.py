@@ -15,6 +15,7 @@ written: CI's lanes (.github/workflows/test.yml), the release's suite (release.y
     python scripts/test_parts.py --record-durations ...   # write this run's per-file times
     python scripts/test_parts.py --seconds FILE ...       # the same times, to a file of their own
     python scripts/test_parts.py --merge-seconds DIR      # such files, from CI, into the durations
+    python scripts/test_parts.py --refresh-seconds DIR    # the same, only when the parts get much shorter
     python scripts/test_parts.py --list --parts 8         # show how 8 parts are dealt
     python scripts/test_parts.py --check                  # prove the parts are the discovered suite
 
@@ -685,12 +686,10 @@ def seconds_files(paths) -> list[Path]:
     return found
 
 
-def merge_seconds(paths, path: Path | None = None) -> dict:
-    """The --seconds files under `paths` into the durations by record_durations' rules, each lane's into its
-    own table; where several jobs timed one file in one lane - a job for each Python - their median, each
-    file counted once however often it is named. Every file is read before anything is written, and one
-    that is not a seconds file of a lane there is - one that holds anything --seconds does not write, as
-    an --outcomes file does - refuses the merge. Returns, by lane, how many files its table took."""
+def read_seconds(paths) -> tuple[dict, list, set]:
+    """The --seconds files under `paths`, read and checked as merge_seconds says: by lane, each file's
+    median over the jobs that timed it, with the files read and the CI runs they name. Nothing is
+    written."""
     files = seconds_files(paths)
     if not files:
         raise Refused("no seconds files in %s" % ", ".join(map(str, paths)))
@@ -714,10 +713,85 @@ def merge_seconds(paths, path: Path | None = None) -> dict:
         raise Refused("the seconds files given time no file: %s" % ", ".join(map(str, files)))
     medians = {lane: {key: statistics.median(values) for key, values in table.items()}
                for lane, table in timed.items()}
+    return medians, files, runs
+
+
+def write_medians(medians: dict, files: list, runs: set, path: Path | None = None) -> dict:
+    """read_seconds' answer into the durations by record_durations' rules. Returns, by lane, how many files
+    its table took."""
     source = "" if not runs else " of CI run%s %s" % ("s" if len(runs) > 1 else "", ", ".join(sorted(runs)))
     write_durations(medians, "by --merge-seconds from %d seconds file%s%s, each file's median over the jobs that "
                              "timed it in that lane" % (len(files), "" if len(files) == 1 else "s", source), path)
     return {lane: len(set(medians[lane]) & set(lane_files(lane))) for lane in LANES if lane in medians}
+
+
+def merge_seconds(paths, path: Path | None = None) -> dict:
+    """The --seconds files under `paths` into the durations by record_durations' rules, each lane's into its
+    own table; where several jobs timed one file in one lane - a job for each Python - their median, each
+    file counted once however often it is named. Every file is read before anything is written, and one
+    that is not a seconds file of a lane there is - one that holds anything --seconds does not write, as
+    an --outcomes file does - refuses the merge. Returns, by lane, how many files its table took."""
+    return write_medians(*read_seconds(paths), path=path)
+
+
+# --- whether fresh seconds are worth a commit -------------------------------------------------------
+#
+# .github/workflows/durations.yml offers a refresh after every green run of the tests on dev, and each
+# refresh is a commit on dev and one more run of the whole suite. Run to run, a part's time moves by a
+# minute or two on the same deal - the runners are shared - so a refresh for less would be a commit for
+# noise and a suite for nothing. Both bounds must hold: 10 % alone would refresh a short lane for seconds,
+# and 3 minutes alone a long lane for what its own noise is.
+REFRESH_FRACTION = 0.10
+REFRESH_SECONDS = 180.0
+
+
+def longest_part(parts: list[list[str]], seconds: dict) -> float:
+    """The longest of `parts` by `seconds`, a file `seconds` lacks counted as nothing."""
+    return max((sum(seconds.get(name, 0.0) for name in part) for part in parts), default=0.0)
+
+
+def lane_gain(files: list[str], count: int, current: dict, fresh: dict) -> tuple[float, float]:
+    """A lane's longest part, as the fresh seconds predict it, under the deal its current table gives and
+    under the deal the table after a merge of `fresh` gives - for a file `fresh` lacks, the current figure
+    stands in both. Pure: the same arguments, the same answer."""
+    after = dict(current)
+    after.update(fresh)
+    return (longest_part(deal(files, count, current), after),
+            longest_part(deal(files, count, after), after))
+
+
+def worth_refreshing(before: float, after: float) -> bool:
+    """Whether a lane's longest part shrinks by REFRESH_FRACTION of itself and by REFRESH_SECONDS, both."""
+    shrink = before - after
+    return shrink >= REFRESH_FRACTION * before and shrink >= REFRESH_SECONDS
+
+
+def gains(medians: dict, count: int, path: Path | None = None) -> dict:
+    """For each lane `medians` times, (its longest part under the current table, under the refreshed one),
+    both predicted by the fresh seconds (lane_gain), the lanes in LANES' order."""
+    every, lanes = read_durations(path)
+    answer = {}
+    for lane in LANES:
+        if lane in medians:
+            current = dict(every)
+            current.update(lanes.get(lane, {}))
+            answer[lane] = lane_gain(lane_files(lane), count, current, medians[lane])
+    return answer
+
+
+def refresh_seconds(paths, count: int, path: Path | None = None) -> tuple[bool, list[str]]:
+    """merge_seconds, only when some lane's longest part shrinks enough (worth_refreshing). Returns whether
+    the durations were written, and a line for each lane saying what its longest part would be."""
+    medians, files, runs = read_seconds(paths)
+    lines, worth = [], False
+    for lane, (before, after) in gains(medians, count, path).items():
+        enough = worth_refreshing(before, after)
+        worth = worth or enough
+        lines.append("lane %s: longest of %d parts %.1f min under the current table, %.1f min under the "
+                     "fresh one%s" % (lane, count, before / 60, after / 60, " - enough" if enough else ""))
+    if worth:
+        write_medians(medians, files, runs, path)
+    return worth, lines
 
 
 def summary(merged: dict, seconds: float, parts=None) -> str:
@@ -748,9 +822,12 @@ def main(argv=None) -> int:
     which.add_argument("--compare", nargs=2, metavar="FILE", help="compare two --outcomes files: a whole run, parts at once, or one part alone")
     which.add_argument("--merge-seconds", nargs="+", metavar="PATH",
                        help="write --seconds files, or the folders `gh run download` leaves, into tests/data/durations.json")
+    which.add_argument("--refresh-seconds", nargs="+", metavar="PATH",
+                       help="--merge-seconds, only when some lane's longest of --parts parts shrinks by 10%% "
+                            "and 3 minutes (.github/workflows/durations.yml)")
     which.add_argument("--worker", metavar="SUITE", help=argparse.SUPPRESS)
     which.add_argument("--check-suite", metavar="SUITE", help=argparse.SUPPRESS)
-    parser.add_argument("--parts", type=int, default=4, help="with --list: how many parts")
+    parser.add_argument("--parts", type=int, default=4, help="with --list or --refresh-seconds: how many parts")
     parser.add_argument("--counts", default="1,2,3,4,5,6,7,8",
                         help="with --check: the part counts to prove, comma separated")
     parser.add_argument("--outcomes", metavar="FILE", help="write every test id's outcome as JSON")
@@ -777,6 +854,14 @@ def main(argv=None) -> int:
         for name, count in merge_seconds(options.merge_seconds).items():
             say("lane %s: %d files timed, written into its table" % (name, count))
         say("written: %s" % DURATIONS)
+        return 0
+    if options.refresh_seconds:
+        written, lines = refresh_seconds(options.refresh_seconds, options.parts)
+        for line in lines:
+            say(line)
+        say("written: %s" % DURATIONS if written else
+            "kept: no lane's longest part shrinks by %d%% and %d minutes" % (round(REFRESH_FRACTION * 100),
+                                                                             round(REFRESH_SECONDS / 60)))
         return 0
     if options.check:
         ok, answers = check([int(value) for value in options.counts.split(",") if value.strip()])
