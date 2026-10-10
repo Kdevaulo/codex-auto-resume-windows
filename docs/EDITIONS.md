@@ -237,8 +237,9 @@ hours on the clock, 48 times a day, or sooner than a minute apart.
 
 **Departs from** [A20](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (five continuations a
 conversation in 24 hours, 15 minutes apart), A21 (the attempt, no-progress and continuation budgets),
-A22 (waits come only from the retry timing you chose) and [B9](STANDARDS.md#b-what-it-reads-and-how)
-(only a failure's kind is kept: this also reads Codex's own error code, never its words).
+A22 (waits come only from the retry timing you chose), [B9](STANDARDS.md#b-what-it-reads-and-how)
+(only a failure's kind is kept: this also reads Codex's own error code, never its words) and
+[H2](STANDARDS.md#h-user-control) (nothing can move a limit the program fixes: A20's are the engine's).
 
 **Ceilings.** 48 a day, and 48 in any one conversation - the one capability whose conversation
 ceiling is above the standard edition's five, because it departs from A20.
@@ -264,7 +265,8 @@ another version. Removing a rule ends what it took up and has not sent.
 
 **Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (a failure it cannot classify is never
 retried), A13 (only the classified kinds are recovered), A14 (anything unclassified is never
-retried), A26 (continuation text only for a kind that is recovered) and B9.
+retried), A26 (continuation text only for a kind that is recovered), B9 and
+[H2](STANDARDS.md#h-user-control) (nothing can retry an unknown failure: a rule is a setting of yours).
 
 **Ceilings.** 24 a day, and 5 in any one conversation.
 
@@ -287,8 +289,9 @@ conversation tried again than waited for you.
 again repeats something a person should have decided. A sample keeps a code Codex chose, which may say
 more than the program's own words. Samples are kept 90 days at most.
 
-**Departs from** 0.5, A13, A14, A26, B9 and [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps)
-(state holds only the program's own fixed words, never a code Codex chose).
+**Departs from** 0.5, A13, A14, A26, B9, [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps)
+(state holds only the program's own fixed words, never a code Codex chose) and
+[H2](STANDARDS.md#h-user-control) (nothing can retry an unknown failure).
 
 **Ceilings.** 12 a day, and 3 in any one conversation.
 

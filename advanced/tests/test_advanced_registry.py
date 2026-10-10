@@ -48,6 +48,14 @@ CHANGES = frozenset({"thread/queue/add", "thread/goal/set",
                      "account/rateLimitResetCredit/consume"})
 
 
+
+def standards_text(rule) -> str:
+    """The sentence of one rule in the standards file: the line that starts with its bold id."""
+    for line in STANDARDS_FILE.read_text(encoding="utf-8").splitlines():
+        if line.startswith(f"**{rule}** "):
+            return line
+    raise AssertionError(f"{rule} is not in the standards file")
+
 class ShippedTests(unittest.TestCase):
     SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
@@ -212,12 +220,13 @@ class ShippedTests(unittest.TestCase):
 
     def test_the_capacity_retries_depart_and_rest_on_what_the_design_says(self):
         """A20 (five a conversation a day, fifteen minutes apart), A21 (the budgets), A22 (waits only
-        from the retry timing) and B9 (it reads Codex's code); 48 a day in one conversation - core's
-        capacity day, which only the A20 departure allows - and one to twelve hours, two by default."""
+        from the retry timing), B9 (it reads Codex's code) and H2 (nothing can move an engine constant -
+        revision 2 names it); 48 a day in one conversation - core's capacity day, which only the A20
+        departure allows - and one to twelve hours, two by default."""
         from codex_auto_resume_advanced.vocabulary import OptionKey
         cap = registry.REGISTRY.get("capacity_retry")
-        self.assertEqual(cap.departs_from, ("A20", "A21", "A22", "B9"))
-        self.assertEqual((cap.compat, cap.measurements, cap.revision), ("transient_classification", (), 1))
+        self.assertEqual(cap.departs_from, ("A20", "A21", "A22", "B9", "H2"))
+        self.assertEqual((cap.compat, cap.measurements, cap.revision), ("transient_classification", (), 2))
         self.assertEqual(cap.points, frozenset({Point.ADMISSION, Point.GATES}))
         self.assertEqual((cap.ceilings.per_day, cap.ceilings.per_conversation), (48, 48))
         from codex_auto_resume import ladder
@@ -229,11 +238,12 @@ class ShippedTests(unittest.TestCase):
 
     def test_the_rules_depart_and_rest_on_what_the_design_says(self):
         """0.5, A13, A14 (an unknown failure is never retried), A26 (continuation text only for a
-        recovered kind) and B9 (it reads Codex's code); five a conversation, two dozen a day; the one
-        capability whose rules the Dashboard edits, counting its hits as `matched`."""
+        recovered kind), B9 (it reads Codex's code) and H2 (no setting retries an unknown failure, and
+        a rule is a person's setting - revision 2 names it); five a conversation, two dozen a day; the
+        one capability whose rules the Dashboard edits, counting its hits as `matched`."""
         rules = registry.REGISTRY.get("structured_rules")
-        self.assertEqual(rules.departs_from, ("0.5", "A13", "A14", "A26", "B9"))
-        self.assertEqual((rules.compat, rules.measurements, rules.revision), ("transient_classification", (), 1))
+        self.assertEqual(rules.departs_from, ("0.5", "A13", "A14", "A26", "B9", "H2"))
+        self.assertEqual((rules.compat, rules.measurements, rules.revision), ("transient_classification", (), 2))
         self.assertEqual(rules.points, frozenset({Point.ADMISSION, Point.GATES}))
         self.assertEqual((rules.ceilings.per_day, rules.ceilings.per_conversation), (24, 5))
         self.assertEqual((rules.rules_editor, rules.samples, rules.codes, rules.options), (True, False, ("matched",), ()))
@@ -241,12 +251,13 @@ class ShippedTests(unittest.TestCase):
                          ["structured_rules"])
 
     def test_the_unknown_failure_budget_departs_and_rests_on_what_the_design_says(self):
-        """As the rules, and D2 too - a sample keeps a code Codex chose; three a conversation, a dozen
-        a day; one to three tries a task, one by default; the one capability that samples."""
+        """As the rules, H2 among them, and D2 too - a sample keeps a code Codex chose; three a
+        conversation, a dozen a day; one to three tries a task, one by default; the one capability that
+        samples. Revision 2 names H2."""
         from codex_auto_resume_advanced.vocabulary import OptionKey
         unknown = registry.REGISTRY.get("unknown_failure_budget")
-        self.assertEqual(unknown.departs_from, ("0.5", "A13", "A14", "A26", "B9", "D2"))
-        self.assertEqual((unknown.compat, unknown.measurements, unknown.revision), ("transient_classification", (), 1))
+        self.assertEqual(unknown.departs_from, ("0.5", "A13", "A14", "A26", "B9", "D2", "H2"))
+        self.assertEqual((unknown.compat, unknown.measurements, unknown.revision), ("transient_classification", (), 2))
         self.assertEqual(unknown.points, frozenset({Point.ADMISSION, Point.GATES}))
         self.assertEqual((unknown.ceilings.per_day, unknown.ceilings.per_conversation), (12, 3))
         option = unknown.option(OptionKey.ATTEMPTS)
@@ -289,6 +300,49 @@ class ShippedTests(unittest.TestCase):
         self.assertEqual((early.ceilings.per_day, early.ceilings.per_conversation), (12, 3))
         self.assertEqual((early.options, early.rules_editor, early.samples, early.codes),
                          ((), False, False, ("probed", "lifted")))
+
+    def test_a_capability_that_moves_an_engine_constant_departs_from_h2(self):
+        """H2: no setting moves an engine constant, and A20's caps are engine constants (the standards
+        file says so). A capability that departs from A20 lets a person's choice move them, so it names
+        H2 as well: the capacity retries and Send now."""
+        self.assertIn("engine constants", standards_text("A20"))
+        self.assertIn("move an engine constant", standards_text("H2"))
+        moving = [definition.id for definition in registry.DEFINITIONS if "A20" in definition.departs_from]
+        self.assertEqual(moving, ["capacity_retry", "send_now"])
+        for definition in registry.DEFINITIONS:
+            if "A20" in definition.departs_from:
+                with self.subTest(definition.id):
+                    self.assertIn("H2", definition.departs_from)
+
+    def test_a_capability_that_retries_an_unknown_failure_departs_from_h2(self):
+        """H2: no setting retries an unknown failure. Every capability that answers at P17 is asked about
+        a failure nothing classified (failures.UNKNOWN), with a rule written for its code: one that takes
+        it up - the rules and the unknown-failure budget - names H2. Codex giving up and a sign-in failure
+        are kinds core names (terminal_failure, terminal_auth), not unknown ones, and are not asked."""
+        from codex_auto_resume import failures
+        from codex_auto_resume.domain.plug import DEFER
+
+        class Scoped:
+            def rules(self):
+                return [{"rule_id": 1, "tag": "unheardOf", "status_from": None, "status_to": None,
+                         "category": "timeout", "known": False}]
+
+            def options(self):
+                return {}
+
+        failure = {"category": failures.UNKNOWN, "code": "unheardOf", "status": 500, "chain": None}
+        taking = []
+        for definition in registry.DEFINITIONS:
+            if Point.ADMISSION not in definition.points:
+                continue
+            code = definition.make(None)
+            code.bind(Scoped())
+            if code.admission(dict(failure)) != DEFER:
+                taking.append(definition.id)
+        self.assertEqual(taking, ["structured_rules", "unknown_failure_budget"])
+        for capability in taking:
+            with self.subTest(capability):
+                self.assertIn("H2", registry.REGISTRY.get(capability).departs_from)
 
     def test_once_more_when_unsure_departs_and_rests_on_what_the_design_says(self):
         """0.2 (never again when the first may have been delivered), A6 (an uncertain delivery is never

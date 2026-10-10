@@ -71,6 +71,10 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
   your own message when a limit resets* is revision 2 for it, and asks to be read again.
 - **Longer messages.** *Longer reset messages* is now *Longer messages*, revision 2: it lets a queued message be up to
   8,154 characters too.
+- **Three capabilities also name H2.** *Short retries when Codex is at capacity* moves A20's caps, which are the
+  engine's, and *Rules for Codex's error codes* and *Retry failures it cannot name* retry failures nothing classified:
+  H2 says no setting can do either, so their statements now name H2 beside the rest. Each is revision 2, and one you
+  turned on turns off until you confirm its statement again.
 - **An edited message is yours.** A message you edit in Codex's queue is left there, never deleted and never counted
   against the capability that sent it.
 - **A watched capability's log** keeps its newest 200 lines (was 250), so every capability watched at once still fits

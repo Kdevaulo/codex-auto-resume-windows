@@ -389,15 +389,16 @@ QUEUE_FOR_OPEN = CapabilityDef(
 # and five, lengthened by up to a fifth, a minute apart, 48 a day, twelve hours on the clock
 # (ladder.py) - so it departs from A20 (five a conversation a day, fifteen minutes apart), A21 (the
 # attempt, no-progress and continuation budgets), A22 (waits only from the retry timing) and B9 (it
-# reads Codex's error code, not only a kind). It stands on transient_classification, the history
-# table the failure's kind and code are read from, and rests on no measurement: core sends what it
-# always sends. Its ceilings are core's capacity day, 48 in one conversation and in all, which only
-# A20's departure allows.
+# reads Codex's error code, not only a kind), and from H2 (nothing can move an engine constant: A20's
+# caps are the engine's, and a person's choice moves them here). It stands on transient_classification,
+# the history table the failure's kind and code are read from, and rests on no measurement: core sends
+# what it always sends. Its ceilings are core's capacity day, 48 in one conversation and in all, which
+# only A20's departure allows. Revision 2 (v0.6.15-beta) names H2, where revision 1 did not.
 CAPACITY_RETRY = CapabilityDef(
     id="capacity_retry",
     points=frozenset({Point.ADMISSION, Point.GATES}),
-    revision=1,
-    departs_from=("A20", "A21", "A22", "B9"),
+    revision=2,
+    departs_from=("A20", "A21", "A22", "B9", "H2"),
     compat="transient_classification",
     ceilings=Ceilings(per_day=48, per_conversation=48),
     journal_prefix="cap",
@@ -413,14 +414,16 @@ CAPACITY_RETRY = CapabilityDef(
 # matching rule names (AS_*), and at known_failure the same word again while that rule is there - its
 # removal ends what it took up. Core paces it as that kind, counts it against that kind's budget and
 # follows that kind's switch. It departs from 0.5 (unknown failures are never retried), A13 and A14
-# (only classified kinds), A26 (continuation text for a recovered kind) and B9 (it reads Codex's code),
-# and stands on transient_classification. Its hits are counted (`matched`) the first time core goes on
-# with what a rule took up. Ceilings: five a conversation, two dozen a day.
+# (only classified kinds), A26 (continuation text for a recovered kind), B9 (it reads Codex's code) and
+# H2 (nothing can retry an unknown failure: a rule is a person's setting, and it retries only what
+# nothing classified), and stands on transient_classification. Its hits are counted (`matched`) the
+# first time core goes on with what a rule took up. Ceilings: five a conversation, two dozen a day.
+# Revision 2 (v0.6.15-beta) names H2, where revision 1 did not.
 STRUCTURED_RULES = CapabilityDef(
     id="structured_rules",
     points=frozenset({Point.ADMISSION, Point.GATES}),
-    revision=1,
-    departs_from=("0.5", "A13", "A14", "A26", "B9"),
+    revision=2,
+    departs_from=("0.5", "A13", "A14", "A26", "B9", "H2"),
     compat="transient_classification",
     ceilings=Ceilings(per_day=24, per_conversation=5),
     journal_prefix="rule",
@@ -437,13 +440,13 @@ STRUCTURED_RULES = CapabilityDef(
 # come first; at known_failure ADMIT again. Core waits ten minutes, then 15 and 30
 # (ladder.ADMITTED_WAITS), and its own no-progress and chain budgets still bind. The first time core
 # goes on with one it keeps a sample (state/choices.py; `sampled`). It departs from 0.5, A13, A14,
-# A26 and B9 as the rules do, and from D2 too: a sample keeps a code Codex chose. Ceilings: three a
-# conversation, a dozen a day.
+# A26, B9 and H2 as the rules do, and from D2 too: a sample keeps a code Codex chose. Ceilings: three
+# a conversation, a dozen a day. Revision 2 (v0.6.15-beta) names H2, where revision 1 did not.
 UNKNOWN_FAILURE_BUDGET = CapabilityDef(
     id="unknown_failure_budget",
     points=frozenset({Point.ADMISSION, Point.GATES}),
-    revision=1,
-    departs_from=("0.5", "A13", "A14", "A26", "B9", "D2"),
+    revision=2,
+    departs_from=("0.5", "A13", "A14", "A26", "B9", "D2", "H2"),
     compat="transient_classification",
     ceilings=Ceilings(per_day=12, per_conversation=3),
     journal_prefix="unk",
