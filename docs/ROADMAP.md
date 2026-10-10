@@ -810,7 +810,7 @@ confirms, and does not drop the capability.
 
 - **Watching several Codex homes**, a standard-edition addition that waited on measurement MH, which
   passed on 2026-09-28. Built for v0.6.15-beta: up to three more homes, in the
-  [guide](GUIDE.md#several-codex-homes); MH is to be measured again on the Codex in force.
+  [guide](GUIDE.md#several-codex-homes); MH passed again on codex-cli 0.162.0-alpha.17.2 on 2026-10-10.
 - **Arabic and Hebrew**, translated and held since v0.6.11-beta, offered once the window is mirrored
   for right-to-left.
 - **winget** manifests for both editions, pointing at the pinned archives; submitting them is a

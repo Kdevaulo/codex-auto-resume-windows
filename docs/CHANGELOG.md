@@ -32,8 +32,8 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
 - **Only the Dashboard writes them.** Codex's `update_settings` refuses the field, and no Codex reply carries the
   paths. Restore defaults keeps them. Removing a home cancels the recoveries waiting in it (the owner's answer), and
   one already in Codex's queue is watched until it settles.
-- **Measured on 0.158 only.** MH, a second home reached by the desktop app, passed on codex-cli 0.158; on a newer
-  Codex the card says it is unmeasured until it is measured again.
+- **Measured up to 0.162.** MH, a second home reached by the desktop app, passed on codex-cli 0.158 and again on
+  codex-cli 0.162.0-alpha.17.2; on a Codex newer than 0.162 the card says it is unmeasured until it is measured again.
 
 ### Advanced: several conversations at once
 
@@ -83,6 +83,19 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
   again after a usage limit by itself, what saves you work, the other common failures, and last the rare cases and
   expert settings (the owner's order). A capability's warnings never move it down.
 
+### Measured again on codex-cli 0.162.0-alpha.17.2
+
+Every measurement was made again on the Codex in force (2026-10-10, [`docs/evidence/live/`](evidence/live/)). MW,
+M1, M5, M6, M7, MA and MH passed again, M2b and MP1 to MP3 passed for the first time, and M2, M3 and M4 failed again.
+What follows from it:
+
+- **Several Codex homes** no longer say they are unmeasured on this Codex (MH).
+- **The goal continuation** also acts on a conversation the app holds where M2b passed: it sets the paused goal
+  active, then adds the continuation to the conversation's queue.
+- **The panel beside the chat** passed MP1 to MP3, so the [guide](GUIDE.md#the-panel-beside-the-chat) describes it now.
+- A capability whose measurement passed on this Codex shows no warning for it here; on any other version it still
+  does.
+
 ### Fixes
 
 - **The product's icon in every window's title bar.** *Install another version...*, the Timeline and the Log
@@ -91,8 +104,8 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
 
 ### Known limits
 
-- MQ, ME, MS, MK and MT are not measured yet, and MH is to be measured again on the Codex in force: every capability
-  that rests on one says so as a warning you confirm.
+- MQ, ME, MS, MK and MT are not measured yet, and MU, MN and MR - what the reset credit and the message at a reset
+  rest on - are not settled: every capability that rests on one says so as a warning you confirm.
 - The Dashboard's Pending list shows a continuation queued for opening as Codex's own queued row; it does not yet say
   that it runs when you open the conversation.
 

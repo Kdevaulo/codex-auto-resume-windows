@@ -121,10 +121,10 @@ Twenty-one: sixteen that change how a recovery is made or what follows a turn, t
 time you pick - the two at a usage reset, and queued messages - and two actions: Longer messages, which
 only lets a message be longer, and the compatibility report, which only you start. Four rest on a
 measurement each that was made - the first three, and queue for when a conversation is opened - seven on
-measurements not made yet, and the other ten on none. Each measurement made was made once,
-by hand, on the owner's machine, on `codex-cli 0.158.0-alpha.2.1`; its record is in
-[`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a measurement not
-made yet, a capability's statement carries the warning that it was not measured there.
+measurements not made yet, and the other ten on none. Each measurement made was made by hand, on the
+owner's machine, first on `codex-cli 0.158.0-alpha.2.1` and again on `codex-cli 0.162.0-alpha.17.2`;
+its record is in [`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a
+measurement not made yet, a capability's statement carries the warning that it was not measured there.
 
 ### Start with Codex
 
@@ -187,8 +187,9 @@ conversation is due to continue while the Codex app does not have it open, it se
 goal active again through Codex's own app server (`thread/goal/set`), so that Codex carries the goal
 on when the app next opens the conversation. It never creates a goal and never reads or changes what
 the goal says. While the app has the conversation open, the continuation goes through Codex's queue
-as in the standard edition; setting the goal active first there waits for measurement M2b to pass
-for your version of Codex, which has not been made yet. While a goal it set active carries the
+as in the standard edition, except where measurement M2b passed for your version of Codex - so far
+`codex-cli 0.162.0-alpha.17.2`: there it sets the paused goal active first and then adds the
+continuation to the conversation's queue, as M2b did. While a goal it set active carries the
 conversation on, the standard continuation waits, for up to ten minutes, so the two do not both run.
 
 **When it helps.** When a usage limit stopped work under a goal and you do not keep that
@@ -210,7 +211,9 @@ Codex to stop it.
 **Ceilings.** 12 a day, and 3 in any one conversation.
 
 **Measurement M2: failed**, for a conversation the app holds; its statement shows that as a warning.
-M2b, which would let it act while the app holds the conversation, has not been made.
+**Measurement M2b: passed** on `codex-cli 0.162.0-alpha.17.2` - a goal set active beside a queued turn
+carries on while the app holds the conversation - so on that version it acts there too; on any other,
+a conversation the app holds gets the standard continuation alone.
 
 Where the goal continuation and the marker-free continuation are both on and the goal applies, the
 goal continuation carries the send.
