@@ -559,7 +559,7 @@ capability, in plain words.
   capabilities off, and no MCP tool turns one on, whatever a client sends
   (`advanced/tests/test_advanced_arming.py`, `advanced/tests/test_advanced_surfaces.py`). The
   Dashboard's **Advanced features** page is what makes that request, sending exactly what it showed
-  (`advanced/tests/test_advanced_page.py`). Like every request on that bridge, it is open to
+  (`advanced/tests/test_advanced_page_arming.py`). Like every request on that bridge, it is open to
   anything running as you; what cannot make it is a model through the plugin's MCP tools. A
   capability watched first journals what it would have done and does nothing, and nothing moves it
   from watched to on but a request of this kind.

@@ -9,8 +9,8 @@ specification: once on a program small enough to read, and once on the window it
 build/make_gui.ps1 from a copy of its sources and from the same copy with every point cut out.
 
 The advanced window is built from that copy too, with a probe listed on its overlay in place of
-the real one's sources (the Advanced features page, which advanced/tests/test_advanced_page.py
-builds and holds): the probe's names and strings are in the advanced executable, none of them are
+the real one's sources (the Advanced features page, which the advanced/tests/test_advanced_page_*.py
+modules build and hold): the probe's names and strings are in the advanced executable, none of them are
 in the standard one, and build/edition_audit.py's check (d) reads the two the same way.
 
 GUI test module: compiles real executables, so it runs on its own.
