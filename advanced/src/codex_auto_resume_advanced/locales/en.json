@@ -433,5 +433,12 @@
   "continue.subagent.kind.usage_limit": "usage limit",
   "continue.subagent.kind.temporary": "temporary error",
   "continue.subagent.kind.interrupted": "interrupted",
-  "continue.subagent.kind.error": "error"
+  "continue.subagent.kind.error": "error",
+  "name.keep_going": "Keep a conversation going",
+  "statement.keep_going.does": "For a conversation you pick in the Dashboard, with a count of 1 to 10: when its latest turn ended well and it has been idle for a minute, sends one continuation of its own - \"Carry on with the next step of the plan.\" - up to the count you chose. It stops when a turn made no progress, when every step of the plan is completed, when a goal of Codex's own is keeping it going, when a turn failed or was interrupted, or when the count is used. It reads only the kinds of item a turn left and the status of each plan step, never their words. Until this has been measured on the Codex you have (MK), no more than 3 are sent.",
+  "statement.keep_going.departs": "A13 (only failures are recovered), A26 (the product's continuations are its fixed templates or your Custom message) and B9 (nothing is read from the content of a conversation's items).",
+  "statement.keep_going.instead": "The standard edition leaves a turn Codex completed alone; Codex's own goals (/goal) keep a conversation going within Codex's own limits.",
+  "statement.keep_going.risks": "Work goes on when you might have wanted it to stop: stop it in the Dashboard, or switch the conversation off. It is paced like every recovery, fifteen minutes apart and five a day in one conversation.",
+  "statement.keep_going.stop": "Turn it off here or turn every advanced feature off; no conversation is kept going any more, and a continuation not yet sent is dropped.",
+  "continue.keep_going": "Carry on with the next step of the plan."
 }

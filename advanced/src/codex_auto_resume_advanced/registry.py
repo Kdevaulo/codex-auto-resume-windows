@@ -73,6 +73,7 @@ from .engine.resetmessage import make as make_reset_message, make_long as make_l
 from .engine.earlyreset import make as make_early_reset
 from .engine.emptyreply import make as make_empty_response
 from .engine.subagent import make as make_subagent_parent
+from .engine.keepgoing import make as make_keep_going
 from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
 from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
@@ -672,6 +673,27 @@ SUBAGENT_PARENT = CapabilityDef(
     measurements=(Measurement.MS,),
 )
 
+# Keep going (v0.6.14-beta.2; the plan's item 6). A person picks conversations in the Dashboard, each with a count of 1
+# to 10; at P8, at most once a minute, a picked conversation whose latest turn ended well and that has been idle a
+# minute is sent one continuation of the edition's own words, a P2 CONTINUATION core sends only while that turn is the
+# latest. It stops on no progress, a finished plan (its steps' statuses alone), an unreadable plan, the count used, an
+# active goal, a failed or interrupted turn, and the conversation switched off. Until MK passes on the Codex in force,
+# three at most are sent. It departs from A13 (only failures are recovered), A26 (words of its own) and B9 (a plan's
+# step statuses are read from an item's content), and stands on outcome_observation. Ceilings: core's five a
+# conversation, two dozen a day.
+KEEP_GOING = CapabilityDef(
+    id="keep_going",
+    points=frozenset({Point.TICK, Point.RECORDS}),
+    revision=1,
+    departs_from=("A13", "A26", "B9"),
+    compat="outcome_observation",
+    ceilings=Ceilings(per_day=24, per_conversation=CORE_DAILY_CAP),
+    journal_prefix="keep",
+    make=make_keep_going,
+    codes=("found", "stopped", "sent", "delivered", "unknown", "superseded"),
+    measurements=(Measurement.MK,),
+)
+
 # Longer reset messages (v0.6.14, the owner's answer of 2026-10-08): a message sent at a reset may be up to what one
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
@@ -718,6 +740,6 @@ COMPAT_REPORT = CapabilityDef(
 # answers at none, last.
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
-               ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, EMPTY_RESPONSE, SUBAGENT_PARENT, LONG_RESET_MESSAGE,
+               ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING, LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)

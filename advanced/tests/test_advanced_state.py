@@ -968,7 +968,7 @@ class BoundTests(StateCase):
 
     def test_the_watch_bound_sits_inside_the_journal_s(self):
         from codex_auto_resume_advanced import registry
-        self.assertEqual(WATCH_LIMIT, 250)
+        self.assertEqual(WATCH_LIMIT, 200, "250 until v0.6.14-beta.2, when the capabilities grew to 21")
         # Every capability watched at once, each at its bound, still fits inside the journal's.
         self.assertLess(len(registry.DEFINITIONS) * WATCH_LIMIT, EVENT_LIMIT)
         # The journal's own bound cuts every other line first: newer lines of another capability,

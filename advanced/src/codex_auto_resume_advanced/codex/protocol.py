@@ -70,6 +70,8 @@ MEASUREMENT_METHODS = {
     Measurement.ME: (),
     # MS reads the spawn edges and the subagent's latest turn from their databases (codex/lineage.py), nothing more.
     Measurement.MS: (),
+    # MK reads the newest plan item's step statuses from the turn history (codex/turns.py), nothing more.
+    Measurement.MK: (),
 }
 
 # The methods a capability's own route may call, beyond `initialize` - each one a measurement

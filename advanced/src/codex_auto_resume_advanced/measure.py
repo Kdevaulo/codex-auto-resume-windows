@@ -378,6 +378,24 @@ def _ms(ctx):
     return _blocked("confirm the parent was told which subagent stopped, then set the verdict", **observed)
 
 
+def _mk(ctx):
+    """A plan's steps (keep_going): the owner names a throwaway conversation with a plan; whether its newest plan item
+    is found and how many of its steps read as each status are read from the history of the Codex home the backend
+    drives (codex/turns.plan_statuses) - counts of closed words, never a step's words."""
+    from .codex import turns
+    home = getattr(ctx.backend, "codex_home", None)
+    if not ctx.thread_given or home is None:
+        return _blocked("name a throwaway conversation with a plan", plan_read=False)
+    try:
+        statuses = turns.Turns(home).plan_statuses(ctx.probe_thread)
+    except Exception:
+        return _blocked("the plan's steps could not be read", plan_read=False)
+    observed = {"plan_read": True, "plan_found": statuses is not None}
+    for word in sorted(turns.STEP_STATUSES | {turns.UNKNOWN}):
+        observed["steps_" + word] = sum(status == word for status in statuses or ())
+    return _blocked("confirm the counts match the plan Codex shows, then set the verdict", **observed)
+
+
 def _mw(ctx):
     """Re-proof of the WMI escape, with the heartbeat's job words. The launcher starts a watcher
     outside Codex's job through WMI and hands back the job words its heartbeat recorded."""
@@ -663,7 +681,7 @@ PROBES = {
     Measurement.MH: _mh, Measurement.MA: _ma, Measurement.MW: _mw,
     Measurement.MP1: _mp1, Measurement.MP2: _mp2, Measurement.MP3: _mp3,
     Measurement.MU: _mu, Measurement.MN: _mn, Measurement.MR: _mr,
-    Measurement.MQ: _mq, Measurement.ME: _me, Measurement.MS: _ms,
+    Measurement.MQ: _mq, Measurement.ME: _me, Measurement.MS: _ms, Measurement.MK: _mk,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe

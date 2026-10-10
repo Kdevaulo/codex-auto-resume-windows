@@ -148,7 +148,8 @@ PAGE_KEYS = PAGE_KEYS + REPORT_KEYS
 # fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
 # subagent's line, its id and a closed kind word).
 CONTINUE_PREFIX = "continue."
-CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "subagent.line")
+CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "subagent.line",
+                      CONTINUE_PREFIX + "keep_going")
                      + tuple(CONTINUE_PREFIX + "subagent.kind." + kind
                              for kind in ("usage_limit", "temporary", "interrupted", "error")))
 

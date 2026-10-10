@@ -76,6 +76,9 @@ ARGUMENTS = {
     BridgeCommand.ADVANCED_RESET_CANCEL: frozenset({"rule", "generation"}),
     BridgeCommand.ADVANCED_RESET_GO_ON: frozenset({"rule", "generation"}),
     BridgeCommand.ADVANCED_CREDIT_NOW: frozenset({"rule", "bucket", "minutes", "generation"}),
+    BridgeCommand.ADVANCED_KEEP_GOING: frozenset(),
+    BridgeCommand.ADVANCED_KEEP_GOING_SET: frozenset({"thread_id", "count", "generation"}),
+    BridgeCommand.ADVANCED_KEEP_GOING_STOP: frozenset({"thread_id", "generation"}),
     BridgeCommand.ADVANCED_REPORT_BUILD: frozenset({"login"}),
     BridgeCommand.ADVANCED_REPORT_SAVE: frozenset({"sha256", "path"}),
     BridgeCommand.ADVANCED_REPORT_CHECK: frozenset({"sha256"}),
@@ -91,6 +94,10 @@ REPORT = "compat_report"
 RESET_COMMANDS = frozenset({BridgeCommand.ADVANCED_RESETS, BridgeCommand.ADVANCED_RESET_ADD,
                             BridgeCommand.ADVANCED_RESET_CANCEL, BridgeCommand.ADVANCED_RESET_GO_ON,
                             BridgeCommand.ADVANCED_CREDIT_NOW})
+
+# Keep going's commands (control/keepgoing.py, v0.6.14-beta.2), the Dashboard's alone.
+KEEP_GOING_COMMANDS = frozenset({BridgeCommand.ADVANCED_KEEP_GOING, BridgeCommand.ADVANCED_KEEP_GOING_SET,
+                                 BridgeCommand.ADVANCED_KEEP_GOING_STOP})
 
 _NO_ARGUMENTS = {"type": "object", "properties": {}, "additionalProperties": False}
 _OFF_ONLY = ("Turning a capability on is not something any tool does: the user does it in the "
@@ -250,6 +257,13 @@ def bridge(runtime, command, argument):
         return watchlog.view(runtime, argument.get("capability"))
     if command in RESET_COMMANDS:
         return resets(runtime, command, argument)
+    if command in KEEP_GOING_COMMANDS:
+        from .control import keepgoing
+        if command == BridgeCommand.ADVANCED_KEEP_GOING:
+            return keepgoing.view(runtime)
+        if command == BridgeCommand.ADVANCED_KEEP_GOING_SET:
+            return keepgoing.set_one(runtime, argument)
+        return keepgoing.stop(runtime, argument)
     if command == BridgeCommand.ADVANCED_KEEP_ON:
         return arming.set_keep_on(argument.get("capability"), argument.get("keep_on"),
                                   send_again=argument.get("send_again", False),

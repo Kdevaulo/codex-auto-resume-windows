@@ -22,7 +22,7 @@ from codex_auto_resume.domain.plug import Alternative, Point
 from ..vocabulary import Actor, JournalCode, OffReason, RecordState
 
 EVENT_LIMIT = 5000
-WATCH_LIMIT = 250                 # would_have lines kept a capability, its newest
+WATCH_LIMIT = 200                 # would_have lines kept a capability, its newest (250 until v0.6.14-beta.2: 21 capabilities fit)
 EVENT_MAX_AGE = 90 * 86400
 _PRUNE_EVERY = 256
 _DAY = 86400

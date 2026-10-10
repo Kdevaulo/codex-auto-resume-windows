@@ -274,6 +274,10 @@ class BridgeCommand(StrEnum):
     ADVANCED_RESET_CANCEL = "advanced-reset-cancel"
     ADVANCED_RESET_GO_ON = "advanced-reset-go-on"
     ADVANCED_CREDIT_NOW = "advanced-credit-now"
+    # v0.6.14-beta.2: keep going (control/keepgoing.py) - the conversations kept going read, one picked, one stopped.
+    ADVANCED_KEEP_GOING = "advanced-keep-going"
+    ADVANCED_KEEP_GOING_SET = "advanced-keep-going-set"
+    ADVANCED_KEEP_GOING_STOP = "advanced-keep-going-stop"
     # The compatibility report (report/flow.py): write it, save it where the person chooses, check what
     # sending would write, send it, and read how one of the first, third or fourth - each a job this
     # process holds - is getting on. Like the rest, only the Dashboard's; no MCP tool reaches any of them.
@@ -328,6 +332,8 @@ class Measurement(StrEnum):
     # A throwaway parent whose subagent fails: the spawn edge is there, and the subagent's latest turn can be told as a
     # closed kind (subagent_parent's 5b).
     MS = "ms"
+    # A throwaway conversation with a plan: the newest plan item found and its steps' statuses read (keep_going).
+    MK = "mk"
 
 
 class RuleState(StrEnum):
@@ -535,6 +541,7 @@ class KeepReason(StrEnum):
     COUNT_SPENT = "count_spent"              # the continuations a person allowed were used
     GOAL_ACTIVE = "goal_active"              # a goal is active: Codex goes on itself
     FAILED = "failed"                        # a failed turn is core's ordinary recovery, never this
+    PLAN_UNREADABLE = "plan_unreadable"      # a plan item there whose steps cannot be read: stopped (fail closed)
     BY_PERSON = "by_person"
     TURNED_OFF = "turned_off"
     CONVERSATION_OFF = "conversation_off"

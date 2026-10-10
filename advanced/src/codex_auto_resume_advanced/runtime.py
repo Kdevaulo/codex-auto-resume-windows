@@ -92,6 +92,8 @@ SUBMISSION_UNKNOWN = "submission_unknown"
 # because Codex did not run it when the conversation was opened (core's engine/foropen.py).
 WITHDRAWN_UNCONFIRMED = "withdrawn_unconfirmed"
 NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
+# Keep going's capability, whose continuations are counted as used at SENT.
+KEEP_GOING = "keep_going"
 
 
 def _taken(point, answer) -> bool:
@@ -628,6 +630,12 @@ class Runtime:
             return DEFER                                 # repaired from the next P2 (resetmessage.records)
         if moved is None:
             return DEFER
+        if move == RecordMove.SENT and moved["capability"] == KEEP_GOING:
+            try:
+                # Keep going counts a continuation as used at its send's start (engine/keepgoing.py).
+                self.state.keep_going_used(record.get("thread_id"), at=self.clock())
+            except StateError:
+                pass
         code = MOVE_CODES.get(move)
         if code is not None:
             try:
