@@ -278,6 +278,11 @@ class BridgeCommand(StrEnum):
     ADVANCED_KEEP_GOING = "advanced-keep-going"
     ADVANCED_KEEP_GOING_SET = "advanced-keep-going-set"
     ADVANCED_KEEP_GOING_STOP = "advanced-keep-going-stop"
+    # and the prompt queue (control/prompts.py): the prompts read, one added, one cancelled, one held let go on.
+    ADVANCED_PROMPTS = "advanced-prompts"
+    ADVANCED_PROMPT_ADD = "advanced-prompt-add"
+    ADVANCED_PROMPT_CANCEL = "advanced-prompt-cancel"
+    ADVANCED_PROMPT_GO_ON = "advanced-prompt-go-on"
     # The compatibility report (report/flow.py): write it, save it where the person chooses, check what
     # sending would write, send it, and read how one of the first, third or fourth - each a job this
     # process holds - is getting on. Like the rest, only the Dashboard's; no MCP tool reaches any of them.
@@ -334,6 +339,9 @@ class Measurement(StrEnum):
     MS = "ms"
     # A throwaway conversation with a plan: the newest plan item found and its steps' statuses read (keep_going).
     MK = "mk"
+    # One message queued while a turn runs in a throwaway conversation: delivered once, after that turn ended
+    # (prompt_queue's after_turn).
+    MT = "mt"
 
 
 class RuleState(StrEnum):

@@ -15,6 +15,8 @@ recurring prompt without its every; this module refuses the rest: twenty waiting
 from __future__ import annotations
 
 from ..vocabulary import PromptEvery, PromptReason, PromptState, PromptTrigger, RecordState, Refusal
+
+PROMPT_QUEUE = "prompt_queue"
 from .choices import Refused
 from .schema import PROMPT_SPAN
 from .session import StateError, _key, _thread, _timestamp, _word
@@ -170,7 +172,8 @@ class PromptsMixin:
         with self._transaction(create=False) as connection:
             if connection is None:
                 return False
-            return connection.execute("UPDATE prompts SET state=?, reason=NULL WHERE prompt_id=? AND state=?",
+            # The person's word: it no longer waits for the one before it (`depends`), which did not arrive.
+            return connection.execute("UPDATE prompts SET state=?, reason=NULL, depends=0 WHERE prompt_id=? AND state=?",
                                       (PromptState.WAITING, prompt_id, PromptState.HELD)).rowcount == 1
 
     def end_prompts(self, reason, *, thread_id=None, at=None) -> int:
@@ -206,3 +209,162 @@ def prune(connection, now, max_age, limit) -> None:
     if excess > 0:
         connection.execute("DELETE FROM prompts WHERE prompt_id IN (SELECT prompt_id FROM prompts WHERE %s "
                            "ORDER BY coalesce(finished_at, created_at) LIMIT ?)" % finished, (excess,))
+
+
+# How a move of an occurrence's record ends that occurrence: its reason, and the record's state then.
+_ENDS = {"delivered": (PromptReason.DELIVERED, RecordState.FINISHED),
+         "unproven": (PromptReason.UNKNOWN, RecordState.FINISHED),
+         "superseded": (PromptReason.SUPERSEDED, RecordState.FINISHED),
+         "handed_over": (PromptReason.HANDED_OVER, RecordState.FINISHED)}
+DAY = 86400
+PERIODS = {PromptEvery.DAY: DAY, PromptEvery.WEEK: 7 * DAY}
+
+
+def next_slot(row):
+    """When a recurring prompt's next occurrence falls after the one at `due_at`, or None where its series ends there:
+    its occurrences used, or past `until`."""
+    if row["trigger"] != PromptTrigger.RECURRING or row["sent_count"] >= row["occurrences"]:
+        return None
+    following = row["due_at"] + PERIODS[PromptEvery(row["every"])]
+    return following if row["until"] is None or following <= row["until"] else None
+
+
+class PromptMovesMixin:
+    def prompt_moved(self, record_id, move, *, at=None, queue_id=None) -> dict | None:
+        """What core told of a prompt's occurrence (P14), in one transaction across the prompt and its record: sent,
+        a one-time prompt's words go (a series keeps them until it ends) and the queue item is kept; handed back or
+        never started, it waits again; delivered, unproven, superseded or handed over, the occurrence is used - a
+        series waits for its next, anything else is done; withdrawn on a person's Cancel, it is cancelled, and on a
+        Pause held for them to say go on or cancel (no guess, E1); refused by Codex, said, and left. The capability and
+        whether it turns it off (UNPROVEN), or None where it is no prompt's."""
+        _key(record_id, "record id")
+        now = self._now(at)
+        move = str(move)
+        with self._transaction(create=False) as connection:
+            if connection is None:
+                return None
+            row = connection.execute("SELECT p.*, c.state AS record_state, c.withdraw AS withdraw FROM prompts p "
+                                     "JOIN records c ON c.record_id = p.record_id WHERE p.record_id=?",
+                                     (record_id,)).fetchone()
+            if row is None or row["state"] not in [str(state) for state in PENDING]:
+                return None
+            prompt = row["prompt_id"]
+            if move == "sent":
+                one_time = row["trigger"] != PromptTrigger.RECURRING
+                connection.execute("UPDATE prompts SET sent_at=coalesce(launching_at, ?), launching_at=coalesce("
+                                   "launching_at, ?)%s WHERE prompt_id=?" % (", words=NULL" if one_time else ""),
+                                   (now, now, prompt))
+                if isinstance(queue_id, str) and len(queue_id) == 36:
+                    connection.execute("UPDATE records SET queue_id=? WHERE record_id=?", (queue_id, record_id))
+            elif move in ("released", "not_started"):
+                connection.execute("UPDATE records SET state=?, finished_at=NULL WHERE record_id=? AND state=?",
+                                   (RecordState.WAITING, record_id, RecordState.IN_FLIGHT))
+                connection.execute("UPDATE prompts SET launching_at=NULL WHERE prompt_id=?", (prompt,))
+            elif move in _ENDS:
+                reason, record_state = _ENDS[move]
+                connection.execute("UPDATE records SET state=?, finished_at=?, withdraw=0 WHERE record_id=?",
+                                   (record_state, now, record_id))
+                used = dict(row, sent_count=row["sent_count"] + 1)
+                following = None if move == "unproven" else next_slot(used)
+                if following is None:
+                    connection.execute("UPDATE prompts SET state=?, reason=?, words=NULL, sent_count=?, finished_at=? "
+                                       "WHERE prompt_id=?", (PromptState.DONE, reason, used["sent_count"], now, prompt))
+                else:
+                    connection.execute("UPDATE prompts SET state=?, reason=?, sent_count=?, record_id=NULL, due_at=?, "
+                                       "launching_at=NULL, sent_at=NULL WHERE prompt_id=?",
+                                       (PromptState.WAITING, reason, used["sent_count"], following, prompt))
+            elif move == "withdrawn":
+                connection.execute("UPDATE records SET state=?, finished_at=?, withdraw=0 WHERE record_id=?",
+                                   (RecordState.CANCELLED, now, record_id))
+                if row["withdraw"]:
+                    connection.execute("UPDATE prompts SET state=?, reason=?, words=NULL, finished_at=? WHERE "
+                                       "prompt_id=?", (PromptState.CANCELLED, PromptReason.WITHDRAWN, now, prompt))
+                else:
+                    connection.execute("UPDATE prompts SET state=?, reason=?, record_id=NULL, launching_at=NULL, "
+                                       "sent_at=NULL WHERE prompt_id=?", (PromptState.HELD, PromptReason.WITHDRAWN,
+                                                                          prompt))
+            elif move == "withdraw_refused":
+                connection.execute("UPDATE prompts SET reason=? WHERE prompt_id=?", (PromptReason.WITHDRAW_REFUSED,
+                                                                                     prompt))
+                connection.execute("UPDATE records SET withdraw=0 WHERE record_id=?", (record_id,))
+            elif move != "waiting":
+                return None
+            return {"capability": PROMPT_QUEUE, "trip": move == "unproven"}
+
+    def prompts_in_flight(self) -> list:
+        """Every prompt whose occurrence is in flight, whatever its capability stands at: core watches each to its end."""
+        return [row for row in self.prompts(pending=True) if row["record_state"] == RecordState.IN_FLIGHT]
+
+    def release_unlaunched_prompts(self, after, at=None) -> int:
+        """Every occurrence claimed `after` seconds ago whose launch never began, handed back (as state/resets)."""
+        now = self._now(at)
+        with self._transaction(create=False) as connection:
+            if connection is None:
+                return 0
+            keys = [row[0] for row in connection.execute(
+                "SELECT c.record_id FROM prompts p JOIN records c ON c.record_id = p.record_id WHERE p.state=? "
+                "AND p.launching_at IS NULL AND p.sent_at IS NULL AND c.state=? AND c.claimed_at IS NOT NULL "
+                "AND c.claimed_at <= ?", (PromptState.READY, RecordState.IN_FLIGHT, now - after)).fetchall()]
+            for key in keys:
+                connection.execute("UPDATE records SET state=? WHERE record_id=? AND state=?",
+                                   (RecordState.WAITING, key, RecordState.IN_FLIGHT))
+            return len(keys)
+
+
+class PromptsHandle:
+    """What prompt_queue's code is given of the state (state.Scoped's `prompts`): the prompts, read always; their
+    occurrences made and their moves of its own written only while the runtime has it on."""
+    __slots__ = ("capability", "_calls")
+
+    def __init__(self, state, capability, on):
+        self.capability = capability
+
+        def is_on():
+            return on is not None and on() is True
+
+        def writing(call):
+            def written(*arguments, **keywords):
+                if not is_on():
+                    raise StateError("the capability is not on")
+                return call(*arguments, **keywords)
+            return written
+
+        def occur(prompt_id, key, thread_id, due_at):
+            """A due prompt's occurrence: its record waiting, and the prompt ready with it."""
+            if state.add_record(key, capability, thread_id):
+                state.change_prompt(prompt_id, state=PromptState.READY, record_id=key, due_at=due_at)
+                return True
+            return False
+
+        self._calls = {
+            "on": is_on,
+            "now": lambda: state.clock(),
+            "prompts": state.prompts,
+            "prompt": state.prompt,
+            "occur": writing(occur),
+            "change": writing(state.change_prompt),
+            "drop": writing(lambda key: state.move_record(key, RecordState.CANCELLED)),
+            "end": writing(lambda reason, *, thread_id=None: state.end_prompts(reason, thread_id=thread_id)),
+        }
+
+    def __getattr__(self, name):
+        calls = object.__getattribute__(self, "_calls")
+        if name in calls:
+            return calls[name]
+        raise AttributeError(name)
+
+
+def end_pending(connection, capabilities, now) -> None:
+    """Every prompt still to go whose occurrence is not in flight, ended (turned_off) with its words, in the caller's
+    transaction, when prompt_queue moves off on (state/arming.py): turning it on again revives none."""
+    if PROMPT_QUEUE not in capabilities:
+        return
+    rows = connection.execute("SELECT p.prompt_id, p.record_id FROM prompts p LEFT JOIN records c ON c.record_id = "
+                              "p.record_id WHERE p.state IN (?,?,?) AND (c.state IS NULL OR c.state <> ?)",
+                              (*PENDING, RecordState.IN_FLIGHT)).fetchall()
+    for prompt, record in rows:
+        connection.execute("UPDATE prompts SET state=?, reason=?, words=NULL, finished_at=? WHERE prompt_id=?",
+                           (PromptState.CANCELLED, PromptReason.TURNED_OFF, now, prompt))
+        if record is not None:
+            connection.execute("UPDATE records SET state=?, finished_at=? WHERE record_id=? AND state<>?",
+                               (RecordState.CANCELLED, now, record, RecordState.FINISHED))

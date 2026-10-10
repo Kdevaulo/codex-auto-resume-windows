@@ -396,6 +396,17 @@ def _mk(ctx):
     return _blocked("confirm the counts match the plan Codex shows, then set the verdict", **observed)
 
 
+def _mt(ctx):
+    """A message queued while a turn runs (prompt_queue's after_turn): the owner names a throwaway conversation with a
+    turn running, and core's backend queues one short message there; that it was delivered once, after that turn
+    ended, is the person's to confirm."""
+    with ctx.open() as session:
+        loaded = session.call("thread/loaded/list")
+    observed = {"loaded_listed": isinstance(loaded, dict)}
+    return _blocked("queue one short message while a turn runs in a throwaway conversation, confirm it was delivered "
+                    "once after that turn ended, then set the verdict", **observed)
+
+
 def _mw(ctx):
     """Re-proof of the WMI escape, with the heartbeat's job words. The launcher starts a watcher
     outside Codex's job through WMI and hands back the job words its heartbeat recorded."""
@@ -682,6 +693,7 @@ PROBES = {
     Measurement.MP1: _mp1, Measurement.MP2: _mp2, Measurement.MP3: _mp3,
     Measurement.MU: _mu, Measurement.MN: _mn, Measurement.MR: _mr,
     Measurement.MQ: _mq, Measurement.ME: _me, Measurement.MS: _ms, Measurement.MK: _mk,
+    Measurement.MT: _mt,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe

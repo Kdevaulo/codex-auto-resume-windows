@@ -24,7 +24,7 @@ from .arming import ArmingMixin
 from .choices import ChoicesMixin, Refused, Scoped  # noqa: F401
 from .continuations import ContinuationsMixin
 from .journal import EVENT_LIMIT, EVENT_MAX_AGE, WATCH_LIMIT, JournalMixin  # noqa: F401
-from .prompts import PromptsMixin
+from .prompts import PromptMovesMixin, PromptsMixin
 from .records import RecordsMixin
 from .resets import ResetsMixin
 from .schema import ATTACHED, FILE_NAME, SCHEMA_VERSION, TABLES  # noqa: F401
@@ -33,7 +33,7 @@ from .spend import SpendMixin
 
 
 class AdvancedState(SessionMixin, ArmingMixin, SpendMixin, RecordsMixin, JournalMixin, ChoicesMixin,
-                    ResetsMixin, ContinuationsMixin, PromptsMixin):
+                    ResetsMixin, ContinuationsMixin, PromptsMixin, PromptMovesMixin):
     """One installation's advanced state, for one process: opened when first needed."""
 
     def __init__(self, paths, *, registry=REGISTRY, **options):

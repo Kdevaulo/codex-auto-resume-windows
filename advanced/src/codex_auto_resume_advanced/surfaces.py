@@ -79,6 +79,11 @@ ARGUMENTS = {
     BridgeCommand.ADVANCED_KEEP_GOING: frozenset(),
     BridgeCommand.ADVANCED_KEEP_GOING_SET: frozenset({"thread_id", "count", "generation"}),
     BridgeCommand.ADVANCED_KEEP_GOING_STOP: frozenset({"thread_id", "generation"}),
+    BridgeCommand.ADVANCED_PROMPTS: frozenset(),
+    BridgeCommand.ADVANCED_PROMPT_ADD: frozenset({"thread_id", "words", "trigger", "at", "every", "occurrences",
+                                                  "depends", "generation"}),
+    BridgeCommand.ADVANCED_PROMPT_CANCEL: frozenset({"prompt", "generation"}),
+    BridgeCommand.ADVANCED_PROMPT_GO_ON: frozenset({"prompt", "generation"}),
     BridgeCommand.ADVANCED_REPORT_BUILD: frozenset({"login"}),
     BridgeCommand.ADVANCED_REPORT_SAVE: frozenset({"sha256", "path"}),
     BridgeCommand.ADVANCED_REPORT_CHECK: frozenset({"sha256"}),
@@ -98,6 +103,10 @@ RESET_COMMANDS = frozenset({BridgeCommand.ADVANCED_RESETS, BridgeCommand.ADVANCE
 # Keep going's commands (control/keepgoing.py, v0.6.14-beta.2), the Dashboard's alone.
 KEEP_GOING_COMMANDS = frozenset({BridgeCommand.ADVANCED_KEEP_GOING, BridgeCommand.ADVANCED_KEEP_GOING_SET,
                                  BridgeCommand.ADVANCED_KEEP_GOING_STOP})
+
+# The prompt queue's commands (control/prompts.py, v0.6.14-beta.2), the Dashboard's alone.
+PROMPT_COMMANDS = frozenset({BridgeCommand.ADVANCED_PROMPTS, BridgeCommand.ADVANCED_PROMPT_ADD,
+                             BridgeCommand.ADVANCED_PROMPT_CANCEL, BridgeCommand.ADVANCED_PROMPT_GO_ON})
 
 _NO_ARGUMENTS = {"type": "object", "properties": {}, "additionalProperties": False}
 _OFF_ONLY = ("Turning a capability on is not something any tool does: the user does it in the "
@@ -257,6 +266,15 @@ def bridge(runtime, command, argument):
         return watchlog.view(runtime, argument.get("capability"))
     if command in RESET_COMMANDS:
         return resets(runtime, command, argument)
+    if command in PROMPT_COMMANDS:
+        from .control import prompts
+        if command == BridgeCommand.ADVANCED_PROMPTS:
+            return prompts.view(runtime)
+        if command == BridgeCommand.ADVANCED_PROMPT_ADD:
+            return prompts.add(runtime, argument)
+        if command == BridgeCommand.ADVANCED_PROMPT_CANCEL:
+            return prompts.cancel(runtime, argument.get("prompt"), argument.get("generation"))
+        return prompts.go_on(runtime, argument.get("prompt"), argument.get("generation"))
     if command in KEEP_GOING_COMMANDS:
         from .control import keepgoing
         if command == BridgeCommand.ADVANCED_KEEP_GOING:

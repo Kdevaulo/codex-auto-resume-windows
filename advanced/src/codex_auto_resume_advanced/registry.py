@@ -74,6 +74,7 @@ from .engine.earlyreset import make as make_early_reset
 from .engine.emptyreply import make as make_empty_response
 from .engine.subagent import make as make_subagent_parent
 from .engine.keepgoing import make as make_keep_going
+from .engine.promptqueue import make as make_prompt_queue
 from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
 from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
@@ -531,7 +532,9 @@ RESET_CREDIT = CapabilityDef(
 RESET_MESSAGE = CapabilityDef(
     id="reset_message",
     points=frozenset({Point.TICK, Point.RECORDS, Point.GATES}),
-    revision=1,
+    # Revision 2 (v0.6.14-beta.2): a Pause takes back a message Codex already holds and cancels it (core's
+    # engine/plugrecords.py), which its statement's H4 now says.
+    revision=2,
     departs_from=("A8", "A17", "A26", "C4", "C9", "D2", "H4", "H6"),
     compat="exact_thread_recovery",
     ceilings=Ceilings(per_day=10, per_conversation=2),
@@ -631,6 +634,27 @@ PARALLEL_DISPATCH = CapabilityDef(
     measurements=(Measurement.MQ,),
 )
 
+# The prompt queue (v0.6.14-beta.2; the plan's item 7, on reset_message's way). A person queues messages of their own
+# for one conversation in the Dashboard - after the turn now running, at a time, or every day or week from a time, 30
+# times and 30 days at most - and at P2 each conversation's first one still to go is made due and handed core with its
+# words, a P2 MESSAGE core sends exactly as typed: in order, each once, one waiting for the one before it to arrive
+# where asked, paced like every recovery (A20 kept, the owner's answer). Cancel and a Pause take back one Codex already
+# holds (the owner's answer of 2026-10-09). It departs from A8, A17, A26, A27, C4, D2, H4 and H6 as its statement says,
+# and stands on exact_thread_recovery. Its after_turn route rests on MT. Ceilings: core's five a conversation, thirty a
+# day. Before the edition's own continuations, so a person's message is handed first (P2's eight).
+PROMPT_QUEUE = CapabilityDef(
+    id="prompt_queue",
+    points=frozenset({Point.RECORDS}),
+    revision=1,
+    departs_from=("A8", "A17", "A26", "A27", "C4", "D2", "H4", "H6"),
+    compat="exact_thread_recovery",
+    ceilings=Ceilings(per_day=30, per_conversation=CORE_DAILY_CAP),
+    journal_prefix="queue",
+    make=make_prompt_queue,
+    codes=("due", "sent", "delivered", "unknown", "expired", "missed", "held", "superseded"),
+    measurements=(Measurement.MT,),
+)
+
 # Empty-response recovery (v0.6.14-beta.2; the plan's item 3). At P8, at most once a minute, it looks at the
 # conversations with a turn completed in the last hour: one switched on whose latest turn Codex completed with no
 # error, no final agent item and only a message of the person's and Codex's reasoning in it - judged by kinds alone
@@ -702,7 +726,8 @@ LONG_RESET_MESSAGE = CapabilityDef(
     id="long_reset_message",
     kind=CapabilityKind.ACTION,
     points=frozenset(),
-    revision=1,
+    # Revision 2 (v0.6.14-beta.2): "Longer messages" - a queued prompt's too (engine/promptqueue.py).
+    revision=2,
     departs_from=("A27",),
     compat=None,
     ceilings=None,
@@ -740,6 +765,7 @@ COMPAT_REPORT = CapabilityDef(
 # answers at none, last.
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
-               ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING, LONG_RESET_MESSAGE,
+               ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
+               LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)

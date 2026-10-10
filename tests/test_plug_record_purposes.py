@@ -131,6 +131,14 @@ class InFlightTests(RecordCase):
         self.assertIn(("withdrawn", "consent", "paused"), plug.moves)
         self.assertEqual(self.h.home.queued(T1), [])
 
+    def test_a_pause_right_after_the_send_takes_it_back_before_it_was_ever_watched(self):
+        """Fails with the record remembered only once watched: paused at the very next tick, nothing would know it."""
+        plug, queue_id = self.sent()
+        self.h.store.set_enabled(False, self.h.now)
+        self.h.tick(advance=5)
+        self.assertIn(("withdrawn", "consent", "paused"), plug.moves)
+        self.assertEqual(self.h.home.queued(T1), [])
+
     def test_one_codex_will_not_give_back_is_left_there_said_and_never_sent_again(self):
         plug, queue_id = self.sent(withdraw=True)
         self.h.backend.delete_result = False

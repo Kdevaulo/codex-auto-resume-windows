@@ -258,7 +258,12 @@ class PlugRecordsMixin:
         else:
             move = RecordMove.SENT
         queue_id = response.get("queue_id") if move == RecordMove.SENT else None
-        self._record_told(dict(record, queue_id=queue_id if isinstance(queue_id, str) else None), move)
+        sent = dict(record, queue_id=queue_id if isinstance(queue_id, str) else None)
+        self._record_told(sent, move)
+        if move == RecordMove.SENT:
+            # Remembered from its send, so a Pause before the next tick that watches it takes it back too (H4).
+            self._flying()[record["record_id"]] = dict(sent, state="in_flight", words=None, sent_at=self.clock(),
+                                                       withdraw=False)
         self.log(record["thread_id"], SENT_LINES.get(move, "plug_record_sent"), None)
 
     def _watch_record(self, record) -> None:

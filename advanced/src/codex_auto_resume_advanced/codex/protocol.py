@@ -72,6 +72,8 @@ MEASUREMENT_METHODS = {
     Measurement.MS: (),
     # MK reads the newest plan item's step statuses from the turn history (codex/turns.py), nothing more.
     Measurement.MK: (),
+    # MT lists what the app holds, before core's backend queues one message while a turn runs.
+    Measurement.MT: ("thread/loaded/list",),
 }
 
 # The methods a capability's own route may call, beyond `initialize` - each one a measurement

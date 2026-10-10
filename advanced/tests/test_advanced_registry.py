@@ -52,7 +52,7 @@ class ShippedTests(unittest.TestCase):
     SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
-               "empty_response", "subagent_parent", "keep_going",
+               "prompt_queue", "empty_response", "subagent_parent", "keep_going",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -72,7 +72,8 @@ class ShippedTests(unittest.TestCase):
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
                      Point.TICK: ("reset_credit", "reset_message", "empty_response", "subagent_parent",
                                   "keep_going"),
-                     Point.RECORDS: ("reset_message", "empty_response", "subagent_parent", "keep_going"),
+                     Point.RECORDS: ("reset_message", "prompt_queue", "empty_response", "subagent_parent",
+                                     "keep_going"),
                      # v0.6.14-beta.2: the lines a parent's continuation is given of its subagents' stops (5a).
                      Point.TEXT: ("subagent_parent",),
                      Point.UNLOADED: ("goal_continuation", "queue_for_open"),
@@ -293,6 +294,18 @@ class ShippedTests(unittest.TestCase):
         self.assertEqual([(option.key, option.choices, option.default) for option in found.options],
                          [(OptionKey.DAYS, (3, 4, 5, 6, 7), 3)])
         self.assertIs(registry.QUEUE_FOR_OPEN, found)
+
+    def test_the_prompt_queue_departs_and_rests_on_what_the_design_says(self):
+        """A8, A17, A26, A27, C4, D2, H4 and H6 - A20 kept (the owner's answer); exact_thread_recovery and MT; core's
+        five a conversation, thirty a day; at P2 alone. And Longer messages is revision 2, naming queued prompts."""
+        found = registry.REGISTRY.get("prompt_queue")
+        self.assertEqual(found.departs_from, ("A8", "A17", "A26", "A27", "C4", "D2", "H4", "H6"))
+        self.assertNotIn("A20", found.departs_from)
+        self.assertEqual((found.compat, found.measurements, found.journal_prefix),
+                         ("exact_thread_recovery", (Measurement.MT,), "queue"))
+        self.assertEqual(found.points, frozenset({Point.RECORDS}))
+        self.assertEqual((found.ceilings.per_day, found.ceilings.per_conversation), (30, registry.CORE_DAILY_CAP))
+        self.assertEqual(registry.LONG_RESET_MESSAGE.revision, 2)
 
     def test_keep_going_departs_and_rests_on_what_the_design_says(self):
         """A13, A26 and B9; it stands on outcome_observation and rests on MK; core's five a conversation, two dozen a

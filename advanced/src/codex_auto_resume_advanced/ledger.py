@@ -222,4 +222,13 @@ class ClaimLedger:
                 return None
             return (found[0], found[1], found[2], found[3],
                     "UPDATE %s.continuations SET launching_at=? WHERE answer_id=?")
+        found = connection.execute(
+            "SELECT c.state, c.capability, c.thread_id, p.prompt_id, p.state, p.launching_at "
+            "FROM %s.records c JOIN %s.prompts p ON p.record_id = c.record_id WHERE c.record_id=?"
+            % (ATTACHED, ATTACHED), (key,)).fetchone()
+        if found is not None:
+            # (v0.6.14-beta.2) a prompt's occurrence: its prompt due (ready) and not launched.
+            if found[4] != "ready" or found[5] is not None:
+                return None
+            return found[0], found[1], found[2], found[3], "UPDATE %s.prompts SET launching_at=? WHERE prompt_id=?"
         return None

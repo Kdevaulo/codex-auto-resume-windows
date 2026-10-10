@@ -64,7 +64,7 @@ from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
 from .vocabulary import (TRIPWIRES, ArmingState, CapabilityKind, ContinuationReason, JournalCode, KeepReason,
-                         OffReason, OverrideKind)
+                         OffReason, OverrideKind, PromptReason)
 
 # How long what every capability stands at is taken as read, between ticks. A tick reads it
 # again; a process that has no ticks - the bridge, the MCP server - reads it at most this often.
@@ -527,7 +527,7 @@ class Runtime:
         flight, whatever its capability stands at now - core watches each to its end - but one claimed whose launch
         never began, which is handed back, and what each capability that is on answers. Core checks what it is handed (domain/plughands.records_of) and carries each out
         itself. A watched capability is not asked: it holds no message (arming.py, sweep)."""
-        from .engine import continued
+        from .engine import continued, promptqueue
         from .engine.resetmessage import handed
         from .state.resets import UNLAUNCHED_AFTER
         found, seen = [], set()
@@ -535,11 +535,13 @@ class Runtime:
             # A claim whose launch never began is handed back first (state/resets.release_unlaunched).
             self.state.release_unlaunched(at=self.clock())
             self.state.release_unlaunched_continuations(UNLAUNCHED_AFTER, at=self.clock())
+            self.state.release_unlaunched_prompts(UNLAUNCHED_AFTER, at=self.clock())
         except StateError:
             pass                                         # tried again at the next P2
         try:
             flying = [handed(rule) for rule in self.state.messages_in_flight()]
             flying += [continued.handed(row) for row in self.state.continuations_in_flight()]
+            flying += [promptqueue.handed(row) for row in self.state.prompts_in_flight()]
         except StateError:
             flying = []
         # P2's eight (v0.6.14-beta.2): those in flight first, the longest in flight first, from a place that moves on
@@ -582,6 +584,7 @@ class Runtime:
             # v0.6.14-beta.2: and every continuation of the edition's own still waiting there, and keep going for it.
             self.state.end_continuations(ContinuationReason.CONVERSATION_OFF, thread_id=thread_id, at=self.clock())
             self.state.stop_keep_going(KeepReason.CONVERSATION_OFF, thread_id=thread_id, at=self.clock())
+            self.state.end_prompts(PromptReason.CONVERSATION_OFF, thread_id=thread_id, at=self.clock())
         except StateError:
             pass
 
@@ -626,6 +629,10 @@ class Runtime:
                 # v0.6.14-beta.2: one of the edition's own continuations (state/continuations.py).
                 moved = self.state.continuation_moved(record.get("record_id"), move, at=self.clock(),
                                                       queue_id=record.get("queue_id"))
+            if moved is None:
+                # or a queued prompt's occurrence (state/prompts.py).
+                moved = self.state.prompt_moved(record.get("record_id"), move, at=self.clock(),
+                                                queue_id=record.get("queue_id"))
         except StateError:
             return DEFER                                 # repaired from the next P2 (resetmessage.records)
         if moved is None:
