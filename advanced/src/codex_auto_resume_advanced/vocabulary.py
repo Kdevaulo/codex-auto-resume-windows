@@ -325,6 +325,9 @@ class Measurement(StrEnum):
     # A turn that ended with no reply, when Codex produces one: its item kinds (closed words) and its final agent item
     # absent (empty_response).
     ME = "me"
+    # A throwaway parent whose subagent fails: the spawn edge is there, and the subagent's latest turn can be told as a
+    # closed kind (subagent_parent's 5b).
+    MS = "ms"
 
 
 class RuleState(StrEnum):

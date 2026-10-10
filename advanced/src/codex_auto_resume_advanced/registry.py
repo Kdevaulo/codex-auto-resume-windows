@@ -72,6 +72,7 @@ from .engine.credits import make as make_reset_credit
 from .engine.resetmessage import make as make_reset_message, make_long as make_long_messages
 from .engine.earlyreset import make as make_early_reset
 from .engine.emptyreply import make as make_empty_response
+from .engine.subagent import make as make_subagent_parent
 from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
 from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
@@ -651,6 +652,26 @@ EMPTY_RESPONSE = CapabilityDef(
     measurements=(Measurement.ME,),
 )
 
+# Subagent recovery through the parent (v0.6.14-beta.2; the plan's item 5). At P4, for a core continuation of a parent
+# whose subagents stopped on a failure, it adds one line a subagent, at most five, in fixed words with only the
+# subagent's id and a closed kind word varying (5a); at P8 and P2, once MS passes on the Codex in force, one
+# continuation of its own to a parent that finished normally after a subagent stopped (5b). Every record is the
+# parent's: nothing is ever sent to a subagent. It departs from 0.5 (only failed turns are recovered), A15 (subagents
+# are never detected or recovered) and A26 (words of its own), and stands on thread_eligibility, which conversations
+# are a person's own. Its route rests on MS. Ceilings: three a conversation, a dozen a day.
+SUBAGENT_PARENT = CapabilityDef(
+    id="subagent_parent",
+    points=frozenset({Point.TEXT, Point.TICK, Point.RECORDS}),
+    revision=1,
+    departs_from=("0.5", "A15", "A26"),
+    compat="thread_eligibility",
+    ceilings=Ceilings(per_day=12, per_conversation=3),
+    journal_prefix="sub",
+    make=make_subagent_parent,
+    codes=("told", "followed_up", "sent", "delivered", "unknown", "superseded"),
+    measurements=(Measurement.MS,),
+)
+
 # Longer reset messages (v0.6.14, the owner's answer of 2026-10-08): a message sent at a reset may be up to what one
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
@@ -697,5 +718,6 @@ COMPAT_REPORT = CapabilityDef(
 # answers at none, last.
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
-               ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, EMPTY_RESPONSE, LONG_RESET_MESSAGE, COMPAT_REPORT)
+               ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, EMPTY_RESPONSE, SUBAGENT_PARENT, LONG_RESET_MESSAGE,
+               COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)

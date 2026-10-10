@@ -68,6 +68,8 @@ MEASUREMENT_METHODS = {
     Measurement.MQ: ("thread/loaded/list",),
     # ME reads the turn history from its database (codex/turns.py) and calls nothing.
     Measurement.ME: (),
+    # MS reads the spawn edges and the subagent's latest turn from their databases (codex/lineage.py), nothing more.
+    Measurement.MS: (),
 }
 
 # The methods a capability's own route may call, beyond `initialize` - each one a measurement

@@ -357,6 +357,27 @@ def _me(ctx):
     return _blocked("confirm the turn ended with no reply, then set the verdict", **observed)
 
 
+def _ms(ctx):
+    """A subagent's stop told to its parent (subagent_parent): the owner names a throwaway parent whose subagent failed;
+    whether a spawn edge is there and the subagent's latest turn can be told as one of the closed kinds are read from
+    the databases of the Codex home the backend drives (codex/lineage.py) - booleans and a closed word, never an id."""
+    from .codex import lineage
+    from .engine.subagent import kind_of
+    home = getattr(ctx.backend, "codex_home", None)
+    if not ctx.thread_given or home is None:
+        return _blocked("name a throwaway parent whose subagent failed", edges_read=False)
+    try:
+        children = lineage.Lineage(home).children(ctx.probe_thread)
+    except Exception:
+        return _blocked("the spawn edges could not be read", edges_read=False)
+    kinds = [kind_of(child) for child in children]
+    observed = {"edges_read": True, "edge_present": bool(children),
+                "child_classified": any(kind is not None for kind in kinds)}
+    if any(kind is not None for kind in kinds):
+        observed["child_kind"] = next(kind for kind in kinds if kind is not None)
+    return _blocked("confirm the parent was told which subagent stopped, then set the verdict", **observed)
+
+
 def _mw(ctx):
     """Re-proof of the WMI escape, with the heartbeat's job words. The launcher starts a watcher
     outside Codex's job through WMI and hands back the job words its heartbeat recorded."""
@@ -642,7 +663,7 @@ PROBES = {
     Measurement.MH: _mh, Measurement.MA: _ma, Measurement.MW: _mw,
     Measurement.MP1: _mp1, Measurement.MP2: _mp2, Measurement.MP3: _mp3,
     Measurement.MU: _mu, Measurement.MN: _mn, Measurement.MR: _mr,
-    Measurement.MQ: _mq, Measurement.ME: _me,
+    Measurement.MQ: _mq, Measurement.ME: _me, Measurement.MS: _ms,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe

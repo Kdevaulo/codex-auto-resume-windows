@@ -422,5 +422,16 @@
   "statement.empty_response.instead": "The standard edition leaves a turn Codex completed alone, with or without a reply.",
   "statement.empty_response.risks": "Codex may have meant to end the turn quietly, and the continuation starts work you did not ask for. It is sent only while that turn is still the conversation's latest, and never twice for one turn.",
   "statement.empty_response.stop": "Turn it off here or turn every advanced feature off; a continuation not yet sent is dropped at once.",
-  "continue.empty_response": "The last turn ended without a reply. Please continue from where you stopped."
+  "continue.empty_response": "The last turn ended without a reply. Please continue from where you stopped.",
+  "name.subagent_parent": "Tell a parent which of its subagents stopped",
+  "statement.subagent_parent.does": "When a subagent of one of your conversations stops on a failure, the parent conversation is told in fixed words, one line for each subagent, five at most: \"Subagent <its id> stopped: <why>. Resume or respawn it only if it is still needed.\" If the parent failed too, the lines are added to the continuation the product sends it anyway. If the parent finished normally, it is sent one continuation with the lines - only once this has been measured on the Codex you have (MS). Nothing is ever written to a subagent, and each stop is told once.",
+  "statement.subagent_parent.departs": "0.5 (only failed turns are recovered), A15 (subagent conversations are never detected or recovered) and A26 (the product's continuations are its fixed templates or your Custom message).",
+  "statement.subagent_parent.instead": "The standard edition does not look at subagents at all; a parent that failed is sent the ordinary continuation.",
+  "statement.subagent_parent.risks": "The parent may resume or respawn work you meant to drop. Only a subagent's id and a fixed word for why it stopped are told - never anything it said.",
+  "statement.subagent_parent.stop": "Turn it off here or turn every advanced feature off; a continuation not yet sent is dropped at once.",
+  "continue.subagent.line": "Subagent {child} stopped: {kind}. Resume or respawn it only if it is still needed.",
+  "continue.subagent.kind.usage_limit": "usage limit",
+  "continue.subagent.kind.temporary": "temporary error",
+  "continue.subagent.kind.interrupted": "interrupted",
+  "continue.subagent.kind.error": "error"
 }

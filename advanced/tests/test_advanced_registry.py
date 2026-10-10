@@ -52,7 +52,7 @@ class ShippedTests(unittest.TestCase):
     SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
-               "empty_response",
+               "empty_response", "subagent_parent",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -70,8 +70,10 @@ class ShippedTests(unittest.TestCase):
         # answer at P17 and again at P3, in the order that is precedence where two would answer.
         answering = {Point.START_ROUTE: ("start_with_codex",),
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
-                     Point.TICK: ("reset_credit", "reset_message", "empty_response"),
-                     Point.RECORDS: ("reset_message", "empty_response"),
+                     Point.TICK: ("reset_credit", "reset_message", "empty_response", "subagent_parent"),
+                     Point.RECORDS: ("reset_message", "empty_response", "subagent_parent"),
+                     # v0.6.14-beta.2: the lines a parent's continuation is given of its subagents' stops (5a).
+                     Point.TEXT: ("subagent_parent",),
                      Point.UNLOADED: ("goal_continuation", "queue_for_open"),
                      Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
@@ -290,6 +292,16 @@ class ShippedTests(unittest.TestCase):
         self.assertEqual([(option.key, option.choices, option.default) for option in found.options],
                          [(OptionKey.DAYS, (3, 4, 5, 6, 7), 3)])
         self.assertIs(registry.QUEUE_FOR_OPEN, found)
+
+    def test_the_subagent_recovery_departs_and_rests_on_what_the_design_says(self):
+        """0.5, A15 and A26; it stands on thread_eligibility and rests on MS; three a conversation, a dozen a day;
+        at P4 (5a), P8 and P2 (5b)."""
+        found = registry.REGISTRY.get("subagent_parent")
+        self.assertEqual(found.departs_from, ("0.5", "A15", "A26"))
+        self.assertEqual((found.compat, found.measurements, found.journal_prefix),
+                         ("thread_eligibility", (Measurement.MS,), "sub"))
+        self.assertEqual(found.points, frozenset({Point.TEXT, Point.TICK, Point.RECORDS}))
+        self.assertEqual((found.ceilings.per_day, found.ceilings.per_conversation), (12, 3))
 
     def test_the_empty_response_recovery_departs_and_rests_on_what_the_design_says(self):
         """0.5 (a completed turn is no failure), A13 and A26; it stands on outcome_observation and rests on ME; two a

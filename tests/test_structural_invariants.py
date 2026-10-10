@@ -211,6 +211,16 @@ class OneSenderTests(unittest.TestCase):
                          [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._resume_unloaded")])
         self.assertEqual(ast.unparse(resumed[0][2].func.value), "route")
 
+    def test_nothing_injects_items_into_a_conversation(self):
+        """v0.6.14-beta.2: Codex's thread/inject_items writes items into a conversation - a subagent's among them - and
+        neither edition ever calls it: a parent hears of its subagents in its own continuation (the advanced
+        engine/subagent.py), and nothing is ever written to a subagent. No source file of either names it."""
+        root = Path(__file__).resolve().parents[1]
+        named = sorted(str(path.relative_to(root)) for folder in (root / "src", root / "advanced" / "src")
+                       for path in folder.rglob("*") if path.suffix in (".py", ".ps1", ".js", ".cs")
+                       and "inject_items" in path.read_text(encoding="utf-8", errors="replace"))
+        self.assertEqual(named, [])
+
     def test_exactly_one_place_spawns_the_queue_process(self):
         """`codex queue` is started with a message in one function. The only other process
         that names `queue` asks it for `--help`, to prove the flags still exist."""
