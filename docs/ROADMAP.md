@@ -750,7 +750,8 @@ the web's steps without it. The project's check takes a report the product wrote
 ## v0.6.15 — The rest of the advanced edition
 
 **In development: v0.6.15-beta ✅, its first pre-release, is out: stage 3c and watching several Codex
-homes. Stage 4 is next.**
+homes. Next, v0.6.15-beta.2: words for this time, in the standard edition. Then stage 4 as
+v0.6.15-beta.3 and stage 5 as v0.6.15-beta.4; the final v0.6.15 is stage 6.**
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
@@ -760,6 +761,16 @@ last. Every capability here is the advanced edition's alone, off until a person 
 statement that names the standards it departs from, as v0.6.11's and v0.6.14's are. Some rest on a
 measurement of the real Codex; one that fails narrows the route, or becomes a warning the person
 confirms, and does not drop the capability.
+
+### v0.6.15-beta.2 — Words for this time (standard edition)
+
+What the owner asked for on 2026-10-10: pick one waiting recovery on Pending and, this one time, when its
+limit lifts, send its usual continuation with words of the person's own after it. Standards A26 and A27 are
+amended at the owner's word to allow it. The words are a Custom message in every way - written only in the
+Dashboard, at most 2000 characters, sent exactly as typed, the same placeholders, checked again when read - kept
+in a file of their own beside the state (no state schema change, no setting), sent once and then deleted, and
+deleted when the recovery ends without a send. Adding them starts, speeds and skips nothing. v0.6.14's *Send your
+own message when a limit resets* stays as it is.
 
 ### Recovery through the channels already in use
 
@@ -1076,9 +1087,9 @@ Eight more ways to recover, Keep it on and a watch log, in the advanced edition
 
         ↓
 
-v0.6.15-beta → v0.6.15-beta.2 → … → v0.6.15
+v0.6.15-beta → v0.6.15-beta.2 → v0.6.15-beta.3 → v0.6.15-beta.4 → v0.6.15
 The rest of the advanced edition, in as many pre-releases as it needs
-+ several Codex homes, Arabic and Hebrew mirrored, winget
++ several Codex homes, words for this time, Arabic and Hebrew mirrored, winget
 
         ↓
 
