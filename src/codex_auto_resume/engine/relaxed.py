@@ -233,6 +233,19 @@ class RelaxedMixin:
         which the claim holds it to as the engine does (store/claims.py)."""
         return dict(limits, managed_max_recovery_attempts=self.managed.max_recovery_attempts)
 
+    def _held(self, name, row, vector, answer) -> bool:
+        """Whether the plug's answer at gate `name` holds this record, which core would let go.
+
+        HOLD only restricts: the gate is recorded as waiting, and the record keeps its state and
+        its reason for one more poll, as on any wait of core's own. Every other answer lets core go
+        on as it would have with no plug at all - known_failure's words aside (_known_failure)."""
+        if answer is not Alternative.HOLD:
+            return False
+        vector[name] = machine.gate(machine.WAIT, machine.HELD)
+        self._wait(row, row["state"], row.get("last_error"), self.options["state_poll_seconds"],
+                   vector)
+        return True
+
     def _parked(self, row, vector) -> bool:
         """While `row` is looked at early, a wait is its gate vector alone: True, and it keeps its
         state, its reason and its next look. False for every other record, which waits as it would."""

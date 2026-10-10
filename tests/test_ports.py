@@ -86,6 +86,8 @@ ENGINE_TO_STORE = {
     # and a record the task-changed guard holds for a person when it falls due (engine/guard.py) -
     # never at the defaults, where the guard is off.
     "hold_changed",
+    # v0.6.15-beta: a worker's own store closed once its receipt came (engine/launches.py) - never the engine's.
+    "close",
     # and a needs-you notice kept so it is told once (engine/notices.py) - never at the defaults.
     "raise_notice",
     # and what fell due during a long sleep, held for a person (engine/freshness.py) - never at the
@@ -144,8 +146,8 @@ ENGINE_TO_PLUG = {"admission", "delivery", "gate", "moved", "null", "outcome", "
 # `claim_ledger_checked` is how the claim asks: it says whether that one call raised, so a
 # failure on another thread holding the same plug is not read as this claim's (domain/plug.py).
 STORE_TO_LEDGER = {"claim_ledger_checked", "null"}
-# v0.6.14: and a conversation switched off, so the edition ends what it keeps waiting there (a reset
-# message) at the switch itself (Plug.conversation_off; NULL does nothing).
+# `conversation_off`: a person switched a conversation off, so what the edition holds for it ends at that
+# switch (a reset message, a queued prompt) - told by the control layer that wrote the switch.
 CONTROL_TO_PLUG = {"conversation_off", "start_route", "surface"}
 # What the one layer a front end calls asks of the state: what to show, and the four things a
 # person can ask for - pause, cancel, retry now, give the attempts back.

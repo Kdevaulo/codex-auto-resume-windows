@@ -16,6 +16,7 @@ from __future__ import annotations
 from .. import failures, guards, ladder, machine, needsyou
 from ..machine import OBSERVING, TERMINAL, WAITING, WATCHED
 from ..codex import admissible as admissible_failure, detect
+from ..domain import ids
 from ..domain.plug import DEFER, PACED_AS, Alternative, Point
 from .relaxed import UNADMITTED_SECONDS
 
@@ -25,6 +26,22 @@ class DetectMixin:
         """The wait a record returns to when it goes back to waiting now."""
         return machine.waiting_state(row, self.clock())
 
+    def _records(self, states):
+        """This engine's own home's records in `states` (v0.6.15-beta): never another home's."""
+        return self.store.records_in(states, home_key=self.home_key)
+
+    def _claimed(self, thread_id):
+        """This home's records that may have put a continuation into `thread_id` (store.claimed_on_thread)."""
+        return [row for row in self.store.claimed_on_thread(thread_id) if row["home_key"] == self.home_key]
+
+    def _keyed(self, found):
+        """A failure as this engine's home knows it (v0.6.15-beta): its id derived with the home's key, which
+        the default home's never is - so the same turn in two homes is two interruptions."""
+        if found is not None and self.home_key:
+            found["interruption_id"] = ids.interruption_id(
+                found["thread_id"], found["turn_id"], found["completed_at"], found["ordinal"], home_key=self.home_key)
+        return found
+
     def valid_interruption(self, row):
         """Whether the record is still its conversation's latest failure: an identity check and only
         that. One the edition's plug took up (failures.ADMISSIBLE) is found as it was taken up, never by
@@ -32,8 +49,8 @@ class DetectMixin:
         latest = self.source.latest(row["thread_id"])
         if not latest:
             return False
-        found = (admissible_failure(latest) if row["category"] in failures.ADMISSIBLE
-                 else detect(latest))
+        found = self._keyed(admissible_failure(latest) if row["category"] in failures.ADMISSIBLE
+                            else detect(latest))
         return found is not None and found["interruption_id"] == row["interruption_id"]
 
     def supersede_reason(self, row):
@@ -53,7 +70,7 @@ class DetectMixin:
     # --------------------------------------------------------------- collect
     def _owner(self, thread_id, turn_id):
         """Which of our records put its continuation into this turn, if any."""
-        candidates = [row for row in self.store.claimed_on_thread(thread_id)
+        candidates = [row for row in self._claimed(thread_id)
                       if row["recovery_turn_id"] is None]
         if not candidates:
             return None
@@ -73,7 +90,7 @@ class DetectMixin:
         turn and no assistant reply, the count carries forward; visible progress resets
         it. Only lifecycle booleans are consulted - no message text.
         """
-        previous = [row for row in self.store.claimed_on_thread(detection["thread_id"])
+        previous = [row for row in self._claimed(detection["thread_id"])
                     if row["state"] == "resumed" and row["interruption_id"] != detection["interruption_id"]]
         if not previous:
             return None
@@ -104,10 +121,10 @@ class DetectMixin:
                  else self.source.latest_failures(since, **extra))
         for raw in found:
             shape, admissible = raw.pop("shape", None), raw.pop("admissible", False)
-            record = detect(raw)
+            record = self._keyed(detect(raw))
             admissible = record is None and admissible
             if admissible:
-                record = admissible_failure(raw)
+                record = self._keyed(admissible_failure(raw))
             if record is None or not self.store.thread_enabled(record["thread_id"]):
                 continue
             if self.store.get(record["interruption_id"]) is not None:
@@ -187,7 +204,8 @@ class DetectMixin:
             limits = self.capacity_limits() if answer is Alternative.CAPACITY else self.limits()
             if not self.store.register(detection, now, state=state, next_retry_at=when,
                                        owner_id=owner, failed_turn_progress=progress,
-                                       legacy_carry=carry, limits=limits, hold=hold, **facts):
+                                       legacy_carry=carry, limits=limits, hold=hold, home_key=self.home_key,
+                                       **facts):
                 continue
             registered = self.store.get(detection["interruption_id"])
             if admissible:

@@ -30,7 +30,8 @@ MIXINS = (package.OptionsMixin, package.AnnounceMixin, package.FreshnessMixin,
           # and an uncertain continuation sent once more, where the plug asks and core may.
           package.ResendMixin,
           # and records of the edition's plug's own, tried like core's (P2).
-          package.PlugRecordsMixin)
+          package.PlugRecordsMixin,
+          package.ForOpenMixin)
 
 # The forty-one methods the one class had, counted the day it was split.
 METHODS = {
@@ -87,11 +88,21 @@ METHODS = {
     # and a person's Send now (SEND_NOW, engine/relaxed.py): the schedule it passes, an attempt budget
     # of the person's own, and the administrator's ceiling the claim is told.
     "_send_now", "_own_budget", "forced_limits",
+    # v0.6.15-beta: a conversation's day and spacing, read by the gates and again in the claim, and how
+    # long a record the claim refused for them waits.
+    "caps", "_cap_delay",
+    # and the engine's own Codex home: its records, its claimed ones and its ids (engine/detect.py).
+    "_records", "_claimed", "_keyed",
+    # and several receipts waited for at once (P12, engine/delivery.py): how many, the worker taken and freed, whether
+    # the send goes to it, the hand-over and what came of it.
+    "_workers", "_take_slot", "_pooled", "_launched", "_free_slot", "_settle_launch",
     # and P8's errand of the plug, run last in the tick, and what holds back its one write.
     "_errand", "errand_held",
     # and P2 carried out: the records of the plug's own, their words, their gates and moves, their claim
     # and the look before their send, what came of it, and those in flight watched (engine/plugrecords.py).
-    "plug_records", "_worded", "_record_told", "_record_waits", "_try_record", "_record_would_send",
+    "plug_records", "_worded", "_record_told", "_record_waits", "_try_record", "_record_would_send", "_not_ones_own", "_take_back", "_flying", "paused_records",
+    # v0.6.15-beta: one queued for when its conversation is opened (engine/foropen.py).
+    "for_open", "_open_reason", "_for_open_rests", "_not_for_open",
     "_record_claim", "_record_problem", "_record_sent", "_watch_record",
 }
 

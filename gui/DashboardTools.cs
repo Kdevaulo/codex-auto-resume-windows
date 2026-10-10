@@ -238,6 +238,9 @@ namespace CodexAutoResume
             dialog.ClientSize = new Size(Px(760), Px(500));
             dialog.MinimizeBox = false;
             dialog.ShowInTaskbar = false;
+            // The product's icon in the title bar, as the window has it: without one Windows draws its
+            // default form icon there (owner, 2026-10-10).
+            dialog.Icon = Icon;
 
             var top = new SoftStack();
             top.Dock = DockStyle.Top;

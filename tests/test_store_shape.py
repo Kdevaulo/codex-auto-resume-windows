@@ -77,6 +77,12 @@ METHODS = {
     "errand_guard",
     # and a record of the plug's own claimed, and the guard its launch is made in (P2).
     "reserve_record", "record_guard",
+    # v0.6.15-beta: a conversation's day and spacing read again inside the claim (store/ledger.py).
+    "_caps_refusal",
+    # v0.6.15-beta: schema 5 - which Codex home a record is of - made and migrated to (store/migrations.py).
+    "_add_schema_5", "_migrate_4_to_5",
+    # and a Codex home's waiting records cancelled when it is removed, and the homes they are of.
+    "cancel_home", "home_keys",
 }
 
 # Reachable as `store.<name>` before the split, and still.

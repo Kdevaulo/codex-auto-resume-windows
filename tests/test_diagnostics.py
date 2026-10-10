@@ -71,6 +71,20 @@ class DiagnosticsTests(unittest.TestCase):
         # Which message is used is a choice, not the user's words, and is recorded as it is.
         self.assertEqual(settings["custom_message_mode"], self.control.get_settings()["custom_message_mode"])
 
+    def test_a_further_codex_home_is_counted_and_never_named(self):
+        """Its folder holds the Windows user name and its alias is the person's own text."""
+        extra = Path(self.temporary.name) / "Users" / "tester" / "codex-two"
+        extra.mkdir(parents=True)
+        (extra / "state_5.sqlite").write_bytes(b"")
+        default = Path(self.temporary.name) / "defaulthome"
+        default.mkdir()
+        with patch.dict(os.environ, {"CODEX_HOME": str(default)}):
+            self.control.update_settings({"codex_homes": [{"path": str(extra), "alias": "Private alias"}]})
+            text = self.bundle_text()
+        for secret in ("tester", "codex-two", "Private alias", str(self.temporary.name)):
+            self.assertNotIn(secret, text, secret)
+        self.assertEqual(json.loads(text)["settings"]["codex_homes"], 1)
+
     def test_aliases_are_consistent_inside_one_file(self):
         bundle = json.loads(self.bundle_text())
         record = bundle["records"][0]

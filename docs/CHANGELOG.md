@@ -1,5 +1,115 @@
 # Changelog
 
+## v0.6.15-beta — Several conversations at once, several Codex homes, and five more ways to go on
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15-beta)
+
+**A pre-release, the first of v0.6.15 (stage 3c).** It is a GitHub pre-release, so `releases/latest` stays
+v0.6.14; an installation of v0.6.14 is offered it by *Check for updates*, which asks first and says it is tested
+less, and *Install another version...* lists it. The standard edition gains one thing - watching up to three
+more Codex homes - and keeps every standard. The advanced edition gains six capabilities, each off until you turn it
+on in the Dashboard's **Advanced features** page, with a statement in your language that names the standards it
+departs from ([EDITIONS.md](EDITIONS.md#todays-capabilities)).
+
+**Going back.** The watcher's state is now schema 5: each record says which Codex home it is of. It is brought up
+from schema 4 the first time it is opened, every row kept. To go back to v0.6.14 or v0.6.13, *Install another
+version...* converts it down first (`downgrade-state --to 4`): it is refused while a continuation sent in an extra
+home may still be in that home's Codex queue. Every row is kept, and none of an extra home's is left for the older
+release to act on: its waiting recoveries are cancelled, one whose recovery turn is running ends unverified, and its
+finished rows stay as they are. The advanced edition's own file is now version 4
+- the continuations, the conversations kept going and the queued prompts - brought up from version 3 when it is first
+opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
+
+### Several Codex homes (standard edition)
+
+- **Up to three more Codex homes.** *Settings > Advanced > Codex homes* names up to three more `CODEX_HOME` folders
+  besides the default one, each with a short alias. One watcher recovers in every home it holds, each through its own
+  reader, Codex process, lock and engine, and a record goes only to its own home. Pending, History, the Codex panel and
+  the cards add the alias to a record of an extra home.
+- **Locked by folder.** Each home is locked by its path and by its folder, so one folder under two names is one home,
+  and two installations never watch it twice. A UNC path, a link, a missing state database and a folder named twice are
+  refused when it is saved.
+- **Only the Dashboard writes them.** Codex's `update_settings` refuses the field, and no Codex reply carries the
+  paths. Restore defaults keeps them. Removing a home cancels the recoveries waiting in it (the owner's answer), and
+  one already in Codex's queue is watched until it settles.
+- **Measured up to 0.162.** MH, a second home reached by the desktop app, passed on codex-cli 0.158 and again on
+  codex-cli 0.162.0-alpha.17.2; on a Codex newer than 0.162 the card says it is unmeasured until it is measured again.
+
+### Advanced: several conversations at once
+
+- **Several conversations at once.** Two to four continuations wait for Codex's answer at once, each in a
+  conversation of its own, while every check, every claim and the last look before each send still run one at a time
+  (2 by default; more only once MQ passes on your Codex). A send whose fate cannot be known turns it off. Departs from
+  0.5 and A19.
+
+### Advanced: five more ways to go on
+
+- **Queue for when a conversation is opened.** A usage-limited conversation the app does not have open is sent the
+  ordinary continuation anyway and left in Codex's queue, for the days you choose (3 to 7); the program takes it back
+  at seven days and an hour whatever it is told, and at once when this is turned off. Opened and not run within three
+  minutes, it is taken back, sent the ordinary way, and this turns off. Departs from A11.
+- **Continue a turn that ended with no reply.** A turn Codex completed with only your message and its reasoning in
+  it - judged by the kinds of item alone, never their words - is continued once in fixed words, a run of them twice at
+  most; a goal Codex keeps going or has stopped is left alone. Departs from 0.5, A13 and A26.
+- **Tell a parent which of its subagents stopped.** One fixed line for each subagent that stopped on a failure, five
+  at most, added to the parent's own continuation; once MS passes, a parent that finished normally is sent one too.
+  Nothing is ever written to a subagent. Departs from 0.5, A15 and A26.
+- **Keep a conversation going.** A conversation you pick, with a count of 1 to 10, is sent "Carry on with the next
+  step of the plan." after each turn that ended well, and stops on no progress, a finished plan, an active goal, a
+  failed or interrupted turn, or the count used; three at most until MK passes. Departs from A13, A26 and B9.
+- **Queue messages for later.** Your own messages for one conversation, after the turn now running, at a time, or
+  every day or week - in order, each once, one waiting for the one before it where you ask; paced like every recovery,
+  fifteen minutes apart and five a day in one conversation (the owner's answer). Departs from A8, A17, A26, A27, C4,
+  D2, H4 and H6.
+
+### What changed for the capabilities you have
+
+- **Cancel and Pause take back a message Codex already holds.** A message at a reset, a queued message or one of the
+  edition's own continuations already in Codex's queue is taken back out of it by a Cancel or a Pause, as the program
+  takes back its own; if Codex will not give it back, the row says so and it is never sent again (the owner's answer).
+  A message at a reset taken back this way is cancelled; a queued message, held for you to say go on or cancel. *Send
+  your own message when a limit resets* is revision 2 for it, and asks to be read again.
+- **Longer messages.** *Longer reset messages* is now *Longer messages*, revision 2: it lets a queued message be up to
+  8,154 characters too.
+- **Three capabilities also name H2.** *Short retries when Codex is at capacity* moves A20's caps, which are the
+  engine's, and *Rules for Codex's error codes* and *Retry failures it cannot name* retry failures nothing classified:
+  H2 says no setting can do either, so their statements now name H2 beside the rest. Each is revision 2, and one you
+  turned on turns off until you confirm its statement again.
+- **An edited message is yours.** A message you edit in Codex's queue is left there, never deleted and never counted
+  against the capability that sent it.
+- **A watched capability's log** keeps its newest 200 lines (was 250), so every capability watched at once still fits
+  inside the journal.
+- **The Advanced features page lists them by importance**, the compatibility report first: then what gets work going
+  again after a usage limit by itself, what saves you work, the other common failures, and last the rare cases and
+  expert settings (the owner's order). A capability's warnings never move it down.
+
+### Measured again on codex-cli 0.162.0-alpha.17.2
+
+Every measurement was made again on the Codex in force (2026-10-10, [`docs/evidence/live/`](evidence/live/)). MW,
+M1, M5, M6, M7, MA and MH passed again, M2b and MP1 to MP3 passed for the first time, and M2, M3 and M4 failed again.
+What follows from it:
+
+- **Several Codex homes** no longer say they are unmeasured on this Codex (MH).
+- **The goal continuation** also acts on a conversation the app holds where M2b passed: it sets the paused goal
+  active, then adds the continuation to the conversation's queue. Its statement says so at revision 2, and one you
+  turned on asks to be confirmed again.
+- **The panel beside the chat** passed MP1 to MP3, so the [guide](GUIDE.md#the-panel-beside-the-chat) describes it now.
+- A capability whose measurement passed on this Codex shows no warning for it here; on any other version it still
+  does.
+
+### Fixes
+
+- **The product's icon in every window's title bar.** *Install another version...*, the Timeline and the Log
+  showed Windows' default form icon - red, blue and yellow squares - in their title bars; they show the Dashboard's
+  own icon now, in both editions (owner, 2026-10-10).
+
+### Known limits
+
+- MQ, ME, MS, MK and MT are not measured yet, and MU, MN and MR - what the reset credit and the message at a reset
+  rest on - are not settled: every capability that rests on one says so as a warning you confirm.
+- The Dashboard's Pending list shows a continuation queued for opening as Codex's own queued row; it does not yet say
+  that it runs when you open the conversation.
+
 ## v0.6.14 — The window no longer hangs while a recovery waits, eight more ways to recover, Keep it on, a compatibility report sent from the Dashboard, actions at a usage reset you pick, a watch log and the panel beside the chat
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.13...v0.6.14)

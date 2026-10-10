@@ -1488,6 +1488,8 @@ function pendingRow(row) {
   // The exact thread id, shortened for display only. Every action this panel can take
   // addresses a record by its full id, never by what is shown.
   var shown = row.name || String(row.thread_id || '').slice(0, 8);
+  // v0.6.15-beta: with more than one Codex home watched, a record of another home says which, by its alias.
+  if (typeof row.home === 'string' && row.home) shown += ' · ' + row.home;
   title.appendChild(element('span', 'prow-name' + (row.name ? '' : ' mono'), shown));
   // The public code, never the engine's working state: several stored states share
   // one code, and what a person is told must not depend on engine internals.

@@ -71,11 +71,12 @@ from codex_auto_resume.compat.model import FAILED_HERE, INCOMPATIBLE, STATES, UN
 
 from . import policy as _policy
 from .measured import MEASURED
-from .registry import GLOBAL_HOURLY, ONCE_MORE
+from .registry import GLOBAL_HOURLY, ONCE_MORE, shown as _shown
 from .state import Refused, StaleGeneration, StateError
 from .state.spend import CHANNELS
 from .state.choices import DAY, RECENT_DAYS, RULES_LIMIT, aggregated, tag_problem
 from .statement import CATALOGS
+from .vocabulary import ContinuationReason, PromptReason  # noqa: E402  (v0.6.15-beta)
 from .vocabulary import (KEPT_NOTICES, TRIPWIRES, Actor, ArmingState, ArmingWarning, CapabilityKind,
                          KeepOn, Measurement, OffReason, OverrideKind, RecordState, Refusal, RuleReason,
                          RuleState, Verdict)
@@ -506,6 +507,15 @@ class Arming:
             if (states.get(CREDIT, ArmingState.OFF) != ArmingState.ARMED
                     and self.state.reading().get("credits") is not None):
                 self.state.set_reading(credits=None, expiry_known=None, nearest_expiry=None)
+            # v0.6.15-beta: every queued prompt not in Codex's queue while prompt_queue does not stand on, and every
+            # continuation still waiting of one that does not stand on (state/continuations).
+            if states.get("prompt_queue", ArmingState.OFF) != ArmingState.ARMED:
+                self.state.end_prompts(PromptReason.TURNED_OFF, at=self.clock())
+            for row in self.state.continuations(pending=True):
+                if (states.get(row["capability"], ArmingState.OFF) != ArmingState.ARMED
+                        and row["record_state"] == RecordState.WAITING):
+                    self.state.end_continuations(ContinuationReason.TURNED_OFF, capability=row["capability"],
+                                                 at=self.clock())
         except StateError:
             return                                   # tried again at the next sweep
 
@@ -869,7 +879,7 @@ class Arming:
                     engine_version=engine_version(view))
 
     def listing(self) -> dict:
-        """Every capability as a surface shows it: where it is stored, what it is now, since
+        """Every capability as a surface shows it, in registry.SHOWN_ORDER: where it is stored, what it is now, since
         when and by whom, what a person would be agreeing to, what its statement warns of now
         and what they confirmed when they last turned it on or watched it."""
         from .runtime import SENDING              # lazily: runtime imports this module
@@ -881,7 +891,8 @@ class Arming:
         except StateError:
             rows, meta = {}, {"generation": 0, "global_hourly": GLOBAL_HOURLY}
         shown = []
-        for definition in self.registry:
+        # In the order a person reads them (registry.SHOWN_ORDER), not the order they answer in.
+        for definition in _shown(self.registry):
             row = rows.get(definition.id) or {}
             off = row.get("state", ArmingState.OFF) == ArmingState.OFF
             shown.append({

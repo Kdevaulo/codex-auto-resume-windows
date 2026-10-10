@@ -14,13 +14,17 @@ it at all: a secret goes to Windows Credential Manager (credentials.py).
     journal   what happened, the sampler's counts, and the bounds on every table
     choices   the capabilities' choices and rules, what they took up, and what they keep of it
     resets    the reset actions' windows, last reading, rules and spends (v0.6.14)
+    continuations  the edition's own continuations, and the conversations kept going (v0.6.15-beta)
+    prompts   a person's queued prompts (v0.6.15-beta)
 """
 from __future__ import annotations
 
 from ..registry import REGISTRY
 from .arming import ArmingMixin
 from .choices import ChoicesMixin, Refused, Scoped  # noqa: F401
+from .continuations import ContinuationsMixin
 from .journal import EVENT_LIMIT, EVENT_MAX_AGE, WATCH_LIMIT, JournalMixin  # noqa: F401
+from .prompts import PromptMovesMixin, PromptsMixin
 from .records import RecordsMixin
 from .resets import ResetsMixin
 from .schema import ATTACHED, FILE_NAME, SCHEMA_VERSION, TABLES  # noqa: F401
@@ -29,7 +33,7 @@ from .spend import SpendMixin
 
 
 class AdvancedState(SessionMixin, ArmingMixin, SpendMixin, RecordsMixin, JournalMixin, ChoicesMixin,
-                    ResetsMixin):
+                    ResetsMixin, ContinuationsMixin, PromptsMixin, PromptMovesMixin):
     """One installation's advanced state, for one process: opened when first needed."""
 
     def __init__(self, paths, *, registry=REGISTRY, **options):

@@ -111,25 +111,34 @@ INTERRUPTION_ID_SCHEMA = "^[0-9a-fA-F]{%d}$" % INTERRUPTION_ID_LENGTH
 _STORED_KEY = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 
 
-def interruption_id(thread_id, turn_id, completed_at, ordinal) -> InterruptionId:
+def interruption_id(thread_id, turn_id, completed_at, ordinal, home_key="") -> InterruptionId:
     """The id of a failed turn: SHA-256, as lowercase hex, of the compact JSON array
     `[thread_id, turn_id, float(completed_at).hex(), ordinal]`, ASCII-encoded.
+
+    v0.6.15-beta: of a Codex home other than the default (`home_key`, the SHA-256 its lock is named
+    by), the six-member array `["home", home_key, thread_id, turn_id, float(completed_at).hex(),
+    ordinal]` - never equal to a four-member one - so one conversation copied into two homes is two
+    records, each sent to its own home. The default home's ids are what they always were.
 
     Written once and recomputed at every look for as long as the record lives, so it never
     changes: a failure computed to another id is a new interruption, and a second recovery of
     one already recovered. `float.hex()` gives a whole second one spelling whether Codex wrote
     it as an int or a float (tests/test_domain_vectors.py holds the vectors)."""
     identity = [thread_id, turn_id, float(completed_at).hex(), ordinal]
+    if home_key:
+        identity = ["home", home_key] + identity
     text = json.dumps(identity, separators=(",", ":"), allow_nan=False)
     return InterruptionId(hashlib.sha256(text.encode("ascii")).hexdigest())
 
 
-def stalled_id(thread_id, turn_id) -> InterruptionId:
+def stalled_id(thread_id, turn_id, home_key="") -> InterruptionId:
     """The key a needs-you notice about a turn that stopped moving is kept under (v0.6.11): SHA-256,
     as lowercase hex, of the compact JSON array `["stalled", thread_id, turn_id]`. Three members where
     an interruption's id has four, so it is never one; and one turn is told once, however long it
-    stays still."""
-    text = json.dumps(["stalled", thread_id, turn_id], separators=(",", ":"), allow_nan=False)
+    stays still. Of a Codex home other than the default (v0.6.15-beta), four members:
+    `["stalled", home_key, thread_id, turn_id]`."""
+    identity = ["stalled", home_key, thread_id, turn_id] if home_key else ["stalled", thread_id, turn_id]
+    text = json.dumps(identity, separators=(",", ":"), allow_nan=False)
     return InterruptionId(hashlib.sha256(text.encode("ascii")).hexdigest())
 
 

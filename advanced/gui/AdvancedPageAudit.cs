@@ -3,7 +3,8 @@
 // Codex Auto Resume - the Advanced features page checking itself, on demand (advanced/gui/AdvancedPage.cs).
 //
 // Two entry points, as the standard window has LayoutAudit (gui/WindowAudit.cs), and run by
-// advanced/tests/test_advanced_page.py, never by the window a person opens:
+// advanced/tests/test_advanced_page_*.py (their shared harness is advanced/tests/pagecase.py), never by the window a
+// person opens:
 //
 //   * AdvancedLayoutAudit lays the page out in one language at one scaling, each capability open in turn - the
 //     report's card in every state a report can be in, and Pending with the reset rules scheduled - and reports

@@ -23,7 +23,7 @@ class RecordsMixin:
                  owner_id: str | None = None, failed_turn_progress: bool | None = None,
                  legacy_carry: int | None = None, limits: dict | None = None,
                  hold: str | None = None, task_print: str | None = None,
-                 context_tokens: int | None = None) -> bool:
+                 context_tokens: int | None = None, home_key: str = "") -> bool:
         """Create the record WITH its real schedule and its chain, in one transaction.
 
         Writing the schedule, or the counters inherited from the record whose own
@@ -42,6 +42,7 @@ class RecordsMixin:
         `hold` (schema 4) is the hold its conversation's tier puts on it (machine.hold_for_tier):
         None at the defaults, where every conversation is resumed automatically. `task_print` and
         `context_tokens` are what the two guards keep of it (guards.py): None while they are off.
+        `home_key` (schema 5) is the Codex home it is of: '' for the default, every record before.
         """
         _timestamp(now, "now")
         required = {"thread_id", "turn_id", "completed_at", "started_at", "ordinal",
@@ -71,7 +72,7 @@ class RecordsMixin:
             "usage_probe_at": None, "gate_eval": None, "gate_eval_at": None,
             "history_hidden_at": None, "not_before": None, "hold": hold,
             "task_print": task_print, "context_tokens": context_tokens, "objection_at": None,
-            "objection_until": None,
+            "objection_until": None, "home_key": home_key,
         }
         _validated_record(dict(row))
         with self._transaction() as connection:
@@ -88,8 +89,8 @@ class RecordsMixin:
                                   (row["thread_id"], row["marker"])).fetchone() is not None:
                 row["marker"] = ids.marker(key)
             drift = connection.execute(
-                "SELECT interruption_id FROM interruptions WHERE thread_id=? AND turn_id=? "
-                "AND interruption_id<>? LIMIT 1", (row["thread_id"], row["turn_id"], key)).fetchone()
+                "SELECT interruption_id FROM interruptions WHERE thread_id=? AND turn_id=? AND home_key=? "
+                "AND interruption_id<>? LIMIT 1", (row["thread_id"], row["turn_id"], home_key, key)).fetchone()
             if drift is not None:
                 # The same Codex turn under a new identity (its completion time or
                 # position changed). Recovering it again would be a second recovery of
@@ -179,14 +180,44 @@ class RecordsMixin:
                 "SELECT * FROM interruptions ORDER BY detected_at, interruption_id"
             )]
 
-    def records_in(self, states) -> list[dict[str, Any]]:
+    def records_in(self, states, home_key=None) -> list[dict[str, Any]]:
+        """The records in `states`, oldest first - of one Codex home only when `home_key` is given (schema 5):
+        each engine asks for its own home's, so it never sees, claims or watches another's."""
         wanted = tuple(sorted(set(states) & STATES))
         if not wanted:
             return []
+        home = "" if home_key is None else " AND home_key=?"
         with self._read() as connection:
             return [_validated_record(dict(row)) for row in connection.execute(
-                "SELECT * FROM interruptions WHERE state IN (%s) ORDER BY detected_at, interruption_id"
-                % ",".join("?" for _ in wanted), wanted)]
+                "SELECT * FROM interruptions WHERE state IN (%s)%s ORDER BY detected_at, interruption_id"
+                % (",".join("?" for _ in wanted), home), wanted + (() if home_key is None else (home_key,)))]
+
+    def home_keys(self) -> set:
+        """The Codex homes other than the default that records waiting now are of (schema 5)."""
+        waiting = tuple(sorted(WAITING))
+        with self._read() as connection:
+            return {row[0] for row in connection.execute(
+                "SELECT DISTINCT home_key FROM interruptions WHERE home_key<>'' AND state IN (%s)"
+                % ",".join("?" for _ in waiting), waiting)}
+
+    def cancel_home(self, home_key: str, now: float, reason: str) -> int:
+        """Every record waiting in one Codex home other than the default, cancelled and final (v0.6.15-beta):
+        the home was taken out of Settings, or no Settings name it. What may be in Codex's queue there is left
+        to its watch. Returns how many were cancelled."""
+        _timestamp(now, "now")
+        if not home_key:
+            raise StoreError("The default Codex home is never removed")
+        with self._transaction() as connection:
+            rows = [_validated_record(dict(row)) for row in connection.execute(
+                "SELECT * FROM interruptions WHERE home_key=? AND state IN (%s)"
+                % ",".join("?" for _ in WAITING), (home_key,) + tuple(sorted(WAITING)))]
+            for row in rows:
+                connection.execute(
+                    "UPDATE interruptions SET state='cancelled', cancel_requested=1, last_error=?, outcome_at=? "
+                    "WHERE interruption_id=?", (reason, now, row["interruption_id"]))
+                self._event(connection, now, "state", record=row, from_state=row["state"], to_state="cancelled",
+                            reason=reason, actor="engine")
+            return len(rows)
 
     def pending(self) -> list[dict[str, Any]]:
         return self.records_in(STATES - TERMINAL)

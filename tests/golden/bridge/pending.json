@@ -98,7 +98,8 @@
             "attempt_limit": null,
             "name": "example-project",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "8888888888888888888888888888888888888888888888888888888888888888",
@@ -191,7 +192,8 @@
             "attempt_limit": 4,
             "name": "example-service",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           }
         ]
       }

@@ -68,20 +68,24 @@ class StoreView:
     """
     __slots__ = ("now", "_reads")
 
-    def __init__(self, store, now, last_usage=None):
+    def __init__(self, store, now, last_usage=None, home_key=None):
         self.now = now
+        # v0.6.15-beta: the engine's own Codex home, so a plug is shown the records of that home alone - the
+        # default home's, for the one engine a plug is given (runtime/homes.py) - however it asks.
+        mine = (lambda rows: rows) if home_key is None else (
+            lambda rows: [row for row in rows if row["home_key"] == home_key])
         # Written out one by one rather than looked up by name, so that each read names the
         # store call it makes and tests/test_ports.py sees every one of them: a call built at
         # run time is one no table can hold.
         reads = {
             "get": lambda *a, **k: store.get(*a, **k),
-            "records_in": lambda *a, **k: store.records_in(*a, **k),
+            "records_in": lambda *a, **k: store.records_in(*a, **dict(k, home_key=home_key)),
             "settings": lambda *a, **k: store.settings(*a, **k),
             "thread_enabled": lambda *a, **k: store.thread_enabled(*a, **k),
             "others_in_flight": lambda *a, **k: store.others_in_flight(*a, **k),
             "recent_claims": lambda *a, **k: store.recent_claims(*a, **k),
             "recent_claim_count": lambda *a, **k: store.recent_claim_count(*a, **k),
-            "claimed_on_thread": lambda *a, **k: store.claimed_on_thread(*a, **k),
+            "claimed_on_thread": lambda *a, **k: mine(store.claimed_on_thread(*a, **k)),
             "last_usage": lambda: last_usage() if last_usage is not None else None,
         }
         for name, call in reads.items():
@@ -97,13 +101,22 @@ class StoreView:
 class OptionsMixin:
     def __init__(self, store, source, backend, *, dispatch_lock=nullcontext,
                  clock=time.time, log=None, options=None, notify=None, language=None,
-                 home_lock=None, engine_state=None, plug=None, connectivity=None):
+                 home_lock=None, engine_state=None, plug=None, connectivity=None, home_key="",
+                 open_store=None):
         self.store, self.source, self.backend = store, source, backend
         # The edition's plug, as core holds one (domain/plug.py): NULL, the standard edition's,
         # unless the watcher was given another. Every point is asked through this and nothing
         # else, and it is fixed for the engine's life, so no edition changes under a tick.
         self.plug = guard(plug)
         self.dispatch_lock, self.clock = dispatch_lock, clock
+        # v0.6.15-beta: the Codex home this engine recovers in - '' for the default, else the key an extra home's
+        # lock is named by (runtime/homes.py) - and whether that home was taken out of Settings, after which it
+        # only watches what it sent until that settles (`tick`).
+        self.home_key, self.retiring = home_key, False
+        # v0.6.15-beta (P12): what opens a store of the engine's own state for a worker that waits for a receipt
+        # (engine/launches.py) - None, and every send is made inline as always - the pool open for this tick, the
+        # worker taken for the record being dispatched, and whether its send goes to that worker.
+        self.open_store, self._pool, self._held_slot, self._pooling = open_store, None, None, False
         self.log = log or (lambda *args: None)
         self.notify = notify or (lambda *args: None)
         self.language = language or "en"
@@ -242,6 +255,14 @@ class OptionsMixin:
         if self.options.get("max_chain_seconds") is not None:
             found["max_chain_seconds"] = self.options["max_chain_seconds"]
         return found
+
+    def caps(self, relaxed=None) -> tuple:
+        """(claims a day, seconds between two) for one conversation: core's, or a capacity error's that
+        the plug vouches for (ladder.py). Read by the gates and again inside the claim (v0.6.15-beta,
+        store/claims.py `_caps_refusal`), so a claim committed between the two is counted."""
+        if relaxed == "capacity":
+            return ladder.CAPACITY_PER_DAY, ladder.CAPACITY_SPACING
+        return self.options["max_submissions_per_thread_per_day"], self.options["thread_cooldown_seconds"]
 
     def recovers(self, category) -> bool:
         """Whether the user has left this category of failure switched on.

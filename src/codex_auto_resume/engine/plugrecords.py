@@ -27,6 +27,17 @@ Core carries each out as it carries out its own, and nothing of it is the plug's
 * in flight: its marker found in Codex's history is delivered; none a day after it was sent is unproven,
   and never sent again (A6).
 
+From v0.6.15-beta a record says what its words are (plughands.RecordPurpose): a person's MESSAGE, or a
+CONTINUATION in the edition's own catalog words (continuation.validate_continuation). Either goes only to a
+person's own desktop conversation - one `LocalSource.latest` reads: not archived, not a subagent's, the
+predicate detection uses (A15) - else it waits (identity, not_user_conversation); nothing is ever written
+into a child. A CONTINUATION goes only while the turn it follows is still the conversation's latest, final
+and with nothing after it; else it is SUPERSEDED, told once and never sent (A17 for it). Both are asked
+again in the last look. In flight, a queue item Codex said it took that a person edited is HANDED_OVER -
+theirs, never deleted and never unproven - and one a person cancelled, or every one while recovery is
+paused or its conversation off, is taken back out of Codex's queue (WITHDRAWN), as core takes its own back
+(H4, H6); one Codex will not give back is WITHDRAW_REFUSED, left there and watched, and never sent twice.
+
 Every move is told at P14 (RecordMove), and every wait with its gate and the gate's reason: the plug
 keeps its own record, and learns what became of it from core, as it learns of core's own records.
 The standard edition's plug hands over none, so none of this runs there.
@@ -35,6 +46,7 @@ from __future__ import annotations
 
 from .. import continuation, machine, power
 from ..domain.plug import RecordMove
+from ..domain.plughands import RecordPurpose
 
 # The two states a record the plug hands over is in (Guarded.records).
 WAITING_RECORD, IN_FLIGHT_RECORD = "waiting", "in_flight"
@@ -43,6 +55,11 @@ NOTED_LIMIT = 512
 COMPATIBLE = ("verified", "checked", "structurally_compatible")
 # The log's fixed line for what came of a send (logbook.py).
 SENT_LINES = {RecordMove.RELEASED: "plug_record_released", RecordMove.NOT_STARTED: "plug_record_not_started"}
+# A turn whose ending is known, which a continuation may follow (codex/values.py KNOWN_STATUSES less inProgress).
+FINAL = frozenset({"completed", "failed", "interrupted"})
+# The moves after which a record is no longer core's to watch.
+ENDED = frozenset({RecordMove.DELIVERED, RecordMove.UNPROVEN, RecordMove.HANDED_OVER, RecordMove.WITHDRAWN,
+                   RecordMove.SUPERSEDED})
 
 
 class PlugRecordsMixin:
@@ -52,6 +69,7 @@ class PlugRecordsMixin:
         for record in self.plug.records(view):
             try:
                 if record["state"] == IN_FLIGHT_RECORD:
+                    self._flying()[record["record_id"]] = record
                     self._watch_record(record)
                 elif self._worded(record):
                     self._try_record(record)
@@ -63,15 +81,53 @@ class PlugRecordsMixin:
         """Whether a waiting record's words are a person's own that may be sent (A26, A27 as P2 keeps
         them): checked here again, whatever the plug checked, and a record whose words fail is dropped."""
         try:
-            continuation.validate_prompt(record["words"])
-        except (continuation.PromptError, TypeError):
+            if record["purpose"] == RecordPurpose.CONTINUATION:
+                continuation.validate_continuation(record["words"])
+            else:
+                continuation.validate_prompt(record["words"])
+        except (continuation.PromptError, TypeError, KeyError):
             return False
         return True
+
+    def _not_ones_own(self, record):
+        """(move, gate, reason) for a record that may not go to its conversation now, or None (v0.6.15-beta): not a
+        person's own desktop conversation - archived, a subagent's, nothing the history reader takes - waits; a
+        CONTINUATION whose turn is no longer the latest, not ended, or has anything after it is SUPERSEDED."""
+        thread = record["thread_id"]
+        latest = self.source.latest(thread)
+        if latest is None:
+            return RecordMove.WAITING, "identity", "not_user_conversation"
+        if record["purpose"] != RecordPurpose.CONTINUATION:
+            return None
+        if (latest.get("ordinal") != record["ordinal"] or latest.get("status") not in FINAL
+                or self.source.later_turns(thread, record["ordinal"], record["marker"])):
+            return RecordMove.SUPERSEDED, "identity", "latest_turn_changed"
+        return None
 
     def _record_told(self, record, move, gate=None, reason=None):
         """P14 for a record of the plug's: `move` (RecordMove), with the gate and the reason of a wait."""
         told = dict(record) if gate is None else dict(record, gate=gate, reason=reason)
+        if move in ENDED:
+            self._flying().pop(record["record_id"], None)
         self.plug.moved(told, move)
+
+    def _flying(self) -> dict:
+        """The plug's records this engine watched in flight (v0.6.15-beta), by id, until each ends: what a Pause
+        takes back out of Codex's queue while the plug is asked nothing (`paused_records`)."""
+        found = self.__dict__.setdefault("_records_flying", {})
+        if len(found) > NOTED_LIMIT:
+            found.clear()
+        return found
+
+    def paused_records(self):
+        """While recovery is paused, the plug's records core watched in flight, each looked at as its watch looks -
+        delivered, handed over, or taken back out of Codex's queue (H4) - with the plug asked nothing (K5) and told
+        each move (P14). One that raises costs only itself."""
+        for record in list(self._flying().values()):
+            try:
+                self._watch_record(record)
+            except Exception:
+                self.log(record["thread_id"], "plug_record_check_failed", None)
 
     def _record_waits(self, record, gate, reason) -> None:
         self._record_told(record, RecordMove.WAITING, gate, reason)
@@ -101,6 +157,10 @@ class PlugRecordsMixin:
         if fresh is not True:
             return self._record_waits(record, "identity", "projection_stale" if fresh is False
                                       else "projection_table_missing")
+        found = self._not_ones_own(record)
+        if found is not None:
+            move, gate, reason = found
+            return self._record_told(record, move, gate, reason)
         app = self.backend.app_identity()
         if not app:
             return self._record_waits(record, "thread_available", "desktop_app_unavailable")
@@ -174,6 +234,10 @@ class PlugRecordsMixin:
             return RecordMove.RELEASED, "usage", "usage_recheck_failed"
         if self._projection_now(thread) is not True:
             return RecordMove.RELEASED, "identity", "projection_stale"
+        found = self._not_ones_own(record)
+        if found is not None:
+            move, gate, reason = found
+            return (RecordMove.RELEASED if move == RecordMove.WAITING else move), gate, reason
         if self.source.foreign_queued(thread, record["marker"]):
             return RecordMove.RELEASED, "no_newer_user_work", "user_input_queued"
         presence = self.source.marker_presence(thread, record["marker"])
@@ -193,15 +257,54 @@ class PlugRecordsMixin:
                     else RecordMove.NOT_STARTED)
         else:
             move = RecordMove.SENT
-        self._record_told(record, move)
+        queue_id = response.get("queue_id") if move == RecordMove.SENT else None
+        sent = dict(record, queue_id=queue_id if isinstance(queue_id, str) else None)
+        self._record_told(sent, move)
+        if move == RecordMove.SENT:
+            # Remembered from its send, so a Pause before the next tick that watches it takes it back too (H4).
+            self._flying()[record["record_id"]] = dict(sent, state="in_flight", words=None, sent_at=self.clock(),
+                                                       withdraw=False)
         self.log(record["thread_id"], SENT_LINES.get(move, "plug_record_sent"), None)
 
     def _watch_record(self, record) -> None:
         """A record of the plug's in flight: delivered once its marker is in Codex's history; unproven
         a day after it was sent with none there - and never sent again."""
-        if self.source.marker_rows(record["thread_id"], record["marker"]):
+        thread = record["thread_id"]
+        if self.source.marker_rows(thread, record["marker"]):
             self._record_told(record, RecordMove.DELIVERED)
+            return
+        queued = record["queue_id"] is not None and self.source.queue_row(thread, record["queue_id"], record["marker"])
+        if queued and queued["exists"] and not queued["has_marker"]:
+            # Somebody edited it in Codex's queue: it is theirs now. Never deleted, never unproven, no trip.
+            self._record_told(record, RecordMove.HANDED_OVER)
+            return
+        if queued and queued["exists"] and self._take_back(record):
             return
         sent = record["sent_at"]
         if sent is not None and self.clock() - sent >= self.options["unknown_reconcile_window_seconds"]:
             self._record_told(record, RecordMove.UNPROVEN)
+
+    def _take_back(self, record) -> bool:
+        """A record still in Codex's queue a person cancelled - or any while recovery is paused or its conversation off
+        (the owner's answer of 2026-10-09) - taken back out of the queue, as core takes back its own (H4, H6): told
+        WITHDRAWN once Codex says it deleted it and its marker is nowhere in the history; told WITHDRAW_REFUSED where
+        Codex would not, and left there - never sent a second time. True where it was asked for back."""
+        thread = record["thread_id"]
+        settings = self.store.settings()
+        paused = not settings["enabled"] or bool(self.managed.disable_auto_resume)
+        if not (record["withdraw"] or paused or not self.store.thread_enabled(thread)):
+            return False
+        refused = self.__dict__.setdefault("_back_refused", set())
+        if record["record_id"] in refused:
+            return False                     # asked once and refused: watched as it is, never asked every tick
+        deleted = self.backend.delete_queue(thread, record["queue_id"])
+        if deleted is True and not self.source.marker_rows(thread, record["marker"]):
+            self._record_told(record, RecordMove.WITHDRAWN, "consent", "paused" if paused else "user_cancelled")
+            self.log(thread, "plug_record_withdrawn", None)
+        else:
+            if len(refused) >= NOTED_LIMIT:
+                refused.clear()
+            refused.add(record["record_id"])
+            self._record_told(record, RecordMove.WITHDRAW_REFUSED, "consent", "withdraw_unconfirmed")
+            self.log(thread, "plug_record_withdraw_refused", None)
+        return True

@@ -144,6 +144,50 @@ class OneSenderTests(unittest.TestCase):
                  or (isinstance(node, ast.arg) and node.arg == "sender")]
         self.assertEqual(other, [])
 
+    def test_the_one_send_is_handed_to_a_worker_only_from_the_dispatch(self):
+        """P12 (v0.6.15-beta): a send's receipt may be waited for on a worker. The send handed there is still the
+        one, bound in the dispatch: exactly one reference to `sender.send` that is not a call, in the whole package,
+        and it is an argument of the dispatch's one hand-over (`self._launched`), after the claim and the look."""
+        innermost = {}
+        for path, tree in srcscan.package_asts().items():
+            where = srcscan.relative(path)
+            for name, scope in scopes(tree).items():
+                called = {id(node.func) for node in ast.walk(scope) if isinstance(node, ast.Call)}
+                for node in ast.walk(scope):
+                    if (isinstance(node, ast.Attribute) and node.attr == "send" and id(node) not in called
+                            and isinstance(node.ctx, ast.Load)):
+                        # Each reference once, under the innermost scope that holds it.
+                        known = innermost.get(id(node))
+                        if known is None or len(name) > len(known[1]):
+                            innermost[id(node)] = (where, name, ast.unparse(node))
+        found = sorted(innermost.values())
+        self.assertEqual(found, [("codex_auto_resume/engine/dispatch.py", "DispatchMixin.dispatch", "sender.send")])
+        path = srcscan.modules()["codex_auto_resume.engine.dispatch"]
+        dispatch = scopes(srcscan.package_asts()[path])["DispatchMixin.dispatch"]
+        handed = [node for node in ast.walk(dispatch) if isinstance(node, ast.Call)
+                  and any(isinstance(argument, ast.Attribute) and ast.unparse(argument) == "sender.send"
+                          for argument in node.args)]
+        self.assertEqual([ast.unparse(node.func) for node in handed], ["self._launched"])
+
+    def test_the_launch_pool_calls_only_what_it_is_handed(self):
+        """engine/launches.py waits for receipts on workers, which never ask the plug, log, announce, move a record or
+        use the engine's store: it names none of them, and of the store it opens, only the launch guard and close."""
+        path = srcscan.modules()["codex_auto_resume.engine.launches"]
+        tree = srcscan.package_asts()[path]
+        names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+        attributes = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+        for word in ("plug", "log", "announce", "moved", "transition"):
+            with self.subTest(word):
+                self.assertNotIn(word, names)
+                self.assertNotIn(word, attributes)
+        on_store = sorted({node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+                           and isinstance(node.value, ast.Name) and node.value.id == "store"})
+        self.assertEqual(on_store, ["close", "submission_guard"])
+        self.assertNotIn("self.store", ast.unparse(tree))
+        imported = sorted({alias.name for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))
+                           for alias in node.names})
+        self.assertEqual(imported, ["annotations", "threading", "time"])
+
     def test_the_plugs_sender_is_asked_once_in_the_whole_package(self):
         """A second question to the plug about the sender would be a second way for a channel to
         reach a send. The one there is, is the binding above."""
@@ -155,14 +199,27 @@ class OneSenderTests(unittest.TestCase):
     def test_a_route_for_a_conversation_not_held_is_asked_once_and_carried_out_once(self):
         """P16 (v0.6.11 stage 3b): the route a plug names where core would wait for the app is
         asked in one place and called in one place - after the one claim and the pre-send look,
-        inside the launch guard - and core's own backend is never handed one."""
+        inside the launch guard - and core's own backend is never handed one. From v0.6.15-beta it is asked
+        in one more place, the watch, only whether a continuation queued for opening stays queued: there it is
+        compared with QUEUE_FOR_OPEN, and nothing it answers is ever called."""
         asked = calls(lambda node: isinstance(node.func, ast.Attribute) and node.func.attr == "unloaded")
         self.assertEqual([(where, name) for where, name, _ in asked],
-                         [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._unloaded")])
+                         [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._unloaded"),
+                          ("codex_auto_resume/engine/foropen.py", "ForOpenMixin._open_reason")])
         resumed = calls(lambda node: isinstance(node.func, ast.Attribute) and node.func.attr == "resume")
         self.assertEqual([(where, name) for where, name, _ in resumed],
                          [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._resume_unloaded")])
         self.assertEqual(ast.unparse(resumed[0][2].func.value), "route")
+
+    def test_nothing_injects_items_into_a_conversation(self):
+        """v0.6.15-beta: Codex's thread/inject_items writes items into a conversation - a subagent's among them - and
+        neither edition ever calls it: a parent hears of its subagents in its own continuation (the advanced
+        engine/subagent.py), and nothing is ever written to a subagent. No source file of either names it."""
+        root = Path(__file__).resolve().parents[1]
+        named = sorted(str(path.relative_to(root)) for folder in (root / "src", root / "advanced" / "src")
+                       for path in folder.rglob("*") if path.suffix in (".py", ".ps1", ".js", ".cs")
+                       and "inject_items" in path.read_text(encoding="utf-8", errors="replace"))
+        self.assertEqual(named, [])
 
     def test_exactly_one_place_spawns_the_queue_process(self):
         """`codex queue` is started with a message in one function. The only other process

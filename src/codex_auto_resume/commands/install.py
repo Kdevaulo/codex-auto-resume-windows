@@ -241,8 +241,8 @@ STOP_WAIT_SECONDS = 60.0
 
 
 def cmd_downgrade_state(args) -> int:
-    """Rewrite the state so an older release can read it - schema 3 for v0.6.0 to v0.6.10,
-    schema 2 for v0.5 - keeping every record.
+    """Rewrite the state so an older release can read it - schema 4 for v0.6.11 to v0.6.14,
+    schema 3 for v0.6.0 to v0.6.10, schema 2 for v0.5 - keeping every record.
 
     Needs the watcher stopped: it runs only while holding the watcher's mutex, so a
     watcher cannot be writing rows while their schema changes. Deleting the state is
@@ -272,6 +272,9 @@ def cmd_downgrade_state(args) -> int:
     if result.get("made_final"):
         _print("%d continuation(s) already handed to Codex were marked final: the older release "
                "could not follow them, and never sends them again" % result["made_final"])
+    if result.get("extra_home_rows"):
+        _print("%d record(s) of other Codex homes were kept, and none of them is waiting any more: the "
+               "older release watches one home" % result["extra_home_rows"])
     if result.get("conversations_off"):
         _print("%d conversation(s) were switched off because they waited for you to say so; "
                "switch them back on in the older release to let them resume"

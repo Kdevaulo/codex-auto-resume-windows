@@ -163,6 +163,51 @@ class DeliveryMixin:
         else:
             self.transition(reserved, "submission_unknown", "queue_result_unknown_do_not_resend", delay=1)
 
+    # --------------------------------------------------------------- receipts on workers (P12, v0.6.15-beta)
+    def _workers(self, due) -> int:
+        """How many sends of this tick may wait for their receipts at once: P12's answer (domain/plughands.py), and 1
+        - every send inline, as always - for another Codex home than the default, a retiring one, or an engine that
+        has no store for a worker to open."""
+        workers = self.plug.partition(due)
+        return 1 if self.home_key or self.retiring or self.open_store is None else workers
+
+    def _take_slot(self, resend, route):
+        """A worker for the send being dispatched, taken before its claim - waiting, outside any transaction, while
+        every worker is busy - while a pool is open; never for a resend or a route."""
+        if (self._pool is not None and not resend and route in (None, Alternative.QUEUE_FOR_OPEN)
+                and self._held_slot is None):
+            self._held_slot = self._pool.take()
+
+    def _pooled(self, sender, client) -> frozenset:
+        """Whether this send goes to the worker taken for it - only core's own backend, carrying its marker - as the
+        claim is told: CONCURRENCY among what it carries, so the plug's ledger pays for it (and its tripwire on a
+        send whose fate is unknown covers it, K7)."""
+        self._pooling = self._held_slot is not None and sender is self.backend and client is None
+        return frozenset({Point.CONCURRENCY}) if self._pooling else frozenset()
+
+    def _launched(self, current, call, thread, words, key, carrying) -> bool:
+        """The send handed to its worker - after the claim, the pre-send look and the proof check - if it goes to
+        one: True, and the pool settles it (`_settle_launch`). False, and dispatch makes the one send inline."""
+        if not self._pooling:
+            return False
+        slot, self._held_slot, self._pooling = self._held_slot, None, False
+        slot.launch(call, thread, words, key, carrying, settle=current)
+        return True
+
+    def _free_slot(self):
+        if self._held_slot is not None:
+            self._held_slot.free()
+        self._held_slot, self._pooling = None, False
+
+    def _settle_launch(self, current, response):
+        """What came of a send a worker waited for, on the tick thread and under the dispatch lock, as dispatch
+        settles its own."""
+        with self.dispatch_lock():
+            try:
+                self._after_send(current, response, False)
+            except Exception:
+                self.log(current["thread_id"], "post_send_bookkeeping_failed", None)
+
     # --------------------------------------------------------------- a conversation not held (P16)
     def _unloaded(self, row, loaded, vector):
         """P16: the route the plug names for `row`, whose conversation the app does not hold, or
@@ -199,7 +244,7 @@ class DeliveryMixin:
             key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector, ledger=self.plug,
             carried=frozenset({Point.UNLOADED}) | self.relaxed_points(relaxed)
             | self.relaxed_points("forced" if forced else None),
-            quiet_until=self.quiet_until(at), relaxed=relaxed, forced=forced)
+            quiet_until=self.quiet_until(at), relaxed=relaxed, forced=forced, caps=self.caps(relaxed))
         if not claimed:
             self._refused(current, gate, reason)
             return

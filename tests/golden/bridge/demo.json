@@ -47,6 +47,7 @@
             "name": null,
             "project": null,
             "cwd_basename": null,
+            "home": null,
             "demo": true
           },
           "history": {
@@ -88,6 +89,7 @@
             "name": null,
             "project": null,
             "cwd_basename": null,
+            "home": null,
             "demo": true
           },
           "asked": false

@@ -1,6 +1,7 @@
-"""Putting the state back for an older release: schema 3 for v0.6.0 to v0.6.10, schema 2 for v0.5.
+"""Putting the state back for an older release: schema 4 for v0.6.11 to v0.6.14, schema 3 for
+v0.6.0 to v0.6.10, schema 2 for v0.5.
 
-It is asked for by hand (`codex-auto-resume downgrade-state --to 3`, or `--to 2`) and never done on
+It is asked for by hand (`codex-auto-resume downgrade-state --to 4`, `--to 3` or `--to 2`) and never done on
 its own: the rows an older release cannot read are the ones it would misread, so they are left
 behind rather than translated - and what an older release could act on wrongly is made into
 something it will not act on at all.
@@ -13,9 +14,9 @@ import time
 
 from .. import machine
 from ..domain import ids
-from .columns import _SCHEMA_4_COLUMNS, _V2_COLUMNS
+from .columns import _SCHEMA_4_COLUMNS, _SCHEMA_5_COLUMNS, _V2_COLUMNS
 from .errors import StoreError
-from .schema import SchemaMixin, _TABLES_V4
+from .schema import SchemaMixin, _TABLES_V4, _TABLES_V5
 from .validate import _validated_record
 
 
@@ -29,7 +30,10 @@ _DOWNGRADE_STATES = {
     "withdrawn_unconfirmed": "submission_unknown",
 }
 
-TARGETS = (2, 3)
+TARGETS = (2, 3, 4)
+
+# Withdrawal reasons a schema-4 reader does not know (v0.6.15-beta), as the one it settles the same way.
+_NEW_WITHDRAWALS = {"window_ended": "expired", "not_delivered_on_open": "not_loaded"}
 
 # A withdrawal for Observe only (v0.6.11), as the Pause's v0.6.10 knows: the same promise, its words.
 _OBSERVE_WITHDRAWALS = {"observe_only": "paused", "observe_only_unknown": "paused_unknown"}
@@ -49,7 +53,7 @@ def downgrade_state(state_dir: Path, target: int) -> dict:
     have kept as it was (`_to_v3`).
     """
     if target not in TARGETS:
-        raise StoreError("A state can be downgraded to schema 3 or 2 only")
+        raise StoreError("A state can be downgraded to schema 4, 3 or 2 only")
     path = Path(state_dir) / "state.sqlite"
     if Path(state_dir).is_symlink() or path.is_symlink() or not path.is_file():
         raise StoreError("Cannot open valid auto-resume state")
@@ -60,8 +64,8 @@ def downgrade_state(state_dir: Path, target: int) -> dict:
         if version in range(1, target + 1):
             return {"changed": False, "rows": None}
         # Literals, never SCHEMA_VERSION: each step reads one schema and writes the one before.
-        if version not in (3, 4):
-            raise StoreError("Only a schema-4 or schema-3 state can be downgraded")
+        if version not in (3, 4, 5):
+            raise StoreError("Only a schema-5, schema-4 or schema-3 state can be downgraded")
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         connection.execute("VACUUM INTO ?", (str(Path(state_dir) / ("state.v%d-backup-%s.sqlite"
                                                                     % (version, stamp))),))
@@ -70,8 +74,13 @@ def downgrade_state(state_dir: Path, target: int) -> dict:
             if connection.execute("PRAGMA user_version").fetchone()[0] != version:
                 raise StoreError("The state changed while it was being downgraded")
             report = {"changed": True}
-            if version == 4:
-                report.update(_to_v3(connection, time.time()))
+            now = time.time()
+            if version == 5:
+                report.update(_to_v4(connection, now))
+            if version in (4, 5) and target <= 3:
+                fours = report.get("made_final", 0)
+                report.update(_to_v3(connection, now))
+                report["made_final"] += fours
             if target == 2:
                 report["rows"] = _to_v2(connection)
             else:
@@ -97,6 +106,45 @@ def downgrade_to_v3(state_dir: Path) -> dict:
 def downgrade_to_v2(state_dir: Path) -> dict:
     """For going back to a v0.5 release."""
     return downgrade_state(state_dir, 2)
+
+
+def _to_v4(connection, now: float) -> dict:
+    """Schema 5 as schema 4, inside the caller's transaction (for v0.6.11 to v0.6.14).
+
+    An older release watches one Codex home and reads every record as that home's. So:
+
+    * It is refused while a record of another home may be in Codex's queue (machine.WATCHED): the
+      older release could neither find nor take back what is queued in a home it does not watch.
+    * Every record of another home is kept - a failure already recovered stays known, so going back
+      and coming forward again never recovers it a second time (A23) - and none is left for the older
+      release to act on: a waiting one is made final, cancelled (home_not_watched), and one whose
+      recovery turn runs ends unverified (E6). Its terminal ones stay as they are.
+    * A withdrawal reason the older release does not know is written as the one it settles the same way.
+    """
+    if {row[0] for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")} != _TABLES_V5:
+        raise StoreError("Unsupported or malformed state schema")
+    watched = tuple(sorted(machine.WATCHED))
+    if connection.execute("SELECT count(*) FROM interruptions WHERE home_key<>'' AND state IN (%s)"
+                          % ",".join("?" for _ in watched), watched).fetchone()[0]:
+        raise StoreError("A continuation sent to another Codex home may still be in its queue; "
+                         "let it settle first")
+    extra = connection.execute("SELECT count(*) FROM interruptions WHERE home_key<>''").fetchone()[0]
+    report = {"made_final": 0, **({"extra_home_rows": extra} if extra else {})}
+    waiting, observing = tuple(sorted(machine.WAITING)), tuple(sorted(machine.OBSERVING))
+    report["made_final"] += connection.execute(
+        "UPDATE interruptions SET state='cancelled', last_error='home_not_watched', cancel_requested=1, "
+        "outcome_at=? WHERE home_key<>'' AND state IN (%s)" % ",".join("?" for _ in waiting),
+        (now,) + waiting).rowcount
+    report["made_final"] += connection.execute(
+        "UPDATE interruptions SET state='outcome_unverified', outcome_at=? WHERE home_key<>'' AND state IN (%s)"
+        % ",".join("?" for _ in observing), (now,) + observing).rowcount
+    for new, old in sorted(_NEW_WITHDRAWALS.items()):
+        connection.execute("UPDATE interruptions SET withdraw_reason=? WHERE withdraw_reason=?", (old, new))
+    for table, name, _definition in reversed(_SCHEMA_5_COLUMNS):
+        connection.execute("ALTER TABLE %s DROP COLUMN %s" % (table, name))
+    connection.execute("PRAGMA user_version=4")
+    return report
 
 
 def _to_v3(connection, now: float) -> dict:
@@ -130,7 +178,8 @@ def _to_v3(connection, now: float) -> dict:
               "unfollowed_off": 0, "observe_only_paused": False}
     connection.row_factory = sqlite3.Row
     try:
-        rows = [_validated_record(dict(row)) for row in connection.execute("SELECT * FROM interruptions")]
+        # Schema 4's rows, read as this release reads every row: of the default home, which they all are now.
+        rows = [_validated_record(dict(row, home_key="")) for row in connection.execute("SELECT * FROM interruptions")]
     finally:
         connection.row_factory = None
     held, unfollowed = set(), set()

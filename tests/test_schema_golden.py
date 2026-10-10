@@ -76,6 +76,14 @@ class SchemaGoldenTests(unittest.TestCase):
         self.assertEqual(made["user_version"], 3)
         self.assertEqual(made, released)
 
+    def test_the_downgrade_to_v4_leaves_the_database_v0_6_13_makes(self):
+        """v0.6.15-beta: schema 5 back to 4 is the very file the last schema-4 final makes itself."""
+        made, released = self.made["downgraded-to-v4"], self.made["fresh-v0.6.13"]
+        if "skipped" in made or "skipped" in released:
+            self.skipTest(made.get("skipped") or released.get("skipped"))
+        self.assertEqual(made["user_version"], 4)
+        self.assertEqual(made, released)
+
     def test_the_golden_names_the_version_the_code_says(self):
         from codex_auto_resume.store import SCHEMA_VERSION
         self.assertEqual(self.stored["fresh"]["user_version"], SCHEMA_VERSION)

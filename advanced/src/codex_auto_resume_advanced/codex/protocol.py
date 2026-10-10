@@ -64,6 +64,16 @@ MEASUREMENT_METHODS = {
     Measurement.MU: ("account/rateLimits/read",),
     Measurement.MN: ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
     Measurement.MR: ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
+    # v0.6.15-beta: MQ lists what the app holds, before core's backend sends to two to four of them at once.
+    Measurement.MQ: ("thread/loaded/list",),
+    # ME reads the turn history from its database (codex/turns.py) and calls nothing.
+    Measurement.ME: (),
+    # MS reads the spawn edges and the subagent's latest turn from their databases (codex/lineage.py), nothing more.
+    Measurement.MS: (),
+    # MK reads the newest plan item's step statuses from the turn history (codex/turns.py), nothing more.
+    Measurement.MK: (),
+    # MT lists what the app holds, before core's backend queues one message while a turn runs.
+    Measurement.MT: ("thread/loaded/list",),
 }
 
 # The methods a capability's own route may call, beyond `initialize` - each one a measurement

@@ -11,13 +11,16 @@ from .columns import (_EVENT_COLUMNS, _NOTICE_COLUMNS, _RECORD_COLUMNS, _SETTING
 from .errors import StoreError
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _TABLES_V2 = {"settings", "threads", "interruptions"}
 
 _TABLES_V3 = _TABLES_V2 | {"events", "watcher_status"}
 
 _TABLES_V4 = _TABLES_V3 | {"notices"}
+
+# Schema 5 (v0.6.15-beta) adds two columns and no table.
+_TABLES_V5 = _TABLES_V4
 
 
 class SchemaMixin:
@@ -75,7 +78,8 @@ class SchemaMixin:
         # Made the way a migration makes it, so an upgraded state and a fresh one are the same
         # file (tests/test_schema_golden.py).
         cls._add_schema_4(connection)
-        connection.execute("PRAGMA user_version=4")
+        cls._add_schema_5(connection)
+        connection.execute("PRAGMA user_version=5")
 
     @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:

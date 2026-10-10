@@ -114,6 +114,8 @@ class ClaimLedger:
                 return Alternative.HOLD
             if Alternative.SEND_NOW in acted[capability] and not self._sent_now(connection, capability, key, row[1], now):
                 return Alternative.HOLD
+            if Alternative.QUEUE_FOR_OPEN in acted[capability] and not self._for_open(connection, definition, key, now):
+                return Alternative.HOLD
             self.state.record_spend(connection, ATTACHED, capability, thread_id, key, now)
         return DEFER
 
@@ -147,6 +149,18 @@ class ClaimLedger:
                            (key, definition.id, OverrideKind.RESEND_ONCE, now))
         return True
 
+    @staticmethod
+    def _for_open(connection, definition, key, now) -> bool:
+        """Whether `definition` may pay for queueing standard record `key` for when its conversation is opened
+        (v0.6.15-beta), written if so: once for each interruption - its QUEUE_FOR_OPEN override, written in the claim,
+        is what the watch keeps the item queued by, and what refuses a second (engine/foropen.py)."""
+        if connection.execute("SELECT 1 FROM %s.overrides WHERE interruption_id=? AND capability=?" % ATTACHED,
+                              (key, definition.id)).fetchone() is not None:
+            return False
+        connection.execute("INSERT INTO %s.overrides (interruption_id, capability, kind, created_at, used_at) "
+                           "VALUES (?,?,?,?,NULL)" % ATTACHED, (key, definition.id, OverrideKind.QUEUE_FOR_OPEN, now))
+        return True
+
     def record(self, connection, record, now) -> object:
         """P11 for a record of this edition's own (P2, v0.6.14): core's claim of it, or its launch, in core's
         transaction and on its connection, with this file attached (`phase`, "claim" or "launch"). DEFER is
@@ -161,12 +175,8 @@ class ClaimLedger:
         if not isinstance(record, dict) or not self.state.attach(connection):
             return Alternative.HOLD
         key, phase = record.get("record_id"), record.get("phase")
-        found = connection.execute(
-            "SELECT c.state, c.capability, c.thread_id, r.rule_id, r.state AS rule_state, r.launching_at "
-            "FROM %s.records c JOIN %s.reset_rules r ON r.record_id = c.record_id WHERE c.record_id=?"
-            % (ATTACHED, ATTACHED), (key,)).fetchone()
-        if (found is None or found[4] != RuleState.READY or found[5] is not None
-                or found[2] != record.get("thread_id")):
+        found = self._owned(connection, key)
+        if found is None or found[2] != record.get("thread_id"):
             return Alternative.HOLD
         capability = found[1]
         definition = self.registry.get(capability)
@@ -186,7 +196,39 @@ class ClaimLedger:
             self.state.record_spend(connection, ATTACHED, capability, found[2], None, now)
             return DEFER
         if phase == "launch" and found[0] == RecordState.IN_FLIGHT:
-            connection.execute("UPDATE %s.reset_rules SET launching_at=? WHERE rule_id=?" % ATTACHED,
-                               (now, found[3]))
+            connection.execute(found[4] % ATTACHED, (now, found[3]))
             return DEFER
         return Alternative.HOLD
+
+    @staticmethod
+    def _owned(connection, key):
+        """(record state, capability, conversation, its row, the statement that writes when its launch began) of a
+        record of this edition's own still to be launched - a message at a reset (its rule due, not launched), or
+        (v0.6.15-beta) one of the edition's continuations (not finished, not launched) - or None."""
+        found = connection.execute(
+            "SELECT c.state, c.capability, c.thread_id, r.rule_id, r.state, r.launching_at "
+            "FROM %s.records c JOIN %s.reset_rules r ON r.record_id = c.record_id WHERE c.record_id=?"
+            % (ATTACHED, ATTACHED), (key,)).fetchone()
+        if found is not None:
+            if found[4] != RuleState.READY or found[5] is not None:
+                return None
+            return found[0], found[1], found[2], found[3], "UPDATE %s.reset_rules SET launching_at=? WHERE rule_id=?"
+        found = connection.execute(
+            "SELECT c.state, c.capability, c.thread_id, n.answer_id, n.finished_at, n.launching_at "
+            "FROM %s.records c JOIN %s.continuations n ON n.record_id = c.record_id WHERE c.record_id=?"
+            % (ATTACHED, ATTACHED), (key,)).fetchone()
+        if found is not None:
+            if found[4] is not None or found[5] is not None:
+                return None
+            return (found[0], found[1], found[2], found[3],
+                    "UPDATE %s.continuations SET launching_at=? WHERE answer_id=?")
+        found = connection.execute(
+            "SELECT c.state, c.capability, c.thread_id, p.prompt_id, p.state, p.launching_at "
+            "FROM %s.records c JOIN %s.prompts p ON p.record_id = c.record_id WHERE c.record_id=?"
+            % (ATTACHED, ATTACHED), (key,)).fetchone()
+        if found is not None:
+            # (v0.6.15-beta) a prompt's occurrence: its prompt due (ready) and not launched.
+            if found[4] != "ready" or found[5] is not None:
+                return None
+            return found[0], found[1], found[2], found[3], "UPDATE %s.prompts SET launching_at=? WHERE prompt_id=?"
+        return None

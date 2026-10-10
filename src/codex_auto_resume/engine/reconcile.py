@@ -42,7 +42,7 @@ class ReconcileMixin:
         window in which a person can start work ahead of our queued item is seconds long.
         """
         return any(machine.may_be_queued(row["state"], row["queue_id"])
-                   for row in self.store.records_in(WATCHED))
+                   for row in self._records(WATCHED))
 
     def watch(self):
         """One pass over everything that may be in Codex's queue. Runs paused or not.
@@ -54,7 +54,7 @@ class ReconcileMixin:
         slow delete cannot keep the others waiting pass after pass.
         """
         now = self.clock()
-        rows = self.store.records_in(WATCHED)
+        rows = self._records(WATCHED)
         if rows:
             start = self._watch_offset % len(rows)
             rows = rows[start:] + rows[:start]
@@ -68,6 +68,8 @@ class ReconcileMixin:
                     continue
                 if not machine.still_followed(row, now, self.options["unknown_reconcile_window_seconds"]):
                     continue
+            if self._for_open_rests(row):
+                continue
             try:
                 with self.dispatch_lock():
                     current = self.store.get(row["interruption_id"])
@@ -187,9 +189,14 @@ class ReconcileMixin:
             reason = "paused" if not settings["enabled"] else "observe_only"
             uncertain = row["state"] == "submission_unknown" or machine.was_resent(row)   # v0.6.14
             return reason + "_unknown" if uncertain else reason
-        if self.loaded(thread) == "notLoaded":
+        loaded = self.loaded(thread)
+        if self.for_open(row):
+            reason = self._open_reason(row, loaded, now)
+            if reason is not None:
+                return _UNDETERMINED if undetermined and reason == "not_delivered_on_open" else reason
+        elif loaded == "notLoaded":
             return "not_loaded"
-        if now - (row.get("submitted_at") or now) >= self.options["delivery_timeout_seconds"]:
+        elif now - (row.get("submitted_at") or now) >= self.options["delivery_timeout_seconds"]:
             return _UNDETERMINED if undetermined else "expired"
         if self.projection_fresh(thread) is False:
             return "projection_stale"
@@ -214,7 +221,8 @@ class ReconcileMixin:
                               state="withdrawn_unconfirmed", withdraw_reason=reason,
                               withdrawn_at=now, withdraw_deleted=True, queue_id=queue_ids[0],
                               last_error=reason, next_retry_at=now + 1)
-            self.moved(row, "withdrawn_unconfirmed")
+            # P14 is told why (v0.6.15-beta): a tripwire reads not_delivered_on_open there.
+            self.moved(dict(row, withdraw_reason=reason), "withdrawn_unconfirmed")
             self.log(thread, "withdrawn_unconfirmed", reason)
             return
         remaining = self.source.queued_rows(thread, marker)
@@ -235,7 +243,7 @@ class ReconcileMixin:
         self.store.update(row["interruption_id"], at=now, event="withdraw",
                           state="withdrawn_unconfirmed", withdraw_reason=reason, withdrawn_at=now,
                           withdraw_deleted=False, last_error=reason, next_retry_at=now + 1)
-        self.moved(row, "withdrawn_unconfirmed")
+        self.moved(dict(row, withdraw_reason=reason), "withdrawn_unconfirmed")
         self.log(thread, "withdrawn_unconfirmed", reason)
 
     def settle(self, row):

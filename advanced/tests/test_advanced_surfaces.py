@@ -25,7 +25,7 @@ import advancedcase as ac  # noqa: E402
 from codex_auto_resume import control, controlcli, mcpserver  # noqa: E402
 from codex_auto_resume.mcp.tools import TOOLS as CORE_TOOLS  # noqa: E402
 from codex_auto_resume.domain.plug import DEFER, Alternative, FailureForm, Surface  # noqa: E402
-from codex_auto_resume_advanced import arming, surfaces  # noqa: E402
+from codex_auto_resume_advanced import arming, registry, surfaces  # noqa: E402
 from codex_auto_resume_advanced.registry import Option  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import (Actor, ArmingState, BridgeCommand,  # noqa: E402
                                                    McpTool, OptionKey, Refusal)
@@ -535,6 +535,28 @@ class ChoiceBridgeTests(ChoicesCase):
             for write in (option, add, remove):
                 write.assert_not_called()
         self.assertEqual(self.advanced.runtime.state.options("test_wake"), {OptionKey.ATTEMPTS: 1})
+
+
+
+class ShownOrderTests(SurfaceCase):
+    """The shipped capabilities as advanced-list and the MCP list answer them, which the Advanced features page shows
+    row by row: in the owner's order (registry.SHOWN_ORDER, 2026-10-10), the compatibility report first - while the
+    registry itself keeps the order in which they answer."""
+
+    def setUp(self):
+        ac.AdvancedCase.setUp(self)
+        self.paths.ensure()
+        self.advanced = self.plug(*registry.DEFINITIONS)
+        self.control = control.Control(self.paths, plug=self.advanced)
+
+    def test_the_list_answers_in_the_owner_s_order_the_report_first(self):
+        """Fails with arming.listing walking the registry again: the report would be last."""
+        listed = [item["id"] for item in self.bridge("advanced-list", {})["result"]["capabilities"]]
+        self.assertEqual(listed, list(registry.SHOWN_ORDER))
+        self.assertEqual(listed[0], "compat_report")
+        mcp = self.call("list_advanced_capabilities")["result"]["structuredContent"]["capabilities"]
+        self.assertEqual([item["id"] for item in mcp], list(registry.SHOWN_ORDER))
+        self.assertEqual(self.advanced.runtime.registry.ids, tuple(d.id for d in registry.DEFINITIONS))
 
 
 if __name__ == "__main__":

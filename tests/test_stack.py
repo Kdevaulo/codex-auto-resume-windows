@@ -68,7 +68,9 @@ ITEM = {_q(name): item for item, names in {
                 # and of its own memory, how it ended and the status file.
                 "runtime.health",
                 # v0.6.12: and of the power action after usage-limit recoveries.
-                "runtime.afterwork"),
+                "runtime.afterwork",
+                # v0.6.15-beta: the other Codex homes a watcher holds.
+                "runtime.homes"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch", "engine.freshness",
                "engine.options", "engine.outcome",
                # v0.6.11: the waits and the two guards, as the engine asks them.
@@ -82,8 +84,12 @@ ITEM = {_q(name): item for item, names in {
                # and an uncertain continuation sent once more, where the plug asks and core may.
                "engine.resend",
                # and records of the edition's own, tried like core's.
-               "engine.plugrecords"),
-    "policy": ("failures", "reasons", "settings", "continuation", "openstate", "domain.gates",
+               "engine.plugrecords",
+               # v0.6.15-beta: several sends waiting for their receipts at once, on workers.
+               "engine.launches",
+               # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
+               "engine.foropen"),
+    "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",
                # v0.6.11: what an edition may change about a decision, and which edition this
@@ -108,7 +114,9 @@ ITEM = {_q(name): item for item, names in {
                # and a value of a person's own beside a drop-down's choices, which the settings coerce with.
                "ownvalues",
                # v0.6.12: when the power action after usage-limit recoveries may act, which a person arms.
-               "poweraction"),
+               "poweraction",
+               # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them.
+               "homes"),
     "machine": ("machine", "domain", "domain.errors", "domain.ids", "domain.public",
                 "domain.states", "domain.vocabulary",
                 # v0.6.11: the registry's vocabularies, out of domain/vocabulary.py.
@@ -116,7 +124,9 @@ ITEM = {_q(name): item for item, names in {
                 # and what a usage reading keeps of Codex's reply.
                 "domain.usage",
                 # v0.6.12: the power action's words, out of domain/vocabulary.py.
-                "domain.power_vocabulary"),
+                "domain.power_vocabulary",
+                # v0.6.15-beta: the reasons and a Codex home's states, out of it too.
+                "domain.reason_vocabulary"),
     "scheduler": ("engine.reconcile",),
     "store": ("store", "store.actions", "store.claims", "store.columns", "store.downgrade",
               "store.errors", "store.journal", "store.legacy", "store.migrations", "store.policy",
@@ -176,6 +186,8 @@ ITEM = {_q(name): item for item, names in {
                  "win.textsize", "win.typeface",
                  # v0.6.12: the power action's calls: offering, who is here, and doing it.
                  "win.powerdown",
+                 # v0.6.15-beta: which folder a path names, whatever its spelling.
+                 "win.folderid",
                  "pwsh", "shortcut", "startup"),
     "config": ("", "config", "logbook"),
 }.items() for name in names}

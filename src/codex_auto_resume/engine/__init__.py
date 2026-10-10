@@ -23,13 +23,17 @@ package does, and reading it should not mean opening seven files.
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from ..domain.plug import DEFER
 from .announce import NOTIFY_ON_STATE, AnnounceMixin  # noqa: F401
 from .delivery import DeliveryMixin
 from .detect import DetectMixin
 from .dispatch import DispatchMixin
+from .foropen import ForOpenMixin
 from .freshness import FreshnessMixin
 from .guard import GuardMixin
+from .launches import LaunchPool
 from .notices import NoticeMixin
 from .options import (BACKOFF_LADDER, TRANSIENT_BACKOFF, OptionsMixin,  # noqa: F401
                       StoreView, backoff_delay, transient_delay)
@@ -41,7 +45,8 @@ from .resend import ResendMixin
 
 
 class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, ReconcileMixin, OutcomeMixin, DispatchMixin,
-             DeliveryMixin, GuardMixin, NoticeMixin, RelaxedMixin, ResendMixin, PlugRecordsMixin):
+             DeliveryMixin, GuardMixin, NoticeMixin, RelaxedMixin, ResendMixin, PlugRecordsMixin,
+             ForOpenMixin):
     """The part that decides.
     """
 
@@ -56,14 +61,19 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         self.watch()
         self.observe_all()
         self.watch_resent()             # v0.6.14: a resend found twice; nothing for the standard edition
+        # v0.6.15-beta: a Codex home taken out of Settings only watches what it sent until that settles.
+        if self.retiring:
+            return
         # v0.6.11: an administrator's DisableAutoResume is a Pause here too, even before the watcher
         # has written it into the state (runtime/app.py), so a write that failed sends nothing.
         if not self.store.settings()["enabled"] or self.managed.disable_auto_resume:
+            # v0.6.15-beta: what the plug sent that Codex still holds is taken back, the plug asked nothing.
+            self.paused_records()
             return
         # The plug is asked nothing more while recovery is paused: a Pause beats every
         # capability, as it beats core. P8 is once a tick, after everything is observed; what it
         # answers to run (v0.6.14, an errand) runs last, after P2, whatever the tick met before it.
-        view = StoreView(self.store, self.clock(), self.last_usage)
+        view = StoreView(self.store, self.clock(), self.last_usage, home_key=self.home_key)
         errand = self.plug.tick(view)
         try:
             try:
@@ -71,16 +81,21 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
             except Exception:
                 self.log(None, "detection_unavailable_no_submission", None)
                 return
-            due = self.store.records_in(UNSENT)
-            # P12: how the due records are divided for dispatch. Core carries out no division but
-            # its own - one record after another, in this thread - so nothing is taken from the
-            # answer yet (domain/plug.py, ALTERNATIVES).
-            self.plug.partition(due)
-            for row in due:
+            due = self._records(UNSENT)
+            # P12 (v0.6.15-beta): how many sends may wait for their receipts at once - 1, one after another in
+            # this thread, unless the plug answers 2 to 4. Every claim and look stays here; a worker only waits for
+            # a receipt, and every one is joined and settled before the tick goes on (engine/launches.py).
+            workers = self._workers(due)
+            with LaunchPool(workers, self.open_store, self._settle_launch) if workers > 1 else nullcontext() as pool:
+                self._pool = pool
                 try:
-                    self.attempt(row)
-                except Exception:
-                    self.log(row["thread_id"], "eligibility_check_failed_no_submission", None)
+                    for row in due:
+                        try:
+                            self.attempt(row)
+                        except Exception:
+                            self.log(row["thread_id"], "eligibility_check_failed_no_submission", None)
+                finally:
+                    self._pool = None
             # v0.6.14: what the watch found no trace of, put to the plug for one more send (P7).
             if not self.plug.null:
                 self.resend_uncertain()

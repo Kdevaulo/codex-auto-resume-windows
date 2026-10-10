@@ -117,13 +117,14 @@ Codex; nothing runs it unless a person asks, and [SECURITY.md](SECURITY.md) says
 
 ## Today's capabilities
 
-Fifteen: eleven that change how a recovery is made, two that act at a usage reset you pick, and two
-actions - Longer reset messages, which only lets a message for a reset be longer, and the compatibility
-report, which only you start. The first three rest on a measurement each that was made, the two reset
-actions on measurements not made yet, and the other ten on none. Each measurement made was made once,
-by hand, on the owner's machine, on `codex-cli 0.158.0-alpha.2.1`; its record is in
-[`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a measurement not
-made yet, a capability's statement carries the warning that it was not measured there.
+Twenty-one: sixteen that change how a recovery is made or what follows a turn, three that send at a
+time you pick - the two at a usage reset, and queued messages - and two actions: Longer messages, which
+only lets a message be longer, and the compatibility report, which only you start. Four rest on a
+measurement each that was made - the first three, and queue for when a conversation is opened - seven on
+measurements not made yet, and the other ten on none. Each measurement made was made by hand, on the
+owner's machine, first on `codex-cli 0.158.0-alpha.2.1` and again on `codex-cli 0.162.0-alpha.17.2`;
+its record is in [`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a
+measurement not made yet, a capability's statement carries the warning that it was not measured there.
 
 ### Start with Codex
 
@@ -186,15 +187,18 @@ conversation is due to continue while the Codex app does not have it open, it se
 goal active again through Codex's own app server (`thread/goal/set`), so that Codex carries the goal
 on when the app next opens the conversation. It never creates a goal and never reads or changes what
 the goal says. While the app has the conversation open, the continuation goes through Codex's queue
-as in the standard edition; setting the goal active first there waits for measurement M2b to pass
-for your version of Codex, which has not been made yet. While a goal it set active carries the
+as in the standard edition, except where measurement M2b passed for your version of Codex - so far
+`codex-cli 0.162.0-alpha.17.2`: there it sets the paused goal active first and then adds the
+continuation to the conversation's queue, as M2b did. While a goal it set active carries the
 conversation on, the standard continuation waits, for up to ten minutes, so the two do not both run.
 
 **When it helps.** When a usage limit stopped work under a goal and you do not keep that
 conversation open: in the standard edition the goal stays paused until you resume it yourself.
 
 **What it risks.** Measurement M2 found that a goal set active this way is not taken up while the app
-has the conversation open, which is why it acts only where the app does not. In the same measurement
+has the conversation open, which is why, unless M2b passed for your version of Codex, it acts only
+where the app does not; where M2b passed it acts there too, setting the goal active and then queueing
+the continuation. In the same measurement
 the goal was live again once the app loaded the conversation, as its statement says, though the
 record in [`docs/evidence/live/`](evidence/live/) keeps only the failing verdict; nobody has yet
 followed Codex carrying such a goal on by itself as the app opens the conversation. Another version
@@ -209,7 +213,9 @@ Codex to stop it.
 **Ceilings.** 12 a day, and 3 in any one conversation.
 
 **Measurement M2: failed**, for a conversation the app holds; its statement shows that as a warning.
-M2b, which would let it act while the app holds the conversation, has not been made.
+**Measurement M2b: passed** on `codex-cli 0.162.0-alpha.17.2` - a goal set active beside a queued turn
+carries on while the app holds the conversation - so on that version it acts there too; on any other,
+a conversation the app holds gets the standard continuation alone.
 
 Where the goal continuation and the marker-free continuation are both on and the goal applies, the
 goal continuation carries the send.
@@ -236,8 +242,9 @@ hours on the clock, 48 times a day, or sooner than a minute apart.
 
 **Departs from** [A20](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (five continuations a
 conversation in 24 hours, 15 minutes apart), A21 (the attempt, no-progress and continuation budgets),
-A22 (waits come only from the retry timing you chose) and [B9](STANDARDS.md#b-what-it-reads-and-how)
-(only a failure's kind is kept: this also reads Codex's own error code, never its words).
+A22 (waits come only from the retry timing you chose), [B9](STANDARDS.md#b-what-it-reads-and-how)
+(only a failure's kind is kept: this also reads Codex's own error code, never its words) and
+[H2](STANDARDS.md#h-user-control) (nothing can move a limit the program fixes: A20's are the engine's).
 
 **Ceilings.** 48 a day, and 48 in any one conversation - the one capability whose conversation
 ceiling is above the standard edition's five, because it departs from A20.
@@ -263,7 +270,8 @@ another version. Removing a rule ends what it took up and has not sent.
 
 **Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (a failure it cannot classify is never
 retried), A13 (only the classified kinds are recovered), A14 (anything unclassified is never
-retried), A26 (continuation text only for a kind that is recovered) and B9.
+retried), A26 (continuation text only for a kind that is recovered), B9 and
+[H2](STANDARDS.md#h-user-control) (nothing can retry an unknown failure: a rule is a setting of yours).
 
 **Ceilings.** 24 a day, and 5 in any one conversation.
 
@@ -286,8 +294,9 @@ conversation tried again than waited for you.
 again repeats something a person should have decided. A sample keeps a code Codex chose, which may say
 more than the program's own words. Samples are kept 90 days at most.
 
-**Departs from** 0.5, A13, A14, A26, B9 and [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps)
-(state holds only the program's own fixed words, never a code Codex chose).
+**Departs from** 0.5, A13, A14, A26, B9, [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps)
+(state holds only the program's own fixed words, never a code Codex chose) and
+[H2](STANDARDS.md#h-user-control) (nothing can retry an unknown failure).
 
 **Ceilings.** 12 a day, and 3 in any one conversation.
 
@@ -477,7 +486,8 @@ checks that apply to it; a recovery's budgets and failure checks are not run),
 recover no failure), [C4](STANDARDS.md#c-network) (it sends at a time you chose),
 [C9](STANDARDS.md#c-network) (it reads usage when no recovery is due),
 [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps) (your words are kept until they are sent),
-[H4](STANDARDS.md#h-user-control) (a Pause does not take back a message already queued) and
+[H4](STANDARDS.md#h-user-control) (a Pause takes back a message Codex already holds and cancels it, rather
+than returning it to waiting; revision 2, from v0.6.15-beta) and
 [H6](STANDARDS.md#h-user-control) (Cancel no longer reaches a message being sent). It keeps A27: a
 message is at most 2,000 characters, as the Custom message is, unless Longer reset messages is on.
 Switching its conversation off cancels it (H5).
@@ -487,11 +497,12 @@ Switching its conversation off cancels it (H5).
 **Measurement MU: not made yet.** It counts resets from the same usage readings as the reset credit,
 so it rests on MU; until MU is made on your version of Codex, the statement carries it as a warning.
 
-### Longer reset messages
+### Longer messages
 
 **What it does.** An action: it sends nothing and answers at no point of a recovery. While it is on, a
-message you schedule for a reset may be up to 8,154 characters - the most one continuation can carry -
-instead of 2,000. Turned off, every waiting message longer than 2,000 characters is cancelled.
+message you schedule for a reset, and from v0.6.15-beta (revision 2) a message you queue, may be up to
+8,154 characters - the most one continuation can carry - instead of 2,000. Turned off, every waiting
+message longer than 2,000 characters is cancelled.
 
 **When it helps.** When what you want a conversation to do after a reset takes more than 2,000
 characters to say.
@@ -502,6 +513,136 @@ characters to say.
 is at most 2,000 characters), and from nothing else: on its own it does nothing.
 
 **Ceilings.** None of its own: it sends nothing. **No measurement.**
+
+### Several conversations at once
+
+**What it does.** The standard edition sends one continuation at a time and waits up to 45 seconds for
+Codex's answer before it looks at the next. With this on, two to four continuations wait for Codex's
+answer at once, each in a conversation of its own - one conversation still never has two on their way -
+while every check, every claim and the last look before each send still run one at a time. You choose
+how many (2 by default); until MQ passes on your version of Codex, never more than 2.
+
+**When it helps.** When several conversations hit the same usage limit and should all go on as soon as it
+resets.
+
+**What it risks.** Several Codex queue processes start close together, which a busy Codex may answer late.
+A continuation whose arrival cannot be proven is never sent again, and this turns itself off.
+
+**Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (one recovery is dispatched at a time) and
+[A19](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (continuations are dispatched in sequence, under
+one lock). It keeps A19's one continuation in flight per conversation.
+
+**Ceilings.** 48 a day, and core's 5 in any one conversation. **Measurement MQ: not made yet.**
+
+### Queue for when a conversation is opened
+
+**What it does.** When a usage limit has reset in a conversation the Codex app does not have open, it sends
+the ordinary continuation anyway - the program's own words and marker, through every check - and leaves it
+in Codex's queue, so Codex runs it when you open the conversation. It stays there for the days you choose (3
+by default, 7 at most); the program takes it back at seven days and an hour whatever it is told, and at once
+when this is turned off. An interruption is queued this way once; taken back, it waits for the app as usual.
+Where the goal continuation applies, its route goes first.
+
+**When it helps.** When you will come back to a conversation later and want it to go on the moment you open
+it.
+
+**What it risks.** A message may wait in Codex for days, and while it waits its recovery counts as open, so
+an action set for after every recovery has finished waits too. Opened and not run within three minutes, it
+is taken back, sent the ordinary way, and this turns itself off.
+
+**Departs from** [A11](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (nothing is queued on the off
+chance that a conversation will be opened). It keeps A17, H4 and H6: every withdrawal still happens at once.
+
+**Ceilings.** 12 a day, and 3 in any one conversation. **Measurement M1: made** on `codex-cli
+0.158.0-alpha.2.1`; on any other version, a warning.
+
+### Continue a turn that ended with no reply
+
+**What it does.** When a turn in a conversation of yours ended with no reply - Codex completed it with only
+your message and its reasoning in it, which is all it judges by, never the words - it sends one short
+continuation of its own: "The last turn ended without a reply. Please continue from where you stopped." It
+looks twice, half a minute apart, before it decides; a conversation whose goal Codex is keeping going, or
+has stopped, is left alone. Each such turn is answered once, and a run of them twice at most.
+
+**When it helps.** When Codex sometimes stops a turn with nothing said, and you would rather it carried on.
+
+**What it risks.** Codex may have meant to end the turn quietly. It is sent only while that turn is still
+the conversation's latest, and never twice for one turn.
+
+**Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (only failed turns are recovered),
+[A13](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (only failures the product can classify) and
+[A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (its continuations are its fixed templates or your
+Custom message).
+
+**Ceilings.** 12 a day, and 2 in any one conversation. **Measurement ME: not made yet.**
+
+### Tell a parent which of its subagents stopped
+
+**What it does.** When a subagent of one of your conversations stops on a failure, the parent is told in
+fixed words, one line for each subagent, five at most: "Subagent <its id> stopped: <why>. Resume or respawn
+it only if it is still needed." If the parent failed too, the lines are added to the continuation the program
+sends it anyway; if it finished normally, it is sent one continuation with the lines - only once MS passes
+on your Codex. Nothing is ever written to a subagent, and each stop is told once.
+
+**When it helps.** When a parent goes on without knowing that work it handed out stopped.
+
+**What it risks.** The parent may resume or respawn work you meant to drop. Only a subagent's id and a fixed
+word for why it stopped are told - never anything it said.
+
+**Departs from** [0.5](STANDARDS.md#0-the-edition-boundary), [A15](STANDARDS.md#a-what-it-may-send-to-codex-and-when)
+(subagent conversations are never detected or recovered) and
+[A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when).
+
+**Ceilings.** 12 a day, and 3 in any one conversation. **Measurement MS: not made yet** - until it is, a
+parent that finished normally is told nothing.
+
+### Keep a conversation going
+
+**What it does.** For a conversation you pick on the page, with a count of 1 to 10: when its latest turn
+ended well and it has been idle for a minute, it sends one continuation of its own - "Carry on with the next
+step of the plan." - up to the count you chose. It stops when a turn made no progress, when every step of
+the plan is completed, when a plan cannot be read, when a goal of Codex's own is keeping it going, when a
+turn failed or was interrupted, or when the count is used. It reads only the kinds of item a turn left and
+the status of each plan step, never their words. Until MK passes on your Codex, no more than 3 are sent.
+
+**When it helps.** When a long plan should go on step by step while you are away. Codex's own goals
+(`/goal`) are the first thing to try: they keep a conversation going within Codex's own limits.
+
+**What it risks.** Work goes on when you might have wanted it to stop: stop it on the page, or switch the
+conversation off. It is paced like every recovery.
+
+**Departs from** [A13](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (only failures are recovered),
+[A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when) and [B9](STANDARDS.md#b-what-it-reads-and-how) (nothing is
+read from the content of a conversation's items).
+
+**Ceilings.** 24 a day, and core's 5 in any one conversation. **Measurement MK: not made yet.**
+
+### Queue messages for later
+
+**What it does.** You queue messages of your own for one conversation on the page: to go after the turn now
+running, at a time you pick, or every day or week from a time - 30 times and 30 days at most. They go in the
+order you queued them, each once, exactly as you wrote them, and one can wait for the one before it to
+arrive. They are paced like every recovery: fifteen minutes apart and five a day in one conversation. Pending
+lists each under **Scheduled**, with Cancel - its words are never shown there. Codex's own automations are
+the official way to schedule work; these wait for usage and go to one exact conversation.
+
+**When it helps.** When you want the next instruction to be there as soon as Codex can take it.
+
+**What it risks.** A queued message can go when you no longer want it: cancel it. One Codex already holds
+is taken back out of its queue; if Codex will not give it back, its row says so and it is never sent again.
+Your words are kept in the advanced edition's state until each has arrived, been cancelled or ended -
+while Codex holds one, so that Go on after a Pause can send it again - and then deleted.
+
+**Departs from** [A8](STANDARDS.md#a-what-it-may-send-to-codex-and-when),
+[A17](STANDARDS.md#a-what-it-may-send-to-codex-and-when), [A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when),
+[A27](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (longer than 2,000 characters while Longer messages
+is on), [C4](STANDARDS.md#c-network), [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps),
+[H4](STANDARDS.md#h-user-control) (a Pause takes back a message Codex already holds and holds it for you to go
+on or cancel) and [H6](STANDARDS.md#h-user-control) (Cancel no longer reaches a message being sent). It keeps
+A20.
+
+**Ceilings.** 30 a day, and core's 5 in any one conversation. **Measurement MT: not made yet** - "after this
+turn" says it is unproven until it is.
 
 ### Compatibility report
 
@@ -617,7 +758,8 @@ as below.
 - **Recovery through the channels already in use** - several conversations at once,
   empty-response recovery, an unloaded conversation through a queue that waits for it, a subagent
   through its parent, keep going after a normal completion, and a prompt queue and recurring
-  wakes.
+  wakes - all six built in its first pre-release, v0.6.15-beta, and described
+  [above](#todays-capabilities).
 - **A route of its own, and other kinds of session** - a conversation nothing holds, run through
   Codex's app server; CLI, TUI and IDE sessions; a full context compacted, then continued; another
   model at capacity; a continuation with no words; a continuation inside the turn through a Codex
@@ -627,5 +769,6 @@ as below.
   outbound network code; a local API and web view, remote control over Telegram and a read-only view
   of other PCs; switching the Codex account on your command; a weekly update check while idle; crash
   supervision, a wake timer for a reset and *Open Codex* on the card.
-- **Also moved here** - watching several Codex homes, which the standard edition gains; Arabic and
+- **Also moved here** - watching several Codex homes, which the standard edition gains and
+  v0.6.15-beta built; Arabic and
   Hebrew; winget manifests for both editions.

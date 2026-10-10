@@ -45,13 +45,15 @@ import copy
 from enum import StrEnum
 import json
 
-from .plughands import Channel, Errand, Route, records_of
+# RecordMove and RecordPurpose (P2's) are beside the hands core holds, and named here as before.
+from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, records_of,  # noqa: F401
+                        workers)
 
 # The interface's version. The advanced package writes out the number it was written for, and
 # edition.py takes its plug only when the two agree: otherwise a hook renamed, or given another
 # argument, would be called the old way or not at all, and nothing would say so. 2: P17 and `wants`.
 # 3 (v0.6.14): P8's errand, and P2's records carried out.
-PLUG_API = 3
+PLUG_API = 4
 
 
 class Edition(StrEnum):
@@ -127,6 +129,9 @@ class Alternative(StrEnum):
     # P15: no marker; queued under the client id core derives from the interruption
     # (ids.continuation_client_id), which is what proves it arrived.
     CLIENT_ID = "client_id"
+    # P16 (v0.6.15-beta): the ordinary send to a conversation the app does not hold, left in Codex's queue for
+    # when it is opened - kept there only while the plug says so, and seven days and an hour at most.
+    QUEUE_FOR_OPEN = "queue_for_open"
     # P17, and P3 at known_failure: take a failure up, waiting as core waits for an admitted one
     # (ladder.ADMITTED_WAITS), or as a temporary failure of the kind named (PACED_AS).
     ADMIT = "admit"
@@ -150,20 +155,6 @@ class FailureForm(StrEnum):
     ABSENT = "absent"                        # nothing at all
 
 
-class RecordMove(StrEnum):
-    """What core did with a record of the plug's own (P2, v0.6.14), as P14 tells it (RECORD_MOVES): it
-    waits, at a gate and for a reason core names; it was handed back before its send, or its process
-    never started, and waits again with its words; it was sent - its words gone from the plug's state -
-    and is watched; its marker was found in Codex's history; or none was a day after it was sent, and
-    it is never sent again."""
-    WAITING = "waiting"
-    RELEASED = "released"
-    NOT_STARTED = "not_started"
-    SENT = "sent"
-    DELIVERED = "delivered"
-    UNPROVEN = "unproven"
-
-
 class Surface(StrEnum):
     """What a plug may add to at P10 (SURFACES). What it adds sits under the one key EXTRA,
     beside everything core shows there and never in place of any of it."""
@@ -177,6 +168,7 @@ class Surface(StrEnum):
 POINTS = tuple(Point)
 SURFACES = tuple(Surface)
 RECORD_MOVES = tuple(RecordMove)
+RECORD_PURPOSES = tuple(RecordPurpose)
 FAILURE_FORMS = tuple(FailureForm)
 # The key a surface puts a plug's fields under. NULL never adds any, so no standard surface
 # carries it.
@@ -399,7 +391,6 @@ ALTERNATIVES = {
     Point.OUTCOME: frozenset(),
     Point.SCHEDULE: RESTRICTIONS | {Alternative.EARLY, Alternative.RESEND, Alternative.SEND_NOW},
     Point.CLAIM_LEDGER: RESTRICTIONS,
-    Point.CONCURRENCY: frozenset(),
     Point.SUPERVISION: frozenset(),
     Point.DELIVERY: frozenset({Alternative.CLIENT_ID}),
     Point.ADMISSION: TAKE_UP,
@@ -411,7 +402,7 @@ PACED_AS = {Alternative.AS_NETWORK_TRANSIENT: "network_transient", Alternative.A
 
 # Every alternative some point accepts. The vocabulary is exactly these
 # (tests/test_vocabulary.py), so no word waits in it for a point that does not take it.
-ANSWERS = frozenset().union(*ALTERNATIVES.values())
+ANSWERS = frozenset().union(*ALTERNATIVES.values()) | {Alternative.QUEUE_FOR_OPEN}
 
 NULL = Plug()
 
@@ -620,7 +611,9 @@ class Guarded:
         return answer, bool(broke)
 
     def partition(self, records):
-        return self._ask(Point.CONCURRENCY, records)
+        """P12 (v0.6.15-beta): how many sends may wait for their receipts at once (plughands.workers), 1 for anything
+        but a whole number 2 to MAX_WORKERS - DEFER, NULL and a hook that raised included."""
+        return workers(self._ask(Point.CONCURRENCY, records))
 
     def supervise(self, facts):
         return self._ask(Point.SUPERVISION, facts)
@@ -643,6 +636,12 @@ class Guarded:
         calls it once, after its claim and its pre-send look (engine/delivery.py)."""
         answer = self._ask(Point.UNLOADED, record)
         if answer is DEFER:
+            return DEFER
+        try:
+            # v0.6.15-beta: or QUEUE_FOR_OPEN - the ordinary send, left in Codex's queue for when it is opened.
+            if type(answer) in (str, Alternative) and answer == Alternative.QUEUE_FOR_OPEN:
+                return Alternative.QUEUE_FOR_OPEN
+        except Exception:
             return DEFER
         try:
             resume = getattr(answer, "resume", None)

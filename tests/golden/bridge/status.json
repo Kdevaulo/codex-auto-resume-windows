@@ -130,7 +130,19 @@
             "keep_awake_hours": "h6",
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
-            "status_file": false
+            "status_file": false,
+            "codex_homes": []
+          },
+          "codex_homes": {
+            "homes": [
+              {
+                "key": "",
+                "alias": null,
+                "path": null,
+                "state": "watched"
+              }
+            ],
+            "unmeasured": false
           }
         }
       }
@@ -264,14 +276,26 @@
             "keep_awake_hours": "h6",
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
-            "status_file": false
+            "status_file": false,
+            "codex_homes": []
           },
           "managed": [
             "DisableAutoResume",
             "DisableUpdateCheck",
             "MaxRecoveryAttempts",
             "QuietHours"
-          ]
+          ],
+          "codex_homes": {
+            "homes": [
+              {
+                "key": "",
+                "alias": null,
+                "path": null,
+                "state": "watched"
+              }
+            ],
+            "unmeasured": false
+          }
         }
       }
     },
@@ -404,7 +428,19 @@
             "keep_awake_hours": "h6",
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
-            "status_file": false
+            "status_file": false,
+            "codex_homes": []
+          },
+          "codex_homes": {
+            "homes": [
+              {
+                "key": "",
+                "alias": null,
+                "path": null,
+                "state": "watched"
+              }
+            ],
+            "unmeasured": false
           },
           "power_action": {
             "armed": {

@@ -79,10 +79,19 @@ NOT_SCENARIOS = {
     "test_screenshots": "draws the settings window's pictures, one GUI module at a time",
     "test_plug_points": "gives every engine a plug of its own, to hold each point where it stands",
     "test_plug_records": "gives every engine a plug with records of its own (P2), to hold each of their moves",
+    "test_queue_for_open": "gives every engine a plug that answers QUEUE_FOR_OPEN at P16, which the neutral plug never "
+                           "answers - a conversation the app does not hold waits there",
+    "test_plug_record_purposes": "gives every engine a plug with continuations and messages of its own (P2), to hold "
+                                 "what each purpose may and may not be sent as",
     "test_power_action": "builds an engine with no store or backend only to ask engine.activity, which reads a "
                          "codexsim home through the source alone; it ticks, dispatches and claims nothing",
     "test_released_calls": "runs the scenarios above against v0.6.10's tagged package and this one, "
                            "in workers of its own; it builds no engine itself",
+    "test_launch_pool": "gives every engine a plug that answers P12 and nothing else, so its sends wait for their "
+                        "receipts on workers - which the neutral plug, answering 1, never asks for",
+    "test_homes": "builds one engine per Codex home over codexsim homes, the default home's with a recording plug "
+                  "and every other's with the NULL plug by design (runtime/homes.py) - the neutral plug is the "
+                  "point it holds the other homes to",
     "test_downgrade": "sends one continuation with this version's engine only to leave it queued, then "
                       "downgrades the state and runs v0.6.10's tagged watcher on it in a process of its "
                       "own, which no plug of this version reaches",

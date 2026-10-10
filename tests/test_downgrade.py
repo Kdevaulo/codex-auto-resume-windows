@@ -29,7 +29,7 @@ import unittest
 
 from codex_auto_resume import machine
 from codex_auto_resume.domain import ids
-from codex_auto_resume.store import (SCHEMA_VERSION, Store, StoreError, downgrade_to_v2,
+from codex_auto_resume.store import (SCHEMA_VERSION, Store, StoreError, downgrade_state, downgrade_to_v2,
                                      downgrade_to_v3)
 
 import released
@@ -198,7 +198,7 @@ class DowngradeToV3Tests(unittest.TestCase):
         self.assertEqual(result, {"changed": True, "rows": len(keys) + 3, "short_markers": len(keys) + 3,
                                   "made_final": len(sent), "postponed": 1, "conversations_off": 2,
                                   "unfollowed_off": 1, "observe_only_paused": False})
-        self.assertTrue(list(self.state.glob("state.v4-backup-*.sqlite")), "a forensic copy was taken")
+        self.assertTrue(list(self.state.glob("state.v5-backup-*.sqlite")), "a forensic copy was taken")
         # Every record v0.6.10 could claim if nothing stopped it: none it could send twice.
         possibly_sent = sorted(key for key, state in keys.items() if state not in machine.WAITING
                                and state != "cancelled")
@@ -528,7 +528,7 @@ class DowngradeStopWatcherTests(unittest.TestCase):
         self.assertEqual(self.schema(), 3)
         self.assertEqual(holder.stdout.readline().strip(), "stopped", "it was asked to stop, and stopped")
         self.assertEqual(holder.wait(timeout=30), 0)
-        self.assertTrue(list(self.state.glob("state.v4-backup-*.sqlite")), "a forensic copy was taken")
+        self.assertTrue(list(self.state.glob("state.v5-backup-*.sqlite")), "a forensic copy was taken")
         log = self.paths.log_file.read_text(encoding="utf-8")
         self.assertIn("downgrade-state asked the watcher to stop", log)
 
@@ -588,7 +588,11 @@ class DowngradeStopWatcherTests(unittest.TestCase):
             args = parser.parse_args(["downgrade-state", "--to", "3", "--stop-watcher"])
             self.assertEqual(plugin_setup.COMMANDS[args.command](args), 0)
             cli.assert_called_once_with(self.paths.home, ["--quiet", "downgrade-state", "--to", "3", "--stop-watcher"])
-        for refused in (["downgrade-state", "--to", "2"], ["downgrade-state"]):
+        with mock.patch.object(plugin_setup, "_cli", return_value=0) as cli,                 mock.patch.object(plugin_setup, "runtime_home", return_value=self.paths.home):
+            args = parser.parse_args(["downgrade-state", "--to", "4", "--stop-watcher"])
+            self.assertEqual(plugin_setup.COMMANDS[args.command](args), 0)
+            cli.assert_called_once_with(self.paths.home, ["--quiet", "downgrade-state", "--to", "4", "--stop-watcher"])
+        for refused in (["downgrade-state", "--to", "2"], ["downgrade-state", "--to", "5"], ["downgrade-state"]):
             with self.subTest(refused), self.assertRaises(SystemExit), redirect_stderr(io.StringIO()):
                 parser.parse_args(refused)
 
@@ -697,6 +701,27 @@ class PickerFloorTests(unittest.TestCase):
                 with self.subTest(tag):
                     self.assertEqual(released.run(tag, _TAGGED_STORE, folder, "schema")["schema"],
                                      self.schema_for(tag[1:]))
+
+    def test_every_schema_4_tag_opens_what_to_4_wrote_with_every_row(self):
+        """v0.6.15-beta: the picker converts with `--to 4` for every offered tag on schema 4, v0.6.11-beta to
+        v0.6.14 - so each of them, its own store, opens the result and reads every record as it was."""
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.state = Path(temporary.name) / "state"
+        DowngradeToV3Tests.v4_state(self)
+        downgrade_state(self.state, 4)
+        expected = {key: row["state"] for key, row in table(self.state / "state.sqlite", "interruptions").items()}
+        tags = [tag for tag in self.from_floor() if self.schema_for(tag[1:]) == 4]
+        self.assertIn("v0.6.11-beta", tags)
+        self.assertIn("v0.6.13", tags)
+        for tag in tags:
+            with self.subTest(tag):
+                copy = Path(temporary.name) / tag
+                shutil.copytree(self.state, copy)
+                read = released.run(tag, _TAGGED_STORE, copy, "open")
+                self.assertNotIn("refused", read)
+                self.assertEqual(read["schema"], 4)
+                self.assertEqual(read["records"], expected)
 
     def test_every_schema_3_tag_opens_what_to_3_wrote_with_every_row(self):
         """The picker converts with `--to 3` for every offered tag on schema 3, v0.6.2 to v0.6.11-alpha - so each

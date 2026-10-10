@@ -186,19 +186,20 @@ def add(runtime, argument) -> dict:
 
 
 def cancel(runtime, rule, generation) -> dict:
-    """advanced-reset-cancel: a person's Cancel of one rule - refused once its message is being sent."""
+    """advanced-reset-cancel: a person's Cancel of one rule - refused while its message's launch is under way; one
+    already in Codex's queue is asked back, and core takes it out at its next look (`withdrawing`)."""
     if type(rule) is not int:
         return _refused(Refusal.INVALID_REQUEST)
     if _stale(runtime, generation):
         return _refused(Refusal.STALE_GENERATION, runtime)
     from ..state import Refused, StateError
     try:
-        runtime.state.cancel_reset_rule(rule, at=runtime.clock())
+        done = runtime.state.cancel_reset_rule(rule, at=runtime.clock())
     except Refused as refused:
         return _refused(refused.refusal, runtime)
     except StateError:
         return _refused(Refusal.STATE_UNAVAILABLE, runtime)
-    return {"done": True, "refusal": None, "rule": rule}
+    return {"done": True, "refusal": None, "rule": rule, "withdrawing": done == "withdrawing"}
 
 
 def go_on(runtime, rule, generation) -> dict:

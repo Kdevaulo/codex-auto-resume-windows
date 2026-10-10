@@ -155,6 +155,11 @@ _RECEIVERS = {
         "powerView": POWER_VIEW,
         "armed": _under(POWER_VIEW, ".armed"), "shown": _under(POWER_VIEW, ".shown"), "last": _under(POWER_VIEW, ".last"),
     },
+    # v0.6.15-beta: the Codex homes' card, beside what it has as a part of the Settings half (_spread).
+    "gui/SettingsHomes.cs": {
+        "view": [("bridge:status", "status.codex_homes"), ("bridge:dashboard", "status.codex_homes")],
+        "home": [("bridge:status", "status.codex_homes.homes[]"), ("bridge:dashboard", "status.codex_homes.homes[]")],
+    },
     "panel": {
         "payload": [("@", "")],
         "row": PANEL_ROW,
@@ -173,6 +178,8 @@ _LOCAL = {
     "gui/Dashboard.cs": {"pages", "EnvironmentVariables", "map"},
     "gui/SettingsApp.cs": {"pages", "editors", "sections", "entry", "empty", "baseline"},
     "gui/SoftTheme.cs": {"MOTION"},
+    # v0.6.15-beta: the homes the card writes back - their folders and aliases - and the request it writes them in.
+    "gui/SettingsHomes.cs": {"entry", "changes"},
 }
 
 # The window was two files until v0.6.10-alpha, when each became several. The three tables above
@@ -266,6 +273,7 @@ _TYPED = {
         "offer": wire.PowerChoice, "choice": wire.PowerChoice, "powerView": wire.PowerView,
         "armed": wire.PowerArmed, "shown": wire.PowerShown, "last": wire.PowerLast,
     },
+    "gui/SettingsHomes.cs": {"view": wire.HomesView, "home": wire.HomeView},
 }
 TYPED = {(name, receiver): contract for name, table in _spread(_TYPED).items()
          for receiver, contract in table.items()}

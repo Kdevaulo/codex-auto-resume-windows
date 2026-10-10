@@ -314,14 +314,14 @@ VERDICT_CASES = [
     # greys it, and as amended it is offered.
     row(INSTALLED, "refused not-offered", edition="advanced"),
     row(INSTALLED, "refused not-offered", edition="advanced", offer="0.6.12-beta.2"),
-    row(INSTALLED, "offered same,prerelease,kept,edition", edition="advanced", newer=True),
+    row(INSTALLED, "offered same,prerelease,convert3,edition", edition="advanced", newer=True),
     # v0.6.6-alpha and -beta carry v0.6.6's file names.
     row("0.6.6-alpha", "refused no-archive", files=assets("0.6.6"), older=True),
     row("0.6.11", "refused no-archive", edition="advanced", files=assets("0.6.11", ("standard",))),
     # No pin and no published checksum; a pinned release needs none.
     row("0.6.12-beta.2", "refused no-checksum", files=assets("0.6.12-beta.2", sums=False), offer="0.6.12-beta.2"),
-    row("0.6.11", "offered older,release,kept,latest", files=assets("0.6.11", sums=False)),
-    row("0.6.11", "offered older,release,kept,latest,edition", edition="advanced", files=assets("0.6.11", sums=False)),
+    row("0.6.11", "offered older,release,convert3,latest", files=assets("0.6.11", sums=False)),
+    row("0.6.11", "offered older,release,convert3,latest,edition", edition="advanced", files=assets("0.6.11", sums=False)),
     # An edition change to an installer that predates editions.
     row("0.6.10", "refused edition-first", installed_edition="advanced"),
     row("0.6.2", "refused edition-first", installed_edition="advanced"),
@@ -329,32 +329,35 @@ VERDICT_CASES = [
     # A policy in force: nothing below v0.6.11-beta, and only then.
     row("0.6.10", "refused managed-policy", policy=True), row("0.6.2", "refused managed-policy", policy=True),
     row("0.6.11-alpha", "refused managed-policy", policy=True, older=True),
-    row("0.6.11-beta", "offered older,prerelease,kept", policy=True, older=True),
-    row("0.6.11", "offered older,release,kept,latest", policy=True),
+    row("0.6.11-beta", "offered older,prerelease,convert3", policy=True, older=True),
+    row("0.6.11", "offered older,release,convert3,latest", policy=True),
     row("0.6.10", "offered older,release,convert3"),
     # I12 as written (both switches off): no older pre-release, and of the newer ones only the update
     # check's own offer. As amended (both on), every one of them is offered.
     row("0.6.11-beta.3", "refused older-prerelease"),
-    row("0.6.11-beta.3", "offered older,prerelease,kept", older=True),
+    row("0.6.11-beta.3", "offered older,prerelease,convert3", older=True),
     row("0.6.12-beta.2", "refused not-offered", latest="0.6.12"),
-    row("0.6.12-beta.2", "offered newer,prerelease,kept", latest="0.6.12", newer=True),
-    row("0.6.12", "offered newer,release,kept,latest", latest="0.6.12"),
-    row("0.6.12-beta.2", "offered newer,prerelease,kept", offer="0.6.12-beta.2"),
+    row("0.6.12-beta.2", "offered newer,prerelease,convert3", latest="0.6.12", newer=True),
+    row("0.6.12", "offered newer,release,convert3,latest", latest="0.6.12"),
+    row("0.6.12-beta.2", "offered newer,prerelease,convert3", offer="0.6.12-beta.2"),
     row("0.6.12-beta.2", "refused not-offered", edition="advanced", offer="0.6.12-beta.2"),
     row("0.6.12-beta.3", "refused not-offered", offer="0.6.12-beta.2"),
-    row("0.6.12-beta.3", "offered newer,prerelease,kept", offer="0.6.12-beta.2", newer=True),
-    row("0.6.12-beta.2", "offered newer,prerelease,kept,edition", edition="advanced", offer="0.6.12-beta.2",
+    row("0.6.12-beta.3", "offered newer,prerelease,convert3", offer="0.6.12-beta.2", newer=True),
+    row("0.6.12-beta.2", "offered newer,prerelease,convert3,edition", edition="advanced", offer="0.6.12-beta.2",
         newer=True),
-    # The schema: converted for 0.6.0 to 0.6.11-alpha, kept from 0.6.11-beta.
+    # The schema: converted for 0.6.0 to 0.6.11-alpha (to 3) and 0.6.11-beta to 0.6.14 (to 4), kept from
+    # 0.6.15-beta, which is schema 5.
     row("0.6.9", "offered older,release,convert3"),
     row("0.6.11-alpha.2", "offered older,prerelease,convert3", older=True),
-    row("0.6.11-beta", "offered older,prerelease,kept", older=True),
+    row("0.6.11-beta", "offered older,prerelease,convert3", older=True),
+    row("0.6.14-beta", "offered newer,prerelease,convert3", offer="0.6.14-beta"),
+    row("0.6.15-beta", "offered newer,prerelease,kept", offer="0.6.15-beta"),
     # The advanced settings: an advanced target before 0.6.11-beta.2 cannot read them.
-    row("0.6.11-beta", "offered older,prerelease,kept,advanced-off", edition="advanced",
+    row("0.6.11-beta", "offered older,prerelease,convert3,advanced-off", edition="advanced",
         installed_edition="advanced", older=True),
-    row("0.6.11-beta.2", "offered older,prerelease,kept", edition="advanced", installed_edition="advanced",
+    row("0.6.11-beta.2", "offered older,prerelease,convert3", edition="advanced", installed_edition="advanced",
         older=True),
-    row("0.6.13", "offered newer,release,kept,edition", edition="advanced", latest="0.6.14"),
+    row("0.6.13", "offered newer,release,convert3,edition", edition="advanced", latest="0.6.14"),
 ]
 
 TABLE_CASES = [
@@ -363,35 +366,35 @@ TABLE_CASES = [
     ({"listed": [{"version": v, "prerelease": "-" in v, "assets": assets(v)}
                  for v in ("0.6.12-beta.2", "0.6.12", "0.6.11", INSTALLED)],
       "installed": INSTALLED, "installed_edition": "standard", "policy": False, "newer": False, "older": False},
-     {"rows": ["0.6.12 standard offered newer,release,kept,latest",
-               "0.6.12 advanced offered newer,release,kept,latest,edition",
+     {"rows": ["0.6.12 standard offered newer,release,convert3,latest",
+               "0.6.12 advanced offered newer,release,convert3,latest,edition",
                "0.6.12-beta.2 standard refused not-offered", "0.6.12-beta.2 advanced refused not-offered",
                "0.6.12-beta standard installed -", "0.6.12-beta advanced refused not-offered",
-               "0.6.11 standard offered older,release,kept", "0.6.11 advanced offered older,release,kept,edition"],
+               "0.6.11 standard offered older,release,convert3", "0.6.11 advanced offered older,release,convert3,edition"],
       "latest": "0.6.12", "offer": ""}),
     # The same list under I12 as amended: every pre-release is offered, the one installed in the other
     # edition too.
     ({"listed": [{"version": v, "prerelease": "-" in v, "assets": assets(v)}
                  for v in ("0.6.12-beta.2", "0.6.12", "0.6.11", "0.6.11-beta.3", INSTALLED)],
       "installed": INSTALLED, "installed_edition": "standard", "policy": False, "newer": True, "older": True},
-     {"rows": ["0.6.12 standard offered newer,release,kept,latest",
-               "0.6.12 advanced offered newer,release,kept,latest,edition",
-               "0.6.12-beta.2 standard offered newer,prerelease,kept",
-               "0.6.12-beta.2 advanced offered newer,prerelease,kept,edition",
-               "0.6.12-beta standard installed -", "0.6.12-beta advanced offered same,prerelease,kept,edition",
-               "0.6.11 standard offered older,release,kept", "0.6.11 advanced offered older,release,kept,edition",
-               "0.6.11-beta.3 standard offered older,prerelease,kept",
-               "0.6.11-beta.3 advanced offered older,prerelease,kept,edition"],
+     {"rows": ["0.6.12 standard offered newer,release,convert3,latest",
+               "0.6.12 advanced offered newer,release,convert3,latest,edition",
+               "0.6.12-beta.2 standard offered newer,prerelease,convert3",
+               "0.6.12-beta.2 advanced offered newer,prerelease,convert3,edition",
+               "0.6.12-beta standard installed -", "0.6.12-beta advanced offered same,prerelease,convert3,edition",
+               "0.6.11 standard offered older,release,convert3", "0.6.11 advanced offered older,release,convert3,edition",
+               "0.6.11-beta.3 standard offered older,prerelease,convert3",
+               "0.6.11-beta.3 advanced offered older,prerelease,convert3,edition"],
       "latest": "0.6.12", "offer": ""}),
     # Newest first by the numbers (.10 after .9), the installed edition first at each version, and the
     # check's own offer: the newest pre-release newer than both.
     ({"listed": [{"version": v, "prerelease": "-" in v, "assets": assets(v)}
                  for v in ("0.6.9", "0.6.10", "0.6.12-beta.9", "0.6.12-beta.10", "0.6.11")],
       "installed": "0.6.11", "installed_edition": "advanced", "policy": False, "newer": False, "older": False},
-     {"rows": ["0.6.12-beta.10 advanced offered newer,prerelease,kept",
+     {"rows": ["0.6.12-beta.10 advanced offered newer,prerelease,convert3",
                "0.6.12-beta.10 standard refused not-offered",
                "0.6.12-beta.9 advanced refused not-offered", "0.6.12-beta.9 standard refused not-offered",
-               "0.6.11 advanced installed -", "0.6.11 standard offered same,release,kept,latest,edition",
+               "0.6.11 advanced installed -", "0.6.11 standard offered same,release,convert3,latest,edition",
                "0.6.10 standard refused edition-first", "0.6.9 standard refused edition-first"],
       "latest": "0.6.11", "offer": "0.6.12-beta.10"}),
 ]
@@ -503,7 +506,7 @@ class ListingTests(unittest.TestCase):
         self.assertEqual((c["PickFloor"], c["EditionsSince"], c["PolicySince"]), ("0.6.2", "0.6.11-alpha", "0.6.11-beta"))
         self.assertEqual(c["EditionsSince"], RELEASE["advanced"]["since"] + "-alpha")
         from codex_auto_resume.store import SCHEMA_VERSION
-        self.assertEqual(c["StateSchemaSince"], [["0.6.11-beta", 4], ["0.6.0", 3]])
+        self.assertEqual(c["StateSchemaSince"], [["0.6.15-beta", 5], ["0.6.11-beta", 4], ["0.6.0", 3]])
         self.assertEqual(c["StateSchemaSince"][0][1], SCHEMA_VERSION, "the first row is this version's own schema")
         self.assertEqual(c["AdvancedStateSince"], [["0.6.11-beta.2", 2], ["0.6.11-alpha", 1]])
         # I12 as the owner amended it on 2026-10-03 (design Q1): a pre-release picked by name and
@@ -668,14 +671,14 @@ LISTED = [entry("0.6.12-beta.2"), entry(INSTALLED), entry("0.6.11", files=assets
           entry("0.6.11-beta"), entry("0.6.10", files=assets("0.6.10", ("standard",))),
           entry("0.6.6-alpha", files=assets("0.6.6")), entry("0.6.2", files=assets("0.6.2", ("standard",), False)),
           entry("0.6.1", files=assets("0.6.1", ("standard",))), entry("0.5.7", files=assets("0.5.7", ("standard",)))]
-ROWS = ["version: 0.6.12-beta.2 standard offered newer,prerelease,kept",
-        "version: 0.6.12-beta.2 advanced offered newer,prerelease,kept,edition",
+ROWS = ["version: 0.6.12-beta.2 standard offered newer,prerelease,convert3",
+        "version: 0.6.12-beta.2 advanced offered newer,prerelease,convert3,edition",
         "version: 0.6.12-beta standard installed -",
-        "version: 0.6.12-beta advanced offered same,prerelease,kept,edition",
-        "version: 0.6.11 standard offered older,release,kept,latest",
-        "version: 0.6.11 advanced offered older,release,kept,latest,edition",
-        "version: 0.6.11-beta standard offered older,prerelease,kept",
-        "version: 0.6.11-beta advanced offered older,prerelease,kept,edition,advanced-off",
+        "version: 0.6.12-beta advanced offered same,prerelease,convert3,edition",
+        "version: 0.6.11 standard offered older,release,convert3,latest",
+        "version: 0.6.11 advanced offered older,release,convert3,latest,edition",
+        "version: 0.6.11-beta standard offered older,prerelease,convert3",
+        "version: 0.6.11-beta advanced offered older,prerelease,convert3,edition,advanced-off",
         "version: 0.6.10 standard offered older,release,convert3",
         "version: 0.6.6-alpha standard refused no-archive",
         "version: 0.6.2 standard offered older,release,convert3"]
@@ -707,8 +710,9 @@ class VersionsRunTests(PickerRun):
             with self.subTest(policy=policy):
                 code, output, asked = self.run_it(policy=policy, Versions=True)
                 self.assertEqual(code, 0, output[-2000:])
+                # The rows before 0.6.11-beta, the first version that applies the keys: 0.6.10 and 0.6.2.
                 expected = [line.replace("offered older,release,convert3", "refused managed-policy")
-                            for line in ROWS]
+                            if line.split()[1] in ("0.6.10", "0.6.2") else line for line in ROWS]
                 self.assertEqual(self.answer_lines(output, "version: "), expected)
 
     def test_a_value_only_a_newer_version_knows_refuses_nothing(self):
@@ -803,11 +807,18 @@ $answers = @(foreach ($case in $cases) {
     $answer = Convert-StateForOlder -Home_ 'C:\scratch-home'
     [ordered]@{ answer = $answer; asked = @($script:asked | ForEach-Object { $_ -join ' ' }) }
 })
+# v0.6.15-beta: a target on schema 4 is converted with --to 4; nothing else but 3 and 4 is asked for at all.
+$script:case = $cases[0]
+$targets = @(foreach ($to in @(4, 5)) {
+    $script:asked = @()
+    $answer = Convert-StateForOlder -Home_ 'C:\scratch-home' -To $to
+    [ordered]@{ answer = $answer; asked = @($script:asked | ForEach-Object { $_ -join ' ' }) }
+})
 $script:case = [pscustomobject]@{ printed = @(); code = 0 }
 $script:asked = @()
 Start-CurrentWatcher -Home_ 'C:\scratch-home'
 Start-CurrentWatcher -Home_ 'C:\scratch-home' -NoStartup
-ConvertTo-Json -Compress -Depth 5 -InputObject ([ordered]@{ answers = $answers;
+ConvertTo-Json -Compress -Depth 5 -InputObject ([ordered]@{ answers = $answers; targets = $targets;
                                                             restarts = @($script:asked | ForEach-Object { $_ -join ' ' }) })
 """
 
@@ -865,6 +876,12 @@ class ConversionAnswerTests(unittest.TestCase):
                 self.assertEqual(answer["answer"], expected)
                 self.assertEqual(listed(answer["asked"]), ["C:\\scratch-home downgrade-state --to 3 --stop-watcher"])
 
+    def test_a_target_on_schema_4_is_converted_to_4_and_no_other_is_asked_for(self):
+        four, five = self.answer["targets"]
+        self.assertEqual(four["answer"], CONVERSION_CASES[0][1])
+        self.assertEqual(listed(four["asked"]), ["C:\\scratch-home downgrade-state --to 4 --stop-watcher"])
+        self.assertEqual((five["answer"], listed(five["asked"] or [])), ("failed", []))
+
     def test_the_watcher_is_started_again_as_a_repair_starts_it(self):
         self.assertEqual(listed(self.answer["restarts"]), ["C:\\scratch-home setup --keep-state",
                                                            "C:\\scratch-home setup --keep-state --no-startup"])
@@ -874,8 +891,8 @@ class ConversionAnswerTests(unittest.TestCase):
 # - whether the archive was unpacked, whether its installer had run, and whether the install lock was held
 # (asked by another process, since the bootstrap's own thread may always take it again).
 CONVERT_STUB = r"""function Convert-StateForOlder {
-    param([string]$Home_)
-    $seen = [ordered]@{ home = $Home_; unpacked = [bool](Test-Path -LiteralPath (Join-Path $unpacked 'install\install.ps1'));
+    param([string]$Home_, [int]$To = 3)
+    $seen = [ordered]@{ home = $Home_; to = $To; unpacked = [bool](Test-Path -LiteralPath (Join-Path $unpacked 'install\install.ps1'));
                         installed = [bool](Test-Path -LiteralPath $env:CAR_INSTALLED);
                         lock = [string](& $env:CAR_PYTHON -c $env:CAR_LOCK_PROBE) }
     Add-Content -LiteralPath $env:CAR_EVENTS -Value ('convert ' + (ConvertTo-Json $seen -Compress)) -Encoding UTF8
@@ -989,30 +1006,31 @@ class PickRunTests(PickerRun):
 
     # -------------------------------------------------------------- what is installed
     def test_a_newer_release_is_installed_checked_against_its_pin(self):
-        self.serve([entry("0.6.12"), entry(INSTALLED), entry("0.6.11")])
-        self.published("0.6.12", pin=True)
-        code, output, asked = self.pick("0.6.12")
+        # v0.6.15-beta: a target on this version's schema (5) - every earlier one converts the state first.
+        self.serve([entry("0.6.15"), entry(INSTALLED), entry("0.6.11")])
+        self.published("0.6.15", pin=True)
+        code, output, asked = self.pick("0.6.15")
         self.assertEqual(code, 0, output[-2000:])
         self.assertEqual(self.answer_lines(output, "pick: "),
-                         ["pick: offered newer,release,kept,latest", "pick: installed 0.6.12 standard"])
+                         ["pick: offered newer,release,kept,latest", "pick: installed 0.6.15 standard"])
         self.assertIn("SHA-256 matches the digest pinned in this plugin", output)
         self.assertEqual(asked, [["Get", PAGES.replace("{page}", "1")]] + POLICY_READS
-                         + [["", NOWHERE + "/download/v0.6.12/CodexAutoResume-v0.6.12-win-x64.zip"]],
+                         + [["", NOWHERE + "/download/v0.6.15/CodexAutoResume-v0.6.15-win-x64.zip"]],
                          "the list, the policy keys and the archive, and nothing else")
         self.assertEqual(self.bound(), {"PluginName": "codex-auto-resume"})
         self.assertEqual(self.seen(), [], "a version on this schema needs no conversion")
         self.assertEqual(sorted(self.temp.glob("codex-auto-resume-*")), [], "the download outlived the install")
 
     def test_the_checks_own_pre_release_is_checked_against_its_published_checksum(self):
-        self.serve([entry("0.6.12-beta.2"), entry(INSTALLED), entry("0.6.11")])
-        self.published("0.6.12-beta.2")
-        code, output, asked = self.pick("0.6.12-beta.2", NoStartup=True)
+        self.serve([entry("0.6.15-beta.2"), entry(INSTALLED), entry("0.6.11")])
+        self.published("0.6.15-beta.2")
+        code, output, asked = self.pick("0.6.15-beta.2", NoStartup=True)
         self.assertEqual(code, 0, output[-2000:])
         self.assertEqual(self.answer_lines(output, "pick: "),
-                         ["pick: offered newer,prerelease,kept", "pick: installed 0.6.12-beta.2 standard"])
+                         ["pick: offered newer,prerelease,kept", "pick: installed 0.6.15-beta.2 standard"])
         self.assertIn("SHA-256 matches the checksum published beside it", output)
-        self.assertEqual(self.downloads(asked), ["CodexAutoResume-v0.6.12-beta.2-win-x64.zip",
-                                                 "CodexAutoResume-v0.6.12-beta.2-win-x64.zip.sha256"])
+        self.assertEqual(self.downloads(asked), ["CodexAutoResume-v0.6.15-beta.2-win-x64.zip",
+                                                 "CodexAutoResume-v0.6.15-beta.2-win-x64.zip.sha256"])
         self.assertEqual(self.bound(), {"PluginName": "codex-auto-resume", "SkipStartup": "True"})
 
     def test_an_edition_change_tells_the_installer_it_was_asked_for(self):
@@ -1020,8 +1038,11 @@ class PickRunTests(PickerRun):
         self.published(INSTALLED, edition="advanced")
         code, output, asked = self.pick(INSTALLED, edition="Advanced", Force=True)
         self.assertEqual(code, 0, output[-2000:])
+        # The installed version is on schema 4, and this one writes 5: the state is converted to 4 first.
         self.assertEqual(self.answer_lines(output, "pick: "),
-                         ["pick: offered same,prerelease,kept,edition", "pick: installed 0.6.12-beta advanced"])
+                         ["pick: offered same,prerelease,convert3,edition", "pick: state converted 30 5 2 1 0",
+                          "pick: installed 0.6.12-beta advanced"])
+        self.assertEqual([seen["to"] for word, seen in self.seen() if word == "convert"], [4])
         self.assertIn("Standard edition -> Advanced edition", output)
         self.assertEqual(self.downloads(asked), ["CodexAutoResume-Advanced-v0.6.12-beta-win-x64.zip",
                                                  "CodexAutoResume-Advanced-v0.6.12-beta-win-x64.zip.sha256"])
@@ -1037,7 +1058,7 @@ class PickRunTests(PickerRun):
         self.assertEqual(lines, ["pick: offered older,release,convert3", "pick: state converted 30 5 2 1 0",
                                  "pick: installed 0.6.10 standard"])
         self.assertLess(output.index("Archive contents verified"), output.index("pick: state converted"))
-        self.assertEqual(self.seen(), [("convert", {"home": str(self.home), "unpacked": True, "installed": False,
+        self.assertEqual(self.seen(), [("convert", {"home": str(self.home), "to": 3, "unpacked": True, "installed": False,
                                                     "lock": "held"})])
         self.assertEqual(self.bound(), {"PluginName": "codex-auto-resume"})
         self.assertEqual(sorted(self.temp.glob("codex-auto-resume-*")), [])
@@ -1111,9 +1132,9 @@ class PickRunTests(PickerRun):
         self.assertEqual(sorted(self.temp.glob("codex-auto-resume-*")), [])
 
     def test_an_installer_that_fails_says_no_installed_line(self):
-        self.serve([entry("0.6.12"), entry(INSTALLED)])
-        self.published("0.6.12", pin=True)
-        code, output, _ = self.pick("0.6.12", installer_exit=7)
+        self.serve([entry("0.6.15"), entry(INSTALLED)])
+        self.published("0.6.15", pin=True)
+        code, output, _ = self.pick("0.6.15", installer_exit=7)
         self.assertEqual(code, 7, output[-2000:])
         self.assertEqual(self.answer_lines(output, "pick: "), ["pick: offered newer,release,kept,latest"])
         self.assertEqual(sorted(self.temp.glob("codex-auto-resume-*")), [])

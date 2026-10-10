@@ -35,6 +35,12 @@ def record(key=KEY, thread=T1, words=WORDS, state="waiting", sent_at=None, **cha
     return made
 
 
+def taken(made):
+    """What core takes of `made`, a record naming none of v0.6.15-beta's keys: a person's message, queued nowhere
+    Codex said, and no one asking for it back."""
+    return dict(made, purpose="message", ordinal=None, queue_id=None, withdraw=False)
+
+
 class Records(Asked):
     """A plug with records of its own: `handed` is what P2 answers, `ledger` what P11 answers to a
     record's claim and launch (DEFER: claimed), and `moves` every move core tells of one."""
@@ -280,7 +286,7 @@ class CheckedTests(unittest.TestCase):
 
     def test_records_leave_the_decision_table_for_a_value_core_checks(self):
         self.assertNotIn(Point.RECORDS, ALTERNATIVES)
-        self.assertEqual(guard(Records([record()])).records(None), (record(),))
+        self.assertEqual(guard(Records([record()])).records(None), (taken(record()),))
         self.assertEqual(guard(None).records(None), ())
 
     def test_a_malformed_record_is_dropped_and_the_rest_are_taken(self):
@@ -293,9 +299,9 @@ class CheckedTests(unittest.TestCase):
             with self.subTest(found=found):
                 self.assertEqual(plughands.records_of([found]), ())
         good = record(OTHER)
-        self.assertEqual(plughands.records_of([good] + bad), (good,))
-        self.assertEqual(plughands.records_of(bad[:4] + [good]), (good,))
-        self.assertEqual(plughands.records_of([record()] * 3), (record(),), "one id, once")
+        self.assertEqual(plughands.records_of([good] + bad), (taken(good),))
+        self.assertEqual(plughands.records_of(bad[:4] + [good]), (taken(good),))
+        self.assertEqual(plughands.records_of([record()] * 3), (taken(record()),), "one id, once")
         many = [record("%016x" % n * 4) for n in range(1, 12)]
         self.assertEqual(len(plughands.records_of(many)), plughands.RECORDS_LIMIT)
         for answer in (DEFER, None, {"record_id": KEY}, "records", record()):

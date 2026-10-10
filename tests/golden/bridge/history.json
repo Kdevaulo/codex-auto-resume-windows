@@ -98,7 +98,8 @@
             "attempt_limit": 4,
             "name": "example-service",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "7777777777777777777777777777777777777777777777777777777777777777",
@@ -191,7 +192,8 @@
             "attempt_limit": null,
             "name": "example-project",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "9999999999999999999999999999999999999999999999999999999999999999",
@@ -231,7 +233,8 @@
             "attempt_limit": 4,
             "name": null,
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "6666666666666666666666666666666666666666666666666666666666666666",
@@ -271,7 +274,8 @@
             "attempt_limit": null,
             "name": "example-docs",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "5555555555555555555555555555555555555555555555555555555555555555",
@@ -311,7 +315,8 @@
             "attempt_limit": 4,
             "name": "example-app",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "4444444444444444444444444444444444444444444444444444444444444444",
@@ -351,7 +356,8 @@
             "attempt_limit": 4,
             "name": "example-service",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "3333333333333333333333333333333333333333333333333333333333333333",
@@ -391,7 +397,8 @@
             "attempt_limit": 4,
             "name": "example-app",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "2222222222222222222222222222222222222222222222222222222222222222",
@@ -431,7 +438,8 @@
             "attempt_limit": null,
             "name": "example-project",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           },
           {
             "interruption_id": "1111111111111111111111111111111111111111111111111111111111111111",
@@ -471,7 +479,8 @@
             "attempt_limit": 4,
             "name": "example-docs",
             "project": null,
-            "cwd_basename": null
+            "cwd_basename": null,
+            "home": null
           }
         ]
       }

@@ -64,8 +64,10 @@ LAYER = {_q(name): layer for layer, names in {
                # and what a usage reading keeps of Codex's reply, and nothing else.
                "domain.usage",
                # v0.6.12: the power action's words, out of domain/vocabulary.py at its line budget.
-               "domain.power_vocabulary"),
-    "policy": ("", "settings", "continuation", "l10n", "messages", "interface", "config", "logbook",
+               "domain.power_vocabulary",
+               # v0.6.15-beta: the reasons and a Codex home's states, out of it at its budget too.
+               "domain.reason_vocabulary"),
+    "policy": ("", "settings", "settings_schema", "continuation", "l10n", "messages", "interface", "config", "logbook",
                # v0.6.11: which edition this is, found by looking beside the package; and quiet
                # hours and a postponement's times, on the local clock.
                "edition", "quiet",
@@ -85,7 +87,10 @@ LAYER = {_q(name): layer for layer, names in {
                # and a value of a person's own beside a drop-down's choices, Custom... and Unlimited.
                "ownvalues",
                # v0.6.12: when the power action after usage-limit recoveries may act - pure.
-               "poweraction"),
+               "poweraction",
+               # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them - pure
+               # but for the look at a folder; its identity is handed in from win/folderid.py.
+               "homes"),
     "adapters": ("store", "openstate", "codex", "windows", "compat", "compatio", "startup", "shortcut",
                  # v0.6.10-alpha: compat.py and compatio.py became compat/.
                  "compat.model", "compat.standing", "compat.report", "compat.permits", "compat.files", "compat.cache", "compat.probes", "compat.views", "compat.evaluator",
@@ -122,6 +127,8 @@ LAYER = {_q(name): layer for layer, names in {
                  "win.typeface",
                  # v0.6.12: the power action's calls - may this account, is anyone here, and doing it.
                  "win.powerdown",
+                 # v0.6.15-beta: which folder a path names, whatever its spelling (the home's second lock).
+                 "win.folderid",
                  # v0.6.10-alpha: source.py became source/, and every part of it reads Codex;
                  # windows.py's other half - the CLI, the App Server, the pairing - joined it.
                  "codex.appserver", "codex.errors", "codex.history", "codex.labels",
@@ -142,7 +149,11 @@ LAYER = {_q(name): layer for layer, names in {
                # and an uncertain continuation sent once more, where the plug asks and core may.
                "engine.resend",
                # and records of the edition's own, tried like core's.
-               "engine.plugrecords"),
+               "engine.plugrecords",
+               # v0.6.15-beta: several sends waiting for their receipts at once, on workers.
+               "engine.launches",
+               # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
+               "engine.foropen"),
     # v0.6.10-alpha: control.py became control/, ten files, `Control` composed from eight
     # mixins. `layer` is where the composition lives, so that the front holds no code.
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
@@ -161,6 +172,8 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.health",
               # v0.6.12: and of the power action after usage-limit recoveries.
               "runtime.afterwork",
+              # v0.6.15-beta: and the other Codex homes it holds, each with an engine of its own.
+              "runtime.homes",
               # v0.6.10-alpha: cli.py's command bodies became commands/; cli.py is the parser.
               "commands", "commands.base", "commands.install", "commands.records",
               "commands.status", "commands.watcher",
@@ -262,6 +275,9 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     # Reaching `ui.tray` loads `ui/__init__.py` with it, and since v0.6.10-alpha the icon
     # is inside `ui/`, so the package above it is an edge these two did not have before.
     ("runtime.app", "ui"): ("cost", "the package above the icon, loaded with it"),
+    # v0.6.15-beta: the Codex version in force, read only while another Codex home is added (homes.unmeasured).
+    ("control.watcher", "compatio"): ("cost", "the compatibility report's Codex version, read only while another "
+                                              "Codex home is added"),
     ("commands.watcher", "ui"): ("cost", "the package above the icon, loaded with it"),
     ("runtime.app", "ui.popup"): ("cost", "the popup's theme and motion, adopted only by a running watcher"),
     ("commands.install", "control"): ("cost", "the diagnostics command is the only one that goes through control"),

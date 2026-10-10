@@ -84,7 +84,7 @@ class ClaimsMixin:
     def reserve_detailed(self, interruption_id: str, now: float, *, limits: dict | None = None,
                          gates: dict | None = None, ledger=None, carried=frozenset(),
                          quiet_until: float | None = None, relaxed: str | None = None,
-                         resend: tuple | None = None, forced: bool = False) -> tuple:
+                         resend: tuple | None = None, forced: bool = False, caps: tuple | None = None) -> tuple:
         """Claim a record for sending, re-checking every store-side gate in the claim.
 
         Returns (claimed, refusing_gate, reason). The gate vector - the engine's view of Codex plus
@@ -129,6 +129,7 @@ class ClaimsMixin:
                 if name in vector and vector[name][0] != machine.PASS:
                     refusal = (name, vector[name][1])
                     break
+            refusal = refusal or (self._caps_refusal(connection, row, now, vector, caps, forced) if caps else None)
             refusal = refusal or self._relaxation_refused(connection, row, now, vector, relaxed, ledger, carried)
             if gates is not None and refusal is None:
                 found = machine.first_refusal(vector)

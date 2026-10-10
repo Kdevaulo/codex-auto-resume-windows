@@ -325,6 +325,88 @@ def _ma(ctx):
                     "and set the verdict", **observed)
 
 
+def _mq(ctx):
+    """Several conversations at once (parallel_dispatch): the owner names two to four throwaway conversations the app
+    holds, and core's backend sends one short message to each at once; that each receipt is matched and each marker is
+    in its own conversation's history once, and nowhere else, is the person's to confirm."""
+    with ctx.open() as session:
+        loaded = session.call("thread/loaded/list")
+    observed = {"loaded_listed": isinstance(loaded, dict)}
+    return _blocked("send one short message to each of two to four throwaway conversations at once, confirm each "
+                    "receipt is matched and each marker is in its own history once, then set the verdict", **observed)
+
+
+def _me(ctx):
+    """An empty reply (empty_response): the owner names a conversation whose last turn Codex ended with no reply, when
+    Codex produces one; whether that turn's items are only the person's message and reasoning, and whether a final
+    agent item is recorded, are read from the history of the Codex home the backend drives (codex/turns.py) - booleans and a closed word, never a word of
+    the turn's. That this is a turn with no reply is the person's to say."""
+    from .codex import turns
+    from .engine.emptyreply import EMPTY_KINDS
+    home = getattr(ctx.backend, "codex_home", None)
+    if not ctx.thread_given or home is None:
+        return _blocked("name a conversation whose last turn ended with no reply", history_read=False)
+    try:
+        found = turns.Turns(home).latest(ctx.probe_thread)
+    except Exception:
+        return _blocked("the turn history could not be read", history_read=False)
+    observed = {"history_read": True, "turn_found": found is not None}
+    if found is not None:
+        observed.update(completed=found.status == "completed", final_agent=found.final_agent,
+                        empty_kinds_only=set(found.kinds) <= EMPTY_KINDS)
+    return _blocked("confirm the turn ended with no reply, then set the verdict", **observed)
+
+
+def _ms(ctx):
+    """A subagent's stop told to its parent (subagent_parent): the owner names a throwaway parent whose subagent failed;
+    whether a spawn edge is there and the subagent's latest turn can be told as one of the closed kinds are read from
+    the databases of the Codex home the backend drives (codex/lineage.py) - booleans and a closed word, never an id."""
+    from .codex import lineage
+    from .engine.subagent import kind_of
+    home = getattr(ctx.backend, "codex_home", None)
+    if not ctx.thread_given or home is None:
+        return _blocked("name a throwaway parent whose subagent failed", edges_read=False)
+    try:
+        children = lineage.Lineage(home).children(ctx.probe_thread)
+    except Exception:
+        return _blocked("the spawn edges could not be read", edges_read=False)
+    kinds = [kind_of(child) for child in children]
+    observed = {"edges_read": True, "edge_present": bool(children),
+                "child_classified": any(kind is not None for kind in kinds)}
+    if any(kind is not None for kind in kinds):
+        observed["child_kind"] = next(kind for kind in kinds if kind is not None)
+    return _blocked("confirm the parent was told which subagent stopped, then set the verdict", **observed)
+
+
+def _mk(ctx):
+    """A plan's steps (keep_going): the owner names a throwaway conversation with a plan; whether its newest plan item
+    is found and how many of its steps read as each status are read from the history of the Codex home the backend
+    drives (codex/turns.plan_statuses) - counts of closed words, never a step's words."""
+    from .codex import turns
+    home = getattr(ctx.backend, "codex_home", None)
+    if not ctx.thread_given or home is None:
+        return _blocked("name a throwaway conversation with a plan", plan_read=False)
+    try:
+        statuses = turns.Turns(home).plan_statuses(ctx.probe_thread)
+    except Exception:
+        return _blocked("the plan's steps could not be read", plan_read=False)
+    observed = {"plan_read": True, "plan_found": statuses is not None}
+    for word in sorted(turns.STEP_STATUSES | {turns.UNKNOWN}):
+        observed["steps_" + word] = sum(status == word for status in statuses or ())
+    return _blocked("confirm the counts match the plan Codex shows, then set the verdict", **observed)
+
+
+def _mt(ctx):
+    """A message queued while a turn runs (prompt_queue's after_turn): the owner names a throwaway conversation with a
+    turn running, and core's backend queues one short message there; that it was delivered once, after that turn
+    ended, is the person's to confirm."""
+    with ctx.open() as session:
+        loaded = session.call("thread/loaded/list")
+    observed = {"loaded_listed": isinstance(loaded, dict)}
+    return _blocked("queue one short message while a turn runs in a throwaway conversation, confirm it was delivered "
+                    "once after that turn ended, then set the verdict", **observed)
+
+
 def _mw(ctx):
     """Re-proof of the WMI escape, with the heartbeat's job words. The launcher starts a watcher
     outside Codex's job through WMI and hands back the job words its heartbeat recorded."""
@@ -610,6 +692,8 @@ PROBES = {
     Measurement.MH: _mh, Measurement.MA: _ma, Measurement.MW: _mw,
     Measurement.MP1: _mp1, Measurement.MP2: _mp2, Measurement.MP3: _mp3,
     Measurement.MU: _mu, Measurement.MN: _mn, Measurement.MR: _mr,
+    Measurement.MQ: _mq, Measurement.ME: _me, Measurement.MS: _ms, Measurement.MK: _mk,
+    Measurement.MT: _mt,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe

@@ -124,18 +124,20 @@ def engines_instead(rows, codex_exe) -> frozenset:
     return frozenset() if any(path.lower() == held for path in served) else served
 
 
-def desktop_pair(rows, codex_exe, codex_home=None):
+def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False):
     """Bind the configured official engine to exactly one Windows Store app main.
 
     The app's Codex server is the one child of that main running the configured engine; where
     the main has several such children, the one of them holding Codex's queue or state database
-    in `codex_home` open (`_state_holder`), and without a `codex_home` none.
+    in `codex_home` open (`_state_holder`), and without a `codex_home` none. With `require_holder`
+    (v0.6.15-beta, a Codex home other than the default), even one such child must hold that home's
+    database open: an app started on another home holds none of this one's, and its recoveries wait.
     """
     mains = [_app_main(rows)]
     servers = [row for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
                and row["path"].lower() == str(codex_exe).lower() and row.get("parent") == mains[0]["pid"]]
     holder = None
-    if len(servers) > 1:
+    if len(servers) > 1 or (require_holder and servers):
         row, holder = _state_holder(servers, codex_home)
         servers = [row]
     if len(servers) != 1:

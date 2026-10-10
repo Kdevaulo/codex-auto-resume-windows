@@ -65,9 +65,12 @@ def canonical_uuid(value):
 
 
 class Backend:
-    def __init__(self, codex_home: Path, codex_exe: Path):
+    def __init__(self, codex_home: Path, codex_exe: Path, require_holder: bool = False):
         self.codex_home = Path(codex_home).resolve()
         self.codex_exe = Path(codex_exe).resolve()
+        # v0.6.15-beta: a Codex home other than the default is the app's only while its server holds that
+        # home's database open (codex/pairing.py); the default home is paired as it always was.
+        self.require_holder = require_holder
         self._version_signature = None
         self._last_checks = None
         self.engine_version = None
@@ -185,6 +188,8 @@ class Backend:
             self._compatible()
             rows = inventory()
             try:
+                if self.require_holder:
+                    return desktop_pair(rows, self.codex_exe, self.codex_home, require_holder=True)
                 return desktop_pair(rows, self.codex_exe, self.codex_home)
             except AdapterError:
                 # The same rows, read again for one thing: the paths the app main runs instead,

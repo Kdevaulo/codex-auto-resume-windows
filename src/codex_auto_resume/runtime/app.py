@@ -118,6 +118,9 @@ class App(WatchLoop):
         self._settings_stamp_seen = self._settings_stamp()
         self._home_lock = None
         self._plug = None
+        # v0.6.15-beta: the one dispatch lock of this watcher, handed to every engine it builds (one per
+        # Codex home it watches, runtime/homes.py): a send and the watch of a record are never made at once.
+        self._dispatch_lock = threading.RLock()
 
     @property
     def plug(self):
@@ -280,13 +283,27 @@ class App(WatchLoop):
                   "home_lock": lambda: self._home_lock is not None and self._home_lock.held,
                   # v0.6.11: asked only while Wait for an internet connection is on (power.py).
                   "connectivity": network.internet}
-        if dispatch_lock is not None:
-            kwargs["dispatch_lock"] = dispatch_lock
+        kwargs["dispatch_lock"] = dispatch_lock if dispatch_lock is not None else self.dispatch_lock
+        # v0.6.15-beta (P12): a store of its own for each worker that waits for a receipt (engine/launches.py).
+        kwargs["open_store"] = self.worker_store
         engine = Engine(store, source, self.backend(), plug=self.plug, **kwargs)
         engine.apply_policy(self._stored, self.managed)
         self._observe_only(engine)
         self._managed_pause(engine)
         return engine
+
+    def worker_store(self) -> Store:
+        """A connection of its own to the watcher's state, for one worker's launch guard (engine/launches.py): the
+        state the watcher has already opened and upgraded, so it is not checked again."""
+        return Store(self.paths.state_dir, check=False)
+
+    def dispatch_lock(self):
+        """The watcher's one dispatch lock (v0.6.15-beta), as an engine asks for it: the same
+        `threading.RLock` for every engine of this process, made once."""
+        lock = getattr(self, "_dispatch_lock", None)
+        if lock is None:
+            lock = self._dispatch_lock = threading.RLock()
+        return lock
 
     @staticmethod
     def _read_managed():
@@ -354,6 +371,9 @@ class App(WatchLoop):
         previous = self.settings.get("interface_language")
         self.settings = values
         engine.apply_policy(self._stored, held)
+        homes = getattr(self, "_homes", None)
+        if homes is not None:
+            homes.apply_policy(self._stored, held)
         self._observe_only(engine)
         self._managed_pause(engine)
         from ..ui import popup
@@ -463,6 +483,32 @@ class App(WatchLoop):
 
     def home_lock(self) -> HomeLock:
         return HomeLock(self.codex_home, self.lock_dir)
+
+    # ------------------------------------------------------------ other Codex homes (v0.6.15-beta)
+    def extra_home_lock(self, path) -> HomeLock:
+        """The lock of a Codex home Settings add: by its path and its folder's identity, never by one alone."""
+        return HomeLock(path, self.lock_dir, require_identity=True)
+
+    @staticmethod
+    def home_source(path) -> LocalSource:
+        return LocalSource(path)
+
+    @staticmethod
+    def home_backend(path, codex_exe) -> Backend:
+        """A backend whose CODEX_HOME is that home, on the codex.exe the default home's discovery found - one
+        engine binary for all, so the compatibility evaluation, made against the default home, stays one."""
+        return Backend(path, codex_exe, require_holder=True)
+
+    def home_engine(self, store: Store, source, backend, key, held) -> Engine:
+        """The engine of a Codex home other than the default (runtime/homes.py): the NULL plug - the advanced
+        edition acts on the default home only - the watcher's one dispatch lock, that home's key, reader,
+        backend and lock, and the policy every engine has."""
+        engine = Engine(store, source, backend, plug=None, dispatch_lock=self.dispatch_lock, home_key=key,
+                        log=EngineLog(self.logger), notify=Toasts(self._notifier(source), self.logger),
+                        language=l10n.current(), engine_state=self.engine_state, home_lock=held,
+                        connectivity=network.internet)
+        engine.apply_policy(self._stored, self.managed)
+        return engine
 
     def watcher_running(self) -> bool | None:
         """True/False, or None when the probe itself is unavailable."""

@@ -204,12 +204,12 @@ class LaneDurationsTests(unittest.TestCase):
     where the standard lane's took 19 to 29: a file can take one lane far longer than another, as
     tests/test_neutral_plug.py takes 1305 s with the advanced package beside core and 841 s without it."""
 
-    # The longest part of a lane, at most this many times its shortest, by the lane's own table. Dealt by
+    # The longest part of a lane, at most parts.SPREAD times its shortest, by the lane's own table. Dealt by
     # the one table for every lane, the parts today's lane tables predict are 1.21 times apart in the
     # standard lane, 1.24 in the advanced one and 1.45 in the release one; dealt by each lane's own, under
     # 1.01 in all three. These are the tables' figures: measured, the one table's release deal came out
     # 1.30 times apart on dev's CI run 37056482710 and 1.12 in v0.6.12-alpha's release run 37061200703.
-    SPREAD = 1.2
+    # --refresh-seconds refuses a table by the same check (parts.uneven_lanes).
 
     def durations(self, document) -> Path:
         folder = tempfile.TemporaryDirectory()
@@ -305,14 +305,8 @@ class LaneDurationsTests(unittest.TestCase):
         counts = sorted({declared_parts(job(tests, "test")), declared_parts(job(tests, "main-tree")),
                          declared_parts(job(workflow("release.yml"), "test")),
                          declared_parts(job(workflow("sync-ko.yml"), "test"))})
-        for lane in parts.LANES:
-            seconds = parts.load_durations(lane)
-            for count in counts:
-                with self.subTest(lane=lane, count=count):
-                    totals = [sum(seconds.get(name, 0.0) for name in part)
-                              for part in parts.deal(parts.lane_files(lane), count, seconds)]
-                    self.assertLessEqual(max(totals), self.SPREAD * min(totals),
-                                         "the %s lane's parts would take %s s" % (lane, [round(t) for t in totals]))
+        self.assertEqual(parts.SPREAD, 1.2)
+        self.assertEqual(parts.uneven_lanes(counts), [])
 
 
 class SecondsFileTests(unittest.TestCase):

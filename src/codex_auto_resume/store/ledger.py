@@ -17,7 +17,7 @@ import sqlite3
 from .. import failures, ladder, machine
 from ..domain.plug import Alternative, Point
 from .columns import _UNREAD_BY_DISPATCH
-from .validate import is_usage
+from .validate import _finite, is_usage
 
 # What a ledger may do on the claim's connection while it is asked (P11): read anything but the
 # needs-you notices (schema 4), which decide no claim; attach a database of its own; and write,
@@ -144,6 +144,31 @@ class LedgerMixin:
         return (relaxed == "early" and row["category"] == failures.USAGE_LIMIT
                 and row["state"] in ladder.EARLY_STATES and not ledger.null
                 and Point.SCHEDULE in carried)
+
+    @staticmethod
+    def _caps_refusal(connection, row, now, vector, caps, forced):
+        """`reserve_detailed`'s caps, (claims a day, spacing): the conversation's day and spacing, read inside
+        the claim (v0.6.15-beta), a Send now passing the spacing as at the gate - the same two
+        reads as the gates' (`recent_claim_count`, `recent_claims`), so a claim of the same conversation
+        committed after the gates read them - by another engine or a worker's settling - is counted.
+        The refusal is a wait (engine/announce.py `_refused`), never a stop: `attempt_budget` with the
+        gate's own reason."""
+        per_day, cooldown = caps
+        thread, since = row["thread_id"], now - 86400
+        count = int(connection.execute(
+            "SELECT coalesce(sum(max(attempt_count, 1)), 0) FROM interruptions "
+            "WHERE thread_id=? AND coalesce(submitted_at, last_claim_at)>?", (thread, since)).fetchone()[0])
+        if count >= per_day:
+            reason = "daily_submission_cap"
+        else:
+            latest = connection.execute(
+                "SELECT max(coalesce(submitted_at, last_claim_at)) FROM interruptions "
+                "WHERE thread_id=? AND coalesce(submitted_at, last_claim_at)>?", (thread, since)).fetchone()[0]
+            if forced or _finite(latest) is None or now - latest >= cooldown:
+                return None
+            reason = "thread_submission_cooldown"
+        vector["attempt_budget"] = machine.gate(machine.WAIT, reason)
+        return "attempt_budget", reason
 
     @staticmethod
     def _forced_claim(row, now, vector, quiet_until, limits, ledger, carried) -> None:

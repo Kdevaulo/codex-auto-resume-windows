@@ -85,7 +85,7 @@ METHODS = {
     # and the countdown's own end, done or skipped under the one lock, and Windows' refusal remembered.
     "power_batch_finish", "power_refused",
     "list_pending", "preview_continuation", "request_retry_now", "reset_recovery_budget",
-    "restore_defaults", "set_enabled", "set_interruption_recovery", "set_startup_enabled",
+    "restore_defaults", "_strict_homes", "homes_view", "set_enabled", "set_interruption_recovery", "set_startup_enabled",
     "set_thread_enabled", "settings_path", "start_for_codex", "start_watcher",
     "startup_enabled", "statistics", "stop_watcher", "timeline", "update_settings",
     "watcher_running",

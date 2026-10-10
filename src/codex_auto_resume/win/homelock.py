@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 from ..domain.errors import AdapterError
+from . import folderid
 from .kernel import _kernel
 
 
@@ -53,29 +54,44 @@ def install_in_progress():
 
 
 class HomeLock:
-    """An exclusive lock, for the watcher's whole life, on our own file for one Codex home.
+    """An exclusive lock, for the watcher's whole life, on our own files for one Codex home.
 
     The single-instance mutex is per state directory and per logon session. Two
     installations with different state directories - or one in another session of the
-    same user - could otherwise both recover the same Codex conversations. The file is
+    same user - could otherwise both recover the same Codex conversations. The files are
     ours, under the user's local application data, never anything of Codex's.
+
+    Two files since v0.6.15-beta: the one named by the home's resolved path (as homes.key), as since
+    v0.6.0, taken first - so a watcher of an earlier version, which takes that one alone, is still
+    excluded by the same spelling - and one named by the folder's identity (win/folderid.py), which no
+    spelling changes, so one folder named twice - a subst drive, a share of the same disk - is one home.
+    Either busy is busy, and nothing is left held. A folder whose identity cannot be read now is locked
+    by its path alone, as before: the default home before Codex made it. A home that needs it
+    (`require_identity`, a home a person added) is not locked at all then: "home_unavailable".
     """
 
-    def __init__(self, codex_home, base=None):
-        resolved = os.path.normcase(str(Path(codex_home).resolve()))
+    def __init__(self, codex_home, base=None, *, require_identity=False):
+        self.home = Path(codex_home)
         root = Path(base) if base else Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "codex-auto-resume" / "homes"
+        self.root = root
+        # The name homes.key gives a home too, worked out here: the platform asks nothing of the policy above it.
+        resolved = os.path.normcase(str(Path(codex_home).resolve()))
         self.path = root / (hashlib.sha256(resolved.encode("utf-8")).hexdigest() + ".lock")
-        self._fd = None
+        self.require_identity = require_identity
+        self.identity = None
+        self._fd = self._id_fd = None
 
     @property
     def held(self) -> bool:
         return self._fd is not None
 
-    def __enter__(self):
+    @staticmethod
+    def _take(path):
+        """A descriptor of `path` holding its first byte exclusively, or AdapterError."""
         import msvcrt
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
         except OSError:
             raise AdapterError("home_lock_unavailable") from None
         try:
@@ -84,16 +100,35 @@ class HomeLock:
         except OSError:
             os.close(fd)
             raise AdapterError("home_lock_busy") from None
-        self._fd = fd
+        return fd
+
+    @staticmethod
+    def _let_go(fd):
+        import msvcrt
+        try:
+            os.lseek(fd, 0, 0)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+        os.close(fd)
+
+    def __enter__(self):
+        identity = folderid.identity(self.home)
+        if identity is None and self.require_identity:
+            raise AdapterError("home_unavailable")
+        fd = self._take(self.path)
+        if identity is not None:
+            try:
+                self._id_fd = self._take(self.root / ("id-%s.lock" % identity))
+            except AdapterError:
+                self._let_go(fd)
+                raise
+        self._fd, self.identity = fd, identity
         return self
 
     def __exit__(self, *unused):
-        if self._fd is not None:
-            import msvcrt
-            try:
-                os.lseek(self._fd, 0, 0)
-                msvcrt.locking(self._fd, msvcrt.LK_UNLCK, 1)
-            except OSError:
-                pass
-            os.close(self._fd)
-            self._fd = None
+        for name in ("_id_fd", "_fd"):
+            fd = getattr(self, name)
+            if fd is not None:
+                self._let_go(fd)
+                setattr(self, name, None)

@@ -35,6 +35,7 @@ class DispatchMixin:
             self._attempt(row)
         finally:
             self._early_look = self._schedule_said = None
+            self._free_slot()               # a worker taken for a send that did not go to it (engine/delivery.py)
 
     def _attempt(self, row):
         now = self.clock()
@@ -158,7 +159,7 @@ class DispatchMixin:
             return
         vector["no_newer_user_work"] = machine.gate(machine.PASS)
         recent = self.store.recent_claims(row["thread_id"], now - 86400)
-        per_day = ladder.CAPACITY_PER_DAY if capacity else self.options["max_submissions_per_thread_per_day"]
+        per_day, cooldown = self.caps(relaxed)
         if self.store.recent_claim_count(row["thread_id"], now - 86400) >= per_day:
             # Defer until the oldest claim rolls out of the 24h window rather than
             # permanently abandoning a still-valid interruption. Bounded to N/day per thread.
@@ -166,7 +167,6 @@ class DispatchMixin:
             self._wait(row, "waiting_retry", "daily_submission_cap",
                        max(60, min(recent) + 86400 - now + 5), vector)
             return
-        cooldown = ladder.CAPACITY_SPACING if capacity else self.options["thread_cooldown_seconds"]
         if recent and now - max(recent) < cooldown and not forced:
             vector["attempt_budget"] = machine.gate(machine.WAIT, "thread_submission_cooldown")
             self._wait(row, "waiting_retry", "thread_submission_cooldown", cooldown, vector)
@@ -200,19 +200,6 @@ class DispatchMixin:
             return False
         return self._held(name, row, vector, self.plug.gate(name, row, dict(vector)))
 
-    def _held(self, name, row, vector, answer) -> bool:
-        """Whether the plug's answer at gate `name` holds this record, which core would let go.
-
-        HOLD only restricts: the gate is recorded as waiting, and the record keeps its state and
-        its reason for one more poll, as on any wait of core's own. Every other answer lets core go
-        on as it would have with no plug at all - known_failure's words aside (_known_failure)."""
-        if answer is not Alternative.HOLD:
-            return False
-        vector[name] = machine.gate(machine.WAIT, machine.HELD)
-        self._wait(row, row["state"], row.get("last_error"), self.options["state_poll_seconds"],
-                   vector)
-        return True
-
     def dispatch(self, row, app, vector, limits, route=None, relaxed=None, resend=False, forced=False,
                  record=False):
         """Claim, re-check, send. The only method that sends: to core's backend, or to the
@@ -232,6 +219,7 @@ class DispatchMixin:
                 current, message, worded = row, row["words"], False
             else:
                 key = row["interruption_id"]
+                self._take_slot(resend, route)      # P12: before the re-checks, so they are fresh at the claim
                 current = self.store.get(key)
                 if not current or not self.allowed(current) or not (
                         self._resendable(current, self.clock()) if resend else current["state"] in UNSENT):
@@ -252,7 +240,7 @@ class DispatchMixin:
                     if not resend and not self._parked(current, vector):
                         self.transition(current, "waiting_for_usage", "usage_recheck_failed", delay=900)
                     return
-                if route is not None:
+                if route is not None and route is not Alternative.QUEUE_FOR_OPEN:
                     self._resume_unloaded(current, vector, limits, route, app, relaxed=relaxed, forced=forced)
                     return
                 # The text is decided before the claim, not after it. Building it reads catalogs
@@ -285,7 +273,7 @@ class DispatchMixin:
                 # P15, decided like them before the claim, and written into the record before it - for a
                 # resend, the proof its first send carried, or nothing is sent (engine/delivery.py).
                 client = self._delivery(current, sender, resend=resend)
-                if client is False:
+                if client is False or self._not_for_open(current, route, sender, client, vector):
                     return
                 # P11 is asked inside the claim, once every check the store makes there has passed.
                 # The claim is told which of the plug's answers the send carries - its words, its
@@ -297,12 +285,14 @@ class DispatchMixin:
                                                                (Point.SENDER, sender is not self.backend),
                                                                (Point.DELIVERY, client is not None))
                                     if taken) | self.relaxed_points("resend" if resend else relaxed)
-                carried |= self.relaxed_points("forced" if forced else None)
+                carried |= (self.relaxed_points("forced" if forced else None) | self._pooled(sender, client)
+                            | ({Point.UNLOADED} if route is Alternative.QUEUE_FOR_OPEN else frozenset()))
                 at = self.clock()
                 claimed, gate, reason = self.store.reserve_detailed(
                     key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector,
                     ledger=self.plug, carried=carried, quiet_until=self.quiet_until(at), relaxed=relaxed,
-                    resend=self.resend_window() if resend else None, forced=forced)
+                    resend=self.resend_window() if resend else None, forced=forced,
+                    caps=None if resend else self.caps(relaxed))
                 if not claimed:
                     if not resend:                          # a resend refused stays as it was
                         self._refused(current, gate, reason)
@@ -331,6 +321,8 @@ class DispatchMixin:
                 words, carrying = ((message, {"client_id": client}) if client is not None
                                    else (message + "\n\n" + claim["marker"], {}))
                 thread, launch_guard = claim["thread_id"], self.store.submission_guard(key)
+            if self._launched(current, sender.send, thread, words, current.get("interruption_id"), carrying):
+                return                      # its receipt is waited for on a worker, and settled by the pool
             try:
                 response = sender.send(thread, words, launch_guard=launch_guard, **carrying)
             except Exception:

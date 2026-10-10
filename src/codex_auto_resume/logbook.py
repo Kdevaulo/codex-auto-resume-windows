@@ -113,6 +113,9 @@ _MESSAGES = {
     ("plug_record_send_started", None): "an advanced record's send started",
     ("plug_record_sent", None): "an advanced record was sent",
     ("plug_record_not_started", None): "an advanced record's send never started; it waits again",
+    # v0.6.15-beta: one taken back out of Codex's queue on a Cancel or a Pause, or one Codex would not give back.
+    ("plug_record_withdrawn", None): "an advanced record was taken back out of Codex's queue; nothing was sent",
+    ("plug_record_withdraw_refused", None): "Codex did not give an advanced record back; it is left there, never sent again",
     # v0.6.14: a failure the edition's plug took up (domain/plug.py, P17); never in the standard edition.
     ("failure_taken_up", None): "failure of a kind recovered only on request taken up (interruption {detail12})",
     # v0.6.11: the two guards (guards.py), each only when it is on.

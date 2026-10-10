@@ -1349,7 +1349,8 @@
                 "attempt_limit": null,
                 "name": null,
                 "project": null,
-                "cwd_basename": null
+                "cwd_basename": null,
+                "home": null
               },
               {
                 "interruption_id": "8888888888888888888888888888888888888888888888888888888888888888",
@@ -1442,7 +1443,8 @@
                 "attempt_limit": 4,
                 "name": null,
                 "project": null,
-                "cwd_basename": null
+                "cwd_basename": null,
+                "home": null
               }
             ],
             "reasons": [

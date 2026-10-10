@@ -139,8 +139,10 @@ jobs:
         run: python scripts/test_parts.py --lane $env:CODEX_AR_EDITION --part "$env:PART/$env:PARTS" -v --annotate --seconds "$env:RUNNER_TEMP\seconds.json"
 
       - name: Keep this part's seconds per file
-        # tests/data/durations.json is what the parts are dealt by, and it is refreshed from these:
-        # `gh run download <run> -p 'seconds-*'`, then scripts/test_parts.py --merge-seconds. Read
+        # tests/data/durations.json is what the parts are dealt by, and it is refreshed from these
+        # without a person: after every green run on dev, durations.yml reads them and commits a new
+        # table to dev when it shortens some lane's longest part by enough (scripts/test_parts.py
+        # --refresh-seconds). By hand: `gh run download <run> -p 'seconds-*'`, then --merge-seconds. Read
         # from the job log instead, a file's seconds were its lines' timestamps, and a test with a
         # docstring was credited to the file after it. A failed part timed its files too, so this
         # runs whatever the suite did; a re-run's seconds replace the first attempt's.

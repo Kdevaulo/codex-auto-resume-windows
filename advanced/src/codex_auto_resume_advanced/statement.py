@@ -83,7 +83,7 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "tripped.statement_changed", "tripped.engine_changed",
     # v0.6.14: a capability's own choices, the rules for Codex's error codes and the samples of what nothing
     # classified, and what the page says of each.
-    "options", "option.attempts", "option.ceiling_hours", "option.hours", "done.option", "refused.option",
+    "options", "option.attempts", "option.ceiling_hours", "option.workers", "option.days", "option.hours", "done.option", "refused.option",
     "refused.choice", "rules", "rules.none", "rules.full", "rule.code", "rule.sampled", "rule.status",
     "rule.any_status", "rule.kind", "rule.hits", "rule.add", "rule.remove", "rule.known", "done.rule_added",
     "done.rule_removed", "refused.rule_shape", "refused.rule_known", "refused.rule_decision",
@@ -94,7 +94,7 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "keep_on.turn_off", "confirm.keep_on", "confirm.send_again", "done.keep_on", "done.keep_on_off",
     "refused.not_on", "kept.statement_changed", "kept.measurement_failed", "kept.failed_here", "kept.incompatible",
     "kept.local_check_failed", "kept.hook_exception", "kept.submission_unknown", "kept.engine_changed",
-    "kept.duplicate_seen", "tripped.duplicate_seen", "send_now.title", "send_now.none", "send_now.button",
+    "kept.duplicate_seen", "tripped.duplicate_seen", "kept.not_delivered_on_open", "tripped.not_delivered_on_open", "send_now.title", "send_now.none", "send_now.button",
     "confirm.send_now", "done.send_now",
     # In place of the limits, for an action (the compatibility report), which sends nothing to Codex: what bounds it.
     "action_limits",
@@ -107,6 +107,7 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "watchlog.answer.as_server_5xx", "watchlog.answer.as_stream_interrupted", "watchlog.answer.capacity",
     "watchlog.answer.early", "watchlog.answer.resend", "watchlog.answer.send_now", "watchlog.answer.text",
     "watchlog.answer.sender", "watchlog.answer.tick", "watchlog.answer.start_route", "watchlog.answer.unloaded",
+    "watchlog.answer.concurrency", "watchlog.answer.queue_for_open",
     "watchlog.answer.other",
     # v0.6.14: the reset actions (advanced/gui/AdvancedResets.cs) - the rules of a reset credit and of a message at a
     # reset, the form they are added with, each word a rule's state and reason can be said in, the questions, notes
@@ -143,6 +144,25 @@ REPORT_KEYS = (tuple(REPORT_PREFIX + name for name in (
     + tuple(REPORT_PREFIX + "web." + str(reason) for reason in WebReason)
     + tuple(REPORT_PREFIX + "refused." + str(code) for code in ReportRefusal))
 PAGE_KEYS = PAGE_KEYS + REPORT_KEYS
+# Keep going's card and the prompt queue's, on the page and Pending (v0.6.15-beta: advanced/gui/AdvancedKeepGoing.cs,
+# AdvancedQueue.cs).
+PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
+    "keep.title", "keep.none", "keep.count", "keep.button", "keep.line",
+    "keep.stop", "keep.capped", "confirm.keep_going", "done.keep_going", "refused.keep_count_invalid",
+    "queue.title", "queue.none", "queue.add", "queue.when", "queue.when.after_turn",
+    "queue.when.at_time", "queue.when.daily", "queue.when.weekly", "queue.hour", "queue.times",
+    "queue.depends", "queue.depends.no", "queue.depends.yes", "queue.button", "queue.line",
+    "queue.at", "queue.series", "queue.state.waiting", "queue.state.held", "queue.state.in_codex",
+    "queue.state.being_sent", "queue.state.refused", "queue.unproven", "queue.go_on", "confirm.prompt",
+    "done.prompt_added", "refused.prompt_refused", "refused.queue_full", "refused.dependency_unknown",))
+# The edition's own continuations' words (v0.6.15-beta): what empty_response, subagent_parent and keep_going send -
+# fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
+# subagent's line, its id and a closed kind word).
+CONTINUE_PREFIX = "continue."
+CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "subagent.line",
+                      CONTINUE_PREFIX + "keep_going")
+                     + tuple(CONTINUE_PREFIX + "subagent.kind." + kind
+                             for kind in ("usage_limit", "temporary", "interrupted", "error")))
 
 
 def name_key(capability) -> str:

@@ -49,7 +49,9 @@ rules for Codex's error codes, the retries of failures nothing classified, of Co
 of a sign-in failure (engine/admitted.py); at P8 and P7, a reset credit used at the limit a person picked
 (engine/credits.py), and at P8, P2 and P3 a message of a person's own sent when the window they picked resets
 (engine/resetmessage.py); and, at P7 and P3, the notice of a usage limit that lifts early (engine/earlyreset.py); at P7, an uncertain continuation sent once more (engine/oncemore.py),
-and one waiting recovery a person asks to send now (control/sendnow.py); and, at no point, two actions: longer
+and one waiting recovery a person asks to send now (control/sendnow.py); at P12, several conversations at once
+(engine/parallel.py); at P16, a conversation queued in Codex for when it is opened (engine/foropen.py); and, at no
+point, two actions: longer
 reset messages, and the compatibility report (report/). The tests define one of their own to hold every
 rule here.
 """
@@ -69,9 +71,15 @@ from .engine.capacity import CEILING_HOURS, DEFAULT_HOURS, make as make_capacity
 from .engine.credits import make as make_reset_credit
 from .engine.resetmessage import make as make_reset_message, make_long as make_long_messages
 from .engine.earlyreset import make as make_early_reset
+from .engine.emptyreply import make as make_empty_response
+from .engine.subagent import make as make_subagent_parent
+from .engine.keepgoing import make as make_keep_going
+from .engine.promptqueue import make as make_prompt_queue
+from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
 from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
+from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
 from .vocabulary import CapabilityKind, Measurement, OptionKey
@@ -338,13 +346,39 @@ MARKER_FREE = CapabilityDef(
 GOAL_CONTINUATION = CapabilityDef(
     id="goal_continuation",
     points=frozenset({Point.UNLOADED, Point.GATES, Point.SENDER}),
-    revision=1,
+    # Revision 2 (v0.6.15-beta): its risks say it acts on a conversation the app holds where M2b passed.
+    revision=2,
     departs_from=("0.5", "A2", "A11", "B3", "B4"),
     compat="loaded_state_detection",
     ceilings=Ceilings(per_day=12, per_conversation=3),
     journal_prefix="goal",
     make=make_goal_continuation,
     measurements=(Measurement.M2,),
+)
+
+# Queue for opening (v0.6.15-beta; the plan's item 4: an unloaded conversation through the deferred queue). At P16,
+# for a usage-limited conversation the Codex app does not hold (notLoaded, never unknown), it answers QUEUE_FOR_OPEN:
+# core sends its own words with its marker through its own backend, under the one claim - which writes this
+# capability's override, one per interruption (ledger.py) - and leaves the item in Codex's queue for when the
+# conversation is opened. In the watch it keeps the item queued while the override is within the person's Days (3 to
+# 7, 3 by default); core takes it back at seven days and an hour whatever it answers, and at once when it is turned
+# off. Opened and not delivered within core's 180 seconds, the item is taken back, given back to waiting and sent the
+# ordinary way, and this turns off (NOT_DELIVERED_ON_OPEN). It departs from A11 (nothing is queued on the off chance)
+# and keeps A17, H4 and H6 - every withdrawal still fires at once - and stands on loaded_state_detection, what decides
+# that a conversation is not held. Its route rests on M1, passed on codex-cli 0.158 and a warning on any other.
+# Ceilings: three a conversation a day, a dozen a day in all. After the goal continuation, whose route comes first
+# where both are on and a goal applies.
+QUEUE_FOR_OPEN = CapabilityDef(
+    id="queue_for_open",
+    points=frozenset({Point.UNLOADED}),
+    revision=1,
+    departs_from=("A11",),
+    compat="loaded_state_detection",
+    ceilings=Ceilings(per_day=12, per_conversation=3),
+    journal_prefix="qfo",
+    make=make_queue_for_open,
+    options=(Option(OptionKey.DAYS, DAYS, DEFAULT_DAYS),),
+    measurements=(Measurement.M1,),
 )
 
 # Short retries when Codex is at capacity (v0.6.14 stage 3b; the plan's row: serverOverloaded alone,
@@ -356,15 +390,16 @@ GOAL_CONTINUATION = CapabilityDef(
 # and five, lengthened by up to a fifth, a minute apart, 48 a day, twelve hours on the clock
 # (ladder.py) - so it departs from A20 (five a conversation a day, fifteen minutes apart), A21 (the
 # attempt, no-progress and continuation budgets), A22 (waits only from the retry timing) and B9 (it
-# reads Codex's error code, not only a kind). It stands on transient_classification, the history
-# table the failure's kind and code are read from, and rests on no measurement: core sends what it
-# always sends. Its ceilings are core's capacity day, 48 in one conversation and in all, which only
-# A20's departure allows.
+# reads Codex's error code, not only a kind), and from H2 (nothing can move an engine constant: A20's
+# caps are the engine's, and a person's choice moves them here). It stands on transient_classification,
+# the history table the failure's kind and code are read from, and rests on no measurement: core sends
+# what it always sends. Its ceilings are core's capacity day, 48 in one conversation and in all, which
+# only A20's departure allows. Revision 2 (v0.6.15-beta) names H2, where revision 1 did not.
 CAPACITY_RETRY = CapabilityDef(
     id="capacity_retry",
     points=frozenset({Point.ADMISSION, Point.GATES}),
-    revision=1,
-    departs_from=("A20", "A21", "A22", "B9"),
+    revision=2,
+    departs_from=("A20", "A21", "A22", "B9", "H2"),
     compat="transient_classification",
     ceilings=Ceilings(per_day=48, per_conversation=48),
     journal_prefix="cap",
@@ -380,14 +415,16 @@ CAPACITY_RETRY = CapabilityDef(
 # matching rule names (AS_*), and at known_failure the same word again while that rule is there - its
 # removal ends what it took up. Core paces it as that kind, counts it against that kind's budget and
 # follows that kind's switch. It departs from 0.5 (unknown failures are never retried), A13 and A14
-# (only classified kinds), A26 (continuation text for a recovered kind) and B9 (it reads Codex's code),
-# and stands on transient_classification. Its hits are counted (`matched`) the first time core goes on
-# with what a rule took up. Ceilings: five a conversation, two dozen a day.
+# (only classified kinds), A26 (continuation text for a recovered kind), B9 (it reads Codex's code) and
+# H2 (nothing can retry an unknown failure: a rule is a person's setting, and it retries only what
+# nothing classified), and stands on transient_classification. Its hits are counted (`matched`) the
+# first time core goes on with what a rule took up. Ceilings: five a conversation, two dozen a day.
+# Revision 2 (v0.6.15-beta) names H2, where revision 1 did not.
 STRUCTURED_RULES = CapabilityDef(
     id="structured_rules",
     points=frozenset({Point.ADMISSION, Point.GATES}),
-    revision=1,
-    departs_from=("0.5", "A13", "A14", "A26", "B9"),
+    revision=2,
+    departs_from=("0.5", "A13", "A14", "A26", "B9", "H2"),
     compat="transient_classification",
     ceilings=Ceilings(per_day=24, per_conversation=5),
     journal_prefix="rule",
@@ -404,13 +441,13 @@ STRUCTURED_RULES = CapabilityDef(
 # come first; at known_failure ADMIT again. Core waits ten minutes, then 15 and 30
 # (ladder.ADMITTED_WAITS), and its own no-progress and chain budgets still bind. The first time core
 # goes on with one it keeps a sample (state/choices.py; `sampled`). It departs from 0.5, A13, A14,
-# A26 and B9 as the rules do, and from D2 too: a sample keeps a code Codex chose. Ceilings: three a
-# conversation, a dozen a day.
+# A26, B9 and H2 as the rules do, and from D2 too: a sample keeps a code Codex chose. Ceilings: three
+# a conversation, a dozen a day. Revision 2 (v0.6.15-beta) names H2, where revision 1 did not.
 UNKNOWN_FAILURE_BUDGET = CapabilityDef(
     id="unknown_failure_budget",
     points=frozenset({Point.ADMISSION, Point.GATES}),
-    revision=1,
-    departs_from=("0.5", "A13", "A14", "A26", "B9", "D2"),
+    revision=2,
+    departs_from=("0.5", "A13", "A14", "A26", "B9", "D2", "H2"),
     compat="transient_classification",
     ceilings=Ceilings(per_day=12, per_conversation=3),
     journal_prefix="unk",
@@ -499,7 +536,9 @@ RESET_CREDIT = CapabilityDef(
 RESET_MESSAGE = CapabilityDef(
     id="reset_message",
     points=frozenset({Point.TICK, Point.RECORDS, Point.GATES}),
-    revision=1,
+    # Revision 2 (v0.6.15-beta): a Pause takes back a message Codex already holds and cancels it (core's
+    # engine/plugrecords.py), which its statement's H4 now says.
+    revision=2,
     departs_from=("A8", "A17", "A26", "C4", "C9", "D2", "H4", "H6"),
     compat="exact_thread_recovery",
     ceilings=Ceilings(per_day=10, per_conversation=2),
@@ -579,6 +618,110 @@ SEND_NOW = CapabilityDef(
     codes=("requested",),
 )
 
+# Several conversations at once (v0.6.15-beta; the plan's row: parallel processing across conversations). At P12 it
+# answers how many sends may wait for their receipts at once - the Workers option, 2 by default, 2 at most until MQ
+# passes on the Codex in force - and core lets that many wait on workers, one in each conversation, while every gate,
+# claim and look stays on the tick (core's engine/launches.py). Each pooled claim pays one unit, so a pooled send whose
+# fate cannot be known turns it off (K7). It departs from 0.5 (one recovery dispatched at a time) and A19 (in sequence,
+# under one lock) - and keeps A19's one continuation in flight per conversation - and stands on exact_thread_recovery.
+# Ceilings: core's five a conversation a day, 48 a day in all.
+PARALLEL_DISPATCH = CapabilityDef(
+    id="parallel_dispatch",
+    points=frozenset({Point.CONCURRENCY}),
+    revision=1,
+    departs_from=("0.5", "A19"),
+    compat="exact_thread_recovery",
+    ceilings=Ceilings(per_day=48, per_conversation=CORE_DAILY_CAP),
+    journal_prefix="par",
+    make=make_parallel,
+    options=(Option(OptionKey.WORKERS, WORKERS, DEFAULT_WORKERS),),
+    measurements=(Measurement.MQ,),
+)
+
+# The prompt queue (v0.6.15-beta; the plan's item 7, on reset_message's way). A person queues messages of their own
+# for one conversation in the Dashboard - after the turn now running, at a time, or every day or week from a time, 30
+# times and 30 days at most - and at P2 each conversation's first one still to go is made due and handed core with its
+# words, a P2 MESSAGE core sends exactly as typed: in order, each once, one waiting for the one before it to arrive
+# where asked, paced like every recovery (A20 kept, the owner's answer). Cancel and a Pause take back one Codex already
+# holds (the owner's answer of 2026-10-09). It departs from A8, A17, A26, A27, C4, D2, H4 and H6 as its statement says,
+# and stands on exact_thread_recovery. Its after_turn route rests on MT. Ceilings: core's five a conversation, thirty a
+# day. Before the edition's own continuations, so a person's message is handed first (P2's eight).
+PROMPT_QUEUE = CapabilityDef(
+    id="prompt_queue",
+    points=frozenset({Point.RECORDS}),
+    revision=1,
+    departs_from=("A8", "A17", "A26", "A27", "C4", "D2", "H4", "H6"),
+    compat="exact_thread_recovery",
+    ceilings=Ceilings(per_day=30, per_conversation=CORE_DAILY_CAP),
+    journal_prefix="queue",
+    make=make_prompt_queue,
+    codes=("due", "sent", "delivered", "unknown", "expired", "missed", "held", "superseded"),
+    measurements=(Measurement.MT,),
+)
+
+# Empty-response recovery (v0.6.15-beta; the plan's item 3). At P8, at most once a minute, it looks at the
+# conversations with a turn completed in the last hour: one switched on whose latest turn Codex completed with no
+# error, no final agent item and only a message of the person's and Codex's reasoning in it - judged by kinds alone
+# (codex/turns.py) - seen so twice, thirty seconds apart and ten after it ended, is continued once in the edition's
+# own words, its turn's record a P2 CONTINUATION that core sends only while that turn is the latest. A goal Codex
+# keeps going or stopped (active, blocked) is left alone; goals unreadable, nothing. Twice a chain at most. It departs
+# from 0.5 (a completed turn is no failure), A13 (only classified failures) and A26 (words of its own), and stands on
+# outcome_observation, the history its kinds are read from. Its route rests on ME. Ceilings: two a conversation, a
+# dozen a day.
+EMPTY_RESPONSE = CapabilityDef(
+    id="empty_response",
+    points=frozenset({Point.TICK, Point.RECORDS}),
+    revision=1,
+    departs_from=("0.5", "A13", "A26"),
+    compat="outcome_observation",
+    ceilings=Ceilings(per_day=12, per_conversation=2),
+    journal_prefix="empty",
+    make=make_empty_response,
+    codes=("found", "goal_left", "chain_spent", "sent", "delivered", "unknown", "superseded"),
+    measurements=(Measurement.ME,),
+)
+
+# Subagent recovery through the parent (v0.6.15-beta; the plan's item 5). At P4, for a core continuation of a parent
+# whose subagents stopped on a failure, it adds one line a subagent, at most five, in fixed words with only the
+# subagent's id and a closed kind word varying (5a); at P8 and P2, once MS passes on the Codex in force, one
+# continuation of its own to a parent that finished normally after a subagent stopped (5b). Every record is the
+# parent's: nothing is ever sent to a subagent. It departs from 0.5 (only failed turns are recovered), A15 (subagents
+# are never detected or recovered) and A26 (words of its own), and stands on thread_eligibility, which conversations
+# are a person's own. Its route rests on MS. Ceilings: three a conversation, a dozen a day.
+SUBAGENT_PARENT = CapabilityDef(
+    id="subagent_parent",
+    points=frozenset({Point.TEXT, Point.TICK, Point.RECORDS}),
+    revision=1,
+    departs_from=("0.5", "A15", "A26"),
+    compat="thread_eligibility",
+    ceilings=Ceilings(per_day=12, per_conversation=3),
+    journal_prefix="sub",
+    make=make_subagent_parent,
+    codes=("told", "followed_up", "sent", "delivered", "unknown", "superseded"),
+    measurements=(Measurement.MS,),
+)
+
+# Keep going (v0.6.15-beta; the plan's item 6). A person picks conversations in the Dashboard, each with a count of 1
+# to 10; at P8, at most once a minute, a picked conversation whose latest turn ended well and that has been idle a
+# minute is sent one continuation of the edition's own words, a P2 CONTINUATION core sends only while that turn is the
+# latest. It stops on no progress, a finished plan (its steps' statuses alone), an unreadable plan, the count used, an
+# active goal, a failed or interrupted turn, and the conversation switched off. Until MK passes on the Codex in force,
+# three at most are sent. It departs from A13 (only failures are recovered), A26 (words of its own) and B9 (a plan's
+# step statuses are read from an item's content), and stands on outcome_observation. Ceilings: core's five a
+# conversation, two dozen a day.
+KEEP_GOING = CapabilityDef(
+    id="keep_going",
+    points=frozenset({Point.TICK, Point.RECORDS}),
+    revision=1,
+    departs_from=("A13", "A26", "B9"),
+    compat="outcome_observation",
+    ceilings=Ceilings(per_day=24, per_conversation=CORE_DAILY_CAP),
+    journal_prefix="keep",
+    make=make_keep_going,
+    codes=("found", "stopped", "sent", "delivered", "unknown", "superseded"),
+    measurements=(Measurement.MK,),
+)
+
 # Longer reset messages (v0.6.14, the owner's answer of 2026-10-08): a message sent at a reset may be up to what one
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
@@ -587,7 +730,8 @@ LONG_RESET_MESSAGE = CapabilityDef(
     id="long_reset_message",
     kind=CapabilityKind.ACTION,
     points=frozenset(),
-    revision=1,
+    # Revision 2 (v0.6.15-beta): "Longer messages" - a queued prompt's too (engine/promptqueue.py).
+    revision=2,
     departs_from=("A27",),
     compat=None,
     ceilings=None,
@@ -623,7 +767,31 @@ COMPAT_REPORT = CapabilityDef(
 
 # In this order, which is also which answers first where two answer at one point; the action, which
 # answers at none, last.
-DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
+DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
-               ONCE_MORE, SEND_NOW, LONG_RESET_MESSAGE, COMPAT_REPORT)
+               ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
+               LONG_RESET_MESSAGE,
+               COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)
+
+# The order a person sees them in - the Dashboard's Advanced features page and every list arming.listing
+# answers - which is not the order above: that one decides which answers first, and this one only what is
+# read first. The owner's order, 2026-10-10 ("고급 기능 순서를 중요하고 많이 쓸만한거 순서대로 해줘. 그리고
+# 호환성 보고서를 제일 위로 해줘"): the compatibility report at the top, then 1) what gets work going again
+# after a usage limit with no hands, 2) what saves the person work, 3) the other common failures, 4) rare
+# cases and expert settings. A measurement's warning never pushes a capability down. Every capability of
+# DEFINITIONS appears here exactly once (test_advanced_registry holds it).
+SHOWN_ORDER = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
+               "early_reset", "parallel_dispatch", "reset_message", "long_reset_message", "keep_going",
+               "prompt_queue", "empty_response", "once_more_when_unsure", "send_now", "capacity_retry",
+               "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
+               "structured_rules")
+
+
+def shown(registry) -> tuple:
+    """`registry`'s capabilities in SHOWN_ORDER; any it does not name (a registry a test made) after
+    them, in the registry's own order."""
+    place = {capability: index for index, capability in enumerate(SHOWN_ORDER)}
+    definitions = tuple(registry)
+    return tuple(sorted(definitions, key=lambda definition: (place.get(definition.id, len(place)),
+                                                             definitions.index(definition))))

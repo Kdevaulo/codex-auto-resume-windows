@@ -56,12 +56,15 @@ import time
 from codex_auto_resume import continuation, failures
 from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, RECORD_MOVES, RESTRICTIONS,
                                            TAKE_UP, Alternative, Point, RecordMove)
+from codex_auto_resume.domain.plughands import RECORDS_LIMIT, workers
 
 from .arming import Arming
+from .engine import foropen
 from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
-from .vocabulary import TRIPWIRES, ArmingState, CapabilityKind, JournalCode, OffReason
+from .vocabulary import (TRIPWIRES, ArmingState, CapabilityKind, ContinuationReason, JournalCode, KeepReason,
+                         OffReason, OverrideKind, PromptReason)
 
 # How long what every capability stands at is taken as read, between ticks. A tick reads it
 # again; a process that has no ticks - the bridge, the MCP server - reads it at most this often.
@@ -85,6 +88,12 @@ HELD_AT_CEILING = TAKE_UP - {Alternative.CAPACITY}
 NOTED_LIMIT = 4096
 # The state core holds a record in whose send may or may not have reached Codex.
 SUBMISSION_UNKNOWN = "submission_unknown"
+# Core's word for a queued item it took back, and (v0.6.15-beta) the reason one queued for opening was taken back
+# because Codex did not run it when the conversation was opened (core's engine/foropen.py).
+WITHDRAWN_UNCONFIRMED = "withdrawn_unconfirmed"
+NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
+# Keep going's capability, whose continuations are counted as used at SENT.
+KEEP_GOING = "keep_going"
 
 
 def _taken(point, answer) -> bool:
@@ -98,6 +107,10 @@ def _taken(point, answer) -> bool:
         if point == Point.SENDER:
             return callable(getattr(answer, "send", None))
         if point == Point.UNLOADED:
+            # A route core resumes the conversation with, or (v0.6.15-beta) QUEUE_FOR_OPEN: core's own send left in
+            # Codex's queue for when the conversation is opened.
+            if isinstance(answer, str):
+                return answer == Alternative.QUEUE_FOR_OPEN
             return callable(getattr(answer, "resume", None))
     except Exception:                              # unhashable, refused, a `send` that raises
         return False
@@ -178,6 +191,7 @@ class Runtime:
         self._noted = set()
         # (capability, record) a kept-on capability's hook raised for: passed over for it (K8).
         self._skipped = set()
+        self._records_turn = 0
         # The measurement harness's seams (measure.py). A person runs a measurement; production
         # opens a real one-turn session against the installed Codex and records to the source
         # tree, and a test gives a fake session and a temporary directory, so no test opens a
@@ -260,6 +274,9 @@ class Runtime:
         relaxing = point == Point.GATES and _known_failure(arguments[0]) and isinstance(record, dict)
         admission = self._admission_of(record) if relaxing else None
         key = record.get("interruption_id") if isinstance(record, dict) else None
+        # P16 in the watch (v0.6.15-beta): whether a continuation queued for opening stays queued. It was paid for at
+        # its claim; nothing is spent or carried again, so neither a ceiling nor the claim is asked.
+        kept = point == Point.UNLOADED and foropen.watching(record)
         chosen = chooser = None
         for definition in definitions:
             state = states.get(definition.id, ArmingState.OFF)
@@ -281,7 +298,7 @@ class Runtime:
                 return answer
             if chooser is not None:
                 continue
-            if point in SENDING:
+            if point in SENDING and not kept:
                 if not isinstance(record, dict) or self._ceiling(definition, record) is not None:
                     self._once(JournalCode.CEILING, definition, point, answer, record)
                     if relaxing and answer in HELD_AT_CEILING:
@@ -298,7 +315,7 @@ class Runtime:
             return getattr(NULL, HOOKS[point])(*arguments)
         if relaxing and _relaxes(chosen) and not self._first(chooser, chosen, arguments, admission):
             return getattr(NULL, HOOKS[point])(*arguments)
-        if point in SENDING:
+        if point in SENDING and not kept:
             self._acted.setdefault(record.get("interruption_id"), set()).add(
                 (point, chooser.id, _word(chosen, point)))
         self._once(JournalCode.ACTED, chooser, point, chosen, record)
@@ -510,17 +527,31 @@ class Runtime:
         flight, whatever its capability stands at now - core watches each to its end - but one claimed whose launch
         never began, which is handed back, and what each capability that is on answers. Core checks what it is handed (domain/plughands.records_of) and carries each out
         itself. A watched capability is not asked: it holds no message (arming.py, sweep)."""
+        from .engine import continued, promptqueue
         from .engine.resetmessage import handed
+        from .state.resets import UNLAUNCHED_AFTER
         found, seen = [], set()
         try:
             # A claim whose launch never began is handed back first (state/resets.release_unlaunched).
             self.state.release_unlaunched(at=self.clock())
+            self.state.release_unlaunched_continuations(UNLAUNCHED_AFTER, at=self.clock())
+            self.state.release_unlaunched_prompts(UNLAUNCHED_AFTER, at=self.clock())
         except StateError:
             pass                                         # tried again at the next P2
         try:
             flying = [handed(rule) for rule in self.state.messages_in_flight()]
+            flying += [continued.handed(row) for row in self.state.continuations_in_flight()]
+            flying += [promptqueue.handed(row) for row in self.state.prompts_in_flight()]
         except StateError:
             flying = []
+        # P2's eight (v0.6.15-beta): those in flight first, the longest in flight first, from a place that moves on
+        # each tick when there are more than core takes; then one due of each capability in the registry's order, then
+        # the rest - so none waits behind another for more than a tick.
+        flying = sorted((record for record in flying if record is not None), key=lambda record: record["sent_at"] or 0)
+        if len(flying) > RECORDS_LIMIT:
+            start = (self._records_turn * RECORDS_LIMIT) % len(flying)
+            flying = flying[start:] + flying[:start]
+        self._records_turn += 1
         states = self.states()
         answers = [flying]
         for definition in self.registry.at(Point.RECORDS):
@@ -532,7 +563,9 @@ class Runtime:
                 self._tripped(definition)
                 continue
             if isinstance(answer, (list, tuple)):
-                answers.append(answer)
+                answers.append(list(answer))
+        due = answers[1:]
+        answers = [flying, [answer[0] for answer in due if answer], [record for answer in due for record in answer[1:]]]
         for answer in answers:
             for record in answer:
                 key = record.get("record_id") if isinstance(record, dict) else None
@@ -548,6 +581,10 @@ class Runtime:
         end. What cannot be written now, P2 cancels when it finds the conversation off."""
         try:
             self.state.end_messages_in(thread_id, at=self.clock())
+            # v0.6.15-beta: and every continuation of the edition's own still waiting there, and keep going for it.
+            self.state.end_continuations(ContinuationReason.CONVERSATION_OFF, thread_id=thread_id, at=self.clock())
+            self.state.stop_keep_going(KeepReason.CONVERSATION_OFF, thread_id=thread_id, at=self.clock())
+            self.state.end_prompts(PromptReason.CONVERSATION_OFF, thread_id=thread_id, at=self.clock())
         except StateError:
             pass
 
@@ -558,9 +595,27 @@ class Runtime:
             return DEFER
         if _own_record(record) and state in RECORD_MOVES:
             return self._record_moved(record, RecordMove(state))
+        if self._not_delivered_on_open(record, state):
+            self.states(fresh=True)
         if self.arming.moved(record, state):
             self.states(fresh=True)
         return DEFER
+
+    def _not_delivered_on_open(self, record, state) -> bool:
+        """The tripwire NOT_DELIVERED_ON_OPEN (v0.6.15-beta): core took back a continuation queued for opening because
+        the conversation was opened and Codex did not run it - the capability whose override queued it turns off, or,
+        kept on, notes it (K8). Whether it was turned off."""
+        if (state != WITHDRAWN_UNCONFIRMED or not isinstance(record, dict)
+                or record.get("withdraw_reason") != NOT_DELIVERED_ON_OPEN):
+            return False
+        key = record.get("interruption_id")
+        try:
+            found = self.state.override(key, foropen.CAPABILITY)
+        except StateError:
+            return False
+        if found is None or found.get("kind") != OverrideKind.QUEUE_FOR_OPEN:
+            return False
+        return self.arming.trip(foropen.CAPABILITY, OffReason.NOT_DELIVERED_ON_OPEN)
 
     def _record_moved(self, record, move):
         """P14 for a record of this edition's own (v0.6.14): its rule and its record as core says they are now,
@@ -568,11 +623,26 @@ class Runtime:
         as a send it paid for gone submission_unknown does (K7)."""
         try:
             moved = self.state.record_moved(record.get("record_id"), move, gate=record.get("gate"),
-                                            reason=record.get("reason"), at=self.clock())
+                                            reason=record.get("reason"), at=self.clock(),
+                                            queue_id=record.get("queue_id"))
+            if moved is None:
+                # v0.6.15-beta: one of the edition's own continuations (state/continuations.py).
+                moved = self.state.continuation_moved(record.get("record_id"), move, at=self.clock(),
+                                                      queue_id=record.get("queue_id"))
+            if moved is None:
+                # or a queued prompt's occurrence (state/prompts.py).
+                moved = self.state.prompt_moved(record.get("record_id"), move, at=self.clock(),
+                                                queue_id=record.get("queue_id"))
         except StateError:
             return DEFER                                 # repaired from the next P2 (resetmessage.records)
         if moved is None:
             return DEFER
+        if move == RecordMove.SENT and moved["capability"] == KEEP_GOING:
+            try:
+                # Keep going counts a continuation as used at its send's start (engine/keepgoing.py).
+                self.state.keep_going_used(record.get("thread_id"), at=self.clock())
+            except StateError:
+                pass
         code = MOVE_CODES.get(move)
         if code is not None:
             try:
@@ -582,6 +652,41 @@ class Runtime:
         if moved["trip"]:
             self.arming.trip(moved["capability"], OffReason.SUBMISSION_UNKNOWN)
             self.states(fresh=True)
+        return DEFER
+
+    def partition(self, records):
+        """P12 (v0.6.15-beta): how many sends may wait for their receipts at once - an armed capability's whole
+        number, which core holds to 2 to 4 (domain/plughands.workers), or NULL's. Each due record its ceilings leave a
+        unit for is remembered as acted at CONCURRENCY, so the claim of a pooled send pays exactly one (`claim`)."""
+        definitions = self.registry.at(Point.CONCURRENCY)
+        if not definitions or not isinstance(records, list):
+            return DEFER
+        states = self.states()
+        for definition in definitions:
+            state = states.get(definition.id, ArmingState.OFF)
+            if state == ArmingState.OFF:
+                continue
+            try:
+                answer = self._code_of(definition).partition(records)
+            except Exception:
+                self._tripped(definition)
+                continue
+            if workers(answer) == 1:
+                continue
+            if state == ArmingState.SHADOW:
+                self._once(JournalCode.WOULD_HAVE, definition, Point.CONCURRENCY, answer, None)
+                continue
+            paid = [record for record in records if isinstance(record, dict)
+                    and (definition.id, record.get("interruption_id")) not in self._skipped
+                    and self._ceiling(definition, record) is None]
+            if not paid:
+                self._once(JournalCode.CEILING, definition, Point.CONCURRENCY, answer, None)
+                continue
+            for record in paid:
+                self._acted.setdefault(record.get("interruption_id"), set()).add(
+                    (Point.CONCURRENCY, definition.id, None))
+            self._once(JournalCode.ACTED, definition, Point.CONCURRENCY, answer, None)
+            return answer
         return DEFER
 
     def claim(self, connection, record, now, carried):
@@ -604,7 +709,10 @@ class Runtime:
                 return Alternative.HOLD                  # a record that cannot be paid for is not sent
         key = record.get("interruption_id") if isinstance(record, dict) else None
         acted = {}
-        for point, capability, word in self._acted.pop(key, ()):
+        entries = self._acted.pop(key, ())
+        if Point.CONCURRENCY in carried and not any(point == Point.CONCURRENCY for point, _c, _w in entries):
+            return Alternative.HOLD                      # pooled, and nothing left to pay for it: one poll
+        for point, capability, word in entries:
             if point in carried:
                 words = acted.setdefault(capability, set())
                 if word in ANSWERS:

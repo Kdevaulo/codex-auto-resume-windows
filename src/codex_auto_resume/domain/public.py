@@ -6,7 +6,7 @@ names are drawn from, which is why nothing here reads settings or the clock.
 """
 from __future__ import annotations
 
-from .vocabulary import (Actor, EventCode, GateName, GateResult, HoldKind, ImportanceTier,
+from .vocabulary import (Actor, EventCode, GateName, GateResult, HoldKind, HomeState, ImportanceTier,
                          Overlay, Page, PublicCode, ReasonCode, RecordState, TurnStatus,
                          WithdrawReason)
 from .states import CLAIMED, IN_FLIGHT, OBSERVING, TERMINAL, WAITING, waiting_state
@@ -17,8 +17,13 @@ WITHDRAW_REASONS = frozenset(WithdrawReason)
 SUPERSEDE_WITHDRAWALS = frozenset({"superseded", "superseded_by_user", "user_queued_input"})
 # Taken back because nothing may go to Codex for now - a Pause, or (v0.6.11) Observe only - and so
 # handed back to waiting once nothing ran; the same two over an uncertain submission end it final.
-RELEASABLE_WITHDRAWALS = frozenset({"paused", "observe_only"})
+# v0.6.15-beta: and one queued for when its conversation is opened (P16's QUEUE_FOR_OPEN), taken back when the plug
+# no longer keeps it there or seven days and an hour passed, or when the conversation was opened and Codex did not
+# deliver it: given back to waiting once nothing ran, to go the ordinary way.
+RELEASABLE_WITHDRAWALS = frozenset({"paused", "observe_only", "window_ended", "not_delivered_on_open"})
 TURN_STATUSES = frozenset(TurnStatus)
+# v0.6.15-beta: what a watcher found of each Codex home it is set to watch (runtime/homes.py).
+HOME_STATES = tuple(HomeState)
 ACTORS = frozenset(Actor)
 # Schema 4 (v0.6.11). Why a record waits for a person (`interruptions.hold`), and how much a
 # conversation asks first (`threads.tier`). Neither is ever set at the defaults: a record with no

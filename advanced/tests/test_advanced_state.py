@@ -75,7 +75,9 @@ class VocabularyTests(unittest.TestCase):
     def test_every_tripwire_is_a_reason_a_capability_is_off(self):
         self.assertEqual({str(word) for word in vocabulary.TRIPWIRES},
                          {"submission_unknown", "local_check_failed", "failed_here", "incompatible",
-                          "hook_exception", "statement_changed", "measurement_failed", "duplicate_seen"})
+                          "hook_exception", "statement_changed", "measurement_failed", "duplicate_seen",
+                          # v0.6.15-beta: queue_for_open's, Codex not running on open what was queued for it.
+                          "not_delivered_on_open"})
 
 
 class FileTests(StateCase):
@@ -125,7 +127,7 @@ class FileTests(StateCase):
 
     def test_a_file_that_is_not_exactly_this_schema_is_refused_not_repaired(self):
         for damage in ("CREATE TABLE extra (x)", "ALTER TABLE journal ADD COLUMN words TEXT",
-                       "PRAGMA user_version=4", "PRAGMA user_version=2", "PRAGMA user_version=1",
+                       "PRAGMA user_version=%d" % (SCHEMA_VERSION + 1), "PRAGMA user_version=2", "PRAGMA user_version=1",
                        "DELETE FROM meta", "DROP TABLE samples", "ALTER TABLE samples ADD COLUMN words TEXT"):
             with self.subTest(damage):
                 self.home = self.home.parent / ("home-%d" % abs(hash(damage)))
@@ -209,7 +211,7 @@ class FileTests(StateCase):
         path = self.version_one(("test_wake", "shadow", 1, None))
         self.assertEqual(self.state().arming()["test_wake"]["state"], ArmingState.SHADOW)
         with contextlib.closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], SCHEMA_VERSION)
             self.assertEqual(AdvancedState._tables(connection), TABLES)
 
     def test_a_version_one_file_that_is_not_exactly_version_one_is_refused(self):
@@ -336,7 +338,7 @@ class ClosedWordTests(StateCase):
         state.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
         connection = self.raw(state)
         for statement in ("UPDATE arming SET state='on'",
-                          "INSERT INTO records VALUES ('%s','test_wake','%s','sent',1,NULL,0,NULL)"
+                          "INSERT INTO records VALUES ('%s','test_wake','%s','sent',1,NULL,0,NULL,NULL,0)"
                           % (ac.KEY, ac.THREAD),
                           "INSERT INTO overrides VALUES ('%s','test_wake','forever',1,NULL)" % ac.KEY,
                           "UPDATE meta SET global_hourly=13",
@@ -716,7 +718,7 @@ class ResetStateTests(StateCase):
     def test_the_tables_are_version_three_and_start_empty_with_one_reading(self):
         state = self.state()
         state.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
-        self.assertEqual(SCHEMA_VERSION, 3)
+        self.assertGreaterEqual(SCHEMA_VERSION, 3, "the reset actions' tables are in every version from 3")
         for name in ("windows", "readings", "reset_rules", "credit_spends"):
             self.assertIn(name, TABLES)
         self.assertEqual((state.windows(), state.reset_rules(), state.credit_spends()), ({}, [], []))
@@ -868,23 +870,57 @@ class ResetStateTests(StateCase):
         self.assertEqual([rule["rule_id"] for rule in state.reset_rules(pending=None)], [pending])
         self.assertEqual([spend["occasion"] for spend in state.credit_spends()], [2])
 
+    def version_three(self, *, resets=True):
+        """A file exactly as v0.6.14 made it - version 3, its `options` CHECK without the choices version 4 added -
+        with an option a person chose, and (with `resets`) the reset actions' four tables."""
+        self.paths.advanced_dir.mkdir(parents=True)
+        (self.paths.advanced_dir / config.OWNER_MARKER).write_text(config.OWNER_TEXT, encoding="utf-8")
+        path = self.paths.advanced_dir / FILE_NAME
+        added = ", ".join("'%s'" % word for word in schema_module.V4_OPTION_WORDS)
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            for statement in schema_module.STATEMENTS_V3:
+                if statement.lstrip().startswith("CREATE TABLE options"):
+                    for word in schema_module.V4_OPTION_WORDS:
+                        statement = statement.replace(", '%s'" % word, "")
+                if statement.lstrip().startswith("CREATE TABLE overrides"):
+                    for word in schema_module.V4_OVERRIDE_WORDS:
+                        statement = statement.replace(", '%s'" % word, "")
+                if not resets and statement in schema_module.ADD_RESETS:
+                    continue
+                connection.execute(statement)
+            connection.execute("INSERT INTO arming VALUES ('test_wake','shadow',?,'dashboard',NULL,1,NULL,NULL)",
+                               (self.now,))
+            connection.execute("INSERT INTO options VALUES ('test_wake', 'attempts', 2)")
+            connection.commit()
+            with self.assertRaises(sqlite3.IntegrityError, msg="the old CHECK: %s" % added):
+                connection.execute("INSERT INTO options VALUES ('test_wake', 'workers', 2)")
+        return path
+
+    def test_a_version_three_file_is_brought_to_version_four_and_keeps_every_row(self):
+        """v0.6.14's file: its tables whose CHECK names a list that grew are made again, every row kept - SQLite
+        cannot change a CHECK in place - and version 4's columns and tables are added."""
+        path = self.version_three()
+        state = self.state()
+        self.assertEqual(state.arming()["test_wake"]["state"], ArmingState.SHADOW)
+        state.close()
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            self.assertEqual(connection.execute("SELECT * FROM options").fetchall(), [("test_wake", "attempts", 2)])
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], SCHEMA_VERSION)
+            self.assertEqual(AdvancedState._tables(connection), TABLES)
+            connection.execute("INSERT INTO options VALUES ('test_wake', 'workers', 3)")   # the new CHECK
+
     def test_a_version_three_file_from_before_the_reset_actions_is_given_their_tables(self):
         """A pre-release build of this beta may have written version 3 without the reset actions' four
-        tables: they are added when it is first read, every row it held kept, its version unchanged."""
-        state = self.state()
-        state.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
-        state.close()
-        with contextlib.closing(sqlite3.connect(state.path)) as connection:
-            for name in ("windows", "readings", "reset_rules", "credit_spends"):
-                connection.execute("DROP TABLE %s" % name)
-            connection.commit()
+        tables: they are added when it is first read, every row it held kept, and it is brought on to version 4."""
+        path = self.version_three(resets=False)
+        with contextlib.closing(sqlite3.connect(path)) as connection:
             self.assertEqual(AdvancedState._tables(connection), schema_module.TABLES_V3_BEFORE_RESETS)
         again = self.state()
         self.assertEqual(again.arming()["test_wake"]["state"], ArmingState.SHADOW)
         self.assertEqual(again.reset_rules(), [])
         again.close()
-        with contextlib.closing(sqlite3.connect(state.path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 3)
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], SCHEMA_VERSION)
             self.assertEqual(AdvancedState._tables(connection), TABLES)
 
 
@@ -905,7 +941,7 @@ class BoundTests(StateCase):
                                [(old,)] * 10 + [(recent,)] * (EVENT_LIMIT + 50))
         connection.executemany("INSERT INTO spend (at, capability, thread_id) VALUES (?, 'test_wake', ?)",
                                [(old, ac.THREAD)] * 10 + [(recent, ac.THREAD)] * 30)
-        connection.executemany("INSERT INTO records VALUES (?, 'test_wake', ?, ?, ?, NULL, 0, ?)",
+        connection.executemany("INSERT INTO records VALUES (?, 'test_wake', ?, ?, ?, NULL, 0, ?, NULL, 0)",
                                [("%064x" % n, ac.THREAD, "finished", old, old) for n in range(5)]
                                + [("%064x" % (100 + n), ac.THREAD, "waiting", old, None) for n in range(3)])
         connection.executemany("INSERT INTO overrides VALUES (?, 'test_wake', 'force_once', ?, NULL)",
@@ -932,7 +968,7 @@ class BoundTests(StateCase):
 
     def test_the_watch_bound_sits_inside_the_journal_s(self):
         from codex_auto_resume_advanced import registry
-        self.assertEqual(WATCH_LIMIT, 250)
+        self.assertEqual(WATCH_LIMIT, 200, "250 until v0.6.15-beta, when the capabilities grew to 21")
         # Every capability watched at once, each at its bound, still fits inside the journal's.
         self.assertLess(len(registry.DEFINITIONS) * WATCH_LIMIT, EVENT_LIMIT)
         # The journal's own bound cuts every other line first: newer lines of another capability,

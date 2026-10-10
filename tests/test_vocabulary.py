@@ -42,6 +42,8 @@ if _HERE not in sys.path:
 import srcscan  # noqa: E402
 from codex_auto_resume.domain import compat_vocabulary as c, plug as p, vocabulary as v  # noqa: E402
 from codex_auto_resume.domain import power_vocabulary as pw  # noqa: E402
+from codex_auto_resume.domain import reason_vocabulary as rv  # noqa: E402
+from codex_auto_resume.domain import plughands  # noqa: E402
 
 # "module.NAME" -> (kind, length, digest), or the text of a single word.
 LISTS = {
@@ -57,7 +59,7 @@ LISTS = {
     "machine.POSSIBLY_SENT": ("set", 20, "dadead4aea3c20e5"),
     "machine.WATCHED": ("set", 4, "07ba1375946c1591"),
     # v0.6.11: observe_only and observe_only_unknown - taken back for Observe only, in its own words.
-    "machine.WITHDRAW_REASONS": ("set", 13, "e0093ee6641742ac"),
+    "machine.WITHDRAW_REASONS": ("set", 15, "e655adbd6ac55e2a"),
     "machine.SUPERSEDE_WITHDRAWALS": ("set", 3, "b63141bdc33260f0"),
     "machine.TURN_STATUSES": ("set", 5, "58aca83cec78ff2b"),
     "machine.ACTORS": ("set", 5, "eaf35d06c4c2b568"),
@@ -66,7 +68,8 @@ LISTS = {
     # v0.6.14: not_recoverable (a gate reason until then) and admission_expired - a failure the plug
     # took up (P17) that nothing takes up now, and one taken up a day ago; and capacity_window, capacity
     # retries past their twelve hours on the clock.
-    "machine.REASONS": ("set", 70, "baf0da759f937514"),
+    # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
+    "machine.REASONS": ("set", 74, "5c6aa62cce9a0415"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -86,7 +89,8 @@ LISTS = {
     # v0.6.14: admission_expired and capacity_window, reasons now (not_recoverable was a gate reason);
     # and `resend`, submission_safe passed for an uncertain submission sent once more (engine/resend.py),
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
-    "machine.GATE_REASONS": ("set", 87, "e561b7a5a3de8661"),
+    # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
+    "machine.GATE_REASONS": ("set", 91, "409337d90aa93a63"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",
@@ -204,11 +208,12 @@ LISTS = {
     # And RESEND, P7's word for an uncertain submission sent once more, which core proves may go, and
     # SEND_NOW, its word for a waiting record a person asked to send now.
     "domain.plug.POINTS": ("tuple", 16, "07e8ae14d7f49978"),
-    "domain.plug.ANSWERS": ("set", 12, "4c1e9268012950b1"),
+    "domain.plug.ANSWERS": ("set", 13, "dcf766b4e83e21eb"),
     "domain.plug.FAILURE_FORMS": ("tuple", 5, "bcc0ad1bd6f81009"),
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
     # v0.6.14: what core did with a record of the plug's own (P2), as P14 tells it.
-    "domain.plug.RECORD_MOVES": ("tuple", 6, "714a23886c2dd85c"),
+    "domain.plug.RECORD_MOVES": ("tuple", 10, "b4dae164afc55dd3"),
+    "domain.plug.RECORD_PURPOSES": ("tuple", 2, "d9b26e6afdae8bdb"),
     "domain.plug.EXTRA": "advanced",
 }
 
@@ -318,6 +323,7 @@ HOMES = {
     v.PublicCode: ("list", "machine.PUBLIC_CODES"),
     v.WithdrawReason: ("list", "machine.WITHDRAW_REASONS"),
     v.ReasonCode: ("list", "machine.REASONS"),
+    rv.HomeState: ("list", "machine.HOME_STATES"),
     v.EventCode: ("list", "machine.EVENT_CODES"),
     v.Actor: ("list", "machine.ACTORS"),
     v.TurnStatus: ("list", "machine.TURN_STATUSES"),
@@ -391,6 +397,7 @@ HOMES = {
     p.Surface: ("list", "domain.plug.SURFACES"),
     p.FailureForm: ("list", "domain.plug.FAILURE_FORMS"),
     p.RecordMove: ("list", "domain.plug.RECORD_MOVES"),
+    p.RecordPurpose: ("list", "domain.plug.RECORD_PURPOSES"),
     # v0.6.12: the power action's own words, beside domain/vocabulary.py at its line budget.
     pw.PowerAction: ("list", "poweraction.ACTIONS"),
     pw.PowerAfter: ("list", "poweraction.AFTERS"),
@@ -407,9 +414,11 @@ HOMES = {
 def enums():
     """Every vocabulary the four modules define: `domain/vocabulary.py`; `domain/compat_vocabulary.py`,
     the registry's, out of it since v0.6.11 and named through it still; `domain/plug.py`, whose six
-    are the plug interface's own; and `domain/power_vocabulary.py`, the power action's (v0.6.12). Each
+    are the plug interface's own; `domain/power_vocabulary.py`, the power action's (v0.6.12); and
+    `domain/reason_vocabulary.py`, the reasons and a Codex home's states (v0.6.15-beta); and
+    `domain/plughands.py`, P2's moves and purposes beside the hands core holds (v0.6.15-beta). Each
     is held to every rule here all the same."""
-    return [value for module in (v, c, p, pw) for value in vars(module).values()
+    return [value for module in (v, c, p, pw, rv, plughands) for value in vars(module).values()
             if inspect.isclass(value) and issubclass(value, StrEnum) and value is not StrEnum
             and value.__module__ == module.__name__]
 

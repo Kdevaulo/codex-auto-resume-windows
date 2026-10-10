@@ -60,17 +60,20 @@ class OffReason(StrEnum):
     # harm a resend risks. It turns off what sent it again whether or not it is kept on - the
     # once-more capability, or Keep on's Send again alone (arming.py).
     DUPLICATE_SEEN = "duplicate_seen"
+    # A conversation queued for opening was opened and Codex did not run the item within core's delivery window
+    # (v0.6.15-beta, queue_for_open): what M1 measured did not hold on this Codex.
+    NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
 
 
 TRIPWIRES = frozenset({OffReason.SUBMISSION_UNKNOWN, OffReason.LOCAL_CHECK_FAILED,
                        OffReason.FAILED_HERE, OffReason.INCOMPATIBLE, OffReason.HOOK_EXCEPTION,
                        OffReason.STATEMENT_CHANGED, OffReason.MEASUREMENT_FAILED,
-                       OffReason.DUPLICATE_SEEN})
+                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN})
 # What a capability kept on (KeepOn, K8) notes instead of turning off, most serious first: the order
 # in which one notice gives way to another (state/arming.py, note_kept). A notice only ever rises.
 KEPT_NOTICES = (OffReason.DUPLICATE_SEEN, OffReason.STATEMENT_CHANGED, OffReason.FAILED_HERE,
                 OffReason.LOCAL_CHECK_FAILED, OffReason.INCOMPATIBLE, OffReason.MEASUREMENT_FAILED,
-                OffReason.ENGINE_CHANGED, OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
+                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.ENGINE_CHANGED, OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
 
 
 class ArmingWarning(StrEnum):
@@ -128,6 +131,13 @@ class Refusal(StrEnum):
     ALREADY_SCHEDULED = "already_scheduled"
     BEING_SENT = "being_sent"
     CONVERSATION_OFF = "conversation_off"
+    # Stage 3c (v0.6.15-beta, state/prompts.py, state/continuations.py): a prompt the check refuses or too long;
+    # twenty waiting, or five in that conversation; one that waits for the one before it where there is none; and
+    # a count of continuations to keep going that is not one on offer.
+    PROMPT_REFUSED = "prompt_refused"
+    QUEUE_FULL = "queue_full"
+    DEPENDENCY_UNKNOWN = "dependency_unknown"
+    KEEP_COUNT_INVALID = "keep_count_invalid"
 
 
 class JournalCode(StrEnum):
@@ -171,12 +181,19 @@ class OverrideKind(StrEnum):
     EARLY_RESET = "early_reset"
     CAPACITY_LADDER = "capacity_ladder"
     RESEND_ONCE = "resend_once"
+    # v0.6.15-beta: a continuation queued for when its conversation is opened, paid for in the claim - once for
+    # each interruption, so one released from that queue is never queued for opening again.
+    QUEUE_FOR_OPEN = "queue_for_open"
 
 
 class OptionKey(StrEnum):
     """A choice a capability offers a person (registry.Option), stored in `options` by this key."""
     ATTEMPTS = "attempts"                    # how many tries a task gets
     CEILING_HOURS = "ceiling_hours"          # for how long, in hours on the clock, it keeps trying
+    # v0.6.15-beta: how many sends may wait for their receipts at once (parallel_dispatch, 2 to 4), and how many
+    # days a continuation is kept in Codex's queue for when its conversation is opened (queue_for_open, 3 to 7).
+    WORKERS = "workers"
+    DAYS = "days"
 
 
 class KeepOn(StrEnum):
@@ -257,6 +274,15 @@ class BridgeCommand(StrEnum):
     ADVANCED_RESET_CANCEL = "advanced-reset-cancel"
     ADVANCED_RESET_GO_ON = "advanced-reset-go-on"
     ADVANCED_CREDIT_NOW = "advanced-credit-now"
+    # v0.6.15-beta: keep going (control/keepgoing.py) - the conversations kept going read, one picked, one stopped.
+    ADVANCED_KEEP_GOING = "advanced-keep-going"
+    ADVANCED_KEEP_GOING_SET = "advanced-keep-going-set"
+    ADVANCED_KEEP_GOING_STOP = "advanced-keep-going-stop"
+    # and the prompt queue (control/prompts.py): the prompts read, one added, one cancelled, one held let go on.
+    ADVANCED_PROMPTS = "advanced-prompts"
+    ADVANCED_PROMPT_ADD = "advanced-prompt-add"
+    ADVANCED_PROMPT_CANCEL = "advanced-prompt-cancel"
+    ADVANCED_PROMPT_GO_ON = "advanced-prompt-go-on"
     # The compatibility report (report/flow.py): write it, save it where the person chooses, check what
     # sending would write, send it, and read how one of the first, third or fourth - each a job this
     # process holds - is getting on. Like the rest, only the Dashboard's; no MCP tool reaches any of them.
@@ -302,6 +328,20 @@ class Measurement(StrEnum):
     MU = "mu"
     MN = "mn"
     MR = "mr"
+    # v0.6.15-beta: two to four throwaway conversations sent to at once through core's backend - each receipt
+    # matched, each marker in its own history once and nowhere else (parallel_dispatch).
+    MQ = "mq"
+    # A turn that ended with no reply, when Codex produces one: its item kinds (closed words) and its final agent item
+    # absent (empty_response).
+    ME = "me"
+    # A throwaway parent whose subagent fails: the spawn edge is there, and the subagent's latest turn can be told as a
+    # closed kind (subagent_parent's 5b).
+    MS = "ms"
+    # A throwaway conversation with a plan: the newest plan item found and its steps' statuses read (keep_going).
+    MK = "mk"
+    # One message queued while a turn runs in a throwaway conversation: delivered once, after that turn ended
+    # (prompt_queue's after_turn).
+    MT = "mt"
 
 
 class RuleState(StrEnum):
@@ -336,6 +376,12 @@ class RuleReason(StrEnum):
     BY_PERSON = "by_person"
     TURNED_OFF = "turned_off"
     CONVERSATION_OFF = "conversation_off"    # its conversation was switched off (H5)
+    # v0.6.15-beta: edited by a person in Codex's queue, theirs now; its turn no longer the latest (a continuation);
+    # taken back out of Codex's queue on a Cancel or a Pause; and Codex would not give it back, so it is left there.
+    HANDED_OVER = "handed_over"
+    SUPERSEDED = "superseded"
+    WITHDRAWN = "withdrawn"
+    WITHDRAW_REFUSED = "withdraw_refused"
 
 
 class SpendOutcome(StrEnum):
@@ -464,3 +510,86 @@ class McpTool(StrEnum):
     LIST_ADVANCED_CAPABILITIES = "list_advanced_capabilities"
     DISARM_ADVANCED_CAPABILITY = "disarm_advanced_capability"
     DISARM_ALL_ADVANCED = "disarm_all_advanced"
+
+
+# ------------------------------------------------------------------ stage 3c (v0.6.15-beta)
+class ContinuationKind(StrEnum):
+    """What one of the edition's own continuations answers (state/continuations.py): a turn that ended with no reply,
+    a subagent that stopped, or a conversation a person asked to keep going."""
+    EMPTY_RESPONSE = "empty_response"
+    SUBAGENT = "subagent"
+    KEEP_GOING = "keep_going"
+
+
+class ContinuationReason(StrEnum):
+    """How one of the edition's own continuations ended, or why none was made (state/continuations.py)."""
+    SENT = "sent"
+    DELIVERED = "delivered"
+    UNKNOWN = "unknown"
+    SUPERSEDED = "superseded"
+    HANDED_OVER = "handed_over"
+    WITHDRAWN = "withdrawn"
+    CHAIN_SPENT = "chain_spent"              # an empty reply's chain had its two continuations
+    GOAL_LEFT = "goal_left"                  # a goal Codex keeps going, or blocked: left alone
+    MENTIONED = "mentioned"                  # a subagent's stop told in the parent's own continuation (P4)
+    TURNED_OFF = "turned_off"
+    CONVERSATION_OFF = "conversation_off"
+
+
+class KeepState(StrEnum):
+    """Where a conversation a person asked to keep going stands (state/continuations.py keep_going)."""
+    ON = "on"
+    DONE = "done"
+
+
+class KeepReason(StrEnum):
+    """Why a conversation kept going stopped."""
+    NO_PROGRESS = "no_progress"              # the last turn left nothing that counts as progress
+    PLAN_DONE = "plan_done"                  # every step of its plan is completed
+    COUNT_SPENT = "count_spent"              # the continuations a person allowed were used
+    GOAL_ACTIVE = "goal_active"              # a goal is active: Codex goes on itself
+    FAILED = "failed"                        # a failed turn is core's ordinary recovery, never this
+    PLAN_UNREADABLE = "plan_unreadable"      # a plan item there whose steps cannot be read: stopped (fail closed)
+    BY_PERSON = "by_person"
+    TURNED_OFF = "turned_off"
+    CONVERSATION_OFF = "conversation_off"
+
+
+class PromptTrigger(StrEnum):
+    """When a queued prompt goes (state/prompts.py): after the turn now running, at a time, or on a schedule."""
+    AFTER_TURN = "after_turn"
+    AT_TIME = "at_time"
+    RECURRING = "recurring"
+
+
+class PromptEvery(StrEnum):
+    """How often a recurring prompt goes."""
+    DAY = "day"
+    WEEK = "week"
+
+
+class PromptState(StrEnum):
+    """Where a queued prompt stands: waiting for its time, due (READY) and being tried, held until a person says go on
+    or cancel, or finished - done, or cancelled. Only one waiting, due or held holds its words."""
+    WAITING = "waiting"
+    READY = "ready"
+    HELD = "held"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+class PromptReason(StrEnum):
+    """Why a queued prompt stands where it stands."""
+    DELIVERED = "delivered"
+    HANDED_OVER = "handed_over"
+    SUPERSEDED = "superseded"
+    EXPIRED = "expired"                      # not sent a day after it fell due
+    MISSED = "missed"                        # an occurrence that fell while nothing ran, counted as used
+    DEPENDENCY_FAILED = "dependency_failed"  # the one before it did not arrive: held for a person
+    BY_PERSON = "by_person"
+    TURNED_OFF = "turned_off"
+    TOO_LONG = "too_long"                    # over 2,000 characters once Longer messages was turned off
+    CONVERSATION_OFF = "conversation_off"
+    WITHDRAWN = "withdrawn"                  # taken back out of Codex's queue on a Cancel or a Pause
+    WITHDRAW_REFUSED = "withdraw_refused"    # Codex would not give it back: left there, never sent again
+    UNKNOWN = "unknown"

@@ -1,0 +1,189 @@
+# ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
+"""The prompt queue (v0.6.15-beta, the plan's item 7, on reset_message's way): a person's queued messages go after the
+current turn, at a time or on a schedule, in order, each once, and their words go once they are sent - at P2.
+
+The standard edition sends one thing of its own, a continuation for a recovery that is due (A26, C4). With this on, a
+person writes messages in the Dashboard for one conversation each (control/prompts.py): after the turn now running
+(`after_turn`: due at once, it goes through Codex's own queue, which runs it when that turn ends - MT measures it), at a
+time (`at_time`), or every day or week from a time (`recurring`, 30 occurrences and 30 days at most). Core sends each as
+it sends a message at a reset (P2's MESSAGE: exactly as typed, its marker after a blank line), through its gates, the
+one claim and the ledger's caps - one in flight in a conversation across both stores, fifteen minutes apart and five a
+day in one conversation (A20 kept, the owner's answer of 2026-10-09).
+
+At P2, each conversation's prompts in their order (`position`), the first still to go alone eligible:
+* one whose conversation is off is cancelled; one over 2,000 characters while Longer messages is off, cancelled;
+* `depends`: not due until the one before it in that conversation was delivered - ended any other way, it is held
+  (dependency_failed) for the person to say go on or cancel;
+* due, its occurrence is made - a record with an id of its own - and handed core with its words;
+* a series' occurrences that fell while nothing ran are caught up once, the latest alone, the earlier counted as used
+  (`missed`); an occurrence not sent a day after it fell due is used as expired, and the series goes on.
+
+The words leave the disk at a one-time prompt's send, at a series' end, at a cancel, at expiry, when the conversation
+is switched off and when this stands anywhere but on (state/prompts.py), and never reach a log, the journal,
+diagnostics, a notification, the status, MCP or a golden.
+"""
+from __future__ import annotations
+
+import secrets
+
+from codex_auto_resume import continuation
+from codex_auto_resume.domain import ids
+from codex_auto_resume.domain.plug import DEFER
+
+from ..vocabulary import PromptEvery, PromptReason, PromptState, PromptTrigger, RecordState
+
+CAPABILITY = "prompt_queue"
+LONG = "long_reset_message"
+SHORT_LIMIT = 2000
+DUE_FOR = 86400
+# How far apart a series' occurrences fall (state/prompts.PERIODS, which the state's moves read the same way).
+PERIODS = {PromptEvery.DAY: 86400, PromptEvery.WEEK: 7 * 86400}
+
+
+def handed(row) -> dict | None:
+    """What core is handed of one prompt's occurrence (P2: plughands.records_of), or None for one not to hand."""
+    key = row.get("record_id")
+    if key is None or row["state"] not in (PromptState.READY,):
+        return None
+    own = {"record_id": key, "thread_id": row["thread_id"], "marker": ids.short_marker(key), "purpose": "message",
+           "ordinal": None}
+    if row["record_state"] == RecordState.IN_FLIGHT:
+        return dict(own, state="in_flight", words=None, sent_at=row.get("sent_at") or row.get("launching_at"),
+                    queue_id=row.get("queue_id"), withdraw=bool(row.get("withdraw")))
+    if row["record_state"] == RecordState.WAITING and row["words"]:
+        return dict(own, state="waiting", words=row["words"], sent_at=None, queue_id=None, withdraw=False)
+    return None
+
+
+def words_problem(words, long_on) -> bool:
+    """Whether `words` are no message of a person's that core sends: empty, product text, a marker, or longer than
+    2,000 characters while Longer messages is off (what one continuation carries while it is on)."""
+    try:
+        continuation.validate_prompt(words)
+    except Exception:
+        return True
+    return not long_on and len(words) > SHORT_LIMIT
+
+
+class PromptQueue:
+    """The capability's code: its hook at P2. `bind` gives it its view of the state (state.Scoped)."""
+    __slots__ = ("paths", "_scoped")
+
+    def __init__(self, paths):
+        self.paths = paths
+        self._scoped = None
+
+    def bind(self, scoped):
+        self._scoped = scoped
+
+    def records(self, view):
+        """P2: each conversation's first prompt still to go, made due and handed with its words where it is due."""
+        scoped = self._scoped
+        if scoped is None:
+            return DEFER
+        handle = scoped.prompts
+        if not handle.on():
+            return DEFER
+        try:
+            rows = handle.prompts(pending=None)
+        except Exception:
+            return DEFER
+        now = handle.now()
+        long_on = scoped.armed(LONG)
+        found, by_thread = [], {}
+        for row in rows:
+            by_thread.setdefault(row["thread_id"], []).append(row)
+        for thread, queue in by_thread.items():
+            try:
+                record = self._first(handle, view, thread, queue, now, long_on)
+            except Exception:
+                continue
+            if record is not None:
+                found.append(record)
+        return found or DEFER
+
+    def _first(self, handle, view, thread, queue, now, long_on):
+        """The record to hand of `thread`'s first prompt still to go, or None."""
+        pending = [row for row in queue if row["state"] in (PromptState.WAITING, PromptState.READY,
+                                                            PromptState.HELD)]
+        if not pending:
+            return None
+        row = pending[0]
+        if row["state"] == PromptState.HELD or row["record_state"] == RecordState.IN_FLIGHT:
+            return None                                  # held for the person, or core's to watch (runtime.records)
+        if view.thread_enabled(thread) is False:
+            handle.end(PromptReason.CONVERSATION_OFF, thread_id=thread)
+            return None
+        if row["words"] is None or words_problem(row["words"], long_on):
+            handle.change(row["prompt_id"], state=PromptState.CANCELLED, reason=PromptReason.TOO_LONG,
+                          finished_at=now)
+            return None
+        if row["state"] == PromptState.READY:
+            if row["due_at"] is not None and now - row["due_at"] >= DUE_FOR:
+                return self._expired(handle, row, now)
+            return handed(row)
+        if row["depends"]:
+            before = [other for other in queue if other["position"] < row["position"]]
+            last = before[-1] if before else None
+            if last is not None and last["state"] in (PromptState.WAITING, PromptState.READY, PromptState.HELD):
+                return None
+            if last is not None and last["reason"] != PromptReason.DELIVERED:
+                handle.change(row["prompt_id"], state=PromptState.HELD, reason=PromptReason.DEPENDENCY_FAILED)
+                self._count("held")
+                return None
+        due = row["due_at"] if row["due_at"] is not None else now
+        if now < due:
+            return None
+        if row["trigger"] == PromptTrigger.RECURRING:
+            due = self._catch_up(handle, row, due, now)
+            if due is None:
+                return None
+        key = secrets.token_hex(32)
+        if not handle.occur(row["prompt_id"], key, thread, due):
+            return None
+        self._count("due")
+        fresh = handle.prompt(row["prompt_id"])
+        return handed(fresh) if fresh is not None else None
+
+    def _catch_up(self, handle, row, due, now):
+        """A series' latest occurrence that fell, the earlier ones that fell while nothing ran counted as used
+        (`missed`): when that one is due, or None where the series ended."""
+        period = PERIODS[row["every"]]
+        late = int((now - due) // period)
+        if late <= 0:
+            return due
+        used = min(row["sent_count"] + late, row["occurrences"])
+        latest = due + late * period
+        if used >= row["occurrences"] or (row["until"] is not None and latest > row["until"]):
+            handle.change(row["prompt_id"], state=PromptState.DONE, reason=PromptReason.MISSED, sent_count=used,
+                          finished_at=now)
+            self._count("missed")
+            return None
+        handle.change(row["prompt_id"], sent_count=used, due_at=latest)
+        self._count("missed")
+        return latest
+
+    def _expired(self, handle, row, now):
+        """An occurrence not sent a day after it fell due: used, as expired - a series waits for its next."""
+        period = PERIODS.get(row["every"]) if row["trigger"] == PromptTrigger.RECURRING else None
+        used = row["sent_count"] + 1
+        following = None if period is None else row["due_at"] + period
+        if following is None or used >= row["occurrences"] or (row["until"] is not None and following > row["until"]):
+            handle.change(row["prompt_id"], state=PromptState.DONE, reason=PromptReason.EXPIRED, sent_count=used,
+                          finished_at=now)
+        else:
+            handle.change(row["prompt_id"], state=PromptState.WAITING, reason=PromptReason.EXPIRED, sent_count=used,
+                          record_id=None, due_at=following)
+        self._count("expired")
+        return None
+
+    def _count(self, code) -> None:
+        try:
+            self._scoped.count(code)
+        except Exception:
+            pass
+
+
+def make(paths) -> PromptQueue:
+    """The capability's factory (registry.CapabilityDef.make): its code for one installation."""
+    return PromptQueue(paths)
