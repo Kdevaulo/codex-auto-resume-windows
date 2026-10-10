@@ -50,8 +50,9 @@ from codex_auto_resume import failures
 from codex_auto_resume.domain.plug import TAKE_UP, FailureForm
 
 from ..registry import GLOBAL_HOURLY
-from ..vocabulary import (ArmingState, KeepOn, OptionKey, OverrideKind, RecordState, RuleReason, RuleState,
-                          SpendOutcome)
+from ..vocabulary import (ArmingState, ContinuationKind, ContinuationReason, KeepOn, KeepReason, KeepState,
+                          OptionKey, OverrideKind, PromptEvery, PromptReason, PromptState, PromptTrigger, RecordState,
+                          RuleReason, RuleState, SpendOutcome)
 
 SCHEMA_VERSION = 4
 FILE_NAME = "advanced.sqlite"
@@ -83,13 +84,23 @@ TABLES = {
                     "due_at", "launching_at", "sent_at", "finished_at"),
     "credit_spends": ("spend_id", "rule_id", "bucket", "minutes", "occasion", "attempt_id", "created_at", "tries",
                       "outcome", "finished_at"),
+    # Version 4 (v0.6.14-beta.2): the edition's own continuations, the conversations kept going, the queued prompts.
+    "continuations": ("answer_id", "capability", "kind", "thread_id", "record_id", "ordinal", "words", "chain",
+                      "created_at", "finished_at", "reason"),
+    "keep_going": ("thread_id", "count", "used", "armed_at", "state", "reason", "finished_at"),
+    "prompts": ("prompt_id", "thread_id", "words", "trigger", "at", "every", "occurrences", "sent_count", "until",
+                "depends", "position", "state", "reason", "record_id", "gate", "gate_reason", "created_at", "due_at",
+                "launching_at", "sent_at", "finished_at"),
 }
+V4_TABLES = ("continuations", "keep_going", "prompts")
 # The reset actions' tables, the last four of version 3 (v0.6.14).
 RESET_TABLES = ("windows", "readings", "reset_rules", "credit_spends")
 # The buckets a usage window is kept under (core's domain/usage.BUCKETS), and the capabilities whose
 # rules `reset_rules` holds (registry.RESET_CREDIT, RESET_MESSAGE).
 BUCKETS = ("codex", "premium", "legacy", "other")
 RESET_CAPABILITIES = ("reset_credit", "reset_message")
+# The capabilities whose continuations `continuations` holds (v0.6.14-beta.2).
+CONTINUATION_CAPABILITIES = ("empty_response", "subagent_parent", "keep_going")
 # The tables version 2 had: v0.6.11's and v0.6.12's file.
 # `records` before version 4 added its last two columns (queue_id, withdraw).
 RECORDS_V3 = TABLES["records"][:-2]
@@ -341,10 +352,85 @@ _STATEMENTS_V3 = _STATEMENTS_V3 + _STATEMENTS_RESETS
 
 # Version 4's own columns (v0.6.14-beta.2): the queue item a record's send was taken as, and a person's Cancel of one
 # already in Codex's queue, for core to take back (the owner's answer of 2026-10-09).
+_KEY = "CHECK (%s IS NULL OR (length(%s) = 64 AND %s NOT GLOB '*[^0-9a-f]*'))"
+_UUID = "CHECK (length(thread_id) = 36 AND thread_id NOT GLOB '*[^0-9a-f-]*')"
+# The longest a recurring prompt's series runs, from when it was written.
+PROMPT_SPAN = 30 * 86400
 _STATEMENTS_V4 = (
     "ALTER TABLE records ADD COLUMN queue_id TEXT CHECK (queue_id IS NULL OR (length(queue_id) = 36 AND "
     "queue_id NOT GLOB '*[^0-9a-f-]*'))",
     "ALTER TABLE records ADD COLUMN withdraw INTEGER NOT NULL DEFAULT 0 CHECK (withdraw IN (0, 1))",
+    # One row for each continuation the edition made or chose not to (an empty reply, a subagent's stop, a
+    # conversation kept going), keyed by what it answers - so one turn is answered once - and its words, the
+    # catalog's, kept only until it is sent.
+    """CREATE TABLE continuations (
+        answer_id TEXT PRIMARY KEY %s,
+        capability TEXT NOT NULL %s,
+        kind TEXT NOT NULL %s,
+        thread_id TEXT NOT NULL %s,
+        record_id TEXT %s,
+        ordinal INTEGER %s,
+        words TEXT CHECK (words IS NULL OR (typeof(words) = 'text' AND length(words) BETWEEN 1 AND 2000)),
+        chain INTEGER NOT NULL %s,
+        created_at REAL NOT NULL,
+        finished_at REAL,
+        reason TEXT CHECK (reason IS NULL OR reason IN (%s)),
+        CHECK (words IS NULL OR finished_at IS NULL)
+    )""" % (_KEY % ("answer_id", "answer_id", "answer_id"), _one_of("capability", CONTINUATION_CAPABILITIES),
+            _one_of("kind", ContinuationKind), _UUID,
+            _KEY % ("record_id", "record_id", "record_id"), _int("ordinal"), _int("chain", null=False),
+            ", ".join("'%s'" % word for word in ContinuationReason)),
+    "CREATE INDEX continuations_thread ON continuations(thread_id)",
+    # The conversations a person picked to keep going after a turn that ended well, each with how many continuations
+    # it may have, and how many it had.
+    """CREATE TABLE keep_going (
+        thread_id TEXT PRIMARY KEY %s,
+        count INTEGER NOT NULL %s,
+        used INTEGER NOT NULL %s,
+        armed_at REAL NOT NULL,
+        state TEXT NOT NULL %s,
+        reason TEXT CHECK (reason IS NULL OR reason IN (%s)),
+        finished_at REAL,
+        CHECK (used <= count)
+    )""" % (_UUID, _int("count", low=1, high=10, null=False), _int("used", null=False), _one_of("state", KeepState),
+            ", ".join("'%s'" % word for word in KeepReason)),
+    # A person's queued prompts: after the turn now running, at a time, or on a schedule - their words only while one
+    # is still to go, a series 30 occurrences and 30 days at most.
+    """CREATE TABLE prompts (
+        prompt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id TEXT NOT NULL %s,
+        words TEXT,
+        trigger TEXT NOT NULL %s,
+        at REAL,
+        every TEXT CHECK (every IS NULL OR every IN (%s)),
+        occurrences INTEGER NOT NULL %s,
+        sent_count INTEGER NOT NULL %s,
+        until REAL,
+        depends INTEGER NOT NULL %s,
+        position INTEGER NOT NULL %s,
+        state TEXT NOT NULL %s,
+        reason TEXT CHECK (reason IS NULL OR reason IN (%s)),
+        record_id TEXT %s,
+        gate TEXT %s,
+        gate_reason TEXT %s,
+        created_at REAL NOT NULL,
+        due_at REAL,
+        launching_at REAL,
+        sent_at REAL,
+        finished_at REAL,
+        CHECK (words IS NULL OR (state IN ('%s', '%s', '%s') AND typeof(words) = 'text'
+                                 AND length(words) BETWEEN 1 AND 8192)),
+        CHECK (occurrences = 1 OR trigger = '%s'),
+        CHECK ((every IS NULL) = (trigger <> '%s')),
+        CHECK (until IS NULL OR until - created_at <= %d),
+        CHECK (sent_count <= occurrences)
+    )""" % (_UUID, _one_of("trigger", PromptTrigger), ", ".join("'%s'" % word for word in PromptEvery),
+            _int("occurrences", low=1, high=30, null=False), _int("sent_count", null=False), _flag("depends"),
+            _int("position", null=False), _one_of("state", PromptState),
+            ", ".join("'%s'" % word for word in PromptReason), _KEY % ("record_id", "record_id", "record_id"),
+            _gate_word("gate"), _gate_word("gate_reason"), PromptState.WAITING, PromptState.READY, PromptState.HELD,
+            PromptTrigger.RECURRING, PromptTrigger.RECURRING, PROMPT_SPAN),
+    "CREATE INDEX prompts_thread ON prompts(thread_id, position)",
 )
 STATEMENTS = _STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + ("PRAGMA user_version=%d" % SCHEMA_VERSION,)
 # Version 2's file exactly as v0.6.11 and v0.6.12 made it: what a test builds an older file from.
@@ -361,13 +447,16 @@ UPGRADE_FROM_2 = _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 STATEMENTS_V3 = _STATEMENTS_V2 + _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 # A version-3 file a pre-release build made before the reset actions' tables (v0.6.14): those four
 # added, every row kept, its version unchanged.
-TABLES_V3_BEFORE_RESETS = dict({name: TABLES[name] for name in TABLES if name not in RESET_TABLES}, records=RECORDS_V3)
+TABLES_V3_BEFORE_RESETS = dict({name: TABLES[name] for name in TABLES if name not in RESET_TABLES + V4_TABLES},
+                               records=RECORDS_V3)
 ADD_RESETS = _STATEMENTS_RESETS
 # Version 4 (v0.6.14-beta.2): the tables whose CHECKs name a closed list that grew are made again with the new list, every
 # row kept - SQLite cannot change a CHECK in place - and the tables of 3c added. A version-3 file is brought to it.
-TABLES_V3 = dict(TABLES, records=RECORDS_V3)
+TABLES_V3 = {name: columns for name, columns in dict(TABLES, records=RECORDS_V3).items() if name not in V4_TABLES}
 # The choices version 4 added to `options` (OptionKey): what a version-3 file's CHECK refuses.
-V4_OPTION_WORDS = ("workers",)
+V4_OPTION_WORDS = ("workers", "days")
+# And to `overrides`.
+V4_OVERRIDE_WORDS = ("queue_for_open",)
 
 
 def _remade(statement, table, columns, index=None) -> tuple:
@@ -381,6 +470,8 @@ def _remade(statement, table, columns, index=None) -> tuple:
 
 UPGRADE_FROM_3 = (
     _remade(_STATEMENTS_V3[0], "options", TABLES["options"])
+    + _remade(next(s for s in _STATEMENTS_V2 if s.lstrip().startswith("CREATE TABLE overrides")), "overrides",
+              TABLES["overrides"])
     + _remade(next(s for s in _STATEMENTS_RESETS if s.lstrip().startswith("CREATE TABLE reset_rules")), "reset_rules",
               TABLES["reset_rules"], "CREATE INDEX reset_rules_state ON reset_rules(state)")
     + _STATEMENTS_V4 + ("PRAGMA user_version=4",))

@@ -128,6 +128,13 @@ class Refusal(StrEnum):
     ALREADY_SCHEDULED = "already_scheduled"
     BEING_SENT = "being_sent"
     CONVERSATION_OFF = "conversation_off"
+    # Stage 3c (v0.6.14-beta.2, state/prompts.py, state/continuations.py): a prompt the check refuses or too long;
+    # twenty waiting, or five in that conversation; one that waits for the one before it where there is none; and
+    # a count of continuations to keep going that is not one on offer.
+    PROMPT_REFUSED = "prompt_refused"
+    QUEUE_FULL = "queue_full"
+    DEPENDENCY_UNKNOWN = "dependency_unknown"
+    KEEP_COUNT_INVALID = "keep_count_invalid"
 
 
 class JournalCode(StrEnum):
@@ -171,14 +178,19 @@ class OverrideKind(StrEnum):
     EARLY_RESET = "early_reset"
     CAPACITY_LADDER = "capacity_ladder"
     RESEND_ONCE = "resend_once"
+    # v0.6.14-beta.2: a continuation queued for when its conversation is opened, paid for in the claim - once for
+    # each interruption, so one released from that queue is never queued for opening again.
+    QUEUE_FOR_OPEN = "queue_for_open"
 
 
 class OptionKey(StrEnum):
     """A choice a capability offers a person (registry.Option), stored in `options` by this key."""
     ATTEMPTS = "attempts"                    # how many tries a task gets
     CEILING_HOURS = "ceiling_hours"          # for how long, in hours on the clock, it keeps trying
-    # v0.6.14-beta.2: how many sends may wait for their receipts at once (parallel_dispatch, 2 to 4).
+    # v0.6.14-beta.2: how many sends may wait for their receipts at once (parallel_dispatch, 2 to 4), and how many
+    # days a continuation is kept in Codex's queue for when its conversation is opened (queue_for_open, 3 to 7).
     WORKERS = "workers"
+    DAYS = "days"
 
 
 class KeepOn(StrEnum):
@@ -475,3 +487,85 @@ class McpTool(StrEnum):
     LIST_ADVANCED_CAPABILITIES = "list_advanced_capabilities"
     DISARM_ADVANCED_CAPABILITY = "disarm_advanced_capability"
     DISARM_ALL_ADVANCED = "disarm_all_advanced"
+
+
+# ------------------------------------------------------------------ stage 3c (v0.6.14-beta.2)
+class ContinuationKind(StrEnum):
+    """What one of the edition's own continuations answers (state/continuations.py): a turn that ended with no reply,
+    a subagent that stopped, or a conversation a person asked to keep going."""
+    EMPTY_RESPONSE = "empty_response"
+    SUBAGENT = "subagent"
+    KEEP_GOING = "keep_going"
+
+
+class ContinuationReason(StrEnum):
+    """How one of the edition's own continuations ended, or why none was made (state/continuations.py)."""
+    SENT = "sent"
+    DELIVERED = "delivered"
+    UNKNOWN = "unknown"
+    SUPERSEDED = "superseded"
+    HANDED_OVER = "handed_over"
+    WITHDRAWN = "withdrawn"
+    CHAIN_SPENT = "chain_spent"              # an empty reply's chain had its two continuations
+    GOAL_LEFT = "goal_left"                  # a goal Codex keeps going, or blocked: left alone
+    MENTIONED = "mentioned"                  # a subagent's stop told in the parent's own continuation (P4)
+    TURNED_OFF = "turned_off"
+    CONVERSATION_OFF = "conversation_off"
+
+
+class KeepState(StrEnum):
+    """Where a conversation a person asked to keep going stands (state/continuations.py keep_going)."""
+    ON = "on"
+    DONE = "done"
+
+
+class KeepReason(StrEnum):
+    """Why a conversation kept going stopped."""
+    NO_PROGRESS = "no_progress"              # the last turn left nothing that counts as progress
+    PLAN_DONE = "plan_done"                  # every step of its plan is completed
+    COUNT_SPENT = "count_spent"              # the continuations a person allowed were used
+    GOAL_ACTIVE = "goal_active"              # a goal is active: Codex goes on itself
+    FAILED = "failed"                        # a failed turn is core's ordinary recovery, never this
+    BY_PERSON = "by_person"
+    TURNED_OFF = "turned_off"
+    CONVERSATION_OFF = "conversation_off"
+
+
+class PromptTrigger(StrEnum):
+    """When a queued prompt goes (state/prompts.py): after the turn now running, at a time, or on a schedule."""
+    AFTER_TURN = "after_turn"
+    AT_TIME = "at_time"
+    RECURRING = "recurring"
+
+
+class PromptEvery(StrEnum):
+    """How often a recurring prompt goes."""
+    DAY = "day"
+    WEEK = "week"
+
+
+class PromptState(StrEnum):
+    """Where a queued prompt stands: waiting for its time, due (READY) and being tried, held until a person says go on
+    or cancel, or finished - done, or cancelled. Only one waiting, due or held holds its words."""
+    WAITING = "waiting"
+    READY = "ready"
+    HELD = "held"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+class PromptReason(StrEnum):
+    """Why a queued prompt stands where it stands."""
+    DELIVERED = "delivered"
+    HANDED_OVER = "handed_over"
+    SUPERSEDED = "superseded"
+    EXPIRED = "expired"                      # not sent a day after it fell due
+    MISSED = "missed"                        # an occurrence that fell while nothing ran, counted as used
+    DEPENDENCY_FAILED = "dependency_failed"  # the one before it did not arrive: held for a person
+    BY_PERSON = "by_person"
+    TURNED_OFF = "turned_off"
+    TOO_LONG = "too_long"                    # over 2,000 characters once Longer messages was turned off
+    CONVERSATION_OFF = "conversation_off"
+    WITHDRAWN = "withdrawn"                  # taken back out of Codex's queue on a Cancel or a Pause
+    WITHDRAW_REFUSED = "withdraw_refused"    # Codex would not give it back: left there, never sent again
+    UNKNOWN = "unknown"

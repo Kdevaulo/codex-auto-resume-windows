@@ -198,6 +198,10 @@ class JournalMixin:
         # The reset actions' rules and spends (v0.6.14): the same bounds, and never one still to act.
         from .resets import prune
         prune(connection, now, EVENT_MAX_AGE, EVENT_LIMIT)
+        # And the continuations, the conversations kept going and the prompts (v0.6.14-beta.2): the same.
+        from . import continuations, prompts
+        continuations.prune(connection, now, EVENT_MAX_AGE, EVENT_LIMIT)
+        prompts.prune(connection, now, EVENT_MAX_AGE, EVENT_LIMIT)
 
     @staticmethod
     def _prune_spend(connection, schema, now) -> None:

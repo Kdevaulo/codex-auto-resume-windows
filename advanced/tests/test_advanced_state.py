@@ -880,6 +880,9 @@ class ResetStateTests(StateCase):
                 if statement.lstrip().startswith("CREATE TABLE options"):
                     for word in schema_module.V4_OPTION_WORDS:
                         statement = statement.replace(", '%s'" % word, "")
+                if statement.lstrip().startswith("CREATE TABLE overrides"):
+                    for word in schema_module.V4_OVERRIDE_WORDS:
+                        statement = statement.replace(", '%s'" % word, "")
                 if not resets and statement in schema_module.ADD_RESETS:
                     continue
                 connection.execute(statement)
