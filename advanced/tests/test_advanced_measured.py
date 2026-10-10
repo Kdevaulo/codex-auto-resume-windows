@@ -80,15 +80,18 @@ class TableTests(unittest.TestCase):
         as the app's bundled engine runs it, and the VS Code extension), M6, M7, MA, MH and MP1-MP3 passed;
         M2 (a goal set elsewhere is not seen while the app holds the thread), M3 and M4 (no Stop-hook plugin
         yet) failed. MU was probed but waits for a 5-hour reset with no Codex use, MN needs an account with
-        no reset credit (this one has some), and MR spends a credit: none of the three is settled."""
+        no reset credit (this one has some): neither is settled. 2026-10-11, the owner allowed one credit: MR
+        passed - at a real limit one consume said reset, spent exactly one credit, spent none on the retry
+        with its key, and the app ran a message afterwards (the usage read right after still showed the
+        limit and no window changed)."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
                                   Measurement.M6, Measurement.M7, Measurement.MA, Measurement.MH,
-                                  Measurement.MP1, Measurement.MP2, Measurement.MP3})
+                                  Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR})
         self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4})
         self.assertEqual(set(Measurement) - passed - failed,
-                         {Measurement.MU, Measurement.MN, Measurement.MR})
+                         {Measurement.MU, Measurement.MN})
 
 
 if __name__ == "__main__":
