@@ -357,8 +357,10 @@ def audit_data(locale: str, bridge: Bridge) -> dict:  # noqa: C901 - one layout'
 
 
 # How long one view of one audit may take to lay out, at most: what it takes on a quiet PC (about 7 seconds at
-# v0.6.14), with room for a slower one. A hang is what this catches.
-AUDIT_SECONDS = 12
+# v0.6.14), with room for a slower one. A hang is what this catches. 12 was too tight for GitHub's runners: dev runs
+# 38077769655 and 38082727688 each timed test_advanced_page_layout_3 (ja, fr, pl, he) out in two advanced lanes,
+# "the probe did not run", with nothing cut off; 30 still ends a hang long before the job's own limit.
+AUDIT_SECONDS = 30
 
 
 def audited_views() -> int:
