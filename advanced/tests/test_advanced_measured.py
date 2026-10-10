@@ -91,7 +91,10 @@ class TableTests(unittest.TestCase):
                          {Measurement.MU, Measurement.MN, Measurement.MR,
                           # v0.6.15-beta's own, for several conversations at once: not made yet.
                           Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK,
-                          Measurement.MT})
+                          Measurement.MT,
+                          # v0.6.15-beta.3's nine, for stage 4: built, and the main session's or a fork's to run.
+                          Measurement.M6B, Measurement.MO, Measurement.MX, Measurement.MXA, Measurement.MF,
+                          Measurement.M3B, Measurement.MB, Measurement.MC1, Measurement.MC2})
 
 
 if __name__ == "__main__":

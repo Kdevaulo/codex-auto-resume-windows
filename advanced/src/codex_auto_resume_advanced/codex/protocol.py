@@ -74,6 +74,21 @@ MEASUREMENT_METHODS = {
     Measurement.MK: (),
     # MT lists what the app holds, before core's backend queues one message while a turn runs.
     Measurement.MT: ("thread/loaded/list",),
+    # v0.6.15-beta.3 (stage 4). M6B runs one headless turn on the thread's saved settings, as M6 did on forced ones;
+    # MX asks thread/compact/start on our own server and lets go; MF reads Codex's models, overrides one at resume or
+    # on a turn, and restores it with thread/settings/update; M3B starts a turn with no input; MB writes and reads
+    # Codex's config on a scratch home; MC1 adds one item to a queue the app holds, as M7 did. MO, MXA and MC2 read
+    # Codex's files only.
+    Measurement.M6B: ("thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe"),
+    Measurement.MO: (),
+    Measurement.MX: ("thread/resume", "thread/compact/start", "thread/unsubscribe"),
+    Measurement.MXA: (),
+    Measurement.MF: ("thread/resume", "model/list", "turn/start", "turn/interrupt", "thread/settings/update",
+                     "thread/unsubscribe"),
+    Measurement.M3B: ("thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe"),
+    Measurement.MB: ("config/read", "config/value/write"),
+    Measurement.MC1: ("thread/queue/add", "thread/queue/list"),
+    Measurement.MC2: (),
 }
 
 # The methods a capability's own route may call, beyond `initialize` - each one a measurement

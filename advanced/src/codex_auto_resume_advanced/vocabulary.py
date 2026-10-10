@@ -342,6 +342,64 @@ class Measurement(StrEnum):
     # One message queued while a turn runs in a throwaway conversation: delivered once, after that turn ended
     # (prompt_queue's after_turn).
     MT = "mt"
+    # v0.6.15-beta.3 (stage 4). With Codex closed: a headless turn on the thread's own saved settings, a command
+    # run under them, every approval declined (M6B); thread/compact/start on our own server, and the turn it leaves
+    # (MX); a model override at resume lasting the session only, or a restore by thread/settings/update read back
+    # (MF); a turn started with no input, proven by its client id (M3B); and Codex's own config writes on a scratch
+    # home - read back, removed, a stale version refused (MB). With Codex open: a terminal's TUI and VS Code's
+    # conversations - their source, originator and holder (MO); a person's own /compact in the app (MXA); a message
+    # queued with no marker showing as the person's own (MC1); and which of the history and the rollout says first
+    # that a turn started and ended (MC2).
+    M6B = "m6b"
+    MO = "mo"
+    MX = "mx"
+    MXA = "mxa"
+    MF = "mf"
+    M3B = "m3b"
+    MB = "mb"
+    MC1 = "mc1"
+    MC2 = "mc2"
+
+
+class ObservedWord(StrEnum):
+    """The closed words a stage-4 measurement's observation may hold besides booleans and counts (v0.6.15-beta.3,
+    evidence.CLOSED_WORDS): a thread's saved sandbox and approval policy and its reviewer, as Codex's schema names
+    them; a conversation's source, thread source, history mode, originator and holder; and the buckets a span or a
+    lag is kept in, and which of two came first - never a model, a name, a path or anything a turn said."""
+    READONLY = "readOnly"
+    WORKSPACEWRITE = "workspaceWrite"
+    EXTERNALSANDBOX = "externalSandbox"
+    DANGERFULLACCESS = "dangerFullAccess"
+    UNTRUSTED = "untrusted"
+    ON_FAILURE = "on-failure"
+    ON_REQUEST = "on-request"
+    NEVER = "never"
+    GRANULAR = "granular"
+    USER = "user"
+    CLI = "cli"
+    VSCODE = "vscode"
+    EXEC = "exec"
+    MCP = "mcp"
+    PAGINATED = "paginated"
+    CLI_ORIGINATOR = "cli_originator"
+    IDE_ORIGINATOR = "ide_originator"
+    DESKTOP = "desktop"
+    APP = "app"
+    SESSION = "session"
+    NONE = "none"
+    UNKNOWN = "unknown"
+    OTHER = "other"
+    UNDER_1S = "under_1s"
+    S1_TO_5 = "s1_to_5"
+    OVER_5S = "over_5s"
+    UNDER_10S = "under_10s"
+    UNDER_60S = "under_60s"
+    UNDER_600S = "under_600s"
+    OVER_600S = "over_600s"
+    DB = "db"
+    ROLLOUT = "rollout"
+    SAME = "same"
+    NEITHER = "neither"
 
 
 class RuleState(StrEnum):

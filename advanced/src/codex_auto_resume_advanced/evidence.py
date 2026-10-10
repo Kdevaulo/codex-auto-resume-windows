@@ -24,7 +24,7 @@ import re
 from codex_auto_resume import failures, machine
 from codex_auto_resume.diagnostics import EMAIL_RE, KEY_RE, PATH_RE, UUID_RE
 
-from .vocabulary import Measurement, NoteCode, SpendOutcome, Verdict
+from .vocabulary import Measurement, NoteCode, ObservedWord, SpendOutcome, Verdict
 
 # The same tag scripts/live_evidence.py skips these files by; tests/test_advanced_measure.py
 # keeps the two spellings identical, so neither can move without the other.
@@ -42,7 +42,9 @@ ALIAS_RE = re.compile(r"^(?:thread|record|chain)-[0-9a-f]{8}$")
 CLOSED_WORDS = (frozenset(str(word) for word in machine.TURN_STATUSES)
                 | frozenset(str(word) for word in failures.CATEGORIES)
                 | frozenset(str(word) for word in Verdict)
-                | frozenset(str(word) for word in SpendOutcome))
+                | frozenset(str(word) for word in SpendOutcome)
+                # v0.6.15-beta.3: and the stage-4 measurements' own (vocabulary.ObservedWord).
+                | frozenset(str(word) for word in ObservedWord))
 
 
 def _closed(value: str) -> bool:
