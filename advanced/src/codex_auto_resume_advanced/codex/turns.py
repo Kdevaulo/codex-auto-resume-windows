@@ -1,0 +1,155 @@
+# ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
+"""Codex's turn history, read-only (v0.6.14-beta.2): what kinds of item a conversation's latest turn left, which
+conversations finished a turn lately, and the statuses of a plan's steps - never what any of it says.
+
+The empty-response recovery (engine/emptyreply.py) and keep going (engine/keepgoing.py) judge a turn by the kinds of
+item it left alone, counted per `item_type` (no content column); keep going stops on a finished plan, read by
+`plan_statuses`, whose one statement selects only `json_extract(step.value, '$.status')` over the newest plan
+item's steps - never a step's words. Every statement this module runs is one of `STATEMENTS` below, which
+advanced/tests/test_advanced_codex_reads.py holds to that.
+
+The file is found as core finds every Codex database (codex/paths.newest_generation): the newest generation, a
+symbolic link never followed, the columns read required, opened read-only with query_only on and trusted_schema off
+(B1). Anything that goes wrong is TurnsUnavailable, which every capability reads as "do nothing".
+"""
+from __future__ import annotations
+
+from pathlib import Path
+import sqlite3
+from typing import NamedTuple
+
+from codex_auto_resume.codex.paths import _safe_path, newest_generation
+from codex_auto_resume.domain import ids
+
+# The columns read, and the only ones (thread_items' item_json only through the plan statement's json_each).
+TURN_COLUMNS = frozenset({"thread_id", "turn_id", "status", "error_json", "completed_at", "rollout_ordinal",
+                          "final_agent_item_id"})
+ITEM_COLUMNS = frozenset({"thread_id", "turn_id", "item_type", "item_json", "rollout_ordinal"})
+LATEST = ("SELECT turn_id, status, error_json IS NOT NULL AND error_json NOT IN ('', 'null'), completed_at, "
+          "final_agent_item_id IS NOT NULL, rollout_ordinal FROM thread_turns WHERE thread_id=? "
+          "ORDER BY rollout_ordinal DESC LIMIT 1")
+KINDS = "SELECT item_type, count(*) FROM thread_items WHERE thread_id=? AND turn_id=? GROUP BY item_type"
+RECENT = ("SELECT thread_id FROM thread_turns WHERE status='completed' AND completed_at >= ? "
+          "GROUP BY thread_id ORDER BY max(completed_at) DESC LIMIT ?")
+PLAN_ITEM_TYPE = "plan"
+HAS_PLAN = "SELECT EXISTS(SELECT 1 FROM thread_items WHERE thread_id=? AND item_type=?)"
+PLAN = ("SELECT json_extract(step.value, '$.status') FROM (SELECT item_json FROM thread_items WHERE thread_id=? "
+        "AND item_type=? ORDER BY rollout_ordinal DESC LIMIT 1) AS newest, json_each(newest.item_json, '$.steps') "
+        "AS step")
+STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN)
+# A plan step's statuses as Codex writes them; anything else reads "unknown".
+STEP_STATUSES = frozenset({"pending", "in_progress", "completed"})
+UNKNOWN = "unknown"
+# How many conversations `recent` names at most.
+RECENT_LIMIT = 50
+# A kind word as Codex spells one: letters, at most this long. Anything else is counted as "other".
+KIND_MAX = 64
+
+
+class TurnsUnavailable(RuntimeError):
+    """The turn history could not be read as this reads it. A static reason only."""
+
+
+class Turn(NamedTuple):
+    turn_id: str
+    status: str                 # completed, failed, interrupted, inProgress - or "other"
+    errored: bool               # an error was recorded (its words are never read)
+    completed_at: int | None
+    final_agent: bool           # Codex recorded a final agent item
+    ordinal: int
+    kinds: dict                 # {item_type: count}, a kind of no shape this knows counted as "other"
+
+
+def connect(home, kind, tables):
+    """A read-only connection to the newest generation of core's `kind` database in the Codex home `home`, its
+    `tables` ({name: columns}) required - or TurnsUnavailable."""
+    root = _safe_path(Path(home))
+    try:
+        path = newest_generation(root, kind)
+    except OSError:
+        raise TurnsUnavailable("the Codex home cannot be listed") from None
+    if path is None:
+        raise TurnsUnavailable("no %s database" % kind)
+    path = _safe_path(path)
+    if path.parent != root:
+        raise TurnsUnavailable("the database is outside the Codex home")
+    connection = None
+    try:
+        connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=3)
+        connection.execute("PRAGMA query_only=ON")
+        connection.execute("PRAGMA trusted_schema=OFF")
+        for table, columns in tables.items():
+            found = {row[1] for row in connection.execute("PRAGMA table_info(%s)" % table)}
+            if not columns <= found:
+                raise TurnsUnavailable("the %s table has moved on" % table)
+    except (sqlite3.Error, OSError, ValueError):
+        if connection is not None:
+            connection.close()
+        raise TurnsUnavailable("the database cannot be read") from None
+    except TurnsUnavailable:
+        connection.close()
+        raise
+    return connection
+
+
+def _kind(value) -> str:
+    return value if isinstance(value, str) and 0 < len(value) <= KIND_MAX and value.isalpha() else "other"
+
+
+class Turns:
+    """The turn history of the Codex home `home`."""
+
+    def __init__(self, home):
+        self.home = home
+
+    def _read(self, run):
+        connection = connect(self.home, "history", {"thread_turns": TURN_COLUMNS, "thread_items": ITEM_COLUMNS})
+        try:
+            return run(connection)
+        except (sqlite3.Error, OSError, ValueError):
+            raise TurnsUnavailable("the turn history cannot be read") from None
+        finally:
+            connection.close()
+
+    def latest(self, thread_id) -> Turn | None:
+        """The latest turn of conversation `thread_id` and the kinds of item it left, or None where it has none."""
+        if not ids.is_uuid(thread_id):
+            raise TurnsUnavailable("not a conversation")
+
+        def run(connection):
+            row = connection.execute(LATEST, (thread_id,)).fetchone()
+            if row is None:
+                return None
+            turn_id, status, errored, completed, final, ordinal = row
+            if not ids.is_uuid(turn_id) or type(ordinal) is not int:
+                raise TurnsUnavailable("a turn of no shape this knows")
+            kinds = {}
+            for kind, count in connection.execute(KINDS, (thread_id, turn_id)).fetchall():
+                kinds[_kind(kind)] = kinds.get(_kind(kind), 0) + int(count)
+            status = status if status in ("completed", "failed", "interrupted", "inProgress") else "other"
+            completed = completed if type(completed) is int and completed > 0 else None
+            return Turn(turn_id, status, bool(errored), completed, bool(final), ordinal, kinds)
+        return self._read(run)
+
+    def recent(self, since) -> list:
+        """The conversations with a turn completed at `since` or later (Codex's seconds), the latest first, at
+        most RECENT_LIMIT - the candidates the edition looks at, never a list of every conversation."""
+        rows = self._read(lambda connection: connection.execute(RECENT, (int(since), RECENT_LIMIT)).fetchall())
+        return [row[0] for row in rows if ids.is_uuid(row[0])]
+
+    def plan_statuses(self, thread_id) -> tuple | None:
+        """The statuses of the newest plan item's steps in `thread_id`, in order, each a STEP_STATUSES word or
+        "unknown" - None where the conversation has no plan item. A plan item there whose steps cannot be read
+        is TurnsUnavailable: what stops on a finished plan stops on an unreadable one too (fail closed)."""
+        if not ids.is_uuid(thread_id):
+            raise TurnsUnavailable("not a conversation")
+
+        def run(connection):
+            if not connection.execute(HAS_PLAN, (thread_id, PLAN_ITEM_TYPE)).fetchone()[0]:
+                return None
+            statuses = tuple(row[0] if row[0] in STEP_STATUSES else UNKNOWN
+                             for row in connection.execute(PLAN, (thread_id, PLAN_ITEM_TYPE)).fetchall())
+            if not statuses:
+                raise TurnsUnavailable("a plan item with no steps this reads")
+            return statuses
+        return self._read(run)
