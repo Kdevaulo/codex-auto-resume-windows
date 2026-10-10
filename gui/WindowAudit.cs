@@ -200,6 +200,8 @@ namespace CodexAutoResume
                         // asked for, so no audit reaches GitHub.
                         form.AuditVersions(findings);
                         form.AuditConversationMessage(snapshot, findings);
+                        // v0.6.15-beta.2: and the dialog of a waiting task's words for this time, built the same way.
+                        form.AuditOnceWords(snapshot, findings);
                     }
                     // v0.6.11: the dialog of a value of the person's own, of each kind the schema offers (SettingsOwn.cs).
                     form.AuditOwnValues(schema, findings);
@@ -1174,6 +1176,26 @@ namespace CodexAutoResume
                     findings.Add("conversation message :: its text box reaches past the dialog, " + conversationArea.Right +
                                  " in " + dialog.ClientSize.Width);
                 AuditSpoken("conversation message", dialog, findings);
+            }
+        }
+
+        /// The dialog of a waiting task's words for this time (v0.6.15-beta.2), built with words in it at its opening size
+        /// and never shown: its text box, its count and its Preview have to fit the dialog in every language.
+        private void AuditOnceWords(Dictionary<string, object> snapshot, List<string> findings)
+        {
+            var rows = snapshot == null ? null : snapshot.ContainsKey("pending") ? snapshot["pending"] as List<object> : null;
+            var row = rows != null && rows.Count > 0 ? rows[0] as Dictionary<string, object> : null;
+            if (row == null) return;
+            using (Form dialog = BuildOnceWords(row, "Then run the tests, please. {reason}"))
+            {
+                dialog.TopLevel = false;
+                Materialise(dialog);
+                dialog.PerformLayout();
+                bool whole = dialog.ClientSize.Width >= Px(600);
+                if (whole && onceWordsArea != null && onceWordsArea.Right > dialog.ClientSize.Width)
+                    findings.Add("words for this time :: its text box reaches past the dialog, " + onceWordsArea.Right +
+                                 " in " + dialog.ClientSize.Width);
+                AuditSpoken("words for this time", dialog, findings);
             }
         }
 

@@ -759,6 +759,8 @@ namespace CodexAutoResume
                 foreach (string cell in Cells(row, pending)) parts.Add(cell ?? "");
                 parts.Add(ToneFor(row).ToArgb().ToString(CultureInfo.InvariantCulture));
                 parts.Add(ThreadOn(row) ? "1" : "0");
+                // v0.6.15-beta.2: whether it has words for this time, which its menu and its note follow.
+                parts.Add(HasOnceWords(row) ? "w" : "");
             }
             return string.Join("\u001f", parts.ToArray());
         }
