@@ -301,6 +301,7 @@
   "page.watchlog.answer.early": "Проверить раньше времени сброса",
   "page.watchlog.answer.hold": "Оставить ждать",
   "page.watchlog.answer.other": "Что-то другое",
+  "page.watchlog.answer.queue_for_open": "Поставил в очередь до открытия беседы",
   "page.watchlog.answer.resend": "Отправить ещё раз",
   "page.watchlog.answer.send_now": "Отправить сейчас",
   "page.watchlog.answer.sender": "Отправить по-своему",

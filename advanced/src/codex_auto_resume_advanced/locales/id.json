@@ -301,6 +301,7 @@
   "page.watchlog.answer.early": "Memeriksa sebelum waktu reset",
   "page.watchlog.answer.hold": "Membuatnya tetap menunggu",
   "page.watchlog.answer.other": "Hal lain",
+  "page.watchlog.answer.queue_for_open": "Mengantrekannya untuk saat percakapan dibuka",
   "page.watchlog.answer.resend": "Mengirim sekali lagi",
   "page.watchlog.answer.send_now": "Mengirim sekarang",
   "page.watchlog.answer.sender": "Mengirim dengan caranya sendiri",

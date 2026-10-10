@@ -33,7 +33,7 @@ _DOWNGRADE_STATES = {
 TARGETS = (2, 3, 4)
 
 # Withdrawal reasons a schema-4 reader does not know (v0.6.14-beta.2), as the one it settles the same way.
-_NEW_WITHDRAWALS = {}
+_NEW_WITHDRAWALS = {"window_ended": "expired", "not_delivered_on_open": "not_loaded"}
 
 # A withdrawal for Observe only (v0.6.11), as the Pause's v0.6.10 knows: the same promise, its words.
 _OBSERVE_WITHDRAWALS = {"observe_only": "paused", "observe_only_unknown": "paused_unknown"}

@@ -27,6 +27,10 @@ class WithdrawReason(StrEnum):
     # v0.6.11: taken back because Observe only is on - a Pause's promise, under words of its own.
     OBSERVE_ONLY = "observe_only"
     OBSERVE_ONLY_UNKNOWN = "observe_only_unknown"
+    # v0.6.14-beta.2: one queued for when its conversation is opened (P16's QUEUE_FOR_OPEN) - the plug no longer
+    # keeps it there, or seven days and an hour passed; or the conversation was opened and Codex did not deliver it.
+    WINDOW_ENDED = "window_ended"
+    NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
 
 
 class ReasonCode(StrEnum):
@@ -114,6 +118,8 @@ class ReasonCode(StrEnum):
     EXPIRED = "expired"
     OBSERVE_ONLY = "observe_only"
     OBSERVE_ONLY_UNKNOWN = "observe_only_unknown"
+    WINDOW_ENDED = "window_ended"
+    NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
 
 
 class HomeState(StrEnum):

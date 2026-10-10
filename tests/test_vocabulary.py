@@ -59,7 +59,7 @@ LISTS = {
     "machine.POSSIBLY_SENT": ("set", 20, "dadead4aea3c20e5"),
     "machine.WATCHED": ("set", 4, "07ba1375946c1591"),
     # v0.6.11: observe_only and observe_only_unknown - taken back for Observe only, in its own words.
-    "machine.WITHDRAW_REASONS": ("set", 13, "e0093ee6641742ac"),
+    "machine.WITHDRAW_REASONS": ("set", 15, "e655adbd6ac55e2a"),
     "machine.SUPERSEDE_WITHDRAWALS": ("set", 3, "b63141bdc33260f0"),
     "machine.TURN_STATUSES": ("set", 5, "58aca83cec78ff2b"),
     "machine.ACTORS": ("set", 5, "eaf35d06c4c2b568"),
@@ -69,7 +69,7 @@ LISTS = {
     # took up (P17) that nothing takes up now, and one taken up a day ago; and capacity_window, capacity
     # retries past their twelve hours on the clock.
     # v0.6.14-beta.2: home_removed and home_not_watched - a Codex home's waiting records cancelled.
-    "machine.REASONS": ("set", 72, "0212d8ad384bd7a9"),
+    "machine.REASONS": ("set", 74, "5c6aa62cce9a0415"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -90,7 +90,7 @@ LISTS = {
     # and `resend`, submission_safe passed for an uncertain submission sent once more (engine/resend.py),
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
     # v0.6.14-beta.2: and home_removed and home_not_watched, as every reason is.
-    "machine.GATE_REASONS": ("set", 89, "0b551e7947a69cfb"),
+    "machine.GATE_REASONS": ("set", 91, "409337d90aa93a63"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",
@@ -208,7 +208,7 @@ LISTS = {
     # And RESEND, P7's word for an uncertain submission sent once more, which core proves may go, and
     # SEND_NOW, its word for a waiting record a person asked to send now.
     "domain.plug.POINTS": ("tuple", 16, "07e8ae14d7f49978"),
-    "domain.plug.ANSWERS": ("set", 12, "4c1e9268012950b1"),
+    "domain.plug.ANSWERS": ("set", 13, "dcf766b4e83e21eb"),
     "domain.plug.FAILURE_FORMS": ("tuple", 5, "bcc0ad1bd6f81009"),
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
     # v0.6.14: what core did with a record of the plug's own (P2), as P14 tells it.

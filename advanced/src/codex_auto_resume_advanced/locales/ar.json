@@ -301,6 +301,7 @@
   "page.watchlog.answer.early": "النظر قبل وقت إعادة الضبط",
   "page.watchlog.answer.hold": "إبقاؤها في الانتظار",
   "page.watchlog.answer.other": "شيء آخر",
+  "page.watchlog.answer.queue_for_open": "وضعها في الطابور إلى أن تُفتح المحادثة",
   "page.watchlog.answer.resend": "الإرسال مرة أخرى",
   "page.watchlog.answer.send_now": "الإرسال الآن",
   "page.watchlog.answer.sender": "الإرسال بطريقتها الخاصة",

@@ -301,6 +301,7 @@
   "page.watchlog.answer.early": "Перевірити раніше часу скидання",
   "page.watchlog.answer.hold": "Залишити чекати",
   "page.watchlog.answer.other": "Щось інше",
+  "page.watchlog.answer.queue_for_open": "Поставив у чергу до відкриття розмови",
   "page.watchlog.answer.resend": "Надіслати ще раз",
   "page.watchlog.answer.send_now": "Надіслати зараз",
   "page.watchlog.answer.sender": "Надіслати по-своєму",

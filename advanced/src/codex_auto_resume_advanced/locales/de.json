@@ -301,6 +301,7 @@
   "page.watchlog.answer.early": "Vor dem Rücksetzzeitpunkt nachsehen",
   "page.watchlog.answer.hold": "Warten lassen",
   "page.watchlog.answer.other": "Etwas anderes",
+  "page.watchlog.answer.queue_for_open": "Für das Öffnen der Unterhaltung eingereiht",
   "page.watchlog.answer.resend": "Noch einmal senden",
   "page.watchlog.answer.send_now": "Jetzt senden",
   "page.watchlog.answer.sender": "Auf eigenem Weg senden",

@@ -86,7 +86,9 @@ ITEM = {_q(name): item for item, names in {
                # and records of the edition's own, tried like core's.
                "engine.plugrecords",
                # v0.6.14-beta.2: several sends waiting for their receipts at once, on workers.
-               "engine.launches"),
+               "engine.launches",
+               # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
+               "engine.foropen"),
     "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",

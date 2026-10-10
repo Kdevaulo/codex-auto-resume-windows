@@ -129,6 +129,9 @@ class Alternative(StrEnum):
     # P15: no marker; queued under the client id core derives from the interruption
     # (ids.continuation_client_id), which is what proves it arrived.
     CLIENT_ID = "client_id"
+    # P16 (v0.6.14-beta.2): the ordinary send to a conversation the app does not hold, left in Codex's queue for
+    # when it is opened - kept there only while the plug says so, and seven days and an hour at most.
+    QUEUE_FOR_OPEN = "queue_for_open"
     # P17, and P3 at known_failure: take a failure up, waiting as core waits for an admitted one
     # (ladder.ADMITTED_WAITS), or as a temporary failure of the kind named (PACED_AS).
     ADMIT = "admit"
@@ -399,7 +402,7 @@ PACED_AS = {Alternative.AS_NETWORK_TRANSIENT: "network_transient", Alternative.A
 
 # Every alternative some point accepts. The vocabulary is exactly these
 # (tests/test_vocabulary.py), so no word waits in it for a point that does not take it.
-ANSWERS = frozenset().union(*ALTERNATIVES.values())
+ANSWERS = frozenset().union(*ALTERNATIVES.values()) | {Alternative.QUEUE_FOR_OPEN}
 
 NULL = Plug()
 
@@ -633,6 +636,12 @@ class Guarded:
         calls it once, after its claim and its pre-send look (engine/delivery.py)."""
         answer = self._ask(Point.UNLOADED, record)
         if answer is DEFER:
+            return DEFER
+        try:
+            # v0.6.14-beta.2: or QUEUE_FOR_OPEN - the ordinary send, left in Codex's queue for when it is opened.
+            if type(answer) in (str, Alternative) and answer == Alternative.QUEUE_FOR_OPEN:
+                return Alternative.QUEUE_FOR_OPEN
+        except Exception:
             return DEFER
         try:
             resume = getattr(answer, "resume", None)

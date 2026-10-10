@@ -199,10 +199,13 @@ class OneSenderTests(unittest.TestCase):
     def test_a_route_for_a_conversation_not_held_is_asked_once_and_carried_out_once(self):
         """P16 (v0.6.11 stage 3b): the route a plug names where core would wait for the app is
         asked in one place and called in one place - after the one claim and the pre-send look,
-        inside the launch guard - and core's own backend is never handed one."""
+        inside the launch guard - and core's own backend is never handed one. From v0.6.14-beta.2 it is asked
+        in one more place, the watch, only whether a continuation queued for opening stays queued: there it is
+        compared with QUEUE_FOR_OPEN, and nothing it answers is ever called."""
         asked = calls(lambda node: isinstance(node.func, ast.Attribute) and node.func.attr == "unloaded")
         self.assertEqual([(where, name) for where, name, _ in asked],
-                         [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._unloaded")])
+                         [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._unloaded"),
+                          ("codex_auto_resume/engine/foropen.py", "ForOpenMixin._open_reason")])
         resumed = calls(lambda node: isinstance(node.func, ast.Attribute) and node.func.attr == "resume")
         self.assertEqual([(where, name) for where, name, _ in resumed],
                          [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._resume_unloaded")])

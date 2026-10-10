@@ -240,7 +240,7 @@ class DispatchMixin:
                     if not resend and not self._parked(current, vector):
                         self.transition(current, "waiting_for_usage", "usage_recheck_failed", delay=900)
                     return
-                if route is not None:
+                if route is not None and route is not Alternative.QUEUE_FOR_OPEN:
                     self._resume_unloaded(current, vector, limits, route, app, relaxed=relaxed, forced=forced)
                     return
                 # The text is decided before the claim, not after it. Building it reads catalogs
@@ -273,7 +273,7 @@ class DispatchMixin:
                 # P15, decided like them before the claim, and written into the record before it - for a
                 # resend, the proof its first send carried, or nothing is sent (engine/delivery.py).
                 client = self._delivery(current, sender, resend=resend)
-                if client is False:
+                if client is False or self._not_for_open(current, route, sender, client, vector):
                     return
                 # P11 is asked inside the claim, once every check the store makes there has passed.
                 # The claim is told which of the plug's answers the send carries - its words, its
@@ -285,7 +285,8 @@ class DispatchMixin:
                                                                (Point.SENDER, sender is not self.backend),
                                                                (Point.DELIVERY, client is not None))
                                     if taken) | self.relaxed_points("resend" if resend else relaxed)
-                carried |= self.relaxed_points("forced" if forced else None) | self._pooled(sender, client)
+                carried |= (self.relaxed_points("forced" if forced else None) | self._pooled(sender, client)
+                            | ({Point.UNLOADED} if route is Alternative.QUEUE_FOR_OPEN else frozenset()))
                 at = self.clock()
                 claimed, gate, reason = self.store.reserve_detailed(
                     key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector,

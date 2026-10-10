@@ -30,6 +30,7 @@ from .announce import NOTIFY_ON_STATE, AnnounceMixin  # noqa: F401
 from .delivery import DeliveryMixin
 from .detect import DetectMixin
 from .dispatch import DispatchMixin
+from .foropen import ForOpenMixin
 from .freshness import FreshnessMixin
 from .guard import GuardMixin
 from .launches import LaunchPool
@@ -44,7 +45,8 @@ from .resend import ResendMixin
 
 
 class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, ReconcileMixin, OutcomeMixin, DispatchMixin,
-             DeliveryMixin, GuardMixin, NoticeMixin, RelaxedMixin, ResendMixin, PlugRecordsMixin):
+             DeliveryMixin, GuardMixin, NoticeMixin, RelaxedMixin, ResendMixin, PlugRecordsMixin,
+             ForOpenMixin):
     """The part that decides.
     """
 

@@ -405,5 +405,6 @@
   "statement.parallel_dispatch.departs": "0.5 (one recovery is dispatched at a time) and A19 (continuations are dispatched in sequence, under one lock).",
   "statement.parallel_dispatch.instead": "The standard edition sends one continuation at a time and waits for Codex's answer, up to 45 seconds, before it looks at the next one.",
   "statement.parallel_dispatch.risks": "Several Codex queue processes start close together, which a busy or slow Codex may answer late or not at all. A continuation whose delivery cannot be proven is never sent again, and this feature turns itself off.",
-  "statement.parallel_dispatch.stop": "Turn it off here or turn every advanced feature off; from the next look every continuation is sent one at a time again."
+  "statement.parallel_dispatch.stop": "Turn it off here or turn every advanced feature off; from the next look every continuation is sent one at a time again.",
+  "page.watchlog.answer.queue_for_open": "Queued it for when the conversation is opened"
 }

@@ -156,11 +156,16 @@ class ClosedAlternativeTests(unittest.TestCase):
         core takes only at known_failure (tests/test_plug_points.py, KnownFailureTests): the first
         relaxations of a gate, each held to core's own fence (failures.admits). And P7 takes RESEND,
         an uncertain submission sent once more where core proves it may (engine/resend.py), and
-        SEND_NOW, a person's request that passes a waiting record's own wait (engine/relaxed.py)."""
+        SEND_NOW, a person's request that passes a waiting record's own wait (engine/relaxed.py).
+
+        v0.6.14-beta.2: and P16 takes QUEUE_FOR_OPEN, which no point's alternatives list: core's ordinary send,
+        left in Codex's queue for when the conversation is opened, kept only while the plug says so and seven
+        days and an hour at most (engine/foropen.py)."""
         take_up = {Alternative.ADMIT, Alternative.CAPACITY} | set(plug.PACED_AS)
         self.assertEqual(plug.TAKE_UP, take_up)
         self.assertEqual(plug.ANSWERS, plug.RESTRICTIONS | {Alternative.CLIENT_ID, Alternative.EARLY,
-                                                            Alternative.RESEND, Alternative.SEND_NOW} | take_up)
+                                                            Alternative.RESEND, Alternative.SEND_NOW,
+                                                            Alternative.QUEUE_FOR_OPEN} | take_up)
         self.assertEqual(plug.ANSWERS, frozenset(Alternative))
         for point, accepted in plug.ALTERNATIVES.items():
             with self.subTest(point):
