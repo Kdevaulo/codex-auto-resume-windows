@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.6.15 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15)
+
+**A fix alone, on v0.6.14 - and from v0.6.14, an ordinary update.** It is the latest release, for
+both editions, so v0.6.14's *Check for updates* offers it in the edition you have, and the plugin in
+Codex installs it too. Nothing else changed: no setting, no stored format, no capability. The owner
+had it published as a final of its own (2026-10-13) so that every v0.6.14 is offered it; the rest of
+the advanced edition, planned as v0.6.15, is now v0.6.16 ([ROADMAP.md](ROADMAP.md)), and the
+pre-release v0.6.15-beta is published again as v0.6.16-beta. An installation of v0.6.15-beta is
+offered this release too, because it is newer by number: it has fewer capabilities than that beta,
+so stay on the beta line (v0.6.16-beta and later) if you use them.
+
+### Both editions
+
+#### Fixes
+
+- **A conversation ChatGPT hands over to the Codex app, and one Codex gives no label at all, are now
+  recovered** ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+  Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
+  That label is Codex's analytics classification, not a mark of whose a conversation is: a
+  conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
+  `codex_work_desktop`, and the app gives many of its own conversations no label at all - 41 of 64
+  on one PC, made by Codex 0.149 to 0.162. None of them was ever recovered, and nothing in the log
+  said why: the watcher fails closed on what it does not recognise, so it left them alone. Both are
+  taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
+  made, and the CLI's, the terminal's and VS Code's sessions still stay out, and Codex's state and
+  the conversation's own file must still say the same. Found by a person's report and the read-only
+  check written for it; the tests that hold it fail with the fix taken out.
+
+### Advanced edition
+
+Nothing of its own: the fix above is in both editions.
+
 ## v0.6.14 — The window no longer hangs while a recovery waits, eight more ways to recover, Keep it on, a compatibility report sent from the Dashboard, actions at a usage reset you pick, a watch log and the panel beside the chat
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.13...v0.6.14)
