@@ -10,6 +10,7 @@ from pathlib import Path
 import sqlite3
 import time
 from typing import Any, Iterator
+from .downgrade import from_v5
 from .errors import StateFromNewerVersion, StoreError, UpgradePending
 from .schema import SCHEMA_VERSION, _TABLES_V4
 from .validate import _flag, _timestamp, _uuid, _validated_notice, _validated_record, _validated_tier
@@ -35,7 +36,7 @@ class SessionMixin:
             self._connection.execute("PRAGMA synchronous=FULL")
             version = self._connection.execute("PRAGMA user_version").fetchone()[0]
             if version == 5 and migrate:
-                from .downgrade import from_v5      # a state v0.6.15-beta wrote: back to schema 4 first
+                # A state v0.6.15-beta wrote: back to schema 4 first (downgrade.from_v5).
                 version = 4 if from_v5(self._connection, self.state_dir)["changed"] else version
             if version > SCHEMA_VERSION:
                 raise StateFromNewerVersion(
