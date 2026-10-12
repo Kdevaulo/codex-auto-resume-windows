@@ -29,9 +29,15 @@ both editions, so v0.6.14's *Check for updates* offers it in the edition you hav
 Codex installs it too. Nothing else changed: no setting, no stored format, no capability. The owner
 had it published as a final of its own (2026-10-13) so that every v0.6.14 is offered it; the rest of
 the advanced edition, planned as v0.6.15, is now v0.6.16 ([ROADMAP.md](ROADMAP.md)), and the
-pre-release v0.6.15-beta is published again as v0.6.16-beta. An installation of v0.6.15-beta is
-offered this release too, because it is newer by number: it has fewer capabilities than that beta,
-so stay on the beta line (v0.6.16-beta and later) if you use them.
+pre-release v0.6.15-beta is published again as v0.6.16-beta.
+
+**From v0.6.15-beta, it is offered too, being newer by number - and it is v0.6.14's code.** Stay on
+the beta line (v0.6.16-beta.2 carries this fix) if you use what that beta added. Taken anyway, it
+brings the state v0.6.15-beta wrote back to the format v0.6.14 reads before the watcher starts, a
+copy kept beside it (`state.v5-backup-*.sqlite`): every record stays, a record of another Codex
+home is no longer acted on (one still waiting is cancelled), and while a continuation sent to
+another home may still be in its queue the watcher waits instead. The advanced edition's
+capabilities read as off, as v0.6.14 reads that beta's file.
 
 ### Both editions
 
@@ -42,13 +48,16 @@ so stay on the beta line (v0.6.16-beta and later) if you use them.
   Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
   That label is Codex's analytics classification, not a mark of whose a conversation is: a
   conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
-  `codex_work_desktop`, and the app gives many of its own conversations no label at all - 41 of 64
-  on one PC, made by Codex 0.149 to 0.162. None of them was ever recovered, and nothing in the log
-  said why: the watcher fails closed on what it does not recognise, so it left them alone. Both are
+  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
+  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
+  usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
   taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
   made, and the CLI's, the terminal's and VS Code's sessions still stay out, and Codex's state and
   the conversation's own file must still say the same. Found by a person's report and the read-only
-  check written for it; the tests that hold it fail with the fix taken out.
+  check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
+  carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
+  turn there that fails.
 
 ### Advanced edition
 
