@@ -84,16 +84,16 @@ class TableTests(unittest.TestCase):
         passed - at a real limit one consume said reset, spent exactly one credit, spent none on the retry
         with its key, and the app ran a message afterwards (the usage read right after still showed the
         limit and no window changed). With none left, MN passed: both consumes said no_credit and the count
-        stayed at zero."""
+        stayed at zero. 2026-10-13, MU passed: the 5-hour window reset at 22:54 with no Codex use after it, the
+        first message at 01:39 opened a new window resetting at 06:39, and its reset time stayed there."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
                                   Measurement.M6, Measurement.M7, Measurement.MA, Measurement.MH,
                                   Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR,
-                                  Measurement.MN})
+                                  Measurement.MN, Measurement.MU})
         self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4})
-        self.assertEqual(set(Measurement) - passed - failed,
-                         {Measurement.MU})
+        self.assertEqual(set(Measurement) - passed - failed, set())
 
 
 if __name__ == "__main__":
