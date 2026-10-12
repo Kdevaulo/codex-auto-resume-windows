@@ -26,6 +26,16 @@ from . import workspace
 from .payload import _choose_reset, _item_is_ours, _needing, _queue_has_marker, detect  # noqa: F401
 
 
+# A person's own conversations in the Codex desktop app (A15), by what Codex records of them. thread_source is
+# Codex's analytics label (codex-rs ThreadSource: user, subagent, guardian_review, memory_consolidation, or a
+# feature's name), not a mark of whose a conversation is: the app leaves it unset on many conversations of its
+# own (41 of 64 on the owner's PC, made by 0.149 to 0.162, their rollout's first line without the key) and
+# writes chatgpt_handoff on one ChatGPT handed over to it, opened as codex_work_desktop (issue #27). The state
+# row and the rollout must still say the same; a subagent, a review or a memory pass is never one of these.
+OWN_THREAD_SOURCES = frozenset({"user", "chatgpt_handoff", None})
+DESKTOP_ORIGINATORS = frozenset({"Codex Desktop", "codex_work_desktop"})
+
+
 class HistoryMixin:
     def _metadata(self, thread_id: str, strict: bool = False) -> Path | None:
         # strict=True (used by latest()) re-raises transient I/O as SourceError so the
@@ -37,7 +47,7 @@ class HistoryMixin:
                 "SELECT rollout_path,source,thread_source,archived,history_mode "
                 "FROM threads WHERE id=?", (thread_id,)).fetchone()
         if (row is None or row["source"] != "vscode" or row["archived"] != 0
-                or row["thread_source"] != "user" or row["history_mode"] != "paginated"
+                or row["thread_source"] not in OWN_THREAD_SOURCES or row["history_mode"] != "paginated"
                 or not isinstance(row["rollout_path"], str)):
             return None
         try:
@@ -55,9 +65,9 @@ class HistoryMixin:
                 return None
             payload = event.get("payload")
             if (not isinstance(payload, dict) or payload.get("id") != thread_id
-                    or payload.get("originator") != "Codex Desktop"
+                    or payload.get("originator") not in DESKTOP_ORIGINATORS
                     or payload.get("source") != "vscode"
-                    or payload.get("thread_source") != "user"):
+                    or payload.get("thread_source") != row["thread_source"]):
                 return None
             return path
         except OSError:
