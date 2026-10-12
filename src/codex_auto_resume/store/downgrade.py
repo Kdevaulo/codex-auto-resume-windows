@@ -205,3 +205,62 @@ def _to_v2(connection) -> int:
         raise StoreError("A state has no schema-2 meaning")
     connection.execute("PRAGMA user_version=2")
     return rows
+
+
+# What v0.6.15-beta added to schema 4 (store/columns.py there), and the withdrawal reasons it wrote that this
+# release settles the same way under another name. v0.6.15 is this release's code under a higher number than
+# v0.6.15-beta, so an update from that beta reaches a schema-5 state: it is brought back to 4 (from_v5) instead
+# of refused as a newer version's.
+_SCHEMA_5_ADDED = (("interruptions", "home_key"), ("watcher_status", "homes"))
+_V5_WITHDRAWALS = {"window_ended": "expired", "not_delivered_on_open": "not_loaded"}
+
+
+def from_v5(connection, state_dir: Path) -> dict:
+    """A state v0.6.15-beta wrote, as schema 4, a copy kept first - as v0.6.15-beta's own `_to_v4` does - on
+    the caller's open connection (autocommit), which holds the watcher's mutex.
+
+    Only that beta's shape is taken: schema 4's tables with exactly its two columns added. Anything else at
+    a newer number is left alone, and refused as a newer version's, as before. This release watches one
+    Codex home: a record of another home is kept, so it is never recovered twice, and none is left to act
+    on - a waiting one is cancelled (home_not_watched), one whose recovery turn runs ends unverified. It is
+    refused while a record of another home may still be in that home's queue."""
+    tables = {row[0] for row in connection.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+    added = all(name in {row[1] for row in connection.execute("PRAGMA table_info(%s)" % table)}
+                for table, name in _SCHEMA_5_ADDED) if tables == _TABLES_V4 else False
+    if connection.execute("PRAGMA user_version").fetchone()[0] != 5 or not added:
+        return {"changed": False}
+    try:
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        connection.execute("VACUUM INTO ?", (str(Path(state_dir) / ("state.v5-backup-%s.sqlite" % stamp)),))
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            if connection.execute("PRAGMA user_version").fetchone()[0] != 5:
+                raise StoreError("The state changed while it was being downgraded")
+            watched = tuple(sorted(machine.WATCHED))
+            if connection.execute("SELECT count(*) FROM interruptions WHERE home_key<>'' AND state IN (%s)"
+                                  % ",".join("?" for _ in watched), watched).fetchone()[0]:
+                raise StoreError("A continuation sent to another Codex home may still be in its queue; "
+                                 "let it settle first")
+            now = time.time()
+            waiting, observing = tuple(sorted(machine.WAITING)), tuple(sorted(machine.OBSERVING))
+            made_final = connection.execute(
+                "UPDATE interruptions SET state='cancelled', last_error='home_not_watched', cancel_requested=1, "
+                "outcome_at=? WHERE home_key<>'' AND state IN (%s)" % ",".join("?" for _ in waiting),
+                (now,) + waiting).rowcount
+            made_final += connection.execute(
+                "UPDATE interruptions SET state='outcome_unverified', outcome_at=? WHERE home_key<>'' "
+                "AND state IN (%s)" % ",".join("?" for _ in observing), (now,) + observing).rowcount
+            for new, old in sorted(_V5_WITHDRAWALS.items()):
+                connection.execute("UPDATE interruptions SET withdraw_reason=? WHERE withdraw_reason=?", (old, new))
+            for table, name in reversed(_SCHEMA_5_ADDED):
+                connection.execute("ALTER TABLE %s DROP COLUMN %s" % (table, name))
+            connection.execute("PRAGMA user_version=4")
+            connection.execute("COMMIT")
+        except Exception:
+            if connection.in_transaction:
+                connection.execute("ROLLBACK")
+            raise
+        return {"changed": True, "made_final": made_final}
+    except sqlite3.Error as exc:
+        raise StoreError("The state could not be downgraded") from exc

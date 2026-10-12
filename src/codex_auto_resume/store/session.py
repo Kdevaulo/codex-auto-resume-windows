@@ -34,6 +34,9 @@ class SessionMixin:
             self._connection.execute("PRAGMA foreign_keys=ON")
             self._connection.execute("PRAGMA synchronous=FULL")
             version = self._connection.execute("PRAGMA user_version").fetchone()[0]
+            if version == 5 and migrate:
+                from .downgrade import from_v5      # a state v0.6.15-beta wrote: back to schema 4 first
+                version = 4 if from_v5(self._connection, self.state_dir)["changed"] else version
             if version > SCHEMA_VERSION:
                 raise StateFromNewerVersion(
                     "This state was written by a newer version of codex-auto-resume")

@@ -503,7 +503,8 @@ class ListingTests(unittest.TestCase):
         self.assertEqual((c["PickFloor"], c["EditionsSince"], c["PolicySince"]), ("0.6.2", "0.6.11-alpha", "0.6.11-beta"))
         self.assertEqual(c["EditionsSince"], RELEASE["advanced"]["since"] + "-alpha")
         from codex_auto_resume.store import SCHEMA_VERSION
-        self.assertEqual(c["StateSchemaSince"], [["0.6.11-beta", 4], ["0.6.0", 3]])
+        # v0.6.15 is v0.6.14's code above v0.6.15-beta, which wrote schema 5 (store/downgrade.py from_v5).
+        self.assertEqual(c["StateSchemaSince"], [["0.6.15", 4], ["0.6.15-beta", 5], ["0.6.11-beta", 4], ["0.6.0", 3]])
         self.assertEqual(c["StateSchemaSince"][0][1], SCHEMA_VERSION, "the first row is this version's own schema")
         self.assertEqual(c["AdvancedStateSince"], [["0.6.11-beta.2", 2], ["0.6.11-alpha", 1]])
         # I12 as the owner amended it on 2026-10-03 (design Q1): a pre-release picked by name and

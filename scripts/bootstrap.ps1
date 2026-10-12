@@ -280,7 +280,7 @@ $PolicyValues = @('DisableAutoResume', 'ForceObserveOnly', 'DisableUpdateCheck',
 # The state's schema from each version on, newest first; the first row is this version's own. A
 # target on the schema before it is offered with the state converted first (downgrade-state --to 3);
 # a target on any other is not offered at all.
-$StateSchemaSince = @(@('0.6.11-beta', 4), @('0.6.0', 3))
+$StateSchemaSince = @(@('0.6.15', 4), @('0.6.15-beta', 5), @('0.6.11-beta', 4), @('0.6.0', 3))
 # The advanced settings' form from each version on, newest first; the first row is this version's
 # own. An advanced target on an older form cannot read them: every advanced feature is off there.
 $AdvancedStateSince = @(@('0.6.11-beta.2', 2), @('0.6.11-alpha', 1))

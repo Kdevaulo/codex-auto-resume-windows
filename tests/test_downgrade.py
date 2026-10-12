@@ -29,6 +29,7 @@ import unittest
 
 from codex_auto_resume import machine
 from codex_auto_resume.domain import ids
+from codex_auto_resume.store.errors import StateFromNewerVersion
 from codex_auto_resume.store import (SCHEMA_VERSION, Store, StoreError, downgrade_to_v2,
                                      downgrade_to_v3)
 
@@ -962,6 +963,64 @@ class ConvertedStateUnderTheInstallLockTests(unittest.TestCase):
         read = released.run("v0.6.10", _TAGGED_STORE, kept, "open")
         self.assertNotIn("refused", read)
         self.assertEqual((read["schema"], read["records"]), (3, self.rows))
+
+
+class FromV5Tests(unittest.TestCase):
+    """v0.6.15 is v0.6.14's code under a higher number than v0.6.15-beta, so an update from that beta reaches a
+    state the beta wrote: schema 4 with `interruptions.home_key` and `watcher_status.homes` added. The watcher
+    brings it back to schema 4, a copy kept, instead of refusing it as a newer version's (downgrade.from_v5)."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.state = Path(self.temporary.name) / "state"
+        keys = DowngradeToV3Tests.v4_state(self)
+        self.waiting = next(key for key, state in sorted(keys.items()) if state in machine.WAITING)
+        self.watched = next(key for key, state in sorted(keys.items()) if state in machine.WATCHED)
+        self.withdrawn = next(key for key, state in sorted(keys.items()) if state == "withdrawn_unconfirmed")
+        with closing(sqlite3.connect(self.state / "state.sqlite")) as db:
+            self.rows = db.execute("SELECT count(*) FROM interruptions").fetchone()[0]
+            db.execute("ALTER TABLE interruptions ADD COLUMN home_key TEXT NOT NULL DEFAULT ''")
+            db.execute("ALTER TABLE watcher_status ADD COLUMN homes TEXT")
+            db.execute("UPDATE interruptions SET home_key='h1' WHERE interruption_id=?", (self.waiting,))
+            db.execute("UPDATE interruptions SET withdraw_reason='window_ended' WHERE interruption_id=?",
+                       (self.withdrawn,))
+            db.execute("PRAGMA user_version=5")
+            db.commit()
+
+    def read(self):
+        with closing(sqlite3.connect(self.state / "state.sqlite")) as db:
+            db.row_factory = sqlite3.Row
+            return (db.execute("PRAGMA user_version").fetchone()[0],
+                    {row["interruption_id"]: dict(row) for row in db.execute("SELECT * FROM interruptions")})
+
+    def test_the_watcher_opens_it_as_schema_4_and_keeps_every_row(self):
+        with Store(self.state, migrate=True) as store:
+            self.assertEqual(len(store.all_records()), self.rows)
+        version, rows = self.read()
+        self.assertEqual(version, 4)
+        self.assertEqual(len(rows), self.rows)
+        self.assertNotIn("home_key", rows[self.waiting])
+        self.assertEqual((rows[self.waiting]["state"], rows[self.waiting]["last_error"]),
+                         ("cancelled", "home_not_watched"))
+        self.assertEqual(rows[self.withdrawn]["withdraw_reason"], "expired")
+        self.assertEqual(len(list(self.state.glob("state.v5-backup-*.sqlite"))), 1)
+        with Store(self.state) as store:                # and any reader after it
+            self.assertEqual(len(store.all_records()), self.rows)
+
+    def test_a_reader_that_holds_no_mutex_still_refuses_it(self):
+        with self.assertRaises(StateFromNewerVersion):
+            Store(self.state)
+        self.assertEqual(self.read()[0], 5)
+
+    def test_it_is_refused_while_another_homes_continuation_may_be_queued(self):
+        with closing(sqlite3.connect(self.state / "state.sqlite")) as db:
+            db.execute("UPDATE interruptions SET home_key='h1' WHERE interruption_id=?", (self.watched,))
+            db.commit()
+        with self.assertRaises(StoreError):
+            Store(self.state, migrate=True)
+        version, rows = self.read()
+        self.assertEqual((version, rows[self.waiting]["home_key"]), (5, "h1"))
 
 
 if __name__ == "__main__":
