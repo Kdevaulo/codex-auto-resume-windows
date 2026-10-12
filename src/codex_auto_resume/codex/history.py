@@ -18,22 +18,12 @@ from .. import failures, guards, machine, projects
 from ..domain import ids
 from .errors import SourceError
 from .labels import _label
-from .values import (KNOWN_STATUSES, MAX_ITEM_BYTES, MAX_META_BYTES,
-                     MAX_SCAN_BYTES, PROGRESS_ITEM_TYPES, _json,
+from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, MAX_ITEM_BYTES, MAX_META_BYTES,
+                     MAX_SCAN_BYTES, OWN_THREAD_SOURCES, PROGRESS_ITEM_TYPES, _json,
                      _turn_status, epoch, error_shape, normalize)
 from .paths import _safe_path
 from . import workspace
 from .payload import _choose_reset, _item_is_ours, _needing, _queue_has_marker, detect  # noqa: F401
-
-
-# A person's own conversations in the Codex desktop app (A15), by what Codex records of them. thread_source is
-# Codex's analytics label (codex-rs ThreadSource: user, subagent, guardian_review, memory_consolidation, or a
-# feature's name), not a mark of whose a conversation is: the app leaves it unset on many conversations of its
-# own (41 of 64 on the owner's PC, made by 0.149 to 0.162, their rollout's first line without the key) and
-# writes chatgpt_handoff on one ChatGPT handed over to it, opened as codex_work_desktop (issue #27). The state
-# row and the rollout must still say the same; a subagent, a review or a memory pass is never one of these.
-OWN_THREAD_SOURCES = frozenset({"user", "chatgpt_handoff", None})
-DESKTOP_ORIGINATORS = frozenset({"Codex Desktop", "codex_work_desktop"})
 
 
 class HistoryMixin:
