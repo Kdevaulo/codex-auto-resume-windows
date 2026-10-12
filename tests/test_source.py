@@ -1093,6 +1093,62 @@ class ChildThreadTests(unittest.TestCase):
         self.home.fail_usage(meta_says)
         self.assertEqual(self.source.latest_failures(self.since), [])
 
+    def test_issue_27_own_desktop_conversations_without_the_user_label_are_detected(self):
+        """Issue #27: a conversation ChatGPT handed over to the app, and the many the app writes no
+        thread_source for at all, are a person's own; a usage limit in each is detected."""
+        cases = {
+            "handed over from ChatGPT": dict(thread_source="chatgpt_handoff", originator="codex_work_desktop"),
+            "handed over, opened as the app": dict(thread_source="chatgpt_handoff"),
+            "no label": dict(thread_source=None),
+            "user, opened as ChatGPT work": dict(thread_source="user", originator="codex_work_desktop"),
+        }
+        for name, meta in cases.items():
+            with self.subTest(case=name):
+                thread = codexsim.new_id()
+                self.home.add_thread(thread, **meta)
+                if meta["thread_source"] is None:
+                    self._drop_meta_source(thread)
+                self.home.fail_usage(thread)
+                detected = [row["thread_id"] for row in self.source.latest_failures(self.since)]
+                self.assertIn(thread, detected)
+
+    def _drop_meta_source(self, thread):
+        """The rollout's first line as the app writes it when it sets no thread_source: without the key."""
+        path = self.home.rollout(thread)
+        first, _, rest = path.read_bytes().partition(b"\n")
+        event = json.loads(first)
+        event["payload"].pop("thread_source", None)
+        path.write_bytes(json.dumps(event).encode("utf-8") + b"\n" + rest)
+
+    def test_issue_27_internal_and_mismatched_conversations_stay_excluded(self):
+        """Widening to the unlabelled and handed-over conversations takes in nothing else: Codex's own
+        internal conversations, an agent-made one, a foreign originator, or a state row and rollout that
+        disagree are still never detected."""
+        cases = {
+            "review": dict(thread_source="guardian_review"),
+            "memory pass": dict(thread_source="memory_consolidation"),
+            "agent-made": dict(thread_source="agent_created_thread"),
+            "handed over, subagent": dict(thread_source="subagent", originator="codex_work_desktop"),
+            "no label, vscode extension": dict(thread_source=None, originator="codex_vscode"),
+        }
+        for name, meta in cases.items():
+            with self.subTest(case=name):
+                thread = codexsim.new_id()
+                self.home.add_thread(thread, **meta)
+                if meta["thread_source"] is None:
+                    self._drop_meta_source(thread)
+                self.home.fail_usage(thread)
+                self.assertNotIn(thread, [row["thread_id"] for row in self.source.latest_failures(self.since)])
+        for state, rollout in (("chatgpt_handoff", None), (None, "chatgpt_handoff"), ("user", None), (None, "user")):
+            with self.subTest(state=state, rollout=rollout):
+                thread = codexsim.new_id()
+                self.home.add_thread(thread, thread_source=rollout)
+                if rollout is None:
+                    self._drop_meta_source(thread)
+                self._set_state(thread, thread_source=state)
+                self.home.fail_usage(thread)
+                self.assertNotIn(thread, [row["thread_id"] for row in self.source.latest_failures(self.since)])
+
 
 @contextmanager
 def closing_db(path):
