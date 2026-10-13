@@ -39,6 +39,15 @@ with a plugin at v0.6.11-beta.2 or later.
 
 Nothing of its own: the fix above is in both editions.
 
+### Known issue
+
+- **Updating from v0.6.11 to v0.6.15, an error window may say "Setup did not complete ... Not a state an
+  older watcher owns", and its Korean lines may show as broken characters.** The update did finish: the files
+  are replaced, the watcher that starts brings the state up to this release's format, and Diagnostics shows
+  the new version. Nothing needs doing. One step of the installer read the state while the old watcher still
+  held it, in a format that step did not know yet, and reported that as a failure (found 2026-10-13; fixed in
+  a coming release).
+
 ## v0.6.16-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15-beta...v0.6.16-beta)
@@ -58,6 +67,15 @@ Nothing new: see v0.6.15-beta, below.
 ### Advanced edition
 
 Nothing new: see v0.6.15-beta, below.
+
+### Known issue
+
+- **Updating from v0.6.11 to v0.6.15, an error window may say "Setup did not complete ... Not a state an
+  older watcher owns", and its Korean lines may show as broken characters.** The update did finish: the files
+  are replaced, the watcher that starts brings the state up to this release's format, and Diagnostics shows
+  the new version. Nothing needs doing. One step of the installer read the state while the old watcher still
+  held it, in a format that step did not know yet, and reported that as a failure (found 2026-10-13; fixed in
+  a coming release).
 
 ## v0.6.15 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
 
@@ -101,6 +119,13 @@ capabilities read as off, as v0.6.14 reads that beta's file.
 ### Advanced edition
 
 Nothing of its own: the fix above is in both editions.
+
+### Known issue
+
+- **Updating from v0.6.15-beta, an error window may say the update did not finish.** It did: the files are
+  replaced, the watcher that starts brings the state back to the format this release reads (a copy kept), and
+  Diagnostics shows v0.6.15. Nothing needs doing. One step of the installer read the state before the new
+  watcher had converted it, and reported that as a failure (found 2026-10-13; fixed in a coming release).
 
 ## v0.6.15-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
