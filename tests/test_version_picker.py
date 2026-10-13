@@ -1008,15 +1008,15 @@ class PickRunTests(PickerRun):
     # -------------------------------------------------------------- what is installed
     def test_a_newer_release_is_installed_checked_against_its_pin(self):
         # v0.6.15-beta: a target on this version's schema (5) - every earlier one converts the state first.
-        self.serve([entry("0.6.15"), entry(INSTALLED), entry("0.6.11")])
-        self.published("0.6.15", pin=True)
-        code, output, asked = self.pick("0.6.15")
+        self.serve([entry("0.6.17"), entry(INSTALLED), entry("0.6.11")])
+        self.published("0.6.17", pin=True)
+        code, output, asked = self.pick("0.6.17")
         self.assertEqual(code, 0, output[-2000:])
         self.assertEqual(self.answer_lines(output, "pick: "),
-                         ["pick: offered newer,release,kept,latest", "pick: installed 0.6.15 standard"])
+                         ["pick: offered newer,release,kept,latest", "pick: installed 0.6.17 standard"])
         self.assertIn("SHA-256 matches the digest pinned in this plugin", output)
         self.assertEqual(asked, [["Get", PAGES.replace("{page}", "1")]] + POLICY_READS
-                         + [["", NOWHERE + "/download/v0.6.15/CodexAutoResume-v0.6.15-win-x64.zip"]],
+                         + [["", NOWHERE + "/download/v0.6.17/CodexAutoResume-v0.6.17-win-x64.zip"]],
                          "the list, the policy keys and the archive, and nothing else")
         self.assertEqual(self.bound(), {"PluginName": "codex-auto-resume"})
         self.assertEqual(self.seen(), [], "a version on this schema needs no conversion")
@@ -1133,9 +1133,9 @@ class PickRunTests(PickerRun):
         self.assertEqual(sorted(self.temp.glob("codex-auto-resume-*")), [])
 
     def test_an_installer_that_fails_says_no_installed_line(self):
-        self.serve([entry("0.6.15"), entry(INSTALLED)])
-        self.published("0.6.15", pin=True)
-        code, output, _ = self.pick("0.6.15", installer_exit=7)
+        self.serve([entry("0.6.17"), entry(INSTALLED)])
+        self.published("0.6.17", pin=True)
+        code, output, _ = self.pick("0.6.17", installer_exit=7)
         self.assertEqual(code, 7, output[-2000:])
         self.assertEqual(self.answer_lines(output, "pick: "), ["pick: offered newer,release,kept,latest"])
         self.assertEqual(sorted(self.temp.glob("codex-auto-resume-*")), [])
