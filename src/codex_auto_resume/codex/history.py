@@ -18,8 +18,8 @@ from .. import failures, guards, machine, projects
 from ..domain import ids
 from .errors import SourceError
 from .labels import _label
-from .values import (KNOWN_STATUSES, MAX_ITEM_BYTES, MAX_META_BYTES,
-                     MAX_SCAN_BYTES, PROGRESS_ITEM_TYPES, _json,
+from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, MAX_ITEM_BYTES, MAX_META_BYTES,
+                     MAX_SCAN_BYTES, OWN_THREAD_SOURCES, PROGRESS_ITEM_TYPES, _json,
                      _turn_status, epoch, error_shape, normalize)
 from .paths import _safe_path
 from . import workspace
@@ -37,7 +37,7 @@ class HistoryMixin:
                 "SELECT rollout_path,source,thread_source,archived,history_mode "
                 "FROM threads WHERE id=?", (thread_id,)).fetchone()
         if (row is None or row["source"] != "vscode" or row["archived"] != 0
-                or row["thread_source"] != "user" or row["history_mode"] != "paginated"
+                or row["thread_source"] not in OWN_THREAD_SOURCES or row["history_mode"] != "paginated"
                 or not isinstance(row["rollout_path"], str)):
             return None
         try:
@@ -55,9 +55,9 @@ class HistoryMixin:
                 return None
             payload = event.get("payload")
             if (not isinstance(payload, dict) or payload.get("id") != thread_id
-                    or payload.get("originator") != "Codex Desktop"
+                    or payload.get("originator") not in DESKTOP_ORIGINATORS
                     or payload.get("source") != "vscode"
-                    or payload.get("thread_source") != "user"):
+                    or payload.get("thread_source") != row["thread_source"]):
                 return None
             return path
         except OSError:

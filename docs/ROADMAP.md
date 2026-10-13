@@ -758,7 +758,7 @@ moved one on; the published v0.6.15-beta is published again as v0.6.16-beta.
 
 ## v0.6.16 — The rest of the advanced edition
 
-**In development: v0.6.16-beta ✅ (published first as v0.6.15-beta), its first pre-release, is out: stage 3c and watching several Codex
+**In development: v0.6.16-beta.2 ✅ is out, v0.6.15's fix on the beta line, after v0.6.16-beta (published first as v0.6.15-beta), its first pre-release: stage 3c and watching several Codex
 homes. Stage 4 is next.**
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,

@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.6.16-beta.2 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta...v0.6.16-beta.2)
+
+**A pre-release with one fix, for both editions: v0.6.15's, on the beta line.** It is a GitHub
+pre-release, so `releases/latest` stays v0.6.15; an installation of v0.6.15, v0.6.15-beta or
+v0.6.16-beta is offered it by *Check for updates*, which asks first and says it is tested less, and
+*Install another version...* lists it. Everything else is v0.6.16-beta's.
+
+**A plugin copy older than v0.6.11-beta.2's cannot read this version.** The bootstraps published
+from v0.6.0 to v0.6.11-beta read no number after `-beta`, so none of them can compare
+`0.6.16-beta.2` with anything; v0.6.11-beta.2's copy and every later one read it. Set up and repair
+with the installation's own copy, `%USERPROFILE%\.codex-auto-resume\app\scripts\bootstrap.ps1`, or
+with a plugin at v0.6.11-beta.2 or later.
+
+### Both editions
+
+#### Fixes
+
+- **A conversation ChatGPT hands over to the Codex app, and one Codex gives no label at all, are now
+  recovered** ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+  Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
+  That label is Codex's analytics classification, not a mark of whose a conversation is: a
+  conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
+  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
+  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
+  usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
+  taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
+  made, and the CLI's, the terminal's and VS Code's sessions still stay out, and Codex's state and
+  the conversation's own file must still say the same. Found by a person's report and the read-only
+  check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
+  carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
+  turn there that fails.
+
+### Advanced edition
+
+Nothing of its own: the fix above is in both editions.
+
 ## v0.6.16-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15-beta...v0.6.16-beta)

@@ -18,6 +18,17 @@ MAX_META_BYTES = 256 * 1024
 
 MAX_ITEM_BYTES = 1024 * 1024
 
+# A person's own conversations in the Codex desktop app (A15), by what Codex records of them. thread_source is
+# Codex's analytics label (codex-rs ThreadSource: user, subagent, guardian_review, memory_consolidation, or a
+# feature's name), not a mark of whose a conversation is: the app leaves it unset on many conversations of its
+# own - forks, and the sessions it copies in from another tool, 41 of 64 on the owner's PC (0.149 to 0.162),
+# their rollout's first line without the key - and writes chatgpt_handoff on one ChatGPT handed over to it,
+# opened as codex_work_desktop (issue #27). A copied-in turn carries no Codex error code, so nothing in such a
+# conversation is detected until Codex itself runs a turn there that fails (A13, A16). The state row and the
+# rollout must still say the same; a subagent, a review or a memory pass is never one of these.
+OWN_THREAD_SOURCES = frozenset({"user", "chatgpt_handoff", None})
+DESKTOP_ORIGINATORS = frozenset({"Codex Desktop", "codex_work_desktop"})
+
 KNOWN_STATUSES = machine.TURN_STATUSES - {"other"}      # Codex's own four; "other" is ours
 
 # Item types that count as a turn having produced something. Anything Codex adds later
