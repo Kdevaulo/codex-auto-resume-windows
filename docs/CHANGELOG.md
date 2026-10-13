@@ -1,8 +1,76 @@
 # Changelog
 
+## v0.6.16-beta — Several conversations at once, several Codex homes, and five more ways to go on
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15-beta...v0.6.16-beta)
+
+**The pre-release v0.6.15-beta, published again under the number it now has.** Nothing in it changed
+but the number: v0.6.15 became a fix alone on v0.6.14 ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)), so the rest of the advanced
+edition is v0.6.16 and this is its first pre-release (owner, 2026-10-13). It is a GitHub pre-release,
+so `releases/latest` stays v0.6.15; an installation of v0.6.15 or v0.6.15-beta is offered it by
+*Check for updates*, which asks first and says it is tested less, and *Install another version...*
+lists it. What it carries is in the v0.6.15-beta entry below. It does not carry v0.6.15's fix yet:
+v0.6.16-beta.2, right after it, does.
+
+### Both editions
+
+Nothing new: see v0.6.15-beta, below.
+
+### Advanced edition
+
+Nothing new: see v0.6.15-beta, below.
+
+## v0.6.15 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15)
+
+**A fix alone, on v0.6.14 - and from v0.6.14, an ordinary update.** It is the latest release, for
+both editions, so v0.6.14's *Check for updates* offers it in the edition you have, and the plugin in
+Codex installs it too. Nothing else changed: no setting, no stored format, no capability. The owner
+had it published as a final of its own (2026-10-13) so that every v0.6.14 is offered it; the rest of
+the advanced edition, planned as v0.6.15, is now v0.6.16 ([ROADMAP.md](ROADMAP.md)), and the
+pre-release v0.6.15-beta is published again as v0.6.16-beta.
+
+**From v0.6.15-beta, it is offered too, being newer by number - and it is v0.6.14's code.** Stay on
+the beta line (v0.6.16-beta.2 carries this fix) if you use what that beta added. Taken anyway, it
+brings the state v0.6.15-beta wrote back to the format v0.6.14 reads before the watcher starts, a
+copy kept beside it (`state.v5-backup-*.sqlite`): every record stays, a record of another Codex
+home is no longer acted on (one still waiting is cancelled), and while a continuation sent to
+another home may still be in its queue the watcher waits instead. The advanced edition's
+capabilities read as off, as v0.6.14 reads that beta's file.
+
+### Both editions
+
+#### Fixes
+
+- **A conversation ChatGPT hands over to the Codex app, and one Codex gives no label at all, are now
+  recovered** ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+  Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
+  That label is Codex's analytics classification, not a mark of whose a conversation is: a
+  conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
+  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
+  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
+  usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
+  taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
+  made, and the CLI's, the terminal's and VS Code's sessions still stay out, and Codex's state and
+  the conversation's own file must still say the same. Found by a person's report and the read-only
+  check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
+  carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
+  turn there that fails.
+
+### Advanced edition
+
+Nothing of its own: the fix above is in both editions.
+
 ## v0.6.15-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15-beta)
+
+**Published again as v0.6.16-beta (2026-10-13).** Built from main 43494538 and published on 2026-10-11;
+when v0.6.15 became a fix alone on v0.6.14 two days later, this pre-release's content was published again,
+unchanged, as v0.6.16-beta. Its page and archives stay as they were, and *Check for updates* no longer offers
+it: v0.6.15 and v0.6.16-beta are both newer.
 
 **A pre-release, the first of v0.6.15 (stage 3c).** It is a GitHub pre-release, so `releases/latest` stays
 v0.6.14; an installation of v0.6.14 is offered it by *Check for updates*, which asks first and says it is tested
