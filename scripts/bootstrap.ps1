@@ -289,7 +289,7 @@ $StateSchemaSince = @(@('0.6.16-beta', 5), @('0.6.15', 4), @('0.6.15-beta', 5), 
 # The advanced settings' form from each version on, newest first; the first row is this version's
 # own. An advanced target on an older form cannot read them: every advanced feature is off there.
 # v0.6.15 is v0.6.14's code (form 3) between v0.6.15-beta and v0.6.16-beta (both form 4).
-$AdvancedStateSince = @(@('0.6.16-beta.3', 5), @('0.6.16-beta', 4), @('0.6.15', 3), @('0.6.15-beta', 4),
+$AdvancedStateSince = @(@('0.6.16-beta.4', 6), @('0.6.16-beta.3', 5), @('0.6.16-beta', 4), @('0.6.15', 3), @('0.6.15-beta', 4),
                         @('0.6.14', 3), @('0.6.11-beta.2', 2), @('0.6.11-alpha', 1))
 # The list is read page by page, $PickPageSize to a page (release_pages in release.json), at most
 # $PickMaxPages of them - a page with fewer ends it, and a full last one is no answer - and all of it

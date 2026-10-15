@@ -35,7 +35,8 @@ class VersionFiveTests(StateCase):
         with contextlib.closing(sqlite3.connect(path)) as connection:
             for statement in statements:
                 if statement.lstrip().startswith(("CREATE TABLE options", "CREATE TABLE continuations")):
-                    for word in schema_module.V5_OPTION_WORDS + schema_module.V5_CONTINUATION_WORDS:
+                    for word in (schema_module.V5_OPTION_WORDS + schema_module.V5_CONTINUATION_WORDS
+                                 + schema_module.V6_OPTION_WORDS + schema_module.V6_CONTINUATION_WORDS):
                         statement = statement.replace(", '%s'" % word, "")
                 connection.execute(statement)
             connection.execute("INSERT INTO arming VALUES ('test_wake','shadow',?,'dashboard',NULL,1,NULL,NULL)",
@@ -59,7 +60,7 @@ class VersionFiveTests(StateCase):
         self.assertEqual(state.meter(), {})
         state.close()
         with contextlib.closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 5)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.SCHEMA_VERSION)
             self.assertEqual(AdvancedState._tables(connection), schema_module.TABLES)
             self.assertEqual(connection.execute("SELECT * FROM options").fetchall(), [("test_wake", "attempts", 2)])
             self.assertEqual(connection.execute("SELECT answer_id FROM continuations").fetchall(), [(KEY,)])
@@ -78,7 +79,7 @@ class VersionFiveTests(StateCase):
         state.close()
         path = self.paths.advanced_dir / schema_module.FILE_NAME
         with contextlib.closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 5)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.SCHEMA_VERSION)
             self.assertEqual(connection.execute("SELECT count(*) FROM meter").fetchone()[0], 1)
         before = path.read_bytes()
         from unittest.mock import patch

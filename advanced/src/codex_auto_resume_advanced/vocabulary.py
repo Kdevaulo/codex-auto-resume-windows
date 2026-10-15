@@ -216,6 +216,22 @@ class OptionKey(StrEnum):
     WRAP_STYLE = "wrap_style"
     PAUSE_FIVE_HOUR = "pause_five_hour"
     PAUSE_WEEKLY = "pause_weekly"
+    # v0.6.16-beta.4 (the owner's additions to issue #29), each 1 on or 2 off where it is a switch: each window acted
+    # on or not, the stop percentage the wrap-up's words ask Codex to stop at in each window (a request, apart from
+    # the forced stop's own, PAUSE_*), whether the words carry the reset time, and one continuation after the reset.
+    WINDOW_FIVE_HOUR = "window_five_hour"
+    WINDOW_WEEKLY = "window_weekly"
+    STOP_WORDS_FIVE_HOUR = "stop_words_five_hour"
+    STOP_WORDS_WEEKLY = "stop_words_weekly"
+    WRAP_RESET_TIME = "wrap_reset_time"
+    WRAP_AFTER_RESET = "wrap_after_reset"
+
+
+class WordingKey(StrEnum):
+    """A person's own wording a capability keeps (v0.6.16-beta.4, state `wordings`): text, never logged, checked as
+    the custom continuation text is (continuation.MAX_CUSTOM_LENGTH)."""
+    WRAP_CUSTOM_FIVE_HOUR = "wrap_custom_five_hour"
+    WRAP_CUSTOM_WEEKLY = "wrap_custom_weekly"
 
 
 class KeepOn(StrEnum):
@@ -554,6 +570,9 @@ class ContinuationKind(StrEnum):
     # v0.6.16-beta.3 (issue #29): a conversation with a turn running asked to wrap up, once for each usage window
     # that reached the percentage a person chose (usage_wrap_up), sent while that turn is still the latest.
     WRAP_UP = "wrap_up"
+    # v0.6.16-beta.4: one continuation when the window resets, to a conversation that was wrapped up or stopped and
+    # then ended well - sent only while its turn is still the latest, final and with nothing after it.
+    AFTER_RESET = "after_reset"
 
 
 class ContinuationReason(StrEnum):
