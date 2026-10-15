@@ -78,6 +78,15 @@ ICON_MOTION = {
     "breathe_frame_ms": 156,  # ten ticks: about six frames a second while it breathes...
     "turn_frame_ms": 62,      # ...four, sixteen, while it travels: about one frame a position at that speed
     "positions": 24,          # head positions round the ring, fifteen degrees apart
+    # The notification-area icon's own finer steps (v0.6.16): it is redrawn for every frame it is sent, and
+    # watching's slow sweep in 15 degree steps on a 62 ms timer moved about eight times a second, a pixel at a
+    # time, at uneven intervals - "너무 끊겨보여". So the icon in the notification area splits each position into
+    # `tray_fine` steps of the same drawing - every `tray_fine`th of them is a position's frame, pixel for pixel -
+    # and runs watching's sweep at `glide_frame_ms`, two ticks; recovering's and a failure's quick sweeps keep
+    # turn_frame_ms and so what explorer.exe pays for them. The taskbar button (Brand.Mark), which Windows
+    # redraws no more than about eight times a second whatever it is sent (measured, v0.6.5), keeps `positions`.
+    "tray_fine": 4,
+    "glide_frame_ms": 31,
     "levels": 24,             # the breath's brightness steps: a tint of the head, never a stored frame
     "dim": 0.6,               # the breath's low, toward the badge: deeper than the light since v0.6.6 softened it
     "build_budget_ms": 2000,  # a frame table that takes longer than this is not used
@@ -161,7 +170,7 @@ def icon_turn(state, elapsed_ms) -> float:
     return ICON_SWEEP * brand._breath(min(into, max(out, into - hold)), 2 * out)
 
 
-def icon_frame(state, elapsed_ms, since_entered_ms=None, *, reduced=False) -> tuple:
+def icon_frame(state, elapsed_ms, since_entered_ms=None, *, reduced=False, fine=1) -> tuple:
     """(head position, breathing level) for one frame: a pure function of the state and the clock.
 
     Position 0 is the head in its place, positions counting on clockwise round the ring, and a sweep reaches the
@@ -169,9 +178,10 @@ def icon_frame(state, elapsed_ms, since_entered_ms=None, *, reduced=False) -> tu
     failure's, which blinks as it goes (ICON_TRAVEL_BREATHS). With
     motion reduced every state is its rest: the head in its place at full colour, so the states differ by colour
     only. `since_entered_ms`, how long the state has been shown, is what a problem's one pulse ran on until v0.6.8;
-    nothing reads it now, and it is still taken so its callers are unchanged.
+    nothing reads it now, and it is still taken so its callers are unchanged. With `fine` the positions are that
+    many times as many, a table built with as many (IconFrames' `fine`): the notification area's own.
     """
-    positions, top = ICON_MOTION["positions"], ICON_MOTION["levels"] - 1
+    positions, top = ICON_MOTION["positions"] * int(fine), ICON_MOTION["levels"] - 1
     if reduced:
         return (0, top)
     turn = icon_turn(state, elapsed_ms)
@@ -184,11 +194,14 @@ def icon_frame(state, elapsed_ms, since_entered_ms=None, *, reduced=False) -> tu
     return (0, top)
 
 
-def icon_frame_ms(state, elapsed_ms, since_entered_ms=None, *, reduced=False):
-    """How soon the next frame is due, in ms, or None when nothing moves (no timer at all)."""
+def icon_frame_ms(state, elapsed_ms, since_entered_ms=None, *, reduced=False, fine=1):
+    """How soon the next frame is due, in ms, or None when nothing moves (no timer at all). With `fine` steps
+    (the notification area's) watching's sweep glides at ICON_MOTION glide_frame_ms."""
     if reduced:
         return None
     if icon_turn(state, elapsed_ms) is not None:
+        if int(fine) > 1 and state == "watching":
+            return ICON_MOTION["glide_frame_ms"]
         return ICON_MOTION["turn_frame_ms"]
     if state in ICON_BREATHS:
         return ICON_MOTION["breathe_frame_ms"]
@@ -212,14 +225,17 @@ class IconFrames:
     colour with the arithmetic a whole render uses. Position 0 in the accent is therefore the .ico's
     own image at that size, byte for byte. A frame is that and the head's colour at a breathing
     level, and nothing on top of it since v0.6.8. Top-down BGRA with straight alpha, as icon
-    bitmaps are. `ground` and `heads` go into the window's Brand.Mark as they are.
+    bitmaps are. `ground` and `heads` go into the window's Brand.Mark as they are. With `fine` (the notification
+    area's ICON_MOTION tray_fine) there are that many times as many positions, every `fine`th of them one of the
+    plain table's.
     """
 
-    def __init__(self, size):
+    def __init__(self, size, fine=1):
         self.size = size = int(size)
-        if size <= 0:
-            raise ValueError("an icon has a size")
-        positions = ICON_MOTION["positions"]
+        if size <= 0 or int(fine) < 1:
+            raise ValueError("an icon has a size, and a position at least one step")
+        self.fine = int(fine)
+        positions = ICON_MOTION["positions"] * self.fine
         base = bytearray(size * size * 4)
         for y, row in enumerate(brand.icon_samples(size, head=False)):
             for x, sample in enumerate(row):
@@ -255,10 +271,10 @@ class IconFrames:
         return frame
 
 
-def build_icon_frames(size, clock=time.perf_counter):
-    """IconFrames for `size`, or None when it cannot be built inside ICON_MOTION's budget."""
+def build_icon_frames(size, clock=time.perf_counter, fine=1):
+    """IconFrames for `size` (and `fine`), or None when it cannot be built inside ICON_MOTION's budget."""
     started = clock()
-    frames = IconFrames(size)
+    frames = IconFrames(size, fine)
     if (clock() - started) * 1000.0 > ICON_MOTION["build_budget_ms"]:
         return None
     return frames

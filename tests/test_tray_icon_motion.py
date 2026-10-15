@@ -633,6 +633,132 @@ class BudgetTests(unittest.TestCase):
             tray.IconFrames(0)
 
 
+# ------------------------------------------------------------------------ the notification area's glide
+TICK = 1000.0 / 64                                   # Windows' timer tick, which a SetTimer interval waits out
+
+
+def shown_while_sweeping(state, fine):
+    """The frames the notification-area icon shows over one of `state`'s sweeps, as (ms, degrees from its place):
+    stepped as its own timer fires - each interval rounded up to Windows' tick - from where the sweep starts, a frame
+    shown only when it changes (Tray._frame_for)."""
+    start = SWEEPS[state][0]
+    end = start + 2 * SWEEPS[state][1] + SWEEPS[state][2]
+    at, shown = start, []
+    while at <= end:
+        position, _ = tray.icon_frame(state, at, at, fine=fine)
+        degrees = position * 360.0 / (MOTION["positions"] * fine)
+        if not shown or shown[-1][1] != degrees:
+            shown.append((at, degrees))
+        at += math.ceil(tray.icon_frame_ms(state, at, at, fine=fine) / TICK - 1e-9) * TICK
+    return shown
+
+
+class GlideTests(unittest.TestCase):
+    """v0.6.16: the owner, of watching's occasional sweep - "평상 시에서 아이콘 한 번씩 움직일 때 너무 끊겨보여". It
+    moved in 15 degree steps on a 62 ms timer: about eight moves a second, a pixel at a time at 16 px, 62, 125 and
+    187 ms apart by turns as the eased speed fell between two ticks. Measured on a hidden window with the icon's own
+    timer (frames recorded, never shown): 39 frames a sweep, a median 126 ms between moves. In ICON_MOTION
+    tray_fine steps at glide_frame_ms: 140 frames, a median 33 ms. The drawing is the same; only when it is drawn
+    changed."""
+
+    FINE = MOTION["tray_fine"]
+
+    def test_the_fine_table_is_the_plain_one_with_steps_between(self):
+        """Every tray_fine-th frame of the notification area's table is the plain table's frame, pixel for pixel,
+        in every colour - the same mark, the same head, the same ring: nothing new is drawn."""
+        plain, fine = tray.IconFrames(16), tray.IconFrames(16, self.FINE)
+        self.assertEqual((plain.fine, fine.fine), (1, self.FINE))
+        self.assertEqual(len(fine.heads), MOTION["positions"] * self.FINE)
+        self.assertEqual(fine.ground, plain.ground)
+        for state in tray.ICON_STATES:
+            colour = tray.icon_head_colour(state)
+            for position in range(MOTION["positions"]):
+                with self.subTest(state=state, position=position):
+                    self.assertEqual(fine.compose(position * self.FINE, colour), plain.compose(position, colour))
+
+    def test_the_glide_lands_on_two_of_windows_ticks(self):
+        self.assertGreater(self.FINE, 1)
+        self.assertLessEqual(MOTION["glide_frame_ms"], 2 * TICK)
+        self.assertGreater(MOTION["glide_frame_ms"], TICK)
+        self.assertLess(MOTION["glide_frame_ms"], MOTION["turn_frame_ms"])
+
+    def test_watching_s_sweep_moves_in_small_even_steps(self):
+        """Over the middle of the way out, where it is quickest, no move waits more than two glide frames (the
+        plain steps waited up to six ticks); everywhere the head is within one fine step of where the sweep has it
+        at that moment, and no move is more than two fine steps - under half a pixel at 16 px; and the whole sweep
+        is at least three times as many frames as it was."""
+        shown = shown_while_sweeping("watching", self.FINE)
+        start, out = SWEEPS["watching"][0], SWEEPS["watching"][1]
+        step = 360.0 / (MOTION["positions"] * self.FINE)
+        glide = math.ceil(MOTION["glide_frame_ms"] / TICK) * TICK
+        middle = [(a, b) for a, b in zip(shown, shown[1:])
+                  if start + 0.2 * out <= a[0] and b[0] <= start + 0.8 * out]
+        self.assertTrue(middle)
+        for (was, _), (now, _) in middle:
+            with self.subTest(at=was):
+                self.assertLessEqual(now - was, 2 * glide + 1e-6)
+        at = start
+        while at <= start + 2 * out + SWEEPS["watching"][2]:
+            position, _ = tray.icon_frame("watching", at, fine=self.FINE)
+            with self.subTest(at=at):
+                self.assertLessEqual(abs(position * step - tray.icon_turn("watching", at)), step)
+            at += math.ceil(tray.icon_frame_ms("watching", at, fine=self.FINE) / TICK - 1e-9) * TICK
+        for (_, there), (_, here) in zip(shown, shown[1:]):
+            self.assertLessEqual(abs(here - there), 2 * step)
+        # A degree of the head's travel round the ring's centre line, in pixels of a 16 px icon.
+        radius = (brand.ICON_SHAPE["ring_inner"] + brand.ICON_SHAPE["ring_outer"]) / 2 * 8
+        biggest = max(abs(b[1] - a[1]) for a, b in zip(shown, shown[1:]))
+        self.assertLess(math.radians(biggest) * radius, 0.5)
+        self.assertGreaterEqual(len(shown), 3 * len(shown_while_sweeping("watching", 1)))
+        self.assertEqual((shown[0][1], shown[-1][1]), (0.0, 0.0))
+
+    def test_the_quick_sweeps_keep_their_rate_and_what_explorer_pays_for_them(self):
+        for state in ("recovering", "failed"):
+            with self.subTest(state):
+                self.assertEqual(tray.icon_frame_ms(state, 100, fine=self.FINE), MOTION["turn_frame_ms"])
+        self.assertEqual(tray.icon_frame_ms("watching", SWEEP_AT + 10, fine=self.FINE), MOTION["glide_frame_ms"])
+        self.assertEqual(tray.icon_frame_ms("watching", 10, fine=self.FINE), MOTION["breathe_frame_ms"])
+        self.assertEqual(tray.icon_frame_ms("attention", 10, fine=self.FINE), MOTION["breathe_frame_ms"])
+
+    def test_the_fine_steps_are_the_plain_ones_where_they_meet_and_reduce_motion_holds_them(self):
+        for state in tray.ICON_STATES:
+            for elapsed in (0, 1600, SWEEP_AT + 400, SWEEP_AT + 3520, 99999):
+                with self.subTest(state=state, elapsed=elapsed):
+                    self.assertEqual(tray.icon_frame(state, elapsed, 100, reduced=True, fine=self.FINE), (0, TOP))
+                    self.assertIsNone(tray.icon_frame_ms(state, elapsed, 100, reduced=True, fine=self.FINE))
+                    fine, level = tray.icon_frame(state, elapsed, fine=self.FINE)
+                    plain, plain_level = tray.icon_frame(state, elapsed)
+                    self.assertEqual(level, plain_level)
+                    self.assertLessEqual(abs(fine - plain * self.FINE), self.FINE // 2)
+
+    def test_the_icon_builds_the_fine_table_and_steps_and_times_by_the_table_it_has(self):
+        built = []
+        with unittest.mock.patch.object(animation, "build_icon_frames",
+                                        lambda size, fine=1: built.append((size, fine))), \
+                unittest.mock.patch.object(animation.threading, "Thread",
+                                           lambda target, **_: types.SimpleNamespace(start=target)):
+            icon = tray.Tray(strings={})
+            icon._build_frames_later(16)
+        self.assertEqual(built, [(16, self.FINE)])
+        icon = tray.Tray(strings={})
+        icon._hwnd = 12345
+        icon._frames = tray.IconFrames(16, self.FINE)
+        icon._icon_state, icon._motion_allowed = "watching", True
+        fake = FakeUser32()
+        at = icon._epoch + (SWEEP_AT + 1700) / 1000.0
+        with unittest.mock.patch.object(animation, "_dll", lambda name: fake), \
+                unittest.mock.patch.object(time, "monotonic", lambda: at):
+            icon._sync_motion()
+        self.assertEqual(fake.timers, {2: MOTION["glide_frame_ms"]})
+        position, _ = tray.icon_frame("watching", SWEEP_AT + 1700, fine=self.FINE)
+        self.assertNotEqual(position % self.FINE, 0, "pick a moment between two plain positions")
+        with unittest.mock.patch.object(popup, "_icon_from_pixels", lambda pixels, width, height: 7):
+            changed, replaced = icon._frame_for(at)
+        self.assertTrue(changed)
+        self.assertEqual(replaced, [None])
+        self.assertEqual(icon._frame_key[0], position)
+
+
 # ------------------------------------------------------------------------ the icon, on Windows
 class FakeUser32:
     """Timers on a window that does not exist, recorded instead of set."""
@@ -1099,7 +1225,7 @@ class SwapTests(unittest.TestCase):
         icon = tray.Tray(strings={}, log=lambda message: self.logged.append(message))
         icon._hwnd = 12345
         icon._icon = 1                                     # a base icon exists; never drawn here
-        icon._frames = tray.IconFrames(16)
+        icon._frames = tray.IconFrames(16, MOTION["tray_fine"])     # the notification area's own table
         icon._icon_state = "recovering"
         icon._motion_allowed = True
         icon._notify_icon = lambda: True                   # the shell is not told
