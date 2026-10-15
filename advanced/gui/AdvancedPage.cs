@@ -97,6 +97,8 @@ namespace CodexAutoResume
         // The capability whose cards are showing; what they were built from; the status's `advanced` as last seen.
         private string advancedOpen, advancedShown, advancedBadge;
         private bool advancedAsking, advancedReading, advancedReadAgain, advancedFilling, hourlyFilling;
+        // v0.6.16-beta.3: the round of a turn-on whose requirements' statements were read for it - read once a round.
+        private int readNeedsAt = -1;
         // What waits for the read in flight to finish, in order (ReadAdvanced).
         private readonly List<MethodInvoker> advancedThen = new List<MethodInvoker>();
         // The font the list's cells were last measured in, and how many times they were (FillAdvancedList): every
@@ -962,6 +964,9 @@ namespace CodexAutoResume
                     about.Controls.Add(caption);
                     about.Controls.Add(body);
                 }
+                // v0.6.16-beta.3: what it needs on (registry.CapabilityDef.requires), which turning it on turns on too.
+                string needs = NamesOf(Items(item, "requires"));
+                if (needs.Length > 0) about.Controls.Add(HelpText(Word("page.requires", "Needs: {names}", "names", needs)));
             }
 
             // The report's card - what a person starts it doing - under its statement (AdvancedReport.cs).
@@ -1370,6 +1375,8 @@ namespace CodexAutoResume
                 said = Word("page.tripped.duplicate_seen", "It turned itself off because a continuation it sent again was found twice.");
             else if (reason == "not_delivered_on_open")
                 said = Word("page.tripped.not_delivered_on_open", "Turned off: a conversation was opened and Codex did not run the message queued for it.");
+            else if (reason == "requirement_off")
+                said = Word("page.tripped.requirement_off", "Turned off: a feature it needs is no longer on.");
             return said ?? Word("page.tripped", "It turned itself off.");
         }
 
@@ -1498,24 +1505,46 @@ namespace CodexAutoResume
             }
             Dictionary<string, object> item = AdvancedItem(id), statement = AdvancedStatement(id);
             string name = AdvancedName(id);
+            // v0.6.16-beta.3: what it needs and is not on now is turned on with it, in this one confirmation - each
+            // one's statement read first, and shown in the same dialog (registry.CapabilityDef.requires).
+            List<string> needs = state == StateArmed ? Strings(Items(item, "requires_off")) : new List<string>();
+            List<string> unread = needs.FindAll(delegate(string need) { return AdvancedStatement(need) == null; });
+            if (unread.Count > 0)
+            {
+                if (round > 0 && readNeedsAt == round)
+                {
+                    TellAdvanced(Word("page.refused.unread", "Something changed after this was shown, and how it stands now could not be read, so nothing was turned on. Try again in a moment."));
+                    return;
+                }
+                readNeedsAt = round;
+                ReadNeeds(unread, delegate { ArmAdvanced(id, state, round); });
+                return;
+            }
+            var needed = new List<Dictionary<string, object>>();
+            foreach (string need in needs) needed.Add(AdvancedStatement(need));
             // What is sent is decided here, from what the dialog is about to show, and from nothing read later.
-            string argument = ArmArgument(id, state, Whole(Get(advancedListing, "generation")), statement);
+            string argument = ArmArgument(id, state, Whole(Get(advancedListing, "generation")), statement, needed);
             string affirm = state == StateArmed ? Word("page.turn_on", "Turn on") : Word("page.watch", "Watch first");
             // The safe answer is the default: Enter and Escape leave it as it is, and only the button that names the
             // action says yes (Dialog, as the update check's offer of a pre-release asks).
-            if (!AskAdvanced(ArmQuestion(name, state, statement, round > 0), affirm)) return;
+            if (!AskAdvanced(ArmQuestion(name, state, statement, round > 0, needs, needed), affirm)) return;
             AdvancedCall("advanced-arm", argument, true, delegate(Dictionary<string, object> reply)
             {
                 Dictionary<string, object> result = AdvancedResult(reply);
                 if (AdvancedDone(result))
                 {
-                    SetNote(advancedNote, state == StateArmed ? Word("page.done.on", "{name} is on.", "name", name)
-                                                              : Word("page.done.watch", "{name} is being watched. It does nothing yet.", "name", name));
+                    string done = state != StateArmed ? Word("page.done.watch", "{name} is being watched. It does nothing yet.", "name", name)
+                                  : needs.Count > 0 ? Word("page.done.on_with", "{name} is on, and so is what it needs: {names}.", "name", name)
+                                                      .Replace("{names}", NamesOf(needs))
+                                  : Word("page.done.on", "{name} is on.", "name", name);
+                    SetNote(advancedNote, done);
                     ReadAdvanced(null);
                     return;
                 }
                 string refusal = Str(result, "refusal");
-                if (StaleRefusal(refusal) && round + 1 < AdvancedAsks)
+                if (refusal == "requirement_refused" || StaleRefusal(refusal))
+                    foreach (string need in needs) advancedStatements.Remove(need);    // read again before asking again
+                if ((StaleRefusal(refusal) || refusal == "requirement_refused") && round + 1 < AdvancedAsks)
                 {
                     // Something changed after the page showed it - a capability turned off elsewhere, a new statement, a
                     // warning, a Codex version: what holds now is read, and asked about again - or, where it cannot be,
@@ -1545,13 +1574,34 @@ namespace CodexAutoResume
         /// none), and the words of every warning it carried - which the person confirms by saying yes.
         internal static string ArmArgument(string id, string state, int generation, Dictionary<string, object> statement)
         {
-            var text = new StringBuilder("{\"capability\":").Append(Json.Escape(id))
-                .Append(",\"state\":").Append(Json.Escape(state))
-                .Append(",\"revision\":").Append(Whole(Get(statement, "revision")).ToString(CultureInfo.InvariantCulture))
-                .Append(",\"generation\":").Append(generation.ToString(CultureInfo.InvariantCulture))
-                .Append(",\"engine_version\":");
-            string version = Str(statement, "engine_version");
-            text.Append(version == null ? "null" : Json.Escape(version)).Append(",\"warnings\":[");
+            return ArmArgument(id, state, generation, statement, null);
+        }
+
+        /// With `needed` (v0.6.16-beta.3): the statement of each requirement it turns on with it, sent as `also` - each
+        /// one's id, revision, the words of its warnings and the Codex version it named - which the one yes confirms.
+        internal static string ArmArgument(string id, string state, int generation, Dictionary<string, object> statement,
+                                           List<Dictionary<string, object>> needed)
+        {
+            string main = ArmFields(id, state, generation, statement);
+            if (needed == null || needed.Count == 0) return main + "}";
+            var text = new StringBuilder(main).Append(",\"also\":[");
+            for (int index = 0; index < needed.Count; index++)
+            {
+                Dictionary<string, object> need = needed[index];
+                if (index > 0) text.Append(',');
+                text.Append("{\"capability\":").Append(Json.Escape(Str(need, "capability") ?? ""))
+                    .Append(",\"revision\":").Append(Whole(Get(need, "revision")).ToString(CultureInfo.InvariantCulture))
+                    .Append(",\"engine_version\":");
+                string version = Str(need, "engine_version");
+                text.Append(version == null ? "null" : Json.Escape(version)).Append(",\"warnings\":").Append(WarningWords(need)).Append('}');
+            }
+            return text.Append("]}").ToString();
+        }
+
+        /// The words of every warning a statement carries, as a JSON list.
+        private static string WarningWords(Dictionary<string, object> statement)
+        {
+            var text = new StringBuilder("[");
             bool first = true;
             foreach (object entry in Items(Map(statement, "warnings"), "items") ?? new List<object>())
             {
@@ -1561,12 +1611,33 @@ namespace CodexAutoResume
                 first = false;
                 text.Append(Json.Escape(word));
             }
-            return text.Append("]}").ToString();
+            return text.Append(']').ToString();
+        }
+
+        /// The advanced-arm request's own fields, without its closing brace.
+        private static string ArmFields(string id, string state, int generation, Dictionary<string, object> statement)
+        {
+            var text = new StringBuilder("{\"capability\":").Append(Json.Escape(id))
+                .Append(",\"state\":").Append(Json.Escape(state))
+                .Append(",\"revision\":").Append(Whole(Get(statement, "revision")).ToString(CultureInfo.InvariantCulture))
+                .Append(",\"generation\":").Append(generation.ToString(CultureInfo.InvariantCulture))
+                .Append(",\"engine_version\":");
+            string version = Str(statement, "engine_version");
+            text.Append(version == null ? "null" : Json.Escape(version)).Append(",\"warnings\":").Append(WarningWords(statement));
+            return text.ToString();
         }
 
         /// The question the dialog asks: that something changed, when it did; what is asked; every warning, with its
         /// title and the note under them; for "on", the Codex version it is for; and the statement's five fields.
         private string ArmQuestion(string name, string state, Dictionary<string, object> statement, bool changed)
+        {
+            return ArmQuestion(name, state, statement, changed, new List<string>(), new List<Dictionary<string, object>>());
+        }
+
+        /// With what it needs (v0.6.16-beta.3): after its own statement, the sentence that turning it on turns them on
+        /// too, and each one's statement under its name - every statement the one yes confirms, in the one dialog.
+        private string ArmQuestion(string name, string state, Dictionary<string, object> statement, bool changed,
+                                   List<string> needs, List<Dictionary<string, object>> needed)
         {
             string gap = Environment.NewLine + Environment.NewLine;
             var text = new StringBuilder();
@@ -1574,6 +1645,23 @@ namespace CodexAutoResume
             text.Append(state == StateArmed
                         ? Word("page.confirm.on", "Turn on {name}?", "name", name)
                         : Word("page.confirm.watch", "Watch {name} first? It is asked wherever it would act and notes what it would have done, but does nothing.", "name", name));
+            if (needs.Count > 0)
+                text.Append(gap).Append(Word("page.confirm.requires", "It needs {names}, so turning it on turns that on too. What each one does is below; this one yes turns them all on.",
+                                             "names", NamesOf(needs)));
+            AppendStatement(text, state, statement);
+            for (int index = 0; index < needs.Count && index < needed.Count; index++)
+            {
+                text.Append(gap).Append(Word("page.confirm.requirement", "Needed by it: {name}", "name", AdvancedName(needs[index])));
+                AppendStatement(text, state, needed[index]);
+            }
+            return text.ToString();
+        }
+
+        /// A statement as the dialog shows it: every warning, with its title and the note under them; for "on", the
+        /// Codex version it is for; and its five fields.
+        private void AppendStatement(StringBuilder text, string state, Dictionary<string, object> statement)
+        {
+            string gap = Environment.NewLine + Environment.NewLine;
             Dictionary<string, object> warnings = Map(statement, "warnings");
             List<object> said = Items(warnings, "items");
             if (said != null && said.Count > 0)
@@ -1597,7 +1685,43 @@ namespace CodexAutoResume
                 if (string.IsNullOrEmpty(body)) continue;
                 text.Append(gap).Append(Str(field, "title") ?? "").Append(Environment.NewLine).Append(body);
             }
-            return text.ToString();
+        }
+
+        /// The ids in `entries`, as strings, in their order.
+        private static List<string> Strings(List<object> entries)
+        {
+            var found = new List<string>();
+            foreach (object entry in entries ?? new List<object>())
+                if (entry is string && ((string)entry).Length > 0) found.Add((string)entry);
+            return found;
+        }
+
+        /// The capabilities `ids` names, by their names, joined with commas.
+        private string NamesOf(List<object> ids)
+        {
+            return NamesOf(Strings(ids));
+        }
+
+        private string NamesOf(List<string> ids)
+        {
+            return string.Join(", ", ids.ConvertAll(delegate(string capability) { return AdvancedName(capability); }).ToArray());
+        }
+
+        /// The statements of `ids` read, one after another, each kept where it was read; then `then`.
+        private void ReadNeeds(List<string> ids, MethodInvoker then)
+        {
+            if (ids.Count == 0)
+            {
+                then();
+                return;
+            }
+            string need = ids[0];
+            AdvancedCall("advanced-statement", LocaleArgument(need), false, delegate(Dictionary<string, object> answer)
+            {
+                Dictionary<string, object> result = AdvancedResult(answer);
+                if (AdvancedDone(result) && Str(result, "capability") == need) advancedStatements[need] = result;
+                ReadNeeds(ids.GetRange(1, ids.Count - 1), then);
+            });
         }
 
         private void DisarmAdvanced(string id)
@@ -1607,7 +1731,13 @@ namespace CodexAutoResume
             AdvancedCall("advanced-disarm", "{\"capability\":" + Json.Escape(id) + "}", true, delegate(Dictionary<string, object> reply)
             {
                 Dictionary<string, object> result = AdvancedResult(reply);
-                if (AdvancedDone(result)) SetNote(advancedNote, Word("page.done.off", "{name} is off.", "name", name));
+                // v0.6.16-beta.3: what needed it was turned off first, and is named first.
+                string also = NamesOf(Items(result, "also_off"));
+                if (AdvancedDone(result))
+                    SetNote(advancedNote, also.Length > 0
+                            ? Word("page.done.also_off", "{names} turned off first, because it needs {name}. Then {name} turned off.", "name", name)
+                                  .Replace("{names}", also)
+                            : Word("page.done.off", "{name} is off.", "name", name));
                 ReadAdvanced(null);
                 if (!AdvancedDone(result)) TellAdvanced(AdvancedRefusal(result));
             });

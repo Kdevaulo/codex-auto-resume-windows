@@ -519,5 +519,13 @@
   "statement.usage_pause.stop": "Turn it off here, turn the usage meter off, or turn every advanced feature off; whatever was held goes on as it would have.",
   "continue.wrap_up.short": "Please stop now.",
   "continue.wrap_up.standard": "Please finish the current step, then stop.",
-  "continue.wrap_up.detailed": "Commit what is pending, write down where you are and what is left, then stop."
+  "continue.wrap_up.detailed": "Commit what is pending, write down where you are and what is left, then stop.",
+  "page.requires": "Needs: {names}",
+  "page.confirm.requires": "It needs {names}, so turning it on turns that on too. What each one does is below; this one yes turns them all on.",
+  "page.confirm.requirement": "Needed by it: {name}",
+  "page.done.on_with": "{name} is on, and so is what it needs: {names}.",
+  "page.done.also_off": "{names} turned off first, because it needs {name}. Then {name} turned off.",
+  "page.refused.requirement": "What this feature needs could not be turned on with it, so nothing was turned on. Try again in a moment.",
+  "page.tripped.requirement_off": "Turned off: a feature it needs is no longer on.",
+  "page.kept.requirement_off": "It stayed on although a feature it needs is no longer on."
 }

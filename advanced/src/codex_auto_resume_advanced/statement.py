@@ -155,6 +155,12 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "queue.at", "queue.series", "queue.state.waiting", "queue.state.held", "queue.state.in_codex",
     "queue.state.being_sent", "queue.state.refused", "queue.unproven", "queue.go_on", "confirm.prompt",
     "done.prompt_added", "refused.prompt_refused", "refused.queue_full", "refused.dependency_unknown",))
+# A capability that needs another (v0.6.16-beta.3, registry.CapabilityDef.requires): what its card says it needs, the
+# one confirmation that turns on what it needs too, what turning a requirement off turned off first, and the words for
+# a dependent read down because what it needs is off.
+PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
+    "requires", "confirm.requires", "confirm.requirement", "done.on_with", "done.also_off", "refused.requirement",
+    "tripped.requirement_off", "kept.requirement_off"))
 # The usage meter's, the wrap-up's and the pause's choices (v0.6.16-beta.3, issue #29): each OptionKey's label, and
 # how its values are said.
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
