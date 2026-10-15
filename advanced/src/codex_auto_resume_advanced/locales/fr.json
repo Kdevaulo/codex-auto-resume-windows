@@ -326,6 +326,7 @@
   "page.send_now.button": "Envoyer maintenant...",
   "page.send_now.none": "Aucune récupération n'est en attente.",
   "page.send_now.title": "Récupérations en attente",
+  "page.state_kept_on": "reste activé",
   "page.statement_unavailable": "Ce que fait cette fonction ne peut pas être lu pour le moment ; elle ne peut donc être ni activée ni observée.",
   "page.tripped": "Elle s'est désactivée d'elle-même.",
   "page.tripped.duplicate_seen": "Elle s'est désactivée d'elle-même, car une relance qu'elle a renvoyée a été trouvée deux fois.",

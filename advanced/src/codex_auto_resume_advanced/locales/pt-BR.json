@@ -326,6 +326,7 @@
   "page.send_now.button": "Enviar agora...",
   "page.send_now.none": "Nenhuma recuperação está em espera.",
   "page.send_now.title": "Recuperações em espera",
+  "page.state_kept_on": "mantido ligado",
   "page.statement_unavailable": "Não é possível ler agora o que este recurso faz, então ele não pode ser ligado nem observado.",
   "page.tripped": "Ele se desligou sozinho.",
   "page.tripped.duplicate_seen": "Ele se desligou sozinho porque uma continuação que reenviou foi encontrada duas vezes.",

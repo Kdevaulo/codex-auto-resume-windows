@@ -326,6 +326,7 @@
   "page.send_now.button": "立即发送...",
   "page.send_now.none": "没有等待中的恢复。",
   "page.send_now.title": "等待中的恢复",
+  "page.state_kept_on": "保持开启",
   "page.statement_unavailable": "现在无法读取此功能会做什么，因此不能开启或观察它。",
   "page.tripped": "它已自行关闭。",
   "page.tripped.duplicate_seen": "它已自行关闭，因为它再次发送的一条续接消息被发现了两次。",

@@ -326,6 +326,7 @@
   "page.send_now.button": "Jetzt senden...",
   "page.send_now.none": "Keine Wiederherstellung wartet.",
   "page.send_now.title": "Wartende Wiederherstellungen",
+  "page.state_kept_on": "bleibt an",
   "page.statement_unavailable": "Was diese Funktion tut, kann gerade nicht gelesen werden. Deshalb kann sie weder eingeschaltet noch beobachtet werden.",
   "page.tripped": "Die Funktion hat sich selbst ausgeschaltet.",
   "page.tripped.duplicate_seen": "Die Funktion hat sich selbst ausgeschaltet, weil eine von ihr erneut gesendete Fortsetzung zweimal gefunden wurde.",

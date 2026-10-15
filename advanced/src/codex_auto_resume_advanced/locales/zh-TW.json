@@ -326,6 +326,7 @@
   "page.send_now.button": "立即傳送...",
   "page.send_now.none": "沒有等待中的復原。",
   "page.send_now.title": "等待中的復原",
+  "page.state_kept_on": "保持開啟",
   "page.statement_unavailable": "目前無法讀取此功能會做什麼，因此無法開啟或觀察它。",
   "page.tripped": "它已自行關閉。",
   "page.tripped.duplicate_seen": "它已自行關閉，因為它再次傳送的一則接續訊息被發現了兩次。",

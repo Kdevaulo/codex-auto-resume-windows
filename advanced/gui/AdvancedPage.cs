@@ -227,6 +227,14 @@ namespace CodexAutoResume
         }
 
         /// A state in the registry's words: Off, Watching, On.
+        /// v0.6.16-beta.3: a row's state in the list - its word, and "· kept on" after it for one kept on (KeptOn) - as text in
+        /// the flat row, nothing drawn.
+        private string ListState(Dictionary<string, object> row)
+        {
+            string word = StateWord(Str(row, "state"));
+            return KeptOn(row) ? word + " · " + Word("page.state_kept_on", "kept on") : word;
+        }
+
         private string StateWord(string state)
         {
             if (state == StateArmed) return Word("state.armed", "On");
@@ -758,7 +766,7 @@ namespace CodexAutoResume
                     foreach (var row in rows)
                     {
                         var item = new ListViewItem(AdvancedName(Str(row, "id")));
-                        item.SubItems.Add(StateWord(Str(row, "state")));
+                        item.SubItems.Add(ListState(row));
                         item.Tag = row;
                         advancedList.Items.Add(item);
                     }
@@ -771,7 +779,7 @@ namespace CodexAutoResume
                     {
                         ListViewItem item = advancedList.Items[i];
                         item.Tag = rows[i];
-                        string state = StateWord(Str(rows[i], "state"));
+                        string state = ListState(rows[i]);
                         if (item.SubItems[1].Text == state) continue;
                         item.SubItems[1].Text = state;
                         measure = true;
@@ -884,6 +892,9 @@ namespace CodexAutoResume
             TableLayoutPanel head = NewGroup(AdvancedName(id), advancedStack);
             TableLayoutPanel facts = Facts(head);
             Fact(facts, Word("page.col_state", "State")).Text = StateWord(Str(item, "state"));
+            // v0.6.16-beta.3: whether it is kept on, right under where it stands - while it is on or watched (AdvancedKeepOn.cs);
+            // the owner found it too far down the page, under its statement and its limits.
+            BuildKeepOn(item, head);
             // That it turned itself off, and why, where it did - a tripwire, or a new version of Codex - in the accent, as
             // what a policy refuses is: a person who turned it on finds it off, and is told it was not someone else.
             string tripped = TrippedText(item);
@@ -990,8 +1001,7 @@ namespace CodexAutoResume
             limits.Controls.Add(NewRow(Word("page.hourly", "Sends an hour, all advanced features together"), advancedHourly));
             limits.Controls.Add(HelpText(Word("page.hourly_note", "You can lower this limit. It never goes above {n}.", "n", HourlyMost())));
 
-            // Under its limits (v0.6.14): whether it is kept on, while it is on or watched; and Send now's waiting recoveries.
-            BuildKeepOn(item);
+            // Under its limits (v0.6.14): Send now's waiting recoveries. Keep it on is in the head card (v0.6.16-beta.3).
             BuildSendNow(item);
             // The reset actions' rules and the form they are added with, while one is on (AdvancedResets.cs); the
             // conversations kept going and the queued prompts, each while its capability is on (v0.6.15-beta).

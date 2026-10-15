@@ -326,6 +326,7 @@
   "page.send_now.button": "Enviar ahora...",
   "page.send_now.none": "No hay ninguna recuperación en espera.",
   "page.send_now.title": "Recuperaciones en espera",
+  "page.state_kept_on": "se mantiene activado",
   "page.statement_unavailable": "Ahora mismo no se puede leer qué hace esta función, así que no se puede activar ni observar.",
   "page.tripped": "Se desactivó sola.",
   "page.tripped.duplicate_seen": "Se desactivó sola porque una continuación que reenvió se encontró dos veces.",

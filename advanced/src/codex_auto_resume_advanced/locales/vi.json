@@ -326,6 +326,7 @@
   "page.send_now.button": "Gửi ngay...",
   "page.send_now.none": "Không có lần khôi phục nào đang chờ.",
   "page.send_now.title": "Các lần khôi phục đang chờ",
+  "page.state_kept_on": "luôn bật",
   "page.statement_unavailable": "Hiện không thể đọc tính năng này làm gì, nên không thể bật hoặc quan sát nó.",
   "page.tripped": "Nó đã tự tắt.",
   "page.tripped.duplicate_seen": "Nó đã tự tắt vì một tin nhắn tiếp tục nó gửi lại đã được tìm thấy hai lần.",

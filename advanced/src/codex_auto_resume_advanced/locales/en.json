@@ -64,6 +64,7 @@
   "page.keep_on.send_again": "Also send again when unsure...",
   "page.keep_on.turn_off": "Let it turn itself off",
   "page.keep_on.turn_on": "Keep it on...",
+  "page.state_kept_on": "kept on",
   "page.kept.duplicate_seen": "A continuation it sent again was found twice, so sending again is off. It stays on.",
   "page.kept.engine_changed": "It stayed on although the version of Codex changed. Turn it on again to confirm this version.",
   "page.kept.failed_here": "It stayed on although a compatibility check of what it relies on failed on this computer.",

@@ -326,6 +326,7 @@
   "page.send_now.button": "Wyślij teraz...",
   "page.send_now.none": "Żadne odzyskiwanie nie oczekuje.",
   "page.send_now.title": "Oczekujące odzyskiwania",
+  "page.state_kept_on": "pozostaje włączone",
   "page.statement_unavailable": "Nie można teraz odczytać, co robi ta funkcja, więc nie można jej włączyć ani obserwować.",
   "page.tripped": "Funkcja sama się wyłączyła.",
   "page.tripped.duplicate_seen": "Funkcja sama się wyłączyła, bo kontynuacja, którą wysłała ponownie, została znaleziona dwa razy.",
