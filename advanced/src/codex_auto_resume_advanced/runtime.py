@@ -170,7 +170,7 @@ def _word(answer, point):
 class Runtime:
     def __init__(self, paths, *, registry=REGISTRY, clock=time.time,
                  measure_session_factory=None, measure_launcher=None, measure_backend=None,
-                 evidence_dir=None, **arming):
+                 measure_cli=None, measure_ipc=None, evidence_dir=None, **arming):
         self.paths = paths
         self.registry = registry
         self.clock = clock
@@ -199,6 +199,8 @@ class Runtime:
         self._measure_session_factory = measure_session_factory
         self._measure_launcher = measure_launcher
         self._measure_backend = measure_backend
+        self._measure_cli = measure_cli
+        self._measure_ipc = measure_ipc
         self._evidence_dir = evidence_dir
 
     # ------------------------------------------------------------------ standing
@@ -749,9 +751,13 @@ class Runtime:
         launcher = self._measure_launcher
         if launcher is None:
             launcher = measure.live_launcher(self.paths)
+        # v0.6.16-beta.3: the read-only probes' seams - the engine's own CLI help (MAWS/MCLOUD) and the
+        # Desktop's IPC pipe (MIPC). Built from the same backend, so they are of the Codex the record names.
+        cli = self._measure_cli if self._measure_cli is not None else measure.live_cli(backend, self.paths)
+        ipc = self._measure_ipc if self._measure_ipc is not None else measure.live_ipc()
         return measure.run(measurement, session_factory=session_factory,
                            launcher=launcher, backend=backend, thread=thread, may_spend=may_spend,
-                           directory=self._evidence_dir, clock=self.clock)
+                           directory=self._evidence_dir, clock=self.clock, cli=cli, ipc=ipc)
 
     def complete_measurement(self, measurement, verdict, note):
         """Record a person's completion of a blocked measurement (measure-verdict, measure.py).

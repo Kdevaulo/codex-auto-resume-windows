@@ -91,7 +91,9 @@ class TableTests(unittest.TestCase):
                          {Measurement.MU, Measurement.MN, Measurement.MR,
                           # v0.6.15-beta's own, for several conversations at once: not made yet.
                           Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK,
-                          Measurement.MT})
+                          Measurement.MT,
+                          # v0.6.16-beta.3's read-only probes: the main session runs them on a real machine.
+                          Measurement.MIPC, Measurement.MAWS, Measurement.MCLOUD})
 
 
 if __name__ == "__main__":

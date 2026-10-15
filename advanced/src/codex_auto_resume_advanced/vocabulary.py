@@ -350,6 +350,16 @@ class Measurement(StrEnum):
     # One message queued while a turn runs in a throwaway conversation: delivered once, after that turn ended
     # (prompt_queue's after_turn).
     MT = "mt"
+    # v0.6.16-beta.3 - the three probes for what stop-now and send-now would need, each read-only, no live run
+    # from this product (measure.py). MIPC: whether the Desktop's own IPC pipe \\.\pipe\codex-ipc is reachable -
+    # it never writes a start, an interrupt or a message; the person confirms whether a turn the app holds could be
+    # driven through it. MAWS: whether a shared app-server is a setting Codex documents (CODEX_APP_SERVER_WS_URL or a
+    # shared-backend switch), read from the engine's own help. MCLOUD: whether a `codex cloud` command offers a
+    # supported, read-only way to read a cloud task's state. None of the three drives a turn; stop-now and send-now
+    # wait on MIPC's answer.
+    MIPC = "mipc"
+    MAWS = "maws"
+    MCLOUD = "mcloud"
 
 
 class RuleState(StrEnum):

@@ -1386,5 +1386,85 @@ class InvocationTests(ac.AdvancedCase):
         self.assertTrue(all("measure" not in tool["name"] for tool in tools))
 
 
+class ReadOnlyProbeTests(unittest.TestCase):
+    """The three read-only probes for what stop-now and send-now would need (v0.6.16-beta.3): the IPC pipe
+    (MIPC), a documented shared app-server (MAWS), and a cloud-task state read (MCLOUD). Each is driven
+    through a seam, so no test touches the real pipe or runs the real CLI; each records booleans only and
+    leaves its verdict blocked for the owner to complete on a real machine."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(self.dir, ignore_errors=True))
+
+    def run_one(self, measurement, *, cli=None, ipc=None):
+        return measure.run(measurement, cli=cli, ipc=ipc,
+                           versions={"product_version": "0.6.16-beta.3", "codex_version": "0.162.0",
+                                     "windows_build": "10.0.26200"},
+                           clock=lambda: 1_800_000_000.0, directory=self.dir)
+
+    def observed(self, summary):
+        return summary["observed"]
+
+    def test_none_of_the_three_opens_an_app_server_session(self):
+        for measurement in (Measurement.MIPC, Measurement.MAWS, Measurement.MCLOUD):
+            with self.subTest(measurement):
+                self.assertEqual(protocol.methods_for(measurement), frozenset({"initialize", "initialized"}))
+
+    def test_the_ipc_probe_records_what_the_look_found_and_never_writes(self):
+        reached = self.run_one(Measurement.MIPC, ipc=lambda: {"exists": True, "opened": True, "frame_read": True})
+        self.assertEqual(reached["verdict"], str(Verdict.BLOCKED))
+        self.assertEqual({k: self.observed(reached)[k] for k in ("pipe_exists", "pipe_opened", "frame_read")},
+                         {"pipe_exists": True, "pipe_opened": True, "frame_read": True})
+        # No seam (and a seam that raises) is all False, never an error.
+        for ipc in (None, (lambda: (_ for _ in ()).throw(OSError("no")))):
+            summary = self.run_one(Measurement.MIPC, ipc=ipc)
+            self.assertEqual({self.observed(summary)[k] for k in ("pipe_exists", "pipe_opened", "frame_read")},
+                             {False})
+
+    def test_the_ipc_look_itself_opens_for_reading_only(self):
+        """Read from the source: live_ipc opens the pipe 'rb' and writes nothing to it."""
+        import inspect
+        source = inspect.getsource(measure.live_ipc)
+        self.assertIn('"rb"', source)
+        for written in (".write(", '"wb"', '"r+b"', '"ab"'):
+            self.assertNotIn(written, source)
+
+    def test_the_shared_server_probe_reads_the_help_for_the_setting(self):
+        seen = self.run_one(Measurement.MAWS, cli=lambda args: "env CODEX_APP_SERVER_WS_URL sets the server")
+        self.assertEqual(seen["verdict"], str(Verdict.BLOCKED))
+        self.assertEqual({k: self.observed(seen)[k] for k in ("help_read", "ws_url_documented")},
+                         {"help_read": True, "ws_url_documented": True})
+        absent = self.run_one(Measurement.MAWS, cli=lambda args: "Usage: codex app-server [options]")
+        self.assertEqual({k: self.observed(absent)[k] for k in ("help_read", "ws_url_documented",
+                                                                "shared_switch_documented")},
+                         {"help_read": True, "ws_url_documented": False, "shared_switch_documented": False})
+        self.assertEqual(self.observed(self.run_one(Measurement.MAWS))["help_read"], False)
+        # The call it makes is the engine's own help for the app-server, read-only.
+        asked = []
+        self.run_one(Measurement.MAWS, cli=lambda args: asked.append(args) or "")
+        self.assertEqual(asked, [("app-server", "--help")])
+
+    def test_the_cloud_probe_reads_the_help_for_a_state_read(self):
+        present = self.run_one(Measurement.MCLOUD, cli=lambda args: "codex cloud: list and show task status")
+        self.assertEqual({k: self.observed(present)[k] for k in ("cloud_help_read", "cloud_command_present",
+                                                                 "state_read_present")},
+                         {"cloud_help_read": True, "cloud_command_present": True, "state_read_present": True})
+        none = self.run_one(Measurement.MCLOUD, cli=lambda args: "error: unrecognized subcommand 'cloud'")
+        self.assertEqual({k: self.observed(none)[k] for k in ("cloud_command_present", "state_read_present")},
+                         {"cloud_command_present": False, "state_read_present": False})
+        asked = []
+        self.run_one(Measurement.MCLOUD, cli=lambda args: asked.append(args) or "")
+        self.assertEqual(asked, [("cloud", "--help")])
+
+    def test_every_probes_observation_is_content_free(self):
+        for measurement, seam in ((Measurement.MIPC, {"ipc": lambda: {"exists": True}}),
+                                  (Measurement.MAWS, {"cli": lambda a: "CODEX_APP_SERVER_WS_URL"}),
+                                  (Measurement.MCLOUD, {"cli": lambda a: "status"})):
+            with self.subTest(measurement):
+                summary = self.run_one(measurement, **seam)
+                record = json.loads(Path(summary["recorded"]).read_text(encoding="utf-8"))
+                self.assertEqual(live_evidence.content_refusals(record), [])
+
+
 if __name__ == "__main__":
     unittest.main()
