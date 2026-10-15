@@ -57,10 +57,27 @@ class StartWithCodex:
     left to decide: the capability's whole purpose is to offer the escape, and the hook hands
     core this object as the route. `start` is what core then calls, with the command line it
     built, to run the WMI create and hand back the created watcher's pid or a refusal code."""
-    __slots__ = ("paths",)
+    __slots__ = ("paths", "_scoped")
 
     def __init__(self, paths):
         self.paths = paths
+        self._scoped = None
+
+    def bind(self, scoped):
+        """Its view of the state (runtime.Runtime._code_of): the one write it uses is `count`, its own
+        codes with their journal lines, made only while it is on."""
+        self._scoped = scoped
+
+    def told(self, word):
+        """What core made of the route it named (core's control/codexstart.OUTCOMES): written to the
+        journal as the capability's own code - started, refused, already running, held by a pause or an
+        installation, a watcher that ended at once (v0.6.16-beta.3, issue #31). A word it has no code
+        for is not written. Never raises."""
+        try:
+            if self._scoped is not None and isinstance(word, str):
+                self._scoped.count(word)
+        except Exception:
+            pass
 
     def start_route(self, request):
         """P9: the route that starts the watcher outside Codex's job. `request` is core's copy
