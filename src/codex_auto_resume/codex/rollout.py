@@ -34,7 +34,8 @@ SPAN = 1 << 40
 # The split files of each Codex home by name, looked at again at most every LIST_SECONDS: one listing for every
 # conversation, names only.
 LIST_SECONDS = 60.0
-_SPLITS, _ASKED = {}, set()
+AGAIN = 5
+_SPLITS, _ASKED, _RELISTED = {}, set(), {}
 
 
 def _splits(home, fresh=False) -> dict:
@@ -95,8 +96,22 @@ def meta_id(path):
 
 
 def named_after(home, turns_id) -> tuple:
-    """The conversation ids whose files, by name, hold `turns_id`'s turns (`<id>_<turns_id>.jsonl`)."""
-    return tuple(owner for owner, pairs in _splits(home).items() if any(pair[0] == turns_id for pair in pairs))
+    """The conversation ids whose files, by name, hold `turns_id`'s turns (`<id>_<turns_id>.jsonl`) - listed again,
+    once for each id and at most AGAIN times a minute, where the listing names none: a split newer than the listing
+    is found at once, and many ids no file names cost a few listings."""
+    def named(listing):
+        return tuple(owner for owner, pairs in listing.items() if any(pair[0] == turns_id for pair in pairs))
+    found = named(_splits(home))
+    now = time.monotonic()
+    recent = _RELISTED.setdefault(str(home), [])
+    recent[:] = [at for at in recent if now - at < LIST_SECONDS]
+    if not found and (str(home), turns_id) not in _ASKED and len(recent) < AGAIN:
+        if len(_ASKED) > 4096:
+            _ASKED.clear()
+        _ASKED.add((str(home), turns_id))
+        recent.append(now)
+        found = named(_splits(home, fresh=True))
+    return found
 
 
 def placed(row, owner, index) -> dict:

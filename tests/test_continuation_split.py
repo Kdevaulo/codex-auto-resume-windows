@@ -354,6 +354,20 @@ class SplitRecoveryTests(unittest.TestCase):
             h.tick(advance=61)
         self.assertEqual(h.record(A)["state"], "recovered")
 
+    def test_a_failure_under_b_is_found_at_once_after_a_split_to_c_inside_one_listing(self):
+        """A listing made before A's split files existed does not hide B's failure for its minute."""
+        h = self.harness()
+        h.home.rotate(OTHER)                                      # some split in the home, so it has a listing
+        h.enable(at=BASE - 60)
+        h.home.add_turn(A, status="completed", completed=int(BASE - 600))
+        h.tick()
+        rollout._splits(h.home.root, fresh=True)                  # listed now: no file of A's split yet
+        h.home.rotate(A)
+        failed = h.home.fail_usage(A)
+        h.home.rotate(A)
+        h.tick(advance=5)
+        self.assertEqual([row["turn_id"] for row in h.records(A)], [failed])
+
     def test_the_chain_is_kept_in_the_state_folder_for_a_watcher_started_again(self):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)
