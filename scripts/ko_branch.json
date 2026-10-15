@@ -42,6 +42,7 @@
   "intentionally_english": {
     "LICENSE": "The authoritative licence text. A translation would be a second licence.",
     "skills/codex-auto-resume/SKILL.md": "Instructions Codex reads to operate the plugin, not prose a person reads. Translating it would make the two branches behave differently, which is exactly what generating ko from main exists to prevent.",
+    "docs/WINGET.md": "A maintainer's note on submitting the winget manifests, read by the one person who submits them, who reads English; the files it describes are English.",
     ".github/GENERATED-BRANCH.md": "Written by the generator, for maintainers, and only exists on ko."
   },
   "_reviewed_comment": [
