@@ -601,7 +601,7 @@ default (or wherever `CODEX_AUTO_RESUME_PLUGIN_HOME`, or failing that
   text. Deleting it turns the power action off. It goes with the rest of `config/` under
   `Uninstall.cmd -Purge`, and the command line's `uninstall` deletes it unless you pass
   `--keep-state`;
-- `config/once-words.json`, from v0.6.15-beta.2, only while a waiting task has words for this time
+- `config/once-words.json`, from v0.6.16-beta.3, only while a waiting task has words for this time
   you added in the Dashboard: for each such task, this product's own interruption id (never a
   conversation's), the words exactly as you wrote them, and when you wrote them. The words are sent
   once, after that task's next continuation, into that conversation, as a Custom message is. Each

@@ -155,7 +155,7 @@ ITEM = {_q(name): item for item, names in {
                 "control.tools",
                 # v0.6.12: the power action's file.
                 "control.poweraction",
-                # v0.6.15-beta.2: the words for this time, in a file of their own beside the state, as that one is.
+                # v0.6.16-beta.3: the words for this time, in a file of their own beside the state, as that one is.
                 "oncewords",
                 "auto_resume", "cli", "controlcli", "diagnostics",
                 "commands", "commands.base", "commands.install", "commands.records",

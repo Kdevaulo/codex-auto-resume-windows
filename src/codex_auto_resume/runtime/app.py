@@ -286,7 +286,7 @@ class App(WatchLoop):
         kwargs["dispatch_lock"] = dispatch_lock if dispatch_lock is not None else self.dispatch_lock
         # v0.6.15-beta (P12): a store of its own for each worker that waits for a receipt (engine/launches.py).
         kwargs["open_store"] = self.worker_store
-        # v0.6.15-beta.2: the words for this time a person added in the Dashboard, beside the state (oncewords.py).
+        # v0.6.16-beta.3: the words for this time a person added in the Dashboard, beside the state (oncewords.py).
         kwargs["once_words"] = oncewords.OnceWords.of(self.paths)
         engine = Engine(store, source, self.backend(), plug=self.plug, **kwargs)
         engine.apply_policy(self._stored, self.managed)

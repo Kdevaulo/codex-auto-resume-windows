@@ -189,7 +189,7 @@ class ContractTests(unittest.TestCase):
         # v0.6.11: and its conversation's own tier, beside whether it is switched on.
         # v0.6.11: and the attempts a temporary failure may have now, beside what it used.
         # v0.6.15-beta: and the alias of another Codex home's record.
-        # v0.6.15-beta.2: and whether it has words for this time.
+        # v0.6.16-beta.3: and whether it has words for this time.
         self.assertEqual(added, {"thread_enabled", "tier", "name", "project", "cwd_basename", "attempt_limit", "home",
                                  "once_words"})
 

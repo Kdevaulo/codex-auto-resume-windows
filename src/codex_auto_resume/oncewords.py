@@ -1,4 +1,4 @@
-"""Words for this time (v0.6.15-beta.2): a person's own words added, once, to one waiting interruption's next
+"""Words for this time (v0.6.16-beta.3): a person's own words added, once, to one waiting interruption's next
 continuation.
 
 A person picks one waiting recovery on the Dashboard's Pending page and writes a few words for it. When that

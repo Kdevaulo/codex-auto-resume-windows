@@ -19,20 +19,24 @@ from __future__ import annotations
 
 from .vocabulary import Measurement, Verdict
 
-# The Codex the 2026-09-26 measurements were made on, as `codex --version` names it - the same
-# words the Compatibility Registry's view carries as the engine version.
-CLI_0158_ALPHA_2_1 = "codex-cli 0.158.0-alpha.2.1"
+# The Codex the 2026-10-10 measurements were made on, as `codex --version` names it - the same
+# words the Compatibility Registry's view carries as the engine version. Every earlier reading
+# (codex-cli 0.158.0-alpha.2.1, 2026-09-26 and 09-28) was made again on it.
+CLI_0162_ALPHA_17_2 = "codex-cli 0.162.0-alpha.17.2"
 
 MEASURED = {
-    Measurement.M1: (Verdict.PASS, CLI_0158_ALPHA_2_1),
-    Measurement.M2: (Verdict.FAIL, CLI_0158_ALPHA_2_1),
-    Measurement.M3: (Verdict.FAIL, CLI_0158_ALPHA_2_1),
-    Measurement.M4: (Verdict.FAIL, CLI_0158_ALPHA_2_1),
-    Measurement.M5: (Verdict.FAIL, CLI_0158_ALPHA_2_1),
-    Measurement.M6: (Verdict.PASS, CLI_0158_ALPHA_2_1),
-    Measurement.M7: (Verdict.PASS, CLI_0158_ALPHA_2_1),
-    Measurement.MW: (Verdict.PASS, CLI_0158_ALPHA_2_1),
-    # Completed by the owner at the app on 2026-09-28, on the same engine.
-    Measurement.MA: (Verdict.PASS, CLI_0158_ALPHA_2_1),
-    Measurement.MH: (Verdict.PASS, CLI_0158_ALPHA_2_1),
+    Measurement.M1: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.M2: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    Measurement.M2B: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.M3: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    Measurement.M4: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    Measurement.M5: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.M6: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.M7: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MW: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MA: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MH: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MP1: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MP2: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MP3: (Verdict.PASS, CLI_0162_ALPHA_17_2),
 }

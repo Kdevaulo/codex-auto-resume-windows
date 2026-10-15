@@ -123,7 +123,7 @@ class RecordsMixin:
         # that home's reader, and with its alias as `home`; None for every record while there is one home.
         others = _other_homes(values.get(homes.FIELD))
         readers = {}
-        # v0.6.15-beta.2: which records have words for this time - whether, never what (oncewords.py).
+        # v0.6.16-beta.3: which records have words for this time - whether, never what (oncewords.py).
         try:
             worded = oncewords.OnceWords.of(self.paths).held()
         except Exception:

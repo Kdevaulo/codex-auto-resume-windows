@@ -117,7 +117,7 @@ class OptionsMixin:
         # (engine/launches.py) - None, and every send is made inline as always - the pool open for this tick, the
         # worker taken for the record being dispatched, and whether its send goes to that worker.
         self.open_store, self._pool, self._held_slot, self._pooling = open_store, None, None, False
-        # v0.6.15-beta.2: the words for this time (oncewords.py), None for none, and what each send spent.
+        # v0.6.16-beta.3: the words for this time (oncewords.py), None for none, and what each send spent.
         self.once_words, self._once_sent = once_words, {}
         self.log = log or (lambda *args: None)
         self.notify = notify or (lambda *args: None)

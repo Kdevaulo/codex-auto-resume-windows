@@ -79,7 +79,7 @@ class PendingRow(RecordView):
     cwd_basename: str | None
     # v0.6.15-beta: the alias of the Codex home a record of another home than the default is of, or None.
     home: str | None
-    # v0.6.15-beta.2: whether a person added words for this time to it - never the words.
+    # v0.6.16-beta.3: whether a person added words for this time to it - never the words.
     once_words: bool
 
 

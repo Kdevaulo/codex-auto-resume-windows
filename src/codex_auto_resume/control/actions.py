@@ -290,7 +290,7 @@ class ActionsMixin:
         return {"interruption_id": key, "thread_id": thread, "state": detail, "woke": woke,
                 "note": "nothing is sent now; every safety check still applies"}
 
-    # ------------------------------------------------------- words for this time (v0.6.15-beta.2)
+    # ------------------------------------------------------- words for this time (v0.6.16-beta.3)
     def once_words(self, interruption_id) -> dict:
         """One interruption's words for this time, as they are read and checked again (oncewords.py), for the
         Dashboard's dialog alone: no MCP tool reads them and the panel never shows them."""
@@ -299,7 +299,7 @@ class ActionsMixin:
         return {"interruption_id": key, "set": text is not None, "text": text}
 
     def set_once_words(self, interruption_id, thread_id, text) -> dict:
-        """Words for this time for one exact waiting recovery (v0.6.15-beta.2): `text`, added once after the next
+        """Words for this time for one exact waiting recovery (v0.6.16-beta.3): `text`, added once after the next
         continuation it sends - or None, or nothing but spaces, to take them away (always allowed: it only reduces).
 
         A Custom message in every way (A27): refused, if it is, in the Custom message's validator's own words, and

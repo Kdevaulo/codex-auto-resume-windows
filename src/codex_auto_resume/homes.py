@@ -124,9 +124,10 @@ def strict(value, default_home, identity) -> None:
         seen[folder] = entry["alias"]
 
 
-# MH - the Codex app run on a second home - passed on codex-cli 0.158.0-alpha.2.1 (2026-09-28). On a Codex newer
-# than 0.158 it is unproven until measured again, which Settings say beside the homes (the owner, 2026-10-09).
-MEASURED = (0, 158)
+# MH - the Codex app run on a second home - passed on codex-cli 0.158.0-alpha.2.1 (2026-09-28) and again on
+# codex-cli 0.162.0-alpha.17.2 (2026-10-10). On a Codex newer than 0.162 it is unproven until measured again, which
+# Settings say beside the homes (the owner, 2026-10-09).
+MEASURED = (0, 162)
 
 
 def unmeasured(version) -> bool:

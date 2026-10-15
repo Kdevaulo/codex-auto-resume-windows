@@ -273,7 +273,7 @@ namespace CodexAutoResume
                                                 delegate { EditConversationMessage(row); });
             message.Enabled = idle;
             pendingMenu.Items.Add(message);
-            // v0.6.15-beta.2: words added once to this task's next continuation, after the conversation's message - and,
+            // v0.6.16-beta.3: words added once to this task's next continuation, after the conversation's message - and,
             // when it has some, taking them away.
             bool worded = HasOnceWords(row);
             var once = new ToolStripMenuItem(worded ? S("menu.once_words_change", "Change words for this time...")

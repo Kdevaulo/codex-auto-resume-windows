@@ -1,4 +1,4 @@
-"""v0.6.15-beta.2: words for this time - where they are kept, what they may say, and who may write them.
+"""v0.6.16-beta.3: words for this time - where they are kept, what they may say, and who may write them.
 
 A person may add words for one waiting recovery on the Dashboard's Pending page; the watcher sends them once, after
 that recovery's next continuation (tests/test_once_words_engine.py). They are kept in config/once-words.json beside

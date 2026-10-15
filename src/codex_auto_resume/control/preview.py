@@ -21,7 +21,7 @@ class PreviewMixin:
         `thread_id` previews it for one conversation (v0.6.11), with that conversation's own
         message - the one stored, or one in `changes` under `custom_message_by_thread`.
 
-        `once_words` (v0.6.15-beta.2, the bridge's alone) are one waiting recovery's words for this time, being
+        `once_words` (v0.6.16-beta.3, the bridge's alone) are one waiting recovery's words for this time, being
         written: shown after the continuation as the watcher would add them, or reported as a Custom message's
         refusal is and left out.
 

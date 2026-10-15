@@ -130,7 +130,7 @@ class DeliveryMixin:
         except Exception:
             return message, False
 
-    # --------------------------------------------------------------- words for this time (v0.6.15-beta.2)
+    # --------------------------------------------------------------- words for this time (v0.6.16-beta.3)
     def _once_words(self, row, message, limits):
         """(the continuation with this interruption's words for this time after it, the words), or (`message`,
         None): no words, words that fail the Custom message's check as they are read again (A27), or a record not

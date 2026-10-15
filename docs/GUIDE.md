@@ -388,7 +388,7 @@ for that conversation alone. **Let this project resume** and **Hold this project
 the project that task's conversation is filed under, as described under
 [Observe only, and which conversations and projects resume](#observe-only-and-which-conversations-and-projects-resume).
 Last, in the Dashboard's menu only, **Message for this conversation...** gives that conversation a
-continuation message of its own, and, from v0.6.15-beta.2, **Add words for this time...** adds words of
+continuation message of its own, and, from v0.6.16-beta.3, **Add words for this time...** adds words of
 yours to that task's next continuation alone, once - both as described under
 [The continuation message](#the-continuation-message).
 None of them sends anything, each is refused if its row has since become another task, and the
@@ -717,6 +717,25 @@ starts again at Windows sign-in.
 
 See [docs/PLUGIN.md](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/docs/PLUGIN.md) for the layout, exactly what the setup script will and will
 not do, the update and removal lifecycle, and why the usage-limit notice does **not** get a checkbox.
+
+### The panel beside the chat
+
+The settings panel in Codex can sit beside a conversation, in the Codex app's right side panel, as well
+as in the conversation itself.
+
+- **Open beside the chat.** Where Codex can show it there, the panel's bottom bar starts with *Open
+  beside the chat*, which asks Codex to move the panel to the right side panel and calls no tool. If
+  Codex keeps it in the conversation, the button goes for that page and the bar says *Codex kept the
+  panel here.*
+- **A tab of the side panel.** The panel's tool, *Open Auto Resume settings*, offers itself to a
+  conversation's side panel: a Codex app that lists plugins' tools shows it under New tab > More
+  tools....
+- **Read again on return.** Beside the chat, the panel reads its state again when you come back to it,
+  at most once every 15 seconds and never while something is being changed there, and leaves the
+  keyboard on the control it was on. It runs no timer.
+
+Measurements MP1 to MP3, that the Codex app shows the panel there as it should, passed on
+`codex-cli 0.162` ([docs/LIVE_ACCEPTANCE.md](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/docs/LIVE_ACCEPTANCE.md)).
 
 > There is one installation, and both routes converge on it. If you also run a source checkout,
 > keep only one: separate state means two watchers, and two watchers could resume the same task
@@ -1321,8 +1340,9 @@ Pending, History, the Codex panel and the cards show the alias beside a record o
   queue there is watched until it settles, and only then is the home let go.
 - **The advanced edition acts on the default home only.** Every advanced capability sees the default
   home's records alone; an extra home is recovered as the standard edition recovers.
-- **Measured on 0.158.** That the desktop app reaches a second home (measurement MH) passed on
-  `codex-cli 0.158`. On a newer Codex the card says it is unmeasured until it is measured again.
+- **Measured up to 0.162.** That the desktop app reaches a second home (measurement MH) passed on
+  `codex-cli 0.158` and again on `codex-cli 0.162`. On a Codex newer than 0.162 the card says it is
+  unmeasured until it is measured again.
 
 ### Languages
 
@@ -1396,7 +1416,7 @@ keeps it beside the conversation's id, and the diagnostics bundle records only t
 
 #### Words for this time
 
-From v0.6.15-beta.2 one waiting task can carry words of yours for its next continuation alone: **Add
+From v0.6.16-beta.3 one waiting task can carry words of yours for its next continuation alone: **Add
 words for this time...** on its row in the Dashboard's Pending page. When that task's limit lifts and
 it is continued, the words are sent once, after the continuation message it would send anyway, with one
 blank line between. They start, speed up and skip nothing: the task is continued exactly when it would

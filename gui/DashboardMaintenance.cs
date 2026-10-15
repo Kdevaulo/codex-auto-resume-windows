@@ -393,6 +393,9 @@ namespace CodexAutoResume
                 info.CreateNoWindow = true;
                 info.RedirectStandardOutput = true;
                 info.RedirectStandardError = true;
+                // UTF-8, as the script writes it: the setup step's lines may be Korean (issue #33).
+                info.StandardOutputEncoding = Encoding.UTF8;
+                info.StandardErrorEncoding = Encoding.UTF8;
                 using (Process process = Process.Start(info))
                 {
                     Task<string> output = process.StandardOutput.ReadToEndAsync();

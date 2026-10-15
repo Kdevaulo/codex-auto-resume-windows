@@ -577,7 +577,7 @@ BRIDGE_CASES = {
         Case("a kind that is never recovered", {"category": "unclassified"}),
         Case("a setting that does not exist", {"category": "usage_limit",
                                                "changes": {"no_such_setting": 1}}),
-        # v0.6.15-beta.2: one waiting recovery's words for this time, after the continuation - and refused ones.
+        # v0.6.16-beta.3: one waiting recovery's words for this time, after the continuation - and refused ones.
         Case("words for this time after the continuation", {"category": "usage_limit",
                                                              "once_words": "Then run the tests, please."}),
         Case("words for this time that could not be stored are reported", {"category": "usage_limit",
@@ -638,7 +638,7 @@ BRIDGE_CASES = {
         Case("the text must be named, even to take it away", {"thread_id": T1}),
         Case("taken away", {"thread_id": T1, "text": None}),
         Case("not a conversation id", {"thread_id": "latest", "text": "go"})],
-    # v0.6.15-beta.2: one waiting recovery's words for this time, from its row in the Dashboard only.
+    # v0.6.16-beta.3: one waiting recovery's words for this time, from its row in the Dashboard only.
     "once-words": [
         Case("none yet", {"interruption_id": WAITING_RESET}),
         Case("words for one waiting recovery",

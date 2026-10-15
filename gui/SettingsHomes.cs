@@ -57,7 +57,7 @@ namespace CodexAutoResume
         }
 
         /// From a status read (ApplyStatus): the homes and what the watcher found of each, and whether watching a
-        /// second home is unproven on the Codex in force (MH, measured on 0.158 only).
+        /// second home is unproven on the Codex in force (MH, measured up to 0.162).
         private void ApplyHomesStatus(Dictionary<string, object> status)
         {
             if (homesCard == null || status == null) return;
@@ -70,7 +70,7 @@ namespace CodexAutoResume
             }
             homesShown = shown;
             ShowLine(homesWarning, Equals(Get(view, "unmeasured"), true)
-                ? S("homes.unmeasured", "Watching a second Codex home was proven on Codex 0.158; on this Codex it is unproven.")
+                ? S("homes.unmeasured", "Watching a second Codex home was proven on Codex 0.162; on this Codex it is unproven.")
                 : "");
             ShowHomes();
         }

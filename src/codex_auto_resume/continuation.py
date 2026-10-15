@@ -509,7 +509,7 @@ def _settings_metadata(values, row, limits, environ):
 
 
 # ---------------------------------------------------------- words for this time
-# v0.6.15-beta.2: a person's own words for one waiting interruption (oncewords.py), added once after the
+# v0.6.16-beta.3: a person's own words for one waiting interruption (oncewords.py), added once after the
 # continuation that interruption would send anyway - one blank line between - and filled in as a Custom message
 # is, from the same record. They are a Custom message in every way (A27), and like one they are only ever added
 # to a category that is continued.

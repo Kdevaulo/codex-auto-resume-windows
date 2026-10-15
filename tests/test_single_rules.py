@@ -289,6 +289,25 @@ class OpeningTests(unittest.TestCase):
             "control, reducing": LegacyStore.__name__,
         })
 
+    def test_a_schema_4_state_under_its_watcher_is_opened_as_that_watchers(self):
+        """v0.6.11 to v0.6.15 write schema 4. While such a watcher still runs, the command line - the
+        installer's step that reads a setting, and the reducing actions - opens its state as it opens
+        a v0.5 or v0.6.0 one, without upgrading it (issue #33: "Not a state an older watcher owns")."""
+        from codex_auto_resume.store import downgrade_state
+        thread_id = "0a1b2c3d-0002-7000-8000-00000000000a"
+        paths = self.home()
+        with Store(paths.state_dir) as store:
+            store.register(detection("b" * 64, thread_id), 100.0)
+        downgrade_state(paths.state_dir, 4)
+        with an_older_watcher(paths.state_dir):
+            opened = self.opened(self.openers()["cli"], paths)
+            self.assertIsInstance(opened, LegacyStore)
+            self.assertEqual(opened.version, 4)
+            self.assertIn("enabled", opened.settings())
+            opened.cancel_thread(thread_id, 200.0)
+            self.assertIn(thread_id, opened.disabled_threads())
+        self.assertEqual(self.version(paths), 4, "nothing migrates under an older watcher")
+
     def test_a_newer_or_damaged_state_is_refused_the_same_way_whatever_the_policy(self):
         for state, app_error, code in ((lambda: self.current_state(user_version=SCHEMA_VERSION + 1), StateFromNewerVersion,
                                         "newer_state"),

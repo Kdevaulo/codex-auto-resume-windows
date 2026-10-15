@@ -71,7 +71,7 @@ from codex_auto_resume.compat.model import FAILED_HERE, INCOMPATIBLE, STATES, UN
 
 from . import policy as _policy
 from .measured import MEASURED
-from .registry import GLOBAL_HOURLY, ONCE_MORE
+from .registry import GLOBAL_HOURLY, ONCE_MORE, shown as _shown
 from .state import Refused, StaleGeneration, StateError
 from .state.spend import CHANNELS
 from .state.choices import DAY, RECENT_DAYS, RULES_LIMIT, aggregated, tag_problem
@@ -879,7 +879,7 @@ class Arming:
                     engine_version=engine_version(view))
 
     def listing(self) -> dict:
-        """Every capability as a surface shows it: where it is stored, what it is now, since
+        """Every capability as a surface shows it, in registry.SHOWN_ORDER: where it is stored, what it is now, since
         when and by whom, what a person would be agreeing to, what its statement warns of now
         and what they confirmed when they last turned it on or watched it."""
         from .runtime import SENDING              # lazily: runtime imports this module
@@ -891,7 +891,8 @@ class Arming:
         except StateError:
             rows, meta = {}, {"generation": 0, "global_hourly": GLOBAL_HOURLY}
         shown = []
-        for definition in self.registry:
+        # In the order a person reads them (registry.SHOWN_ORDER), not the order they answer in.
+        for definition in _shown(self.registry):
             row = rows.get(definition.id) or {}
             off = row.get("state", ArmingState.OFF) == ArmingState.OFF
             shown.append({

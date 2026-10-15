@@ -1,8 +1,140 @@
 # Changelog
 
+## v0.6.16-beta.2 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta...v0.6.16-beta.2)
+
+**A pre-release with one fix, for both editions: v0.6.15's, on the beta line.** It is a GitHub
+pre-release, so `releases/latest` stays v0.6.15; an installation of v0.6.15, v0.6.15-beta or
+v0.6.16-beta is offered it by *Check for updates*, which asks first and says it is tested less, and
+*Install another version...* lists it. Everything else is v0.6.16-beta's.
+
+**A plugin copy older than v0.6.11-beta.2's cannot read this version.** The bootstraps published
+from v0.6.0 to v0.6.11-beta read no number after `-beta`, so none of them can compare
+`0.6.16-beta.2` with anything; v0.6.11-beta.2's copy and every later one read it. Set up and repair
+with the installation's own copy, `%USERPROFILE%\.codex-auto-resume\app\scripts\bootstrap.ps1`, or
+with a plugin at v0.6.11-beta.2 or later.
+
+### Both editions
+
+#### Fixes
+
+- **A conversation ChatGPT hands over to the Codex app, and one Codex gives no label at all, are now
+  recovered** ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+  Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
+  That label is Codex's analytics classification, not a mark of whose a conversation is: a
+  conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
+  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
+  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
+  usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
+  taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
+  made, and the CLI's, the terminal's and VS Code's sessions still stay out, and Codex's state and
+  the conversation's own file must still say the same. Found by a person's report and the read-only
+  check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
+  carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
+  turn there that fails.
+
+### Advanced edition
+
+Nothing of its own: the fix above is in both editions.
+
+### Known issue
+
+- **Updating from v0.6.11 to v0.6.15, an error window may say "Setup did not complete ... Not a state an
+  older watcher owns", and its Korean lines may show as broken characters.** The update did finish: the files
+  are replaced, the watcher that starts brings the state up to this release's format, and Diagnostics shows
+  the new version. Nothing needs doing. One step of the installer read the state while the old watcher still
+  held it, in a format that step did not know yet, and reported that as a failure (found 2026-10-13; fixed in
+  a coming release).
+
+## v0.6.16-beta — Several conversations at once, several Codex homes, and five more ways to go on
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15-beta...v0.6.16-beta)
+
+**The pre-release v0.6.15-beta, published again under the number it now has.** Nothing in it changed
+but the number: v0.6.15 became a fix alone on v0.6.14 ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)), so the rest of the advanced
+edition is v0.6.16 and this is its first pre-release (owner, 2026-10-13). It is a GitHub pre-release,
+so `releases/latest` stays v0.6.15; an installation of v0.6.15 or v0.6.15-beta is offered it by
+*Check for updates*, which asks first and says it is tested less, and *Install another version...*
+lists it. What it carries is in the v0.6.15-beta entry below. It does not carry v0.6.15's fix yet:
+v0.6.16-beta.2, right after it, does.
+
+### Both editions
+
+Nothing new: see v0.6.15-beta, below.
+
+### Advanced edition
+
+Nothing new: see v0.6.15-beta, below.
+
+### Known issue
+
+- **Updating from v0.6.11 to v0.6.15, an error window may say "Setup did not complete ... Not a state an
+  older watcher owns", and its Korean lines may show as broken characters.** The update did finish: the files
+  are replaced, the watcher that starts brings the state up to this release's format, and Diagnostics shows
+  the new version. Nothing needs doing. One step of the installer read the state while the old watcher still
+  held it, in a format that step did not know yet, and reported that as a failure (found 2026-10-13; fixed in
+  a coming release).
+
+## v0.6.15 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15)
+
+**A fix alone, on v0.6.14 - and from v0.6.14, an ordinary update.** It is the latest release, for
+both editions, so v0.6.14's *Check for updates* offers it in the edition you have, and the plugin in
+Codex installs it too. Nothing else changed: no setting, no stored format, no capability. The owner
+had it published as a final of its own (2026-10-13) so that every v0.6.14 is offered it; the rest of
+the advanced edition, planned as v0.6.15, is now v0.6.16 ([ROADMAP.md](ROADMAP.md)), and the
+pre-release v0.6.15-beta is published again as v0.6.16-beta.
+
+**From v0.6.15-beta, it is offered too, being newer by number - and it is v0.6.14's code.** Stay on
+the beta line (v0.6.16-beta.2 carries this fix) if you use what that beta added. Taken anyway, it
+brings the state v0.6.15-beta wrote back to the format v0.6.14 reads before the watcher starts, a
+copy kept beside it (`state.v5-backup-*.sqlite`): every record stays, a record of another Codex
+home is no longer acted on (one still waiting is cancelled), and while a continuation sent to
+another home may still be in its queue the watcher waits instead. The advanced edition's
+capabilities read as off, as v0.6.14 reads that beta's file.
+
+### Both editions
+
+#### Fixes
+
+- **A conversation ChatGPT hands over to the Codex app, and one Codex gives no label at all, are now
+  recovered** ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+  Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
+  That label is Codex's analytics classification, not a mark of whose a conversation is: a
+  conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
+  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
+  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
+  usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
+  taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
+  made, and the CLI's, the terminal's and VS Code's sessions still stay out, and Codex's state and
+  the conversation's own file must still say the same. Found by a person's report and the read-only
+  check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
+  carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
+  turn there that fails.
+
+### Advanced edition
+
+Nothing of its own: the fix above is in both editions.
+
+### Known issue
+
+- **Updating from v0.6.15-beta, an error window may say the update did not finish.** It did: the files are
+  replaced, the watcher that starts brings the state back to the format this release reads (a copy kept), and
+  Diagnostics shows v0.6.15. Nothing needs doing. One step of the installer read the state before the new
+  watcher had converted it, and reported that as a failure (found 2026-10-13; fixed in a coming release).
+
 ## v0.6.15-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15-beta)
+
+**Published again as v0.6.16-beta (2026-10-13).** Built from main 43494538 and published on 2026-10-11;
+when v0.6.15 became a fix alone on v0.6.14 two days later, this pre-release's content was published again,
+unchanged, as v0.6.16-beta. Its page and archives stay as they were, and *Check for updates* no longer offers
+it: v0.6.15 and v0.6.16-beta are both newer.
 
 **A pre-release, the first of v0.6.15 (stage 3c).** It is a GitHub pre-release, so `releases/latest` stays
 v0.6.14; an installation of v0.6.14 is offered it by *Check for updates*, which asks first and says it is tested
@@ -32,8 +164,8 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
 - **Only the Dashboard writes them.** Codex's `update_settings` refuses the field, and no Codex reply carries the
   paths. Restore defaults keeps them. Removing a home cancels the recoveries waiting in it (the owner's answer), and
   one already in Codex's queue is watched until it settles.
-- **Measured on 0.158 only.** MH, a second home reached by the desktop app, passed on codex-cli 0.158; on a newer
-  Codex the card says it is unmeasured until it is measured again.
+- **Measured up to 0.162.** MH, a second home reached by the desktop app, passed on codex-cli 0.158 and again on
+  codex-cli 0.162.0-alpha.17.2; on a Codex newer than 0.162 the card says it is unmeasured until it is measured again.
 
 ### Advanced: several conversations at once
 
@@ -71,10 +203,31 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
   your own message when a limit resets* is revision 2 for it, and asks to be read again.
 - **Longer messages.** *Longer reset messages* is now *Longer messages*, revision 2: it lets a queued message be up to
   8,154 characters too.
+- **Three capabilities also name H2.** *Short retries when Codex is at capacity* moves A20's caps, which are the
+  engine's, and *Rules for Codex's error codes* and *Retry failures it cannot name* retry failures nothing classified:
+  H2 says no setting can do either, so their statements now name H2 beside the rest. Each is revision 2, and one you
+  turned on turns off until you confirm its statement again.
 - **An edited message is yours.** A message you edit in Codex's queue is left there, never deleted and never counted
   against the capability that sent it.
 - **A watched capability's log** keeps its newest 200 lines (was 250), so every capability watched at once still fits
   inside the journal.
+- **The Advanced features page lists them by importance**, the compatibility report first: then what gets work going
+  again after a usage limit by itself, what saves you work, the other common failures, and last the rare cases and
+  expert settings (the owner's order). A capability's warnings never move it down.
+
+### Measured again on codex-cli 0.162.0-alpha.17.2
+
+Every measurement was made again on the Codex in force (2026-10-10, [`docs/evidence/live/`](evidence/live/)). MW,
+M1, M5, M6, M7, MA and MH passed again, M2b and MP1 to MP3 passed for the first time, and M2, M3 and M4 failed again.
+What follows from it:
+
+- **Several Codex homes** no longer say they are unmeasured on this Codex (MH).
+- **The goal continuation** also acts on a conversation the app holds where M2b passed: it sets the paused goal
+  active, then adds the continuation to the conversation's queue. Its statement says so at revision 2, and one you
+  turned on asks to be confirmed again.
+- **The panel beside the chat** passed MP1 to MP3, so the [guide](GUIDE.md#the-panel-beside-the-chat) describes it now.
+- A capability whose measurement passed on this Codex shows no warning for it here; on any other version it still
+  does.
 
 ### Fixes
 
@@ -84,8 +237,8 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
 
 ### Known limits
 
-- MQ, ME, MS, MK and MT are not measured yet, and MH is to be measured again on the Codex in force: every capability
-  that rests on one says so as a warning you confirm.
+- MQ, ME, MS, MK and MT are not measured yet, and MU, MN and MR - what the reset credit and the message at a reset
+  rest on - are not settled: every capability that rests on one says so as a warning you confirm.
 - The Dashboard's Pending list shows a continuation queued for opening as Codex's own queued row; it does not yet say
   that it runs when you open the conversation.
 

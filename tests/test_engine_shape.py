@@ -104,7 +104,7 @@ METHODS = {
     # v0.6.15-beta: one queued for when its conversation is opened (engine/foropen.py).
     "for_open", "_open_reason", "_for_open_rests", "_not_for_open",
     "_record_claim", "_record_problem", "_record_sent", "_watch_record",
-    # v0.6.15-beta.2: the words for this time, added once, spent at the send, deleted when not waiting.
+    # v0.6.16-beta.3: the words for this time, added once, spent at the send, deleted when not waiting.
     "_once_words", "_spend_once_words", "_prune_once_words",
 }
 

@@ -74,7 +74,7 @@ _MESSAGES = {
     ("loaded", None): "loaded",
     ("queue_submission_started", None): "reserved interruption; submitting continuation via codex queue",
     ("continuation_submitted", None): "continuation submitted",
-    # v0.6.15-beta.2: the words for this time a person added for one waiting recovery (oncewords.py) - never the words.
+    # v0.6.16-beta.3: the words for this time a person added for one waiting recovery (oncewords.py) - never the words.
     ("once_words_sent", None): "the words for this time go with this continuation, and are deleted",
     ("once_words_kept", None): "the words for this time could not be taken off; this continuation goes without them",
     ("once_words_unavailable", None): "the words for this time could not be checked; nothing is deleted",

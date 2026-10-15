@@ -109,11 +109,15 @@ files share something in one interpreter - a fixed temporary path, the working d
 environment, a module global, a setting one of them changes and never puts back - and the fix is to make
 them independent, never to keep them in one part.
 
-After adding a test file or changing how long one takes, refresh the durations so the parts stay even.
-Each lane has a table of its own, because one file can take one lane much longer than another. The
-figures in the repository are GitHub's runners', where CI's parts run: every part the tests workflow
-(`.github/workflows/test.yml`) runs writes what each of its files took with `--seconds` and keeps it as an
-artifact for 30 days, and `--merge-seconds` takes a run's into the durations:
+The durations keep the parts even, and they refresh themselves. Each lane has a table of its own,
+because one file can take one lane much longer than another. The figures in the repository are GitHub's
+runners', where CI's parts run: every part the tests workflow (`.github/workflows/test.yml`) runs writes
+what each of its files took with `--seconds` and keeps it as an artifact for 30 days. After every green
+run on `dev`, `.github/workflows/durations.yml` reads that run's files with `--refresh-seconds`, and when
+a new deal would make some lane's longest part shorter by at least 10 % and at least 3 minutes, it
+commits the new table to `dev` and runs the tests there again. It writes only while `dev` is still the
+commit it measured, and never to `main`. By hand - a run on another branch, or a gain too small for
+the workflow - `--merge-seconds` takes a run's into the durations whatever the gain:
 
 ```bash
 gh run download <run id> -p 'seconds-*' -D seconds
@@ -126,6 +130,11 @@ from a run on your own machine, into the lane it ran, with your machine's times 
 runners'. A file a lane's table lacks is dealt by the figure for every lane, and a file never measured
 at all round-robin after the measured ones. `--list --parts 8` shows the deal, and `--lane` another
 lane's.
+
+A failed run on `main` gets one more try: `.github/workflows/rerun-once.yml` reruns its failed jobs
+once, on the first attempt only. A runner's hiccup then does not leave the README's badge saying
+failing, and a fault that comes back fails the second attempt too and stays on the badge. It checks
+nothing out and runs nothing of the repository's.
 
 ## Measuring the window
 

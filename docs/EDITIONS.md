@@ -121,10 +121,10 @@ Twenty-one: sixteen that change how a recovery is made or what follows a turn, t
 time you pick - the two at a usage reset, and queued messages - and two actions: Longer messages, which
 only lets a message be longer, and the compatibility report, which only you start. Four rest on a
 measurement each that was made - the first three, and queue for when a conversation is opened - seven on
-measurements not made yet, and the other ten on none. Each measurement made was made once,
-by hand, on the owner's machine, on `codex-cli 0.158.0-alpha.2.1`; its record is in
-[`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a measurement not
-made yet, a capability's statement carries the warning that it was not measured there.
+measurements not made yet, and the other ten on none. Each measurement made was made by hand, on the
+owner's machine, first on `codex-cli 0.158.0-alpha.2.1` and again on `codex-cli 0.162.0-alpha.17.2`;
+its record is in [`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a
+measurement not made yet, a capability's statement carries the warning that it was not measured there.
 
 ### Start with Codex
 
@@ -187,15 +187,18 @@ conversation is due to continue while the Codex app does not have it open, it se
 goal active again through Codex's own app server (`thread/goal/set`), so that Codex carries the goal
 on when the app next opens the conversation. It never creates a goal and never reads or changes what
 the goal says. While the app has the conversation open, the continuation goes through Codex's queue
-as in the standard edition; setting the goal active first there waits for measurement M2b to pass
-for your version of Codex, which has not been made yet. While a goal it set active carries the
+as in the standard edition, except where measurement M2b passed for your version of Codex - so far
+`codex-cli 0.162.0-alpha.17.2`: there it sets the paused goal active first and then adds the
+continuation to the conversation's queue, as M2b did. While a goal it set active carries the
 conversation on, the standard continuation waits, for up to ten minutes, so the two do not both run.
 
 **When it helps.** When a usage limit stopped work under a goal and you do not keep that
 conversation open: in the standard edition the goal stays paused until you resume it yourself.
 
 **What it risks.** Measurement M2 found that a goal set active this way is not taken up while the app
-has the conversation open, which is why it acts only where the app does not. In the same measurement
+has the conversation open, which is why, unless M2b passed for your version of Codex, it acts only
+where the app does not; where M2b passed it acts there too, setting the goal active and then queueing
+the continuation. In the same measurement
 the goal was live again once the app loaded the conversation, as its statement says, though the
 record in [`docs/evidence/live/`](evidence/live/) keeps only the failing verdict; nobody has yet
 followed Codex carrying such a goal on by itself as the app opens the conversation. Another version
@@ -210,7 +213,9 @@ Codex to stop it.
 **Ceilings.** 12 a day, and 3 in any one conversation.
 
 **Measurement M2: failed**, for a conversation the app holds; its statement shows that as a warning.
-M2b, which would let it act while the app holds the conversation, has not been made.
+**Measurement M2b: passed** on `codex-cli 0.162.0-alpha.17.2` - a goal set active beside a queued turn
+carries on while the app holds the conversation - so on that version it acts there too; on any other,
+a conversation the app holds gets the standard continuation alone.
 
 Where the goal continuation and the marker-free continuation are both on and the goal applies, the
 goal continuation carries the send.
@@ -237,8 +242,9 @@ hours on the clock, 48 times a day, or sooner than a minute apart.
 
 **Departs from** [A20](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (five continuations a
 conversation in 24 hours, 15 minutes apart), A21 (the attempt, no-progress and continuation budgets),
-A22 (waits come only from the retry timing you chose) and [B9](STANDARDS.md#b-what-it-reads-and-how)
-(only a failure's kind is kept: this also reads Codex's own error code, never its words).
+A22 (waits come only from the retry timing you chose), [B9](STANDARDS.md#b-what-it-reads-and-how)
+(only a failure's kind is kept: this also reads Codex's own error code, never its words) and
+[H2](STANDARDS.md#h-user-control) (nothing can move a limit the program fixes: A20's are the engine's).
 
 **Ceilings.** 48 a day, and 48 in any one conversation - the one capability whose conversation
 ceiling is above the standard edition's five, because it departs from A20.
@@ -264,7 +270,8 @@ another version. Removing a rule ends what it took up and has not sent.
 
 **Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (a failure it cannot classify is never
 retried), A13 (only the classified kinds are recovered), A14 (anything unclassified is never
-retried), A26 (continuation text only for a kind that is recovered) and B9.
+retried), A26 (continuation text only for a kind that is recovered), B9 and
+[H2](STANDARDS.md#h-user-control) (nothing can retry an unknown failure: a rule is a setting of yours).
 
 **Ceilings.** 24 a day, and 5 in any one conversation.
 
@@ -287,8 +294,9 @@ conversation tried again than waited for you.
 again repeats something a person should have decided. A sample keeps a code Codex chose, which may say
 more than the program's own words. Samples are kept 90 days at most.
 
-**Departs from** 0.5, A13, A14, A26, B9 and [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps)
-(state holds only the program's own fixed words, never a code Codex chose).
+**Departs from** 0.5, A13, A14, A26, B9, [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps)
+(state holds only the program's own fixed words, never a code Codex chose) and
+[H2](STANDARDS.md#h-user-control) (nothing can retry an unknown failure).
 
 **Ceilings.** 12 a day, and 3 in any one conversation.
 

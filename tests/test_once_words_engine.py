@@ -1,4 +1,4 @@
-"""v0.6.15-beta.2: words for this time, as the engine adds them - once, to one interruption, and never on their own.
+"""v0.6.16-beta.3: words for this time, as the engine adds them - once, to one interruption, and never on their own.
 
 A person may add words for one waiting recovery in the Dashboard (oncewords.py). The engine reads them when it
 builds that recovery's next continuation, before the claim (A26), and puts them after the continuation it would

@@ -200,6 +200,10 @@ $ScriptClock = [Diagnostics.Stopwatch]::StartNew()
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
+# Text in and out as UTF-8: the installed setup's lines are UTF-8, PowerShell 5.1 would decode them by the
+# console's code page (949 on a Korean Windows: broken characters, issue #33), and the Dashboard and
+# compat/evaluator.py read this script's output as UTF-8. A process with no console to set is no failure.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 
 $PluginRoot = Split-Path -Parent $PSScriptRoot
 $AllowedHosts = @('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com')
@@ -281,7 +285,7 @@ $PolicyValues = @('DisableAutoResume', 'ForceObserveOnly', 'DisableUpdateCheck',
 # target on schema 4 or 3 is offered with the state converted first (downgrade-state --to <its schema>,
 # the word `convert3` on its row, which has meant "converted first" since schema 3 was the only older
 # one); a target on any other is not offered at all.
-$StateSchemaSince = @(@('0.6.15-beta', 5), @('0.6.11-beta', 4), @('0.6.0', 3))
+$StateSchemaSince = @(@('0.6.16-beta', 5), @('0.6.15', 4), @('0.6.15-beta', 5), @('0.6.11-beta', 4), @('0.6.0', 3))
 # The advanced settings' form from each version on, newest first; the first row is this version's
 # own. An advanced target on an older form cannot read them: every advanced feature is off there.
 $AdvancedStateSince = @(@('0.6.11-beta.2', 2), @('0.6.11-alpha', 1))

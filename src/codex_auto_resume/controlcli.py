@@ -90,7 +90,7 @@ WITH_ARGUMENT = ("update", "enabled", "startup", "cancel", "reset-budget", "retr
                  # v0.6.12: the power action armed - from the Dashboard, which is this bridge's only
                  # caller that arms (H14) - and turned off.
                  "power-arm", "power-disarm",
-                 # v0.6.15-beta.2: one waiting recovery's words for this time - read, set or taken away.
+                 # v0.6.16-beta.3: one waiting recovery's words for this time - read, set or taken away.
                  "once-words")
 # Big enough for the largest Save the settings layer accepts: eight Custom messages of 2000
 # characters each, and the window writes every line break as a six-character escape, so a

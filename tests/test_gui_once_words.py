@@ -1,4 +1,4 @@
-r"""v0.6.15-beta.2: words for this time in the Dashboard - the Pending row's menu, the dialog, and the row's note.
+r"""v0.6.16-beta.3: words for this time in the Dashboard - the Pending row's menu, the dialog, and the row's note.
 
 A waiting task's menu on Pending offers "Add words for this time..." - or, when it has some, "Change words for this
 time..." and "Remove words for this time" - after "Message for this conversation...". The dialog is a small one in

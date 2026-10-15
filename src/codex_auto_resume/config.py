@@ -100,7 +100,7 @@ class Paths:
         self.status_file = self.state_dir / "status.json"
         # v0.6.12: the power action after usage-limit recoveries, armed in the Dashboard (control/poweraction.py).
         self.power_action_file = self.state_dir / "power-action.json"
-        # v0.6.15-beta.2: the words for this time a person added for one waiting recovery (oncewords.py).
+        # v0.6.16-beta.3: the words for this time a person added for one waiting recovery (oncewords.py).
         self.once_words_file = self.state_dir / "once-words.json"
         # v0.6.11: the advanced edition's own state, in one directory of its own under config/,
         # carrying the same marker config/ does. Core never writes there and the standard edition

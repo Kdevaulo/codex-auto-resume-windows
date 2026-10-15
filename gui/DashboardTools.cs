@@ -1,5 +1,5 @@
 // Codex Auto Resume - v0.6.11's own Dashboard tools: a task's postponement taken away, a message for one
-// conversation, the log searched, who may open the state folder, and Show me what happens - and v0.6.15-beta.2's
+// conversation, the log searched, who may open the state folder, and Show me what happens - and v0.6.16-beta.3's
 // words for this time, added once to one waiting task's next continuation.
 //
 // Each only asks the bridge, and each acts on exactly what the person chose: a row's own record and
@@ -218,7 +218,7 @@ namespace CodexAutoResume
         // The last conversation dialog's text box, for LayoutAudit.
         private SoftTextArea conversationArea;
 
-        // ------------------------------------------------------------ words for this time (v0.6.15-beta.2)
+        // ------------------------------------------------------------ words for this time (v0.6.16-beta.3)
         /// Whether a row has words for this time, as the listing says: that it has them, never what they say.
         internal static bool HasOnceWords(Dictionary<string, object> row)
         {
@@ -401,7 +401,7 @@ namespace CodexAutoResume
         // The last words-for-this-time dialog's text box, for LayoutAudit.
         private SoftTextArea onceWordsArea;
 
-        /// v0.6.15-beta.2: under a task's checks, that words for this time go with its next continuation - never the words.
+        /// v0.6.16-beta.3: under a task's checks, that words for this time go with its next continuation - never the words.
         private static string WithOnceWords(Dictionary<string, object> row, string note, string said)
         {
             if (!HasOnceWords(row)) return note;
