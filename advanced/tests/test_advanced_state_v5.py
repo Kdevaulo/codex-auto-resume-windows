@@ -59,7 +59,7 @@ class VersionFiveTests(StateCase):
         self.assertEqual(state.meter(), {})
         state.close()
         with contextlib.closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 5)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.SCHEMA_VERSION)
             self.assertEqual(AdvancedState._tables(connection), schema_module.TABLES)
             self.assertEqual(connection.execute("SELECT * FROM options").fetchall(), [("test_wake", "attempts", 2)])
             self.assertEqual(connection.execute("SELECT answer_id FROM continuations").fetchall(), [(KEY,)])
@@ -78,7 +78,7 @@ class VersionFiveTests(StateCase):
         state.close()
         path = self.paths.advanced_dir / schema_module.FILE_NAME
         with contextlib.closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 5)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.SCHEMA_VERSION)
             self.assertEqual(connection.execute("SELECT count(*) FROM meter").fetchone()[0], 1)
         before = path.read_bytes()
         from unittest.mock import patch

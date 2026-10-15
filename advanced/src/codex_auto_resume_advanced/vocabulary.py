@@ -434,6 +434,41 @@ class ObservedWord(StrEnum):
     NEITHER = "neither"
 
 
+class RunEnd(StrEnum):
+    """How a turn run here ended (v0.6.16-beta.4, codex/headless.py): it completed, failed or was interrupted - by a
+    person's Stop, or the watcher leaving - by itself; its cap ended it; the Codex app started and it gave way (Q3);
+    nothing was left to follow it (lost); or the conversation's saved settings were refused before anything started."""
+    COMPLETED = "completed"
+    FAILED = "failed"
+    INTERRUPTED = "interrupted"
+    CAPPED = "capped"
+    YIELDED = "yielded"
+    LOST = "lost"
+    REFUSED_SETTINGS = "refused_settings"
+
+
+class ChatState(StrEnum):
+    """Where a message of the Dashboard's chat stands (v0.6.16-beta.4, state/chat.py): waiting to be handed to core,
+    in flight - claimed and sent, watched - or finished, done or cancelled. Only one waiting holds its words."""
+    WAITING = "waiting"
+    IN_FLIGHT = "in_flight"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+class ChatReason(StrEnum):
+    """Why a chat message stands where it stands: Codex took it and its turn started (delivered); Codex did not take
+    it within three minutes and it was taken back (not_taken); a Pause took it back (withdrawn); a person cancelled
+    it; chat was turned off; its conversation was switched off; or what came of it cannot be proven (unknown)."""
+    DELIVERED = "delivered"
+    NOT_TAKEN = "not_taken"
+    WITHDRAWN = "withdrawn"
+    CANCELLED = "cancelled"
+    TURNED_OFF = "turned_off"
+    CONVERSATION_OFF = "conversation_off"
+    UNKNOWN = "unknown"
+
+
 class RuleState(StrEnum):
     """Where one of the reset actions' rules stands (state/resets.py): counting the resets or fills of its
     window, due (READY) and acting or asking, held until a person says go on, or finished - done, or
