@@ -172,6 +172,99 @@ class StartForCodexTests(unittest.TestCase):
         self.assertFalse(self.paths.logs_dir.exists())
 
 
+class PlugReasonTests(unittest.TestCase):
+    """v0.6.16-beta.3, issue #31: an edition's start with Codex that was on and started nothing left
+    "off" in codex-start.log, as if nobody had turned it on. Core now asks the plug why (Plug.start_held)
+    and writes it; tells a route it named what became of it (`told`); and, asked to, looks once more a
+    few seconds after a start, so a watcher that ended at once is said too."""
+
+    setUp = StartForCodexTests.setUp
+    turn_on = StartForCodexTests.turn_on
+    logged = StartForCodexTests.logged
+
+    class Route:
+        def __init__(self):
+            self.words = []
+
+        def start(self, command):
+            return {"pid": 5150}
+
+        def told(self, word):
+            self.words.append(word)
+
+    def plug(self, *, route=None, held=None):
+        from codex_auto_resume.domain.plug import DEFER, Plug
+
+        class Fake(Plug):
+            def start_route(self, request):
+                return DEFER if route is None else route
+
+            def start_held(self):
+                return held
+        return Fake()
+
+    def layer(self, **kwargs):
+        return control.Control(self.paths, plug=self.plug(**kwargs))
+
+    def test_a_held_start_says_why(self):
+        self.assertTrue(self.layer(held="compat_unknown").start_for_codex().endswith("; off (held: compat_unknown)"))
+        self.assertEqual(self.launches, [])
+
+    def test_nothing_on_is_still_a_bare_off(self):
+        self.assertTrue(self.layer(held=None).start_for_codex().endswith("; off"))
+
+    def test_only_a_short_closed_word_is_written(self):
+        for held in ("C:\\Users\\x", "x" * 33, "Compat", "", 7):
+            with self.subTest(held=held):
+                self.assertTrue(self.layer(held=held).start_for_codex().endswith("; off"))
+
+    def test_a_route_is_told_what_core_made_of_it(self):
+        route = self.Route()
+        self.assertIn("started pid 4242", self.layer(route=route).start_for_codex())
+        with patch.object(control.Control, "watcher_running", return_value=True):
+            self.assertTrue(self.layer(route=route).start_for_codex().endswith("already running"))
+        self.assertEqual(route.words, ["started", "running"])
+
+    def test_a_route_whose_told_raises_costs_nothing(self):
+        route = self.Route()
+        route.told = lambda word: 1 / 0
+        self.assertIn("started pid 4242", self.layer(route=route).start_for_codex())
+
+    def test_a_watcher_that_ended_at_once_gets_a_second_line(self):
+        self.turn_on()
+        from codex_auto_resume.control import codexstart
+        with patch.object(codexstart, "_process_there", return_value=False):
+            self.control.start_for_codex(confirm_seconds=1)
+        self.assertIn("the watcher started as pid 4242 ended within 1 s", self.logged()[-1])
+
+    def test_a_watcher_still_there_or_no_start_adds_no_line(self):
+        self.turn_on()
+        from codex_auto_resume.control import codexstart
+        with patch.object(codexstart, "_process_there", return_value=True), \
+                patch.object(codexstart, "CONFIRM_POLL_SECONDS", 0.01):
+            self.control.start_for_codex(confirm_seconds=0.05)
+        with patch.object(control.Control, "watcher_running", return_value=True), \
+                patch.object(codexstart, "_process_there", side_effect=AssertionError("no start, no look")):
+            self.control.start_for_codex(confirm_seconds=1)
+        self.assertEqual([line for line in self.logged() if "ended within" in line], [])
+
+    def test_the_mcp_server_asks_for_the_look(self):
+        from codex_auto_resume.control import codexstart
+        from codex_auto_resume.mcp import server as mcp_server
+        made = {}
+        real = threading.Thread
+
+        def capture(*args, **kwargs):
+            made.update(kwargs)
+            return real(target=lambda **_kw: None)
+
+        with tempfile.TemporaryDirectory() as home, \
+                patch("threading.Thread", capture), \
+                patch.object(mcp_server, "Control"), patch.object(mcp_server, "Server"):
+            mcpserver.main(["--home", home])
+        self.assertEqual(made.get("kwargs"), {"confirm_seconds": codexstart.CONFIRM_SECONDS})
+
+
 class StartWatcherFromCodexTests(unittest.TestCase):
     """v0.6.10: Start watcher, asked of the MCP server, says how long the watcher it starts lasts.
 
@@ -434,7 +527,7 @@ class SurfaceTests(unittest.TestCase):
 
     def test_the_mcp_server_starts_it_only_for_an_installation(self):
         calls = []
-        with patch.object(control.Control, "start_for_codex", lambda self: calls.append(self.paths.home)), \
+        with patch.object(control.Control, "start_for_codex", lambda self, **_kw: calls.append(self.paths.home)), \
                 patch.object(mcpserver.Server, "serve", return_value=0), \
                 tempfile.TemporaryDirectory() as home:
             self.assertEqual(mcpserver.main(["--home", home]), 0)

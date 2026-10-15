@@ -169,13 +169,15 @@ class McpTests(StartWithCodexCase):
 
 
 class RegistryMetadataTests(StartWithCodexCase):
-    def test_it_declares_no_journal_codes_of_its_own(self):
-        """Nothing ever writes swc.started or swc.refused: the journal is the runtime's own -
-        ACTED where core takes the route, WOULD_HAVE where it is watched - so the definition
-        declares no codes of its own, and none can be formed from it."""
-        self.assertEqual(START_WITH_CODEX.codes, ())
-        self.assertIsNone(START_WITH_CODEX.code("started"))
-        self.assertIsNone(START_WITH_CODEX.code("refused"))
+    def test_its_codes_are_every_outcome_core_tells_and_held(self):
+        """v0.6.16-beta.3 (issue #31): what core made of a route it named is journalled in the
+        capability's own codes, so each word core tells (control/codexstart.OUTCOMES, and "ended"
+        for a watcher gone at once) is one of them, and so is `held`, for a start it did not name."""
+        from codex_auto_resume.control import codexstart as core_start
+        told = {word for _opening, word in core_start.OUTCOMES} | {"ended"}
+        self.assertLessEqual(told, set(START_WITH_CODEX.codes))
+        self.assertIn("held", START_WITH_CODEX.codes)
+        self.assertEqual(START_WITH_CODEX.code("started"), "swc.started")
 
     def test_the_listing_marks_whether_a_capability_sends(self):
         """START_ROUTE is not a sending point, so start-with-Codex spends no unit and its ceilings
@@ -199,9 +201,108 @@ class EditionRoundTripTests(StartWithCodexCase):
                          "the standard store was never opened")
 
 
-class CoreCarryOutTests(StartWithCodexCase):
-    """The whole path: core reaches P9, the advanced plug names the route, core builds the command
-    line from the stable launcher and carries it out, and writes the one content-free line."""
+def swc_codes(runtime):
+    return [line["code"] for line in runtime.state.journal(capability=CAP)]
+
+
+def stale_view():
+    from codex_auto_resume.compat.report import unusable_view
+    return unusable_view("stale", engine={"found": True, "version": ENGINE})
+
+
+class NoWatcherReportTests(StartWithCodexCase):
+    """Issue #31: after a Windows restart nothing had written the watcher's compatibility report for
+    hours - only a running watcher writes it - so the report read as stale, every grade UNKNOWN, and an
+    armed start-with-Codex was held back (compat_unknown) at every Codex start, answering DEFER with no
+    journal line and "off" in codex-start.log. The capability that exists to start the watcher needed
+    what only the running watcher provides."""
+
+    def setUp(self):
+        super().setUp()
+        self.live = ac.view(state="COMPATIBLE", capability="engine_present", version=ENGINE)
+        self.checked = []
+
+    def options(self, *definitions):
+        found = super().options(*definitions)
+
+        def live():
+            self.checked.append(1)
+            return self.live
+        found["live"] = live
+        return found
+
+    def test_with_no_usable_report_codex_is_checked_here_and_the_route_is_named(self):
+        runtime = self.armed_runtime()
+        self.compat = stale_view()
+        route = runtime.start_route(dict(JOB_ENDS))
+        self.assertIsInstance(route, StartWithCodex)
+        self.assertEqual(self.checked, [1])
+        self.assertIsNone(runtime.start_held())
+
+    def test_a_usable_report_is_used_and_codex_is_not_checked_again(self):
+        runtime = self.armed_runtime()
+        self.assertIsInstance(runtime.start_route(dict(JOB_ENDS)), StartWithCodex)
+        self.assertEqual(self.checked, [])
+
+    def test_nothing_armed_checks_nothing(self):
+        runtime = self.runtime(START_WITH_CODEX)
+        self.compat = stale_view()
+        self.assertIs(runtime.start_route(dict(JOB_ENDS)), DEFER)
+        self.assertEqual(self.checked, [])
+        self.assertIsNone(runtime.start_held())
+
+    def test_a_check_that_finds_nothing_known_still_holds_it_back_and_says_so(self):
+        """The fresh check decides as the report would: a grade nobody knows holds an armed capability
+        back. Now that is a journal line of its own, and core is told why."""
+        from codex_auto_resume.compat.report import unusable_view
+        runtime = self.armed_runtime()
+        self.compat = stale_view()
+        self.live = unusable_view("absent", engine={"found": True, "version": ENGINE})
+        self.assertIs(runtime.start_route(dict(JOB_ENDS)), DEFER)
+        self.assertEqual(runtime.start_held(), "compat_unknown")
+        self.assertIn("swc.held", swc_codes(runtime))
+        self.assertEqual(runtime.state.arming()[CAP]["state"], ArmingState.ARMED, "held back, not turned off")
+
+    def test_a_new_codex_found_by_the_check_turns_it_off_and_says_so(self):
+        runtime = self.armed_runtime()
+        self.compat = stale_view()
+        self.live = ac.view(state="COMPATIBLE", capability="engine_present", version="0.999.0")
+        self.assertIs(runtime.start_route(dict(JOB_ENDS)), DEFER)
+        self.assertEqual(runtime.start_held(), "engine_changed")
+        self.assertEqual(runtime.state.arming()[CAP]["reason"], OffReason.ENGINE_CHANGED)
+
+    def test_a_policy_that_reads_it_down_is_said(self):
+        from codex_auto_resume_advanced import policy as admin
+        runtime = self.armed_runtime()
+        self.policy = admin.Policy(allowed=frozenset())
+        self.assertIs(runtime.start_route(dict(JOB_ENDS)), DEFER)
+        self.assertEqual(runtime.start_held(), "policy")
+        self.assertIn("swc.held", swc_codes(runtime))
+
+    def test_watched_it_says_watched(self):
+        runtime = self.runtime(START_WITH_CODEX)
+        self.assertTrue(self.arm(runtime, CAP, state="shadow")["done"])
+        self.assertIs(runtime.start_route(dict(JOB_ENDS)), DEFER)
+        self.assertEqual(runtime.start_held(), "watched")
+
+    def test_the_installed_runtime_checks_codex_through_compatio_live_view(self):
+        """Production wiring: an Arming given no view reads the watcher's report and, where that
+        cannot be used, a live check - the same one the Dashboard's "Check now" makes."""
+        from codex_auto_resume import compatio
+        from codex_auto_resume_advanced.arming import Arming
+        from codex_auto_resume_advanced.state import AdvancedState
+        state = AdvancedState(self.paths, registry=Registry((START_WITH_CODEX,)), clock=lambda: self.now)
+        self.addCleanup(state.close)
+        arming = Arming(state, policy=lambda: self.policy, measured=lambda: self.measured,
+                        catalogs=self.catalogs, clock=lambda: self.now)
+        with patch.object(compatio, "live_view", return_value=dict(self.compat)) as live:
+            self.assertEqual(arming.live_view(), self.compat)
+            live.assert_called_once()
+        self.assertIsNone(Arming(state, view=lambda: {})._live, "a view handed in is never joined by a real check")
+
+
+class CoreCase(StartWithCodexCase):
+    """An installed home - the launcher there - and core's control layer over an armed plug."""
 
     def setUp(self):
         super().setUp()
@@ -215,6 +316,11 @@ class CoreCarryOutTests(StartWithCodexCase):
             generation=plug.runtime.state.meta()["generation"],
             acknowledged_version=ENGINE, warnings=[], actor="dashboard")["done"])
         return control.Control(self.paths, plug=plug), plug
+
+
+class CoreCarryOutTests(CoreCase):
+    """The whole path: core reaches P9, the advanced plug names the route, core builds the command
+    line from the stable launcher and carries it out, and writes the one content-free line."""
 
     def test_core_starts_the_watcher_outside_the_job_through_the_armed_capability(self):
         layer, _plug = self.armed_layer()
@@ -309,6 +415,70 @@ class CoreCarryOutTests(StartWithCodexCase):
             line = layer.start_for_codex()
         self.assertTrue(line.endswith("start uncertain: WMI did not answer (timeout)"), line)
         self.assertNotIn("not started", line)
+
+
+class CoreOutcomeTests(CoreCase):
+    """Issue #31: a named route used to leave `acted` and nothing else, whatever core did after -
+    so "acted" with no watcher (2026-10-13 15:55) could not be told from a start. What core made of
+    it is now in the journal as well as in codex-start.log, and a held-back start is in both."""
+
+    def run_start(self, *, running=False, wmi_code=0, confirm=0, there=True):
+        layer, plug = self.armed_layer()
+
+        def run(script, values, *, timeout):
+            if wmi_code == 0:
+                Path(values["WMI_PIDFILE"]).write_text("5150", encoding="utf-8")
+            return wmi_code
+
+        with patch.object(control.Control, "watcher_running", return_value=running), \
+                patch.object(startup, "python_launcher", return_value=Path("pythonw.exe")), \
+                patch.object(pwsh, "executable", return_value="powershell.exe"), \
+                patch.object(pwsh, "run", run), \
+                patch("codex_auto_resume.control.codexstart._process_there", return_value=there), \
+                patch("codex_auto_resume.control.codexstart.CONFIRM_POLL_SECONDS", 0.01), \
+                patch("codex_auto_resume.windows.process_context", return_value=dict(JOB_ENDS)), \
+                patch("codex_auto_resume.windows.install_in_progress", return_value=False):
+            line = layer.start_for_codex(confirm_seconds=confirm)
+        return line, swc_codes(plug.runtime), self.paths.codex_start_log.read_text(encoding="utf-8")
+
+    def test_a_start_is_journalled_as_started(self):
+        line, codes, _log = self.run_start()
+        self.assertTrue(line.endswith("started through WMI pid 5150"), line)
+        self.assertIn("swc.started", codes)
+
+    def test_already_running_is_journalled_as_that_not_as_a_start(self):
+        line, codes, _log = self.run_start(running=True)
+        self.assertTrue(line.endswith("already running"), line)
+        self.assertIn("swc.running", codes)
+        self.assertNotIn("swc.started", codes)
+
+    def test_a_wmi_refusal_is_in_both_places(self):
+        line, codes, log = self.run_start(wmi_code=121)
+        self.assertIn("not started: WMI refused (121)", line)
+        self.assertIn("not started: WMI refused (121)", log)
+        self.assertIn("swc.refused", codes)
+
+    def test_a_watcher_that_ended_at_once_is_said_in_both_places(self):
+        _line, codes, log = self.run_start(confirm=1, there=False)
+        self.assertIn("the watcher started as pid 5150 ended within 1 s", log)
+        self.assertIn("swc.ended", codes)
+
+    def test_a_watcher_still_there_adds_nothing(self):
+        _line, codes, log = self.run_start(confirm=0.05, there=True)
+        self.assertNotIn("ended within", log)
+        self.assertNotIn("swc.ended", codes)
+
+    def test_held_back_is_said_in_codex_start_log_and_the_journal(self):
+        layer, plug = self.armed_layer()
+        self.compat = stale_view()
+        with patch.object(control.Control, "watcher_running", side_effect=AssertionError("not asked")), \
+                patch.object(pwsh, "run", side_effect=AssertionError("no WMI")), \
+                patch("codex_auto_resume_advanced.arming._live_view_of", return_value=stale_view()), \
+                patch("codex_auto_resume.windows.process_context", return_value=dict(JOB_ENDS)), \
+                patch("codex_auto_resume.windows.install_in_progress", return_value=False):
+            line = layer.start_for_codex()
+        self.assertTrue(line.endswith("; off (held: compat_unknown)"), line)
+        self.assertIn("swc.held", swc_codes(plug.runtime))
 
 
 if __name__ == "__main__":

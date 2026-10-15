@@ -42,6 +42,7 @@ import sys
 
 from .. import config, controlcli, l10n, reasons as _reasons
 from ..control import Control, ControlError
+from ..control.codexstart import CONFIRM_SECONDS
 from ..domain.plug import DEFER, Surface
 from ..settings import DASHBOARD_ONLY
 from .tools import (PANEL_DISPLAY_MODES, PANEL_PREFERRED_MODE, RESOURCES, SETTINGS_UI, TOOLS, plugged_tools,
@@ -535,8 +536,10 @@ def main(argv=None) -> int:
     starter = None
     if home:
         import threading
+        # v0.6.16-beta.3 (issue #31): and a watcher it started that ends at once is said so, a few
+        # seconds on, where this server lives that long.
         starter = threading.Thread(target=control.start_for_codex, name="start-for-codex",
-                                   daemon=True)
+                                   kwargs={"confirm_seconds": CONFIRM_SECONDS}, daemon=True)
         starter.start()
     try:
         return Server(control).serve()

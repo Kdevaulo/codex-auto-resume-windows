@@ -318,6 +318,10 @@ class GuardTests(WatchCase):
                     and node.args and isinstance(node.args[0], ast.Attribute) \
                     and isinstance(node.args[0].value, ast.Name) and node.args[0].value.id == "Point":
                 asked.add(Point[node.args[0].attr])
+            # P9 (v0.6.16-beta.3) goes through the runtime's own start_route, which reads afresh and then asks.
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "start_route" \
+                    and isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "runtime":
+                asked.add(Point.START_ROUTE)
         self.assertIn(Point.GATES, asked)
         # P12 (v0.6.15-beta) is asked through the runtime's own partition, whose answer is a number: a value too.
         self.assertEqual((asked | {Point.TICK, Point.CONCURRENCY}) - set(ALTERNATIVES), set(watchlog.VALUE_POINTS))
