@@ -68,7 +68,24 @@ class Wordless(Headless):
         return {"outcome": "accepted"}
 
 
+def holding(backend):
+    """codexsim's backend, which is v0.6.10's file and asks no one who holds a conversation, given Backend.holder:
+    `holder_map` says who holds each, "unknown" for the rest, and `holder_calls` keeps every ask."""
+    backend.holder_map, backend.holder_calls = {}, []
+
+    def holder(thread_id):
+        backend.holder_calls.append(thread_id)
+        return backend.holder_map.get(thread_id, "unknown")
+    backend.holder = holder
+    return backend
+
+
 class UnheldCase(PluggedCase):
+    def fresh(self, **kwargs):
+        made = super().fresh(**kwargs)
+        holding(made.backend)
+        return made
+
     def closed(self, h=None, holder="none"):
         """A usage-limited conversation past its reset, with the Codex app closed and `holder` on its lock."""
         h = h or self.h

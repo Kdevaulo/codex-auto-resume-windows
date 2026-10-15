@@ -204,11 +204,12 @@ class OneSenderTests(unittest.TestCase):
         compared with QUEUE_FOR_OPEN, and nothing it answers is ever called."""
         asked = calls(lambda node: isinstance(node.func, ast.Attribute) and node.func.attr == "unloaded")
         self.assertEqual([(where, name) for where, name, _ in asked],
-                         [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._unloaded"),
-                          ("codex_auto_resume/engine/foropen.py", "ForOpenMixin._open_reason")])
+                         [("codex_auto_resume/engine/foropen.py", "ForOpenMixin._open_reason"),
+                          ("codex_auto_resume/engine/routes.py", "RoutesMixin._unloaded"),
+                          ("codex_auto_resume/engine/routes.py", "RoutesMixin._unheld")])
         resumed = calls(lambda node: isinstance(node.func, ast.Attribute) and node.func.attr == "resume")
         self.assertEqual([(where, name) for where, name, _ in resumed],
-                         [("codex_auto_resume/engine/delivery.py", "DeliveryMixin._resume_unloaded")])
+                         [("codex_auto_resume/engine/routes.py", "RoutesMixin._resume_unloaded")])
         self.assertEqual(ast.unparse(resumed[0][2].func.value), "route")
 
     def test_nothing_injects_items_into_a_conversation(self):

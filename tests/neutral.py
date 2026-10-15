@@ -85,6 +85,12 @@ NOT_SCENARIOS = {
     "test_plug_records": "gives every engine a plug with records of its own (P2), to hold each of their moves",
     "test_queue_for_open": "gives every engine a plug that answers QUEUE_FOR_OPEN at P16, which the neutral plug never "
                            "answers - a conversation the app does not hold waits there",
+    "test_route_unheld": "gives every engine a plug that wants P16 and names a route with the app closed (v0.6.16-beta.4), "
+                         "which the neutral plug never does - a conversation with no app waits there",
+    "test_to_session": "gives every engine a plug that answers TO_SESSION at P16 for a conversation another Codex session "
+                       "holds (v0.6.16-beta.4), which the neutral plug never answers - such a conversation waits there",
+    "test_session_kinds": "gives every engine a plug that names terminal and VS Code conversations at P18 "
+                          "(v0.6.16-beta.4), which the neutral plug never names - only the app's are detected there",
     "test_plug_record_purposes": "gives every engine a plug with continuations and messages of its own (P2), to hold "
                                  "what each purpose may and may not be sent as",
     "test_power_action": "builds an engine with no store or backend only to ask engine.activity, which reads a "

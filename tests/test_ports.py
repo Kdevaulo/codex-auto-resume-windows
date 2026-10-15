@@ -106,7 +106,9 @@ ENGINE_TO_STORE = {
 # Since v0.6.11 the send is asked of `sender`, the one name dispatch binds to the backend - or to
 # a channel the edition's plug names at P5 (tests/test_structural_invariants.py) - so both names
 # are read as this seam.
-ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "loaded", "send", "usage"}
+# v0.6.16-beta.4: and who holds a conversation while the app is not running - asked only while the plug wants P16
+# (engine/routes.py), so never by the standard edition.
+ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "holder", "loaded", "send", "usage"}
 BACKEND_NAMES = ("backend", "sender")
 # What it reads out of Codex's own files, through the source: the turns, the markers that say a
 # continuation of ours is in the queue, what a recovered turn produced, and the projection's age.

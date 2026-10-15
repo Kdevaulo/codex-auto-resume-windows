@@ -55,8 +55,9 @@ from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, Widen
 # The interface's version. The advanced package writes out the number it was written for, and
 # edition.py takes its plug only when the two agree: otherwise a hook renamed, or given another
 # argument, would be called the old way or not at all, and nothing would say so. 2: P17 and `wants`.
-# 3 (v0.6.14): P8's errand, and P2's records carried out.
-PLUG_API = 4
+# 3 (v0.6.14): P8's errand, and P2's records carried out. 4 (v0.6.15-beta): P12, QUEUE_FOR_OPEN.
+# 5 (v0.6.16-beta.4): P16 asked with the app closed, and a route that takes core's words.
+PLUG_API = 5
 
 
 POINTS = tuple(Point)
@@ -200,7 +201,12 @@ class Plug:
         conversation is notLoaded - never when it could not say. DEFER is core's own way: the
         record waits for the app to open it (A11). A route - an object with a callable `resume`
         - is carried out by core instead: the gates that follow, its one claim, the pre-send look,
-        and the route called once inside the launch guard (engine/delivery.py)."""
+        and the route called once inside the launch guard (engine/delivery.py).
+
+        From v0.6.16-beta.4 `record` says where it is asked: `app` True and `holder` "app_free" for
+        a conversation the running app does not hold; `app` False and `holder` "none" - asked only
+        while the plug wants P16, for the default Codex home - where the app is not running and
+        nothing holds the conversation's writer lock, and there only a route is taken."""
         return DEFER
 
     def eligibility(self):                            # P19
@@ -524,9 +530,11 @@ class Guarded:
             return DEFER
         try:
             resume = getattr(answer, "resume", None)
+            # v0.6.16-beta.4: a route that takes core's words says so - True itself, and nothing else.
+            words = getattr(answer, "takes_words", False) is True
         except Exception:                              # a `resume` that raises when it is looked up
             return DEFER
-        return Route(resume) if callable(resume) else DEFER
+        return Route(resume, words=words) if callable(resume) else DEFER
 
     def admission(self, failure):
         """P17: an answer of TAKE_UP, or DEFER. Core takes one only if failures.takes offered it."""

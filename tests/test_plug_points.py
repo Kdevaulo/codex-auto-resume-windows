@@ -1350,7 +1350,7 @@ PERSONS = frozenset({"cancel_interruption", "cancel_thread", "restore_budget_det
 # v0.6.11 stage 3b: and the claim of a route the plug names for a conversation not held (P16).
 MOVING = frozenset({"AnnounceMixin.transition", "AnnounceMixin._release", "DispatchMixin.dispatch",
                     "ReconcileMixin.withdraw", "ReconcileMixin.settle", "ReconcileMixin.correlate",
-                    "DeliveryMixin._resume_unloaded"})
+                    "RoutesMixin._resume_unloaded"})
 
 
 def _moves_a_record(function, call) -> bool:

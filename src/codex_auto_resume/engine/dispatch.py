@@ -25,8 +25,7 @@ from ..domain.plug import Alternative, Point
 from ..machine import OBSERVING, TERMINAL, WAITING, WATCHED
 from .reconcile import UNSENT
 
-# What the app said of a conversation it does not hold, and the reason a record waits for it with: one it could not
-# tell of is UNKNOWN, loaded_state_unknown.
+# What the app said of a conversation it does not hold, and the reason a record waits with (else UNKNOWN).
 _WAITS = {"notLoaded": "notLoaded", "elsewhere": "held_by_other_session"}
 
 
@@ -135,14 +134,13 @@ class DispatchMixin:
             if self._plugged(name, row, vector):
                 return
         app = self.backend.app_identity()
-        if not app:
+        # P16: a conversation the app does not hold waits for it to be opened (A11) - and, with no app, for the app
+        # - unless the plug names a route that continues it otherwise, which core carries out (engine/routes.py).
+        route, loaded = self._route(row, app, vector)
+        if not app and route is None:
             vector["thread_available"] = machine.gate(machine.WAIT, "desktop_app_unavailable")
             self._wait(row, "waiting_for_app", "desktop_app_unavailable", poll, vector)
             return
-        loaded = self.backend.loaded(row["thread_id"], app)
-        # P16: a conversation the app does not hold waits for it to be opened (A11), unless the
-        # plug names a route that continues it otherwise, which core carries out (engine/delivery.py).
-        route = self._unloaded(row, loaded, vector)
         if route is None and loaded != "loaded":
             # v0.6.16-beta.4: one another Codex session holds - a terminal or VS Code - waits with a reason of its own.
             reason = _WAITS.get(loaded, "loaded_state_unknown")
@@ -232,11 +230,9 @@ class DispatchMixin:
                     if not resend:
                         self.transition(current, *self.supersede_reason(current))
                     return
-                # A fresh process identity prevents a prior app's status authorizing a new app. A
-                # route is for a conversation the app does not hold, and only while it still does not.
-                if (self.backend.app_identity() != app
-                        or self.backend.loaded(current["thread_id"], app) != (
-                            "loaded" if route is None else "notLoaded")):
+                # A fresh process identity prevents a prior app's status authorizing a new app; a route only while
+                # the conversation is still not held (engine/routes.py).
+                if not self._still_where(current["thread_id"], app, route):
                     if not resend and not self._parked(current, vector):
                         self.transition(current, "waiting_for_loaded_thread", "loaded_recheck_failed", delay=60)
                     return
@@ -244,7 +240,7 @@ class DispatchMixin:
                     if not resend and not self._parked(current, vector):
                         self.transition(current, "waiting_for_usage", "usage_recheck_failed", delay=900)
                     return
-                if route is not None and route is not Alternative.QUEUE_FOR_OPEN:
+                if route is not None and route is not Alternative.QUEUE_FOR_OPEN and not route.words:
                     self._resume_unloaded(current, vector, limits, route, app, relaxed=relaxed, forced=forced)
                     return
                 # The text is decided before the claim, not after it. Building it reads catalogs
@@ -265,6 +261,11 @@ class DispatchMixin:
                 message, worded = self._plugged_text(current, message, limits)
                 plain = message                 # v0.6.16-beta.3: the words for this time, after it (engine/delivery.py)
                 message, once = (message, None) if resend else self._once_words(current, message, limits)
+                if route is not None and route is not Alternative.QUEUE_FOR_OPEN:
+                    # A route that takes words (v0.6.16-beta.4) carries these in a send's place (engine/routes.py).
+                    self._resume_unloaded(current, vector, limits, route, app, relaxed=relaxed, forced=forced,
+                                          words=(message, worded, once, plain))
+                    return
             # P5, decided before the claim like the words: core's own backend, unless the plug
             # names a channel. The one binding of the one sender; whichever it is gets the one
             # send below, after the claim and the pre-send look, inside the launch guard.

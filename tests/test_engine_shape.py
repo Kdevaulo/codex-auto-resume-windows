@@ -31,7 +31,9 @@ MIXINS = (package.OptionsMixin, package.AnnounceMixin, package.FreshnessMixin,
           package.ResendMixin,
           # and records of the edition's plug's own, tried like core's (P2).
           package.PlugRecordsMixin,
-          package.ForOpenMixin)
+          package.ForOpenMixin,
+          # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
+          package.RoutesMixin)
 
 # The forty-one methods the one class had, counted the day it was split.
 METHODS = {
@@ -110,6 +112,8 @@ METHODS = {
     "_wrap_up_markers", "persons_turns", "_only_wrap_ups_after",
     # v0.6.16-beta.3: the words for this time, added once, spent at the send, deleted when not waiting.
     "_once_words", "_spend_once_words", "_prune_once_words",
+    # v0.6.16-beta.4: P16 asked with the app closed and nothing holding the conversation, and the look made again.
+    "_unheld", "_unheld_now", "_holder", "_route", "_still_where",
 }
 
 # What `from codex_auto_resume.engine import ...` has to keep answering (app.py, the tests).

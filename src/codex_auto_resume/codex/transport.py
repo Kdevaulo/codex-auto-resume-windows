@@ -17,7 +17,7 @@ from .. import machine
 from ..domain import ids, vocabulary
 from ..win.inventory import resource_users
 from ..win.kernel import NO_WINDOW
-from .pairing import desktop_pair, engines_instead, inventory, session_kind
+from .pairing import app_running, desktop_pair, engines_instead, inventory, session_kind
 from .appserver import PROTOCOL_METHODS, Protocol
 from .errors import AdapterError
 from .usage import parse_usage
@@ -79,9 +79,10 @@ class Backend:
         # none of them ran this engine - an update that started the app's server from another
         # build - and nothing whenever that is not what the last pairing saw (app_identity).
         self.served_elsewhere = frozenset()
-        # v0.6.16-beta.4: the inventory rows the last app_identity() read - in memory only, for loaded() to tell
-        # another Codex session holding a conversation from anything unknown without reading them again.
-        self._rows = []
+        # v0.6.16-beta.4: the inventory rows the last app_identity() read - in memory only, for loaded() and holder()
+        # to tell another Codex session holding a conversation from anything unknown without reading them again -
+        # or None where that look could not read them.
+        self._rows = None
 
     def _environment(self):
         env = os.environ.copy()
@@ -189,7 +190,7 @@ class Backend:
         self.served_elsewhere = frozenset()
         try:
             self._compatible()
-            self._rows = []
+            self._rows = None
             rows = self._rows = inventory()
             try:
                 if self.require_holder:
@@ -234,6 +235,27 @@ class Backend:
             if (len(users) == 1 and users != [expected] and self.app_identity() == app_identity
                     and session_kind(self._rows, users[0], self.codex_exe)):
                 return "elsewhere"
+            return "unknown"
+        except (AdapterError, ValueError, OSError, KeyError, TypeError):
+            return "unknown"
+
+    def holder(self, thread_id):
+        """v0.6.16-beta.4: who holds conversation `thread_id`'s writer lock while the Codex app is not running - asked
+        by the engine only where its plug wants P16 (engine/delivery.py): "none" - the last app_identity() read the
+        processes and found no process of the app's package, and the Restart Manager finds no holder (B12) -;
+        "session", one holder that is another Codex session (pairing.session_kind); and "unknown" for anything else,
+        a failure included. The rows are the ones the app's pairing read: no process is started for it."""
+        try:
+            canonical_uuid(thread_id)
+            self._compatible()
+            rows = self._rows
+            if rows is None or app_running(rows):
+                return "unknown"
+            users = resource_users(self.codex_home / "thread-writer-locks" / (thread_id + ".lock"))
+            if not users:
+                return "none"
+            if len(users) == 1 and session_kind(rows, users[0], self.codex_exe):
+                return "session"
             return "unknown"
         except (AdapterError, ValueError, OSError, KeyError, TypeError):
             return "unknown"

@@ -92,7 +92,9 @@ ITEM = {_q(name): item for item, names in {
                # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
                "engine.foropen",
                # v0.6.16-beta.3: the store as a plug is shown it, off options.py's page.
-               "engine.storeview"),
+               "engine.storeview",
+               # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
+               "engine.routes"),
     "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",

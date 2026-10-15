@@ -9,6 +9,7 @@ they did:
     freshness   whether Codex is in a state worth reading
     dispatch    sending one continuation
     delivery    how it is carried, the last look before it goes, and what proves it arrived
+    routes      a conversation the app does not hold, continued by a route the plug names (P16)
     reconcile   what became of a continuation that was sent
     outcome     how the recovered turn ended, and what it costs the budgets
     announce    moving a record, and saying so
@@ -43,12 +44,13 @@ from .plugrecords import PlugRecordsMixin
 from .reconcile import SETTLED, UNSENT, ReconcileMixin, _UNDETERMINED  # noqa: F401
 from .relaxed import RelaxedMixin
 from .resend import ResendMixin
+from .routes import RoutesMixin
 from .storeview import StoreView
 
 
 class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, ReconcileMixin, OutcomeMixin, DispatchMixin,
              DeliveryMixin, GuardMixin, NoticeMixin, RelaxedMixin, ResendMixin, PlugRecordsMixin,
-             ForOpenMixin):
+             ForOpenMixin, RoutesMixin):
     """The part that decides.
     """
 

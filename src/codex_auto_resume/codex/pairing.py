@@ -135,6 +135,21 @@ def _extension_engine(path) -> bool:
     return bool(pattern.fullmatch(path))
 
 
+def app_running(rows) -> bool:
+    """Whether any process of the Codex app's package is among the inventory's rows (v0.6.16-beta.4): a main, a
+    child, or several - what makes "Codex is closed" untrue even where no one main pairs."""
+    try:
+        _app_main(rows)
+        return True
+    except AdapterError as error:
+        if str(error) != "desktop_main_missing_or_ambiguous":
+            return True
+    program_files = os.environ.get("ProgramW6432") or os.environ.get("ProgramFiles", r"C:\Program Files")
+    root = str(Path(program_files) / "WindowsApps").lower() + "\\openai.codex_"
+    return any(isinstance(row, dict) and isinstance(row.get("path"), str) and row["path"].lower().startswith(root)
+               for row in rows)
+
+
 def session_kind(rows, user, codex_exe) -> bool:
     """v0.6.16-beta.4: whether the one Restart Manager holder `user` of a conversation's writer lock is another Codex
     session - a terminal's TUI or the VS Code extension's server - rather than the app's, ours or anything unknown.

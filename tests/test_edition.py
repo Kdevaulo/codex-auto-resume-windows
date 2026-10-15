@@ -108,7 +108,7 @@ class NullPlugTests(unittest.TestCase):
         self.assertGreaterEqual(plug.PLUG_API, 1)
         # 3 (v0.6.14): P8's errand, and P2's records carried out - a package written for 2 is refused. 4
         # (v0.6.15-beta): P12's whole number of workers carried out, P2's purposes and moves.
-        self.assertEqual(plug.PLUG_API, 4)
+        self.assertEqual(plug.PLUG_API, 5)
 
 
 class RecordingPlug(Plug):
