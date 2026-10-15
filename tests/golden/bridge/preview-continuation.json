@@ -90,6 +90,46 @@
         "error": "unknown setting: no_such_setting",
         "error_code": "request_failed"
       }
+    },
+    {
+      "case": "words for this time after the continuation",
+      "argument": {
+        "category": "usage_limit",
+        "once_words": "Then run the tests, please."
+      },
+      "reply": {
+        "ok": true,
+        "result": {
+          "category": "usage_limit",
+          "locale": "en",
+          "style": "standard",
+          "source": null,
+          "text": "The task was interrupted because the usage limit was reached. Please retry.\n\nThen run the tests, please.",
+          "refusal": null,
+          "refusal_code": null,
+          "refusal_detail": null
+        }
+      }
+    },
+    {
+      "case": "words for this time that could not be stored are reported",
+      "argument": {
+        "category": "usage_limit",
+        "once_words": "{prompt}"
+      },
+      "reply": {
+        "ok": true,
+        "result": {
+          "category": "usage_limit",
+          "locale": "en",
+          "style": "standard",
+          "source": null,
+          "text": "The task was interrupted because the usage limit was reached. Please retry.",
+          "refusal": "{prompt} is not available: it would put the text you sent into the message.",
+          "refusal_code": "forbidden_placeholder",
+          "refusal_detail": "{prompt}"
+        }
+      }
     }
   ]
 }

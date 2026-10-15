@@ -609,6 +609,9 @@ class Runtime:
         states = self.states()
         answers = [flying]
         for definition in self.registry.at(Point.RECORDS):
+            if states.get(definition.id, ArmingState.OFF) == ArmingState.SHADOW:
+                self._watched_records(definition, view)
+                continue
             if states.get(definition.id, ArmingState.OFF) != ArmingState.ARMED:
                 continue
             try:
@@ -627,6 +630,21 @@ class Runtime:
                     seen.add(key)
                     found.append(record)
         return found or DEFER
+
+    def _watched_records(self, definition, view) -> None:
+        """P2 for a watched capability (v0.6.16-beta.3): each of its rows a person set up that would be handed core now -
+        as its code decides it from the stored state, writing nothing (`watched_due`) - journalled once as what it would
+        have sent, with the time; never handed, never sent, and nothing spent or read for it."""
+        would = getattr(self._code_of(definition), "watched_due", None)
+        if not callable(would):
+            return
+        try:
+            keys = would(view)
+        except Exception:
+            return                                        # a watched one's look costs nothing, and trips nothing
+        for key in keys or ():
+            if isinstance(key, str):
+                self._once(JournalCode.WOULD_HAVE, definition, Point.RECORDS, Point.RECORDS, {"interruption_id": key})
 
     def conversation_off(self, thread_id) -> None:
         """A person switched `thread_id` off, in the Dashboard, a model's tool or the command line (core's

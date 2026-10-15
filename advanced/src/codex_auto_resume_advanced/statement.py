@@ -91,6 +91,8 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "sample.status", "sample.count",
     # v0.6.14: Keep it on, what a kept-on capability noted instead of turning itself off, and Send now.
     "keep_on", "keep_on.off", "keep_on.on", "keep_on.again", "keep_on.turn_on", "keep_on.send_again",
+    # v0.6.16-beta.3: "· kept on" after a kept-on capability's state in the list.
+    "state_kept_on",
     "keep_on.turn_off", "confirm.keep_on", "confirm.send_again", "done.keep_on", "done.keep_on_off",
     "refused.not_on", "kept.statement_changed", "kept.measurement_failed", "kept.failed_here", "kept.incompatible",
     "kept.local_check_failed", "kept.hook_exception", "kept.submission_unknown", "kept.engine_changed",
@@ -108,6 +110,8 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "watchlog.answer.early", "watchlog.answer.resend", "watchlog.answer.send_now", "watchlog.answer.text",
     "watchlog.answer.sender", "watchlog.answer.tick", "watchlog.answer.start_route", "watchlog.answer.unloaded",
     "watchlog.answer.concurrency", "watchlog.answer.queue_for_open",
+    # v0.6.16-beta.3: a message a watched capability would have sent.
+    "watchlog.answer.records",
     "watchlog.answer.other",
     # v0.6.14: the reset actions (advanced/gui/AdvancedResets.cs) - the rules of a reset credit and of a message at a
     # reset, the form they are added with, each word a rule's state and reason can be said in, the questions, notes

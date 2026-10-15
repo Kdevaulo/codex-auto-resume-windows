@@ -1026,7 +1026,15 @@
           "homes.state.duplicate": "The same folder as another home",
           "homes.state.retiring": "Removing: waiting for what was sent there to settle",
           "homes.state.waiting": "Not looked at yet",
-          "why.home_removed": "Its Codex home was removed in Settings, so it will not be resumed."
+          "why.home_removed": "Its Codex home was removed in Settings, so it will not be resumed.",
+          "menu.once_words_add": "Add words for this time...",
+          "menu.once_words_change": "Change words for this time...",
+          "menu.once_words_remove": "Remove words for this time",
+          "once.title": "Words for this time",
+          "once.help": "Sent once, after the usual continuation message, the next time this task is continued. They start, speed up or skip nothing, and are deleted once they are sent or when the task ends without a send. Written only here, and sent exactly as you write them.",
+          "once.set": "Words for this time are added to this task's next continuation.",
+          "once.removed": "This task's next continuation is sent without words of yours.",
+          "explain.once_words": "Words for this time go with its next continuation, once."
         },
         "preference": "system",
         "system_language": "en",

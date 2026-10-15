@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import time
 
-from .. import machine, projects, quiet, settings
-from ..machine import WAITING
+from .. import machine, oncewords, projects, quiet, settings
+from ..machine import CLAIMED, OBSERVING, WAITING
 from ..store import TERMINAL, StoreError
 from ..windows import WakeEvent
 from .errors import (ControlError,
@@ -289,6 +289,52 @@ class ActionsMixin:
             woke = False
         return {"interruption_id": key, "thread_id": thread, "state": detail, "woke": woke,
                 "note": "nothing is sent now; every safety check still applies"}
+
+    # ------------------------------------------------------- words for this time (v0.6.16-beta.3)
+    def once_words(self, interruption_id) -> dict:
+        """One interruption's words for this time, as they are read and checked again (oncewords.py), for the
+        Dashboard's dialog alone: no MCP tool reads them and the panel never shows them."""
+        key = _identifier(interruption_id)
+        text = oncewords.OnceWords.of(self.paths).words(key)
+        return {"interruption_id": key, "set": text is not None, "text": text}
+
+    def set_once_words(self, interruption_id, thread_id, text) -> dict:
+        """Words for this time for one exact waiting recovery (v0.6.16-beta.3): `text`, added once after the next
+        continuation it sends - or None, or nothing but spaces, to take them away (always allowed: it only reduces).
+
+        A Custom message in every way (A27): refused, if it is, in the Custom message's validator's own words, and
+        only for a record that still waits - bound to its conversation as a row's click is. The Dashboard's alone,
+        from a row of Pending: no MCP tool calls this and update_settings has no such field, because words a model
+        set would be sent later, on the person's behalf. Nothing is sent now, and nothing is woken: adding words
+        starts, speeds and skips nothing."""
+        key = _identifier(interruption_id)
+        thread = _thread_id(thread_id)
+        held = oncewords.OnceWords.of(self.paths)
+        if text is None or (isinstance(text, str) and not text.strip()):
+            if not held.remove(key):
+                raise ControlError("the state is busy", code="state_busy")
+            return {"interruption_id": key, "thread_id": thread, "set": False}
+        self.validated_text(text)
+        with self._open() as store:
+            record = self._bound_record(store, key, thread)
+        state = record["state"]
+        if record["cancel_requested"]:
+            raise ControlError("that recovery was cancelled", code="cancel_requested")
+        if state in CLAIMED:
+            raise ControlError("that recovery is being sent now", code="being_sent")
+        if state in OBSERVING:
+            raise ControlError("that recovery is already running in Codex", code="observing")
+        if state not in WAITING:
+            raise ControlError("that recovery is already in Codex", code="in_flight")
+        try:
+            held.put(key, text)
+        except oncewords.OnceWordsError as exc:
+            if exc.code == "too_many_messages":
+                raise ControlError(str(exc), code="too_many_messages") from None
+            if exc.code == "state_busy":
+                raise ControlError("the state is busy", code="state_busy") from None
+            raise ControlError(str(exc), code="request_failed") from None
+        return {"interruption_id": key, "thread_id": thread, "set": True}
 
     def set_thread_tier(self, thread_id, tier, *, interruption_id=None, actor: str = "gui") -> dict:
         """How much one conversation asks before it is resumed: a tier of its own, or None for

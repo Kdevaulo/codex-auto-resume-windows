@@ -19,7 +19,7 @@ import time
 import traceback
 import uuid
 
-from .. import compatio, config, edition, l10n, managed, needsyou, notifier, settings as policy
+from .. import compatio, config, edition, l10n, managed, needsyou, notifier, oncewords, settings as policy
 from ..codex import LocalSource
 from ..codex.pairing import app_engines
 from ..domain.plug import DEFER, EXTRA, Surface, guard
@@ -286,6 +286,8 @@ class App(WatchLoop):
         kwargs["dispatch_lock"] = dispatch_lock if dispatch_lock is not None else self.dispatch_lock
         # v0.6.15-beta (P12): a store of its own for each worker that waits for a receipt (engine/launches.py).
         kwargs["open_store"] = self.worker_store
+        # v0.6.16-beta.3: the words for this time a person added in the Dashboard, beside the state (oncewords.py).
+        kwargs["once_words"] = oncewords.OnceWords.of(self.paths)
         engine = Engine(store, source, self.backend(), plug=self.plug, **kwargs)
         engine.apply_policy(self._stored, self.managed)
         self._observe_only(engine)
@@ -506,7 +508,7 @@ class App(WatchLoop):
         engine = Engine(store, source, backend, plug=None, dispatch_lock=self.dispatch_lock, home_key=key,
                         log=EngineLog(self.logger), notify=Toasts(self._notifier(source), self.logger),
                         language=l10n.current(), engine_state=self.engine_state, home_lock=held,
-                        connectivity=network.internet)
+                        connectivity=network.internet, once_words=oncewords.OnceWords.of(self.paths))
         engine.apply_policy(self._stored, self.managed)
         return engine
 

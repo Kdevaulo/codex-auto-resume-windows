@@ -273,6 +273,21 @@ namespace CodexAutoResume
                                                 delegate { EditConversationMessage(row); });
             message.Enabled = idle;
             pendingMenu.Items.Add(message);
+            // v0.6.16-beta.3: words added once to this task's next continuation, after the conversation's message - and,
+            // when it has some, taking them away.
+            bool worded = HasOnceWords(row);
+            var once = new ToolStripMenuItem(worded ? S("menu.once_words_change", "Change words for this time...")
+                                                    : S("menu.once_words_add", "Add words for this time..."), null,
+                                             delegate { EditOnceWords(row); });
+            once.Enabled = CanAddOnceWords(row, idle);
+            pendingMenu.Items.Add(once);
+            if (worded)
+            {
+                var unsay = new ToolStripMenuItem(S("menu.once_words_remove", "Remove words for this time"), null,
+                                                  delegate { SaveOnceWords(null, row, null); });
+                unsay.Enabled = idle;
+                pendingMenu.Items.Add(unsay);
+            }
             return true;
         }
 
@@ -857,7 +872,9 @@ namespace CodexAutoResume
                         word = S("explain.offline", "No internet (Windows reports)");
                     rows.Add(new[] { S("gate." + name, name.Replace('_', ' ')), word, code });
                 }
-            explainList.SetRows(rows, S("explain.not_checked", "Not checked yet"), WithUsage(row, ExplainNote(row, gates)));
+            explainList.SetRows(rows, S("explain.not_checked", "Not checked yet"),
+                                WithOnceWords(row, WithUsage(row, ExplainNote(row, gates)),
+                                              S("explain.once_words", "Words for this time go with its next continuation, once.")));
         }
 
         /// v0.6.11: under a usage limit's checks, what the watcher last read of Codex's usage, with its age - and first,

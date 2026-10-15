@@ -61,6 +61,7 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         self.watch()
         self.observe_all()
         self.watch_resent()             # v0.6.14: a resend found twice; nothing for the standard edition
+        self._prune_once_words()        # v0.6.16-beta.3: words of a recovery no longer waiting, deleted
         # v0.6.15-beta: a Codex home taken out of Settings only watches what it sent until that settles.
         if self.retiring:
             return

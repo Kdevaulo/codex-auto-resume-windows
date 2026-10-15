@@ -52,11 +52,12 @@ namespace CodexAutoResume
             });
         }
 
-        /// The open capability's card, while keep_going is on: the conversations kept going, then the form.
+        /// The open capability's card, while keep_going is on or watched (v0.6.16-beta.3): the conversations kept going, then
+        /// the form.
         private void BuildKeepGoing(Dictionary<string, object> item)
         {
             ForgetKeepGoingCard();
-            if (Str(item, "id") != KeepGoingId || Str(item, "state") != StateArmed || advancedKeepGoing == null) return;
+            if (Str(item, "id") != KeepGoingId || !Standing(item) || advancedKeepGoing == null) return;
             TableLayoutPanel card = NewGroup(Word("page.keep.title", "Conversations kept going"), advancedStack);
             int shown = 0;
             foreach (object entry in Items(advancedKeepGoing, "rows") ?? new List<object>())
