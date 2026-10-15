@@ -357,6 +357,7 @@
   "page.watchlog.answer.hold": "Bekletmek",
   "page.watchlog.answer.other": "Başka bir şey",
   "page.watchlog.answer.queue_for_open": "Konuşma açıldığında çalışmak üzere sıraya koydu",
+  "page.watchlog.answer.records": "Göndereceği bir mesajınız",
   "page.watchlog.answer.resend": "Bir kez daha göndermek",
   "page.watchlog.answer.send_now": "Şimdi göndermek",
   "page.watchlog.answer.sender": "Kendi yoluyla göndermek",

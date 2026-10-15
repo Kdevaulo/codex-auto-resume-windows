@@ -357,6 +357,7 @@
   "page.watchlog.answer.hold": "待たせる",
   "page.watchlog.answer.other": "その他",
   "page.watchlog.answer.queue_for_open": "会話が開かれたときのためにキューに入れた",
+  "page.watchlog.answer.records": "送っていたはずのあなたのメッセージ",
   "page.watchlog.answer.resend": "もう一度送る",
   "page.watchlog.answer.send_now": "今すぐ送る",
   "page.watchlog.answer.sender": "独自の方法で送る",

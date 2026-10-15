@@ -19,7 +19,7 @@ At P2, each conversation's prompts in their order (`position`), the first still 
   (`missed`); an occurrence not sent a day after it fell due is used as expired, and the series goes on.
 
 The words leave the disk at a one-time prompt's send, at a series' end, at a cancel, at expiry, when the conversation
-is switched off and when this stands anywhere but on (state/prompts.py), and never reach a log, the journal,
+is switched off and when this is turned off (state/prompts.py; watched, they are kept - v0.6.16-beta.3), and never reach a log, the journal,
 diagnostics, a notification, the status, MCP or a golden.
 """
 from __future__ import annotations
@@ -101,6 +101,38 @@ class PromptQueue:
             if record is not None:
                 found.append(record)
         return found or DEFER
+
+    def would_send(self, view):
+        """While watched (v0.6.16-beta.3, runtime.Runtime._watched_records): the prompt id of each conversation's first
+        prompt still to go that `_first` would make due and hand now, decided from the stored rows alone - nothing is
+        written, cancelled, held, caught up or made due."""
+        scoped = self._scoped
+        if scoped is None:
+            return []
+        handle = scoped.prompts
+        rows = handle.prompts(pending=None)
+        now = handle.now()
+        long_on = scoped.armed(LONG)
+        found, by_thread = [], {}
+        for row in rows:
+            by_thread.setdefault(row["thread_id"], []).append(row)
+        for thread, queue in by_thread.items():
+            pending = [row for row in queue if row["state"] in (PromptState.WAITING, PromptState.READY)]
+            if not pending or pending[0]["record_state"] == RecordState.IN_FLIGHT:
+                continue
+            row = pending[0]
+            if view.thread_enabled(thread) is False or row["words"] is None or words_problem(row["words"], long_on):
+                continue
+            if row["depends"]:
+                before = [other for other in queue if other["position"] < row["position"]]
+                last = before[-1] if before else None
+                if last is not None and (last["state"] in (PromptState.WAITING, PromptState.READY, PromptState.HELD)
+                                         or last["reason"] != PromptReason.DELIVERED):
+                    continue
+            due = row["due_at"] if row["due_at"] is not None else now
+            if now >= due:
+                found.append("%s:%d" % (row["prompt_id"], int(due)))
+        return found
 
     def _first(self, handle, view, thread, queue, now, long_on):
         """The record to hand of `thread`'s first prompt still to go, or None."""

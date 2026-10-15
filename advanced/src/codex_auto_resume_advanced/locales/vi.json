@@ -357,6 +357,7 @@
   "page.watchlog.answer.hold": "Để nó tiếp tục chờ",
   "page.watchlog.answer.other": "Điều khác",
   "page.watchlog.answer.queue_for_open": "Đưa vào hàng đợi cho đến khi cuộc trò chuyện được mở",
+  "page.watchlog.answer.records": "Một tin nhắn của bạn mà nó lẽ ra đã gửi",
   "page.watchlog.answer.resend": "Gửi thêm một lần",
   "page.watchlog.answer.send_now": "Gửi ngay",
   "page.watchlog.answer.sender": "Gửi theo cách riêng của nó",

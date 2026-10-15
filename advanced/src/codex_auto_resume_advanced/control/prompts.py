@@ -18,7 +18,7 @@ from ..engine.promptqueue import CAPABILITY, LONG, SHORT_LIMIT
 from ..state.choices import Refused
 from ..state.prompts import PER_CONVERSATION, PROMPTS_LIMIT
 from ..vocabulary import Measurement, PromptState, Refusal
-from .resets import _on, _refused, _stale, switched_off
+from .resets import _on, _refused, _stale, _standing, switched_off
 
 SHOWN = ("prompt_id", "thread_id", "trigger", "at", "every", "occurrences", "sent_count", "until", "depends",
          "position", "state", "reason", "gate", "gate_reason", "created_at", "due_at", "sent_at", "finished_at")
@@ -74,7 +74,7 @@ def add(runtime, argument) -> dict:
     thread, words = argument.get("thread_id"), argument.get("words")
     if not ids.is_uuid(thread):
         return _refused(Refusal.INVALID_REQUEST, runtime)
-    if not _on(runtime, CAPABILITY):
+    if not _standing(runtime, CAPABILITY):
         return _refused(Refusal.NOT_ON, runtime)
     if switched_off(runtime, thread):
         return _refused(Refusal.CONVERSATION_OFF, runtime)

@@ -45,7 +45,10 @@ confirms them, for the version of Codex shown. **Watch first** instead has it as
 would act, and note what it would have done, while it does nothing. What it would have done is
 counted on its page, under its other cards, for the last 30 days: each answer in words, once for
 each recovery it would have acted on, how many times and when last; a diagnostics export you ask
-for includes the same. If anything changed while you
+for includes the same. A capability that acts on what you set up for it - a message or a credit at a
+reset, a conversation kept going, a queued message - can be set up while it is watched as well: what
+it would have sent, and when, is counted there, nothing is sent, spent or read for it, and turning it
+on keeps what you set up (from v0.6.16-beta.3). If anything changed while you
 were reading, the page reads it again and asks again with what holds now (K3); where it cannot read
 it again, or your administrator's policy now refuses it, it says that nothing was turned on, and why.
 The page reads the list again after everything you do there, and whenever the watcher says a

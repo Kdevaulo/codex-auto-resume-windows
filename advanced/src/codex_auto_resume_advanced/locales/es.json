@@ -357,6 +357,7 @@
   "page.watchlog.answer.hold": "Mantenerla en espera",
   "page.watchlog.answer.other": "Otra cosa",
   "page.watchlog.answer.queue_for_open": "La dejó en cola para cuando se abra la conversación",
+  "page.watchlog.answer.records": "Un mensaje tuyo que habría enviado",
   "page.watchlog.answer.resend": "Enviar una vez más",
   "page.watchlog.answer.send_now": "Enviar ahora",
   "page.watchlog.answer.sender": "Enviar a su manera",

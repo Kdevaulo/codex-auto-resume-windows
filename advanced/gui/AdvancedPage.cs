@@ -227,6 +227,14 @@ namespace CodexAutoResume
         }
 
         /// A state in the registry's words: Off, Watching, On.
+        /// v0.6.16-beta.3: whether a capability is on or watched - what a reset action, Keep a conversation going and Queue
+        /// messages for later may be set up for: watched, its rows are evaluated and journalled, never acted on.
+        internal static bool Standing(Dictionary<string, object> item)
+        {
+            string state = Str(item, "state");
+            return state == StateArmed || state == StateShadow;
+        }
+
         /// v0.6.16-beta.3: a row's state in the list - its word, and "· kept on" after it for one kept on (KeptOn) - as text in
         /// the flat row, nothing drawn.
         private string ListState(Dictionary<string, object> row)
@@ -1003,8 +1011,8 @@ namespace CodexAutoResume
 
             // Under its limits (v0.6.14): Send now's waiting recoveries. Keep it on is in the head card (v0.6.16-beta.3).
             BuildSendNow(item);
-            // The reset actions' rules and the form they are added with, while one is on (AdvancedResets.cs); the
-            // conversations kept going and the queued prompts, each while its capability is on (v0.6.15-beta).
+            // The reset actions' rules and the form they are added with (AdvancedResets.cs); the conversations kept going
+            // and the queued prompts (v0.6.15-beta) - each while its capability is on or, from v0.6.16-beta.3, watched.
             BuildResets(item);
             BuildKeepGoing(item);
             BuildQueue(item);

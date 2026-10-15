@@ -499,7 +499,8 @@ class Arming:
         try:
             rules = self.state.reset_rules()
             for rule in rules:
-                if states.get(rule["capability"], ArmingState.OFF) == ArmingState.ARMED:
+                # v0.6.16-beta.3: a watched one keeps its rules (state/arming.py); read down to off, they end.
+                if states.get(rule["capability"], ArmingState.OFF) != ArmingState.OFF:
                     continue
                 if rule["launching_at"] is not None or rule["record_state"] == RecordState.IN_FLIGHT:
                     continue
@@ -509,7 +510,7 @@ class Arming:
                 self.state.set_reading(credits=None, expiry_known=None, nearest_expiry=None)
             # v0.6.15-beta: every queued prompt not in Codex's queue while prompt_queue does not stand on, and every
             # continuation still waiting of one that does not stand on (state/continuations).
-            if states.get("prompt_queue", ArmingState.OFF) != ArmingState.ARMED:
+            if states.get("prompt_queue", ArmingState.OFF) == ArmingState.OFF:
                 self.state.end_prompts(PromptReason.TURNED_OFF, at=self.clock())
             for row in self.state.continuations(pending=True):
                 if (states.get(row["capability"], ArmingState.OFF) != ArmingState.ARMED

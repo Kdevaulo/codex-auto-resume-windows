@@ -13,7 +13,7 @@ from codex_auto_resume.domain import ids
 from ..engine.keepgoing import CAPABILITY, UNMEASURED_COUNT, allowed
 from ..state.continuations import KEEP_COUNTS
 from ..vocabulary import KeepReason, KeepState, Measurement, Refusal
-from .resets import _on, _refused, _stale, switched_off
+from .resets import _refused, _stale, _standing, switched_off
 
 SHOWN = ("thread_id", "count", "used", "armed_at", "state", "reason", "finished_at")
 
@@ -48,7 +48,7 @@ def set_one(runtime, argument) -> dict:
         return _refused(Refusal.INVALID_REQUEST, runtime)
     if type(count) is not int or count not in KEEP_COUNTS:
         return _refused(Refusal.KEEP_COUNT_INVALID, runtime)
-    if not _on(runtime, CAPABILITY):
+    if not _standing(runtime, CAPABILITY):
         return _refused(Refusal.NOT_ON, runtime)
     if switched_off(runtime, thread):
         return _refused(Refusal.CONVERSATION_OFF, runtime)

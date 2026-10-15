@@ -357,6 +357,7 @@
   "page.watchlog.answer.hold": "让它继续等待",
   "page.watchlog.answer.other": "其他",
   "page.watchlog.answer.queue_for_open": "已排队，待对话打开时运行",
+  "page.watchlog.answer.records": "本会发送的你的消息",
   "page.watchlog.answer.resend": "再发送一次",
   "page.watchlog.answer.send_now": "立即发送",
   "page.watchlog.answer.sender": "用它自己的方式发送",

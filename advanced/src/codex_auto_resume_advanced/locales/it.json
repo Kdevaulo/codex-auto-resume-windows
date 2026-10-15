@@ -357,6 +357,7 @@
   "page.watchlog.answer.hold": "Tenerlo in attesa",
   "page.watchlog.answer.other": "Altro",
   "page.watchlog.answer.queue_for_open": "Messa in coda per quando la conversazione viene aperta",
+  "page.watchlog.answer.records": "Un tuo messaggio che avrebbe inviato",
   "page.watchlog.answer.resend": "Inviare ancora una volta",
   "page.watchlog.answer.send_now": "Inviare ora",
   "page.watchlog.answer.sender": "Inviare a modo suo",
