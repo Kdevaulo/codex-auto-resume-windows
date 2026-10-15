@@ -6,8 +6,10 @@ differ - so the next time it happens the log says where the keyboard went. Never
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import sys
+import threading
 import unittest
 
 _HERE = str(Path(__file__).resolve().parent)
@@ -52,6 +54,39 @@ class FocusLineTests(unittest.TestCase):
 
     def test_the_probe_answers_its_three_keys_on_this_machine(self):
         self.assertEqual(set(win32.focus_snapshot()), {"front_class", "front_process", "focus_class"})
+
+
+
+@unittest.skipUnless(os.name == "nt", "the card is a Windows window")
+class SecondLookTests(unittest.TestCase):
+    """The look FOCUS_AFTER after a card is the card host's own timer on its own thread, never a thread of its own: a
+    thread that has asked user32 holds a USER object while it lives, and the card stack leaves nothing behind
+    (test_notice_card.test_cards_leave_nothing_behind found two on dev CI, 2026-10-15)."""
+
+    def setUp(self):
+        from test_notice_card import EVENTS, WindowsTests, build, tray_popup
+        tray_popup._gdiplus_acquire()
+        self.addCleanup(tray_popup._gdiplus_release)
+        self.now = 0.0
+        self.said, self.asked = [], [dict(CODEX), dict(MOVED), dict(MOVED)]
+        self.host = stack.CardStack(log=self.said.append, focus=lambda: self.asked.pop(0), clock=lambda: self.now,
+                                    locate=lambda: dict(WindowsTests.WHERE),
+                                    appearance=lambda: dict(WindowsTests.LIGHT)).create()
+        self.addCleanup(self.host.destroy)
+        self.card = lambda index: build("interruption", EVENTS[index][1], thread="t%d" % index)
+
+    def test_cards_shown_start_no_thread_and_the_timer_takes_one_look_from_before_the_first(self):
+        threads = threading.active_count()
+        self.assertIsNotNone(self.host.show(self.card(0)))
+        self.assertIsNotNone(self.host.show(self.card(1)))
+        self.assertEqual(threading.active_count(), threads, "no thread waits to look again")
+        self.assertEqual(self.said, [])
+        self.assertEqual(self.host._handle(self.host.hwnd, stack.WM_TIMER, win32.TIMER_FOCUS, 0), 0)
+        self.assertEqual(len(self.said), 1, "one look, for both cards")
+        self.assertIn("Codex.exe", self.said[0])
+        self.assertEqual(self.asked, [], "asked before each card and once after the last")
+        self.host._handle(self.host.hwnd, stack.WM_TIMER, win32.TIMER_FOCUS, 0)
+        self.assertEqual(len(self.said), 1, "a timer that comes again finds no look waiting")
 
 
 if __name__ == "__main__":

@@ -1253,6 +1253,13 @@ namespace CodexAutoResume
         /// known to have asked.
         internal static int AuditedSpoken;
 
+        /// Whether AuditSpoken holds every text box it passes to a whole line (AuditTextLine). Off only while a dialog that
+        /// Windows has made smaller than it was laid out for - one larger than SystemInformation.MaxWindowTrackSize, on a
+        /// small screen - is asked its names (SettingsForm.AuditOwnValues): what is cut off there is the screen's clamp, not
+        /// the layout, the reason the rest of that dialog's layout is not walked either, and the window never opens at
+        /// that text size on that screen (TextScale.Fitting).
+        internal static bool AuditLines = true;
+
         /// v0.6.11: every control in `parent` that is showing, that a person can act on (Actionable), and that a screen
         /// reader would announce with no name - the name it is given (AccessibleName), or else the one Windows makes of
         /// it: its text, or for a text box or a number the words before it (SpokenName). Run in every language the audit
@@ -1262,7 +1269,7 @@ namespace CodexAutoResume
             foreach (Control child in parent.Controls)
             {
                 if (!OwnVisible(child)) continue;
-                AuditTextLine(where, child, findings);
+                if (AuditLines) AuditTextLine(where, child, findings);
                 if (Actionable(child))
                 {
                     AuditedSpoken++;

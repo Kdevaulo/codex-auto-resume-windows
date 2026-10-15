@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import ctypes as C
 import os
-import threading
 import time
 
 from ... import brand
@@ -13,7 +12,7 @@ from ... import notice_card
 from ... import notice_presence
 from .. import popup
 from . import win32
-from .win32 import HWND_MESSAGE, IDC_ARROW, MA_NOACTIVATE, TIMER_FRAME, TIMER_WAIT, TME_LEAVE, TRACKMOUSEEVENT, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSELEAVE, WM_MOUSEMOVE, WM_NOTICE, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WNDPROC, _declare, _on_a_worker_thread, look, screen  # noqa: F401
+from .win32 import HWND_MESSAGE, IDC_ARROW, MA_NOACTIVATE, TIMER_FOCUS, TIMER_FRAME, TIMER_WAIT, TME_LEAVE, TRACKMOUSEEVENT, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSELEAVE, WM_MOUSEMOVE, WM_NOTICE, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WNDPROC, _declare, _on_a_worker_thread, look, screen  # noqa: F401
 from .card import Card  # noqa: F401
 
 # v0.6.16-beta.3 (issue #32, typing lost when a card appears): how long after a card is shown who has the keyboard
@@ -55,6 +54,7 @@ class CardStack:
         self.appearance = appearance or look
         # v0.6.16-beta.3 (issue #32): who has the keyboard, asked around a card being shown, never a title.
         self.focus = focus or win32.focus_snapshot
+        self._focus_before = None       # who had it before the first card of a look still to be taken
         self.hwnd = None
         self.class_name = None
         self.instance = None
@@ -108,9 +108,10 @@ class CardStack:
             self._complete(notice, False)
         hwnd, self.hwnd = self.hwnd, None
         if hwnd:
-            for timer in (TIMER_FRAME, TIMER_WAIT):
+            for timer in (TIMER_FRAME, TIMER_WAIT, TIMER_FOCUS):
                 user32.KillTimer(hwnd, timer)
             user32.DestroyWindow(hwnd)
+        self._focus_before = None
         self._frame_running = False
         self._frame_ms = None
         if self.class_name:
@@ -156,10 +157,13 @@ class CardStack:
             self._end(card, False)
             self._drop(card)
             return None
-        if before is not None:
-            later = threading.Timer(FOCUS_AFTER, self._focus_after, (before,))
-            later.daemon = True
-            later.start()
+        if before is not None and self.hwnd:
+            # Asked again on this thread's own timer, not on a thread of its own: a thread that has asked user32 holds
+            # a USER object for as long as it lives (test_cards_leave_nothing_behind caught two). Cards shown within
+            # FOCUS_AFTER of each other are one look, from before the first to FOCUS_AFTER after the last.
+            if self._focus_before is None:
+                self._focus_before = before
+            win32._dll("user32").SetTimer(self.hwnd, TIMER_FOCUS, int(FOCUS_AFTER * 1000), None)
         self._tick()
         return card
 
@@ -364,6 +368,12 @@ class CardStack:
                         self.log("notification card failed (%s)" % type(exc).__name__)
                 return 0
             if message == WM_TIMER:
+                if wparam == TIMER_FOCUS:
+                    user32.KillTimer(hwnd, TIMER_FOCUS)
+                    before, self._focus_before = self._focus_before, None
+                    if before is not None:
+                        self._focus_after(before)
+                    return 0
                 if wparam == TIMER_WAIT:
                     user32.KillTimer(hwnd, TIMER_WAIT)
                 self._tick()

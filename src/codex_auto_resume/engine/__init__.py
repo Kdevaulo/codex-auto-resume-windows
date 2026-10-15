@@ -37,12 +37,13 @@ from .guard import GuardMixin
 from .launches import LaunchPool
 from .notices import NoticeMixin
 from .options import (BACKOFF_LADDER, TRANSIENT_BACKOFF, OptionsMixin,  # noqa: F401
-                      StoreView, backoff_delay, transient_delay)
+                      backoff_delay, transient_delay)
 from .outcome import OutcomeMixin
 from .plugrecords import PlugRecordsMixin
 from .reconcile import SETTLED, UNSENT, ReconcileMixin, _UNDETERMINED  # noqa: F401
 from .relaxed import RelaxedMixin
 from .resend import ResendMixin
+from .storeview import StoreView
 
 
 class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, ReconcileMixin, OutcomeMixin, DispatchMixin,
