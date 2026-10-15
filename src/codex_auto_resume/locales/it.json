@@ -709,6 +709,8 @@
   "panel.saved": "Salvato.",
   "panel.saving": "Salvataggio...",
   "panel.start_ends_with_codex": "Codex termina ciò che i suoi plugin avviano, quindi questo monitor si arresta alla chiusura di Codex, se non prima. Una volta chiuso Codex, apri Codex Auto Resume dal menu Start e avvialo da lì, oppure attiva «Avvia all'accesso a Windows» nella Dashboard perché si avvii con Windows.",
+  "panel.off_no_sign_in": "Niente lo avvia da solo: «Avvia all'accesso a Windows» è disattivato. Apri Codex Auto Resume dal menu Start e avvialo da lì, oppure attiva «Avvia all'accesso a Windows» nella Dashboard perché si avvii con Windows.",
+  "panel.off_sign_in": "«Avvia all'accesso a Windows» è attivo, ma ora il monitor non è in esecuzione. Per avviarlo in modo che resti attivo anche dopo la chiusura di Codex, apri Codex Auto Resume dal menu Start e avvialo da lì.",
   "panel.start_exited": "Si è avviato e si è fermato di nuovo; nessun monitor è attivo.",
   "panel.start_failed": "Impossibile avviarlo: {reason}",
   "panel.start_may_end_with_codex": "Windows non ha indicato se Codex termina ciò che i suoi plugin avviano, quindi questo monitor potrebbe arrestarsi alla chiusura di Codex. In tal caso, apri Codex Auto Resume dal menu Start e avvialo da lì, oppure attiva «Avvia all'accesso a Windows» nella Dashboard perché si avvii con Windows.",

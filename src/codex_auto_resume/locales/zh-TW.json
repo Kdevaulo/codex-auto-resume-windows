@@ -709,6 +709,8 @@
   "panel.saved": "已儲存。",
   "panel.saving": "正在儲存…",
   "panel.start_ends_with_codex": "Codex 會結束其外掛程式啟動的程式，因此此監看程式會在 Codex 關閉時停止（也可能更早）。Codex 關閉後，請從 [開始] 功能表開啟 Codex Auto Resume 並在其中啟動它，或在儀表板中開啟「在 Windows 登入時執行」，讓它隨 Windows 啟動。",
+  "panel.off_no_sign_in": "沒有任何程式會自動啟動它：「在 Windows 登入時執行」已關閉。請從 [開始] 功能表開啟 Codex Auto Resume 並在其中啟動它，或在儀表板中開啟「在 Windows 登入時執行」，讓它隨 Windows 啟動。",
+  "panel.off_sign_in": "「在 Windows 登入時執行」已開啟，但它目前沒有執行。若要讓它在 Codex 關閉後繼續執行，請從 [開始] 功能表開啟 Codex Auto Resume 並在其中啟動它。",
   "panel.start_exited": "已啟動但隨即停止；目前沒有任何程式在監看。",
   "panel.start_failed": "無法啟動：{reason}",
   "panel.start_may_end_with_codex": "Windows 未說明 Codex 是否會結束其外掛程式啟動的程式，因此此監看程式可能會在 Codex 關閉時停止。如果停止了，請從 [開始] 功能表開啟 Codex Auto Resume 並在其中啟動它，或在儀表板中開啟「在 Windows 登入時執行」，讓它隨 Windows 啟動。",

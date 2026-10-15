@@ -709,6 +709,8 @@
   "panel.saved": "Zapisano.",
   "panel.saving": "Zapisywanie…",
   "panel.start_ends_with_codex": "Codex kończy to, co uruchamiają jego wtyczki, więc ten monitor zatrzyma się przy zamknięciu Codex, jeśli nie wcześniej. Po zamknięciu Codex otwórz Codex Auto Resume z menu Start i uruchom go tam albo włącz „Start przy logowaniu do Windows” w oknie Dashboard, aby startował razem z Windows.",
+  "panel.off_no_sign_in": "Nic nie uruchamia go samo: „Start przy logowaniu do Windows” jest wyłączony. Otwórz Codex Auto Resume z menu Start i uruchom go tam albo włącz „Start przy logowaniu do Windows” w oknie Dashboard, aby startował razem z Windows.",
+  "panel.off_sign_in": "„Start przy logowaniu do Windows” jest włączony, ale monitor teraz nie działa. Aby uruchomić go tak, by działał także po zamknięciu Codex, otwórz Codex Auto Resume z menu Start i uruchom go tam.",
   "panel.start_exited": "Uruchomił się i znów zatrzymał; nic nie jest monitorowane.",
   "panel.start_failed": "Nie udało się uruchomić: {reason}",
   "panel.start_may_end_with_codex": "Windows nie podał, czy Codex kończy to, co uruchamiają jego wtyczki, więc ten monitor może się zatrzymać przy zamknięciu Codex. Jeśli tak się stanie, otwórz Codex Auto Resume z menu Start i uruchom go tam albo włącz „Start przy logowaniu do Windows” w oknie Dashboard, aby startował razem z Windows.",

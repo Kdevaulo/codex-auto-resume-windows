@@ -539,5 +539,49 @@ class SurfaceTests(unittest.TestCase):
             self.assertEqual(calls, [])
 
 
+class PanelOffTests(unittest.TestCase):
+    """v0.6.16-beta.3, issue #31 item 4: Codex started its plugin, no watcher runs and nothing starts it. The panel
+    said "Watcher not running" and offered Start watcher, whose start is made inside Codex and may end with it;
+    what lasts was said only after a start. Now, under Start watcher, it says how the watcher starts for good -
+    and that nothing will start it where Run at Windows sign-in is off. The standard edition starts nothing
+    itself for it; it only says so."""
+
+    KEYS = ("panel.off_no_sign_in", "panel.off_sign_in")
+
+    def shown(self, **status):
+        import shutil
+        if not shutil.which("node"):
+            self.skipTest("needs Node to run the panel's own code")
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_mcpui_v064 import run_page, say, snapshot
+        data = snapshot()
+        data["status"] = dict(data["status"], **status)
+        return run_page(say("ROOT_NODE.textContent"), data=data)
+
+    def test_with_sign_in_off_it_says_nothing_starts_it_and_how(self):
+        text = self.shown(watcher_running=False, startup_enabled=False)
+        self.assertIn(l10n.catalog("en")["panel.off_no_sign_in"], text)
+        self.assertNotIn(l10n.catalog("en")["panel.off_sign_in"], text)
+
+    def test_with_sign_in_on_it_says_the_start_that_lasts(self):
+        text = self.shown(watcher_running=False, startup_enabled=True)
+        self.assertIn(l10n.catalog("en")["panel.off_sign_in"], text)
+
+    def test_a_running_watcher_or_a_status_that_does_not_say_shows_neither(self):
+        for status in ({"watcher_running": True, "startup_enabled": False}, {"watcher_running": False}):
+            with self.subTest(status=status):
+                text = self.shown(**status)
+                for key in self.KEYS:
+                    self.assertNotIn(l10n.catalog("en")[key], text)
+
+    def test_every_language_says_it_and_the_fallback_is_the_english(self):
+        from codex_auto_resume.mcp import panel as mcpui
+        for key in self.KEYS:
+            self.assertIn("t('%s', '%s')" % (key, l10n.catalog("en")[key]), mcpui._SCRIPT)
+            for locale in l10n.LOCALES:
+                with self.subTest(key=key, locale=locale):
+                    self.assertTrue(l10n._read(locale).get(key))
+
+
 if __name__ == "__main__":
     unittest.main()

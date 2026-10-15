@@ -709,6 +709,8 @@
   "panel.saved": "Gespeichert.",
   "panel.saving": "Wird gespeichert…",
   "panel.start_ends_with_codex": "Codex beendet, was seine Plug-ins starten, daher stoppt dieser Watcher, wenn Codex geschlossen wird, wenn nicht früher. Öffnen Sie nach dem Schließen von Codex „Codex Auto Resume“ über das Startmenü und starten Sie ihn dort, oder schalten Sie im Dashboard „Bei Windows-Anmeldung starten“ ein, damit er mit Windows startet.",
+  "panel.off_no_sign_in": "Nichts startet ihn von selbst: „Bei Windows-Anmeldung starten“ ist aus. Öffnen Sie „Codex Auto Resume“ über das Startmenü und starten Sie ihn dort, oder schalten Sie im Dashboard „Bei Windows-Anmeldung starten“ ein, damit er mit Windows startet.",
+  "panel.off_sign_in": "„Bei Windows-Anmeldung starten“ ist an, aber er läuft gerade nicht. Damit er auch nach dem Schließen von Codex weiterläuft, öffnen Sie „Codex Auto Resume“ über das Startmenü und starten Sie ihn dort.",
   "panel.start_exited": "Gestartet und wieder beendet; nichts wird überwacht.",
   "panel.start_failed": "Start nicht möglich: {reason}",
   "panel.start_may_end_with_codex": "Windows gab nicht an, ob Codex beendet, was seine Plug-ins starten, daher stoppt dieser Watcher möglicherweise, wenn Codex geschlossen wird. Falls ja, öffnen Sie „Codex Auto Resume“ über das Startmenü und starten Sie ihn dort, oder schalten Sie im Dashboard „Bei Windows-Anmeldung starten“ ein, damit er mit Windows startet.",

@@ -709,6 +709,8 @@
   "panel.saved": "저장했습니다.",
   "panel.saving": "저장하는 중...",
   "panel.start_ends_with_codex": "Codex는 플러그인이 시작한 것을 끝내므로, 이 워처는 Codex를 닫을 때(그보다 일찍일 수도 있습니다) 멈춥니다. Codex를 닫은 뒤 시작 메뉴에서 Codex Auto Resume을 열어 거기서 시작하거나, Windows와 함께 시작되도록 대시보드에서 'Windows 로그인 시 실행'을 켜세요.",
+  "panel.off_no_sign_in": "스스로 시작해 주는 것이 없습니다: 'Windows 로그인 시 실행'이 꺼져 있습니다. 시작 메뉴에서 Codex Auto Resume을 열어 거기서 시작하거나, Windows와 함께 시작되도록 대시보드에서 'Windows 로그인 시 실행'을 켜세요.",
+  "panel.off_sign_in": "'Windows 로그인 시 실행'이 켜져 있지만 지금은 실행 중이 아닙니다. Codex를 닫은 뒤에도 계속 실행되게 시작하려면 시작 메뉴에서 Codex Auto Resume을 열어 거기서 시작하세요.",
   "panel.start_exited": "시작했다가 곧 종료되었습니다. 아무것도 감시하고 있지 않습니다.",
   "panel.start_failed": "시작하지 못했습니다: {reason}",
   "panel.start_may_end_with_codex": "Codex가 플러그인이 시작한 것을 끝내는지 Windows가 알려 주지 않았으므로, 이 워처는 Codex를 닫으면 멈출 수 있습니다. 멈추면 시작 메뉴에서 Codex Auto Resume을 열어 거기서 시작하거나, Windows와 함께 시작되도록 대시보드에서 'Windows 로그인 시 실행'을 켜세요.",
