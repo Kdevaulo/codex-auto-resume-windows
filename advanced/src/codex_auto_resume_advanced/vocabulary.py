@@ -153,6 +153,9 @@ class Refusal(StrEnum):
     FAILED_HERE = "failed_here"
     # A person's own wording the custom continuation text's checks refuse, or a key the capability does not keep.
     WORDING_INVALID = "wording_invalid"
+    # v0.6.16-beta.4 (j): a near-limit percentage out of order - a window's warning above its wrap-up, or the wrap-up at
+    # or above the stop its words ask for.
+    OPTION_ORDER = "option_order"
 
 
 class JournalCode(StrEnum):

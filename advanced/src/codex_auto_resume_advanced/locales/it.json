@@ -158,6 +158,8 @@
   "page.option.set": "Imposta",
   "page.option.range": "Da {low} a {high}",
   "page.refused.option_range": "Scrivi un numero intero da {low} a {high}. Non è cambiato nulla.",
+  "page.refused.option_order": "Per ogni finestra, l'avviso deve stare alla chiusura o sotto, e la chiusura sotto l'arresto che chiedono le sue parole. Non è cambiato nulla.",
+  "page.warn.stop_before_words": "Salvato. L'arresto forzato è sotto quello che chiedono le parole di chiusura, quindi può fermare Codex prima che si fermi da solo.",
   "page.option.warn_five_hour": "Avvisa a (finestra di 5 ore)",
   "page.option.warn_weekly": "Avvisa a (finestra settimanale)",
   "page.option.workers": "Insieme",

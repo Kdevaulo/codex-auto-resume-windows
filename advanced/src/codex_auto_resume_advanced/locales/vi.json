@@ -158,6 +158,8 @@
   "page.option.set": "Đặt",
   "page.option.range": "Từ {low} đến {high}",
   "page.refused.option_range": "Hãy nhập số nguyên từ {low} đến {high}. Không có gì thay đổi.",
+  "page.refused.option_order": "Ở mỗi khung, cảnh báo phải bằng hoặc thấp hơn mức kết thúc, và mức kết thúc thấp hơn mức dừng mà câu chữ yêu cầu. Không có gì thay đổi.",
+  "page.warn.stop_before_words": "Đã lưu. Mức dừng cưỡng bức thấp hơn mức dừng mà câu kết thúc yêu cầu, nên có thể dừng Codex trước khi Codex tự dừng.",
   "page.option.warn_five_hour": "Cảnh báo ở mức (cửa sổ 5 giờ)",
   "page.option.warn_weekly": "Cảnh báo ở mức (cửa sổ hằng tuần)",
   "page.option.workers": "Cùng lúc",

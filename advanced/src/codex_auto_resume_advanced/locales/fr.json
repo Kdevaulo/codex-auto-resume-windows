@@ -158,6 +158,8 @@
   "page.option.set": "Appliquer",
   "page.option.range": "De {low} à {high}",
   "page.refused.option_range": "Saisissez un nombre entier de {low} à {high}. Rien n'a été modifié.",
+  "page.refused.option_order": "Pour chaque fenêtre, l'avertissement doit être au niveau de la clôture ou en dessous, et la clôture sous l'arrêt que ses mots demandent. Rien n'a été modifié.",
+  "page.warn.stop_before_words": "Enregistré. L'arrêt forcé est sous l'arrêt que demandent les mots de clôture : il peut arrêter Codex avant que Codex ne s'arrête de lui-même.",
   "page.option.warn_five_hour": "Avertir à (fenêtre de 5 heures)",
   "page.option.warn_weekly": "Avertir à (fenêtre hebdomadaire)",
   "page.option.workers": "À la fois",

@@ -158,6 +158,8 @@
   "page.option.set": "Übernehmen",
   "page.option.range": "{low} bis {high}",
   "page.refused.option_range": "Geben Sie eine ganze Zahl von {low} bis {high} ein. Nichts wurde geändert.",
+  "page.refused.option_order": "Für jedes Fenster muss die Warnung höchstens beim Abschluss liegen und der Abschluss unter dem Halt, um den seine Worte bitten. Nichts wurde geändert.",
+  "page.warn.stop_before_words": "Gespeichert. Der erzwungene Halt liegt unter dem Halt, um den die Abschlussworte bitten, und kann Codex anhalten, bevor Codex selbst anhält.",
   "page.option.warn_five_hour": "Warnen bei (5-Stunden-Fenster)",
   "page.option.warn_weekly": "Warnen bei (Wochenfenster)",
   "page.option.workers": "Gleichzeitig",

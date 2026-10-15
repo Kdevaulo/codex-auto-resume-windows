@@ -86,6 +86,33 @@ class PageTests(PageCase):
             "generation": script["advanced-list"][0]["result"]["generation"],
             "words": script["advanced-words"][0]["result"]["words"]}
 
+    @classmethod
+    def scenario_order(cls, bridge):
+        """(j): a forced stop below the words' stop taken, and said; a wrap-up above the words' stop refused, and told."""
+        script = cls.opening(bridge, "en")
+        generation = script["advanced-list"][0]["result"]["generation"]
+        taken = bridge("advanced-option", {"capability": "usage_pause", "key": "pause_five_hour", "value": 92,
+                                           "generation": generation})
+        refused = bridge("advanced-option", {"capability": WRAP, "key": "wrap_weekly", "value": 96,
+                                             "generation": taken["result"]["generation"]})
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "usage_pause"},
+                 {"do": "reply", "key": "advanced-option", "with": [taken]},
+                 {"do": "set_option", "key": "pause_five_hour", "value": 97}, {"do": "look"},
+                 {"do": "choose", "id": WRAP}, {"do": "reply", "key": "advanced-option", "with": [refused]},
+                 {"do": "set_option", "key": "wrap_weekly", "value": 96}]
+        script["advanced-wordings"] = [bridge("advanced-wordings", {"capability": WRAP})]
+        return "en", {"script": script, "steps": steps}, {
+            "taken": taken["result"], "refused": refused["result"], "words": script["advanced-words"][0]["result"]["words"]}
+
+    def test_out_of_order_is_told_and_a_forced_stop_below_the_words_is_said(self):
+        result, expected = self.of("scenario_order")
+        words = expected["words"]
+        self.assertEqual(expected["taken"]["warning"], "stop_before_words")
+        self.assertEqual(expected["refused"]["refusal"], "option_order")
+        (look,) = result["looks"]
+        self.assertEqual(look["note"], words["page.warn.stop_before_words"])
+        self.assertEqual(result["told"], [words["page.refused.option_order"]])
+
     def test_a_number_can_be_typed_in_beside_the_presets_and_is_checked_before_it_is_sent(self):
         result, expected = self.of("scenario_custom_numbers")
         words = expected["words"]

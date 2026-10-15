@@ -158,6 +158,8 @@
   "page.option.set": "设置",
   "page.option.range": "{low} 到 {high}",
   "page.refused.option_range": "请输入 {low} 到 {high} 之间的整数。未作任何更改。",
+  "page.refused.option_order": "每个窗口中，提醒须不高于收尾，收尾须低于文字要求的停止点。未作任何更改。",
+  "page.warn.stop_before_words": "已保存。强制停止低于收尾文字要求的停止点，可能在 Codex 自己停下之前就把它停下。",
   "page.option.warn_five_hour": "警告阈值（5 小时窗口）",
   "page.option.warn_weekly": "警告阈值（每周窗口）",
   "page.option.workers": "同时",

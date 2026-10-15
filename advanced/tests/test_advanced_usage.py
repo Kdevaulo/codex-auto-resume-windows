@@ -160,6 +160,28 @@ class CustomNumberTests(UsageCase):
         self.assertEqual((options["poll_minutes"]["custom"], options["warn_weekly"]["custom"]), ([5, 60], [1, 100]))
         self.assertNotIn("custom", options["window_weekly"])
 
+    def test_each_windows_percentages_stay_in_order_and_a_forced_stop_below_the_words_only_warns(self):
+        """v0.6.16-beta.4 (j): warn <= wrap-up < the words' stop, each window on its own - refused otherwise, with
+        nothing written; a forced stop below the words' stop is taken, and said (it may cut Codex off first)."""
+        for capability, key, value in (("usage_meter", OptionKey.WARN_FIVE_HOUR, 91),
+                                       ("usage_wrap_up", OptionKey.WRAP_WEEKLY, 95),
+                                       ("usage_wrap_up", OptionKey.STOP_WORDS_FIVE_HOUR, 90),
+                                       ("usage_wrap_up", OptionKey.WRAP_FIVE_HOUR, 84)):
+            with self.subTest(key=key):
+                before = self.rt.state.options(capability)[key]
+                found = self.set(capability, key, value)
+                if key == OptionKey.WRAP_FIVE_HOUR:
+                    self.assertEqual(found["refusal"], Refusal.OPTION_ORDER, "below the warning, 85")
+                else:
+                    self.assertEqual(found["refusal"], Refusal.OPTION_ORDER)
+                self.assertEqual(self.rt.state.options(capability)[key], before)
+        self.assertTrue(self.set("usage_meter", OptionKey.WARN_FIVE_HOUR, 90)["done"], "at the wrap-up is in order")
+        self.assertTrue(self.set("usage_wrap_up", OptionKey.STOP_WORDS_WEEKLY, 91)["done"])
+        found = self.set("usage_pause", OptionKey.PAUSE_FIVE_HOUR, 92)
+        self.assertEqual((found["done"], found.get("warning")), (True, "stop_before_words"))
+        self.assertEqual(self.rt.state.options("usage_pause")[OptionKey.PAUSE_FIVE_HOUR], 92)
+        self.assertNotIn("warning", self.set("usage_pause", OptionKey.PAUSE_FIVE_HOUR, 97))
+
     def test_the_meter_reads_at_a_spacing_typed_in(self):
         self.on("usage_meter")
         self.assertTrue(self.set("usage_meter", OptionKey.POLL_MINUTES, 7)["done"])

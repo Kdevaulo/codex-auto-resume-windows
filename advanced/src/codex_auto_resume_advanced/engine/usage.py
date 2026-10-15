@@ -427,6 +427,24 @@ class UsagePause:
             pass
 
 
+def order_problem(values) -> tuple:
+    """Item (j) of the owner's additions, for each window: the warning at or below the wrap-up, and the wrap-up below the
+    stop the words ask for - else ("order", None); a forced stop below the words' stop only warns ("stop_before_words"),
+    as it would cut Codex off before it stops itself - never refuses. `values` is {capability: its options} as they
+    would be; (refusal word or None, warning word or None)."""
+    warning = None
+    for minutes in WINDOWS:
+        warn = values.get(METER, {}).get(STAGE_OPTIONS[METER][minutes], DEFAULT_WARN)
+        wrap = values.get(WRAP_UP, {}).get(STAGE_OPTIONS[WRAP_UP][minutes], DEFAULT_WRAP)
+        words = values.get(WRAP_UP, {}).get(STOP_WORDS_OPTIONS[minutes], DEFAULT_STOP_WORDS)
+        forced = values.get(PAUSE, {}).get(STAGE_OPTIONS[PAUSE][minutes], DEFAULT_PAUSE)
+        if not warn <= wrap < words:
+            return "order", None
+        if forced < words:
+            warning = "stop_before_words"
+    return None, warning
+
+
 def previews(state, now) -> dict:
     """What the wrap-up would send for each window now, exactly (v0.6.16-beta.4, item (a)): its wording, numbers,
     reset time and Custom words as they stand, in the continuation language - for the page to show under the choice.

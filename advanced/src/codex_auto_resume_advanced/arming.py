@@ -988,8 +988,26 @@ class Arming:
             return {"done": False, "refusal": Refusal.NOT_THE_DASHBOARD}
         if self.registry.get(capability) is None:
             return {"done": False, "refusal": Refusal.UNKNOWN_CAPABILITY}
-        return self._chosen(lambda: {"generation": self.state.set_option(
-            capability, key, value, generation=generation, actor=actor, at=self.clock())})
+        # v0.6.16-beta.4 (j): the near-limit percentages of a window stay in order - checked as they would be after.
+        from .engine import usage
+        warned = {}
+        if capability in (usage.METER, usage.WRAP_UP, usage.PAUSE):
+            definition = self.registry.get(capability)
+            option = definition.option(key)
+            try:
+                values = {other: dict(self.state.options(other)) for other in (usage.METER, usage.WRAP_UP, usage.PAUSE)
+                          if self.registry.get(other) is not None}
+            except StateError:
+                values = None
+            if values is not None and option is not None and option.takes(value):
+                values.setdefault(capability, {})[option.key] = value
+                problem, warning = usage.order_problem(values)
+                if problem is not None:
+                    return {"done": False, "refusal": Refusal.OPTION_ORDER, "generation": self._generation()}
+                if warning is not None:
+                    warned = {"warning": warning}
+        return self._chosen(lambda: dict(warned, generation=self.state.set_option(
+            capability, key, value, generation=generation, actor=actor, at=self.clock())))
 
     def wordings_view(self, capability) -> dict:
         """A capability's own wordings as the Dashboard's page shows them, with what they may hold: the text a person

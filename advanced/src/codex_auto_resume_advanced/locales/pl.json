@@ -158,6 +158,8 @@
   "page.option.set": "Ustaw",
   "page.option.range": "Od {low} do {high}",
   "page.refused.option_range": "Wpisz liczbę całkowitą od {low} do {high}. Nic nie zmieniono.",
+  "page.refused.option_order": "W każdym oknie ostrzeżenie musi być przy zakończeniu lub niżej, a zakończenie poniżej zatrzymania, o które proszą jego słowa. Nic nie zmieniono.",
+  "page.warn.stop_before_words": "Zapisano. Wymuszone zatrzymanie jest poniżej tego, o które proszą słowa zakończenia, więc może zatrzymać Codex, zanim sam się zatrzyma.",
   "page.option.warn_five_hour": "Ostrzegaj przy (okno 5-godzinne)",
   "page.option.warn_weekly": "Ostrzegaj przy (okno tygodniowe)",
   "page.option.workers": "Naraz",

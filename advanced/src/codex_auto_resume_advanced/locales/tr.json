@@ -158,6 +158,8 @@
   "page.option.set": "Ayarla",
   "page.option.range": "{low} ile {high} arası",
   "page.refused.option_range": "{low} ile {high} arasında bir tam sayı yazın. Hiçbir şey değiştirilmedi.",
+  "page.refused.option_order": "Her pencere için uyarı toparlamada ya da altında, toparlama da sözlerinin istediği durmanın altında olmalı. Hiçbir şey değiştirilmedi.",
+  "page.warn.stop_before_words": "Kaydedildi. Zorla durdurma, toparlama sözlerinin istediği durmanın altında; Codex kendi durmadan onu durdurabilir.",
   "page.option.warn_five_hour": "Uyarı eşiği (5 saatlik pencere)",
   "page.option.warn_weekly": "Uyarı eşiği (haftalık pencere)",
   "page.option.workers": "Aynı anda",

@@ -158,6 +158,8 @@
   "page.option.set": "Atur",
   "page.option.range": "{low} sampai {high}",
   "page.refused.option_range": "Ketik bilangan bulat dari {low} sampai {high}. Tidak ada yang diubah.",
+  "page.refused.option_order": "Untuk tiap jendela, peringatan harus sama dengan atau di bawah penutupan, dan penutupan di bawah henti yang diminta kata-katanya. Tidak ada yang diubah.",
+  "page.warn.stop_before_words": "Tersimpan. Henti paksa ada di bawah henti yang diminta kata-kata penutupan, jadi bisa menghentikan Codex sebelum Codex berhenti sendiri.",
   "page.option.warn_five_hour": "Peringatkan pada (jendela 5 jam)",
   "page.option.warn_weekly": "Peringatkan pada (jendela mingguan)",
   "page.option.workers": "Sekaligus",

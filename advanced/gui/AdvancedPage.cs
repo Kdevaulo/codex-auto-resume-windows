@@ -1138,7 +1138,11 @@ namespace CodexAutoResume
                 Dictionary<string, object> result = AdvancedResult(reply);
                 // The drop-down shows what holds after, whatever it was left on.
                 advancedShown = null;
-                if (AdvancedDone(result)) SetNote(advancedNote, Word("page.done.option", "{name} uses this from now on.", "name", name));
+                if (AdvancedDone(result))
+                    SetNote(advancedNote, Str(result, "warning") == "stop_before_words"
+                        // v0.6.16-beta.4 (j): taken, and said what it may do - never refused.
+                        ? Word("page.warn.stop_before_words", "Saved. The forced stop is below the stop the wrap-up's words ask for, so it may stop Codex before Codex stops itself.")
+                        : Word("page.done.option", "{name} uses this from now on.", "name", name));
                 ReadAdvanced(null);
                 if (!AdvancedDone(result)) TellAdvanced(KeptRefusal(Str(result, "refusal")));
             });
@@ -1341,6 +1345,8 @@ namespace CodexAutoResume
                 return Word("page.refused.rule_overlap", "Another rule already covers this code and these status numbers.");
             if (refusal == "rules_full")
                 return Word("page.rules.full", "There are ten rules. Remove one to add another.");
+            if (refusal == "option_order")
+                return Word("page.refused.option_order", "For each window, the warning must be at or below the wrap-up, and the wrap-up below the stop its words ask for. Nothing was changed.");
             if (refusal == "option_invalid")
                 return Word("page.refused.option", "That choice is not one this feature offers. Nothing was changed.");
             if (refusal == "stale_generation" || refusal == "unknown_rule")
