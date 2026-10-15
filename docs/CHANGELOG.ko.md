@@ -23,12 +23,12 @@
   씁니다(기준 A26과 A27, 소유자가 고침).
 - **Codex가 턴을 다른 id로 기록하는 대화를 그곳까지 따라갑니다.** Codex는 한 대화의 턴을 새 id로 이어 기록할 수
   있는데, 그곳의 실패는 한 번도 찾지 못했습니다. 이제 감시기가 대화가 가졌던 모든 id를 차례대로 따라가므로, 그
-  실패를 찾고 옛 실패가 되살아나지도 않습니다(@aca22jy 신고, #30).
+  실패를 찾고 옛 실패가 되살아나지도 않습니다([@aca22jy](https://github.com/aca22jy) 신고, [#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)).
 - **감시기가 받지 않은 실패한 턴은 모두 한 번, 이유와 함께 로그에 남습니다.** 턴과 이유마다 한 번이며, 다시
-  시작해도 되풀이하지 않고, 한 번에 몇 줄씩만 씁니다(@barkshah2002-pixel 제안, #27).
+  시작해도 되풀이하지 않고, 한 번에 몇 줄씩만 씁니다([@barkshah2002-pixel](https://github.com/barkshah2002-pixel) 제안, [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
 - **진단에서 실패가 왜 이어지지 않았는지 확인할 수 있습니다.** *실패가 이어지지 않은 이유 확인...*이 가장 최근 대화
-  200개에 대해 감시기 자신의 규칙에 묻고 10초 안에 끝내며, 대화의 내용은 읽지 않습니다(@barkshah2002-pixel 제안,
-  #27).
+  200개에 대해 감시기 자신의 규칙에 묻고 10초 안에 끝내며, 대화의 내용은 읽지 않습니다([@barkshah2002-pixel](https://github.com/barkshah2002-pixel) 제안,
+  [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
 - **설정의 Windows 로그인 시 실행이 Windows에 실제로 등록된 것을 보여 주고**, 저장은 내가 바꾼 경우에만 그것을
   씁니다. 업데이트도 내가 남겨 둔 항목을 그대로 둡니다(#31).
 - **감시기가 꺼져 있으면 패널이 그것을 시작하는 방법을 알려 주고**, 로그인 시 실행이 꺼져 있는 동안에는 아무것도
@@ -47,7 +47,7 @@
   요청, 기준 K3를 소유자가 고침).
 - **사용량 미터, 한도 근처에서 마무리하기, 한도 근처에서 멈추기.** 미터는 내가 고른 주기로 Codex 사용량을 읽고
   한도가 가까우면 알립니다. 마무리는 돌고 있는 턴마다 지금 단계를 끝내 달라고 하고, 멈춤은 재설정까지 제품의
-  이어서 하기를 붙잡아 둡니다. 둘 다 미터가 필요합니다(@Hunweibyn 제안, #29).
+  이어서 하기를 붙잡아 둡니다. 둘 다 미터가 필요합니다([@Hunweibyn](https://github.com/Hunweibyn) 제안, [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
 - **Codex 자체 대화를 뺀 모든 대화 복구하기**가 하위 에이전트, 검토, 메모리 정리, 에이전트가 만든 대화를 뺀 앱의 모든
   대화에서 실패한 턴을 받습니다.
 - **켜 둔 채로 두기가 눈에 보이는 곳에 있습니다.** 기능의 머리 카드에서 상태 바로 아래에 있고, 목록은 "· 켜 둔 채로
@@ -89,7 +89,7 @@ v0.6.11-beta.2의 사본부터는 모두 이것을 읽습니다. 설치에 들�
   정리, 에이전트가 만든 대화, CLI·터미널·VS Code의 세션은 여전히 빠지고, Codex의 상태와 대화 파일이 같은 말을
   해야 하는 것도 그대로입니다. 한 사람의 신고와 그것을 위해 만든 읽기 전용 점검으로 찾았으며, 이를 지키는
   시험은 수정을 빼면 실패합니다. 가져온 턴에는 Codex의 오류 코드가 없으므로, 그런 세션에서는 Codex가 직접
-  돌린 턴이 실패하기 전까지 아무것도 감지되지 않습니다(@barkshah2002-pixel 신고, #27; @ZionZhang42 확인, #27).
+  돌린 턴이 실패하기 전까지 아무것도 감지되지 않습니다([@barkshah2002-pixel](https://github.com/barkshah2002-pixel) 신고, [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27); [@ZionZhang42](https://github.com/ZionZhang42) 확인, [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
 
 ### 고급판
 
@@ -162,7 +162,7 @@ v0.6.16이며([ROADMAP.ko.md](ROADMAP.ko.md)), 사전 릴리스 v0.6.15-beta는 
   정리, 에이전트가 만든 대화, CLI·터미널·VS Code의 세션은 여전히 빠지고, Codex의 상태와 대화 파일이 같은 말을
   해야 하는 것도 그대로입니다. 한 사람의 신고와 그것을 위해 만든 읽기 전용 점검으로 찾았으며, 이를 지키는
   시험은 수정을 빼면 실패합니다. 가져온 턴에는 Codex의 오류 코드가 없으므로, 그런 세션에서는 Codex가 직접
-  돌린 턴이 실패하기 전까지 아무것도 감지되지 않습니다(@barkshah2002-pixel 신고, #27; @ZionZhang42 확인, #27).
+  돌린 턴이 실패하기 전까지 아무것도 감지되지 않습니다([@barkshah2002-pixel](https://github.com/barkshah2002-pixel) 신고, [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27); [@ZionZhang42](https://github.com/ZionZhang42) 확인, [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
 
 ### 고급판
 
@@ -711,7 +711,7 @@ v0.6.11의 항목에 있습니다([상태, 그리고 되돌아가기](CHANGELOG.
 ### 사용량 한도 복구 뒤의 전원 동작
 
 Discussion #22에서 요청받았고, 소유자가 2026-09-30과 2026-10-03에 정했습니다. 표준판에 들어갑니다. 모든
-기준을 지키며, 멈춤 단추를 위해 소유자가 A28을 고쳤습니다(@cervinho 제안, #22).
+기준을 지키며, 멈춤 단추를 위해 소유자가 A28을 고쳤습니다([@cervinho](https://github.com/cervinho) 제안, [#22](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/22)).
 
 - **기본으로 꺼져 있고, 대시보드에서만 켭니다.** 설정 > 일반에 새 마지막 카드 **사용량 제한 복구가 끝나면**이
   있습니다. 동작(절전, 최대 절전, 시스템 종료), 조건(모든 복구가 성공했을 때, 각 복구가 성공했거나 사용자에게
