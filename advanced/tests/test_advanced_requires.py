@@ -66,9 +66,12 @@ class RegistryShapeTests(unittest.TestCase):
         self.assertEqual(made.requires("a_thr"), ("a_one", "a_two"))
         self.assertEqual(made.required_by("a_one"), ("a_two", "a_thr"))
 
-    def test_the_shipped_pair_is_longer_reset_messages_on_the_message(self):
-        self.assertEqual(registry.REGISTRY.get("long_reset_message").requires, ("reset_message",))
-        self.assertIn("long_reset_message", registry.REGISTRY.required_by("reset_message"))
+    def test_the_shipped_pairs_are_the_meters_and_longer_messages_requires_nothing(self):
+        """The audit (v0.6.16-beta.3): no capability before it needs another. Longer messages lengthens what the
+        message at a reset and the prompt queue send - either one - so it requires neither."""
+        shipped = {d.id: d.requires for d in registry.DEFINITIONS if d.requires}
+        self.assertEqual(shipped, {"usage_wrap_up": ("usage_meter",), "usage_pause": ("usage_meter",)})
+        self.assertEqual(registry.REGISTRY.get("long_reset_message").requires, ())
 
 
 class RequireCase(ac.AdvancedCase):

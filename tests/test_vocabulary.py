@@ -189,12 +189,12 @@ LISTS = {
     "ui.popup.ATTENTION_OVERLAYS": ("set", 4, "a707a2b300127033"),
     # v0.6.11: and the needs-you notice's light, attention; and a long sleep's, paused (power.py).
     # and Show me what happens' card, waiting.
-    "notifier.NOTICE_STATUS": ("dict", 12, "ccfbc4aee6adaf58"),
+    "notifier.NOTICE_STATUS": ("dict", 13, "0119f51b8b7710c8"),   # v0.6.16-beta.3: near_limit
     # v0.6.12: the power action's five notices follow them, in a table of their own (PowerNotice), and the
     # whole table is both.
     "notifier.POWER_STATUS": ("dict", 5, "d403490eeafa7732"),
     "notifier.POWER_EVENTS": ("tuple", 5, "e5a05bae37eb8e45"),
-    "notifier.STATUS": ("dict", 17, "2ec8a9e6e4566ab5"),
+    "notifier.STATUS": ("dict", 18, "a034163f3da8091a"),
     "mcpserver.Server.START_WORDING": ("dict", 4, "f15e04a780f57870"),
     # v0.6.11: the two editions, and the plug that is the whole difference between them.
     "edition.EDITIONS": ("tuple", 2, "49cc206af3867704"),
@@ -213,7 +213,7 @@ LISTS = {
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
     # v0.6.14: what core did with a record of the plug's own (P2), as P14 tells it.
     "domain.plug.RECORD_MOVES": ("tuple", 10, "b4dae164afc55dd3"),
-    "domain.plug.RECORD_PURPOSES": ("tuple", 2, "d9b26e6afdae8bdb"),
+    "domain.plug.RECORD_PURPOSES": ("tuple", 3, "43433c43e9c5b2be"),   # v0.6.16-beta.3: wrap_up
     "domain.plug.EXTRA": "advanced",
 }
 

@@ -600,6 +600,7 @@
   "msg.toast_memory_stopped_next": "Pemantau berhenti di antara pemeriksaan, jadi tidak ada yang menunggu yang hilang. Mulai lagi dari Dasbor.",
   "msg.toast_memory_warning": "Pemantau memakai banyak memori",
   "msg.toast_memory_warning_next": "Pemantau tetap berjalan. Diagnostik menunjukkan pemakaian tertingginya.",
+  "msg.toast_near_limit": "Penggunaan Codex mendekati batas",
   "msg.toast_no_progress_body": "Pemulihan tidak menghasilkan kemajuan, jadi dihentikan.",
   "msg.toast_notify_only": "Percakapan ini hanya memberi tahu; tidak ada yang dilanjutkan otomatis.",
   "msg.toast_objection": "Berlanjut pada {time} kecuali Anda menghentikannya.",

@@ -155,12 +155,21 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "queue.at", "queue.series", "queue.state.waiting", "queue.state.held", "queue.state.in_codex",
     "queue.state.being_sent", "queue.state.refused", "queue.unproven", "queue.go_on", "confirm.prompt",
     "done.prompt_added", "refused.prompt_refused", "refused.queue_full", "refused.dependency_unknown",))
+# The usage meter's, the wrap-up's and the pause's choices (v0.6.16-beta.3, issue #29): each OptionKey's label, and
+# how its values are said.
+PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
+    "option.poll_minutes", "option.warn_five_hour", "option.warn_weekly", "option.wrap_five_hour",
+    "option.wrap_weekly", "option.wrap_style", "option.pause_five_hour", "option.pause_weekly",
+    "option.minutes", "option.percent", "option.style.1", "option.style.2", "option.style.3"))
 # The edition's own continuations' words (v0.6.15-beta): what empty_response, subagent_parent and keep_going send -
 # fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
 # subagent's line, its id and a closed kind word).
 CONTINUE_PREFIX = "continue."
 CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "subagent.line",
-                      CONTINUE_PREFIX + "keep_going")
+                      CONTINUE_PREFIX + "keep_going",
+                      # v0.6.16-beta.3: the wrap-up's three wordings (engine/usage.py).
+                      CONTINUE_PREFIX + "wrap_up.short", CONTINUE_PREFIX + "wrap_up.standard",
+                      CONTINUE_PREFIX + "wrap_up.detailed")
                      + tuple(CONTINUE_PREFIX + "subagent.kind." + kind
                              for kind in ("usage_limit", "temporary", "interrupted", "error")))
 

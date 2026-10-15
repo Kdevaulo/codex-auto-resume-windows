@@ -568,13 +568,33 @@ class Runtime:
                 answers.append(list(answer))
         due = answers[1:]
         answers = [flying, [answer[0] for answer in due if answer], [record for answer in due for record in answer[1:]]]
+        held = self._holders(states)
         for answer in answers:
             for record in answer:
                 key = record.get("record_id") if isinstance(record, dict) else None
+                if key is not None and any(holds(record) for holds in held):
+                    continue                                 # held back this tick (usage_pause's `holds`)
                 if key is not None and key not in seen:
                     seen.add(key)
                     found.append(record)
         return found or DEFER
+
+    def _holders(self, states) -> list:
+        """The `holds` of every capability on that has one (v0.6.16-beta.3, usage_pause): each says whether a record
+        of the edition's own waiting is held back from core this tick. One that raises holds nothing."""
+        found = []
+        for definition in self.registry:
+            if states.get(definition.id, ArmingState.OFF) != ArmingState.ARMED:
+                continue
+            holds = _own(self._code_of(definition), "holds")
+            if holds is not None:
+                def guarded(record, holds=holds):
+                    try:
+                        return holds(dict(record)) is True
+                    except Exception:
+                        return False
+                found.append(guarded)
+        return found
 
     def conversation_off(self, thread_id) -> None:
         """A person switched `thread_id` off, in the Dashboard, a model's tool or the command line (core's

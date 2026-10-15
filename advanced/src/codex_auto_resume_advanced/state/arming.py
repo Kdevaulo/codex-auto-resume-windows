@@ -28,6 +28,7 @@ from ..vocabulary import (KEPT_NOTICES, Actor, ArmingState, ArmingWarning, Journ
 from .choices import Refused
 from .continuations import end_pending as end_continuations
 from .prompts import end_pending as end_prompts
+from .meter import METER, end_meter
 from .resets import end_pending
 from .schema import CONTINUATION_CAPABILITIES
 from .schema import RESET_CAPABILITIES
@@ -140,6 +141,8 @@ class ArmingMixin:
                 end_pending(connection, (capability,), now)      # a reset action's rules end with it
                 end_continuations(connection, (capability,), now)  # and (v0.6.15-beta) its continuations
                 end_prompts(connection, (capability,), now)        # and its queued prompts
+                if capability == METER:
+                    end_meter(connection)                          # (v0.6.16-beta.3) and the meter's reading
             connection.execute("UPDATE meta SET generation = generation + 1")
             code = _CODES.get(state) or (JournalCode.TRIPPED if actor == Actor.TRIPWIRE
                                          else JournalCode.RESET if actor in (Actor.EDITION_ENTRY, Actor.ENGINE_CHANGE)
@@ -209,6 +212,7 @@ class ArmingMixin:
             end_pending(connection, RESET_CAPABILITIES, now)     # every reset action's rules end with them
             end_continuations(connection, CONTINUATION_CAPABILITIES, now)
             end_prompts(connection, ("prompt_queue",), now)
+            end_meter(connection)
             connection.execute("UPDATE meta SET generation = generation + 1")
             self._note(connection, now, JournalCode.RESET if actor == Actor.EDITION_ENTRY
                        else JournalCode.ALL_OFF, reason=reason, actor=actor)

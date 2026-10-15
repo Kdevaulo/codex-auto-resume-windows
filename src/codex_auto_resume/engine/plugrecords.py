@@ -81,7 +81,7 @@ class PlugRecordsMixin:
         """Whether a waiting record's words are a person's own that may be sent (A26, A27 as P2 keeps
         them): checked here again, whatever the plug checked, and a record whose words fail is dropped."""
         try:
-            if record["purpose"] == RecordPurpose.CONTINUATION:
+            if record["purpose"] in (RecordPurpose.CONTINUATION, RecordPurpose.WRAP_UP):
                 continuation.validate_continuation(record["words"])
             else:
                 continuation.validate_prompt(record["words"])
@@ -97,6 +97,11 @@ class PlugRecordsMixin:
         latest = self.source.latest(thread)
         if latest is None:
             return RecordMove.WAITING, "identity", "not_user_conversation"
+        if record["purpose"] == RecordPurpose.WRAP_UP:
+            # v0.6.16-beta.3: a wrap-up goes only into the very turn it was made for, while it still runs.
+            if latest.get("ordinal") != record["ordinal"] or latest.get("status") != "inProgress":
+                return RecordMove.SUPERSEDED, "identity", "latest_turn_changed"
+            return None
         if record["purpose"] != RecordPurpose.CONTINUATION:
             return None
         if (latest.get("ordinal") != record["ordinal"] or latest.get("status") not in FINAL

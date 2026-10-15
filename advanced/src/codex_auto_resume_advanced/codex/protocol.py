@@ -95,6 +95,8 @@ CAPABILITY_METHODS = {
     "reset_credit": ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
     # A message sent at a reset (engine/resetmessage.py) reads usage, to count the resets, and nothing else.
     "reset_message": ("account/rateLimits/read",),
+    # The usage meter (engine/usage.py, v0.6.16-beta.3) reads usage on its schedule, and nothing else.
+    "usage_meter": ("account/rateLimits/read",),
 }
 
 # Every method some measurement declared: what a capability's own route may be given, and nothing

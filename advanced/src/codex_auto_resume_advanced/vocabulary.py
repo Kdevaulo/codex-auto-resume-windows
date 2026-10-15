@@ -202,6 +202,17 @@ class OptionKey(StrEnum):
     # days a continuation is kept in Codex's queue for when its conversation is opened (queue_for_open, 3 to 7).
     WORKERS = "workers"
     DAYS = "days"
+    # v0.6.16-beta.3 (issue #29), each a person's own choice: how often the usage meter reads (minutes), and for
+    # each of the five-hour and the weekly window the percentage it warns at, wraps up at and pauses at - and the
+    # wrap-up's wording (1 short, 2 standard, 3 detailed).
+    POLL_MINUTES = "poll_minutes"
+    WARN_FIVE_HOUR = "warn_five_hour"
+    WARN_WEEKLY = "warn_weekly"
+    WRAP_FIVE_HOUR = "wrap_five_hour"
+    WRAP_WEEKLY = "wrap_weekly"
+    WRAP_STYLE = "wrap_style"
+    PAUSE_FIVE_HOUR = "pause_five_hour"
+    PAUSE_WEEKLY = "pause_weekly"
 
 
 class KeepOn(StrEnum):
@@ -537,6 +548,9 @@ class ContinuationKind(StrEnum):
     EMPTY_RESPONSE = "empty_response"
     SUBAGENT = "subagent"
     KEEP_GOING = "keep_going"
+    # v0.6.16-beta.3 (issue #29): a conversation with a turn running asked to wrap up, once for each usage window
+    # that reached the percentage a person chose (usage_wrap_up), sent while that turn is still the latest.
+    WRAP_UP = "wrap_up"
 
 
 class ContinuationReason(StrEnum):

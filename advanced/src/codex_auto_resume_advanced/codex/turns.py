@@ -37,7 +37,10 @@ PLAN = ("SELECT json_extract(step.value, '$.status') FROM (SELECT item_json FROM
         "AND item_type=? ORDER BY rollout_ordinal DESC LIMIT 1) AS newest, json_each(newest.item_json, '$.steps') "
         "AS step")
 BETWEEN = "SELECT count(*) FROM thread_turns WHERE thread_id=? AND rollout_ordinal > ? AND rollout_ordinal < ?"
-STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN, BETWEEN)
+# v0.6.16-beta.3 (usage_wrap_up): the conversations whose latest turn is running - status words and ids only.
+RUNNING = ("SELECT t.thread_id FROM thread_turns t WHERE t.status='inProgress' AND NOT EXISTS (SELECT 1 FROM "
+           "thread_turns n WHERE n.thread_id=t.thread_id AND n.rollout_ordinal > t.rollout_ordinal) LIMIT ?")
+STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN, BETWEEN, RUNNING)
 # A plan step's statuses as Codex writes them; anything else reads "unknown".
 STEP_STATUSES = frozenset({"pending", "in_progress", "completed"})
 UNKNOWN = "unknown"
@@ -136,6 +139,12 @@ class Turns:
         """The conversations with a turn completed at `since` or later (Codex's seconds), the latest first, at
         most RECENT_LIMIT - the candidates the edition looks at, never a list of every conversation."""
         rows = self._read(lambda connection: connection.execute(RECENT, (int(since), RECENT_LIMIT)).fetchall())
+        return [row[0] for row in rows if ids.is_uuid(row[0])]
+
+    def running(self) -> list:
+        """The conversations whose latest turn is running now, at most RECENT_LIMIT (v0.6.16-beta.3, the wrap-up's
+        candidates): ids, never a word of any turn."""
+        rows = self._read(lambda connection: connection.execute(RUNNING, (RECENT_LIMIT,)).fetchall())
         return [row[0] for row in rows if ids.is_uuid(row[0])]
 
     def between(self, thread_id, after, before) -> int:

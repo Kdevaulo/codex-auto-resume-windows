@@ -586,6 +586,23 @@ class App(WatchLoop):
             added = self.plug.surface(Surface.TRAY, dict(snapshot))
             if added is not DEFER:
                 snapshot[EXTRA] = added
+                self._near_limit(added)
             icon_tray.update(snapshot)
         except Exception:
             pass
+
+    def _near_limit(self, added):
+        """The advanced edition's usage meter at a warning (v0.6.16-beta.3, issue #29): each notice its plug adds to
+        the icon's snapshot is shown once in this watcher's life, by its key - a window and its reset - under the
+        notifications switch, off the tick path like every watcher notice. The standard edition adds none."""
+        meter = added.get("meter") if isinstance(added, dict) else None
+        notices = meter.get("notices") if isinstance(meter, dict) else None
+        shown = self.__dict__.setdefault("_near_limit_shown", set())
+        for notice in notices if isinstance(notices, list) else ():
+            key = notice.get("key") if isinstance(notice, dict) else None
+            if not isinstance(key, str) or key in shown or len(shown) > 64:
+                continue
+            shown.add(key)
+            self._watcher_notice("near_limit", {"minutes": notice.get("window_minutes"),
+                                                "percent": notice.get("used_percent"),
+                                                "reset_at": notice.get("reset_at")})

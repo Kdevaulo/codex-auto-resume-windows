@@ -46,9 +46,12 @@ ERRAND_GUARDS = 8
 class RecordPurpose(StrEnum):
     """What a record of the plug's says (v0.6.15-beta): a person's own MESSAGE (continuation.validate_prompt, product
     text refused), or a CONTINUATION in the edition's own catalog words (continuation.validate_continuation), sent only
-    while the turn it follows is still its conversation's latest."""
+    while the turn it follows is still its conversation's latest. From v0.6.16-beta.3 a WRAP_UP, in the edition's own
+    catalog words too, sent only while the turn it was made for is still the latest and still running - Codex's queue
+    delivers it when that turn ends."""
     MESSAGE = "message"
     CONTINUATION = "continuation"
+    WRAP_UP = "wrap_up"
 
 
 class RecordMove(StrEnum):
@@ -189,7 +192,7 @@ def _record(found):
     if (type(key) is not str or not ids.is_interruption_id(key) or ids.uuid_problem(thread) is not None
             or found["marker"] != ids.short_marker(key) or purpose not in tuple(RecordPurpose)):
         return None
-    if purpose == RecordPurpose.CONTINUATION:
+    if purpose in (RecordPurpose.CONTINUATION, RecordPurpose.WRAP_UP):
         if type(ordinal) is not int or ordinal < 0:
             return None
     elif ordinal is not None:

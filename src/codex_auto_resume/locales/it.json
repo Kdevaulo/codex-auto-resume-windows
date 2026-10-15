@@ -600,6 +600,7 @@
   "msg.toast_memory_stopped_next": "Si è arrestato tra due controlli, quindi nulla di ciò che attendeva è andato perso. Riavvialo dalla Dashboard.",
   "msg.toast_memory_warning": "Il monitor sta usando molta memoria",
   "msg.toast_memory_warning_next": "Continua a monitorare. Diagnostica mostra il massimo che ha usato.",
+  "msg.toast_near_limit": "L'utilizzo di Codex è vicino a un limite",
   "msg.toast_no_progress_body": "Il recupero non ha prodotto progressi, quindi è stato interrotto.",
   "msg.toast_notify_only": "Questa conversazione invia solo avvisi; non viene ripreso nulla automaticamente.",
   "msg.toast_objection": "Continuerà alle {time}, a meno che tu non la fermi.",

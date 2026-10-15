@@ -86,6 +86,8 @@ from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
+from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STYLE, DEFAULT_WARN, DEFAULT_WRAP, PERCENTS,
+                           POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
 from .vocabulary import CapabilityKind, Measurement, OptionKey
@@ -780,13 +782,87 @@ KEEP_GOING = CapabilityDef(
     measurements=(Measurement.MK,),
 )
 
+# The usage meter (v0.6.16-beta.3, issue #29; the v0.6.11 design's "Live usage meter"). At P8, while the Codex app
+# runs, it reads usage on its own every POLL_MINUTES (5 to 60, 15 by default) through one finite session that asks
+# account/rateLimits/read alone (codex/protocol.CAPABILITY_METHODS), keeps the windows as core keeps a reading
+# (state/meter.py), shows them in the icon's tooltip and the popup (surfaces.meter_view), and at the person's
+# warning percentage of the five-hour or the weekly window (85 by default, each its own) shows a notice once for that
+# window. It never satisfies core's usage gate. It departs from C4 (it reads on a schedule, on its own) and C9 (usage
+# read when no recovery is due), stands on usage_probe and rests on MU. It sends nothing: its ceilings are the
+# schema's floor and never bind, as start_with_codex's. Wrap up near a limit and Pause near a limit require it.
+USAGE_METER = CapabilityDef(
+    id="usage_meter",
+    points=frozenset({Point.TICK}),
+    revision=1,
+    departs_from=("C4", "C9"),
+    compat="usage_probe",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="meter",
+    make=make_meter,
+    codes=("read", "unreadable", "warned"),
+    measurements=(Measurement.MU,),
+    options=(Option(OptionKey.POLL_MINUTES, POLL_CHOICES, DEFAULT_POLL),
+             Option(OptionKey.WARN_FIVE_HOUR, PERCENTS, DEFAULT_WARN),
+             Option(OptionKey.WARN_WEEKLY, PERCENTS, DEFAULT_WARN)),
+)
+
+# Wrap up near a limit (v0.6.16-beta.3, issue #29; the v0.6.11 design's "Near-limit wrap-up nudge"). At P8, when the
+# meter's reading of the five-hour or the weekly window is at the person's wrap-up percentage (90 by default, each its
+# own), each conversation switched on whose latest turn is running is given one message of the edition's own - short,
+# standard or detailed, as the person chose - once for that window (its key the conversation, the window and its
+# reset); at P2 each waiting one is handed core as a WRAP_UP record, which core queues through `codex queue` only
+# while that turn is still the latest and still running, so Codex delivers it when the turn ends. It departs from
+# A13 (no failure is recovered) and A26 (words of its own), stands on exact_thread_recovery, the queue every send
+# rests on, and rests on MT (a message queued while a turn runs is delivered after it). It requires the meter.
+# Ceilings: two a conversation (both windows), a dozen a day.
+USAGE_WRAP_UP = CapabilityDef(
+    id="usage_wrap_up",
+    points=frozenset({Point.TICK, Point.RECORDS}),
+    revision=1,
+    departs_from=("A13", "A26"),
+    compat="exact_thread_recovery",
+    ceilings=Ceilings(per_day=12, per_conversation=2),
+    journal_prefix="wrap",
+    make=make_wrap_up,
+    codes=("found", "sent", "delivered", "unknown", "superseded"),
+    measurements=(Measurement.MT,),
+    options=(Option(OptionKey.WRAP_FIVE_HOUR, PERCENTS, DEFAULT_WRAP),
+             Option(OptionKey.WRAP_WEEKLY, PERCENTS, DEFAULT_WRAP),
+             Option(OptionKey.WRAP_STYLE, STYLES, DEFAULT_STYLE)),
+    requires=("usage_meter",),
+)
+
+# Pause near a limit (v0.6.16-beta.3, issue #29). At P8, when the meter's reading of the five-hour or the weekly
+# window is at the person's pause percentage (95 by default, each its own), the window is marked held until its reset
+# (state/meter.py); at P3 it answers HOLD for every record of core's while one is held, and the edition's own
+# continuations waiting are not handed to core (`holds`, runtime.records). A person's own messages, a wrap-up and
+# anything typed in Codex are untouched. It lets go when the window resets. It departs from C9 (it acts on a reading
+# taken when no recovery is due - the meter's), stands on usage_probe and rests on MU. It sends nothing: a HOLD is a
+# restriction, never paid for, so its ceilings are the schema's floor. It requires the meter.
+USAGE_PAUSE = CapabilityDef(
+    id="usage_pause",
+    points=frozenset({Point.GATES, Point.TICK}),
+    revision=1,
+    departs_from=("C9",),
+    compat="usage_probe",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="pause",
+    make=make_pause,
+    codes=("paused", "resumed"),
+    measurements=(Measurement.MU,),
+    options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE),
+             Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE)),
+    requires=("usage_meter",),
+)
+
 # Longer reset messages (v0.6.14, the owner's answer of 2026-10-08): a message sent at a reset may be up to what one
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
 # nothing; reset_message reads whether it stands on, and when it does not, a waiting message over 2,000 is cancelled.
-# It requires reset_message (v0.6.16-beta.3): longer messages are nothing without the message at a reset, so
-# turning Longer messages on turns the message capability on in the same confirmation, and turning the message off
-# turns Longer messages off (arming.py). The one pair today's registry already had.
+# It requires nothing (v0.6.16-beta.3's audit of the registry for `requires`): it lengthens what reset_message and
+# prompt_queue send, either one, so neither is a requirement - requiring one would turn on a feature a person who wants
+# longer queued prompts never asked for. No capability of the registry before v0.6.16-beta.3 needs another; the pairs
+# are new: the usage meter, which Wrap up near a limit and Pause near a limit require.
 LONG_RESET_MESSAGE = CapabilityDef(
     id="long_reset_message",
     kind=CapabilityKind.ACTION,
@@ -798,7 +874,6 @@ LONG_RESET_MESSAGE = CapabilityDef(
     ceilings=None,
     journal_prefix="longmsg",
     make=make_long_messages,
-    requires=("reset_message",),
 )
 
 # The compatibility report (v0.6.14 stage 3b, the plan's in-app report): this PC's own records written
@@ -832,6 +907,7 @@ COMPAT_REPORT = CapabilityDef(
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
+               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE,
                LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)
@@ -844,7 +920,9 @@ REGISTRY = Registry(DEFINITIONS)
 # cases and expert settings. A measurement's warning never pushes a capability down. Every capability of
 # DEFINITIONS appears here exactly once (test_advanced_registry holds it).
 SHOWN_ORDER = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
-               "early_reset", "parallel_dispatch", "reset_message", "long_reset_message", "keep_going",
+               "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
+               # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
+               "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",
                "prompt_queue", "empty_response", "once_more_when_unsure", "send_now", "capacity_retry",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
                "structured_rules")

@@ -871,6 +871,7 @@
   "msg.toast_power_failed_body": "Nothing else changed. The Dashboard says more.",
   "msg.toast_power_not_met": "The PC stays on: not every recovery ended as you chose",
   "msg.toast_power_stopped": "The PC stays on this time",
+  "msg.toast_near_limit": "Codex usage is near a limit",
   "diag.memory_peak": "Peak memory",
   "diag.memory_mb": "{n} MB",
   "diag.stopped_unexpectedly": "stopped unexpectedly at {time}",

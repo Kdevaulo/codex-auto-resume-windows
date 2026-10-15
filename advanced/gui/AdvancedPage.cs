@@ -1054,6 +1054,14 @@ namespace CodexAutoResume
         private string OptionText(string key, int value)
         {
             if (key == "ceiling_hours") return Word("page.option.hours", "{n} h", "n", value);
+            // v0.6.16-beta.3 (issue #29): the meter's spacing, a stage's percentage, the wrap-up's wording.
+            if (key == "poll_minutes") return Word("page.option.minutes", "{n} min", "n", value);
+            if (key == "wrap_style")
+                return Word("page.option.style." + value.ToString(CultureInfo.InvariantCulture),
+                            value == 1 ? "Short" : value == 3 ? "Detailed" : "Standard");
+            if (key.StartsWith("warn_", StringComparison.Ordinal) || key.StartsWith("wrap_", StringComparison.Ordinal) ||
+                key.StartsWith("pause_", StringComparison.Ordinal))
+                return Word("page.option.percent", "{n}%", "n", value);
             return value.ToString(CultureInfo.CurrentCulture);
         }
 

@@ -600,6 +600,7 @@
   "msg.toast_memory_stopped_next": "Nó dừng giữa hai lần kiểm tra nên không mất gì đang chờ. Hãy chạy lại từ Bảng điều khiển.",
   "msg.toast_memory_warning": "Bộ theo dõi đang dùng nhiều bộ nhớ",
   "msg.toast_memory_warning_next": "Nó vẫn tiếp tục theo dõi. Chẩn đoán cho biết mức cao nhất nó đã dùng.",
+  "msg.toast_near_limit": "Mức dùng Codex gần chạm giới hạn",
   "msg.toast_no_progress_body": "Việc khôi phục không tạo ra tiến triển nào, nên đã dừng.",
   "msg.toast_notify_only": "Cuộc trò chuyện này chỉ thông báo; không có gì được tự động tiếp tục.",
   "msg.toast_objection": "Sẽ tiếp tục lúc {time} trừ khi bạn dừng lại.",

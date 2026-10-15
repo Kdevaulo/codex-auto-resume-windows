@@ -600,6 +600,7 @@
   "msg.toast_memory_stopped_next": "它在两次检查之间停止，因此等待中的内容没有丢失。请从仪表板重新启动它。",
   "msg.toast_memory_warning": "监视程序占用了大量内存",
   "msg.toast_memory_warning_next": "它会继续监视。“诊断”会显示它用过的最大内存。",
+  "msg.toast_near_limit": "Codex 用量接近限额",
   "msg.toast_no_progress_body": "恢复没有带来任何进展，因此已停止。",
   "msg.toast_notify_only": "此对话仅通知；不会自动继续。",
   "msg.toast_objection": "除非你停止，否则将于 {time} 继续。",

@@ -600,6 +600,7 @@
   "msg.toast_memory_stopped_next": "Se detuvo entre dos comprobaciones, así que no se perdió nada de lo que esperaba. Vuelve a iniciarlo desde el Panel.",
   "msg.toast_memory_warning": "El monitor está usando mucha memoria",
   "msg.toast_memory_warning_next": "Sigue vigilando. Diagnóstico muestra lo máximo que ha usado.",
+  "msg.toast_near_limit": "El uso de Codex está cerca de un límite",
   "msg.toast_no_progress_body": "La recuperación no produjo avances, así que se detuvo.",
   "msg.toast_notify_only": "Esta conversación solo notifica; no se reanuda nada automáticamente.",
   "msg.toast_objection": "Continuará a esta hora: {time}, salvo que la detengas.",

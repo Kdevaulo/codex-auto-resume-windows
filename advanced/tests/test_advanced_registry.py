@@ -61,6 +61,8 @@ class ShippedTests(unittest.TestCase):
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
                "prompt_queue", "empty_response", "subagent_parent", "keep_going",
+               # v0.6.16-beta.3 (issue #29): the usage meter, and the wrap-up and the pause that require it.
+               "usage_meter", "usage_wrap_up", "usage_pause",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -79,15 +81,15 @@ class ShippedTests(unittest.TestCase):
         answering = {Point.START_ROUTE: ("start_with_codex",),
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
                      Point.TICK: ("reset_credit", "reset_message", "empty_response", "subagent_parent",
-                                  "keep_going"),
+                                  "keep_going", "usage_meter", "usage_wrap_up", "usage_pause"),
                      Point.RECORDS: ("reset_message", "prompt_queue", "empty_response", "subagent_parent",
-                                     "keep_going"),
+                                     "keep_going", "usage_wrap_up"),
                      # v0.6.15-beta: the lines a parent's continuation is given of its subagents' stops (5a).
                      Point.TEXT: ("subagent_parent",),
                      Point.UNLOADED: ("goal_continuation", "queue_for_open"),
                      Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
-                                   "early_reset"),
+                                   "early_reset", "usage_pause"),
                      Point.ADMISSION: ("capacity_retry", "structured_rules", "unknown_failure_budget",
                                        "codex_gave_up", "sign_in_retry"),
                      Point.SENDER: ("goal_continuation", "marker_free_continuation"),
@@ -99,7 +101,8 @@ class ShippedTests(unittest.TestCase):
 
     # The order a person reads them in (the owner's, 2026-10-10): the compatibility report first, then by importance.
     SHOWN = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
-             "early_reset", "parallel_dispatch", "reset_message", "long_reset_message", "keep_going", "prompt_queue",
+             "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
+             "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
              "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "codex_gave_up",
              "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules")
 

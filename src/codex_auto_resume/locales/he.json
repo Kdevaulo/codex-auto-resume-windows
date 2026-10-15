@@ -600,6 +600,7 @@
   "msg.toast_memory_stopped_next": "הוא נעצר בין בדיקות, ולכן שום דבר ממתין לא הלך לאיבוד. אפשר להפעיל אותו שוב מלוח המחוונים.",
   "msg.toast_memory_warning": "תהליך הניטור משתמש בהרבה זיכרון",
   "msg.toast_memory_warning_next": "הוא ממשיך לנטר. \"אבחון\" מציג את השימוש המרבי שלו.",
+  "msg.toast_near_limit": "השימוש ב-Codex קרוב למגבלה",
   "msg.toast_no_progress_body": "השחזור לא הניב התקדמות, ולכן הוא נעצר.",
   "msg.toast_notify_only": "השיחה הזו רק שולחת התראות; דבר לא מחודש אוטומטית.",
   "msg.toast_objection": "ההמשך יתבצע ב-{time}, אלא אם ייעצר על ידך.",
