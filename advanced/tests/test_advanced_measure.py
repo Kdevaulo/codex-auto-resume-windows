@@ -1482,16 +1482,26 @@ class ReadOnlyProbeTests(unittest.TestCase):
         self.assertEqual(asked, [("app-server", "--help")])
 
     def test_the_cloud_probe_reads_the_help_for_a_state_read(self):
-        present = self.run_one(Measurement.MCLOUD, cli=lambda args: "codex cloud: list and show task status")
+        top = "Usage: codex [OPTIONS] [PROMPT]\n       codex [OPTIONS] <COMMAND>\nCommands: exec, login, cloud ..."
+
+        def help_of(cloud):
+            return lambda args: cloud if args == ("cloud", "--help") else top
+        present = self.run_one(Measurement.MCLOUD,
+                               cli=help_of("Usage: codex cloud [OPTIONS] [COMMAND]\nlist and show task status"))
         self.assertEqual({k: self.observed(present)[k] for k in ("cloud_help_read", "cloud_command_present",
                                                                  "state_read_present")},
                          {"cloud_help_read": True, "cloud_command_present": True, "state_read_present": True})
         none = self.run_one(Measurement.MCLOUD, cli=lambda args: "error: unrecognized subcommand 'cloud'")
         self.assertEqual({k: self.observed(none)[k] for k in ("cloud_command_present", "state_read_present")},
                          {"cloud_command_present": False, "state_read_present": False})
+        # `codex <unknown> --help` exits 0 with the top-level help: read as no cloud command, whatever words it has.
+        missing = self.run_one(Measurement.MCLOUD, cli=help_of(top))
+        self.assertEqual({k: self.observed(missing)[k] for k in ("cloud_help_read", "cloud_command_present",
+                                                                 "state_read_present")},
+                         {"cloud_help_read": True, "cloud_command_present": False, "state_read_present": False})
         asked = []
         self.run_one(Measurement.MCLOUD, cli=lambda args: asked.append(args) or "")
-        self.assertEqual(asked, [("cloud", "--help")])
+        self.assertEqual(asked, [("cloud", "--help"), ("--help",)])
 
     def test_every_probes_observation_is_content_free(self):
         for measurement, seam in ((Measurement.MIPC, {"ipc": lambda: {"exists": True}}),

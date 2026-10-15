@@ -771,7 +771,12 @@ def _mcloud(ctx):
     text = ctx.cli_help(("cloud", "--help"))
     read = text is not None
     lowered = text.lower() if read else ""
-    present = read and "unrecognized" not in lowered and "unknown" not in lowered and "no such" not in lowered
+    # `codex <unknown> --help` exits 0 with the top-level help, so a cloud command is there only where its help is not
+    # the top-level one and has a usage line of its own that names it.
+    top = ctx.cli_help(("--help",)) if read else None
+    own_usage = any(line.strip().startswith("usage:") and " cloud" in line for line in lowered.splitlines())
+    present = (read and own_usage and (top is None or text.strip() != top.strip())
+               and "unrecognized" not in lowered and "unknown" not in lowered and "no such" not in lowered)
     observed = {"cloud_help_read": read, "cloud_command_present": bool(present),
                 "state_read_present": bool(present) and any(word in lowered for word in _CLOUD_STATE_WORDS)}
     return _blocked("a read-only look for a `codex cloud` command and a supported way to read a cloud task's state. "
