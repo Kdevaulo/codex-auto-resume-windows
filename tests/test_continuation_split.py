@@ -194,6 +194,8 @@ class SplitReadTests(SplitCase):
             db.execute("UPDATE threads SET rollout_path=? WHERE id=?",
                        (str(self.home.root / "sessions" / ("rollout-x-%s_%s.jsonl" % (OTHER, b))), OTHER))
         self.assertEqual(self.failures(), [])
+        self.assertIsNone(self.source.latest(A), "B is not followed: A's own turns, of which there are none")
+        self.assertEqual(self.source.turn_chain(A), (A,))
 
     def test_a_file_named_otherwise_is_not_a_split(self):
         b = self.home.rotate(A)
