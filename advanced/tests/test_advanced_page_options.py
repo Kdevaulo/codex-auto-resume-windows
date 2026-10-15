@@ -136,14 +136,19 @@ class PageTests(PageCase):
 
     @classmethod
     def scenario_keep_on(cls, bridge):
-        """Short retries when Codex is at capacity watched: Keep it on... asks with its warning and sends it, confirmed;
-        then Also send again when unsure... with its own; then Let it turn itself off, asking nothing. Each list read
-        after is the real bridge's after that request."""
+        """Short retries when Codex is at capacity watched: Keep it on... turns it on and keeps it on in one question -
+        Keep it on's warning, then its statement - sent as one advanced-arm with keep_on (v0.6.16-beta.4); then Also
+        send again when unsure... with its own; then Let it turn itself off, asking nothing - and it stays on. Each list
+        read after is the real bridge's after that request."""
         cls.watched(bridge, "capacity_retry")
         script = cls.opening(bridge, "en")
         generation = script["advanced-list"][0]["result"]["generation"]
-        kept = bridge("advanced-keep-on", {"capability": "capacity_retry", "keep_on": True, "generation": generation,
-                                           "confirmed": ["keep_on"]})
+        shown = bridge("advanced-statement", {"capability": "capacity_retry", "locale": "en"})["result"]
+        kept = bridge("advanced-arm", {"capability": "capacity_retry", "state": "armed", "revision": shown["revision"],
+                                       "generation": generation, "engine_version": shown["engine_version"],
+                                       "warnings": [item["warning"] for item in shown["warnings"]["items"]],
+                                       "keep_on": True})
+        assert kept["result"]["done"], kept
         once = bridge("advanced-list", {})
         again = bridge("advanced-keep-on", {"capability": "capacity_retry", "keep_on": True, "send_again": True,
                                             "generation": once["result"]["generation"],
@@ -153,7 +158,7 @@ class PageTests(PageCase):
         after = bridge("advanced-list", {})
         steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "capacity_retry"},
                  {"do": "look"},
-                 {"do": "reply", "key": "advanced-keep-on", "with": [kept]},
+                 {"do": "reply", "key": "advanced-arm", "with": [kept]},
                  {"do": "reply", "key": "advanced-list", "with": [once]},
                  {"do": "press", "button": "keep_on"}, {"do": "look"},
                  {"do": "reply", "key": "advanced-keep-on", "with": [again]},
@@ -164,7 +169,7 @@ class PageTests(PageCase):
                  {"do": "press", "button": "let_go"}, {"do": "look"},
                  {"do": "choose", "id": "send_now"}, {"do": "look"}]
         return "en", {"answers": [True, True], "script": script, "steps": steps}, {
-            "generations": [generation, once["result"]["generation"]],
+            "generations": [generation, once["result"]["generation"]], "statement": shown,
             "words": script["advanced-words"][0]["result"]["words"]}
 
     @classmethod
@@ -172,7 +177,7 @@ class PageTests(PageCase):
         """Kept on, Short retries when Codex is at capacity noted a new Codex version instead of turning itself off: said
         in the accent under its state; and a once-more capability that a resend found twice turned off: said why."""
         from codex_auto_resume_advanced.vocabulary import Actor, ArmingState, OffReason
-        cls.watched(bridge, "capacity_retry")
+        cls.watched(bridge, "capacity_retry", "armed")
         generation = bridge("advanced-list", {})["result"]["generation"]
         assert bridge("advanced-keep-on", {"capability": "capacity_retry", "keep_on": True, "generation": generation,
                                            "confirmed": ["keep_on"]})["result"]["done"]
@@ -188,9 +193,9 @@ class PageTests(PageCase):
 
     @classmethod
     def scenario_action_kept(cls, bridge):
-        """The compatibility report watched and kept on: Let it turn itself off, and no Also send again when unsure... -
-        an action sends no continuation to send again, and the bridge refuses Send again for one."""
-        cls.watched(bridge, REPORT)
+        """The compatibility report on and kept on: Let it turn itself off, and no Also send again when unsure... - an
+        action sends no continuation to send again, and the bridge refuses Send again for one."""
+        cls.watched(bridge, REPORT, "armed")
         generation = bridge("advanced-list", {})["result"]["generation"]
         assert bridge("advanced-keep-on", {"capability": REPORT, "keep_on": True, "generation": generation,
                                            "confirmed": ["keep_on"]})["result"]["done"]
@@ -246,31 +251,36 @@ class PageTests(PageCase):
 
     def test_keep_it_on_is_in_the_head_card_right_under_where_it_stands(self):
         """The owner found Keep it on too far down, a card of its own under the statement and the limits (2026-10-11):
-        it is in the head card now, its caption right after the State fact - and no card of its own is left."""
+        it is in the head card now, its caption right after the State fact - and no card of its own is left. Kept on,
+        the State fact itself says Keep it on, never "On · kept on" (v0.6.16-beta.4)."""
         result, expected = self.of("scenario_keep_on")
         words = expected["words"]
-        for look in result["looks"][:4]:
+        states = (words["state.shadow"], words["page.keep_on"], words["page.keep_on"], words["state.armed"])
+        for look, state in zip(result["looks"][:4], states):
             head = look["cards"][0]
-            at = head.index(words["page.keep_on"])
-            self.assertEqual(head[at - 2], words["page.col_state"], "right after the State fact")
-            self.assertEqual(head[at - 1], words["state.shadow"])
+            at = head.index(words["page.col_state"])
+            self.assertEqual(head[at + 1], state)
+            self.assertEqual(head[at + 2], words["page.keep_on"], "Keep it on's caption right after the State fact")
             self.assertNotIn(words["page.keep_on"], [card[0] for card in look["cards"]])
 
-    def test_the_list_says_kept_on_beside_the_state_of_a_kept_on_capability_alone(self):
+    def test_the_list_says_keep_it_on_alone_for_a_kept_on_capability(self):
+        """v0.6.16-beta.4 (the owner): a kept-on capability's row says Keep it on, and nothing else - not "On · kept on";
+        watched before, it is on after Keep it on; let go, it is plainly on."""
         result, expected = self.of("scenario_keep_on")
         words = expected["words"]
         first, once, twice, after, _ = result["looks"]
         name = words["name.capacity_retry"]
-        kept = words["state.shadow"] + " · " + words["page.state_kept_on"]
+        kept = words["page.keep_on"]
 
         def states(look):
             return {row[0]: row[1] for row in look["rows"]}
         for look, expected_state in ((first, words["state.shadow"]), (once, kept), (twice, kept),
-                                     (after, words["state.shadow"])):
+                                     (after, words["state.armed"])):
             shown = states(look)
             self.assertEqual(shown[name], expected_state)
-            self.assertEqual([text for text in shown.values() if words["page.state_kept_on"] in text],
-                             [kept] if expected_state == kept else [], "no other row says kept on")
+            self.assertEqual([text for text in shown.values() if text == kept],
+                             [kept] if expected_state == kept else [], "no other row says Keep it on")
+            self.assertFalse([text for text in shown.values() if " \u00b7 " in text], "no state with a second word")
 
     def test_keep_it_on_asks_with_each_warning_sends_what_was_confirmed_and_lets_go_asking_nothing(self):
         result, expected = self.of("scenario_keep_on")
@@ -286,19 +296,25 @@ class PageTests(PageCase):
         self.assertEqual(after["kept"], first["kept"])
         self.assertEqual(once["note"], words["page.done.keep_on"].replace("{name}", name))
         self.assertEqual(after["note"], words["page.done.keep_on_off"].replace("{name}", name))
-        self.assertEqual(result["asked"], [words["page.confirm.keep_on"].replace("{name}", name),
-                                           words["page.confirm.send_again"].replace("{name}", name)])
+        # One question turns it on and keeps it on: Keep it on's warning, then the statement it turns on.
+        keep_question, again_question = result["asked"]
+        self.assertTrue(keep_question.startswith(words["page.confirm.keep_on"].replace("{name}", name)))
+        self.assertIn(words["page.confirm.on"].replace("{name}", name), keep_question)
+        self.assertEqual(again_question, words["page.confirm.send_again"].replace("{name}", name))
         first_generation, second_generation = expected["generations"]
+        statement = expected["statement"]
+        self.assertEqual(sent(result, "advanced-arm"), [
+            {"capability": "capacity_retry", "state": "armed", "revision": statement["revision"],
+             "generation": first_generation, "engine_version": statement["engine_version"],
+             "warnings": [item["warning"] for item in statement["warnings"]["items"]], "keep_on": True}])
         self.assertEqual(sent(result, "advanced-keep-on"), [
-            {"capability": "capacity_retry", "keep_on": True, "send_again": False, "generation": first_generation,
-             "confirmed": ["keep_on"]},
             {"capability": "capacity_retry", "keep_on": True, "send_again": True, "generation": second_generation,
              "confirmed": ["keep_on", "send_again"]},
             {"capability": "capacity_retry", "keep_on": False, "send_again": False}])
         self.assertEqual(result["told"], [])
-        # Send now off: no card of waiting recoveries, and no Keep it on for what is off.
+        # Send now off: no card of waiting recoveries - and Keep it on... offered, which turns it on (v0.6.16-beta.4).
         self.assertEqual(send_now["send_now"], [])
-        self.assertEqual(send_now["kept"], {"keep_on": None, "send_again": None, "let_go": None})
+        self.assertEqual(send_now["kept"], {"keep_on": True, "send_again": None, "let_go": None})
         self.assertNotIn(words["page.send_now.title"], [card[0] for card in send_now["cards"]])
 
     def test_what_keep_it_on_sends_is_what_the_real_bridge_takes(self):
@@ -306,11 +322,11 @@ class PageTests(PageCase):
             bridge = Bridge(Path(home))
             try:
                 self.watched(bridge, "capacity_retry")
-                line = next(line for line in self.of("scenario_keep_on")[0]["sent"] if line.startswith("advanced-keep-on "))
+                line = next(line for line in self.of("scenario_keep_on")[0]["sent"] if line.startswith("advanced-arm "))
                 self.assertTrue(bridge.request(line)["result"]["done"])
                 item = next(entry for entry in bridge("advanced-list", {})["result"]["capabilities"]
                             if entry["id"] == "capacity_retry")
-                self.assertEqual((item["keep_on"], item["send_again"]), (True, False))
+                self.assertEqual((item["state"], item["keep_on"], item["send_again"]), ("armed", True, False))
             finally:
                 bridge.close()
 

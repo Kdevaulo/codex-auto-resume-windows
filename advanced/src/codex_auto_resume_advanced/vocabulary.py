@@ -149,6 +149,8 @@ class Refusal(StrEnum):
     # A requirement's compatibility grade is Failed here on this PC: like a policy on it, it keeps the dependent off,
     # whatever is confirmed - the owner's rule for `requires`.
     REQUIREMENT_FAILED_HERE = "requirement_failed_here"
+    # Keep it on (v0.6.16-beta.4) for a capability whose compatibility is Failed here: never kept on that way.
+    FAILED_HERE = "failed_here"
 
 
 class JournalCode(StrEnum):

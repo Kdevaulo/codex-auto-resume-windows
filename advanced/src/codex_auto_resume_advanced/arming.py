@@ -702,7 +702,7 @@ class Arming:
 
     # ------------------------------------------------------------------ on
     def arm(self, capability, *, state, revision, generation, acknowledged_version=None,
-            warnings=None, also=None, actor) -> dict:
+            warnings=None, also=None, keep_on=False, actor) -> dict:
         """Move `capability` to watched (SHADOW) or on (ARMED), for a person in the Dashboard.
 
         `warnings` are the words of the statement's warnings the person confirmed (none, when
@@ -717,6 +717,10 @@ class Arming:
         requirements that are off, each confirmed as the capability itself is; a policy on any of them
         refuses the whole, so a required one an administrator forbids keeps the dependent off. Only for an
         ARMED request: watching needs no requirement, so `also` must be empty for SHADOW.
+
+        `keep_on` (v0.6.16-beta.4, the owner's "Keep it on turns it on"): turn it on AND keep it on (K8) in the
+        same confirmation - only for ARMED, refused like any arm, and refused too where its own compatibility is
+        Failed here (FAILED_HERE): Keep it on never turns itself off, so it is not taken on a grade that failed.
 
         {"done": bool, "refusal": Refusal or None, "warnings": the warnings that hold now, once
         read, "generation": the generation after}."""
@@ -735,7 +739,8 @@ class Arming:
         if (state not in (ArmingState.SHADOW, ArmingState.ARMED) or type(revision) is not int
                 or type(generation) is not int or confirmed is None
                 or not (acknowledged_version is None or isinstance(acknowledged_version, str))
-                or not (also is None or isinstance(also, (list, tuple)))):
+                or not (also is None or isinstance(also, (list, tuple)))
+                or type(keep_on) is not bool or (keep_on and state != ArmingState.ARMED)):
             return refused(Refusal.INVALID_REQUEST)
         view = self.view()
 
@@ -807,6 +812,8 @@ class Arming:
         shown = self.warnings(definition, view)
         if reason is not None:
             return refused(reason)
+        if keep_on and ArmingWarning.FAILED_HERE in shown:
+            return refused(Refusal.FAILED_HERE)
         moves = [(capability, ArmingState.ARMED, revision, acknowledged_version, shown)]
         for other in needed:
             other_def = self.registry.get(other)
@@ -823,7 +830,8 @@ class Arming:
             moves.append((other, ArmingState.ARMED, other_revision, other_version,
                           self.warnings(other_def, view)))
         try:
-            _written, after = self.state.move_set(moves, actor=actor, generation=generation, at=self.clock())
+            _written, after = self.state.move_set(moves, actor=actor, generation=generation, at=self.clock(),
+                                                  keep=(capability,) if keep_on else ())
         except StaleGeneration:
             return refused(Refusal.STALE_GENERATION)
         except StateError:
@@ -919,7 +927,8 @@ class Arming:
                 return refused(Refusal.NOT_ALLOWED_BY_POLICY)
             if policy.force_shadow and row.get("state") == ArmingState.ARMED:
                 return refused(Refusal.SHADOW_FORCED_BY_POLICY)
-            if self.current(policy=policy).get(definition.id, ArmingState.OFF) == ArmingState.OFF:
+            # v0.6.16-beta.4: kept on is on - one watched or off is turned on and kept on through the arm (`keep_on`).
+            if self.current(policy=policy).get(definition.id, ArmingState.OFF) != ArmingState.ARMED:
                 return refused(Refusal.NOT_ON)
             if confirmed != wanted:
                 return refused(Refusal.STALE_CONFIRMATION)

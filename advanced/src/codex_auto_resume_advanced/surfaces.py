@@ -56,7 +56,7 @@ ARGUMENTS = {
     BridgeCommand.ADVANCED_WORDS: frozenset({"locale"}),
     BridgeCommand.ADVANCED_STATEMENT: frozenset({"capability", "locale"}),
     BridgeCommand.ADVANCED_ARM: frozenset({"capability", "state", "revision", "generation",
-                                           "engine_version", "warnings", "also"}),
+                                           "engine_version", "warnings", "also", "keep_on"}),
     BridgeCommand.ADVANCED_DISARM: frozenset({"capability"}),
     BridgeCommand.ADVANCED_DISARM_ALL: frozenset(),
     BridgeCommand.ADVANCED_CEILING: frozenset({"global_hourly", "generation"}),
@@ -276,7 +276,7 @@ def bridge(runtime, command, argument):
                           revision=argument.get("revision"), generation=argument.get("generation"),
                           acknowledged_version=argument.get("engine_version"),
                           warnings=argument.get("warnings"), also=argument.get("also"),
-                          actor=Actor.DASHBOARD)
+                          keep_on=argument.get("keep_on", False), actor=Actor.DASHBOARD)
     if command == BridgeCommand.ADVANCED_DISARM:
         return arming.disarm(argument.get("capability"), actor=Actor.DASHBOARD)
     if command == BridgeCommand.ADVANCED_DISARM_ALL:
