@@ -75,6 +75,8 @@ def names_on(source: str, receivers: tuple) -> set:
 # claiming the right to send, writing what happened, and the counters the budgets are made of.
 ENGINE_TO_STORE = {
     "get", "register", "update", "settings", "record_gates", "records_in", "correlate",
+    # v0.6.16-beta.4: the waiting records of a kind of conversation the plug no longer watches, cancelled (P18).
+    "cancel_waiting",
     "reserve_detailed", "claimed_on_thread", "others_in_flight", "recent_claims",
     "recent_claim_count", "release_claim", "release_withdrawn", "submission_guard",
     "thread_enabled",
@@ -116,6 +118,9 @@ ENGINE_TO_SOURCE = {
     "latest", "later_turns", "latest_failures", "turn_markers", "turn_observation",
     "turn_progress", "progress", "projection", "marker_presence", "marker_rows", "queue_row",
     "queued_rows", "foreign_queued", "reset_hint",
+    # v0.6.16-beta.4: the kinds of conversation besides the app's the plug names (P18), set once a tick, and whether a
+    # conversation is taken up with some of them - asked only when a kind leaves.
+    "session_kinds", "taken",
     # v0.6.11: the key of a conversation's project, asked only when Settings let some projects
     # resume and not others (projects.asks) - never at the defaults.
     "project_key",
@@ -149,9 +154,10 @@ ENGINE_TO_SOURCE = {
 # through its own claim, pre-send look and launch guard where it would otherwise wait (A11).
 # `admission` is P17: whether a failure core never recovers alone is taken up (v0.6.14). `wants` is
 # not a point: whether the plug may answer at one now, so core makes that point's reads only then.
-# `eligibility` is P19 (v0.6.16-beta.3): which conversations besides a person's own detection takes up.
+# `eligibility` is P19 (v0.6.16-beta.3): which conversations besides a person's own detection takes up; `sessions` P18
+# (v0.6.16-beta.4): which conversations besides the app's are watched.
 ENGINE_TO_PLUG = {"admission", "delivery", "eligibility", "gate", "moved", "null", "outcome", "partition", "records",
-                  "schedule", "sender", "text", "tick", "unloaded", "wants"}
+                  "schedule", "sender", "sessions", "text", "tick", "unloaded", "wants"}
 # `claim_ledger_checked` is how the claim asks: it says whether that one call raised, so a
 # failure on another thread holding the same plug is not read as this claim's (domain/plug.py).
 STORE_TO_LEDGER = {"claim_ledger_checked", "null"}

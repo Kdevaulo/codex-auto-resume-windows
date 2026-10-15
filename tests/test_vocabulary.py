@@ -70,7 +70,7 @@ LISTS = {
     # retries past their twelve hours on the clock.
     # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
     # v0.6.16-beta.4: held_by_other_session - open in a terminal's or VS Code's Codex session.
-    "machine.REASONS": ("set", 75, "13fd39ec1495fdbf"),
+    "machine.REASONS": ("set", 76, "7f68b9822c2afa8f"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -92,7 +92,7 @@ LISTS = {
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
     # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
     # v0.6.16-beta.4: and held_by_other_session.
-    "machine.GATE_REASONS": ("set", 92, "d8674e27ded3617b"),
+    "machine.GATE_REASONS": ("set", 93, "af93ba8a246d8879"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",
@@ -209,7 +209,7 @@ LISTS = {
     # and EARLY, P7's look at a usage-limited record before its time; and the form a failure's error took.
     # And RESEND, P7's word for an uncertain submission sent once more, which core proves may go, and
     # SEND_NOW, its word for a waiting record a person asked to send now.
-    "domain.plug.POINTS": ("tuple", 17, "8a5a44aaca6902c5"),   # v0.6.16-beta.3: P19 eligibility
+    "domain.plug.POINTS": ("tuple", 18, "99df46d4da526400"),   # v0.6.16-beta.3: P19 eligibility; beta.4: P18
     "domain.plug.ANSWERS": ("set", 13, "dcf766b4e83e21eb"),
     "domain.plug.FAILURE_FORMS": ("tuple", 5, "bcc0ad1bd6f81009"),
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
@@ -217,6 +217,7 @@ LISTS = {
     "domain.plug.RECORD_MOVES": ("tuple", 10, "b4dae164afc55dd3"),
     "domain.plug.RECORD_PURPOSES": ("tuple", 3, "43433c43e9c5b2be"),   # v0.6.16-beta.3: wrap_up
     "domain.plughands.WIDENINGS": ("tuple", 1, "dc457abadb3a5b04"),   # v0.6.16-beta.3: P19's answer
+    "domain.plughands.SESSION_KINDS": ("tuple", 2, "c2b8c09ae74e62ba"),   # v0.6.16-beta.4: P18's answer
     "domain.plug.EXTRA": "advanced",
 }
 
@@ -403,6 +404,7 @@ HOMES = {
     p.RecordMove: ("list", "domain.plug.RECORD_MOVES"),
     p.RecordPurpose: ("list", "domain.plug.RECORD_PURPOSES"),
     p.Widening: ("list", "domain.plughands.WIDENINGS"),
+    p.SessionKind: ("list", "domain.plughands.SESSION_KINDS"),
     # v0.6.12: the power action's own words, beside domain/vocabulary.py at its line budget.
     pw.PowerAction: ("list", "poweraction.ACTIONS"),
     pw.PowerAfter: ("list", "poweraction.AFTERS"),

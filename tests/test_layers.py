@@ -145,7 +145,9 @@ LAYER = {_q(name): layer for layer, names in {
                  "codex.workspace",
                  # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30),
                  # and the ids a split conversation has had, remembered.
-                 "codex.rollout", "codex.chains"),
+                 "codex.rollout", "codex.chains",
+                 # v0.6.16-beta.4: which kinds of conversation are taken up (P18), pure.
+                 "codex.eligibility"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch",
                "engine.freshness", "engine.options", "engine.outcome", "engine.reconcile",
                # v0.6.11: the waits and the two guards, as the engine asks them.
@@ -167,7 +169,9 @@ LAYER = {_q(name): layer for layer, names in {
                # v0.6.16-beta.3: the store as a plug is shown it, off options.py's page.
                "engine.storeview",
                # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
-               "engine.routes"),
+               "engine.routes",
+               # and which conversations besides the app's are watched (P18).
+               "engine.kinds"),
     # v0.6.10-alpha: control.py became control/, ten files, `Control` composed from eight
     # mixins. `layer` is where the composition lives, so that the front holds no code.
     "control": ("control", "control.actions", "control.codexstart", "control.errors",

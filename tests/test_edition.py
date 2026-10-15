@@ -258,6 +258,8 @@ class GuardTests(unittest.TestCase):
                     self.assertEqual(answer, 1, "one send after another (v0.6.15-beta, plughands.workers)")
                 elif point is Point.ELIGIBILITY:
                     self.assertEqual(answer, frozenset(), "a person's own conversations alone (A15, plughands.widening_of)")
+                elif point is Point.SESSIONS:
+                    self.assertEqual(answer, frozenset(), "the app's conversations alone (A15, plughands.kinds_of)")
                 else:
                     self.assertIs(answer, DEFER)
         self.assertEqual(guarded.failures, 0)

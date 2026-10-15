@@ -10,6 +10,7 @@ they did:
     dispatch    sending one continuation
     delivery    how it is carried, the last look before it goes, and what proves it arrived
     routes      a conversation the app does not hold, continued by a route the plug names (P16)
+    kinds       which conversations besides the app's are watched (P18)
     reconcile   what became of a continuation that was sent
     outcome     how the recovered turn ended, and what it costs the budgets
     announce    moving a record, and saying so
@@ -44,13 +45,14 @@ from .plugrecords import PlugRecordsMixin
 from .reconcile import SETTLED, UNSENT, ReconcileMixin, _UNDETERMINED  # noqa: F401
 from .relaxed import RelaxedMixin
 from .resend import ResendMixin
+from .kinds import KindsMixin
 from .routes import RoutesMixin
 from .storeview import StoreView
 
 
 class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, ReconcileMixin, OutcomeMixin, DispatchMixin,
              DeliveryMixin, GuardMixin, NoticeMixin, RelaxedMixin, ResendMixin, PlugRecordsMixin,
-             ForOpenMixin, RoutesMixin):
+             ForOpenMixin, RoutesMixin, KindsMixin):
     """The part that decides.
     """
 
@@ -86,6 +88,7 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         # P19 (v0.6.16-beta.3): which of the app's conversations detection takes up from here on - a person's own
         # alone where the plug names nothing, which is the standard edition's always (NULL answers the empty set).
         self.source.widened = self.plug.eligibility()
+        self.session_kinds()            # P18 (v0.6.16-beta.4): and which conversations besides the app's (engine/kinds.py)
         view = StoreView(self.store, self.clock(), self.last_usage, home_key=self.home_key)
         errand = self.plug.tick(view)
         try:

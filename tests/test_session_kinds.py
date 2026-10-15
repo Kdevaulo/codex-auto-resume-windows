@@ -8,6 +8,7 @@ never eligible, whatever is named. The engine runs against codexsim with a plug 
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -21,18 +22,37 @@ from test_plug_points import Asked, PluggedCase  # noqa: E402
 from codex_auto_resume.codex import eligibility  # noqa: E402
 from codex_auto_resume.domain.plughands import SessionKind, kinds_of  # noqa: E402
 
-CLI = {"source": "cli", "originator": "codex_cli_rs"}
+CLI = {"source": "cli", "originator": "codex-tui"}
 IDE = {"source": "vscode", "originator": "codex_vscode"}
+
+
+def add_thread(home, thread_id, *, source, originator, thread_source="user"):
+    """A conversation as a terminal's Codex TUI or VS Code records one - codexsim (v0.6.10's file) makes the app's."""
+    path = home.rollout(thread_id)
+    meta = {"type": "session_meta", "payload": {"id": thread_id, "originator": originator, "source": source,
+                                                "thread_source": thread_source}}
+    path.write_bytes(json.dumps(meta).encode("utf-8") + b"\n")
+    with home._db("state_5.sqlite") as db:
+        db.execute("INSERT INTO threads (id, rollout_path, source, thread_source, archived, history_mode, name) "
+                   "VALUES (?,?,?,?,0,'paginated',NULL)", (thread_id, str(path), source, thread_source))
+    home.catch_up(thread_id)
+
+
+class KindsAsked(Asked):
+    """test_plug_points' plug, with P18's hook."""
+
+    def sessions(self):
+        return self._answer("sessions")
 
 
 class KindsCase(PluggedCase):
     def failing(self, h, thread_id, kind):
         """A usage limit in a conversation of `kind` (a terminal's, VS Code's), past its reset, held by the app."""
-        h.home.add_thread(thread_id, **kind)
+        add_thread(h.home, thread_id, **kind)
         self.ready_after_reset(h, thread_id=thread_id)
 
     def watching(self, kinds, h=None):
-        plug = Asked(sessions=frozenset(kinds))
+        plug = KindsAsked(sessions=frozenset(kinds))
         self.plugged(plug, h or self.h)
         return plug
 
@@ -65,16 +85,19 @@ class DetectionTests(KindsCase):
 
     def test_a_subagent_an_archived_one_and_an_exec_session_never(self):
         self.watching({"cli", "ide"})
-        self.h.home.add_thread(T1, thread_source="subagent", **CLI)
+        add_thread(self.h.home, T1, thread_source="subagent", **CLI)
         self.ready_after_reset(self.h, thread_id=T1)
-        self.failing(self.h, T2, CLI)
+        add_thread(self.h.home, T2, **CLI)
+        self.h.home.fail_usage(T2)
         archive(self.h.home, T2)
         self.h.tick()
         self.assertEqual(self.h.records(T1), [])
         self.assertEqual(self.h.records(T2), [])
-        self.assertFalse(eligibility.row_eligible({"source": "exec", "archived": 0, "thread_source": "user",
-                                                   "history_mode": "paginated", "rollout_path": "x"},
-                                                  frozenset({"cli", "ide"})))
+        self.assertEqual(eligibility.row_problem({"source": "exec", "archived": 0, "thread_source": "user",
+                                                  "history_mode": "paginated"}, frozenset({"cli", "ide"})),
+                         "source exec")
+        self.assertIsNone(eligibility.kind_of("cli", {"source": "cli", "originator": "codex_exec"},
+                                              frozenset({"cli", "ide"})), "a codex exec run is never a person's TUI")
 
     def test_paused_it_is_not_asked(self):
         plug = self.watching({"cli"})
@@ -86,7 +109,7 @@ class DetectionTests(KindsCase):
 class ShrinkTests(KindsCase):
     def test_a_kind_no_longer_named_cancels_its_waiting_records(self):
         plug = self.watching({"cli"})
-        self.h.home.add_thread(T1, **CLI)
+        add_thread(self.h.home, T1, **CLI)
         self.h.home.fail_usage(T1)
         self.h.tick()
         self.assertEqual(self.h.record(T1)["state"] in ("waiting_reset", "waiting_poll"), True)

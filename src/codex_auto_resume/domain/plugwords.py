@@ -76,6 +76,7 @@ class Point(StrEnum):
     DELIVERY = "delivery"                    # P15 how a continuation is carried and proven
     UNLOADED = "unloaded"                    # P16 what continues one the app does not hold
     ADMISSION = "admission"                  # P17 a failure core never recovers alone, taken up
+    SESSIONS = "sessions"                    # P18 which conversations besides the app's core watches
     ELIGIBILITY = "eligibility"              # P19 which of the app's conversations core takes up
 
 

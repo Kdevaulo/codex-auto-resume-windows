@@ -116,7 +116,9 @@ ENGINE_POINTS = frozenset({Point.RECORDS, Point.GATES, Point.TEXT, Point.SENDER,
                            Point.SCHEDULE, Point.TICK, Point.CLAIM_LEDGER, Point.CONCURRENCY,
                            Point.MOVED, Point.DELIVERY, Point.UNLOADED, Point.ADMISSION,
                            # v0.6.16-beta.3: which conversations are taken up, asked once a tick.
-                           Point.ELIGIBILITY})
+                           Point.ELIGIBILITY,
+                           # v0.6.16-beta.4: and which besides the app's are watched (P18), once a tick too.
+                           Point.SESSIONS})
 # What a moment read off the wall clock while a pair ran is written as, in rows and calls alike.
 WALL_CLOCK = "<wall clock>"
 # What a scenario is asked of Codex: every call the engine can make of a backend.
@@ -232,6 +234,10 @@ class DeferringPlug(Plug):
     def eligibility(self):
         self.asked.add(Point.ELIGIBILITY)
         return super().eligibility()
+
+    def sessions(self):
+        self.asked.add(Point.SESSIONS)
+        return super().sessions()
 
     def wants(self, point):
         """Every point, as a plug with a capability on there would say: core makes the reads that

@@ -81,6 +81,9 @@ class ReasonCode(StrEnum):
     # going back to a version that watches one home, another home's waiting records (store/downgrade.py).
     HOME_REMOVED = "home_removed"
     HOME_NOT_WATCHED = "home_not_watched"
+    # v0.6.16-beta.4: a kind of conversation the plug no longer watches (P18) - a terminal's, VS Code's - cancels the
+    # waiting records of its conversations.
+    SESSION_KIND_OFF = "session_kind_off"
     # sending and receipts
     AWAITING_DELIVERY_RECEIPT = "awaiting_delivery_receipt"
     QUEUE_RESULT_UNKNOWN_DO_NOT_RESEND = "queue_result_unknown_do_not_resend"

@@ -49,8 +49,8 @@ from .plugwords import Alternative, Edition, FailureForm, PlugFailure, Point, Su
 
 # RecordMove and RecordPurpose (P2's) and what a surface takes (`fields`) are beside the hands core holds, and
 # named here as before.
-from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, Widening, fields,  # noqa: F401
-                        records_of, widening_of, workers)
+from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, SessionKind, Widening, fields,  # noqa: F401
+                        kinds_of, records_of, widening_of, workers)
 
 # The interface's version. The advanced package writes out the number it was written for, and
 # edition.py takes its plug only when the two agree: otherwise a hook renamed, or given another
@@ -209,6 +209,12 @@ class Plug:
         nothing holds the conversation's writer lock, and there only a route is taken."""
         return DEFER
 
+    def sessions(self):                               # P18
+        """Which conversations besides the Codex app's core watches (v0.6.16-beta.4): SessionKind words, asked once a
+        tick while not paused, and read by every eligibility check core makes (codex/eligibility.py). DEFER - the
+        app's alone (A15) - is NULL's."""
+        return DEFER
+
     def eligibility(self):                            # P19
         """Which conversations besides a person's own core takes up (v0.6.16-beta.3): Widening words, asked once a tick
         while not paused. DEFER - a person's own alone (A15) - is NULL's."""
@@ -258,7 +264,7 @@ HOOKS = {
     Point.START_ROUTE: "start_route", Point.SURFACES: "surface",
     Point.CLAIM_LEDGER: "claim_ledger", Point.CONCURRENCY: "partition",
     Point.SUPERVISION: "supervise", Point.MOVED: "moved", Point.DELIVERY: "delivery",
-    Point.UNLOADED: "unloaded", Point.ADMISSION: "admission", Point.ELIGIBILITY: "eligibility",
+    Point.UNLOADED: "unloaded", Point.ADMISSION: "admission", Point.ELIGIBILITY: "eligibility", Point.SESSIONS: "sessions",
 }
 
 # A hook may always restrict. HOLD keeps a record waiting, exactly as a gate that says WAIT
@@ -543,6 +549,10 @@ class Guarded:
     def eligibility(self) -> frozenset:
         """P19: the plug's Widening words (plughands.widening_of); the empty set for anything else, NULL's included."""
         return widening_of(self._ask(Point.ELIGIBILITY))
+
+    def sessions(self) -> frozenset:
+        """P18 (v0.6.16-beta.4): the plug's SessionKind words (plughands.kinds_of); the empty set otherwise."""
+        return kinds_of(self._ask(Point.SESSIONS))
 
     def wants(self, point) -> bool:
         """Plug.wants, True only if it says True: not a point, so NULL and a raise want nothing."""

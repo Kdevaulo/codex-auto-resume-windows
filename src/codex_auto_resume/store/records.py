@@ -219,6 +219,23 @@ class RecordsMixin:
                             reason=reason, actor="engine")
             return len(rows)
 
+    def cancel_waiting(self, interruption_ids, now: float, reason: str) -> int:
+        """These records, those still waiting and never sent, cancelled and final (v0.6.16-beta.4): a kind of
+        conversation the plug no longer watches (engine/kinds.py). Returns the ids it cancelled."""
+        _timestamp(now, "now")
+        keys = [key for key in interruption_ids if isinstance(key, str)]
+        with self._transaction() as connection:
+            rows = [_validated_record(dict(row)) for key in keys for row in connection.execute(
+                "SELECT * FROM interruptions WHERE interruption_id=? AND submitted_at IS NULL AND state IN (%s)"
+                % ",".join("?" for _ in WAITING), (key,) + tuple(sorted(WAITING)))]
+            for row in rows:
+                connection.execute(
+                    "UPDATE interruptions SET state='cancelled', cancel_requested=1, last_error=?, outcome_at=? "
+                    "WHERE interruption_id=?", (reason, now, row["interruption_id"]))
+                self._event(connection, now, "state", record=row, from_state=row["state"], to_state="cancelled",
+                            reason=reason, actor="engine")
+            return [row["interruption_id"] for row in rows]
+
     def pending(self) -> list[dict[str, Any]]:
         return self.records_in(STATES - TERMINAL)
 

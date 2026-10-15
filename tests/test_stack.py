@@ -94,7 +94,9 @@ ITEM = {_q(name): item for item, names in {
                # v0.6.16-beta.3: the store as a plug is shown it, off options.py's page.
                "engine.storeview",
                # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
-               "engine.routes"),
+               "engine.routes",
+               # and which conversations besides the app's are watched (P18).
+               "engine.kinds"),
     "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",
@@ -160,7 +162,9 @@ ITEM = {_q(name): item for item, names in {
               "codex.workspace",
               # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30),
               # and the ids a split conversation has had, remembered.
-              "codex.rollout", "codex.chains"),
+              "codex.rollout", "codex.chains",
+              # v0.6.16-beta.4: which kinds of conversation are taken up (P18), pure.
+              "codex.eligibility"),
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
                 "control.layer", "control.policy", "control.preview", "control.records",
                 "control.seen", "control.state", "control.watcher", "control.wire",

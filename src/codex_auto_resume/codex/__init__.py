@@ -32,6 +32,9 @@ class LocalSource(SchemaMixin, HistoryMixin):
     # P19 (v0.6.16-beta.3): which conversations besides a person's own `_eligibility` takes up (values.taken_thread_source)
     # - the engine sets it from its plug each tick; empty, the standard edition's always, it is A15 as ever.
     widened = frozenset()
+    # P18 (v0.6.16-beta.4): the kinds of conversation besides the app's `_eligibility` takes up (codex/eligibility.py),
+    # set by the engine from its plug each tick; empty, the standard edition's always.
+    session_kinds = frozenset()
 
     def elsewhere(self, codex_home) -> "LocalSource":
         """A reader of another Codex home, made as this one is (v0.6.15-beta): for the labels of that home's records,
