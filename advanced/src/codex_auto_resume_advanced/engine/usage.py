@@ -53,7 +53,8 @@ PERCENTS = (50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 96, 97, 98, 99)
 # v0.6.16-beta.4 (f): what a person may type in beside the choices - any whole percentage, any spacing of 5 to 60.
 PERCENT_RANGE = (1, 100)
 POLL_RANGE = (5, 60)
-DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 95
+# The forced stop's own percentage (usage_pause, v0.6.16-beta.4: 97, above the 95 the wrap-up's words ask for).
+DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 97
 # v0.6.16-beta.4: the stop percentage the wrap-up's words ask Codex to stop at (wrapwords.py), each window its own.
 DEFAULT_STOP_WORDS = 95
 STOP_WORDS_OPTIONS = {FIVE_HOUR: OptionKey.STOP_WORDS_FIVE_HOUR, WEEKLY: OptionKey.STOP_WORDS_WEEKLY}
@@ -365,13 +366,18 @@ class UsagePause:
         self._scoped = scoped
 
     def tick(self, view):
+        if self._scoped is not None:
+            self._mark()
+        return DEFER
+
+    def _mark(self) -> list:
+        """The windows held and let go at P8, as their readings stand; the rows newly held this tick."""
         scoped = self._scoped
-        if scoped is None:
-            return DEFER
+        newly = []
         try:
             handle = scoped.meter
             if not handle.on():
-                return DEFER
+                return newly
             now = scoped.now()
             options = scoped.options()
             on = _acting(scoped)
@@ -383,13 +389,14 @@ class UsagePause:
                 if over and held != row["reset_at"]:
                     if handle.mark(row["bucket"], row["minutes"], paused_reset_at=row["reset_at"]):
                         self._count("paused")
+                        newly.append(row)
                 elif held is not None and not over and (not acted or held != row["reset_at"]
                                                          or now >= held + CLOSE_AFTER):
                     if handle.mark(row["bucket"], row["minutes"], clear_pause=True):
                         self._count("resumed")
         except Exception:
             pass
-        return DEFER
+        return newly
 
     def holding(self) -> bool:
         """Whether a window the pause marked has not reset yet - its reset time not yet passed."""
@@ -482,5 +489,7 @@ def make_wrap_up(paths) -> UsageWrapUp:
     return UsageWrapUp(paths)
 
 
-def make_pause(paths) -> UsagePause:
-    return UsagePause(paths)
+def make_pause(paths):
+    """usage_pause's code: from v0.6.16-beta.4 the forced stop (engine/usagestop.py), which holds as the pause held."""
+    from .usagestop import UsageStop
+    return UsageStop(paths)

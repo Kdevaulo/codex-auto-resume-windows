@@ -533,10 +533,19 @@ def memory_content(event, used, limit) -> dict:
                     more=[(l10n.message("toast_button_open"), open_uri("overview" if stopped else "diagnostics"))])
 
 
-def near_limit_content(minutes, percent, reset_at) -> dict:
+# v0.6.16-beta.4: what the advanced edition's forced stop near a limit says (its `kind`), each a title and a sentence.
+NEAR_LIMIT_KINDS = ("not_stopped", "press_resume", "not_continued")
+
+
+def near_limit_content(minutes, percent, reset_at, kind=None) -> dict:
     """The advanced edition's usage meter at a warning (v0.6.16-beta.3, issue #29): which window, how full and when
     it resets - in the words the popup's usage line uses - and one button that opens the Dashboard. About no
-    conversation. Only the meter's surface ever asks for it; the standard edition never shows one."""
+    conversation. Only the meter's surface ever asks for it; the standard edition never shows one. From v0.6.16-beta.4
+    a `kind` of NEAR_LIMIT_KINDS is the forced stop's: a turn it could not stop, a queue to Resume in Codex, or a
+    conversation it could not continue after the reset - said in its own title and sentence."""
+    if kind in NEAR_LIMIT_KINDS:
+        return _content(l10n.message("toast_near_limit_" + kind), l10n.message("near_limit_%s_body" % kind),
+                        more=[(l10n.message("toast_button_open"), open_uri("overview"))])
     def say(key, **fields):
         return l10n.text(key, l10n.current(), **fields)
     try:

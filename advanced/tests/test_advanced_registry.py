@@ -46,6 +46,8 @@ READS = frozenset({"thread/loaded/list", "thread/queue/list", "thread/goal/get"}
 CHANGES = frozenset({"thread/queue/add", "thread/goal/set",
                      # v0.6.14: a reset credit spent changes the account's state (engine/credits.py).
                      "account/rateLimitResetCredit/consume"})
+# v0.6.16-beta.4: the capabilities that change Codex's state through the Codex app's IPC pipe (codex/ipc.py).
+IPC_CHANGES = frozenset({"usage_pause"})
 
 
 
@@ -148,7 +150,9 @@ class ShippedTests(unittest.TestCase):
                 beyond = protocol.methods_for_capability(definition.id) - B4_METHODS
                 self.assertLessEqual(beyond, READS | CHANGES, "a method this table has not placed")
                 self.assertEqual("B4" in definition.departs_from, bool(beyond))
-                self.assertEqual("B3" in definition.departs_from, bool(beyond & CHANGES))
+                # v0.6.16-beta.4: the forced stop changes Codex's state through the app's own IPC channel (codex/ipc.py),
+                # not a session of its own - B3 all the same.
+                self.assertEqual("B3" in definition.departs_from, bool(beyond & CHANGES) or definition.id in IPC_CHANGES)
 
     def test_every_statement_names_every_standard_it_departs_from_in_every_language(self):
         for definition in registry.DEFINITIONS:

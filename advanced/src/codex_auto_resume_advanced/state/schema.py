@@ -135,7 +135,9 @@ RESET_TABLES = ("windows", "readings", "reset_rules", "credit_spends")
 BUCKETS = ("codex", "premium", "legacy", "other")
 RESET_CAPABILITIES = ("reset_credit", "reset_message")
 # The capabilities whose continuations `continuations` holds (v0.6.15-beta).
-CONTINUATION_CAPABILITIES = ("empty_response", "subagent_parent", "keep_going", "usage_wrap_up")
+CONTINUATION_CAPABILITIES = ("empty_response", "subagent_parent", "keep_going", "usage_wrap_up",
+                             # v0.6.16-beta.4 (version 6): the forced stop's continuation after the reset.
+                             "usage_pause")
 # The tables version 2 had: v0.6.11's and v0.6.12's file.
 # `records` before version 4 added its last two columns (queue_id, withdraw).
 RECORDS_V3 = TABLES["records"][:-2]
@@ -559,7 +561,7 @@ TABLES_V5 = {name: columns for name, columns in TABLES.items() if name not in V6
 # The choices version 6 added to `options` (OptionKey), and the kind to `continuations`: what a version-5 file refuses.
 V6_OPTION_WORDS = ("window_five_hour", "window_weekly", "stop_words_five_hour", "stop_words_weekly", "wrap_reset_time",
                    "wrap_after_reset")
-V6_CONTINUATION_WORDS = ("after_reset",)
+V6_CONTINUATION_WORDS = ("after_reset", "usage_pause")
 UPGRADE_FROM_5 = (
     _remade(_STATEMENTS_V3[0], "options", TABLES["options"], suffix="v6")
     + _remade(next(s for s in _STATEMENTS_V4 if s.lstrip().startswith("CREATE TABLE continuations")), "continuations",

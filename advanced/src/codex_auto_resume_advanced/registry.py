@@ -877,23 +877,26 @@ USAGE_WRAP_UP = CapabilityDef(
     requires=("usage_meter",),
 )
 
-# Pause near a limit (v0.6.16-beta.3, issue #29). At P8, when the meter's reading of the five-hour or the weekly
-# window is at the person's pause percentage (95 by default, each its own), the window is marked held until its reset
-# (state/meter.py); at P3 it answers HOLD for every record of core's while one is held, and the edition's own
-# continuations waiting are not handed to core (`holds`, runtime.records). A person's own messages, a wrap-up and
-# anything typed in Codex are untouched. It lets go when the window resets. It departs from C9 (it acts on a reading
-# taken when no recovery is due - the meter's), stands on usage_probe and rests on MU. It sends nothing: a HOLD is a
-# restriction, never paid for, so its ceilings are the schema's floor. It requires the meter.
+# Stop near a limit (v0.6.16-beta.4, item (h); Pause near a limit in v0.6.16-beta.3). At P8, when the meter's reading of
+# a window switched on is at the person's stop percentage (97 by default, each its own), the window is marked held until
+# its reset (state/meter.py) - at P3 HOLD for every record of core's, and the edition's own continuations waiting not
+# handed to core (`holds`) - and each conversation switched on whose turn runs is stopped through the Codex app's own
+# IPC channel (engine/usagestop.py, codex/ipc.py; measurement MIPC), falling back to the hold alone, with a notice, where
+# it cannot; after the reset a conversation it stopped is continued once by a turn the app starts (Continue after the
+# reset). A person's own messages, a wrap-up and anything typed in Codex are untouched. It departs from A2 (a turn
+# started through the app's channel, not `codex queue`), B3 (Codex's state changed through that channel), C9 (it acts
+# on the meter's reading) and H6 (a running turn is stopped), stands on usage_probe and rests on MU. Its ceilings are
+# the schema's floor - one stop and one continuation a conversation a window. It requires the meter.
 USAGE_PAUSE = CapabilityDef(
     id="usage_pause",
     points=frozenset({Point.GATES, Point.TICK}),
-    revision=1,
-    departs_from=("C9",),
+    revision=2,
+    departs_from=("A2", "B3", "C9", "H6"),
     compat="usage_probe",
     ceilings=Ceilings(per_day=1, per_conversation=1),
     journal_prefix="pause",
     make=make_pause,
-    codes=("paused", "resumed"),
+    codes=("paused", "resumed", "stopped", "not_stopped", "resume_unproven", "continued", "not_continued"),
     measurements=(Measurement.MU,),
     options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE),
              Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE)),

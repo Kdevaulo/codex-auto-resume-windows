@@ -223,7 +223,16 @@ def meter_view(runtime) -> dict:
         if (warned is not None and 0 <= now - warned < usage.NOTICE_FOR and row["warned_reset_at"] == row["reset_at"]
                 and row["reset_at"] is not None):
             notices.append({"key": "%s:%d:%d" % (bucket, minutes, row["reset_at"]), "window_minutes": minutes,
-                            "used_percent": row["used_percent"], "reset_at": row["reset_at"]})
+                            "used_percent": row["used_percent"], "reset_at": row["reset_at"], "kind": "warn"})
+    # v0.6.16-beta.4 (h): what the forced stop has to say - a turn it could not stop, a queue to Resume in Codex, a
+    # conversation it could not continue after the reset.
+    if states.get(usage.PAUSE) == ArmingState.ARMED:
+        try:
+            said = runtime._code_of(runtime.registry.get(usage.PAUSE)).notices(now)
+        except Exception:
+            said = []
+        for notice in said:
+            notices.append(dict(notice, used_percent=None))
     return {"meter": {"read_at": max(row["read_at"] for row in rows.values()), "windows": shown,
                       "notices": notices}}
 

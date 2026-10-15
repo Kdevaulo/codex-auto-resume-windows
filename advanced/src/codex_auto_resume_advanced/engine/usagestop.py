@@ -1,0 +1,225 @@
+# ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
+"""The forced stop near a usage limit (v0.6.16-beta.4, item (h) of the owner's additions to issue #29) - usage_pause.
+
+At the stop percentage a person chose for a window (97 by default, each window its own, apart from the stop the
+wrap-up's words ask for), the window is held until it resets, as the plain pause held it: core's records wait (HOLD)
+and the edition's own continuations are not handed to core. And now each conversation switched on whose turn is
+running is stopped - through the Codex app's own channel, the IPC pipe the app's Stop button uses (codex/ipc.py,
+measurement MIPC): the stop the person would make, once for that window. It works only for a conversation the app has
+open; where it cannot stop one - the app does not hold it, the app is not running, its build checks another version of
+the request, it does not answer - it falls back to holding, and a notice says the turn could not be stopped.
+
+A stopped conversation's queue is paused by the app, and the pause survives the app's restart: the product puts it
+back to running only once that request is measured (ipc.QUEUE_RESUME), and until then a notice tells the person to
+press Resume in Codex. When the window resets, a conversation it stopped is continued once - Continue after the reset,
+the wrap-up's choice, on by default - by a turn started through the same channel (ipc.start_turn), which goes past the
+paused queue; only while that turn of the stop is still the conversation's latest, ended, with nothing after it (A17)
+and the app holds the conversation (A11). It is kept in `continuations` (ContinuationKind.AFTER_RESET, its window's
+length in minutes in `chain`), so a restart forgets nothing; where the app does not hold the conversation it waits, and
+a notice says to open it in Codex.
+
+Every outcome is one closed word, journalled (registry codes); never a conversation's words.
+"""
+from __future__ import annotations
+
+from codex_auto_resume import continuation, settings
+from codex_auto_resume.domain import ids
+from codex_auto_resume.domain.plug import DEFER
+from codex_auto_resume.domain.plughands import Widening
+
+from .. import statement
+from ..codex import inuse, ipc
+from ..codex.turns import Turns
+from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
+from .continued import answer_key, words_pass
+from .usage import (CLOSE_AFTER, EVERY_CONVERSATION, NOTICE_FOR, ON, WRAP_UP, UsagePause, _acting, windows)
+
+AFTER_RESET_KEY = "continue.after_reset"
+FINAL = frozenset({"completed", "failed", "interrupted"})
+# How many notices the stop keeps for the icon to show (each once in a watcher's life, by its key).
+NOTICES_KEPT = 16
+
+
+class _StopErrand:
+    __slots__ = ("code", "targets", "window")
+
+    def __init__(self, code, targets, window):
+        self.code, self.targets, self.window = code, targets, window
+
+    def run(self, guard):
+        return self.code.stop_all(self.targets, self.window)
+
+
+class UsageStop(UsagePause):
+    """usage_pause's code from v0.6.16-beta.4: the pause's holding, and the forced stop and its continuation after
+    the reset. `stop`, `start` and `home` are seams a test fills (ipc.stop_turn, ipc.start_turn, the Codex home)."""
+    __slots__ = ("_stop", "_start", "_home", "_notices")
+
+    def __init__(self, paths, *, stop=None, start=None, home=None):
+        super().__init__(paths)
+        self._stop = stop
+        self._start = start
+        self._home = home
+        self._notices = []
+
+    # ---------------------------------------------------------------- reading Codex
+    def _codex_home(self):
+        return self._home if self._home is not None else inuse.home(self.paths)
+
+    def _source(self):
+        """Core's reader, judging a conversation as core does - a person's own, or P19's widening while Recover every
+        conversation is on - and never a kind Codex makes for itself (as the wrap-up judges one)."""
+        from codex_auto_resume.codex import LocalSource
+        source = LocalSource(self._codex_home())
+        try:
+            widened = self._scoped.armed(EVERY_CONVERSATION) is True
+        except Exception:
+            widened = False
+        source.widened = frozenset({Widening.EVERY_DESKTOP}) if widened else frozenset()
+        return source
+
+    def _locale(self):
+        try:
+            return continuation.resolve_locale(settings.load(self.paths.settings_file))
+        except Exception:
+            return None
+
+    # ---------------------------------------------------------------- P8
+    def tick(self, view):
+        scoped = self._scoped
+        if scoped is None:
+            return DEFER
+        newly = self._mark()
+        try:
+            self._after_reset(view)
+        except Exception:
+            pass
+        if not newly:
+            return DEFER
+        try:
+            targets = self._running(view)
+        except Exception:
+            return DEFER
+        return _StopErrand(self, targets, newly[0]) if targets else DEFER
+
+    def _running(self, view) -> list:
+        """(thread, turn) of each conversation switched on, of the kind core recovers, whose latest turn runs."""
+        turns, source, found = Turns(self._codex_home()), self._source(), []
+        for thread in turns.running():
+            try:
+                if view.thread_enabled(thread) is not True or source.latest(thread) is None:
+                    continue
+                turn = turns.latest(thread)
+            except Exception:
+                continue
+            if turn is not None and turn.status == "inProgress":
+                found.append((thread, turn))
+        return found
+
+    def stop_all(self, targets, window):
+        """The errand: each running turn stopped through the app; what came of each journalled and, where it matters,
+        said in a notice; each one stopped remembered for its continuation after the reset."""
+        stop = self._stop or ipc.stop_turn
+        for thread, turn in targets:
+            try:
+                word, resumed = stop(thread, turn.turn_id)
+            except Exception:
+                word, resumed = ipc.Stop.BROKEN, None
+            if word != ipc.Stop.STOPPED:
+                self._count("not_stopped")
+                self._notice("not_stopped", window)
+                continue
+            self._count("stopped")
+            if resumed != ipc.Resume.RESUMED:
+                self._count("resume_unproven")
+                self._notice("press_resume", window)
+            self._remember(thread, turn, window)
+        return None
+
+    def _remember(self, thread, turn, window) -> None:
+        """A conversation it stopped, kept for one continuation after its window resets - where Continue after the
+        reset (the wrap-up's choice) is on."""
+        scoped = self._scoped
+        try:
+            if scoped.options_of(WRAP_UP).get(OptionKey.WRAP_AFTER_RESET, ON) != ON:
+                return
+            words = statement.CATALOGS.text(AFTER_RESET_KEY, self._locale())
+            if not words_pass(words):
+                return
+            key = answer_key(ContinuationKind.AFTER_RESET, thread, window["bucket"], window["minutes"],
+                             window["reset_at"])
+            if scoped.continuations.get(key) is None:
+                scoped.continuations.add(key, ContinuationKind.AFTER_RESET, thread, words, ordinal=turn.ordinal,
+                                         chain=window["minutes"])
+        except Exception:
+            pass
+
+    def _after_reset(self, view) -> None:
+        """Each conversation it stopped whose window has reset: continued once by a turn the app starts, while the
+        stopped turn is still its latest, ended, with nothing after it, and the app holds it; ended where newer work
+        came; waiting, with a notice, where the app does not hold it."""
+        scoped = self._scoped
+        handle = scoped.continuations
+        waiting = [row for row in handle.mine() if row["record_state"] == RecordState.WAITING
+                   and row["kind"] == ContinuationKind.AFTER_RESET and row["words"]]
+        if not waiting:
+            return
+        now, rows = scoped.now(), scoped.meter.rows()
+        turns, source, start = Turns(self._codex_home()), self._source(), self._start or ipc.start_turn
+        for row in waiting:
+            if not _reset_since(rows, row["chain"], row["created_at"], now):
+                continue
+            thread = row["thread_id"]
+            try:
+                if view.thread_enabled(thread) is not True:
+                    continue
+                if source.latest(thread) is None:
+                    continue
+                latest = turns.latest(thread)
+            except Exception:
+                continue
+            if latest is None or latest.ordinal != row["ordinal"]:
+                handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)          # newer work came (A17)
+                continue
+            if latest.status not in FINAL:
+                continue
+            word = start(thread, row["words"] + "\n\n" + ids.short_marker(row["record_id"]))
+            if word == ipc.Start.STARTED:
+                handle.end(ContinuationReason.SENT, thread_id=thread)
+                self._count("continued")
+            else:
+                self._count("not_continued")
+                self._notice("not_continued", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"})
+
+    # ---------------------------------------------------------------- the icon's notices
+    def _notice(self, kind, window) -> None:
+        now = self._scoped.now()
+        key = "%s:%s:%s" % (kind, window.get("minutes"), window.get("reset_at") or int(now // NOTICE_FOR))
+        if any(notice["key"] == key for notice in self._notices):
+            return
+        self._notices.append({"key": key, "kind": kind, "window_minutes": window.get("minutes"), "at": now,
+                              "reset_at": window.get("reset_at")})
+        del self._notices[:-NOTICES_KEPT]
+
+    def notices(self, now) -> list:
+        """What the stop has to say to the icon now: the notices of the last NOTICE_FOR seconds - its key, kind
+        (not_stopped, press_resume, not_continued), the window and its reset. Codes and numbers only."""
+        return [{key: notice[key] for key in ("key", "kind", "window_minutes", "reset_at")}
+                for notice in self._notices if 0 <= now - notice["at"] < NOTICE_FOR]
+
+
+def _reset_since(rows, minutes, created_at, now) -> bool:
+    """Whether the window of `minutes` has reset since `created_at`: the meter's row of it shows a window begun
+    after, or the reset it showed has passed. With no row of it, a window's length after."""
+    found = [row for row in windows(rows) if row["minutes"] == minutes]
+    if not found:
+        return now - created_at >= minutes * 60
+    row = found[0]
+    reset = row["reset_at"]
+    if type(reset) is not int:
+        return False
+    return now >= reset + CLOSE_AFTER or reset - minutes * 60 > created_at
+
+
+def make_stop(paths) -> UsageStop:
+    return UsageStop(paths)

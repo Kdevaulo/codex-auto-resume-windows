@@ -200,7 +200,9 @@ CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "sub
                       CONTINUE_PREFIX + "wrap_up.window.weekly",
                       # (i): when the window resets, said with core's hour and minute; a weekly reset's date.
                       CONTINUE_PREFIX + "wrap_up.resets_at", CONTINUE_PREFIX + "wrap_up.resets_on",
-                      CONTINUE_PREFIX + "wrap_up.date")
+                      CONTINUE_PREFIX + "wrap_up.date",
+                      # (h, g): the continuation after the reset (engine/usagestop.py).
+                      CONTINUE_PREFIX + "after_reset")
                      + tuple(CONTINUE_PREFIX + "subagent.kind." + kind
                              for kind in ("usage_limit", "temporary", "interrupted", "error")))
 

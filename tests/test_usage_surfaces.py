@@ -95,6 +95,33 @@ class WatcherNoticeTests(unittest.TestCase):
         App._near_limit(watcher, "DEFER")
         self.assertEqual(len(watcher.shown), 1)
 
+    def test_the_forced_stops_notices_carry_their_kind_and_say_it_in_their_own_words(self):
+        """v0.6.16-beta.4: a notice of the advanced edition's forced stop near a limit - a turn it could not stop, a
+        queue to Resume in Codex, a conversation it could not continue - has a title and a sentence of its own."""
+        from codex_auto_resume import l10n, notify
+        from codex_auto_resume.runtime.app import App
+
+        class Watcher:
+            def __init__(self):
+                self.shown = []
+
+            def _watcher_notice(self, event, detail):
+                self.shown.append((event, detail.get("kind")))
+        watcher = Watcher()
+        notices = [{"key": "%s:300:1" % kind, "window_minutes": 300, "used_percent": None, "reset_at": None,
+                    "kind": kind} for kind in notify.NEAR_LIMIT_KINDS]
+        App._near_limit(watcher, {"meter": dict(METER, notices=notices)})
+        self.assertEqual(watcher.shown, [("near_limit", kind) for kind in notify.NEAR_LIMIT_KINDS])
+        titles = set()
+        for kind in notify.NEAR_LIMIT_KINDS:
+            content = notify.near_limit_content(300, None, None, kind)
+            self.assertIn(l10n.message("toast_near_limit_" + kind), repr(content))
+            self.assertIn(l10n.message("near_limit_%s_body" % kind), repr(content))
+            titles.add(l10n.message("toast_near_limit_" + kind))
+        self.assertEqual(len(titles), 3)
+        self.assertIn(l10n.message("toast_near_limit"), repr(notify.near_limit_content(300, 86, None)),
+                      "a warning as before")
+
 
 if __name__ == "__main__":
     unittest.main()

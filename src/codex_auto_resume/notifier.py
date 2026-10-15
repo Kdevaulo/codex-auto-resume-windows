@@ -212,7 +212,7 @@ def build(event, detail, identity=None, *, sound=False):
         # v0.6.16-beta.3 (issue #29): the advanced edition's usage meter reached a warning. About a usage window,
         # not a conversation, so it has no key and replaces no card; its one button opens the Dashboard.
         return _notice("near_limit", notify.near_limit_content(detail.get("minutes"), detail.get("percent"),
-                                                               detail.get("reset_at")), key=None)
+                                                               detail.get("reset_at"), detail.get("kind")), key=None)
     if event in POWER_EVENTS:
         # v0.6.12: the power action (runtime/afterwork.py). About this PC, not a conversation, so it has
         # no key and replaces no card. Only the countdown's has a stop button, named by its batch (A28).
