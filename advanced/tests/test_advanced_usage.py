@@ -22,7 +22,7 @@ import advancedcase as ac  # noqa: E402
 from takingcase import TakingCase  # noqa: E402
 from codex_auto_resume.domain.plug import DEFER, Alternative, Point, Surface  # noqa: E402
 from codex_auto_resume_advanced import registry, statement, surfaces  # noqa: E402
-from codex_auto_resume_advanced.engine import usage  # noqa: E402
+from codex_auto_resume_advanced.engine import usage, wrapwords  # noqa: E402
 from codex_auto_resume_advanced.registry import USAGE_METER, USAGE_PAUSE, USAGE_WRAP_UP, Registry  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import Actor, ArmingState, ContinuationKind, OptionKey, OffReason  # noqa: E402
 from test_engine import T1  # noqa: E402
@@ -104,7 +104,8 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual({option.key: option.default for option in USAGE_METER.options},
                          {OptionKey.POLL_MINUTES: 15, OptionKey.WARN_FIVE_HOUR: 85, OptionKey.WARN_WEEKLY: 85})
         self.assertEqual({option.key: option.default for option in USAGE_WRAP_UP.options},
-                         {OptionKey.WRAP_FIVE_HOUR: 90, OptionKey.WRAP_WEEKLY: 90, OptionKey.WRAP_STYLE: 2})
+                         {OptionKey.WRAP_FIVE_HOUR: 90, OptionKey.WRAP_WEEKLY: 90, OptionKey.WRAP_STYLE: 2,
+                          OptionKey.STOP_WORDS_FIVE_HOUR: 95, OptionKey.STOP_WORDS_WEEKLY: 95})
         self.assertEqual({option.key: option.default for option in USAGE_PAUSE.options},
                          {OptionKey.PAUSE_FIVE_HOUR: 95, OptionKey.PAUSE_WEEKLY: 95})
         self.assertEqual(USAGE_METER.option(OptionKey.POLL_MINUTES).choices, (5, 10, 15, 20, 30, 45, 60))
@@ -112,11 +113,19 @@ class DefinitionTests(unittest.TestCase):
             self.assertIn(capability, registry.REGISTRY.ids)
 
     def test_each_wording_is_a_continuation_core_sends_in_every_language(self):
-        from codex_auto_resume import continuation, l10n
-        for key in usage.STYLE_KEYS.values():
-            for locale in l10n.LOCALES:
-                with self.subTest(key=key, locale=locale):
-                    continuation.validate_continuation(statement.CATALOGS.text(key, locale))
+        """Each of the four wordings, for each window, filled in: words core sends as a continuation, in every
+        language - and the one with the numbers names the window and both percentages (v0.6.16-beta.4)."""
+        from codex_auto_resume import l10n
+        for style in usage.STYLES:
+            for minutes in usage.WINDOWS:
+                for locale in l10n.LOCALES:
+                    with self.subTest(style=style, minutes=minutes, locale=locale):
+                        words = wrapwords.render(style=style, minutes=minutes, used=91.6, stop_at=96, locale=locale)
+                        self.assertIsNotNone(words)
+                        if style == 4:
+                            self.assertIn("91", words)
+                            self.assertIn("96", words)
+                            self.assertIn(wrapwords.window_words(minutes, locale), words)
 
 
 class MeterTests(UsageCase):
@@ -267,14 +276,62 @@ class WrapUpTests(TakingCase):
 
     def test_a_conversation_with_a_turn_running_is_sent_one_wrap_up_for_the_window(self):
         plug, _turn = self.running()
+        self.language(plug, "en")
         for _ in range(3):
             self.h.tick(advance=61)
         sent = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
         self.assertEqual(len(sent), 1, self.h.logs[-10:])
-        self.assertTrue(sent[0].startswith(statement.CATALOGS.text("continue.wrap_up.standard")))
+        self.assertTrue(sent[0].startswith(statement.CATALOGS.text("continue.wrap_up.standard", "en")))
         for _ in range(3):
             self.h.tick(advance=61)
         self.assertEqual(len([t for t, _p in self.h.backend.send_calls if t == T1]), 1, "once for the window")
+
+    def language(self, plug, locale):
+        """The continuation language a person chose, written where core keeps it - never this PC's own."""
+        from codex_auto_resume import settings
+        values = settings.defaults()
+        values["continuation_language"] = locale
+        settings.save(plug.paths.settings_file, values)
+
+    def test_with_the_numbers_the_words_name_the_window_and_the_stop_percentage(self):
+        """v0.6.16-beta.4 (c, d, j): the wording with the numbers says how much of which window is used and the stop
+        percentage the person chose for that window - the five-hour one's here, 96 - in the words sent."""
+        plug, _turn = self.running()
+        self.language(plug, "en")
+        self.choose(plug, OptionKey.WRAP_STYLE, 4)
+        self.choose(plug, OptionKey.STOP_WORDS_FIVE_HOUR, 96)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        sent = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
+        self.assertEqual(len(sent), 1, self.h.logs[-10:])
+        expected = statement.CATALOGS.text("continue.wrap_up.numbers", "en", percent=91,
+                                           window=statement.CATALOGS.text("continue.wrap_up.window.five_hour", "en"),
+                                           stop_at=96)
+        self.assertTrue(sent[0].startswith(expected), sent[0])
+
+    def test_the_weekly_window_is_named_as_this_weeks_limit(self):
+        plug, _turn = self.running(percent=50)
+        self.language(plug, "en")
+        self.choose(plug, OptionKey.WRAP_STYLE, 4)
+        plug.runtime.state.save_meter([{"bucket": "codex", "window_minutes": 10080, "used_percent": 92,
+                                        "reset_at": int(self.h.now) + 86400}], at=self.h.now)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        sent = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
+        self.assertEqual(len(sent), 1, self.h.logs[-10:])
+        self.assertIn(statement.CATALOGS.text("continue.wrap_up.window.weekly", "en"), sent[0])
+        self.assertIn("95%", sent[0])
+
+    def test_the_words_are_in_the_continuation_language(self):
+        """Sent in the language a person chose for continuations, whatever the window's - core's resolve_locale."""
+        plug, _turn = self.running()
+        self.choose(plug, OptionKey.WRAP_STYLE, 4)
+        self.language(plug, "ko")
+        for _ in range(3):
+            self.h.tick(advance=61)
+        sent = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
+        self.assertEqual(len(sent), 1, self.h.logs[-10:])
+        self.assertIn(statement.CATALOGS.text("continue.wrap_up.window.five_hour", "ko"), sent[0])
 
     def test_below_the_percentage_nothing_is_sent(self):
         self.running(percent=80)

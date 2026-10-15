@@ -87,7 +87,8 @@ from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
-from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STYLE, DEFAULT_WARN, DEFAULT_WRAP, PERCENTS,
+from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STOP_WORDS, DEFAULT_STYLE, DEFAULT_WARN,
+                           DEFAULT_WRAP, PERCENTS,
                            POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
@@ -851,6 +852,8 @@ USAGE_WRAP_UP = CapabilityDef(
     measurements=(Measurement.MT,),
     options=(Option(OptionKey.WRAP_FIVE_HOUR, PERCENTS, DEFAULT_WRAP),
              Option(OptionKey.WRAP_WEEKLY, PERCENTS, DEFAULT_WRAP),
+             Option(OptionKey.STOP_WORDS_FIVE_HOUR, PERCENTS, DEFAULT_STOP_WORDS),
+             Option(OptionKey.STOP_WORDS_WEEKLY, PERCENTS, DEFAULT_STOP_WORDS),
              Option(OptionKey.WRAP_STYLE, STYLES, DEFAULT_STYLE)),
     requires=("usage_meter",),
 )

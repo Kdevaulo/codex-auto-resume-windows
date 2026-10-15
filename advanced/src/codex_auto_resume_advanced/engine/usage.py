@@ -32,11 +32,13 @@ from __future__ import annotations
 from codex_auto_resume.domain.plug import DEFER, Alternative
 from codex_auto_resume.domain.plughands import RECORDS_LIMIT, Widening
 
-from .. import statement
+from codex_auto_resume import continuation, settings
+
 from ..codex import credits, inuse
 from ..codex.turns import Turns
 from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
-from .continued import answer_key, handed, words_pass
+from .continued import answer_key, handed
+from .wrapwords import DEFAULT_STYLE, STYLE_KEYS, STYLES, render  # noqa: F401 - the registry's, and the tests'
 
 METER, WRAP_UP, PAUSE = "usage_meter", "usage_wrap_up", "usage_pause"
 # Recover every conversation (engine/everyconversation.py): while it is on, core takes up P19's widening, and so does
@@ -49,9 +51,9 @@ POLL_CHOICES = (5, 10, 15, 20, 30, 45, 60)
 DEFAULT_POLL = 15
 PERCENTS = (50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 96, 97, 98, 99)
 DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 95
-STYLES = (1, 2, 3)
-DEFAULT_STYLE = 2
-STYLE_KEYS = {1: "continue.wrap_up.short", 2: "continue.wrap_up.standard", 3: "continue.wrap_up.detailed"}
+# v0.6.16-beta.4: the stop percentage the wrap-up's words ask Codex to stop at (wrapwords.py), each window its own.
+DEFAULT_STOP_WORDS = 95
+STOP_WORDS_OPTIONS = {FIVE_HOUR: OptionKey.STOP_WORDS_FIVE_HOUR, WEEKLY: OptionKey.STOP_WORDS_WEEKLY}
 # Each capability's percentage option for each window.
 STAGE_OPTIONS = {METER: {FIVE_HOUR: OptionKey.WARN_FIVE_HOUR, WEEKLY: OptionKey.WARN_WEEKLY},
                  WRAP_UP: {FIVE_HOUR: OptionKey.WRAP_FIVE_HOUR, WEEKLY: OptionKey.WRAP_WEEKLY},
@@ -230,8 +232,20 @@ class UsageWrapUp:
                if now - row["read_at"] <= FRESH and reached(row, percent(options, WRAP_UP, row["minutes"]), now)]
         if not due:
             return
-        words = statement.CATALOGS.text(STYLE_KEYS.get(options.get(OptionKey.WRAP_STYLE), STYLE_KEYS[DEFAULT_STYLE]))
-        if not words_pass(words):
+        # v0.6.16-beta.4: the words of each window due - with the numbers where that wording is chosen - in the
+        # continuation language, made once a look (wrapwords.render).
+        try:
+            locale = continuation.resolve_locale(settings.load(self.paths.settings_file))
+        except Exception:
+            locale = None
+        worded = []
+        for row in due:
+            words = render(style=options.get(OptionKey.WRAP_STYLE, DEFAULT_STYLE), minutes=row["minutes"],
+                           used=row["used_percent"], locale=locale,
+                           stop_at=options.get(STOP_WORDS_OPTIONS[row["minutes"]], DEFAULT_STOP_WORDS))
+            if words is not None:
+                worded.append((row, words))
+        if not worded:
             return
         turns = Turns(self._codex_home())
         source = self._source()
@@ -244,7 +258,7 @@ class UsageWrapUp:
                 continue
             if turn is None or turn.status != "inProgress":
                 continue
-            for row in due:
+            for row, words in worded:
                 key = answer_key(WRAP_UP, thread, row["bucket"], row["minutes"], row["reset_at"])
                 if handle.get(key) is None and handle.add(key, ContinuationKind.WRAP_UP, thread, words,
                                                           ordinal=turn.ordinal):

@@ -1081,9 +1081,9 @@ namespace CodexAutoResume
             if (key == "poll_minutes") return Word("page.option.minutes", "{n} min", "n", value);
             if (key == "wrap_style")
                 return Word("page.option.style." + value.ToString(CultureInfo.InvariantCulture),
-                            value == 1 ? "Short" : value == 3 ? "Detailed" : "Standard");
+                            value == 1 ? "Short" : value == 3 ? "Detailed" : value == 4 ? "With the numbers" : "Standard");
             if (key.StartsWith("warn_", StringComparison.Ordinal) || key.StartsWith("wrap_", StringComparison.Ordinal) ||
-                key.StartsWith("pause_", StringComparison.Ordinal))
+                key.StartsWith("pause_", StringComparison.Ordinal) || key.StartsWith("stop_words_", StringComparison.Ordinal))
                 return Word("page.option.percent", "{n}%", "n", value);
             return value.ToString(CultureInfo.CurrentCulture);
         }

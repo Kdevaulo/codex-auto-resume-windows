@@ -168,7 +168,9 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "option.poll_minutes", "option.warn_five_hour", "option.warn_weekly", "option.wrap_five_hour",
     "option.wrap_weekly", "option.wrap_style", "option.pause_five_hour", "option.pause_weekly",
-    "option.minutes", "option.percent", "option.style.1", "option.style.2", "option.style.3"))
+    "option.minutes", "option.percent", "option.style.1", "option.style.2", "option.style.3",
+    # v0.6.16-beta.4: the wording with the numbers, and the stop percentage the words name, each window its own.
+    "option.style.4", "option.stop_words_five_hour", "option.stop_words_weekly"))
 # The edition's own continuations' words (v0.6.15-beta): what empty_response, subagent_parent and keep_going send -
 # fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
 # subagent's line, its id and a closed kind word).
@@ -177,7 +179,11 @@ CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "sub
                       CONTINUE_PREFIX + "keep_going",
                       # v0.6.16-beta.3: the wrap-up's three wordings (engine/usage.py).
                       CONTINUE_PREFIX + "wrap_up.short", CONTINUE_PREFIX + "wrap_up.standard",
-                      CONTINUE_PREFIX + "wrap_up.detailed")
+                      CONTINUE_PREFIX + "wrap_up.detailed",
+                      # v0.6.16-beta.4: the wording with the numbers and the windows it names (engine/wrapwords.py) -
+                      # filled in, so held to core's check only once filled (wrapwords.render).
+                      CONTINUE_PREFIX + "wrap_up.numbers", CONTINUE_PREFIX + "wrap_up.window.five_hour",
+                      CONTINUE_PREFIX + "wrap_up.window.weekly")
                      + tuple(CONTINUE_PREFIX + "subagent.kind." + kind
                              for kind in ("usage_limit", "temporary", "interrupted", "error")))
 
