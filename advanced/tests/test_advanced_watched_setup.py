@@ -175,6 +175,16 @@ class KeepGoingWatchedTests(WatchedCase):
         self.arm(plug, state=ArmingState.ARMED)
         self.assertEqual(plug.runtime.state.keep_going(T1)["state"], "on", "turned on, the conversation is kept")
 
+    def test_on_to_watched_keeps_the_conversation_and_watched_to_off_ends_it(self):
+        plug = self.armed()
+        self.h.backend.loaded_map[T1] = "loaded"
+        self.h.home.add_thread(T1)
+        self.assertTrue(self.bridge(plug, "advanced-keep-going-set", thread_id=T1, count=3)["done"])
+        self.arm(plug, state=ArmingState.SHADOW)
+        self.assertEqual(plug.runtime.state.keep_going(T1)["state"], "on", "watched, what the person picked stays")
+        self.assertTrue(plug.runtime.arming.disarm(self.cap, actor=Actor.DASHBOARD)["done"])
+        self.assertNotEqual(plug.runtime.state.keep_going(T1)["state"], "on", "turned off, it ends")
+
 
 if __name__ == "__main__":
     unittest.main()

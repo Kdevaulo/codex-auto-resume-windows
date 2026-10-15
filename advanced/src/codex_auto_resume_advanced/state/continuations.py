@@ -321,10 +321,11 @@ class ContinuationsHandle:
         raise AttributeError(name)
 
 
-def end_pending(connection, capabilities, now) -> None:
-    """Every continuation still waiting of `capabilities`, ended (turned_off) with its words, and - for keep_going -
-    every conversation kept going stopped, in the caller's transaction: a move off on (state/arming.py), so turning
-    one on again revives none. One in flight is its watch's to end."""
+def end_pending(connection, capabilities, now, *, kept=True) -> None:
+    """Every continuation still waiting of `capabilities`, ended (turned_off) with its words, and - for keep_going, with
+    `kept` - every conversation kept going stopped, in the caller's transaction: a move off on (state/arming.py), so
+    turning one on again revives none. One in flight is its watch's to end. Without `kept` (v0.6.16-beta.3, a move to
+    watched) the conversations a person picked stay: what a person set up ends only when it is turned off."""
     ended = [capability for capability in capabilities if capability in CONTINUATION_CAPABILITIES]
     if not ended:
         return
@@ -336,7 +337,7 @@ def end_pending(connection, capabilities, now) -> None:
                            (now, ContinuationReason.TURNED_OFF, record))
         connection.execute("UPDATE records SET state=?, finished_at=? WHERE record_id=?",
                            (RecordState.CANCELLED, now, record))
-    if KEEP_GOING in ended:
+    if KEEP_GOING in ended and kept:
         connection.execute("UPDATE keep_going SET state=?, reason=?, finished_at=? WHERE state=?",
                            (KeepState.DONE, KeepReason.TURNED_OFF, now, KeepState.ON))
 

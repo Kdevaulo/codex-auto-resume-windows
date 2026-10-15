@@ -143,7 +143,8 @@ class ArmingMixin:
                 end_pending(connection, (capability,), now)      # a reset action's rules end with it
                 end_prompts(connection, (capability,), now)        # and its queued prompts
             if state != ArmingState.ARMED:
-                end_continuations(connection, (capability,), now)  # and (v0.6.15-beta) its continuations
+                # and (v0.6.15-beta) its continuations - and, only when turned off, the conversations kept going
+                end_continuations(connection, (capability,), now, kept=state == ArmingState.OFF)
             connection.execute("UPDATE meta SET generation = generation + 1")
             code = _CODES.get(state) or (JournalCode.TRIPPED if actor == Actor.TRIPWIRE
                                          else JournalCode.RESET if actor in (Actor.EDITION_ENTRY, Actor.ENGINE_CHANGE)
