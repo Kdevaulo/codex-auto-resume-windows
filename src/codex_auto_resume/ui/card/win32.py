@@ -36,6 +36,8 @@ MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY = 2, 1
 ABM_GETTASKBARPOS = 5
 ABE_LEFT, ABE_TOP, ABE_RIGHT, ABE_BOTTOM = 0, 1, 2, 3
 TIMER_FRAME, TIMER_WAIT = 1, 2
+# v0.6.16-beta.3 (issue #32): the second look at who has the keyboard, FOCUS_AFTER after a card is shown.
+TIMER_FOCUS = 3
 PIXEL_FORMAT_32BPP_PARGB = 0x000E200B
 # Compositing is GDI+'s high-speed blend, as the popup's painter blends: its high-quality one is
 # gamma-corrected, and at 200% it made one entrance frame cost 35 ms instead of 9 - on the real
