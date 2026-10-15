@@ -13,7 +13,7 @@ line saying the same label of that very id - and every gate a recovery passes, t
 by the app before anything is sent.
 
 It answers one closed word, EVERY_DESKTOP (domain/plughands.Widening), which core reads at the one place a
-conversation is judged (codex/history._metadata) through codex/values.taken_thread_source. Its code decides nothing
+conversation is judged (codex/history._eligibility) through codex/values.taken_thread_source. Its code decides nothing
 else and reads nothing.
 """
 from __future__ import annotations

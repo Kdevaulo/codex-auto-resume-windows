@@ -39,4 +39,10 @@ MEASURED = {
     Measurement.MP1: (Verdict.PASS, CLI_0162_ALPHA_17_2),
     Measurement.MP2: (Verdict.PASS, CLI_0162_ALPHA_17_2),
     Measurement.MP3: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    # 2026-10-11, at the owner's word that one reset credit may be spent.
+    Measurement.MR: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    # 2026-10-11, once that credit was spent and the account had none left.
+    Measurement.MN: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    # 2026-10-13, after a 5-hour reset that passed with no Codex use.
+    Measurement.MU: (Verdict.PASS, CLI_0162_ALPHA_17_2),
 }

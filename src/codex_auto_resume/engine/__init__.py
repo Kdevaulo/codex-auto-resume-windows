@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 
+from ..domain import skips
 from ..domain.plug import DEFER
 from .announce import NOTIFY_ON_STATE, AnnounceMixin  # noqa: F401
 from .delivery import DeliveryMixin
@@ -61,15 +62,21 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         self.watch()
         self.observe_all()
         self.watch_resent()             # v0.6.14: a resend found twice; nothing for the standard edition
+        self._prune_once_words()        # v0.6.16-beta.3: words of a recovery no longer waiting, deleted
         # v0.6.15-beta: a Codex home taken out of Settings only watches what it sent until that settles.
         if self.retiring:
             return
         # v0.6.11: an administrator's DisableAutoResume is a Pause here too, even before the watcher
         # has written it into the state (runtime/app.py), so a write that failed sends nothing.
         if not self.store.settings()["enabled"] or self.managed.disable_auto_resume:
+            # v0.6.16-beta.3: said once each time recovery is found off - no failed turn is read meanwhile.
+            if not self._off_told:
+                self._off_told = True
+                self.log(None, skips.RECOVERY_OFF, None)
             # v0.6.15-beta: what the plug sent that Codex still holds is taken back, the plug asked nothing.
             self.paused_records()
             return
+        self._off_told = False
         # The plug is asked nothing more while recovery is paused: a Pause beats every
         # capability, as it beats core. P8 is once a tick, after everything is observed; what it
         # answers to run (v0.6.14, an errand) runs last, after P2, whatever the tick met before it.

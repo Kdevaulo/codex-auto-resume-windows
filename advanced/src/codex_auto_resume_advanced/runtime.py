@@ -94,6 +94,9 @@ WITHDRAWN_UNCONFIRMED = "withdrawn_unconfirmed"
 NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
 # Keep going's capability, whose continuations are counted as used at SENT.
 KEEP_GOING = "keep_going"
+# The reasons a start route was not named that nothing else in the journal says (v0.6.16-beta.3): a
+# turn off has its own line, a watched answer its would-have; held back by Codex or a policy has none.
+HELD_WORDS = frozenset({"compat_unknown", "engine_unknown", "policy", "refused", "off"})
 
 
 def _taken(point, answer) -> bool:
@@ -192,6 +195,9 @@ class Runtime:
         # (capability, record) a kept-on capability's hook raised for: passed over for it (K8).
         self._skipped = set()
         self._records_turn = 0
+        # Why the last start route asked (P9) named none, where a capability there was stored on or
+        # watched (`start_held`); None where nothing was.
+        self._start_held = None
         # The measurement harness's seams (measure.py). A person runs a measurement; production
         # opens a real one-turn session against the installed Codex and records to the source
         # tree, and a test gives a fake session and a temporary directory, so no test opens a
@@ -204,10 +210,10 @@ class Runtime:
         self._evidence_dir = evidence_dir
 
     # ------------------------------------------------------------------ standing
-    def states(self, *, fresh=False) -> dict:
+    def states(self, *, fresh=False, live=()) -> dict:
         now = self.clock()
         if fresh or self._at is None or not 0 <= now - self._at < REFRESH_SECONDS:
-            self._states, self._since, self._unreadable = self.arming.read()
+            self._states, self._since, self._unreadable = self.arming.read(live=live)
             self._at = now
             if not self._unreadable:
                 for capability in self._since:
@@ -260,6 +266,54 @@ class Runtime:
         states = self.states()
         return any(states.get(definition.id, ArmingState.OFF) != ArmingState.OFF
                    for definition in definitions)
+
+    def start_route(self, request):
+        """P9, asked where Codex has just started this plugin's MCP server (core's control/codexstart.py).
+
+        v0.6.16-beta.3 (issue #31). What every capability here stands at is read afresh, and - for one
+        stored on or watched - with a fresh check of Codex where the watcher's report cannot be used
+        (Arming.read's `live`): that report is written only by a running watcher, and the watcher not
+        running is the one case this point is for. Where none names a route, why is kept for core's
+        line (`start_held`) and, where nothing else in the journal says it, written there as the
+        capability's own `held`: a held-back start is a decision too."""
+        definitions = self.registry.at(Point.START_ROUTE)
+        self._start_held = None
+        if not definitions:
+            return NULL.start_route(request)
+        self.states(fresh=True, live=frozenset(definition.id for definition in definitions))
+        answer = self.ask(Point.START_ROUTE, request)
+        if answer is DEFER:
+            self._start_held = self._held_start(definitions)
+        return answer
+
+    def start_held(self):
+        """Why the last start route asked named none, or None (core's Plug.start_held)."""
+        return self._start_held
+
+    def _held_start(self, definitions):
+        """Why no capability at P9 named a route, as one word, for the first stored on or watched at
+        the read; None where every one was stored off. A capability turned off on the way - at the
+        read, or by a hook that raised as it was asked - already has its turn off journalled, and a
+        watched one its would-have; one only held back - by what Codex is, or by a policy - or one on
+        that named nothing core could carry out gets its `held` line here."""
+        if self._unreadable:
+            return "unreadable"
+        for definition in definitions:
+            word = self.arming.why.get(definition.id)
+            if word is None:
+                if definition.id not in self._since:
+                    continue                                  # stored off: nothing of it was on
+                if self._states.get(definition.id) == ArmingState.ARMED:
+                    word = "refused"                          # asked, and named nothing core can carry out
+                else:
+                    word = OffReason.HOOK_EXCEPTION.value     # tripped off as it was asked
+            if word in HELD_WORDS:
+                try:
+                    self.state.counted(definition.id, "held", at=self.clock())
+                except StateError:
+                    pass
+            return word
+        return None
 
     def ask(self, point, *arguments):
         """The answer at `point`: an armed capability's, or NULL's. A record of this edition's own (P2) is asked
@@ -557,6 +611,9 @@ class Runtime:
         states = self.states()
         answers = [flying]
         for definition in self.registry.at(Point.RECORDS):
+            if states.get(definition.id, ArmingState.OFF) == ArmingState.SHADOW:
+                self._watched_records(definition, view)
+                continue
             if states.get(definition.id, ArmingState.OFF) != ArmingState.ARMED:
                 continue
             try:
@@ -622,6 +679,21 @@ class Runtime:
             self._once(JournalCode.ACTED, definition, Point.ELIGIBILITY, Point.ELIGIBILITY, None)
             found |= answer
         return frozenset(found) if found else DEFER
+
+    def _watched_records(self, definition, view) -> None:
+        """P2 for a watched capability (v0.6.16-beta.3): each of its rows a person set up that would be handed core now -
+        as its code decides it from the stored state, writing nothing (`watched_due`) - journalled once as what it would
+        have sent, with the time; never handed, never sent, and nothing spent or read for it."""
+        would = getattr(self._code_of(definition), "watched_due", None)
+        if not callable(would):
+            return
+        try:
+            keys = would(view)
+        except Exception:
+            return                                        # a watched one's look costs nothing, and trips nothing
+        for key in keys or ():
+            if isinstance(key, str):
+                self._once(JournalCode.WOULD_HAVE, definition, Point.RECORDS, Point.RECORDS, {"interruption_id": key})
 
     def conversation_off(self, thread_id) -> None:
         """A person switched `thread_id` off, in the Dashboard, a model's tool or the command line (core's

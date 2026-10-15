@@ -43,11 +43,11 @@ from __future__ import annotations
 from contextlib import nullcontext
 import copy
 from enum import StrEnum
-import json
 
-# RecordMove and RecordPurpose (P2's) are beside the hands core holds, and named here as before.
-from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, Widening, records_of,  # noqa: F401
-                        widening_of, workers)
+# RecordMove and RecordPurpose (P2's) and what a surface takes (`fields`) are beside the hands core holds, and
+# named here as before.
+from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, Widening, fields,  # noqa: F401
+                        records_of, widening_of, workers)
 
 # The interface's version. The advanced package writes out the number it was written for, and
 # edition.py takes its plug only when the two agree: otherwise a hook renamed, or given another
@@ -473,26 +473,6 @@ def consult(plug, point, *arguments, failed=None):
     return Alternative(answer) if accepted else DEFER
 
 
-def fields(answer):
-    """What a surface takes from a plug: a JSON object, copied, or DEFER.
-
-    Words for keys, and nothing JSON cannot write strictly - no NaN, no infinity, no object of
-    some other kind - so what a plug adds reaches a front end through the same writer as every
-    reply (controlcli.encode) and cannot break it. It is copied through that writer's own form,
-    so nothing the plug keeps a reference to changes a reply after it was made.
-
-    A dict with str keys exactly, not a subclass of either: a subclass brings its own iteration,
-    items and hashing, which are the plug's code running here, outside `consult`. Anything at all
-    that goes wrong while it is copied is DEFER - a surface is the status, get_status and the
-    Dashboard, which a strange answer must never break."""
-    try:
-        if type(answer) is not dict or not all(type(key) is str for key in answer):
-            return DEFER
-        return json.loads(json.dumps(answer, allow_nan=False))
-    except Exception:
-        return DEFER
-
-
 class Guarded:
     """A plug as core holds it: every hook asked through `consult`, every value checked before
     core takes it.
@@ -600,7 +580,7 @@ class Guarded:
 
     def surface(self, name, facts):
         """Fields for surface `name` (a Surface), or DEFER."""
-        return fields(self._ask(Point.SURFACES, Surface(name), facts))
+        return fields(self._ask(Point.SURFACES, Surface(name), facts), DEFER)
 
     def claim_ledger(self, connection, record, now, carried):
         return self.claim_ledger_checked(connection, record, now, carried)[0]
@@ -672,6 +652,13 @@ class Guarded:
         except Exception:
             self.failures += 1
             return False
+
+    def start_held(self):
+        """Not a point: why P9 just named no route, from a plug that says (control/codexstart.py, v0.6.16-beta.3)."""
+        try:
+            return None if self.plug is NULL else getattr(self.plug, "start_held", lambda: None)()
+        except Exception:
+            self.failures += 1
 
     def codex(self, codex_exe, codex_home):
         """Tell the plug which Codex this process drives (Plug.codex). Not a point, so not asked

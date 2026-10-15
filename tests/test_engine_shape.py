@@ -57,6 +57,8 @@ METHODS = {
     # v0.6.11: the needs-you notices, each raised once (engine/notices.py), and the last usage reading
     # the watcher's heartbeat keeps, which reads nothing (engine/freshness.py).
     "tell_needs_you", "_notice", "last_usage",
+    # v0.6.16-beta.3: why a failed turn is not taken up, decided once and said once (issue #27).
+    "detection_since", "not_taken_up", "_skip", "_say_passed_over",
     # v0.6.11: whether Windows reports no internet and the wait that follows, and what a wake forgets
     # and a long sleep holds (engine/freshness.py) - each asked of nothing at the defaults.
     "offline", "_offline", "after_sleep",
@@ -106,6 +108,8 @@ METHODS = {
     "_record_claim", "_record_problem", "_record_sent", "_watch_record",
     # v0.6.16-beta.3: the turns a wrap-up started are the product's own, never the person's work.
     "_wrap_up_markers", "persons_turns", "_only_wrap_ups_after",
+    # v0.6.16-beta.3: the words for this time, added once, spent at the send, deleted when not waiting.
+    "_once_words", "_spend_once_words", "_prune_once_words",
 }
 
 # What `from codex_auto_resume.engine import ...` has to keep answering (app.py, the tests).

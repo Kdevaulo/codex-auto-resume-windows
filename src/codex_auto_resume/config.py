@@ -98,8 +98,12 @@ class Paths:
         self.failure_seen_file = self.state_dir / "failure-seen.json"
         # v0.6.11: the status file for other tools, written only while the setting is on (statusfile.py).
         self.status_file = self.state_dir / "status.json"
+        # v0.6.16-beta.3: the ids each conversation Codex split has had, ids only, written by the watcher (codex/chains.py).
+        self.split_chains_file = self.state_dir / "split-chains.json"
         # v0.6.12: the power action after usage-limit recoveries, armed in the Dashboard (control/poweraction.py).
         self.power_action_file = self.state_dir / "power-action.json"
+        # v0.6.16-beta.3: the words for this time a person added for one waiting recovery (oncewords.py).
+        self.once_words_file = self.state_dir / "once-words.json"
         # v0.6.11: the advanced edition's own state, in one directory of its own under config/,
         # carrying the same marker config/ does. Core never writes there and the standard edition
         # never creates it; it is named here only so a purge can take it (owned_state_files).
@@ -221,10 +225,10 @@ class Paths:
             return []
         names = ["state.sqlite", "state.sqlite-journal", "state.sqlite-wal", "state.sqlite-shm", "settings.json",
                  "compatibility.json", "compat-cache.json", "failure-seen.json", "status.json",
-                 "power-action.json"]
+                 "power-action.json", "split-chains.json", "once-words.json"]
         files = [self.state_dir / name for name in names]
         for pattern in ("settings.*.tmp", "compatibility.*.tmp", "compat-cache.*.tmp", "failure-seen.*.tmp",
-                        "status.*.tmp", "power-action.*.tmp"):
+                        "status.*.tmp", "power-action.*.tmp", "split-chains.*.tmp", "once-words.*.tmp"):
             files += [p for p in sorted(self.state_dir.glob(pattern))
                       if not is_link(p) and self.confined(p)]
         return files + self.owned_advanced_files() + [self.state_dir / OWNER_MARKER]

@@ -16,9 +16,29 @@ from __future__ import annotations
 from .. import failures, guards, ladder, machine, needsyou
 from ..machine import OBSERVING, TERMINAL, WAITING, WATCHED
 from ..codex import admissible as admissible_failure, detect
-from ..domain import ids
+from ..domain import ids, skips
 from ..domain.plug import DEFER, PACED_AS, Alternative, Point
 from .relaxed import UNADMITTED_SECONDS
+
+# v0.6.16-beta.3 (issue #27): how far before the look-back window failed turns are still read, to say once
+# that each came before it (A16) - the longest look-back Settings allow.
+PASSED_OVER_SECONDS = 7 * 86400
+# The most (turn, reason) pairs and explained turns kept, the oldest let go first; and the most skip lines one
+# check writes - the rest are counted in one line, so a watcher never floods its log (a start over a home with
+# hundreds of failed turns, say). What a watcher before this one already wrote is not written again
+# (logbook.EngineLog reads it back).
+SKIPS_KEPT = 20000
+SKIPS_AT_ONCE = 20
+
+
+def _keep(held: dict, key) -> bool:
+    """Whether `key` is new to `held`, which it joins - the oldest let go past SKIPS_KEPT, never all at once."""
+    if key in held:
+        return False
+    if len(held) >= SKIPS_KEPT:
+        held.pop(next(iter(held)))
+    held[key] = True
+    return True
 
 
 class DetectMixin:
@@ -79,6 +99,57 @@ class DetectMixin:
             return False
         return bool(later) and not self.persons_turns(thread, later)
 
+    def detection_since(self, settings) -> float:
+        """Where the look-back window opens (A16): automatic recovery turned on, minus the look-back."""
+        return max(0.0, settings["armed_at"] - self.options["detection_lookback_seconds"])
+
+    def not_taken_up(self, record):
+        """Why a failure the history brought is still not taken up, by the engine's own records and Settings:
+        (reason, kind word) of domain/skips.py, or None. The order collect asks in; the Diagnostics check
+        asks the same (checkup.py)."""
+        if not self.store.thread_enabled(record["thread_id"]):
+            return skips.CONVERSATION_OFF, None
+        if not self.recovers(record["category"]):
+            return skips.CATEGORY_OFF, skips.kind(record["category"])
+        return None
+
+    def _skip(self, thread_id, turn_id, reason, kind=None):
+        """One line for a failed turn not taken up, once per turn and reason (logbook.skipped)."""
+        if _keep(self._skips_told, (turn_id, reason)):
+            self.log(thread_id, "not_taken_up", (turn_id, reason, kind))
+
+    def _say_passed_over(self, since, asking):
+        """Why each failed turn the history did not bring was passed over (codex/history.py `passed_over`),
+        once per turn; and how many failed turns the check saw, when that number changes. Never costs the
+        tick: what cannot be read is said nothing about."""
+        # Before the window only once each time it opens where it does (a start, a re-arm): what failed later is
+        # never before it, so each check after reads the window alone.
+        before = max(0.0, since - PASSED_OVER_SECONDS) if self._passed_since != since else since
+        self._passed_since = since
+        try:
+            read = self.source.passed_over(since, before, known=frozenset(self._passed_known))
+        except Exception:
+            return
+        said = []
+        for entry in read["passed"]:
+            reason = entry["reason"]
+            # One the edition's plug may take up is not said to be passed over before it was asked (P17).
+            if reason == skips.NOT_RECOVERED and asking and entry["category"] in failures.ADMISSIBLE:
+                continue
+            if _keep(self._passed_known, entry["turn_id"]) and reason is not None:
+                said.append(entry)
+        # The newest first, SKIPS_AT_ONCE of them, and how many more in one line.
+        said.sort(key=lambda entry: entry["completed_at"] or 0, reverse=True)
+        for entry in said[:SKIPS_AT_ONCE]:
+            self._skip(entry["thread_id"], entry["turn_id"], entry["reason"], entry["kind"])
+        for entry in said[SKIPS_AT_ONCE:]:
+            _keep(self._skips_told, (entry["turn_id"], entry["reason"]))
+        if len(said) > SKIPS_AT_ONCE:
+            self.log(None, "not_taken_up_more", str(len(said) - SKIPS_AT_ONCE))
+        if read["seen"] != self._seen_failed:
+            self._seen_failed = read["seen"]
+            self.log(None, "failed_turns_seen", str(read["seen"]))
+
     # --------------------------------------------------------------- collect
     def _owner(self, thread_id, turn_id):
         """Which of our records put its continuation into this turn, if any."""
@@ -119,7 +190,7 @@ class DetectMixin:
         settings = self.store.settings()
         if not settings["enabled"]:
             return
-        since = max(0.0, settings["armed_at"] - self.options["detection_lookback_seconds"])
+        since = self.detection_since(settings)
         # v0.6.11: the same read also brings the failures a needs-you notice is raised for, only while
         # one is on (needsyou.kinds) - none of which `detect` takes, so none becomes a record. At the
         # defaults it is v0.6.10's read exactly.
@@ -137,12 +208,16 @@ class DetectMixin:
             admissible = record is None and admissible
             if admissible:
                 record = self._keyed(admissible_failure(raw))
-            if record is None or not self.store.thread_enabled(record["thread_id"]):
+            if record is None:
+                continue
+            why = self.not_taken_up(record)
+            if why is not None and why[0] == skips.CONVERSATION_OFF:
+                self._skip(record["thread_id"], record["turn_id"], *why)
                 continue
             if self.store.get(record["interruption_id"]) is not None:
                 continue
             category = record["category"]
-            if not self.recovers(category):
+            if why is not None:
                 # Logged once per interruption: the user switched this off deliberately,
                 # so it is a fact worth being able to find, not a repeating complaint.
                 if record["interruption_id"] not in self._declined:
@@ -150,6 +225,7 @@ class DetectMixin:
                         self._declined.clear()
                     self._declined.add(record["interruption_id"])
                     self.log(record["thread_id"], "category_recovery_disabled", category)
+                self._skip(record["thread_id"], record["turn_id"], *why)
                 continue
             now = self.clock()
             if admissible and (record["completed_at"] < now - ladder.ADMISSION_MAX_AGE
@@ -246,6 +322,8 @@ class DetectMixin:
             # a person, never that it will resume (notify.scheduled_content).
             held = {"hold": registered["hold"]} if registered["hold"] is not None else {}
             self.announce("interruption", registered, **held)
+        # v0.6.16-beta.3: and why every other failed turn of the read was passed over (issue #27).
+        self._say_passed_over(since, asking)
         # A failure being recovered needs no "needs you" notice: one a record holds is left out there,
         # on this tick and every later one (engine/notices.py).
         self.tell_needs_you(found, since)

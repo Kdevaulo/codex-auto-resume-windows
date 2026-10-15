@@ -106,7 +106,7 @@ namespace CodexAutoResume
         private void BuildQueue(Dictionary<string, object> item)
         {
             ForgetQueueCard();
-            if (Str(item, "id") != PromptQueueId || Str(item, "state") != StateArmed || advancedPrompts == null) return;
+            if (Str(item, "id") != PromptQueueId || !Standing(item) || advancedPrompts == null) return;
             TableLayoutPanel card = NewGroup(Word("page.queue.title", "Queued messages"), advancedStack);
             List<Dictionary<string, object>> rows = PendingPrompts();
             if (rows.Count == 0) card.Controls.Add(HelpText(Word("page.queue.none", "No message is queued.")));

@@ -102,7 +102,7 @@ class OptionsMixin:
     def __init__(self, store, source, backend, *, dispatch_lock=nullcontext,
                  clock=time.time, log=None, options=None, notify=None, language=None,
                  home_lock=None, engine_state=None, plug=None, connectivity=None, home_key="",
-                 open_store=None):
+                 open_store=None, once_words=None):
         self.store, self.source, self.backend = store, source, backend
         # The edition's plug, as core holds one (domain/plug.py): NULL, the standard edition's,
         # unless the watcher was given another. Every point is asked through this and nothing
@@ -117,6 +117,8 @@ class OptionsMixin:
         # (engine/launches.py) - None, and every send is made inline as always - the pool open for this tick, the
         # worker taken for the record being dispatched, and whether its send goes to that worker.
         self.open_store, self._pool, self._held_slot, self._pooling = open_store, None, None, False
+        # v0.6.16-beta.3: the words for this time (oncewords.py), None for none, and what each send spent.
+        self.once_words, self._once_sent = once_words, {}
         self.log = log or (lambda *args: None)
         self.notify = notify or (lambda *args: None)
         self.language = language or "en"
@@ -182,9 +184,9 @@ class OptionsMixin:
         self._usage_cache = None
         # v0.6.11: records whose task changed under the task-changed guard's Tell, said on their
         # continuation's notice (engine/guard.py); and jitter's draw, asked only while it is on.
-        self._told = set()
-        self._random = random.Random()
-        self._declined = set()
+        self._told, self._declined, self._random = set(), set(), random.Random()
+        # v0.6.16-beta.3 (issue #27): skip lines written, turns explained, failed turns seen, "off" said.
+        self._skips_told, self._passed_known, self._seen_failed, self._off_told, self._passed_since = {}, {}, None, False, None
         # v0.6.14: when each failure the edition's plug did not take up was last put to it (P17), the
         # record looked at early now and when the last early window opened (EARLY, engine/relaxed.py).
         self._unadmitted = {}

@@ -1,5 +1,6 @@
 // Codex Auto Resume - v0.6.11's own Dashboard tools: a task's postponement taken away, a message for one
-// conversation, the log searched, who may open the state folder, and Show me what happens.
+// conversation, the log searched, who may open the state folder, and Show me what happens - and v0.6.16-beta.3's
+// words for this time, added once to one waiting task's next continuation.
 //
 // Each only asks the bridge, and each acts on exactly what the person chose: a row's own record and
 // conversation, or nothing at all. The demo's rows are made up (demo.py) and kept in this window's
@@ -217,6 +218,196 @@ namespace CodexAutoResume
         // The last conversation dialog's text box, for LayoutAudit.
         private SoftTextArea conversationArea;
 
+        // ------------------------------------------------------------ words for this time (v0.6.16-beta.3)
+        /// Whether a row has words for this time, as the listing says: that it has them, never what they say.
+        internal static bool HasOnceWords(Dictionary<string, object> row)
+        {
+            return row != null && Equals(Get(row, "once_words"), true);
+        }
+
+        /// Whether words for this time can be added to, or changed on, a row: a waiting task that is not cancelled -
+        /// the tasks Postpone is offered for - and never a made-up one.
+        internal static bool CanAddOnceWords(Dictionary<string, object> row, bool idle)
+        {
+            return CanPostpone(row, idle) && !IsDemo(row);
+        }
+
+        /// Opens the dialog for the words of exactly the task the menu was opened on, with the words it has now, which
+        /// only the bridge reads (the listing says only that there are some).
+        private void EditOnceWords(Dictionary<string, object> row)
+        {
+            if (row == null || IsDemo(row) || Str(row, "interruption_id") == null || Str(row, "thread_id") == null) return;
+            string argument = "{\"interruption_id\":" + Json.Escape(Str(row, "interruption_id")) + "}";
+            CallAsync("once-words", argument, delegate(Dictionary<string, object> reply)
+            {
+                if (!Ok(reply))
+                {
+                    Report(reply);
+                    return;
+                }
+                using (Form dialog = BuildOnceWords(row, Str(Map(reply, "result"), "text")))
+                    dialog.ShowDialog(this);
+            });
+        }
+
+        /// The dialog for one waiting task's words for this time, built and not shown: the words, sent once after the
+        /// usual continuation exactly as written, their count, the Custom message's refusal, the Preview of the next
+        /// continuation with them, and Save and Cancel.
+        private Form BuildOnceWords(Dictionary<string, object> row, string current)
+        {
+            var dialog = new Form();
+            dialog.Text = S("once.title", "Words for this time") + " - " + Conversation(row);
+            dialog.Font = Font;
+            dialog.BackColor = Canvas;
+            dialog.ForeColor = Ink;
+            Soft.TitleBar(dialog);
+            dialog.StartPosition = FormStartPosition.CenterParent;
+            dialog.MinimizeBox = false;
+            dialog.MaximizeBox = false;
+            dialog.ShowInTaskbar = false;
+            dialog.ShowIcon = false;
+            dialog.ClientSize = new Size(Px(600), Px(520));
+
+            var body = new SoftStack();
+            body.Dock = DockStyle.Fill;
+            body.ColumnCount = 1;
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            body.GrowStyle = TableLayoutPanelGrowStyle.AddRows;
+            body.Padding = Pad(16, 16, 16, 0);
+            body.BackColor = Canvas;
+            var help = Value(S("once.help",
+                "Sent once, after the usual continuation message, the next time this task is continued. They start, speed up or skip nothing, and are deleted once they are sent or when the task ends without a send. Written only here, and sent exactly as you write them."));
+            help.ForeColor = Secondary;
+            help.MaximumSize = new Size(Px(560), 0);
+            body.Controls.Add(help);
+            var placeholders = Value(S("custom.placeholders", "You can use {reason}, {category}, {attempt}, {max_attempts} and {reset_time}."));
+            placeholders.ForeColor = Secondary;
+            placeholders.MaximumSize = new Size(Px(560), 0);
+            body.Controls.Add(placeholders);
+
+            var area = new SoftTextArea();
+            area.Dock = DockStyle.Fill;
+            area.Margin = Pad(0, 6, 0, 2);
+            area.Font = Font;
+            area.Box.Font = Font;
+            area.Box.Text = FromStored(current);
+            area.Box.AccessibleName = S("once.title", "Words for this time");
+            area.Height = Px(140);
+            body.Controls.Add(area);
+            // Their length as the settings layer counts a Custom message's, against the same 2000.
+            Label count = CountLabel();
+            area.Box.TextChanged += delegate { UpdateCount(area, count); };
+            UpdateCount(area, count);
+            body.Controls.Add(count);
+
+            var refusal = Value("");
+            refusal.ForeColor = Palette.Danger;
+            refusal.MaximumSize = new Size(Px(560), 0);
+            body.Controls.Add(refusal);
+            body.Controls.Add(Caption(S("preview.title", "Preview")));
+            var preview = new SoftQuote();
+            preview.Dock = DockStyle.Fill;
+            preview.Font = Font;
+            preview.Margin = Pad(0, 2, 0, 2);
+            preview.AccessibleName = S("preview.title", "Preview");
+            body.Controls.Add(preview);
+            dialog.Controls.Add(body);
+
+            FlowLayoutPanel buttons = ButtonRow();
+            buttons.FlowDirection = FlowDirection.RightToLeft;
+            buttons.Padding = Pad(0, 12, 16, 16);
+            Button save = MakeButton(S("action.save", "Save"), true, delegate
+            {
+                string text = (area.Box.Text ?? "").Replace("\r\n", "\n");
+                SaveOnceWords(dialog, row, text.Trim().Length == 0 ? null : text);
+            });
+            Button cancel = MakeButton(S("action.cancel", "Cancel"), false, delegate { dialog.Close(); });
+            buttons.Controls.Add(save);
+            buttons.Controls.Add(cancel);
+            dialog.Controls.Add(buttons);
+            dialog.CancelButton = cancel;
+            dialog.ActiveControl = area.Box;
+
+            // The next continuation of this task with the words after it, as the watcher would build it
+            // (control/preview.py): asked a moment after the typing stops, from a worker the bridge counts while it
+            // runs (PersistentBridge.Queue), and never saved.
+            var wait = new Timer();
+            wait.Interval = 400;
+            int token = 0;
+            string category = Str(row, "category") ?? "usage_limit";
+            string thread = Str(row, "thread_id");
+            EventHandler ask = delegate
+            {
+                wait.Stop();
+                int mine = ++token;
+                string text = (area.Box.Text ?? "").Replace("\r\n", "\n");
+                string argument = "{\"category\":" + Json.Escape(category) + ",\"thread_id\":" + Json.Escape(thread) +
+                                  ",\"once_words\":" + (text.Trim().Length == 0 ? "null" : Json.Escape(text)) + "}";
+                bridge.Queue(delegate
+                {
+                    Dictionary<string, object> reply = null;
+                    try { reply = bridge.Call("preview-continuation", argument); }
+                    catch (Exception) { reply = null; }
+                    MethodInvoker apply = delegate
+                    {
+                        if (mine != token || dialog.IsDisposed) return;
+                        var result = Ok(reply) ? Map(reply, "result") : null;
+                        preview.Quote = result == null ? S("preview.unavailable", "Preview is not available right now.")
+                                                       : Str(result, "text") ?? "";
+                        refusal.Text = result == null ? "" : RefusalText(result);
+                    };
+                    try { if (dialog.IsHandleCreated && !dialog.IsDisposed) dialog.BeginInvoke(apply); }
+                    catch (Exception) { }
+                });
+            };
+            wait.Tick += ask;
+            area.Box.TextChanged += delegate { wait.Stop(); wait.Start(); };
+            dialog.Shown += delegate { ask(null, EventArgs.Empty); };
+            dialog.FormClosed += delegate { wait.Stop(); wait.Dispose(); };
+            dialog.KeyPreview = true;
+            dialog.KeyDown += delegate(object sender, KeyEventArgs e)
+            {
+                if (e.KeyCode == Keys.Escape) { e.Handled = true; dialog.Close(); }
+            };
+            onceWordsArea = area;
+            return dialog;
+        }
+
+        /// Saves (or, for null, takes away) the words of exactly the task the menu was opened on, and closes the dialog
+        /// once they are stored. Nothing is sent, and nothing is checked sooner because of them.
+        private void SaveOnceWords(Form dialog, Dictionary<string, object> row, string text)
+        {
+            string key = Str(row, "interruption_id");
+            string argument = "{\"interruption_id\":" + Json.Escape(key) + ",\"thread_id\":" + Json.Escape(Str(row, "thread_id")) +
+                              ",\"text\":" + (text == null ? "null" : Json.Escape(text)) + "}";
+            CallAsync("once-words", argument, delegate(Dictionary<string, object> reply)
+            {
+                if (!Ok(reply))
+                {
+                    Report(reply);
+                    if (dialog == null) RefreshAfterChange();
+                    return;
+                }
+                bool set = Equals(Get(Map(reply, "result"), "set"), true);
+                pendingNoteFor = key;
+                pendingNoteText = set ? S("once.set", "Words for this time are added to this task's next continuation.")
+                                      : S("once.removed", "This task's next continuation is sent without words of yours.");
+                ShowPendingNote();
+                if (dialog != null && !dialog.IsDisposed) dialog.Close();
+                RefreshAfterChange();
+            });
+        }
+
+        // The last words-for-this-time dialog's text box, for LayoutAudit.
+        private SoftTextArea onceWordsArea;
+
+        /// v0.6.16-beta.3: under a task's checks, that words for this time go with its next continuation - never the words.
+        private static string WithOnceWords(Dictionary<string, object> row, string note, string said)
+        {
+            if (!HasOnceWords(row)) return note;
+            return string.IsNullOrEmpty(note) ? said : note + "\n" + said;
+        }
+
         // ------------------------------------------------------------------- the log, searched
         private void OpenLogSearch()
         {
@@ -256,8 +447,7 @@ namespace CodexAutoResume
             query.Dock = DockStyle.Fill;
             query.Font = Font;
             query.Box.Font = Font;
-            query.Box.AcceptsReturn = false;
-            query.Box.WordWrap = false;
+            query.OneLine = true;               // issue #34: the line centred, never cut off
             query.Box.MaxLength = 100;
             query.Box.AccessibleName = S("logs.search", "Search");
             query.Height = Px(Brand.ButtonHeight);
@@ -430,6 +620,122 @@ namespace CodexAutoResume
 
         // The last Log dialog's list, for LayoutAudit.
         private ListView logsList;
+
+        // ------------------------------------------------- why a failure was not taken up (v0.6.16-beta.3)
+        private void OpenDetectionCheck()
+        {
+            using (Form dialog = BuildDetectionCheck()) dialog.ShowDialog(this);
+        }
+
+        /// The check's dialog, built and not shown: what the bridge's `detection-check` says (checkup.py) - the
+        /// watcher's own decisions asked on the spot, read only, in the Interface language, the most likely reason
+        /// first - in a read-only well, with Copy and Close. Asked once, when the dialog opens.
+        private Form BuildDetectionCheck()
+        {
+            var dialog = new Form();
+            dialog.Text = S("check.title", "Why a failure was not taken up");
+            dialog.Font = Font;
+            dialog.BackColor = Canvas;
+            dialog.ForeColor = Ink;
+            Soft.TitleBar(dialog);
+            dialog.StartPosition = FormStartPosition.CenterParent;
+            dialog.ClientSize = new Size(Px(760), Px(520));
+            dialog.MinimizeBox = false;
+            dialog.ShowInTaskbar = false;
+            dialog.Icon = Icon;
+
+            var well = new SoftTextArea();
+            well.Dock = DockStyle.Fill;
+            well.Font = Font;
+            well.Box.Font = Font;
+            well.Box.ReadOnly = true;
+            well.Box.WordWrap = true;
+            well.Box.Text = S("check.running", "Checking...");
+            well.Box.AccessibleName = S("check.title", "Why a failure was not taken up");
+            var padding = new Panel();
+            padding.BackColor = Canvas;
+            padding.Dock = DockStyle.Fill;
+            padding.Padding = Pad(12, 12, 12, 0);
+            padding.Controls.Add(well);
+
+            var footer = new SoftStack();
+            footer.Dock = DockStyle.Bottom;
+            footer.AutoSize = true;
+            footer.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            footer.ColumnCount = 1;
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            footer.Padding = Pad(12, 8, 12, 0);
+            footer.BackColor = Canvas;
+            var note = Value(S("check.note", "Read only. No conversation's words are read, and conversations are shown as aliases that are valid only in this result. Copy it into an issue if you are asked for it."));
+            note.ForeColor = Secondary;
+            note.MaximumSize = new Size(Px(720), 0);
+            footer.Controls.Add(note);
+
+            FlowLayoutPanel buttons = ButtonRow();
+            buttons.FlowDirection = FlowDirection.RightToLeft;
+            buttons.Padding = Pad(12, 8, 12, 12);
+            var close = MakeButton(S("action.close", "Close"), false, delegate { dialog.Close(); });
+            Button copy = MakeButton(S("check.copy", "Copy"), true, null);
+            copy.Enabled = false;
+            copy.Click += delegate
+            {
+                try
+                {
+                    Clipboard.SetText(well.Box.Text ?? "");
+                    copy.Text = S("check.copied", "Copied.");
+                }
+                catch (Exception) { }
+            };
+            buttons.Controls.Add(close);
+            buttons.Controls.Add(copy);
+
+            dialog.Controls.Add(padding);
+            dialog.Controls.Add(footer);
+            dialog.Controls.Add(buttons);
+            dialog.CancelButton = close;
+
+            dialog.Shown += delegate
+            {
+                well.Box.Select(0, 0);
+                System.Threading.ThreadPool.QueueUserWorkItem(delegate
+                {
+                    Dictionary<string, object> reply = null;
+                    try { reply = bridge.Call("detection-check", null); }
+                    catch (Exception) { reply = null; }
+                    MethodInvoker apply = delegate
+                    {
+                        if (dialog.IsDisposed) return;
+                        string text = DetectionCheckText(Ok(reply) ? Map(reply, "result") : null,
+                                                         S("check.unavailable", "The check could not be run right now."));
+                        well.Box.Text = text;
+                        well.Box.Select(0, 0);
+                        copy.Enabled = Ok(reply);
+                    };
+                    try { if (dialog.IsHandleCreated && !dialog.IsDisposed) dialog.BeginInvoke(apply); }
+                    catch (Exception) { }
+                });
+            };
+            detectionWell = well;
+            return dialog;
+        }
+
+        /// The check's answer as the well shows it and Copy copies it: its lines, one under another, or - for an
+        /// answer that could not be had - `unavailable`.
+        internal static string DetectionCheckText(Dictionary<string, object> result, string unavailable)
+        {
+            var lines = Items(result, "lines");
+            if (result == null || lines == null) return unavailable;
+            var said = new StringBuilder();
+            foreach (object line in lines)
+            {
+                if (said.Length > 0) said.Append("\r\n");
+                said.Append(line as string ?? "");
+            }
+            return said.ToString();
+        }
+
+        // The last check dialog's well, for LayoutAudit.
+        private SoftTextArea detectionWell;
 
         // --------------------------------------------------------- who may open the state folder
         /// Asked with the compatibility view, as the plugin's copy is (LoadPluginCopy): one word, and a sentence

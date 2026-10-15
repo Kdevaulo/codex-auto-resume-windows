@@ -534,6 +534,33 @@ class BridgeTests(unittest.TestCase):
         install.assert_called_once_with(self.bridge.watcher_command(self.home))
         self.assertIn(l10n.message("setup_autostart"), text)
 
+    def test_an_update_never_takes_a_sign_in_entry_away_whatever_it_finds(self):
+        """v0.6.16-beta.3, issue #31 item 3: an update (install.ps1's upgrade branch, the bootstrap's repair
+        and a pick's restart all run `setup --keep-state`) keeps the person's choice both ways - one they
+        removed stays removed (above), and one they kept is never removed: not when it is ours and current,
+        not when it is ours and stale (it is repaired), and not when -SkipStartup
+        (--no-startup) is passed, which leaves the registry alone altogether."""
+        self.pretend_installed()
+        ours = self.bridge.watcher_command(self.home)
+        stale = startup.command_line(self.home / self.bridge.LAUNCHER_NAME, None,
+                                     launcher=Path(r"C:\Python313\pythonw.exe"))
+        for argv, current, written in ((["setup", "--keep-state"], ours, True),
+                                       (["setup", "--keep-state"], stale, True),
+                                       (["setup", "--keep-state", "--no-startup"], ours, False),
+                                       (["setup", "--keep-state", "--no-startup"], None, False)):
+            with self.subTest(argv=argv, current=current), \
+                    patch.object(startup, "uninstall") as remove, \
+                    patch.object(startup, "uninstall_protocol") as protocol_gone:
+                code, install, _commands, enabled, _text = self.setup_paused(argv, current)
+                self.assertEqual(code, self.bridge.EXIT_OK)
+                remove.assert_not_called()
+                protocol_gone.assert_not_called()
+                self.assertFalse(enabled, "the pause is the person's too")
+                if written:
+                    install.assert_called_once_with(ours)
+                else:
+                    install.assert_not_called()
+
     def test_without_keep_state_setup_still_enables_and_registers(self):
         code, install, commands, enabled, text = self.setup_paused(["setup"], None)
         self.assertEqual(code, self.bridge.EXIT_OK)

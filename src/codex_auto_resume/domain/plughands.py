@@ -1,5 +1,5 @@
 """What core holds of something a plug names: a channel, a route and (v0.6.14) an errand - and which
-records of the plug's own core takes to carry out (P2).
+records of the plug's own core takes to carry out (P2), and what a surface takes of a plug's fields (P10).
 
 A hook answers; it never sends, claims or starts anything (domain/plug.py). Where a point's answer is
 something core carries out - a channel the one send is handed to (P5), a route that continues a
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from enum import StrEnum
+import json
 
 from . import ids
 from .states import EPOCH_STORE, epoch
@@ -252,3 +253,23 @@ def records_of(answer) -> tuple:
             seen.add(made["record_id"])
             taken.append(made)
     return tuple(taken)
+
+
+def fields(answer, refused=None):
+    """What a surface takes from a plug (P10, plug.Guarded.surface): a JSON object, copied, or `refused` - DEFER there.
+
+    Words for keys, and nothing JSON cannot write strictly - no NaN, no infinity, no object of
+    some other kind - so what a plug adds reaches a front end through the same writer as every
+    reply (controlcli.encode) and cannot break it. It is copied through that writer's own form,
+    so nothing the plug keeps a reference to changes a reply after it was made.
+
+    A dict with str keys exactly, not a subclass of either: a subclass brings its own iteration,
+    items and hashing, which are the plug's code running here, outside `consult`. Anything at all
+    that goes wrong while it is copied is refused - a surface is the status, get_status and the
+    Dashboard, which a strange answer must never break."""
+    try:
+        if type(answer) is not dict or not all(type(key) is str for key in answer):
+            return refused
+        return json.loads(json.dumps(answer, allow_nan=False))
+    except Exception:
+        return refused

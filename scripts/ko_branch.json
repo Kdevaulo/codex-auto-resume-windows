@@ -58,10 +58,10 @@
     "CI does not translate anything. A person decides what the Korean should say."
   ],
   "reviewed": {
-    "docs/CHANGELOG.md": "162d86f68fe2a2838a676dfd4998b42676fedb3b8a66bf19b8c94971b9a36b7f",
+    "docs/CHANGELOG.md": "8114ead4c2c025d50faec0934c40a7964a03e137dd7bdfc4a61f41911536e421",
     "docs/CONTRIBUTING.md": "3207eb4667a5a226d17ee186857d87cbf0f9aa4e5d1c36cd7b7793a5ad427202",
     "docs/CONTRIBUTORS.md": "29a99a735aec90caf76898eadc6cbbd3e8250a39aa832996d6ab9dfe63638c7f",
-    "docs/PRIVACY.md": "bc0b9c131949e6167bf468f8a4b23c6e1bb3396c7e7844c626984e8ec3b32abf",
+    "docs/PRIVACY.md": "0b06c1934c02714442b162b5ff40d679200813b729043414718ac2fe2c29d26b",
     "README.md": "b72ab2dd54d98ea91aeda6015bceebcee9a8c1a2a3fe206a9023c17cc005c173",
     "docs/SECURITY.md": "8e8c094aee929bb250c88737f1893adcd89c55436049fcbaca4f4c2fbaf8b64c",
     "docs/SUPPORT.md": "7833488b0467b1afa997380e3cc9c0f6a3b1cfa25d488db50f9ec0774c4c08e4",
@@ -70,11 +70,11 @@
     "docs/DEVELOPMENT.md": "e62cfbe43c855d5c87bfce8e0d69eba649f625f3f1d508818d8126de723b73de",
     "docs/PLUGIN.md": "e61e04ca4f08f01dc2e1ab89d8f443a2f6915b8ff38bbddce63900ddde42c945",
     "docs/VERIFY.md": "64c0d82d1101d02429707828e326dc29caed063d041b500ae5c88bbb9a0bc2e7",
-    "docs/FEATURE_MATRIX.md": "fff9b7fa2836aedc752c6c5d7ca7d5960c974042badd25c968fd392e862e309b",
+    "docs/FEATURE_MATRIX.md": "2030b9cc33562fccf72746c646362ae00f0cdd268c5815f2697e52b5830e10be",
     "docs/LIVE_ACCEPTANCE.md": "0c7c71b31d40ac1a4af254808730f3dfe17d30713373fb84c8c97e237808e11f",
-    "docs/ROADMAP.md": "7538a0905ff0a410e34f7d462a2e75ef04d7df4cd497f548ae63f28693b0681d",
-    "docs/GUIDE.md": "5a770903856c7cf463a225afc5683a3fc198ba1183c6cfa0b8041c71adaddf62",
-    "docs/STANDARDS.md": "fd8fafbfda1eeb8385a00396ce947ece81f4294c6e716709544cbd869396d9fc",
-    "docs/EDITIONS.md": "3370b68f53591ce92c7ded4f54999d745fd6115b028914cb1e44d5d0c08af4d8"
+    "docs/ROADMAP.md": "049aceda39a3923d75a632c7ce6ff0a765d910873925c238fbf34e8ea9f19442",
+    "docs/GUIDE.md": "20f09b0a463692a9941e6211e4bee471071b75ff88c9f646237b3bb23eb30e28",
+    "docs/STANDARDS.md": "1210b09a9ce61e72afb756341d7c36636465dba72196ed4e4d8483b4434861ed",
+    "docs/EDITIONS.md": "43a99e7c53acd8c090e7e35105fb499e73a81ba6454c90591c08b53752f7e5fa"
   }
 }

@@ -194,7 +194,7 @@ class UsageWrapUp:
         return self._home if self._home is not None else inuse.home(self.paths)
 
     def _source(self):
-        """Core's own reader of the Codex home, judging a conversation as core does (codex/history._metadata): a
+        """Core's own reader of the Codex home, judging a conversation as core does (codex/history._eligibility): a
         person's own - or, while Recover every conversation is on, P19's widening - and never a kind Codex makes for
         itself (a subagent, a review, a memory pass, an agent-made conversation). Its `latest` is None for any other."""
         from codex_auto_resume.codex import LocalSource
