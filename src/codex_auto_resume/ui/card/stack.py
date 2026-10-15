@@ -336,13 +336,17 @@ class CardStack:
         self._sync_hover(self.clock())
         self._tick()
 
-    def _click(self, card, target):
+    def _click(self, card, target, *, face=False):
+        """A click: on a button (`target`), what it says; on the card's face (`face`, v0.6.16), where the notice is
+        about (its vm's `click`, notifier.click_uri) - and either way the card goes, as a right click makes it go."""
         now = self.clock()
         if target is not None:
             index = target[1]
             actions = card.vm["actions"]
             if 0 <= index < len(actions) and self.on_action is not None:
                 self.worker(self._quietly, self.on_action, actions[index]["uri"])
+        elif face and card.vm.get("click") and self.on_action is not None:
+            self.worker(self._quietly, self.on_action, card.vm["click"])
         card.seen = True                                 # somebody pointed at it and clicked
         card.motion.retire(now)
         self._tick()
@@ -412,7 +416,7 @@ class CardStack:
             if target is not None and target == pressed:
                 self._click(card, target)
             elif target is None and pressed is None:
-                self._click(card, None)           # a click on the card itself puts it away
+                self._click(card, None, face=True)   # the card itself: where it is about, and it goes
             else:
                 card.redraw()
                 self._tick()

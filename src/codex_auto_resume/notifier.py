@@ -46,7 +46,7 @@ from dataclasses import dataclass, replace
 import re
 import threading
 
-from . import demo, l10n, notice_presence, notify, reasons
+from . import demo, l10n, notice_presence, notify, reasons, settings
 
 # The setting that turns the card off (settings.py, the "windows" group, default on).
 CARD_SETTING = "notification_card"
@@ -92,7 +92,9 @@ class Notice:
     `chip` is the reason's catalog label (a detected interruption only) and `chip_tone` its
     colour token; `actions` are the toast's buttons, (label, URI) pairs; `content` is the toast
     itself - the arguments `notify.show` receives - as sorted (name, value) pairs; `key` is the
-    exact conversation id, so a newer card for the same conversation replaces the older one.
+    exact conversation id, so a newer card for the same conversation replaces the older one;
+    `click` (v0.6.16) is where a click on the notice itself goes - the card's face, the toast's body
+    (its `launch`) - as click_uri decided it, or "" for nowhere.
     """
     kind: str
     status: str
@@ -105,6 +107,7 @@ class Notice:
     content: tuple
     locale: str
     key: str | None = None
+    click: str = ""
 
     def toast_content(self) -> dict:
         """The toast, as `notify.show_content` takes it."""
@@ -147,7 +150,73 @@ def _notice(kind, content, *, key, chip=None, chip_tone=None, line=None) -> Noti
                   locale=l10n.current(), key=key)
 
 
-def build(event, detail, identity=None, *, sound=False):
+# ------------------------------------------------------------- a click on the notice itself
+# v0.6.16 (the owner: "팝업을 클릭하면 무언가가 이미 있나? 없다면 만들어줘"). Until then a click on a card's face only put it
+# away, and a click on a toast's body did nothing of ours. Now both go where the notice is about, and click_uri below is
+# the one place that says where. Three destinations, the setting's values: the notice's own Dashboard page (the
+# default, and the only one while the in-app chat is off); the conversation's chat here (v0.6.16-beta.4's in-app chat
+# adds it, in click_uri); and Codex itself at that conversation (notify.codex_thread_uri). The setting is offered,
+# and read, only while the chat is on (chat_on), so until the chat is merged every click opens the page.
+CLICK_SETTING = "notice_click"
+CLICK_DESTINATIONS = settings.NOTICE_CLICKS
+DEFAULT_CLICK = settings.FIELDS[CLICK_SETTING][0]
+# The page a notice with no Open button is about: a continuation being sent is still on Pending; how one ended -
+# resumed, failed, uncertain, stopped for good, cancelled - is on History. A notice with an Open button is about the
+# page that button opens.
+BODY_PAGES = {"starting": "pending", "resumed": "history", "failed": "history", "unknown": "history",
+              "stopped": "history", "cancelled": "history", "power_stopped": "settings"}
+
+
+def chat_on(values) -> bool:
+    """Whether the in-app chat is on in these settings. There is none yet - v0.6.16-beta.4 brings it and answers
+    here - so a click goes to the notice's page whatever CLICK_SETTING holds."""
+    return False
+
+
+def click_destination(values) -> str:
+    """Where a click on a notice goes under these settings: CLICK_SETTING's value while the chat is on, else the
+    page. Anything unknown is the page."""
+    values = values if isinstance(values, dict) else {}
+    chosen = values.get(CLICK_SETTING) if chat_on(values) else DEFAULT_CLICK
+    return chosen if chosen in CLICK_DESTINATIONS else DEFAULT_CLICK
+
+
+def notice_page(kind, actions) -> str:
+    """The Dashboard page a notice is about: its Open button's page, else BODY_PAGES', else the Overview."""
+    for _label, uri in actions or ():
+        page = notify.parse_open_uri(uri)
+        if page is not None:
+            return page
+    return BODY_PAGES.get(kind, "overview")
+
+
+def click_uri(kind, actions, key, destination=DEFAULT_CLICK) -> str:
+    """THE place a click on a notice's face or body is sent: one URI, which `activate` (the card) and Windows (the
+    toast's `launch`) both open. `key` is the conversation's id, or None for a notice about no conversation, which
+    always opens its page."""
+    if destination == "codex":
+        link = notify.codex_thread_uri(key)
+        if link is not None:
+            return link
+    # destination == "chat": v0.6.16-beta.4's in-app chat returns that conversation's chat here, where key is one.
+    return notify.open_uri(notice_page(kind, actions))
+
+
+def _with_click(notice, destination=DEFAULT_CLICK):
+    """The notice with its click decided, and the toast's body sent there too (its `launch`)."""
+    if notice is None:
+        return None
+    click = click_uri(notice.kind, notice.actions, notice.key, destination)
+    return replace(notice, click=click, content=_frozen(dict(notice.toast_content(), launch=click)))
+
+
+def build(event, detail, identity=None, *, sound=False, destination=DEFAULT_CLICK):
+    """The Notice for one engine event, or None for an event that is never announced; a click on it goes to
+    `destination` (click_destination of the settings), as click_uri decides."""
+    return _with_click(_build(event, detail, identity, sound=sound), destination)
+
+
+def _build(event, detail, identity=None, *, sound=False):
     """The Notice for one engine event, or None for an event that is never announced.
 
     The same mapping `app.App._notifier` has made since v0.6.0, event for event, now in one
@@ -228,10 +297,11 @@ def build(event, detail, identity=None, *, sound=False):
 def build_demo(now) -> Notice:
     """Show me what happens (v0.6.11): an interruption's card, built by `build` from the made-up task
     of demo.py, its title saying Demo and every button's URI empty - drawn as a button, doing nothing
-    (`activate` ignores it). Its content is none: a demo is never a toast (`complete`, `show_demo`)."""
+    (`activate` ignores it). Its content is none: a demo is never a toast (`complete`, `show_demo`), and a click on
+    it opens nothing either (v0.6.16): it only goes, as a click always made a card go."""
     notice = build("interruption", demo.detail(now),
                    {"name": l10n.text("demo.conversation", l10n.current())})
-    return replace(notice, kind="demo", status=STATUS["demo"], key=None, content=(),
+    return replace(notice, kind="demo", status=STATUS["demo"], key=None, content=(), click="",
                    title=l10n.text("demo.card_title", l10n.current(), title=notice.title),
                    actions=tuple((label, "") for label, _uri in notice.actions))
 
@@ -253,12 +323,12 @@ def show_demo(notice, *, inbox=None, setting=True, probe=None) -> bool:
 
 def build_power_stopped() -> Notice:
     """What a power action's stop button says afterwards, from a card or a toast (v0.6.12)."""
-    return _notice("power_stopped", notify.power_content("power_stopped", {}), key=None)
+    return _with_click(_notice("power_stopped", notify.power_content("power_stopped", {}), key=None))
 
 
 def build_cancelled(thread_id) -> Notice:
     """What a cancel from a notification button says afterwards, as `notify.cancelled` does."""
-    return _notice("cancelled", notify.cancelled_content(thread_id), key=thread_id)
+    return _with_click(_notice("cancelled", notify.cancelled_content(thread_id), key=thread_id))
 
 
 # --------------------------------------------------------------------------- the handover
@@ -379,10 +449,12 @@ def complete(notice, card_shown, *, show=notify.show_content) -> bool:
 
 
 # ------------------------------------------------------------------------- the buttons
-def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None) -> str:
+def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None, open_link=None) -> str:
     """Do what a card button's URI asks, in process. Returns what happened, as one word.
 
     "opened" / "not_installed"  an open URI: `open_dashboard(page)` for one of the window's pages
+    "opened" / "not_opened"     (v0.6.16) the Codex app's link to one conversation (notify.codex_thread_uri), the
+                                destination a click on a notice may have: `open_link(link)`, Windows' URL handler
     "cancelled"                  a cancel URI: that one interruption, through the control layer
     "stopped"                    a power-stop URI (v0.6.12): the power action stopped for its batch
     "refused" / "failed"         the control layer said no (a coded refusal) or broke
@@ -402,6 +474,16 @@ def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None)
             except Exception:
                 pass                        # a log that cannot be written changes nothing a press does
 
+    thread_id = notify.parse_codex_thread_uri(uri)
+    if thread_id is not None:
+        try:
+            opened = open_link is not None and open_link(notify.codex_thread_uri(thread_id)) is True
+        except Exception as exc:
+            say("notification card: opening Codex failed (%s)" % type(exc).__name__)
+            return "failed"
+        say("thread %s: Codex opened from a notification card" % thread_id if opened
+            else "notification card: Codex could not be opened")
+        return "opened" if opened else "not_opened"
     page = notify.parse_open_uri(uri)
     if page is not None:
         if open_dashboard is None:

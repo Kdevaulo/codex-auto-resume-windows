@@ -131,7 +131,8 @@
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
             "status_file": false,
-            "codex_homes": []
+            "codex_homes": [],
+            "notice_click": "page"
           },
           "codex_homes": {
             "homes": [
@@ -277,7 +278,8 @@
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
             "status_file": false,
-            "codex_homes": []
+            "codex_homes": [],
+            "notice_click": "page"
           },
           "managed": [
             "DisableAutoResume",
@@ -429,7 +431,8 @@
             "memory_guard": "off",
             "memory_guard_limit": "mb1024",
             "status_file": false,
-            "codex_homes": []
+            "codex_homes": [],
+            "notice_click": "page"
           },
           "codex_homes": {
             "homes": [

@@ -100,6 +100,8 @@ def view(notice) -> dict:
         "line": notice.line,
         "origin": popup.one_line(notice.origin, 200),
         "actions": actions,
+        # v0.6.16: where a click on the card's face goes (notifier.click_uri), or "" for nowhere.
+        "click": getattr(notice, "click", "") or "",
         "locale": notice.locale if notice.locale in l10n.LOCALES else l10n.DEFAULT,
     }
 
