@@ -281,7 +281,8 @@ def cmd_setup(args) -> int:
         pass
     # The entry in Add or remove programs, where the installer has kept an uninstaller for it to name.
     try:
-        addremove.register(home, edition.name().value, config.version())
+        addremove.register(home, edition.name().value, config.version(),
+                           addremove.display_name(config.PROJECT_ROOT / config.PLUGIN_MANIFEST))
     except startup.StartupError:
         pass
     started = start_watcher(home)

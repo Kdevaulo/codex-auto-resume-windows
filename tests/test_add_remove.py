@@ -449,7 +449,8 @@ class KeyTests(Entry):
 
     def test_the_display_name_is_the_installed_manifests_and_the_publisher_is_the_plugin_author(self):
         manifest = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8-sig"))
-        self.assertEqual(addremove.display_name(), manifest["interface"]["displayName"])
+        self.assertEqual(addremove.display_name(ROOT / ".codex-plugin" / "plugin.json"), manifest["interface"]["displayName"])
+        self.assertEqual(addremove.display_name(ROOT / "no-such-manifest.json"), "Codex Auto Resume")
         self.assertEqual(addremove.PUBLISHER, manifest["author"]["name"])
 
 
@@ -526,8 +527,9 @@ class WiringTests(Entry):
 
     def test_the_bridges_setup_registers_only_through_this_module(self):
         text = (ROOT / "scripts" / "plugin_setup.py").read_text(encoding="utf-8")
-        self.assertIn("addremove.register(home, edition.name().value, config.version())", text)
-        self.assertEqual(text.count("addremove."), 1)
+        self.assertIn("addremove.register(home, edition.name().value, config.version(),", text)
+        self.assertIn("addremove.display_name(config.PROJECT_ROOT / config.PLUGIN_MANIFEST))", text)
+        self.assertEqual(text.count("addremove."), 2)
         for forbidden in ("winreg", "CurrentVersion"):
             self.assertNotIn(forbidden, text)
 

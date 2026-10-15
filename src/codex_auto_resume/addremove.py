@@ -8,7 +8,9 @@ installer), and the same command with -Silent for a caller that cannot answer or
 
 One key per edition, by a fixed name (`CodexAutoResume`, and the advanced edition's with its word added), and only
 one of them at a time: an edition change writes the new edition's and takes the other's away, a repair or an
-update writes the same key again. Nothing is ever written to HKLM, and no other key is written.
+update writes the same key again. Nothing is ever written to HKLM, and no other key is written. This module
+decides what the key says and whose it is; startup.py, the one module that touches the registry, reads, writes
+and deletes it.
 
 What is removed is what can be proved ours, the rule the Run value follows (startup.belongs_to): a key is this
 installation's only when its InstallLocation is this home and its uninstall command runs this home's kept
@@ -21,7 +23,7 @@ import json
 import os
 from pathlib import Path
 
-from . import config, startup
+from . import startup
 
 UNINSTALL_ROOT = r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
 BASE_NAME = "CodexAutoResume"
@@ -30,6 +32,8 @@ DEFAULT_DISPLAY_NAME = "Codex Auto Resume"
 KEPT_FOLDER = "uninstall"
 KEPT_SCRIPT = "install.ps1"
 EDITIONS = ("standard", "advanced")
+VALUE_NAMES = ("DisplayName", "DisplayVersion", "Publisher", "InstallLocation", "UninstallString",
+               "QuietUninstallString", "NoModify", "NoRepair")
 
 
 def key_name(edition: str) -> str:
@@ -60,10 +64,10 @@ def uninstall_command(home, silent: bool = False) -> str:
     return " ".join(startup.quote_argument(argument) for argument in argv)
 
 
-def display_name() -> str:
+def display_name(manifest_path) -> str:
     """The name the installed manifest gives this edition: the advanced edition's carries its word."""
     try:
-        manifest = json.loads((config.PROJECT_ROOT / config.PLUGIN_MANIFEST).read_text(encoding="utf-8-sig"))
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8-sig"))
         text = str(manifest["interface"]["displayName"]).strip()
     except (OSError, ValueError, KeyError, TypeError):
         return DEFAULT_DISPLAY_NAME
@@ -86,21 +90,7 @@ def entry_values(home, name: str, version: str) -> dict:
 
 def read(edition: str) -> dict | None:
     """The values of the key of this edition's name, or None when there is none."""
-    winreg = startup._winreg()
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path(edition), 0, winreg.KEY_READ) as key:
-            found, index = {}, 0
-            for name in ("DisplayName", "DisplayVersion", "Publisher", "InstallLocation", "UninstallString",
-                         "QuietUninstallString", "NoModify", "NoRepair"):
-                try:
-                    found[name] = winreg.QueryValueEx(key, name)[0]
-                except FileNotFoundError:
-                    continue
-            return found
-    except FileNotFoundError:
-        return None
-    except OSError as exc:
-        raise startup.StartupError("Cannot read the current user's Uninstall key") from exc
+    return startup.read_key(key_path(edition), VALUE_NAMES)
 
 
 def owned(values: dict | None, home) -> bool:
@@ -122,22 +112,15 @@ def register(home, edition: str, version: str, name: str | None = None) -> list[
     """Write this edition's key for the installation at `home`, and take the other edition's away when it is
     this installation's. Nothing is written unless the kept uninstaller is there for the key to name, and
     nothing is written over a key of that name that is not this installation's. Returns what was done."""
-    winreg = startup._winreg()
     done = []
     if edition not in EDITIONS or not kept_script(home).is_file() or not version or version == "unknown":
         return done
     existing = read(edition)
     if existing is not None and not owned(existing, home):
         return done
-    values = entry_values(home, name or display_name(), version)
+    values = entry_values(home, name or DEFAULT_DISPLAY_NAME, version)
     if existing != values:
-        try:
-            with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path(edition), 0, winreg.KEY_SET_VALUE) as key:
-                for value_name, value in values.items():
-                    kind = winreg.REG_DWORD if isinstance(value, int) else winreg.REG_SZ
-                    winreg.SetValueEx(key, value_name, 0, kind, value)
-        except OSError as exc:
-            raise startup.StartupError("Cannot write the current user's Uninstall key") from exc
+        startup.write_key(key_path(edition), values)
         done.append("wrote " + key_name(edition))
     for other in EDITIONS:
         if other != edition:
@@ -147,16 +130,7 @@ def register(home, edition: str, version: str, name: str | None = None) -> list[
 
 def remove_edition(edition: str, home) -> bool:
     """Delete this edition's key if it is this installation's. True when it was deleted."""
-    winreg = startup._winreg()
-    if not owned(read(edition), home):
-        return False
-    try:
-        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key_path(edition))
-    except FileNotFoundError:
-        return False
-    except OSError as exc:
-        raise startup.StartupError("Cannot remove the current user's Uninstall key") from exc
-    return True
+    return owned(read(edition), home) and startup.delete_key(key_path(edition))
 
 
 def unregister(home) -> list[str]:

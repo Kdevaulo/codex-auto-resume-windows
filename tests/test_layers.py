@@ -94,6 +94,8 @@ LAYER = {_q(name): layer for layer, names in {
                # but for the look at a folder; its identity is handed in from win/folderid.py.
                "homes"),
     "adapters": ("store", "openstate", "codex", "windows", "compat", "compatio", "startup", "shortcut",
+                 # v0.6.16: the entry in Add or remove programs, written through startup.
+                 "addremove",
                  # v0.6.16-beta.3: the words for this time's file beside the state, written under its lock.
                  "oncewords",
                  # v0.6.10-alpha: compat.py and compatio.py became compat/.
@@ -223,7 +225,7 @@ LAYER = {_q(name): layer for layer, names in {
 PLANNED = {_q(name) for name in ("codex", "win", "ui", "mcp", "domain.public")}
 STORE = {_q("store"), _q("openstate")}              # openstate moves into store/ as store/open.py
 CODEX = {_q("codex"), _q("windows"), _q("codex")}         # Codex's files and processes
-WIN = {_q(name) for name in ("windows", "startup", "shortcut", "pwsh", "notify", "notice_presence",
+WIN = {_q(name) for name in ("windows", "startup", "addremove", "shortcut", "pwsh", "notify", "notice_presence",
                              "tray_place", "win")}
 UI = {_q(name) for name in ("brand", "notice_card", "notice_window", "ui")}
 MCP = {_q("mcpserver"), _q("mcp")}

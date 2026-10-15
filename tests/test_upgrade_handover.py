@@ -47,7 +47,7 @@ class LauncherPathTests(unittest.TestCase):
         command is looked up. A line starting with `:` is a label, which runs nothing. The
         edition-change question in Install.cmd needs all three.
         """
-        builtins = {"@echo", "setlocal", "title", "set", "echo.", "echo", "if", "pause", "exit",
+        builtins = {"@echo", "setlocal", "title", "set", "echo.", "echo", "if", "pause", "exit", "for",
                     "rem", "goto"}
         for launcher in LAUNCHERS:
             for number, line in enumerate(launcher.read_text(encoding="utf-8").splitlines(), 1):
