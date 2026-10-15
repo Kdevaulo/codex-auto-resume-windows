@@ -152,6 +152,8 @@
   "page.preview.title": "Ce qui est envoyé, exactement",
   "page.preview.300": "Quand la fenêtre de cinq heures l'atteint :",
   "page.preview.10080": "Quand la fenêtre hebdomadaire l'atteint :",
+  "page.option.window_five_hour": "Agir sur la fenêtre de cinq heures",
+  "page.option.window_weekly": "Agir sur la fenêtre hebdomadaire",
   "page.option.warn_five_hour": "Avertir à (fenêtre de 5 heures)",
   "page.option.warn_weekly": "Avertir à (fenêtre hebdomadaire)",
   "page.option.workers": "À la fois",

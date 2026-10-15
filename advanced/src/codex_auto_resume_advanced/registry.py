@@ -829,7 +829,9 @@ USAGE_METER = CapabilityDef(
     measurements=(Measurement.MU,),
     options=(Option(OptionKey.POLL_MINUTES, POLL_CHOICES, DEFAULT_POLL),
              Option(OptionKey.WARN_FIVE_HOUR, PERCENTS, DEFAULT_WARN),
-             Option(OptionKey.WARN_WEEKLY, PERCENTS, DEFAULT_WARN)),
+             Option(OptionKey.WARN_WEEKLY, PERCENTS, DEFAULT_WARN),
+             Option(OptionKey.WINDOW_FIVE_HOUR, SWITCH, ON),
+             Option(OptionKey.WINDOW_WEEKLY, SWITCH, ON)),
 )
 
 # Wrap up near a limit (v0.6.16-beta.3, issue #29; the v0.6.11 design's "Near-limit wrap-up nudge"). At P8, when the

@@ -152,6 +152,8 @@
   "page.preview.title": "보내지는 문구 그대로",
   "page.preview.300": "5시간 창이 이르렀을 때:",
   "page.preview.10080": "주간 창이 이르렀을 때:",
+  "page.option.window_five_hour": "5시간 창에서 작동",
+  "page.option.window_weekly": "주간 창에서 작동",
   "page.option.warn_five_hour": "경고 기준 (5시간 구간)",
   "page.option.warn_weekly": "경고 기준 (주간 구간)",
   "page.option.workers": "동시에",

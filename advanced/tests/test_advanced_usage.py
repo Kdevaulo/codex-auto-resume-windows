@@ -102,7 +102,8 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual((USAGE_WRAP_UP.departs_from, USAGE_WRAP_UP.requires), (("A13", "A26"), ("usage_meter",)))
         self.assertEqual((USAGE_PAUSE.departs_from, USAGE_PAUSE.requires), (("C9",), ("usage_meter",)))
         self.assertEqual({option.key: option.default for option in USAGE_METER.options},
-                         {OptionKey.POLL_MINUTES: 15, OptionKey.WARN_FIVE_HOUR: 85, OptionKey.WARN_WEEKLY: 85})
+                         {OptionKey.POLL_MINUTES: 15, OptionKey.WARN_FIVE_HOUR: 85, OptionKey.WARN_WEEKLY: 85,
+                          OptionKey.WINDOW_FIVE_HOUR: 1, OptionKey.WINDOW_WEEKLY: 1})
         self.assertEqual({option.key: option.default for option in USAGE_WRAP_UP.options},
                          {OptionKey.WRAP_FIVE_HOUR: 90, OptionKey.WRAP_WEEKLY: 90, OptionKey.WRAP_STYLE: 2,
                           OptionKey.STOP_WORDS_FIVE_HOUR: 95, OptionKey.STOP_WORDS_WEEKLY: 95,
@@ -134,6 +135,25 @@ class DefinitionTests(unittest.TestCase):
 
 
 class MeterTests(UsageCase):
+    def window_off(self, key):
+        """(e): one window switched off in the meter's choices, as the Dashboard sets it."""
+        result = self.rt.arming.set_option("usage_meter", key, 2, generation=self.rt.state.meta()["generation"],
+                                           actor=Actor.DASHBOARD)
+        self.assertTrue(result["done"], result)
+
+    def test_a_window_switched_off_is_shown_never_warned_of(self):
+        """v0.6.16-beta.4 (e): the five-hour window off - read and shown, no warning, no band; the weekly one acts."""
+        self.on("usage_meter")
+        self.window_off(OptionKey.WINDOW_FIVE_HOUR)
+        self.answer = reply(five=96, week=96)
+        self.look()
+        meter = self.rt.state.meter()
+        self.assertEqual(meter[("codex", 300)]["used_percent"], 96.0, "still read and shown")
+        self.assertIsNone(meter[("codex", 300)]["warned_reset_at"])
+        self.assertIsNotNone(meter[("codex", 10080)]["warned_reset_at"])
+        bands = {row["window_minutes"]: row["band"] for row in surfaces.meter_view(self.rt)["meter"]["windows"]}
+        self.assertEqual(bands, {300: "none", 10080: "warn"})
+
     def test_off_it_reads_nothing_and_shows_nothing(self):
         self.look()
         self.assertEqual((self.calls, self.rt.state.meter()), ([], {}))
@@ -241,6 +261,22 @@ class PauseTests(UsageCase):
         self.now = self.rt.state.meter()[("codex", 300)]["reset_at"] + 61
         self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), DEFER)
 
+    def test_a_window_switched_off_is_never_held_and_one_held_lets_go(self):
+        """v0.6.16-beta.4 (e): over the stop percentage with its window switched off, nothing is held; a window held
+        lets go as soon as it is switched off."""
+        self.on("usage_pause")
+        self.answer = reply(five=96)
+        self.look()
+        self.look()
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
+        MeterTests.window_off(self, OptionKey.WINDOW_FIVE_HOUR)
+        self.look()
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), DEFER)
+        self.now += 20 * 60
+        self.look()
+        self.look()
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), DEFER, "never held while off")
+
     def test_below_the_percentage_nothing_is_held(self):
         self.on("usage_pause")
         self.answer = reply(five=94)
@@ -337,6 +373,18 @@ class WrapUpTests(TakingCase):
         sent = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
         self.assertEqual(len(sent), 1, self.h.logs[-10:])
         self.assertIn(statement.CATALOGS.text("continue.wrap_up.window.five_hour", "ko"), sent[0])
+
+    def test_a_window_switched_off_gets_no_wrap_up(self):
+        """v0.6.16-beta.4 (e): the five-hour window over its wrap-up percentage but switched off in the meter's choices -
+        nothing is sent; both windows off, the meter still shows usage and nothing acts."""
+        plug, _turn = self.running()
+        result = plug.runtime.arming.set_option("usage_meter", OptionKey.WINDOW_FIVE_HOUR, 2,
+                                                generation=plug.runtime.state.meta()["generation"], actor=Actor.DASHBOARD)
+        self.assertTrue(result["done"], result)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.assertEqual(self.h.backend.send_calls, [])
+        self.assertEqual(plug.runtime.state.continuations(capability=self.cap, pending=None), [])
 
     def test_include_the_reset_time_says_when_the_window_resets_and_off_leaves_it_out(self):
         """v0.6.16-beta.4 (i): on by default, the words end with when the window that triggered them resets - core's hour

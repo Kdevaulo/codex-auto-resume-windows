@@ -152,6 +152,8 @@
   "page.preview.title": "Was genau gesendet wird",
   "page.preview.300": "Wenn das Fünf-Stunden-Fenster ihn erreicht:",
   "page.preview.10080": "Wenn das Wochenfenster ihn erreicht:",
+  "page.option.window_five_hour": "Beim Fünf-Stunden-Fenster handeln",
+  "page.option.window_weekly": "Beim Wochenfenster handeln",
   "page.option.warn_five_hour": "Warnen bei (5-Stunden-Fenster)",
   "page.option.warn_weekly": "Warnen bei (Wochenfenster)",
   "page.option.workers": "Gleichzeitig",

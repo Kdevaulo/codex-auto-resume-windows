@@ -152,6 +152,8 @@
   "page.preview.title": "מה בדיוק נשלח",
   "page.preview.300": "כשחלון חמש השעות מגיע אליו:",
   "page.preview.10080": "כשהחלון השבועי מגיע אליו:",
+  "page.option.window_five_hour": "לפעול לפי חלון חמש השעות",
+  "page.option.window_weekly": "לפעול לפי החלון השבועי",
   "page.option.warn_five_hour": "להזהיר ב- (חלון 5 שעות)",
   "page.option.warn_weekly": "להזהיר ב- (חלון שבועי)",
   "page.option.workers": "בבת אחת",

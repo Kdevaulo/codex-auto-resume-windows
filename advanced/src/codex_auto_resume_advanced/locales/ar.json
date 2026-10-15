@@ -152,6 +152,8 @@
   "page.preview.title": "ما يُرسل بالضبط",
   "page.preview.300": "عندما تصل نافذة الساعات الخمس إليه:",
   "page.preview.10080": "عندما تصل النافذة الأسبوعية إليه:",
+  "page.option.window_five_hour": "التصرف بحسب نافذة الساعات الخمس",
+  "page.option.window_weekly": "التصرف بحسب النافذة الأسبوعية",
   "page.option.warn_five_hour": "التحذير عند (نافذة 5 ساعات)",
   "page.option.warn_weekly": "التحذير عند (النافذة الأسبوعية)",
   "page.option.workers": "معًا",

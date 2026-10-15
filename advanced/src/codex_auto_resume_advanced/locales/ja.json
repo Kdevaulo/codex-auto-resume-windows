@@ -152,6 +152,8 @@
   "page.preview.title": "送られる文 (そのまま)",
   "page.preview.300": "5時間枠が達したとき:",
   "page.preview.10080": "週間枠が達したとき:",
+  "page.option.window_five_hour": "5時間枠で動作",
+  "page.option.window_weekly": "週間枠で動作",
   "page.option.warn_five_hour": "警告するしきい値（5 時間枠）",
   "page.option.warn_weekly": "警告するしきい値（週間枠）",
   "page.option.workers": "同時に",

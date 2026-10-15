@@ -152,6 +152,8 @@
   "page.preview.title": "實際傳送的內容",
   "page.preview.300": "5 小時視窗達到時：",
   "page.preview.10080": "每週視窗達到時：",
+  "page.option.window_five_hour": "依 5 小時視窗動作",
+  "page.option.window_weekly": "依每週視窗動作",
   "page.option.warn_five_hour": "警告門檻（5 小時視窗）",
   "page.option.warn_weekly": "警告門檻（每週視窗）",
   "page.option.workers": "同時",

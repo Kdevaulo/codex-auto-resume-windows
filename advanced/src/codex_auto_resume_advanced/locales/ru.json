@@ -152,6 +152,8 @@
   "page.preview.title": "Что именно отправляется",
   "page.preview.300": "Когда пятичасовое окно доходит до него:",
   "page.preview.10080": "Когда недельное окно доходит до него:",
+  "page.option.window_five_hour": "Действовать по пятичасовому окну",
+  "page.option.window_weekly": "Действовать по недельному окну",
   "page.option.warn_five_hour": "Предупреждать при (5-часовое окно)",
   "page.option.warn_weekly": "Предупреждать при (недельное окно)",
   "page.option.workers": "Сразу",

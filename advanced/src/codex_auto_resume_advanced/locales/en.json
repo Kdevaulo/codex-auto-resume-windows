@@ -520,6 +520,8 @@
   "page.preview.title": "What is sent, exactly",
   "page.preview.300": "When the five-hour window reaches it:",
   "page.preview.10080": "When the weekly window reaches it:",
+  "page.option.window_five_hour": "Act on the five-hour window",
+  "page.option.window_weekly": "Act on the weekly window",
   "name.usage_meter": "Usage meter",
   "name.usage_wrap_up": "Wrap up near a limit",
   "name.usage_pause": "Pause near a limit",

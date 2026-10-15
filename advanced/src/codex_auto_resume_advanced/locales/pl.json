@@ -152,6 +152,8 @@
   "page.preview.title": "Co dokładnie zostanie wysłane",
   "page.preview.300": "Gdy okno pięciogodzinne do niego dojdzie:",
   "page.preview.10080": "Gdy okno tygodniowe do niego dojdzie:",
+  "page.option.window_five_hour": "Działaj przy oknie pięciogodzinnym",
+  "page.option.window_weekly": "Działaj przy oknie tygodniowym",
   "page.option.warn_five_hour": "Ostrzegaj przy (okno 5-godzinne)",
   "page.option.warn_weekly": "Ostrzegaj przy (okno tygodniowe)",
   "page.option.workers": "Naraz",

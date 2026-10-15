@@ -152,6 +152,8 @@
   "page.preview.title": "O que é enviado, exatamente",
   "page.preview.300": "Quando a janela de cinco horas chega a ele:",
   "page.preview.10080": "Quando a janela semanal chega a ele:",
+  "page.option.window_five_hour": "Agir na janela de cinco horas",
+  "page.option.window_weekly": "Agir na janela semanal",
   "page.option.warn_five_hour": "Avisar em (janela de 5 horas)",
   "page.option.warn_weekly": "Avisar em (janela semanal)",
   "page.option.workers": "Ao mesmo tempo",

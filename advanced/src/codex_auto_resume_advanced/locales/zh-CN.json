@@ -152,6 +152,8 @@
   "page.preview.title": "实际发送的内容",
   "page.preview.300": "5 小时窗口达到时：",
   "page.preview.10080": "每周窗口达到时：",
+  "page.option.window_five_hour": "按 5 小时窗口动作",
+  "page.option.window_weekly": "按每周窗口动作",
   "page.option.warn_five_hour": "警告阈值（5 小时窗口）",
   "page.option.warn_weekly": "警告阈值（每周窗口）",
   "page.option.workers": "同时",

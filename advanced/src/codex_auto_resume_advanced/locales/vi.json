@@ -152,6 +152,8 @@
   "page.preview.title": "Nội dung gửi đi, chính xác",
   "page.preview.300": "Khi khung năm giờ chạm tới:",
   "page.preview.10080": "Khi khung hằng tuần chạm tới:",
+  "page.option.window_five_hour": "Hoạt động theo khung năm giờ",
+  "page.option.window_weekly": "Hoạt động theo khung hằng tuần",
   "page.option.warn_five_hour": "Cảnh báo ở mức (cửa sổ 5 giờ)",
   "page.option.warn_weekly": "Cảnh báo ở mức (cửa sổ hằng tuần)",
   "page.option.workers": "Cùng lúc",

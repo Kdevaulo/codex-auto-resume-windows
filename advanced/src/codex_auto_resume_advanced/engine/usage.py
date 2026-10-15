@@ -54,6 +54,8 @@ DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 95
 # v0.6.16-beta.4: the stop percentage the wrap-up's words ask Codex to stop at (wrapwords.py), each window its own.
 DEFAULT_STOP_WORDS = 95
 STOP_WORDS_OPTIONS = {FIVE_HOUR: OptionKey.STOP_WORDS_FIVE_HOUR, WEEKLY: OptionKey.STOP_WORDS_WEEKLY}
+# (e): each window acted on or not - the meter's own choice, which the warning, the wrap-up and the stop each follow.
+WINDOW_OPTIONS = {FIVE_HOUR: OptionKey.WINDOW_FIVE_HOUR, WEEKLY: OptionKey.WINDOW_WEEKLY}
 # (b): the wrap-up's Custom text for each window (state `wordings`).
 CUSTOM_WORDINGS = {FIVE_HOUR: WordingKey.WRAP_CUSTOM_FIVE_HOUR, WEEKLY: WordingKey.WRAP_CUSTOM_WEEKLY}
 # Each capability's percentage option for each window.
@@ -86,6 +88,20 @@ def reached(row, threshold, now) -> bool:
 def windows(rows):
     """The rows of the five-hour and the weekly windows, any bucket's."""
     return [row for row in rows.values() if row["minutes"] in WINDOWS]
+
+
+def acting(meter_options) -> frozenset:
+    """The windows a person lets these capabilities act on (v0.6.16-beta.4, item (e)): each one switched on in the
+    meter's choices - both by default. Both off, the meter still reads and shows usage, and nothing acts."""
+    return frozenset(minutes for minutes, key in WINDOW_OPTIONS.items() if meter_options.get(key, ON) == ON)
+
+
+def _acting(scoped) -> frozenset:
+    """The windows acted on, as the meter's choices say; every window where they cannot be read."""
+    try:
+        return acting(scoped.options_of(METER))
+    except Exception:
+        return frozenset(WINDOWS)
 
 
 class _Errand:
@@ -166,7 +182,10 @@ class UsageMeter:
         handle.save(found)
         self._count("read")
         options = scoped.options()
+        on = acting(options)
         for row in windows(handle.rows()):
+            if row["minutes"] not in on:
+                continue                                   # (e) a window switched off: shown, never warned of
             if reached(row, percent(options, METER, row["minutes"]), now) and row["warned_reset_at"] != row["reset_at"]:
                 if handle.mark(row["bucket"], row["minutes"], warned_reset_at=row["reset_at"]):
                     self._count("warned")
@@ -230,8 +249,9 @@ class UsageWrapUp:
         if not handle.on():
             return
         options = scoped.options()
-        due = [row for row in windows(scoped.meter.rows())
-               if now - row["read_at"] <= FRESH and reached(row, percent(options, WRAP_UP, row["minutes"]), now)]
+        on = _acting(scoped)
+        due = [row for row in windows(scoped.meter.rows()) if row["minutes"] in on
+               and now - row["read_at"] <= FRESH and reached(row, percent(options, WRAP_UP, row["minutes"]), now)]
         if not due:
             return
         # v0.6.16-beta.4: the words of each window due - with the numbers where that wording is chosen - in the
@@ -351,13 +371,17 @@ class UsagePause:
                 return DEFER
             now = scoped.now()
             options = scoped.options()
+            on = _acting(scoped)
             for row in windows(handle.rows()):
-                over = reached(row, percent(options, PAUSE, row["minutes"]), now)
+                # (e) a window switched off is never held, and one held lets go when it is switched off.
+                acted = row["minutes"] in on
+                over = acted and reached(row, percent(options, PAUSE, row["minutes"]), now)
                 held = row["paused_reset_at"]
                 if over and held != row["reset_at"]:
                     if handle.mark(row["bucket"], row["minutes"], paused_reset_at=row["reset_at"]):
                         self._count("paused")
-                elif held is not None and not over and (held != row["reset_at"] or now >= held + CLOSE_AFTER):
+                elif held is not None and not over and (not acted or held != row["reset_at"]
+                                                         or now >= held + CLOSE_AFTER):
                     if handle.mark(row["bucket"], row["minutes"], clear_pause=True):
                         self._count("resumed")
         except Exception:

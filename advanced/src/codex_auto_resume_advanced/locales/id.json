@@ -152,6 +152,8 @@
   "page.preview.title": "Yang dikirim, persisnya",
   "page.preview.300": "Saat jendela lima jam mencapainya:",
   "page.preview.10080": "Saat jendela mingguan mencapainya:",
+  "page.option.window_five_hour": "Bertindak pada jendela lima jam",
+  "page.option.window_weekly": "Bertindak pada jendela mingguan",
   "page.option.warn_five_hour": "Peringatkan pada (jendela 5 jam)",
   "page.option.warn_weekly": "Peringatkan pada (jendela mingguan)",
   "page.option.workers": "Sekaligus",

@@ -152,6 +152,8 @@
   "page.preview.title": "Tam olarak gönderilen",
   "page.preview.300": "Beş saatlik pencere ona ulaştığında:",
   "page.preview.10080": "Haftalık pencere ona ulaştığında:",
+  "page.option.window_five_hour": "Beş saatlik pencerede çalış",
+  "page.option.window_weekly": "Haftalık pencerede çalış",
   "page.option.warn_five_hour": "Uyarı eşiği (5 saatlik pencere)",
   "page.option.warn_weekly": "Uyarı eşiği (haftalık pencere)",
   "page.option.workers": "Aynı anda",

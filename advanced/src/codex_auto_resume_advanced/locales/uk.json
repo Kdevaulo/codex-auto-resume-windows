@@ -152,6 +152,8 @@
   "page.preview.title": "Що саме надсилається",
   "page.preview.300": "Коли п'ятигодинне вікно доходить до нього:",
   "page.preview.10080": "Коли тижневе вікно доходить до нього:",
+  "page.option.window_five_hour": "Діяти за п'ятигодинним вікном",
+  "page.option.window_weekly": "Діяти за тижневим вікном",
   "page.option.warn_five_hour": "Попереджати за (5-годинне вікно)",
   "page.option.warn_weekly": "Попереджати за (тижневе вікно)",
   "page.option.workers": "Одночасно",
