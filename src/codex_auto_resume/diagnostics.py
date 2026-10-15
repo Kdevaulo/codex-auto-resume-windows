@@ -291,7 +291,7 @@ def write(control, target: Path, check=None) -> Path:
     redact = Redactor()
     # Written whole or not at all: the text is made before the file is, so a value that
     # cannot be written leaves no half a bundle behind to block the next attempt's name.
-    text = json.dumps(collect(control, redact=redact, check=check), indent=1, ensure_ascii=False, allow_nan=False,
+    text = json.dumps(collect(control, redact=redact, **({} if check is None else {"check": check})), indent=1, ensure_ascii=False, allow_nan=False,
                       default=redact.unexpected)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("x", encoding="utf-8") as stream:
