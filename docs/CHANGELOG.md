@@ -24,12 +24,12 @@ there, and *Install another version...* says so before it installs one.
 - **A conversation whose turns Codex records under another id is followed there.** Codex can carry on a
   conversation's turns under a new id, and a failure there was never found. The watcher now follows every id a
   conversation has had, in order, so its failure is found and an old one never comes back (reported by
-  @aca22jy, #30).
+  [@aca22jy](https://github.com/aca22jy), [#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)).
 - **Every failed turn the watcher does not take up is logged once, with why** - once per turn and reason,
-  across restarts, a few lines at a time (suggested by @barkshah2002-pixel, #27).
+  across restarts, a few lines at a time (suggested by [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
 - **Diagnostics can check why a failure was not taken up.** *Check why a failure was not taken up...* asks the
   watcher's own rules about the newest 200 conversations, within 10 seconds, and reads nothing of what they say
-  (suggested by @barkshah2002-pixel, #27).
+  (suggested by [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
 - **Settings' Run at Windows sign-in shows what Windows really holds**, and Save writes it only where you moved
   it; an update keeps the entry you kept (#31).
 - **The panel says how to start the watcher when it is off**, and that nothing starts it while sign-in is off
@@ -51,7 +51,7 @@ there, and *Install another version...* says so before it installs one.
   turns off what needs it (the owner's request; standard K3 amended by the owner).
 - **Usage meter, Wrap up near a limit and Pause near a limit.** The meter reads your Codex usage on a schedule
   you pick and warns near a limit; the wrap-up asks each running turn to finish its step; the pause holds the
-  product's continuations until the reset. Both need the meter (suggested by @Hunweibyn, #29).
+  product's continuations until the reset. Both need the meter (suggested by [@Hunweibyn](https://github.com/Hunweibyn), [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
 - **Recover every conversation but Codex's own** takes up a failed turn in any conversation of the app except
   subagents, reviews, memory passes and the ones an agent made.
 - **Keep it on sits in view**, in a capability's head card under its state, and the list says "· kept on".
@@ -95,7 +95,7 @@ with a plugin at v0.6.11-beta.2 or later.
   the conversation's own file must still say the same. Found by a person's report and the read-only
   check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
   carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
-  turn there that fails (reported by @barkshah2002-pixel, #27; proved by @ZionZhang42, #27).
+  turn there that fails (reported by [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27); proved by [@ZionZhang42](https://github.com/ZionZhang42), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
 
 ### Advanced edition
 
@@ -176,7 +176,7 @@ capabilities read as off, as v0.6.14 reads that beta's file.
   the conversation's own file must still say the same. Found by a person's report and the read-only
   check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
   carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
-  turn there that fails (reported by @barkshah2002-pixel, #27; proved by @ZionZhang42, #27).
+  turn there that fails (reported by [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27); proved by [@ZionZhang42](https://github.com/ZionZhang42), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
 
 ### Advanced edition
 
@@ -808,7 +808,7 @@ pre-releases, below, say which.
 
 Asked for in Discussion #22, and decided by the owner on 2026-09-30 and 2026-10-03. It is in the
 standard edition: it keeps every standard, with A28 amended by the owner for its stop button (suggested by
-@cervinho, #22).
+[@cervinho](https://github.com/cervinho), [#22](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/22)).
 
 - **Off by default, turned on only in the Dashboard.** Settings > General has a new last card, **When
   usage-limit recoveries finish**: Then (Sleep, Hibernate or Shut down), When (every recovery succeeded;
