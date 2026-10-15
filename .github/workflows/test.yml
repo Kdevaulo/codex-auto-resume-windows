@@ -95,6 +95,15 @@ jobs:
           # Python ships, that lane starts testing the real thing without an edit.
           allow-prereleases: true
 
+      - name: Install PyYAML for the workflow-shape test
+        # tests/test_workflow_privilege.py YamlShapeTests parses every workflow with PyYAML and skips
+        # without it. Only this test job gets it: no file of the product imports yaml (the product
+        # stays standard library), so nothing here is a dependency of what is shipped.
+        # An exact version. The next Python is a release candidate that may have no wheel for it yet,
+        # so its lane carries on without the package rather than failing the job's first step.
+        continue-on-error: ${{ matrix.experimental }}
+        run: python -m pip install PyYAML==6.0.3
+
       - name: Say which interpreter this actually is
         # The lane is named for a line, not a build. When a failure turns out to be the
         # interpreter's, the first question is which one - and on the pre-release lane
