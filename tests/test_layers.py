@@ -170,8 +170,9 @@ LAYER = {_q(name): layer for layer, names in {
                "engine.storeview",
                # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
                "engine.routes",
-               # and which conversations besides the app's are watched (P18).
-               "engine.kinds"),
+               # and which conversations besides the app's are watched (P18), one sent to another session (P16),
+               # and a full context window's compaction turns.
+               "engine.kinds", "engine.tosession", "engine.compaction"),
     # v0.6.10-alpha: control.py became control/, ten files, `Control` composed from eight
     # mixins. `layer` is where the composition lives, so that the front holds no code.
     "control": ("control", "control.actions", "control.codexstart", "control.errors",

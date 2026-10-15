@@ -95,8 +95,9 @@ ITEM = {_q(name): item for item, names in {
                "engine.storeview",
                # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
                "engine.routes",
-               # and which conversations besides the app's are watched (P18).
-               "engine.kinds"),
+               # and which conversations besides the app's are watched (P18), one sent to another session (P16),
+               # and a full context window's compaction turns.
+               "engine.kinds", "engine.tosession", "engine.compaction"),
     "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",

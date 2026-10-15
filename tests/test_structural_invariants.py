@@ -206,7 +206,9 @@ class OneSenderTests(unittest.TestCase):
         self.assertEqual([(where, name) for where, name, _ in asked],
                          [("codex_auto_resume/engine/foropen.py", "ForOpenMixin._open_reason"),
                           ("codex_auto_resume/engine/routes.py", "RoutesMixin._unloaded"),
-                          ("codex_auto_resume/engine/routes.py", "RoutesMixin._unheld")])
+                          ("codex_auto_resume/engine/routes.py", "RoutesMixin._unheld"),
+                          # v0.6.16-beta.4: P16 for a conversation another Codex session holds (TO_SESSION).
+                          ("codex_auto_resume/engine/tosession.py", "ToSessionMixin._session")])
         resumed = calls(lambda node: isinstance(node.func, ast.Attribute) and node.func.attr == "resume")
         self.assertEqual([(where, name) for where, name, _ in resumed],
                          [("codex_auto_resume/engine/routes.py", "RoutesMixin._resume_unloaded")])

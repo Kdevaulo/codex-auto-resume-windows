@@ -26,10 +26,9 @@ from .payload import (_choose_reset, _item_is_ours, _needing, _queue_has_marker,
 
 class HistoryMixin:
     def _eligibility(self, thread_id: str, strict: bool = False, kinds=None):
-        """(its file, None) for a desktop-app conversation of a person's own (A15) - or one of the other kinds the
-        plug names (P18, codex/eligibility.py; `kinds`, else the engine's of this tick) - or (None, why not): a reason
-        of domain/skips.py and the kind word behind it. strict=True (latest) re-raises transient I/O as
-        SourceError so the engine defers instead of treating an unreadable rollout as "latest turn changed"."""
+        """(its file, None) for a conversation taken up - a person's own desktop one (A15), or of a kind the plug names
+        (P18; `kinds`, else this tick's) - or (None, why not), a domain/skips.py reason and its kind word. strict=True
+        (latest) re-raises transient I/O as SourceError, so the engine defers rather than calling it changed."""
         kinds = self.session_kinds if kinds is None else kinds
         if not ids.is_uuid(thread_id):
             return None, (skips.UNKNOWN_CONVERSATION, None)
@@ -546,6 +545,7 @@ class HistoryMixin:
             "progress": any(counts.get(kind, 0) > 0 for kind in PROGRESS_ITEM_TYPES),
             "foreign_user_messages": foreign,
             "later_terminal": later_terminal,
+            "compaction_only": "contextCompaction" in counts and set(counts) <= {"contextCompaction", "reasoning"},
         }
 
     def turn_progress(self, thread_id: str, turn_id: str):

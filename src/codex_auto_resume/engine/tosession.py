@@ -18,11 +18,8 @@ from __future__ import annotations
 from .. import machine
 from ..domain.plug import Alternative
 
-# What each of the two withdrawals is stored as (a word every schema-5 reader knows), and shown as.
-STORED = {"session_ended": "window_ended", "session_expired": "not_delivered_on_open"}
-# The reasons a withdrawal waits on while a later turn is not yet knowable - it may be the item running: foropen's
-# not_delivered_on_open (v0.6.15-beta), and every one of a continuation sent to another session.
-UNDETERMINED_WAITS = frozenset({"not_delivered_on_open", "expired", *STORED})
+# What each of the two withdrawals is stored as (a word every schema-5 reader knows), and shown as (domain/public.py).
+STORED = machine.SESSION_WITHDRAWALS
 
 
 class ToSessionMixin:

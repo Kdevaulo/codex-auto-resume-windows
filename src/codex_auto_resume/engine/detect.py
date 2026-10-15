@@ -18,6 +18,7 @@ from ..machine import OBSERVING, TERMINAL, WAITING, WATCHED
 from ..codex import admissible as admissible_failure, detect
 from ..domain import ids, skips
 from ..domain.plug import DEFER, PACED_AS, Alternative, Point
+from .compaction import COMPACTED
 from .relaxed import UNADMITTED_SECONDS
 
 # v0.6.16-beta.3 (issue #27): how far before the look-back window failed turns are still read, to say once
@@ -69,6 +70,8 @@ class DetectMixin:
         latest = self.source.latest(row["thread_id"])
         if not latest:
             return False
+        if self.compacted_since(row, latest):           # v0.6.16-beta.4: still the one (engine/compaction.py)
+            return True
         found = self._keyed(admissible_failure(latest) if row["category"] in failures.ADMISSIBLE
                             else detect(latest))
         return found is not None and found["interruption_id"] == row["interruption_id"]
@@ -133,8 +136,9 @@ class DetectMixin:
         said = []
         for entry in read["passed"]:
             reason = entry["reason"]
-            # One the edition's plug may take up is not said to be passed over before it was asked (P17).
-            if reason == skips.NOT_RECOVERED and asking and entry["category"] in failures.ADMISSIBLE:
+            # One the edition's plug may take up is not said to be passed over before it was asked (P17) - all but an
+            # invalid request, which it takes up for one code alone (v0.6.16-beta.4): said as ever, whatever its code.
+            if reason == skips.NOT_RECOVERED and asking and entry["category"] in failures.ADMISSIBLE - {COMPACTED}:
                 continue
             if _keep(self._passed_known, entry["turn_id"]) and reason is not None:
                 said.append(entry)

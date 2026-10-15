@@ -91,6 +91,8 @@ NOT_SCENARIOS = {
                        "holds (v0.6.16-beta.4), which the neutral plug never answers - such a conversation waits there",
     "test_session_kinds": "gives every engine a plug that names terminal and VS Code conversations at P18 "
                           "(v0.6.16-beta.4), which the neutral plug never names - only the app's are detected there",
+    "test_compaction_core": "gives every engine a plug that takes a full context window up at P17 (v0.6.16-beta.4), "
+                            "which the neutral plug never does - such a failure is never registered there",
     "test_plug_record_purposes": "gives every engine a plug with continuations and messages of its own (P2), to hold "
                                  "what each purpose may and may not be sent as",
     "test_power_action": "builds an engine with no store or backend only to ask engine.activity, which reads a "

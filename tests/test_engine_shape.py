@@ -35,7 +35,11 @@ MIXINS = (package.OptionsMixin, package.AnnounceMixin, package.FreshnessMixin,
           # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
           package.RoutesMixin,
           # and which conversations besides the app's are watched (P18).
-          package.KindsMixin)
+          package.KindsMixin,
+          # a continuation sent to a conversation another Codex session holds (P16's TO_SESSION),
+          package.ToSessionMixin,
+          # and a full context window's record, which a compaction turn supersedes nothing of.
+          package.CompactionMixin)
 
 # The forty-one methods the one class had, counted the day it was split.
 METHODS = {
@@ -116,8 +120,12 @@ METHODS = {
     "_once_words", "_spend_once_words", "_prune_once_words",
     # v0.6.16-beta.4: P16 asked with the app closed and nothing holding the conversation, and the look made again.
     "_unheld", "_unheld_now", "_holder", "_route", "_still_where",
-    # and which conversations besides the app's are watched, asked once a tick (P18, engine/kinds.py).
+    # and which conversations besides the app's are watched, asked once a tick (P18, engine/kinds.py);
     "session_kinds",
+    # a continuation sent to another Codex session (P16's TO_SESSION, engine/tosession.py);
+    "to_session", "_session", "_session_reason",
+    # and the compaction turns after a full context window (engine/compaction.py).
+    "compacted_since", "compaction", "foreign",
 }
 
 # What `from codex_auto_resume.engine import ...` has to keep answering (app.py, the tests).

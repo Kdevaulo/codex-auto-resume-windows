@@ -46,6 +46,7 @@ from .reconcile import SETTLED, UNSENT, ReconcileMixin, _UNDETERMINED  # noqa: F
 from .relaxed import RelaxedMixin
 from .resend import ResendMixin
 from .tosession import ToSessionMixin
+from .compaction import CompactionMixin
 from .kinds import KindsMixin
 from .routes import RoutesMixin
 from .storeview import StoreView
@@ -53,7 +54,7 @@ from .storeview import StoreView
 
 class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, ReconcileMixin, OutcomeMixin, DispatchMixin,
              DeliveryMixin, GuardMixin, NoticeMixin, RelaxedMixin, ResendMixin, PlugRecordsMixin,
-             ForOpenMixin, RoutesMixin, KindsMixin, ToSessionMixin):
+             ForOpenMixin, RoutesMixin, KindsMixin, ToSessionMixin, CompactionMixin):
     """The part that decides.
     """
 
