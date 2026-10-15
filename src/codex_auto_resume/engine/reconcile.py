@@ -176,7 +176,8 @@ class ReconcileMixin:
             return "cancel"
         if not self.store.thread_enabled(thread):
             return "thread_disabled"
-        turns = self.source.later_turns(thread, row["ordinal"], marker)
+        # v0.6.16-beta.3: a turn a wrap-up of this product's started is not someone else's (persons_turns).
+        turns = self.persons_turns(thread, self.source.later_turns(thread, row["ordinal"], marker))
         undetermined = any(turn["kind"] == "undetermined" for turn in turns)
         if any(turn["kind"] == "foreign" for turn in turns):
             return "superseded_by_user"

@@ -104,6 +104,8 @@ METHODS = {
     # v0.6.15-beta: one queued for when its conversation is opened (engine/foropen.py).
     "for_open", "_open_reason", "_for_open_rests", "_not_for_open",
     "_record_claim", "_record_problem", "_record_sent", "_watch_record",
+    # v0.6.16-beta.3: the turns a wrap-up started are the product's own, never the person's work.
+    "_wrap_up_markers", "persons_turns", "_only_wrap_ups_after",
 }
 
 # What `from codex_auto_resume.engine import ...` has to keep answering (app.py, the tests).

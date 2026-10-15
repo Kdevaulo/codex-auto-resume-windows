@@ -335,6 +335,40 @@ class WrapUpTests(TakingCase):
         rows = {row["thread_id"]: row for row in plug.runtime.state.continuations(capability=self.cap, pending=None)}
         self.assertEqual({rows[thread]["reason"] for thread in stale}, {"superseded"})
 
+    def _limit_story(self, percent):
+        """The turn running fails at the usage limit; with a wrap-up queued (91%) Codex delivers it into a turn of its
+        own, which fails at the limit as well. Then the reset passes."""
+        from test_engine import dispatch_and_fail, fail_turn
+        _plug, turn = self.running(percent=percent)
+        self.h.backend.after_accept = "queue"
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        wrapped = len(self.h.backend.send_calls)
+        reset = int(self.h.now) + 600
+        fail_turn(self.h.home, T1, turn, usage=True, reset=reset)
+        self.h.tick(advance=1)
+        if wrapped:
+            dispatch_and_fail(self.h.home, T1, usage=True, reset=reset)
+        for _ in range(3):
+            self.h.tick(advance=5)
+        self.h.now = reset + 120
+        for _ in range(60):
+            self.h.tick(advance=30)
+        return wrapped, len(self.h.backend.send_calls) - wrapped, [row["state"] for row in self.h.records(T1)]
+
+    def test_a_wrap_up_turn_is_the_products_own_and_the_recovery_ends_as_without_it(self):
+        """The turn a wrap-up starts is this product's own message, never the person's work (A17): the failure before
+        it is superseded as no longer the latest - not superseded_by_user - and the conversation is recovered once
+        after the reset, as it is with no wrap-up."""
+        _wrapped, control_sends, control = self._limit_story(80)
+        self.setUp()
+        wrapped, sends, states = self._limit_story(91)
+        self.assertEqual(wrapped, 1)
+        self.assertEqual(sends, control_sends)
+        self.assertEqual(control_sends, 1)
+        self.assertNotIn("superseded_by_user", states)
+        self.assertEqual(states, ["superseded"] + control)
+
 
 if __name__ == "__main__":
     unittest.main()
