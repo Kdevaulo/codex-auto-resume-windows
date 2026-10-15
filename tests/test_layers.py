@@ -61,9 +61,9 @@ LAYER = {_q(name): layer for layer, names in {
                "domain.plug", "domain.compat_vocabulary",
                # v0.6.14: what core holds of a channel, a route and an errand the plug names.
                "domain.plughands",
-               # v0.6.16-beta.4: the plug of a package that could not be loaded, and the asking, out of
-               # domain/plug.py at its line budget.
-               "domain.plugdamaged",
+               # v0.6.16-beta.4: the plug interface's own words, out of domain/plug.py at its line
+               # budget.
+               "domain.plugwords",
                # and what a usage reading keeps of Codex's reply, and nothing else.
                "domain.usage",
                # v0.6.12: the power action's words, out of domain/vocabulary.py at its line budget.
