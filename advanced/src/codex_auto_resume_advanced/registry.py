@@ -86,6 +86,8 @@ from .engine.subagent import make as make_subagent_parent
 from .engine.keepgoing import make as make_keep_going
 from .engine.promptqueue import make as make_prompt_queue
 from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
+from .engine.fallback import (ATTEMPTS as FALLBACK_ATTEMPTS, DEFAULT_ATTEMPTS as FALLBACK_DEFAULT_ATTEMPTS,
+                              NOT_RESTORED, make as make_model_fallback)
 from .engine.goal import make as make_goal_continuation
 from .engine.headless import DEFAULT_HOURS as HEADLESS_DEFAULT_HOURS, HOURS as HEADLESS_HOURS, make as make_headless_run
 from .engine.markerfree import make as make_marker_free
@@ -527,6 +529,28 @@ COMPACT_CONTINUE = CapabilityDef(
     make=make_compact_continue,
     codes=tuple(str(word) for word in RunEnd),
     measurements=(Measurement.M7, Measurement.MX, Measurement.MXA),
+)
+
+# Another model when one is at capacity (v0.6.16-beta.4, stage 4; headless only). At P16, for a server error Codex
+# coded serverOverloaded whose task has had the person's Attempts (1 to 3, 2 by default) of continuations, and only
+# where nothing holds the conversation while Codex is closed, it is the headless route in fallback mode: one turn on
+# Codex's own default model where the conversation is on another, the conversation's own model put back before it
+# lets go (codex/headless.py); at P8 it journals each run, and a model Codex would not put back (model_not_restored).
+# It departs from 0.5 (it changes and replays a model setting), A2, A11, B3, B4, E8 and F8 (as headless_run) and B9
+# (it reads Codex's error code), stands on transient_classification and rests on MF. Ceilings: two a conversation,
+# six a day. Before headless_run in DEFINITIONS, so its own case is its route's at P16.
+MODEL_FALLBACK = CapabilityDef(
+    id="model_fallback",
+    points=frozenset({Point.UNLOADED, Point.TICK}),
+    revision=1,
+    departs_from=("0.5", "A2", "A11", "B3", "B4", "B9", "E8", "F8"),
+    compat="transient_classification",
+    ceilings=Ceilings(per_day=6, per_conversation=2),
+    journal_prefix="model",
+    make=make_model_fallback,
+    codes=tuple(str(word) for word in RunEnd) + (NOT_RESTORED,),
+    options=(Option(OptionKey.ATTEMPTS, FALLBACK_ATTEMPTS, FALLBACK_DEFAULT_ATTEMPTS),),
+    measurements=(Measurement.MF,),
 )
 
 # Short retries when Codex is at capacity (v0.6.14 stage 3b; the plan's row: serverOverloaded alone,
@@ -1010,7 +1034,7 @@ COMPAT_REPORT = CapabilityDef(
 
 # In this order, which is also which answers first where two answer at one point; the action, which
 # answers at none, last.
-DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, COMPACT_CONTINUE, HEADLESS_RUN, OTHER_SESSIONS, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
+DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, COMPACT_CONTINUE, MODEL_FALLBACK, HEADLESS_RUN, OTHER_SESSIONS, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
                USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION,
@@ -1035,7 +1059,7 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",
                "prompt_queue", "empty_response", "once_more_when_unsure", "send_now", "capacity_retry",
                # v0.6.16-beta.4: what a failure of Codex's own is taken up with, beside the capacity retry (Q12).
-               "compact_continue",
+               "compact_continue", "model_fallback",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
                "structured_rules")
 

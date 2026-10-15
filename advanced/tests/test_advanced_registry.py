@@ -49,8 +49,11 @@ CHANGES = frozenset({"thread/queue/add", "thread/goal/set",
                      # v0.6.16-beta.4: a turn run here - a conversation loaded, a turn started and interrupted, and
                      # the conversation let go (codex/headless.py).
                      "thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe",
-                     # and a conversation compacted (engine/compact.py).
-                     "thread/compact/start"})
+                     # and a conversation compacted (engine/compact.py), and a turn on Codex's default model, the
+                     # conversation's own put back after it (engine/fallback.py).
+                     "thread/compact/start", "thread/settings/update"})
+# v0.6.16-beta.4: Codex's models listed (engine/fallback.py).
+READS = READS | {"model/list"}
 
 
 
@@ -65,7 +68,7 @@ class ShippedTests(unittest.TestCase):
     SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open",
                # v0.6.16-beta.4: a full conversation compacted, then continued; a conversation nothing holds, run here
                # while Codex is closed.
-               "compact_continue", "headless_run", "other_sessions", "marker_free_continuation", "capacity_retry",
+               "compact_continue", "model_fallback", "headless_run", "other_sessions", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
                "prompt_queue", "empty_response", "subagent_parent", "keep_going",
@@ -90,14 +93,14 @@ class ShippedTests(unittest.TestCase):
         # answer at P17 and again at P3, in the order that is precedence where two would answer.
         answering = {Point.START_ROUTE: ("start_with_codex",),
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
-                     Point.TICK: ("compact_continue", "headless_run", "reset_credit", "reset_message", "empty_response", "subagent_parent",
+                     Point.TICK: ("compact_continue", "model_fallback", "headless_run", "reset_credit", "reset_message", "empty_response", "subagent_parent",
                                   "keep_going", "usage_meter", "usage_wrap_up", "usage_pause"),
                      Point.RECORDS: ("reset_message", "prompt_queue", "empty_response", "subagent_parent",
                                      "keep_going", "usage_wrap_up"),
                      # v0.6.15-beta: the lines a parent's continuation is given of its subagents' stops (5a).
                      Point.TEXT: ("subagent_parent",),
-                     Point.UNLOADED: ("goal_continuation", "queue_for_open", "compact_continue", "headless_run",
-                                      "other_sessions"),
+                     Point.UNLOADED: ("goal_continuation", "queue_for_open", "compact_continue", "model_fallback",
+                                      "headless_run", "other_sessions"),
                      Point.SESSIONS: ("other_sessions",),
                      Point.GATES: ("goal_continuation", "compact_continue", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
@@ -118,7 +121,8 @@ class ShippedTests(unittest.TestCase):
              "other_sessions", "marker_free_continuation", "reset_credit",
              "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
              "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
-             "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "compact_continue", "codex_gave_up",
+             "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "compact_continue", "model_fallback",
+             "codex_gave_up",
              "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules")
 
     def test_the_shown_order_names_every_capability_of_the_registry_exactly_once(self):

@@ -117,6 +117,10 @@ CAPABILITY_METHODS = {
     # compaction MX asked.
     "compact_continue": ("thread/resume", "thread/compact/start", "turn/start", "turn/interrupt",
                          "thread/unsubscribe"),
+    # One turn on Codex's default model (engine/fallback.py): what MF asked - the model read, the turn, the
+    # conversation's own model put back.
+    "model_fallback": ("thread/resume", "model/list", "turn/start", "turn/interrupt", "thread/settings/update",
+                       "thread/unsubscribe"),
     # The usage meter (engine/usage.py, v0.6.16-beta.3) reads usage on its schedule, and nothing else.
     "usage_meter": ("account/rateLimits/read",),
 }
