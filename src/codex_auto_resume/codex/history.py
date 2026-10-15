@@ -19,7 +19,6 @@ from .errors import SourceError
 from .labels import _label
 from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, OWN_THREAD_SOURCES, PROGRESS_ITEM_TYPES, _json,
                      _turn_status, epoch, normalize)
-from .paths import _safe_path
 from . import rollout, workspace
 from .payload import (_choose_reset, _item_is_ours, _needing, _queue_has_marker, detect,  # noqa: F401
                       judge, later_turn, marker_row)
@@ -46,7 +45,7 @@ class HistoryMixin:
             if wrong:
                 return None, (skips.OTHER_KIND, word)
         try:
-            path = self._confined_rollout(thread_id, row["rollout_path"])
+            path = rollout.confined(self.home, thread_id, row["rollout_path"])
             payload = None if path is None else rollout.session_meta(path)
             if payload is None or payload.get("id") != thread_id:
                 return None, (skips.OTHER_KIND, "file")
@@ -106,30 +105,15 @@ class HistoryMixin:
         return (owner, None) if turns == turns_id else (owner, (skips.CONTINUED_ELSEWHERE, None))
 
     def _rollout_path(self, thread_id: str) -> Path | None:
-        """Where a conversation's file is, confined to the Codex sessions folder.
-
-        Only for the size comparison behind projection freshness, which needs nothing
-        else: the file is not opened, and whether the thread is still eligible for
-        recovery does not matter - a settle must be able to tell, for an archived
-        thread too, whether Codex's history has caught up.
-        """
+        """Where a conversation's file is, confined to the Codex sessions folder (rollout.confined). Only for
+        the size comparison behind projection freshness: the file is not opened, and whether the thread is
+        still eligible does not matter - a settle must tell, for an archived thread too, whether Codex's
+        history has caught up."""
         if not ids.is_uuid(thread_id):
             return None
         with self._db("state") as connection:
             row = connection.execute("SELECT rollout_path FROM threads WHERE id=?", (thread_id,)).fetchone()
-        return None if row is None else self._confined_rollout(thread_id, row["rollout_path"])
-
-    def _confined_rollout(self, thread_id, raw) -> Path | None:
-        """`raw`, the rollout path Codex's `threads` row names, if it is this conversation's file in the
-        Codex sessions folder: a .jsonl file whose name holds the id. None for anything else, which is
-        then neither opened nor asked about."""
-        if not ids.is_uuid(thread_id) or not isinstance(raw, str):
-            return None
-        path = _safe_path(Path(raw))
-        if (not path.is_relative_to(_safe_path(self.home / "sessions"))
-                or path.suffix != ".jsonl" or thread_id not in path.name):
-            return None
-        return path
+        return None if row is None else rollout.confined(self.home, thread_id, row["rollout_path"])
 
     def latest(self, thread_id: str) -> dict | None:
         if not ids.is_uuid(thread_id):
@@ -173,6 +157,42 @@ class HistoryMixin:
             if owner is not None and why is None:
                 result.append(judge(dict(row, thread_id=owner), needs_you, admissible, shapes))
         return result
+
+    def passed_over(self, since: float, before: float, *, every_status=False, known=frozenset()) -> dict:
+        """What latest_failures does not bring, and why (v0.6.16-beta.3, issue #27). "passed": each failed turn
+        completed at `before` or later - or, with `every_status` (the Diagnostics check), every conversation's
+        latest turn - whose turn id is not in `known`, with the reason (domain/skips.py) it stops at, in the
+        order latest_failures decides: a later turn (A17), before `since` (A16), its conversation (A15,
+        `_owner`), its kind (A13); None where it would be brought, or is no failure. "seen": how many failed
+        latest turns from `since` on the read held. Lifecycle columns, ids and kind words only."""
+        if not epoch(since) or not epoch(before):
+            raise SourceError("Invalid detection start timestamp")
+        with self._db("history") as connection:
+            rows = connection.execute(
+                "SELECT t.thread_id,t.turn_id,t.status,t.started_at,t.completed_at,t.rollout_ordinal,t.error_json,"
+                "EXISTS (SELECT 1 FROM thread_turns n WHERE n.thread_id=t.thread_id "
+                "AND n.rollout_ordinal>t.rollout_ordinal) AS later FROM thread_turns t "
+                "WHERE (t.status='failed' OR ?) AND coalesce(t.completed_at,t.started_at)>=?",
+                (1 if every_status else 0, before)).fetchall()
+        seen, found = 0, []
+        for row in rows:
+            failed, when, later = row["status"] == "failed", row["completed_at"], bool(row["later"])
+            inside = epoch(when) and when >= since
+            seen += int(failed and inside and not later)
+            if (every_status and later) or row["turn_id"] in known:
+                continue
+            category = (normalize(dict(row)) or {}).get("category") if failed else None
+            owner, why = (row["thread_id"], (skips.NEWER_TURN, None)) if later else (
+                (row["thread_id"], (skips.BEFORE_WINDOW, None)) if failed and not inside
+                else self._owner(row["thread_id"]))
+            if why is None and failed and judge(dict(row, thread_id=owner)) is None:
+                why = (skips.NOT_RECOVERED, skips.kind(category))
+            found.append({"thread_id": owner or row["thread_id"], "turn_id": row["turn_id"],
+                          "turns_id": row["thread_id"] if owner not in (None, row["thread_id"]) else None,
+                          "status": _turn_status(row["status"]), "category": category,
+                          "completed_at": when if epoch(when) else None,
+                          "reason": why[0] if why else None, "kind": why[1] if why else None})
+        return {"seen": seen, "passed": found}
 
     def stalled_turns(self, since: float, quiet_seconds: float, now: float) -> list[dict]:
         """Conversations whose latest turn is still in progress and has recorded nothing new for
@@ -645,7 +665,7 @@ class HistoryMixin:
             return unknown
         for row in conversations:
             try:
-                path = self._confined_rollout(row["id"], row["rollout_path"])
+                path = rollout.confined(self.home, row["id"], row["rollout_path"])
                 if path is None:
                     continue
                 info = path.stat()

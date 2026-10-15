@@ -1,7 +1,8 @@
 """A conversation's rollout file, read no further than this product needs (v0.6.16-beta.3).
 
-Three readings, none of them a statement to a database - codex/history.py keeps every one:
+Four readings, none of them a statement to a database - codex/history.py keeps every one:
 
+    confined       which file a `threads` row's path names, if it is that conversation's in the sessions folder
     session_meta   the file's first line: who the conversation says it is
     continued_id   the id Codex records the conversation's turns under, where it split them
     reset_scan     the rate-limit snapshots just before a usage-limit failure, for the reset hint
@@ -13,14 +14,28 @@ reads the name.
 """
 from __future__ import annotations
 
+from pathlib import Path
 import re
 
 from ..domain import ids
+from .paths import _safe_path
 from .payload import _choose_reset
 from .values import MAX_ITEM_BYTES, MAX_META_BYTES, MAX_SCAN_BYTES, _json
 
 UNKNOWN_RESET = {"reset_at": None, "limit_type": "unknown", "uncertain": True}
-_UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+
+
+def confined(home, thread_id, raw):
+    """`raw`, the rollout path Codex's `threads` row names, as a Path if it is this conversation's file in the
+    Codex home `home`'s sessions folder: a .jsonl file whose name holds the id. None for anything else, which
+    is then neither opened nor asked about."""
+    if not ids.is_uuid(thread_id) or not isinstance(raw, str):
+        return None
+    path = _safe_path(Path(raw))
+    if (not path.is_relative_to(_safe_path(Path(home) / "sessions"))
+            or path.suffix != ".jsonl" or thread_id not in path.name):
+        return None
+    return path
 
 
 def session_meta(path) -> dict | None:
@@ -44,7 +59,7 @@ def continued_id(thread_id, name) -> str | None:
     """B, where the file name `name` ends exactly in `<thread_id>_<B>.jsonl` and B is another id; else None."""
     if not ids.is_uuid(thread_id) or not isinstance(name, str):
         return None
-    found = re.search(r"(?:^|[-_])%s_(%s)\.jsonl\Z" % (re.escape(thread_id), _UUID), name)
+    found = re.search(r"(?:^|[-_])%s_(%s)\.jsonl\Z" % (re.escape(thread_id), ids.uuid_pattern(any_case=True)), name)
     other = found.group(1) if found else None
     return other if other is not None and ids.is_uuid(other) and other != thread_id else None
 
