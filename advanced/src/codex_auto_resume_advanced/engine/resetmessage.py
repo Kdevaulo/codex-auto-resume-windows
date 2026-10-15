@@ -200,7 +200,8 @@ class ResetMessage:
             if on is False:
                 continue
             if rule["state"] == RuleState.READY or resetwatch.due(rule, rows.get((rule["bucket"], rule["minutes"]))):
-                found.append(rule["rule_id"])
+                # A key the runtime journals (runtime._watched_records takes text): the rule's own id, as text.
+                found.append("rule:%d" % rule["rule_id"])
         return found
 
     def _ended(self, rule, view, now):

@@ -19,6 +19,8 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from takingcase import TakingCase  # noqa: E402
+from test_advanced_reset_message import RESET, MessageCase  # noqa: E402
+from codex_auto_resume_advanced.engine.resetwatch import CLOSE_AFTER  # noqa: E402
 from codex_auto_resume_advanced import surfaces, watchlog  # noqa: E402
 from codex_auto_resume_advanced.registry import KEEP_GOING, LONG_RESET_MESSAGE, PROMPT_QUEUE, RESET_CREDIT, RESET_MESSAGE  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import Actor, ArmingState, JournalCode, PromptState  # noqa: E402
@@ -116,6 +118,27 @@ class ResetMessageWatchedTests(WatchedCase):
         self.assertIn(("tick", "tick"), self.watched_lines(plug), "its look is journalled, never made")
         self.arm(plug, state=ArmingState.ARMED)
         self.assertIsNotNone(plug.runtime.state.reset_rule(added["rule"])["words"], "turned on, the rule is kept")
+
+
+class ResetMessageDueWatchedTests(MessageCase):
+    """A message at a reset adopted while on, then watched: when its reset comes by the stored windows it is journalled
+    once as a message it would have sent - never sent, and no usage read for it."""
+
+    def test_its_reset_comes_and_it_is_journalled_once_as_records(self):
+        plug = self.armed()
+        rule, _key = self.message(plug)
+        self.h.tick()                                    # adopted while on, the windows stored
+        self.arm(plug, state=ArmingState.SHADOW, warnings=list(plug.runtime.arming.warnings(self.DEFINITION)))
+        reads = len(self.codex.calls)
+        self.h.now = RESET + CLOSE_AFTER
+        for _ in range(3):
+            self.h.tick(advance=60)
+        rows = [(line["point"], line["answer"]) for line in plug.runtime.state.journal(capability=self.cap)
+                if line["code"] == JournalCode.WOULD_HAVE]
+        self.assertEqual(rows.count(("records", "records")), 1, "once, as a message of yours it would have sent")
+        self.assertEqual(self.h.backend.send_calls, [])
+        self.assertEqual(len(self.codex.calls), reads, "no usage read while watched")
+        self.assertIsNotNone(self.found(plug, rule)["words"])
 
 
 class CreditWatchedTests(WatchedCase):
