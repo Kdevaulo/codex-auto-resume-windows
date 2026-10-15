@@ -24,6 +24,7 @@ from codex_auto_resume_advanced.vocabulary import (ArmingState, ArmingWarning, J
                                                    OptionKey, RunEnd, Verdict)
 from test_advanced_headless import SAVED, Server  # noqa: E402
 from test_engine import T1  # noqa: E402
+from test_route_unheld import holding  # noqa: E402
 
 
 class HomeServer(Server):
@@ -40,12 +41,22 @@ class HomeServer(Server):
             self.h.home.enqueue(T1, words, client_id=params.get("clientUserMessageId") or new_id())
             turn = self.h.home.dispatch(T1, status="inProgress")
             answer = {"turn": {"id": turn}}
-            self.replies["turn/start"] = answer
+            self.replies["turn/start"], self.turn = answer, turn
         return answer
+
+    def _complete(self, status):
+        with self.lock:
+            self.events.append({"method": "turn/completed", "params": {
+                "threadId": T1, "turn": {"id": getattr(self, "turn", None), "status": status}}})
 
 
 class HeadlessCase(TakingCase):
     DEFINITION = HEADLESS_RUN
+
+    def fresh(self, **kwargs):
+        made = super().fresh(**kwargs)
+        holding(made.backend)
+        return made
 
     def setUp(self):
         super().setUp()
@@ -127,6 +138,14 @@ class RunTests(HeadlessCase):
         record = {"interruption_id": "%064x" % 3, "app": False, "holder": "none", "category": "usage_limit"}
         self.assertIs(code.unloaded(record), DEFER)
         self.follower._run = None
+
+    def test_never_for_a_conversation_the_running_app_or_another_session_holds(self):
+        """Fails with the unheld check reverted: it would run a conversation the app or a session holds."""
+        code = HeadlessRunCode(None, follower=self.follower)
+        code.bind(object())
+        for where in ({"app": True, "holder": "app_free"}, {"app": True, "holder": "session"}, {}):
+            record = dict({"interruption_id": "%064x" % 3, "category": "usage_limit"}, **where)
+            self.assertIs(code.unloaded(record), DEFER, where)
 
     def test_a_full_context_window_is_not_its_to_run(self):
         code = HeadlessRunCode(None, follower=self.follower)

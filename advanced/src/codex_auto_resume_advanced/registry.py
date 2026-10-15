@@ -84,6 +84,7 @@ from .engine.keepgoing import make as make_keep_going
 from .engine.promptqueue import make as make_prompt_queue
 from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
 from .engine.goal import make as make_goal_continuation
+from .engine.headless import DEFAULT_HOURS as HEADLESS_DEFAULT_HOURS, HOURS as HEADLESS_HOURS, make as make_headless_run
 from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
@@ -91,7 +92,7 @@ from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STYLE, DEFAULT_W
                            POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
-from .vocabulary import CapabilityKind, Measurement, OptionKey
+from .vocabulary import CapabilityKind, Measurement, OptionKey, RunEnd
 
 # The one ceiling over every capability together: advanced sends an hour. It is also the highest
 # value a person may set it to - it can be lowered and never raised.
@@ -444,6 +445,32 @@ QUEUE_FOR_OPEN = CapabilityDef(
     make=make_queue_for_open,
     options=(Option(OptionKey.DAYS, DAYS, DEFAULT_DAYS),),
     measurements=(Measurement.M1,),
+)
+
+# Run a conversation here while Codex is closed (v0.6.16-beta.4, stage 4; the plan's "unloaded conversation: recover
+# it here, headless"). At P16, asked by core where the Codex app is not running and nothing holds the conversation's
+# writer lock (`holder="none", app=False`, for the default home), it is the route: core decides the words - with its
+# marker - claims, this paying one unit, and calls it inside its launch guard; the route runs that one turn on our own
+# app server on the settings Codex saved for the conversation, declines every approval, refuses full access, an
+# outside sandbox and another reviewer before anything starts, and lets go (codex/headless.py). One run at a time; the
+# person's Hours (1 to 6, 1 by default) cap it; a Stop on Pending's row, and the Codex app starting (Q3, at once),
+# interrupt it. At P8 it writes the live run's row, hands a Stop on and journals how each run ended. It departs from
+# 0.5 (it wakes a conversation through thread/resume), A2 (a channel beside codex queue), A11 (nothing is done for a
+# conversation the app does not hold), B3 and B4 (four more app-server methods), E8 and F8 (a Codex helper that lives
+# for the turn, ended by us), and keeps A4. It stands on loaded_state_detection and rests on M6 and M6B. A full
+# context window is compact_continue's, never this one's. Ceilings: three a conversation, a dozen a day.
+HEADLESS_RUN = CapabilityDef(
+    id="headless_run",
+    points=frozenset({Point.UNLOADED, Point.TICK}),
+    revision=1,
+    departs_from=("0.5", "A2", "A11", "B3", "B4", "E8", "F8"),
+    compat="loaded_state_detection",
+    ceilings=Ceilings(per_day=12, per_conversation=3),
+    journal_prefix="head",
+    make=make_headless_run,
+    codes=tuple(str(word) for word in RunEnd),
+    options=(Option(OptionKey.CEILING_HOURS, HEADLESS_HOURS, HEADLESS_DEFAULT_HOURS),),
+    measurements=(Measurement.M6, Measurement.M6B),
 )
 
 # Short retries when Codex is at capacity (v0.6.14 stage 3b; the plan's row: serverOverloaded alone,
@@ -927,7 +954,7 @@ COMPAT_REPORT = CapabilityDef(
 
 # In this order, which is also which answers first where two answer at one point; the action, which
 # answers at none, last.
-DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
+DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, HEADLESS_RUN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
                USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION,
@@ -944,7 +971,9 @@ REGISTRY = Registry(DEFINITIONS)
 # DEFINITIONS appears here exactly once (test_advanced_registry holds it).
 SHOWN_ORDER = ("compat_report", "start_with_codex",
                # v0.6.16-beta.3: which conversations are recovered at all, beside what starts the recovering.
-               "every_conversation", "queue_for_open", "marker_free_continuation", "reset_credit",
+               "every_conversation", "queue_for_open",
+               # v0.6.16-beta.4: what gets a conversation going when nothing holds it, beside queue for opening (Q12).
+               "headless_run", "marker_free_continuation", "reset_credit",
                "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
                # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
                "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",

@@ -313,6 +313,8 @@ class BridgeCommand(StrEnum):
     ADVANCED_REPORT_CHECK = "advanced-report-check"
     ADVANCED_REPORT_SEND = "advanced-report-send"
     ADVANCED_REPORT_JOB = "advanced-report-job"
+    # v0.6.16-beta.4: a person's Stop of a turn run here (engine/headless.py) - the Dashboard's alone, never MCP.
+    ADVANCED_HEADLESS_STOP = "advanced-headless-stop"
 
 
 class Measurement(StrEnum):

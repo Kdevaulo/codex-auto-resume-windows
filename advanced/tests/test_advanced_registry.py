@@ -45,7 +45,10 @@ B4_METHODS = frozenset({"initialize", "initialized", "account/rateLimits/read", 
 READS = frozenset({"thread/loaded/list", "thread/queue/list", "thread/goal/get"})
 CHANGES = frozenset({"thread/queue/add", "thread/goal/set",
                      # v0.6.14: a reset credit spent changes the account's state (engine/credits.py).
-                     "account/rateLimitResetCredit/consume"})
+                     "account/rateLimitResetCredit/consume",
+                     # v0.6.16-beta.4: a turn run here - a conversation loaded, a turn started and interrupted, and
+                     # the conversation let go (codex/headless.py).
+                     "thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe"})
 
 
 
@@ -57,7 +60,9 @@ def standards_text(rule) -> str:
     raise AssertionError(f"{rule} is not in the standards file")
 
 class ShippedTests(unittest.TestCase):
-    SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open", "marker_free_continuation", "capacity_retry",
+    SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open",
+               # v0.6.16-beta.4: a conversation nothing holds, run here while Codex is closed.
+               "headless_run", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
                "prompt_queue", "empty_response", "subagent_parent", "keep_going",
@@ -82,13 +87,13 @@ class ShippedTests(unittest.TestCase):
         # answer at P17 and again at P3, in the order that is precedence where two would answer.
         answering = {Point.START_ROUTE: ("start_with_codex",),
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
-                     Point.TICK: ("reset_credit", "reset_message", "empty_response", "subagent_parent",
+                     Point.TICK: ("headless_run", "reset_credit", "reset_message", "empty_response", "subagent_parent",
                                   "keep_going", "usage_meter", "usage_wrap_up", "usage_pause"),
                      Point.RECORDS: ("reset_message", "prompt_queue", "empty_response", "subagent_parent",
                                      "keep_going", "usage_wrap_up"),
                      # v0.6.15-beta: the lines a parent's continuation is given of its subagents' stops (5a).
                      Point.TEXT: ("subagent_parent",),
-                     Point.UNLOADED: ("goal_continuation", "queue_for_open"),
+                     Point.UNLOADED: ("goal_continuation", "queue_for_open", "headless_run"),
                      Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
                                    "early_reset", "usage_pause"),
@@ -104,7 +109,8 @@ class ShippedTests(unittest.TestCase):
             self.assertEqual(tuple(d.id for d in registry.REGISTRY.at(point)), answering.get(point, ()))
 
     # The order a person reads them in (the owner's, 2026-10-10): the compatibility report first, then by importance.
-    SHOWN = ("compat_report", "start_with_codex", "every_conversation", "queue_for_open", "marker_free_continuation", "reset_credit",
+    SHOWN = ("compat_report", "start_with_codex", "every_conversation", "queue_for_open", "headless_run",
+             "marker_free_continuation", "reset_credit",
              "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
              "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
              "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "codex_gave_up",
