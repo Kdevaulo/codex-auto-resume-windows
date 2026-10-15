@@ -76,6 +76,11 @@ def _note_line(path: Path, text: str) -> None:
 # own line is written before the look begins.
 CONFIRM_SECONDS = 8
 CONFIRM_POLL_SECONDS = 0.5
+# After the started process is gone, when the watcher's mutex is asked whether another process took over: the
+# launcher hands over to a fresh copy of itself where the state is newer than its engine, and that copy sleeps
+# 2 s before it starts the watcher (scripts/watcher_launcher.py, _relaunch_once). Asked twice, a few seconds
+# apart, never in a loop: each ask holds the mutex for an instant, and a watcher taking it then would stop.
+HANDOVER_LOOKS = (4.0, 4.0)
 
 # What a start for Codex came to, in the words a plug's route is told (`told`), by the decision's
 # opening words: the first that matches. Anything else - a line from a later version - is "other".
@@ -194,8 +199,9 @@ class CodexStartMixin:
         The watcher runs inside the launcher's own process, so the pid the start reported is the
         watcher's: still there, the start held; gone, it ended before it could watch. The process is
         looked at, not the watcher's single-instance mutex, which a probe could hold at the very
-        moment the new watcher takes it; the mutex is asked once, after the process is gone, so a
-        start that lost a race to another watcher is not called a failure. Never raises."""
+        moment the new watcher takes it; the mutex is asked after the process is gone (HANDOVER_LOOKS),
+        so a start that lost a race to another watcher, or a launcher that handed over to a fresh copy
+        of itself, is not called a failure. Never raises."""
         pid = _started_pid(decision)
         if pid is None:
             return
@@ -207,8 +213,10 @@ class CodexStartMixin:
                 time.sleep(CONFIRM_POLL_SECONDS)
             else:
                 return
-            if self.watcher_running() is True:
-                return
+            for wait in HANDOVER_LOOKS:
+                time.sleep(wait)
+                if self.watcher_running() is True:
+                    return
             _note_line(self.paths.codex_start_log,
                        "pid %d; the watcher started as pid %d ended within %d s (see logs/errors.log)"
                        % (os.getpid(), pid, seconds))

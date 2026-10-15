@@ -233,9 +233,25 @@ class PlugReasonTests(unittest.TestCase):
     def test_a_watcher_that_ended_at_once_gets_a_second_line(self):
         self.turn_on()
         from codex_auto_resume.control import codexstart
-        with patch.object(codexstart, "_process_there", return_value=False):
+        with patch.object(codexstart, "_process_there", return_value=False),                 patch.object(codexstart, "HANDOVER_LOOKS", (0, 0)):
             self.control.start_for_codex(confirm_seconds=1)
         self.assertIn("the watcher started as pid 4242 ended within 1 s", self.logged()[-1])
+
+    def test_a_launcher_that_handed_over_is_not_called_ended(self):
+        """The launcher hands over to a fresh copy of itself where the state is newer than its engine, and the
+        copy sleeps 2 s before it starts the watcher (watcher_launcher._relaunch_once): the pid the start made is
+        gone at once, and the watcher is there seconds later. It is looked for more than once, the first look
+        later than the copy's sleep, so that is not said to have ended."""
+        self.turn_on()
+        from codex_auto_resume.control import codexstart
+        slept = []
+        answers = iter([False, False, True])        # the start's own ask, then the first look, then the second
+        with patch.object(codexstart, "_process_there", return_value=False),                 patch.object(codexstart.time, "sleep", side_effect=slept.append),                 patch.object(control.Control, "watcher_running", side_effect=lambda *a: next(answers)):
+            self.control.start_for_codex(confirm_seconds=8)
+        self.assertEqual([line for line in self.logged() if "ended within" in line], [])
+        self.assertEqual(slept, list(codexstart.HANDOVER_LOOKS))
+        self.assertGreater(codexstart.HANDOVER_LOOKS[0], 2)
+        self.assertGreater(sum(codexstart.HANDOVER_LOOKS), 4)
 
     def test_a_watcher_still_there_or_no_start_adds_no_line(self):
         self.turn_on()

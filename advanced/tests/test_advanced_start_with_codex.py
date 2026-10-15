@@ -435,7 +435,7 @@ class CoreOutcomeTests(CoreCase):
                 patch.object(pwsh, "executable", return_value="powershell.exe"), \
                 patch.object(pwsh, "run", run), \
                 patch("codex_auto_resume.control.codexstart._process_there", return_value=there), \
-                patch("codex_auto_resume.control.codexstart.CONFIRM_POLL_SECONDS", 0.01), \
+                patch("codex_auto_resume.control.codexstart.CONFIRM_POLL_SECONDS", 0.01),                 patch("codex_auto_resume.control.codexstart.HANDOVER_LOOKS", (0, 0)), \
                 patch("codex_auto_resume.windows.process_context", return_value=dict(JOB_ENDS)), \
                 patch("codex_auto_resume.windows.install_in_progress", return_value=False):
             line = layer.start_for_codex(confirm_seconds=confirm)
