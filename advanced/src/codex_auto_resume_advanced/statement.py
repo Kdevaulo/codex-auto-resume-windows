@@ -248,6 +248,9 @@ class Catalogs:
         locale = l10n.current() if locale is None else locale
         return {"capability": definition.id, "revision": definition.revision,
                 "locale": locale if locale in l10n.LOCALES else l10n.DEFAULT,
+                # What it needs on (v0.6.16-beta.3): the ids it requires, so the Dashboard reads their
+                # statements too and turns them on in the one confirmation (surfaces.arm's `also`).
+                "requires": list(definition.requires),
                 "departs_from": list(definition.departs_from),
                 "warnings": {"title": self.text(WARNING_TITLE_KEY, locale),
                              "note": self.text(WARNING_NOTE_KEY, locale),

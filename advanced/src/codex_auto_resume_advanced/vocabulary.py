@@ -63,17 +63,22 @@ class OffReason(StrEnum):
     # A conversation queued for opening was opened and Codex did not run the item within core's delivery window
     # (v0.6.15-beta, queue_for_open): what M1 measured did not hold on this Codex.
     NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
+    # A capability this one requires (registry.CapabilityDef.requires) is not on now - turned off, watched, read
+    # down by an administrator's policy, or its compatibility failed here (v0.6.16-beta.3): a capability is only as
+    # on as what it needs.
+    REQUIREMENT_OFF = "requirement_off"
 
 
 TRIPWIRES = frozenset({OffReason.SUBMISSION_UNKNOWN, OffReason.LOCAL_CHECK_FAILED,
                        OffReason.FAILED_HERE, OffReason.INCOMPATIBLE, OffReason.HOOK_EXCEPTION,
                        OffReason.STATEMENT_CHANGED, OffReason.MEASUREMENT_FAILED,
-                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN})
+                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF})
 # What a capability kept on (KeepOn, K8) notes instead of turning off, most serious first: the order
 # in which one notice gives way to another (state/arming.py, note_kept). A notice only ever rises.
 KEPT_NOTICES = (OffReason.DUPLICATE_SEEN, OffReason.STATEMENT_CHANGED, OffReason.FAILED_HERE,
                 OffReason.LOCAL_CHECK_FAILED, OffReason.INCOMPATIBLE, OffReason.MEASUREMENT_FAILED,
-                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.ENGINE_CHANGED, OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
+                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF, OffReason.ENGINE_CHANGED,
+                OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
 
 
 class ArmingWarning(StrEnum):
@@ -138,6 +143,9 @@ class Refusal(StrEnum):
     QUEUE_FULL = "queue_full"
     DEPENDENCY_UNKNOWN = "dependency_unknown"
     KEEP_COUNT_INVALID = "keep_count_invalid"
+    # Turning a capability on with its requirements in the one confirmation (v0.6.16-beta.3): the `also` list did
+    # not carry exactly the requirements that are off, or one of them was refused its own confirmation.
+    REQUIREMENT_REFUSED = "requirement_refused"
 
 
 class JournalCode(StrEnum):

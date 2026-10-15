@@ -208,15 +208,23 @@ class ShadowTests(ArmingCase):
         self.assertEqual(self.rt.state.spent("test_wake", ac.THREAD)["capability_day"], 0)
 
     def test_nothing_in_the_package_moves_a_capability_to_on_but_the_dashboards_arm(self):
-        """Read from the source: the one call that stores ARMED is `Arming.arm`'s move."""
+        """Read from the source: no `.move` call stores ARMED - every one stores OFF or SHADOW - and the
+        one call that stores ARMED is `Arming.arm`'s `move_set` (v0.6.16-beta.3), which is in arming.py
+        and nowhere else."""
         package = ac.ROOT / "advanced" / "src" / "codex_auto_resume_advanced"
-        found = []
+        moves, sets = [], []
         for path in sorted(package.rglob("*.py")):
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "move":
-                    found.append((path.name, ast.unparse(node.args[1]) if len(node.args) > 1 else None))
-        self.assertEqual(sorted(found), [("arming.py", "ArmingState.OFF"), ("arming.py", "ArmingState.OFF"),
-                                         ("arming.py", "state")])
+                    moves.append((path.name, ast.unparse(node.args[1]) if len(node.args) > 1 else None))
+                if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "move_set":
+                    sets.append(path.name)
+        # Every `.move` stores OFF (a trip, a disarm, the cascade) or SHADOW (arm's watch path); none ARMED.
+        self.assertTrue(all(name == "arming.py" and arg in ("ArmingState.OFF", "ArmingState.SHADOW")
+                            for name, arg in moves), sorted(moves))
+        self.assertIn("ArmingState.SHADOW", {arg for _name, arg in moves})
+        # ARMED is only ever stored through move_set, in arming.py (Arming.arm).
+        self.assertEqual(set(sets), {"arming.py"})
 
 
 class PolicyTests(ArmingCase):
@@ -746,7 +754,10 @@ class RemainingRefusalTests(WarningCase):
         self.assertEqual(named, {"NOT_THE_DASHBOARD", "UNKNOWN_CAPABILITY", "INVALID_REQUEST",
                                  "FORBIDDEN_BY_POLICY", "NOT_ALLOWED_BY_POLICY",
                                  "SHADOW_FORCED_BY_POLICY", "STALE_REVISION", "STATEMENT_INCOMPLETE",
-                                 "STALE_CONFIRMATION", "STALE_GENERATION", "STATE_UNAVAILABLE"})
+                                 "STALE_CONFIRMATION", "STALE_GENERATION", "STATE_UNAVAILABLE",
+                                 # v0.6.16-beta.3: the `also` list did not carry exactly the requirements
+                                 # that are off, or one of them failed its own confirmation.
+                                 "REQUIREMENT_REFUSED"})
         self.assertNotIn("not_permitted", {str(word) for word in Refusal})
 
 

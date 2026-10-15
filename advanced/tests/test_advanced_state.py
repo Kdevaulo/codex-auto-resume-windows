@@ -77,7 +77,9 @@ class VocabularyTests(unittest.TestCase):
                          {"submission_unknown", "local_check_failed", "failed_here", "incompatible",
                           "hook_exception", "statement_changed", "measurement_failed", "duplicate_seen",
                           # v0.6.15-beta: queue_for_open's, Codex not running on open what was queued for it.
-                          "not_delivered_on_open"})
+                          "not_delivered_on_open",
+                          # v0.6.16-beta.3: a capability it requires is not on (registry.CapabilityDef.requires).
+                          "requirement_off"})
 
 
 class FileTests(StateCase):

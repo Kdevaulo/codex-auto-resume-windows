@@ -38,6 +38,12 @@ asked to agree to and everything the plug holds it to:
 * `resends` - whether what it does is send an uncertain continuation once more (v0.6.14): such a
   capability answers at P7, is turned off by a resend of its found twice whether or not it is kept on,
   and is never given Keep on's Send again, which would be itself (arming.py);
+* `requires` - the ids of other capabilities this one needs on (v0.6.16-beta.3, the owner's rule: a
+  capability that needs another, or that makes another turn on, turns both on). Turning this one on
+  turns on what it requires in the same confirmation (one yes, both statements), and turning a required
+  one off turns off what requires it; a required one an administrator's policy forbids, or whose
+  compatibility is Failed here, keeps the dependent off, with that reason (arming.py). Never names
+  itself, and the registry is acyclic (Registry rejects a cycle when it is made);
 * `make` - the factory for its code: given the installation's paths, it returns an object whose
   methods are the plug's hooks for its points, each answering as a plug would.
 
@@ -138,6 +144,7 @@ class CapabilityDef:
     rules_editor: bool = False
     samples: bool = False
     resends: bool = False
+    requires: tuple = ()
     kind: CapabilityKind = CapabilityKind.ROUTE
 
     def option(self, key) -> Option | None:
@@ -228,6 +235,12 @@ def problems(definition) -> list:
     if type(definition.resends) is not bool or (
             definition.resends is True and Point.SCHEDULE not in (points if isinstance(points, frozenset) else ())):
         found.append("resends")
+    requires = definition.requires
+    if (not isinstance(requires, tuple)
+            or not all(isinstance(other, str) for other in requires)
+            or len(set(requires)) != len(requires)
+            or definition.id in requires):
+        found.append("requires")
     return found
 
 
@@ -249,6 +262,51 @@ class Registry:
                 raise RegistryError("two capabilities share one %s" % attribute)
         self.definitions = definitions
         self._by_id = {definition.id: definition for definition in definitions}
+        self._check_requirements()
+
+    def _check_requirements(self) -> None:
+        """Every required id is a capability of this registry, and the requirement graph has no cycle:
+        a capability that cannot have every requirement turned on, or that would require itself round a
+        loop, is never offered."""
+        for definition in self.definitions:
+            for other in definition.requires:
+                if other not in self._by_id:
+                    raise RegistryError("%s requires an unknown capability %s" % (definition.id, other))
+        colour = {}                              # 0 visiting, 1 done
+
+        def visit(capability):
+            if colour.get(capability) == 1:
+                return
+            if colour.get(capability) == 0:
+                raise RegistryError("the requirements of %s form a cycle" % capability)
+            colour[capability] = 0
+            for other in self._by_id[capability].requires:
+                visit(other)
+            colour[capability] = 1
+
+        for definition in self.definitions:
+            visit(definition.id)
+
+    def requires(self, capability) -> tuple:
+        """The ids `capability` needs on, transitively, in a stable order (each required capability's own
+        requirements before it); empty for one that needs none or is not of this registry."""
+        found, seen = [], set()
+
+        def visit(current):
+            definition = self._by_id.get(current)
+            for other in definition.requires if definition is not None else ():
+                if other not in seen:
+                    seen.add(other)
+                    visit(other)
+                    found.append(other)
+        visit(capability)
+        return tuple(found)
+
+    def required_by(self, capability) -> tuple:
+        """The ids that need `capability` on, transitively, in the registry's order: what turning it off
+        turns off too (arming.disarm)."""
+        return tuple(definition.id for definition in self.definitions
+                     if capability in self.requires(definition.id))
 
     @property
     def ids(self) -> tuple:
@@ -726,6 +784,9 @@ KEEP_GOING = CapabilityDef(
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
 # nothing; reset_message reads whether it stands on, and when it does not, a waiting message over 2,000 is cancelled.
+# It requires reset_message (v0.6.16-beta.3): longer messages are nothing without the message at a reset, so
+# turning Longer messages on turns the message capability on in the same confirmation, and turning the message off
+# turns Longer messages off (arming.py). The one pair today's registry already had.
 LONG_RESET_MESSAGE = CapabilityDef(
     id="long_reset_message",
     kind=CapabilityKind.ACTION,
@@ -737,6 +798,7 @@ LONG_RESET_MESSAGE = CapabilityDef(
     ceilings=None,
     journal_prefix="longmsg",
     make=make_long_messages,
+    requires=("reset_message",),
 )
 
 # The compatibility report (v0.6.14 stage 3b, the plan's in-app report): this PC's own records written
