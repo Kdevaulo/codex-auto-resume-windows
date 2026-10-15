@@ -22,7 +22,9 @@ if _HERE not in sys.path:
 
 import codexsim  # noqa: E402
 from codexsim import BASE, RESET, new_id  # noqa: E402
-from codex_auto_resume.codex import LocalSource, rollout  # noqa: E402
+import shutil  # noqa: E402
+
+from codex_auto_resume.codex import LocalSource, chains, rollout  # noqa: E402
 from codex_auto_resume.domain import ids  # noqa: E402
 from test_engine import Harness  # noqa: E402
 
@@ -309,6 +311,65 @@ class SplitRecoveryTests(unittest.TestCase):
         self.addCleanup(h.close)
         h.backend.loaded_map[A] = "loaded"
         return h
+
+    def test_an_earlier_file_that_leaves_never_brings_an_old_failure_back(self):
+        """The chain a conversation had is remembered (codex/chains.py), not read again from files that can go."""
+        h = self.harness()
+        old = h.home.fail_usage(A)
+        b = h.home.rotate(A)
+        h.home.add_turn(A, status="completed")
+        h.enable(at=BASE - 60)
+        h.tick()
+        h.home.rotate(A)
+        h.tick(advance=5)
+        archived = h.home.root / "archived_sessions"
+        archived.mkdir()
+        shutil.move(str(h.home.rollout(b)), str(archived / h.home.rollout(b).name))
+        rollout._SPLITS.clear()
+        h.now = max(h.now, RESET + 61)
+        for _ in range(10):
+            h.tick(advance=60)
+        self.assertEqual([row for row in h.records(A) if row["turn_id"] == old], [])
+        self.assertEqual(h.backend.send_calls, [])
+
+    def test_an_id_keeps_its_place_while_its_continuation_waits_in_the_queue(self):
+        h = self.harness()
+        h.home.add_turn(A, status="completed", completed=int(BASE - 600))
+        b = h.home.rotate(A)
+        h.home.add_turn(A, status="completed", completed=int(BASE - 300))
+        h.home.rotate(A)
+        h.home.fail_usage(A)                                      # under C, the third id
+        h.enable(at=BASE - 60)
+        h.tick()
+        h.backend.after_accept = "queue"
+        h.now = RESET + 61
+        h.tick()
+        self.assertEqual(h.record(A)["state"], "queued")
+        h.home.rollout(b).unlink()                                # B's file goes: C keeps its place
+        rollout._SPLITS.clear()
+        h.tick(advance=5)
+        self.assertEqual(h.record(A)["state"], "queued")
+        h.home.dispatch(A)
+        for _ in range(10):
+            h.tick(advance=61)
+        self.assertEqual(h.record(A)["state"], "recovered")
+
+    def test_the_chain_is_kept_in_the_state_folder_for_a_watcher_started_again(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        root = Path(folder.name)
+        home = SplitHome(root / "codex-home")
+        kept = root / "config" / "split-chains.json"
+        b = home.rotate(A)
+        home.add_turn(A, status="completed")
+        c = home.rotate(A)
+        LocalSource(home.root, chains=chains.ChainMemory(kept)).latest(A)
+        home.rollout(b).unlink()
+        rollout._SPLITS.clear()
+        again = LocalSource(home.root, chains=chains.ChainMemory(kept))       # a new process reads the file
+        self.assertEqual(again.turn_chain(A), (A, b, c))
+        self.assertEqual(json.loads(kept.read_text(encoding="utf-8"))["format"], chains.FORMAT)
+        self.assertNotIn("codex-home", kept.read_text(encoding="utf-8"), "ids and a home's digest, never a path")
 
     def test_an_old_failure_is_never_sent_once_a_person_worked_under_b(self):
         h = self.harness()

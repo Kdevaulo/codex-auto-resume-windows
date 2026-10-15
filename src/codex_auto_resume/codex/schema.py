@@ -13,12 +13,16 @@ from pathlib import Path
 import re
 import sqlite3
 from .errors import SourceError
+from .chains import memory as chain_memory
 from .paths import DB_KINDS, _safe_path, newest_generation
 
 
 class SchemaMixin:
-    def __init__(self, codex_home: Path):
+    def __init__(self, codex_home: Path, chains=None):
         self.home = _safe_path(Path(codex_home))
+        # v0.6.16-beta.3: the ids each split conversation has had (codex/chains.py) - the watcher's file, or this
+        # process's own.
+        self.chains = chains if chains is not None else chain_memory()
 
     def _connect(self, path):
         connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=3)

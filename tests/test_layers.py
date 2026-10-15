@@ -138,8 +138,9 @@ LAYER = {_q(name): layer for layer, names in {
                  "codex.transport", "codex.usage", "codex.values",
                  # v0.6.11: a conversation's folder's git HEAD, as a digest, for the task-changed guard.
                  "codex.workspace",
-                 # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30).
-                 "codex.rollout"),
+                 # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30),
+                 # and the ids a split conversation has had, remembered.
+                 "codex.rollout", "codex.chains"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch",
                "engine.freshness", "engine.options", "engine.outcome", "engine.reconcile",
                # v0.6.11: the waits and the two guards, as the engine asks them.

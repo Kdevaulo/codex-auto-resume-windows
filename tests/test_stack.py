@@ -152,8 +152,9 @@ ITEM = {_q(name): item for item, names in {
               "compat.reported",
               # v0.6.11: a conversation's folder's git HEAD, as a digest.
               "codex.workspace",
-              # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30).
-              "codex.rollout"),
+              # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30),
+              # and the ids a split conversation has had, remembered.
+              "codex.rollout", "codex.chains"),
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
                 "control.layer", "control.policy", "control.preview", "control.records",
                 "control.seen", "control.state", "control.watcher", "control.wire",

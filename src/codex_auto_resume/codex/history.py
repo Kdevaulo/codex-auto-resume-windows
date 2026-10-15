@@ -73,12 +73,19 @@ class HistoryMixin:
         current = None if path is None else rollout.continued_id(thread_id, path.name)
         if current is None:
             return path, (thread_id,), why
-        chain = tuple(other for other, _ in rollout.earlier(self.home, thread_id, current)) + (current,)
+        # What was seen before is kept (codex/chains.py); an earlier file's id joins only if it says it is A's.
+        held = self.chains.get(self.home, thread_id)
+        found = tuple(other for other, file in rollout.earlier(self.home, thread_id, current)
+                      if other not in held and rollout.meta_id(file) == thread_id)
+        chain = tuple(dict.fromkeys(held + found + (current,)))
         with self._db("state") as connection:
-            if connection.execute("SELECT count(*) FROM threads WHERE %s OR (id<>? AND instr(rollout_path,?)>0)"
-                                  % self._of(chain, "id"), (*chain, thread_id, current)).fetchone()[0]:
-                return path, (thread_id,), why
-        return path, (thread_id,) + chain, why
+            taken = rollout.taken(chain, connection.execute(
+                "SELECT id,rollout_path FROM threads WHERE %s OR (id<>? AND (%s))" % (self._of(chain, "id"), " OR ".join(
+                    ["instr(rollout_path,?)>0"] * len(chain))), (*chain, thread_id, *chain)).fetchall())
+        if taken & set(held + (current,)):
+            return path, (thread_id,), why
+        chain = self.chains.extend(self.home, thread_id, [other for other in chain if other not in taken])
+        return path, (thread_id,) + chain + (() if current in chain else (current,)), why
 
     def _ids(self, thread_id: str) -> tuple:
         """Every id a conversation's turns are recorded under (`_chain`): every read of its turns asks this."""
@@ -632,22 +639,14 @@ class HistoryMixin:
         return {"table": True, "fresh": size == row[0]}
 
     def activity(self, threads=(), now=None, recent: float = 3600.0) -> dict:
-        """Whether anything may still run in this Codex home, for the power action (v0.6.12): sizes, times
-        and counts, and nothing of any conversation's content (B7). Two parts, in this order.
-
-        Codex's history has caught up first (A18). Every conversation whose file was written in the last
-        `recent` seconds, and every one of `threads` - the batch's own - whatever its age, must have been
-        projected exactly: its file's size, from one stat call (the file is never opened), is the byte
-        offset the projection has reached. There is no grace, as the engine allows before a send: nothing
-        is checked again after the PC sleeps or shuts down, so a turn just started without local input, or
-        a failure not projected yet, holds the action instead of reading as nothing running. A missing
-        projection row for such a file is behind too. `history` is True when all are current, False when
-        one is behind, and None when that cannot be told - the projection table itself missing, a
-        database that cannot be read, a file that cannot be stat'ed.
-
-        Then the counts, only once the history is current: the latest turns still in progress, in every
-        conversation of this home, and the items queued in Codex. Each is None when it cannot be read; a
-        turn left in progress by a crash is counted, and holds the action (Q9)."""
+        """Whether anything may still run in this Codex home, for the power action (v0.6.12): sizes, times and
+        counts, never content (B7). First Codex's history has caught up (A18): every conversation whose file was
+        written in the last `recent` seconds, and each of `threads` (the batch's own) at any age, projected
+        exactly - its file's size, one stat call, nothing opened, is the projection's offset, with no grace, so
+        a turn just started or a failure not projected yet holds the action; a missing row is behind too.
+        `history` is True when all are current, False when one is behind, None when it cannot be told. Then,
+        only once current, the latest turns still in progress in every conversation and the items queued in
+        Codex - each None when unreadable; a turn left in progress by a crash holds the action (Q9)."""
         unknown = {"history": None, "running": None, "queued": None}
         if not epoch(now) or type(recent) not in (int, float) or not recent >= 0:
             return unknown

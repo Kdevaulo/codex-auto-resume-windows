@@ -70,6 +70,30 @@ def earlier(home, thread_id, current) -> tuple:
     return tuple(pair for pair in pairs if pair[0] != current)
 
 
+def taken(chain, rows) -> set:
+    """The ids of `chain` that are no split id of the conversation's: one with a `threads` row of its own, or one
+    another conversation's file names (`rows`: (id, rollout_path) of those rows)."""
+    return {other for other in chain for row_id, path in rows
+            if row_id == other or (isinstance(path, str) and other in path)}
+
+
+_META = {}
+
+
+def meta_id(path):
+    """The id an earlier file's first line says it is (session_meta), read once and remembered - None for none."""
+    key = str(path)
+    if key not in _META:
+        try:
+            payload = session_meta(Path(path))
+        except OSError:
+            return None
+        if len(_META) >= 4096:
+            _META.pop(next(iter(_META)))
+        _META[key] = payload.get("id") if payload else None
+    return _META[key]
+
+
 def named_after(home, turns_id) -> tuple:
     """The conversation ids whose files, by name, hold `turns_id`'s turns (`<id>_<turns_id>.jsonl`)."""
     return tuple(owner for owner, pairs in _splits(home).items() if any(pair[0] == turns_id for pair in pairs))

@@ -27,6 +27,7 @@ from pathlib import Path
 
 from . import config, homes as homes_module, l10n, notice_presence, notify, settings as settings_module
 from .codex import LocalSource
+from .codex.chains import memory as chain_memory
 from .diagnostics import Redactor, _compatibility
 from .domain import skips
 from .engine import Engine
@@ -184,14 +185,15 @@ def _summary(rows, watcher_running, cloud):
 def sources_for(control) -> list:
     """(label, reader) for each Codex home the watcher knows: the default (label None) first, then each one
     Settings add, by its number (2, 3, ...) - never its folder or the alias a person gave it."""
-    found = [(None, LocalSource(config.codex_home()))]
+    chains = chain_memory(control.paths.split_chains_file, writable=False)        # the watcher's, read only
+    found = [(None, LocalSource(config.codex_home(), chains=chains))]
     try:
         named = control.get_settings().get(homes_module.FIELD) or []
     except Exception:
         named = []
     for number, entry in enumerate(named if isinstance(named, list) else [], 2):
         if isinstance(entry, dict) and isinstance(entry.get("path"), str):
-            found.append((number, LocalSource(Path(entry["path"]))))
+            found.append((number, LocalSource(Path(entry["path"]), chains=chains)))
     return found
 
 

@@ -98,6 +98,8 @@ class Paths:
         self.failure_seen_file = self.state_dir / "failure-seen.json"
         # v0.6.11: the status file for other tools, written only while the setting is on (statusfile.py).
         self.status_file = self.state_dir / "status.json"
+        # v0.6.16-beta.3: the ids each conversation Codex split has had, ids only, written by the watcher (codex/chains.py).
+        self.split_chains_file = self.state_dir / "split-chains.json"
         # v0.6.12: the power action after usage-limit recoveries, armed in the Dashboard (control/poweraction.py).
         self.power_action_file = self.state_dir / "power-action.json"
         # v0.6.11: the advanced edition's own state, in one directory of its own under config/,
