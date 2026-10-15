@@ -126,7 +126,9 @@ ITEM = {_q(name): item for item, names in {
                 # v0.6.12: the power action's words, out of domain/vocabulary.py.
                 "domain.power_vocabulary",
                 # v0.6.15-beta: the reasons and a Codex home's states, out of it too.
-                "domain.reason_vocabulary"),
+                "domain.reason_vocabulary",
+                # v0.6.16-beta.3: why a failed turn was not taken up, as codes (issue #27).
+                "domain.skips"),
     "scheduler": ("engine.reconcile",),
     "store": ("store", "store.actions", "store.claims", "store.columns", "store.downgrade",
               "store.errors", "store.journal", "store.legacy", "store.migrations", "store.policy",
@@ -147,7 +149,9 @@ ITEM = {_q(name): item for item, names in {
               # v0.6.10: what others report, read beside the registry and never by it.
               "compat.reported",
               # v0.6.11: a conversation's folder's git HEAD, as a digest.
-              "codex.workspace"),
+              "codex.workspace",
+              # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30).
+              "codex.rollout"),
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
                 "control.layer", "control.policy", "control.preview", "control.records",
                 "control.seen", "control.state", "control.watcher", "control.wire",

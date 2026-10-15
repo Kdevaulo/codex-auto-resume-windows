@@ -1,0 +1,248 @@
+"""A conversation whose turns Codex records under another id (issue #30, openai/codex#43422).
+
+The `threads` row holds the conversation's id A; its current rollout file is named `..._A_B.jsonl` and its
+session_meta says A; its turns are projected under B, and B has no `threads` row. Before v0.6.16-beta.3 the
+watcher rejected B as an unknown conversation, read an older turn under A, and missed the failure.
+
+`SplitHome` is codexsim's Codex home, split the way that report found it: once `rotate` has run, every turn,
+item and event written for A goes under B and into the A_B file, as Codex writes them. codexsim itself is not
+changed (test_released_calls compares its helpers with v0.6.10's).
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+_HERE = str(Path(__file__).resolve().parent)
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+import codexsim  # noqa: E402
+from codexsim import BASE, RESET, new_id  # noqa: E402
+from codex_auto_resume.codex import LocalSource  # noqa: E402
+from codex_auto_resume.domain import ids  # noqa: E402
+from test_engine import Harness  # noqa: E402
+
+A = "0a1b2c3d-0001-7000-8000-00000000000a"
+OTHER = "0a1b2c3d-0001-7000-8000-00000000000c"
+
+
+class SplitHome(codexsim.CodexHome):
+    """codexsim's Codex home, with conversations Codex has split."""
+
+    def __init__(self, root):
+        self.split, self.current = {}, {}     # B -> A, and A -> the id its turns go under now
+        super().__init__(root)
+
+    def _to(self, thread_id):
+        return self.current.get(thread_id, thread_id)
+
+    def rollout(self, thread_id):
+        owner = self.split.get(thread_id)
+        if owner is None:
+            return super().rollout(thread_id)
+        return self.root / "sessions" / ("rollout-2026-10-14T12-00-00-%s_%s.jsonl" % (owner, thread_id))
+
+    def add_thread(self, thread_id, **kwargs):
+        if thread_id in self.split:
+            self.catch_up(thread_id)
+            return
+        super().add_thread(thread_id, **kwargs)
+
+    def rotate(self, thread_id, *, meta_id=None, thread_source="user", originator="Codex Desktop"):
+        """Codex starts the conversation's next file, A_B.jsonl, and projects its turns under B from now on."""
+        self.add_thread(thread_id, thread_source=thread_source, originator=originator)
+        turns = new_id()
+        self.split[turns], self.current[thread_id] = thread_id, turns
+        meta = {"type": "session_meta", "payload": {"id": meta_id or thread_id, "originator": originator,
+                                                    "source": "vscode", "thread_source": thread_source}}
+        self.rollout(turns).write_bytes(json.dumps(meta).encode("utf-8") + b"\n")
+        with self._db("state_5.sqlite") as db:
+            db.execute("UPDATE threads SET rollout_path=? WHERE id=?", (str(self.rollout(turns)), thread_id))
+        self.catch_up(turns)
+        return turns
+
+    # Everything written for A after a split goes where Codex writes it: under B, into the A_B file.
+    def add_turn(self, thread_id, *args, **kwargs):
+        return super().add_turn(self._to(thread_id), *args, **kwargs)
+
+    def add_item(self, thread_id, *args, **kwargs):
+        return super().add_item(self._to(thread_id), *args, **kwargs)
+
+    def set_turn(self, thread_id, turn_id, **columns):
+        return super().set_turn(self._to(thread_id), turn_id, **columns)
+
+    def fail_usage(self, thread_id, *args, **kwargs):
+        return super().fail_usage(self._to(thread_id), *args, **kwargs)
+
+    def _append(self, thread_id, events):
+        return super()._append(self._to(thread_id), events)
+
+    def catch_up(self, thread_id):
+        return super().catch_up(self._to(thread_id))
+
+    def turns(self, thread_id):
+        return super().turns(self._to(thread_id))
+
+    def next_ordinal(self, thread_id):
+        # Codex's ordinals run on across the split (openai/codex#43422: the new file starts past A's).
+        own = super().next_ordinal(self._to(thread_id))
+        owner = self.split.get(thread_id)
+        return max(own, super().next_ordinal(owner)) if owner else own
+
+
+class SplitCase(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.home = SplitHome(Path(folder.name) / "codex-home")
+        self.source = LocalSource(self.home.root)
+
+    def failures(self):
+        return self.source.latest_failures(BASE - 3600)
+
+
+class SplitReadTests(SplitCase):
+    def test_a_failure_recorded_under_b_is_found_as_the_conversation_a(self):
+        """The reported case: fails on v0.6.16-beta.2, which found nothing and read an older turn under A."""
+        self.home.add_turn(A, status="completed", completed=int(BASE - 600))
+        b = self.home.rotate(A)
+        turn = self.home.fail_usage(A)
+        self.assertEqual([row["thread_id"] for row in self.home.turns(A)], [b])
+        found = self.failures()
+        self.assertEqual([(entry["thread_id"], entry["turn_id"]) for entry in found], [(A, turn)])
+        entry = found[0]
+        self.assertEqual(entry["interruption_id"], ids.interruption_id(A, turn, entry["completed_at"],
+                                                                       entry["ordinal"]))
+        latest = self.source.latest(A)
+        self.assertEqual((latest["thread_id"], latest["turn_id"], latest["status"]), (A, turn, "failed"))
+        self.assertEqual(self.source.reset_hint(A, turn)["reset_at"], RESET)
+        self.assertEqual(self.source.projection(A), {"table": True, "fresh": True})
+        self.assertIs(self.source.turn_progress(A, turn), False)
+        self.assertIsNone(self.source.latest(b), "B is no conversation of its own")
+
+    def test_a_later_turn_under_b_never_replays_the_failure(self):
+        self.home.rotate(A)
+        failed = self.home.fail_usage(A)
+        ordinal = self.source.latest(A)["ordinal"]
+        later = self.home.add_turn(A, status="completed")
+        self.assertEqual(self.failures(), [])
+        self.assertEqual(self.source.latest(A)["turn_id"], later)
+        self.assertNotEqual(later, failed)
+        self.assertTrue(self.source.progress(A, ordinal)["later_turn"])
+
+    def test_an_older_failure_under_a_is_not_replayed_once_its_turns_go_on_under_b(self):
+        old = self.home.fail_usage(A)
+        self.assertEqual([entry["turn_id"] for entry in self.failures()], [old])
+        self.home.rotate(A)
+        self.assertEqual([entry["turn_id"] for entry in self.failures()], [old],
+                         "until B has a turn, A's own is still the conversation's latest")
+        newer = self.home.add_turn(A, status="completed")
+        self.assertEqual(self.failures(), [])
+        self.assertEqual(self.source.latest(A)["turn_id"], newer)
+
+    def test_a_second_split_follows_the_new_id_and_leaves_the_old_failure(self):
+        self.home.rotate(A)
+        first = self.home.fail_usage(A)
+        c = self.home.rotate(A)
+        self.home.add_turn(A, status="completed")
+        self.assertEqual(self.failures(), [], "B's failure is not the latest any more, and B is nobody's now")
+        second = self.home.fail_usage(A)
+        self.assertEqual([(entry["thread_id"], entry["turn_id"]) for entry in self.failures()], [(A, second)])
+        self.assertNotEqual(first, second)
+        self.assertEqual(self.home.turns(A)[-1]["thread_id"], c)
+
+    def test_a_normal_conversation_reads_as_it_did(self):
+        turn = self.home.fail_usage(OTHER)
+        self.assertEqual([(entry["thread_id"], entry["turn_id"]) for entry in self.failures()], [(OTHER, turn)])
+        self.assertEqual(self.source.latest(OTHER)["turn_id"], turn)
+        self.assertEqual(self.source.reset_hint(OTHER, turn)["reset_at"], RESET)
+
+    def test_a_subagent_stays_out_split_or_not(self):
+        self.home.add_thread(A, thread_source="subagent")
+        self.home.rotate(A, thread_source="subagent")
+        self.home.fail_usage(A)
+        self.assertEqual(self.failures(), [])
+        self.assertIsNone(self.source.latest(A))
+
+    def test_a_session_meta_of_another_id_is_not_followed(self):
+        self.home.add_thread(A)
+        self.home.rotate(A, meta_id=OTHER)
+        self.home.fail_usage(A)
+        self.assertEqual(self.failures(), [])
+        self.assertIsNone(self.source.latest(A))
+
+    def test_b_with_a_conversation_of_its_own_is_not_taken(self):
+        b = self.home.rotate(A)
+        self.home.fail_usage(A)
+        with self.home._db("state_5.sqlite") as db:
+            db.execute("INSERT INTO threads (id, rollout_path, source, thread_source, archived, history_mode) "
+                       "VALUES (?,?,'vscode','user',0,'paginated')", (b, str(self.home.root / "nowhere.jsonl")))
+        self.assertEqual(self.failures(), [])
+        self.assertIsNone(self.source.latest(A), "A's own turns: there are none")
+
+    def test_b_named_by_two_conversations_is_nobodys(self):
+        b = self.home.rotate(A)
+        self.home.fail_usage(A)
+        self.home.add_thread(OTHER)
+        with self.home._db("state_5.sqlite") as db:
+            db.execute("UPDATE threads SET rollout_path=? WHERE id=?",
+                       (str(self.home.root / "sessions" / ("rollout-x-%s_%s.jsonl" % (OTHER, b))), OTHER))
+        self.assertEqual(self.failures(), [])
+
+    def test_a_file_named_otherwise_is_not_a_split(self):
+        b = self.home.rotate(A)
+        self.home.fail_usage(A)
+        moved = self.home.root / "sessions" / ("rollout-2026-10-14T12-00-00-%s_%s.old.jsonl" % (A, b))
+        self.home.rollout(b).replace(moved)
+        with self.home._db("state_5.sqlite") as db:
+            db.execute("UPDATE threads SET rollout_path=? WHERE id=?", (str(moved), A))
+        self.assertEqual(self.failures(), [])
+
+    def test_a_stalled_turn_under_b_is_the_conversations(self):
+        self.home.rotate(A)
+        turn = self.home.add_turn(A, status="inProgress", started=int(BASE - 900), user_text=None, progress=False)
+        found = self.source.stalled_turns(int(BASE - 3600), 300, BASE)
+        self.assertEqual([(entry["thread_id"], entry["turn_id"]) for entry in found], [(A, turn)])
+
+    def test_the_power_actions_check_reads_the_split_files_projection(self):
+        self.home.rotate(A)
+        self.home.add_turn(A, status="completed")
+        self.assertTrue(self.source.activity((A,), BASE)["history"])
+        self.home.make_stale(A)
+        self.assertFalse(self.source.activity((A,), BASE)["history"])
+
+
+class SplitRecoveryTests(unittest.TestCase):
+    """The whole path on a split conversation: detected as A, sent to A's queue, its turn followed under B."""
+
+    def test_a_usage_limit_recovers_with_the_queue_and_the_app_check_under_a(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        root = Path(folder.name)
+        h = Harness(root / "state", home=SplitHome(root / "codex-home"))
+        self.addCleanup(h.close)
+        h.enable()
+        b = h.home.rotate(A)
+        h.home.fail_usage(A)
+        h.backend.loaded_map[A] = "loaded"
+        h.tick()
+        row = h.record(A)
+        self.assertIsNotNone(row, "the failure recorded under B is detected as A's")
+        self.assertEqual((row["state"], row["reset_at"]), ("waiting_reset", RESET))
+        h.now = RESET + 61
+        h.tick()
+        self.assertEqual([call[0] for call in h.backend.send_calls], [A], "codex queue is asked for A")
+        self.assertEqual(h.home.turns(A)[-1]["thread_id"], b, "and the app ran the turn under B")
+        h.tick(advance=6)
+        self.assertEqual(h.record(A)["recovery_turn_id"], h.home.turns(A)[-1]["turn_id"])
+        h.tick(advance=10)
+        self.assertEqual(h.record(A)["state"], "recovered")
+        self.assertEqual(h.records(b), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

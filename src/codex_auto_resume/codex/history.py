@@ -12,61 +12,98 @@ from __future__ import annotations
 
 import json
 from pathlib import Path, PureWindowsPath
-import re
 import sqlite3
 from .. import failures, guards, machine, projects
-from ..domain import ids
+from ..domain import ids, skips
 from .errors import SourceError
 from .labels import _label
-from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, MAX_ITEM_BYTES, MAX_META_BYTES,
-                     MAX_SCAN_BYTES, OWN_THREAD_SOURCES, PROGRESS_ITEM_TYPES, _json,
-                     _turn_status, epoch, error_shape, normalize)
+from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, OWN_THREAD_SOURCES, PROGRESS_ITEM_TYPES, _json,
+                     _turn_status, epoch, normalize)
 from .paths import _safe_path
-from . import workspace
-from .payload import _choose_reset, _item_is_ours, _needing, _queue_has_marker, detect  # noqa: F401
+from . import rollout, workspace
+from .payload import (_choose_reset, _item_is_ours, _needing, _queue_has_marker, detect,  # noqa: F401
+                      judge, later_turn, marker_row)
 
 
 class HistoryMixin:
-    def _metadata(self, thread_id: str, strict: bool = False) -> Path | None:
-        # strict=True (used by latest()) re-raises transient I/O as SourceError so the
-        # engine defers instead of treating an unreadable rollout as "latest turn changed".
+    def _eligibility(self, thread_id: str, strict: bool = False):
+        """(its file, None) for a desktop-app conversation of a person's own (A15), or (None, why not): a reason
+        of domain/skips.py and the kind word behind it. strict=True (latest) re-raises transient I/O as
+        SourceError so the engine defers instead of treating an unreadable rollout as "latest turn changed"."""
         if not ids.is_uuid(thread_id):
-            return None
+            return None, (skips.UNKNOWN_CONVERSATION, None)
         with self._db("state") as connection:
             row = connection.execute(
                 "SELECT rollout_path,source,thread_source,archived,history_mode "
                 "FROM threads WHERE id=?", (thread_id,)).fetchone()
-        if (row is None or row["source"] != "vscode" or row["archived"] != 0
-                or row["thread_source"] not in OWN_THREAD_SOURCES or row["history_mode"] != "paginated"
-                or not isinstance(row["rollout_path"], str)):
-            return None
+        if row is None:
+            return None, (skips.UNKNOWN_CONVERSATION, None)
+        for wrong, word in ((row["source"] != "vscode", "source " + skips.kind(row["source"])),
+                            (row["archived"] != 0, "archived"),
+                            (row["thread_source"] not in OWN_THREAD_SOURCES,
+                             "thread_source " + skips.kind(row["thread_source"])),
+                            (row["history_mode"] != "paginated", "history_mode " + skips.kind(row["history_mode"]))):
+            if wrong:
+                return None, (skips.OTHER_KIND, word)
         try:
-            path = _safe_path(Path(row["rollout_path"]))
-            if not path.is_relative_to(_safe_path(self.home / "sessions")):
-                return None
-            if path.suffix != ".jsonl" or thread_id not in path.name:
-                return None
-            with path.open("rb") as stream:
-                first = stream.readline(MAX_META_BYTES + 1)
-            if len(first) > MAX_META_BYTES or not first.endswith(b"\n"):
-                return None
-            event = _json(first.decode("utf-8"))
-            if not isinstance(event, dict) or event.get("type") != "session_meta":
-                return None
-            payload = event.get("payload")
-            if (not isinstance(payload, dict) or payload.get("id") != thread_id
-                    or payload.get("originator") not in DESKTOP_ORIGINATORS
-                    or payload.get("source") != "vscode"
-                    or payload.get("thread_source") != row["thread_source"]):
-                return None
-            return path
+            path = self._confined_rollout(thread_id, row["rollout_path"])
+            payload = None if path is None else rollout.session_meta(path)
+            if payload is None or payload.get("id") != thread_id:
+                return None, (skips.OTHER_KIND, "file")
+            if payload.get("originator") not in DESKTOP_ORIGINATORS:
+                return None, (skips.OTHER_KIND, "originator " + skips.kind(payload.get("originator")))
+            if payload.get("source") != "vscode" or payload.get("thread_source") != row["thread_source"]:
+                return None, (skips.OTHER_KIND, "file " + skips.kind(payload.get("thread_source")))
+            return path, None
         except OSError:
             # Transient (AV scanner, sharing violation) vs a genuinely ineligible thread.
             if strict:
                 raise SourceError("Codex local state unavailable or unsupported") from None
-            return None
+            return None, (skips.OTHER_KIND, "file")
         except (ValueError, UnicodeError):
-            return None
+            return None, (skips.OTHER_KIND, "file")
+
+    def _follow(self, thread_id: str, strict: bool = False):
+        """(its file, the id its turns are recorded under, why not) - the file None for a conversation this does
+        not recover (`_eligibility`). The id is its own, or B where Codex split it (codex/rollout.py, issue #30)
+        and every guard holds: its current file is named exactly A_B.jsonl, its session_meta says A, B has no
+        `threads` row and no other conversation's file names B. Until B has a turn, A's own are still the
+        latest. Any doubt is A, today's read. The queue and the app's hold stay under A always."""
+        path, why = self._eligibility(thread_id, strict=strict)
+        other = None if path is None else rollout.continued_id(thread_id, path.name)
+        if other is not None:
+            with self._db("state") as connection:
+                if connection.execute(
+                        "SELECT count(*) FROM threads WHERE id=? OR (id<>? AND instr(rollout_path,?)>0)",
+                        (other, thread_id, other)).fetchone()[0]:
+                    other = None
+        if other is not None:
+            with self._db("history") as connection:
+                if not connection.execute("SELECT EXISTS(SELECT 1 FROM thread_turns WHERE thread_id=?)",
+                                          (other,)).fetchone()[0]:
+                    other = None
+        return path, other or thread_id, why
+
+    def _turns(self, thread_id: str) -> str:
+        """The id a conversation's turns are recorded under (`_follow`): every read of its turns asks this."""
+        return self._follow(thread_id)[1] if ids.is_uuid(thread_id) else thread_id
+
+    def _owner(self, turns_id: str):
+        """(the conversation this recovers whose turns are recorded under `turns_id`, None) - itself, or the one
+        conversation whose current file names it (`_follow`) - or (its id or None, why not). A conversation
+        split again (A_C) owns C, never B; one that is split owns nothing under its own id any more."""
+        if not ids.is_uuid(turns_id):
+            return None, (skips.UNKNOWN_CONVERSATION, None)
+        with self._db("state") as connection:
+            found = {row[0] for row in connection.execute(
+                "SELECT id FROM threads WHERE id=? OR instr(rollout_path,?)>0", (turns_id, turns_id))}
+        owner = turns_id if turns_id in found else next(iter(found)) if len(found) == 1 else None
+        if owner is None or not ids.is_uuid(owner):
+            return None, (skips.UNKNOWN_CONVERSATION, None)
+        path, turns, why = self._follow(owner)
+        if path is None:
+            return owner, why
+        return (owner, None) if turns == turns_id else (owner, (skips.CONTINUED_ELSEWHERE, None))
 
     def _rollout_path(self, thread_id: str) -> Path | None:
         """Where a conversation's file is, confined to the Codex sessions folder.
@@ -95,14 +132,17 @@ class HistoryMixin:
         return path
 
     def latest(self, thread_id: str) -> dict | None:
-        if not ids.is_uuid(thread_id) or self._metadata(thread_id, strict=True) is None:
+        if not ids.is_uuid(thread_id):
+            return None
+        path, turns, _ = self._follow(thread_id, strict=True)
+        if path is None:
             return None
         with self._db("history") as connection:
             row = connection.execute(
                 "SELECT thread_id,turn_id,status,started_at,completed_at,"
                 "rollout_ordinal,error_json FROM thread_turns WHERE thread_id=? "
-                "ORDER BY rollout_ordinal DESC LIMIT 1", (thread_id,)).fetchone()
-        return normalize(dict(row)) if row else None
+                "ORDER BY rollout_ordinal DESC LIMIT 1", (turns,)).fetchone()
+        return normalize(dict(row, thread_id=thread_id)) if row else None
 
     def latest_failures(self, since: float, *, needs_you=frozenset(), admissible=False,
                         shapes=False) -> list[dict]:
@@ -128,17 +168,10 @@ class HistoryMixin:
                 (since,)).fetchall()
         result = []
         for row in rows:
-            eligible = detect(dict(row))
-            if eligible is None and needs_you:
-                eligible = _needing(dict(row), needs_you)
-            if eligible is None and admissible:
-                eligible = _needing(dict(row), failures.ADMISSIBLE)
-            if eligible is not None and admissible and eligible["category"] in failures.ADMISSIBLE:
-                eligible["admissible"] = True
-            if eligible is not None and shapes:
-                eligible["shape"] = error_shape(dict(row))
-            if eligible and self._metadata(eligible["thread_id"]) is not None:
-                result.append(eligible)
+            # A turn recorded under another id is read as its conversation's (`_owner`); no owner, no failure.
+            owner, why = self._owner(row["thread_id"]) if judge(row, needs_you, admissible, shapes) else (None, 0)
+            if owner is not None and why is None:
+                result.append(judge(dict(row, thread_id=owner), needs_you, admissible, shapes))
         return result
 
     def stalled_turns(self, since: float, quiet_seconds: float, now: float) -> list[dict]:
@@ -170,8 +203,9 @@ class HistoryMixin:
             last = row["last_item_ms"]
             item = last / 1000.0 if type(last) is int and epoch(last // 1000) else None
             moved = max(started, item) if item is not None else started
-            if now - moved >= quiet_seconds and self._metadata(thread) is not None:
-                found.append({"thread_id": thread, "turn_id": turn, "moved_at": moved})
+            owner, why = self._owner(thread) if now - moved >= quiet_seconds else (None, 0)
+            if owner is not None and why is None:
+                found.append({"thread_id": owner, "turn_id": turn, "moved_at": moved})
         return found
 
     def identity(self, thread_id: str) -> dict:
@@ -296,6 +330,7 @@ class HistoryMixin:
         if not ids.is_uuid(thread_id) or type(after_ordinal) is not int:
             return empty
         try:
+            turns = self._turns(thread_id)
             with self._db("history") as connection:
                 columns = {row[1] for row in connection.execute("PRAGMA table_info(thread_turns)")}
                 final = "final_agent_item_id" in columns
@@ -303,7 +338,7 @@ class HistoryMixin:
                     "SELECT status, completed_at%s FROM thread_turns "
                     "WHERE thread_id=? AND rollout_ordinal>?"
                     % (", final_agent_item_id" if final else ""),
-                    (thread_id, after_ordinal)).fetchall()
+                    (turns, after_ordinal)).fetchall()
         except (SourceError, sqlite3.Error, OSError, ValueError):
             return empty
         result = dict(empty, later_turn=bool(rows))
@@ -315,10 +350,10 @@ class HistoryMixin:
         return result
 
     def reset_hint(self, thread_id: str, turn_id: str) -> dict:
-        unknown = {"reset_at": None, "limit_type": "unknown", "uncertain": True}
+        unknown = dict(rollout.UNKNOWN_RESET)
         if not ids.is_uuid(thread_id) or not ids.is_uuid(turn_id):
             return unknown
-        path = self._metadata(thread_id)
+        path, turns, _ = self._follow(thread_id)
         if path is None:
             return unknown
         with self._db("history") as connection:
@@ -326,53 +361,12 @@ class HistoryMixin:
                 "SELECT thread_id,turn_id,status,started_at,completed_at,"
                 "rollout_ordinal,error_json,rollout_end_byte_offset "
                 "FROM thread_turns WHERE thread_id=? AND turn_id=?",
-                (thread_id, turn_id)).fetchone()
-        eligible = detect(dict(row)) if row is not None else None
+                (turns, turn_id)).fetchone()
+        eligible = detect(dict(row, thread_id=thread_id)) if row is not None else None
         # A reset timestamp only means anything for a usage limit.
         if eligible is None or eligible["category"] != failures.USAGE_LIMIT:
             return unknown
-        end = row["rollout_end_byte_offset"]
-        if type(end) is not int or end <= 0:
-            return unknown
-        try:
-            # The verified end offset is immediately after the failure event.
-            # Never include a subsequent turn's unrelated rate-limit snapshot.
-            with path.open("rb") as stream:
-                start = max(0, end - MAX_SCAN_BYTES)
-                stream.seek(start)
-                if start:
-                    stream.readline(MAX_ITEM_BYTES + 1)
-                remaining = end - stream.tell()
-                if remaining <= 0:
-                    return unknown
-                data = stream.read(min(MAX_SCAN_BYTES, remaining))
-        except (OSError, ValueError):
-            return unknown
-        buckets = {}
-        found = False
-        for line in data.splitlines():
-            if len(line) > MAX_ITEM_BYTES:
-                continue
-            try:
-                event = _json(line.decode("utf-8"))
-            except UnicodeError:
-                continue
-            if not isinstance(event, dict) or event.get("type") != "event_msg":
-                continue
-            payload = event.get("payload")
-            if not isinstance(payload, dict):
-                continue
-            if payload.get("type") == "task_complete" and payload.get("turn_id") == turn_id:
-                error = payload.get("error")
-                found = isinstance(error, dict) and error.get("codex_error_info") == "usage_limit_exceeded"
-                break
-            if payload.get("type") == "token_count":
-                limits = payload.get("rate_limits")
-                if isinstance(limits, dict):
-                    bucket = limits.get("limit_id")
-                    if isinstance(bucket, str) and re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", bucket):
-                        buckets[bucket] = limits
-        return _choose_reset(buckets, row["completed_at"]) if found else unknown
+        return rollout.reset_scan(path, row["rollout_end_byte_offset"], turn_id, row["completed_at"])
 
     # ------------------------------------------------------------------------
     # Following our own continuation.
@@ -391,6 +385,15 @@ class HistoryMixin:
         if not ids.is_uuid(thread_id) or not ids.is_delivery_proof(marker) or marker == thread_id:
             raise SourceError("Invalid delivery identity")
 
+    def _following(self, thread_id, marker) -> str:
+        """`_identity`, then the id the conversation's turns are recorded under (`_turns`), which the
+        marker may not be either."""
+        self._identity(thread_id, marker)
+        turns = self._turns(thread_id)
+        if marker == turns:
+            raise SourceError("Invalid delivery identity")
+        return turns
+
     def marker_rows(self, thread_id: str, marker: str) -> list:
         """Every history row that holds our marker, with the facts about its own turn.
 
@@ -398,7 +401,7 @@ class HistoryMixin:
         It is never "the latest turn": by the time anyone looks, a person may already
         have started another one.
         """
-        self._identity(thread_id, marker)
+        turns = self._following(thread_id, marker)
         with self._db("history") as connection:
             rows = connection.execute(
                 "SELECT i.turn_id, i.item_id, i.item_json, t.rollout_ordinal, t.status, "
@@ -407,24 +410,8 @@ class HistoryMixin:
                 "FROM thread_items i LEFT JOIN thread_turns t "
                 "ON t.thread_id=i.thread_id AND t.turn_id=i.turn_id "
                 "WHERE i.thread_id=? AND i.item_type='userMessage' AND instr(i.item_json,?)>0",
-                (thread_id, marker)).fetchall()
-        found = []
-        for row in rows:
-            payload = _json(row["item_json"])
-            if not _item_is_ours(payload, marker):
-                continue
-            client = payload.get("clientId")
-            ordinal = row["rollout_ordinal"]
-            found.append({
-                "turn_id": row["turn_id"] if ids.is_uuid(row["turn_id"]) else None,
-                "ordinal": ordinal if type(ordinal) is int else None,
-                "status": _turn_status(row["status"]),
-                # A row whose turn is not projected yet cannot say who started it.
-                "first_unset": bool(row["first_unset"]) or type(ordinal) is not int,
-                "starts_turn": bool(row["starts_turn"]),
-                "client_id": client if ids.is_client_id(client) else None,
-            })
-        return found
+                (turns, marker)).fetchall()
+        return [found for found in (marker_row(row, marker) for row in rows) if found is not None]
 
     def queued_rows(self, thread_id: str, marker: str) -> list:
         """Our own queued items: ids and client ids only."""
@@ -473,7 +460,7 @@ class HistoryMixin:
         has finished without any user message - input a hook blocked, or a turn Codex
         started itself - it is treated as someone else's.
         """
-        self._identity(thread_id, marker)
+        turns = self._following(thread_id, marker)
         if type(after_ordinal) is not int:
             raise SourceError("Invalid ordinal")
         with self._db("history") as connection:
@@ -484,22 +471,8 @@ class HistoryMixin:
                 "AND i.item_id=t.first_user_item_id AND i.item_type='userMessage' "
                 "AND instr(i.item_json,?)>0) AS first_is_ours "
                 "FROM thread_turns t WHERE t.thread_id=? AND t.rollout_ordinal>? "
-                "ORDER BY t.rollout_ordinal", (marker, thread_id, after_ordinal)).fetchall()
-        turns = []
-        for row in rows:
-            status = _turn_status(row["status"])
-            if row["first_is_ours"]:
-                kind, reason = "ours", None
-            elif not row["has_first"] and status == "inProgress":
-                kind, reason = "undetermined", None
-            elif not row["has_first"]:
-                kind, reason = "foreign", "turn_without_user_item"
-            else:
-                kind, reason = "foreign", "later_turn_exists"
-            turns.append({"turn_id": row["turn_id"] if ids.is_uuid(row["turn_id"]) else None,
-                          "ordinal": row["rollout_ordinal"], "status": status,
-                          "kind": kind, "reason": reason})
-        return turns
+                "ORDER BY t.rollout_ordinal", (marker, turns, after_ordinal)).fetchall()
+        return [later_turn(row) for row in rows]
 
     def turn_observation(self, thread_id: str, turn_id: str, marker: str) -> dict:
         """What happened in one exact turn, content-free.
@@ -508,26 +481,26 @@ class HistoryMixin:
         in *that* turn - not in any later turn, which may be somebody else's. A user
         message in the turn that is not ours means a person joined it.
         """
-        self._identity(thread_id, marker)
+        turns = self._following(thread_id, marker)
         if not ids.is_uuid(turn_id):
             raise SourceError("Invalid turn identity")
         with self._db("history") as connection:
             turn = connection.execute(
                 "SELECT status, completed_at, rollout_ordinal FROM thread_turns "
-                "WHERE thread_id=? AND turn_id=?", (thread_id, turn_id)).fetchone()
+                "WHERE thread_id=? AND turn_id=?", (turns, turn_id)).fetchone()
             if turn is None:
                 return {"found": False}
             counts = {row[0]: row[1] for row in connection.execute(
                 "SELECT item_type, count(*) FROM thread_items WHERE thread_id=? AND turn_id=? "
-                "GROUP BY item_type", (thread_id, turn_id)) if isinstance(row[0], str)}
+                "GROUP BY item_type", (turns, turn_id)) if isinstance(row[0], str)}
             foreign = connection.execute(
                 "SELECT count(*) FROM thread_items WHERE thread_id=? AND turn_id=? "
                 "AND item_type='userMessage' AND instr(item_json,?)=0",
-                (thread_id, turn_id, marker)).fetchone()[0]
+                (turns, turn_id, marker)).fetchone()[0]
             later_terminal = bool(type(turn["rollout_ordinal"]) is int and connection.execute(
                 "SELECT EXISTS(SELECT 1 FROM thread_turns WHERE thread_id=? AND rollout_ordinal>? "
                 "AND status IN ('completed','failed','interrupted'))",
-                (thread_id, turn["rollout_ordinal"])).fetchone()[0])
+                (turns, turn["rollout_ordinal"])).fetchone()[0])
         completed = turn["completed_at"]
         return {
             "found": True,
@@ -544,11 +517,12 @@ class HistoryMixin:
             return None
         kinds = tuple(sorted(PROGRESS_ITEM_TYPES))
         try:
+            turns = self._turns(thread_id)
             with self._db("history") as connection:
                 return bool(connection.execute(
                     "SELECT EXISTS(SELECT 1 FROM thread_items WHERE thread_id=? AND turn_id=? "
                     "AND item_type IN (%s))" % ",".join("?" for _ in kinds),
-                    (thread_id, turn_id, *kinds)).fetchone()[0])
+                    (turns, turn_id, *kinds)).fetchone()[0])
         except (SourceError, sqlite3.Error, OSError, ValueError):
             return None
 
@@ -559,10 +533,11 @@ class HistoryMixin:
             return None
         counts = {kind: 0 for kind in sorted(PROGRESS_ITEM_TYPES) + ["userMessage", "other"]}
         try:
+            turns = self._turns(thread_id)
             with self._db("history") as connection:
                 rows = connection.execute(
                     "SELECT item_type, count(*) FROM thread_items WHERE thread_id=? AND turn_id=? "
-                    "GROUP BY item_type", (thread_id, turn_id)).fetchall()
+                    "GROUP BY item_type", (turns, turn_id)).fetchall()
         except (SourceError, sqlite3.Error, OSError, ValueError):
             return None
         for kind, count in rows:
@@ -574,15 +549,16 @@ class HistoryMixin:
         appear in a user message of one turn. Booleans only."""
         if not ids.is_uuid(thread_id) or not ids.is_uuid(turn_id):
             raise SourceError("Invalid turn identity")
+        turns = self._turns(thread_id)
         wanted = [marker for marker in markers
-                  if ids.is_delivery_proof(marker) and marker not in (thread_id, turn_id)]
+                  if ids.is_delivery_proof(marker) and marker not in (thread_id, turns, turn_id)]
         found = []
         with self._db("history") as connection:
             for marker in wanted:
                 if connection.execute(
                         "SELECT EXISTS(SELECT 1 FROM thread_items WHERE thread_id=? AND turn_id=? "
                         "AND item_type='userMessage' AND instr(item_json,?)>0)",
-                        (thread_id, turn_id, marker)).fetchone()[0]:
+                        (turns, turn_id, marker)).fetchone()[0]:
                     found.append(marker)
         return found
 
@@ -592,11 +568,11 @@ class HistoryMixin:
         Checked immediately before a send: a copy that already exists means another
         installation derived the same marker and got there first.
         """
-        self._identity(thread_id, marker)
+        turns = self._following(thread_id, marker)
         with self._db("history") as connection:
             history = connection.execute(
                 "SELECT count(*) FROM thread_items WHERE thread_id=? AND instr(item_json,?)>0",
-                (thread_id, marker)).fetchone()[0]
+                (turns, marker)).fetchone()[0]
         with self._db("queue") as connection:
             queue = connection.execute(
                 "SELECT count(*) FROM queued_items WHERE thread_id=? AND instr(payload_json,?)>0",
@@ -614,6 +590,7 @@ class HistoryMixin:
         if not ids.is_uuid(thread_id):
             return {"table": None, "fresh": None}
         try:
+            turns = self._turns(thread_id)
             with self._db("history") as connection:
                 if not connection.execute(
                         "SELECT 1 FROM sqlite_master WHERE type='table' "
@@ -621,7 +598,7 @@ class HistoryMixin:
                     return {"table": False, "fresh": None}
                 row = connection.execute(
                     "SELECT next_rollout_byte_offset FROM thread_history_projection_state "
-                    "WHERE thread_id=?", (thread_id,)).fetchone()
+                    "WHERE thread_id=?", (turns,)).fetchone()
             path = self._rollout_path(thread_id)
         except (SourceError, sqlite3.Error, OSError, ValueError):
             return {"table": None, "fresh": None}
@@ -678,7 +655,8 @@ class HistoryMixin:
                 return unknown
             if row["id"] not in wanted and info.st_mtime < now - recent:
                 continue
-            offset = offsets.get(row["id"])
+            split = rollout.continued_id(row["id"], path.name)      # its file projected under B (issue #30)
+            offset = offsets.get(split if split in offsets else row["id"])
             if type(offset) is not int or offset != info.st_size:
                 return {"history": False, "running": None, "queued": None}
         found = {"history": True, "running": None, "queued": None}

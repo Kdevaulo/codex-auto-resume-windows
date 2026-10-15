@@ -66,7 +66,9 @@ LAYER = {_q(name): layer for layer, names in {
                # v0.6.12: the power action's words, out of domain/vocabulary.py at its line budget.
                "domain.power_vocabulary",
                # v0.6.15-beta: the reasons and a Codex home's states, out of it at its budget too.
-               "domain.reason_vocabulary"),
+               "domain.reason_vocabulary",
+               # v0.6.16-beta.3: why a failed turn was not taken up, as codes (issue #27).
+               "domain.skips"),
     "policy": ("", "settings", "settings_schema", "continuation", "l10n", "messages", "interface", "config", "logbook",
                # v0.6.11: which edition this is, found by looking beside the package; and quiet
                # hours and a postponement's times, on the local clock.
@@ -135,7 +137,9 @@ LAYER = {_q(name): layer for layer, names in {
                  "codex.pairing", "codex.paths", "codex.payload", "codex.schema",
                  "codex.transport", "codex.usage", "codex.values",
                  # v0.6.11: a conversation's folder's git HEAD, as a digest, for the task-changed guard.
-                 "codex.workspace"),
+                 "codex.workspace",
+                 # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30).
+                 "codex.rollout"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch",
                "engine.freshness", "engine.options", "engine.outcome", "engine.reconcile",
                # v0.6.11: the waits and the two guards, as the engine asks them.
