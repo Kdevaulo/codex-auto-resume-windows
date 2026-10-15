@@ -1,0 +1,18 @@
+{
+  "format": "codex-auto-resume-measurement/1",
+  "step": "m3b",
+  "verdict": "fail",
+  "recorded_at": "2026-10-15T22:14Z",
+  "product_version": "0.6.16-beta.3",
+  "codex_version": "codex-cli 0.162.0-alpha.17.2",
+  "windows_build": "10.0.26300",
+  "observed": {
+    "turn_started": true,
+    "turn_ended_by_itself": true,
+    "client_id_recorded": false,
+    "unsubscribed": true,
+    "turn_status": "completed",
+    "thread_given": true
+  },
+  "note": "no turn started, or no client id to prove it by"
+}
