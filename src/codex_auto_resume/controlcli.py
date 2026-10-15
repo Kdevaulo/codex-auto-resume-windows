@@ -71,7 +71,9 @@ PLAIN = ("status", "settings", "describe", "defaults", "pending", "pending-all",
          # who may open the state folder; and Show me what happens.
          "plugin-copy", "state-access", "demo",
          # v0.6.12: what the power action after usage-limit recoveries offers here, and what is armed.
-         "power-action")
+         "power-action",
+         # v0.6.16-beta.3: Diagnostics' check of why a failure was not taken up (checkup.py), read only.
+         "detection-check")
 WITH_ARGUMENT = ("update", "enabled", "startup", "cancel", "reset-budget", "retry-now",
                  "timeline", "statistics", "thread-enabled", "cancel-thread", "diagnostics",
                  "preview-continuation", "interruption-recovery",
@@ -380,6 +382,10 @@ def dispatch(control: Control, command: str, payload: dict) -> dict:
             return {"ok": True, "result": control.plugin_copy()}
         if command == "state-access":
             return {"ok": True, "result": control.state_access()}
+        if command == "detection-check":
+            # Read only: the watcher's own decisions asked on the spot, in the Interface language.
+            from . import checkup
+            return {"ok": True, "result": checkup.run(control)}
         if command == "demo":
             # Made-up rows for the Dashboard, and a made-up card asked of the icon: nothing is sent.
             return {"ok": True, "result": control.show_demo()}
@@ -485,12 +491,12 @@ def dispatch(control: Control, command: str, payload: dict) -> dict:
         if command == "compat-refresh":
             return {"ok": True, "result": _compat_refresh(control)}
         if command == "diagnostics":
-            from . import diagnostics
+            from . import checkup, diagnostics
             target = payload.get("path")
             if not isinstance(target, str) or not target.lower().endswith(".json"):
                 raise ControlError("choose a .json file to write")
             try:
-                written = diagnostics.write(control, Path(target))
+                written = diagnostics.write(control, Path(target), check=checkup.for_bundle(control))
             except FileExistsError:
                 raise ControlError("that file already exists; choose a new name",
                                    code="file_exists") from None

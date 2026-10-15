@@ -1,0 +1,120 @@
+{
+  "command": "detection-check",
+  "cases": [
+    {
+      "case": "the recent conversations, the homes, usage, notices and Codex",
+      "argument": null,
+      "reply": {
+        "ok": true,
+        "result": {
+          "summary": "ready",
+          "watcher_running": true,
+          "conversations": [
+            {
+              "thread": "thread-8c101a60",
+              "home": null,
+              "status": "failed",
+              "category": "server_5xx",
+              "completed_at": 1799996400,
+              "reason": "other_kind",
+              "kind": "thread_source subagent",
+              "turns_under": null,
+              "brought": false,
+              "remaining": [],
+              "records": []
+            },
+            {
+              "thread": "thread-9e0171f8",
+              "home": null,
+              "status": "failed",
+              "category": "usage_limit",
+              "completed_at": 1799998500,
+              "reason": null,
+              "kind": null,
+              "turns_under": null,
+              "brought": true,
+              "remaining": [],
+              "records": [
+                "waiting_reset"
+              ]
+            },
+            {
+              "thread": "thread-03911268",
+              "home": null,
+              "status": "failed",
+              "category": "server_5xx",
+              "completed_at": 1799999880,
+              "reason": null,
+              "kind": null,
+              "turns_under": "thread-25c11382",
+              "brought": true,
+              "remaining": [],
+              "records": []
+            }
+          ],
+          "split": [
+            {
+              "thread": "thread-03911268",
+              "turns_under": "thread-25c11382"
+            }
+          ],
+          "homes": [
+            {
+              "home": null,
+              "state_written": 1799999700.0,
+              "history_written": 1799999700.0,
+              "current": true,
+              "readable": true,
+              "cloud_tasks": null
+            }
+          ],
+          "cloud_tasks": null,
+          "usage": {
+            "read": true,
+            "read_at": 1799999880.0,
+            "five_hour": 100,
+            "weekly": 62,
+            "reset_at": 1800002540
+          },
+          "notices": {
+            "route": "toast",
+            "do_not_disturb": false,
+            "app_allowed": true
+          },
+          "codex": {
+            "version": null,
+            "tier": "unknown",
+            "engine_found": false
+          },
+          "skips": [],
+          "lines": [
+            "The latest failed turn would be taken up, and nothing holds it.",
+            "",
+            "Recent conversations (last 72 hours): how each one's latest turn is recorded, and whether it is taken up",
+            "  1 h ago  thread-8c101a60: latest turn failed (server_5xx) - not taken up: it is not a desktop conversation of your own (thread_source subagent)",
+            "  25 min ago  thread-9e0171f8: latest turn failed (usage_limit) - taken up",
+            "  2 min ago  thread-03911268: latest turn failed (server_5xx) - taken up",
+            "",
+            "For each one taken up above: what else holds it",
+            "  thread-9e0171f8: already taken up - waiting_reset",
+            "  thread-03911268: nothing holds it; the watcher takes it up on its next check.",
+            "",
+            "Conversations whose turns Codex records under another id",
+            "  thread-03911268: its turns are recorded under thread-25c11382; the watcher follows them there",
+            "",
+            "Codex homes the watcher knows",
+            "  The default Codex home: its state written 5 min ago, its history written 5 min ago - the app writes to this one now",
+            "",
+            "Cloud tasks the app knows: none.",
+            "Last usage reading 2 min ago: 5-hour 100%, weekly 62%, next reset in 42 min.",
+            "Notices are shown as Windows notifications. Do not disturb: off. This app's notifications: allowed.",
+            "Codex unknown, compatibility: unknown, engine not found.",
+            "",
+            "The watcher's last reasons for not taking a failed turn up",
+            "  None in the log."
+          ]
+        }
+      }
+    }
+  ]
+}

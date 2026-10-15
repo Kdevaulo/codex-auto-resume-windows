@@ -214,8 +214,10 @@ def _system() -> dict:
     return {"windows": windows, "python": sys.version.split()[0], "machine": machine}
 
 
-def collect(control, *, now=None, redact=None) -> dict:
-    """The whole bundle, redacted. Works with the watcher stopped and Codex closed."""
+def collect(control, *, now=None, redact=None, check=None) -> dict:
+    """The whole bundle, redacted. Works with the watcher stopped and Codex closed. v0.6.16-beta.3: `check`,
+    the Diagnostics check as the bundle runs it (checkup.for_bundle), is asked with this bundle's
+    Redactor, so its aliases are the bundle's."""
     redact = redact or Redactor()
     now = time.time() if now is None else now
     bundle = {
@@ -266,6 +268,11 @@ def collect(control, *, now=None, redact=None) -> dict:
         bundle["state_error"] = redact.text(str(exc))[:200]
     bundle["installation"] = _installation(control)
     bundle["compatibility"] = _compatibility(control)
+    if check is not None:
+        try:
+            bundle["detection_check"] = check(redact)
+        except Exception as exc:
+            bundle["detection_check"] = {"error": type(exc).__name__}
     added = control.plug.surface(Surface.DIAGNOSTICS, {})
     if added is not DEFER:
         bundle[EXTRA] = _redacted(added, redact)
@@ -276,15 +283,15 @@ def collect(control, *, now=None, redact=None) -> dict:
     return bundle
 
 
-def write(control, target: Path) -> Path:
-    """Write the bundle as one JSON file. Refuses to overwrite anything."""
+def write(control, target: Path, check=None) -> Path:
+    """Write the bundle as one JSON file. Refuses to overwrite anything. `check` as `collect` takes it."""
     target = Path(target)
     if target.exists():
         raise FileExistsError("refusing to overwrite %s" % target.name)
     redact = Redactor()
     # Written whole or not at all: the text is made before the file is, so a value that
     # cannot be written leaves no half a bundle behind to block the next attempt's name.
-    text = json.dumps(collect(control, redact=redact), indent=1, ensure_ascii=False, allow_nan=False,
+    text = json.dumps(collect(control, redact=redact, check=check), indent=1, ensure_ascii=False, allow_nan=False,
                       default=redact.unexpected)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("x", encoding="utf-8") as stream:

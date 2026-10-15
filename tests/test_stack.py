@@ -70,7 +70,9 @@ ITEM = {_q(name): item for item, names in {
                 # v0.6.12: and of the power action after usage-limit recoveries.
                 "runtime.afterwork",
                 # v0.6.15-beta: the other Codex homes a watcher holds.
-                "runtime.homes"),
+                "runtime.homes",
+                # v0.6.16-beta.3: its own decisions asked on request, for Diagnostics' check (issue #27).
+                "checkup"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch", "engine.freshness",
                "engine.options", "engine.outcome",
                # v0.6.11: the waits and the two guards, as the engine asks them.

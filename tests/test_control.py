@@ -432,7 +432,10 @@ class NotARecoveryEngineTests(ControlTestCase):
         package = "codex_auto_resume/%s.py"
         self.assertEqual(importers, {
             # The watcher's composition root, which is runtime/app.py since v0.6.10-alpha.
-            "engine": {"codex_auto_resume/runtime/app.py"},
+            "engine": {"codex_auto_resume/runtime/app.py",
+                       # v0.6.16-beta.3: Diagnostics' check asks the engine's own decisions, read only, and
+                       # builds an engine that is never ticked (checkup.py, the watcher's item, not control).
+                       "codex_auto_resume/checkup.py"},
             # Since v0.6.10-alpha the engine is a package, and the one module of it that reads
             # Codex directly is `engine/detect.py` - the exception `tests/test_layers.py`
             # names, in the place it now lives.
@@ -443,7 +446,9 @@ class NotARecoveryEngineTests(ControlTestCase):
             "codex": {package % name for name in ("controlcli", "windows")}
                       | {"codex_auto_resume/engine/detect.py", "codex_auto_resume/runtime/app.py",
                          "codex_auto_resume/compat/cache.py", "codex_auto_resume/compat/evaluator.py",
-                         "codex_auto_resume/compat/views.py"},
+                         "codex_auto_resume/compat/views.py",
+                         # v0.6.16-beta.3: and the check reads each Codex home it knows (checkup.py).
+                         "codex_auto_resume/checkup.py"},
         }, "the set of modules that reach the engine or the source has changed")
 
 
@@ -604,7 +609,9 @@ class BridgeTests(ControlTestCase):
             "check-setting",
             # v0.6.12: the power action after usage-limit recoveries - what Windows offers, armed from the
             # Dashboard, turned off. A file write each, and nothing sent.
-            "power-action", "power-arm", "power-disarm"]))
+            "power-action", "power-arm", "power-disarm",
+            # v0.6.16-beta.3: Diagnostics' check of why a failure was not taken up - read only, nothing sent.
+            "detection-check"]))
 
     def test_serve_answers_every_line_with_exactly_one_line(self):
         requests = "\n".join([

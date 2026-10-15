@@ -66,6 +66,13 @@ WHERE = {
     wire.LogLine: [("bridge:logs", "result.lines[]")],
     wire.LogSearch: [("bridge:logs", "result")],
     wire.StateAccessReply: [("bridge:state-access", "result")],
+    # v0.6.16-beta.3: Diagnostics' check of why a failure was not taken up (checkup.py).
+    wire.DetectionCheck: [("bridge:detection-check", "result")],
+    wire.CheckConversation: [("bridge:detection-check", "result.conversations[]")],
+    wire.CheckHome: [("bridge:detection-check", "result.homes[]")],
+    wire.CheckUsage: [("bridge:detection-check", "result.usage")],
+    wire.CheckNotices: [("bridge:detection-check", "result.notices")],
+    wire.CheckCodex: [("bridge:detection-check", "result.codex")],
     # v0.6.12: the power action after usage-limit recoveries - what the card draws, what an arming
     # answers, what the status carries while the file exists, and what turning it off says.
     wire.PowerView: POWER,

@@ -1116,6 +1116,14 @@ namespace CodexAutoResume
                 }
                 AuditSpoken("logs", dialog, findings);
             }
+            // v0.6.16-beta.3: the check of why a failure was not taken up, as it stands before its answer.
+            using (Form dialog = BuildDetectionCheck())
+            {
+                dialog.TopLevel = false;
+                Materialise(dialog);
+                dialog.PerformLayout();
+                AuditSpoken("detection_check", dialog, findings);
+            }
         }
 
         /// A -Versions answer with every kind of row and the longest words a row says: what the audit fills Install

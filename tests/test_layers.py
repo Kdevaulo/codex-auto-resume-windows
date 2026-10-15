@@ -178,6 +178,8 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.afterwork",
               # v0.6.15-beta: and the other Codex homes it holds, each with an engine of its own.
               "runtime.homes",
+              # v0.6.16-beta.3: and its own decisions asked on request, for Diagnostics' check (issue #27).
+              "checkup",
               # v0.6.10-alpha: cli.py's command bodies became commands/; cli.py is the parser.
               "commands", "commands.base", "commands.install", "commands.records",
               "commands.status", "commands.watcher",
@@ -279,6 +281,9 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     # Reaching `ui.tray` loads `ui/__init__.py` with it, and since v0.6.10-alpha the icon
     # is inside `ui/`, so the package above it is an edge these two did not have before.
     ("runtime.app", "ui"): ("cost", "the package above the icon, loaded with it"),
+    # v0.6.16-beta.3: Diagnostics' check, which builds an engine, only when it is asked for or exported.
+    ("controlcli", "checkup"): ("cost", "Diagnostics' check and the engine it asks, only when it runs"),
+    ("commands.install", "checkup"): ("cost", "Diagnostics' check, only while a bundle is exported"),
     # v0.6.15-beta: the Codex version in force, read only while another Codex home is added (homes.unmeasured).
     ("control.watcher", "compatio"): ("cost", "the compatibility report's Codex version, read only while another "
                                               "Codex home is added"),

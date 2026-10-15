@@ -1281,6 +1281,19 @@ a Windows event of its own, which can ask for that card and nothing else.
 of the one you have; [Installing another version](#installing-another-version) says what it asks and
 what it changes.
 
+**Check why a failure was not taken up...**, last, asks the watcher's own rules why a failed turn was
+not continued, and shows the answer with a Copy button - the most likely reason first, in plain words.
+Then how each conversation of the last 72 hours has its latest turn recorded and whether it would be
+taken up, or why not (another kind of conversation, before the look-back window, a newer turn, a kind
+it does not recover); for one it would take up, anything else that holds it (automatic recovery or the
+conversation switched off, that kind switched off in Settings, a record it already has, the watcher not
+running); conversations whose turns Codex records under another id, which the watcher follows; each Codex
+home with when its databases were last written; how many cloud tasks the app knows - they run on
+OpenAI's servers and cannot be recovered yet; the last usage reading; how notices reach you; the Codex
+version and its compatibility; and the watcher's last reasons from its log, which says once per turn why
+a failed turn was not taken up. It only reads: nothing of any conversation's words, and conversations
+appear as aliases valid only in that answer. Export diagnostics... includes the same check.
+
 ### Settings an administrator manages
 
 From v0.6.11 an administrator can set seven values under `Software\Policies\CodexAutoResume` - in

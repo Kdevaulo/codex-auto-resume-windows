@@ -52,10 +52,10 @@ class SplitHome(codexsim.CodexHome):
             return
         super().add_thread(thread_id, **kwargs)
 
-    def rotate(self, thread_id, *, meta_id=None, thread_source="user", originator="Codex Desktop"):
+    def rotate(self, thread_id, *, meta_id=None, thread_source="user", originator="Codex Desktop", turns=None):
         """Codex starts the conversation's next file, A_B.jsonl, and projects its turns under B from now on."""
         self.add_thread(thread_id, thread_source=thread_source, originator=originator)
-        turns = new_id()
+        turns = turns or new_id()
         self.split[turns], self.current[thread_id] = thread_id, turns
         meta = {"type": "session_meta", "payload": {"id": meta_id or thread_id, "originator": originator,
                                                     "source": "vscode", "thread_source": thread_source}}

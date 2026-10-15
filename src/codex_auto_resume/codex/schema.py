@@ -8,6 +8,7 @@ and the answer to that is to refuse rather than to guess.
 from __future__ import annotations
 
 from contextlib import contextmanager
+import json
 from pathlib import Path
 import re
 import sqlite3
@@ -75,3 +76,44 @@ class SchemaMixin:
         finally:
             if connection is not None:
                 connection.close()
+
+    # v0.6.16-beta.3: two facts for the Diagnostics check (checkup.py), neither of them a conversation's.
+    GLOBAL_STATE = ".codex-global-state.json"
+    CLOUD_PREFIX = "cloud-thread-prototype-threads-by-account-v1."
+    MAX_GLOBAL_STATE = 16 * 1024 * 1024
+
+    def written(self) -> dict:
+        """When this home's newest state and history databases were last written: their files' - and their
+        write-ahead logs' - modification times, one stat each, nothing opened; None where there is none."""
+        found = {}
+        for kind in ("state", "history"):
+            path, times = newest_generation(self.home, kind), []
+            for each in () if path is None else (path, path.with_name(path.name + "-wal")):
+                try:
+                    times.append(each.stat().st_mtime)
+                except OSError:
+                    pass
+            found[kind + "_written"] = max(times) if times else None
+        return found
+
+    def cloud_tasks(self):
+        """How many cloud tasks the app knows: the entries under its `CLOUD_PREFIX` keys in the home's
+        GLOBAL_STATE file, a count and nothing of them - or None where the file cannot be read as JSON."""
+        path = self.home / self.GLOBAL_STATE
+        try:
+            if path.is_symlink() or path.stat().st_size > self.MAX_GLOBAL_STATE:
+                return None
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, RecursionError):
+            return None
+        count, stack = 0, [(data, 0)]
+        while stack:
+            value, depth = stack.pop()
+            if not isinstance(value, dict) or depth > 4:
+                continue
+            for key, held in value.items():
+                if isinstance(key, str) and key.startswith(self.CLOUD_PREFIX):
+                    count += len(held) if isinstance(held, (list, dict)) else 1
+                else:
+                    stack.append((held, depth + 1))
+        return count
