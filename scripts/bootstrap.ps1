@@ -200,6 +200,10 @@ $ScriptClock = [Diagnostics.Stopwatch]::StartNew()
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
+# Text in and out as UTF-8: the installed setup's lines are UTF-8, PowerShell 5.1 would decode them by the
+# console's code page (949 on a Korean Windows: broken characters, issue #33), and the Dashboard and
+# compat/evaluator.py read this script's output as UTF-8. A process with no console to set is no failure.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 
 $PluginRoot = Split-Path -Parent $PSScriptRoot
 $AllowedHosts = @('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com')
