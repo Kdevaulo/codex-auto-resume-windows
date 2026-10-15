@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Просить остановиться на (5-часовое окно)",
   "page.option.stop_words_weekly": "Просить остановиться на (недельное окно)",
   "page.option.wrap_reset_time": "Указывать время обновления",
+  "page.option.wrap_after_reset": "Продолжить после обновления",
   "page.option.on": "Вкл.",
   "page.option.off": "Выкл.",
   "page.option.style.5": "Свой текст",

@@ -504,6 +504,7 @@
   "page.option.stop_words_five_hour": "Ask to stop at (5-hour window)",
   "page.option.stop_words_weekly": "Ask to stop at (weekly window)",
   "page.option.wrap_reset_time": "Include the reset time",
+  "page.option.wrap_after_reset": "Continue after the reset",
   "page.option.on": "On",
   "page.option.off": "Off",
   "page.option.style.5": "Custom",

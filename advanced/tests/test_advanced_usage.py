@@ -101,16 +101,16 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual((USAGE_METER.departs_from, USAGE_METER.points, USAGE_METER.requires),
                          (("C4", "C9"), frozenset({Point.TICK}), ()))
         self.assertEqual((USAGE_WRAP_UP.departs_from, USAGE_WRAP_UP.requires), (("A13", "A26"), ("usage_meter",)))
-        self.assertEqual((USAGE_PAUSE.departs_from, USAGE_PAUSE.requires), (("C9",), ("usage_meter",)))
+        self.assertEqual((USAGE_PAUSE.departs_from, USAGE_PAUSE.requires), (("A2", "B3", "C9", "H6"), ("usage_meter",)))
         self.assertEqual({option.key: option.default for option in USAGE_METER.options},
                          {OptionKey.POLL_MINUTES: 15, OptionKey.WARN_FIVE_HOUR: 85, OptionKey.WARN_WEEKLY: 85,
                           OptionKey.WINDOW_FIVE_HOUR: 1, OptionKey.WINDOW_WEEKLY: 1})
         self.assertEqual({option.key: option.default for option in USAGE_WRAP_UP.options},
                          {OptionKey.WRAP_FIVE_HOUR: 90, OptionKey.WRAP_WEEKLY: 90, OptionKey.WRAP_STYLE: 2,
                           OptionKey.STOP_WORDS_FIVE_HOUR: 95, OptionKey.STOP_WORDS_WEEKLY: 95,
-                          OptionKey.WRAP_RESET_TIME: 1})
+                          OptionKey.WRAP_RESET_TIME: 1, OptionKey.WRAP_AFTER_RESET: 1})
         self.assertEqual({option.key: option.default for option in USAGE_PAUSE.options},
-                         {OptionKey.PAUSE_FIVE_HOUR: 95, OptionKey.PAUSE_WEEKLY: 95})
+                         {OptionKey.PAUSE_FIVE_HOUR: 97, OptionKey.PAUSE_WEEKLY: 97})
         self.assertEqual(USAGE_METER.option(OptionKey.POLL_MINUTES).choices, (5, 10, 15, 20, 30, 45, 60))
         for capability in ("usage_meter", "usage_wrap_up", "usage_pause"):
             self.assertIn(capability, registry.REGISTRY.ids)
@@ -309,7 +309,7 @@ class PauseTests(UsageCase):
 
     def test_over_the_percentage_it_holds_core_and_the_editions_own_continuations_until_the_reset(self):
         self.on("usage_pause")
-        self.answer = reply(five=96)
+        self.answer = reply(five=98)
         self.look()
         self.look()                                   # the pause's own tick marks the window
         code = self.rt._code_of(USAGE_PAUSE)
@@ -325,7 +325,7 @@ class PauseTests(UsageCase):
         """v0.6.16-beta.4 (e): over the stop percentage with its window switched off, nothing is held; a window held
         lets go as soon as it is switched off."""
         self.on("usage_pause")
-        self.answer = reply(five=96)
+        self.answer = reply(five=98)
         self.look()
         self.look()
         self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
@@ -339,7 +339,7 @@ class PauseTests(UsageCase):
 
     def test_below_the_percentage_nothing_is_held(self):
         self.on("usage_pause")
-        self.answer = reply(five=94)
+        self.answer = reply(five=96)
         self.look()
         self.look()
         self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), DEFER)
@@ -433,6 +433,49 @@ class WrapUpTests(TakingCase):
         sent = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
         self.assertEqual(len(sent), 1, self.h.logs[-10:])
         self.assertIn(statement.CATALOGS.text("continue.wrap_up.window.five_hour", "ko"), sent[0])
+
+    def wrapped_then(self, status, *, after_reset=None):
+        """A wrap-up sent and delivered - Codex runs it as a turn of its own - that turn ended with `status`, and then
+        the window's reset passed, with a reading of the new window. What is sent after the wrap-up."""
+        plug, turn = self.running()
+        self.language(plug, "en")
+        if after_reset is not None:
+            self.choose(plug, OptionKey.WRAP_AFTER_RESET, after_reset)
+        self.h.backend.after_accept = "queue"
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        wrapped = len(self.h.backend.send_calls)
+        self.h.home.set_turn(T1, turn, status="completed", completed_at=int(self.h.now))
+        delivered = self.h.home.dispatch(T1, status=status, progress=True)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        reset = plug.runtime.state.meter()[("codex", 300)]["reset_at"]
+        self.h.now = reset + 120
+        plug.runtime.state.save_meter([{"bucket": "codex", "window_minutes": 300, "used_percent": 2,
+                                        "reset_at": reset + 5 * 3600}], at=self.h.now)
+        for _ in range(4):
+            self.h.tick(advance=61)
+        return plug, wrapped, delivered, self.h.backend.send_calls[wrapped:]
+
+    def test_continue_after_the_reset_sends_one_continuation_to_a_conversation_that_ended_well(self):
+        """v0.6.16-beta.4 (g): wrapped up, then ended well before the limit - once the window resets, one continuation,
+        through core's queue, in the continuation language."""
+        plug, wrapped, delivered, after = self.wrapped_then("completed")
+        self.assertEqual(wrapped, 1)
+        self.assertIsNotNone(delivered)
+        self.assertEqual(len(after), 1, self.h.logs[-12:])
+        self.assertTrue(after[0][1].startswith(statement.CATALOGS.text("continue.after_reset", "en") + "\n\n"))
+        self.assertIn("wrap.continued", [entry["code"] for entry in plug.runtime.state.journal()])
+        for _ in range(4):
+            self.h.tick(advance=61)
+        self.assertEqual(len(self.h.backend.send_calls), wrapped + 1, "once")
+
+    def test_after_the_reset_a_failed_turn_is_cores_and_the_choice_off_sends_nothing(self):
+        _plug, wrapped, _delivered, after = self.wrapped_then("completed", after_reset=2)
+        self.assertEqual(after, [], "Continue after the reset off")
+        self.setUp()
+        _plug, wrapped, _delivered, after = self.wrapped_then("interrupted")
+        self.assertEqual(after, [], "a turn stopped is not the wrap-up's to continue")
 
     def test_a_window_switched_off_gets_no_wrap_up(self):
         """v0.6.16-beta.4 (e): the five-hour window over its wrap-up percentage but switched off in the meter's choices -

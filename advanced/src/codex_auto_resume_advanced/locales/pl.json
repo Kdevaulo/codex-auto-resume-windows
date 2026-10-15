@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Poproś o zatrzymanie przy (okno 5-godzinne)",
   "page.option.stop_words_weekly": "Poproś o zatrzymanie przy (okno tygodniowe)",
   "page.option.wrap_reset_time": "Podaj czas odnowienia",
+  "page.option.wrap_after_reset": "Kontynuuj po odnowieniu",
   "page.option.on": "Włączone",
   "page.option.off": "Wyłączone",
   "page.option.style.5": "Własne",

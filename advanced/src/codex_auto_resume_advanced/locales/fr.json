@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Demander l'arrêt à (fenêtre de 5 heures)",
   "page.option.stop_words_weekly": "Demander l'arrêt à (fenêtre hebdomadaire)",
   "page.option.wrap_reset_time": "Inclure l'heure de réinitialisation",
+  "page.option.wrap_after_reset": "Reprendre après la réinitialisation",
   "page.option.on": "Activé",
   "page.option.off": "Désactivé",
   "page.option.style.5": "Personnalisé",

@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Minta berhenti di (jendela 5 jam)",
   "page.option.stop_words_weekly": "Minta berhenti di (jendela mingguan)",
   "page.option.wrap_reset_time": "Sertakan waktu reset",
+  "page.option.wrap_after_reset": "Lanjutkan setelah reset",
   "page.option.on": "Aktif",
   "page.option.off": "Nonaktif",
   "page.option.style.5": "Kustom",

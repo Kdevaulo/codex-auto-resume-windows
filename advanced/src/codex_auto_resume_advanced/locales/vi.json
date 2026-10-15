@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Yêu cầu dừng ở (khung 5 giờ)",
   "page.option.stop_words_weekly": "Yêu cầu dừng ở (khung hằng tuần)",
   "page.option.wrap_reset_time": "Kèm thời điểm đặt lại",
+  "page.option.wrap_after_reset": "Tiếp tục sau khi đặt lại",
   "page.option.on": "Bật",
   "page.option.off": "Tắt",
   "page.option.style.5": "Tùy chỉnh",

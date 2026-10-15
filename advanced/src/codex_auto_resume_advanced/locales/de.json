@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Um Anhalten bitten bei (5-Stunden-Fenster)",
   "page.option.stop_words_weekly": "Um Anhalten bitten bei (Wochenfenster)",
   "page.option.wrap_reset_time": "Zeit des Zurücksetzens nennen",
+  "page.option.wrap_after_reset": "Nach dem Zurücksetzen fortsetzen",
   "page.option.on": "Ein",
   "page.option.off": "Aus",
   "page.option.style.5": "Eigene",

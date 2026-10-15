@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "停止を求める割合 (5時間枠)",
   "page.option.stop_words_weekly": "停止を求める割合 (週間枠)",
   "page.option.wrap_reset_time": "リセット時刻を含める",
+  "page.option.wrap_after_reset": "リセット後に続ける",
   "page.option.on": "オン",
   "page.option.off": "オフ",
   "page.option.style.5": "カスタム",

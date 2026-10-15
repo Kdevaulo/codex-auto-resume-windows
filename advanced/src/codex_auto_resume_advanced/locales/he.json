@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "לבקש לעצור ב- (חלון 5 השעות)",
   "page.option.stop_words_weekly": "לבקש לעצור ב- (החלון השבועי)",
   "page.option.wrap_reset_time": "לכלול את זמן האיפוס",
+  "page.option.wrap_after_reset": "המשך אחרי האיפוס",
   "page.option.on": "פועל",
   "page.option.off": "כבוי",
   "page.option.style.5": "מותאם אישית",

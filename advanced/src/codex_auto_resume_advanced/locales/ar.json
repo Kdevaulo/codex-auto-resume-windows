@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "اطلب التوقف عند (نافذة الساعات الخمس)",
   "page.option.stop_words_weekly": "اطلب التوقف عند (النافذة الأسبوعية)",
   "page.option.wrap_reset_time": "تضمين وقت إعادة الضبط",
+  "page.option.wrap_after_reset": "المتابعة بعد إعادة الضبط",
   "page.option.on": "تشغيل",
   "page.option.off": "إيقاف",
   "page.option.style.5": "مخصص",

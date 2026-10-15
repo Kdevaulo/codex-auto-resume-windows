@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "要求停止於（5 小時視窗）",
   "page.option.stop_words_weekly": "要求停止於（每週視窗）",
   "page.option.wrap_reset_time": "包含重置時間",
+  "page.option.wrap_after_reset": "重置後繼續",
   "page.option.on": "開",
   "page.option.off": "關",
   "page.option.style.5": "自訂",

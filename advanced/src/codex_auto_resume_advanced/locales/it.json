@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Chiedi di fermarsi al (finestra di 5 ore)",
   "page.option.stop_words_weekly": "Chiedi di fermarsi al (finestra settimanale)",
   "page.option.wrap_reset_time": "Includi l'ora dell'azzeramento",
+  "page.option.wrap_after_reset": "Continua dopo l'azzeramento",
   "page.option.on": "Attivo",
   "page.option.off": "Disattivo",
   "page.option.style.5": "Personalizzato",

@@ -34,6 +34,8 @@ from codex_auto_resume.domain.plughands import RECORDS_LIMIT, Widening
 
 from codex_auto_resume import continuation, settings
 
+from .. import statement
+
 from ..codex import credits, inuse
 from ..codex.turns import Turns
 from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState, WordingKey
@@ -58,6 +60,8 @@ DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 97
 # v0.6.16-beta.4: the stop percentage the wrap-up's words ask Codex to stop at (wrapwords.py), each window its own.
 DEFAULT_STOP_WORDS = 95
 STOP_WORDS_OPTIONS = {FIVE_HOUR: OptionKey.STOP_WORDS_FIVE_HOUR, WEEKLY: OptionKey.STOP_WORDS_WEEKLY}
+# (g): the continuation after the reset (engine/usagestop.py says it for a conversation it stopped).
+AFTER_RESET_KEY = "continue.after_reset"
 # (e): each window acted on or not - the meter's own choice, which the warning, the wrap-up and the stop each follow.
 WINDOW_OPTIONS = {FIVE_HOUR: OptionKey.WINDOW_FIVE_HOUR, WEEKLY: OptionKey.WINDOW_WEEKLY}
 # (b): the wrap-up's Custom text for each window (state `wordings`).
@@ -92,6 +96,18 @@ def reached(row, threshold, now) -> bool:
 def windows(rows):
     """The rows of the five-hour and the weekly windows, any bucket's."""
     return [row for row in rows.values() if row["minutes"] in WINDOWS]
+
+
+def _reset_since(rows, minutes, created_at, now) -> bool:
+    """Whether the window of `minutes` has reset since `created_at`: the meter's row of it shows a window begun after, or
+    the reset it showed has passed. With no row of it, a window's length after."""
+    found = [row for row in windows(rows) if row["minutes"] == minutes]
+    if not found:
+        return now - created_at >= minutes * 60
+    reset = found[0]["reset_at"]
+    if type(reset) is not int:
+        return False
+    return now >= reset + CLOSE_AFTER or reset - minutes * 60 > created_at
 
 
 def acting(meter_options) -> frozenset:
@@ -245,6 +261,10 @@ class UsageWrapUp:
             self._look(view, now)
         except Exception:
             pass
+        try:
+            self._after_reset(view, now)
+        except Exception:
+            pass
         return DEFER
 
     def _look(self, view, now) -> None:
@@ -292,9 +312,52 @@ class UsageWrapUp:
                 continue
             for row, words in worded:
                 key = answer_key(WRAP_UP, thread, row["bucket"], row["minutes"], row["reset_at"])
+                # Its window's length is kept in `chain` (v0.6.16-beta.4): what Continue after the reset reads it by.
                 if handle.get(key) is None and handle.add(key, ContinuationKind.WRAP_UP, thread, words,
-                                                          ordinal=turn.ordinal):
+                                                          ordinal=turn.ordinal, chain=row["minutes"]):
                     self._count("found")
+
+    def _after_reset(self, view, now) -> None:
+        """Continue after the reset (v0.6.16-beta.4, item (g), on by default): a conversation sent a wrap-up that then
+        ended well - its latest turn completed - is sent one continuation once the wrap-up's window resets, through
+        core's queue as every continuation goes: only while that turn is still the latest, ended, with nothing after it
+        (A17), and the app holds the conversation (A11), at core's gates. One that failed is core's recovery, one
+        stopped is the forced stop's (engine/usagestop.py): each is noted and left. Once for each wrap-up."""
+        scoped = self._scoped
+        handle = scoped.continuations
+        if not handle.on() or scoped.options().get(OptionKey.WRAP_AFTER_RESET, ON) != ON:
+            return
+        sent = [row for row in handle.mine(pending=None) if row["kind"] == ContinuationKind.WRAP_UP
+                and row["reason"] in (ContinuationReason.DELIVERED, ContinuationReason.SENT) and row["chain"] in WINDOWS]
+        if not sent:
+            return
+        rows, turns, source, words = scoped.meter.rows(), Turns(self._codex_home()), self._source(), None
+        for wrap in sent:
+            key = answer_key(ContinuationKind.AFTER_RESET, wrap["thread_id"], "wrap", wrap["chain"],
+                             int(wrap["created_at"]))
+            if handle.get(key) is not None or not _reset_since(rows, wrap["chain"], wrap["created_at"], now):
+                continue
+            thread = wrap["thread_id"]
+            try:
+                if view.thread_enabled(thread) is not True or source.latest(thread) is None:
+                    continue
+                latest = turns.latest(thread)
+            except Exception:
+                continue
+            if latest is None or latest.status == "inProgress":
+                continue                                          # still working: looked at again
+            if latest.status != "completed":
+                handle.note(key, ContinuationKind.AFTER_RESET, thread, ContinuationReason.HANDED_OVER)
+                continue                                          # a failure is core's; a stop, the forced stop's
+            if words is None:
+                try:
+                    words = statement.CATALOGS.text(AFTER_RESET_KEY,
+                                                    continuation.resolve_locale(settings.load(self.paths.settings_file)))
+                except Exception:
+                    words = statement.CATALOGS.text(AFTER_RESET_KEY)
+            if handle.add(key, ContinuationKind.AFTER_RESET, thread, words, ordinal=latest.ordinal,
+                          chain=wrap["chain"]):
+                self._count("continued")
 
     def records(self, view):
         """P2: every wrap-up waiting, with its words. One in flight is the runtime's to hand."""
@@ -306,8 +369,13 @@ class UsageWrapUp:
         except Exception:
             return DEFER
         waiting = [row for row in rows if row["record_state"] == RecordState.WAITING]
+        # The wrap-ups go only into the very turn they were made for (_still_due); a continuation after the reset is
+        # core's to check as every continuation is - its turn the latest, ended, nothing after it.
+        later = [row for row in waiting if row["kind"] == ContinuationKind.AFTER_RESET]
+        waiting = [row for row in waiting if row["kind"] != ContinuationKind.AFTER_RESET]
         if waiting:
-            waiting = self._still_due(waiting)
+            waiting = self._still_due(waiting, frozenset(row["thread_id"] for row in later))
+        waiting += later
         found = [record for record in (handed(row) for row in waiting) if record is not None]
         # Core tries RECORDS_LIMIT a tick: past it, those waiting are handed from a place that moves on each tick, so
         # none waits behind the others for good (as engine/resetmessage.py hands its messages).
@@ -317,7 +385,7 @@ class UsageWrapUp:
             self._turn += 1
         return found or DEFER
 
-    def _still_due(self, waiting) -> list:
+    def _still_due(self, waiting, spared=frozenset()) -> list:
         """The waiting ones whose conversation core would still recover and whose turn is still the latest and still
         running; every other one ends superseded here - core would keep it waiting for good (not a conversation it
         takes up) or drop it (its turn moved on), and either way it would take a place among core's few a tick.
@@ -339,6 +407,8 @@ class UsageWrapUp:
                 kept.append(row)
             elif thread not in ended:
                 ended.add(thread)
+                if thread in spared:
+                    continue                    # not handed; a continuation after the reset waits there, not ended
                 try:
                     self._scoped.continuations.end(ContinuationReason.SUPERSEDED, thread_id=thread)
                 except Exception:

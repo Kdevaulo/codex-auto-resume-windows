@@ -32,9 +32,7 @@ from ..codex import inuse, ipc
 from ..codex.turns import Turns
 from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
 from .continued import answer_key, words_pass
-from .usage import (CLOSE_AFTER, EVERY_CONVERSATION, NOTICE_FOR, ON, WRAP_UP, UsagePause, _acting, windows)
-
-AFTER_RESET_KEY = "continue.after_reset"
+from .usage import AFTER_RESET_KEY, EVERY_CONVERSATION, NOTICE_FOR, ON, WRAP_UP, UsagePause, _reset_since
 FINAL = frozenset({"completed", "failed", "interrupted"})
 # How many notices the stop keeps for the icon to show (each once in a watcher's life, by its key).
 NOTICES_KEPT = 16
@@ -206,19 +204,6 @@ class UsageStop(UsagePause):
         (not_stopped, press_resume, not_continued), the window and its reset. Codes and numbers only."""
         return [{key: notice[key] for key in ("key", "kind", "window_minutes", "reset_at")}
                 for notice in self._notices if 0 <= now - notice["at"] < NOTICE_FOR]
-
-
-def _reset_since(rows, minutes, created_at, now) -> bool:
-    """Whether the window of `minutes` has reset since `created_at`: the meter's row of it shows a window begun
-    after, or the reset it showed has passed. With no row of it, a window's length after."""
-    found = [row for row in windows(rows) if row["minutes"] == minutes]
-    if not found:
-        return now - created_at >= minutes * 60
-    row = found[0]
-    reset = row["reset_at"]
-    if type(reset) is not int:
-        return False
-    return now >= reset + CLOSE_AFTER or reset - minutes * 60 > created_at
 
 
 def make_stop(paths) -> UsageStop:

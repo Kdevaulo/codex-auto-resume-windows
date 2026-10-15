@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "请求停止于（5 小时窗口）",
   "page.option.stop_words_weekly": "请求停止于（每周窗口）",
   "page.option.wrap_reset_time": "包含重置时间",
+  "page.option.wrap_after_reset": "重置后继续",
   "page.option.on": "开",
   "page.option.off": "关",
   "page.option.style.5": "自定义",

@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Просити зупинитися на (5-годинне вікно)",
   "page.option.stop_words_weekly": "Просити зупинитися на (тижневе вікно)",
   "page.option.wrap_reset_time": "Вказувати час оновлення",
+  "page.option.wrap_after_reset": "Продовжити після оновлення",
   "page.option.on": "Увімк.",
   "page.option.off": "Вимк.",
   "page.option.style.5": "Свій текст",

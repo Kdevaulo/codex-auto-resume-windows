@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "멈추라고 할 지점 (5시간 창)",
   "page.option.stop_words_weekly": "멈추라고 할 지점 (주간 창)",
   "page.option.wrap_reset_time": "초기화 시각 넣기",
+  "page.option.wrap_after_reset": "초기화 뒤 이어 가기",
   "page.option.on": "켜기",
   "page.option.off": "끄기",
   "page.option.style.5": "직접 입력",

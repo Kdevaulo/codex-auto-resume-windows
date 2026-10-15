@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Durmasını iste (5 saatlik pencere)",
   "page.option.stop_words_weekly": "Durmasını iste (haftalık pencere)",
   "page.option.wrap_reset_time": "Sıfırlanma zamanını ekle",
+  "page.option.wrap_after_reset": "Sıfırlamadan sonra sürdür",
   "page.option.on": "Açık",
   "page.option.off": "Kapalı",
   "page.option.style.5": "Özel",

@@ -137,6 +137,7 @@
   "page.option.stop_words_five_hour": "Pedir para parar em (janela de 5 horas)",
   "page.option.stop_words_weekly": "Pedir para parar em (janela semanal)",
   "page.option.wrap_reset_time": "Incluir o horário de redefinição",
+  "page.option.wrap_after_reset": "Continuar após a redefinição",
   "page.option.on": "Ativado",
   "page.option.off": "Desativado",
   "page.option.style.5": "Personalizado",
