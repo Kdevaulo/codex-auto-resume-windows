@@ -43,9 +43,10 @@ from __future__ import annotations
 from contextlib import nullcontext
 from enum import StrEnum
 
-# RecordMove and RecordPurpose (P2's) are beside the hands core holds, and named here as before.
-from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, records_of,  # noqa: F401
-                        workers)
+# RecordMove and RecordPurpose (P2's) and what a surface takes (`fields`) are beside the hands core holds, and
+# named here as before.
+from .plughands import (Channel, Errand, RecordMove, RecordPurpose, Route, Widening, fields,  # noqa: F401
+                        records_of, widening_of, workers)
 
 # The interface's version. The advanced package writes out the number it was written for, and
 # edition.py takes its plug only when the two agree: otherwise a hook renamed, or given another
@@ -118,6 +119,7 @@ class Point(StrEnum):
     DELIVERY = "delivery"                    # P15 how a continuation is carried and proven
     UNLOADED = "unloaded"                    # P16 what continues one the app does not hold
     ADMISSION = "admission"                  # P17 a failure core never recovers alone, taken up
+    ELIGIBILITY = "eligibility"              # P19 which of the app's conversations core takes up
 
 
 class Alternative(StrEnum):
@@ -307,6 +309,11 @@ class Plug:
         and the route called once inside the launch guard (engine/delivery.py)."""
         return DEFER
 
+    def eligibility(self):                            # P19
+        """Which conversations besides a person's own core takes up (v0.6.16-beta.3): Widening words, asked once a tick
+        while not paused. DEFER - a person's own alone (A15) - is NULL's."""
+        return DEFER
+
     def admission(self, failure):                     # P17
         """Whether core takes up a failure it would not recover alone, or relaxes one it would: `failure` is its
         facts - its kind, Codex's code and status and the error's form, never a word of the message - with
@@ -351,7 +358,7 @@ HOOKS = {
     Point.START_ROUTE: "start_route", Point.SURFACES: "surface",
     Point.CLAIM_LEDGER: "claim_ledger", Point.CONCURRENCY: "partition",
     Point.SUPERVISION: "supervise", Point.MOVED: "moved", Point.DELIVERY: "delivery",
-    Point.UNLOADED: "unloaded", Point.ADMISSION: "admission",
+    Point.UNLOADED: "unloaded", Point.ADMISSION: "admission", Point.ELIGIBILITY: "eligibility",
 }
 
 # A hook may always restrict. HOLD keeps a record waiting, exactly as a gate that says WAIT
@@ -405,8 +412,8 @@ ANSWERS = frozenset().union(*ALTERNATIVES.values()) | {Alternative.QUEUE_FOR_OPE
 NULL = Plug()
 
 
-# The plug of an installation whose package could not be loaded, and the asking (v0.6.15-beta.3: domain/plugdamaged.py).
-from .plugdamaged import DamagedPlug, _handed, consult, fields  # noqa: E402,F401
+# The plug of an installation whose package could not be loaded, and the asking (v0.6.16-beta.4: domain/plugdamaged.py).
+from .plugdamaged import DamagedPlug, _handed, consult  # noqa: E402,F401
 
 
 class Guarded:
@@ -516,7 +523,7 @@ class Guarded:
 
     def surface(self, name, facts):
         """Fields for surface `name` (a Surface), or DEFER."""
-        return fields(self._ask(Point.SURFACES, Surface(name), facts))
+        return fields(self._ask(Point.SURFACES, Surface(name), facts), DEFER)
 
     def claim_ledger(self, connection, record, now, carried):
         return self.claim_ledger_checked(connection, record, now, carried)[0]
@@ -575,6 +582,10 @@ class Guarded:
         """P17: an answer of TAKE_UP, or DEFER. Core takes one only if failures.takes offered it."""
         return self._ask(Point.ADMISSION, failure)
 
+    def eligibility(self) -> frozenset:
+        """P19: the plug's Widening words (plughands.widening_of); the empty set for anything else, NULL's included."""
+        return widening_of(self._ask(Point.ELIGIBILITY))
+
     def wants(self, point) -> bool:
         """Plug.wants, True only if it says True: not a point, so NULL and a raise want nothing."""
         if self.plug is NULL:
@@ -584,6 +595,13 @@ class Guarded:
         except Exception:
             self.failures += 1
             return False
+
+    def start_held(self):
+        """Not a point: why P9 just named no route, from a plug that says (control/codexstart.py, v0.6.16-beta.3)."""
+        try:
+            return None if self.plug is NULL else getattr(self.plug, "start_held", lambda: None)()
+        except Exception:
+            self.failures += 1
 
     def codex(self, codex_exe, codex_home):
         """Tell the plug which Codex this process drives (Plug.codex). Not a point, so not asked

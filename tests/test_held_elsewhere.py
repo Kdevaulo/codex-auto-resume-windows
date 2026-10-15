@@ -1,4 +1,4 @@
-"""A conversation open in a terminal or VS Code waits with a reason of its own (v0.6.15-beta.3, the standard edition).
+"""A conversation open in a terminal or VS Code waits with a reason of its own (v0.6.16-beta.4, the standard edition).
 
 The app's queue reaches only a conversation the Codex app holds. One whose writer lock another Codex session holds -
 a TUI the app's bundled engine runs in a terminal, or the VS Code extension's own server - read "unknown" until now,

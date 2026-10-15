@@ -136,7 +136,7 @@ def _extension_engine(path) -> bool:
 
 
 def session_kind(rows, user, codex_exe) -> bool:
-    """v0.6.15-beta.3: whether the one Restart Manager holder `user` of a conversation's writer lock is another Codex
+    """v0.6.16-beta.4: whether the one Restart Manager holder `user` of a conversation's writer lock is another Codex
     session - a terminal's TUI or the VS Code extension's server - rather than the app's, ours or anything unknown.
 
     Its inventory row, matched by pid, is a codex.exe that is either (a) the configured engine `codex_exe` run by

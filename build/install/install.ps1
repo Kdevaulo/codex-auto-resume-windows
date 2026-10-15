@@ -39,6 +39,11 @@ if ($PluginName -ieq '-SkipStartup') {
 
 $ErrorActionPreference = 'Stop'
 $script:Failed = $false
+# Text in and out as UTF-8. The setup step's lines are UTF-8 (scripts/plugin_setup.py reconfigures its
+# streams), and PowerShell 5.1 decodes a program's output by [Console]::OutputEncoding - the console's code
+# page, 949 on a Korean Windows - so its Korean lines arrived as broken characters (issue #33). The Dashboard
+# reads this script's output as UTF-8 too. A process with no console to set is no failure.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 
 function Step { param([string]$m) Write-Host ('  ' + $m) }
 function Ok   { param([string]$m) Write-Host ('  [ok] ' + $m) }

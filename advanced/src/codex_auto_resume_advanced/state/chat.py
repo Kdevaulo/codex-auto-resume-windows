@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""What the edition keeps of the Dashboard's chat messages (version 5, v0.6.15-beta.3).
+"""What the edition keeps of the Dashboard's chat messages (version 5, v0.6.16-beta.4).
 
     chat_messages  one row for each message a person sent from the Dashboard's Chat page, with its record (a row of
                    `records`, counted in every claim as the edition's own): its words only while it waits to be handed

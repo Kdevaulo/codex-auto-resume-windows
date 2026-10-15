@@ -61,7 +61,7 @@ LAYER = {_q(name): layer for layer, names in {
                "domain.plug", "domain.compat_vocabulary",
                # v0.6.14: what core holds of a channel, a route and an errand the plug names.
                "domain.plughands",
-               # v0.6.15-beta.3: the plug of a package that could not be loaded, and the asking, out of
+               # v0.6.16-beta.4: the plug of a package that could not be loaded, and the asking, out of
                # domain/plug.py at its line budget.
                "domain.plugdamaged",
                # and what a usage reading keeps of Codex's reply, and nothing else.
@@ -69,7 +69,9 @@ LAYER = {_q(name): layer for layer, names in {
                # v0.6.12: the power action's words, out of domain/vocabulary.py at its line budget.
                "domain.power_vocabulary",
                # v0.6.15-beta: the reasons and a Codex home's states, out of it at its budget too.
-               "domain.reason_vocabulary"),
+               "domain.reason_vocabulary",
+               # v0.6.16-beta.3: why a failed turn was not taken up, as codes (issue #27).
+               "domain.skips"),
     "policy": ("", "settings", "settings_schema", "continuation", "l10n", "messages", "interface", "config", "logbook",
                # v0.6.11: which edition this is, found by looking beside the package; and quiet
                # hours and a postponement's times, on the local clock.
@@ -95,6 +97,8 @@ LAYER = {_q(name): layer for layer, names in {
                # but for the look at a folder; its identity is handed in from win/folderid.py.
                "homes"),
     "adapters": ("store", "openstate", "codex", "windows", "compat", "compatio", "startup", "shortcut",
+                 # v0.6.16-beta.3: the words for this time's file beside the state, written under its lock.
+                 "oncewords",
                  # v0.6.10-alpha: compat.py and compatio.py became compat/.
                  "compat.model", "compat.standing", "compat.report", "compat.permits", "compat.files", "compat.cache", "compat.probes", "compat.views", "compat.evaluator",
                  # v0.6.10: what others report, read beside the registry and never by it.
@@ -138,7 +142,10 @@ LAYER = {_q(name): layer for layer, names in {
                  "codex.pairing", "codex.paths", "codex.payload", "codex.schema",
                  "codex.transport", "codex.usage", "codex.values",
                  # v0.6.11: a conversation's folder's git HEAD, as a digest, for the task-changed guard.
-                 "codex.workspace"),
+                 "codex.workspace",
+                 # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30),
+                 # and the ids a split conversation has had, remembered.
+                 "codex.rollout", "codex.chains"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch",
                "engine.freshness", "engine.options", "engine.outcome", "engine.reconcile",
                # v0.6.11: the waits and the two guards, as the engine asks them.
@@ -156,7 +163,9 @@ LAYER = {_q(name): layer for layer, names in {
                # v0.6.15-beta: several sends waiting for their receipts at once, on workers.
                "engine.launches",
                # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
-               "engine.foropen"),
+               "engine.foropen",
+               # v0.6.16-beta.3: the store as a plug is shown it, off options.py's page.
+               "engine.storeview"),
     # v0.6.10-alpha: control.py became control/, ten files, `Control` composed from eight
     # mixins. `layer` is where the composition lives, so that the front holds no code.
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
@@ -177,6 +186,8 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.afterwork",
               # v0.6.15-beta: and the other Codex homes it holds, each with an engine of its own.
               "runtime.homes",
+              # v0.6.16-beta.3: and its own decisions asked on request, for Diagnostics' check (issue #27).
+              "checkup",
               # v0.6.10-alpha: cli.py's command bodies became commands/; cli.py is the parser.
               "commands", "commands.base", "commands.install", "commands.records",
               "commands.status", "commands.watcher",
@@ -278,6 +289,9 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     # Reaching `ui.tray` loads `ui/__init__.py` with it, and since v0.6.10-alpha the icon
     # is inside `ui/`, so the package above it is an edge these two did not have before.
     ("runtime.app", "ui"): ("cost", "the package above the icon, loaded with it"),
+    # v0.6.16-beta.3: Diagnostics' check, which builds an engine, only when it is asked for or exported.
+    ("controlcli", "checkup"): ("cost", "Diagnostics' check and the engine it asks, only when it runs"),
+    ("commands.install", "checkup"): ("cost", "Diagnostics' check, only while a bundle is exported"),
     # v0.6.15-beta: the Codex version in force, read only while another Codex home is added (homes.unmeasured).
     ("control.watcher", "compatio"): ("cost", "the compatibility report's Codex version, read only while another "
                                               "Codex home is added"),

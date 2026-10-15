@@ -24,7 +24,7 @@ from codex_auto_resume.domain.plug import Point  # noqa: E402
 from codex_auto_resume_advanced import registry, standards, statement  # noqa: E402
 from codex_auto_resume_advanced.registry import (CAPABILITY_POINTS, Ceilings, Registry,  # noqa: E402
                                                  RegistryError, problems)
-from codex_auto_resume_advanced.vocabulary import ArmingWarning, CapabilityKind, Field, Measurement, OptionKey  # noqa: E402
+from codex_auto_resume_advanced.vocabulary import ArmingWarning, CapabilityKind, Field, Measurement, OptionKey, Verdict  # noqa: E402
 
 # The standards file, public in the repository: each rule a line `**A1** <sentence>`, under its
 # family's heading `## A. <title>`, then the line that says how it is held and which tests hold it.
@@ -61,6 +61,10 @@ class ShippedTests(unittest.TestCase):
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
                "prompt_queue", "empty_response", "subagent_parent", "keep_going",
+               # v0.6.16-beta.3 (issue #29): the usage meter, and the wrap-up and the pause that require it.
+               "usage_meter", "usage_wrap_up", "usage_pause",
+               # and the widening to every conversation but Codex's own (P19).
+               "every_conversation",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -79,27 +83,30 @@ class ShippedTests(unittest.TestCase):
         answering = {Point.START_ROUTE: ("start_with_codex",),
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
                      Point.TICK: ("reset_credit", "reset_message", "empty_response", "subagent_parent",
-                                  "keep_going"),
+                                  "keep_going", "usage_meter", "usage_wrap_up", "usage_pause"),
                      Point.RECORDS: ("reset_message", "prompt_queue", "empty_response", "subagent_parent",
-                                     "keep_going"),
+                                     "keep_going", "usage_wrap_up"),
                      # v0.6.15-beta: the lines a parent's continuation is given of its subagents' stops (5a).
                      Point.TEXT: ("subagent_parent",),
                      Point.UNLOADED: ("goal_continuation", "queue_for_open"),
                      Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
-                                   "early_reset"),
+                                   "early_reset", "usage_pause"),
                      Point.ADMISSION: ("capacity_retry", "structured_rules", "unknown_failure_budget",
                                        "codex_gave_up", "sign_in_retry"),
                      Point.SENDER: ("goal_continuation", "marker_free_continuation"),
                      Point.DELIVERY: ("marker_free_continuation",),
                      # v0.6.15-beta: several sends waiting for their receipts at once.
-                     Point.CONCURRENCY: ("parallel_dispatch",)}
+                     Point.CONCURRENCY: ("parallel_dispatch",),
+                     # v0.6.16-beta.3: which conversations core takes up.
+                     Point.ELIGIBILITY: ("every_conversation",)}
         for point in Point:
             self.assertEqual(tuple(d.id for d in registry.REGISTRY.at(point)), answering.get(point, ()))
 
     # The order a person reads them in (the owner's, 2026-10-10): the compatibility report first, then by importance.
-    SHOWN = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
-             "early_reset", "parallel_dispatch", "reset_message", "long_reset_message", "keep_going", "prompt_queue",
+    SHOWN = ("compat_report", "start_with_codex", "every_conversation", "queue_for_open", "marker_free_continuation", "reset_credit",
+             "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
+             "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
              "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "codex_gave_up",
              "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules")
 
@@ -343,6 +350,20 @@ class ShippedTests(unittest.TestCase):
         for capability in taking:
             with self.subTest(capability):
                 self.assertIn("H2", registry.REGISTRY.get(capability).departs_from)
+
+    def test_the_goal_continuations_risks_say_it_acts_where_the_app_holds_the_conversation_once_m2b_passed(self):
+        """While M2b's recorded verdict is a pass (measured.py), engine/goal.py's P5 acts on a conversation the app
+        holds, so no language may still say it acts only on one the app does not have open: every one names M2b in
+        its risks, at revision 2."""
+        from codex_auto_resume_advanced import measured
+        self.assertEqual(measured.MEASURED[Measurement.M2B][0], Verdict.PASS)
+        goal = registry.REGISTRY.get("goal_continuation")
+        self.assertEqual(goal.revision, 2)
+        for locale in l10n.LOCALES:
+            with self.subTest(locale):
+                risks = statement.CATALOGS.own(locale)[statement.key(goal.id, Field.RISKS)]
+                self.assertIn("M2b", risks)
+                self.assertNotIn("that is why it acts only on a conversation the app does not have open.", risks)
 
     def test_once_more_when_unsure_departs_and_rests_on_what_the_design_says(self):
         """0.2 (never again when the first may have been delivered), A6 (an uncertain delivery is never

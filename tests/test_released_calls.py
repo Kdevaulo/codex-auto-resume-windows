@@ -47,7 +47,11 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 HELPERS = ("codexsim", "frozen_registry", "srcscan")
 # What came after v0.6.10 and so has no v0.6.10 run to be compared with.
 AFTER = {"test_ladder_and_guards": "v0.6.11's Custom waits, time ceiling and guards, at their own settings",
-         "test_engine_children": "v0.6.12's app gate where the app main runs two of the configured engine"}
+         "test_engine_children": "v0.6.12's app gate where the app main runs two of the configured engine",
+         "test_skip_reasons": "v0.6.16-beta.3's log lines for a failed turn passed over, which v0.6.10 never wrote",
+         "test_continuation_split": "v0.6.16-beta.3's conversations Codex records under another id (issue #30)",
+         "test_checkup": "v0.6.16-beta.3's Diagnostics check, which v0.6.10 did not have",
+         "test_once_words_engine": "v0.6.16-beta.3's words for this time, which v0.6.10 did not have"}
 MARKER = re.compile(r"\[codex-auto-resume:([0-9a-f]{64}|[0-9a-f]{16})\]")
 
 

@@ -561,7 +561,7 @@ class LoadedState(StrEnum):
     LOADED = "loaded"
     NOTLOADED = "notLoaded"
     UNKNOWN = "unknown"
-    # v0.6.15-beta.3: another Codex session - a terminal's TUI or VS Code's server - holds it (codex/pairing.py).
+    # v0.6.16-beta.4: another Codex session - a terminal's TUI or VS Code's server - holds it (codex/pairing.py).
     ELSEWHERE = "elsewhere"
 
 
@@ -602,3 +602,5 @@ class NoticeKind(StrEnum):
     MEMORY_STOPPED = "memory_stopped"
     # v0.6.11: Show me what happens - a card of made-up words, whose buttons do nothing (demo.py).
     DEMO = "demo"
+    # v0.6.16-beta.3: the advanced edition's usage meter at a warning (issue #29) - shown only from its plug's surface.
+    NEAR_LIMIT = "near_limit"

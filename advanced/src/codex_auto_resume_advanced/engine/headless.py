@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Headless run: a conversation nothing holds is run here while Codex is closed (v0.6.15-beta.3, P16 and P8).
+"""Headless run: a conversation nothing holds is run here while Codex is closed (v0.6.16-beta.4, P16 and P8).
 
 The standard edition waits for the Codex app to hold a conversation before anything is sent there (A11), and only
 through `codex queue` (A2). With this on, core asks P16 for a record of a default home's conversation where the app is

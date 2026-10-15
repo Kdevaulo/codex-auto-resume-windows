@@ -1,6 +1,6 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
 """What the edition keeps of a headless turn while it runs, and of Codex's settings it changed (version 5,
-v0.6.15-beta.3).
+v0.6.16-beta.4).
 
     headless_runs  one row for each turn run here, keyed by the interruption it continues: which capability ran it,
                    in which conversation, when it began and by when its cap ends it, a person's Stop asked from the

@@ -1,4 +1,4 @@
-"""P18 SESSIONS (v0.6.15-beta.3): a plug may ask core to watch the conversations of a terminal's Codex CLI and TUI
+"""P18 SESSIONS (v0.6.16-beta.4): a plug may ask core to watch the conversations of a terminal's Codex CLI and TUI
 and of VS Code too, and every eligibility check core makes reads what it answered.
 
 The standard edition watches the Codex app's own conversations alone (A15), and the NULL plug keeps it so. A plug that

@@ -65,7 +65,11 @@ class AdvancedPlug(Plug):
         return self.runtime.tick(view)
 
     def start_route(self, request):
-        return self.runtime.ask(Point.START_ROUTE, request)
+        return self.runtime.start_route(request)
+
+    def start_held(self):
+        """Why the start route just asked named none (core's Plug.start_held, runtime.Runtime.start_held)."""
+        return self.runtime.start_held()
 
     def surface(self, name, facts):
         from . import surfaces
@@ -91,6 +95,9 @@ class AdvancedPlug(Plug):
 
     def admission(self, failure):
         return self.runtime.ask(Point.ADMISSION, failure)
+
+    def eligibility(self):
+        return self.runtime.eligibility()
 
     def wants(self, point):
         """Whether a capability may answer at `point` now (core's Plug.wants), so core makes the

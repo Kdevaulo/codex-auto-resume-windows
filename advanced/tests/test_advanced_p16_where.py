@@ -1,4 +1,4 @@
-"""Where P16 is asked, as the two capabilities that answered it before v0.6.15-beta.3 read it.
+"""Where P16 is asked, as the two capabilities that answered it before v0.6.16-beta.4 read it.
 
 From this version core tells a P16 record where it is asked: `holder="app_free", app=True` for a conversation the
 running app does not hold, and `holder="none", app=False` where the app is closed and nothing holds it (core's

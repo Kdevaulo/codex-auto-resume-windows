@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Codex's own retry settings, written and put back (v0.6.15-beta.3, P8, and the product leaving).
+"""Codex's own retry settings, written and put back (v0.6.16-beta.4, P8, and the product leaving).
 
 How many times Codex itself retries a request and a stream that failed is two settings of its built-in provider -
 `model_providers.openai.request_max_retries` and `stream_max_retries`, 4 and 5 by its documentation. The standard

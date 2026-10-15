@@ -193,6 +193,7 @@ class Scoped:
         # on), whether a measurement passed or failed on the Codex in force (arming.Arming.verdict), and whether
         # another capability stands on now.
         from .continuations import ContinuationsHandle
+        from .meter import MeterHandle
         from .prompts import PromptsHandle
         from .resets import ResetsHandle
         self._reads.update({
@@ -201,6 +202,8 @@ class Scoped:
             "continuations": ContinuationsHandle(state, capability, on),
             # and prompt_queue's prompts (state/prompts.py).
             "prompts": PromptsHandle(state, capability, on),
+            # v0.6.16-beta.3: the usage meter's last reading (state/meter.py) - read by the wrap-up and the pause too.
+            "meter": MeterHandle(state, capability, on),
             "passed": lambda measurement: verdict is not None and verdict(measurement) == "pass",
             "failed": lambda measurement: verdict is not None and verdict(measurement) == "fail",
             "armed": lambda other: armed is not None and armed(other) is True,

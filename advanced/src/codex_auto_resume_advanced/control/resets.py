@@ -59,6 +59,14 @@ def _on(runtime, capability) -> bool:
     return runtime.states(fresh=True).get(capability, ArmingState.OFF) == ArmingState.ARMED
 
 
+def _standing(runtime, capability) -> bool:
+    """Whether `capability` is on or watched (v0.6.16-beta.3): what a person may set up - a rule, a conversation
+    kept going, a queued message - since a watched capability has something to watch only once it has rows. A watched
+    one's rows are evaluated and journalled, never acted on (runtime.Runtime.records); spending a credit now is still
+    for one that is on alone (credit_now)."""
+    return runtime.states(fresh=True).get(capability, ArmingState.OFF) in (ArmingState.ARMED, ArmingState.SHADOW)
+
+
 def words_limit(runtime) -> int:
     """How long a message may be now: A27's 2,000, or what one continuation carries while Longer reset messages
     stands on."""
@@ -151,7 +159,7 @@ def add(runtime, argument) -> dict:
         return _refused(Refusal.INVALID_REQUEST)
     if _stale(runtime, argument.get("generation")):
         return _refused(Refusal.STALE_GENERATION, runtime)
-    if not _on(runtime, capability):
+    if not _standing(runtime, capability):
         return _refused(Refusal.NOT_ON, runtime)
     bucket, minutes, ordinal = argument.get("bucket"), argument.get("minutes"), argument.get("ordinal")
     if occasion_problem(bucket, minutes, ordinal):

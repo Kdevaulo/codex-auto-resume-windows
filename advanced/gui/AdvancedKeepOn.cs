@@ -91,19 +91,28 @@ namespace CodexAutoResume
                 return Word("page.kept.engine_changed", "It stayed on although the version of Codex changed. Turn it on again to confirm this version.");
             if (notice == "not_delivered_on_open")
                 return Word("page.kept.not_delivered_on_open", "It stayed on although Codex did not run a message queued for a conversation when it was opened.");
+            if (notice == "requirement_off")
+                return Word("page.kept.requirement_off", "It stayed on although a feature it needs is no longer on.");
             return null;
         }
 
         // ---------------------------------------------------------------- the cards
-        /// The open capability's Keep it on card, while it is stored on or watched: whether it turns itself off, and the
-        /// buttons that can act on that now.
-        private void BuildKeepOn(Dictionary<string, object> item)
+        /// Whether a capability is kept on (K8): stored on or watched, with keep_on set - as KeptText reads it.
+        internal static bool KeptOn(Dictionary<string, object> item)
+        {
+            return item != null && (Str(item, "stored") ?? StateOff) != StateOff && Equals(Get(item, "keep_on"), true);
+        }
+
+        /// The open capability's Keep it on, while it is stored on or watched: whether it turns itself off, and the
+        /// buttons that can act on that now - in its head card, under its title, right under where it stands
+        /// (v0.6.16-beta.3; until then a card of its own under its limits). The same words, buttons and flow.
+        private void BuildKeepOn(Dictionary<string, object> item, TableLayoutPanel card)
         {
             keepOnButton = sendAgainButton = letGoButton = null;
             if ((Str(item, "stored") ?? StateOff) == StateOff) return;
             string id = Str(item, "id");
             bool kept = Equals(Get(item, "keep_on"), true), again = Equals(Get(item, "send_again"), true);
-            TableLayoutPanel card = NewGroup(Word("page.keep_on", "Keep it on"), advancedStack);
+            card.Controls.Add(Caption(Word("page.keep_on", "Keep it on")));
             Label state = HelpText(!kept ? Word("page.keep_on.off", "It turns itself off when something it relies on goes wrong.")
                                    : again ? Word("page.keep_on.again", "Kept on, and an uncertain continuation is sent once more.")
                                    : Word("page.keep_on.on", "Kept on: it does not turn itself off."));

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 
-from .. import homes, machine
+from .. import homes, machine, oncewords
 from ..store import MAX_BUDGET_RESETS
 from .errors import ControlError, _identifier
 
@@ -123,6 +123,11 @@ class RecordsMixin:
         # that home's reader, and with its alias as `home`; None for every record while there is one home.
         others = _other_homes(values.get(homes.FIELD))
         readers = {}
+        # v0.6.16-beta.3: which records have words for this time - whether, never what (oncewords.py).
+        try:
+            worded = oncewords.OnceWords.of(self.paths).held()
+        except Exception:
+            worded = {}
         listed = []
         for row in rows:
             identity = {}
@@ -147,7 +152,8 @@ class RecordsMixin:
                          "attempt_limit": None if row["category"] == "usage_limit" else attempts,
                          "name": identity.get("name"), "project": identity.get("project"),
                          "cwd_basename": identity.get("cwd_basename"),
-                         "home": home[0] if home is not None else None})
+                         "home": home[0] if home is not None else None,
+                         "once_words": row["interruption_id"] in worded})
             listed.append(item)
         return listed
 

@@ -1,17 +1,15 @@
 """The plug of an advanced installation whose package could not be loaded, and the one way core asks a plug.
 
-Out of domain/plug.py, which is at its line budget, in v0.6.15-beta.3, and named through it still: `from
-.plug import DamagedPlug, consult, fields` reads as it did. What is here is what domain/plug.py's docstring says of
-them - DamagedPlug does everything NULL does and nothing else; `consult` asks a hook, puts NULL's answer in place of
-one that raised and DEFER in place of a word its point does not take, and hands every hook copies; `fields` is what a
-surface takes from one.
+Out of domain/plug.py, which is at its line budget, in v0.6.16-beta.4, and named through it still: `from .plug import
+DamagedPlug, consult` reads as it did. What is here is what domain/plug.py's docstring says of them - DamagedPlug does
+everything NULL does and nothing else; `consult` asks a hook, puts NULL's answer in place of one that raised and DEFER
+in place of a word its point does not take, and hands every hook copies.
 
 Pure, as the rest of domain/.
 """
 from __future__ import annotations
 
 import copy
-import json
 
 from .plug import ALTERNATIVES, DEFER, HOOKS, NULL, Alternative, Edition, Plug, PlugFailure, Point
 
@@ -74,23 +72,3 @@ def consult(plug, point, *arguments, failed=None):
             failed(point)
         return DEFER
     return Alternative(answer) if accepted else DEFER
-
-
-def fields(answer):
-    """What a surface takes from a plug: a JSON object, copied, or DEFER.
-
-    Words for keys, and nothing JSON cannot write strictly - no NaN, no infinity, no object of
-    some other kind - so what a plug adds reaches a front end through the same writer as every
-    reply (controlcli.encode) and cannot break it. It is copied through that writer's own form,
-    so nothing the plug keeps a reference to changes a reply after it was made.
-
-    A dict with str keys exactly, not a subclass of either: a subclass brings its own iteration,
-    items and hashing, which are the plug's code running here, outside `consult`. Anything at all
-    that goes wrong while it is copied is DEFER - a surface is the status, get_status and the
-    Dashboard, which a strange answer must never break."""
-    try:
-        if type(answer) is not dict or not all(type(key) is str for key in answer):
-            return DEFER
-        return json.loads(json.dumps(answer, allow_nan=False))
-    except Exception:
-        return DEFER

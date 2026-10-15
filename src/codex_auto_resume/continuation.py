@@ -506,3 +506,29 @@ def _settings_metadata(values, row, limits, environ):
         reset_at = row["reset_at"]
     return locale, metadata_for(row, locale=locale, limits=limits,
                                 reset_time=format_reset_time(reset_at))
+
+
+# ---------------------------------------------------------- words for this time
+# v0.6.16-beta.3: a person's own words for one waiting interruption (oncewords.py), added once after the
+# continuation that interruption would send anyway - one blank line between - and filled in as a Custom message
+# is, from the same record. They are a Custom message in every way (A27), and like one they are only ever added
+# to a category that is continued.
+ONCE_SEPARATOR = "\n\n"
+
+
+def with_once_words(message, words, category, values, *, row=None, limits=None, environ=None) -> str:
+    """`message` with the words for this time after it; `message` alone when there are none, when they fail the
+    Custom message's check (read again here), for a category that is not continued, or when they fill in to
+    nothing. Nothing about `message` itself changes, and nothing here decides whether anything is sent."""
+    if words is None or not isinstance(message, str):
+        return message
+    entry = reasons.get(category)
+    if not entry.recoverable:
+        return message
+    try:
+        validate_custom(words)
+    except CustomMessageError:
+        return message
+    locale, metadata = _settings_metadata(values, row, limits, environ)
+    filled = _fill(words, _message_values(entry, locale, metadata))
+    return message + ONCE_SEPARATOR + filled if filled.strip() else message

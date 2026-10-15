@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Compact a full conversation, then continue (v0.6.15-beta.3, P17, P3 and P16).
+"""Compact a full conversation, then continue (v0.6.16-beta.4, P17, P3 and P16).
 
 A turn that fails because the conversation is longer than its model's context window is one the standard edition
 never retries (A14): it ends the record and its needs-you card says to compact or start again. Codex's own automatic

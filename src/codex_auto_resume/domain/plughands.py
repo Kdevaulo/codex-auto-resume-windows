@@ -1,5 +1,5 @@
 """What core holds of something a plug names: a channel, a route and (v0.6.14) an errand - and which
-records of the plug's own core takes to carry out (P2).
+records of the plug's own core takes to carry out (P2), and what a surface takes of a plug's fields (P10).
 
 A hook answers; it never sends, claims or starts anything (domain/plug.py). Where a point's answer is
 something core carries out - a channel the one send is handed to (P5), a route that continues a
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from enum import StrEnum
+import json
 
 from . import ids
 from .states import EPOCH_STORE, epoch
@@ -43,12 +44,39 @@ WORDS_LIMIT = 8192
 ERRAND_GUARDS = 8
 
 
+class Widening(StrEnum):
+    """Which conversations of the Codex app besides a person's own core takes up (P19, v0.6.16-beta.3). EVERY_DESKTOP:
+    every desktop conversation but the kinds Codex makes for itself (codex/values.INTERNAL_THREAD_SOURCES), whatever
+    other label Codex sets on it, still the app's own, not archived, its rollout's first line of that very id."""
+    EVERY_DESKTOP = "every_desktop"
+
+
+WIDENINGS = tuple(Widening)
+
+
+def widening_of(answer) -> frozenset:
+    """What core takes of P19's answer: the Widening words in a set, a frozenset or a tuple of them - and the empty set,
+    a person's own conversations alone as always, for anything else: DEFER, a word, a list holding another word."""
+    if type(answer) not in (set, frozenset, tuple):
+        return frozenset()
+    try:
+        found = frozenset(answer)
+        if not all(type(word) in (str, Widening) and word in tuple(Widening) for word in found):
+            return frozenset()
+        return frozenset(Widening(word) for word in found)
+    except Exception:
+        return frozenset()
+
+
 class RecordPurpose(StrEnum):
     """What a record of the plug's says (v0.6.15-beta): a person's own MESSAGE (continuation.validate_prompt, product
     text refused), or a CONTINUATION in the edition's own catalog words (continuation.validate_continuation), sent only
-    while the turn it follows is still its conversation's latest."""
+    while the turn it follows is still its conversation's latest. From v0.6.16-beta.3 a WRAP_UP, in the edition's own
+    catalog words too, sent only while the turn it was made for is still the latest and still running - Codex's queue
+    delivers it when that turn ends."""
     MESSAGE = "message"
     CONTINUATION = "continuation"
+    WRAP_UP = "wrap_up"
 
 
 class RecordMove(StrEnum):
@@ -189,7 +217,7 @@ def _record(found):
     if (type(key) is not str or not ids.is_interruption_id(key) or ids.uuid_problem(thread) is not None
             or found["marker"] != ids.short_marker(key) or purpose not in tuple(RecordPurpose)):
         return None
-    if purpose == RecordPurpose.CONTINUATION:
+    if purpose in (RecordPurpose.CONTINUATION, RecordPurpose.WRAP_UP):
         if type(ordinal) is not int or ordinal < 0:
             return None
     elif ordinal is not None:
@@ -225,3 +253,23 @@ def records_of(answer) -> tuple:
             seen.add(made["record_id"])
             taken.append(made)
     return tuple(taken)
+
+
+def fields(answer, refused=None):
+    """What a surface takes from a plug (P10, plug.Guarded.surface): a JSON object, copied, or `refused` - DEFER there.
+
+    Words for keys, and nothing JSON cannot write strictly - no NaN, no infinity, no object of
+    some other kind - so what a plug adds reaches a front end through the same writer as every
+    reply (controlcli.encode) and cannot break it. It is copied through that writer's own form,
+    so nothing the plug keeps a reference to changes a reply after it was made.
+
+    A dict with str keys exactly, not a subclass of either: a subclass brings its own iteration,
+    items and hashing, which are the plug's code running here, outside `consult`. Anything at all
+    that goes wrong while it is copied is refused - a surface is the status, get_status and the
+    Dashboard, which a strange answer must never break."""
+    try:
+        if type(answer) is not dict or not all(type(key) is str for key in answer):
+            return refused
+        return json.loads(json.dumps(answer, allow_nan=False))
+    except Exception:
+        return refused

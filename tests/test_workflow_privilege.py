@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 # Every workflow, named: a new one is looked at here before anything else.
 KNOWN = ["community-file.yml", "community-report.yml", "durations.yml", "ko-watch.yml", "release.yml",
-         "sync-ko.yml", "test.yml"]
+         "rerun-once.yml", "sync-ko.yml", "test.yml"]
 
 
 def text(name):
@@ -302,6 +302,40 @@ class KoSyncPrivilegeTests(unittest.TestCase):
         self.assertIn("TESTED_TREE: ${{ needs.test.outputs.tree }}", publish)
         self.assertIn('[ "$built" != "$TESTED_TREE" ]', publish)
         self.assertLess(publish.index("TESTED_TREE"), publish.index("- name: Publish the branch"))
+
+
+class RerunOnceTests(unittest.TestCase):
+    """rerun-once.yml reruns the failed jobs of a failed tests run on main, once, and can do nothing else."""
+
+    def setUp(self):
+        self.source = text("rerun-once.yml")
+        self.jobs = self.source.split("\njobs:", 1)[1]
+
+    def test_it_wakes_only_for_tests_on_main(self):
+        on = self.source[self.source.index("\non:"):self.source.index("\npermissions:")]
+        self.assertIn("workflow_run:", on)
+        self.assertIn('workflows: ["tests"]', on)
+        self.assertIn("types: [completed]", on)
+        self.assertIn("branches: [main]", on)
+        for other in ("push:", "pull_request", "schedule:", "workflow_dispatch:"):
+            self.assertNotIn(other, on)
+
+    def test_it_reruns_only_a_failed_first_attempt_of_main_itself(self):
+        for condition in ("github.event.workflow_run.conclusion == 'failure'",
+                          "github.event.workflow_run.run_attempt == 1",
+                          "github.event.workflow_run.head_branch == 'main'",
+                          "github.event.workflow_run.head_repository.full_name == github.repository"):
+            self.assertIn(condition, self.jobs)
+
+    def test_it_can_only_rerun_and_runs_nothing_of_ours(self):
+        self.assertRegex(self.source, r"(?m)^permissions: \{\}\s*$")
+        grants = re.findall(r"(?m)^      ([a-z-]+): (read|write|none)\s*$", self.source)
+        self.assertEqual(grants, [("actions", "write")])
+        for forbidden in ("actions/checkout", "uses:", "python", "git ", "secrets."):
+            self.assertNotIn(forbidden, self.jobs)
+        self.assertEqual(re.findall(r"(?m)^\s+run: (.*)$", self.jobs),
+                         ['gh run rerun "$RUN_ID" --failed --repo "$REPO"'])
+        self.assertIn("timeout-minutes: 5", self.jobs)
 
 
 class KoWatchTests(unittest.TestCase):

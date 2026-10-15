@@ -74,7 +74,12 @@ MEASUREMENT_METHODS = {
     Measurement.MK: (),
     # MT lists what the app holds, before core's backend queues one message while a turn runs.
     Measurement.MT: ("thread/loaded/list",),
-    # v0.6.15-beta.3 (stage 4). M6B runs one headless turn on the thread's saved settings, as M6 did on forced ones;
+    # v0.6.16-beta.3: the three read-only probes open no app-server session - MIPC touches the Desktop's own IPC
+    # pipe, MAWS and MCLOUD read the engine's own CLI help - so none declares a protocol method here.
+    Measurement.MIPC: (),
+    Measurement.MAWS: (),
+    Measurement.MCLOUD: (),
+    # v0.6.16-beta.4 (stage 4). M6B runs one headless turn on the thread's saved settings, as M6 did on forced ones;
     # MX asks thread/compact/start on our own server and lets go; MF reads Codex's models, overrides one at resume or
     # on a turn, and restores it with thread/settings/update; M3B starts a turn with no input; MB writes and reads
     # Codex's config on a scratch home; MC1 adds one item to a queue the app holds, as M7 did. MO, MXA and MC2 read
@@ -105,6 +110,8 @@ CAPABILITY_METHODS = {
     "reset_credit": ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
     # A message sent at a reset (engine/resetmessage.py) reads usage, to count the resets, and nothing else.
     "reset_message": ("account/rateLimits/read",),
+    # The usage meter (engine/usage.py, v0.6.16-beta.3) reads usage on its schedule, and nothing else.
+    "usage_meter": ("account/rateLimits/read",),
 }
 
 # Every method some measurement declared: what a capability's own route may be given, and nothing

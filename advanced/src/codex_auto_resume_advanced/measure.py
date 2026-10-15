@@ -54,8 +54,14 @@ class Context:
     no test opens a real Codex or starts a real process.
     """
     def __init__(self, measurement, *, session_factory=None, launcher=None, backend=None,
-                 versions=None, redactor=None, thread=None, may_spend=False):
+                 versions=None, redactor=None, thread=None, may_spend=False, cli=None, ipc=None):
         self.measurement = Measurement(measurement)
+        # v0.6.16-beta.3, the read-only probes: `cli` runs the engine's own CLI help (a callable given a
+        # tuple of arguments, answering its stdout text or None), and `ipc` looks at the Desktop's IPC pipe
+        # (a callable answering a dict of booleans). Both are seams: production wires the real ones
+        # (live_cli, live_ipc), and a test wires fakes, so no test runs the CLI or touches the pipe.
+        self._cli = cli
+        self._ipc = ipc
         # The person's second, explicit yes that MR may spend one real reset credit (v0.6.14): False
         # unless the Dashboard's request said so in as many words (surfaces.measure), and nothing
         # else is ever spent by a measurement.
@@ -83,7 +89,7 @@ class Context:
         return self._session_factory(self.measurement)
 
     def open_scratch(self, home):
-        """MB's session (v0.6.15-beta.3): one opened on the Codex home `home` the harness made, never the person's -
+        """MB's session (v0.6.16-beta.4): one opened on the Codex home `home` the harness made, never the person's -
         only through a factory that takes one (its `home` argument); any other is refused, so MB never writes a
         configuration it did not make."""
         import inspect
@@ -101,6 +107,29 @@ class Context:
         """The probe's observation, with whether a real thread was given added - a boolean, and
         never the id itself."""
         return dict(observed, thread_given=self.thread_given)
+
+    def cli_help(self, arguments) -> str | None:
+        """The stdout of the engine's own CLI run with `arguments` (v0.6.16-beta.3, MAWS/MCLOUD), or None
+        where there is no runner, the command could not be run, or it exited non-zero. Read-only: a help
+        text, never a turn. The text is read for whether a word is in it and never recorded."""
+        if self._cli is None:
+            return None
+        try:
+            found = self._cli(tuple(arguments))
+        except Exception:
+            return None
+        return found if isinstance(found, str) else None
+
+    def ipc_look(self) -> dict:
+        """What a read-only look at the Desktop's own IPC pipe found (v0.6.16-beta.3, MIPC): a dict of
+        booleans, or empty where there is no seam or the look raised. Nothing is ever written to the pipe."""
+        if self._ipc is None:
+            return {}
+        try:
+            found = self._ipc()
+        except Exception:
+            return {}
+        return found if isinstance(found, dict) else {}
 
 
 class EvidenceUnavailable(RuntimeError):
@@ -299,7 +328,7 @@ _M6_POLL_SECONDS = 0.25
 
 def _await_turn(session, thread, turn_id, seconds, seen=None):
     """Follow the session's notifications until the turn completes or `seconds` pass. Returns
-    the turn's closed status word, or None when it did not say it ended. `seen` (v0.6.15-beta.3), a
+    the turn's closed status word, or None when it did not say it ended. `seen` (v0.6.16-beta.4), a
     list, is given every notification drained on the way, for a probe that reads an item's kind."""
     deadline = time.monotonic() + seconds
     while True:
@@ -706,7 +735,73 @@ _FIVE_HOURS = 300
 _WEEK = 10080
 
 
-# --------------------------------------------------------------------------- stage 4 (v0.6.15-beta.3)
+# --------------------------------------------------------------------------- the read-only probes (v0.6.16-beta.3)
+# Three for what stop-now and send-now would need, each read-only and each running no live step from this product.
+# MIPC never writes to the pipe; MAWS and MCLOUD read the engine's own CLI help. What each must answer is in its
+# blocked note, for the owner to complete on a real machine, and nothing stop-now / send-now needs is built until
+# MIPC's answer is in. Every observation is a boolean - never a path, a name, or a line of help text.
+_WS_URL = "CODEX_APP_SERVER_WS_URL"
+# The words the engine's help might name a shared-backend switch with (membership only; never recorded).
+_SHARED_SWITCH_WORDS = ("shared app-server", "shared-app-server", "shared backend", "shared-backend",
+                        "app-server-ws", "app_server_ws")
+# The words that would say a `codex cloud` help offers a state/status read (membership only).
+_CLOUD_STATE_WORDS = ("status", "state", "show", "list", "watch", "logs")
+
+
+def _mipc(ctx):
+    """The Desktop's own IPC pipe \\.\\pipe\\codex-ipc (sybxxx/codex-auto-retry: 4-byte little-endian framing,
+    owner-routed thread-follower-start-turn). A read-only look (ctx.ipc_look): whether the pipe exists, whether it
+    opens, and whether a 4-byte frame header reads - and NOTHING written to it, no start, no interrupt, no message.
+
+    It must answer: can this product start a turn, interrupt one, or put a message into a running turn of a
+    conversation the app holds, through this pipe? The look only sees the pipe is reachable; driving a turn is what
+    stop-now and send-now would need and is not built here, so the person confirms the rest."""
+    look = ctx.ipc_look()
+    observed = {"pipe_exists": bool(look.get("exists")), "pipe_opened": bool(look.get("opened")),
+                "frame_read": bool(look.get("frame_read")), "no_answer": bool(look.get("no_answer"))}
+    return _blocked("a read-only look at the Desktop's IPC pipe: it is never written to. Confirm whether a turn of "
+                    "a conversation the app holds can be started, interrupted, or added to through it - stop-now "
+                    "and send-now wait on this answer - then set the verdict", **observed)
+
+
+def _maws(ctx):
+    """Whether a shared app-server is a setting Codex documents (CODEX_APP_SERVER_WS_URL or a shared-backend switch):
+    a read-only look at the engine's own help (ctx.cli_help, `app-server --help`), no launcher and no endpoint of
+    ours. It records only whether the help read and whether each word is in it - never the help text.
+
+    It must answer: could we join a shared app-server Codex itself runs, rather than own Codex's transport? The
+    competitor (sybxxx) starts the Desktop against its own loopback server; this asks whether Codex documents one."""
+    text = ctx.cli_help(("app-server", "--help"))
+    read = text is not None
+    lowered = text.lower() if read else ""
+    observed = {"help_read": read,
+                "ws_url_documented": read and _WS_URL in text,
+                "shared_switch_documented": read and any(word in lowered for word in _SHARED_SWITCH_WORDS)}
+    return _blocked("a read-only look at the engine's help for a documented shared app-server. Confirm against "
+                    "Codex's own documentation, then set the verdict", **observed)
+
+
+def _mcloud(ctx):
+    """Whether a `codex cloud` command offers a supported, read-only way to read a cloud task's state: a read-only
+    look at the engine's own help (ctx.cli_help, `cloud --help`), never UI automation and never a GitHub credential.
+    It records only whether the help read, whether a cloud command is there, and whether it names a state read.
+
+    It must answer: is there a supported way to read a Codex cloud task's state, and later to continue it? A cloud
+    task leaves no local record (v0615-stage4 survey), so without this the watcher cannot see a limit there."""
+    text = ctx.cli_help(("cloud", "--help"))
+    read = text is not None
+    lowered = text.lower() if read else ""
+    # `codex <unknown> --help` exits 0 with the top-level help, so a cloud command is there only where its help is not
+    # the top-level one and has a usage line of its own that names it.
+    top = ctx.cli_help(("--help",)) if read else None
+    own_usage = any(line.strip().startswith("usage:") and " cloud" in line for line in lowered.splitlines())
+    present = (read and own_usage and (top is None or text.strip() != top.strip())
+               and "unrecognized" not in lowered and "unknown" not in lowered and "no such" not in lowered)
+    observed = {"cloud_help_read": read, "cloud_command_present": bool(present),
+                "state_read_present": bool(present) and any(word in lowered for word in _CLOUD_STATE_WORDS)}
+    return _blocked("a read-only look for a `codex cloud` command and a supported way to read a cloud task's state. "
+                    "Confirm against Codex, then set the verdict", **observed)
+# --------------------------------------------------------------------------- stage 4 (v0.6.16-beta.4)
 # Nine more, each what a stage-4 capability's route rests on. Two sittings: Codex closed (M6B, MX, MF, M3B; MB on
 # a scratch Codex home of the harness's own) and Codex open (MO with a TUI and VS Code, MXA, MC1, MC2). Every
 # observation is a boolean, a count, a bucket or a closed word (vocabulary.ObservedWord), never a name, a model, a
@@ -1210,6 +1305,7 @@ PROBES = {
     Measurement.MU: _mu, Measurement.MN: _mn, Measurement.MR: _mr,
     Measurement.MQ: _mq, Measurement.ME: _me, Measurement.MS: _ms, Measurement.MK: _mk,
     Measurement.MT: _mt,
+    Measurement.MIPC: _mipc, Measurement.MAWS: _maws, Measurement.MCLOUD: _mcloud,
     Measurement.M6B: _m6b, Measurement.MO: _mo, Measurement.MX: _mx, Measurement.MXA: _mxa, Measurement.MF: _mf,
     Measurement.M3B: _m3b, Measurement.MB: _mb, Measurement.MC1: _mc1, Measurement.MC2: _mc2,
 }
@@ -1262,7 +1358,7 @@ def probe(ctx) -> tuple:
 
 
 def run(measurement, *, session_factory=None, launcher=None, backend=None, versions=None,
-        clock=time.time, directory=None, thread=None, may_spend=False) -> dict:
+        clock=time.time, directory=None, thread=None, may_spend=False, cli=None, ipc=None) -> dict:
     """Run one measurement and write its record. Returns a small summary of what was recorded.
 
     `versions` is the build, Codex and Windows the record belongs to; when it is not given they
@@ -1285,7 +1381,7 @@ def run(measurement, *, session_factory=None, launcher=None, backend=None, versi
     if versions.get("codex_version") in (None, "", "unknown"):
         raise EvidenceUnavailable("the Codex version this would measure could not be read")
     ctx = Context(measurement, session_factory=session_factory, launcher=launcher,
-                  backend=backend, versions=versions, thread=thread, may_spend=may_spend)
+                  backend=backend, versions=versions, thread=thread, may_spend=may_spend, cli=cli, ipc=ipc)
     verdict, observed, note = probe(ctx)
     record = evidence.build(measurement, verdict, observed,
                             product_version=versions.get("product_version", "0.0.0"),
@@ -1335,7 +1431,7 @@ def live_session_factory(paths, backend=None):
     def factory(measurement, home=None):
         used = backend if backend is not None else live_backend(paths)
         if home is not None:
-            # MB (v0.6.15-beta.3): the same Codex on a scratch home the harness made, never the person's.
+            # MB (v0.6.16-beta.4): the same Codex on a scratch home the harness made, never the person's.
             from codex_auto_resume.codex.transport import Backend
             used = Backend(home, used.codex_exe)
         return Session(used, measurement)
@@ -1356,6 +1452,105 @@ def live_launcher(paths):
         return wmi_escape.probe(paths)
 
     return launcher
+
+
+# MAWS/MCLOUD run the engine's own help; MIPC opens the Desktop's pipe. Both bounds are its own.
+_CLI_HELP_SECONDS = 20
+_IPC_PIPE = r"\\.\pipe\codex-ipc"
+_IPC_FRAME_HEADER = 4            # the 4-byte little-endian length prefix (sybxxx/codex-auto-retry)
+# How long the look waits for that header: a server that answers only once a client has written its first frame
+# writes nothing to one that never writes, so the read is cancelled after this and the look says no_answer.
+_IPC_WAIT_MS = 2000
+
+
+def live_cli(backend=None, paths=None):
+    """The real CLI-help runner (v0.6.16-beta.3, MAWS/MCLOUD): the installed Codex run with the given
+    arguments, read-only, windowless, its stdout answered or None where it could not run or exited
+    non-zero. Never a turn, never a write. A test wires a fake and this is never reached."""
+    import subprocess as S
+    from codex_auto_resume.win.kernel import NO_WINDOW
+
+    def cli(arguments):
+        used = backend if backend is not None else live_backend(paths)
+        try:
+            result = S.run([str(used.codex_exe), *arguments], stdout=S.PIPE, stderr=S.DEVNULL,
+                           text=True, encoding="utf-8", errors="replace", timeout=_CLI_HELP_SECONDS,
+                           creationflags=NO_WINDOW, shell=False)
+        except Exception:
+            return None
+        return result.stdout if result.returncode == 0 else None
+
+    return cli
+
+
+def live_ipc():
+    """The real IPC-pipe look (v0.6.16-beta.3, MIPC): it opens the Desktop's own named pipe for reading
+    only (GENERIC_READ, overlapped), waits at most _IPC_WAIT_MS for the 4-byte frame header, cancels the read
+    if none came, and closes the pipe - it writes nothing, starts nothing, interrupts nothing.
+    {exists, opened, frame_read, no_answer}, each a boolean. A test wires a fake instead."""
+    def ipc():
+        found = {"exists": False, "opened": False, "frame_read": False, "no_answer": False}
+        try:
+            return _ipc_look(found)
+        except Exception:
+            return found
+    return ipc
+
+
+def _ipc_look(found):
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateFileW.restype = wintypes.HANDLE
+    k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+                                wintypes.DWORD, wintypes.HANDLE]
+    k32.CreateEventW.restype = wintypes.HANDLE
+    k32.CreateEventW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
+    k32.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p, ctypes.c_void_p]
+    k32.GetOverlappedResult.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD),
+                                        wintypes.BOOL]
+    k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    k32.WaitForSingleObject.restype = wintypes.DWORD
+    k32.CancelIoEx.argtypes = [wintypes.HANDLE, ctypes.c_void_p]
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+    class OVERLAPPED(ctypes.Structure):
+        _fields_ = [("Internal", ctypes.c_void_p), ("InternalHigh", ctypes.c_void_p), ("Offset", wintypes.DWORD),
+                    ("OffsetHigh", wintypes.DWORD), ("hEvent", wintypes.HANDLE)]
+
+    GENERIC_READ, OPEN_EXISTING, FILE_FLAG_OVERLAPPED = 0x80000000, 3, 0x40000000
+    NOT_FOUND, IO_PENDING, WAIT_OBJECT_0 = (2, 3), 997, 0
+    invalid = wintypes.HANDLE(-1).value
+    # Opened for reading alone; closed below whatever happens. Nothing is ever written to the pipe.
+    pipe = k32.CreateFileW(_IPC_PIPE, GENERIC_READ, 0, None, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, None)
+    if pipe in (None, invalid):
+        if ctypes.get_last_error() not in NOT_FOUND:
+            found["exists"] = True              # the pipe is there but could not be opened now
+        return found
+    found["exists"] = found["opened"] = True
+    event = k32.CreateEventW(None, True, False, None)
+    try:
+        if not event:
+            return found
+        overlapped = OVERLAPPED(hEvent=event)
+        header = ctypes.create_string_buffer(_IPC_FRAME_HEADER)
+        count = wintypes.DWORD(0)
+        started = k32.ReadFile(pipe, header, _IPC_FRAME_HEADER, None, ctypes.byref(overlapped))
+        if not started and ctypes.get_last_error() != IO_PENDING:
+            return found
+        if k32.WaitForSingleObject(event, _IPC_WAIT_MS) != WAIT_OBJECT_0:
+            # Nothing came: the read is cancelled, and waited out, before its buffer goes.
+            k32.CancelIoEx(pipe, ctypes.byref(overlapped))
+            k32.GetOverlappedResult(pipe, ctypes.byref(overlapped), ctypes.byref(count), True)
+            found["no_answer"] = True
+            return found
+        if k32.GetOverlappedResult(pipe, ctypes.byref(overlapped), ctypes.byref(count), False):
+            found["frame_read"] = count.value == _IPC_FRAME_HEADER
+        return found
+    finally:
+        if event:
+            k32.CloseHandle(event)
+        k32.CloseHandle(pipe)
 
 
 def complete(measurement, verdict, note, *, backend=None, versions=None, clock=time.time,

@@ -48,6 +48,7 @@
             "project": null,
             "cwd_basename": null,
             "home": null,
+            "once_words": false,
             "demo": true
           },
           "history": {
@@ -90,6 +91,7 @@
             "project": null,
             "cwd_basename": null,
             "home": null,
+            "once_words": false,
             "demo": true
           },
           "asked": false

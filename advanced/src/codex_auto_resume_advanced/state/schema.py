@@ -43,6 +43,19 @@ actions joined it, but a pre-release build of this beta may have, so a version-3
 tables and not the last four is given them (ADD_RESETS), keeping every row, its version unchanged. A
 version this one does not know is refused, as before: a downgrade leaves the state unreadable, which is
 every capability off.
+
+Version 5 (v0.6.16-beta.3, issue #29) makes `options` and `continuations` again with their wider lists - the usage
+meter's, the wrap-up's and the pause's own choices (OptionKey), and the wrap-up's continuations (usage_wrap_up,
+ContinuationKind.WRAP_UP) - every row kept, and adds one table:
+
+    meter          the usage meter's last reading, one row for each window (a bucket and a length): how full it
+                   was, when it resets and when it was read, and the reset each stage last acted for - the warning
+                   shown, the pause held - so each acts once for a window, across restarts
+
+A version-4 file is brought to it when it is opened (UPGRADE_FROM_4), after any earlier step. The way down is the
+one every earlier version has: a build of version 4 or older refuses a version-5 file as newer, reads every
+capability as off, and writes nothing to it (session._prepare) - the person's choices and the meter's rows wait
+there, untouched, for a build that knows them, and the standard edition never opens the file at all.
 """
 from __future__ import annotations
 
@@ -54,7 +67,7 @@ from ..vocabulary import (ArmingState, ContinuationKind, ContinuationReason, Kee
                           OptionKey, OverrideKind, PromptEvery, PromptReason, PromptState, PromptTrigger, RecordState,
                           RuleReason, RuleState, SpendOutcome)
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 FILE_NAME = "advanced.sqlite"
 # The name the file is attached under on core's connection, inside the one claim (ledger.py).
 ATTACHED = "advanced"
@@ -91,8 +104,13 @@ TABLES = {
     "prompts": ("prompt_id", "thread_id", "words", "trigger", "at", "every", "occurrences", "sent_count", "until",
                 "depends", "position", "state", "reason", "record_id", "gate", "gate_reason", "created_at", "due_at",
                 "launching_at", "sent_at", "finished_at"),
+    # Version 5 (v0.6.16-beta.3): the usage meter's last reading of each window, and what each stage acted for.
+    "meter": ("bucket", "minutes", "used_percent", "reset_at", "read_at", "warned_reset_at", "warned_at",
+              "paused_reset_at"),
 }
 V4_TABLES = ("continuations", "keep_going", "prompts")
+# Version 5's (v0.6.16-beta.3).
+V5_TABLES = ("meter",)
 # The reset actions' tables, the last four of version 3 (v0.6.14).
 RESET_TABLES = ("windows", "readings", "reset_rules", "credit_spends")
 # The buckets a usage window is kept under (core's domain/usage.BUCKETS), and the capabilities whose
@@ -100,7 +118,7 @@ RESET_TABLES = ("windows", "readings", "reset_rules", "credit_spends")
 BUCKETS = ("codex", "premium", "legacy", "other")
 RESET_CAPABILITIES = ("reset_credit", "reset_message")
 # The capabilities whose continuations `continuations` holds (v0.6.15-beta).
-CONTINUATION_CAPABILITIES = ("empty_response", "subagent_parent", "keep_going")
+CONTINUATION_CAPABILITIES = ("empty_response", "subagent_parent", "keep_going", "usage_wrap_up")
 # The tables version 2 had: v0.6.11's and v0.6.12's file.
 # `records` before version 4 added its last two columns (queue_id, withdraw).
 RECORDS_V3 = TABLES["records"][:-2]
@@ -433,7 +451,24 @@ _STATEMENTS_V4 = (
             PromptTrigger.RECURRING, PromptTrigger.RECURRING, PROMPT_SPAN),
     "CREATE INDEX prompts_thread ON prompts(thread_id, position)",
 )
-STATEMENTS = _STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + ("PRAGMA user_version=%d" % SCHEMA_VERSION,)
+# Version 5's own table (v0.6.16-beta.3): the usage meter's last reading of each window. Whole seconds as Codex gives
+# them for a reset; the share as Codex gives it, 0 or more.
+_STATEMENTS_V5 = (
+    """CREATE TABLE meter (
+        bucket TEXT NOT NULL %s,
+        minutes INTEGER NOT NULL %s,
+        used_percent REAL NOT NULL CHECK (typeof(used_percent) IN ('real', 'integer') AND used_percent >= 0),
+        reset_at INTEGER %s,
+        read_at REAL NOT NULL,
+        warned_reset_at INTEGER %s,
+        warned_at REAL,
+        paused_reset_at INTEGER %s,
+        PRIMARY KEY (bucket, minutes)
+    )""" % (_one_of("bucket", BUCKETS), _int("minutes", low=1, high=100800, null=False), _int("reset_at"),
+            _int("warned_reset_at"), _int("paused_reset_at")),
+)
+STATEMENTS = (_STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + _STATEMENTS_V5
+              + ("PRAGMA user_version=%d" % SCHEMA_VERSION,))
 # Version 2's file exactly as v0.6.11 and v0.6.12 made it: what a test builds an older file from.
 STATEMENTS_V2 = _STATEMENTS_V2 + ("PRAGMA user_version=2",)
 
@@ -448,24 +483,25 @@ UPGRADE_FROM_2 = _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 STATEMENTS_V3 = _STATEMENTS_V2 + _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 # A version-3 file a pre-release build made before the reset actions' tables (v0.6.14): those four
 # added, every row kept, its version unchanged.
-TABLES_V3_BEFORE_RESETS = dict({name: TABLES[name] for name in TABLES if name not in RESET_TABLES + V4_TABLES},
+TABLES_V3_BEFORE_RESETS = dict({name: TABLES[name] for name in TABLES if name not in RESET_TABLES + V4_TABLES + V5_TABLES},
                                records=RECORDS_V3)
 ADD_RESETS = _STATEMENTS_RESETS
 # Version 4 (v0.6.15-beta): the tables whose CHECKs name a closed list that grew are made again with the new list, every
 # row kept - SQLite cannot change a CHECK in place - and the tables of 3c added. A version-3 file is brought to it.
-TABLES_V3 = {name: columns for name, columns in dict(TABLES, records=RECORDS_V3).items() if name not in V4_TABLES}
+TABLES_V3 = {name: columns for name, columns in dict(TABLES, records=RECORDS_V3).items()
+             if name not in V4_TABLES + V5_TABLES}
 # The choices version 4 added to `options` (OptionKey): what a version-3 file's CHECK refuses.
 V4_OPTION_WORDS = ("workers", "days")
 # And to `overrides`.
 V4_OVERRIDE_WORDS = ("queue_for_open",)
 
 
-def _remade(statement, table, columns, index=None) -> tuple:
+def _remade(statement, table, columns, index=None, suffix="v4") -> tuple:
     """The statements that make `table` again from `statement`, its CREATE as this version writes it, every row kept."""
-    made = (statement.replace("CREATE TABLE %s (" % table, "CREATE TABLE %s_v4 (" % table, 1),
-            "INSERT INTO %s_v4 (%s) SELECT %s FROM %s" % (table, ", ".join(columns), ", ".join(columns), table),
+    made = (statement.replace("CREATE TABLE %s (" % table, "CREATE TABLE %s_%s (" % (table, suffix), 1),
+            "INSERT INTO %s_%s (%s) SELECT %s FROM %s" % (table, suffix, ", ".join(columns), ", ".join(columns), table),
             "DROP TABLE %s" % table,
-            "ALTER TABLE %s_v4 RENAME TO %s" % (table, table))
+            "ALTER TABLE %s_%s RENAME TO %s" % (table, suffix, table))
     return made + ((index,) if index else ())
 
 
@@ -476,3 +512,16 @@ UPGRADE_FROM_3 = (
     + _remade(next(s for s in _STATEMENTS_RESETS if s.lstrip().startswith("CREATE TABLE reset_rules")), "reset_rules",
               TABLES["reset_rules"], "CREATE INDEX reset_rules_state ON reset_rules(state)")
     + _STATEMENTS_V4 + ("PRAGMA user_version=4",))
+
+# Version 5 (v0.6.16-beta.3, issue #29): `options` and `continuations` made again with their wider lists, every row kept,
+# and the meter's table added. A version-4 file is brought to it; a version-3 one takes UPGRADE_FROM_3 first.
+TABLES_V4 = {name: columns for name, columns in TABLES.items() if name not in V5_TABLES}
+# The choices version 5 added to `options` (OptionKey), and the words to `continuations`: what a version-4 file refuses.
+V5_OPTION_WORDS = ("poll_minutes", "warn_five_hour", "warn_weekly", "wrap_five_hour", "wrap_weekly", "wrap_style",
+                   "pause_five_hour", "pause_weekly")
+V5_CONTINUATION_WORDS = ("usage_wrap_up", "wrap_up")
+UPGRADE_FROM_4 = (
+    _remade(_STATEMENTS_V3[0], "options", TABLES["options"], suffix="v5")
+    + _remade(next(s for s in _STATEMENTS_V4 if s.lstrip().startswith("CREATE TABLE continuations")), "continuations",
+              TABLES["continuations"], "CREATE INDEX continuations_thread ON continuations(thread_id)", suffix="v5")
+    + _STATEMENTS_V5 + ("PRAGMA user_version=5",))

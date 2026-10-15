@@ -39,7 +39,7 @@ class ReasonCode(StrEnum):
     DESKTOP_APP_UNAVAILABLE = "desktop_app_unavailable"
     NOTLOADED = "notLoaded"
     LOADED_STATE_UNKNOWN = "loaded_state_unknown"
-    # v0.6.15-beta.3: open in another Codex session - a terminal or VS Code - which the app's queue cannot reach.
+    # v0.6.16-beta.4: open in another Codex session - a terminal or VS Code - which the app's queue cannot reach.
     HELD_BY_OTHER_SESSION = "held_by_other_session"
     LOADED_RECHECK_FAILED = "loaded_recheck_failed"
     USAGE_UNAVAILABLE = "usage_unavailable"

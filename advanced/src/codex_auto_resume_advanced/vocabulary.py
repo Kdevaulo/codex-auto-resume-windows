@@ -63,17 +63,22 @@ class OffReason(StrEnum):
     # A conversation queued for opening was opened and Codex did not run the item within core's delivery window
     # (v0.6.15-beta, queue_for_open): what M1 measured did not hold on this Codex.
     NOT_DELIVERED_ON_OPEN = "not_delivered_on_open"
+    # A capability this one requires (registry.CapabilityDef.requires) is not on now - turned off, watched, read
+    # down by an administrator's policy, or its compatibility failed here (v0.6.16-beta.3): a capability is only as
+    # on as what it needs.
+    REQUIREMENT_OFF = "requirement_off"
 
 
 TRIPWIRES = frozenset({OffReason.SUBMISSION_UNKNOWN, OffReason.LOCAL_CHECK_FAILED,
                        OffReason.FAILED_HERE, OffReason.INCOMPATIBLE, OffReason.HOOK_EXCEPTION,
                        OffReason.STATEMENT_CHANGED, OffReason.MEASUREMENT_FAILED,
-                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN})
+                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF})
 # What a capability kept on (KeepOn, K8) notes instead of turning off, most serious first: the order
 # in which one notice gives way to another (state/arming.py, note_kept). A notice only ever rises.
 KEPT_NOTICES = (OffReason.DUPLICATE_SEEN, OffReason.STATEMENT_CHANGED, OffReason.FAILED_HERE,
                 OffReason.LOCAL_CHECK_FAILED, OffReason.INCOMPATIBLE, OffReason.MEASUREMENT_FAILED,
-                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.ENGINE_CHANGED, OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
+                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF, OffReason.ENGINE_CHANGED,
+                OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
 
 
 class ArmingWarning(StrEnum):
@@ -138,6 +143,12 @@ class Refusal(StrEnum):
     QUEUE_FULL = "queue_full"
     DEPENDENCY_UNKNOWN = "dependency_unknown"
     KEEP_COUNT_INVALID = "keep_count_invalid"
+    # Turning a capability on with its requirements in the one confirmation (v0.6.16-beta.3): the `also` list did
+    # not carry exactly the requirements that are off, or one of them was refused its own confirmation.
+    REQUIREMENT_REFUSED = "requirement_refused"
+    # A requirement's compatibility grade is Failed here on this PC: like a policy on it, it keeps the dependent off,
+    # whatever is confirmed - the owner's rule for `requires`.
+    REQUIREMENT_FAILED_HERE = "requirement_failed_here"
 
 
 class JournalCode(StrEnum):
@@ -194,6 +205,17 @@ class OptionKey(StrEnum):
     # days a continuation is kept in Codex's queue for when its conversation is opened (queue_for_open, 3 to 7).
     WORKERS = "workers"
     DAYS = "days"
+    # v0.6.16-beta.3 (issue #29), each a person's own choice: how often the usage meter reads (minutes), and for
+    # each of the five-hour and the weekly window the percentage it warns at, wraps up at and pauses at - and the
+    # wrap-up's wording (1 short, 2 standard, 3 detailed).
+    POLL_MINUTES = "poll_minutes"
+    WARN_FIVE_HOUR = "warn_five_hour"
+    WARN_WEEKLY = "warn_weekly"
+    WRAP_FIVE_HOUR = "wrap_five_hour"
+    WRAP_WEEKLY = "wrap_weekly"
+    WRAP_STYLE = "wrap_style"
+    PAUSE_FIVE_HOUR = "pause_five_hour"
+    PAUSE_WEEKLY = "pause_weekly"
 
 
 class KeepOn(StrEnum):
@@ -342,7 +364,17 @@ class Measurement(StrEnum):
     # One message queued while a turn runs in a throwaway conversation: delivered once, after that turn ended
     # (prompt_queue's after_turn).
     MT = "mt"
-    # v0.6.15-beta.3 (stage 4). With Codex closed: a headless turn on the thread's own saved settings, a command
+    # v0.6.16-beta.3 - the three probes for what stop-now and send-now would need, each read-only, no live run
+    # from this product (measure.py). MIPC: whether the Desktop's own IPC pipe \\.\pipe\codex-ipc is reachable -
+    # it never writes a start, an interrupt or a message; the person confirms whether a turn the app holds could be
+    # driven through it. MAWS: whether a shared app-server is a setting Codex documents (CODEX_APP_SERVER_WS_URL or a
+    # shared-backend switch), read from the engine's own help. MCLOUD: whether a `codex cloud` command offers a
+    # supported, read-only way to read a cloud task's state. None of the three drives a turn; stop-now and send-now
+    # wait on MIPC's answer.
+    MIPC = "mipc"
+    MAWS = "maws"
+    MCLOUD = "mcloud"
+    # v0.6.16-beta.4 (stage 4). With Codex closed: a headless turn on the thread's own saved settings, a command
     # run under them, every approval declined (M6B); thread/compact/start on our own server, and the turn it leaves
     # (MX); a model override at resume lasting the session only, or a restore by thread/settings/update read back
     # (MF); a turn started with no input, proven by its client id (M3B); and Codex's own config writes on a scratch
@@ -362,7 +394,7 @@ class Measurement(StrEnum):
 
 
 class ObservedWord(StrEnum):
-    """The closed words a stage-4 measurement's observation may hold besides booleans and counts (v0.6.15-beta.3,
+    """The closed words a stage-4 measurement's observation may hold besides booleans and counts (v0.6.16-beta.4,
     evidence.CLOSED_WORDS): a thread's saved sandbox and approval policy and its reviewer, as Codex's schema names
     them; a conversation's source, thread source, history mode, originator and holder; and the buckets a span or a
     lag is kept in, and which of two came first - never a model, a name, a path or anything a turn said."""
@@ -577,6 +609,9 @@ class ContinuationKind(StrEnum):
     EMPTY_RESPONSE = "empty_response"
     SUBAGENT = "subagent"
     KEEP_GOING = "keep_going"
+    # v0.6.16-beta.3 (issue #29): a conversation with a turn running asked to wrap up, once for each usage window
+    # that reached the percentage a person chose (usage_wrap_up), sent while that turn is still the latest.
+    WRAP_UP = "wrap_up"
 
 
 class ContinuationReason(StrEnum):

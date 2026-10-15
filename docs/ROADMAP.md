@@ -747,10 +747,20 @@ the web's steps without it. The project's check takes a report the product wrote
 
 ---
 
-## v0.6.15 — The rest of the advanced edition
+## v0.6.15 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered ✅
 
-**In development: v0.6.15-beta ✅, its first pre-release, is out: stage 3c and watching several Codex
-homes. Stage 4 is next.**
+A fix alone, on v0.6.14 ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27),
+2026-10-13). Detection took up only conversations Codex labels `user`: a conversation ChatGPT hands
+over to the Codex app (`chatgpt_handoff`) and the many Codex labels not at all were left alone without
+a word and never recovered. The owner had it published as this final so that every v0.6.14 is
+offered it. What this roadmap planned as v0.6.15 is v0.6.16 from here, and every release after it
+moved one on; the published v0.6.15-beta is published again as v0.6.16-beta.
+
+## v0.6.16 — The rest of the advanced edition
+
+**In development: v0.6.16-beta.3 ✅ is out: words for this time in the standard edition, with the
+other work that landed there. Before it came v0.6.16-beta.2, v0.6.15's fix on the beta line, and v0.6.16-beta
+(published first as v0.6.15-beta), the first pre-release: stage 3c and watching several Codex homes.**
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
@@ -760,6 +770,16 @@ last. Every capability here is the advanced edition's alone, off until a person 
 statement that names the standards it departs from, as v0.6.11's and v0.6.14's are. Some rest on a
 measurement of the real Codex; one that fails narrows the route, or becomes a warning the person
 confirms, and does not drop the capability.
+
+### v0.6.16-beta.3 ✅ — Words for this time (standard edition)
+
+What the owner asked for on 2026-10-10: pick one waiting recovery on Pending and, this one time, when its
+limit lifts, send its usual continuation with words of the person's own after it. Standards A26 and A27 are
+amended at the owner's word to allow it. The words are a Custom message in every way - written only in the
+Dashboard, at most 2000 characters, sent exactly as typed, the same placeholders, checked again when read - kept
+in a file of their own beside the state (no state schema change, no setting), sent once and then deleted, and
+deleted when the recovery ends without a send. Adding them starts, speeds and skips nothing. v0.6.14's *Send your
+own message when a limit resets* stays as it is.
 
 ### Recovery through the channels already in use
 
@@ -818,14 +838,14 @@ confirms, and does not drop the capability.
 
 ---
 
-## v0.6.16 — The final Python audit, both editions
+## v0.6.17 — The final Python audit, both editions
 
-v0.6.16 is the last Python release: the whole repository, both editions, through its bug hunt, and
-the Python reference implementation the Rust migration reproduces. It comes after v0.6.15 so that
+v0.6.17 is the last Python release: the whole repository, both editions, through its bug hunt, and
+the Python reference implementation the Rust migration reproduces. It comes after v0.6.16 so that
 the last features written in Python - the rest of the advanced edition - are audited with the rest,
 and the reference the Rust core reproduces holds them.
 
-v0.6.16 is planned as the final comprehensive audit of the Python implementation, in both editions.
+v0.6.17 is planned as the final comprehensive audit of the Python implementation, in both editions.
 
 Unlike v0.6.10-alpha's refactoring, it is intentionally a broad bug hunt.
 
@@ -843,10 +863,12 @@ Expected areas include:
 - malformed, stale, or corrupted state,
 - fault injection,
 - real Codex integration,
-- Advanced / Experimental recovery paths: every capability of v0.6.11, v0.6.14 and v0.6.15, each with its
+- Advanced / Experimental recovery paths: every capability of v0.6.11, v0.6.14 and v0.6.16, each with its
   warnings, tripwires and ceilings,
 - responsiveness, in every language: whatever lag v0.6.9 left,
-- both editions, and that the standard one still holds none of the advanced code.
+- both editions, and that the standard one still holds none of the advanced code,
+- every document, in both languages, read against the code as it is: wrong or stale claims, links,
+  versions and contradictions, and the translations polished.
 
 Confirmed bugs should receive regression tests.
 
@@ -858,14 +880,14 @@ for the Rust migration.
 
 ---
 
-## v0.6.17 — Rust: the core replaced as it is, then made Rust-native
+## v0.6.18 — Rust: the core replaced as it is, then made Rust-native
 
 v0.6.17 arrives in two stages too: **v0.6.17-alpha**, a pre-release, replaces the production Python
 core with Rust as it is; the final **v0.6.17** is that core made naturally Rust-oriented. The alpha is
 a pre-release because the core swapped as it is is a stage on the way to the Rust-native one, not a
 release worth having on its own.
 
-### v0.6.17-alpha — Complete Rust core replacement (a pre-release)
+### v0.6.18-alpha — Complete Rust core replacement (a pre-release)
 
 The alpha is planned to replace the production Python core with Rust, as it is.
 
@@ -918,7 +940,7 @@ Rust
 PowerShell may remain as a thin layer for bootstrap, installation, updating, or similar Windows
 deployment work.
 
-### v0.6.17 — Rust-native restructuring and optimization
+### v0.6.18 — Rust-native restructuring and optimization
 
 The alpha prioritizes behavioral parity.
 
@@ -944,7 +966,7 @@ This is not intended to be the final full-system bug hunt.
 
 ---
 
-## v0.6.18 — Final Rust audit and stabilization: the Rust bug hunt
+## v0.6.19 — Final Rust audit and stabilization: the Rust bug hunt
 
 v0.6.18 is planned as the final comprehensive stabilization pass.
 
@@ -1076,25 +1098,30 @@ Eight more ways to recover, Keep it on and a watch log, in the advanced edition
 
         ↓
 
-v0.6.15-beta → v0.6.15-beta.2 → … → v0.6.15
-The rest of the advanced edition, in as many pre-releases as it needs
-+ several Codex homes, Arabic and Hebrew mirrored, winget
+v0.6.15  ✅ Released
+Conversations ChatGPT hands over, and the ones Codex labels not at all, recovered: a fix alone
 
         ↓
 
-v0.6.16
+v0.6.16-beta → v0.6.16-beta.2 → … → v0.6.16
+The rest of the advanced edition, in as many pre-releases as it needs
++ several Codex homes, words for this time, Arabic and Hebrew mirrored, winget
+
+        ↓
+
+v0.6.17
 The final Python audit, both editions
 → freeze Python reference behavior
 
         ↓
 
-v0.6.17-alpha → v0.6.17
+v0.6.18-alpha → v0.6.18
 Complete Rust core replacement, in a pre-release
 + Rust-native restructuring and optimization, in the final
 
         ↓
 
-v0.6.18
+v0.6.19
 Final Rust audit and stabilization: the Rust bug hunt
 → final stable Rust baseline
 

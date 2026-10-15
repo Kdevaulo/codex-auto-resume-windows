@@ -388,7 +388,9 @@ for that conversation alone. **Let this project resume** and **Hold this project
 the project that task's conversation is filed under, as described under
 [Observe only, and which conversations and projects resume](#observe-only-and-which-conversations-and-projects-resume).
 Last, in the Dashboard's menu only, **Message for this conversation...** gives that conversation a
-continuation message of its own, as described under [The continuation message](#the-continuation-message).
+continuation message of its own, and, from v0.6.16-beta.3, **Add words for this time...** adds words of
+yours to that task's next continuation alone, once - both as described under
+[The continuation message](#the-continuation-message).
 None of them sends anything, each is refused if its row has since become another task, and the
 notification-area popup offers the same menu on a right click on a task, but for the message:
 
@@ -406,8 +408,9 @@ for this: usage is read only when a recovery is due, as it always was, and what 
 of those readings - so it can be hours old, and its age says so. Only the numbers are kept, with the
 time they were read: which window, how much is used, its length and its reset time. No account,
 plan or credit. (The advanced edition's two reset actions read usage on their own while one of their
-rules waits, and one of them keeps how many reset credits you have; [EDITIONS.md](EDITIONS.md) says so
-for each.)
+rules waits, and one of them keeps how many reset credits you have; its usage meter, when you turn it on,
+reads usage on its own at the spacing you choose, and its newest reading is what this line and the icon's
+tooltip then show, with a notice near the limit you set; [EDITIONS.md](EDITIONS.md) says so for each.)
 
 <img src="images/settings-window.png" alt="The Continuation message section of the Dashboard's Settings page: the continuation language, the four message styles with Standard selected, and a Preview of the message sent for a usage limit" width="680">
 
@@ -521,6 +524,8 @@ until you change it. The **advanced** edition is the standard one plus capabilit
 those standards on purpose. Each says which it breaks, is off until you turn it on after reading
 that, and turns itself off again when what you agreed to stops being true - unless you chose, on the
 same page and after its own warning, to keep it on, which notes what would have turned it off instead.
+One that needs another turns that one on with it, in the same confirmation and with both statements
+shown, and turning the needed one off turns off first what needs it.
 You turn one on in the Dashboard, on the page that edition adds, **Advanced features**, and nowhere
 else; from v0.6.14 that page can also send one waiting recovery now, while Send now is on, and have a
 reset credit used, or a message of your own sent, at a usage reset you pick, each shown on Pending
@@ -1281,6 +1286,19 @@ a Windows event of its own, which can ask for that card and nothing else.
 of the one you have; [Installing another version](#installing-another-version) says what it asks and
 what it changes.
 
+**Check why a failure was not taken up...**, last, asks the watcher's own rules why a failed turn was
+not continued, and shows the answer with a Copy button - the most likely reason first, in plain words.
+Then how each conversation of the last 72 hours has its latest turn recorded and whether it would be
+taken up, or why not (another kind of conversation, before the look-back window, a newer turn, a kind
+it does not recover); for one it would take up, anything else that holds it (automatic recovery or the
+conversation switched off, that kind switched off in Settings, a record it already has, the watcher not
+running); conversations whose turns Codex records under another id, which the watcher follows; each Codex
+home with when its databases were last written; how many cloud tasks the app knows - they run on
+OpenAI's servers and cannot be recovered yet; the last usage reading; how notices reach you; the Codex
+version and its compatibility; and the watcher's last reasons from its log, which says once per turn why
+a failed turn was not taken up. It only reads: nothing of any conversation's words, and conversations
+appear as aliases valid only in that answer. Export diagnostics... includes the same check.
+
 ### Settings an administrator manages
 
 From v0.6.11 an administrator can set seven values under `Software\Policies\CodexAutoResume` - in
@@ -1412,10 +1430,27 @@ One that fills in to nothing is not used, and that conversation gets its style's
 conversations can have one; **Remove message**, or Restore defaults, takes it away. The settings file
 keeps it beside the conversation's id, and the diagnostics bundle records only that one is set.
 
+#### Words for this time
+
+From v0.6.16-beta.3 one waiting task can carry words of yours for its next continuation alone: **Add
+words for this time...** on its row in the Dashboard's Pending page. When that task's limit lifts and
+it is continued, the words are sent once, after the continuation message it would send anyway, with one
+blank line between. They start, speed up and skip nothing: the task is continued exactly when it would
+be without them, and every check still applies. Once the continuation that carries them is handed to
+Codex they are deleted, whatever then becomes of it - only when Codex's queue process never started are
+they kept for the next try - and they are deleted too when the task ends without a send: recovered
+another way, cancelled, expired or superseded. They go to that one task alone, never to another task of
+the same conversation, and never twice. They are a Custom message in every other way: the same
+placeholders, the same 2000 characters, sent exactly as typed, and the dialog's Preview shows the next
+continuation with them. The task's *Why it is waiting* note says it has some; **Change words for this
+time...** and **Remove words for this time** on the same menu change them or take them away. They are
+kept in `config/once-words.json` beside the state, never in the settings, and the diagnostics bundle
+records only how many there are.
+
 Custom message text can only be written in the Dashboard. Codex can preview the message and change
-its language or style, but it cannot set the text - neither the Custom messages nor a conversation's
-own: words sent automatically into your conversations must not be something a model can be talked
-into changing.
+its language or style, but it cannot set the text - neither the Custom messages, nor a conversation's
+own, nor the words for this time: words sent automatically into your conversations must not be something
+a model can be talked into changing.
 
 Nothing about the message changes what is recovered. The style and the text choose words for a
 recovery the watcher has already decided to make.

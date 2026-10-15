@@ -79,7 +79,7 @@ class Backend:
         # none of them ran this engine - an update that started the app's server from another
         # build - and nothing whenever that is not what the last pairing saw (app_identity).
         self.served_elsewhere = frozenset()
-        # v0.6.15-beta.3: the inventory rows the last app_identity() read - in memory only, for loaded() to tell
+        # v0.6.16-beta.4: the inventory rows the last app_identity() read - in memory only, for loaded() to tell
         # another Codex session holding a conversation from anything unknown without reading them again.
         self._rows = []
 
@@ -228,7 +228,7 @@ class Backend:
             # ACQUIRE the app's own exclusive lock and could make the app's try_lock fail.
             if users == [expected] and self.app_identity() == app_identity:
                 return "loaded"
-            # v0.6.15-beta.3: one holder that is another Codex session - a terminal's TUI or VS Code's server
+            # v0.6.16-beta.4: one holder that is another Codex session - a terminal's TUI or VS Code's server
             # (pairing.session_kind), with the app identity still the same - is "elsewhere": it waits with its
             # own reason, and nothing is sent. Anything else fails closed, as always.
             if (len(users) == 1 and users != [expected] and self.app_identity() == app_identity

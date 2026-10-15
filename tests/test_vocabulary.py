@@ -69,7 +69,7 @@ LISTS = {
     # took up (P17) that nothing takes up now, and one taken up a day ago; and capacity_window, capacity
     # retries past their twelve hours on the clock.
     # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
-    # v0.6.15-beta.3: held_by_other_session - open in a terminal's or VS Code's Codex session.
+    # v0.6.16-beta.4: held_by_other_session - open in a terminal's or VS Code's Codex session.
     "machine.REASONS": ("set", 75, "13fd39ec1495fdbf"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
@@ -91,7 +91,7 @@ LISTS = {
     # and `resend`, submission_safe passed for an uncertain submission sent once more (engine/resend.py),
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
     # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
-    # v0.6.15-beta.3: and held_by_other_session.
+    # v0.6.16-beta.4: and held_by_other_session.
     "machine.GATE_REASONS": ("set", 92, "d8674e27ded3617b"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
@@ -191,12 +191,12 @@ LISTS = {
     "ui.popup.ATTENTION_OVERLAYS": ("set", 4, "a707a2b300127033"),
     # v0.6.11: and the needs-you notice's light, attention; and a long sleep's, paused (power.py).
     # and Show me what happens' card, waiting.
-    "notifier.NOTICE_STATUS": ("dict", 12, "ccfbc4aee6adaf58"),
+    "notifier.NOTICE_STATUS": ("dict", 13, "0119f51b8b7710c8"),   # v0.6.16-beta.3: near_limit
     # v0.6.12: the power action's five notices follow them, in a table of their own (PowerNotice), and the
     # whole table is both.
     "notifier.POWER_STATUS": ("dict", 5, "d403490eeafa7732"),
     "notifier.POWER_EVENTS": ("tuple", 5, "e5a05bae37eb8e45"),
-    "notifier.STATUS": ("dict", 17, "2ec8a9e6e4566ab5"),
+    "notifier.STATUS": ("dict", 18, "a034163f3da8091a"),
     "mcpserver.Server.START_WORDING": ("dict", 4, "f15e04a780f57870"),
     # v0.6.11: the two editions, and the plug that is the whole difference between them.
     "edition.EDITIONS": ("tuple", 2, "49cc206af3867704"),
@@ -209,13 +209,14 @@ LISTS = {
     # and EARLY, P7's look at a usage-limited record before its time; and the form a failure's error took.
     # And RESEND, P7's word for an uncertain submission sent once more, which core proves may go, and
     # SEND_NOW, its word for a waiting record a person asked to send now.
-    "domain.plug.POINTS": ("tuple", 16, "07e8ae14d7f49978"),
+    "domain.plug.POINTS": ("tuple", 17, "8a5a44aaca6902c5"),   # v0.6.16-beta.3: P19 eligibility
     "domain.plug.ANSWERS": ("set", 13, "dcf766b4e83e21eb"),
     "domain.plug.FAILURE_FORMS": ("tuple", 5, "bcc0ad1bd6f81009"),
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
     # v0.6.14: what core did with a record of the plug's own (P2), as P14 tells it.
     "domain.plug.RECORD_MOVES": ("tuple", 10, "b4dae164afc55dd3"),
-    "domain.plug.RECORD_PURPOSES": ("tuple", 2, "d9b26e6afdae8bdb"),
+    "domain.plug.RECORD_PURPOSES": ("tuple", 3, "43433c43e9c5b2be"),   # v0.6.16-beta.3: wrap_up
+    "domain.plughands.WIDENINGS": ("tuple", 1, "dc457abadb3a5b04"),   # v0.6.16-beta.3: P19's answer
     "domain.plug.EXTRA": "advanced",
 }
 
@@ -225,7 +226,7 @@ RETURNED = {
     ("Backend.send", "outcome"): {"accepted", "not_started", "unknown"},
     ("Backend.send", "error_code"): {"queue_preflight_failed", "queue_consent_refused", "queue_spawn_failed",
                                      "queue_response_unconfirmed", "queue_timeout", "queue_result_unknown"},
-    # v0.6.15-beta.3: elsewhere - another Codex session (a terminal or VS Code) holds it.
+    # v0.6.16-beta.4: elsewhere - another Codex session (a terminal or VS Code) holds it.
     ("Backend.loaded", None): {"loaded", "notLoaded", "unknown", "elsewhere"},
     ("WatcherMixin.start_watcher", "state"): {"already-running"},
     ("await_watcher", "state"): {"running", "exited", "unconfirmed"},
@@ -401,6 +402,7 @@ HOMES = {
     p.FailureForm: ("list", "domain.plug.FAILURE_FORMS"),
     p.RecordMove: ("list", "domain.plug.RECORD_MOVES"),
     p.RecordPurpose: ("list", "domain.plug.RECORD_PURPOSES"),
+    p.Widening: ("list", "domain.plughands.WIDENINGS"),
     # v0.6.12: the power action's own words, beside domain/vocabulary.py at its line budget.
     pw.PowerAction: ("list", "poweraction.ACTIONS"),
     pw.PowerAfter: ("list", "poweraction.AFTERS"),

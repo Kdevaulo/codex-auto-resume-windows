@@ -14,7 +14,7 @@ import re
 import sys
 
 from . import machine
-from .domain import ids
+from .domain import ids, skips
 
 LOGGER_NAME = "codex_auto_resume"
 MAX_BYTES = 1_000_000
@@ -74,6 +74,10 @@ _MESSAGES = {
     ("loaded", None): "loaded",
     ("queue_submission_started", None): "reserved interruption; submitting continuation via codex queue",
     ("continuation_submitted", None): "continuation submitted",
+    # v0.6.16-beta.3: the words for this time a person added for one waiting recovery (oncewords.py) - never the words.
+    ("once_words_sent", None): "the words for this time go with this continuation, and are deleted",
+    ("once_words_kept", None): "the words for this time could not be taken off; this continuation goes without them",
+    ("once_words_unavailable", None): "the words for this time could not be checked; nothing is deleted",
     ("resume_confirmed", None): "resume confirmed",
     ("waiting_reset", None): "waiting for reset",
     ("waiting_poll", None): "waiting (no reset timestamp; conservative polling)",
@@ -139,7 +143,40 @@ _MESSAGES = {
     ("power_now", None): "power action now: {reason}",
     ("power_failed", None): "Windows refused the power action (error {detail})",
     ("power_file_invalid", None): "power-action.json cannot be read as written; treated as off",
+    # v0.6.16-beta.3 (issue #27): how many failed turns a check saw, said when the number changes, and that
+    # automatic recovery is off, said once each time it is found off (engine/detect.py).
+    ("failed_turns_seen", None): "{detail} failed turn(s) seen since the look-back window opened",
+    (skips.RECOVERY_OFF, None): "automatic recovery is off; no failed turn is taken up until it is on again",
+    ("not_taken_up_more", None): "{detail} more failed turns were not taken up; the Diagnostics check says why for each",
 }
+
+# v0.6.16-beta.3 (issue #27): why a failed turn was not taken up, said once per turn and reason
+# (engine/detect.py). Codes, ids and a kind word Codex uses (skips.kind) only.
+SKIPPED = "not_taken_up"
+SKIP_WORDS = {
+    skips.BEFORE_WINDOW: "it completed before the look-back window (automatic recovery turned on, minus the look-back)",
+    skips.NEWER_TURN: "a newer turn came after it in its conversation",
+    skips.OTHER_KIND: "its conversation is not a desktop conversation of a person's own",
+    skips.UNKNOWN_CONVERSATION: "Codex knows no conversation by its id",
+    skips.CONTINUED_ELSEWHERE: "its conversation goes on under another id",
+    skips.NOT_RECOVERED: "it is not a kind of failure this recovers",
+    skips.CATEGORY_OFF: "recovery of this kind is turned off in Settings",
+    skips.CONVERSATION_OFF: "recovery is turned off for its conversation",
+    skips.RECOVERY_OFF: "automatic recovery is off",
+}
+# The line `skipped` writes, as the Diagnostics check reads it back (checkup.py).
+SKIP_LINE = re.compile(r"(?:thread (?P<thread>\S+): )?failed turn (?P<turn>\S+) not taken up \((?P<reason>[a-z_]+)"
+                       r"(?:: (?P<kind>[A-Za-z0-9_. -]{1,48}))?\)")
+
+
+def skipped(thread_id, turn_id, reason, kind=None) -> str:
+    """The one line for a failed turn not taken up: its conversation, the turn, the reason's code and words."""
+    if reason not in SKIP_WORDS:
+        reason = skips.UNKNOWN_CONVERSATION if reason is None else "other"
+    turn = turn_id if ids.is_uuid(turn_id) else "?"
+    said = reason + (": " + kind if isinstance(kind, str) and re.fullmatch(r"[A-Za-z0-9_. -]{1,48}", kind) else "")
+    prefix = "thread " + thread_id + ": " if ids.is_uuid(thread_id) else ""
+    return "%sfailed turn %s not taken up (%s): %s" % (prefix, turn, said, SKIP_WORDS.get(reason, "unspecified"))
 
 
 def _safe_detail(detail) -> str:
@@ -193,9 +230,37 @@ class EngineLog:
 
     def __init__(self, logger: logging.Logger):
         self.logger = logger
+        self._said = None          # the (turn, reason) pairs the log already holds a skip line for
+
+    # v0.6.16-beta.3: how much of the log is read back, once, for the skip lines a watcher before this one wrote.
+    SAID_BYTES = 2 * 1024 * 1024
+
+    def _already_said(self) -> set:
+        """The (turn, reason) of every skip line in the end of the log files this logger writes, read once: so a
+        watcher started again does not say again what the one before it said (engine/detect.py)."""
+        if self._said is None:
+            self._said = set()
+            for handler in self.logger.handlers:
+                name = getattr(handler, "baseFilename", None)
+                for path in ([Path(name + ".1"), Path(name)] if name else []):
+                    try:
+                        with path.open("rb") as stream:
+                            stream.seek(max(0, stream.seek(0, 2) - self.SAID_BYTES))
+                            text = stream.read().decode("utf-8", errors="replace")
+                    except OSError:
+                        continue
+                    for found in SKIP_LINE.finditer(text):
+                        self._said.add((found.group("turn"), found.group("reason")))
+        return self._said
 
     def __call__(self, thread_id, code, detail=None):
         # Engine transitions call log(thread, state, reason); events call log(thread, code, detail).
+        if code == SKIPPED and isinstance(detail, tuple) and len(detail) == 3:
+            said = self._already_said()
+            if (detail[0], detail[1]) not in said:
+                said.add((detail[0], detail[1]))
+                self.logger.info(skipped(thread_id, *detail))
+            return
         reason = None
         if code in STATE_CODES:
             reason, detail = (detail if isinstance(detail, str) else None), None

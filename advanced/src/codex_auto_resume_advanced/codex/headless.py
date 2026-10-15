@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""One turn of a conversation nothing holds, run here on our own app server, every approval declined (v0.6.15-beta.3).
+"""One turn of a conversation nothing holds, run here on our own app server, every approval declined (v0.6.16-beta.4).
 
 The standard edition waits for the Codex app to hold a conversation before anything is sent there (A11), and only
 through `codex queue` (A2). A route of this module (`HeadlessRun`) is what core calls instead, at P16, for a record

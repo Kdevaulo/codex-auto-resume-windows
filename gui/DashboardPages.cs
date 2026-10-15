@@ -687,7 +687,10 @@ namespace CodexAutoResume
                 stopButton,
                 MakeButton(S("action.search_logs", "Search the log..."), false, delegate { OpenLogSearch(); }),
                 demoButton,
-                versionsButton })
+                versionsButton,
+                // v0.6.16-beta.3, last, so no button before it moves: why a failure was not taken up (issue #27).
+                MakeButton(S("action.detection_check", "Check why a failure was not taken up..."), false,
+                           delegate { OpenDetectionCheck(); }) })
             {
                 button.Margin = Pad(0, 0, 0, 9);
                 tools.Controls.Add(button);

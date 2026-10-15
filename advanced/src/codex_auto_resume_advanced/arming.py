@@ -276,14 +276,46 @@ def _view_of(paths):
     return compatio.reader_view(paths, settings=settings.load(paths.settings_file))
 
 
+def _live_view_of(paths):
+    """A fresh check of the Codex on this machine, made here and written nowhere (compatio.live_view):
+    what a reader with no watcher to ask sees. Bound to the engine the settings name, as `_view_of` is."""
+    import os
+    from codex_auto_resume import compatio, config, settings
+    explicit = settings.load(paths.settings_file).get("codex_exe") or os.environ.get(config.ENV_CODEX_EXE) or None
+    return compatio.live_view(paths, config.codex_home(), explicit=explicit)
+
+
+def held_word(definition, row, state, change, held, policy) -> str | None:
+    """Why `definition`, stored on or watched in `row`, does not stand on now (`standing`'s answer
+    `state`, `change` and `held`), as one short word - or None where it stands on, or is stored off.
+    The word is the reason a turn off was written for, the warning that holds it back, "policy" where
+    an administrator's policy reads it down, or "watched"."""
+    if (row or {}).get("state", ArmingState.OFF) == ArmingState.OFF or state == ArmingState.ARMED:
+        return None
+    if change is not None:
+        return str(change)
+    if held is not None:
+        return str(held)
+    if not policy.admits(definition.id):
+        return "policy"
+    return "watched" if state == ArmingState.SHADOW else "off"
+
+
 class Arming:
     def __init__(self, state, *, catalogs=CATALOGS, policy=None, view=None, measured=None,
-                 clock=time.time):
+                 clock=time.time, live=None):
         self.state = state
         self.registry = state.registry
         self.catalogs = catalogs
         self._policy = policy or _policy.read
         self._view = view or (lambda: _view_of(state.paths))
+        # A fresh check of the Codex here, for a reading that cannot wait for a watcher (`read`'s
+        # `live`): by default only where the view is this machine's own, so a view handed in - a
+        # test's - is never joined by a real check.
+        self._live = live if live is not None else (None if view else (lambda: _live_view_of(state.paths)))
+        # {capability: why it does not stand on now} as the last read that worked found it, for one
+        # stored on or watched (`held_word`); empty until a read.
+        self.why = {}
         self._measured = measured or (lambda: MEASURED)
         self.clock = clock
         # {record: (when core told of its move into submission_unknown, when the send that went
@@ -305,6 +337,17 @@ class Arming:
         and no Codex version - both warnings, never permission for anything unconfirmed."""
         try:
             found = self._view()
+        except Exception:
+            return {}
+        return found if isinstance(found, dict) else {}
+
+    def live_view(self) -> dict:
+        """A fresh check of the Codex here (`_live_view_of`), or {} - UNKNOWN for everything - where
+        there is none to make or it cannot be made."""
+        if self._live is None:
+            return {}
+        try:
+            found = self._live()
         except Exception:
             return {}
         return found if isinstance(found, dict) else {}
@@ -343,11 +386,19 @@ class Arming:
         reads. A capability that is off is off whatever any of those say."""
         return self.read(view=view, policy=policy)[0]
 
-    def read(self, *, view=None, policy=None) -> tuple:
+    def read(self, *, view=None, policy=None, live=()) -> tuple:
         """`current`, with what the runtime needs beside it (v0.6.14): ({id: state now}, {id: since
         when its stored state has stood, for one that is not off}, whether the state could not be
         read). A state that cannot be read has every capability off; the third says it was not read
-        as off, which is not the same thing for a record a capability took up (runtime.py)."""
+        as off, which is not the same thing for a record a capability took up (runtime.py).
+
+        `live` (v0.6.16-beta.3, issue #31): the capabilities whose reading cannot wait for a watcher.
+        Where one of them is stored on or watched and the watcher's report cannot be used - stale,
+        absent, or no longer bound to the Codex on disk, as it is whenever no watcher has run for a
+        while - Codex is checked here instead (`live_view`), so start with Codex, which exists to
+        start that watcher, is not held back for the want of a report only a running watcher
+        writes. The check decides as the report would: an unknown or changed Codex still holds the
+        capability back or turns it off."""
         if not len(self.registry):
             return {}, {}, False
         try:
@@ -357,20 +408,56 @@ class Arming:
         since = {capability: row.get("since") for capability, row in rows.items()
                  if (row or {}).get("state", ArmingState.OFF) != ArmingState.OFF}
         if not since:
+            if not failed:
+                self.why = {}
             return {definition.id: ArmingState.OFF for definition in self.registry}, {}, failed
-        view = self.view() if view is None else view
+        if view is None:
+            view = self.view()
+            if any(capability in since for capability in live) and view.get("status") != "ok":
+                view = self.live_view() or view
         policy = self.policy() if policy is None else policy
         measured = self.measured()
-        states = {}
+        states, why = {}, {}
         for definition in self.registry:
-            state, change, _held, notice = standing(definition, rows.get(definition.id), policy, view,
-                                                    measured)
+            row = rows.get(definition.id)
+            state, change, held, notice = standing(definition, row, policy, view, measured)
             if change is not None:
                 self._off(definition.id, change)
-            elif notice is not None and _rises((rows.get(definition.id) or {}).get("reason"), notice):
+            elif notice is not None and _rises((row or {}).get("reason"), notice):
                 self._keep(definition.id, notice)
             states[definition.id] = state
+            word = held_word(definition, row, state, change, held, policy)
+            if word is not None:
+                why[definition.id] = word
+        self._require_met(states, rows)
+        if not failed:
+            self.why = why
         return states, since, failed
+
+    def _require_met(self, states, rows) -> None:
+        """Read down every capability ON (ARMED) whose requirement is not ARMED now (v0.6.16-beta.3,
+        registry.CapabilityDef.requires): a capability is only as on as what it needs. Watching one needs
+        nothing - a watched capability never acts - so only an armed dependent is read down. The requirement
+        may itself have been read down this pass - off, watched, a policy, a Failed-here tripwire - so this
+        runs to a fixpoint, a dependent tripped becoming a requirement another is read down for. Not kept on,
+        it is turned off with REQUIREMENT_OFF; kept on (K8), it is noted and stays where it stands, as every
+        other tripwire is under Keep on."""
+        changed = True
+        while changed:
+            changed = False
+            for definition in self.registry:
+                if not definition.requires or states.get(definition.id, ArmingState.OFF) != ArmingState.ARMED:
+                    continue
+                if all(states.get(other) == ArmingState.ARMED for other in definition.requires):
+                    continue
+                row = rows.get(definition.id) or {}
+                if row.get("keep_on"):
+                    if _rises(row.get("reason"), OffReason.REQUIREMENT_OFF):
+                        self._keep(definition.id, OffReason.REQUIREMENT_OFF)
+                    continue
+                self._off(definition.id, OffReason.REQUIREMENT_OFF)
+                states[definition.id] = ArmingState.OFF
+                changed = True
 
     def _off(self, capability, reason) -> bool:
         try:
@@ -499,7 +586,8 @@ class Arming:
         try:
             rules = self.state.reset_rules()
             for rule in rules:
-                if states.get(rule["capability"], ArmingState.OFF) == ArmingState.ARMED:
+                # v0.6.16-beta.3: a watched one keeps its rules (state/arming.py); read down to off, they end.
+                if states.get(rule["capability"], ArmingState.OFF) != ArmingState.OFF:
                     continue
                 if rule["launching_at"] is not None or rule["record_state"] == RecordState.IN_FLIGHT:
                     continue
@@ -509,7 +597,7 @@ class Arming:
                 self.state.set_reading(credits=None, expiry_known=None, nearest_expiry=None)
             # v0.6.15-beta: every queued prompt not in Codex's queue while prompt_queue does not stand on, and every
             # continuation still waiting of one that does not stand on (state/continuations).
-            if states.get("prompt_queue", ArmingState.OFF) != ArmingState.ARMED:
+            if states.get("prompt_queue", ArmingState.OFF) == ArmingState.OFF:
                 self.state.end_prompts(PromptReason.TURNED_OFF, at=self.clock())
             for row in self.state.continuations(pending=True):
                 if (states.get(row["capability"], ArmingState.OFF) != ArmingState.ARMED
@@ -614,7 +702,7 @@ class Arming:
 
     # ------------------------------------------------------------------ on
     def arm(self, capability, *, state, revision, generation, acknowledged_version=None,
-            warnings=None, actor) -> dict:
+            warnings=None, also=None, actor) -> dict:
         """Move `capability` to watched (SHADOW) or on (ARMED), for a person in the Dashboard.
 
         `warnings` are the words of the statement's warnings the person confirmed (none, when
@@ -622,6 +710,13 @@ class Arming:
         "on". Neither may be what refuses it: when they are not what holds now, the request is
         refused as a stale confirmation, and the warnings that hold now go back with it for the
         Dashboard to show.
+
+        `also` (v0.6.16-beta.3) is the confirmations for the capability's requirements that are not on
+        now, each {"capability", "revision", "warnings", "engine_version"} - turning `capability` ON turns
+        them on in the same confirmation (registry.CapabilityDef.requires). It must carry exactly the
+        requirements that are off, each confirmed as the capability itself is; a policy on any of them
+        refuses the whole, so a required one an administrator forbids keeps the dependent off. Only for an
+        ARMED request: watching needs no requirement, so `also` must be empty for SHADOW.
 
         {"done": bool, "refusal": Refusal or None, "warnings": the warnings that hold now, once
         read, "generation": the generation after}."""
@@ -639,31 +734,96 @@ class Arming:
         confirmed = _confirmed(warnings)
         if (state not in (ArmingState.SHADOW, ArmingState.ARMED) or type(revision) is not int
                 or type(generation) is not int or confirmed is None
-                or not (acknowledged_version is None or isinstance(acknowledged_version, str))):
+                or not (acknowledged_version is None or isinstance(acknowledged_version, str))
+                or not (also is None or isinstance(also, (list, tuple)))):
             return refused(Refusal.INVALID_REQUEST)
-        # The administrator's word, and the only thing that refuses a capability itself.
-        policy = self.policy()
-        if policy.forbid:
-            return refused(Refusal.FORBIDDEN_BY_POLICY)
-        if not policy.admits(definition.id):
-            return refused(Refusal.NOT_ALLOWED_BY_POLICY)
-        if state == ArmingState.ARMED and policy.force_shadow:
-            return refused(Refusal.SHADOW_FORCED_BY_POLICY)
-        # What the person read and confirmed has to be what holds now.
-        if revision != definition.revision:
-            return refused(Refusal.STALE_REVISION)
-        if not self.catalogs.complete_in(definition, "en"):
-            return refused(Refusal.STATEMENT_INCOMPLETE)
         view = self.view()
-        shown = self.warnings(definition, view)
-        if confirmed != frozenset(shown) or (state == ArmingState.ARMED
-                                             and acknowledged_version != engine_version(view)):
-            return refused(Refusal.STALE_CONFIRMATION)
+
+        def check(target, target_revision, target_confirmed, target_version):
+            """A policy refusal for `target`, or STALE_* where its confirmation is not what holds now, or
+            None where it may be armed. The main capability and each requirement are checked the same way."""
+            if policy.forbid:
+                return Refusal.FORBIDDEN_BY_POLICY
+            if not policy.admits(target.id):
+                return Refusal.NOT_ALLOWED_BY_POLICY
+            if policy.force_shadow:
+                return Refusal.SHADOW_FORCED_BY_POLICY
+            if target_revision != target.revision:
+                return Refusal.STALE_REVISION
+            if not self.catalogs.complete_in(target, "en"):
+                return Refusal.STATEMENT_INCOMPLETE
+            if (target_confirmed != frozenset(self.warnings(target, view))
+                    or target_version != engine_version(view)):
+                return Refusal.STALE_CONFIRMATION
+            return None
+
+        policy = self.policy()
+        # Watching needs no requirement and forces none on: the single move, as before.
+        if state == ArmingState.SHADOW:
+            if also:
+                return refused(Refusal.INVALID_REQUEST)
+            if policy.forbid:
+                return refused(Refusal.FORBIDDEN_BY_POLICY)
+            if not policy.admits(definition.id):
+                return refused(Refusal.NOT_ALLOWED_BY_POLICY)
+            if revision != definition.revision:
+                return refused(Refusal.STALE_REVISION)
+            if not self.catalogs.complete_in(definition, "en"):
+                return refused(Refusal.STATEMENT_INCOMPLETE)
+            shown = self.warnings(definition, view)
+            if confirmed != frozenset(shown):
+                return refused(Refusal.STALE_CONFIRMATION)
+            try:
+                _moved, after = self.state.move(capability, ArmingState.SHADOW, actor=actor, revision=revision,
+                                                engine_version=None, warnings=shown, generation=generation,
+                                                at=self.clock())
+            except StaleGeneration:
+                return refused(Refusal.STALE_GENERATION)
+            except StateError:
+                return refused(Refusal.STATE_UNAVAILABLE)
+            return {"done": True, "refusal": None, "warnings": [str(word) for word in shown], "generation": after}
+
+        # Turning it on. Every requirement that is not ARMED now is turned on with it, one confirmation.
         try:
-            _moved, after = self.state.move(
-                capability, state, actor=actor, revision=revision,
-                engine_version=acknowledged_version if state == ArmingState.ARMED else None,
-                warnings=shown, generation=generation, at=self.clock())
+            states = self.current(view=view, policy=policy)
+        except StateError:
+            return refused(Refusal.STATE_UNAVAILABLE)
+        # A requirement graded Failed here keeps the dependent off, as a policy on it does: no confirmation turns it on.
+        for other in self.registry.requires(capability):
+            other_def = self.registry.get(other)
+            if other_def is not None and ArmingWarning.FAILED_HERE in self.warnings(other_def, view):
+                return refused(Refusal.REQUIREMENT_FAILED_HERE)
+        needed = [other for other in self.registry.requires(capability)
+                  if states.get(other, ArmingState.OFF) != ArmingState.ARMED]
+        entries = {}
+        for entry in (also or ()):
+            if not isinstance(entry, dict):
+                return refused(Refusal.INVALID_REQUEST)
+            entries[entry.get("capability")] = entry
+        if set(entries) != set(needed):
+            return refused(Refusal.REQUIREMENT_REFUSED)
+
+        reason = check(definition, revision, confirmed, acknowledged_version)
+        shown = self.warnings(definition, view)
+        if reason is not None:
+            return refused(reason)
+        moves = [(capability, ArmingState.ARMED, revision, acknowledged_version, shown)]
+        for other in needed:
+            other_def = self.registry.get(other)
+            entry = entries[other]
+            other_confirmed = _confirmed(entry.get("warnings"))
+            other_revision, other_version = entry.get("revision"), entry.get("engine_version")
+            if (other_def is None or type(other_revision) is not int or other_confirmed is None
+                    or not (other_version is None or isinstance(other_version, str))):
+                return refused(Refusal.REQUIREMENT_REFUSED)
+            reason = check(other_def, other_revision, other_confirmed, other_version)
+            if reason is not None:
+                # A policy on the required one keeps the dependent off; a stale confirmation can be asked again.
+                return refused(reason)
+            moves.append((other, ArmingState.ARMED, other_revision, other_version,
+                          self.warnings(other_def, view)))
+        try:
+            _written, after = self.state.move_set(moves, actor=actor, generation=generation, at=self.clock())
         except StaleGeneration:
             return refused(Refusal.STALE_GENERATION)
         except StateError:
@@ -679,17 +839,29 @@ class Arming:
 
     # ------------------------------------------------------------------ off
     def disarm(self, capability, *, actor) -> dict:
-        """One capability off, from any surface. Needs nothing, and always wins."""
+        """One capability off, from any surface. Needs nothing, and always wins.
+
+        What requires this one (registry.required_by) and is on or watched now is turned off first, named
+        first in `also_off` (v0.6.16-beta.3): turning a required one off turns off what requires it, before
+        it goes itself - so nothing is left on for a tick with a requirement already gone."""
         if actor not in SURFACES:
-            return {"done": False, "refusal": Refusal.INVALID_REQUEST, "changed": False}
+            return {"done": False, "refusal": Refusal.INVALID_REQUEST, "changed": False, "also_off": []}
         if self.registry.get(capability) is None:
-            return {"done": False, "refusal": Refusal.UNKNOWN_CAPABILITY, "changed": False}
+            return {"done": False, "refusal": Refusal.UNKNOWN_CAPABILITY, "changed": False, "also_off": []}
+        also_off = []
         try:
+            states = self.current()
+            for dependent in self.registry.required_by(capability):
+                if states.get(dependent, ArmingState.OFF) != ArmingState.OFF:
+                    turned, _after = self.state.move(dependent, ArmingState.OFF, actor=actor,
+                                                     reason=OffReason.REQUIREMENT_OFF, at=self.clock())
+                    if turned:
+                        also_off.append(dependent)
             changed, _after = self.state.move(capability, ArmingState.OFF, actor=actor,
                                               reason=OffReason.DISARMED, at=self.clock())
         except StateError:
-            return {"done": False, "refusal": Refusal.STATE_UNAVAILABLE, "changed": False}
-        return {"done": True, "refusal": None, "changed": changed}
+            return {"done": False, "refusal": Refusal.STATE_UNAVAILABLE, "changed": False, "also_off": also_off}
+        return {"done": True, "refusal": None, "changed": changed, "also_off": also_off}
 
     def all_off(self, *, actor) -> dict:
         """"All advanced features off": every capability, at once, from any surface."""
@@ -909,6 +1081,11 @@ class Arming:
                 "warnings": [str(word) for word in self.warnings(definition, view)],
                 "confirmed_warnings": [str(word) for word in row.get("warnings") or ()],
                 "kind": str(definition.kind),
+                # What it needs on (v0.6.16-beta.3): the ids it requires, and those of them not ARMED now,
+                # which turning it on must also turn on (surfaces.arm's `also`).
+                "requires": list(definition.requires),
+                "requires_off": [other for other in self.registry.requires(definition.id)
+                                 if states.get(other, ArmingState.OFF) != ArmingState.ARMED],
                 "departs_from": departs(definition, row), "compat": definition.compat,
                 "measurements": [str(measurement) for measurement in definition.measurements],
                 "points": sorted(str(point) for point in definition.points),

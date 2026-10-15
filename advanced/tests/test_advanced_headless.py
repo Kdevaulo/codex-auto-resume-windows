@@ -1,4 +1,4 @@
-"""One turn of a conversation nothing holds, run here, every approval declined, always let go (v0.6.15-beta.3,
+"""One turn of a conversation nothing holds, run here, every approval declined, always let go (v0.6.16-beta.4,
 codex/headless.py).
 
 Every session is a fake app server of the test's own; nothing here opens a real Codex. The follower runs on its

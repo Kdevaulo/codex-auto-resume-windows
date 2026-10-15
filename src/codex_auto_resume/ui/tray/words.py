@@ -5,7 +5,7 @@ the notification card, so that "3m 20s" is spelled one way wherever this product
 """
 from __future__ import annotations
 
-from ..words import countdown  # noqa: F401
+from ..words import countdown, share, window_name  # noqa: F401
 
 
 TIP_CHARS = 128
@@ -42,4 +42,34 @@ def tooltip(snapshot: dict, strings: dict, now: float, edition: str | None = Non
                 parts.append(strings.get("tray.next", "next check in {time}")
                              .replace("{time}", countdown(due - now)))
         line = " · ".join(parts) if parts else strings.get("tray.idle", "Nothing waiting")
-    return (title + "\n" + line)[:TIP_CHARS - 1]
+    meter = meter_line(snapshot, strings)
+    return (title + "\n" + line + ("\n" + meter if meter else ""))[:TIP_CHARS - 1]
+
+
+# The key a surface puts an edition plug's fields under - domain/plug.EXTRA, which
+# tests/test_usage_surfaces.py holds this to: the icon reads that one key and imports nothing of the plug's.
+EXTRA = "advanced"
+# The words a meter line is said in where the catalog has none (the catalog's own English).
+_USAGE_WORDS = {"usage.window": "{window} {percent}%", "usage.weekly": "weekly", "usage.days": "{n}-day",
+                "usage.hours": "{n}-hour", "usage.minutes": "{n}-minute", "usage.limit": "limit"}
+
+
+def meter_line(snapshot, strings) -> str | None:
+    """The advanced edition's usage meter as one line (v0.6.16-beta.3, issue #29): each window it last read, its
+    length and its share - "5-hour 87% · weekly 40%". Only from what the edition's plug added under its one key; the
+    standard edition adds nothing there, so its tooltip is what it always was. None where there is nothing to say."""
+    added = snapshot.get(EXTRA) if isinstance(snapshot, dict) else None
+    meter = added.get("meter") if isinstance(added, dict) else None
+    windows = meter.get("windows") if isinstance(meter, dict) else None
+    if not isinstance(windows, list):
+        return None
+
+    def say(key, **fields):
+        text = strings.get(key) or _USAGE_WORDS.get(key, key)
+        for name, value in fields.items():
+            text = text.replace("{%s}" % name, str(value))
+        return text
+    parts = [say("usage.window", window=window_name(window.get("window_minutes"), say), percent=share(window))
+             for window in windows if isinstance(window, dict)
+             and type(window.get("used_percent")) in (int, float)]
+    return " · ".join(parts) or None

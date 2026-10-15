@@ -1,4 +1,4 @@
-"""P16's TO_SESSION (v0.6.15-beta.3): a conversation another Codex session holds - a terminal's TUI, VS Code's server
+"""P16's TO_SESSION (v0.6.16-beta.4): a conversation another Codex session holds - a terminal's TUI, VS Code's server
 - is sent the ordinary continuation through `codex queue` where the plug says so, and taken back when that session
 lets go of it or does not take it in time; and none of it stores a word an older schema-5 reader refuses.
 

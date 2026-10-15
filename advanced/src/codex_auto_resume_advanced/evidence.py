@@ -43,7 +43,7 @@ CLOSED_WORDS = (frozenset(str(word) for word in machine.TURN_STATUSES)
                 | frozenset(str(word) for word in failures.CATEGORIES)
                 | frozenset(str(word) for word in Verdict)
                 | frozenset(str(word) for word in SpendOutcome)
-                # v0.6.15-beta.3: and the stage-4 measurements' own (vocabulary.ObservedWord).
+                # v0.6.16-beta.4: and the stage-4 measurements' own (vocabulary.ObservedWord).
                 | frozenset(str(word) for word in ObservedWord))
 
 

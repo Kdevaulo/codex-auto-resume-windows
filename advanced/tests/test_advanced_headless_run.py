@@ -1,4 +1,4 @@
-"""Run a conversation here while Codex is closed (v0.6.15-beta.3): the shipped capability against core's own engine,
+"""Run a conversation here while Codex is closed (v0.6.16-beta.4): the shipped capability against core's own engine,
 store and simulated Codex home (takingcase.py), its route's session a fake app server that runs the turn in that
 home, as our own server would.
 """

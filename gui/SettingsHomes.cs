@@ -42,17 +42,22 @@ namespace CodexAutoResume
             homesRows.ColumnCount = 1;
             homesRows.Dock = DockStyle.Top;
             homesRows.Margin = Pad(0, 2, 0, 2);
+            // On the card's own ground, as everything else on a card is (issue #34: a plain table drew a grey band).
+            homesRows.BackColor = Palette.Card;
             homesCard.Controls.Add(homesRows);
             homesWarning = HelpText("");
             homesCard.Controls.Add(homesWarning);
             homesRefusal = HelpText("");
             homesRefusal.ForeColor = Palette.Danger;
             homesCard.Controls.Add(homesRefusal);
-            FlowLayoutPanel buttons = ButtonRow();
+            // An empty line takes no room until it has something to say (issue #34: a tall gap).
+            ShowLine(homesWarning, "");
+            ShowLine(homesRefusal, "");
+            // On the card itself, as the Tools card's buttons are, not in a page's button row.
             homesAdd = MakeButton(S("homes.add", "Add a Codex home..."), false, delegate { AddHome(); });
-            homesAdd.Margin = Pad(0, 0, 0, 0);
-            buttons.Controls.Add(homesAdd);
-            homesCard.Controls.Add(buttons);
+            homesAdd.Anchor = AnchorStyles.Left | AnchorStyles.Top;
+            homesAdd.Margin = Pad(0, 6, 0, 0);
+            homesCard.Controls.Add(homesAdd);
             ShowHomes();
         }
 
@@ -93,18 +98,31 @@ namespace CodexAutoResume
             foreach (var home in homesShown)
             {
                 bool extra = Str(home, "key") != "";
-                var line = HelpText((extra ? Str(home, "alias") : S("homes.default", "Default")) + " · "
-                                    + (Str(home, "path") ?? "") + " · " + HomeStateName(Str(home, "state")));
+                var line = HelpText(HomeLine(extra ? Str(home, "alias") : S("homes.default", "Default"), Str(home, "path"),
+                                             HomeStateName(Str(home, "state"))));
                 line.ForeColor = Ink;
                 homesRows.Controls.Add(line);
                 if (!extra) continue;
                 FlowLayoutPanel actions = ButtonRow();
+                actions.BackColor = Palette.Card;   // the card's ground (issue #34)
+                actions.Dock = DockStyle.None;
+                actions.Padding = Pad(0, 2, 0, 6);
                 string path = Str(home, "path");
                 actions.Controls.Add(MakeButton(S("homes.rename", "Rename..."), false, delegate { RenameHome(path); }));
                 actions.Controls.Add(MakeButton(S("homes.remove", "Remove"), false, delegate { RemoveHome(path); }));
                 homesRows.Controls.Add(actions);
             }
             homesRows.ResumeLayout();
+        }
+
+        /// A home's line: the parts that have text, joined - never "Default ·  · Watched" for a home whose folder the
+        /// status does not name (issue #34).
+        internal static string HomeLine(params string[] parts)
+        {
+            var kept = new List<string>();
+            foreach (string part in parts)
+                if (!string.IsNullOrEmpty(part) && part.Trim().Length > 0) kept.Add(part);
+            return string.Join(" · ", kept.ToArray());
         }
 
         /// What the watcher found of a home, in words (HomeState). Written as tests, not a switch: a switch of this many
@@ -227,7 +245,7 @@ namespace CodexAutoResume
                 area.Margin = Pad(0, 6, 0, 2);
                 area.Font = Font;
                 area.Box.Font = Font;
-                area.Box.Multiline = false;
+                area.OneLine = true;            // issue #34: the line centred, never cut off
                 area.Box.MaxLength = HomeAliasMax;
                 string start = current ?? "";
                 area.Box.Text = start.Length > HomeAliasMax ? start.Substring(0, HomeAliasMax) : start;

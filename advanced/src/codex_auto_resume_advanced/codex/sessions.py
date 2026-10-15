@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Where a conversation came from, and the kind of the newest event its rollout holds, read-only (v0.6.15-beta.3) -
+"""Where a conversation came from, and the kind of the newest event its rollout holds, read-only (v0.6.16-beta.4) -
 for the measurements MO and MC2 alone, never what either says.
 
 MO records which source, originator and holder a terminal's TUI and VS Code's conversations have, so the words the

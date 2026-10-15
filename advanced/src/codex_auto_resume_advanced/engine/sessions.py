@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Other sessions: the conversations of a terminal's Codex CLI and TUI and of VS Code, recovered too (v0.6.15-beta.3,
+"""Other sessions: the conversations of a terminal's Codex CLI and TUI and of VS Code, recovered too (v0.6.16-beta.4,
 P18 and P16).
 
 The standard edition looks at the Codex app's own conversations alone (A15), and waits, with its own reason, while

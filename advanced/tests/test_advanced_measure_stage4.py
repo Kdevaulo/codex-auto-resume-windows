@@ -1,4 +1,4 @@
-"""The nine measurements stage 4 rests on (v0.6.15-beta.3): each probe calls exactly the methods it declared, records
+"""The nine measurements stage 4 rests on (v0.6.16-beta.4): each probe calls exactly the methods it declared, records
 only booleans, counts, buckets and closed words, and MB opens only a scratch Codex home of its own.
 
 Every session is a fake that refuses a method its measurement did not declare, as the real one does; the files MO,

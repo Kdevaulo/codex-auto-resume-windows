@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Another model when one is at capacity (v0.6.15-beta.3, P16 and P8; headless only).
+"""Another model when one is at capacity (v0.6.16-beta.4, P16 and P8; headless only).
 
 Codex's queue carries input only, so a conversation the app holds keeps its model, and nothing here touches one: the
 standard edition retries the same model at its own pace. With this on, for a record of a server error whose failed

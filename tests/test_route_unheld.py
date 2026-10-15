@@ -1,4 +1,4 @@
-"""P16 with the Codex app closed, and a route that carries core's words (v0.6.15-beta.3).
+"""P16 with the Codex app closed, and a route that carries core's words (v0.6.16-beta.4).
 
 Until now core asked P16 only where the app ran and said a conversation was notLoaded; with no app, a record waited
 `desktop_app_unavailable` (A11). From this version, where the plug wants P16 at all, core asks once more: with the app

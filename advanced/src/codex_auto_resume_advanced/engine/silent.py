@@ -1,5 +1,5 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
-"""Continue with no words (v0.6.15-beta.3, P15; headless only).
+"""Continue with no words (v0.6.16-beta.4, P15; headless only).
 
 The standard edition always ends a continuation's words with its marker and proves delivery by finding it (A4), and
 its words are always a shipped template's or the Custom message (A26). With this on, P15 answers SILENT: core carries

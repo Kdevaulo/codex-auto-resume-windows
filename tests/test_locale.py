@@ -333,7 +333,8 @@ class ReachTests(unittest.TestCase):
         # `Windows` and the product's own name are names and stay. Anything else matching
         # is a missed string.
         # Nor does a string that is only placeholders and a percent sign (usage.window, v0.6.11).
-        self.assertEqual(sorted(same), ["group.windows", "tray.title", "usage.window"],
+        # Nor check.held, a conversation's alias and a reason (v0.6.16-beta.3).
+        self.assertEqual(sorted(same), ["check.held", "group.windows", "tray.title", "usage.window"],
                          "these are identical in both languages")
 
 

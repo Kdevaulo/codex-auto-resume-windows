@@ -551,7 +551,8 @@ capability, in plain words.
 **Who turns a capability on, and what turns it off.**
 
 - **Only the Dashboard's bridge turns one on.** Every capability starts off, and entering the
-  edition turns every one off. A capability is turned on, or set to watch first, one at a time and
+  edition turns every one off. A capability is turned on, or set to watch first, one at a time - or
+  turned on together with what it needs, in one confirmation that shows every statement involved - and
   only by a request on the local bridge the Dashboard uses (`controlcli serve`), which must still
   carry what the person has just been shown: the statement revision they read, the generation the
   list was read at - so that nothing turned off since is undone by a request that had not seen it -
@@ -559,7 +560,7 @@ capability, in plain words.
   capabilities off, and no MCP tool turns one on, whatever a client sends
   (`advanced/tests/test_advanced_arming.py`, `advanced/tests/test_advanced_surfaces.py`). The
   Dashboard's **Advanced features** page is what makes that request, sending exactly what it showed
-  (`advanced/tests/test_advanced_page.py`). Like every request on that bridge, it is open to
+  (`advanced/tests/test_advanced_page_arming.py`). Like every request on that bridge, it is open to
   anything running as you; what cannot make it is a model through the plugin's MCP tools. A
   capability watched first journals what it would have done and does nothing, and nothing moves it
   from watched to on but a request of this kind.
