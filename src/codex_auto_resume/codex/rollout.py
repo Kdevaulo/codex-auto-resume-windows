@@ -1,21 +1,25 @@
 """A conversation's rollout file, read no further than this product needs (v0.6.16-beta.3).
 
-Four readings, none of them a statement to a database - codex/history.py keeps every one:
+None of these readings is a statement to a database - codex/history.py keeps every one:
 
     confined       which file a `threads` row's path names, if it is that conversation's in the sessions folder
     session_meta   the file's first line: who the conversation says it is
     continued_id   the id Codex records the conversation's turns under, where it split them
+    earlier        the ids it recorded them under before, by the names of its earlier files
+    named_after    the conversations whose file names an id as theirs, by name
     reset_scan     the rate-limit snapshots just before a usage-limit failure, for the reset hint
 
 The split is Codex's (openai/codex#43422, this project's issue #30): the `threads` row keeps the
 conversation's id A, but its current file is named `..._A_B.jsonl` and its turns are projected under B,
-which has no row of its own. Whether B is taken is history.py's (`_follow`), with every guard; this only
-reads the name.
+which has no row of its own - and a later split names `..._A_C.jsonl` while B's turns stay under B. Its
+turns are every id's, in that order (`SPAN`); whether an id is taken is history.py's (`_chain`), with every
+guard. Only file names are looked at here, never a file's contents.
 """
 from __future__ import annotations
 
 from pathlib import Path
 import re
+import time
 
 from ..domain import ids
 from .paths import _safe_path
@@ -23,6 +27,59 @@ from .payload import _choose_reset
 from .values import MAX_ITEM_BYTES, MAX_META_BYTES, MAX_SCAN_BYTES, _json
 
 UNKNOWN_RESET = {"reset_at": None, "limit_type": "unknown", "uncertain": True}
+# A turn's ordinal across a split conversation: the index of the id it is recorded under (A's own 0, then each
+# split id in order) times SPAN, plus its own rollout ordinal - so a turn of a later id always comes after every
+# turn of an earlier one, whatever Codex numbered it, and a conversation never split reads its ordinals as they are.
+SPAN = 1 << 40
+# The split files of each Codex home by name, looked at again at most every LIST_SECONDS: one listing for every
+# conversation, names only.
+LIST_SECONDS = 60.0
+_SPLITS, _ASKED = {}, set()
+
+
+def _splits(home, fresh=False) -> dict:
+    """{conversation id: ((split id, file), ...) oldest first} for every file under the home's sessions folder
+    named `<id>_<id>.jsonl` - by name only, nothing opened, no link followed; none where it cannot be listed."""
+    key, now = str(home), time.monotonic()
+    held = _SPLITS.get(key)
+    if held is None or fresh or now - held[0] > LIST_SECONDS:
+        found = {}
+        pattern = re.compile(r"(%s)_(%s)\.jsonl\Z" % (ids.uuid_pattern(any_case=True), ids.uuid_pattern(any_case=True)))
+        try:
+            names = sorted((path for path in (Path(home) / "sessions").rglob("*_*.jsonl") if path.is_file()),
+                           key=lambda path: path.name)
+        except OSError:
+            names = []
+        for path in names:
+            match = pattern.search(path.name)
+            if match and continued_id(match.group(1), path.name) == match.group(2):
+                found.setdefault(match.group(1), []).append((match.group(2), path))
+        held = _SPLITS[key] = (now, {owner: tuple(pairs) for owner, pairs in found.items()})
+    return held[1]
+
+
+def earlier(home, thread_id, current) -> tuple:
+    """((id, file), ...): the ids before `current` that `thread_id`'s earlier files name as `<thread_id>_<id>`, oldest
+    first by file name (Codex starts each name with its time)."""
+    pairs = _splits(home).get(thread_id, ())
+    if (str(home), thread_id, current) not in _ASKED and all(pair[0] != current for pair in pairs):
+        if len(_ASKED) > 4096:
+            _ASKED.clear()
+        _ASKED.add((str(home), thread_id, current))              # a split newer than the listing: list again, once
+        pairs = _splits(home, fresh=True).get(thread_id, ())
+    return tuple(pair for pair in pairs if pair[0] != current)
+
+
+def named_after(home, turns_id) -> tuple:
+    """The conversation ids whose files, by name, hold `turns_id`'s turns (`<id>_<turns_id>.jsonl`)."""
+    return tuple(owner for owner, pairs in _splits(home).items() if any(pair[0] == turns_id for pair in pairs))
+
+
+def placed(row, owner, index) -> dict:
+    """A turn's row as its conversation's: `owner`'s id, and its ordinal across the split (SPAN) - itself for a
+    conversation never split, where `index` is 0."""
+    ordinal = row["rollout_ordinal"]
+    return dict(row, thread_id=owner, rollout_ordinal=index * SPAN + ordinal if type(ordinal) is int else ordinal)
 
 
 def confined(home, thread_id, raw):

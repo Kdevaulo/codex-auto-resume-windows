@@ -22,7 +22,7 @@ if _HERE not in sys.path:
 
 import codexsim  # noqa: E402
 from codexsim import BASE, RESET, new_id  # noqa: E402
-from codex_auto_resume.codex import LocalSource  # noqa: E402
+from codex_auto_resume.codex import LocalSource, rollout  # noqa: E402
 from codex_auto_resume.domain import ids  # noqa: E402
 from test_engine import Harness  # noqa: E402
 
@@ -44,7 +44,9 @@ class SplitHome(codexsim.CodexHome):
         owner = self.split.get(thread_id)
         if owner is None:
             return super().rollout(thread_id)
-        return self.root / "sessions" / ("rollout-2026-10-14T12-00-00-%s_%s.jsonl" % (owner, thread_id))
+        # Codex starts each file's name with its time, so a later split's name sorts after an earlier one's.
+        return self.root / "sessions" / ("rollout-2026-10-14T12-00-%02d-%s_%s.jsonl"
+                                         % (list(self.split).index(thread_id), owner, thread_id))
 
     def add_thread(self, thread_id, **kwargs):
         if thread_id in self.split:
@@ -216,6 +218,60 @@ class SplitReadTests(SplitCase):
         self.assertFalse(self.source.activity((A,), BASE)["history"])
 
 
+class Restarted(SplitHome):
+    """Each split's ordinals start again (the reviewer's collision case): a later id's turns are later anyway."""
+
+    def next_ordinal(self, thread_id):
+        return codexsim.CodexHome.next_ordinal(self, self._to(thread_id))
+
+
+class SecondSplitTests(SplitCase):
+    """A -> B, then A -> C before C has a turn: the conversation's turns are A's, B's and C's, in that order."""
+
+    def forget(self):
+        """As a watcher started afresh knows it: nothing remembered of the names it listed."""
+        rollout._SPLITS.clear()
+        rollout._ASKED.clear()
+
+    def test_an_old_failure_never_comes_back_while_the_newest_id_has_no_turn(self):
+        old = self.home.fail_usage(A)
+        self.home.rotate(A)
+        newer = self.home.add_turn(A, status="completed")
+        c = self.home.rotate(A)
+        with self.home._db("thread_history_1.sqlite") as db:     # A's projection row at the new file's end
+            db.execute("UPDATE thread_history_projection_state SET next_rollout_byte_offset=? WHERE thread_id=?",
+                       (self.home.rollout(c).stat().st_size, A))
+        for fresh in (False, True):
+            if fresh:
+                self.forget()
+            with self.subTest(restarted=fresh):
+                self.assertEqual(self.failures(), [])
+                self.assertEqual(self.source.latest(A)["turn_id"], newer)
+                self.assertNotEqual(newer, old)
+
+    def test_a_failure_under_b_is_still_the_latest_after_a_split_to_c(self):
+        b = self.home.rotate(A)
+        failed = self.home.fail_usage(A)
+        self.home.rotate(A)
+        self.forget()
+        self.assertEqual([entry["turn_id"] for entry in self.failures()], [failed])
+        self.assertEqual(self.source.latest(A)["turn_id"], failed)
+        self.assertEqual(self.source.reset_hint(A, failed)["reset_at"], RESET, "read from B's file")
+        self.assertIn(b, self.source.turn_chain(A))
+
+    def test_a_later_id_comes_after_an_earlier_one_whatever_its_ordinals(self):
+        self.home = Restarted(self.home.root.parent / "restarted")
+        self.source = LocalSource(self.home.root)
+        self.home.add_turn(A, status="completed")
+        self.home.add_turn(A, status="completed")
+        self.home.rotate(A)
+        stopped = self.home.add_turn(A, status="interrupted", progress=False)
+        latest = self.source.latest(A)
+        self.assertEqual(latest["turn_id"], stopped)
+        self.assertGreater(latest["ordinal"], rollout.SPAN)
+        self.assertTrue(self.source.progress(A, 6)["later_turn"], "A's turn at 6 has B's after it")
+
+
 class SplitRecoveryTests(unittest.TestCase):
     """The whole path on a split conversation: detected as A, sent to A's queue, its turn followed under B."""
 
@@ -242,6 +298,49 @@ class SplitRecoveryTests(unittest.TestCase):
         h.tick(advance=10)
         self.assertEqual(h.record(A)["state"], "recovered")
         self.assertEqual(h.records(b), [])
+
+    def harness(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        root = Path(folder.name)
+        h = Harness(root / "state", home=SplitHome(root / "codex-home"))
+        self.addCleanup(h.close)
+        h.backend.loaded_map[A] = "loaded"
+        return h
+
+    def test_an_old_failure_is_never_sent_once_a_person_worked_under_b(self):
+        h = self.harness()
+        old = h.home.fail_usage(A)
+        h.home.rotate(A)
+        h.home.add_turn(A, status="completed")
+        h.enable()
+        h.tick()
+        c = h.home.rotate(A)
+        with h.home._db("thread_history_1.sqlite") as db:
+            db.execute("UPDATE thread_history_projection_state SET next_rollout_byte_offset=? WHERE thread_id=?",
+                       (h.home.rollout(c).stat().st_size, A))
+        for _ in range(20):
+            h.tick(advance=60)
+        self.assertEqual([row for row in h.records(A) if row["turn_id"] == old], [])
+        self.assertEqual(h.backend.send_calls, [])
+
+    def test_a_failure_waiting_under_b_still_waits_and_recovers_after_a_split_to_c(self):
+        h = self.harness()
+        h.home.add_turn(A, status="completed", completed=int(BASE - 600))
+        h.home.rotate(A)
+        h.home.fail_usage(A)
+        h.enable()
+        h.tick()
+        self.assertEqual(h.record(A)["state"], "waiting_reset")
+        h.home.rotate(A)
+        h.tick(advance=5)
+        self.assertEqual(h.record(A)["state"], "waiting_reset", "not superseded by A's own old turn")
+        h.now = RESET + 61
+        h.tick()
+        self.assertEqual([call[0] for call in h.backend.send_calls], [A])
+        h.tick(advance=6)
+        h.tick(advance=10)
+        self.assertEqual(h.record(A)["state"], "recovered")
 
 
 if __name__ == "__main__":

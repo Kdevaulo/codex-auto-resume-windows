@@ -117,13 +117,13 @@ class SkipReasonTests(SkipCase):
         self.ticks(h)
         self.assertEqual(self.skips(h, T1), [(skips.UNKNOWN_CONVERSATION, None)])
 
-    def test_a_conversation_that_goes_on_under_another_id_says_so_of_its_old_failure(self):
+    def test_an_old_failure_with_a_newer_turn_under_another_id_says_so(self):
         h = self.harness(home=SplitHome)
         h.home.fail_transient(T1)
         h.home.rotate(T1)
         h.home.add_turn(T1, status="completed")
         self.ticks(h)
-        self.assertEqual(self.skips(h, T1), [(skips.CONTINUED_ELSEWHERE, None)])
+        self.assertEqual(self.skips(h, T1), [(skips.NEWER_TURN, None)])
 
     def test_automatic_recovery_off_is_said_once_each_time_it_is_found_off(self):
         h = self.harness(enable=False)
