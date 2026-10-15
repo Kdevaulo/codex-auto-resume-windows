@@ -1056,8 +1056,9 @@ class Arming:
             values = self.state.options(definition.id)
         except StateError:
             values = {}
-        return [{"key": str(option.key), "choices": list(option.choices),
-                 "value": values.get(option.key, option.default), "default": option.default}
+        return [dict({"key": str(option.key), "choices": list(option.choices),
+                      "value": values.get(option.key, option.default), "default": option.default},
+                     **({"custom": list(option.custom)} if option.custom else {}))
                 for option in definition.options]
 
     def rules_view(self) -> dict:

@@ -50,6 +50,9 @@ WINDOWS = (FIVE_HOUR, WEEKLY)
 POLL_CHOICES = (5, 10, 15, 20, 30, 45, 60)
 DEFAULT_POLL = 15
 PERCENTS = (50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 96, 97, 98, 99)
+# v0.6.16-beta.4 (f): what a person may type in beside the choices - any whole percentage, any spacing of 5 to 60.
+PERCENT_RANGE = (1, 100)
+POLL_RANGE = (5, 60)
 DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 95
 # v0.6.16-beta.4: the stop percentage the wrap-up's words ask Codex to stop at (wrapwords.py), each window its own.
 DEFAULT_STOP_WORDS = 95

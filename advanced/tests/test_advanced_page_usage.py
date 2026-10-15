@@ -69,6 +69,37 @@ class PageTests(PageCase):
             "words": script["advanced-words"][0]["result"]["words"],
             "previews": script["advanced-wordings"][0]["result"]["previews"]}
 
+    @classmethod
+    def scenario_custom_numbers(cls, bridge):
+        """(f): the five-hour wrap-up percentage typed in as 93 through the real bridge - shown as itself, Custom... last;
+        then the weekly one typed in as 88 and set; then letters typed in, refused before anything is sent."""
+        generation = bridge("advanced-list", {})["result"]["generation"]
+        done = bridge("advanced-option", {"capability": WRAP, "key": "wrap_five_hour", "value": 93, "generation": generation})
+        assert done["result"]["done"], done
+        script = cls.opening(bridge, "en")
+        script["advanced-wordings"] = [bridge("advanced-wordings", {"capability": WRAP})]
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": WRAP}, {"do": "look"},
+                 {"do": "reply", "key": "advanced-option", "with": [{"ok": True, "result": {"done": True}}]},
+                 {"do": "custom_option", "key": "wrap_weekly", "text": "88"},
+                 {"do": "custom_option", "key": "wrap_weekly", "text": "eighty"}, {"do": "look"}]
+        return "en", {"script": script, "steps": steps}, {
+            "generation": script["advanced-list"][0]["result"]["generation"],
+            "words": script["advanced-words"][0]["result"]["words"]}
+
+    def test_a_number_can_be_typed_in_beside_the_presets_and_is_checked_before_it_is_sent(self):
+        result, expected = self.of("scenario_custom_numbers")
+        words = expected["words"]
+        first, after = result["looks"]
+        five = next(choice for choice in first["choices"] if choice["key"] == "wrap_five_hour")
+        self.assertEqual((five["value"], five["items"][-2:]), ("93%", ["93%", words["page.option.custom"]]))
+        style = next(choice for choice in first["choices"] if choice["key"] == "wrap_style")
+        self.assertNotIn(words["page.option.custom"], style["items"], "a wording is no number")
+        self.assertEqual(first["custom"]["wrap_weekly"], False, "the box shows only once Custom... is chosen")
+        self.assertTrue(after["custom"]["wrap_weekly"])
+        self.assertEqual(sent(result, "advanced-option"), [
+            {"capability": WRAP, "key": "wrap_weekly", "value": 88, "generation": expected["generation"]}])
+        self.assertEqual(result["told"], [words["page.refused.option_range"].replace("{low}", "1").replace("{high}", "100")])
+
     def test_custom_wording_has_a_box_for_each_window_with_the_persons_words(self):
         result, expected = self.of("scenario_wordings")
         words = expected["words"]

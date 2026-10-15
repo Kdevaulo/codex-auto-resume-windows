@@ -874,6 +874,7 @@ namespace CodexAutoResume
             advancedStack.RowStyles.Clear();
             advancedHourly = null;
             advancedChoices.Clear();
+            ForgetCustomEntries();
             ruleRemoves.Clear();
             ruleTag = ruleFrom = ruleTo = null;
             ruleKind = ruleSampled = null;
@@ -1063,6 +1064,17 @@ namespace CodexAutoResume
                         if (number == value) index = combo.Items.Count;
                         combo.Items.Add(new Choice(number.ToString(CultureInfo.InvariantCulture), OptionText(key, number)));
                     }
+                    // v0.6.16-beta.4 (f): a number typed in beside the presets - shown as it is where it is one - and
+                    // Custom... last, which opens the box it is typed in (AdvancedUsage.cs).
+                    if (CustomRange(option) != null)
+                    {
+                        if (index < 0 && value > 0)
+                        {
+                            index = combo.Items.Count;
+                            combo.Items.Add(new Choice(value.ToString(CultureInfo.InvariantCulture), OptionText(key, value)));
+                        }
+                        combo.Items.Add(new Choice(CustomChoice, Word("page.option.custom", "Custom...")));
+                    }
                     if (index >= 0) combo.SelectedIndex = index;
                 }
                 finally
@@ -1076,6 +1088,7 @@ namespace CodexAutoResume
                 combo.SelectionChangeCommitted += delegate { SetAdvancedOption(id, key, chosen); };
                 card.Controls.Add(NewRow(label, combo));
                 advancedChoices.Add(combo);
+                BuildCustomEntry(id, key, label, CustomRange(option), card);
             }
             // v0.6.16-beta.4: the wrap-up's Custom wording, under its drop-downs (AdvancedUsage.cs).
             BuildWordings(id, options, card);
@@ -1103,8 +1116,21 @@ namespace CodexAutoResume
         private void SetAdvancedOption(string id, string key, SoftCombo combo)
         {
             var choice = combo.SelectedItem as Choice;
-            if (choiceFilling || choice == null || advancedListing == null || busy > 0) return;
-            string argument = "{\"capability\":" + Json.Escape(id) + ",\"key\":" + Json.Escape(key) + ",\"value\":" + choice.Value +
+            if (choiceFilling || choice == null) return;
+            if (choice.Value == CustomChoice)
+            {
+                OpenCustomEntry(key);                            // (f): the number is typed in, and set with Set
+                return;
+            }
+            if (advancedListing == null || busy > 0) return;
+            SetAdvancedOptionValue(id, key, choice.Value);
+        }
+
+        /// One choice sent as `value` - a preset, or (v0.6.16-beta.4) a number typed in - against the generation the page
+        /// read; the drop-down then shows what holds.
+        private void SetAdvancedOptionValue(string id, string key, string value)
+        {
+            string argument = "{\"capability\":" + Json.Escape(id) + ",\"key\":" + Json.Escape(key) + ",\"value\":" + value +
                               ",\"generation\":" + AdvancedGeneration() + "}";
             string name = AdvancedName(id);
             AdvancedCall("advanced-option", argument, true, delegate(Dictionary<string, object> reply)

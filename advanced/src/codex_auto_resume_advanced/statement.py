@@ -180,7 +180,9 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     # (a) what is sent, exactly, for each window, under the wording choice.
     "preview.title", "preview.300", "preview.10080",
     # (e) each window acted on or not.
-    "option.window_five_hour", "option.window_weekly"))
+    "option.window_five_hour", "option.window_weekly",
+    # (f) a number typed in beside the presets.
+    "option.custom", "option.set", "option.range", "refused.option_range"))
 # The edition's own continuations' words (v0.6.15-beta): what empty_response, subagent_parent and keep_going send -
 # fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
 # subagent's line, its id and a closed kind word).

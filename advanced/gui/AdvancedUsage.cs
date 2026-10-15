@@ -13,6 +13,11 @@
 // the generation the page read). A refusal says why, in the page's words for each of the custom text's checks. The words
 // are the person's own and are never written anywhere but the advanced state.
 //
+// Every number with Custom... (item (f), "이런 수치들은 직접 입력도 가능해야 한다니까"): a choice the bridge says takes a number
+// typed in (its `custom` range) has Custom... last in its drop-down, and a number already typed in shown there as itself.
+// Custom... opens a box under the drop-down with Set beside it; the number is checked before anything is sent - a whole
+// number in the range - and the reason said where it is not, as the bridge's refusal is said where it refuses one.
+//
 // Nothing here draws anything the page does not draw already: the captions, help lines, boxes and buttons are the
 // Settings page's.
 //
@@ -40,6 +45,82 @@ namespace CodexAutoResume
         // The windows' lengths in minutes, as advanced-wordings' previews are keyed, and each one's line on the card.
         private static readonly string[] PreviewWindows = { "300", "10080" };
         private readonly List<Label> previewLines = new List<Label>();
+
+        // (f): the drop-downs' last item, Custom..., and each customizable choice's box and Set, by its key.
+        private const string CustomChoice = "custom";
+        private readonly Dictionary<string, SoftTextArea> customBoxes = new Dictionary<string, SoftTextArea>();
+        private readonly Dictionary<string, Button> customSets = new Dictionary<string, Button>();
+        private readonly Dictionary<string, Control> customRows = new Dictionary<string, Control>();
+        // The keys whose box Custom... opened (a hidden window's controls all read as not Visible, so this says it).
+        private readonly HashSet<string> customOpen = new HashSet<string>();
+
+        private void ForgetCustomEntries()
+        {
+            customBoxes.Clear();
+            customSets.Clear();
+            customRows.Clear();
+            customOpen.Clear();
+        }
+
+        /// A choice's custom range, [lowest, highest], or null where it takes only its presets.
+        private static int[] CustomRange(Dictionary<string, object> option)
+        {
+            List<object> range = Items(option, "custom");
+            if (range == null || range.Count != 2) return null;
+            return new[] { Whole(range[0]), Whole(range[1]) };
+        }
+
+        /// Under a customizable choice, the box a number is typed in and Set beside it - hidden until Custom... is chosen.
+        private void BuildCustomEntry(string id, string key, string label, int[] range, TableLayoutPanel card)
+        {
+            if (range == null) return;
+            SoftTextArea box = OneLine(label + " - " + Word("page.option.custom", "Custom..."), 80, 4);
+            Button set = MakeButton(Word("page.option.set", "Set"), false, delegate { SetCustomValue(id, key, range); });
+            set.AccessibleName = Word("page.option.set", "Set") + " " + label;
+            var pair = new FlowLayoutPanel();
+            pair.AutoSize = true;
+            pair.WrapContents = false;
+            pair.Margin = new Padding(0);
+            pair.Controls.Add(box);
+            set.Margin = Pad(6, 0, 0, 0);
+            pair.Controls.Add(set);
+            Control row = NewRow(Word("page.option.range", "{low} to {high}").Replace("{low}", range[0].ToString(System.Globalization.CultureInfo.CurrentCulture))
+                                    .Replace("{high}", range[1].ToString(System.Globalization.CultureInfo.CurrentCulture)), pair);
+            row.Visible = false;
+            card.Controls.Add(row);
+            customBoxes[key] = box;
+            customSets[key] = set;
+            customRows[key] = row;
+        }
+
+        /// Custom... chosen: its box shown, the keyboard in it.
+        private void OpenCustomEntry(string key)
+        {
+            Control row;
+            SoftTextArea box;
+            if (!customRows.TryGetValue(key, out row) || !customBoxes.TryGetValue(key, out box)) return;
+            row.Visible = true;
+            customOpen.Add(key);
+            box.Box.Focus();
+        }
+
+        /// The number typed in, checked before anything is sent - a whole number from the range's lowest to its highest -
+        /// then set as a choice is; where it is not one, the reason is said and nothing is sent.
+        private void SetCustomValue(string id, string key, int[] range)
+        {
+            SoftTextArea box;
+            if (busy > 0 || advancedListing == null || !customBoxes.TryGetValue(key, out box)) return;
+            int typed;
+            if (!int.TryParse((box.Box.Text ?? "").Trim(), System.Globalization.NumberStyles.None,
+                              System.Globalization.CultureInfo.InvariantCulture, out typed) || typed < range[0] || typed > range[1])
+            {
+                TellAdvanced(Word("page.refused.option_range", "Type a whole number from {low} to {high}. Nothing was changed.")
+                    .Replace("{low}", range[0].ToString(System.Globalization.CultureInfo.CurrentCulture))
+                    .Replace("{high}", range[1].ToString(System.Globalization.CultureInfo.CurrentCulture)));
+                return;
+            }
+            SetAdvancedOptionValue(id, key, typed.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
 
         /// The wrap-up's wordings read, then `after`.
         private void ReadWordings(MethodInvoker after)
@@ -159,6 +240,7 @@ namespace CodexAutoResume
         private void UpdateWordingButtons(bool idle)
         {
             foreach (Button save in wordingSaves.Values) save.Enabled = idle && advancedListing != null;
+            foreach (Button set in customSets.Values) set.Enabled = idle && advancedListing != null;
         }
     }
 }

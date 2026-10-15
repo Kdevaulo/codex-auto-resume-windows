@@ -24,7 +24,8 @@ from codex_auto_resume.domain.plug import DEFER, Alternative, Point, Surface  # 
 from codex_auto_resume_advanced import registry, statement, surfaces  # noqa: E402
 from codex_auto_resume_advanced.engine import usage, wrapwords  # noqa: E402
 from codex_auto_resume_advanced.registry import USAGE_METER, USAGE_PAUSE, USAGE_WRAP_UP, Registry  # noqa: E402
-from codex_auto_resume_advanced.vocabulary import Actor, ArmingState, ContinuationKind, OptionKey, OffReason  # noqa: E402
+from codex_auto_resume_advanced.vocabulary import (Actor, ArmingState, ContinuationKind, OptionKey, OffReason,  # noqa: E402
+                                                   Refusal)
 from test_engine import T1  # noqa: E402
 
 ENGINE = ac.ENGINE
@@ -132,6 +133,43 @@ class DefinitionTests(unittest.TestCase):
                             self.assertIn("91", words)
                             self.assertIn("96", words)
                             self.assertIn(wrapwords.window_words(minutes, locale), words)
+
+
+class CustomNumberTests(UsageCase):
+    """v0.6.16-beta.4 (f): every number has Custom... beside its presets - any whole percentage, a spacing of 5 to 60."""
+
+    def set(self, capability, key, value):
+        return self.rt.arming.set_option(capability, key, value, generation=self.rt.state.meta()["generation"],
+                                         actor=Actor.DASHBOARD)
+
+    def test_a_number_typed_in_is_taken_in_its_range_and_refused_outside_it(self):
+        for capability, key, good, bad in (("usage_wrap_up", OptionKey.WRAP_FIVE_HOUR, 93, (0, 101)),
+                                           ("usage_wrap_up", OptionKey.STOP_WORDS_WEEKLY, 99, (0, 101)),
+                                           ("usage_meter", OptionKey.WARN_WEEKLY, 1, (0, 101)),
+                                           ("usage_pause", OptionKey.PAUSE_FIVE_HOUR, 100, (0, 101)),
+                                           ("usage_meter", OptionKey.POLL_MINUTES, 7, (4, 61))):
+            with self.subTest(key=key):
+                self.assertTrue(self.set(capability, key, good)["done"])
+                self.assertEqual(self.rt.state.options(capability)[key], good)
+                for value in (*bad, "93", 93.0):
+                    self.assertEqual(self.set(capability, key, value)["refusal"], Refusal.OPTION_INVALID, value)
+        self.assertEqual(self.set("usage_wrap_up", OptionKey.WRAP_STYLE, 9)["refusal"], Refusal.OPTION_INVALID,
+                         "a choice with no custom range takes its presets alone")
+        listed = {item["id"]: item for item in self.rt.arming.listing()["capabilities"]}
+        options = {option["key"]: option for option in listed["usage_meter"]["options"]}
+        self.assertEqual((options["poll_minutes"]["custom"], options["warn_weekly"]["custom"]), ([5, 60], [1, 100]))
+        self.assertNotIn("custom", options["window_weekly"])
+
+    def test_the_meter_reads_at_a_spacing_typed_in(self):
+        self.on("usage_meter")
+        self.assertTrue(self.set("usage_meter", OptionKey.POLL_MINUTES, 7)["done"])
+        self.look()
+        self.now += 6 * 60
+        self.look()
+        self.assertEqual(len(self.calls), 1)
+        self.now += 61
+        self.look()
+        self.assertEqual(len(self.calls), 2, "at seven minutes, as typed in")
 
 
 class MeterTests(UsageCase):

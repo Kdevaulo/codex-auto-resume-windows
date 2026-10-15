@@ -88,7 +88,7 @@ from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
 from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STOP_WORDS, DEFAULT_STYLE, DEFAULT_WARN,
-                           DEFAULT_WRAP, ON, PERCENTS, SWITCH,
+                           DEFAULT_WRAP, ON, PERCENT_RANGE, PERCENTS, POLL_RANGE, SWITCH,
                            POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
@@ -130,6 +130,15 @@ class Option:
     key: OptionKey             # what the choice is
     choices: tuple             # the values it may take: whole numbers from 1, smallest first
     default: int               # the one it has until a person picks another; one of the choices
+    # v0.6.16-beta.4 (item (f), "이런 수치들은 직접 입력도 가능해야 한다니까"): (lowest, highest) a person may type in
+    # beside the choices - any whole number in it - or None where only the choices are taken.
+    custom: tuple | None = None
+
+    def takes(self, value) -> bool:
+        """Whether `value` is one this choice takes: one of its choices, or a whole number in its custom range."""
+        if type(value) is not int:
+            return False
+        return value in self.choices or (self.custom is not None and self.custom[0] <= value <= self.custom[1])
 
 
 @dataclass(frozen=True)
@@ -171,7 +180,11 @@ def _option_problem(option) -> bool:
             or not isinstance(option.choices, tuple) or not option.choices
             or not all(_count(value) for value in option.choices)
             or list(option.choices) != sorted(set(option.choices))
-            or not _count(option.default) or option.default not in option.choices)
+            or not _count(option.default) or option.default not in option.choices
+            or not (option.custom is None or (isinstance(option.custom, tuple) and len(option.custom) == 2
+                                              and all(_count(end) for end in option.custom)
+                                              and option.custom[0] <= option.choices[0]
+                                              and option.choices[-1] <= option.custom[1])))
 
 
 def problems(definition) -> list:
@@ -827,9 +840,9 @@ USAGE_METER = CapabilityDef(
     make=make_meter,
     codes=("read", "unreadable", "warned"),
     measurements=(Measurement.MU,),
-    options=(Option(OptionKey.POLL_MINUTES, POLL_CHOICES, DEFAULT_POLL),
-             Option(OptionKey.WARN_FIVE_HOUR, PERCENTS, DEFAULT_WARN),
-             Option(OptionKey.WARN_WEEKLY, PERCENTS, DEFAULT_WARN),
+    options=(Option(OptionKey.POLL_MINUTES, POLL_CHOICES, DEFAULT_POLL, custom=POLL_RANGE),
+             Option(OptionKey.WARN_FIVE_HOUR, PERCENTS, DEFAULT_WARN, custom=PERCENT_RANGE),
+             Option(OptionKey.WARN_WEEKLY, PERCENTS, DEFAULT_WARN, custom=PERCENT_RANGE),
              Option(OptionKey.WINDOW_FIVE_HOUR, SWITCH, ON),
              Option(OptionKey.WINDOW_WEEKLY, SWITCH, ON)),
 )
@@ -854,10 +867,10 @@ USAGE_WRAP_UP = CapabilityDef(
     make=make_wrap_up,
     codes=("found", "sent", "delivered", "unknown", "superseded"),
     measurements=(Measurement.MT,),
-    options=(Option(OptionKey.WRAP_FIVE_HOUR, PERCENTS, DEFAULT_WRAP),
-             Option(OptionKey.WRAP_WEEKLY, PERCENTS, DEFAULT_WRAP),
-             Option(OptionKey.STOP_WORDS_FIVE_HOUR, PERCENTS, DEFAULT_STOP_WORDS),
-             Option(OptionKey.STOP_WORDS_WEEKLY, PERCENTS, DEFAULT_STOP_WORDS),
+    options=(Option(OptionKey.WRAP_FIVE_HOUR, PERCENTS, DEFAULT_WRAP, custom=PERCENT_RANGE),
+             Option(OptionKey.WRAP_WEEKLY, PERCENTS, DEFAULT_WRAP, custom=PERCENT_RANGE),
+             Option(OptionKey.STOP_WORDS_FIVE_HOUR, PERCENTS, DEFAULT_STOP_WORDS, custom=PERCENT_RANGE),
+             Option(OptionKey.STOP_WORDS_WEEKLY, PERCENTS, DEFAULT_STOP_WORDS, custom=PERCENT_RANGE),
              Option(OptionKey.WRAP_STYLE, STYLES, DEFAULT_STYLE),
              Option(OptionKey.WRAP_RESET_TIME, SWITCH, ON)),
     wordings=(WordingKey.WRAP_CUSTOM_FIVE_HOUR, WordingKey.WRAP_CUSTOM_WEEKLY),
@@ -882,8 +895,8 @@ USAGE_PAUSE = CapabilityDef(
     make=make_pause,
     codes=("paused", "resumed"),
     measurements=(Measurement.MU,),
-    options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE),
-             Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE)),
+    options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE),
+             Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE)),
     requires=("usage_meter",),
 )
 

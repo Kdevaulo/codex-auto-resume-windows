@@ -237,7 +237,7 @@ class ChoicesMixin:
                 "SELECT choice, value FROM options WHERE capability=?", (capability,)).fetchall()
         for row in rows:
             option = definition.option(row["choice"])
-            if option is not None and row["value"] in option.choices:
+            if option is not None and option.takes(row["value"]):
                 found[option.key] = row["value"]
         return found
 
@@ -247,7 +247,7 @@ class ChoicesMixin:
         offer for it; StaleGeneration where anything moved since."""
         definition = self.registry.get(capability)
         option = definition.option(key) if definition is not None else None
-        if option is None or type(value) is not int or value not in option.choices:
+        if option is None or not option.takes(value):
             raise Refused(Refusal.OPTION_INVALID)
         actor = _word(actor, Actor, "actor")
         now = self._now(at)
