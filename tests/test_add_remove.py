@@ -210,6 +210,17 @@ class KeptUninstallerTests(unittest.TestCase):
         self.assertIn("result: False", done.stdout, done.stdout + done.stderr)
         self.assertEqual(list(self.outside.iterdir()), [], "nothing was written where the junction points")
 
+    def test_a_junction_to_another_place_inside_the_installation_is_not_followed_either(self):
+        inside = self.home / "app"
+        inside.mkdir()
+        made = subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(self.home / "uninstall"), str(inside)],
+                              capture_output=True, creationflags=NO_WINDOW)
+        if made.returncode != 0:
+            self.skipTest("no junction could be made here")
+        done = self.keep()
+        self.assertIn("result: False", done.stdout, done.stdout + done.stderr)
+        self.assertEqual(list(inside.iterdir()), [], "nothing was written through the junction")
+
     def test_a_file_where_the_folder_should_be_is_left_alone(self):
         (self.home / "uninstall").write_text("not a folder", encoding="utf-8")
         done = self.keep()
