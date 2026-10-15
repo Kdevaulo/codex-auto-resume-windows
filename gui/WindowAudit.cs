@@ -1254,6 +1254,7 @@ namespace CodexAutoResume
             foreach (Control child in parent.Controls)
             {
                 if (!OwnVisible(child)) continue;
+                AuditTextLine(where, child, findings);
                 if (Actionable(child))
                 {
                     AuditedSpoken++;
@@ -1262,6 +1263,32 @@ namespace CodexAutoResume
                 }
                 AuditSpoken(where, child, findings);
             }
+        }
+
+        /// Every text box that shows shows at least one whole line of its text (issue #34): the part of it its parents
+        /// leave in view is as tall as its font's line at least. Walked with the screen-reader check, which reaches
+        /// every page and dialog of both editions the audit builds.
+        internal static void AuditTextLine(string where, Control control, List<string> findings)
+        {
+            var box = control as TextBox;
+            if (box == null) return;
+            int shown = box.Height;
+            Rectangle at = new Rectangle(Point.Empty, box.Size);
+            for (Control c = box; c.Parent != null; c = c.Parent)
+            {
+                at.Offset(c.Left, c.Top);
+                // A page that scrolls shows what is below its fold when it is scrolled to: it cuts nothing off.
+                var page = c.Parent as SoftPage;
+                var scroller = c.Parent as ScrollableControl;
+                if ((page != null && page.Scrolls) || (scroller != null && scroller.AutoScroll)) break;
+                Rectangle room = new Rectangle(Point.Empty, c.Parent.ClientSize);
+                at.Intersect(room);
+                if (c.Parent is Form) break;
+            }
+            shown = Math.Min(shown, Math.Max(0, at.Height));
+            if (shown < box.Font.Height)
+                findings.Add(where + "/" + AuditName(box) + " :: its text is cut off, " + shown + " px shown of a " +
+                             box.Font.Height + " px line");
         }
 
         /// Whether a person can act on `control`: press it, switch it, choose in it, type in it or move through it.

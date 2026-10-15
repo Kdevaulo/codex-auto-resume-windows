@@ -1189,8 +1189,7 @@ namespace CodexAutoResume
             var box = new SoftTextArea();
             box.Font = Font;
             box.Box.Font = Font;
-            box.Box.AcceptsReturn = false;
-            box.Box.WordWrap = false;
+            box.OneLine = true;                 // issue #34: the line centred, never cut off
             box.Box.MaxLength = length;
             box.Box.AccessibleName = name;
             box.Width = Px(width);

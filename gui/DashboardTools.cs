@@ -447,8 +447,7 @@ namespace CodexAutoResume
             query.Dock = DockStyle.Fill;
             query.Font = Font;
             query.Box.Font = Font;
-            query.Box.AcceptsReturn = false;
-            query.Box.WordWrap = false;
+            query.OneLine = true;               // issue #34: the line centred, never cut off
             query.Box.MaxLength = 100;
             query.Box.AccessibleName = S("logs.search", "Search");
             query.Height = Px(Brand.ButtonHeight);
