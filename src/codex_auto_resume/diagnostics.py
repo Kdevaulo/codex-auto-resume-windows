@@ -29,7 +29,7 @@ import secrets
 import sys
 import time
 
-from . import config, homes, interface, logbook, machine, startup
+from . import config, homes, interface, logbook, machine, oncewords, startup
 from .domain import ids
 from .domain.plug import DEFER, EXTRA, Surface
 from .settings import is_custom_text
@@ -256,6 +256,11 @@ def collect(control, *, now=None, redact=None, check=None) -> dict:
             bundle["status"]["power_action"] = status["power_action"]
     except Exception as exc:
         bundle["status"] = {"error": redact.text(str(exc))[:200]}
+    # v0.6.16-beta.3: how many waiting recoveries have words for this time - never the words (oncewords.py).
+    try:
+        bundle["once_words"] = {"count": oncewords.OnceWords.of(control.paths).count()}
+    except Exception:
+        bundle["once_words"] = {"count": None}
     try:
         with control._open() as store:
             bundle["schema_version"] = store.schema_version()

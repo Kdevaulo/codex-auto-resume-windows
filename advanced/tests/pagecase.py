@@ -30,6 +30,8 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -182,6 +184,12 @@ class Bridge:
         self.control = control.Control(self.paths, plug=self.plug)
 
     def close(self):
+        # A report job runs on a thread of its own ("compat-report", report/flow.py) and may still be writing
+        # this home's advanced state when a test is done with the bridge: it finishes first, or the home cannot
+        # be removed (WinError 32 on advanced.sqlite, seen once on a CI runner, dev run 38675702362).
+        deadline = time.monotonic() + 30
+        for thread in [each for each in threading.enumerate() if each.name == "compat-report"]:
+            thread.join(max(0.0, deadline - time.monotonic()))
         if self.plug._runtime is not None:
             self.plug._runtime.state.close()
 

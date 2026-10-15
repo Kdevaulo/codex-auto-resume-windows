@@ -238,18 +238,51 @@ class PageTests(PageCase):
         self.assertEqual(result["told"], [words["page.refused.choice"]])
         self.assertEqual(result["looks"][0]["note"], "")
 
+    @staticmethod
+    def keep_part(look, words):
+        """The texts of Keep it on in the open capability's head card, from its caption on (v0.6.16-beta.3)."""
+        head = look["cards"][0]
+        return head[head.index(words["page.keep_on"]):]
+
+    def test_keep_it_on_is_in_the_head_card_right_under_where_it_stands(self):
+        """The owner found Keep it on too far down, a card of its own under the statement and the limits (2026-10-11):
+        it is in the head card now, its caption right after the State fact - and no card of its own is left."""
+        result, expected = self.of("scenario_keep_on")
+        words = expected["words"]
+        for look in result["looks"][:4]:
+            head = look["cards"][0]
+            at = head.index(words["page.keep_on"])
+            self.assertEqual(head[at - 2], words["page.col_state"], "right after the State fact")
+            self.assertEqual(head[at - 1], words["state.shadow"])
+            self.assertNotIn(words["page.keep_on"], [card[0] for card in look["cards"]])
+
+    def test_the_list_says_kept_on_beside_the_state_of_a_kept_on_capability_alone(self):
+        result, expected = self.of("scenario_keep_on")
+        words = expected["words"]
+        first, once, twice, after, _ = result["looks"]
+        name = words["name.capacity_retry"]
+        kept = words["state.shadow"] + " · " + words["page.state_kept_on"]
+
+        def states(look):
+            return {row[0]: row[1] for row in look["rows"]}
+        for look, expected_state in ((first, words["state.shadow"]), (once, kept), (twice, kept),
+                                     (after, words["state.shadow"])):
+            shown = states(look)
+            self.assertEqual(shown[name], expected_state)
+            self.assertEqual([text for text in shown.values() if words["page.state_kept_on"] in text],
+                             [kept] if expected_state == kept else [], "no other row says kept on")
+
     def test_keep_it_on_asks_with_each_warning_sends_what_was_confirmed_and_lets_go_asking_nothing(self):
         result, expected = self.of("scenario_keep_on")
         words = expected["words"]
         name = words["name.capacity_retry"]
         first, once, twice, after, send_now = result["looks"]
-        card = next(card for card in first["cards"] if card[0] == words["page.keep_on"])
-        self.assertEqual(card[1], words["page.keep_on.off"])
+        self.assertEqual(self.keep_part(first, words)[1], words["page.keep_on.off"])
         self.assertEqual(first["kept"], {"keep_on": True, "send_again": None, "let_go": None})
         self.assertEqual(once["kept"], {"keep_on": None, "send_again": True, "let_go": True})
-        self.assertIn(words["page.keep_on.on"], next(card for card in once["cards"] if card[0] == words["page.keep_on"]))
+        self.assertIn(words["page.keep_on.on"], self.keep_part(once, words))
         self.assertEqual(twice["kept"], {"keep_on": None, "send_again": None, "let_go": True})
-        self.assertIn(words["page.keep_on.again"], next(card for card in twice["cards"] if card[0] == words["page.keep_on"]))
+        self.assertIn(words["page.keep_on.again"], self.keep_part(twice, words))
         self.assertEqual(after["kept"], first["kept"])
         self.assertEqual(once["note"], words["page.done.keep_on"].replace("{name}", name))
         self.assertEqual(after["note"], words["page.done.keep_on_off"].replace("{name}", name))
@@ -294,7 +327,7 @@ class PageTests(PageCase):
         words = expected["words"]
         look, = result["looks"]
         self.assertEqual(look["kept"], {"keep_on": None, "send_again": None, "let_go": True})
-        self.assertIn(words["page.keep_on.on"], next(card for card in look["cards"] if card[0] == words["page.keep_on"]))
+        self.assertIn(words["page.keep_on.on"], self.keep_part(look, words))
         self.assertEqual((expected["refused"]["done"], expected["refused"]["refusal"]), (False, "invalid_request"))
 
     def test_send_now_offers_each_waiting_recovery_asks_first_and_sends_its_id(self):

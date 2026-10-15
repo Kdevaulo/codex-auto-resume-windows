@@ -47,6 +47,8 @@ namespace CodexAutoResume
             { "early", "Looked before the reset time" }, { "resend", "Sent it once more" }, { "send_now", "Sent it now" },
             { "text", "Wrote its own words" }, { "sender", "Sent it its own way" }, { "tick", "Acted between looks" },
             { "start_route", "Started the watcher its own way" }, { "unloaded", "Opened the conversation itself" },
+            // v0.6.16-beta.3: a message of the person's that a watched capability would have sent (runtime._watched_records).
+            { "records", "A message of yours it would have sent" },
         };
 
         /// The open capability's watch log as last read, for ShowAdvancedDetail to compare; "" where there is none.

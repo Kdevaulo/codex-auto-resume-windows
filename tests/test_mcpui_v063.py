@@ -1061,8 +1061,8 @@ DRAWING = ["t", "fill", "element", "card", "activity", "attentionCause", "due", 
            "lightClass", "nextCheck", "heroFacts", "soonestFact", "showFacts", "renderHero", "renderRecovery",
            # v0.6.11: and the last usage reading among the facts.
            "usageLine", "age", "windowName", "clockTime",
-           # and how a watcher that is not running ended.
-           "stoppedFact"]
+           # and how a watcher that is not running ended, and (v0.6.16-beta.3) how it starts for good.
+           "stoppedFact", "offHow"]
 
 
 @unittest.skipUnless(NODE, "needs Node to run the panel's own code")

@@ -259,6 +259,8 @@ class DispatchMixin:
                     self.log(current["thread_id"], "continuation_text_fallback", None)
                     message = _message.build(current["category"], locale=l10n.DEFAULT)
                 message, worded = self._plugged_text(current, message, limits)
+                plain = message                 # v0.6.16-beta.3: the words for this time, after it (engine/delivery.py)
+                message, once = (message, None) if resend else self._once_words(current, message, limits)
             # P5, decided before the claim like the words: core's own backend, unless the plug
             # names a channel. The one binding of the one sender; whichever it is gets the one
             # send below, after the claim and the pre-send look, inside the launch guard.
@@ -312,6 +314,8 @@ class DispatchMixin:
                         self._release(key, claim, target, why, delay)
                     self.log(current["thread_id"], target, why)
                     return
+                if once is not None and not self._spend_once_words(claim, once):
+                    message = plain             # v0.6.16-beta.3: never sent twice (engine/delivery.py)
                 self.log(current["thread_id"], "queue_submission_started", None)
                 # Reservation is durable before any external process can accept the message.
                 # The conversation and the marker are the claimed row's, read back from the store

@@ -276,8 +276,10 @@ class Registry:
 # nothing and claims nothing - it starts the watcher - so it answers at START_ROUTE alone, no
 # point it answers at is a sending point, and its ceilings never bind: a surface that shows them
 # says so (arming.listing marks a non-sending capability). Its journal is the runtime's own -
-# WOULD_HAVE where it is watched, ACTED where core takes its route - so it declares no codes of
-# its own: nothing here would ever write one. It departs from C4 (nothing at start) and F6 (a
+# WOULD_HAVE where it is watched, ACTED where it names a route - and, from v0.6.16-beta.3 (issue
+# #31), what core made of that route, in its own codes (core's control/codexstart.OUTCOMES, told to
+# the route), and `held` where it was on and named none: held back by what Codex is, or by a policy,
+# so a start that did not happen is in the journal as one that did is. It departs from C4 (nothing at start) and F6 (a
 # process-creation route beyond the listed ones), rests on engine_present (the installed Codex is
 # the one we start a watcher for, with local checks), and on measurement MW (the WMI escape still
 # leaves a process outside the job); a version of Codex MW has not passed for is a warning in its
@@ -291,6 +293,8 @@ START_WITH_CODEX = CapabilityDef(
     compat="engine_present",
     ceilings=Ceilings(per_day=1, per_conversation=1),
     journal_prefix="swc",
+    codes=("held", "started", "running", "uncertain", "paused", "unasked", "installing", "not_installed",
+           "refused", "failed", "ended"),
     make=make_start_with_codex,
     measurements=(Measurement.MW,),
 )

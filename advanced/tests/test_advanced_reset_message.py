@@ -342,7 +342,9 @@ class EndTests(MessageCase):
         self.h.tick()
         self.assertEqual((self.found(plug, rule)["reason"], self.found(plug, rule)["words"]), (RuleReason.EXPIRED, None))
 
-    def test_turned_off_or_watched_it_is_cancelled_with_its_words_and_nothing_is_sent(self):
+    def test_turned_off_it_is_cancelled_with_its_words_and_watched_it_is_kept_and_nothing_is_sent(self):
+        """Off, a message ends cancelled with its words. Watched (v0.6.16-beta.3) it is kept - what a watched one is set
+        up with is what it watches (runtime._watched_records) - and, either way, nothing is sent."""
         for how in ("off", "watched"):
             with self.subTest(how):
                 h = self.fresh()
@@ -356,8 +358,11 @@ class EndTests(MessageCase):
                     self.arm(plug, state="shadow", warnings=list(plug.runtime.arming.warnings(RESET_MESSAGE)))
                 h.tick()
                 gone = plug.runtime.state.reset_rule(rule)
-                self.assertEqual((gone["state"], gone["reason"], gone["words"]),
-                                 (RuleState.CANCELLED, RuleReason.TURNED_OFF, None))
+                if how == "off":
+                    self.assertEqual((gone["state"], gone["reason"], gone["words"]),
+                                     (RuleState.CANCELLED, RuleReason.TURNED_OFF, None))
+                else:
+                    self.assertEqual((gone["state"], gone["words"]), (RuleState.COUNTING, WORDS))
                 h.now = RESET + CLOSE_AFTER
                 h.tick()
                 self.assertEqual(h.backend.send_calls, [])

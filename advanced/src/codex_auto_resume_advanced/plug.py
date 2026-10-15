@@ -65,7 +65,11 @@ class AdvancedPlug(Plug):
         return self.runtime.tick(view)
 
     def start_route(self, request):
-        return self.runtime.ask(Point.START_ROUTE, request)
+        return self.runtime.start_route(request)
+
+    def start_held(self):
+        """Why the start route just asked named none (core's Plug.start_held, runtime.Runtime.start_held)."""
+        return self.runtime.start_held()
 
     def surface(self, name, facts):
         from . import surfaces

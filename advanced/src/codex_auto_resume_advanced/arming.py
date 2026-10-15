@@ -276,14 +276,46 @@ def _view_of(paths):
     return compatio.reader_view(paths, settings=settings.load(paths.settings_file))
 
 
+def _live_view_of(paths):
+    """A fresh check of the Codex on this machine, made here and written nowhere (compatio.live_view):
+    what a reader with no watcher to ask sees. Bound to the engine the settings name, as `_view_of` is."""
+    import os
+    from codex_auto_resume import compatio, config, settings
+    explicit = settings.load(paths.settings_file).get("codex_exe") or os.environ.get(config.ENV_CODEX_EXE) or None
+    return compatio.live_view(paths, config.codex_home(), explicit=explicit)
+
+
+def held_word(definition, row, state, change, held, policy) -> str | None:
+    """Why `definition`, stored on or watched in `row`, does not stand on now (`standing`'s answer
+    `state`, `change` and `held`), as one short word - or None where it stands on, or is stored off.
+    The word is the reason a turn off was written for, the warning that holds it back, "policy" where
+    an administrator's policy reads it down, or "watched"."""
+    if (row or {}).get("state", ArmingState.OFF) == ArmingState.OFF or state == ArmingState.ARMED:
+        return None
+    if change is not None:
+        return str(change)
+    if held is not None:
+        return str(held)
+    if not policy.admits(definition.id):
+        return "policy"
+    return "watched" if state == ArmingState.SHADOW else "off"
+
+
 class Arming:
     def __init__(self, state, *, catalogs=CATALOGS, policy=None, view=None, measured=None,
-                 clock=time.time):
+                 clock=time.time, live=None):
         self.state = state
         self.registry = state.registry
         self.catalogs = catalogs
         self._policy = policy or _policy.read
         self._view = view or (lambda: _view_of(state.paths))
+        # A fresh check of the Codex here, for a reading that cannot wait for a watcher (`read`'s
+        # `live`): by default only where the view is this machine's own, so a view handed in - a
+        # test's - is never joined by a real check.
+        self._live = live if live is not None else (None if view else (lambda: _live_view_of(state.paths)))
+        # {capability: why it does not stand on now} as the last read that worked found it, for one
+        # stored on or watched (`held_word`); empty until a read.
+        self.why = {}
         self._measured = measured or (lambda: MEASURED)
         self.clock = clock
         # {record: (when core told of its move into submission_unknown, when the send that went
@@ -305,6 +337,17 @@ class Arming:
         and no Codex version - both warnings, never permission for anything unconfirmed."""
         try:
             found = self._view()
+        except Exception:
+            return {}
+        return found if isinstance(found, dict) else {}
+
+    def live_view(self) -> dict:
+        """A fresh check of the Codex here (`_live_view_of`), or {} - UNKNOWN for everything - where
+        there is none to make or it cannot be made."""
+        if self._live is None:
+            return {}
+        try:
+            found = self._live()
         except Exception:
             return {}
         return found if isinstance(found, dict) else {}
@@ -343,11 +386,19 @@ class Arming:
         reads. A capability that is off is off whatever any of those say."""
         return self.read(view=view, policy=policy)[0]
 
-    def read(self, *, view=None, policy=None) -> tuple:
+    def read(self, *, view=None, policy=None, live=()) -> tuple:
         """`current`, with what the runtime needs beside it (v0.6.14): ({id: state now}, {id: since
         when its stored state has stood, for one that is not off}, whether the state could not be
         read). A state that cannot be read has every capability off; the third says it was not read
-        as off, which is not the same thing for a record a capability took up (runtime.py)."""
+        as off, which is not the same thing for a record a capability took up (runtime.py).
+
+        `live` (v0.6.16-beta.3, issue #31): the capabilities whose reading cannot wait for a watcher.
+        Where one of them is stored on or watched and the watcher's report cannot be used - stale,
+        absent, or no longer bound to the Codex on disk, as it is whenever no watcher has run for a
+        while - Codex is checked here instead (`live_view`), so start with Codex, which exists to
+        start that watcher, is not held back for the want of a report only a running watcher
+        writes. The check decides as the report would: an unknown or changed Codex still holds the
+        capability back or turns it off."""
         if not len(self.registry):
             return {}, {}, False
         try:
@@ -357,19 +408,29 @@ class Arming:
         since = {capability: row.get("since") for capability, row in rows.items()
                  if (row or {}).get("state", ArmingState.OFF) != ArmingState.OFF}
         if not since:
+            if not failed:
+                self.why = {}
             return {definition.id: ArmingState.OFF for definition in self.registry}, {}, failed
-        view = self.view() if view is None else view
+        if view is None:
+            view = self.view()
+            if any(capability in since for capability in live) and view.get("status") != "ok":
+                view = self.live_view() or view
         policy = self.policy() if policy is None else policy
         measured = self.measured()
-        states = {}
+        states, why = {}, {}
         for definition in self.registry:
-            state, change, _held, notice = standing(definition, rows.get(definition.id), policy, view,
-                                                    measured)
+            row = rows.get(definition.id)
+            state, change, held, notice = standing(definition, row, policy, view, measured)
             if change is not None:
                 self._off(definition.id, change)
-            elif notice is not None and _rises((rows.get(definition.id) or {}).get("reason"), notice):
+            elif notice is not None and _rises((row or {}).get("reason"), notice):
                 self._keep(definition.id, notice)
             states[definition.id] = state
+            word = held_word(definition, row, state, change, held, policy)
+            if word is not None:
+                why[definition.id] = word
+        if not failed:
+            self.why = why
         return states, since, failed
 
     def _off(self, capability, reason) -> bool:
@@ -499,7 +560,8 @@ class Arming:
         try:
             rules = self.state.reset_rules()
             for rule in rules:
-                if states.get(rule["capability"], ArmingState.OFF) == ArmingState.ARMED:
+                # v0.6.16-beta.3: a watched one keeps its rules (state/arming.py); read down to off, they end.
+                if states.get(rule["capability"], ArmingState.OFF) != ArmingState.OFF:
                     continue
                 if rule["launching_at"] is not None or rule["record_state"] == RecordState.IN_FLIGHT:
                     continue
@@ -509,7 +571,7 @@ class Arming:
                 self.state.set_reading(credits=None, expiry_known=None, nearest_expiry=None)
             # v0.6.15-beta: every queued prompt not in Codex's queue while prompt_queue does not stand on, and every
             # continuation still waiting of one that does not stand on (state/continuations).
-            if states.get("prompt_queue", ArmingState.OFF) != ArmingState.ARMED:
+            if states.get("prompt_queue", ArmingState.OFF) == ArmingState.OFF:
                 self.state.end_prompts(PromptReason.TURNED_OFF, at=self.clock())
             for row in self.state.continuations(pending=True):
                 if (states.get(row["capability"], ArmingState.OFF) != ArmingState.ARMED

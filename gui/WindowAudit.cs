@@ -200,6 +200,8 @@ namespace CodexAutoResume
                         // asked for, so no audit reaches GitHub.
                         form.AuditVersions(findings);
                         form.AuditConversationMessage(snapshot, findings);
+                        // v0.6.16-beta.3: and the dialog of a waiting task's words for this time, built the same way.
+                        form.AuditOnceWords(snapshot, findings);
                     }
                     // v0.6.11: the dialog of a value of the person's own, of each kind the schema offers (SettingsOwn.cs).
                     form.AuditOwnValues(schema, findings);
@@ -1185,6 +1187,26 @@ namespace CodexAutoResume
             }
         }
 
+        /// The dialog of a waiting task's words for this time (v0.6.16-beta.3), built with words in it at its opening size
+        /// and never shown: its text box, its count and its Preview have to fit the dialog in every language.
+        private void AuditOnceWords(Dictionary<string, object> snapshot, List<string> findings)
+        {
+            var rows = snapshot == null ? null : snapshot.ContainsKey("pending") ? snapshot["pending"] as List<object> : null;
+            var row = rows != null && rows.Count > 0 ? rows[0] as Dictionary<string, object> : null;
+            if (row == null) return;
+            using (Form dialog = BuildOnceWords(row, "Then run the tests, please. {reason}"))
+            {
+                dialog.TopLevel = false;
+                Materialise(dialog);
+                dialog.PerformLayout();
+                bool whole = dialog.ClientSize.Width >= Px(600);
+                if (whole && onceWordsArea != null && onceWordsArea.Right > dialog.ClientSize.Width)
+                    findings.Add("words for this time :: its text box reaches past the dialog, " + onceWordsArea.Right +
+                                 " in " + dialog.ClientSize.Width);
+                AuditSpoken("words for this time", dialog, findings);
+            }
+        }
+
         /// A dashboard reply with no waiting and no finished recoveries in it.
         /// `reply` with its watcher stopped two days ago, `ended` as control/watcher.how_it_ended says it.
         private static Dictionary<string, object> WithStoppedWatcher(Dictionary<string, object> reply, string ended)
@@ -1240,6 +1262,7 @@ namespace CodexAutoResume
             foreach (Control child in parent.Controls)
             {
                 if (!OwnVisible(child)) continue;
+                AuditTextLine(where, child, findings);
                 if (Actionable(child))
                 {
                     AuditedSpoken++;
@@ -1248,6 +1271,32 @@ namespace CodexAutoResume
                 }
                 AuditSpoken(where, child, findings);
             }
+        }
+
+        /// Every text box that shows shows at least one whole line of its text (issue #34): the part of it its parents
+        /// leave in view is as tall as its font's line at least. Walked with the screen-reader check, which reaches
+        /// every page and dialog of both editions the audit builds.
+        internal static void AuditTextLine(string where, Control control, List<string> findings)
+        {
+            var box = control as TextBox;
+            if (box == null) return;
+            int shown = box.Height;
+            Rectangle at = new Rectangle(Point.Empty, box.Size);
+            for (Control c = box; c.Parent != null; c = c.Parent)
+            {
+                at.Offset(c.Left, c.Top);
+                // A page that scrolls shows what is below its fold when it is scrolled to: it cuts nothing off.
+                var page = c.Parent as SoftPage;
+                var scroller = c.Parent as ScrollableControl;
+                if ((page != null && page.Scrolls) || (scroller != null && scroller.AutoScroll)) break;
+                Rectangle room = new Rectangle(Point.Empty, c.Parent.ClientSize);
+                at.Intersect(room);
+                if (c.Parent is Form) break;
+            }
+            shown = Math.Min(shown, Math.Max(0, at.Height));
+            if (shown < box.Font.Height)
+                findings.Add(where + "/" + AuditName(box) + " :: its text is cut off, " + shown + " px shown of a " +
+                             box.Font.Height + " px line");
         }
 
         /// Whether a person can act on `control`: press it, switch it, choose in it, type in it or move through it.

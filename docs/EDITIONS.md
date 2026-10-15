@@ -45,7 +45,10 @@ confirms them, for the version of Codex shown. **Watch first** instead has it as
 would act, and note what it would have done, while it does nothing. What it would have done is
 counted on its page, under its other cards, for the last 30 days: each answer in words, once for
 each recovery it would have acted on, how many times and when last; a diagnostics export you ask
-for includes the same. If anything changed while you
+for includes the same. A capability that acts on what you set up for it - a message or a credit at a
+reset, a conversation kept going, a queued message - can be set up while it is watched as well: what
+it would have sent, and when, is counted there, nothing is sent, spent or read for it, and turning it
+on keeps what you set up (from v0.6.16-beta.3). If anything changed while you
 were reading, the page reads it again and asks again with what holds now (K3); where it cannot read
 it again, or your administrator's policy now refuses it, it says that nothing was turned on, and why.
 The page reads the list again after everything you do there, and whenever the watcher says a
@@ -448,12 +451,15 @@ due).
 **Ceilings.** 12 a day, and 3 in any one conversation; and never more than one credit for one filling
 of a window, two a day or seven a week. Four rules may wait at once.
 
-**Measurements MU, MN and MR: not made yet.** MU reads usage as this capability reads it - with the
+**Measurements MU, MN and MR: passed** on codex-cli 0.162.0-alpha.17.2 (2026-10-10,
+[`docs/evidence/live/`](evidence/live/)). MU reads usage as this capability reads it - with the
 credits' count, and without their details - and how still a window's reset time stays; MN asks for a
 credit on an account with none and checks that nothing is spent; MR, at a real limit and only with
-the person's own second yes, spends exactly one credit and checks that asking again with the same key
-spends no second one. Until they are made on your version of Codex, the statement carries each as a
-warning, and a credit is spent only when you press *Use a reset credit now...*.
+the person's own second yes, spent exactly one credit, which lifted the limit, and asking again with
+the same key spent no second one. On that version of Codex the statement carries none of them as a
+warning, and a credit is used at the limit you picked by itself, unless you chose *Ask me first*; on
+any other version each is a warning until it is measured there, and a credit is spent only when you
+press *Use a reset credit now...*.
 
 ### Send your own message when a limit resets
 
@@ -494,8 +500,9 @@ Switching its conversation off cancels it (H5).
 
 **Ceilings.** 10 a day, and 2 in any one conversation.
 
-**Measurement MU: not made yet.** It counts resets from the same usage readings as the reset credit,
-so it rests on MU; until MU is made on your version of Codex, the statement carries it as a warning.
+**Measurement MU: passed** on codex-cli 0.162.0-alpha.17.2 (2026-10-10). It counts resets from the same
+usage readings as the reset credit, so it rests on MU; on any other version of Codex, until MU is made
+there, the statement carries it as a warning.
 
 ### Longer messages
 

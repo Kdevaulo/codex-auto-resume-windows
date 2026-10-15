@@ -71,6 +71,73 @@ def _note_line(path: Path, text: str) -> None:
         pass
 
 
+# How long the MCP server's starter looks for a watcher it started that ended at once (mcp/server.py),
+# and how often. The thread is a daemon: a server Codex ends sooner cuts the look short, and the start's
+# own line is written before the look begins.
+CONFIRM_SECONDS = 8
+CONFIRM_POLL_SECONDS = 0.5
+# After the started process is gone, when the watcher's mutex is asked whether another process took over: the
+# launcher hands over to a fresh copy of itself where the state is newer than its engine, and that copy sleeps
+# 2 s before it starts the watcher (scripts/watcher_launcher.py, _relaunch_once). Asked twice, a few seconds
+# apart, never in a loop: each ask holds the mutex for an instant, and a watcher taking it then would stop.
+HANDOVER_LOOKS = (4.0, 4.0)
+
+# What a start for Codex came to, in the words a plug's route is told (`told`), by the decision's
+# opening words: the first that matches. Anything else - a line from a later version - is "other".
+OUTCOMES = (("already running", "running"), ("started through WMI pid", "started"), ("started pid", "started"),
+            ("start uncertain", "uncertain"), ("not started: recovery is paused", "paused"),
+            ("not started: the watcher could not be asked", "unasked"),
+            ("not started: an installation is in progress", "installing"),
+            ("not started: not installed", "not_installed"), ("not started: WMI refused", "refused"),
+            ("failed:", "failed"))
+
+
+def outcome_word(decision: str) -> str:
+    """The word a decision of `_start_for_codex` is told to a plug's route in (OUTCOMES)."""
+    for opening, word in OUTCOMES:
+        if decision.startswith(opening):
+            return word
+    return "other"
+
+
+def _word(held):
+    """A plug's reason (Plug.start_held, an optional method of the plug's) as core writes one: `[a-z_]`, 1 to
+    32 letters, or None for anything else - so a plug's answer never puts a path or a name in the log."""
+    if type(held) is not str or not 0 < len(held) <= 32 or not all(c == "_" or "a" <= c <= "z" for c in held):
+        return None
+    return held
+
+
+def _tell(route, word) -> None:
+    """Tell a plug's start route what core made of it, through its optional `told`. Never raises:
+    the route is the plug's code, and what it does with the word changes nothing of core's."""
+    try:
+        told = getattr(route, "told", None)
+        if callable(told):
+            told(word)
+    except Exception:                    # noqa: BLE001 - the plug's own code
+        pass
+
+
+def _started_pid(decision):
+    """The pid a "started" decision names, or None."""
+    for opening in ("started through WMI pid ", "started pid "):
+        if decision.startswith(opening):
+            digits = decision[len(opening):].split(",")[0].strip()
+            return int(digits) if digits.isdigit() else None
+    return None
+
+
+def _process_there(pid) -> bool:
+    """Whether process `pid` still runs. A process Windows will not open is taken as gone: the start
+    made it as this very user, so only a process that has ended cannot be opened."""
+    try:
+        windows.process_identity(pid)
+        return True
+    except windows.AdapterError:
+        return False
+
+
 class CodexStartMixin:
     """The launch Codex asks for, and why it is refused."""
 
@@ -89,7 +156,7 @@ class CodexStartMixin:
         except Exception:        # noqa: BLE001 - a question Windows cannot answer is not an error here
             return None
 
-    def start_for_codex(self) -> str:
+    def start_for_codex(self, confirm_seconds: float = 0) -> str:
         """Start the watcher because Codex has just started this plugin's MCP server - if asked to.
 
         v0.6.9, `start_with_codex`, off by default. Codex starts every plugin's MCP server
@@ -103,19 +170,65 @@ class CodexStartMixin:
 
         Never raises, and returns the one line it records in logs/codex-start.log: what Windows
         wrapped this process in (windows.process_context) and what was decided. The line carries
-        no path, name or content.
+        no path, name or content. With `confirm_seconds` (the MCP server's starter), a watcher it
+        started that is gone that many seconds later gets a second line saying so.
         """
-        context = {}
+        context, named = {}, []
         try:
             context = windows.process_context()
-            decision = self._start_for_codex(context)
+            decision = self._start_for_codex(context, named)
         except Exception as exc:     # noqa: BLE001 - a failure here must never cost Codex the panel
             decision = "failed: %s" % type(exc).__name__
         line = "pid %d; %s; %s" % (os.getpid(), _context_words(context), decision)
         _note_line(self.paths.codex_start_log, line)
+        # v0.6.16-beta.3 (issue #31): a route the plug named is told what core made of it, so the
+        # plug's journal says what happened - a start, or the refusal that came after the route was
+        # named - and not only that a route was named.
+        route = named[0] if named else None
+        if route is not None:
+            _tell(route, outcome_word(decision))
+        if confirm_seconds:
+            self._confirm_codex_start(decision, route, confirm_seconds)
         return line
 
-    def _start_for_codex(self, context) -> str:
+    def _confirm_codex_start(self, decision, route, seconds) -> None:
+        """Whether the watcher a start for Codex just made is still there `seconds` later, said in
+        a second line - and told to the plug's route - only where it is not: a start that failed
+        after it was made says so, as one refused before it does (v0.6.16-beta.3, issue #31).
+
+        The watcher runs inside the launcher's own process, so the pid the start reported is the
+        watcher's: still there, the start held; gone, it ended before it could watch. The process is
+        looked at, not the watcher's single-instance mutex, which a probe could hold at the very
+        moment the new watcher takes it; the mutex is asked after the process is gone (HANDOVER_LOOKS),
+        so a start that lost a race to another watcher, or a launcher that handed over to a fresh copy
+        of itself, is not called a failure. Never raises."""
+        pid = _started_pid(decision)
+        if pid is None:
+            return
+        try:
+            deadline = time.monotonic() + seconds
+            while time.monotonic() < deadline:
+                if not _process_there(pid):
+                    break
+                time.sleep(CONFIRM_POLL_SECONDS)
+            else:
+                return
+            for wait in HANDOVER_LOOKS:
+                time.sleep(wait)
+                if self.watcher_running() is True:
+                    return
+            _note_line(self.paths.codex_start_log,
+                       "pid %d; the watcher started as pid %d ended within %d s (see logs/errors.log)"
+                       % (os.getpid(), pid, seconds))
+            if route is not None:
+                _tell(route, "ended")
+        except Exception:                # noqa: BLE001 - a look after the start never costs the panel
+            pass
+
+    def _start_for_codex(self, context, named=None) -> str:
+        """The decision itself; a route the plug names is appended to `named`, for `start_for_codex`
+        to tell what became of it."""
+        named = [] if named is None else named
         setting_on = bool(self.get_settings().get("start_with_codex"))
         breakaway = bool(context.get("in_job") and context.get("breakaway_ok")
                          and not context.get("silent_breakaway_ok"))
@@ -138,7 +251,12 @@ class CodexStartMixin:
         if not setting_on:
             route = self.plug.start_route(dict(context))
             if route is DEFER:
-                return "off"
+                # v0.6.16-beta.3 (issue #31): the plug says why, where something of its own was turned
+                # on and named no route - held back, watched only, turned off on the way - so a
+                # person who turned start with Codex on never reads a bare "off".
+                held = _word(self.plug.start_held())
+                return "off" if held is None else "off (held: %s)" % held
+            named.append(route)
         # A pause stops start-with-Codex, as it stops every capability and core's own recovery:
         # nothing is started, WMI route or core's own launch, while recovery is paused.
         if self._paused():
@@ -162,6 +280,8 @@ class CodexStartMixin:
             # through WMI, and core carries it out.
             if route is DEFER:
                 route = self.plug.start_route(dict(context))
+                if route is not DEFER:
+                    named.append(route)
             if route is DEFER:
                 return "not started: this Codex ends what its plugins start"
             return self._start_through_route(route)

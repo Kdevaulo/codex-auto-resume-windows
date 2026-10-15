@@ -611,7 +611,10 @@ class BridgeTests(ControlTestCase):
             # Dashboard, turned off. A file write each, and nothing sent.
             "power-action", "power-arm", "power-disarm",
             # v0.6.16-beta.3: Diagnostics' check of why a failure was not taken up - read only, nothing sent.
-            "detection-check"]))
+            "detection-check",
+            # v0.6.16-beta.3: one waiting recovery's words for this time - a file write, sent later
+            # by the watcher once, under every check, as a Custom message is.
+            "once-words"]))
 
     def test_serve_answers_every_line_with_exactly_one_line(self):
         requests = "\n".join([

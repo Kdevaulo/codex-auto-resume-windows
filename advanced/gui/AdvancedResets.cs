@@ -269,12 +269,13 @@ namespace CodexAutoResume
         }
 
         // ---------------------------------------------------------------- the card
-        /// The open reset capability's card, while it is on: its rules, then the form a rule is added with.
+        /// The open reset capability's card, while it is on or watched (v0.6.16-beta.3): its rules, then the form a rule is
+        /// added with. Watched, a rule is evaluated and what it would have done is in the watch log; nothing is sent or spent.
         private void BuildResets(Dictionary<string, object> item)
         {
             ForgetResetCard();
             string id = Str(item, "id");
-            if (!IsResets(id) || Str(item, "state") != StateArmed || advancedResets == null) return;
+            if (!IsResets(id) || !Standing(item) || advancedResets == null) return;
             bool credit = id == ResetCreditId;
             string kind = credit ? "credit." : "message.";
             TableLayoutPanel card = NewGroup(credit ? Word("page.resets.credit.title", "Reset credit rules")

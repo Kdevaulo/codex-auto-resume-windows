@@ -509,6 +509,13 @@ OpenTelemetry exporter(`otel.exporter`, `otel.trace_exporter`, `otel.metrics_exp
   확인이 읽습니다. 지워도 그런 대화의 앞선 ID를 Codex의 파일 이름에서 다시 찾을 뿐입니다. `Uninstall.cmd
   -Purge`로 `config/`의 나머지와 함께 지워지고, 명령줄의 `uninstall`은 `--keep-state`를 주지 않는 한 이것도
   지웁니다;
+- `config/once-words.json`(이번 릴리스부터, 대시보드에서 기다리는 작업에 이번에만 덧붙일 말을 둔 동안에만) — 그런
+  작업마다 이 제품 자신의 중단 id(대화의 id는 아닙니다), 쓴 그대로의 말, 쓴 시각입니다. 그 말은 직접 입력 메시지처럼
+  그 작업의 다음 이어서 하기 메시지 뒤에 한 번, 그 대화로 보냅니다. 작업마다의 항목은 그 말을 담은 이어서 하기
+  메시지를 Codex에 넘길 때, 그 말을 지울 때, 그리고 보내지 않고 작업이 끝나면 워처가 다음에 살펴볼 때 지워지고,
+  파일은 아무것도 남지 않으면 지워집니다. 설정 파일에는 들어가지 않으며, 진단 번들에는 몇 개인지만 남습니다.
+  `Uninstall.cmd -Purge`로 `config/`의 나머지와 함께 지워지고, 명령줄의 `uninstall`은 `--keep-state`를 주지
+  않는 한 이것도 지웁니다;
 - `logs/` — 워처가 무엇을 했는지 사유 코드와 대화 UUID로 기록하는 `auto-resume.log`, 문제가 생겼을 때의
   Python traceback이 남는 `errors.log`, 실행될 때마다 한 줄씩(실패했다면 그 이유도) 남는 `launcher.log`.
   v0.6.8 다음 릴리스부터는 `codex-start.log`도 있습니다. Codex가 플러그인의 MCP 서버를 시작할 때마다 한 줄씩,

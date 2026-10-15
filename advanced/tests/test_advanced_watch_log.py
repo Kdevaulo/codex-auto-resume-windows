@@ -148,12 +148,12 @@ class ViewTests(WatchCase):
         connection = sqlite3.connect(self.advanced.runtime.state.path)
         self.addCleanup(connection.close)
         connection.execute("INSERT INTO journal (at, capability, code, point, answer) "
-                           "VALUES (?, 'test_wake', 'would_have', 'records', 'records')", (self.now,))
+                           "VALUES (?, 'test_wake', 'would_have', 'tick', 'not_a_word')", (self.now,))
         connection.commit()
         self.note(self.now, Alternative.EARLY)
         self.assertEqual(self.log()["entries"], [
             {"answer": "early", "points": ["schedule"], "count": 1, "first": minute(self.now), "last": minute(self.now)},
-            {"answer": None, "points": ["records"], "count": 1, "first": minute(self.now), "last": minute(self.now)}])
+            {"answer": None, "points": ["tick"], "count": 1, "first": minute(self.now), "last": minute(self.now)}])
 
     def test_it_answers_with_no_id_and_no_word(self):
         self.holding()
@@ -318,9 +318,15 @@ class GuardTests(WatchCase):
                     and node.args and isinstance(node.args[0], ast.Attribute) \
                     and isinstance(node.args[0].value, ast.Name) and node.args[0].value.id == "Point":
                 asked.add(Point[node.args[0].attr])
+            # P9 (v0.6.16-beta.3) goes through the runtime's own start_route, which reads afresh and then asks.
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "start_route" \
+                    and isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "runtime":
+                asked.add(Point.START_ROUTE)
         self.assertIn(Point.GATES, asked)
-        # P12 (v0.6.15-beta) is asked through the runtime's own partition, whose answer is a number: a value too.
-        self.assertEqual((asked | {Point.TICK, Point.CONCURRENCY}) - set(ALTERNATIVES), set(watchlog.VALUE_POINTS))
+        # P12 (v0.6.15-beta) is asked through the runtime's own partition, whose answer is a number: a value too; and
+        # (v0.6.16-beta.3) P2's rows of a watched capability, journalled by the runtime itself (runtime._watched_records).
+        self.assertEqual((asked | {Point.TICK, Point.CONCURRENCY, Point.RECORDS}) - set(ALTERNATIVES),
+                         set(watchlog.VALUE_POINTS))
         self.assertEqual(set(watchlog.WORDS), set(Alternative) | set(watchlog.VALUE_POINTS))
         self.assertEqual(len(watchlog.WORDS), len(set(watchlog.WORDS)))
 

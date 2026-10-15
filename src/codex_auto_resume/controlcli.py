@@ -91,7 +91,9 @@ WITH_ARGUMENT = ("update", "enabled", "startup", "cancel", "reset-budget", "retr
                  "check-setting",
                  # v0.6.12: the power action armed - from the Dashboard, which is this bridge's only
                  # caller that arms (H14) - and turned off.
-                 "power-arm", "power-disarm")
+                 "power-arm", "power-disarm",
+                 # v0.6.16-beta.3: one waiting recovery's words for this time - read, set or taken away.
+                 "once-words")
 # Big enough for the largest Save the settings layer accepts: eight Custom messages of 2000
 # characters each, and the window writes every line break as a six-character escape, so a
 # valid Save can come to nearly 100 KiB. At 64 KiB such a Save was refused as "request too
@@ -443,7 +445,8 @@ def dispatch(control: Control, command: str, payload: dict) -> dict:
             changes = payload.get("changes")
             return {"ok": True, "result": control.preview_continuation(payload.get("category"),
                                                                        changes,
-                                                                       thread_id=payload.get("thread_id"))}
+                                                                       thread_id=payload.get("thread_id"),
+                                                                       once_words=payload.get("once_words"))}
         if command == "interruption-recovery":
             return {"ok": True, "result": control.set_interruption_recovery(
                 payload.get("interruption_id"), payload.get("thread_id"), _flag(payload))}
@@ -462,6 +465,12 @@ def dispatch(control: Control, command: str, payload: dict) -> dict:
                 raise ControlError("a custom message has to be text")
             return {"ok": True, "result": control.set_conversation_message(payload.get("thread_id"),
                                                                            payload.get("text"))}
+        if command == "once-words":
+            # Without `text`, the words are read; with it, set - or, for null, taken away.
+            if "text" not in payload:
+                return {"ok": True, "result": control.once_words(payload.get("interruption_id"))}
+            return {"ok": True, "result": control.set_once_words(payload.get("interruption_id"),
+                                                                 payload.get("thread_id"), payload.get("text"))}
         if command == "check-setting":
             return {"ok": True, "result": control.check_setting(payload.get("name"), payload.get("value"))}
         if command == "logs":
