@@ -358,7 +358,7 @@ def uninstall() -> bool:
 # registry, so these are the whole of what it is asked for. They carry no rule of their own.
 
 def read_key(path: str, names) -> dict | None:
-    """The values of `names` under HKCU\`path` that exist, or None when the key does not."""
+    """The values of `names` under the HKCU key `path` that exist, or None when the key does not."""
     winreg = _winreg()
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_READ) as key:
@@ -376,7 +376,7 @@ def read_key(path: str, names) -> dict | None:
 
 
 def write_key(path: str, values: dict) -> None:
-    """Create HKCU\`path` and set each value: a string as REG_SZ, an integer as REG_DWORD."""
+    """Create the HKCU key `path` and set each value: a string as REG_SZ, an integer as REG_DWORD."""
     winreg = _winreg()
     try:
         with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_SET_VALUE) as key:
@@ -388,7 +388,7 @@ def write_key(path: str, values: dict) -> None:
 
 
 def delete_key(path: str) -> bool:
-    """Idempotent: True when HKCU\`path` was removed. A key with subkeys is refused by Windows, as it should be."""
+    """Idempotent: True when the HKCU key `path` was removed. A key with subkeys is refused by Windows, as it should be."""
     winreg = _winreg()
     try:
         winreg.DeleteKey(winreg.HKEY_CURRENT_USER, path)
