@@ -1,5 +1,67 @@
 # Changelog
 
+## v0.6.16-beta.3 — Words for this time, a conversation Codex records under another id, and a usage meter
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta.2...v0.6.16-beta.3)
+
+**A pre-release: the standard edition's words for this time, the fixes people reported, and stage 4's first
+capabilities.** It is a GitHub pre-release, so `releases/latest` stays v0.6.15; an installation of v0.6.15 or
+of an earlier v0.6.16 beta is offered it by *Check for updates*, which asks first and says it is tested less,
+and *Install another version...* lists it. As with v0.6.16-beta.2, a plugin copy older than v0.6.11-beta.2's
+cannot read a numbered pre-release: set up and repair with the installation's own copy.
+
+**Going back.** The watcher's state stays schema 5, as v0.6.16-beta's. The advanced edition's own file is now
+version 5 - the usage meter's last reading - brought up from version 4 the first time it is opened, every row
+kept. An advanced version older than this one cannot read it and fails closed: every advanced feature is off
+there, and *Install another version...* says so before it installs one.
+
+### Both editions
+
+- **Words for this time.** One waiting recovery on the Pending page can carry words of yours - **Add words for
+  this time...** on its row - sent once, after the continuation it would send anyway, and then deleted. They
+  start, speed up and skip nothing, and are deleted too when the recovery ends without a send. They are a Custom
+  message in every other way, written only in the Dashboard (standards A26 and A27, amended by the owner).
+- **A conversation whose turns Codex records under another id is followed there.** Codex can carry on a
+  conversation's turns under a new id, and a failure there was never found. The watcher now follows every id a
+  conversation has had, in order, so its failure is found and an old one never comes back (reported by
+  @aca22jy, #30).
+- **Every failed turn the watcher does not take up is logged once, with why** - once per turn and reason,
+  across restarts, a few lines at a time (suggested by @barkshah2002-pixel, #27).
+- **Diagnostics can check why a failure was not taken up.** *Check why a failure was not taken up...* asks the
+  watcher's own rules about the newest 200 conversations, within 10 seconds, and reads nothing of what they say
+  (suggested by @barkshah2002-pixel, #27).
+- **Settings' Run at Windows sign-in shows what Windows really holds**, and Save writes it only where you moved
+  it; an update keeps the entry you kept (#31).
+- **The panel says how to start the watcher when it is off**, and that nothing starts it while sign-in is off
+  (#31).
+- **Installing over a running v0.6.11 to v0.6.15 watcher no longer reports a false failure**, and the
+  installer's Korean lines reach you and the Dashboard whole (#33). This was the known issue of v0.6.15,
+  v0.6.16-beta and v0.6.16-beta.2.
+- **One-line text boxes show their whole line**, and the Codex homes card no longer runs into what is beside
+  it (#34).
+- **When a card is shown and the keyboard focus moves, the log says where it went**, by window class and
+  program (#32).
+- **The version picker warns** that every advanced feature is off in an advanced version older than this one.
+
+### Advanced edition
+
+- **Start with Codex starts the watcher after a restart too**, and every start it does not make says why (#31).
+- **What a capability needs, it turns on with it.** A capability can need another, and turning it on turns on
+  what it needs in the one confirmation, with every statement in front of you; turning a needed one off first
+  turns off what needs it (the owner's request; standard K3 amended by the owner).
+- **Usage meter, Wrap up near a limit and Pause near a limit.** The meter reads your Codex usage on a schedule
+  you pick and warns near a limit; the wrap-up asks each running turn to finish its step; the pause holds the
+  product's continuations until the reset. Both need the meter (suggested by @Hunweibyn, #29).
+- **Recover every conversation but Codex's own** takes up a failed turn in any conversation of the app except
+  subagents, reviews, memory passes and the ones an agent made.
+- **Keep it on sits in view**, in a capability's head card under its state, and the list says "· kept on".
+- **A watched capability can be set up**: a message or a credit at a reset, a conversation kept going and a
+  queued message are counted as what they would have done, and never sent.
+- **MU, MN and MR passed** on codex-cli 0.162.0-alpha.17.2, so the reset credit and the message at a reset no
+  longer carry an unsettled warning there.
+- **Read-only probes** measure what stop-now, send-now and cloud tasks would need, driving nothing; none of
+  them is built yet.
+
 ## v0.6.16-beta.2 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta...v0.6.16-beta.2)

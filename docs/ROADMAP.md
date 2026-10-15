@@ -758,9 +758,9 @@ moved one on; the published v0.6.15-beta is published again as v0.6.16-beta.
 
 ## v0.6.16 — The rest of the advanced edition
 
-**In development: v0.6.16-beta.2 ✅ is out, v0.6.15's fix on the beta line, after v0.6.16-beta (published first as v0.6.15-beta), its first pre-release: stage 3c and watching several Codex
-homes. Next, v0.6.16-beta.3: words for this time in the standard edition, with the
-other work that lands there.**
+**In development: v0.6.16-beta.3 ✅ is out: words for this time in the standard edition, with the
+other work that landed there. Before it came v0.6.16-beta.2, v0.6.15's fix on the beta line, and v0.6.16-beta
+(published first as v0.6.15-beta), the first pre-release: stage 3c and watching several Codex homes.**
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
@@ -771,7 +771,7 @@ statement that names the standards it departs from, as v0.6.11's and v0.6.14's a
 measurement of the real Codex; one that fails narrows the route, or becomes a warning the person
 confirms, and does not drop the capability.
 
-### v0.6.16-beta.3 — Words for this time (standard edition)
+### v0.6.16-beta.3 ✅ — Words for this time (standard edition)
 
 What the owner asked for on 2026-10-10: pick one waiting recovery on Pending and, this one time, when its
 limit lifts, send its usual continuation with words of the person's own after it. Standards A26 and A27 are
