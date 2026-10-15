@@ -57,6 +57,8 @@ METHODS = {
     # v0.6.11: the needs-you notices, each raised once (engine/notices.py), and the last usage reading
     # the watcher's heartbeat keeps, which reads nothing (engine/freshness.py).
     "tell_needs_you", "_notice", "last_usage",
+    # v0.6.16-beta.3: why a failed turn is not taken up, decided once and said once (issue #27).
+    "detection_since", "not_taken_up", "_skip", "_say_passed_over",
     # v0.6.11: whether Windows reports no internet and the wait that follows, and what a wake forgets
     # and a long sleep holds (engine/freshness.py) - each asked of nothing at the defaults.
     "offline", "_offline", "after_sleep",

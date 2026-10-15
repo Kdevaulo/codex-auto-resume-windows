@@ -21,6 +21,7 @@ import uuid
 
 from .. import compatio, config, edition, l10n, managed, needsyou, notifier, oncewords, settings as policy
 from ..codex import LocalSource
+from ..codex.chains import memory as chain_memory
 from ..codex.pairing import app_engines
 from ..domain.plug import DEFER, EXTRA, Surface, guard
 from ..engine import Engine
@@ -274,7 +275,7 @@ class App(WatchLoop):
             self._record_failure("compatibility check")
 
     def source(self) -> LocalSource:
-        return LocalSource(self.codex_home)
+        return LocalSource(self.codex_home, chains=chain_memory(self.paths.split_chains_file))
 
     def engine(self, store: Store, *, dispatch_lock=None) -> Engine:
         source = self.source()
@@ -491,9 +492,8 @@ class App(WatchLoop):
         """The lock of a Codex home Settings add: by its path and its folder's identity, never by one alone."""
         return HomeLock(path, self.lock_dir, require_identity=True)
 
-    @staticmethod
-    def home_source(path) -> LocalSource:
-        return LocalSource(path)
+    def home_source(self, path) -> LocalSource:
+        return LocalSource(path, chains=chain_memory(self.paths.split_chains_file))
 
     @staticmethod
     def home_backend(path, codex_exe) -> Backend:

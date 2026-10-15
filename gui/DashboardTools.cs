@@ -621,6 +621,122 @@ namespace CodexAutoResume
         // The last Log dialog's list, for LayoutAudit.
         private ListView logsList;
 
+        // ------------------------------------------------- why a failure was not taken up (v0.6.16-beta.3)
+        private void OpenDetectionCheck()
+        {
+            using (Form dialog = BuildDetectionCheck()) dialog.ShowDialog(this);
+        }
+
+        /// The check's dialog, built and not shown: what the bridge's `detection-check` says (checkup.py) - the
+        /// watcher's own decisions asked on the spot, read only, in the Interface language, the most likely reason
+        /// first - in a read-only well, with Copy and Close. Asked once, when the dialog opens.
+        private Form BuildDetectionCheck()
+        {
+            var dialog = new Form();
+            dialog.Text = S("check.title", "Why a failure was not taken up");
+            dialog.Font = Font;
+            dialog.BackColor = Canvas;
+            dialog.ForeColor = Ink;
+            Soft.TitleBar(dialog);
+            dialog.StartPosition = FormStartPosition.CenterParent;
+            dialog.ClientSize = new Size(Px(760), Px(520));
+            dialog.MinimizeBox = false;
+            dialog.ShowInTaskbar = false;
+            dialog.Icon = Icon;
+
+            var well = new SoftTextArea();
+            well.Dock = DockStyle.Fill;
+            well.Font = Font;
+            well.Box.Font = Font;
+            well.Box.ReadOnly = true;
+            well.Box.WordWrap = true;
+            well.Box.Text = S("check.running", "Checking...");
+            well.Box.AccessibleName = S("check.title", "Why a failure was not taken up");
+            var padding = new Panel();
+            padding.BackColor = Canvas;
+            padding.Dock = DockStyle.Fill;
+            padding.Padding = Pad(12, 12, 12, 0);
+            padding.Controls.Add(well);
+
+            var footer = new SoftStack();
+            footer.Dock = DockStyle.Bottom;
+            footer.AutoSize = true;
+            footer.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            footer.ColumnCount = 1;
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            footer.Padding = Pad(12, 8, 12, 0);
+            footer.BackColor = Canvas;
+            var note = Value(S("check.note", "Read only. No conversation's words are read, and conversations are shown as aliases that are valid only in this result. Copy it into an issue if you are asked for it."));
+            note.ForeColor = Secondary;
+            note.MaximumSize = new Size(Px(720), 0);
+            footer.Controls.Add(note);
+
+            FlowLayoutPanel buttons = ButtonRow();
+            buttons.FlowDirection = FlowDirection.RightToLeft;
+            buttons.Padding = Pad(12, 8, 12, 12);
+            var close = MakeButton(S("action.close", "Close"), false, delegate { dialog.Close(); });
+            Button copy = MakeButton(S("check.copy", "Copy"), true, null);
+            copy.Enabled = false;
+            copy.Click += delegate
+            {
+                try
+                {
+                    Clipboard.SetText(well.Box.Text ?? "");
+                    copy.Text = S("check.copied", "Copied.");
+                }
+                catch (Exception) { }
+            };
+            buttons.Controls.Add(close);
+            buttons.Controls.Add(copy);
+
+            dialog.Controls.Add(padding);
+            dialog.Controls.Add(footer);
+            dialog.Controls.Add(buttons);
+            dialog.CancelButton = close;
+
+            dialog.Shown += delegate
+            {
+                well.Box.Select(0, 0);
+                System.Threading.ThreadPool.QueueUserWorkItem(delegate
+                {
+                    Dictionary<string, object> reply = null;
+                    try { reply = bridge.Call("detection-check", null); }
+                    catch (Exception) { reply = null; }
+                    MethodInvoker apply = delegate
+                    {
+                        if (dialog.IsDisposed) return;
+                        string text = DetectionCheckText(Ok(reply) ? Map(reply, "result") : null,
+                                                         S("check.unavailable", "The check could not be run right now."));
+                        well.Box.Text = text;
+                        well.Box.Select(0, 0);
+                        copy.Enabled = Ok(reply);
+                    };
+                    try { if (dialog.IsHandleCreated && !dialog.IsDisposed) dialog.BeginInvoke(apply); }
+                    catch (Exception) { }
+                });
+            };
+            detectionWell = well;
+            return dialog;
+        }
+
+        /// The check's answer as the well shows it and Copy copies it: its lines, one under another, or - for an
+        /// answer that could not be had - `unavailable`.
+        internal static string DetectionCheckText(Dictionary<string, object> result, string unavailable)
+        {
+            var lines = Items(result, "lines");
+            if (result == null || lines == null) return unavailable;
+            var said = new StringBuilder();
+            foreach (object line in lines)
+            {
+                if (said.Length > 0) said.Append("\r\n");
+                said.Append(line as string ?? "");
+            }
+            return said.ToString();
+        }
+
+        // The last check dialog's well, for LayoutAudit.
+        private SoftTextArea detectionWell;
+
         // --------------------------------------------------------- who may open the state folder
         /// Asked with the compatibility view, as the plugin's copy is (LoadPluginCopy): one word, and a sentence
         /// under the Health facts only while other accounts can open the folder.

@@ -116,6 +116,78 @@ class StateAccessReply(TypedDict):
     access: str
 
 
+class CheckConversation(TypedDict):
+    """v0.6.16-beta.3 (`detection-check`, checkup.py): one recent conversation's latest turn - how Codex
+    recorded it, whether the failure scan brings it and why not, and what else holds one it brings."""
+    thread: str
+    home: int | None
+    status: str | None
+    category: str | None
+    completed_at: float | None
+    reason: str | None
+    kind: str | None
+    turns_under: str | None
+    brought: bool
+    remaining: list[str]
+    records: list[str]
+
+
+class CheckHome(TypedDict):
+    """A Codex home the watcher knows, by number (None for the default), and when its databases were written."""
+    home: int | None
+    state_written: float | None
+    history_written: float | None
+    current: bool
+    readable: bool
+    cloud_tasks: int | None
+
+
+class CheckUsage(TypedDict):
+    """Whether the watcher's last usage reading worked, and what it said."""
+    read: bool
+    read_at: float | None
+    five_hour: float | None
+    weekly: float | None
+    reset_at: float | None
+
+
+class CheckNotices(TypedDict):
+    """How a notice reaches the person now (notice_presence), each None where Windows cannot say."""
+    route: str | None
+    do_not_disturb: bool | None
+    app_allowed: bool | None
+
+
+class CheckCodex(TypedDict):
+    """The Codex engine as the Compatibility Registry's view has it."""
+    version: str | None
+    tier: str | None
+    engine_found: bool
+
+
+class CheckLeftOut(TypedDict):
+    """What the check did not show: older conversations past its newest NEWEST, and those it had no time for."""
+    conversations: int
+    unchecked: int
+
+
+class DetectionCheck(TypedDict):
+    """`detection-check`: why a failure was not taken up, as the watcher's own functions answer it now - the
+    summary's code, the parts, and `lines`, all of it in the Interface language, the summary first."""
+    summary: str
+    watcher_running: bool
+    conversations: list[CheckConversation]
+    left_out: CheckLeftOut
+    split: list[dict[str, str]]
+    homes: list[CheckHome]
+    cloud_tasks: int | None
+    usage: CheckUsage
+    notices: CheckNotices
+    codex: CheckCodex
+    skips: list[str]
+    lines: list[str]
+
+
 class TimelineEvent(TypedDict):
     """One entry of a record's journal, as the Timeline dialog lists it."""
     event_id: int
@@ -411,4 +483,5 @@ CONTRACTS = (RecordView, PendingRow, TimelineEvent, Receipt, UsageWindow, UsageR
              StatusSnapshot, Outcomes, Statistics, CompatEngine, CompatData, CompatCapability,
              CompatReported, CompatView, SchemaField, OwnValue, DemoRow, DemoReply, LogLine, LogSearch,
              StateAccessReply, PowerArmed, PowerShown, PowerLast, PowerView, PowerChoice, PowerOptions,
-             PowerDisarmed)
+             PowerDisarmed, CheckConversation, CheckHome, CheckUsage, CheckNotices, CheckCodex, CheckLeftOut,
+             DetectionCheck)

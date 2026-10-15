@@ -1,0 +1,207 @@
+"""A conversation's rollout file, read no further than this product needs (v0.6.16-beta.3).
+
+None of these readings is a statement to a database - codex/history.py keeps every one:
+
+    confined       which file a `threads` row's path names, if it is that conversation's in the sessions folder
+    session_meta   the file's first line: who the conversation says it is
+    continued_id   the id Codex records the conversation's turns under, where it split them
+    earlier        the ids it recorded them under before, by the names of its earlier files
+    named_after    the conversations whose file names an id as theirs, by name
+    reset_scan     the rate-limit snapshots just before a usage-limit failure, for the reset hint
+
+The split is Codex's (openai/codex#43422, this project's issue #30): the `threads` row keeps the
+conversation's id A, but its current file is named `..._A_B.jsonl` and its turns are projected under B,
+which has no row of its own - and a later split names `..._A_C.jsonl` while B's turns stay under B. Its
+turns are every id's, in that order (`SPAN`); whether an id is taken is history.py's (`_chain`), with every
+guard. Only file names are looked at here, never a file's contents.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+import re
+import time
+
+from ..domain import ids
+from .paths import _safe_path
+from .payload import _choose_reset
+from .values import MAX_ITEM_BYTES, MAX_META_BYTES, MAX_SCAN_BYTES, _json
+
+UNKNOWN_RESET = {"reset_at": None, "limit_type": "unknown", "uncertain": True}
+# A turn's ordinal across a split conversation: the index of the id it is recorded under (A's own 0, then each
+# split id in order) times SPAN, plus its own rollout ordinal - so a turn of a later id always comes after every
+# turn of an earlier one, whatever Codex numbered it, and a conversation never split reads its ordinals as they are.
+SPAN = 1 << 40
+# The split files of each Codex home by name, looked at again at most every LIST_SECONDS: one listing for every
+# conversation, names only.
+LIST_SECONDS = 60.0
+AGAIN = 5
+_SPLITS, _ASKED, _RELISTED = {}, set(), {}
+
+
+def _splits(home, fresh=False) -> dict:
+    """{conversation id: ((split id, file), ...) oldest first} for every file under the home's sessions folder
+    named `<id>_<id>.jsonl` - by name only, nothing opened, no link followed; none where it cannot be listed."""
+    key, now = str(home), time.monotonic()
+    held = _SPLITS.get(key)
+    if held is None or fresh or now - held[0] > LIST_SECONDS:
+        found = {}
+        pattern = re.compile(r"(%s)_(%s)\.jsonl\Z" % (ids.uuid_pattern(any_case=True), ids.uuid_pattern(any_case=True)))
+        try:
+            names = sorted((path for path in (Path(home) / "sessions").rglob("*_*.jsonl") if path.is_file()),
+                           key=lambda path: path.name)
+        except OSError:
+            names = []
+        for path in names:
+            match = pattern.search(path.name)
+            if match and continued_id(match.group(1), path.name) == match.group(2):
+                found.setdefault(match.group(1), []).append((match.group(2), path))
+        held = _SPLITS[key] = (now, {owner: tuple(pairs) for owner, pairs in found.items()})
+    return held[1]
+
+
+def earlier(home, thread_id, current) -> tuple:
+    """((id, file), ...): the ids before `current` that `thread_id`'s earlier files name as `<thread_id>_<id>`, oldest
+    first by file name (Codex starts each name with its time)."""
+    pairs = _splits(home).get(thread_id, ())
+    if (str(home), thread_id, current) not in _ASKED and all(pair[0] != current for pair in pairs):
+        if len(_ASKED) > 4096:
+            _ASKED.clear()
+        _ASKED.add((str(home), thread_id, current))              # a split newer than the listing: list again, once
+        pairs = _splits(home, fresh=True).get(thread_id, ())
+    return tuple(pair for pair in pairs if pair[0] != current)
+
+
+def taken(chain, rows) -> set:
+    """The ids of `chain` that are no split id of the conversation's: one with a `threads` row of its own, or one
+    another conversation's file names (`rows`: (id, rollout_path) of those rows)."""
+    return {other for other in chain for row_id, path in rows
+            if row_id == other or (isinstance(path, str) and other in path)}
+
+
+_META = {}
+
+
+def meta_id(path):
+    """The id an earlier file's first line says it is (session_meta), read once and remembered - None for none."""
+    key = str(path)
+    if key not in _META:
+        try:
+            payload = session_meta(Path(path))
+        except OSError:
+            return None
+        if len(_META) >= 4096:
+            _META.pop(next(iter(_META)))
+        _META[key] = payload.get("id") if payload else None
+    return _META[key]
+
+
+def named_after(home, turns_id) -> tuple:
+    """The conversation ids whose files, by name and first line, hold `turns_id`'s turns (`<id>_<turns_id>.jsonl`) -
+    listed again, once for each id and at most AGAIN times a minute, where the listing names none: a split newer than the listing
+    is found at once, and many ids no file names cost a few listings."""
+    def named(listing):                     # a file whose first line is another conversation's names no one
+        return tuple(owner for owner, pairs in listing.items()
+                     if any(other == turns_id and meta_id(file) == owner for other, file in pairs))
+    found = named(_splits(home))
+    now = time.monotonic()
+    recent = _RELISTED.setdefault(str(home), [])
+    recent[:] = [at for at in recent if now - at < LIST_SECONDS]
+    if not found and (str(home), turns_id) not in _ASKED and len(recent) < AGAIN:
+        if len(_ASKED) > 4096:
+            _ASKED.clear()
+        _ASKED.add((str(home), turns_id))
+        recent.append(now)
+        found = named(_splits(home, fresh=True))
+    return found
+
+
+def placed(row, owner, index) -> dict:
+    """A turn's row as its conversation's: `owner`'s id, and its ordinal across the split (SPAN) - itself for a
+    conversation never split, where `index` is 0."""
+    ordinal = row["rollout_ordinal"]
+    return dict(row, thread_id=owner, rollout_ordinal=index * SPAN + ordinal if type(ordinal) is int else ordinal)
+
+
+def confined(home, thread_id, raw):
+    """`raw`, the rollout path Codex's `threads` row names, as a Path if it is this conversation's file in the
+    Codex home `home`'s sessions folder: a .jsonl file whose name holds the id. None for anything else, which
+    is then neither opened nor asked about."""
+    if not ids.is_uuid(thread_id) or not isinstance(raw, str):
+        return None
+    path = _safe_path(Path(raw))
+    if (not path.is_relative_to(_safe_path(Path(home) / "sessions"))
+            or path.suffix != ".jsonl" or thread_id not in path.name):
+        return None
+    return path
+
+
+def session_meta(path) -> dict | None:
+    """The payload of the file's first line where it is a session_meta event, or None. An OSError is the
+    caller's: a file that cannot be opened now is not a file that says nothing."""
+    with path.open("rb") as stream:
+        first = stream.readline(MAX_META_BYTES + 1)
+    if len(first) > MAX_META_BYTES or not first.endswith(b"\n"):
+        return None
+    try:
+        event = _json(first.decode("utf-8"))
+    except UnicodeError:
+        return None
+    if not isinstance(event, dict) or event.get("type") != "session_meta":
+        return None
+    payload = event.get("payload")
+    return payload if isinstance(payload, dict) else None
+
+
+def continued_id(thread_id, name) -> str | None:
+    """B, where the file name `name` ends exactly in `<thread_id>_<B>.jsonl` and B is another id; else None."""
+    if not ids.is_uuid(thread_id) or not isinstance(name, str):
+        return None
+    found = re.search(r"(?:^|[-_])%s_(%s)\.jsonl\Z" % (re.escape(thread_id), ids.uuid_pattern(any_case=True)), name)
+    other = found.group(1) if found else None
+    return other if other is not None and ids.is_uuid(other) and other != thread_id else None
+
+
+def reset_scan(path, end, turn_id, completed_at) -> dict:
+    """The reset hint of the usage-limit failure of `turn_id`, whose event ends at byte `end` of `path`: the
+    rate-limit snapshots before it, chosen as payload._choose_reset chooses - or UNKNOWN_RESET."""
+    if type(end) is not int or end <= 0:
+        return dict(UNKNOWN_RESET)
+    try:
+        # The verified end offset is immediately after the failure event.
+        # Never include a subsequent turn's unrelated rate-limit snapshot.
+        with path.open("rb") as stream:
+            start = max(0, end - MAX_SCAN_BYTES)
+            stream.seek(start)
+            if start:
+                stream.readline(MAX_ITEM_BYTES + 1)
+            remaining = end - stream.tell()
+            if remaining <= 0:
+                return dict(UNKNOWN_RESET)
+            data = stream.read(min(MAX_SCAN_BYTES, remaining))
+    except (OSError, ValueError):
+        return dict(UNKNOWN_RESET)
+    buckets = {}
+    found = False
+    for line in data.splitlines():
+        if len(line) > MAX_ITEM_BYTES:
+            continue
+        try:
+            event = _json(line.decode("utf-8"))
+        except UnicodeError:
+            continue
+        if not isinstance(event, dict) or event.get("type") != "event_msg":
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("type") == "task_complete" and payload.get("turn_id") == turn_id:
+            error = payload.get("error")
+            found = isinstance(error, dict) and error.get("codex_error_info") == "usage_limit_exceeded"
+            break
+        if payload.get("type") == "token_count":
+            limits = payload.get("rate_limits")
+            if isinstance(limits, dict):
+                bucket = limits.get("limit_id")
+                if isinstance(bucket, str) and re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", bucket):
+                    buckets[bucket] = limits
+    return _choose_reset(buckets, completed_at) if found else dict(UNKNOWN_RESET)

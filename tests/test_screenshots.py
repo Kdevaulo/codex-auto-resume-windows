@@ -2417,7 +2417,7 @@ class FasterRunTests(unittest.TestCase):
         self.assertIn("busy = Math.Max(0, busy + (on ? 1 : -1));", guiscan.member_body("SettingsForm", "SetBusy"))
         # No picture reaches these: the constructor's queued work refreshes the cached words on disk, which the window
         # does not show; a click starts the watcher; the per-conversation message and the log are dialogs of their own.
-        unreached = {"SettingsForm", "StartWatcher", "BuildConversationMessage", "BuildLogs"}
+        unreached = {"SettingsForm", "StartWatcher", "BuildConversationMessage", "BuildLogs", "BuildDetectionCheck"}
         signature = re.compile(r"(?m)^ {8}(?:(?:%s) )*[\w<>\[\]\.\?]+(?:, [\w<>\[\]\.\?]+)* (\w+)\("
                                % "|".join(guiscan.MODIFIERS))
         queued = {}

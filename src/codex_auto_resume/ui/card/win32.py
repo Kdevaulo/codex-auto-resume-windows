@@ -137,6 +137,59 @@ def _declare():
 
 
 # ------------------------------------------------------------------------------ the screen
+def _plain(text):
+    """A window class or a program's file name as the log may hold it: a short plain word, else "other"."""
+    if not isinstance(text, str) or not text:
+        return None
+    return text if len(text) <= 64 and all(ch.isalnum() or ch in "_.:-" for ch in text) else "other"
+
+
+def focus_snapshot() -> dict:
+    """Who has the keyboard now (v0.6.16-beta.3, issue #32): the window class and the program file name of the
+    window in front, and the class of the window with the focus in its thread - never a title, a text or a path.
+    Each None where Windows does not say. Asked only around a card being shown (ui/card/stack.py)."""
+    found = {"front_class": None, "front_process": None, "focus_class": None}
+    if W is None:
+        return found
+    try:
+        user32, kernel32 = C.WinDLL("user32", use_last_error=True), C.WinDLL("kernel32", use_last_error=True)
+        user32.GetForegroundWindow.restype = W.HWND
+        user32.GetClassNameW.argtypes = [W.HWND, W.LPWSTR, C.c_int]
+        user32.GetWindowThreadProcessId.argtypes = [W.HWND, C.POINTER(W.DWORD)]
+        user32.GetWindowThreadProcessId.restype = W.DWORD
+        kernel32.OpenProcess.restype = W.HANDLE
+        kernel32.QueryFullProcessImageNameW.argtypes = [W.HANDLE, W.DWORD, W.LPWSTR, C.POINTER(W.DWORD)]
+
+        def class_of(hwnd):
+            buffer = C.create_unicode_buffer(256)
+            return _plain(buffer.value) if hwnd and user32.GetClassNameW(hwnd, buffer, 256) else None
+
+        class GUITHREADINFO(C.Structure):
+            _fields_ = [("cbSize", W.DWORD), ("flags", W.DWORD), ("hwndActive", W.HWND), ("hwndFocus", W.HWND),
+                        ("hwndCapture", W.HWND), ("hwndMenuOwner", W.HWND), ("hwndMoveSize", W.HWND),
+                        ("hwndCaret", W.HWND), ("rcCaret", W.RECT)]
+        front = user32.GetForegroundWindow()
+        if not front:
+            return found
+        found["front_class"] = class_of(front)
+        process = W.DWORD()
+        thread = user32.GetWindowThreadProcessId(front, C.byref(process))
+        info = GUITHREADINFO(cbSize=C.sizeof(GUITHREADINFO))
+        if thread and user32.GetGUIThreadInfo(thread, C.byref(info)):
+            found["focus_class"] = class_of(info.hwndFocus)
+        handle = kernel32.OpenProcess(0x1000, False, process.value)       # PROCESS_QUERY_LIMITED_INFORMATION
+        if handle:
+            try:
+                buffer, size = C.create_unicode_buffer(1024), W.DWORD(1024)
+                if kernel32.QueryFullProcessImageNameW(handle, 0, buffer, C.byref(size)):
+                    found["front_process"] = _plain(os.path.basename(buffer.value))
+            finally:
+                kernel32.CloseHandle(handle)
+    except (OSError, AttributeError, ValueError):
+        pass
+    return found
+
+
 def taskbar_corner():
     """The primary taskbar's notification-area end as a thin rectangle, and its edge; or None.
 

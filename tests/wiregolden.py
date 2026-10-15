@@ -247,6 +247,40 @@ def _managed(**values):
 NIGHT = {"quiet_hours_start": "22:00", "quiet_hours_end": "07:00", "quiet_hours_days": "weekdays"}
 
 
+@contextmanager
+def _check_pinned(workspace):
+    """What the Diagnostics check (v0.6.16-beta.3, checkup.py) asks of this machine, for this one case: how
+    Windows would show a notice, the aliases' key and when the Codex home's databases were written - each a
+    stand-in, so the answer is the same on every machine and every run. Nothing is asked of Windows."""
+    from codex_auto_resume import checkup, diagnostics
+
+    class Pinned(diagnostics.Redactor):
+        def __init__(self):
+            super().__init__()
+            self._key, self._user = b"wire-golden-check", None
+
+    from test_continuation_split import SplitHome
+
+    # Golden-only, written as Codex writes them: the usage limit the waiting record 7 was taken up from, a
+    # subagent's failure, and a conversation Codex split (issue #30) whose failure is recorded under B.
+    now = generator.ENVELOPE_NOW
+    sim = SplitHome.__new__(SplitHome)
+    sim.root, sim._items, sim.clock, sim.split, sim.current = workspace / "codex", 1000, lambda: now, {}, {}
+    sim.fail_usage(T1, "0a1b2c3d-0301-7000-8000-000000000007", completed=int(now - 25 * 60))
+    subagent = "0a1b2c3d-0305-7000-8000-000000000001"
+    sim.add_thread(subagent, thread_source="subagent")
+    sim.fail_transient(subagent, "0a1b2c3d-0305-7000-8000-000000000002", completed=int(now - 3600))
+    sim.rotate(T2, turns="0a1b2c3d-0304-7000-8000-000000000001")
+    sim.fail_transient(T2, "0a1b2c3d-0304-7000-8000-000000000002", completed=int(now - 120))
+    written = now - 300
+    for path in (workspace / "codex").iterdir():
+        if path.is_file() and (".sqlite" in path.name or path.name.endswith(".jsonl")):
+            os.utime(path, (written, written))
+    presence = {"route": "toast", "do_not_disturb": False, "app_allowed": True}
+    with patch.object(checkup, "_presence", return_value=presence), patch.object(checkup, "Redactor", Pinned):
+        yield
+
+
 def _state_access(word):
     """What Windows says of the state folder's access list, for this one case (v0.6.11, win/acl.py): a
     stand-in for the one function that asks, so the answer is the same on every machine."""
@@ -499,6 +533,8 @@ BRIDGE_CASES = {
         Case("only this account and Windows", using=_state_access("owner_only")),
         Case("other accounts too", using=_state_access("shared"))],
     "demo": [Case("the made-up rows, and no watcher's icon to ask for the card")],
+    # v0.6.16-beta.3: Diagnostics' check of why a failure was not taken up, read only (checkup.py).
+    "detection-check": [Case("the recent conversations, the homes, usage, notices and Codex", using=_check_pinned)],
     # v0.6.11: Diagnostics compares the edition installed with Codex's copy of the plugin, read only.
     "plugin-copy": [
         Case("Codex keeps no copy of the plugin"),
