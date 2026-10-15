@@ -79,7 +79,9 @@ class VocabularyTests(unittest.TestCase):
                           # v0.6.15-beta: queue_for_open's, Codex not running on open what was queued for it.
                           "not_delivered_on_open",
                           # v0.6.16-beta.3: a capability it requires is not on (registry.CapabilityDef.requires).
-                          "requirement_off"})
+                          "requirement_off",
+                          # v0.6.16-beta.4: other_sessions', a session that did not take what was queued for it.
+                          "not_dispatched_by_session"})
 
 
 class FileTests(StateCase):

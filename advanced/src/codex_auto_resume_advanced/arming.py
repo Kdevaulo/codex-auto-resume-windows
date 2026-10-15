@@ -904,7 +904,9 @@ class Arming:
         if (type(keep_on) is not bool or type(send_again) is not bool
                 or not (generation is None or type(generation) is int)
                 or (send_again and (not keep_on or definition.resends
-                                    or definition.kind == CapabilityKind.ACTION))):
+                                    or definition.kind == CapabilityKind.ACTION))
+                # v0.6.16-beta.4: never one whose tripwire is what stops it doing harm (registry.keepable).
+                or (keep_on and not definition.keepable)):
             return refused(Refusal.INVALID_REQUEST)
         try:
             row = self.state.arming().get(definition.id) or {}
@@ -1076,6 +1078,8 @@ class Arming:
                 # so is never given Send again.
                 "keep_on": bool(row.get("keep_on")), "send_again": bool(row.get("send_again")),
                 "notice": None if off else row.get("reason"), "resends": definition.resends,
+                # v0.6.16-beta.4: whether Keep on is offered at all (registry.keepable).
+                "keepable": definition.keepable,
                 "revision": definition.revision, "read_revision": row.get("statement_revision"),
                 "acknowledged_version": row.get("engine_version"),
                 "warnings": [str(word) for word in self.warnings(definition, view)],

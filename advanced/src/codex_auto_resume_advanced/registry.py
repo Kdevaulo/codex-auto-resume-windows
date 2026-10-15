@@ -44,6 +44,8 @@ asked to agree to and everything the plug holds it to:
   one off turns off what requires it; a required one an administrator's policy forbids, or whose
   compatibility is Failed here, keeps the dependent off, with that reason (arming.py). Never names
   itself, and the registry is acyclic (Registry rejects a cycle when it is made);
+* `keepable` - whether a person may keep it on (K8; v0.6.16-beta.4): False for one whose tripwire is what stops it
+  doing harm, which Keep on would turn into a note (arming.py refuses it);
 * `make` - the factory for its code: given the installation's paths, it returns an object whose
   methods are the plug's hooks for its points, each answering as a plug would.
 
@@ -86,6 +88,7 @@ from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
 from .engine.goal import make as make_goal_continuation
 from .engine.headless import DEFAULT_HOURS as HEADLESS_DEFAULT_HOURS, HOURS as HEADLESS_HOURS, make as make_headless_run
 from .engine.markerfree import make as make_marker_free
+from .engine.sessions import make as make_other_sessions
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
 from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STYLE, DEFAULT_WARN, DEFAULT_WRAP, PERCENTS,
@@ -150,6 +153,7 @@ class CapabilityDef:
     resends: bool = False
     requires: tuple = ()
     kind: CapabilityKind = CapabilityKind.ROUTE
+    keepable: bool = True
 
     def option(self, key) -> Option | None:
         """The choice of `key` this capability offers, or None."""
@@ -239,6 +243,8 @@ def problems(definition) -> list:
     if type(definition.resends) is not bool or (
             definition.resends is True and Point.SCHEDULE not in (points if isinstance(points, frozenset) else ())):
         found.append("resends")
+    if type(definition.keepable) is not bool:
+        found.append("keepable")
     requires = definition.requires
     if (not isinstance(requires, tuple)
             or not all(isinstance(other, str) for other in requires)
@@ -471,6 +477,30 @@ HEADLESS_RUN = CapabilityDef(
     codes=tuple(str(word) for word in RunEnd),
     options=(Option(OptionKey.CEILING_HOURS, HEADLESS_HOURS, HEADLESS_DEFAULT_HOURS),),
     measurements=(Measurement.M6, Measurement.M6B),
+)
+
+# Recover the conversations of a terminal's Codex TUI and of VS Code (v0.6.16-beta.4, stage 4; one capability for
+# both, Q10). At P18 it names both other kinds, `cli` and `ide`, and core watches their conversations as the app's:
+# detected, and every check of their records made with them (core's codex/eligibility.py); turned off, core cancels
+# their waiting records (session_kind_off) and follows what it sent to its end. At P16, for a conversation another
+# Codex session holds (`holder="session"`), it answers TO_SESSION: core's ordinary send through `codex queue`, with
+# its marker, for that session to take (M5) - taken back when that session lets go of it, and given back to waiting;
+# taken back because the session did not take it within core's delivery window, it turns off
+# (NOT_DISPATCHED_BY_SESSION), and so it may not be kept on (keepable). It departs from A15 (only the app's
+# conversations are detected) and A11 (sent while a session other than the app holds the conversation), keeps A2, A3,
+# A4, A17, H4 and H6, stands on thread_eligibility and rests on M5 and MO - the words that tell these conversations
+# apart, a warning until MO passes for the Codex in force. Ceilings: three a conversation, two dozen a day.
+OTHER_SESSIONS = CapabilityDef(
+    id="other_sessions",
+    points=frozenset({Point.SESSIONS, Point.UNLOADED}),
+    revision=1,
+    departs_from=("A11", "A15"),
+    compat="thread_eligibility",
+    ceilings=Ceilings(per_day=24, per_conversation=3),
+    journal_prefix="sess",
+    make=make_other_sessions,
+    measurements=(Measurement.M5, Measurement.MO),
+    keepable=False,
 )
 
 # Short retries when Codex is at capacity (v0.6.14 stage 3b; the plan's row: serverOverloaded alone,
@@ -954,7 +984,7 @@ COMPAT_REPORT = CapabilityDef(
 
 # In this order, which is also which answers first where two answer at one point; the action, which
 # answers at none, last.
-DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, HEADLESS_RUN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
+DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, HEADLESS_RUN, OTHER_SESSIONS, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
                USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION,
@@ -973,7 +1003,7 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                # v0.6.16-beta.3: which conversations are recovered at all, beside what starts the recovering.
                "every_conversation", "queue_for_open",
                # v0.6.16-beta.4: what gets a conversation going when nothing holds it, beside queue for opening (Q12).
-               "headless_run", "marker_free_continuation", "reset_credit",
+               "headless_run", "other_sessions", "marker_free_continuation", "reset_credit",
                "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
                # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
                "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",

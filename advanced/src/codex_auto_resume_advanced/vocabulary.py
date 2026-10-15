@@ -67,17 +67,23 @@ class OffReason(StrEnum):
     # down by an administrator's policy, or its compatibility failed here (v0.6.16-beta.3): a capability is only as
     # on as what it needs.
     REQUIREMENT_OFF = "requirement_off"
+    # A continuation sent to a conversation another Codex session held - a terminal's, VS Code's - was taken back
+    # because that session did not take it within core's delivery window (v0.6.16-beta.4, other_sessions): what M5
+    # measured did not hold on this Codex.
+    NOT_DISPATCHED_BY_SESSION = "not_dispatched_by_session"
 
 
 TRIPWIRES = frozenset({OffReason.SUBMISSION_UNKNOWN, OffReason.LOCAL_CHECK_FAILED,
                        OffReason.FAILED_HERE, OffReason.INCOMPATIBLE, OffReason.HOOK_EXCEPTION,
                        OffReason.STATEMENT_CHANGED, OffReason.MEASUREMENT_FAILED,
-                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF})
+                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF,
+                       OffReason.NOT_DISPATCHED_BY_SESSION})
 # What a capability kept on (KeepOn, K8) notes instead of turning off, most serious first: the order
 # in which one notice gives way to another (state/arming.py, note_kept). A notice only ever rises.
 KEPT_NOTICES = (OffReason.DUPLICATE_SEEN, OffReason.STATEMENT_CHANGED, OffReason.FAILED_HERE,
                 OffReason.LOCAL_CHECK_FAILED, OffReason.INCOMPATIBLE, OffReason.MEASUREMENT_FAILED,
-                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF, OffReason.ENGINE_CHANGED,
+                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.NOT_DISPATCHED_BY_SESSION, OffReason.REQUIREMENT_OFF,
+                OffReason.ENGINE_CHANGED,
                 OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
 
 

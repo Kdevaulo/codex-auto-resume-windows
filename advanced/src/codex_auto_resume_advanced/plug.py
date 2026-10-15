@@ -96,6 +96,9 @@ class AdvancedPlug(Plug):
     def admission(self, failure):
         return self.runtime.ask(Point.ADMISSION, failure)
 
+    def sessions(self):
+        return self.runtime.sessions()
+
     def eligibility(self):
         return self.runtime.eligibility()
 

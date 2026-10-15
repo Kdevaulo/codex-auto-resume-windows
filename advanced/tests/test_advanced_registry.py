@@ -62,7 +62,7 @@ def standards_text(rule) -> str:
 class ShippedTests(unittest.TestCase):
     SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open",
                # v0.6.16-beta.4: a conversation nothing holds, run here while Codex is closed.
-               "headless_run", "marker_free_continuation", "capacity_retry",
+               "headless_run", "other_sessions", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
                "prompt_queue", "empty_response", "subagent_parent", "keep_going",
@@ -93,7 +93,8 @@ class ShippedTests(unittest.TestCase):
                                      "keep_going", "usage_wrap_up"),
                      # v0.6.15-beta: the lines a parent's continuation is given of its subagents' stops (5a).
                      Point.TEXT: ("subagent_parent",),
-                     Point.UNLOADED: ("goal_continuation", "queue_for_open", "headless_run"),
+                     Point.UNLOADED: ("goal_continuation", "queue_for_open", "headless_run", "other_sessions"),
+                     Point.SESSIONS: ("other_sessions",),
                      Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
                                    "early_reset", "usage_pause"),
@@ -110,7 +111,7 @@ class ShippedTests(unittest.TestCase):
 
     # The order a person reads them in (the owner's, 2026-10-10): the compatibility report first, then by importance.
     SHOWN = ("compat_report", "start_with_codex", "every_conversation", "queue_for_open", "headless_run",
-             "marker_free_continuation", "reset_credit",
+             "other_sessions", "marker_free_continuation", "reset_credit",
              "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
              "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
              "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "codex_gave_up",

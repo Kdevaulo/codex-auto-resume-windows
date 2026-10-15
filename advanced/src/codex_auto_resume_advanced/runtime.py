@@ -53,13 +53,13 @@ from __future__ import annotations
 from inspect import getattr_static
 import time
 
-from codex_auto_resume import continuation, failures
+from codex_auto_resume import continuation, failures, machine
 from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, RECORD_MOVES, RESTRICTIONS,
                                            TAKE_UP, Alternative, Point, RecordMove)
-from codex_auto_resume.domain.plughands import RECORDS_LIMIT, widening_of, workers
+from codex_auto_resume.domain.plughands import RECORDS_LIMIT, kinds_of, widening_of, workers
 
 from .arming import Arming
-from .engine import foropen
+from .engine import foropen, sessions
 from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
@@ -111,9 +111,10 @@ def _taken(point, answer) -> bool:
             return callable(getattr(answer, "send", None))
         if point == Point.UNLOADED:
             # A route core resumes the conversation with, or (v0.6.15-beta) QUEUE_FOR_OPEN: core's own send left in
-            # Codex's queue for when the conversation is opened.
+            # Codex's queue for when the conversation is opened - or (v0.6.16-beta.4) TO_SESSION, for another Codex
+            # session holding it to take.
             if isinstance(answer, str):
-                return answer == Alternative.QUEUE_FOR_OPEN
+                return answer in (Alternative.QUEUE_FOR_OPEN, Alternative.TO_SESSION)
             return callable(getattr(answer, "resume", None))
     except Exception:                              # unhashable, refused, a `send` that raises
         return False
@@ -680,6 +681,32 @@ class Runtime:
             found |= answer
         return frozenset(found) if found else DEFER
 
+    def sessions(self):
+        """P18 (v0.6.16-beta.4): the SessionKind words every capability on at SESSIONS names, together - or NULL's
+        DEFER. A watched one is only journalled, once: the conversations it would have watched are never read."""
+        definitions = self.registry.at(Point.SESSIONS)
+        if not definitions:
+            return DEFER
+        states = self.states()
+        found = set()
+        for definition in definitions:
+            state = states.get(definition.id, ArmingState.OFF)
+            if state == ArmingState.OFF:
+                continue
+            try:
+                answer = kinds_of(self._code_of(definition).sessions())
+            except Exception:
+                self._tripped(definition)
+                continue
+            if not answer:
+                continue
+            if state == ArmingState.SHADOW:
+                self._once(JournalCode.WOULD_HAVE, definition, Point.SESSIONS, Point.SESSIONS, None)
+                continue
+            self._once(JournalCode.ACTED, definition, Point.SESSIONS, Point.SESSIONS, None)
+            found |= answer
+        return frozenset(found) if found else DEFER
+
     def _watched_records(self, definition, view) -> None:
         """P2 for a watched capability (v0.6.16-beta.3): each of its rows a person set up that would be handed core now -
         as its code decides it from the stored state, writing nothing (`watched_due`) - journalled once as what it would
@@ -716,7 +743,7 @@ class Runtime:
             return DEFER
         if _own_record(record) and state in RECORD_MOVES:
             return self._record_moved(record, RecordMove(state))
-        if self._not_delivered_on_open(record, state):
+        if self._not_delivered_on_open(record, state) or self._not_dispatched_by_session(record, state):
             self.states(fresh=True)
         if self.arming.moved(record, state):
             self.states(fresh=True)
@@ -737,6 +764,23 @@ class Runtime:
         if found is None or found.get("kind") != OverrideKind.QUEUE_FOR_OPEN:
             return False
         return self.arming.trip(foropen.CAPABILITY, OffReason.NOT_DELIVERED_ON_OPEN)
+
+    def _not_dispatched_by_session(self, record, state) -> bool:
+        """The tripwire NOT_DISPATCHED_BY_SESSION (v0.6.16-beta.4): core took back a continuation sent to a
+        conversation another Codex session held (its gate vector's `session` pass, core's own column) because that
+        session did not take it within the delivery window - stored as not_delivered_on_open, the word every schema-5
+        reader knows (core's engine/tosession.py). other_sessions, whose answer sent it, turns off, or - never kept
+        on (keepable) - would note it. Whether it was turned off."""
+        if (state != WITHDRAWN_UNCONFIRMED or not isinstance(record, dict)
+                or record.get("withdraw_reason") != NOT_DELIVERED_ON_OPEN):
+            return False
+        try:
+            gate = machine.decode_gates(record.get("gate_eval")).get("thread_available")
+        except Exception:
+            return False
+        if gate != (machine.PASS, machine.SESSION):
+            return False
+        return self.arming.trip(sessions.CAPABILITY, OffReason.NOT_DISPATCHED_BY_SESSION)
 
     def _record_moved(self, record, move):
         """P14 for a record of this edition's own (v0.6.14): its rule and its record as core says they are now,
