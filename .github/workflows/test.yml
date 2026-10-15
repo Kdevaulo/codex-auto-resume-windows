@@ -139,6 +139,10 @@ jobs:
           # directory, killed when it ends. No Codex, no install, no registry. The standard lane
           # leaves it empty, which the test reads as not asked for.
           CODEX_AR_LIVE_WMI: ${{ matrix.edition == 'advanced' && '1' || '' }}
+          # The app-server schema the advanced lane checks its refusal table against (test data
+          # from codex-cli 0.162.0-alpha.17.2, refreshed with each new engine; see
+          # RefusalTests.test_the_refusals_match_a_generated_schema).
+          CODEX_AR_SCHEMA_DIR: ${{ matrix.edition == 'advanced' && format('{0}/advanced/tests/data/app-server-schema', github.workspace) || '' }}
           PART: ${{ matrix.part }}
           PARTS: "4"
         run: python scripts/test_parts.py --lane $env:CODEX_AR_EDITION --part "$env:PART/$env:PARTS" -v --annotate --seconds "$env:RUNNER_TEMP\seconds.json"
