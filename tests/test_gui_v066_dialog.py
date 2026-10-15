@@ -24,26 +24,38 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
               / "WindowsPowerShell" / "v1.0" / "powershell.exe")
-EXE = ROOT / "build" / "CodexAutoResumeSettings.exe"
+CSC = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Microsoft.NET" / "Framework64" / "v4.0.30319" / "csc.exe"
 STRINGS = ROOT / "src" / "codex_auto_resume" / "locales" / "en.json"
 
 
-def stale_build():
-    """Why the built window cannot be the one these sources make, or None.
+_BUILT = {}
 
-    This is the one test that loads the built exe rather than compiling the sources, and the exe is
-    not tracked: a checkout keeps whichever one was built last. One built on 2026-09-19 lacked a
-    method the probe looks up, and the failure read "You cannot call a method on a null-valued
-    expression" - true, and no help. A source file newer than the exe says what to do instead."""
-    built = EXE.stat().st_mtime
-    sources = sorted((ROOT / "gui").glob("*.cs")) + [ROOT / "gui" / "window.sources",
-                                                      ROOT / "build" / "make_gui.ps1"]
-    newer = [path.relative_to(ROOT).as_posix() for path in sources
-             if path.is_file() and path.stat().st_mtime > built]
-    if newer:
-        return ("build/CodexAutoResumeSettings.exe is older than %s%s: run build/make_gui.ps1 first"
-                % (newer[0], " and %d more" % (len(newer) - 1) if len(newer) > 1 else ""))
-    return None
+
+def built_exe():
+    """The window these sources make, compiled once into a folder of its own and removed when the module ends.
+
+    This used to load build/CodexAutoResumeSettings.exe, which is not tracked: a checkout keeps whichever one
+    was built last, so the tests skipped wherever nobody had run build/make_gui.ps1 (every CI lane), and read an
+    old window where somebody had. Every other window test compiles gui/window.sources itself with the in-box
+    compiler, and so does this one - the same list, into a temporary folder, nothing in build/."""
+    if "exe" not in _BUILT:
+        folder = tempfile.TemporaryDirectory()
+        exe = Path(folder.name) / "CodexAutoResumeSettings.exe"
+        subprocess.run([str(CSC), "/nologo", "/target:winexe", "/platform:x64", "/out:" + str(exe),
+                        "/reference:System.dll", "/reference:System.Drawing.dll",
+                        "/reference:System.Windows.Forms.dll",
+                        *[str(path) for path in guiscan.sources()]],
+                       check=True, capture_output=True, timeout=300)
+        _BUILT["folder"], _BUILT["exe"] = folder, exe
+    return _BUILT["exe"]
+
+
+def tearDownModule():
+    folder = _BUILT.pop("folder", None)
+    _BUILT.pop("exe", None)
+    if folder is not None:
+        folder.cleanup()
+
 
 QUESTION = 'Stop recovering "Refactor the payment retries"? A continuation already running is not stopped.'
 NOTICE = "Diagnostics saved."
@@ -162,19 +174,16 @@ $result | ConvertTo-Json -Depth 8 -Compress
 """
 
 
-@unittest.skipUnless(os.name == "nt", "the window is Windows'")
-@unittest.skipUnless(EXE.is_file(), "build the window first: build/make_gui.ps1")
+@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class DialogTests(unittest.TestCase):
     answer = None
 
     @classmethod
     def setUpClass(cls):
-        stale = stale_build()
-        if stale:
-            raise AssertionError(stale)
+        exe = built_exe()
         with tempfile.TemporaryDirectory() as work:
             environment = dict(os.environ)
-            environment.update({"CAR_EXE": str(EXE), "CAR_STRINGS": str(STRINGS), "CAR_WORK": work,
+            environment.update({"CAR_EXE": str(exe), "CAR_STRINGS": str(STRINGS), "CAR_WORK": work,
                                 "CAR_QUESTION": QUESTION, "CAR_NOTICE": NOTICE, "CAR_LONG": LONG})
             done = subprocess.run([str(POWERSHELL), "-NoProfile", "-ExecutionPolicy", "Bypass",
                                    "-Command", PROBE],
@@ -381,8 +390,7 @@ $result | ConvertTo-Json -Depth 8 -Compress
 """
 
 
-@unittest.skipUnless(os.name == "nt", "the window is Windows'")
-@unittest.skipUnless(EXE.is_file(), "build the window first: build/make_gui.ps1")
+@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class DialogFitTests(unittest.TestCase):
     """The dialog holds the longest thing every language can put in it.
 
@@ -399,9 +407,7 @@ class DialogFitTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        stale = stale_build()
-        if stale:
-            raise AssertionError(stale)
+        exe = built_exe()
         catalogs = ROOT / "src" / "codex_auto_resume" / "locales"
         cases = {}
         for path in sorted(catalogs.glob("*.json")):
@@ -420,7 +426,7 @@ class DialogFitTests(unittest.TestCase):
             written = Path(work) / "cases.json"
             written.write_text(json.dumps(cases, ensure_ascii=False), encoding="utf-8")
             environment = dict(os.environ)
-            environment.update({"CAR_EXE": str(EXE), "CAR_CASES": str(written), "CAR_WORK": work})
+            environment.update({"CAR_EXE": str(exe), "CAR_CASES": str(written), "CAR_WORK": work})
             done = subprocess.run([str(POWERSHELL), "-NoProfile", "-ExecutionPolicy", "Bypass",
                                    "-Command", FIT_PROBE],
                                   capture_output=True, text=True, encoding="utf-8",
