@@ -213,15 +213,16 @@ class PanelTests(unittest.TestCase):
                 self.assertNotIn(l10n._read(locale)["edition.standard"], shown["text"])
 
     def test_the_edition_is_smaller_muted_and_on_the_versions_baseline(self):
-        """Smaller - .62 of the eyebrow, never under 10px - muted in both editions (nothing names one edition's colour),
-        and on the version's baseline - which an inline run in the eyebrow's line is, and nothing moves it off."""
+        """Smaller - .5625 of the eyebrow, never under 9px - muted in both editions (nothing names one edition's
+        colour), and on the version's baseline - which an inline run in the eyebrow's line is, and nothing moves it
+        off."""
         self.assertEqual(declared(".edition", "font-size"), "var(--type-edition)")
-        self.assertEqual(ROOT_TOKENS["--type-edition"], "max(10px, calc(var(--type-small) * .62))")
+        self.assertEqual(ROOT_TOKENS["--type-edition"], "max(9px, calc(var(--type-small) * .5625))")
         self.assertEqual(declared(".edition", "color"), "var(--muted)")
         self.assertEqual(declared(".edition", "vertical-align"), "baseline")
         self.assertEqual(declared(".eyebrow", "color"), "var(--muted)")
         small = brand.TYPE_SCALE["small"]
-        self.assertLess(max(10, small * .62), small)
+        self.assertLess(max(9, small * .5625), small)
         for _where, selectors, declarations in RULES:
             if any("edition" in selector for selector in selectors):
                 self.assertEqual(selectors, (".edition",), "one rule, for every edition")
@@ -232,9 +233,9 @@ class PanelTests(unittest.TestCase):
         theme = guiscan.read("SoftTheme.cs")
         share = float(re.search(r"internal const float AsideShare = ([0-9.]+)f;", theme).group(1))
         least = float(re.search(r"internal const float AsideLeast = ([0-9.]+)f;", theme).group(1))
-        self.assertEqual(share, 0.62)
-        # 7.5 pt is 10 px at 96 DPI, the panel's floor.
-        self.assertEqual(least * 96 / 72, 10)
+        self.assertEqual(share, 0.5625)
+        # 6.75 pt is 9 px at 96 DPI, the panel's floor.
+        self.assertEqual(least * 96 / 72, 9)
         self.assertEqual(ROOT_TOKENS["--type-edition"],
                          "max(%gpx, calc(var(--type-small) * %s))" % (least * 96 / 72, ("%g" % share).lstrip("0")))
 
@@ -494,10 +495,10 @@ class QuietEditionTests(unittest.TestCase):
     def test_the_edition_is_smaller_than_the_version(self):
         def check(case):
             self.assertLess(case["edition"], case["version"])
-            self.assertAlmostEqual(case["edition"], max(7.5, case["version"] * 0.62), places=3)
+            self.assertAlmostEqual(case["edition"], max(6.75, case["version"] * 0.5625), places=3)
             self.assertEqual(case["face"], self.answer["face"], "the version's own face")
             if case["text"] == 1.0:
-                self.assertAlmostEqual(case["edition"], 7.5, places=3)
+                self.assertAlmostEqual(case["edition"], 6.75, places=3)
         self.each(check)
 
     def test_the_edition_is_drawn_in_the_secondary_colour_in_both_editions(self):
