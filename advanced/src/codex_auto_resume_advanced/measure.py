@@ -887,9 +887,10 @@ def _m6b(ctx):
 
 
 # MO's words: the sources a `threads` row says, and the originators the edition takes a terminal's and VS Code's
-# conversations by (core's codex/eligibility.ORIGINATORS, candidates until MO passes).
+# conversations by (core's codex/eligibility.ORIGINATORS) - as MO first recorded them on codex-cli 0.162.0-alpha.17.2
+# (2026-10-16): the TUI writes codex-tui, the VS Code extension codex_vscode.
 SOURCES = frozenset({"cli", "vscode", "exec", "mcp"})
-ORIGINATOR_WORDS = {"codex_cli_rs": ObservedWord.CLI_ORIGINATOR, "codex_vscode": ObservedWord.IDE_ORIGINATOR,
+ORIGINATOR_WORDS = {"codex-tui": ObservedWord.CLI_ORIGINATOR, "codex_vscode": ObservedWord.IDE_ORIGINATOR,
                     "Codex Desktop": ObservedWord.DESKTOP}
 
 

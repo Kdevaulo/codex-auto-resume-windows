@@ -189,7 +189,7 @@ class ContentTests(ProbeCase):
 
     def test_a_free_word_is_refused_and_every_observed_word_is_closed(self):
         with self.assertRaises(evidence.EvidenceError):
-            evidence.build(Measurement.MO, Verdict.BLOCKED, {"originator": "codex_cli_rs"}, product_version="0.6.15",
+            evidence.build(Measurement.MO, Verdict.BLOCKED, {"originator": "codex-tui"}, product_version="0.6.15",
                            codex_version="0.162.0", windows_build="10.0.26200", recorded_at="2026-10-11T00:00Z",
                            note="x")
         for word in ObservedWord:
@@ -296,7 +296,7 @@ class MBTests(ProbeCase):
 
 
 class FileReaderTests(ProbeCase):
-    def home(self, *, source="cli", originator="codex_cli_rs", rollout_tail=()):
+    def home(self, *, source="cli", originator="codex-tui", rollout_tail=()):
         home = (self.dir / "codex").resolve()
         (home / "sessions").mkdir(parents=True)
         rollout = home / "sessions" / ("rollout-%s.jsonl" % THREAD)
