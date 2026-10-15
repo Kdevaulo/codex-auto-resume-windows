@@ -8,7 +8,7 @@ the entry was removed elsewhere put it back.
 
 Now any status read that says it - the Dashboard's snapshot too - sets what an edit of the switch is measured
 from, and the switch shows it unless the person has moved it: a move, before any read or since the last, is
-never taken back by a snapshot while it is unsaved (review finding 1). Save
+never taken back while it is unsaved, by a snapshot or by the page's own read (review findings 1 and 2). Save
 writes the entry only where the person moved the switch from what Windows holds; a move made before any read
 worked is read for first, and where that read fails too the entry is left alone, the move stays unsaved, and
 the save says so instead of "Saved".
@@ -47,10 +47,10 @@ class SourceTests(unittest.TestCase):
         self.assertIn("startupKnown = false;", body("BuildEditors"))
 
     def test_every_status_read_reaches_the_switch_through_one_place(self):
-        self.assertIn("KnowStartup(status, startup, startup != null);", body("ApplyStatus"))
+        self.assertIn("KnowStartup(status, startup);", body("ApplyStatus"))
         know = body("KnowStartup")
         self.assertIn('editors.ContainsKey("__startup")', know)
-        self.assertIn("if (!moved || own) startup.Checked = startupBaseline;", know)
+        self.assertIn("if (!moved) startup.Checked = startupBaseline;", know)
 
     def test_the_sentence_is_in_every_language(self):
         english = l10n._read("en")["settings.startup_unchecked"]
@@ -140,8 +140,9 @@ class BuiltSwitchTests(unittest.TestCase):
     def test_a_snapshot_never_takes_back_a_change_not_yet_saved(self):
         self.assertEqual(self.answer["edited"], {"on": False, "known": True, "dirty": True})
 
-    def test_the_page_s_own_read_says_what_windows_holds(self):
-        self.assertEqual(self.answer["own"], {"on": True, "known": True, "dirty": False})
+    def test_nor_does_the_page_s_own_read(self):
+        """Review finding 2: Start watcher's refresh used to put an unsaved move back."""
+        self.assertEqual(self.answer["own"], {"on": False, "known": True, "dirty": True})
 
     def test_once_windows_holds_what_the_switch_shows_nothing_is_unsaved(self):
         self.assertEqual(self.answer["agreed"], {"on": False, "known": True, "dirty": False})
@@ -229,11 +230,10 @@ $out.snapshot = Now
 (Switch).Checked = $false
 Call 'ApplyStatus' @((Parse $registered), $null) | Out-Null
 $out.edited = Now
-# ... and the page's own read, after a save or a start, says what Windows holds.
+# ... and so does the page's own read, after a start (finding 2).
 Call 'ApplyStatus' @((Parse $registered), (Switch)) | Out-Null
 $out.own = Now
-# Moved again, and Windows comes to hold what the switch shows: nothing is left unsaved.
-(Switch).Checked = $false
+# Windows comes to hold what the switch shows: nothing is left unsaved.
 Call 'ApplyStatus' @((Parse $unregistered), $null) | Out-Null
 $out.agreed = Now
 $form.Dispose()

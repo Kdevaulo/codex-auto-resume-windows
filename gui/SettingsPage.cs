@@ -1260,8 +1260,8 @@ namespace CodexAutoResume
         /// snapshot (`startup` null) - v0.6.16-beta.3, issue #31: it was read by the page's own read alone, and showed
         /// off where that read failed or had not come back yet. What Windows holds becomes what an edit is measured
         /// from; the switch shows it unless the person has moved it - before any read, or since the last - and a
-        /// move is theirs: no snapshot takes it back while it is unsaved. The page's own read (`own`) still does.
-        private void KnowStartup(Dictionary<string, object> status, CheckBox startup, bool own)
+        /// move is theirs: no read, snapshot or the page's own after a start, takes it back while it is unsaved.
+        private void KnowStartup(Dictionary<string, object> status, CheckBox startup)
         {
             if (startup == null) startup = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
             object registered = Get(status, "startup_enabled");
@@ -1269,14 +1269,14 @@ namespace CodexAutoResume
             bool moved = startup.Checked != startupBaseline;
             // What Windows has is not an edit.
             startupBaseline = (bool)registered;
-            if (!moved || own) startup.Checked = startupBaseline;
+            if (!moved) startup.Checked = startupBaseline;
             startupKnown = true;
         }
 
         private void ApplyStatus(Dictionary<string, object> status, CheckBox startup)
         {
             object running = status["watcher_running"];
-            KnowStartup(status, startup, startup != null);
+            KnowStartup(status, startup);
 
             // The header (Hero). A read rewrites it, as it always has, over a note or a hold written since the
             // last one. From the status alone until the Dashboard has a snapshot, and from a status read after
@@ -1507,7 +1507,7 @@ namespace CodexAutoResume
                 CallAsync("status", null, delegate(Dictionary<string, object> read)
                 {
                     var status = Ok(read) ? Map(read, "status") : null;
-                    if (status != null) KnowStartup(status, startup, false);
+                    if (status != null) KnowStartup(status, startup);
                     entryUnread = !startupKnown;
                     decide();
                 });
