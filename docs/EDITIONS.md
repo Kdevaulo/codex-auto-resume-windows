@@ -451,12 +451,15 @@ due).
 **Ceilings.** 12 a day, and 3 in any one conversation; and never more than one credit for one filling
 of a window, two a day or seven a week. Four rules may wait at once.
 
-**Measurements MU, MN and MR: not made yet.** MU reads usage as this capability reads it - with the
+**Measurements MU, MN and MR: passed** on codex-cli 0.162.0-alpha.17.2 (2026-10-10,
+[`docs/evidence/live/`](evidence/live/)). MU reads usage as this capability reads it - with the
 credits' count, and without their details - and how still a window's reset time stays; MN asks for a
 credit on an account with none and checks that nothing is spent; MR, at a real limit and only with
-the person's own second yes, spends exactly one credit and checks that asking again with the same key
-spends no second one. Until they are made on your version of Codex, the statement carries each as a
-warning, and a credit is spent only when you press *Use a reset credit now...*.
+the person's own second yes, spent exactly one credit, which lifted the limit, and asking again with
+the same key spent no second one. On that version of Codex the statement carries none of them as a
+warning, and a credit is used at the limit you picked by itself, unless you chose *Ask me first*; on
+any other version each is a warning until it is measured there, and a credit is spent only when you
+press *Use a reset credit now...*.
 
 ### Send your own message when a limit resets
 
@@ -497,8 +500,9 @@ Switching its conversation off cancels it (H5).
 
 **Ceilings.** 10 a day, and 2 in any one conversation.
 
-**Measurement MU: not made yet.** It counts resets from the same usage readings as the reset credit,
-so it rests on MU; until MU is made on your version of Codex, the statement carries it as a warning.
+**Measurement MU: passed** on codex-cli 0.162.0-alpha.17.2 (2026-10-10). It counts resets from the same
+usage readings as the reset credit, so it rests on MU; on any other version of Codex, until MU is made
+there, the statement carries it as a warning.
 
 ### Longer messages
 
