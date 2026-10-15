@@ -23,6 +23,7 @@ from importlib.machinery import ModuleSpec, PathFinder
 import importlib.util
 import logging
 from pathlib import Path
+import sys
 
 from .domain.plug import NULL, PLUG_API, DamagedPlug, Edition, Guarded, Plug, PlugFailure
 
@@ -46,6 +47,10 @@ def _beside(src) -> ModuleSpec | None:
 
     A package, with its `__init__.py`: a directory of that name holding only a bytecode cache,
     or nothing, is what Python would call a namespace package, and is no edition."""
+    # Python's path finder keeps a directory's listing until that directory's time changes: a copy
+    # replaced at the same path within one tick of it would still read as the copy before (Codex's
+    # copy of this plugin, edition.cached_copy). Each look starts from the directory as it is now.
+    sys.path_importer_cache.pop(str(src), None)
     spec = PathFinder.find_spec(ADVANCED_PACKAGE, [str(src)])
     if spec is None or not spec.origin or Path(spec.origin).name != "__init__.py":
         return None

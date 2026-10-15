@@ -911,5 +911,27 @@ class CodexToldTests(unittest.TestCase):
         self.assertEqual(app.plug.failures, 1)
 
 
+class CopyEditionTests(unittest.TestCase):
+    """The edition of Codex's copy of this plugin is read from the copy as it is now. Python's path
+    finder keeps a directory's listing until that directory's time changes, so a copy replaced at
+    the same path within one tick of that time read as the copy before it - the golden
+    bridge/plugin-copy.json failed that way once on a fast CI runner (2026-10-13)."""
+
+    def test_a_copy_replaced_at_the_same_path_is_read_again(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as temp:
+            version = Path(temp) / "plugins" / "cache" / edition.MARKETPLACE / edition.PLUGIN / "0.0.0"
+            src = version / "src"
+            (src / "codex_auto_resume").mkdir(parents=True)
+            self.assertIs(edition.cached_copy(temp), Edition.STANDARD)
+            seen = os.stat(src).st_mtime_ns
+            shutil.rmtree(version)
+            (src / "codex_auto_resume").mkdir(parents=True)
+            (src / edition.ADVANCED_PACKAGE).mkdir()
+            (src / edition.ADVANCED_PACKAGE / "__init__.py").write_text("", encoding="utf-8")
+            os.utime(src, ns=(seen, seen))       # the same time as the copy before, to the tick
+            self.assertIs(edition.cached_copy(temp), Edition.ADVANCED)
+
+
 if __name__ == "__main__":
     unittest.main()
