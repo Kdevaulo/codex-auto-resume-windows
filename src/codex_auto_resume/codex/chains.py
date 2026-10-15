@@ -88,7 +88,7 @@ class ChainMemory:
                                                          for home, held in self._homes.items()}}, allow_nan=False)
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self.path.with_name(self.path.name + ".tmp")
+            temporary = self.path.with_name("%s.%d.tmp" % (self.path.stem, os.getpid()))   # config.owned_state_files
             temporary.write_text(text, encoding="utf-8")
             os.replace(temporary, self.path)
         except OSError:

@@ -412,6 +412,24 @@ class SplitRecoveryTests(unittest.TestCase):
         self.assertEqual(json.loads(kept.read_text(encoding="utf-8"))["format"], chains.FORMAT)
         self.assertNotIn("codex-home", kept.read_text(encoding="utf-8"), "ids and a home's digest, never a path")
 
+    def test_a_purge_takes_the_remembered_chains_and_their_temporary_files(self):
+        """config/split-chains.json is the product's own state: Uninstall.cmd -Purge and `uninstall` take it."""
+        from codex_auto_resume import config
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        paths = config.Paths(Path(folder.name) / "home")
+        paths.ensure()
+        memory = chains.ChainMemory(paths.split_chains_file)
+        memory.extend(paths.home / "codex", A, [new_id()])
+        stray = paths.state_dir / "split-chains.4242.tmp"
+        stray.write_text("{}", encoding="utf-8")
+        owned = paths.owned_state_files()
+        self.assertTrue(paths.split_chains_file.is_file())
+        self.assertIn(paths.split_chains_file, owned)
+        self.assertIn(stray, owned)
+        self.assertEqual([path.name for path in paths.state_dir.glob("split-chains.*.tmp")], ["split-chains.4242.tmp"],
+                         "the atomic write leaves no temporary file of its own")
+
     def test_an_old_failure_is_never_sent_once_a_person_worked_under_b(self):
         h = self.harness()
         old = h.home.fail_usage(A)

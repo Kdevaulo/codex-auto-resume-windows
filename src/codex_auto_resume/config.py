@@ -223,10 +223,10 @@ class Paths:
             return []
         names = ["state.sqlite", "state.sqlite-journal", "state.sqlite-wal", "state.sqlite-shm", "settings.json",
                  "compatibility.json", "compat-cache.json", "failure-seen.json", "status.json",
-                 "power-action.json"]
+                 "power-action.json", "split-chains.json"]
         files = [self.state_dir / name for name in names]
         for pattern in ("settings.*.tmp", "compatibility.*.tmp", "compat-cache.*.tmp", "failure-seen.*.tmp",
-                        "status.*.tmp", "power-action.*.tmp"):
+                        "status.*.tmp", "power-action.*.tmp", "split-chains.*.tmp"):
             files += [p for p in sorted(self.state_dir.glob(pattern))
                       if not is_link(p) and self.confined(p)]
         return files + self.owned_advanced_files() + [self.state_dir / OWNER_MARKER]
