@@ -614,6 +614,13 @@ class RefusalTests(unittest.TestCase):
                 self.assertNotIn("result", reply)
                 self.assertEqual(reply["error"]["code"], -32601)
 
+    # CI points CODEX_AR_SCHEMA_DIR at advanced/tests/data/app-server-schema: the eight files this
+    # test reads (ServerRequest.json and the seven *Response.json it names) from codex-cli
+    # 0.162.0-alpha.17.2's `codex app-server generate-json-schema --experimental --out DIR`, copied
+    # unedited from a run with an empty CODEX_HOME. --experimental because the session asks for the
+    # experimental API and currentTime/read is only in that schema. The whole bundle is 4.3 MB; these
+    # are about 70 KB. Refresh them with each new engine: regenerate, copy the same eight files, and
+    # change the engine version here.
     @unittest.skipUnless(os.environ.get("CODEX_AR_SCHEMA_DIR"),
                          "opt-in: CODEX_AR_SCHEMA_DIR names a generated app-server schema")
     def test_the_refusals_match_a_generated_schema(self):

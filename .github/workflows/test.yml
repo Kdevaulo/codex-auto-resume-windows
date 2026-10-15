@@ -95,6 +95,15 @@ jobs:
           # Python ships, that lane starts testing the real thing without an edit.
           allow-prereleases: true
 
+      - name: Install PyYAML for the workflow-shape test
+        # tests/test_workflow_privilege.py YamlShapeTests parses every workflow with PyYAML and skips
+        # without it. Only this test job gets it: no file of the product imports yaml (the product
+        # stays standard library), so nothing here is a dependency of what is shipped.
+        # An exact version. The next Python is a release candidate that may have no wheel for it yet,
+        # so its lane carries on without the package rather than failing the job's first step.
+        continue-on-error: ${{ matrix.experimental }}
+        run: python -m pip install PyYAML==6.0.3
+
       - name: Say which interpreter this actually is
         # The lane is named for a line, not a build. When a failure turns out to be the
         # interpreter's, the first question is which one - and on the pre-release lane
@@ -134,6 +143,15 @@ jobs:
         shell: pwsh
         env:
           CODEX_AR_EDITION: ${{ matrix.edition }}
+          # The advanced lane runs the one live WMI test (advanced/tests/test_advanced_measure.py,
+          # WmiEscapeTests): throwaway pythonw processes in a job of the test's own and a temporary
+          # directory, killed when it ends. No Codex, no install, no registry. The standard lane
+          # leaves it empty, which the test reads as not asked for.
+          CODEX_AR_LIVE_WMI: ${{ matrix.edition == 'advanced' && '1' || '' }}
+          # The app-server schema the advanced lane checks its refusal table against (test data
+          # from codex-cli 0.162.0-alpha.17.2, refreshed with each new engine; see
+          # RefusalTests.test_the_refusals_match_a_generated_schema).
+          CODEX_AR_SCHEMA_DIR: ${{ matrix.edition == 'advanced' && format('{0}/advanced/tests/data/app-server-schema', github.workspace) || '' }}
           PART: ${{ matrix.part }}
           PARTS: "4"
         run: python scripts/test_parts.py --lane $env:CODEX_AR_EDITION --part "$env:PART/$env:PARTS" -v --annotate --seconds "$env:RUNNER_TEMP\seconds.json"
