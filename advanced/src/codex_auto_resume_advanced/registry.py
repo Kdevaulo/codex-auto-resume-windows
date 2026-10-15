@@ -832,7 +832,7 @@ EVERY_CONVERSATION = CapabilityDef(
 USAGE_METER = CapabilityDef(
     id="usage_meter",
     points=frozenset({Point.TICK}),
-    revision=1,
+    revision=2,
     departs_from=("C4", "C9"),
     compat="usage_probe",
     ceilings=Ceilings(per_day=1, per_conversation=1),
@@ -859,7 +859,7 @@ USAGE_METER = CapabilityDef(
 USAGE_WRAP_UP = CapabilityDef(
     id="usage_wrap_up",
     points=frozenset({Point.TICK, Point.RECORDS}),
-    revision=1,
+    revision=2,
     departs_from=("A13", "A26"),
     compat="exact_thread_recovery",
     ceilings=Ceilings(per_day=12, per_conversation=2),

@@ -115,6 +115,21 @@ class DefinitionTests(unittest.TestCase):
         for capability in ("usage_meter", "usage_wrap_up", "usage_pause"):
             self.assertIn(capability, registry.REGISTRY.ids)
 
+    def test_the_statements_name_what_the_three_now_do(self):
+        """v0.6.16-beta.4: each statement says what its capability does now, in every language's own words for it - the
+        meter's windows switched off on their own and its spacing typed in, the wrap-up's wordings, Include the reset
+        time and Continue after the reset, the forced stop by its new name - and was given a new revision for it."""
+        from codex_auto_resume import l10n
+        self.assertEqual((USAGE_METER.revision, USAGE_WRAP_UP.revision, USAGE_PAUSE.revision), (2, 2, 2))
+        for locale in l10n.LOCALES:
+            with self.subTest(locale=locale):
+                words = statement.CATALOGS.own(locale)
+                wrap = words["statement.usage_wrap_up.does"]
+                for label in ("page.option.wrap_reset_time", "page.option.wrap_after_reset"):
+                    self.assertIn(words[label].rstrip("."), wrap, label)
+                self.assertIn(words["name.usage_pause"], words["statement.usage_meter.stop"])
+                self.assertIn("60", words["statement.usage_meter.does"])
+
     def test_each_wording_is_a_continuation_core_sends_in_every_language(self):
         """Each of the four wordings, for each window, filled in: words core sends as a continuation, in every
         language - and the one with the numbers names the window and both percentages (v0.6.16-beta.4)."""
