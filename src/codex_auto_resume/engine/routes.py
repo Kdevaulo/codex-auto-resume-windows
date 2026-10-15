@@ -109,9 +109,11 @@ class RoutesMixin:
         key = current["interruption_id"]
         at = self.clock()
         message, worded, once, plain = words if words is not None else (None, False, None, None)
+        silent = message is not None and self._silent(current)
         claimed, gate, reason = self.store.reserve_detailed(
             key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector, ledger=self.plug,
-            carried=frozenset({Point.UNLOADED}) | ({Point.TEXT} if worded else frozenset())
+            carried=frozenset({Point.UNLOADED}) | ({Point.TEXT} if worded and not silent else frozenset())
+            | ({Point.DELIVERY} if silent else frozenset())
             | self.relaxed_points(relaxed) | self.relaxed_points("forced" if forced else None),
             quiet_until=self.quiet_until(at), relaxed=relaxed, forced=forced, caps=self.caps(relaxed))
         if not claimed:
@@ -140,7 +142,8 @@ class RoutesMixin:
         # A route that takes words (v0.6.16-beta.4) is handed them as a send would carry them, the marker read back
         # from the claimed row at their end, and the client id core derives from the interruption.
         handed = ({} if message is None else
-                  {"words": message + "\n\n" + claim["marker"], "client_id": ids.continuation_client_id(key)})
+                  {"words": "" if silent else message + "\n\n" + claim["marker"],
+                   "client_id": ids.continuation_client_id(key)})
         try:
             response = route.resume(thread_id, launch_guard=self.store.submission_guard(key),
                                     still_unloaded=still_unloaded, **handed)
@@ -152,6 +155,18 @@ class RoutesMixin:
             self._after_resume(current, response)
         except Exception:
             self.log(current["thread_id"], "post_send_bookkeeping_failed", None)
+
+    def _silent(self, row) -> bool:
+        """P15 for a route that takes words (v0.6.16-beta.4): SILENT is no words at all, the turn proven by the client
+        id core derives - written into the record before the claim (its `recovery_client_id`, engine/delivery.proof),
+        and taken away again where it is not SILENT this time, so the record goes by its marker."""
+        derived = ids.continuation_client_id(row["interruption_id"])
+        silent = self.plug.delivery(row) is Alternative.SILENT
+        if silent and row.get("recovery_client_id") != derived:
+            self.store.update(row["interruption_id"], at=self.clock(), recovery_client_id=derived)
+        elif not silent and row.get("recovery_client_id") == derived:
+            self.store.update(row["interruption_id"], at=self.clock(), recovery_client_id=None)
+        return silent
 
     def _after_resume(self, row, response):
         """What came of a route (P16). Accepted: nothing was queued, and the conversation goes on

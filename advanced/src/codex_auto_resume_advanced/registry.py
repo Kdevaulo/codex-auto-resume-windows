@@ -92,6 +92,7 @@ from .engine.goal import make as make_goal_continuation
 from .engine.headless import DEFAULT_HOURS as HEADLESS_DEFAULT_HOURS, HOURS as HEADLESS_HOURS, make as make_headless_run
 from .engine.markerfree import make as make_marker_free
 from .engine.sessions import make as make_other_sessions
+from .engine.silent import make as make_silent_continuation
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
 from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STYLE, DEFAULT_WARN, DEFAULT_WRAP, PERCENTS,
@@ -551,6 +552,26 @@ MODEL_FALLBACK = CapabilityDef(
     codes=tuple(str(word) for word in RunEnd) + (NOT_RESTORED,),
     options=(Option(OptionKey.ATTEMPTS, FALLBACK_ATTEMPTS, FALLBACK_DEFAULT_ATTEMPTS),),
     measurements=(Measurement.MF,),
+)
+
+# Continue with no words (v0.6.16-beta.4, stage 4; headless only). At P15 it answers SILENT, which core carries out
+# only through a route that takes words - headless_run's turn, compact_continue's continuation - calling it with no
+# words at all under the client id it derives, its proof (core's engine/routes.py); through codex queue or a channel
+# core ignores it (M3: Codex refuses an empty queue item). It continues nothing by itself. Where Codex refuses a turn
+# with no input it answers DEFER from then on in this process, so the next attempt carries words, and it turns off
+# (REFUSED_BY_CODEX) - so it may not be kept on (keepable). It departs from A4 (no marker) and A26 (no words), stands
+# on recovery_turn_tracking and rests on M3B. Ceilings: five a conversation, two dozen a day.
+SILENT_CONTINUATION = CapabilityDef(
+    id="silent_continuation",
+    points=frozenset({Point.DELIVERY}),
+    revision=1,
+    departs_from=("A4", "A26"),
+    compat="recovery_turn_tracking",
+    ceilings=Ceilings(per_day=24, per_conversation=5),
+    journal_prefix="silent",
+    make=make_silent_continuation,
+    measurements=(Measurement.M3B,),
+    keepable=False,
 )
 
 # Short retries when Codex is at capacity (v0.6.14 stage 3b; the plan's row: serverOverloaded alone,
@@ -1037,7 +1058,7 @@ COMPAT_REPORT = CapabilityDef(
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, COMPACT_CONTINUE, MODEL_FALLBACK, HEADLESS_RUN, OTHER_SESSIONS, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
-               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION,
+               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION, SILENT_CONTINUATION,
                LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)
@@ -1061,7 +1082,9 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                # v0.6.16-beta.4: what a failure of Codex's own is taken up with, beside the capacity retry (Q12).
                "compact_continue", "model_fallback",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
-               "structured_rules")
+               "structured_rules",
+               # v0.6.16-beta.4: how a turn run here starts, last (Q12).
+               "silent_continuation")
 
 
 def shown(registry) -> tuple:

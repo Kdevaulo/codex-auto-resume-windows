@@ -126,6 +126,8 @@ METHODS = {
     "to_session", "_session", "_session_reason",
     # and the compaction turns after a full context window (engine/compaction.py).
     "compacted_since", "compaction", "foreign",
+    # and P15's SILENT for a route that takes words (engine/routes.py).
+    "_silent",
 }
 
 # What `from codex_auto_resume.engine import ...` has to keep answering (app.py, the tests).

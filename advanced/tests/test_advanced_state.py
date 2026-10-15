@@ -81,7 +81,9 @@ class VocabularyTests(unittest.TestCase):
                           # v0.6.16-beta.3: a capability it requires is not on (registry.CapabilityDef.requires).
                           "requirement_off",
                           # v0.6.16-beta.4: other_sessions', a session that did not take what was queued for it.
-                          "not_dispatched_by_session"})
+                          "not_dispatched_by_session",
+                          # and silent_continuation's, Codex refusing a turn with no words.
+                          "refused_by_codex"})
 
 
 class FileTests(StateCase):

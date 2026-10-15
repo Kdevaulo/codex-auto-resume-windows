@@ -71,18 +71,22 @@ class OffReason(StrEnum):
     # because that session did not take it within core's delivery window (v0.6.16-beta.4, other_sessions): what M5
     # measured did not hold on this Codex.
     NOT_DISPATCHED_BY_SESSION = "not_dispatched_by_session"
+    # Codex refused a turn started with no input (v0.6.16-beta.4, silent_continuation): what M3B measured did not
+    # hold on this Codex.
+    REFUSED_BY_CODEX = "refused_by_codex"
 
 
 TRIPWIRES = frozenset({OffReason.SUBMISSION_UNKNOWN, OffReason.LOCAL_CHECK_FAILED,
                        OffReason.FAILED_HERE, OffReason.INCOMPATIBLE, OffReason.HOOK_EXCEPTION,
                        OffReason.STATEMENT_CHANGED, OffReason.MEASUREMENT_FAILED,
                        OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF,
-                       OffReason.NOT_DISPATCHED_BY_SESSION})
+                       OffReason.NOT_DISPATCHED_BY_SESSION, OffReason.REFUSED_BY_CODEX})
 # What a capability kept on (KeepOn, K8) notes instead of turning off, most serious first: the order
 # in which one notice gives way to another (state/arming.py, note_kept). A notice only ever rises.
 KEPT_NOTICES = (OffReason.DUPLICATE_SEEN, OffReason.STATEMENT_CHANGED, OffReason.FAILED_HERE,
                 OffReason.LOCAL_CHECK_FAILED, OffReason.INCOMPATIBLE, OffReason.MEASUREMENT_FAILED,
-                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.NOT_DISPATCHED_BY_SESSION, OffReason.REQUIREMENT_OFF,
+                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.NOT_DISPATCHED_BY_SESSION, OffReason.REFUSED_BY_CODEX,
+                OffReason.REQUIREMENT_OFF,
                 OffReason.ENGINE_CHANGED,
                 OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
 

@@ -303,7 +303,7 @@ ALTERNATIVES = {
     Point.SCHEDULE: RESTRICTIONS | {Alternative.EARLY, Alternative.RESEND, Alternative.SEND_NOW},
     Point.CLAIM_LEDGER: RESTRICTIONS,
     Point.SUPERVISION: frozenset(),
-    Point.DELIVERY: frozenset({Alternative.CLIENT_ID}),
+    Point.DELIVERY: frozenset({Alternative.CLIENT_ID, Alternative.SILENT}),
     Point.ADMISSION: TAKE_UP,
 }
 # The temporary kind each AS_ word waits, counts and is switched off as (failures.TRANSIENT).
@@ -516,8 +516,9 @@ class Guarded:
         self._ask(Point.MOVED, record, state)
 
     def delivery(self, record):
-        """P15: CLIENT_ID, or DEFER - which is the marker, as core has always carried it. Core
-        takes CLIENT_ID only for a send it hands to a channel (engine/dispatch.py)."""
+        """P15: CLIENT_ID, SILENT, or DEFER - which is the marker, as core has always carried it. Core
+        takes CLIENT_ID only for a send it hands to a channel (engine/dispatch.py), and SILENT only for a
+        route that takes words (v0.6.16-beta.4, engine/routes.py)."""
         return self._ask(Point.DELIVERY, record)
 
     def unloaded(self, record):

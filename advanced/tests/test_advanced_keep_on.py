@@ -250,7 +250,7 @@ class KeptTests(KeepOnCase):
                                                          # v0.6.16-beta.3: a requirement is not on.
                                                          "requirement_off",
                                                          # v0.6.16-beta.4: another session did not take it.
-                                                         "not_dispatched_by_session")})
+                                                         "not_dispatched_by_session", "refused_by_codex")})
 
     def test_what_cannot_be_read_still_holds_it_back_and_the_policy_reads_it_down(self):
         self.armed()

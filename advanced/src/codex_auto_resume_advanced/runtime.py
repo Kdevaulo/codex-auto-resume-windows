@@ -59,7 +59,8 @@ from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, 
 from codex_auto_resume.domain.plughands import RECORDS_LIMIT, kinds_of, widening_of, workers
 
 from .arming import Arming
-from .engine import foropen, sessions
+from .codex import headless
+from .engine import foropen, sessions, silent
 from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
@@ -743,7 +744,8 @@ class Runtime:
             return DEFER
         if _own_record(record) and state in RECORD_MOVES:
             return self._record_moved(record, RecordMove(state))
-        if self._not_delivered_on_open(record, state) or self._not_dispatched_by_session(record, state):
+        if (self._not_delivered_on_open(record, state) or self._not_dispatched_by_session(record, state)
+                or self._refused_by_codex()):
             self.states(fresh=True)
         if self.arming.moved(record, state):
             self.states(fresh=True)
@@ -781,6 +783,16 @@ class Runtime:
         if gate != (machine.PASS, machine.SESSION):
             return False
         return self.arming.trip(sessions.CAPABILITY, OffReason.NOT_DISPATCHED_BY_SESSION)
+
+    def _refused_by_codex(self) -> bool:
+        """The tripwire REFUSED_BY_CODEX (v0.6.16-beta.4): a route met Codex refusing a turn with no input
+        (codex/headless.EMPTY_REFUSED) - silent_continuation turns off, once, where it is registered and on. Whether it
+        was turned off."""
+        if not headless.EMPTY_REFUSED or self.__dict__.get("_refused_tripped") or self.registry.get(
+                silent.CAPABILITY) is None:
+            return False
+        self._refused_tripped = True
+        return self.arming.trip(silent.CAPABILITY, OffReason.REFUSED_BY_CODEX)
 
     def _record_moved(self, record, move):
         """P14 for a record of this edition's own (v0.6.14): its rule and its record as core says they are now,

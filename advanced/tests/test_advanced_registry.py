@@ -76,6 +76,8 @@ class ShippedTests(unittest.TestCase):
                "usage_meter", "usage_wrap_up", "usage_pause",
                # and the widening to every conversation but Codex's own (P19).
                "every_conversation",
+               # v0.6.16-beta.4: how a turn run here starts.
+               "silent_continuation",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -108,7 +110,7 @@ class ShippedTests(unittest.TestCase):
                      Point.ADMISSION: ("compact_continue", "capacity_retry", "structured_rules", "unknown_failure_budget",
                                        "codex_gave_up", "sign_in_retry"),
                      Point.SENDER: ("goal_continuation", "marker_free_continuation"),
-                     Point.DELIVERY: ("marker_free_continuation",),
+                     Point.DELIVERY: ("marker_free_continuation", "silent_continuation"),
                      # v0.6.15-beta: several sends waiting for their receipts at once.
                      Point.CONCURRENCY: ("parallel_dispatch",),
                      # v0.6.16-beta.3: which conversations core takes up.
@@ -123,7 +125,8 @@ class ShippedTests(unittest.TestCase):
              "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
              "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "compact_continue", "model_fallback",
              "codex_gave_up",
-             "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules")
+             "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules",
+             "silent_continuation")
 
     def test_the_shown_order_names_every_capability_of_the_registry_exactly_once(self):
         order, ids = registry.SHOWN_ORDER, registry.REGISTRY.ids

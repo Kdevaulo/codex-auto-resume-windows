@@ -409,6 +409,7 @@
   "statement.parallel_dispatch.stop": "Turn it off here or turn every advanced feature off; from the next look every continuation is sent one at a time again.",
   "page.watchlog.answer.queue_for_open": "Queued it for when the conversation is opened",
   "page.watchlog.answer.to_session": "Queued it for the other Codex session that has the conversation",
+  "page.watchlog.answer.silent": "Started the turn with no words",
   "page.watchlog.answer.records": "A message of yours it would have sent",
   "name.queue_for_open": "Queue for when a conversation is opened",
   "statement.queue_for_open.does": "When a usage limit has reset in a conversation the Codex app does not have open, sends the ordinary continuation anyway and leaves it in Codex's queue, so Codex runs it when you open that conversation. It stays queued for the days you choose (3 by default, 7 at most) and is taken back after that. Each interruption is queued this way once; once taken back, it waits for the app as usual. Measured on codex-cli 0.158 (M1); on another version of Codex it is unmeasured.",
@@ -563,5 +564,13 @@
   "statement.model_fallback.instead": "The standard edition retries the same model, at its own pace, and never changes a conversation's model.",
   "statement.model_fallback.departs": "0.5 (it changes and replays a model setting, and runs a turn of its own), A2, A11, B3, B4, E8 and F8 (as Run a conversation here while Codex is closed) and B9 (it reads Codex's error code, not only a kind).",
   "statement.model_fallback.risks": "The turn runs on another model, which may answer differently. If Codex refuses to put the conversation's model back, Pending and History say so, and you switch it back in Codex. Which way puts it back (MF) has not been measured on every Codex version.",
-  "statement.model_fallback.stop": "Turn it off here or turn every advanced feature off; the next recovery then stays on the conversation's own model."
+  "statement.model_fallback.stop": "Turn it off here or turn every advanced feature off; the next recovery then stays on the conversation's own model.",
+  "name.silent_continuation": "Continue with no words",
+  "statement.silent_continuation.does": "When a conversation is run here while Codex is closed, its continuation is started with no words at all, so nothing extra appears in the conversation; its arrival is proven by the id it was started under. It continues nothing by itself: it changes only how Run a conversation here while Codex is closed, or a compacted conversation's continuation, starts its turn.",
+  "statement.silent_continuation.instead": "The standard edition always sends a short sentence with a marker at its end, which shows in the conversation.",
+  "statement.silent_continuation.departs": "A4 (no marker: the turn is proven by its id) and A26 (no words at all).",
+  "statement.silent_continuation.risks": "Whether Codex starts a turn with no words, and keeps its id (M3B), has not been measured on every Codex version. Where Codex refuses it, that turn is started with the usual words instead, and this stops answering for that Codex version.",
+  "statement.silent_continuation.stop": "Turn it off here or turn every advanced feature off; continuations then carry their words and marker again.",
+  "page.tripped.refused_by_codex": "Turned off: Codex refused to start a turn with no words.",
+  "page.kept.refused_by_codex": "It stayed on although Codex refused to start a turn with no words."
 }

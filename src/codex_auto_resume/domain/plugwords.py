@@ -87,6 +87,9 @@ class Alternative(StrEnum):
     # P15: no marker; queued under the client id core derives from the interruption
     # (ids.continuation_client_id), which is what proves it arrived.
     CLIENT_ID = "client_id"
+    # P15 (v0.6.16-beta.4): no words at all, only through a route that takes words - which core then calls with none,
+    # under the client id it derives, its proof (engine/routes.py). Through a channel or core's queue, ignored.
+    SILENT = "silent"
     # P16 (v0.6.15-beta): the ordinary send to a conversation the app does not hold, left in Codex's queue for
     # when it is opened - kept there only while the plug says so, and seven days and an hour at most.
     QUEUE_FOR_OPEN = "queue_for_open"

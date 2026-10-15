@@ -164,8 +164,8 @@ class ClosedAlternativeTests(unittest.TestCase):
         conversation another Codex session holds (engine/tosession.py)."""
         take_up = {Alternative.ADMIT, Alternative.CAPACITY} | set(plug.PACED_AS)
         self.assertEqual(plug.TAKE_UP, take_up)
-        self.assertEqual(plug.ANSWERS, plug.RESTRICTIONS | {Alternative.CLIENT_ID, Alternative.EARLY,
-                                                            Alternative.RESEND, Alternative.SEND_NOW,
+        self.assertEqual(plug.ANSWERS, plug.RESTRICTIONS | {Alternative.CLIENT_ID, Alternative.SILENT,
+                                                            Alternative.EARLY, Alternative.RESEND, Alternative.SEND_NOW,
                                                             Alternative.QUEUE_FOR_OPEN, Alternative.TO_SESSION}
                          | take_up)
         self.assertEqual(plug.ANSWERS, frozenset(Alternative))
@@ -174,7 +174,8 @@ class ClosedAlternativeTests(unittest.TestCase):
                 self.assertIn(point, Point)
                 if point not in (Point.DELIVERY, Point.GATES, Point.ADMISSION, Point.SCHEDULE):
                     self.assertLessEqual(accepted, plug.RESTRICTIONS)
-        self.assertEqual(plug.ALTERNATIVES[Point.DELIVERY], frozenset({Alternative.CLIENT_ID}))
+        # v0.6.16-beta.4: and SILENT, carried out only through a route that takes words (engine/routes.py).
+        self.assertEqual(plug.ALTERNATIVES[Point.DELIVERY], frozenset({Alternative.CLIENT_ID, Alternative.SILENT}))
         self.assertEqual(plug.ALTERNATIVES[Point.GATES], plug.RESTRICTIONS | take_up)
         self.assertEqual(plug.ALTERNATIVES[Point.ADMISSION], take_up)
         # And P7 may look at a usage-limited record early (EARLY), send an uncertain submission once

@@ -52,6 +52,9 @@ POLL_SECONDS = 0.5
 APP_LOOK_SECONDS = 10.0
 # Modes: one turn of words, a compaction, one turn on another model.
 TURN, COMPACT, FALLBACK = "turn", "compact", "fallback"
+# Whether Codex refused a turn with no input in this process (silent_continuation, M3B): from then on the capability
+# answers DEFER, so the next attempt carries words, and it trips (REFUSED_BY_CODEX, runtime.moved).
+EMPTY_REFUSED = False
 
 PREFLIGHT = {"outcome": "not_started", "error_code": "queue_preflight_failed"}
 SPAWN_FAILED = {"outcome": "not_started", "error_code": "queue_spawn_failed"}
@@ -351,6 +354,9 @@ class HeadlessRun:
             return dict(PREFLIGHT)
         except Exception as exc:
             if getattr(exc, "method", None) == method:
+                if method == "turn/start" and not words:
+                    global EMPTY_REFUSED
+                    EMPTY_REFUSED = True
                 return {"outcome": "not_started", "error_code": "queue_preflight_failed",
                         "refused_by_codex": True}
             return {"outcome": "unknown",
