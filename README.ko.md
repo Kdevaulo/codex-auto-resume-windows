@@ -198,6 +198,7 @@ Codex 안의 패널입니다. Codex 창을 찍은 사진이 아니라, 플러그
 ## 만든 사람과 라이선스
 
 **songyb111-gachon**이 두 AI 개발 도구, OpenAI Codex와 Anthropic Claude Code의 도움을 받아 만들었습니다. 자세한 내용은
-[CONTRIBUTORS.ko.md](docs/CONTRIBUTORS.ko.md)에 있습니다.
+[CONTRIBUTORS.ko.md](docs/CONTRIBUTORS.ko.md)에 있습니다. 문제를 알려 주시고, 기능을 제안하고, 고친 버전을 시험해 주신
+모든 분께 감사드립니다. 도와주신 분의 이름은 [변경 기록](docs/CHANGELOG.ko.md)에서 그 항목 옆에 적어 두었습니다.
 
 MIT. [LICENSE](LICENSE)를 참고하세요.

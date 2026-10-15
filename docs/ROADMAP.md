@@ -840,12 +840,12 @@ own message when a limit resets* stays as it is.
 
 ## v0.6.17 — The final Python audit, both editions
 
-v0.6.16 is the last Python release: the whole repository, both editions, through its bug hunt, and
-the Python reference implementation the Rust migration reproduces. It comes after v0.6.15 so that
+v0.6.17 is the last Python release: the whole repository, both editions, through its bug hunt, and
+the Python reference implementation the Rust migration reproduces. It comes after v0.6.16 so that
 the last features written in Python - the rest of the advanced edition - are audited with the rest,
 and the reference the Rust core reproduces holds them.
 
-v0.6.16 is planned as the final comprehensive audit of the Python implementation, in both editions.
+v0.6.17 is planned as the final comprehensive audit of the Python implementation, in both editions.
 
 Unlike v0.6.10-alpha's refactoring, it is intentionally a broad bug hunt.
 
@@ -863,10 +863,12 @@ Expected areas include:
 - malformed, stale, or corrupted state,
 - fault injection,
 - real Codex integration,
-- Advanced / Experimental recovery paths: every capability of v0.6.11, v0.6.14 and v0.6.15, each with its
+- Advanced / Experimental recovery paths: every capability of v0.6.11, v0.6.14 and v0.6.16, each with its
   warnings, tripwires and ceilings,
 - responsiveness, in every language: whatever lag v0.6.9 left,
-- both editions, and that the standard one still holds none of the advanced code.
+- both editions, and that the standard one still holds none of the advanced code,
+- every document, in both languages, read against the code as it is: wrong or stale claims, links,
+  versions and contradictions, and the translations polished.
 
 Confirmed bugs should receive regression tests.
 
