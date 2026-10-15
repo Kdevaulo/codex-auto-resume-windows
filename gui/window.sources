@@ -36,6 +36,7 @@ gui/SettingsHomes.cs
 gui/SettingsOwn.cs
 gui/WindowReopen.cs
 gui/WindowAudit.cs
+gui/WindowRender.cs
 
 [dashboard]
 gui/Dashboard.cs

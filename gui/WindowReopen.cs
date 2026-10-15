@@ -508,7 +508,7 @@ namespace CodexAutoResume
         /// this one stays as it is: the old words and colours are better than no window.
         private void Reopen(bool firstRead)
         {
-            if (reopening || auditing) return;
+            if (reopening || auditing || rendering) return;
             bool normal = WindowState == FormWindowState.Normal;
             Rectangle bounds = normal ? Bounds : RestoreBounds;
             // The invisible border as it is now; maximized, as it was last measured on screen, or as the window this

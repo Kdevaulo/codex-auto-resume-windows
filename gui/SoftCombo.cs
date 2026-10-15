@@ -1098,6 +1098,23 @@ namespace CodexAutoResume
             timer.Start();
         }
 
+        /// The list as Show draws it once it has settled - measured against `area` for a screen, `hovered` raised under
+        /// the pointer - into Image, with no window: for the render mode's motion pictures (WindowRender.cs), which no
+        /// picture of the window itself could hold.
+        internal Bitmap PaintSettled(int hovered, Rectangle area)
+        {
+            Rectangle saved = Area;
+            Area = area;
+            try { Measure(); }
+            finally { Area = saved; }
+            Reveal(combo.SelectedIndex);
+            alpha = 255;
+            rise = 0;
+            hover = hovered;
+            Render();
+            return image;
+        }
+
         private void Tick()
         {
             double t = clock.Elapsed.TotalMilliseconds / Math.Max(1, Motion.Duration);

@@ -1067,6 +1067,9 @@ namespace CodexAutoResume
             Application.SetCompatibleTextRenderingDefault(false);
             // Only a window build/capture_window.ps1 started: the mouse changes nothing it draws.
             SettingsForm.ShutOutPointer();
+            // Only for build/make_motion.py: frames of the window drawn offscreen, and nothing else (WindowRender.cs).
+            string renderJob = SettingsForm.RenderJob;
+            if (renderJob != null) return SettingsForm.RenderFrames(renderJob);
 
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
             var bridge = new Bridge(root);
