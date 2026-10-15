@@ -295,6 +295,9 @@ namespace CodexAutoResume
         // measured from, and the sign-in switch as the status last said.
         private Dictionary<string, string> baseline;
         private bool startupBaseline;
+        // Whether a status read has said what Windows holds for the sign-in switch since the page was built
+        // (ApplyStatus). Until it has, the switch shows nothing it knows and Save writes no entry (v0.6.16-beta.3).
+        private bool startupKnown;
         private NoteLabel reopenNote;
         // The same limit the settings layer enforces. Shown, never enforced here: text past it
         // is refused when saved rather than cut off while it is typed.

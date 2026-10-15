@@ -679,6 +679,8 @@ namespace CodexAutoResume
             baseline = EditorValues();
             CheckBox startupCheck = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
             startupBaseline = startupCheck != null && startupCheck.Checked;
+            // Not read yet: until a status read says what Windows holds (ApplyStatus), Save leaves the entry alone.
+            startupKnown = false;
             if (!auditing) RefreshStatusAsync(null);
         }
 
@@ -1257,11 +1259,19 @@ namespace CodexAutoResume
         private void ApplyStatus(Dictionary<string, object> status, CheckBox startup)
         {
             object running = status["watcher_running"];
-            if (startup != null)
+            // The sign-in switch, from any status read that says it - the page's own, or the Dashboard's snapshot
+            // (`startup` null) - but from a snapshot only while the switch shows what was read last, so a person's
+            // unsaved change is not taken back by the next refresh (v0.6.16-beta.3, issue #31: it was read by the
+            // page's own read alone, and showed off where that read failed or had not come back yet).
+            bool ours = startup != null;
+            if (startup == null) startup = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
+            object registered = Get(status, "startup_enabled");
+            if (startup != null && registered is bool && (ours || !startupKnown || startup.Checked == startupBaseline))
             {
-                startup.Checked = Equals(status["startup_enabled"], true);
+                startup.Checked = (bool)registered;
                 // What Windows has is not an edit.
                 startupBaseline = startup.Checked;
+                startupKnown = true;
             }
 
             // The header (Hero). A read rewrites it, as it always has, over a note or a hold written since the
@@ -1431,6 +1441,7 @@ namespace CodexAutoResume
             // stops the rest rather than reporting a save that half happened.
             var startup = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
             bool startAtSignIn = startup != null && startup.Checked;
+            bool writeStartup = startup != null && startupKnown && startAtSignIn != startupBaseline;
             CallAsync("update", changes, delegate(Dictionary<string, object> updated)
             {
                 if (!Ok(updated)) { SaveFailed(updated); return; }
@@ -1453,11 +1464,13 @@ namespace CodexAutoResume
                 }
                 // This window's own write is not a change made somewhere else.
                 settingsStamp = SettingsStamp();
-                CallAsync("startup", "{\"enabled\":" + (startAtSignIn ? "true" : "false") + "}",
-                          delegate(Dictionary<string, object> registered)
+                // The sign-in entry only where the person moved the switch from what a read said Windows holds
+                // (v0.6.16-beta.3, issue #31): a switch never read is not their choice, and a Save of something
+                // else never writes it - it would remove an entry they kept, or put back one they removed.
+                Action<Dictionary<string, object>> registeredThen = delegate(Dictionary<string, object> registered)
                 {
-                    if (!Ok(registered)) { SaveFailed(registered); return; }
-                    startupBaseline = startAtSignIn;
+                    if (registered != null && !Ok(registered)) { SaveFailed(registered); return; }
+                    if (registered != null) startupBaseline = startAtSignIn;
                     // A new Interface language or theme: the window reopens in it, where it is.
                     reopenFocus = focus;
                     CheckReopen(false);
@@ -1475,7 +1488,10 @@ namespace CodexAutoResume
                             header.Invalidate(true);
                         });
                     });
-                });
+                };
+                if (writeStartup)
+                    CallAsync("startup", "{\"enabled\":" + (startAtSignIn ? "true" : "false") + "}", registeredThen);
+                else registeredThen(null);
             });
         }
 
