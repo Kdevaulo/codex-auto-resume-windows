@@ -38,7 +38,7 @@ from ..codex import credits, inuse
 from ..codex.turns import Turns
 from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
 from .continued import answer_key, handed
-from .wrapwords import DEFAULT_STYLE, STYLE_KEYS, STYLES, render  # noqa: F401 - the registry's, and the tests'
+from .wrapwords import ON, SWITCH, DEFAULT_STYLE, STYLE_KEYS, STYLES, render  # noqa: F401 - the registry's, the tests'
 
 METER, WRAP_UP, PAUSE = "usage_meter", "usage_wrap_up", "usage_pause"
 # Recover every conversation (engine/everyconversation.py): while it is on, core takes up P19's widening, and so does
@@ -242,7 +242,8 @@ class UsageWrapUp:
         for row in due:
             words = render(style=options.get(OptionKey.WRAP_STYLE, DEFAULT_STYLE), minutes=row["minutes"],
                            used=row["used_percent"], locale=locale,
-                           stop_at=options.get(STOP_WORDS_OPTIONS[row["minutes"]], DEFAULT_STOP_WORDS))
+                           stop_at=options.get(STOP_WORDS_OPTIONS[row["minutes"]], DEFAULT_STOP_WORDS),
+                           reset_at=row["reset_at"], include_reset=options.get(OptionKey.WRAP_RESET_TIME, ON) == ON)
             if words is not None:
                 worded.append((row, words))
         if not worded:

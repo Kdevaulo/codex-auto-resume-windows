@@ -1079,6 +1079,9 @@ namespace CodexAutoResume
             if (key == "ceiling_hours") return Word("page.option.hours", "{n} h", "n", value);
             // v0.6.16-beta.3 (issue #29): the meter's spacing, a stage's percentage, the wrap-up's wording.
             if (key == "poll_minutes") return Word("page.option.minutes", "{n} min", "n", value);
+            // v0.6.16-beta.4: a switch's two values (1 on, 2 off).
+            if (key == "wrap_reset_time" || key == "wrap_after_reset" || key.StartsWith("window_", StringComparison.Ordinal))
+                return value == 1 ? Word("page.option.on", "On") : Word("page.option.off", "Off");
             if (key == "wrap_style")
                 return Word("page.option.style." + value.ToString(CultureInfo.InvariantCulture),
                             value == 1 ? "Short" : value == 3 ? "Detailed" : value == 4 ? "With the numbers" : "Standard");

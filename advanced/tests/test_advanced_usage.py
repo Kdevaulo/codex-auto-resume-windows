@@ -105,7 +105,8 @@ class DefinitionTests(unittest.TestCase):
                          {OptionKey.POLL_MINUTES: 15, OptionKey.WARN_FIVE_HOUR: 85, OptionKey.WARN_WEEKLY: 85})
         self.assertEqual({option.key: option.default for option in USAGE_WRAP_UP.options},
                          {OptionKey.WRAP_FIVE_HOUR: 90, OptionKey.WRAP_WEEKLY: 90, OptionKey.WRAP_STYLE: 2,
-                          OptionKey.STOP_WORDS_FIVE_HOUR: 95, OptionKey.STOP_WORDS_WEEKLY: 95})
+                          OptionKey.STOP_WORDS_FIVE_HOUR: 95, OptionKey.STOP_WORDS_WEEKLY: 95,
+                          OptionKey.WRAP_RESET_TIME: 1})
         self.assertEqual({option.key: option.default for option in USAGE_PAUSE.options},
                          {OptionKey.PAUSE_FIVE_HOUR: 95, OptionKey.PAUSE_WEEKLY: 95})
         self.assertEqual(USAGE_METER.option(OptionKey.POLL_MINUTES).choices, (5, 10, 15, 20, 30, 45, 60))
@@ -122,6 +123,10 @@ class DefinitionTests(unittest.TestCase):
                     with self.subTest(style=style, minutes=minutes, locale=locale):
                         words = wrapwords.render(style=style, minutes=minutes, used=91.6, stop_at=96, locale=locale)
                         self.assertIsNotNone(words)
+                        weekly = wrapwords.render(style=style, minutes=minutes, used=91.6, stop_at=96, locale=locale,
+                                                  reset_at=1_800_000_000, include_reset=True)
+                        self.assertIsNotNone(weekly)
+                        self.assertIn(wrapwords.reset_words(1_800_000_000, minutes, locale), weekly)
                         if style == 4:
                             self.assertIn("91", words)
                             self.assertIn("96", words)
@@ -332,6 +337,27 @@ class WrapUpTests(TakingCase):
         sent = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
         self.assertEqual(len(sent), 1, self.h.logs[-10:])
         self.assertIn(statement.CATALOGS.text("continue.wrap_up.window.five_hour", "ko"), sent[0])
+
+    def test_include_the_reset_time_says_when_the_window_resets_and_off_leaves_it_out(self):
+        """v0.6.16-beta.4 (i): on by default, the words end with when the window that triggered them resets - core's hour
+        and minute for the five-hour window; switched off, nothing is added."""
+        from codex_auto_resume import continuation
+        plug, _turn = self.running()
+        self.language(plug, "en")
+        reset = int(self.h.now) + 3600
+        for _ in range(3):
+            self.h.tick(advance=61)
+        (sent,) = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
+        said = statement.CATALOGS.text("continue.wrap_up.resets_at", "en", reset=continuation.format_reset_time(reset))
+        self.assertIn(statement.CATALOGS.text("continue.wrap_up.standard", "en") + " " + said, sent)
+        self.setUp()
+        plug, _turn = self.running()
+        self.language(plug, "en")
+        self.choose(plug, OptionKey.WRAP_RESET_TIME, 2)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        (sent,) = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
+        self.assertNotIn(statement.CATALOGS.text("continue.wrap_up.resets_at", "en", reset="").split("{")[0][:12], sent)
 
     def test_below_the_percentage_nothing_is_sent(self):
         self.running(percent=80)

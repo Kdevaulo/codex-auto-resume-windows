@@ -170,7 +170,9 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "option.wrap_weekly", "option.wrap_style", "option.pause_five_hour", "option.pause_weekly",
     "option.minutes", "option.percent", "option.style.1", "option.style.2", "option.style.3",
     # v0.6.16-beta.4: the wording with the numbers, and the stop percentage the words name, each window its own.
-    "option.style.4", "option.stop_words_five_hour", "option.stop_words_weekly"))
+    "option.style.4", "option.stop_words_five_hour", "option.stop_words_weekly",
+    # (i) Include the reset time, and how an on/off choice says its two values.
+    "option.wrap_reset_time", "option.on", "option.off"))
 # The edition's own continuations' words (v0.6.15-beta): what empty_response, subagent_parent and keep_going send -
 # fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
 # subagent's line, its id and a closed kind word).
@@ -183,7 +185,10 @@ CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "sub
                       # v0.6.16-beta.4: the wording with the numbers and the windows it names (engine/wrapwords.py) -
                       # filled in, so held to core's check only once filled (wrapwords.render).
                       CONTINUE_PREFIX + "wrap_up.numbers", CONTINUE_PREFIX + "wrap_up.window.five_hour",
-                      CONTINUE_PREFIX + "wrap_up.window.weekly")
+                      CONTINUE_PREFIX + "wrap_up.window.weekly",
+                      # (i): when the window resets, said with core's hour and minute; a weekly reset's date.
+                      CONTINUE_PREFIX + "wrap_up.resets_at", CONTINUE_PREFIX + "wrap_up.resets_on",
+                      CONTINUE_PREFIX + "wrap_up.date")
                      + tuple(CONTINUE_PREFIX + "subagent.kind." + kind
                              for kind in ("usage_limit", "temporary", "interrupted", "error")))
 
