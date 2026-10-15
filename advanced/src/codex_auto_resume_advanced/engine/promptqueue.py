@@ -102,7 +102,7 @@ class PromptQueue:
                 found.append(record)
         return found or DEFER
 
-    def would_send(self, view):
+    def watched_due(self, view):
         """While watched (v0.6.16-beta.3, runtime.Runtime._watched_records): the prompt id of each conversation's first
         prompt still to go that `_first` would make due and hand now, decided from the stored rows alone - nothing is
         written, cancelled, held, caught up or made due."""

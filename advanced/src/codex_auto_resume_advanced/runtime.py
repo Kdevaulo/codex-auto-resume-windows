@@ -579,9 +579,9 @@ class Runtime:
 
     def _watched_records(self, definition, view) -> None:
         """P2 for a watched capability (v0.6.16-beta.3): each of its rows a person set up that would be handed core now -
-        as its code decides it from the stored state, writing nothing (`would_send`) - journalled once as what it would
+        as its code decides it from the stored state, writing nothing (`watched_due`) - journalled once as what it would
         have sent, with the time; never handed, never sent, and nothing spent or read for it."""
-        would = getattr(self._code_of(definition), "would_send", None)
+        would = getattr(self._code_of(definition), "watched_due", None)
         if not callable(would):
             return
         try:

@@ -179,7 +179,7 @@ class ResetMessage:
             self._turn += 1
         return found + waiting or DEFER
 
-    def would_send(self, view):
+    def watched_due(self, view):
         """While watched (v0.6.16-beta.3, runtime.Runtime._watched_records): the id of each message whose reset has come by
         the windows as last stored - the time-based step alone, saved nowhere - or that is due already; nothing is
         written, and usage is not read for it (a watched capability's errand is only journalled)."""
