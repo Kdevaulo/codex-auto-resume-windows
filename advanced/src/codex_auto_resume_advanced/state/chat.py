@@ -15,7 +15,7 @@ from .schema import CHAT_WORDS
 from .session import StateError, _key, _thread, _word
 
 CAPABILITY = "codex_chat"
-_COLUMNS = ("message_id", "thread_id", "words", "state", "reason", "record_id", "created_at", "sent_at", "finished_at")
+_COLUMNS = ("chat_id", "thread_id", "words", "state", "reason", "record_id", "created_at", "sent_at", "finished_at")
 # How a record's move ends its message: the reason, and the record's state then.
 _ENDS = {"delivered": (ChatReason.DELIVERED, RecordState.FINISHED),
          "unproven": (ChatReason.UNKNOWN, RecordState.FINISHED),
@@ -62,7 +62,7 @@ class ChatMixin:
         with self._read() as connection:
             if connection is None:
                 return []
-            rows = connection.execute("SELECT %s FROM chat_messages%s ORDER BY message_id DESC LIMIT ?"
+            rows = connection.execute("SELECT %s FROM chat_messages%s ORDER BY chat_id DESC LIMIT ?"
                                       % (", ".join(_COLUMNS), where), (*values, int(limit))).fetchall()
         return [dict(zip(_COLUMNS, row)) for row in reversed(rows)]
 

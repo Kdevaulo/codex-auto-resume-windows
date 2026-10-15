@@ -120,7 +120,7 @@ TABLES = {
     # Stage 4 (v0.6.16-beta.4): a turn run here, and the Dashboard's chat.
     "headless_runs": ("interruption_id", "capability", "thread_id", "started_at", "ends_by", "stop_requested_at",
                       "ended_at", "end"),
-    "chat_messages": ("message_id", "thread_id", "words", "state", "reason", "record_id", "created_at", "sent_at",
+    "chat_messages": ("chat_id", "thread_id", "words", "state", "reason", "record_id", "created_at", "sent_at",
                       "finished_at"),
 }
 V4_TABLES = ("continuations", "keep_going", "prompts")
@@ -503,7 +503,7 @@ _STATEMENTS_STAGE4 = (
     )""" % ("CHECK (length(interruption_id) = 64 AND interruption_id NOT GLOB '*[^0-9a-f]*')",
             _one_of("capability", HEADLESS_CAPABILITIES), _UUID, ", ".join("'%s'" % word for word in RunEnd)),
     """CREATE TABLE chat_messages (
-        message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER PRIMARY KEY AUTOINCREMENT,
         thread_id TEXT NOT NULL %s,
         words TEXT CHECK (words IS NULL OR (typeof(words) = 'text' AND length(words) BETWEEN 1 AND %d)),
         state TEXT NOT NULL %s,
@@ -515,7 +515,7 @@ _STATEMENTS_STAGE4 = (
         CHECK (words IS NULL OR state = '%s')
     )""" % (_UUID, CHAT_WORDS, _one_of("state", ChatState), ", ".join("'%s'" % word for word in ChatReason),
             "CHECK (length(record_id) = 64 AND record_id NOT GLOB '*[^0-9a-f]*')", ChatState.WAITING),
-    "CREATE INDEX chat_messages_thread ON chat_messages(thread_id, message_id)",
+    "CREATE INDEX chat_messages_thread ON chat_messages(thread_id, chat_id)",
 )
 STATEMENTS = (_STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + _STATEMENTS_V5 + _STATEMENTS_STAGE4
               + ("PRAGMA user_version=%d" % SCHEMA_VERSION,))

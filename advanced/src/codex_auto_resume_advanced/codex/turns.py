@@ -46,10 +46,7 @@ BETWEEN = "SELECT count(*) FROM thread_turns WHERE thread_id=? AND rollout_ordin
 # v0.6.16-beta.3 (usage_wrap_up): the conversations whose latest turn is running - status words and ids only.
 RUNNING = ("SELECT t.thread_id FROM thread_turns t WHERE t.status='inProgress' AND NOT EXISTS (SELECT 1 FROM "
            "thread_turns n WHERE n.thread_id=t.thread_id AND n.rollout_ordinal > t.rollout_ordinal) LIMIT ?")
-# v0.6.16-beta.4 (model_fallback): one failed turn's error, read only to be dropped to Codex's code at once (core's
-# failures.shape - a tag of letters and digits, never a word of its message, B9).
-ERROR = "SELECT error_json FROM thread_turns WHERE thread_id=? AND turn_id=?"
-STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN, BETWEEN, RUNNING, ERROR)
+STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN, BETWEEN, RUNNING)
 # A plan step's statuses as Codex writes them; anything else reads "unknown".
 STEP_STATUSES = frozenset({"pending", "in_progress", "completed"})
 UNKNOWN = "unknown"
@@ -218,19 +215,3 @@ class Turns:
                 raise TurnsUnavailable("a plan item with no steps this reads")
             return statuses
         return self._read(run)
-
-    def error_code(self, thread_id, turn_id):
-        """Codex's code for the error of turn `turn_id` (core's failures.shape: a known code, or one of its shape), or
-        None - the error itself dropped at once, never kept or returned."""
-        if not ids.is_uuid(thread_id) or not ids.is_uuid(turn_id):
-            raise TurnsUnavailable("not a turn")
-
-        def run(connection):
-            row = connection.execute(ERROR, (thread_id, turn_id)).fetchone()
-            return row[0] if row is not None else None
-        raw = self._read(run)
-        from codex_auto_resume import failures
-        from codex_auto_resume.codex.values import _json
-        error = _json(raw) if isinstance(raw, str) else None
-        info = error.get("codexErrorInfo") if isinstance(error, dict) else None
-        return failures.shape(info)["code"]
