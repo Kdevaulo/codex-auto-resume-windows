@@ -201,7 +201,7 @@ its provenance marker), and Windows registrations that belong to this installati
 
 Built by **songyb111-gachon** with the assistance of two AI development tools, OpenAI Codex and
 Anthropic Claude Code; [CONTRIBUTORS.md](docs/CONTRIBUTORS.md) has the full breakdown. Thanks to everyone who
-reported a problem, suggested a feature or tested a fix - [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [@ZionZhang42](https://github.com/ZionZhang42), [@aca22jy](https://github.com/aca22jy), [@Hunweibyn](https://github.com/Hunweibyn) and [@cervinho](https://github.com/cervinho) among them;
+reported a problem, suggested a feature or tested a fix - [@cervinho](https://github.com/cervinho), [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [@ZionZhang42](https://github.com/ZionZhang42), [@aca22jy](https://github.com/aca22jy) and [@Hunweibyn](https://github.com/Hunweibyn) among them;
 each is named in the [changelog](docs/CHANGELOG.md) beside what they helped with.
 
 MIT. See [LICENSE](LICENSE).
