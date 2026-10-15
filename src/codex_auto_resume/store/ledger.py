@@ -115,7 +115,7 @@ class _LedgerConnection:
     attribute a ledger could set to a no-op, and the handle it kept then wrote core's tables
     after the authorizer was gone. Nothing can be set on it at all.
 
-    Like the tick's view of the store (engine/options.py, StoreView), this guards against a
+    Like the tick's view of the store (engine/storeview.py, StoreView), this guards against a
     ledger's mistakes, not its intent: the ledger runs in core's process, where the handle's
     closure, a failed statement's traceback and state.sqlite itself all reach the connection
     for code that goes looking."""

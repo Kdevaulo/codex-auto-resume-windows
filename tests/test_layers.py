@@ -160,7 +160,9 @@ LAYER = {_q(name): layer for layer, names in {
                # v0.6.15-beta: several sends waiting for their receipts at once, on workers.
                "engine.launches",
                # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
-               "engine.foropen"),
+               "engine.foropen",
+               # v0.6.16-beta.3: the store as a plug is shown it, off options.py's page.
+               "engine.storeview"),
     # v0.6.10-alpha: control.py became control/, ten files, `Control` composed from eight
     # mixins. `layer` is where the composition lives, so that the front holds no code.
     "control": ("control", "control.actions", "control.codexstart", "control.errors",

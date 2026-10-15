@@ -90,7 +90,9 @@ ITEM = {_q(name): item for item, names in {
                # v0.6.15-beta: several sends waiting for their receipts at once, on workers.
                "engine.launches",
                # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
-               "engine.foropen"),
+               "engine.foropen",
+               # v0.6.16-beta.3: the store as a plug is shown it, off options.py's page.
+               "engine.storeview"),
     "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",
