@@ -1460,7 +1460,24 @@ function renderHero(status, now) {
   message.setAttribute('role', 'status');
   actions.appendChild(message);
   hero.appendChild(actions);
+  // v0.6.16-beta.3 (issue #31): and, under it, how the watcher starts for good - before anyone presses Start, whose
+  // start is made inside Codex, which may end it when it closes, while nothing else may be about to start it.
+  var how = start ? offHow(status) : '';
+  if (how) hero.appendChild(element('p', 'note', how));
   return {node: hero, message: message, start: start, word: word, facts: facts, state: state, light: light};
+}
+
+// v0.6.16-beta.3 (issue #31): a stopped watcher's way back that outlives Codex, by what the status says of the
+// sign-in entry: off, nothing starts the watcher on its own; on, it starts at the next sign-in, and the Start
+// menu's start is the one that lasts now. A status that does not say names neither.
+function offHow(status) {
+  if (status.startup_enabled === false) {
+    return t('panel.off_no_sign_in', 'Nothing starts it on its own: Run at Windows sign-in is off. From the Start menu, open Codex Auto Resume and start it there, or turn on Run at Windows sign-in in the Dashboard so it starts with Windows.');
+  }
+  if (status.startup_enabled === true) {
+    return t('panel.off_sign_in', 'Run at Windows sign-in is on, but it is not running now. To start it so it keeps running after Codex closes, open Codex Auto Resume from the Start menu and start it there.');
+  }
+  return '';
 }
 
 function renderPending(rows) {

@@ -601,6 +601,22 @@ default (or wherever `CODEX_AUTO_RESUME_PLUGIN_HOME`, or failing that
   text. Deleting it turns the power action off. It goes with the rest of `config/` under
   `Uninstall.cmd -Purge`, and the command line's `uninstall` deletes it unless you pass
   `--keep-state`;
+- `config/split-chains.json`, from v0.6.16-beta.3, only once Codex has recorded a conversation's turns
+  under another id (issue #30) — for each such conversation, the ids its turns have been recorded under,
+  per Codex home by a digest of that home's path (never the path itself), at most 2000 conversations of
+  64 ids each per home. Ids only: no title, path, text or time. The watcher writes it, the Dashboard's
+  check reads it; deleting it only means such a conversation's earlier ids are found again from Codex's
+  file names. It goes with the rest of `config/` under `Uninstall.cmd -Purge`, and the command line's
+  `uninstall` deletes it unless you pass `--keep-state`;
+- `config/once-words.json`, from v0.6.16-beta.3, only while a waiting task has words for this time
+  you added in the Dashboard: for each such task, this product's own interruption id (never a
+  conversation's), the words exactly as you wrote them, and when you wrote them. The words are sent
+  once, after that task's next continuation, into that conversation, as a Custom message is. Each
+  task's entry is deleted as the continuation carrying the words is handed to Codex, when you remove
+  the words, and - at the watcher's next look - when the task ends without a send; the file itself is
+  deleted when it holds nothing. The settings file never holds them, and the diagnostics bundle records
+  only how many there are. It goes with the rest of `config/` under `Uninstall.cmd -Purge`, and the
+  command line's `uninstall` deletes it unless you pass `--keep-state`;
 - `logs/` — `auto-resume.log`, what the watcher did, by reason code and conversation UUID;
   `errors.log`, the Python traceback when something goes wrong; `launcher.log`, a line
   per launch (and why, if one failed); and, from v0.6.9, `codex-start.log`, a line each time Codex

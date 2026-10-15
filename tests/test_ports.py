@@ -124,6 +124,12 @@ ENGINE_TO_SOURCE = {
     # v0.6.12: whether Codex's history has caught up and how many turns run and items wait, asked only
     # for an armed power action whose own checks have passed - counts and sizes, never content.
     "activity",
+    # v0.6.16-beta.3: which conversations besides a person's own its reads take up (P19) - set on it by the engine
+    # from the plug's answer each tick, never read back; the standard edition sets the empty set, A15 as ever.
+    "widened",
+    # v0.6.16-beta.3: why each failed turn the failure scan did not bring was passed over, for a skip
+    # line written once per turn (issue #27) - ids, lifecycle columns and kind words only.
+    "passed_over",
 }
 # v0.6.11: what core asks the edition's plug, which it holds as `Guarded` (domain/plug.py). The
 # engine asks at the points of a tick, a dispatch and an ended turn; the claim asks the ledger,
@@ -141,14 +147,17 @@ ENGINE_TO_SOURCE = {
 # through its own claim, pre-send look and launch guard where it would otherwise wait (A11).
 # `admission` is P17: whether a failure core never recovers alone is taken up (v0.6.14). `wants` is
 # not a point: whether the plug may answer at one now, so core makes that point's reads only then.
-ENGINE_TO_PLUG = {"admission", "delivery", "gate", "moved", "null", "outcome", "partition", "records",
+# `eligibility` is P19 (v0.6.16-beta.3): which conversations besides a person's own detection takes up.
+ENGINE_TO_PLUG = {"admission", "delivery", "eligibility", "gate", "moved", "null", "outcome", "partition", "records",
                   "schedule", "sender", "text", "tick", "unloaded", "wants"}
 # `claim_ledger_checked` is how the claim asks: it says whether that one call raised, so a
 # failure on another thread holding the same plug is not read as this claim's (domain/plug.py).
 STORE_TO_LEDGER = {"claim_ledger_checked", "null"}
 # `conversation_off`: a person switched a conversation off, so what the edition holds for it ends at that
 # switch (a reset message, a queued prompt) - told by the control layer that wrote the switch.
-CONTROL_TO_PLUG = {"conversation_off", "start_route", "surface"}
+# `start_held` (v0.6.16-beta.3, issue #31): why the start route just asked named none, for the line
+# the start with Codex writes - asked only after DEFER at P9, and not a point.
+CONTROL_TO_PLUG = {"conversation_off", "start_held", "start_route", "surface"}
 # What the one layer a front end calls asks of the state: what to show, and the four things a
 # person can ask for - pause, cancel, retry now, give the attempts back.
 CONTROL_TO_STORE = {

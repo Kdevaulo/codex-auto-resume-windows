@@ -45,11 +45,22 @@ confirms them, for the version of Codex shown. **Watch first** instead has it as
 would act, and note what it would have done, while it does nothing. What it would have done is
 counted on its page, under its other cards, for the last 30 days: each answer in words, once for
 each recovery it would have acted on, how many times and when last; a diagnostics export you ask
-for includes the same. If anything changed while you
+for includes the same. A capability that acts on what you set up for it - a message or a credit at a
+reset, a conversation kept going, a queued message - can be set up while it is watched as well: what
+it would have sent, and when, is counted there, nothing is sent, spent or read for it, and turning it
+on keeps what you set up (from v0.6.16-beta.3). If anything changed while you
 were reading, the page reads it again and asks again with what holds now (K3); where it cannot read
 it again, or your administrator's policy now refuses it, it says that nothing was turned on, and why.
 The page reads the list again after everything you do there, and whenever the watcher says a
 capability was turned on or off, here or anywhere else.
+
+**What one needs, it turns on with it.** A capability can need another: Wrap up near a limit and Pause
+near a limit both need the usage meter. Turning one on when what it needs is off asks once, with every
+statement involved in front of you - its own, then each one it needs - and that one yes turns them all on;
+if your administrator's policy refuses any of them, or any statement changed, nothing is turned on. Its
+page says what it needs. Turning a needed one off turns off first what needs it, and the page names those
+first. A capability whose need is no longer on - turned off, watched, refused by the policy, or failed here
+- turns itself off, and says why (K3, as the owner amended it on 2026-10-15).
 
 **Everywhere else, only off.** Nothing else - the panel inside Codex, the notification-area icon,
 a card - can turn a capability on. Codex's tools (MCP) can list the capabilities and turn one, or
@@ -117,11 +128,12 @@ Codex; nothing runs it unless a person asks, and [SECURITY.md](SECURITY.md) says
 
 ## Today's capabilities
 
-Twenty-one: sixteen that change how a recovery is made or what follows a turn, three that send at a
-time you pick - the two at a usage reset, and queued messages - and two actions: Longer messages, which
-only lets a message be longer, and the compatibility report, which only you start. Four rest on a
-measurement each that was made - the first three, and queue for when a conversation is opened - seven on
-measurements not made yet, and the other ten on none. Each measurement made was made by hand, on the
+Twenty-five: seventeen that change how a recovery is made, which conversations are recovered or what
+follows a turn, three that send at a time you pick - the two at a usage reset, and queued messages - three
+before a usage limit is reached - the usage meter, and the wrap-up and the pause that need it - and two
+actions: Longer messages, which only lets a message be longer, and the compatibility report, which only you
+start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
+is opened - ten on measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
 owner's machine, first on `codex-cli 0.158.0-alpha.2.1` and again on `codex-cli 0.162.0-alpha.17.2`;
 its record is in [`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a
 measurement not made yet, a capability's statement carries the warning that it was not measured there.
@@ -448,12 +460,15 @@ due).
 **Ceilings.** 12 a day, and 3 in any one conversation; and never more than one credit for one filling
 of a window, two a day or seven a week. Four rules may wait at once.
 
-**Measurements MU, MN and MR: not made yet.** MU reads usage as this capability reads it - with the
+**Measurements MU, MN and MR: passed** on codex-cli 0.162.0-alpha.17.2 (2026-10-10,
+[`docs/evidence/live/`](evidence/live/)). MU reads usage as this capability reads it - with the
 credits' count, and without their details - and how still a window's reset time stays; MN asks for a
 credit on an account with none and checks that nothing is spent; MR, at a real limit and only with
-the person's own second yes, spends exactly one credit and checks that asking again with the same key
-spends no second one. Until they are made on your version of Codex, the statement carries each as a
-warning, and a credit is spent only when you press *Use a reset credit now...*.
+the person's own second yes, spent exactly one credit, which lifted the limit, and asking again with
+the same key spent no second one. On that version of Codex the statement carries none of them as a
+warning, and a credit is used at the limit you picked by itself, unless you chose *Ask me first*; on
+any other version each is a warning until it is measured there, and a credit is spent only when you
+press *Use a reset credit now...*.
 
 ### Send your own message when a limit resets
 
@@ -494,8 +509,9 @@ Switching its conversation off cancels it (H5).
 
 **Ceilings.** 10 a day, and 2 in any one conversation.
 
-**Measurement MU: not made yet.** It counts resets from the same usage readings as the reset credit,
-so it rests on MU; until MU is made on your version of Codex, the statement carries it as a warning.
+**Measurement MU: passed** on codex-cli 0.162.0-alpha.17.2 (2026-10-10). It counts resets from the same
+usage readings as the reset credit, so it rests on MU; on any other version of Codex, until MU is made
+there, the statement carries it as a warning.
 
 ### Longer messages
 
@@ -643,6 +659,85 @@ A20.
 
 **Ceilings.** 30 a day, and core's 5 in any one conversation. **Measurement MT: not made yet** - "after this
 turn" says it is unproven until it is.
+
+### Recover every conversation but Codex's own
+
+**What it does.** Takes up a failed turn in every conversation of the Codex app except the ones Codex makes
+for itself: subagents (Tell a parent which of its subagents stopped handles those), reviews
+(`guardian_review`), memory passes (`memory_consolidation`) and conversations an agent created
+(`agent_created_thread`). A conversation with a label Codex adds later is taken up too, instead of left
+alone. Archived conversations, those of another Codex home, and those of a terminal or VS Code are still
+never taken up.
+
+**When it helps.** When a conversation of yours carries a label the standard edition does not know, so its
+failures are left alone.
+
+**What it risks.** A conversation Codex uses for itself under a new label could be continued, which may cost
+usage or add a message where none was wanted. Every recovery gate still applies: the conversation must be
+switched on and open in the app before anything is sent.
+
+**Departs from** [A15](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (only the desktop app's own user
+conversations are detected).
+
+**Ceilings.** None of its own come into play: what it takes up is recovered under the standard limits.
+It rests on no measurement.
+
+### Usage meter
+
+**What it does.** While the Codex app runs, reads your Codex usage on its own every 5 to 60 minutes, as you
+choose - 15 by default - and shows it in the icon's tooltip and the popup. When the five-hour or the weekly
+window reaches the percentage you set for a warning (85% by default, each window its own), it shows a
+notice, once for that window. The reading is only shown: whether a recovery may go is still decided by the
+reading the program makes when a recovery is due.
+
+**When it helps.** When you want to see how close a limit is before it is reached.
+
+**What it risks.** Each reading is one short request to Codex's own app server, as a recovery's is. A
+reading that cannot be read is shown as nothing and warns of nothing.
+
+**Departs from** [C4](STANDARDS.md#c-network) (nothing happens on its own, on a schedule) and
+[C9](STANDARDS.md#c-network) (usage is read only when a recovery is due).
+
+**Ceilings.** None come into play: it sends nothing. **Measurement MU: not settled yet.**
+
+### Wrap up near a limit
+
+**What it does.** Needs the usage meter, which turns on with it. When the five-hour or the weekly window
+reaches the percentage you set (90% by default, each window its own), each conversation that is switched on
+and has a turn running is sent one message, once for that window: "Please finish the current step, then
+stop." - or, as you choose, the short "Please stop now." or the detailed "Commit what is pending, write down
+where you are and what is left, then stop." It goes through Codex's queue as every continuation does, so
+Codex delivers it when the current turn ends.
+
+**When it helps.** When you would rather a long turn stopped at a good place than ran into the limit.
+
+**What it risks.** The message arrives only when the current turn ends, which may be after the limit is
+reached: it cannot stop a turn midway. A turn that ended before the message went gets none.
+
+**Departs from** [A13](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (only failures are recovered) and
+[A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (words of its own).
+
+**Ceilings.** 12 a day, and 2 in any one conversation - the five-hour and the weekly window's. **Measurement
+MT: not made yet.**
+
+### Pause near a limit
+
+**What it does.** Needs the usage meter, which turns on with it. When the five-hour or the weekly window
+reaches the percentage you set (95% by default, each window its own), the program sends no further
+continuation until that window resets: recoveries wait, and the advanced edition's own continuations are
+held. Messages you queued yourself, and anything you type in Codex, are not touched. After the reset,
+recoveries go on as they always do.
+
+**When it helps.** When you would rather keep the last of a window's usage for yourself.
+
+**What it risks.** Work may wait that could still have run in the usage left. A reading that is old may hold
+recoveries until the reset time it last showed; a window that resets early is seen at the meter's next
+reading.
+
+**Departs from** [C9](STANDARDS.md#c-network): it decides on the usage meter's reading, taken when no
+recovery was due.
+
+**Ceilings.** None come into play: it holds, and sends nothing. **Measurement MU: not settled yet.**
 
 ### Compatibility report
 

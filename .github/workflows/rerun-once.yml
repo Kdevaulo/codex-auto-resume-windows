@@ -1,0 +1,43 @@
+name: rerun once
+
+# Keep main's badge true to main, over a runner's hiccup.
+#
+# The README's badge shows the newest tests run on main. On 2026-10-13 one job of 36 failed there on a
+# fault that did not come back on the next commit (the golden bridge/plugin-copy.json, fixed since by
+# edition._beside), and the badge said failing until the next push. This reruns the failed jobs of a
+# failed run on main once - its first attempt only - so a fault that comes back fails the second
+# attempt too and stays on the badge, and a rerun is never rerun. It checks nothing out and runs no
+# code of this repository; tests/test_workflow_privilege.py RerunOnceTests holds each of those.
+#
+# `workflow_run` runs the copy of this file on the default branch: nothing here wakes until it is on main.
+
+on:
+  workflow_run:
+    workflows: ["tests"]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  rerun:
+    # A failed first attempt of main's own push or dispatch, from this repository. A fork's pull request
+    # cannot satisfy head_repository, a cancelled run is no failure, and a rerun is attempt 2 or more.
+    if: >-
+      github.repository == 'songyb111-gachon/codex-auto-resume-windows' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.run_attempt == 1 &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Rerun the failed jobs once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+        run: gh run rerun "$RUN_ID" --failed --repo "$REPO"

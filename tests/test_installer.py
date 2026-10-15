@@ -996,5 +996,49 @@ class ArchiveContentsTests(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
 
+@unittest.skipUnless(sys.platform == "win32", "Windows PowerShell")
+class OutputEncodingTests(unittest.TestCase):
+    """The installer and the bootstrap read the setup step's lines as UTF-8 and write their own as UTF-8,
+    so a Korean line reaches the person and the Dashboard whole - not as broken characters, as it did on
+    a Korean Windows, whose console code page is 949 (issue #33)."""
+
+    WORD = "\ud55c\uad6d\uc5b4"
+
+    @staticmethod
+    def setting(script):
+        return [line for line in script.read_text(encoding="utf-8").splitlines()
+                if line.startswith("try { [Console]::OutputEncoding")]
+
+    def through(self, setting):
+        """What PowerShell writes, as UTF-8, for a UTF-8 line a Python program printed - piped through
+        Write-Host as install.ps1's Invoke-Setup does, after `setting`."""
+        import base64
+        command = (setting + "\n& '%s' -c \"import sys; sys.stdout.reconfigure(encoding='utf-8'); "
+                   "print(chr(0xD55C) + chr(0xAD6D) + chr(0xC5B4))\" | ForEach-Object { Write-Host ('    ' + $_) }\n"
+                   % sys.executable)
+        done = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand",
+                               base64.b64encode(command.encode("utf-16-le")).decode("ascii")],
+                              capture_output=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(done.returncode, 0, done.stderr.decode("utf-8", "replace"))
+        return done.stdout.decode("utf-8", "replace")
+
+    def test_each_script_sets_its_output_encoding_once(self):
+        for script in (INSTALL_DIR / "install.ps1", BOOTSTRAP):
+            with self.subTest(script.name):
+                self.assertEqual(len(self.setting(script)), 1)
+
+    def test_a_korean_line_of_the_setup_step_arrives_whole(self):
+        for script in (INSTALL_DIR / "install.ps1", BOOTSTRAP):
+            with self.subTest(script.name):
+                self.assertIn(self.WORD, self.through(self.setting(script)[0]))
+
+    def test_the_dashboard_reads_the_bootstrap_as_utf8(self):
+        source = (ROOT / "gui" / "DashboardMaintenance.cs").read_text(encoding="utf-8")
+        body = source[source.index("string StartBootstrap("):]
+        body = body[:body.index("Process.Start(info)")]
+        self.assertIn("info.StandardOutputEncoding = Encoding.UTF8;", body)
+        self.assertIn("info.StandardErrorEncoding = Encoding.UTF8;", body)
+
+
 if __name__ == "__main__":
     unittest.main()

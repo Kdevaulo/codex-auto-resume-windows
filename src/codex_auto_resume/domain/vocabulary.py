@@ -600,3 +600,5 @@ class NoticeKind(StrEnum):
     MEMORY_STOPPED = "memory_stopped"
     # v0.6.11: Show me what happens - a card of made-up words, whose buttons do nothing (demo.py).
     DEMO = "demo"
+    # v0.6.16-beta.3: the advanced edition's usage meter at a warning (issue #29) - shown only from its plug's surface.
+    NEAR_LIMIT = "near_limit"

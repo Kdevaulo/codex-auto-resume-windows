@@ -784,6 +784,30 @@ namespace CodexAutoResume
 
         internal SoftScrollBar Bar { get { return bar; } }
 
+        private bool oneLine;
+
+        /// One line (issue #34): a box a person types one line in - a login, a word, a name, a search - or one that
+        /// shows one line. The well's top and bottom padding is a message's, 12 px each, and in a box a field or a
+        /// button high that left less than a line, so the text was cut off. A one-line box keeps its size and place,
+        /// and its line is centred in it as a button's text is: the same well, the same left padding, the line whole.
+        internal bool OneLine
+        {
+            get { return oneLine; }
+            set
+            {
+                oneLine = value;
+                if (value)
+                {
+                    Box.AcceptsReturn = false;
+                    Box.WordWrap = false;
+                }
+                PerformLayout();
+            }
+        }
+
+        /// The height one line of the box's text takes: its font's line, and the edit control's own pixel above it.
+        internal int LineHeight { get { return Box.Font.Height + Soft.Px(2); } }
+
         protected override void OnLayout(LayoutEventArgs levent)
         {
             base.OnLayout(levent);
@@ -792,6 +816,16 @@ namespace CodexAutoResume
             // drawn; narrower by the gutter while the soft bar shows, so no text runs under it.
             int native = SystemInformation.VerticalScrollBarWidth;
             int gutter = bar.Track.IsEmpty ? 0 : Soft.Px(SoftBar.TrackWidth);
+            if (oneLine)
+            {
+                // The line centred in the box, as a button's text is - never taller than the box itself.
+                int line = Math.Min(LineHeight, Height);
+                int top = Math.Max(0, (Height - line) / 2);
+                clip.SetBounds(Padding.Left, top, Math.Max(0, room - gutter), line);
+                Box.SetBounds(0, 0, Math.Max(0, room - gutter + native), line);
+                Changed();
+                return;
+            }
             int tall = Math.Max(0, Height - Padding.Vertical);
             clip.SetBounds(Padding.Left, Padding.Top, Math.Max(0, room - gutter), tall);
             Box.SetBounds(0, 0, Math.Max(0, room - gutter + native), tall);

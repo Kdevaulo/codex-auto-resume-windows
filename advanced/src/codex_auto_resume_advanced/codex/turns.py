@@ -8,6 +8,10 @@ item it left alone, counted per `item_type` (no content column); keep going stop
 item's steps - never a step's words. Every statement this module runs is one of `STATEMENTS` below, which
 advanced/tests/test_advanced_codex_reads.py holds to that.
 
+v0.6.16-beta.3: a conversation Codex split (issue #30) is read as core reads it - every id its turns are recorded
+under, in order, from core's own `turn_chain` (codex/history.py), and a later id's turn after every earlier id's
+(codex/rollout.SPAN) - and a split id that finished a turn lately is named as its conversation (`owner_of`).
+
 The file is found as core finds every Codex database (codex/paths.newest_generation): the newest generation, a
 symbolic link never followed, the columns read required, opened read-only with query_only on and trusted_schema off
 (B1). Anything that goes wrong is TurnsUnavailable, which every capability reads as "do nothing".
@@ -18,7 +22,9 @@ from pathlib import Path
 import sqlite3
 from typing import NamedTuple
 
+from codex_auto_resume.codex import LocalSource, SourceError
 from codex_auto_resume.codex.paths import _safe_path, newest_generation
+from codex_auto_resume.codex.rollout import SPAN
 from codex_auto_resume.domain import ids
 
 # The columns read, and the only ones (thread_items' item_json only through the plan statement's json_each).
@@ -37,7 +43,10 @@ PLAN = ("SELECT json_extract(step.value, '$.status') FROM (SELECT item_json FROM
         "AND item_type=? ORDER BY rollout_ordinal DESC LIMIT 1) AS newest, json_each(newest.item_json, '$.steps') "
         "AS step")
 BETWEEN = "SELECT count(*) FROM thread_turns WHERE thread_id=? AND rollout_ordinal > ? AND rollout_ordinal < ?"
-STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN, BETWEEN)
+# v0.6.16-beta.3 (usage_wrap_up): the conversations whose latest turn is running - status words and ids only.
+RUNNING = ("SELECT t.thread_id FROM thread_turns t WHERE t.status='inProgress' AND NOT EXISTS (SELECT 1 FROM "
+           "thread_turns n WHERE n.thread_id=t.thread_id AND n.rollout_ordinal > t.rollout_ordinal) LIMIT ?")
+STATEMENTS = (LATEST, KINDS, RECENT, HAS_PLAN, PLAN, BETWEEN, RUNNING)
 # A plan step's statuses as Codex writes them; anything else reads "unknown".
 STEP_STATUSES = frozenset({"pending", "in_progress", "completed"})
 UNKNOWN = "unknown"
@@ -103,6 +112,19 @@ class Turns:
     def __init__(self, home):
         self.home = home
 
+    def _core(self, ask, *arguments):
+        """`ask` of core's reader of this home (its split mapping, issue #30), or TurnsUnavailable. A home whose
+        state database core does not read (none, or of a schema it refuses) maps nothing: ids are read as they are."""
+        core = LocalSource(Path(self.home))
+        try:
+            core.resolve("state")
+        except SourceError:
+            return (arguments[0],) if ask == "turn_chain" else None
+        try:
+            return getattr(core, ask)(*arguments)
+        except (SourceError, sqlite3.Error, OSError, ValueError):
+            raise TurnsUnavailable("the conversation cannot be read") from None
+
     def _read(self, run):
         connection = connect(self.home, "history", {"thread_turns": TURN_COLUMNS, "thread_items": ITEM_COLUMNS})
         try:
@@ -117,33 +139,62 @@ class Turns:
         if not ids.is_uuid(thread_id):
             raise TurnsUnavailable("not a conversation")
 
+        chain = self._core("turn_chain", thread_id)
+
         def run(connection):
-            row = connection.execute(LATEST, (thread_id,)).fetchone()
-            if row is None:
+            for index in range(len(chain) - 1, -1, -1):     # the newest id with a turn has the latest one
+                row = connection.execute(LATEST, (chain[index],)).fetchone()
+                if row is not None:
+                    break
+            else:
                 return None
             turn_id, status, errored, completed, final, ordinal = row
             if not ids.is_uuid(turn_id) or type(ordinal) is not int:
                 raise TurnsUnavailable("a turn of no shape this knows")
             kinds = {}
-            for kind, count in connection.execute(KINDS, (thread_id, turn_id)).fetchall():
+            for kind, count in connection.execute(KINDS, (chain[index], turn_id)).fetchall():
                 kinds[_kind(kind)] = kinds.get(_kind(kind), 0) + int(count)
             status = status if status in ("completed", "failed", "interrupted", "inProgress") else "other"
             completed = completed if type(completed) is int and completed > 0 else None
-            return Turn(turn_id, status, bool(errored), completed, bool(final), ordinal, kinds)
+            return Turn(turn_id, status, bool(errored), completed, bool(final), index * SPAN + ordinal, kinds)
         return self._read(run)
 
     def recent(self, since) -> list:
         """The conversations with a turn completed at `since` or later (Codex's seconds), the latest first, at
         most RECENT_LIMIT - the candidates the edition looks at, never a list of every conversation."""
-        rows = self._read(lambda connection: connection.execute(RECENT, (int(since), RECENT_LIMIT)).fetchall())
-        return [row[0] for row in rows if ids.is_uuid(row[0])]
+        return self._named(self._read(lambda connection: connection.execute(
+            RECENT, (int(since), RECENT_LIMIT)).fetchall()))
+
+    def _named(self, rows) -> list:
+        """Each row's conversation, once: a split id's turns are its conversation's (issue #30, `owner_of`)."""
+        found = []
+        for row in rows:
+            named = (self._core("owner_of", row[0]) or row[0]) if ids.is_uuid(row[0]) else None
+            if named is not None and named not in found:
+                found.append(named)
+        return found
+
+    def running(self) -> list:
+        """The conversations whose latest turn is running now, at most RECENT_LIMIT (v0.6.16-beta.3, the wrap-up's
+        candidates): ids, never a word of any turn - a split id's named as its conversation (`_named`)."""
+        return self._named(self._read(lambda connection: connection.execute(RUNNING, (RECENT_LIMIT,)).fetchall()))
 
     def between(self, thread_id, after, before) -> int:
         """How many turns of `thread_id` lie strictly between the turns at ordinals `after` and `before` - 0 where
         the second is the very next turn after the first (a chain, engine/emptyreply.py)."""
         if not ids.is_uuid(thread_id) or type(after) is not int or type(before) is not int:
             raise TurnsUnavailable("not a conversation")
-        return int(self._read(lambda connection: connection.execute(BETWEEN, (thread_id, after, before)).fetchone()[0]))
+        chain = self._core("turn_chain", thread_id)
+        (first, low), (last, high) = divmod(after, SPAN), divmod(before, SPAN)
+        if not first <= last < len(chain):
+            raise TurnsUnavailable("a turn of no shape this knows")
+        # Within one id, between the two ordinals; across a split, the rest of the first id, every id between and
+        # the start of the last.
+        spans = ([(chain[first], low, high)] if first == last else
+                 [(chain[first], low, SPAN)] + [(other, -1, SPAN) for other in chain[first + 1:last]]
+                 + [(chain[last], -1, high)])
+        return int(self._read(lambda connection: sum(
+            connection.execute(BETWEEN, span).fetchone()[0] for span in spans)))
 
     def plan_statuses(self, thread_id) -> tuple | None:
         """The statuses of the newest plan item's steps in `thread_id`, in order, each a STEP_STATUSES word or
@@ -152,11 +203,14 @@ class Turns:
         if not ids.is_uuid(thread_id):
             raise TurnsUnavailable("not a conversation")
 
+        chain = self._core("turn_chain", thread_id)
+
         def run(connection):
-            if not connection.execute(HAS_PLAN, (thread_id, PLAN_ITEM_TYPE)).fetchone()[0]:
+            held = [other for other in chain if connection.execute(HAS_PLAN, (other, PLAN_ITEM_TYPE)).fetchone()[0]]
+            if not held:
                 return None
             statuses = tuple(row[0] if row[0] in STEP_STATUSES else UNKNOWN
-                             for row in connection.execute(PLAN, (thread_id, PLAN_ITEM_TYPE)).fetchall())
+                             for row in connection.execute(PLAN, (held[-1], PLAN_ITEM_TYPE)).fetchall())
             if not statuses:
                 raise TurnsUnavailable("a plan item with no steps this reads")
             return statuses

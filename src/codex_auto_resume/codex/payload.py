@@ -12,7 +12,7 @@ import re
 
 from .. import failures
 from ..domain import ids
-from .values import _json, epoch, normalize
+from .values import _json, _turn_status, epoch, error_shape, normalize
 
 
 def detect(row) -> dict | None:
@@ -41,6 +41,57 @@ def _needing(row, kinds):
     normalized["interruption_id"] = ids.interruption_id(
         *(normalized[k] for k in ("thread_id", "turn_id", "completed_at", "ordinal")))
     return normalized
+
+
+def judge(row, needs_you=frozenset(), admissible=False, shapes=False) -> dict | None:
+    """One failed latest turn as HistoryMixin.latest_failures brings it, or None: `detect`'s, else - from the
+    same read - one of the `needs_you` kinds, else one the plug may take up (`admissible`), marked so; and with
+    `shapes`, its error's shape (failures.shape), never a word of a message."""
+    eligible = detect(dict(row))
+    if eligible is None and needs_you:
+        eligible = _needing(dict(row), needs_you)
+    if eligible is None and admissible:
+        eligible = _needing(dict(row), failures.ADMISSIBLE)
+    if eligible is not None and admissible and eligible["category"] in failures.ADMISSIBLE:
+        eligible["admissible"] = True
+    if eligible is not None and shapes:
+        eligible["shape"] = error_shape(dict(row))
+    return eligible
+
+
+def later_turn(row) -> dict:
+    """One turn after the failed one, as HistoryMixin.later_turns classifies it: ours, someone else's, or not
+    yet knowable - booleans and ids only."""
+    status = _turn_status(row["status"])
+    if row["first_is_ours"]:
+        kind, reason = "ours", None
+    elif not row["has_first"] and status == "inProgress":
+        kind, reason = "undetermined", None
+    elif not row["has_first"]:
+        kind, reason = "foreign", "turn_without_user_item"
+    else:
+        kind, reason = "foreign", "later_turn_exists"
+    return {"turn_id": row["turn_id"] if ids.is_uuid(row["turn_id"]) else None,
+            "ordinal": row["rollout_ordinal"], "status": status, "kind": kind, "reason": reason}
+
+
+def marker_row(row, marker) -> dict | None:
+    """One history row holding our marker, as HistoryMixin.marker_rows gives it - None where its message
+    is not ours after all."""
+    payload = _json(row["item_json"])
+    if not _item_is_ours(payload, marker):
+        return None
+    client = payload.get("clientId")
+    ordinal = row["rollout_ordinal"]
+    return {
+        "turn_id": row["turn_id"] if ids.is_uuid(row["turn_id"]) else None,
+        "ordinal": ordinal if type(ordinal) is int else None,
+        "status": _turn_status(row["status"]),
+        # A row whose turn is not projected yet cannot say who started it.
+        "first_unset": bool(row["first_unset"]) or type(ordinal) is not int,
+        "starts_turn": bool(row["starts_turn"]),
+        "client_id": client if ids.is_client_id(client) else None,
+    }
 
 
 def admissible(row) -> dict | None:

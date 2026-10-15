@@ -324,13 +324,16 @@ class WindowTests(unittest.TestCase):
     def test_the_dialog_is_a_window_source_of_the_dashboard(self):
         self.assertIn("gui/DashboardVersions.cs", guiscan.group("dashboard"))
 
-    def test_the_button_is_last_in_the_tools_card_and_has_one_handler(self):
+    def test_the_button_follows_show_me_what_happens_and_has_one_handler(self):
+        """It was last in the Tools card from v0.6.12; v0.6.16-beta.3's check of why a failure was not taken up
+        comes after it, so no button before either moves."""
         page = self.body("BuildDiagnostics")
         self.assertIn('versionsButton = MakeButton(S("action.pick_version", "Install another version..."), false, '
                       'delegate { OpenVersions(); });', page)
         tools = page[page.index("foreach (Button button in new[] {"):]
-        self.assertIn("demoButton,\n                versionsButton })", tools.replace("\r\n", "\n"),
+        self.assertIn("demoButton,\n                versionsButton,\n", tools.replace("\r\n", "\n"),
                       "after Show me what happens, so no button before it moves")
+        self.assertLess(tools.index("versionsButton,"), tools.index('"action.detection_check"'))
         self.assertEqual(self.window.count("OpenVersions()"), 2, "defined once, and the button's handler")
 
     def test_it_waits_while_an_action_runs_and_an_administrator_greys_it(self):

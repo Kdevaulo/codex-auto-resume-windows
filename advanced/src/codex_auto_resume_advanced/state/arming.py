@@ -28,6 +28,7 @@ from ..vocabulary import (KEPT_NOTICES, Actor, ArmingState, ArmingWarning, Journ
 from .choices import Refused
 from .continuations import end_pending as end_continuations
 from .prompts import end_pending as end_prompts
+from .meter import METER, end_meter
 from .resets import end_pending
 from .schema import CONTINUATION_CAPABILITIES
 from .schema import RESET_CAPABILITIES
@@ -136,16 +137,63 @@ class ArmingMixin:
                 "INSERT OR REPLACE INTO arming (capability, state, since, actor, reason, "
                 "statement_revision, engine_version, warnings) VALUES (?,?,?,?,?,?,?,?)",
                 (capability, state, now, actor, reason, revision, engine_version, warnings))
-            if state != ArmingState.ARMED:
+            # v0.6.16-beta.3: what a person set up - a reset action's rules, its queued prompts - ends only when it is
+            # turned off: watched, it keeps them, as turning a watched one on does. Its own continuations, which only
+            # one that is on makes, end whenever it is not on.
+            if state == ArmingState.OFF:
                 end_pending(connection, (capability,), now)      # a reset action's rules end with it
-                end_continuations(connection, (capability,), now)  # and (v0.6.15-beta) its continuations
                 end_prompts(connection, (capability,), now)        # and its queued prompts
+            if state != ArmingState.ARMED:
+                # and (v0.6.15-beta) its continuations - and, only when turned off, the conversations kept going
+                end_continuations(connection, (capability,), now, kept=state == ArmingState.OFF)
+                if capability == METER:
+                    end_meter(connection)                          # (v0.6.16-beta.3) and the meter's reading
             connection.execute("UPDATE meta SET generation = generation + 1")
             code = _CODES.get(state) or (JournalCode.TRIPPED if actor == Actor.TRIPWIRE
                                          else JournalCode.RESET if actor in (Actor.EDITION_ENTRY, Actor.ENGINE_CHANGE)
                                          else JournalCode.DISARMED)
             self._note(connection, now, code, capability=capability, reason=reason, actor=actor)
             return True, current + 1
+
+    def move_set(self, moves, *, actor, generation, at=None) -> tuple:
+        """Turn on a capability and the requirements it carries, all in one transaction (v0.6.16-beta.3,
+        registry.CapabilityDef.requires): `moves` is a list of (capability, state, revision, engine_version,
+        warnings), the dependent and each required capability it turns on with it. The generation is checked
+        once and bumped once - one confirmation, one move - so the whole set lands together or not at all.
+        (how many were written, generation after). StaleGeneration where anything moved since.
+
+        Every state is SHADOW or ARMED (a set only turns on); each capability is of the registry. A move to
+        where it already stands, as it stands, writes nothing but is not an error - a requirement already on
+        is left as it is."""
+        prepared = []
+        for capability, state, revision, engine_version, warnings in moves:
+            state = _word(state, ArmingState, "state")
+            if state == ArmingState.OFF or self.registry.get(capability) is None:
+                raise StateError("a set only turns capabilities on")
+            prepared.append((capability, state, revision, engine_version, _joined(warnings)))
+        actor = _word(actor, Actor, "actor")
+        now = self._now(at)
+        with self._transaction(create=True) as connection:
+            current = connection.execute("SELECT generation FROM meta").fetchone()[0]
+            if generation != current:
+                raise StaleGeneration("stale generation")
+            written = 0
+            for capability, state, revision, engine_version, warnings in prepared:
+                before = connection.execute("SELECT * FROM arming WHERE capability=?", (capability,)).fetchone()
+                if (before is not None and _row(before)["state"] == state and (
+                        before["statement_revision"], before["engine_version"], before["warnings"],
+                        before["reason"]) == (revision, engine_version, warnings, None)):
+                    continue
+                connection.execute(
+                    "INSERT OR REPLACE INTO arming (capability, state, since, actor, reason, "
+                    "statement_revision, engine_version, warnings) VALUES (?,?,?,?,?,?,?,?)",
+                    (capability, state, now, actor, None, revision, engine_version, warnings))
+                self._note(connection, now, _CODES.get(state), capability=capability, actor=actor)
+                written += 1
+            if written:
+                connection.execute("UPDATE meta SET generation = generation + 1")
+                return written, current + 1
+            return 0, current
 
     def all_off(self, *, actor, reason, at=None) -> tuple:
         """Every capability off at once, in one transaction. (how many were on, generation).
@@ -169,6 +217,7 @@ class ArmingMixin:
             end_pending(connection, RESET_CAPABILITIES, now)     # every reset action's rules end with them
             end_continuations(connection, CONTINUATION_CAPABILITIES, now)
             end_prompts(connection, ("prompt_queue",), now)
+            end_meter(connection)
             connection.execute("UPDATE meta SET generation = generation + 1")
             self._note(connection, now, JournalCode.RESET if actor == Actor.EDITION_ENTRY
                        else JournalCode.ALL_OFF, reason=reason, actor=actor)

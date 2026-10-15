@@ -272,9 +272,29 @@ def view_model(rows, status, strings, now, *, notice=None, error=None) -> dict:
         "observe_note": (say(strings, "popup.observe_only")
                          if status is not None and status.get("observe_only") is True and not paused else None),
         # v0.6.11: Codex's usage as the watcher last read it, and how long ago - None until it has.
-        "usage_note": usage_line(((status or {}).get("watcher") or {}).get("usage"),
-                                 lambda key, **fields: say(strings, key, **fields), now),
+        "usage_note": usage_line(newest_reading(status), lambda key, **fields: say(strings, key, **fields), now),
     }
+
+
+# The key a surface puts an edition plug's fields under - domain/plug.EXTRA, which
+# tests/test_usage_surfaces.py holds this to: the popup reads that one key and imports nothing of the plug's.
+EXTRA = "advanced"
+
+
+def newest_reading(status):
+    """The usage reading the popup shows: the watcher's last (v0.6.11) - or, where the advanced edition's usage meter
+    read later (v0.6.16-beta.3, issue #29), the meter's, which its plug adds to the status under its one key. The
+    standard edition adds nothing there, so this is the watcher's reading, as it always was."""
+    status = status or {}
+    reading = (status.get("watcher") or {}).get("usage")
+    added = status.get(EXTRA)
+    meter = added.get("meter") if isinstance(added, dict) else None
+    if not (isinstance(meter, dict) and isinstance(meter.get("windows"), list)
+            and type(meter.get("read_at")) in (int, float)):
+        return reading
+    if isinstance(reading, dict) and type(reading.get("read_at")) in (int, float) and reading["read_at"] >= meter["read_at"]:
+        return reading
+    return {"read_at": meter["read_at"], "windows": meter["windows"]}
 
 
 def busy_key(action):

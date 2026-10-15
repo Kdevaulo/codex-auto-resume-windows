@@ -200,6 +200,10 @@ $ScriptClock = [Diagnostics.Stopwatch]::StartNew()
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
+# Text in and out as UTF-8: the installed setup's lines are UTF-8, PowerShell 5.1 would decode them by the
+# console's code page (949 on a Korean Windows: broken characters, issue #33), and the Dashboard and
+# compat/evaluator.py read this script's output as UTF-8. A process with no console to set is no failure.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch { }
 
 $PluginRoot = Split-Path -Parent $PSScriptRoot
 $AllowedHosts = @('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com')
@@ -284,7 +288,9 @@ $PolicyValues = @('DisableAutoResume', 'ForceObserveOnly', 'DisableUpdateCheck',
 $StateSchemaSince = @(@('0.6.16-beta', 5), @('0.6.15', 4), @('0.6.15-beta', 5), @('0.6.11-beta', 4), @('0.6.0', 3))
 # The advanced settings' form from each version on, newest first; the first row is this version's
 # own. An advanced target on an older form cannot read them: every advanced feature is off there.
-$AdvancedStateSince = @(@('0.6.11-beta.2', 2), @('0.6.11-alpha', 1))
+# v0.6.15 is v0.6.14's code (form 3) between v0.6.15-beta and v0.6.16-beta (both form 4).
+$AdvancedStateSince = @(@('0.6.16-beta.3', 5), @('0.6.16-beta', 4), @('0.6.15', 3), @('0.6.15-beta', 4),
+                        @('0.6.14', 3), @('0.6.11-beta.2', 2), @('0.6.11-alpha', 1))
 # The list is read page by page, $PickPageSize to a page (release_pages in release.json), at most
 # $PickMaxPages of them - a page with fewer ends it, and a full last one is no answer - and all of it
 # within $PickBudgetSeconds, each page within $PickPageTimeoutMax. The window waits longer than that

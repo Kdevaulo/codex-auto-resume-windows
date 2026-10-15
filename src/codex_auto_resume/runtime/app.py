@@ -19,8 +19,9 @@ import time
 import traceback
 import uuid
 
-from .. import compatio, config, edition, l10n, managed, needsyou, notifier, settings as policy
+from .. import compatio, config, edition, l10n, managed, needsyou, notifier, oncewords, settings as policy
 from ..codex import LocalSource
+from ..codex.chains import memory as chain_memory
 from ..codex.pairing import app_engines
 from ..domain.plug import DEFER, EXTRA, Surface, guard
 from ..engine import Engine
@@ -274,7 +275,7 @@ class App(WatchLoop):
             self._record_failure("compatibility check")
 
     def source(self) -> LocalSource:
-        return LocalSource(self.codex_home)
+        return LocalSource(self.codex_home, chains=chain_memory(self.paths.split_chains_file))
 
     def engine(self, store: Store, *, dispatch_lock=None) -> Engine:
         source = self.source()
@@ -286,6 +287,8 @@ class App(WatchLoop):
         kwargs["dispatch_lock"] = dispatch_lock if dispatch_lock is not None else self.dispatch_lock
         # v0.6.15-beta (P12): a store of its own for each worker that waits for a receipt (engine/launches.py).
         kwargs["open_store"] = self.worker_store
+        # v0.6.16-beta.3: the words for this time a person added in the Dashboard, beside the state (oncewords.py).
+        kwargs["once_words"] = oncewords.OnceWords.of(self.paths)
         engine = Engine(store, source, self.backend(), plug=self.plug, **kwargs)
         engine.apply_policy(self._stored, self.managed)
         self._observe_only(engine)
@@ -489,9 +492,8 @@ class App(WatchLoop):
         """The lock of a Codex home Settings add: by its path and its folder's identity, never by one alone."""
         return HomeLock(path, self.lock_dir, require_identity=True)
 
-    @staticmethod
-    def home_source(path) -> LocalSource:
-        return LocalSource(path)
+    def home_source(self, path) -> LocalSource:
+        return LocalSource(path, chains=chain_memory(self.paths.split_chains_file))
 
     @staticmethod
     def home_backend(path, codex_exe) -> Backend:
@@ -506,7 +508,7 @@ class App(WatchLoop):
         engine = Engine(store, source, backend, plug=None, dispatch_lock=self.dispatch_lock, home_key=key,
                         log=EngineLog(self.logger), notify=Toasts(self._notifier(source), self.logger),
                         language=l10n.current(), engine_state=self.engine_state, home_lock=held,
-                        connectivity=network.internet)
+                        connectivity=network.internet, once_words=oncewords.OnceWords.of(self.paths))
         engine.apply_policy(self._stored, self.managed)
         return engine
 
@@ -586,6 +588,23 @@ class App(WatchLoop):
             added = self.plug.surface(Surface.TRAY, dict(snapshot))
             if added is not DEFER:
                 snapshot[EXTRA] = added
+                self._near_limit(added)
             icon_tray.update(snapshot)
         except Exception:
             pass
+
+    def _near_limit(self, added):
+        """The advanced edition's usage meter at a warning (v0.6.16-beta.3, issue #29): each notice its plug adds to
+        the icon's snapshot is shown once in this watcher's life, by its key - a window and its reset - under the
+        notifications switch, off the tick path like every watcher notice. The standard edition adds none."""
+        meter = added.get("meter") if isinstance(added, dict) else None
+        notices = meter.get("notices") if isinstance(meter, dict) else None
+        shown = self.__dict__.setdefault("_near_limit_shown", set())
+        for notice in notices if isinstance(notices, list) else ():
+            key = notice.get("key") if isinstance(notice, dict) else None
+            if not isinstance(key, str) or key in shown or len(shown) > 64:
+                continue
+            shown.add(key)
+            self._watcher_notice("near_limit", {"minutes": notice.get("window_minutes"),
+                                                "percent": notice.get("used_percent"),
+                                                "reset_at": notice.get("reset_at")})

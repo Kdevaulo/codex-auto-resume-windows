@@ -679,6 +679,8 @@ namespace CodexAutoResume
             baseline = EditorValues();
             CheckBox startupCheck = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
             startupBaseline = startupCheck != null && startupCheck.Checked;
+            // Not read yet: until a status read says what Windows holds (ApplyStatus), Save leaves the entry alone.
+            startupKnown = false;
             if (!auditing) RefreshStatusAsync(null);
         }
 
@@ -1254,15 +1256,27 @@ namespace CodexAutoResume
             });
         }
 
+        /// The sign-in switch from a status read that says what Windows holds - the page's own, or the Dashboard's
+        /// snapshot (`startup` null) - v0.6.16-beta.3, issue #31: it was read by the page's own read alone, and showed
+        /// off where that read failed or had not come back yet. What Windows holds becomes what an edit is measured
+        /// from; the switch shows it unless the person has moved it - before any read, or since the last - and a
+        /// move is theirs: no read, snapshot or the page's own after a start, takes it back while it is unsaved.
+        private void KnowStartup(Dictionary<string, object> status, CheckBox startup)
+        {
+            if (startup == null) startup = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
+            object registered = Get(status, "startup_enabled");
+            if (startup == null || !(registered is bool)) return;
+            bool moved = startup.Checked != startupBaseline;
+            // What Windows has is not an edit.
+            startupBaseline = (bool)registered;
+            if (!moved) startup.Checked = startupBaseline;
+            startupKnown = true;
+        }
+
         private void ApplyStatus(Dictionary<string, object> status, CheckBox startup)
         {
             object running = status["watcher_running"];
-            if (startup != null)
-            {
-                startup.Checked = Equals(status["startup_enabled"], true);
-                // What Windows has is not an edit.
-                startupBaseline = startup.Checked;
-            }
+            KnowStartup(status, startup);
 
             // The header (Hero). A read rewrites it, as it always has, over a note or a hold written since the
             // last one. From the status alone until the Dashboard has a snapshot, and from a status read after
@@ -1453,11 +1467,16 @@ namespace CodexAutoResume
                 }
                 // This window's own write is not a change made somewhere else.
                 settingsStamp = SettingsStamp();
-                CallAsync("startup", "{\"enabled\":" + (startAtSignIn ? "true" : "false") + "}",
-                          delegate(Dictionary<string, object> registered)
+                // The sign-in entry only where the person moved the switch from what a read said Windows holds
+                // (v0.6.16-beta.3, issue #31): a Save of something else never writes it - it would remove an entry
+                // they kept, or put back one they removed. A move made before any read has worked is read for first
+                // (startupKnown); where that read fails too, the entry is left as it is, the move stays unsaved, and
+                // the save says so rather than "Saved".
+                bool entryUnread = false;
+                Action<Dictionary<string, object>> registeredThen = delegate(Dictionary<string, object> registered)
                 {
-                    if (!Ok(registered)) { SaveFailed(registered); return; }
-                    startupBaseline = startAtSignIn;
+                    if (registered != null && !Ok(registered)) { SaveFailed(registered); return; }
+                    if (registered != null) startupBaseline = startAtSignIn;
                     // A new Interface language or theme: the window reopens in it, where it is.
                     reopenFocus = focus;
                     CheckReopen(false);
@@ -1469,12 +1488,28 @@ namespace CodexAutoResume
                         {
                             // A new interface language this window could not reopen in reaches it the next
                             // time it opens; saying so is better than a window that half changes.
-                            detail.Text = languageChanged
+                            detail.Text = entryUnread
+                                ? S("settings.startup_unchecked", "Saved, except Run at Windows sign-in: what Windows holds could not be read, so it was left as it is. Save again in a moment.")
+                                : languageChanged
                                 ? S("settings.language_changed", "Language changed. Anything already open changes the next time it opens.")
                                 : S("settings.saved", "Saved. The watcher uses these from its next check.");
                             header.Invalidate(true);
                         });
                     });
+                };
+                Action decide = delegate
+                {
+                    if (startup != null && startupKnown && startAtSignIn != startupBaseline)
+                        CallAsync("startup", "{\"enabled\":" + (startAtSignIn ? "true" : "false") + "}", registeredThen);
+                    else registeredThen(null);
+                };
+                if (startup == null || startupKnown || startAtSignIn == startupBaseline) { decide(); return; }
+                CallAsync("status", null, delegate(Dictionary<string, object> reply)
+                {
+                    var status = Ok(reply) ? Map(reply, "status") : null;
+                    if (status != null) KnowStartup(status, startup);
+                    entryUnread = !startupKnown;
+                    decide();
                 });
             });
         }

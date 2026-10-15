@@ -35,74 +35,11 @@ def transient_delay(attempt: int) -> int:
     return TRANSIENT_BACKOFF[index]
 
 
-# What a plug is shown of the store, at P2 and P8: the reads the engine itself makes, and none
-# of its writes. Not the journal, which no decision reads (tests/test_surface_properties.py): a
-# plug learns what became of a record from the moves core tells it of as it writes them (P14,
-# engine/announce.py), not from a history a pruned entry or a retention bound would change.
-VIEW_READS = frozenset({"get", "records_in", "settings", "thread_enabled", "others_in_flight",
-                        "recent_claims", "recent_claim_count", "claimed_on_thread",
-                        # v0.6.14: the engine's own last usage reading - what core read, nothing new.
-                        "last_usage"})
-
-
-class StoreView:
-    """The engine's store as a plug sees it, and the moment it was shown.
-
-    The reads, and nothing that writes: a plug is told what core holds and decides nothing by
-    changing it. Each read is the store's own, looked up when it is used, so a view costs
-    nothing until a plug reads through it.
-
-    The store is kept in a closure, not on an attribute, and a read is handed over as a function
-    of its own rather than the store's bound method: `view._store`, or a read's `__self__`, would
-    have been every write the store has.
-
-    From v0.6.14 it shows the engine's own last usage reading too (`last_usage`, engine/freshness.py):
-    (when, the windows), or None - what core already read for a recovery that was due, reused as it is,
-    so a plug that counts usage windows asks Codex for nothing core has just been told.
-
-    That keeps a plug from writing by accident, and it is all this can do. The plug is this
-    product's own advanced package, running in core's process, and Python keeps nothing there
-    from code that means to find it: a closure's cells, a frame's locals, the garbage collector
-    and the store's file on disk all lead to the store. What is taken away is the plain way to
-    a write a hook did not mean to make, not every way.
-    """
-    __slots__ = ("now", "_reads")
-
-    def __init__(self, store, now, last_usage=None, home_key=None):
-        self.now = now
-        # v0.6.15-beta: the engine's own Codex home, so a plug is shown the records of that home alone - the
-        # default home's, for the one engine a plug is given (runtime/homes.py) - however it asks.
-        mine = (lambda rows: rows) if home_key is None else (
-            lambda rows: [row for row in rows if row["home_key"] == home_key])
-        # Written out one by one rather than looked up by name, so that each read names the
-        # store call it makes and tests/test_ports.py sees every one of them: a call built at
-        # run time is one no table can hold.
-        reads = {
-            "get": lambda *a, **k: store.get(*a, **k),
-            "records_in": lambda *a, **k: store.records_in(*a, **dict(k, home_key=home_key)),
-            "settings": lambda *a, **k: store.settings(*a, **k),
-            "thread_enabled": lambda *a, **k: store.thread_enabled(*a, **k),
-            "others_in_flight": lambda *a, **k: store.others_in_flight(*a, **k),
-            "recent_claims": lambda *a, **k: store.recent_claims(*a, **k),
-            "recent_claim_count": lambda *a, **k: store.recent_claim_count(*a, **k),
-            "claimed_on_thread": lambda *a, **k: mine(store.claimed_on_thread(*a, **k)),
-            "last_usage": lambda: last_usage() if last_usage is not None else None,
-        }
-        for name, call in reads.items():
-            call.__name__ = call.__qualname__ = name
-        self._reads = reads
-
-    def __getattr__(self, name):
-        if name in VIEW_READS and name in self._reads:
-            return self._reads[name]
-        raise AttributeError(name)
-
-
 class OptionsMixin:
     def __init__(self, store, source, backend, *, dispatch_lock=nullcontext,
                  clock=time.time, log=None, options=None, notify=None, language=None,
                  home_lock=None, engine_state=None, plug=None, connectivity=None, home_key="",
-                 open_store=None):
+                 open_store=None, once_words=None):
         self.store, self.source, self.backend = store, source, backend
         # The edition's plug, as core holds one (domain/plug.py): NULL, the standard edition's,
         # unless the watcher was given another. Every point is asked through this and nothing
@@ -117,6 +54,8 @@ class OptionsMixin:
         # (engine/launches.py) - None, and every send is made inline as always - the pool open for this tick, the
         # worker taken for the record being dispatched, and whether its send goes to that worker.
         self.open_store, self._pool, self._held_slot, self._pooling = open_store, None, None, False
+        # v0.6.16-beta.3: the words for this time (oncewords.py), None for none, and what each send spent.
+        self.once_words, self._once_sent = once_words, {}
         self.log = log or (lambda *args: None)
         self.notify = notify or (lambda *args: None)
         self.language = language or "en"
@@ -182,9 +121,9 @@ class OptionsMixin:
         self._usage_cache = None
         # v0.6.11: records whose task changed under the task-changed guard's Tell, said on their
         # continuation's notice (engine/guard.py); and jitter's draw, asked only while it is on.
-        self._told = set()
-        self._random = random.Random()
-        self._declined = set()
+        self._told, self._declined, self._random = set(), set(), random.Random()
+        # v0.6.16-beta.3 (issue #27): skip lines written, turns explained, failed turns seen, "off" said.
+        self._skips_told, self._passed_known, self._seen_failed, self._off_told, self._passed_since = {}, {}, None, False, None
         # v0.6.14: when each failure the edition's plug did not take up was last put to it (P17), the
         # record looked at early now and when the last early window opened (EARLY, engine/relaxed.py).
         self._unadmitted = {}

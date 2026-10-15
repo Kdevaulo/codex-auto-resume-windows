@@ -1,8 +1,9 @@
 """The state as an older release wrote it, opened without changing its schema.
 
 A watcher from before this schema may still be running, and what it owns is read here rather
-than upgraded: an upgrade under a running older watcher would rewrite rows it is writing. From
-v0.6.11 that watcher can be a v0.6.x one, whose state is schema 3, as well as a v0.5 one.
+than upgraded: an upgrade under a running older watcher would rewrite rows it is writing. That
+watcher can be a v0.5 one (schema 1 or 2), a v0.6.0 to v0.6.10 one (schema 3) or a v0.6.11 to
+v0.6.15 one (schema 4).
 """
 from __future__ import annotations
 
@@ -15,14 +16,14 @@ from .. import machine
 from ..machine import TERMINAL
 from .errors import StoreError
 from .policy import PolicyMixin
-from .schema import SchemaMixin, _TABLES_V2, _TABLES_V3
+from .schema import SchemaMixin, _TABLES_V2, _TABLES_V3, _TABLES_V4
 from .session import SessionMixin
 from .validate import _timestamp, _uuid, _validated_record
 
 
 class LegacyStore:
-    """A state an older watcher still owns - schema 1 or 2 (v0.5), or 3 (v0.6.0 to v0.6.10) -
-    opened without changing it.
+    """A state an older watcher still owns - schema 1 or 2 (v0.5), 3 (v0.6.0 to v0.6.10) or 4
+    (v0.6.11 to v0.6.15) - opened without changing it.
 
     Between an upgrade and the moment the old watcher exits, the new interfaces must
     still be able to do the things that only ever reduce automation: pause, switch a
@@ -42,7 +43,9 @@ class LegacyStore:
             tables = SessionMixin._tables(self._connection)
         except sqlite3.Error as exc:
             raise StoreError("Cannot open valid auto-resume state") from exc
-        if (version, tables) not in ((1, _TABLES_V2), (2, _TABLES_V2), (3, _TABLES_V3)):
+        # Schema 4 was missing here until v0.6.16-beta.3, so installing over a running v0.6.11 to v0.6.15
+        # watcher reported a failure it did not have (issue #33).
+        if (version, tables) not in ((1, _TABLES_V2), (2, _TABLES_V2), (3, _TABLES_V3), (4, _TABLES_V4)):
             self.close()
             raise StoreError("Not a state an older watcher owns")
         self.version = version

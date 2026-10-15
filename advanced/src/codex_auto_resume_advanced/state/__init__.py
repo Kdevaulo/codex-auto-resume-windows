@@ -16,6 +16,7 @@ it at all: a secret goes to Windows Credential Manager (credentials.py).
     resets    the reset actions' windows, last reading, rules and spends (v0.6.14)
     continuations  the edition's own continuations, and the conversations kept going (v0.6.15-beta)
     prompts   a person's queued prompts (v0.6.15-beta)
+    meter     the usage meter's last reading of each window, and what each stage acted for (v0.6.16-beta.3)
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ from ..registry import REGISTRY
 from .arming import ArmingMixin
 from .choices import ChoicesMixin, Refused, Scoped  # noqa: F401
 from .continuations import ContinuationsMixin
+from .meter import MeterMixin
 from .journal import EVENT_LIMIT, EVENT_MAX_AGE, WATCH_LIMIT, JournalMixin  # noqa: F401
 from .prompts import PromptMovesMixin, PromptsMixin
 from .records import RecordsMixin
@@ -33,7 +35,7 @@ from .spend import SpendMixin
 
 
 class AdvancedState(SessionMixin, ArmingMixin, SpendMixin, RecordsMixin, JournalMixin, ChoicesMixin,
-                    ResetsMixin, ContinuationsMixin, PromptsMixin, PromptMovesMixin):
+                    ResetsMixin, ContinuationsMixin, PromptsMixin, PromptMovesMixin, MeterMixin):
     """One installation's advanced state, for one process: opened when first needed."""
 
     def __init__(self, paths, *, registry=REGISTRY, **options):

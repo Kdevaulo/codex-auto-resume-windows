@@ -172,6 +172,115 @@ class StartForCodexTests(unittest.TestCase):
         self.assertFalse(self.paths.logs_dir.exists())
 
 
+class PlugReasonTests(unittest.TestCase):
+    """v0.6.16-beta.3, issue #31: an edition's start with Codex that was on and started nothing left
+    "off" in codex-start.log, as if nobody had turned it on. Core now asks the plug why (Plug.start_held)
+    and writes it; tells a route it named what became of it (`told`); and, asked to, looks once more a
+    few seconds after a start, so a watcher that ended at once is said too."""
+
+    setUp = StartForCodexTests.setUp
+    turn_on = StartForCodexTests.turn_on
+    logged = StartForCodexTests.logged
+
+    class Route:
+        def __init__(self):
+            self.words = []
+
+        def start(self, command):
+            return {"pid": 5150}
+
+        def told(self, word):
+            self.words.append(word)
+
+    def plug(self, *, route=None, held=None):
+        from codex_auto_resume.domain.plug import DEFER, Plug
+
+        class Fake(Plug):
+            def start_route(self, request):
+                return DEFER if route is None else route
+
+            def start_held(self):
+                return held
+        return Fake()
+
+    def layer(self, **kwargs):
+        return control.Control(self.paths, plug=self.plug(**kwargs))
+
+    def test_a_held_start_says_why(self):
+        self.assertTrue(self.layer(held="compat_unknown").start_for_codex().endswith("; off (held: compat_unknown)"))
+        self.assertEqual(self.launches, [])
+
+    def test_nothing_on_is_still_a_bare_off(self):
+        self.assertTrue(self.layer(held=None).start_for_codex().endswith("; off"))
+
+    def test_only_a_short_closed_word_is_written(self):
+        for held in ("C:\\Users\\x", "x" * 33, "Compat", "", 7):
+            with self.subTest(held=held):
+                self.assertTrue(self.layer(held=held).start_for_codex().endswith("; off"))
+
+    def test_a_route_is_told_what_core_made_of_it(self):
+        route = self.Route()
+        self.assertIn("started pid 4242", self.layer(route=route).start_for_codex())
+        with patch.object(control.Control, "watcher_running", return_value=True):
+            self.assertTrue(self.layer(route=route).start_for_codex().endswith("already running"))
+        self.assertEqual(route.words, ["started", "running"])
+
+    def test_a_route_whose_told_raises_costs_nothing(self):
+        route = self.Route()
+        route.told = lambda word: 1 / 0
+        self.assertIn("started pid 4242", self.layer(route=route).start_for_codex())
+
+    def test_a_watcher_that_ended_at_once_gets_a_second_line(self):
+        self.turn_on()
+        from codex_auto_resume.control import codexstart
+        with patch.object(codexstart, "_process_there", return_value=False),                 patch.object(codexstart, "HANDOVER_LOOKS", (0, 0)):
+            self.control.start_for_codex(confirm_seconds=1)
+        self.assertIn("the watcher started as pid 4242 ended within 1 s", self.logged()[-1])
+
+    def test_a_launcher_that_handed_over_is_not_called_ended(self):
+        """The launcher hands over to a fresh copy of itself where the state is newer than its engine, and the
+        copy sleeps 2 s before it starts the watcher (watcher_launcher._relaunch_once): the pid the start made is
+        gone at once, and the watcher is there seconds later. It is looked for more than once, the first look
+        later than the copy's sleep, so that is not said to have ended."""
+        self.turn_on()
+        from codex_auto_resume.control import codexstart
+        slept = []
+        answers = iter([False, False, True])        # the start's own ask, then the first look, then the second
+        with patch.object(codexstart, "_process_there", return_value=False),                 patch.object(codexstart.time, "sleep", side_effect=slept.append),                 patch.object(control.Control, "watcher_running", side_effect=lambda *a: next(answers)):
+            self.control.start_for_codex(confirm_seconds=8)
+        self.assertEqual([line for line in self.logged() if "ended within" in line], [])
+        self.assertEqual(slept, list(codexstart.HANDOVER_LOOKS))
+        self.assertGreater(codexstart.HANDOVER_LOOKS[0], 2)
+        self.assertGreater(sum(codexstart.HANDOVER_LOOKS), 4)
+
+    def test_a_watcher_still_there_or_no_start_adds_no_line(self):
+        self.turn_on()
+        from codex_auto_resume.control import codexstart
+        with patch.object(codexstart, "_process_there", return_value=True), \
+                patch.object(codexstart, "CONFIRM_POLL_SECONDS", 0.01):
+            self.control.start_for_codex(confirm_seconds=0.05)
+        with patch.object(control.Control, "watcher_running", return_value=True), \
+                patch.object(codexstart, "_process_there", side_effect=AssertionError("no start, no look")):
+            self.control.start_for_codex(confirm_seconds=1)
+        self.assertEqual([line for line in self.logged() if "ended within" in line], [])
+
+    def test_the_mcp_server_asks_for_the_look(self):
+        from codex_auto_resume.control import codexstart
+        from codex_auto_resume.mcp import server as mcp_server
+        made = {}
+        real = threading.Thread
+
+        def capture(*args, **kwargs):
+            made.update(kwargs)
+            return real(target=lambda **_kw: None)
+
+        with tempfile.TemporaryDirectory() as home, \
+                patch("threading.Thread", capture), \
+                patch.object(mcp_server, "Control"), patch.object(mcp_server, "Server"):
+            mcpserver.main(["--home", home])
+        self.assertEqual(made.get("kwargs"), {"confirm_seconds": codexstart.CONFIRM_SECONDS})
+
+
 class StartWatcherFromCodexTests(unittest.TestCase):
     """v0.6.10: Start watcher, asked of the MCP server, says how long the watcher it starts lasts.
 
@@ -434,7 +543,7 @@ class SurfaceTests(unittest.TestCase):
 
     def test_the_mcp_server_starts_it_only_for_an_installation(self):
         calls = []
-        with patch.object(control.Control, "start_for_codex", lambda self: calls.append(self.paths.home)), \
+        with patch.object(control.Control, "start_for_codex", lambda self, **_kw: calls.append(self.paths.home)), \
                 patch.object(mcpserver.Server, "serve", return_value=0), \
                 tempfile.TemporaryDirectory() as home:
             self.assertEqual(mcpserver.main(["--home", home]), 0)
@@ -444,6 +553,50 @@ class SurfaceTests(unittest.TestCase):
             with patch.object(config, "PROJECT_ROOT", Path(home) / "checkout"):
                 self.assertEqual(mcpserver.main([]), 0)
             self.assertEqual(calls, [])
+
+
+class PanelOffTests(unittest.TestCase):
+    """v0.6.16-beta.3, issue #31 item 4: Codex started its plugin, no watcher runs and nothing starts it. The panel
+    said "Watcher not running" and offered Start watcher, whose start is made inside Codex and may end with it;
+    what lasts was said only after a start. Now, under Start watcher, it says how the watcher starts for good -
+    and that nothing will start it where Run at Windows sign-in is off. The standard edition starts nothing
+    itself for it; it only says so."""
+
+    KEYS = ("panel.off_no_sign_in", "panel.off_sign_in")
+
+    def shown(self, **status):
+        import shutil
+        if not shutil.which("node"):
+            self.skipTest("needs Node to run the panel's own code")
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_mcpui_v064 import run_page, say, snapshot
+        data = snapshot()
+        data["status"] = dict(data["status"], **status)
+        return run_page(say("ROOT_NODE.textContent"), data=data)
+
+    def test_with_sign_in_off_it_says_nothing_starts_it_and_how(self):
+        text = self.shown(watcher_running=False, startup_enabled=False)
+        self.assertIn(l10n.catalog("en")["panel.off_no_sign_in"], text)
+        self.assertNotIn(l10n.catalog("en")["panel.off_sign_in"], text)
+
+    def test_with_sign_in_on_it_says_the_start_that_lasts(self):
+        text = self.shown(watcher_running=False, startup_enabled=True)
+        self.assertIn(l10n.catalog("en")["panel.off_sign_in"], text)
+
+    def test_a_running_watcher_or_a_status_that_does_not_say_shows_neither(self):
+        for status in ({"watcher_running": True, "startup_enabled": False}, {"watcher_running": False}):
+            with self.subTest(status=status):
+                text = self.shown(**status)
+                for key in self.KEYS:
+                    self.assertNotIn(l10n.catalog("en")[key], text)
+
+    def test_every_language_says_it_and_the_fallback_is_the_english(self):
+        from codex_auto_resume.mcp import panel as mcpui
+        for key in self.KEYS:
+            self.assertIn("t('%s', '%s')" % (key, l10n.catalog("en")[key]), mcpui._SCRIPT)
+            for locale in l10n.LOCALES:
+                with self.subTest(key=key, locale=locale):
+                    self.assertTrue(l10n._read(locale).get(key))
 
 
 if __name__ == "__main__":

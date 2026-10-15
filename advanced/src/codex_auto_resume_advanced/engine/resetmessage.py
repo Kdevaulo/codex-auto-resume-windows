@@ -27,7 +27,7 @@ typed: nothing is filled in, and it is at most 2,000 characters unless Longer re
 The runtime keeps what core tells it at P14 (runtime.py): sent, the words are gone; delivered, done;
 unproven a day after it was sent, done as unknown, and the capability turns itself off (K7). The words
 leave the disk at the send's start, at a cancel, at expiry, when the conversation is switched off (at the
-switch itself: runtime.conversation_off) and when the capability stands anywhere but on (at the move
+switch itself: runtime.conversation_off) and when the capability is turned off - watched, it keeps them (v0.6.16-beta.3) - (at the move
 itself, state/resets.end_pending, and at the sweep for a policy that reads it down, arming.py); the file
 refuses words on a finished rule (state/schema.py). They never reach a log, the journal, diagnostics, a
 notification, the status, MCP or a golden.
@@ -178,6 +178,31 @@ class ResetMessage:
             waiting = waiting[start:] + waiting[:start]
             self._turn += 1
         return found + waiting or DEFER
+
+    def watched_due(self, view):
+        """While watched (v0.6.16-beta.3, runtime.Runtime._watched_records): the id of each message whose reset has come by
+        the windows as last stored - the time-based step alone, saved nowhere - or that is due already; nothing is
+        written, and usage is not read for it (a watched capability's errand is only journalled)."""
+        scoped = self._scoped
+        if scoped is None:
+            return []
+        handle = scoped.resets
+        now = scoped.now()
+        rows = {family: resetwatch.by_time(row, now)[0] for family, row in (handle.windows() or {}).items()}
+        found = []
+        for rule in handle.reset_rules(capability=CAPABILITY):
+            if rule["record_state"] == RecordState.IN_FLIGHT or rule["words"] is None:
+                continue
+            try:
+                on = view.thread_enabled(rule["thread_id"])
+            except Exception:
+                on = True
+            if on is False:
+                continue
+            if rule["state"] == RuleState.READY or resetwatch.due(rule, rows.get((rule["bucket"], rule["minutes"]))):
+                # A key the runtime journals (runtime._watched_records takes text): the rule's own id, as text.
+                found.append("rule:%d" % rule["rule_id"])
+        return found
 
     def _ended(self, rule, view, now):
         """(state, reason) a message not yet sent ends with now, or None."""

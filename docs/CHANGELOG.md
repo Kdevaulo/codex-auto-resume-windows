@@ -1,5 +1,67 @@
 # Changelog
 
+## v0.6.16-beta.3 — Words for this time, a conversation Codex records under another id, and a usage meter
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta.2...v0.6.16-beta.3)
+
+**A pre-release: the standard edition's words for this time, the fixes people reported, and stage 4's first
+capabilities.** It is a GitHub pre-release, so `releases/latest` stays v0.6.15; an installation of v0.6.15 or
+of an earlier v0.6.16 beta is offered it by *Check for updates*, which asks first and says it is tested less,
+and *Install another version...* lists it. As with v0.6.16-beta.2, a plugin copy older than v0.6.11-beta.2's
+cannot read a numbered pre-release: set up and repair with the installation's own copy.
+
+**Going back.** The watcher's state stays schema 5, as v0.6.16-beta's. The advanced edition's own file is now
+version 5 - the usage meter's last reading - brought up from version 4 the first time it is opened, every row
+kept. An advanced version older than this one cannot read it and fails closed: every advanced feature is off
+there, and *Install another version...* says so before it installs one.
+
+### Both editions
+
+- **Words for this time.** One waiting recovery on the Pending page can carry words of yours - **Add words for
+  this time...** on its row - sent once, after the continuation it would send anyway, and then deleted. They
+  start, speed up and skip nothing, and are deleted too when the recovery ends without a send. They are a Custom
+  message in every other way, written only in the Dashboard (standards A26 and A27, amended by the owner).
+- **A conversation whose turns Codex records under another id is followed there.** Codex can carry on a
+  conversation's turns under a new id, and a failure there was never found. The watcher now follows every id a
+  conversation has had, in order, so its failure is found and an old one never comes back (reported by
+  @aca22jy, #30).
+- **Every failed turn the watcher does not take up is logged once, with why** - once per turn and reason,
+  across restarts, a few lines at a time (suggested by @barkshah2002-pixel, #27).
+- **Diagnostics can check why a failure was not taken up.** *Check why a failure was not taken up...* asks the
+  watcher's own rules about the newest 200 conversations, within 10 seconds, and reads nothing of what they say
+  (suggested by @barkshah2002-pixel, #27).
+- **Settings' Run at Windows sign-in shows what Windows really holds**, and Save writes it only where you moved
+  it; an update keeps the entry you kept (#31).
+- **The panel says how to start the watcher when it is off**, and that nothing starts it while sign-in is off
+  (#31).
+- **Installing over a running v0.6.11 to v0.6.15 watcher no longer reports a false failure**, and the
+  installer's Korean lines reach you and the Dashboard whole (#33). This was the known issue of v0.6.15,
+  v0.6.16-beta and v0.6.16-beta.2.
+- **One-line text boxes show their whole line**, and the Codex homes card no longer runs into what is beside
+  it (#34).
+- **When a card is shown and the keyboard focus moves, the log says where it went**, by window class and
+  program (#32).
+- **The version picker warns** that every advanced feature is off in an advanced version older than this one.
+
+### Advanced edition
+
+- **Start with Codex starts the watcher after a restart too**, and every start it does not make says why (#31).
+- **What a capability needs, it turns on with it.** A capability can need another, and turning it on turns on
+  what it needs in the one confirmation, with every statement in front of you; turning a needed one off first
+  turns off what needs it (the owner's request; standard K3 amended by the owner).
+- **Usage meter, Wrap up near a limit and Pause near a limit.** The meter reads your Codex usage on a schedule
+  you pick and warns near a limit; the wrap-up asks each running turn to finish its step; the pause holds the
+  product's continuations until the reset. Both need the meter (suggested by @Hunweibyn, #29).
+- **Recover every conversation but Codex's own** takes up a failed turn in any conversation of the app except
+  subagents, reviews, memory passes and the ones an agent made.
+- **Keep it on sits in view**, in a capability's head card under its state, and the list says "· kept on".
+- **A watched capability can be set up**: a message or a credit at a reset, a conversation kept going and a
+  queued message are counted as what they would have done, and never sent.
+- **MU, MN and MR passed** on codex-cli 0.162.0-alpha.17.2, so the reset credit and the message at a reset no
+  longer carry an unsettled warning there.
+- **Read-only probes** measure what stop-now, send-now and cloud tasks would need, driving nothing; none of
+  them is built yet.
+
 ## v0.6.16-beta.2 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta...v0.6.16-beta.2)
@@ -24,8 +86,8 @@ with a plugin at v0.6.11-beta.2 or later.
   Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
   That label is Codex's analytics classification, not a mark of whose a conversation is: a
   conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
-  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
-  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  `codex_work_desktop`, and the app gives no label at all to a session it copies in from another
+  tool (Claude Code, forks made there included) - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
   was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
   usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
   taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
@@ -33,11 +95,20 @@ with a plugin at v0.6.11-beta.2 or later.
   the conversation's own file must still say the same. Found by a person's report and the read-only
   check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
   carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
-  turn there that fails.
+  turn there that fails (reported by @barkshah2002-pixel, #27; proved by @ZionZhang42, #27).
 
 ### Advanced edition
 
 Nothing of its own: the fix above is in both editions.
+
+### Known issue
+
+- **Updating from v0.6.11 to v0.6.15, an error window may say "Setup did not complete ... Not a state an
+  older watcher owns", and its Korean lines may show as broken characters.** The update did finish: the files
+  are replaced, the watcher that starts brings the state up to this release's format, and Diagnostics shows
+  the new version. Nothing needs doing. One step of the installer read the state while the old watcher still
+  held it, in a format that step did not know yet, and reported that as a failure (found 2026-10-13; fixed in
+  a coming release).
 
 ## v0.6.16-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
@@ -58,6 +129,15 @@ Nothing new: see v0.6.15-beta, below.
 ### Advanced edition
 
 Nothing new: see v0.6.15-beta, below.
+
+### Known issue
+
+- **Updating from v0.6.11 to v0.6.15, an error window may say "Setup did not complete ... Not a state an
+  older watcher owns", and its Korean lines may show as broken characters.** The update did finish: the files
+  are replaced, the watcher that starts brings the state up to this release's format, and Diagnostics shows
+  the new version. Nothing needs doing. One step of the installer read the state while the old watcher still
+  held it, in a format that step did not know yet, and reported that as a failure (found 2026-10-13; fixed in
+  a coming release).
 
 ## v0.6.15 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
 
@@ -87,8 +167,8 @@ capabilities read as off, as v0.6.14 reads that beta's file.
   Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
   That label is Codex's analytics classification, not a mark of whose a conversation is: a
   conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
-  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
-  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  `codex_work_desktop`, and the app gives no label at all to a session it copies in from another
+  tool (Claude Code, forks made there included) - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
   was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
   usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
   taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
@@ -96,11 +176,18 @@ capabilities read as off, as v0.6.14 reads that beta's file.
   the conversation's own file must still say the same. Found by a person's report and the read-only
   check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
   carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
-  turn there that fails.
+  turn there that fails (reported by @barkshah2002-pixel, #27; proved by @ZionZhang42, #27).
 
 ### Advanced edition
 
 Nothing of its own: the fix above is in both editions.
+
+### Known issue
+
+- **Updating from v0.6.15-beta, an error window may say the update did not finish.** It did: the files are
+  replaced, the watcher that starts brings the state back to the format this release reads (a copy kept), and
+  Diagnostics shows v0.6.15. Nothing needs doing. One step of the installer read the state before the new
+  watcher had converted it, and reported that as a failure (found 2026-10-13; fixed in a coming release).
 
 ## v0.6.15-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
@@ -127,6 +214,8 @@ finished rows stay as they are. The advanced edition's own file is now version 4
 - the continuations, the conversations kept going and the queued prompts - brought up from version 3 when it is first
 opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
 
+### Both editions
+
 ### Several Codex homes (standard edition)
 
 - **Up to three more Codex homes.** *Settings > Advanced > Codex homes* names up to three more `CODEX_HOME` folders
@@ -141,6 +230,14 @@ opened; v0.6.14 cannot read version 4 and fails closed: every capability off.
   one already in Codex's queue is watched until it settles.
 - **Measured up to 0.162.** MH, a second home reached by the desktop app, passed on codex-cli 0.158 and again on
   codex-cli 0.162.0-alpha.17.2; on a Codex newer than 0.162 the card says it is unmeasured until it is measured again.
+
+### Fixes
+
+- **The product's icon in every window's title bar.** *Install another version...*, the Timeline and the Log
+  showed Windows' default form icon - red, blue and yellow squares - in their title bars; they show the Dashboard's
+  own icon now, in both editions (owner, 2026-10-10).
+
+### Advanced edition
 
 ### Advanced: several conversations at once
 
@@ -204,12 +301,6 @@ What follows from it:
 - A capability whose measurement passed on this Codex shows no warning for it here; on any other version it still
   does.
 
-### Fixes
-
-- **The product's icon in every window's title bar.** *Install another version...*, the Timeline and the Log
-  showed Windows' default form icon - red, blue and yellow squares - in their title bars; they show the Dashboard's
-  own icon now, in both editions (owner, 2026-10-10).
-
 ### Known limits
 
 - MQ, ME, MS, MK and MT are not measured yet, and MU, MN and MR - what the reset credit and the message at a reset
@@ -244,6 +335,126 @@ interruption and the samples, and for the reset actions what is counted of the u
 last reading, the reset rules and the credits spent - brought up from version 2 the first time it is
 opened, every row kept. v0.6.13 cannot read version 3 and fails closed: in its advanced edition every capability is
 off.
+
+### Both editions
+
+### The panel beside the chat
+
+In both editions, the settings panel in Codex can sit beside a conversation, in the Codex app's right
+side panel, as well as in the conversation.
+
+- **Open beside the chat.** Where Codex can show it there, the panel's bottom bar starts with *Open
+  beside the chat*, which asks Codex to move the panel to the right side panel and calls no tool. If
+  Codex keeps it in the conversation, the button goes for that page and the bar says *Codex kept the
+  panel here.*
+- **A tab of the side panel.** The panel's tool, *Open Auto Resume settings*, offers itself to a
+  conversation's side panel, where a Codex app that lists plugins' tools shows it under New tab >
+  More tools.... The panel tells Codex it opens in the conversation first.
+- **Read again on return.** Beside the chat, the panel reads its state again when you come back to it,
+  at most once every 15 seconds and never while something is being changed there, and leaves the
+  keyboard on the control it was on. It runs no timer.
+- **Not measured yet.** Measurements MP1 to MP3, which say whether the Codex app shows the panel there
+  as it should, are not made yet ([LIVE_ACCEPTANCE.md](LIVE_ACCEPTANCE.md)), so the guide does not
+  describe the panel beside the chat until they pass.
+
+### No Standard label beside the version
+
+The standard edition no longer names itself beside the version (owner, 2026-10-05): the version at the
+foot of the Dashboard, the Version row on its Diagnostics page and the heading of the panel in Codex
+show the version alone, and the notification-area icon's tooltip shows the product's name alone. The
+advanced edition still shows *Advanced* in each, and *Advanced - not loaded* where its own part could
+not be loaded. *Standard* still appears where editions are told apart: where you choose one, as in
+*Install another version...*, and where the installer and Diagnostics say that Codex still has the
+other edition's copy of the plugin.
+
+### The power action's card has a switch
+
+In both editions, the power action's card in Settings > General turns on and off with the switch every
+other on-or-off setting in the window is, in place of its button (owner, 2026-10-04). Turning it on
+still asks first, with Cancel the default, and the switch is back off after Cancel or a refusal;
+turning it off asks nothing, as Pause asks nothing. It still applies at once: Save does not change it.
+The switch's line, which says what it is set to, wraps where the window is narrow rather than end in an
+ellipsis, and so does the card's heading.
+
+### The window no longer hangs while a recovery waits
+
+**What you saw.** In both editions and in every language, while a recovery waited for a usage-limit
+reset, the window stopped answering: clicks did nothing for seconds at a time, and closing and opening
+it again did not help, though the watcher behind it went on recovering as it should (owner,
+2026-10-10).
+
+**Why.** The same text was measured again and again on a timer, for nothing on screen. Three things
+did it, each by laying out a whole page that nobody was looking at, or that had not changed:
+
+- Every five-second status rewrote the power action card's lines in Settings > General as visible. While
+  Settings is not the page in front, a line there always reads as hidden, so the window "showed" it
+  again each time and laid out the whole of Settings > General - on a PC where Windows offers no sleep,
+  as on many laptops, from the first time Settings had been seen, and on every PC once a power action
+  had run. History's "Turn on for this conversation" button was rewritten the same way.
+- Every second, the clock wrote the Overview's "Next check in" line on every page, and each new
+  countdown laid out the Overview's cards and measured every line on them - behind Pending, or in front
+  for the same size.
+- A switch, a conversation's line and a choice card measured their words on every question a layout
+  asked them - several widths per pass, up to four passes - so each layout repeated those measurements
+  thousands of times.
+
+**What changed.** A line's visibility is written only when it really changes. The Overview's waiting
+lines are written while the Overview is in front, and once more as it comes back, so it shows the
+countdown of now; in front, a countdown that needs the same room as the last one is written without
+laying out its card. The three controls measure each of their words once and remember the answer. In the
+advanced edition, the Advanced features list, which measured every cell again every few seconds while its
+page was in front, measures them again only when a row or a word changed. This changes when work happens,
+never what is drawn.
+
+**Before and after**, on the compiled window with the owner's state (one recovery waiting, sleep not
+offered, a power action that has run), advanced edition, Korean, 150 %, all pages built, Pending in
+front; medians of the runs:
+
+| Each... | Before | After |
+| --- | --- | --- |
+| clock second | 164-168 text measurements, 3 layouts, 9.6-13.8 ms | 0 measurements, 0 layouts, 1.5-3.3 ms |
+| five-second snapshot | 595-621 measurements, 8 layouts, 48-62 ms | 9 measurements, no page laid out, 0.6-2.3 ms |
+| clock second, Overview in front | 168 measurements, 3 page layouts, 19.1-21.5 ms | 6 measurements, 0 layouts, 2.7-3.7 ms |
+| first visit to the Overview / Settings | 7,510 / 7,692 measurements | 245 / 888 measurements |
+
+The standard edition in English did the same: 588 measurements per snapshot and 157 per second before,
+none after. Opening the window left the window unanswering for 6-20 of 39 checks before and 2-5 after.
+What a first visit to a page still costs is its one layout, which this change does not touch.
+
+**Nothing drawn changed.** Every control a person sees on every page and every Settings section - its
+place, size, visibility, words, font, colours, margins and items, first shown, after twelve hidden
+clock seconds, and with the Overview in front - is byte-identical before and after, in Korean and
+English, at 100 % and 150 %.
+
+### For developers
+
+- Core gains plug point P17 (`Point.ADMISSION`): a failure core never recovers alone is put to the
+  edition's plug only as core offers it (`failures.takes`), and what the plug may relax is held to
+  core's own bounds (`engine/relaxed.py`, `ladder.py`). P7 also answers `EARLY`, `SEND_NOW` and
+  `RESEND`, the last proven by `engine/resend.py` before core sends anything once more. The standard
+  edition has no plug, so none of it runs there.
+- The advanced registry knows two kinds of capability: a route answers at plug points; an action -
+  the compatibility report - answers at none, so core never asks it, and has no ceilings and no
+  compatibility capability. A capability's definition also says its own choices, whether the page
+  shows it the rules and the samples, and whether it sends once more itself; an action is never given
+  Keep it on's Send again.
+- New bridge commands, the Dashboard's alone and reached by no MCP tool: `advanced-option`,
+  `advanced-rules`, `advanced-rule-add`, `advanced-rule-remove`, `advanced-samples`,
+  `advanced-keep-on`, `advanced-send-now`, and the report's `advanced-report-build`,
+  `advanced-report-save`, `advanced-report-check`, `advanced-report-send` and `advanced-report-job`;
+  then `advanced-watch-log`, and for the reset actions `advanced-resets`, `advanced-reset-add`,
+  `advanced-reset-cancel`, `advanced-reset-go-on` and `advanced-credit-now`.
+- Core tells the edition's plug when a conversation is switched off (`Plug.conversation_off`, not a
+  plug point), so a reset message waiting there ends at once. The panel's `open_settings` declares a
+  side-panel entrypoint, and its page names its display modes, inline first.
+- `build/community_report.py` accepts a report the product wrote itself: `reporter.tool`
+  `codex-auto-resume`, its `tool_version` its own product version, v0.6.14 or later.
+- Each capability has a test module of its own under `advanced/tests/`, Keep it on one too and the
+  report four; core's share is in `tests/test_plug_points.py`, `test_store.py`,
+  `test_ladder_and_guards.py` and `test_failures.py`.
+
+
+### Advanced edition
 
 ### Recovery the standard edition leaves for you, or makes slower
 
@@ -376,122 +587,6 @@ The measurements the two reset actions rest on - MU, MN and MR - are not made ye
 made on your version of Codex, each statement carries them as warnings, the form says that the count
 past the next reset is unproven, and a credit is spent only when you press *Use a reset credit
 now...*. [EDITIONS.md](EDITIONS.md#use-a-reset-credit-at-the-limit-you-pick) describes each.
-
-### The panel beside the chat
-
-In both editions, the settings panel in Codex can sit beside a conversation, in the Codex app's right
-side panel, as well as in the conversation.
-
-- **Open beside the chat.** Where Codex can show it there, the panel's bottom bar starts with *Open
-  beside the chat*, which asks Codex to move the panel to the right side panel and calls no tool. If
-  Codex keeps it in the conversation, the button goes for that page and the bar says *Codex kept the
-  panel here.*
-- **A tab of the side panel.** The panel's tool, *Open Auto Resume settings*, offers itself to a
-  conversation's side panel, where a Codex app that lists plugins' tools shows it under New tab >
-  More tools.... The panel tells Codex it opens in the conversation first.
-- **Read again on return.** Beside the chat, the panel reads its state again when you come back to it,
-  at most once every 15 seconds and never while something is being changed there, and leaves the
-  keyboard on the control it was on. It runs no timer.
-- **Not measured yet.** Measurements MP1 to MP3, which say whether the Codex app shows the panel there
-  as it should, are not made yet ([LIVE_ACCEPTANCE.md](LIVE_ACCEPTANCE.md)), so the guide does not
-  describe the panel beside the chat until they pass.
-
-### No Standard label beside the version
-
-The standard edition no longer names itself beside the version (owner, 2026-10-05): the version at the
-foot of the Dashboard, the Version row on its Diagnostics page and the heading of the panel in Codex
-show the version alone, and the notification-area icon's tooltip shows the product's name alone. The
-advanced edition still shows *Advanced* in each, and *Advanced - not loaded* where its own part could
-not be loaded. *Standard* still appears where editions are told apart: where you choose one, as in
-*Install another version...*, and where the installer and Diagnostics say that Codex still has the
-other edition's copy of the plugin.
-
-### The power action's card has a switch
-
-In both editions, the power action's card in Settings > General turns on and off with the switch every
-other on-or-off setting in the window is, in place of its button (owner, 2026-10-04). Turning it on
-still asks first, with Cancel the default, and the switch is back off after Cancel or a refusal;
-turning it off asks nothing, as Pause asks nothing. It still applies at once: Save does not change it.
-The switch's line, which says what it is set to, wraps where the window is narrow rather than end in an
-ellipsis, and so does the card's heading.
-
-### The window no longer hangs while a recovery waits
-
-**What you saw.** In both editions and in every language, while a recovery waited for a usage-limit
-reset, the window stopped answering: clicks did nothing for seconds at a time, and closing and opening
-it again did not help, though the watcher behind it went on recovering as it should (owner,
-2026-10-10).
-
-**Why.** The same text was measured again and again on a timer, for nothing on screen. Three things
-did it, each by laying out a whole page that nobody was looking at, or that had not changed:
-
-- Every five-second status rewrote the power action card's lines in Settings > General as visible. While
-  Settings is not the page in front, a line there always reads as hidden, so the window "showed" it
-  again each time and laid out the whole of Settings > General - on a PC where Windows offers no sleep,
-  as on many laptops, from the first time Settings had been seen, and on every PC once a power action
-  had run. History's "Turn on for this conversation" button was rewritten the same way.
-- Every second, the clock wrote the Overview's "Next check in" line on every page, and each new
-  countdown laid out the Overview's cards and measured every line on them - behind Pending, or in front
-  for the same size.
-- A switch, a conversation's line and a choice card measured their words on every question a layout
-  asked them - several widths per pass, up to four passes - so each layout repeated those measurements
-  thousands of times.
-
-**What changed.** A line's visibility is written only when it really changes. The Overview's waiting
-lines are written while the Overview is in front, and once more as it comes back, so it shows the
-countdown of now; in front, a countdown that needs the same room as the last one is written without
-laying out its card. The three controls measure each of their words once and remember the answer. In the
-advanced edition, the Advanced features list, which measured every cell again every few seconds while its
-page was in front, measures them again only when a row or a word changed. This changes when work happens,
-never what is drawn.
-
-**Before and after**, on the compiled window with the owner's state (one recovery waiting, sleep not
-offered, a power action that has run), advanced edition, Korean, 150 %, all pages built, Pending in
-front; medians of the runs:
-
-| Each... | Before | After |
-| --- | --- | --- |
-| clock second | 164-168 text measurements, 3 layouts, 9.6-13.8 ms | 0 measurements, 0 layouts, 1.5-3.3 ms |
-| five-second snapshot | 595-621 measurements, 8 layouts, 48-62 ms | 9 measurements, no page laid out, 0.6-2.3 ms |
-| clock second, Overview in front | 168 measurements, 3 page layouts, 19.1-21.5 ms | 6 measurements, 0 layouts, 2.7-3.7 ms |
-| first visit to the Overview / Settings | 7,510 / 7,692 measurements | 245 / 888 measurements |
-
-The standard edition in English did the same: 588 measurements per snapshot and 157 per second before,
-none after. Opening the window left the window unanswering for 6-20 of 39 checks before and 2-5 after.
-What a first visit to a page still costs is its one layout, which this change does not touch.
-
-**Nothing drawn changed.** Every control a person sees on every page and every Settings section - its
-place, size, visibility, words, font, colours, margins and items, first shown, after twelve hidden
-clock seconds, and with the Overview in front - is byte-identical before and after, in Korean and
-English, at 100 % and 150 %.
-
-### For developers
-
-- Core gains plug point P17 (`Point.ADMISSION`): a failure core never recovers alone is put to the
-  edition's plug only as core offers it (`failures.takes`), and what the plug may relax is held to
-  core's own bounds (`engine/relaxed.py`, `ladder.py`). P7 also answers `EARLY`, `SEND_NOW` and
-  `RESEND`, the last proven by `engine/resend.py` before core sends anything once more. The standard
-  edition has no plug, so none of it runs there.
-- The advanced registry knows two kinds of capability: a route answers at plug points; an action -
-  the compatibility report - answers at none, so core never asks it, and has no ceilings and no
-  compatibility capability. A capability's definition also says its own choices, whether the page
-  shows it the rules and the samples, and whether it sends once more itself; an action is never given
-  Keep it on's Send again.
-- New bridge commands, the Dashboard's alone and reached by no MCP tool: `advanced-option`,
-  `advanced-rules`, `advanced-rule-add`, `advanced-rule-remove`, `advanced-samples`,
-  `advanced-keep-on`, `advanced-send-now`, and the report's `advanced-report-build`,
-  `advanced-report-save`, `advanced-report-check`, `advanced-report-send` and `advanced-report-job`;
-  then `advanced-watch-log`, and for the reset actions `advanced-resets`, `advanced-reset-add`,
-  `advanced-reset-cancel`, `advanced-reset-go-on` and `advanced-credit-now`.
-- Core tells the edition's plug when a conversation is switched off (`Plug.conversation_off`, not a
-  plug point), so a reset message waiting there ends at once. The panel's `open_settings` declares a
-  side-panel entrypoint, and its page names its display modes, inline first.
-- `build/community_report.py` accepts a report the product wrote itself: `reporter.tool`
-  `codex-auto-resume`, its `tool_version` its own product version, v0.6.14 or later.
-- Each capability has a test module of its own under `advanced/tests/`, Keep it on one too and the
-  report four; core's share is in `tests/test_plug_points.py`, `test_store.py`,
-  `test_ladder_and_guards.py` and `test_failures.py`.
-
 
 ## v0.6.13 — Codex's engine found again, wherever an update puts it
 
@@ -712,7 +807,8 @@ pre-releases, below, say which.
 ### The power action after usage-limit recoveries
 
 Asked for in Discussion #22, and decided by the owner on 2026-09-30 and 2026-10-03. It is in the
-standard edition: it keeps every standard, with A28 amended by the owner for its stop button.
+standard edition: it keeps every standard, with A28 amended by the owner for its stop button (suggested by
+@cervinho, #22).
 
 - **Off by default, turned on only in the Dashboard.** Settings > General has a new last card, **When
   usage-limit recoveries finish**: Then (Sleep, Hibernate or Shut down), When (every recovery succeeded;
@@ -982,6 +1078,8 @@ change it; what changes with nothing turned on is what is said and drawn, and a 
 content-free questions to Windows, which [PRIVACY.md](PRIVACY.md) lists. Going back to v0.6.10
 takes one command first ([below](#the-state-and-going-back)).
 
+### Both editions
+
 ### Two editions, and a setup program for each
 
 - **Standard and advanced, released together with one version.** The standard edition is the product
@@ -1009,33 +1107,6 @@ takes one command first ([below](#the-state-and-going-back)).
   [EDITIONS.md](EDITIONS.md) says what each edition is, what each advanced capability does, risks and
   departs from, and how to choose, switch, update and verify. The guide, the README and the security,
   privacy and comparison pages link both.
-
-### The advanced edition's first capabilities, and the page that turns them on
-
-- **Advanced features**, a tab after Settings in the advanced edition's Dashboard, is the one place a
-  capability is turned on. It shows each capability's state and statement - what it does, what the
-  standard edition does instead, the standards it departs from, what can go wrong and how to stop it,
-  every warning it carries now, and its limits - and **Turn on** or **Watch first** asks once more,
-  with all of that in front of you. A yes confirms those warnings, for the version of Codex shown;
-  if anything changed while you read, the page reads it again and asks again. Codex's tools, the
-  panel and the icon only ever turn a capability off; **Turn every advanced feature off** turns them
-  all off at once, a pause stops all of them, and one limit of at most 12 sends an hour stands over
-  them together.
-- **Start with Codex, through WMI.** Codex ends what its plugins start (measured for v0.6.9). On,
-  this starts the watcher whenever Codex starts and, where Codex's job would end it, through WMI,
-  outside that job, so closing Codex does not end it.
-- **A continuation with no marker.** The words go without the marker, through Codex's app server
-  under a client id derived from the interruption, and delivery is proven by that id alone. A send it
-  cannot prove is held, never sent again, and turns the capability off.
-- **Goal continuation.** For a usage limit whose reset has passed, in a conversation the Codex app
-  does not hold, the goal the limit paused is set active again - an existing goal only, never its
-  words - so that Codex carries it on when the app next opens the conversation.
-- **Warnings, not refusals.** A measurement that failed or was never made, a compatibility grade of
-  Failed here, Incompatible or Unknown, or a version of Codex nobody knows is a warning you confirm
-  by turning the capability on. Only an administrator's policy refuses or limits - `ForbidAdvanced`,
-  `AllowedCapabilities` and `ForceShadow`, read and never written. A capability still turns itself
-  off at a new statement, a new Codex version, a failure you did not confirm or a send whose delivery
-  became uncertain, and the page says which.
 
 ### What the standard edition adds
 
@@ -1125,6 +1196,35 @@ check. [v0.6.11-beta's entry](CHANGELOG.md#staying-out-of-the-way) has each in f
 - **The advanced edition's own file**, `config\advanced\advanced.sqlite`, is version 2; the standard
   edition has none, and a purge removes it.
 
+### Advanced edition
+
+### The advanced edition's first capabilities, and the page that turns them on
+
+- **Advanced features**, a tab after Settings in the advanced edition's Dashboard, is the one place a
+  capability is turned on. It shows each capability's state and statement - what it does, what the
+  standard edition does instead, the standards it departs from, what can go wrong and how to stop it,
+  every warning it carries now, and its limits - and **Turn on** or **Watch first** asks once more,
+  with all of that in front of you. A yes confirms those warnings, for the version of Codex shown;
+  if anything changed while you read, the page reads it again and asks again. Codex's tools, the
+  panel and the icon only ever turn a capability off; **Turn every advanced feature off** turns them
+  all off at once, a pause stops all of them, and one limit of at most 12 sends an hour stands over
+  them together.
+- **Start with Codex, through WMI.** Codex ends what its plugins start (measured for v0.6.9). On,
+  this starts the watcher whenever Codex starts and, where Codex's job would end it, through WMI,
+  outside that job, so closing Codex does not end it.
+- **A continuation with no marker.** The words go without the marker, through Codex's app server
+  under a client id derived from the interruption, and delivery is proven by that id alone. A send it
+  cannot prove is held, never sent again, and turns the capability off.
+- **Goal continuation.** For a usage limit whose reset has passed, in a conversation the Codex app
+  does not hold, the goal the limit paused is set active again - an existing goal only, never its
+  words - so that Codex carries it on when the app next opens the conversation.
+- **Warnings, not refusals.** A measurement that failed or was never made, a compatibility grade of
+  Failed here, Incompatible or Unknown, or a version of Codex nobody knows is a warning you confirm
+  by turning the capability on. Only an administrator's policy refuses or limits - `ForbidAdvanced`,
+  `AllowedCapabilities` and `ForceShadow`, read and never written. A capability still turns itself
+  off at a new statement, a new Codex version, a failure you did not confirm or a send whose delivery
+  became uncertain, and the page says which.
+
 ## v0.6.11-beta.3 — The Advanced features page, where a capability is turned on
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.11-beta.2...v0.6.11-beta.3)
@@ -1171,6 +1271,32 @@ refused it, that a capability that turned itself off did not say why, that the s
 cut off on a 4:3, 5:4 or portrait screen at a large text size, that a window reopening itself
 forgot the page, and that its German, Japanese and Korean words were not consistent; each is fixed,
 with a test.
+
+### Both editions
+
+### The edition, quiet beside the version
+
+- **The edition beside the version is now quiet secondary text**: a space after the version with no
+  ` · ` before it, smaller (0.62 of the version, never under 10 px), in the standard secondary grey in
+  both editions, and on the version's baseline - at the foot of the Dashboard, in the Version row of
+  its Diagnostics page and in the heading of the panel in Codex. v0.6.11-beta.2 wrote it as more of
+  the version's own text, in the same type and size. The notification-area icon's tooltip is
+  unchanged.
+
+### Going back from v0.6.11-beta.3
+
+- **The watcher's state and the settings are unchanged.** `state.sqlite` is still schema 4 and the
+  settings are v0.6.11-beta.2's, so going back to v0.6.11-beta.2 or v0.6.11-beta takes only that
+  release's `Install.cmd`. Going back to v0.6.11-alpha or v0.6.10 still takes `downgrade-state --to 3`
+  from this release first, as v0.6.11-beta's entry says.
+- **The advanced edition's own file.** `config\advanced\advanced.sqlite` is still version 2, as
+  v0.6.11-beta.2 writes it, and that version reads it as it is: a capability turned on here is still
+  on there, and the hourly limit set here still holds. v0.6.11-beta.2 has no page to turn one on
+  again, only Codex's tools to turn one off, so turn off here first whatever you want off there.
+  v0.6.11-alpha's and v0.6.11-beta's advanced edition refuse a version-2 file, as v0.6.11-beta.2's
+  entry says.
+
+### Advanced edition
 
 ### The Advanced features page
 
@@ -1220,28 +1346,6 @@ only turn capabilities off. [EDITIONS.md](EDITIONS.md) says what each capability
   window that reopens itself on this page - for a theme, a language or Windows' colours - comes back
   to it. An advanced installation whose own part could not be loaded runs as the standard edition and
   shows no such tab.
-
-### The edition, quiet beside the version
-
-- **The edition beside the version is now quiet secondary text**: a space after the version with no
-  ` · ` before it, smaller (0.62 of the version, never under 10 px), in the standard secondary grey in
-  both editions, and on the version's baseline - at the foot of the Dashboard, in the Version row of
-  its Diagnostics page and in the heading of the panel in Codex. v0.6.11-beta.2 wrote it as more of
-  the version's own text, in the same type and size. The notification-area icon's tooltip is
-  unchanged.
-
-### Going back from v0.6.11-beta.3
-
-- **The watcher's state and the settings are unchanged.** `state.sqlite` is still schema 4 and the
-  settings are v0.6.11-beta.2's, so going back to v0.6.11-beta.2 or v0.6.11-beta takes only that
-  release's `Install.cmd`. Going back to v0.6.11-alpha or v0.6.10 still takes `downgrade-state --to 3`
-  from this release first, as v0.6.11-beta's entry says.
-- **The advanced edition's own file.** `config\advanced\advanced.sqlite` is still version 2, as
-  v0.6.11-beta.2 writes it, and that version reads it as it is: a capability turned on here is still
-  on there, and the hourly limit set here still holds. v0.6.11-beta.2 has no page to turn one on
-  again, only Codex's tools to turn one off, so turn off here first whatever you want off there.
-  v0.6.11-alpha's and v0.6.11-beta's advanced edition refuse a version-2 file, as v0.6.11-beta.2's
-  entry says.
 
 ## v0.6.11-beta.2 — The advanced edition's first capabilities, before the page that turns them on
 
@@ -1296,44 +1400,7 @@ later standard send of the same record going unknown turned off a capability tha
 earlier one; and the app could open a conversation between the goal continuation's look and its set.
 Each is fixed, with a test that failed before.
 
-### The advanced edition's first three capabilities
-
-Each is off until a person turns it on after reading its statement, which says what it does, what
-the standard edition does instead, which standards it departs from, what can go wrong and how to
-stop it; and each turns itself off again when what was agreed to stops being true. A pause stops all
-of them, and every check a send passes stays the standard edition's. [EDITIONS.md](EDITIONS.md) has
-each one in full.
-
-- **Start with Codex, through WMI.** Codex ends what its plugins start (measured for v0.6.9): its MCP
-  servers run in a job that ends with it. On, start-with-Codex starts the watcher whenever Codex
-  starts, and where Codex's job would end it, starts it through WMI (`Win32_Process` `Create`, with no
-  window), whose own host is its parent, outside the job - so closing Codex does not end it
-  (measurement MW). Off, the advanced edition answers exactly as the standard edition does, before a
-  single probe.
-- **A continuation with no marker.** The words go without the `[codex-auto-resume:` marker, into the
-  conversation's queue through Codex's app server (`thread/queue/add`) under a client id derived from
-  the interruption, and delivery is proven by that id alone (measurement M7). A send it cannot prove
-  is held as uncertain, never sent again, and turns the capability off. Past its ceilings - five a
-  conversation, 24 a day - continuations carry the marker, as the standard edition's do.
-- **Goal continuation.** For a usage limit whose reset has passed, in a conversation the Codex app
-  does not hold, the goal the limit paused is set active again through the app server
-  (`thread/goal/set`) - an existing goal only, by its id and status, never its words - so that Codex
-  carries it on when the app next opens the conversation. M2 found that the app does not take such a
-  goal up while it holds the conversation, and saw the goal live again once the app loaded it; so it
-  acts only where the app does not, and looks again just before the set. Nobody has yet followed
-  Codex carrying such a goal on by itself. Ceilings: three a conversation, twelve a day.
-- **A warning, not a refusal.** A measurement a capability rests on that failed or was never made for
-  the Codex in force, a compatibility grade of Failed here, Incompatible or Unknown, or a Codex version
-  nobody knows is a warning in its statement, and turning it on confirms exactly those warnings - the
-  owner's rule of 2026-09-26, in place of a refusal. Only an administrator's policy still refuses.
-  What turns a capability off by itself stays: a new statement, a new Codex version, a failure the
-  person did not confirm, or a send it paid for whose delivery became uncertain.
-- **The Codex the watcher drives.** The capabilities use the `codex.exe` and the Codex home the
-  watcher found and checked, its `codex_exe` setting and `--codex-home` included.
-- **What they stand on.** MA and MH, the two measurements that needed the owner at the app, passed on
-  codex-cli 0.158.0-alpha.2.1 on 2026-09-28 (`docs/evidence/live/`). The harness gains M2b, which sets
-  an existing paused goal active in a throwaway conversation the Desktop has open; until it passes,
-  the goal continuation never acts on a conversation the app holds.
+### Both editions
 
 ### Numbered pre-releases, and an update check that offers them
 
@@ -1459,6 +1526,47 @@ None is VERIFIED yet. The recordings are under `docs/evidence/compat/`.
 - **The standard archive's documents name no advanced identifier.** Two of them spelled names of the
   advanced package that the edition audit refuses in the standard archive; they now say the same in
   words.
+
+### Advanced edition
+
+### The advanced edition's first three capabilities
+
+Each is off until a person turns it on after reading its statement, which says what it does, what
+the standard edition does instead, which standards it departs from, what can go wrong and how to
+stop it; and each turns itself off again when what was agreed to stops being true. A pause stops all
+of them, and every check a send passes stays the standard edition's. [EDITIONS.md](EDITIONS.md) has
+each one in full.
+
+- **Start with Codex, through WMI.** Codex ends what its plugins start (measured for v0.6.9): its MCP
+  servers run in a job that ends with it. On, start-with-Codex starts the watcher whenever Codex
+  starts, and where Codex's job would end it, starts it through WMI (`Win32_Process` `Create`, with no
+  window), whose own host is its parent, outside the job - so closing Codex does not end it
+  (measurement MW). Off, the advanced edition answers exactly as the standard edition does, before a
+  single probe.
+- **A continuation with no marker.** The words go without the `[codex-auto-resume:` marker, into the
+  conversation's queue through Codex's app server (`thread/queue/add`) under a client id derived from
+  the interruption, and delivery is proven by that id alone (measurement M7). A send it cannot prove
+  is held as uncertain, never sent again, and turns the capability off. Past its ceilings - five a
+  conversation, 24 a day - continuations carry the marker, as the standard edition's do.
+- **Goal continuation.** For a usage limit whose reset has passed, in a conversation the Codex app
+  does not hold, the goal the limit paused is set active again through the app server
+  (`thread/goal/set`) - an existing goal only, by its id and status, never its words - so that Codex
+  carries it on when the app next opens the conversation. M2 found that the app does not take such a
+  goal up while it holds the conversation, and saw the goal live again once the app loaded it; so it
+  acts only where the app does not, and looks again just before the set. Nobody has yet followed
+  Codex carrying such a goal on by itself. Ceilings: three a conversation, twelve a day.
+- **A warning, not a refusal.** A measurement a capability rests on that failed or was never made for
+  the Codex in force, a compatibility grade of Failed here, Incompatible or Unknown, or a Codex version
+  nobody knows is a warning in its statement, and turning it on confirms exactly those warnings - the
+  owner's rule of 2026-09-26, in place of a refusal. Only an administrator's policy still refuses.
+  What turns a capability off by itself stays: a new statement, a new Codex version, a failure the
+  person did not confirm, or a send it paid for whose delivery became uncertain.
+- **The Codex the watcher drives.** The capabilities use the `codex.exe` and the Codex home the
+  watcher found and checked, its `codex_exe` setting and `--codex-home` included.
+- **What they stand on.** MA and MH, the two measurements that needed the owner at the app, passed on
+  codex-cli 0.158.0-alpha.2.1 on 2026-09-28 (`docs/evidence/live/`). The harness gains M2b, which sets
+  an existing paused goal active in a throwaway conversation the Desktop has open; until it passes,
+  the goal continuation never acts on a conversation the app holds.
 
 ## v0.6.11-beta — The standard edition's additions, and v0.6.10's behaviour at its defaults
 
@@ -1850,6 +1958,8 @@ feature in it to switch on yet. The standard edition behaves as v0.6.10 did, apa
 [In the standard edition](#in-the-standard-edition) lists. To leave it, run `Install.cmd` from any
 later release's archive.
 
+### Both editions
+
 ### Two editions, from one repository
 
 - **The standard edition is what every release so far has been.** The advanced edition is the
@@ -1879,37 +1989,6 @@ later release's archive.
 - **Every published bootstrap still updates.** `build/legacy_bootstraps.py` takes each tag's own
   bootstrap, from v0.5.2 on, out of git, and checks with its own code that it accepts the new
   archive.
-
-### What the advanced edition stands on
-
-Nothing here can be switched on yet: the list of advanced capabilities is empty. What is here is
-what every one of them will go through.
-
-- **Thirteen places where core asks or tells.** At each, the standard edition asks and tells
-  nobody. An advanced capability may always hold something back there; it can never send by itself - the one send is
-  still core's, after core's own consent check, claim and pre-send look. A plug is handed copies,
-  cannot write core's tables, and a channel it names is held to core's launch guard. The claim
-  counts both editions' sends under one lock, so the five-a-day and fifteen-minute limits hold
-  across them. Core tells the plug each move of a record as it writes it, so what turns a
-  capability off is read from the records, never from the journal, which only a person reads.
-- **Its own state, kept apart.** Advanced state lives in `config/advanced/advanced.sqlite`. Nothing
-  is added to the product's state or settings files, and a purge removes it.
-- **Who turns a capability on, and what turns it off.** Each capability will carry a statement, in
-  nine languages, naming the standards it departs from. It is off, watched without acting, or on,
-  and only the Dashboard can turn one on. It can be turned off from anywhere, including from inside
-  Codex, and "All advanced features off" is one action. A capability turns itself off when a
-  submission's result is unknown, a local check fails, the Codex version changes, its statement
-  changes or its code fails. Read-only Windows policy keys can forbid the edition, force it to
-  watch only, or allow only named capabilities.
-- **Measuring before building.** Some capabilities depend on what only a live machine can show.
-  `measure <id>` and `measure-verdict` record, content-free, what a person saw on a throwaway
-  conversation, in `docs/evidence/live/`.
-
-How it was checked: every one of the 283 simulated scenarios gives identical records and identical
-calls to Codex with a plug that defers everywhere, and in the advanced lane with the advanced
-package's own plug. A review from three sides reproduced 21 problems before this was released -
-among them, a plug could change a conversation it was handed and send to one the person had turned
-off - and a second pass found 10 more; each is fixed, with a test that failed before.
 
 ### In the standard edition
 
@@ -1963,6 +2042,39 @@ off - and a second pass found 10 more; each is fixed, with a test that failed be
 - The folder's README is written by `build/community_report.py` from the index, and
   `tests/test_reported_data.py` holds it to that; the maintainer's tool imports that code from
   `main` instead of keeping a copy of its own, which had drifted.
+
+### Advanced edition
+
+### What the advanced edition stands on
+
+Nothing here can be switched on yet: the list of advanced capabilities is empty. What is here is
+what every one of them will go through.
+
+- **Thirteen places where core asks or tells.** At each, the standard edition asks and tells
+  nobody. An advanced capability may always hold something back there; it can never send by itself - the one send is
+  still core's, after core's own consent check, claim and pre-send look. A plug is handed copies,
+  cannot write core's tables, and a channel it names is held to core's launch guard. The claim
+  counts both editions' sends under one lock, so the five-a-day and fifteen-minute limits hold
+  across them. Core tells the plug each move of a record as it writes it, so what turns a
+  capability off is read from the records, never from the journal, which only a person reads.
+- **Its own state, kept apart.** Advanced state lives in `config/advanced/advanced.sqlite`. Nothing
+  is added to the product's state or settings files, and a purge removes it.
+- **Who turns a capability on, and what turns it off.** Each capability will carry a statement, in
+  nine languages, naming the standards it departs from. It is off, watched without acting, or on,
+  and only the Dashboard can turn one on. It can be turned off from anywhere, including from inside
+  Codex, and "All advanced features off" is one action. A capability turns itself off when a
+  submission's result is unknown, a local check fails, the Codex version changes, its statement
+  changes or its code fails. Read-only Windows policy keys can forbid the edition, force it to
+  watch only, or allow only named capabilities.
+- **Measuring before building.** Some capabilities depend on what only a live machine can show.
+  `measure <id>` and `measure-verdict` record, content-free, what a person saw on a throwaway
+  conversation, in `docs/evidence/live/`.
+
+How it was checked: every one of the 283 simulated scenarios gives identical records and identical
+calls to Codex with a plug that defers everywhere, and in the advanced lane with the advanced
+package's own plug. A review from three sides reproduced 21 problems before this was released -
+among them, a plug could change a conversation it was handed and send to one the person had turned
+off - and a second pass found 10 more; each is fixed, with a test that failed before.
 
 ## v0.6.10 — The design settled, and what others report
 

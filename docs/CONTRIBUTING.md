@@ -131,6 +131,11 @@ runners'. A file a lane's table lacks is dealt by the figure for every lane, and
 at all round-robin after the measured ones. `--list --parts 8` shows the deal, and `--lane` another
 lane's.
 
+A failed run on `main` gets one more try: `.github/workflows/rerun-once.yml` reruns its failed jobs
+once, on the first attempt only. A runner's hiccup then does not leave the README's badge saying
+failing, and a fault that comes back fails the second attempt too and stays on the badge. It checks
+nothing out and runs nothing of the repository's.
+
 ## Measuring the window
 
 Speed is a claim like any other, and `build/measure_window.py` is how it is checked rather than

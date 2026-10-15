@@ -91,6 +91,8 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "sample.status", "sample.count",
     # v0.6.14: Keep it on, what a kept-on capability noted instead of turning itself off, and Send now.
     "keep_on", "keep_on.off", "keep_on.on", "keep_on.again", "keep_on.turn_on", "keep_on.send_again",
+    # v0.6.16-beta.3: "· kept on" after a kept-on capability's state in the list.
+    "state_kept_on",
     "keep_on.turn_off", "confirm.keep_on", "confirm.send_again", "done.keep_on", "done.keep_on_off",
     "refused.not_on", "kept.statement_changed", "kept.measurement_failed", "kept.failed_here", "kept.incompatible",
     "kept.local_check_failed", "kept.hook_exception", "kept.submission_unknown", "kept.engine_changed",
@@ -108,6 +110,8 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "watchlog.answer.early", "watchlog.answer.resend", "watchlog.answer.send_now", "watchlog.answer.text",
     "watchlog.answer.sender", "watchlog.answer.tick", "watchlog.answer.start_route", "watchlog.answer.unloaded",
     "watchlog.answer.concurrency", "watchlog.answer.queue_for_open",
+    # v0.6.16-beta.3: a message a watched capability would have sent.
+    "watchlog.answer.records",
     "watchlog.answer.other",
     # v0.6.14: the reset actions (advanced/gui/AdvancedResets.cs) - the rules of a reset credit and of a message at a
     # reset, the form they are added with, each word a rule's state and reason can be said in, the questions, notes
@@ -155,12 +159,27 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "queue.at", "queue.series", "queue.state.waiting", "queue.state.held", "queue.state.in_codex",
     "queue.state.being_sent", "queue.state.refused", "queue.unproven", "queue.go_on", "confirm.prompt",
     "done.prompt_added", "refused.prompt_refused", "refused.queue_full", "refused.dependency_unknown",))
+# A capability that needs another (v0.6.16-beta.3, registry.CapabilityDef.requires): what its card says it needs, the
+# one confirmation that turns on what it needs too, what turning a requirement off turned off first, and the words for
+# a dependent read down because what it needs is off.
+PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
+    "requires", "confirm.requires", "confirm.requirement", "done.on_with", "done.also_off", "refused.requirement", "refused.requirement_failed_here",
+    "tripped.requirement_off", "kept.requirement_off"))
+# The usage meter's, the wrap-up's and the pause's choices (v0.6.16-beta.3, issue #29): each OptionKey's label, and
+# how its values are said.
+PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
+    "option.poll_minutes", "option.warn_five_hour", "option.warn_weekly", "option.wrap_five_hour",
+    "option.wrap_weekly", "option.wrap_style", "option.pause_five_hour", "option.pause_weekly",
+    "option.minutes", "option.percent", "option.style.1", "option.style.2", "option.style.3"))
 # The edition's own continuations' words (v0.6.15-beta): what empty_response, subagent_parent and keep_going send -
 # fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
 # subagent's line, its id and a closed kind word).
 CONTINUE_PREFIX = "continue."
 CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "subagent.line",
-                      CONTINUE_PREFIX + "keep_going")
+                      CONTINUE_PREFIX + "keep_going",
+                      # v0.6.16-beta.3: the wrap-up's three wordings (engine/usage.py).
+                      CONTINUE_PREFIX + "wrap_up.short", CONTINUE_PREFIX + "wrap_up.standard",
+                      CONTINUE_PREFIX + "wrap_up.detailed")
                      + tuple(CONTINUE_PREFIX + "subagent.kind." + kind
                              for kind in ("usage_limit", "temporary", "interrupted", "error")))
 
@@ -248,6 +267,9 @@ class Catalogs:
         locale = l10n.current() if locale is None else locale
         return {"capability": definition.id, "revision": definition.revision,
                 "locale": locale if locale in l10n.LOCALES else l10n.DEFAULT,
+                # What it needs on (v0.6.16-beta.3): the ids it requires, so the Dashboard reads their
+                # statements too and turns them on in the one confirmation (surfaces.arm's `also`).
+                "requires": list(definition.requires),
                 "departs_from": list(definition.departs_from),
                 "warnings": {"title": self.text(WARNING_TITLE_KEY, locale),
                              "note": self.text(WARNING_NOTE_KEY, locale),

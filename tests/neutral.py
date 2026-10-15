@@ -72,7 +72,11 @@ MODULES = ("test_compat_characterization", "test_compat_io", "test_correlation",
            # v0.6.11: the Custom waits, the time ceiling and the two guards, at their settings.
            "test_ladder_and_guards",
            # v0.6.12: the app gate where the app main runs two of the configured engine.
-           "test_engine_children")
+           "test_engine_children",
+           # v0.6.16-beta.3: why a failed turn is passed over, said in the log; a conversation Codex records under
+           # another id (issue #30); the Diagnostics check, which asks a built engine its own rule; and the words for
+           # this time, added once to one recovery's continuation.
+           "test_skip_reasons", "test_continuation_split", "test_checkup", "test_once_words_engine")
 NOT_SCENARIOS = {
     "test_codex_schema": "reads a Codex home through the source alone; it builds no engine",
     "test_source": "reads a Codex home through the source alone; it builds no engine",
@@ -92,6 +96,8 @@ NOT_SCENARIOS = {
     "test_homes": "builds one engine per Codex home over codexsim homes, the default home's with a recording plug "
                   "and every other's with the NULL plug by design (runtime/homes.py) - the neutral plug is the "
                   "point it holds the other homes to",
+    "test_eligibility": "reads a Codex home through the source alone at the widening P19 names, and gives an engine "
+                        "plugs whose P19 answer it sets - the widening the neutral plug never asks for",
     "test_downgrade": "sends one continuation with this version's engine only to leave it queued, then "
                       "downgrades the state and runs v0.6.10's tagged watcher on it in a process of its "
                       "own, which no plug of this version reaches",
@@ -102,7 +108,9 @@ FIRST = ("test_outcomes",)
 # have to reach every one, or a point nothing reaches would pass for a neutral one.
 ENGINE_POINTS = frozenset({Point.RECORDS, Point.GATES, Point.TEXT, Point.SENDER, Point.OUTCOME,
                            Point.SCHEDULE, Point.TICK, Point.CLAIM_LEDGER, Point.CONCURRENCY,
-                           Point.MOVED, Point.DELIVERY, Point.UNLOADED, Point.ADMISSION})
+                           Point.MOVED, Point.DELIVERY, Point.UNLOADED, Point.ADMISSION,
+                           # v0.6.16-beta.3: which conversations are taken up, asked once a tick.
+                           Point.ELIGIBILITY})
 # What a moment read off the wall clock while a pair ran is written as, in rows and calls alike.
 WALL_CLOCK = "<wall clock>"
 # What a scenario is asked of Codex: every call the engine can make of a backend.
@@ -214,6 +222,10 @@ class DeferringPlug(Plug):
     def admission(self, failure):
         self.asked.add(Point.ADMISSION)
         return super().admission(failure)
+
+    def eligibility(self):
+        self.asked.add(Point.ELIGIBILITY)
+        return super().eligibility()
 
     def wants(self, point):
         """Every point, as a plug with a capability on there would say: core makes the reads that

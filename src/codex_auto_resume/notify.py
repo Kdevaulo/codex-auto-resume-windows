@@ -533,6 +533,29 @@ def memory_content(event, used, limit) -> dict:
                     more=[(l10n.message("toast_button_open"), open_uri("overview" if stopped else "diagnostics"))])
 
 
+def near_limit_content(minutes, percent, reset_at) -> dict:
+    """The advanced edition's usage meter at a warning (v0.6.16-beta.3, issue #29): which window, how full and when
+    it resets - in the words the popup's usage line uses - and one button that opens the Dashboard. About no
+    conversation. Only the meter's surface ever asks for it; the standard edition never shows one."""
+    def say(key, **fields):
+        return l10n.text(key, l10n.current(), **fields)
+    try:
+        share = max(0, min(100, int(percent)))
+    except (TypeError, ValueError, OverflowError):
+        share = 0
+    # The window named as the popup's usage line names it (ui/words.window_name): weekly, in hours or minutes.
+    if minutes == 7 * 24 * 60:
+        window = say("usage.weekly")
+    elif type(minutes) is int and minutes > 0:
+        window = say("usage.hours", n=minutes // 60) if minutes % 60 == 0 else say("usage.minutes", n=minutes)
+    else:
+        window = say("usage.limit")
+    body = (say("usage.window_resets", window=window, percent=share, time=_local_time(reset_at))
+            if type(reset_at) is int else say("usage.window", window=window, percent=share))
+    return _content(l10n.message("toast_near_limit"), body,
+                    more=[(l10n.message("toast_button_open"), open_uri("overview"))])
+
+
 # ------------------------------------------------- the power action after recoveries (v0.6.12)
 # Every usage-limit recovery of a batch has ended and nothing else runs in Codex, so this PC is about to
 # go to sleep, hibernate or shut down (runtime/afterwork.py). The countdown's notice says when, and has

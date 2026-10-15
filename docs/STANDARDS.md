@@ -89,8 +89,9 @@ changed).
 **A14** Never retried: anything unclassified, user cancellation, permission, approval, content policy, invalid request, context length, 401/403, badRequest, sandboxError, and responseTooManyFailedAttempts without a 429.  
 *tested*: `test_recovery.py`, `test_failures.py`, `test_settings.py`, `test_plug_points.py`
 
-**A15** Only desktop-app user conversations. Subagent, archived and non-desktop threads are never detected.  
-*tested*: `test_engine.py`
+**A15** Only desktop-app user conversations. Codex's `thread_source` label is not required: a desktop conversation with no label, or with ChatGPT's handoff label, is the person's own. Subagent, archived and non-desktop threads, and threads an agent made, are never detected (clarified on 2026-10-15).  
+*tested*: `test_engine.py`, `test_source.py`
+<!-- A15 clarified, not changed, at the owner's word after issue #27 (2026-10-13): the label is Codex's analytics classification, not a mark of whose a conversation is. -->
 
 **A16** A failure is eligible only while it is the thread's latest turn and completed after arming minus the look-back (default 6 h, at most 7 days).  
 *tested*: `test_engine.py`
@@ -122,11 +123,13 @@ changed).
 **A25** Retry now only moves the schedule. It sends nothing, skips no gate and opens no usage window.  
 *tested*: `test_mcp.py`, `test_store.py`
 
-**A26** The continuation text comes only from shipped templates or the Custom message, only for a recoverable category, and is decided before the claim; it cannot change what is recovered.  
-*tested*: `test_continuation.py`
+**A26** The continuation text comes only from shipped templates or the Custom message - and the words a person added for one waiting interruption, once, after it - only for a recoverable category, and is decided before the claim; it cannot change what is recovered (amended by the owner on 2026-10-10).  
+*tested*: `test_continuation.py`, `test_once_words_engine.py`
+<!-- A26 amended at the owner's word, 2026-10-10: "대기 중인 메시지 중 하나를 골라서 이번 한번만 한도가 풀렸을 때 기존 재시도 메시지에 추가로 보내고 싶은 말을 보내고 싶은거야" - words for this time, added once to one waiting recovery's continuation. -->
 
-**A27** The Custom message, and a conversation's own message, are written only in the Dashboard; MCP update_settings refuses both and the preview tool takes no text. Each is at most 2000 characters and sent exactly as typed. Placeholders come from a whitelist ({reason},{category},{attempt},{max_attempts},{reset_time}); dangerous ones are refused by name. It is re-checked on read, and text that fails the check is treated as not set.  
-*tested*: `test_continuation.py`, `test_mcp.py`, `test_conversation_message.py`
+**A27** The Custom message, a conversation's own message, and the words a person added for one waiting interruption are written only in the Dashboard; MCP update_settings refuses them and the preview tool takes no text. Each is at most 2000 characters and sent exactly as typed. Placeholders come from a whitelist ({reason},{category},{attempt},{max_attempts},{reset_time}); dangerous ones are refused by name. It is re-checked on read, and text that fails the check is treated as not set (amended by the owner on 2026-10-10).  
+*tested*: `test_continuation.py`, `test_mcp.py`, `test_conversation_message.py`, `test_once_words.py`
+<!-- A27 amended at the owner's word, 2026-10-10: the words for this time are a Custom message in every way, kept in config/once-words.json beside the state. -->
 
 **A28** A notification or card button can only cancel one exact interruption (an opaque 64-hex id), stop the power action for one batch (named by that batch's opaque 16-hex id, which every batch end replaces), or open one page from a fixed list; anything else is ignored and logged, and a button never causes a send (amended by the owner on 2026-10-03).  
 *tested*: `test_notify.py`, `test_notice_card.py`, `test_cli.py`
@@ -554,7 +557,7 @@ changed).
 **K2** Updates stay within an edition. An update, and a pre-release the update check offers, fetch the installed edition's archive and check it against the digest the installed copy pins for that edition and version where it has one, and otherwise against the .sha256 published beside it (today every pre-release and every advanced archive); a bootstrap or installer that meets the other edition refuses before anything moves unless the change was asked for and confirmed, and says it first; a change of edition is a reinstall that keeps settings and pending recoveries and starts every advanced capability off.  
 *tested*: `test_edition_bootstrap.py`, `test_edition_installer.py`, `test_prerelease_offer.py`
 
-**K3** Arming only in the Dashboard. Arming.arm refuses every actor but the Dashboard, one capability at a time, and needs the statement revision, the generation, the warnings and, for on, the Codex version the Dashboard showed, each still holding; every other surface (MCP, the icon, a card) may only turn capabilities off; no MCP tool arms, whatever a client sends, and the one-shot bridge never reaches the plug.  
+**K3** Arming only in the Dashboard. Arming.arm refuses every actor but the Dashboard, one capability at a time - or one together with the capabilities it requires that are not on, in the same confirmation, every statement involved shown and each confirmed as one capability alone is, a policy on any of them refusing the whole - and needs the statement revision, the generation, the warnings and, for on, the Codex version the Dashboard showed, each still holding; turning a required capability off turns off first what requires it, and a capability whose requirement is not on is off; every other surface (MCP, the icon, a card) may only turn capabilities off; no MCP tool arms, whatever a client sends, and the one-shot bridge never reaches the plug. [AMENDED by the owner 2026-10-15: "다른 기능도 같이 켜져야 하거나 켜지게 하는 경우 있으면 둘 다 켜지게" - a capability that needs another turns it on in the same confirmation, and turning the needed one off turns off what needs it, named first.]  
 *tested*: `test_advanced_arming.py`, `test_advanced_surfaces.py`
 
 **K4** Off by default, and advanced only by departing. Every capability starts off, entering the edition turns every one off, and a watched one never promotes itself; departs_from is never empty and names only standards the standard edition keeps (0.1-0.7, A-J), so a capability that keeps every standard belongs in the standard edition.  

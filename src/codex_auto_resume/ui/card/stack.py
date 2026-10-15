@@ -12,8 +12,22 @@ from ... import notice_card
 from ... import notice_presence
 from .. import popup
 from . import win32
-from .win32 import HWND_MESSAGE, IDC_ARROW, MA_NOACTIVATE, TIMER_FRAME, TIMER_WAIT, TME_LEAVE, TRACKMOUSEEVENT, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSELEAVE, WM_MOUSEMOVE, WM_NOTICE, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WNDPROC, _declare, _on_a_worker_thread, look, screen  # noqa: F401
+from .win32 import HWND_MESSAGE, IDC_ARROW, MA_NOACTIVATE, TIMER_FOCUS, TIMER_FRAME, TIMER_WAIT, TME_LEAVE, TRACKMOUSEEVENT, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSELEAVE, WM_MOUSEMOVE, WM_NOTICE, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WNDPROC, _declare, _on_a_worker_thread, look, screen  # noqa: F401
 from .card import Card  # noqa: F401
+
+# v0.6.16-beta.3 (issue #32, typing lost when a card appears): how long after a card is shown who has the keyboard
+# is asked again.
+FOCUS_AFTER = 0.5
+
+
+def focus_line(before, after):
+    """The one log line for who has the keyboard just before a card and FOCUS_AFTER after - the window class and
+    program in front, the focus window's class (win32.focus_snapshot) - or None where nothing changed."""
+    if not isinstance(before, dict) or not isinstance(after, dict) or before == after:
+        return None
+    said = lambda found: "%s (%s), focus %s" % (found.get("front_class"), found.get("front_process"),  # noqa: E731
+                                                found.get("focus_class"))
+    return "notification card: the keyboard moved while it was shown: %s -> %s" % (said(before), said(after))
 
 class CardStack:
     """Every card on screen, on the icon's thread. `wake` is the one method another thread calls.
@@ -28,7 +42,7 @@ class CardStack:
     """
 
     def __init__(self, *, on_action=None, log=None, anchor=None, inbox=None, on_complete=None,
-                 clock=None, locate=None, appearance=None, worker=None):
+                 clock=None, locate=None, appearance=None, worker=None, focus=None):
         self.on_action = on_action
         self.log = log or (lambda *unused: None)
         self.anchor = anchor
@@ -38,6 +52,9 @@ class CardStack:
         self.clock = clock or (lambda: time.monotonic() * 1000.0)
         self.locate = locate or (lambda: screen(self.anchor))
         self.appearance = appearance or look
+        # v0.6.16-beta.3 (issue #32): who has the keyboard, asked around a card being shown, never a title.
+        self.focus = focus or win32.focus_snapshot
+        self._focus_before = None       # who had it before the first card of a look still to be taken
         self.hwnd = None
         self.class_name = None
         self.instance = None
@@ -91,9 +108,10 @@ class CardStack:
             self._complete(notice, False)
         hwnd, self.hwnd = self.hwnd, None
         if hwnd:
-            for timer in (TIMER_FRAME, TIMER_WAIT):
+            for timer in (TIMER_FRAME, TIMER_WAIT, TIMER_FOCUS):
                 user32.KillTimer(hwnd, timer)
             user32.DestroyWindow(hwnd)
+        self._focus_before = None
         self._frame_running = False
         self._frame_ms = None
         if self.class_name:
@@ -117,6 +135,7 @@ class CardStack:
     # ---- showing
     def show(self, notice, *, where=None, drawn=None):
         """Put one notice on screen as the newest card. Returns the Card, or None if it failed."""
+        before = self._focus_now()
         try:
             self._acquire_gdiplus()
             where = where or self.locate()
@@ -138,8 +157,27 @@ class CardStack:
             self._end(card, False)
             self._drop(card)
             return None
+        if before is not None and self.hwnd:
+            # Asked again on this thread's own timer, not on a thread of its own: a thread that has asked user32 holds
+            # a USER object for as long as it lives (test_cards_leave_nothing_behind caught two). Cards shown within
+            # FOCUS_AFTER of each other are one look, from before the first to FOCUS_AFTER after the last.
+            if self._focus_before is None:
+                self._focus_before = before
+            win32._dll("user32").SetTimer(self.hwnd, TIMER_FOCUS, int(FOCUS_AFTER * 1000), None)
         self._tick()
         return card
+
+    def _focus_now(self):
+        try:
+            return self.focus()
+        except Exception:
+            return None
+
+    def _focus_after(self, before):
+        """FOCUS_AFTER after a card was shown: one line, only when who has the keyboard is not who had it."""
+        line = focus_line(before, self._focus_now())
+        if line is not None:
+            self.log(line)
 
     def admit(self, card, now, where):
         """A new card joins the stack: what it replaces or pushes out leaves.
@@ -330,6 +368,12 @@ class CardStack:
                         self.log("notification card failed (%s)" % type(exc).__name__)
                 return 0
             if message == WM_TIMER:
+                if wparam == TIMER_FOCUS:
+                    user32.KillTimer(hwnd, TIMER_FOCUS)
+                    before, self._focus_before = self._focus_before, None
+                    if before is not None:
+                        self._focus_after(before)
+                    return 0
                 if wparam == TIMER_WAIT:
                     user32.KillTimer(hwnd, TIMER_WAIT)
                 self._tick()
