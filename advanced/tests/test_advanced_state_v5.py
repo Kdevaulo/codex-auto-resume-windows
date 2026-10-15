@@ -72,8 +72,14 @@ class VersionFiveTests(StateCase):
         writes nothing to it: held here by a build that knows one version fewer than the file has."""
         state = self.state()
         state.move("test_wake", "shadow", actor="dashboard", revision=1)
+        # What only version 5 holds - a meter row - is in the file the older build is shown, and stays.
+        self.assertEqual(state.save_meter([{"bucket": "codex", "window_minutes": 300, "used_percent": 91.0,
+                                            "reset_at": 1_800_003_600}], at=self.now), 1)
         state.close()
         path = self.paths.advanced_dir / schema_module.FILE_NAME
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 5)
+            self.assertEqual(connection.execute("SELECT count(*) FROM meter").fetchone()[0], 1)
         before = path.read_bytes()
         from unittest.mock import patch
         from codex_auto_resume_advanced.state import session
