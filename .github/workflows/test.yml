@@ -134,6 +134,11 @@ jobs:
         shell: pwsh
         env:
           CODEX_AR_EDITION: ${{ matrix.edition }}
+          # The advanced lane runs the one live WMI test (advanced/tests/test_advanced_measure.py,
+          # WmiEscapeTests): throwaway pythonw processes in a job of the test's own and a temporary
+          # directory, killed when it ends. No Codex, no install, no registry. The standard lane
+          # leaves it empty, which the test reads as not asked for.
+          CODEX_AR_LIVE_WMI: ${{ matrix.edition == 'advanced' && '1' || '' }}
           PART: ${{ matrix.part }}
           PARTS: "4"
         run: python scripts/test_parts.py --lane $env:CODEX_AR_EDITION --part "$env:PART/$env:PARTS" -v --annotate --seconds "$env:RUNNER_TEMP\seconds.json"
