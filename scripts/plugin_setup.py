@@ -38,7 +38,7 @@ EXIT_ERROR = 1
 EXIT_UNCONFIRMED = 2
 
 sys.path.insert(0, str(PLUGIN_ROOT / "src"))
-from codex_auto_resume import config, control, edition, l10n, startup # noqa: E402
+from codex_auto_resume import addremove, config, control, edition, l10n, startup # noqa: E402
 from codex_auto_resume.app import App                        # noqa: E402
 
 
@@ -277,6 +277,11 @@ def cmd_setup(args) -> int:
     # replace it with the stable launcher so an update cannot orphan the button.
     try:
         startup.install_protocol(notification_command(home))
+    except startup.StartupError:
+        pass
+    # The entry in Add or remove programs, where the installer has kept an uninstaller for it to name.
+    try:
+        addremove.register(home, edition.name().value, config.version())
     except startup.StartupError:
         pass
     started = start_watcher(home)

@@ -17,11 +17,10 @@ workflow writes `<sha256>  <name>`, as build/make_release.py does for every file
 still required: a version whose archive has no pin yet has not had its published digest checked
 (docs/CONTRIBUTING.md, "After a release is published"), and no manifests are made for it.
 
-The silent switch is the one thing that does not exist yet. winget's community repository accepts an
-installer only if it installs without a person, and Install.cmd ends in `pause` whatever it is given
-(outputs/plans/v0616-winget/GAPS.md says what the smallest change is). UNATTENDED_FROM names the first
-version whose Setup program has it; until it is set, this writes nothing without --draft, so a manifest
-that cannot pass is not made by accident. UNATTENDED_SWITCH is the proposed switch.
+winget's community repository accepts an installer only if it installs without a person. The Setup
+programs do from UNATTENDED_FROM on (the -Silent switch, and an entry in Add or remove programs for
+`winget upgrade` and `winget uninstall`); for an earlier version this writes nothing without --draft, so a
+manifest that cannot pass is not made by accident.
 
 The YAML is written by hand, without a YAML library: every value is a double-quoted string, which is what
 a JSON string also is, and the structure is the few shapes the schema needs here.
@@ -49,10 +48,12 @@ SCHEMA = "1.12.0"
 # The publisher segment of both package identifiers: the GitHub owner the product is published under, which is
 # also the author in the plugin manifest and the Publisher field below. A segment may hold a hyphen.
 PUBLISHER = "songyb111-gachon"
-# The first version whose Setup program installs without anyone answering (GAPS.md). None until it exists.
-UNATTENDED_FROM = None
-# The proposed switch: the Setup program takes it, does not pass it on, and runs Install.cmd and install.ps1
-# in an unattended mode that ends without `pause` or a question.
+# The first version whose Setup program installs without anyone answering: its Install.cmd and Uninstall.cmd read
+# UNATTENDED_SWITCH and ask nothing and wait for no key, and the installation keeps the entry in Add or remove
+# programs that `winget list`, `upgrade` and `uninstall` find it by (src/codex_auto_resume/addremove.py).
+UNATTENDED_FROM = "0.6.16"
+# The switch: the Setup program passes it to Install.cmd, which passes it to install.ps1, and the entry's
+# QuietUninstallString carries it.
 UNATTENDED_SWITCH = "-Silent"
 # What Install.cmd ends with when the other edition is installed: install.ps1's EDITION_CHANGE_REFUSED.
 EDITION_CHANGE_REFUSED = 14
@@ -260,8 +261,8 @@ def build(version: str, digests: dict, out: Path, draft: bool = False, release: 
     if not draft and (UNATTENDED_FROM is None or
                       legacy_bootstraps.order(version) < legacy_bootstraps.order(UNATTENDED_FROM)):
         raise SystemExit("the Setup program of %s has no unattended mode, and winget accepts no installer that "
-                         "needs a person (outputs/plans/v0616-winget/GAPS.md). Write the files anyway, to look at, "
-                         "with --draft." % version)
+                         "needs a person (from %s on it has). Write the files anyway, to look at, with --draft."
+                         % (version, UNATTENDED_FROM))
     written = []
     for edition in EDITIONS:
         target = out / folder(edition, version)

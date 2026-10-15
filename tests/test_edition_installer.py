@@ -237,7 +237,7 @@ class EditionChangeTextTests(unittest.TestCase):
         ask - one number, or a refusal would reach the person as a failure with no question."""
         bootstrap = re.search(r"\$ExitOtherEdition = (\d+)", BOOTSTRAP.read_text(encoding="utf-8"))
         installer = re.search(r"\$EDITION_CHANGE_REFUSED = (\d+)", self.text)
-        launcher = re.search(r'if "%EXIT_CODE%"=="(\d+)" goto ask', LAUNCHER.read_text(encoding="utf-8"))
+        launcher = re.search(r'if "%EXIT_CODE%"=="(\d+)" if not defined SILENT goto ask', LAUNCHER.read_text(encoding="utf-8"))
         self.assertEqual({bootstrap.group(1), installer.group(1), launcher.group(1)}, {"14"})
         self.assertNotIn("exit 14", self.text, "by name, so the three can be found together")
 

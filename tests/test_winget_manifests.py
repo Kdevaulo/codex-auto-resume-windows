@@ -23,10 +23,12 @@ import re
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "build"))
 
+from codex_auto_resume import addremove  # noqa: E402
 import winget_manifests as wm  # noqa: E402
 
 SAMPLE = {
@@ -34,9 +36,9 @@ SAMPLE = {
     "repo": "example-repo",
     "download": "https://github.com/example-owner/example-repo/releases/download/v{version}/",
     "archive": "CodexAutoResume-v{version}-win-x64.zip",
-    "sha256": {"0.6.15": "1" * 64},
+    "sha256": {"0.6.15": "1" * 64, "0.6.16": "3" * 64},
     "advanced": {"archive": "CodexAutoResume-Advanced-v{version}-win-x64.zip", "since": "0.6.11",
-                 "sha256": {"0.6.15": "2" * 64}},
+                 "sha256": {"0.6.15": "2" * 64, "0.6.16": "4" * 64}},
 }
 DIGESTS = {"standard": "ab" * 32, "advanced": "cd" * 32}
 
@@ -314,22 +316,32 @@ class RefusalTests(unittest.TestCase):
         self.assertTrue(self.build(release=release, draft=True))
 
     def test_a_setup_program_with_no_unattended_mode_makes_nothing_unless_drafted(self):
-        self.assertIsNone(wm.UNATTENDED_FROM, "set it, and the test below, when the Setup program has the switch")
+        # 0.6.15 is the last release without it.
         with self.assertRaises(SystemExit) as raised:
             self.build()
         self.assertIn("unattended", str(raised.exception))
         self.assertEqual(len(self.build(draft=True)), 8)
 
-    def test_with_the_switch_released_a_version_from_it_on_is_made(self):
-        previous = wm.UNATTENDED_FROM
-        wm.UNATTENDED_FROM = "0.6.15"
-        try:
-            self.assertEqual(len(self.build()), 8)
-            wm.UNATTENDED_FROM = "0.6.16"
-            with self.assertRaises(SystemExit):
-                self.build()
-        finally:
-            wm.UNATTENDED_FROM = previous
+    def test_from_the_version_that_has_the_switch_the_manifests_are_made(self):
+        self.assertEqual(wm.UNATTENDED_FROM, "0.6.16")
+        self.assertEqual(len(self.build("0.6.16")), 8)
+        with patch.object(wm, "UNATTENDED_FROM", None), self.assertRaises(SystemExit):
+            self.build("0.6.16")
+        with patch.object(wm, "UNATTENDED_FROM", "0.6.17"), self.assertRaises(SystemExit):
+            self.build("0.6.16")
+
+    def test_the_switch_is_the_one_the_launchers_the_setup_program_and_the_entry_use(self):
+        self.assertEqual(wm.UNATTENDED_SWITCH, "-Silent")
+        for name in ("Install.cmd", "Uninstall.cmd"):
+            text = (ROOT / "build" / "install" / name).read_text(encoding="utf-8")
+            self.assertIn('"%%~A"=="' + wm.UNATTENDED_SWITCH + '"', text)
+        self.assertIn('"%s"' % wm.UNATTENDED_SWITCH, (ROOT / "build" / "setup" / "Setup.cs").read_text(encoding="utf-8"))
+        self.assertIn("[switch]$Silent", (ROOT / "build" / "install" / "install.ps1").read_text(encoding="utf-8"))
+        self.assertTrue(addremove.uninstall_command(Path("C:/home"), silent=True).endswith('"' + wm.UNATTENDED_SWITCH + '"'))
+        entry = {"standard": "Codex Auto Resume", "advanced": "Codex Auto Resume Advanced"}
+        for edition in wm.EDITIONS:
+            self.assertEqual(wm.display_name(edition), entry[edition])
+        self.assertEqual(wm.PUBLISHER, addremove.PUBLISHER)
 
     def test_a_digest_that_is_not_a_digest_is_refused(self):
         for bad in ("", "xyz", "a" * 63, "g" * 64):

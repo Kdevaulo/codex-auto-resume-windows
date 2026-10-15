@@ -108,6 +108,18 @@ folder only, so a DLL lying beside it in Downloads is never loaded, and it stops
 is beside it. Started from a command line, it passes switches such as `-SkipStartup` on to
 `Install.cmd`, and refuses anything but switches and plain words.
 
+From v0.6.16, `-Silent` installs without a question and without waiting for a key:
+`CodexAutoResume-Setup-vX.Y.Z.exe -Silent`, which is how `winget` runs it. Nothing else changes: it prints what
+it prints and ends with the exit code it ends with otherwise (0 done, 1 stopped, 14 when the other edition is
+installed, in which case nothing is changed, since nobody can be asked). The same switch works on the archive's
+`Install.cmd` and `Uninstall.cmd`, and the setup program does not wait for Enter when it stops.
+
+From v0.6.16 an installation also appears in Windows' Settings > Apps and in `winget list`, as *Codex Auto Resume*
+(*Codex Auto Resume Advanced* for the advanced edition), for your Windows user only. Its Uninstall button runs the
+uninstaller the installer keeps in `%USERPROFILE%\.codex-auto-resume\uninstall\`, the same one as `Uninstall.cmd`.
+A change of edition replaces the entry with the other edition's, and an update rewrites it. An installation placed
+elsewhere with `CODEX_AUTO_RESUME_PLUGIN_HOME` gets neither the kept uninstaller nor an entry.
+
 It is not code-signed (see the end of [From the release archive](#from-the-release-archive)), so
 SmartScreen may show *Windows protected your PC* when you start it. Choose **More info**, then
 **Run anyway**. That warning says the file is unsigned and has no reputation with Microsoft yet; it
@@ -1482,7 +1494,10 @@ error logs; `logs\launcher.log` and `logs\codex-start.log` stay), so reinstallin
 removes its Windows registrations and the plugin, and keeps your settings and pending
 recoveries unless you ask it to delete them too; it leaves the installation folder, which still
 holds the program files, for you to delete. `Uninstall.cmd` also removes this product's
-marketplace from Codex while it still points at this installation.
+marketplace from Codex while it still points at this installation. From v0.6.16 it, and Settings > Apps and
+`winget uninstall` with it (`-Silent` for no questions), also remove the installation's entry in Add or remove
+programs and the uninstaller kept for it - each only while it names this installation; an entry of that name that
+names another is left as it is.
 
 From a source checkout, the same command-line tool also deletes this tool's own state and logs
 (`--keep-logs` keeps the logs; `--keep-state` keeps settings and pending recoveries):

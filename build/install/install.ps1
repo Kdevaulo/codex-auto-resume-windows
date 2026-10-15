@@ -20,6 +20,7 @@ param(
     [switch]$Uninstall,          # remove the program, keeping settings and pending state
     [switch]$Purge,              # with -Uninstall: also delete settings, state and logs
     [switch]$AllowEditionChange, # replace the installed edition with this archive's other one
+    [switch]$Silent,             # for Install.cmd and Uninstall.cmd, which ask nothing and wait for no key with it
     [string]$PluginName      = 'codex-auto-resume',
     [string]$MarketplaceName = 'codex-auto-resume-windows'
 )
@@ -412,6 +413,49 @@ function Invoke-Setup {
     return $LASTEXITCODE
 }
 
+function Install-KeptUninstaller {
+    <#
+        Keep a copy of this script in the installation, for the entry in Add or remove programs.
+
+        The archive's own Uninstall.cmd is gone once a setup program has run: it unpacks the
+        archive into a temporary folder and removes it. Windows' list of installed programs, and
+        `winget uninstall` with it, runs a command line, so there has to be a file for that command
+        to name. This script is that file - uninstalling is its -Uninstall branch, which asks the
+        installed engine about the installation and needs nothing else from the archive.
+
+        One file, in a folder of the installation's own, written beside its name and moved into
+        place so a copy cut short is never the one that runs. A link or a junction where the
+        folder should be is not followed and not replaced: the path is refused unless it resolves
+        inside the verified root, the confinement every other write in this file keeps.
+
+        Returns $true when the copy is there afterwards.
+    #>
+    param([string]$Source)
+    $folder = Join-Path $OwnedHome 'uninstall'
+    $target = Join-Path $folder 'install.ps1'
+    if (-not (Test-PathInside $target $OwnedHome)) {
+        Warn ('Not keeping an uninstaller: ' + $folder + ' is outside the verified installation.')
+        return $false
+    }
+    $existing = Get-Item -LiteralPath $folder -Force -ErrorAction SilentlyContinue
+    if ($existing -and (-not $existing.PSIsContainer -or $existing.LinkType)) {
+        Warn ('Not keeping an uninstaller: ' + $folder + ' is not an ordinary folder.')
+        return $false
+    }
+    if ((Resolve-Canonical $Source) -eq (Resolve-Canonical $target)) { return $true }
+    $temp = $target + '.writing'
+    try {
+        if (-not $existing) { New-Item -ItemType Directory -Path $folder -ErrorAction Stop | Out-Null }
+        Copy-Item -LiteralPath $Source -Destination $temp -Force -ErrorAction Stop
+        Move-Item -LiteralPath $temp -Destination $target -Force -ErrorAction Stop
+    } catch {
+        Warn ('Could not keep an uninstaller: ' + $_.Exception.Message)
+        $null = Remove-OwnedItem $temp
+        return $false
+    }
+    return $true
+}
+
 function Write-CopyJournal {
     <#
         Write down what is about to be moved aside, before any of it moves.
@@ -685,6 +729,10 @@ if ($Uninstall) {
     # So the check comes first, and the proof only goes when there is nothing left to do.
     # The copy journal is ours too, and an installation being removed has nothing left to
     # put back, so it goes with the rest rather than outliving the thing it described.
+    # This script may be the copy being removed: PowerShell has read all of it, and nothing holds the file.
+    $kept = Join-Path $OwnedHome 'uninstall'
+    $keptItem = Get-Item -LiteralPath $kept -Force -ErrorAction SilentlyContinue
+    if ($keptItem -and $keptItem.PSIsContainer -and -not $keptItem.LinkType) { $null = Remove-OwnedItem $kept }
     foreach ($file in @('CodexAutoResumeSettings.exe', 'codex-auto-resume.ico', 'watcher-launcher.py',
                         'runtime.json', '.owned-by-codex-auto-resume',
                         '.codex-auto-resume-install-journal.json')) {
@@ -1001,6 +1049,13 @@ if ($stale.Count -gt 0) {
     foreach ($process in $stale) {
         Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
     }
+}
+
+# The entry in Add or remove programs is written by the engine's setup below, and only where this has
+# left an uninstaller for it to name. Only for the ordinary home: an installation somewhere the person
+# chose through CODEX_AUTO_RESUME_PLUGIN_HOME would need the uninstaller told where it is, and gets none.
+if ([string]::IsNullOrWhiteSpace($env:CODEX_AUTO_RESUME_PLUGIN_HOME)) {
+    $null = Install-KeptUninstaller -Source $PSCommandPath
 }
 
 Step 'Setting up the watcher'

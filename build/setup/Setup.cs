@@ -75,15 +75,22 @@ namespace CodexAutoResumeSetup
         {
             if (!Dlls.FromSystem32Only())
             {
-                return Say.Stopped(Codes.Unguarded, Dlls.Unguarded, !Hook(arguments));
+                return Say.Stopped(Codes.Unguarded, Dlls.Unguarded, Waits(arguments));
             }
             string config = Dlls.ConfigBeside();
             if (config != null)
             {
                 return Say.Stopped(Codes.Configured, string.Format(CultureInfo.InvariantCulture, Dlls.Configured,
-                                                                   config), !Hook(arguments));
+                                                                   config), Waits(arguments));
             }
             return Started(arguments, Hook(arguments));
+        }
+
+        // Whether a stop waits for Enter, when this program has a console of its own: not under a test's hook,
+        // and not with -Silent, which is what a caller that has no one to press a key passes (winget, a script).
+        static bool Waits(string[] arguments)
+        {
+            return !Hook(arguments) && !Passed.Silent(arguments);
         }
 
         // A test's hook, which never waits for Enter: every one begins with two hyphens, and nothing Install.cmd
@@ -96,18 +103,19 @@ namespace CodexAutoResumeSetup
         [MethodImpl(MethodImplOptions.NoInlining)]
         static int Started(string[] arguments, bool hook)
         {
+            bool wait = !hook && !Passed.Silent(arguments);
             bool modules = arguments.Length == 1 && arguments[0] == "--loaded-modules";
             string into = arguments.Length == 2 && arguments[0] == "--unpack-into" ? arguments[1] : null;
             if (hook ? !(modules || (into != null && Passed.Name(into))) : !Passed.Acceptable(arguments))
             {
-                return Say.Stopped(Codes.Arguments, Passed.Refused, !hook);
+                return Say.Stopped(Codes.Arguments, Passed.Refused, wait);
             }
             byte[] archive = Carried.Read();
             if (archive == null)
             {
                 return Say.Stopped(Codes.Damaged, "This setup program stops here: the archive it carries is not the " +
                                    "one it was built with (its SHA-256 differs). The file is damaged - download it " +
-                                   "again.", !hook);
+                                   "again.", wait);
             }
             // Before the folder is made, so a console window closed at any moment after it finds it removed.
             Closing.Watch();
@@ -116,7 +124,7 @@ namespace CodexAutoResumeSetup
                                          out reason);
             if (folder == null)
             {
-                return Say.Stopped(Codes.NoFolder, reason, !hook);
+                return Say.Stopped(Codes.NoFolder, reason, wait);
             }
             try
             {
@@ -133,7 +141,7 @@ namespace CodexAutoResumeSetup
                 }
                 if (failed != null)
                 {
-                    return Say.Stopped(Codes.NotUnpacked, "This setup program stops here: " + failed, !hook);
+                    return Say.Stopped(Codes.NotUnpacked, "This setup program stops here: " + failed, wait);
                 }
                 if (modules)
                 {
@@ -173,7 +181,7 @@ namespace CodexAutoResumeSetup
             if (!File.Exists(script))
             {
                 return Say.Stopped(Codes.NotStarted, "This setup program stops here: the archive it carries has no " +
-                                   "Install.cmd.", true);
+                                   "Install.cmd.", !Passed.Silent(arguments));
             }
             ProcessStartInfo start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"));
             start.Arguments = "/d /s /c \"\"" + script + "\"" +
@@ -201,7 +209,7 @@ namespace CodexAutoResumeSetup
             catch (Win32Exception error)
             {
                 return Say.Stopped(Codes.NotStarted, "This setup program stops here: Install.cmd could not be " +
-                                   "started (" + error.Message + ").", true);
+                                   "started (" + error.Message + ").", !Passed.Silent(arguments));
             }
         }
 
@@ -275,6 +283,19 @@ namespace CodexAutoResumeSetup
         internal const string Refused =
             "This setup program stops here: it passes on to Install.cmd only switches and plain words - letters, " +
             "digits and hyphens, such as -SkipStartup - and was given something else.";
+
+        // -Silent, as Install.cmd and Uninstall.cmd read it: nothing is asked and nothing waits for a key.
+        public static bool Silent(string[] arguments)
+        {
+            foreach (string argument in arguments)
+            {
+                if (string.Equals(argument, "-Silent", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         public static bool Acceptable(string[] arguments)
         {

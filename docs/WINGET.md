@@ -22,14 +22,25 @@ the Codex plugin, none of which a portable layout carries.
 `scripts/release.json` pins the archives, not the Setup programs, so each Setup program's SHA-256 comes from the
 `.sha256` file published beside it (the same `<sha256>  <name>` file every release asset has).
 
-## Before the first submission
+## What the installer gives winget
 
-winget accepts an installer only if it installs without a person. The Setup program does not yet: `Install.cmd`
-ends in `pause`, the Setup program passes on only switches `install.ps1` knows, and it adds no Add or remove
-programs entry for `winget upgrade` and `winget uninstall` to find. Until that is built,
-`build/winget_manifests.py` writes nothing without `--draft`, and `UNATTENDED_FROM` in it is empty. Once a
-release has an unattended mode, set `UNATTENDED_FROM` to that version (and `UNATTENDED_SWITCH` if its switch is
-not `-Silent`), and change the test that holds it.
+From v0.6.16 both Setup programs meet what the community repository asks of an installer:
+
+- **Silent install.** `CodexAutoResume-Setup-vX.Y.Z.exe -Silent` (and the Advanced one) asks nothing and waits for
+  no key. The manifest's `Silent` and `SilentWithProgress` switches are both `-Silent`. Exit codes are the ones the
+  installer has always had; 14, the other edition being installed (nothing changed, nobody to ask), is listed under
+  `ExpectedReturnCodes` with a link to EDITIONS.md.
+- **An entry in Add or remove programs**, so `winget list`, `winget upgrade` and `winget uninstall` find the
+  installation: HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\CodexAutoResume (the advanced edition:
+  CodexAutoResumeAdvanced), with `DisplayName` "Codex Auto Resume" ("Codex Auto Resume Advanced"), `DisplayVersion`,
+  `Publisher` "songyb111-gachon", `InstallLocation`, `UninstallString`, `QuietUninstallString` (with `-Silent`),
+  `NoModify` and `NoRepair`. The manifest's `AppsAndFeaturesEntries` repeats the name, publisher and version, which is
+  how winget matches them. The uninstall command runs the installer's kept copy of itself in
+  `%USERPROFILE%\.codex-auto-resume\uninstall\`. An installation under `CODEX_AUTO_RESUME_PLUGIN_HOME` has no
+  entry, and so is not one winget sees.
+
+`build/winget_manifests.py` writes nothing for an earlier version without `--draft` (`UNATTENDED_FROM` in it is
+0.6.16). The switch and the entry are held by `tests/test_add_remove.py` and `tests/test_winget_manifests.py`.
 
 ## Making the files, after a final release
 
@@ -50,7 +61,7 @@ On a machine where installing it for real is fine, such as Windows Sandbox:
 - `winget validate --manifest <folder>` checks the files against the schema.
 - `winget settings --enable LocalManifestFiles`, then `winget install --manifest <folder>` installs from them. It runs
   the real Setup program: do it in a sandbox or a virtual machine, not on a machine whose installation matters.
-- `winget upgrade` and `winget uninstall` can be tried the same way once the Add or remove programs entry exists.
+- `winget list`, `winget upgrade` and `winget uninstall` can be tried the same way, now that the entry exists.
 
 Then, for each package (the repository takes one pull request per package version), fork microsoft/winget-pkgs,
 copy that package's `manifests/s/songyb111-gachon/...` folder in, and open the pull request. The validation

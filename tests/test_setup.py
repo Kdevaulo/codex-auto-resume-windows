@@ -224,6 +224,11 @@ class HandOffTests(unittest.TestCase):
         self.assertEqual(self.scratch.left(), [])
         self.assertEqual(sum(line.startswith("args=[]") for line in self.scratch.recorded()), 3)
 
+    def test_the_silent_switch_is_passed_on_like_any_other(self):
+        done = self.scratch.run(self.exe, "-SkipStartup", "-Silent")
+        self.assertEqual(done.returncode, 7, done.stderr)
+        self.assertEqual(self.scratch.recorded()[0], "args=[-SkipStartup -Silent]")
+
     def test_an_argument_cmd_would_read_as_more_than_a_word_is_refused(self):
         for argument in ("-Skip&Startup", "a b", "-Name^x", "%PATH%", "\"x\"", "--anything", "-", "a|b", "-x>y"):
             with self.subTest(argument):
@@ -441,7 +446,7 @@ def _kernel32():
     return k32
 
 
-def run_in_a_console_then_close_it(exe: Path, environment: dict, cwd: Path, closed_when) -> int:
+def run_in_a_console_then_close_it(exe: Path, environment: dict, cwd: Path, closed_when, arguments=()) -> int:
     """Starts `exe` in a pseudo-console - a console with no window - and closes that console once `closed_when()`
     is true, which sends every program in it the CTRL_CLOSE_EVENT the X of a console window sends. Its exit code."""
     k32 = _kernel32()
@@ -477,7 +482,7 @@ def run_in_a_console_then_close_it(exe: Path, environment: dict, cwd: Path, clos
     startup.lpAttributeList = ctypes.cast(attributes, ctypes.c_void_p)
     block = ctypes.create_unicode_buffer("".join("%s=%s\0" % pair for pair in sorted(environment.items())) + "\0")
     info = _ProcessInformation()
-    line = ctypes.create_unicode_buffer('"%s"' % exe)
+    line = ctypes.create_unicode_buffer(" ".join(['"%s"' % exe, *arguments]))
     # EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT: the pseudo-console, and this environment.
     assert k32.CreateProcessW(None, line, None, None, False, 0x00080000 | 0x00000400, block, str(cwd),
                               ctypes.byref(startup), ctypes.byref(info)), ctypes.get_last_error()
@@ -555,6 +560,41 @@ class CloseTests(unittest.TestCase):
         self.assertEqual(scratch.left(), [], "the unpacked archive outlived the console window")
 
 
+@unittest.skipUnless(CSC.is_file() and _pseudo_consoles(), "the in-box C# compiler and pseudo-consoles are not available")
+class SilentTests(unittest.TestCase):
+    """With -Silent, a stop waits for no one. Alone in a console of its own - as a double-clicked program is, and
+    as a caller that gives it a console but no person is - the program says why it stopped and then waits for Enter
+    ("Press Enter to close this window"). A damaged copy stops it there; without the switch it is still waiting
+    when the console is closed on it, with it the program has ended by itself with its own code."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.work = Path(tempfile.mkdtemp(prefix="setup-silent-"))
+        _, exe = build_around(TEST_ENTRIES, cls.work)
+        image = bytearray(exe.read_bytes())
+        start, end = make_setup.carried_span(bytes(image))
+        image[(start + end) // 2] ^= 0x01
+        cls.damaged = cls.work / "damaged.exe"
+        cls.damaged.write_bytes(bytes(image))
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.work, ignore_errors=True)
+
+    def ended_by_itself(self, *arguments):
+        scratch = Scratch(self)
+        environment = dict(os.environ, TEMP=str(scratch.temp), TMP=str(scratch.temp))
+        started = time.monotonic()
+        return run_in_a_console_then_close_it(self.damaged, environment, scratch.base,
+                                              lambda: time.monotonic() - started > 6, arguments)
+
+    def test_with_the_switch_it_ends_by_itself_with_its_own_code(self):
+        self.assertEqual(self.ended_by_itself("-Silent"), 43)
+
+    def test_without_it_it_waits_for_the_enter_nobody_presses(self):
+        self.assertNotEqual(self.ended_by_itself(), 43)
+
+
 def method(name: str) -> str:
     """The text of a method of Setup.cs, from its signature to its closing brace."""
     found = re.search(r"\n([ \t]+)(?:public |internal |private )?static \w+(?:<\w+>)? %s\(" % re.escape(name), SOURCE)
@@ -602,6 +642,15 @@ class SourceTests(unittest.TestCase):
         self.assertIn('start.Arguments = "/d /s /c \\"\\"" + script + "\\""', install)
         self.assertIn("start.WorkingDirectory = folder;", install)
         self.assertIn('string script = Path.Combine(folder, "Install.cmd");', install)
+
+    def test_every_stop_asks_whether_it_may_wait_and_silent_says_no(self):
+        # Each Say.Stopped is told, not left to wait: by a hook or -Silent, which nothing else is.
+        stops = re.findall(r"Say\.Stopped\([^;]*?\);", SOURCE)
+        self.assertGreaterEqual(len(stops), 7)
+        for stop in stops:
+            self.assertTrue(stop[:-2].endswith(("wait", "Waits(arguments)", "!Passed.Silent(arguments)")), stop)
+        self.assertIn("return !Hook(arguments) && !Passed.Silent(arguments);", SOURCE)
+        self.assertIn('string.Equals(argument, "-Silent", StringComparison.OrdinalIgnoreCase)', SOURCE)
 
     def test_its_manifest_asks_for_no_elevation(self):
         manifest = (ROOT / make_setup.MANIFEST).read_text(encoding="utf-8")
