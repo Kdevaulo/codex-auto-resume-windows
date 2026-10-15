@@ -61,6 +61,30 @@ function Area($one, $height) {
 $out.one = Area $true 36
 $out.well = Area $false 36
 $out.message = Area $false 96
+# The same cut-off box walked by the name check, with the line check on, and held off as it is for a dialog the
+# screen has made smaller than its layout (AuditOwnValues): how many cut-offs each finds.
+function Spoken($lines) {
+  $area = $A.GetConstructor($flags, $null, [type[]]@(), $null).Invoke(@())
+  $box = $A.GetField('Box', $flags).GetValue($area)
+  $area.Font = $font; $box.Font = $font
+  $area.Width = 280; $area.Height = 36
+  $frame = New-Object Windows.Forms.Form
+  $frame.ClientSize = New-Object Drawing.Size 400, 200
+  $frame.Controls.Add($area)
+  $frame.CreateControl(); $area.CreateControl(); $area.PerformLayout()
+  $found = New-Object 'System.Collections.Generic.List[string]'
+  $held = $F.GetField('AuditLines', $flags)
+  $held.SetValue($null, $lines)
+  try {
+    $F.GetMethod('AuditSpoken', $flags).Invoke($null, [object[]]@('probe', $frame.PSObject.BaseObject, $found.PSObject.BaseObject)) | Out-Null
+  } finally {
+    $held.SetValue($null, $true)
+  }
+  $frame.Dispose()
+  return @(@($found) | Where-Object { $_ -like '*its text is cut off*' }).Count
+}
+$out.spokenLines = Spoken $true
+$out.spokenHeld = Spoken $false
 $out | ConvertTo-Json -Depth 5 -Compress
 """
 
@@ -109,6 +133,13 @@ class WindowTests(unittest.TestCase):
         self.assertIn("its text is cut off", well["findings"][0])
         self.assertEqual(self.answer["message"]["findings"], [], "a message's well is left as it is")
 
+    def test_a_dialog_the_screen_made_smaller_is_asked_its_names_and_not_its_lines(self):
+        """A custom value's dialog at 200% and the largest text size is wider than a 1024 x 768 screen lets a window be,
+        so Windows makes it smaller than its layout and cuts its number box off (dev CI, 2026-10-15): the name check
+        still walks it, the line check only where the dialog is whole - as its layout already was."""
+        self.assertEqual(self.answer["spokenLines"], 1, "walked with the names, the cut-off box is found")
+        self.assertEqual(self.answer["spokenHeld"], 0, "held off, it is not")
+
     def test_a_homes_row_joins_only_the_parts_that_have_text(self):
         self.assertEqual(self.answer["joined"], ["Default · Watched", "Work · C:\\Users\\ExampleUser\\.codex-work · Watched",
                                                  "Default · Not looked at yet"])
@@ -136,6 +167,9 @@ class SourceTests(unittest.TestCase):
 
     def test_the_audit_checks_every_text_box_where_it_checks_every_name(self):
         self.assertIn("AuditTextLine(where, child, findings)", guiscan.member_body("SettingsForm", "AuditSpoken"))
+        own = guiscan.member_body("SettingsForm", "AuditOwnValues")
+        self.assertIn("AuditLines = whole;", own, "a custom value's dialog is held to whole lines where it is whole")
+        self.assertIn("AuditLines = true;", own, "and the check is on again for everything walked after it")
 
 
 if __name__ == "__main__":

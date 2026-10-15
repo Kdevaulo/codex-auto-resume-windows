@@ -480,7 +480,16 @@ namespace CodexAutoResume
                         int room = dialog.ClientSize.Height - dialog.Controls[1].Height;
                         if (needs > room) findings.Add(where + " :: the refusal needs " + needs + " high, the dialog gives " + room);
                     }
-                    AuditSpoken(where, dialog, findings);
+                    // Every name is asked either way; a whole line in each box only where the dialog is whole, as its layout is.
+                    AuditLines = whole;
+                    try
+                    {
+                        AuditSpoken(where, dialog, findings);
+                    }
+                    finally
+                    {
+                        AuditLines = true;
+                    }
                 }
             }
         }
