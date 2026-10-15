@@ -92,7 +92,7 @@ from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STOP_WORDS, DEFA
                            POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
-from .vocabulary import CapabilityKind, Measurement, OptionKey
+from .vocabulary import CapabilityKind, Measurement, OptionKey, WordingKey
 
 # The one ceiling over every capability together: advanced sends an hour. It is also the highest
 # value a person may set it to - it can be lowered and never raised.
@@ -150,6 +150,8 @@ class CapabilityDef:
     resends: bool = False
     requires: tuple = ()
     kind: CapabilityKind = CapabilityKind.ROUTE
+    # v0.6.16-beta.4: the WordingKeys of a person's own text it keeps (state `wordings`): the wrap-up's Custom text.
+    wordings: tuple = ()
 
     def option(self, key) -> Option | None:
         """The choice of `key` this capability offers, or None."""
@@ -856,6 +858,7 @@ USAGE_WRAP_UP = CapabilityDef(
              Option(OptionKey.STOP_WORDS_WEEKLY, PERCENTS, DEFAULT_STOP_WORDS),
              Option(OptionKey.WRAP_STYLE, STYLES, DEFAULT_STYLE),
              Option(OptionKey.WRAP_RESET_TIME, SWITCH, ON)),
+    wordings=(WordingKey.WRAP_CUSTOM_FIVE_HOUR, WordingKey.WRAP_CUSTOM_WEEKLY),
     requires=("usage_meter",),
 )
 

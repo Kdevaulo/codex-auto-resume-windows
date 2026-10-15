@@ -359,6 +359,20 @@ class WrapUpTests(TakingCase):
         (sent,) = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
         self.assertNotIn(statement.CATALOGS.text("continue.wrap_up.resets_at", "en", reset="").split("{")[0][:12], sent)
 
+    def test_custom_the_windows_own_words_are_sent_filled_in(self):
+        """v0.6.16-beta.4 (b): with Custom, a window's own words, the numbers filled in (test_advanced_wordings)."""
+        plug, _turn = self.running()
+        self.language(plug, "en")
+        self.choose(plug, OptionKey.WRAP_STYLE, wrapwords.CUSTOM_STYLE)
+        state = plug.runtime.state
+        assert plug.runtime.arming.set_wording("usage_wrap_up", "wrap_custom_five_hour",
+                                               "Finish now: {percent}% of {window}.",
+                                               generation=state.meta()["generation"], actor=Actor.DASHBOARD)["done"]
+        for _ in range(3):
+            self.h.tick(advance=61)
+        (sent,) = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
+        self.assertTrue(sent.startswith("Finish now: 91% of the five-hour limit."), sent)
+
     def test_below_the_percentage_nothing_is_sent(self):
         self.running(percent=80)
         for _ in range(3):

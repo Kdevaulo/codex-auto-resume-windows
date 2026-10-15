@@ -623,6 +623,12 @@ namespace CodexAutoResume
                 MethodInvoker after = done;
                 done = delegate { ReadPrompts(after); };
             }
+            // v0.6.16-beta.4: the wrap-up's own wordings (AdvancedUsage.cs).
+            if (id == WrapUpId)
+            {
+                MethodInvoker after = done;
+                done = delegate { ReadWordings(after); };
+            }
             bool rules = Equals(Get(item, "rules_editor"), true), samples = Equals(Get(item, "samples"), true);
             MethodInvoker readWatch = delegate
             {
@@ -851,7 +857,7 @@ namespace CodexAutoResume
                            WatchShown(advancedOpen) + "|" +
                            KeptShown(item) + "|" +
                            (IsReport(item) ? ReportShown() : "") + "|" +
-                           ResetsShown(item) + "|" + KeepGoingShown(item) + "|" + QueueShown(item);
+                           ResetsShown(item) + "|" + KeepGoingShown(item) + "|" + QueueShown(item) + "|" + WordingsShown(item);
             if (shown == advancedShown)
             {
                 UpdateAdvancedButtons();
@@ -1071,6 +1077,8 @@ namespace CodexAutoResume
                 card.Controls.Add(NewRow(label, combo));
                 advancedChoices.Add(combo);
             }
+            // v0.6.16-beta.4: the wrap-up's Custom wording, under its drop-downs (AdvancedUsage.cs).
+            BuildWordings(id, options, card);
         }
 
         /// One value of a choice as the drop-down shows it: hours with their unit, a count as a number.
@@ -1084,7 +1092,8 @@ namespace CodexAutoResume
                 return value == 1 ? Word("page.option.on", "On") : Word("page.option.off", "Off");
             if (key == "wrap_style")
                 return Word("page.option.style." + value.ToString(CultureInfo.InvariantCulture),
-                            value == 1 ? "Short" : value == 3 ? "Detailed" : value == 4 ? "With the numbers" : "Standard");
+                            value == 1 ? "Short" : value == 3 ? "Detailed" : value == 4 ? "With the numbers" :
+                            value == 5 ? "Custom" : "Standard");
             if (key.StartsWith("warn_", StringComparison.Ordinal) || key.StartsWith("wrap_", StringComparison.Ordinal) ||
                 key.StartsWith("pause_", StringComparison.Ordinal) || key.StartsWith("stop_words_", StringComparison.Ordinal))
                 return Word("page.option.percent", "{n}%", "n", value);
@@ -1429,6 +1438,7 @@ namespace CodexAutoResume
             foreach (Button remove in ruleRemoves) remove.Enabled = listed;
             if (ruleAdd != null) ruleAdd.Enabled = listed;
             UpdateKeptButtons(idle);
+            UpdateWordingButtons(idle);
             UpdateResetButtons(idle);
             UpdateKeepGoingButtons(idle);
             UpdateQueueButtons(idle);

@@ -991,6 +991,39 @@ class Arming:
         return self._chosen(lambda: {"generation": self.state.set_option(
             capability, key, value, generation=generation, actor=actor, at=self.clock())})
 
+    def wordings_view(self, capability) -> dict:
+        """A capability's own wordings as the Dashboard's page shows them, with what they may hold: the text a person
+        wrote for each key it keeps, the longest one may be, and the placeholders it may write. Never logged, and read
+        by the Dashboard alone (no MCP tool reaches it)."""
+        from .engine import wrapwords
+        definition = self.registry.get(capability)
+        if definition is None or not definition.wordings:
+            return {"done": False, "refusal": Refusal.UNKNOWN_CAPABILITY}
+        try:
+            found = self.state.wordings(capability)
+        except StateError:
+            return {"done": False, "refusal": Refusal.STATE_UNAVAILABLE}
+        return {"done": True, "refusal": None, "wordings": {str(key): found.get(key) for key in definition.wordings},
+                "limit": wrapwords.continuation.MAX_CUSTOM_LENGTH, "placeholders": list(wrapwords.PLACEHOLDERS),
+                "generation": self._generation()}
+
+    def set_wording(self, capability, key, words, *, generation, actor) -> dict:
+        """A person's own wording set in the Dashboard - or taken away, `words` None - after the custom continuation
+        text's checks (wrapwords.check_custom): refused WORDING_INVALID with the `problem` word where they fail."""
+        from .engine import wrapwords
+        if actor != Actor.DASHBOARD:
+            return {"done": False, "refusal": Refusal.NOT_THE_DASHBOARD}
+        if self.registry.get(capability) is None:
+            return {"done": False, "refusal": Refusal.UNKNOWN_CAPABILITY}
+        if words is not None:
+            try:
+                wrapwords.check_custom(words)
+            except wrapwords.WordingError as error:
+                return {"done": False, "refusal": Refusal.WORDING_INVALID, "problem": error.code,
+                        "generation": self._generation()}
+        return self._chosen(lambda: {"generation": self.state.set_wording(
+            capability, key, words, generation=generation, actor=actor, at=self.clock())})
+
     def add_rule(self, tag, status_from, status_to, category, *, generation, actor) -> dict:
         """A rule for one of Codex's error codes, in the Dashboard (state/choices.rule_problem)."""
         if actor != Actor.DASHBOARD:

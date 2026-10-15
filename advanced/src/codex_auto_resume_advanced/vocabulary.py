@@ -151,6 +151,8 @@ class Refusal(StrEnum):
     REQUIREMENT_FAILED_HERE = "requirement_failed_here"
     # Keep it on (v0.6.16-beta.4) for a capability whose compatibility is Failed here: never kept on that way.
     FAILED_HERE = "failed_here"
+    # A person's own wording the custom continuation text's checks refuse, or a key the capability does not keep.
+    WORDING_INVALID = "wording_invalid"
 
 
 class JournalCode(StrEnum):
@@ -300,6 +302,10 @@ class BridgeCommand(StrEnum):
     # Keep on (v0.6.14, K8): set or let go for one capability that is on or watched, the Dashboard's
     # alone, after its warning, against the generation the page read; no MCP tool reaches it.
     ADVANCED_KEEP_ON = "advanced-keep-on"
+    # v0.6.16-beta.4: a capability's own wordings read, and one set or taken away (the wrap-up's Custom text) - the
+    # Dashboard's alone, against the generation the page read; no MCP tool reaches them.
+    ADVANCED_WORDINGS = "advanced-wordings"
+    ADVANCED_WORDING = "advanced-wording"
     # Send now (v0.6.14): a person's request that one waiting recovery go at the watcher's next look,
     # by its interruption id, the Dashboard's alone while Send now is on; no MCP tool reaches it.
     ADVANCED_SEND_NOW = "advanced-send-now"

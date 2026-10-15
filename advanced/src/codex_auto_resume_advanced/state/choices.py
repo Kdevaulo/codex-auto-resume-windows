@@ -181,6 +181,8 @@ class Scoped:
         self._reads = {
             "now": lambda: state.clock(),
             "options": lambda: state.options(capability),
+            # v0.6.16-beta.4: its own wordings (the wrap-up's Custom text).
+            "wordings": lambda: state.wordings(capability),
             "rules": lambda: state.rules() if rules_editor else [],
             "admission": admission,
             "count": count,
@@ -252,6 +254,39 @@ class ChoicesMixin:
             connection.execute("INSERT INTO options (capability, choice, value) VALUES (?,?,?) "
                                "ON CONFLICT (capability, choice) DO UPDATE SET value=excluded.value",
                                (capability, str(option.key), value))
+            connection.execute("UPDATE meta SET generation = generation + 1")
+            self._note(connection, now, JournalCode.OPTION_CHANGED, capability=capability, actor=actor)
+            return current + 1
+
+    # ------------------------------------------------------------------ wordings (v0.6.16-beta.4)
+    def wordings(self, capability) -> dict:
+        """{WordingKey: text} of `capability`'s own wordings a person wrote - only the keys it keeps. Never logged."""
+        definition = self.registry.get(capability)
+        if definition is None or not definition.wordings:
+            return {}
+        with self._read() as connection:
+            rows = [] if connection is None else connection.execute(
+                "SELECT choice, words FROM wordings WHERE capability=?", (capability,)).fetchall()
+        return {row["choice"]: row["words"] for row in rows if row["choice"] in definition.wordings}
+
+    def set_wording(self, capability, key, words, *, generation, actor, at=None) -> int:
+        """A person's own wording set - or, with `words` None, taken away - against the generation the Dashboard read.
+        The generation after. Refused (WORDING_INVALID) for a key the capability does not keep; the words themselves
+        are the caller's to check (wrapwords.check_custom), the file's CHECK their length. Journalled as a choice
+        changed - the words never."""
+        definition = self.registry.get(capability)
+        if definition is None or key not in definition.wordings or not (words is None or isinstance(words, str)):
+            raise Refused(Refusal.WORDING_INVALID)
+        actor = _word(actor, Actor, "actor")
+        now = self._now(at)
+        with self._transaction() as connection:
+            current = self._current_generation(connection, generation)
+            if words is None:
+                connection.execute("DELETE FROM wordings WHERE capability=? AND choice=?", (capability, str(key)))
+            else:
+                connection.execute("INSERT INTO wordings (capability, choice, words, changed_at) VALUES (?,?,?,?) "
+                                   "ON CONFLICT (capability, choice) DO UPDATE SET words=excluded.words, "
+                                   "changed_at=excluded.changed_at", (capability, str(key), words, now))
             connection.execute("UPDATE meta SET generation = generation + 1")
             self._note(connection, now, JournalCode.OPTION_CHANGED, capability=capability, actor=actor)
             return current + 1

@@ -36,7 +36,7 @@ from codex_auto_resume import continuation, settings
 
 from ..codex import credits, inuse
 from ..codex.turns import Turns
-from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
+from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState, WordingKey
 from .continued import answer_key, handed
 from .wrapwords import ON, SWITCH, DEFAULT_STYLE, STYLE_KEYS, STYLES, render  # noqa: F401 - the registry's, the tests'
 
@@ -54,6 +54,8 @@ DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 95
 # v0.6.16-beta.4: the stop percentage the wrap-up's words ask Codex to stop at (wrapwords.py), each window its own.
 DEFAULT_STOP_WORDS = 95
 STOP_WORDS_OPTIONS = {FIVE_HOUR: OptionKey.STOP_WORDS_FIVE_HOUR, WEEKLY: OptionKey.STOP_WORDS_WEEKLY}
+# (b): the wrap-up's Custom text for each window (state `wordings`).
+CUSTOM_WORDINGS = {FIVE_HOUR: WordingKey.WRAP_CUSTOM_FIVE_HOUR, WEEKLY: WordingKey.WRAP_CUSTOM_WEEKLY}
 # Each capability's percentage option for each window.
 STAGE_OPTIONS = {METER: {FIVE_HOUR: OptionKey.WARN_FIVE_HOUR, WEEKLY: OptionKey.WARN_WEEKLY},
                  WRAP_UP: {FIVE_HOUR: OptionKey.WRAP_FIVE_HOUR, WEEKLY: OptionKey.WRAP_WEEKLY},
@@ -238,12 +240,17 @@ class UsageWrapUp:
             locale = continuation.resolve_locale(settings.load(self.paths.settings_file))
         except Exception:
             locale = None
+        try:
+            custom = scoped.wordings()
+        except Exception:
+            custom = {}
         worded = []
         for row in due:
             words = render(style=options.get(OptionKey.WRAP_STYLE, DEFAULT_STYLE), minutes=row["minutes"],
                            used=row["used_percent"], locale=locale,
                            stop_at=options.get(STOP_WORDS_OPTIONS[row["minutes"]], DEFAULT_STOP_WORDS),
-                           reset_at=row["reset_at"], include_reset=options.get(OptionKey.WRAP_RESET_TIME, ON) == ON)
+                           reset_at=row["reset_at"], include_reset=options.get(OptionKey.WRAP_RESET_TIME, ON) == ON,
+                           custom=custom.get(CUSTOM_WORDINGS.get(row["minutes"])))
             if words is not None:
                 worded.append((row, words))
         if not worded:
