@@ -90,6 +90,9 @@ class Alternative(StrEnum):
     # P16 (v0.6.15-beta): the ordinary send to a conversation the app does not hold, left in Codex's queue for
     # when it is opened - kept there only while the plug says so, and seven days and an hour at most.
     QUEUE_FOR_OPEN = "queue_for_open"
+    # P16 (v0.6.16-beta.4): the ordinary send to a conversation another Codex session holds - a terminal's, VS
+    # Code's - left in Codex's queue for that session to take, and taken back when it ends (engine/tosession.py).
+    TO_SESSION = "to_session"
     # P17, and P3 at known_failure: take a failure up, waiting as core waits for an admitted one
     # (ladder.ADMITTED_WAITS), or as a temporary failure of the kind named (PACED_AS).
     ADMIT = "admit"

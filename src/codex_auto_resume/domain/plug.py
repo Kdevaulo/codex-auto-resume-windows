@@ -313,7 +313,9 @@ PACED_AS = {Alternative.AS_NETWORK_TRANSIENT: "network_transient", Alternative.A
 
 # Every alternative some point accepts. The vocabulary is exactly these
 # (tests/test_vocabulary.py), so no word waits in it for a point that does not take it.
-ANSWERS = frozenset().union(*ALTERNATIVES.values()) | {Alternative.QUEUE_FOR_OPEN}
+# P16's two answers core carries out as its ordinary send, a queue item and no route (v0.6.15-beta, beta.4).
+QUEUED = frozenset({Alternative.QUEUE_FOR_OPEN, Alternative.TO_SESSION})
+ANSWERS = frozenset().union(*ALTERNATIVES.values()) | QUEUED
 
 NULL = Plug()
 
@@ -529,9 +531,10 @@ class Guarded:
         if answer is DEFER:
             return DEFER
         try:
-            # v0.6.15-beta: or QUEUE_FOR_OPEN - the ordinary send, left in Codex's queue for when it is opened.
-            if type(answer) in (str, Alternative) and answer == Alternative.QUEUE_FOR_OPEN:
-                return Alternative.QUEUE_FOR_OPEN
+            # v0.6.15-beta: or QUEUE_FOR_OPEN - the ordinary send, left in Codex's queue for when it is opened; and
+            # (v0.6.16-beta.4) TO_SESSION, the ordinary send to a conversation another Codex session holds.
+            if type(answer) in (str, Alternative) and answer in (Alternative.QUEUE_FOR_OPEN, Alternative.TO_SESSION):
+                return Alternative(answer)
         except Exception:
             return DEFER
         try:

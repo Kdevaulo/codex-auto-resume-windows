@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from .domain.gates import (BLOCK, FORCEABLE, GATE_REASONS, GATE_RESULTS, GATES, HELD, NOT_CHECKED,
                            OBSERVE_ONLY, PASS, PLUGGED, POSTPONED, QUIET_HOURS, RESEND, RESENDABLE,
-                           SEND_NOW, UNKNOWN, WAIT, birth_stop, counted_from, decode_gates,
+                           SEND_NOW, SESSION, UNKNOWN, WAIT, birth_stop, counted_from, decode_gates,
                            encode_gates, first_refusal, gate, gate_budgets, gate_consent,
                            gate_schedule, gate_submission_safe, inherited, over_ceiling,
                            own_budget_only, resend_candidate, waited_aside, was_resent,
@@ -55,7 +55,7 @@ __all__ = ["ACTORS", "BLOCK", "CLAIMED", "EPOCH_CODEX", "EPOCH_STORE", "EPOCH_US
            "IMPORTANCE_TIERS", "IN_FLIGHT", "NOT_CHECKED", "OBSERVE_ONLY", "OBSERVING", "OUTCOMES",
            "OVERLAYS", "PAGES", "PASS", "PLAIN_MOVES", "PLUGGED", "POSSIBLY_SENT", "POSTPONED",
            "PUBLIC_CODES",
-           "QUIET_HOURS", "REASONS", "RELEASABLE_WITHDRAWALS", "RESEND", "RESENDABLE", "SEND_NOW", "STATES",
+           "QUIET_HOURS", "REASONS", "RELEASABLE_WITHDRAWALS", "RESEND", "RESENDABLE", "SEND_NOW", "SESSION", "STATES",
            "SUPERSEDE_WITHDRAWALS",
            "TERMINAL", "TURN_STATUSES", "UNKNOWN", "V2_STATES", "WAIT", "WAITING",
            "WAITING_CODES", "WATCHED",

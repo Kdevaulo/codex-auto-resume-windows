@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from .. import machine
 from ..domain import ids
-from ..domain.plug import DEFER, Alternative, Point
+from ..domain.plug import QUEUED, DEFER, Alternative, Point
 
 # Where P16 is asked (v0.6.16-beta.4): a conversation the running app does not hold, and one nothing holds while the
 # app is not running (Backend.holder's word for it).
@@ -34,7 +34,8 @@ class RoutesMixin:
         if not app:
             return self._unheld(row, vector), "notLoaded"
         loaded = self.backend.loaded(row["thread_id"], app)
-        return self._unloaded(row, loaded, vector), loaded
+        # v0.6.16-beta.4: or held by another Codex session (engine/tosession.py).
+        return self._unloaded(row, loaded, vector) or self._session(row, loaded, vector), loaded
 
     def _still_where(self, thread_id, app, route) -> bool:
         """The re-check under the dispatch lock: the same app, holding the conversation for a send or not holding it
@@ -42,7 +43,8 @@ class RoutesMixin:
         if app is None:
             return self._unheld_now(thread_id)
         return (self.backend.app_identity() == app
-                and self.backend.loaded(thread_id, app) == ("loaded" if route is None else "notLoaded"))
+                and self.backend.loaded(thread_id, app) == ("loaded" if route is None else "elsewhere"
+                                                            if route is Alternative.TO_SESSION else "notLoaded"))
 
     def _unloaded(self, row, loaded, vector):
         """P16: the route the plug names for `row`, whose conversation the app does not hold, or
@@ -57,7 +59,7 @@ class RoutesMixin:
             return None
         # v0.6.16-beta.4: told where it is asked - the app runs, and does not hold it.
         route = self.plug.unloaded(dict(row, holder=APP_FREE, app=True))
-        if route is DEFER:
+        if route is DEFER or route is Alternative.TO_SESSION:
             return None
         vector["thread_available"] = machine.gate(machine.PASS, machine.PLUGGED)
         return route
@@ -75,7 +77,7 @@ class RoutesMixin:
         if self._holder(row["thread_id"]) != NOBODY:
             return None
         route = self.plug.unloaded(dict(row, holder=NOBODY, app=False))
-        if route is DEFER or route is Alternative.QUEUE_FOR_OPEN:
+        if route is DEFER or route in QUEUED:
             return None
         vector["thread_available"] = machine.gate(machine.PASS, machine.PLUGGED)
         return route

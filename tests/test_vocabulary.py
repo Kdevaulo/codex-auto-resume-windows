@@ -70,7 +70,7 @@ LISTS = {
     # retries past their twelve hours on the clock.
     # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
     # v0.6.16-beta.4: held_by_other_session - open in a terminal's or VS Code's Codex session.
-    "machine.REASONS": ("set", 76, "7f68b9822c2afa8f"),
+    "machine.REASONS": ("set", 78, "79c222542ea40f29"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -92,7 +92,7 @@ LISTS = {
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
     # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
     # v0.6.16-beta.4: and held_by_other_session.
-    "machine.GATE_REASONS": ("set", 93, "af93ba8a246d8879"),
+    "machine.GATE_REASONS": ("set", 96, "4b69890ae6ed4c9e"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",
@@ -210,7 +210,7 @@ LISTS = {
     # And RESEND, P7's word for an uncertain submission sent once more, which core proves may go, and
     # SEND_NOW, its word for a waiting record a person asked to send now.
     "domain.plug.POINTS": ("tuple", 18, "99df46d4da526400"),   # v0.6.16-beta.3: P19 eligibility; beta.4: P18
-    "domain.plug.ANSWERS": ("set", 13, "dcf766b4e83e21eb"),
+    "domain.plug.ANSWERS": ("set", 14, "f475444358ecd0fd"),
     "domain.plug.FAILURE_FORMS": ("tuple", 5, "bcc0ad1bd6f81009"),
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
     # v0.6.14: what core did with a record of the plug's own (P2), as P14 tells it.

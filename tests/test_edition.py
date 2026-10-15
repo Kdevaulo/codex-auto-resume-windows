@@ -160,12 +160,14 @@ class ClosedAlternativeTests(unittest.TestCase):
 
         v0.6.15-beta: and P16 takes QUEUE_FOR_OPEN, which no point's alternatives list: core's ordinary send,
         left in Codex's queue for when the conversation is opened, kept only while the plug says so and seven
-        days and an hour at most (engine/foropen.py)."""
+        days and an hour at most (engine/foropen.py); and (v0.6.16-beta.4) TO_SESSION, the same send for a
+        conversation another Codex session holds (engine/tosession.py)."""
         take_up = {Alternative.ADMIT, Alternative.CAPACITY} | set(plug.PACED_AS)
         self.assertEqual(plug.TAKE_UP, take_up)
         self.assertEqual(plug.ANSWERS, plug.RESTRICTIONS | {Alternative.CLIENT_ID, Alternative.EARLY,
                                                             Alternative.RESEND, Alternative.SEND_NOW,
-                                                            Alternative.QUEUE_FOR_OPEN} | take_up)
+                                                            Alternative.QUEUE_FOR_OPEN, Alternative.TO_SESSION}
+                         | take_up)
         self.assertEqual(plug.ANSWERS, frozenset(Alternative))
         for point, accepted in plug.ALTERNATIVES.items():
             with self.subTest(point):

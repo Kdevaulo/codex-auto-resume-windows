@@ -21,7 +21,7 @@ claim and a look of its own (engine/plugrecords.py, v0.6.14).
 from __future__ import annotations
 
 from .. import continuation as _message, failures, l10n, ladder, machine
-from ..domain.plug import Alternative, Point
+from ..domain.plug import QUEUED as _QUEUED, Alternative, Point
 from ..machine import OBSERVING, TERMINAL, WAITING, WATCHED
 from .reconcile import UNSENT
 
@@ -240,7 +240,7 @@ class DispatchMixin:
                     if not resend and not self._parked(current, vector):
                         self.transition(current, "waiting_for_usage", "usage_recheck_failed", delay=900)
                     return
-                if route is not None and route is not Alternative.QUEUE_FOR_OPEN and not route.words:
+                if route is not None and route not in _QUEUED and not route.words:
                     self._resume_unloaded(current, vector, limits, route, app, relaxed=relaxed, forced=forced)
                     return
                 # The text is decided before the claim, not after it. Building it reads catalogs
@@ -261,7 +261,7 @@ class DispatchMixin:
                 message, worded = self._plugged_text(current, message, limits)
                 plain = message                 # v0.6.16-beta.3: the words for this time, after it (engine/delivery.py)
                 message, once = (message, None) if resend else self._once_words(current, message, limits)
-                if route is not None and route is not Alternative.QUEUE_FOR_OPEN:
+                if route is not None and route not in _QUEUED:
                     # A route that takes words (v0.6.16-beta.4) carries these in a send's place (engine/routes.py).
                     self._resume_unloaded(current, vector, limits, route, app, relaxed=relaxed, forced=forced,
                                           words=(message, worded, once, plain))
@@ -293,7 +293,7 @@ class DispatchMixin:
                                                                (Point.DELIVERY, client is not None))
                                     if taken) | self.relaxed_points("resend" if resend else relaxed)
                 carried |= (self.relaxed_points("forced" if forced else None) | self._pooled(sender, client)
-                            | ({Point.UNLOADED} if route is Alternative.QUEUE_FOR_OPEN else frozenset()))
+                            | ({Point.UNLOADED} if route in _QUEUED else frozenset()))
                 at = self.clock()
                 claimed, gate, reason = self.store.reserve_detailed(
                     key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector,

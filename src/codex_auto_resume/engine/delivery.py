@@ -208,7 +208,8 @@ class DeliveryMixin:
     def _take_slot(self, resend, route):
         """A worker for the send being dispatched, taken before its claim - waiting, outside any transaction, while
         every worker is busy - while a pool is open; never for a resend or a route."""
-        if (self._pool is not None and not resend and route in (None, Alternative.QUEUE_FOR_OPEN)
+        if (self._pool is not None and not resend and route in (None, Alternative.QUEUE_FOR_OPEN,
+                                                                Alternative.TO_SESSION)
                 and self._held_slot is None):
             self._held_slot = self._pool.take()
 
