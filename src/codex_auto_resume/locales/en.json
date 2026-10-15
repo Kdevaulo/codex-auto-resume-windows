@@ -529,6 +529,7 @@
   "settings.restore_failed": "Could not restore defaults.",
   "settings.save_failed": "Could not save.",
   "settings.saved": "Saved. The watcher uses these from its next check.",
+  "settings.startup_unchecked": "Saved, except Run at Windows sign-in: what Windows holds could not be read, so it was left as it is. Save again in a moment.",
   "start.exited": "It started and stopped again. See the logs in the installation folder.",
   "start.failed": "Could not start the watcher.",
   "start.unconfirmed": "Started, but not confirmed running yet",

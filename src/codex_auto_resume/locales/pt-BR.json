@@ -894,6 +894,7 @@
   "settings.restore_failed": "Não foi possível restaurar os padrões.",
   "settings.save_failed": "Não foi possível salvar.",
   "settings.saved": "Salvo. O monitor usa estas configurações a partir da próxima verificação.",
+  "settings.startup_unchecked": "Salvo, exceto “Executar ao entrar no Windows”: não foi possível ler o que o Windows tem registrado, então ficou como estava. Salve novamente em instantes.",
   "start.exited": "Ele foi iniciado e parou novamente. Veja os logs na pasta de instalação.",
   "start.failed": "Não foi possível iniciar o monitor.",
   "start.unconfirmed": "Iniciado, mas ainda sem confirmação de que está em execução",

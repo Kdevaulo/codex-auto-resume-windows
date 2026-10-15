@@ -894,6 +894,7 @@
   "settings.restore_failed": "无法还原默认值。",
   "settings.save_failed": "无法保存。",
   "settings.saved": "已保存。监视程序会从下次检查开始使用这些设置。",
+  "settings.startup_unchecked": "已保存，但“登录 Windows 时运行”除外：无法读取 Windows 中的登记情况，因此保持不变。请稍后再保存一次。",
   "start.exited": "它启动后又停止了。请查看安装文件夹中的日志。",
   "start.failed": "无法启动监视程序。",
   "start.unconfirmed": "已启动，但尚未确认正在运行",

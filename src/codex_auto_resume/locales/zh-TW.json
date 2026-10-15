@@ -894,6 +894,7 @@
   "settings.restore_failed": "無法還原預設值。",
   "settings.save_failed": "無法儲存。",
   "settings.saved": "已儲存。監看程式會從下次檢查起套用這些設定。",
+  "settings.startup_unchecked": "已儲存，但「在 Windows 登入時執行」除外：無法讀取 Windows 中的登記狀態，因此保持不變。請稍後再儲存一次。",
   "start.exited": "已啟動但又停止了。請查看安裝資料夾中的記錄檔。",
   "start.failed": "無法啟動監看程式。",
   "start.unconfirmed": "已啟動，但尚未確認正在執行",

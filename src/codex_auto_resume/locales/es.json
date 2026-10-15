@@ -894,6 +894,7 @@
   "settings.restore_failed": "No se pudieron restaurar los valores predeterminados.",
   "settings.save_failed": "No se pudo guardar.",
   "settings.saved": "Guardado. El monitor usa estos valores desde su próxima comprobación.",
+  "settings.startup_unchecked": "Guardado, excepto «Ejecutar al iniciar sesión en Windows»: no se pudo leer lo que Windows tiene registrado, así que se dejó como estaba. Vuelve a guardar en un momento.",
   "start.exited": "Se inició y volvió a detenerse. Consulta los registros en la carpeta de instalación.",
   "start.failed": "No se pudo iniciar el monitor.",
   "start.unconfirmed": "Iniciado, pero aún sin confirmar que se esté ejecutando",

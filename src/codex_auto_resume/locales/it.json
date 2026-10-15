@@ -894,6 +894,7 @@
   "settings.restore_failed": "Impossibile ripristinare i valori predefiniti.",
   "settings.save_failed": "Impossibile salvare.",
   "settings.saved": "Salvato. Il monitor le usa dal prossimo controllo.",
+  "settings.startup_unchecked": "Salvato, tranne «Avvia all'accesso a Windows»: non è stato possibile leggere ciò che Windows ha registrato, quindi è rimasto com'era. Salva di nuovo tra un momento.",
   "start.exited": "Si è avviato e si è fermato di nuovo. Consulta i log nella cartella di installazione.",
   "start.failed": "Impossibile avviare il monitor.",
   "start.unconfirmed": "Avviato, ma esecuzione non ancora confermata",

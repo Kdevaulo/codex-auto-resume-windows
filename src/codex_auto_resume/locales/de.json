@@ -894,6 +894,7 @@
   "settings.restore_failed": "Standardwerte konnten nicht wiederhergestellt werden.",
   "settings.save_failed": "Speichern nicht möglich.",
   "settings.saved": "Gespeichert. Der Watcher verwendet sie ab seiner nächsten Prüfung.",
+  "settings.startup_unchecked": "Gespeichert, außer „Bei Windows-Anmeldung starten“: Was Windows dafür eingetragen hat, ließ sich nicht lesen, daher blieb es unverändert. Speichern Sie gleich noch einmal.",
   "start.exited": "Er wurde gestartet und hat sich wieder beendet. Sehen Sie sich die Protokolle im Installationsordner an.",
   "start.failed": "Der Watcher konnte nicht gestartet werden.",
   "start.unconfirmed": "Gestartet, aber noch nicht als laufend bestätigt",

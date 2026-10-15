@@ -1256,23 +1256,27 @@ namespace CodexAutoResume
             });
         }
 
+        /// The sign-in switch from a status read that says what Windows holds - the page's own, or the Dashboard's
+        /// snapshot (`startup` null) - v0.6.16-beta.3, issue #31: it was read by the page's own read alone, and showed
+        /// off where that read failed or had not come back yet. What Windows holds becomes what an edit is measured
+        /// from; the switch shows it unless the person has moved it - before any read, or since the last - and a
+        /// move is theirs: no snapshot takes it back while it is unsaved. The page's own read (`own`) still does.
+        private void KnowStartup(Dictionary<string, object> status, CheckBox startup, bool own)
+        {
+            if (startup == null) startup = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
+            object registered = Get(status, "startup_enabled");
+            if (startup == null || !(registered is bool)) return;
+            bool moved = startup.Checked != startupBaseline;
+            // What Windows has is not an edit.
+            startupBaseline = (bool)registered;
+            if (!moved || own) startup.Checked = startupBaseline;
+            startupKnown = true;
+        }
+
         private void ApplyStatus(Dictionary<string, object> status, CheckBox startup)
         {
             object running = status["watcher_running"];
-            // The sign-in switch, from any status read that says it - the page's own, or the Dashboard's snapshot
-            // (`startup` null) - but from a snapshot only while the switch shows what was read last, so a person's
-            // unsaved change is not taken back by the next refresh (v0.6.16-beta.3, issue #31: it was read by the
-            // page's own read alone, and showed off where that read failed or had not come back yet).
-            bool ours = startup != null;
-            if (startup == null) startup = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
-            object registered = Get(status, "startup_enabled");
-            if (startup != null && registered is bool && (ours || !startupKnown || startup.Checked == startupBaseline))
-            {
-                startup.Checked = (bool)registered;
-                // What Windows has is not an edit.
-                startupBaseline = startup.Checked;
-                startupKnown = true;
-            }
+            KnowStartup(status, startup, startup != null);
 
             // The header (Hero). A read rewrites it, as it always has, over a note or a hold written since the
             // last one. From the status alone until the Dashboard has a snapshot, and from a status read after
@@ -1441,7 +1445,6 @@ namespace CodexAutoResume
             // stops the rest rather than reporting a save that half happened.
             var startup = editors.ContainsKey("__startup") ? editors["__startup"] as CheckBox : null;
             bool startAtSignIn = startup != null && startup.Checked;
-            bool writeStartup = startup != null && startupKnown && startAtSignIn != startupBaseline;
             CallAsync("update", changes, delegate(Dictionary<string, object> updated)
             {
                 if (!Ok(updated)) { SaveFailed(updated); return; }
@@ -1465,8 +1468,11 @@ namespace CodexAutoResume
                 // This window's own write is not a change made somewhere else.
                 settingsStamp = SettingsStamp();
                 // The sign-in entry only where the person moved the switch from what a read said Windows holds
-                // (v0.6.16-beta.3, issue #31): a switch never read is not their choice, and a Save of something
-                // else never writes it - it would remove an entry they kept, or put back one they removed.
+                // (v0.6.16-beta.3, issue #31): a Save of something else never writes it - it would remove an entry
+                // they kept, or put back one they removed. A move made before any read has worked is read for first
+                // (startupKnown); where that read fails too, the entry is left as it is, the move stays unsaved, and
+                // the save says so rather than "Saved".
+                bool entryUnread = false;
                 Action<Dictionary<string, object>> registeredThen = delegate(Dictionary<string, object> registered)
                 {
                     if (registered != null && !Ok(registered)) { SaveFailed(registered); return; }
@@ -1482,16 +1488,29 @@ namespace CodexAutoResume
                         {
                             // A new interface language this window could not reopen in reaches it the next
                             // time it opens; saying so is better than a window that half changes.
-                            detail.Text = languageChanged
+                            detail.Text = entryUnread
+                                ? S("settings.startup_unchecked", "Saved, except Run at Windows sign-in: what Windows holds could not be read, so it was left as it is. Save again in a moment.")
+                                : languageChanged
                                 ? S("settings.language_changed", "Language changed. Anything already open changes the next time it opens.")
                                 : S("settings.saved", "Saved. The watcher uses these from its next check.");
                             header.Invalidate(true);
                         });
                     });
                 };
-                if (writeStartup)
-                    CallAsync("startup", "{\"enabled\":" + (startAtSignIn ? "true" : "false") + "}", registeredThen);
-                else registeredThen(null);
+                Action decide = delegate
+                {
+                    if (startup != null && startupKnown && startAtSignIn != startupBaseline)
+                        CallAsync("startup", "{\"enabled\":" + (startAtSignIn ? "true" : "false") + "}", registeredThen);
+                    else registeredThen(null);
+                };
+                if (startup == null || startupKnown || startAtSignIn == startupBaseline) { decide(); return; }
+                CallAsync("status", null, delegate(Dictionary<string, object> read)
+                {
+                    var status = Ok(read) ? Map(read, "status") : null;
+                    if (status != null) KnowStartup(status, startup, false);
+                    entryUnread = !startupKnown;
+                    decide();
+                });
             });
         }
 

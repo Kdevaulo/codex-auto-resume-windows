@@ -894,6 +894,7 @@
   "settings.restore_failed": "Nie udało się przywrócić ustawień domyślnych.",
   "settings.save_failed": "Nie udało się zapisać.",
   "settings.saved": "Zapisano. Monitor użyje tych ustawień od następnego sprawdzenia.",
+  "settings.startup_unchecked": "Zapisano, z wyjątkiem „Start przy logowaniu do Windows”: nie udało się odczytać, co jest zapisane w Windows, więc pozostawiono to bez zmian. Zapisz ponownie za chwilę.",
   "start.exited": "Uruchomił się i znów zatrzymał. Zajrzyj do dzienników w folderze instalacji.",
   "start.failed": "Nie udało się uruchomić monitora.",
   "start.unconfirmed": "Uruchomiono, ale jeszcze nie potwierdzono, że działa",

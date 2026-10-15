@@ -894,6 +894,7 @@
   "settings.restore_failed": "Impossible de restaurer les valeurs par défaut.",
   "settings.save_failed": "Impossible d'enregistrer.",
   "settings.saved": "Enregistré. Le surveillant les utilise dès sa prochaine vérification.",
+  "settings.startup_unchecked": "Enregistré, sauf « Lancer à la connexion à Windows » : ce que Windows a enregistré n'a pas pu être lu, il a donc été laissé tel quel. Enregistrez de nouveau dans un instant.",
   "start.exited": "Il a démarré puis s'est de nouveau arrêté. Consultez les journaux dans le dossier d'installation.",
   "start.failed": "Impossible de démarrer le surveillant.",
   "start.unconfirmed": "Démarré, mais exécution pas encore confirmée",
