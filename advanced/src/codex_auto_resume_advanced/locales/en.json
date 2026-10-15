@@ -527,5 +527,11 @@
   "page.done.also_off": "{names} turned off first, because it needs {name}. Then {name} turned off.",
   "page.refused.requirement": "What this feature needs could not be turned on with it, so nothing was turned on. Try again in a moment.",
   "page.tripped.requirement_off": "Turned off: a feature it needs is no longer on.",
-  "page.kept.requirement_off": "It stayed on although a feature it needs is no longer on."
+  "page.kept.requirement_off": "It stayed on although a feature it needs is no longer on.",
+  "name.every_conversation": "Recover every conversation but Codex's own",
+  "statement.every_conversation.does": "Takes up a failed turn in every conversation of the Codex app except the ones Codex makes for itself: subagents (Tell a parent which of its subagents stopped handles those), reviews (guardian_review), memory passes (memory_consolidation) and conversations an agent created (agent_created_thread). A conversation with a label Codex adds later is taken up too, instead of left alone. Archived conversations, those of another Codex home, and those of a terminal or VS Code are still never taken up.",
+  "statement.every_conversation.instead": "The standard edition takes up only conversations it can prove are your own: those Codex labels as yours, those handed over from ChatGPT, and those with no label at all.",
+  "statement.every_conversation.departs": "A15 (only the desktop app's own user conversations are detected).",
+  "statement.every_conversation.risks": "A conversation Codex uses for itself under a new label could be continued, which may cost usage or add a message where none was wanted. Every recovery gate still applies: the conversation must be switched on and open in the app before anything is sent.",
+  "statement.every_conversation.stop": "Turn it off here or turn every advanced feature off; only your own conversations are taken up again, and a recovery already waiting in any other is not sent."
 }

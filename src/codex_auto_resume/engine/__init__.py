@@ -73,6 +73,9 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         # The plug is asked nothing more while recovery is paused: a Pause beats every
         # capability, as it beats core. P8 is once a tick, after everything is observed; what it
         # answers to run (v0.6.14, an errand) runs last, after P2, whatever the tick met before it.
+        # P19 (v0.6.16-beta.3): which of the app's conversations detection takes up from here on - a person's own
+        # alone where the plug names nothing, which is the standard edition's always (NULL answers the empty set).
+        self.source.widened = self.plug.eligibility()
         view = StoreView(self.store, self.clock(), self.last_usage, home_key=self.home_key)
         errand = self.plug.tick(view)
         try:

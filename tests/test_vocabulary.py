@@ -207,13 +207,14 @@ LISTS = {
     # and EARLY, P7's look at a usage-limited record before its time; and the form a failure's error took.
     # And RESEND, P7's word for an uncertain submission sent once more, which core proves may go, and
     # SEND_NOW, its word for a waiting record a person asked to send now.
-    "domain.plug.POINTS": ("tuple", 16, "07e8ae14d7f49978"),
+    "domain.plug.POINTS": ("tuple", 17, "8a5a44aaca6902c5"),   # v0.6.16-beta.3: P19 eligibility
     "domain.plug.ANSWERS": ("set", 13, "dcf766b4e83e21eb"),
     "domain.plug.FAILURE_FORMS": ("tuple", 5, "bcc0ad1bd6f81009"),
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
     # v0.6.14: what core did with a record of the plug's own (P2), as P14 tells it.
     "domain.plug.RECORD_MOVES": ("tuple", 10, "b4dae164afc55dd3"),
     "domain.plug.RECORD_PURPOSES": ("tuple", 3, "43433c43e9c5b2be"),   # v0.6.16-beta.3: wrap_up
+    "domain.plughands.WIDENINGS": ("tuple", 1, "dc457abadb3a5b04"),   # v0.6.16-beta.3: P19's answer
     "domain.plug.EXTRA": "advanced",
 }
 
@@ -398,6 +399,7 @@ HOMES = {
     p.FailureForm: ("list", "domain.plug.FAILURE_FORMS"),
     p.RecordMove: ("list", "domain.plug.RECORD_MOVES"),
     p.RecordPurpose: ("list", "domain.plug.RECORD_PURPOSES"),
+    p.Widening: ("list", "domain.plughands.WIDENINGS"),
     # v0.6.12: the power action's own words, beside domain/vocabulary.py at its line budget.
     pw.PowerAction: ("list", "poweraction.ACTIONS"),
     pw.PowerAfter: ("list", "poweraction.AFTERS"),

@@ -328,7 +328,7 @@ class PageTests(PageCase):
                          [[words["name." + capability], words["state.off"]] for capability in SHOWN])
         self.assertEqual(SHOWN[:3], ["compat_report", "start_with_codex", "queue_for_open"])
         self.assertEqual(sorted(SHOWN), sorted(IDS))
-        self.assertEqual(len(IDS), 24)                  # v0.6.16-beta.3: the usage meter, the wrap-up, the pause
+        self.assertEqual(len(IDS), 25)                  # v0.6.16-beta.3: every conversation, the usage meter, the wrap-up, the pause
         self.assertEqual(result["page"], "advanced")
         # The row chosen is the capability open, and nothing else is.
         self.assertEqual(result["open"], IDS[1])

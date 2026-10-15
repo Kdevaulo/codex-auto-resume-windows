@@ -56,7 +56,7 @@ import time
 from codex_auto_resume import continuation, failures
 from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, RECORD_MOVES, RESTRICTIONS,
                                            TAKE_UP, Alternative, Point, RecordMove)
-from codex_auto_resume.domain.plughands import RECORDS_LIMIT, workers
+from codex_auto_resume.domain.plughands import RECORDS_LIMIT, widening_of, workers
 
 from .arming import Arming
 from .engine import foropen
@@ -595,6 +595,33 @@ class Runtime:
                         return False
                 found.append(guarded)
         return found
+
+    def eligibility(self):
+        """P19 (v0.6.16-beta.3): the Widening words every capability on at ELIGIBILITY names, together - or NULL's DEFER.
+        A watched one is only journalled, once: what it would have widened is never taken. Nothing is read with none
+        registered there."""
+        definitions = self.registry.at(Point.ELIGIBILITY)
+        if not definitions:
+            return DEFER
+        states = self.states()
+        found = set()
+        for definition in definitions:
+            state = states.get(definition.id, ArmingState.OFF)
+            if state == ArmingState.OFF:
+                continue
+            try:
+                answer = widening_of(self._code_of(definition).eligibility())
+            except Exception:
+                self._tripped(definition)
+                continue
+            if not answer:
+                continue
+            if state == ArmingState.SHADOW:
+                self._once(JournalCode.WOULD_HAVE, definition, Point.ELIGIBILITY, Point.ELIGIBILITY, None)
+                continue
+            self._once(JournalCode.ACTED, definition, Point.ELIGIBILITY, Point.ELIGIBILITY, None)
+            found |= answer
+        return frozenset(found) if found else DEFER
 
     def conversation_off(self, thread_id) -> None:
         """A person switched `thread_id` off, in the Dashboard, a model's tool or the command line (core's

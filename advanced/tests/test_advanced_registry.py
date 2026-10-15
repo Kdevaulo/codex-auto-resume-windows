@@ -63,6 +63,8 @@ class ShippedTests(unittest.TestCase):
                "prompt_queue", "empty_response", "subagent_parent", "keep_going",
                # v0.6.16-beta.3 (issue #29): the usage meter, and the wrap-up and the pause that require it.
                "usage_meter", "usage_wrap_up", "usage_pause",
+               # and the widening to every conversation but Codex's own (P19).
+               "every_conversation",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -95,12 +97,14 @@ class ShippedTests(unittest.TestCase):
                      Point.SENDER: ("goal_continuation", "marker_free_continuation"),
                      Point.DELIVERY: ("marker_free_continuation",),
                      # v0.6.15-beta: several sends waiting for their receipts at once.
-                     Point.CONCURRENCY: ("parallel_dispatch",)}
+                     Point.CONCURRENCY: ("parallel_dispatch",),
+                     # v0.6.16-beta.3: which conversations core takes up.
+                     Point.ELIGIBILITY: ("every_conversation",)}
         for point in Point:
             self.assertEqual(tuple(d.id for d in registry.REGISTRY.at(point)), answering.get(point, ()))
 
     # The order a person reads them in (the owner's, 2026-10-10): the compatibility report first, then by importance.
-    SHOWN = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
+    SHOWN = ("compat_report", "start_with_codex", "every_conversation", "queue_for_open", "marker_free_continuation", "reset_credit",
              "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
              "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
              "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "codex_gave_up",

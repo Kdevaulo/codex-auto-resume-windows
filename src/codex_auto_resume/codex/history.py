@@ -19,8 +19,8 @@ from ..domain import ids
 from .errors import SourceError
 from .labels import _label
 from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, MAX_ITEM_BYTES, MAX_META_BYTES,
-                     MAX_SCAN_BYTES, OWN_THREAD_SOURCES, PROGRESS_ITEM_TYPES, _json,
-                     _turn_status, epoch, error_shape, normalize)
+                     MAX_SCAN_BYTES, PROGRESS_ITEM_TYPES, _json, _turn_status, epoch, error_shape, normalize,
+                     taken_thread_source)
 from .paths import _safe_path
 from . import workspace
 from .payload import _choose_reset, _item_is_ours, _needing, _queue_has_marker, detect  # noqa: F401
@@ -37,7 +37,7 @@ class HistoryMixin:
                 "SELECT rollout_path,source,thread_source,archived,history_mode "
                 "FROM threads WHERE id=?", (thread_id,)).fetchone()
         if (row is None or row["source"] != "vscode" or row["archived"] != 0
-                or row["thread_source"] not in OWN_THREAD_SOURCES or row["history_mode"] != "paginated"
+                or not taken_thread_source(row["thread_source"], self.widened) or row["history_mode"] != "paginated"
                 or not isinstance(row["rollout_path"], str)):
             return None
         try:

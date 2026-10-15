@@ -43,6 +43,30 @@ WORDS_LIMIT = 8192
 ERRAND_GUARDS = 8
 
 
+class Widening(StrEnum):
+    """Which conversations of the Codex app besides a person's own core takes up (P19, v0.6.16-beta.3). EVERY_DESKTOP:
+    every desktop conversation but the kinds Codex makes for itself (codex/values.INTERNAL_THREAD_SOURCES), whatever
+    other label Codex sets on it, still the app's own, not archived, its rollout's first line of that very id."""
+    EVERY_DESKTOP = "every_desktop"
+
+
+WIDENINGS = tuple(Widening)
+
+
+def widening_of(answer) -> frozenset:
+    """What core takes of P19's answer: the Widening words in a set, a frozenset or a tuple of them - and the empty set,
+    a person's own conversations alone as always, for anything else: DEFER, a word, a list holding another word."""
+    if type(answer) not in (set, frozenset, tuple):
+        return frozenset()
+    try:
+        found = frozenset(answer)
+        if not all(type(word) in (str, Widening) and word in tuple(Widening) for word in found):
+            return frozenset()
+        return frozenset(Widening(word) for word in found)
+    except Exception:
+        return frozenset()
+
+
 class RecordPurpose(StrEnum):
     """What a record of the plug's says (v0.6.15-beta): a person's own MESSAGE (continuation.validate_prompt, product
     text refused), or a CONTINUATION in the edition's own catalog words (continuation.validate_continuation), sent only

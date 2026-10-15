@@ -27,6 +27,20 @@ MAX_ITEM_BYTES = 1024 * 1024
 # conversation is detected until Codex itself runs a turn there that fails (A13, A16). The state row and the
 # rollout must still say the same; a subagent, a review or a memory pass is never one of these.
 OWN_THREAD_SOURCES = frozenset({"user", "chatgpt_handoff", None})
+# v0.6.16-beta.3 (P19, plughands.Widening.EVERY_DESKTOP): the kinds Codex makes for itself, which nothing takes up
+# however widely the plug asks - a subagent (its parent is told instead), a review, a memory pass, a conversation an
+# agent made. A closed list: every other label, today's and tomorrow's, is taken up while the plug asks it.
+INTERNAL_THREAD_SOURCES = frozenset({"subagent", "guardian_review", "memory_consolidation", "agent_created_thread"})
+
+
+def taken_thread_source(value, widened=frozenset()) -> bool:
+    """Whether a conversation labelled `value` is one this product takes up: a person's own (OWN_THREAD_SOURCES), or -
+    while the plug widens to every desktop conversation (P19) - any label but INTERNAL_THREAD_SOURCES. The standard
+    edition's `widened` is always empty, so this is OWN_THREAD_SOURCES exactly."""
+    if value in OWN_THREAD_SOURCES:
+        return True
+    return ("every_desktop" in widened and isinstance(value, str) and 0 < len(value) <= 64
+            and value not in INTERNAL_THREAD_SOURCES)
 DESKTOP_ORIGINATORS = frozenset({"Codex Desktop", "codex_work_desktop"})
 
 KNOWN_STATUSES = machine.TURN_STATUSES - {"other"}      # Codex's own four; "other" is ours

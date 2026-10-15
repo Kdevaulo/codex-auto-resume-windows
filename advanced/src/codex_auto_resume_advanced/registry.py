@@ -78,6 +78,7 @@ from .engine.credits import make as make_reset_credit
 from .engine.resetmessage import make as make_reset_message, make_long as make_long_messages
 from .engine.earlyreset import make as make_early_reset
 from .engine.emptyreply import make as make_empty_response
+from .engine.everyconversation import make as make_every_conversation
 from .engine.subagent import make as make_subagent_parent
 from .engine.keepgoing import make as make_keep_going
 from .engine.promptqueue import make as make_prompt_queue
@@ -782,6 +783,24 @@ KEEP_GOING = CapabilityDef(
     measurements=(Measurement.MK,),
 )
 
+# Recover every conversation but Codex's own (v0.6.16-beta.3; users asked, the owner's plan of 2026-10-13). At P19 it
+# answers EVERY_DESKTOP, and core takes up every desktop conversation of the app but the kinds Codex makes for itself
+# (core's codex/values.INTERNAL_THREAD_SOURCES: subagent, guardian_review, memory_consolidation, agent_created_thread)
+# - every other check of a conversation, and every gate of a recovery, standing. It departs from A15 (only the desktop
+# app's own user conversations are detected), stands on thread_eligibility - the state row and the rollout's first
+# line it is judged by - and rests on no measurement. It sends nothing itself: what it takes up is core's recovery, under
+# core's own limits, so its ceilings are the schema's floor and never bind.
+EVERY_CONVERSATION = CapabilityDef(
+    id="every_conversation",
+    points=frozenset({Point.ELIGIBILITY}),
+    revision=1,
+    departs_from=("A15",),
+    compat="thread_eligibility",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="every",
+    make=make_every_conversation,
+)
+
 # The usage meter (v0.6.16-beta.3, issue #29; the v0.6.11 design's "Live usage meter"). At P8, while the Codex app
 # runs, it reads usage on its own every POLL_MINUTES (5 to 60, 15 by default) through one finite session that asks
 # account/rateLimits/read alone (codex/protocol.CAPABILITY_METHODS), keeps the windows as core keeps a reading
@@ -907,7 +926,7 @@ COMPAT_REPORT = CapabilityDef(
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
-               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE,
+               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION,
                LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)
@@ -919,7 +938,9 @@ REGISTRY = Registry(DEFINITIONS)
 # after a usage limit with no hands, 2) what saves the person work, 3) the other common failures, 4) rare
 # cases and expert settings. A measurement's warning never pushes a capability down. Every capability of
 # DEFINITIONS appears here exactly once (test_advanced_registry holds it).
-SHOWN_ORDER = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
+SHOWN_ORDER = ("compat_report", "start_with_codex",
+               # v0.6.16-beta.3: which conversations are recovered at all, beside what starts the recovering.
+               "every_conversation", "queue_for_open", "marker_free_continuation", "reset_credit",
                "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
                # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
                "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",
