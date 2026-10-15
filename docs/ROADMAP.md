@@ -815,8 +815,8 @@ finish its step, and a pause that holds our continuations until the reset
 - another model when one is at capacity, on the headless route only,
 - a continuation with no words, where Codex allows it (the app's queue refused an empty one:
   measurement M3),
-- Codex's own retry settings, written through its official configuration and put back when the
-  capability is turned off or the product uninstalled,
+- Codex's own retry settings - measured on 2026-10-16 (MB): Codex refuses a change to its built-in provider's
+  settings, so the capability writes nothing and says so,
 - chatting with a Codex conversation inside the Dashboard - reading it and sending it a message -
   which the owner asked for on 2026-10-02: advanced only, off by default, and on this PC only, never
   through a remote channel; with no live output, only "in progress" while a turn runs and the result
@@ -846,6 +846,11 @@ Three things the owner asked for on 2026-10-16, for the v0.6.16 final:
 - a smaller edition label,
 - a click on a popup's body opens its page; with the in-app chat on, the person picks whether it opens that
   conversation's chat here or Codex.
+
+And one the owner added the same day: recovering a Codex cloud task, in the advanced edition and off by default -
+through the Codex app's own internal channel where the app shows the task as a conversation, and otherwise started
+again as a new cloud task with `codex cloud exec` once the limit resets - if the measurements allow it (Codex's own
+`codex cloud` command reads a task's state but cannot continue one: measurement MCLOUD, 2026-10-16).
 
 ### Also moved here
 
