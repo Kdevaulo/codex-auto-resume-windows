@@ -21,7 +21,8 @@ MAX_ITEM_BYTES = 1024 * 1024
 # A person's own conversations in the Codex desktop app (A15), by what Codex records of them. thread_source is
 # Codex's analytics label (codex-rs ThreadSource: user, subagent, guardian_review, memory_consolidation, or a
 # feature's name), not a mark of whose a conversation is: the app leaves it unset on many conversations of its
-# own - forks, and the sessions it copies in from another tool, 41 of 64 on the owner's PC (0.149 to 0.162),
+# own - the sessions it copies in from another tool (Claude Code, forks made there included; a fork made in the
+# Codex app is labelled user), 41 of 64 on the owner's PC (0.149 to 0.162),
 # their rollout's first line without the key - and writes chatgpt_handoff on one ChatGPT handed over to it,
 # opened as codex_work_desktop (issue #27). A copied-in turn carries no Codex error code, so nothing in such a
 # conversation is detected until Codex itself runs a turn there that fails (A13, A16). The state row and the

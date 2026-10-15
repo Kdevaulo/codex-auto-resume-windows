@@ -89,8 +89,9 @@ changed).
 **A14** Never retried: anything unclassified, user cancellation, permission, approval, content policy, invalid request, context length, 401/403, badRequest, sandboxError, and responseTooManyFailedAttempts without a 429.  
 *tested*: `test_recovery.py`, `test_failures.py`, `test_settings.py`, `test_plug_points.py`
 
-**A15** Only desktop-app user conversations. Subagent, archived and non-desktop threads are never detected.  
-*tested*: `test_engine.py`
+**A15** Only desktop-app user conversations. Codex's `thread_source` label is not required: a desktop conversation with no label, or with ChatGPT's handoff label, is the person's own. Subagent, archived and non-desktop threads, and threads an agent made, are never detected (clarified on 2026-10-15).  
+*tested*: `test_engine.py`, `test_source.py`
+<!-- A15 clarified, not changed, at the owner's word after issue #27 (2026-10-13): the label is Codex's analytics classification, not a mark of whose a conversation is. -->
 
 **A16** A failure is eligible only while it is the thread's latest turn and completed after arming minus the look-back (default 6 h, at most 7 days).  
 *tested*: `test_engine.py`

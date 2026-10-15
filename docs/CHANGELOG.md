@@ -24,8 +24,8 @@ with a plugin at v0.6.11-beta.2 or later.
   Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
   That label is Codex's analytics classification, not a mark of whose a conversation is: a
   conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
-  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
-  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  `codex_work_desktop`, and the app gives no label at all to a session it copies in from another
+  tool (Claude Code, forks made there included) - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
   was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
   usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
   taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
@@ -33,7 +33,7 @@ with a plugin at v0.6.11-beta.2 or later.
   the conversation's own file must still say the same. Found by a person's report and the read-only
   check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
   carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
-  turn there that fails.
+  turn there that fails (reported by @barkshah2002-pixel, #27; proved by @ZionZhang42, #27).
 
 ### Advanced edition
 
@@ -105,8 +105,8 @@ capabilities read as off, as v0.6.14 reads that beta's file.
   Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
   That label is Codex's analytics classification, not a mark of whose a conversation is: a
   conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
-  `codex_work_desktop`, and the app gives no label at all to a fork, or to a session it copies in
-  from another tool - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  `codex_work_desktop`, and the app gives no label at all to a session it copies in from another
+  tool (Claude Code, forks made there included) - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
   was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
   usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
   taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
@@ -114,7 +114,7 @@ capabilities read as off, as v0.6.14 reads that beta's file.
   the conversation's own file must still say the same. Found by a person's report and the read-only
   check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
   carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
-  turn there that fails.
+  turn there that fails (reported by @barkshah2002-pixel, #27; proved by @ZionZhang42, #27).
 
 ### Advanced edition
 
@@ -745,7 +745,8 @@ pre-releases, below, say which.
 ### The power action after usage-limit recoveries
 
 Asked for in Discussion #22, and decided by the owner on 2026-09-30 and 2026-10-03. It is in the
-standard edition: it keeps every standard, with A28 amended by the owner for its stop button.
+standard edition: it keeps every standard, with A28 amended by the owner for its stop button (suggested by
+@cervinho, #22).
 
 - **Off by default, turned on only in the Dashboard.** Settings > General has a new last card, **When
   usage-limit recoveries finish**: Then (Sleep, Hibernate or Shut down), When (every recovery succeeded;
