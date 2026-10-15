@@ -400,6 +400,35 @@ class UsagePause:
             pass
 
 
+def previews(state, now) -> dict:
+    """What the wrap-up would send for each window now, exactly (v0.6.16-beta.4, item (a)): its wording, numbers,
+    reset time and Custom words as they stand, in the continuation language - for the page to show under the choice.
+    Of the meter's last reading of that window where there is one, else as if the window had just reached the wrap-up
+    percentage, resetting a window's length from now. {minutes: words or None}."""
+    try:
+        options, custom = state.options(WRAP_UP), state.wordings(WRAP_UP)
+        rows = {}
+        for row in windows(state.meter()):
+            rows.setdefault(row["minutes"], row)
+    except Exception:
+        return {}
+    try:
+        locale = continuation.resolve_locale(settings.load(state.paths.settings_file))
+    except Exception:
+        locale = None
+    found = {}
+    for minutes in WINDOWS:
+        row = rows.get(minutes)
+        live = row is not None and type(row["reset_at"]) is int and row["reset_at"] > now
+        found[minutes] = render(
+            style=options.get(OptionKey.WRAP_STYLE, DEFAULT_STYLE), minutes=minutes, locale=locale,
+            used=row["used_percent"] if live else options.get(STAGE_OPTIONS[WRAP_UP][minutes], DEFAULT_WRAP),
+            stop_at=options.get(STOP_WORDS_OPTIONS[minutes], DEFAULT_STOP_WORDS),
+            reset_at=row["reset_at"] if live else int(now) + minutes * 60,
+            include_reset=options.get(OptionKey.WRAP_RESET_TIME, ON) == ON, custom=custom.get(CUSTOM_WORDINGS[minutes]))
+    return found
+
+
 def make_meter(paths) -> UsageMeter:
     return UsageMeter(paths)
 

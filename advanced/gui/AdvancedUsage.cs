@@ -3,6 +3,10 @@
 // Codex Auto Resume - the Advanced features page's near-the-limit choices (v0.6.16-beta.4, the owner's additions to
 // issue #29).
 //
+// Wrap up near a limit's words as they would be sent: under its drop-downs, for each window, the exact words the wrap-up
+// would send now - its wording, numbers, reset time and Custom words as they stand, in the continuation language - as
+// the continuation styles show theirs (the bridge makes them: advanced-wordings' `previews`).
+//
 // Wrap up near a limit's Custom wording: while its Wording is Custom, its Choices card has, under the drop-downs, one
 // box for each window - the five-hour and the weekly - with the person's own words (advanced-wordings, read when the
 // capability opens), a line saying which numbers the words may hold, and Save words under each (advanced-wording, with
@@ -33,6 +37,9 @@ namespace CodexAutoResume
         // Each window's box and its Save words, as the card was built.
         private readonly Dictionary<string, SoftTextArea> wordingBoxes = new Dictionary<string, SoftTextArea>();
         private readonly Dictionary<string, Button> wordingSaves = new Dictionary<string, Button>();
+        // The windows' lengths in minutes, as advanced-wordings' previews are keyed, and each one's line on the card.
+        private static readonly string[] PreviewWindows = { "300", "10080" };
+        private readonly List<Label> previewLines = new List<Label>();
 
         /// The wrap-up's wordings read, then `after`.
         private void ReadWordings(MethodInvoker after)
@@ -58,7 +65,22 @@ namespace CodexAutoResume
         {
             wordingBoxes.Clear();
             wordingSaves.Clear();
-            if (id != WrapUpId || advancedWordings == null || OptionValue(options, "wrap_style") != CustomWording) return;
+            previewLines.Clear();
+            if (id != WrapUpId || advancedWordings == null) return;
+            // (a) What is sent, exactly, for each window - whatever the wording.
+            Dictionary<string, object> previews = Map(advancedWordings, "previews");
+            card.Controls.Add(Caption(Word("page.preview.title", "What is sent")));
+            foreach (string minutes in PreviewWindows)
+            {
+                string words = Str(previews, minutes);
+                if (words == null) continue;
+                Label line = HelpText(Word("page.preview." + minutes, minutes) + Environment.NewLine + words);
+                line.ForeColor = Ink;
+                line.Margin = Pad(0, 2, 0, 6);
+                card.Controls.Add(line);
+                previewLines.Add(line);
+            }
+            if (OptionValue(options, "wrap_style") != CustomWording) return;
             Dictionary<string, object> held = Map(advancedWordings, "wordings");
             int most = Math.Max(1, Whole(Get(advancedWordings, "limit")));
             card.Controls.Add(HelpText(Word("page.wording.help", "Your words may hold {percent}, {window}, {stop_at} and {reset}, each filled in when they are sent, and nothing else in braces. A window with no words of its own is sent the standard wording.")));

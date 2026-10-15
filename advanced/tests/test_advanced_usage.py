@@ -359,6 +359,18 @@ class WrapUpTests(TakingCase):
         (sent,) = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
         self.assertNotIn(statement.CATALOGS.text("continue.wrap_up.resets_at", "en", reset="").split("{")[0][:12], sent)
 
+    def test_what_the_page_shows_under_the_choice_is_what_is_sent(self):
+        """v0.6.16-beta.4 (a): the words advanced-wordings shows for a window (usage.previews) are the words sent."""
+        plug, _turn = self.running()
+        self.language(plug, "en")
+        self.choose(plug, OptionKey.WRAP_STYLE, 4)
+        shown = plug.runtime.arming.wordings_view("usage_wrap_up")["previews"]
+        self.assertEqual(set(shown), {"300", "10080"})
+        for _ in range(3):
+            self.h.tick(advance=61)
+        (sent,) = [prompt for thread, prompt in self.h.backend.send_calls if thread == T1]
+        self.assertTrue(sent.startswith(shown["300"] + "\n"), (sent, shown["300"]))
+
     def test_custom_the_windows_own_words_are_sent_filled_in(self):
         """v0.6.16-beta.4 (b): with Custom, a window's own words, the numbers filled in (test_advanced_wordings)."""
         plug, _turn = self.running()

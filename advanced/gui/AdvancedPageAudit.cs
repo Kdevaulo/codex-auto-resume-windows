@@ -623,6 +623,9 @@ namespace CodexAutoResume
             var wordings = new Dictionary<string, object>();
             foreach (KeyValuePair<string, SoftTextArea> box in wordingBoxes) wordings[box.Key] = box.Value.Box.Text;
             look["wordings"] = wordings;
+            var previewed = new List<object>();
+            foreach (Label line in previewLines) previewed.Add(line.Text);
+            look["previews"] = previewed;
             var waiting = new List<object>();
             foreach (Button send in sendNowButtons) waiting.Add(send.Tag);
             look["send_now"] = waiting;

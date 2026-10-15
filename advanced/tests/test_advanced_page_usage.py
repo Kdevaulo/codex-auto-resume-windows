@@ -56,7 +56,8 @@ class PageTests(PageCase):
                  {"do": "wording", "key": FIVE, "text": "Bad {prompt}"}, {"do": "look"}]
         return "en", {"script": script, "steps": steps}, {
             "generation": script["advanced-list"][0]["result"]["generation"], "refused": refused["result"],
-            "words": script["advanced-words"][0]["result"]["words"]}
+            "words": script["advanced-words"][0]["result"]["words"],
+            "previews": script["advanced-wordings"][0]["result"]["previews"]}
 
     @classmethod
     def scenario_standard_wording(cls, bridge):
@@ -64,7 +65,9 @@ class PageTests(PageCase):
         script = cls.opening(bridge, "en")
         script["advanced-wordings"] = [bridge("advanced-wordings", {"capability": WRAP})]
         steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": WRAP}, {"do": "look"}]
-        return "en", {"script": script, "steps": steps}, {}
+        return "en", {"script": script, "steps": steps}, {
+            "words": script["advanced-words"][0]["result"]["words"],
+            "previews": script["advanced-wordings"][0]["result"]["previews"]}
 
     def test_custom_wording_has_a_box_for_each_window_with_the_persons_words(self):
         result, expected = self.of("scenario_wordings")
@@ -85,6 +88,18 @@ class PageTests(PageCase):
         result, _ = self.of("scenario_standard_wording")
         (look,) = result["looks"]
         self.assertEqual(look["wordings"], {})
+
+    def test_what_is_sent_is_shown_under_the_choice_for_each_window(self):
+        """(a): under the wording choice, for each window, the words the bridge says would be sent - exactly."""
+        for name in ("scenario_standard_wording", "scenario_wordings"):
+            with self.subTest(name):
+                result, expected = self.of(name)
+                words, previews = expected["words"], expected["previews"]
+                look = result["looks"][0]
+                self.assertEqual(look["previews"], [words["page.preview.300"] + "\r\n" + previews["300"],
+                                                    words["page.preview.10080"] + "\r\n" + previews["10080"]])
+                choices = next(card for card in look["cards"] if card[0] == words["page.options"])
+                self.assertIn(words["page.preview.title"], choices)
 
     def test_what_save_words_sends_is_what_the_real_bridge_takes(self):
         with tempfile.TemporaryDirectory() as home:

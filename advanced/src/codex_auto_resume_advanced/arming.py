@@ -993,8 +993,9 @@ class Arming:
 
     def wordings_view(self, capability) -> dict:
         """A capability's own wordings as the Dashboard's page shows them, with what they may hold: the text a person
-        wrote for each key it keeps, the longest one may be, and the placeholders it may write. Never logged, and read
-        by the Dashboard alone (no MCP tool reaches it)."""
+        wrote for each key it keeps, the longest one may be, the placeholders it may write - and (v0.6.16-beta.4, (a))
+        what the wrap-up would send for each window now, exactly (usage.previews). Never logged, and read by the
+        Dashboard alone (no MCP tool reaches it)."""
         from .engine import wrapwords
         definition = self.registry.get(capability)
         if definition is None or not definition.wordings:
@@ -1003,8 +1004,12 @@ class Arming:
             found = self.state.wordings(capability)
         except StateError:
             return {"done": False, "refusal": Refusal.STATE_UNAVAILABLE}
+        from .engine import usage
+        # (a): what would be sent for each window, exactly - shown under the wording choice.
+        shown = usage.previews(self.state, self.clock()) if capability == usage.WRAP_UP else {}
         return {"done": True, "refusal": None, "wordings": {str(key): found.get(key) for key in definition.wordings},
                 "limit": wrapwords.continuation.MAX_CUSTOM_LENGTH, "placeholders": list(wrapwords.PLACEHOLDERS),
+                "previews": {str(minutes): words for minutes, words in shown.items()},
                 "generation": self._generation()}
 
     def set_wording(self, capability, key, words, *, generation, actor) -> dict:
