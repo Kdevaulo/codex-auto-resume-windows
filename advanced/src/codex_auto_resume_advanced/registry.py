@@ -76,6 +76,7 @@ from .control.sendnow import make as make_send_now
 from .engine.admitted import (ATTEMPTS, DEFAULT_ATTEMPTS, make_codex_gave_up, make_sign_in_retry,
                               make_structured_rules, make_unknown_failure_budget)
 from .engine.capacity import CEILING_HOURS, DEFAULT_HOURS, make as make_capacity_retry
+from .engine.compact import make as make_compact_continue
 from .engine.credits import make as make_reset_credit
 from .engine.resetmessage import make as make_reset_message, make_long as make_long_messages
 from .engine.earlyreset import make as make_early_reset
@@ -501,6 +502,31 @@ OTHER_SESSIONS = CapabilityDef(
     make=make_other_sessions,
     measurements=(Measurement.M5, Measurement.MO),
     keepable=False,
+)
+
+# Compact a full conversation, then continue (v0.6.16-beta.4, stage 4). At P17 it takes up Codex's own
+# contextWindowExceeded alone (core offers a terminal_invalid failure for that one code, failures.admits); at P3 it
+# admits it again while it is worth going on - less than a day since, and no compaction after it failed - and, where
+# the app holds the conversation, HOLDs until a compaction turn is the latest: Pending asks the person to run /compact
+# in Codex (MXA), and core's ordinary continuation follows, which a compaction turn does not supersede (core's
+# engine/detect.py). Where nothing holds it and Codex is closed it compacts it here at P16 on the headless route
+# (thread/compact/start, MX), then continues it the same way, and at P8 journals each run. It departs from 0.5, A2,
+# A11, B3, B4, E8 and F8 (as headless_run), A13 and A14 (a context-length failure is taken up), A16 (the continuation
+# follows the compaction turn), A17 (a compaction turn supersedes nothing of its record) and A26 (the continuation's
+# words for a failure the standard edition does not recover). It stands on transient_classification and rests on M7,
+# MX and MXA. Ceilings: two a conversation - the compaction's claim and its continuation's - and six a day. Before
+# headless_run in DEFINITIONS, so its own record is its route's at P16.
+COMPACT_CONTINUE = CapabilityDef(
+    id="compact_continue",
+    points=frozenset({Point.ADMISSION, Point.GATES, Point.UNLOADED, Point.TICK}),
+    revision=1,
+    departs_from=("0.5", "A2", "A11", "A13", "A14", "A16", "A17", "A26", "B3", "B4", "E8", "F8"),
+    compat="transient_classification",
+    ceilings=Ceilings(per_day=6, per_conversation=2),
+    journal_prefix="compact",
+    make=make_compact_continue,
+    codes=tuple(str(word) for word in RunEnd),
+    measurements=(Measurement.M7, Measurement.MX, Measurement.MXA),
 )
 
 # Short retries when Codex is at capacity (v0.6.14 stage 3b; the plan's row: serverOverloaded alone,
@@ -984,7 +1010,7 @@ COMPAT_REPORT = CapabilityDef(
 
 # In this order, which is also which answers first where two answer at one point; the action, which
 # answers at none, last.
-DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, HEADLESS_RUN, OTHER_SESSIONS, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
+DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, COMPACT_CONTINUE, HEADLESS_RUN, OTHER_SESSIONS, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
                USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION,
@@ -1008,6 +1034,8 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
                "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",
                "prompt_queue", "empty_response", "once_more_when_unsure", "send_now", "capacity_retry",
+               # v0.6.16-beta.4: what a failure of Codex's own is taken up with, beside the capacity retry (Q12).
+               "compact_continue",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
                "structured_rules")
 

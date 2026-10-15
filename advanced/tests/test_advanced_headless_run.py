@@ -201,7 +201,9 @@ class RegistryTests(HeadlessCase):
         self.assertEqual((definition.compat, definition.measurements),
                          ("loaded_state_detection", (Measurement.M6, Measurement.M6B)))
         ids = [d.id for d in registry.DEFINITIONS]
-        self.assertEqual(ids.index("headless_run"), ids.index("queue_for_open") + 1)
+        # v0.6.16-beta.4: after queue for opening, and after compact_continue, whose own record is its route's.
+        self.assertEqual(ids.index("headless_run"), ids.index("queue_for_open") + 2)
+        self.assertEqual(ids.index("compact_continue"), ids.index("queue_for_open") + 1)
 
     def test_unmeasured_on_this_codex_is_a_warning_never_a_refusal(self):
         plug = self.advanced()

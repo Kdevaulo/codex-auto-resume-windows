@@ -302,6 +302,7 @@ class DetectMixin:
             registered = self.store.get(detection["interruption_id"])
             if admissible:
                 self.log(detection["thread_id"], "failure_taken_up", detection["interruption_id"])
+                _keep(self._passed_known, detection["turn_id"])      # never said passed over after (v0.6.16-beta.4)
             else:
                 self.log(detection["thread_id"],
                          "usageLimitExceeded_detected" if usage else "transient_failure_detected",

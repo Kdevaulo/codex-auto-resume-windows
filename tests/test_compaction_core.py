@@ -34,6 +34,8 @@ class AdmitTests(PluggedCase):
         self.assertEqual((facts["category"], facts["code"], facts["takes"]),
                          ("terminal_invalid", "contextWindowExceeded", frozenset({Alternative.ADMIT})))
         self.assertEqual([row["category"] for row in self.h.records()], ["terminal_invalid"])
+        self.h.tick(advance=60)
+        self.assertNotIn("not_taken_up", [line[1] for line in self.h.logs], "taken up: never said passed over")
 
     def test_no_other_invalid_request_is_ever_put_to_it(self):
         """Fails with the code rule reverted: a bad request would be offered too."""

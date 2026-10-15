@@ -113,6 +113,10 @@ CAPABILITY_METHODS = {
     # v0.6.16-beta.4: a turn run here (codex/headless.py) - resumed, started, interrupted, let go - as M6 and M6B did;
     # never a compaction or another model, which are compact_continue's and model_fallback's own rows.
     "headless_run": ("thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe"),
+    # A full conversation compacted here, then continued (engine/compact.py): the headless route's calls and the one
+    # compaction MX asked.
+    "compact_continue": ("thread/resume", "thread/compact/start", "turn/start", "turn/interrupt",
+                         "thread/unsubscribe"),
     # The usage meter (engine/usage.py, v0.6.16-beta.3) reads usage on its schedule, and nothing else.
     "usage_meter": ("account/rateLimits/read",),
 }
