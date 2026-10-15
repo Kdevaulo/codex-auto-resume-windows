@@ -671,6 +671,7 @@
   "msg.toast_memory_stopped_next": "確認と確認の間で停止したため、待機中のものは失われていません。ダッシュボードから再び開始してください。",
   "msg.toast_memory_warning": "監視プロセスのメモリ使用量が多くなっています",
   "msg.toast_memory_warning_next": "監視は続きます。診断に最大の使用量が表示されます。",
+  "msg.toast_near_limit": "Codex の使用量が上限に近づいています",
   "msg.toast_no_progress_body": "復旧しても進展がなかったため、停止しました。",
   "msg.toast_notify_only": "この会話は通知のみです。自動では再開しません。",
   "msg.toast_objection": "停止しなければ {time} に続行します。",

@@ -671,6 +671,7 @@
   "msg.toast_memory_stopped_next": "它在兩次檢查之間停止，因此等待中的項目沒有遺失。請從儀表板重新啟動它。",
   "msg.toast_memory_warning": "監看程式正在使用大量記憶體",
   "msg.toast_memory_warning_next": "它會繼續監看。「診斷」會顯示它用過的最大記憶體。",
+  "msg.toast_near_limit": "Codex 使用量接近限制",
   "msg.toast_no_progress_body": "復原沒有產生任何進展，因此已停止。",
   "msg.toast_notify_only": "此對話僅通知；不會自動接續。",
   "msg.toast_objection": "除非您停止，否則將於 {time} 接續。",

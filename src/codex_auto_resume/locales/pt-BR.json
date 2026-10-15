@@ -671,6 +671,7 @@
   "msg.toast_memory_stopped_next": "Ele parou entre duas verificações, então nada do que aguardava foi perdido. Inicie-o de novo pelo Dashboard.",
   "msg.toast_memory_warning": "O monitor está usando muita memória",
   "msg.toast_memory_warning_next": "Ele continua monitorando. Diagnóstico mostra o máximo que ele já usou.",
+  "msg.toast_near_limit": "O uso do Codex está perto de um limite",
   "msg.toast_no_progress_body": "A recuperação não gerou progresso, por isso foi interrompida.",
   "msg.toast_notify_only": "Esta conversa só notifica; nada é retomado automaticamente.",
   "msg.toast_objection": "Continua às {time}, a menos que você interrompa.",

@@ -671,6 +671,7 @@
   "msg.toast_memory_stopped_next": "توقف بين فحصين، لذا لم يضع شيء مما كان ينتظر. شغّله مجددًا من لوحة المعلومات.",
   "msg.toast_memory_warning": "المراقِب يستخدم ذاكرة كثيرة",
   "msg.toast_memory_warning_next": "يواصل المراقبة. ويعرض «التشخيص» أقصى ما استخدمه.",
+  "msg.toast_near_limit": "استخدام Codex قريب من حدّ",
   "msg.toast_no_progress_body": "لم تُحقق الاستعادة أي تقدّم، لذا أُوقفت.",
   "msg.toast_notify_only": "هذه المحادثة تكتفي بالإشعار؛ لا يُستأنف شيء تلقائيًا.",
   "msg.toast_objection": "ستُتابَع في {time} ما لم توقفها.",

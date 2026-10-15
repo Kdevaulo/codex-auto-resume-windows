@@ -314,14 +314,14 @@ VERDICT_CASES = [
     # greys it, and as amended it is offered.
     row(INSTALLED, "refused not-offered", edition="advanced"),
     row(INSTALLED, "refused not-offered", edition="advanced", offer="0.6.12-beta.2"),
-    row(INSTALLED, "offered same,prerelease,convert3,edition", edition="advanced", newer=True),
+    row(INSTALLED, "offered same,prerelease,convert3,edition,advanced-off", edition="advanced", newer=True),
     # v0.6.6-alpha and -beta carry v0.6.6's file names.
     row("0.6.6-alpha", "refused no-archive", files=assets("0.6.6"), older=True),
     row("0.6.11", "refused no-archive", edition="advanced", files=assets("0.6.11", ("standard",))),
     # No pin and no published checksum; a pinned release needs none.
     row("0.6.12-beta.2", "refused no-checksum", files=assets("0.6.12-beta.2", sums=False), offer="0.6.12-beta.2"),
     row("0.6.11", "offered older,release,convert3,latest", files=assets("0.6.11", sums=False)),
-    row("0.6.11", "offered older,release,convert3,latest,edition", edition="advanced", files=assets("0.6.11", sums=False)),
+    row("0.6.11", "offered older,release,convert3,latest,edition,advanced-off", edition="advanced", files=assets("0.6.11", sums=False)),
     # An edition change to an installer that predates editions.
     row("0.6.10", "refused edition-first", installed_edition="advanced"),
     row("0.6.2", "refused edition-first", installed_edition="advanced"),
@@ -343,7 +343,7 @@ VERDICT_CASES = [
     row("0.6.12-beta.2", "refused not-offered", edition="advanced", offer="0.6.12-beta.2"),
     row("0.6.12-beta.3", "refused not-offered", offer="0.6.12-beta.2"),
     row("0.6.12-beta.3", "offered newer,prerelease,convert3", offer="0.6.12-beta.2", newer=True),
-    row("0.6.12-beta.2", "offered newer,prerelease,convert3,edition", edition="advanced", offer="0.6.12-beta.2",
+    row("0.6.12-beta.2", "offered newer,prerelease,convert3,edition,advanced-off", edition="advanced", offer="0.6.12-beta.2",
         newer=True),
     # The schema: converted for 0.6.0 to 0.6.11-alpha (to 3) and 0.6.11-beta to 0.6.14 (to 4), kept from
     # 0.6.15-beta, which is schema 5.
@@ -352,12 +352,15 @@ VERDICT_CASES = [
     row("0.6.11-beta", "offered older,prerelease,convert3", older=True),
     row("0.6.14-beta", "offered newer,prerelease,convert3", offer="0.6.14-beta"),
     row("0.6.15-beta", "offered newer,prerelease,kept", offer="0.6.15-beta"),
-    # The advanced settings: an advanced target before 0.6.11-beta.2 cannot read them.
+    # The advanced settings: an advanced target on an older form than this version's (5, from 0.6.16-beta.3)
+    # cannot read them - every one of these - and one on this form can.
     row("0.6.11-beta", "offered older,prerelease,convert3,advanced-off", edition="advanced",
         installed_edition="advanced", older=True),
-    row("0.6.11-beta.2", "offered older,prerelease,convert3", edition="advanced", installed_edition="advanced",
+    row("0.6.11-beta.2", "offered older,prerelease,convert3,advanced-off", edition="advanced", installed_edition="advanced",
         older=True),
-    row("0.6.13", "offered newer,release,convert3,edition", edition="advanced", latest="0.6.14"),
+    row("0.6.13", "offered newer,release,convert3,edition,advanced-off", edition="advanced", latest="0.6.14"),
+    row("0.6.16-beta.3", "offered newer,prerelease,kept", edition="advanced", installed_edition="advanced",
+        newer=True),
 ]
 
 TABLE_CASES = [
@@ -367,10 +370,10 @@ TABLE_CASES = [
                  for v in ("0.6.12-beta.2", "0.6.12", "0.6.11", INSTALLED)],
       "installed": INSTALLED, "installed_edition": "standard", "policy": False, "newer": False, "older": False},
      {"rows": ["0.6.12 standard offered newer,release,convert3,latest",
-               "0.6.12 advanced offered newer,release,convert3,latest,edition",
+               "0.6.12 advanced offered newer,release,convert3,latest,edition,advanced-off",
                "0.6.12-beta.2 standard refused not-offered", "0.6.12-beta.2 advanced refused not-offered",
                "0.6.12-beta standard installed -", "0.6.12-beta advanced refused not-offered",
-               "0.6.11 standard offered older,release,convert3", "0.6.11 advanced offered older,release,convert3,edition"],
+               "0.6.11 standard offered older,release,convert3", "0.6.11 advanced offered older,release,convert3,edition,advanced-off"],
       "latest": "0.6.12", "offer": ""}),
     # The same list under I12 as amended: every pre-release is offered, the one installed in the other
     # edition too.
@@ -378,20 +381,20 @@ TABLE_CASES = [
                  for v in ("0.6.12-beta.2", "0.6.12", "0.6.11", "0.6.11-beta.3", INSTALLED)],
       "installed": INSTALLED, "installed_edition": "standard", "policy": False, "newer": True, "older": True},
      {"rows": ["0.6.12 standard offered newer,release,convert3,latest",
-               "0.6.12 advanced offered newer,release,convert3,latest,edition",
+               "0.6.12 advanced offered newer,release,convert3,latest,edition,advanced-off",
                "0.6.12-beta.2 standard offered newer,prerelease,convert3",
-               "0.6.12-beta.2 advanced offered newer,prerelease,convert3,edition",
-               "0.6.12-beta standard installed -", "0.6.12-beta advanced offered same,prerelease,convert3,edition",
-               "0.6.11 standard offered older,release,convert3", "0.6.11 advanced offered older,release,convert3,edition",
+               "0.6.12-beta.2 advanced offered newer,prerelease,convert3,edition,advanced-off",
+               "0.6.12-beta standard installed -", "0.6.12-beta advanced offered same,prerelease,convert3,edition,advanced-off",
+               "0.6.11 standard offered older,release,convert3", "0.6.11 advanced offered older,release,convert3,edition,advanced-off",
                "0.6.11-beta.3 standard offered older,prerelease,convert3",
-               "0.6.11-beta.3 advanced offered older,prerelease,convert3,edition"],
+               "0.6.11-beta.3 advanced offered older,prerelease,convert3,edition,advanced-off"],
       "latest": "0.6.12", "offer": ""}),
     # Newest first by the numbers (.10 after .9), the installed edition first at each version, and the
     # check's own offer: the newest pre-release newer than both.
     ({"listed": [{"version": v, "prerelease": "-" in v, "assets": assets(v)}
                  for v in ("0.6.9", "0.6.10", "0.6.12-beta.9", "0.6.12-beta.10", "0.6.11")],
       "installed": "0.6.11", "installed_edition": "advanced", "policy": False, "newer": False, "older": False},
-     {"rows": ["0.6.12-beta.10 advanced offered newer,prerelease,convert3",
+     {"rows": ["0.6.12-beta.10 advanced offered newer,prerelease,convert3,advanced-off",
                "0.6.12-beta.10 standard refused not-offered",
                "0.6.12-beta.9 advanced refused not-offered", "0.6.12-beta.9 standard refused not-offered",
                "0.6.11 advanced installed -", "0.6.11 standard offered same,release,convert3,latest,edition",
@@ -509,7 +512,12 @@ class ListingTests(unittest.TestCase):
         # v0.6.15 is v0.6.14's code (schema 4) between v0.6.15-beta and v0.6.16-beta (both schema 5).
         self.assertEqual(c["StateSchemaSince"], [["0.6.16-beta", 5], ["0.6.15", 4], ["0.6.15-beta", 5], ["0.6.11-beta", 4], ["0.6.0", 3]])
         self.assertEqual(c["StateSchemaSince"][0][1], SCHEMA_VERSION, "the first row is this version's own schema")
-        self.assertEqual(c["AdvancedStateSince"], [["0.6.11-beta.2", 2], ["0.6.11-alpha", 1]])
+        # The advanced settings' form likewise: v0.6.15 is v0.6.14's (form 3) between two form-4 pre-releases.
+        self.assertEqual(c["AdvancedStateSince"], [["0.6.16-beta.3", 5], ["0.6.16-beta", 4], ["0.6.15", 3],
+                                                   ["0.6.15-beta", 4], ["0.6.14", 3], ["0.6.11-beta.2", 2],
+                                                   ["0.6.11-alpha", 1]])
+        self.assertEqual(c["AdvancedStateSince"][0][1], advanced_schema_version(ROOT),
+                         "the first row is this version's own advanced form")
         # I12 as the owner amended it on 2026-10-03 (design Q1): a pre-release picked by name and
         # confirmed, older or newer, as a release is.
         self.assertEqual((c["PickNewerPrereleases"], c["PickOlderPrereleases"]), (True, True))
@@ -538,6 +546,55 @@ class PolicySinceTests(unittest.TestCase):
             ["git", "-C", str(ROOT), "cat-file", "-e", "%s:src/codex_auto_resume/managed.py" % tag],
             capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).returncode == 0]
         self.assertEqual(with_policy[0], "v" + since)
+
+
+def advanced_schema_version(tree, ref=None):
+    """The advanced state's SCHEMA_VERSION in `tree`'s checkout, or at tag `ref` of it; None where it has none."""
+    name = "advanced/src/codex_auto_resume_advanced/state/schema.py"
+    if ref is None:
+        path = Path(tree) / name
+        if not path.is_file():
+            return None
+        text = path.read_text(encoding="utf-8")
+    else:
+        shown = subprocess.run(["git", "-C", str(tree), "show", "%s:%s" % (ref, name)], capture_output=True,
+                               text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if shown.returncode != 0:
+            return None
+        text = shown.stdout
+    found = re.search(r"^SCHEMA_VERSION = (\d+)$", text, re.M)
+    return int(found.group(1)) if found else None
+
+
+class AdvancedStateSinceTests(unittest.TestCase):
+    """$AdvancedStateSince gives every tagged version the advanced form its own code has: a row left stale would
+    keep the confirmation from saying that every advanced feature is off in the version picked (v0.6.14 to
+    v0.6.16-beta.2 left it at form 2). Read from the tags; skipped where they are not in the checkout, a failure on
+    CI."""
+
+    def test_each_tag_is_given_the_form_its_own_code_has(self):
+        text = BOOTSTRAP.read_text(encoding="utf-8")
+        block = re.search(r"^\$AdvancedStateSince = (@\(.*?\))$", text, re.M | re.S).group(1)
+        table = [(version, int(form)) for version, form in re.findall(r"@\('([^']+)', (\d+)\)", block)]
+        listed = subprocess.run(["git", "-C", str(ROOT), "tag", "--list", "v*"], capture_output=True, text=True,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout.split()
+        if "v0.6.16-beta.2" not in listed:
+            if os.environ.get("CI"):
+                self.fail("v0.6.16-beta.2 is not in this checkout; CI must fetch the tags")
+            self.skipTest("the tags are not in this checkout")
+        checked = 0
+        for tag in listed:
+            try:
+                order = legacy.order(tag[1:])
+            except ValueError:
+                continue
+            form = advanced_schema_version(ROOT, tag)
+            if form is None:
+                continue
+            given = next((value for since, value in table if order >= legacy.order(since)), None)
+            self.assertEqual(given, form, tag)
+            checked += 1
+        self.assertGreater(checked, 10)
 
 
 class SourceTests(unittest.TestCase):
@@ -673,11 +730,11 @@ LISTED = [entry("0.6.12-beta.2"), entry(INSTALLED), entry("0.6.11", files=assets
           entry("0.6.6-alpha", files=assets("0.6.6")), entry("0.6.2", files=assets("0.6.2", ("standard",), False)),
           entry("0.6.1", files=assets("0.6.1", ("standard",))), entry("0.5.7", files=assets("0.5.7", ("standard",)))]
 ROWS = ["version: 0.6.12-beta.2 standard offered newer,prerelease,convert3",
-        "version: 0.6.12-beta.2 advanced offered newer,prerelease,convert3,edition",
+        "version: 0.6.12-beta.2 advanced offered newer,prerelease,convert3,edition,advanced-off",
         "version: 0.6.12-beta standard installed -",
-        "version: 0.6.12-beta advanced offered same,prerelease,convert3,edition",
+        "version: 0.6.12-beta advanced offered same,prerelease,convert3,edition,advanced-off",
         "version: 0.6.11 standard offered older,release,convert3,latest",
-        "version: 0.6.11 advanced offered older,release,convert3,latest,edition",
+        "version: 0.6.11 advanced offered older,release,convert3,latest,edition,advanced-off",
         "version: 0.6.11-beta standard offered older,prerelease,convert3",
         "version: 0.6.11-beta advanced offered older,prerelease,convert3,edition,advanced-off",
         "version: 0.6.10 standard offered older,release,convert3",
@@ -1041,7 +1098,7 @@ class PickRunTests(PickerRun):
         self.assertEqual(code, 0, output[-2000:])
         # The installed version is on schema 4, and this one writes 5: the state is converted to 4 first.
         self.assertEqual(self.answer_lines(output, "pick: "),
-                         ["pick: offered same,prerelease,convert3,edition", "pick: state converted 30 5 2 1 0",
+                         ["pick: offered same,prerelease,convert3,edition,advanced-off", "pick: state converted 30 5 2 1 0",
                           "pick: installed 0.6.12-beta advanced"])
         self.assertEqual([seen["to"] for word, seen in self.seen() if word == "convert"], [4])
         self.assertIn("Standard edition -> Advanced edition", output)

@@ -56,7 +56,7 @@ import time
 from codex_auto_resume import continuation, failures
 from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, RECORD_MOVES, RESTRICTIONS,
                                            TAKE_UP, Alternative, Point, RecordMove)
-from codex_auto_resume.domain.plughands import RECORDS_LIMIT, workers
+from codex_auto_resume.domain.plughands import RECORDS_LIMIT, widening_of, workers
 
 from .arming import Arming
 from .engine import foropen
@@ -173,7 +173,7 @@ def _word(answer, point):
 class Runtime:
     def __init__(self, paths, *, registry=REGISTRY, clock=time.time,
                  measure_session_factory=None, measure_launcher=None, measure_backend=None,
-                 evidence_dir=None, **arming):
+                 measure_cli=None, measure_ipc=None, evidence_dir=None, **arming):
         self.paths = paths
         self.registry = registry
         self.clock = clock
@@ -205,6 +205,8 @@ class Runtime:
         self._measure_session_factory = measure_session_factory
         self._measure_launcher = measure_launcher
         self._measure_backend = measure_backend
+        self._measure_cli = measure_cli
+        self._measure_ipc = measure_ipc
         self._evidence_dir = evidence_dir
 
     # ------------------------------------------------------------------ standing
@@ -623,13 +625,60 @@ class Runtime:
                 answers.append(list(answer))
         due = answers[1:]
         answers = [flying, [answer[0] for answer in due if answer], [record for answer in due for record in answer[1:]]]
+        held = self._holders(states)
         for answer in answers:
             for record in answer:
                 key = record.get("record_id") if isinstance(record, dict) else None
+                if key is not None and any(holds(record) for holds in held):
+                    continue                                 # held back this tick (usage_pause's `holds`)
                 if key is not None and key not in seen:
                     seen.add(key)
                     found.append(record)
         return found or DEFER
+
+    def _holders(self, states) -> list:
+        """The `holds` of every capability on that has one (v0.6.16-beta.3, usage_pause): each says whether a record
+        of the edition's own waiting is held back from core this tick. One that raises holds nothing."""
+        found = []
+        for definition in self.registry:
+            if states.get(definition.id, ArmingState.OFF) != ArmingState.ARMED:
+                continue
+            holds = _own(self._code_of(definition), "holds")
+            if holds is not None:
+                def guarded(record, holds=holds):
+                    try:
+                        return holds(dict(record)) is True
+                    except Exception:
+                        return False
+                found.append(guarded)
+        return found
+
+    def eligibility(self):
+        """P19 (v0.6.16-beta.3): the Widening words every capability on at ELIGIBILITY names, together - or NULL's DEFER.
+        A watched one is only journalled, once: what it would have widened is never taken. Nothing is read with none
+        registered there."""
+        definitions = self.registry.at(Point.ELIGIBILITY)
+        if not definitions:
+            return DEFER
+        states = self.states()
+        found = set()
+        for definition in definitions:
+            state = states.get(definition.id, ArmingState.OFF)
+            if state == ArmingState.OFF:
+                continue
+            try:
+                answer = widening_of(self._code_of(definition).eligibility())
+            except Exception:
+                self._tripped(definition)
+                continue
+            if not answer:
+                continue
+            if state == ArmingState.SHADOW:
+                self._once(JournalCode.WOULD_HAVE, definition, Point.ELIGIBILITY, Point.ELIGIBILITY, None)
+                continue
+            self._once(JournalCode.ACTED, definition, Point.ELIGIBILITY, Point.ELIGIBILITY, None)
+            found |= answer
+        return frozenset(found) if found else DEFER
 
     def _watched_records(self, definition, view) -> None:
         """P2 for a watched capability (v0.6.16-beta.3): each of its rows a person set up that would be handed core now -
@@ -821,9 +870,13 @@ class Runtime:
         launcher = self._measure_launcher
         if launcher is None:
             launcher = measure.live_launcher(self.paths)
+        # v0.6.16-beta.3: the read-only probes' seams - the engine's own CLI help (MAWS/MCLOUD) and the
+        # Desktop's IPC pipe (MIPC). Built from the same backend, so they are of the Codex the record names.
+        cli = self._measure_cli if self._measure_cli is not None else measure.live_cli(backend, self.paths)
+        ipc = self._measure_ipc if self._measure_ipc is not None else measure.live_ipc()
         return measure.run(measurement, session_factory=session_factory,
                            launcher=launcher, backend=backend, thread=thread, may_spend=may_spend,
-                           directory=self._evidence_dir, clock=self.clock)
+                           directory=self._evidence_dir, clock=self.clock, cli=cli, ipc=ipc)
 
     def complete_measurement(self, measurement, verdict, note):
         """Record a person's completion of a blocked measurement (measure-verdict, measure.py).

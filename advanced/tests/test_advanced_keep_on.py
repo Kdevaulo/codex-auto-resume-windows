@@ -246,7 +246,9 @@ class KeptTests(KeepOnCase):
             reason for reason in OffReason if reason in ("statement_changed", "failed_here", "local_check_failed",
                                                          "incompatible", "measurement_failed",
                                                          "submission_unknown", "hook_exception",
-                                                         "duplicate_seen", "not_delivered_on_open")})
+                                                         "duplicate_seen", "not_delivered_on_open",
+                                                         # v0.6.16-beta.3: a requirement is not on.
+                                                         "requirement_off")})
 
     def test_what_cannot_be_read_still_holds_it_back_and_the_policy_reads_it_down(self):
         self.armed()

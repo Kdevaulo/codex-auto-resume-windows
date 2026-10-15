@@ -671,6 +671,7 @@
   "msg.toast_memory_stopped_next": "Zatrzymał się między sprawdzeniami, więc nic, co czekało, nie przepadło. Uruchom go ponownie w oknie Dashboard.",
   "msg.toast_memory_warning": "Monitor zużywa dużo pamięci",
   "msg.toast_memory_warning_next": "Nadal monitoruje. Diagnostyka pokazuje, ile najwięcej zużył.",
+  "msg.toast_near_limit": "Użycie Codex jest bliskie limitu",
   "msg.toast_no_progress_body": "Odzyskiwanie nie przyniosło postępu, więc zostało zatrzymane.",
   "msg.toast_notify_only": "Ta rozmowa tylko powiadamia; nic nie jest wznawiane automatycznie.",
   "msg.toast_objection": "Kontynuacja o {time}, chyba że ją zatrzymasz.",

@@ -671,6 +671,7 @@
   "msg.toast_memory_stopped_next": "Il s'est arrêté entre deux vérifications, donc rien de ce qui attendait n'a été perdu. Redémarrez-le depuis le Tableau de bord.",
   "msg.toast_memory_warning": "Le surveillant utilise beaucoup de mémoire",
   "msg.toast_memory_warning_next": "Il continue de surveiller. Diagnostics indique le maximum qu'il a utilisé.",
+  "msg.toast_near_limit": "L'utilisation de Codex approche d'une limite",
   "msg.toast_no_progress_body": "La récupération n'a produit aucun progrès : elle a donc été arrêtée.",
   "msg.toast_notify_only": "Cette conversation ne fait que notifier ; rien n'est repris automatiquement.",
   "msg.toast_objection": "Reprise à {time}, sauf si vous l'arrêtez.",

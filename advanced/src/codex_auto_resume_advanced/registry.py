@@ -38,6 +38,12 @@ asked to agree to and everything the plug holds it to:
 * `resends` - whether what it does is send an uncertain continuation once more (v0.6.14): such a
   capability answers at P7, is turned off by a resend of its found twice whether or not it is kept on,
   and is never given Keep on's Send again, which would be itself (arming.py);
+* `requires` - the ids of other capabilities this one needs on (v0.6.16-beta.3, the owner's rule: a
+  capability that needs another, or that makes another turn on, turns both on). Turning this one on
+  turns on what it requires in the same confirmation (one yes, both statements), and turning a required
+  one off turns off what requires it; a required one an administrator's policy forbids, or whose
+  compatibility is Failed here, keeps the dependent off, with that reason (arming.py). Never names
+  itself, and the registry is acyclic (Registry rejects a cycle when it is made);
 * `make` - the factory for its code: given the installation's paths, it returns an object whose
   methods are the plug's hooks for its points, each answering as a plug would.
 
@@ -72,6 +78,7 @@ from .engine.credits import make as make_reset_credit
 from .engine.resetmessage import make as make_reset_message, make_long as make_long_messages
 from .engine.earlyreset import make as make_early_reset
 from .engine.emptyreply import make as make_empty_response
+from .engine.everyconversation import make as make_every_conversation
 from .engine.subagent import make as make_subagent_parent
 from .engine.keepgoing import make as make_keep_going
 from .engine.promptqueue import make as make_prompt_queue
@@ -80,6 +87,8 @@ from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
+from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STYLE, DEFAULT_WARN, DEFAULT_WRAP, PERCENTS,
+                           POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
 from .vocabulary import CapabilityKind, Measurement, OptionKey
@@ -138,6 +147,7 @@ class CapabilityDef:
     rules_editor: bool = False
     samples: bool = False
     resends: bool = False
+    requires: tuple = ()
     kind: CapabilityKind = CapabilityKind.ROUTE
 
     def option(self, key) -> Option | None:
@@ -228,6 +238,12 @@ def problems(definition) -> list:
     if type(definition.resends) is not bool or (
             definition.resends is True and Point.SCHEDULE not in (points if isinstance(points, frozenset) else ())):
         found.append("resends")
+    requires = definition.requires
+    if (not isinstance(requires, tuple)
+            or not all(isinstance(other, str) for other in requires)
+            or len(set(requires)) != len(requires)
+            or definition.id in requires):
+        found.append("requires")
     return found
 
 
@@ -249,6 +265,51 @@ class Registry:
                 raise RegistryError("two capabilities share one %s" % attribute)
         self.definitions = definitions
         self._by_id = {definition.id: definition for definition in definitions}
+        self._check_requirements()
+
+    def _check_requirements(self) -> None:
+        """Every required id is a capability of this registry, and the requirement graph has no cycle:
+        a capability that cannot have every requirement turned on, or that would require itself round a
+        loop, is never offered."""
+        for definition in self.definitions:
+            for other in definition.requires:
+                if other not in self._by_id:
+                    raise RegistryError("%s requires an unknown capability %s" % (definition.id, other))
+        colour = {}                              # 0 visiting, 1 done
+
+        def visit(capability):
+            if colour.get(capability) == 1:
+                return
+            if colour.get(capability) == 0:
+                raise RegistryError("the requirements of %s form a cycle" % capability)
+            colour[capability] = 0
+            for other in self._by_id[capability].requires:
+                visit(other)
+            colour[capability] = 1
+
+        for definition in self.definitions:
+            visit(definition.id)
+
+    def requires(self, capability) -> tuple:
+        """The ids `capability` needs on, transitively, in a stable order (each required capability's own
+        requirements before it); empty for one that needs none or is not of this registry."""
+        found, seen = [], set()
+
+        def visit(current):
+            definition = self._by_id.get(current)
+            for other in definition.requires if definition is not None else ():
+                if other not in seen:
+                    seen.add(other)
+                    visit(other)
+                    found.append(other)
+        visit(capability)
+        return tuple(found)
+
+    def required_by(self, capability) -> tuple:
+        """The ids that need `capability` on, transitively, in the registry's order: what turning it off
+        turns off too (arming.disarm)."""
+        return tuple(definition.id for definition in self.definitions
+                     if capability in self.requires(definition.id))
 
     @property
     def ids(self) -> tuple:
@@ -726,10 +787,105 @@ KEEP_GOING = CapabilityDef(
     measurements=(Measurement.MK,),
 )
 
+# Recover every conversation but Codex's own (v0.6.16-beta.3; users asked, the owner's plan of 2026-10-13). At P19 it
+# answers EVERY_DESKTOP, and core takes up every desktop conversation of the app but the kinds Codex makes for itself
+# (core's codex/values.INTERNAL_THREAD_SOURCES: subagent, guardian_review, memory_consolidation, agent_created_thread)
+# - every other check of a conversation, and every gate of a recovery, standing. It departs from A15 (only the desktop
+# app's own user conversations are detected), stands on thread_eligibility - the state row and the rollout's first
+# line it is judged by - and rests on no measurement. It sends nothing itself: what it takes up is core's recovery, under
+# core's own limits, so its ceilings are the schema's floor and never bind.
+EVERY_CONVERSATION = CapabilityDef(
+    id="every_conversation",
+    points=frozenset({Point.ELIGIBILITY}),
+    revision=1,
+    departs_from=("A15",),
+    compat="thread_eligibility",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="every",
+    make=make_every_conversation,
+)
+
+# The usage meter (v0.6.16-beta.3, issue #29; the v0.6.11 design's "Live usage meter"). At P8, while the Codex app
+# runs, it reads usage on its own every POLL_MINUTES (5 to 60, 15 by default) through one finite session that asks
+# account/rateLimits/read alone (codex/protocol.CAPABILITY_METHODS), keeps the windows as core keeps a reading
+# (state/meter.py), shows them in the icon's tooltip and the popup (surfaces.meter_view), and at the person's
+# warning percentage of the five-hour or the weekly window (85 by default, each its own) shows a notice once for that
+# window. It never satisfies core's usage gate. It departs from C4 (it reads on a schedule, on its own) and C9 (usage
+# read when no recovery is due), stands on usage_probe and rests on MU. It sends nothing: its ceilings are the
+# schema's floor and never bind, as start_with_codex's. Wrap up near a limit and Pause near a limit require it.
+USAGE_METER = CapabilityDef(
+    id="usage_meter",
+    points=frozenset({Point.TICK}),
+    revision=1,
+    departs_from=("C4", "C9"),
+    compat="usage_probe",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="meter",
+    make=make_meter,
+    codes=("read", "unreadable", "warned"),
+    measurements=(Measurement.MU,),
+    options=(Option(OptionKey.POLL_MINUTES, POLL_CHOICES, DEFAULT_POLL),
+             Option(OptionKey.WARN_FIVE_HOUR, PERCENTS, DEFAULT_WARN),
+             Option(OptionKey.WARN_WEEKLY, PERCENTS, DEFAULT_WARN)),
+)
+
+# Wrap up near a limit (v0.6.16-beta.3, issue #29; the v0.6.11 design's "Near-limit wrap-up nudge"). At P8, when the
+# meter's reading of the five-hour or the weekly window is at the person's wrap-up percentage (90 by default, each its
+# own), each conversation switched on whose latest turn is running is given one message of the edition's own - short,
+# standard or detailed, as the person chose - once for that window (its key the conversation, the window and its
+# reset); at P2 each waiting one is handed core as a WRAP_UP record, which core queues through `codex queue` only
+# while that turn is still the latest and still running, so Codex delivers it when the turn ends. It departs from
+# A13 (no failure is recovered) and A26 (words of its own), stands on exact_thread_recovery, the queue every send
+# rests on, and rests on MT (a message queued while a turn runs is delivered after it). It requires the meter.
+# Ceilings: two a conversation (both windows), a dozen a day.
+USAGE_WRAP_UP = CapabilityDef(
+    id="usage_wrap_up",
+    points=frozenset({Point.TICK, Point.RECORDS}),
+    revision=1,
+    departs_from=("A13", "A26"),
+    compat="exact_thread_recovery",
+    ceilings=Ceilings(per_day=12, per_conversation=2),
+    journal_prefix="wrap",
+    make=make_wrap_up,
+    codes=("found", "sent", "delivered", "unknown", "superseded"),
+    measurements=(Measurement.MT,),
+    options=(Option(OptionKey.WRAP_FIVE_HOUR, PERCENTS, DEFAULT_WRAP),
+             Option(OptionKey.WRAP_WEEKLY, PERCENTS, DEFAULT_WRAP),
+             Option(OptionKey.WRAP_STYLE, STYLES, DEFAULT_STYLE)),
+    requires=("usage_meter",),
+)
+
+# Pause near a limit (v0.6.16-beta.3, issue #29). At P8, when the meter's reading of the five-hour or the weekly
+# window is at the person's pause percentage (95 by default, each its own), the window is marked held until its reset
+# (state/meter.py); at P3 it answers HOLD for every record of core's while one is held, and the edition's own
+# continuations waiting are not handed to core (`holds`, runtime.records). A person's own messages, a wrap-up and
+# anything typed in Codex are untouched. It lets go when the window resets. It departs from C9 (it acts on a reading
+# taken when no recovery is due - the meter's), stands on usage_probe and rests on MU. It sends nothing: a HOLD is a
+# restriction, never paid for, so its ceilings are the schema's floor. It requires the meter.
+USAGE_PAUSE = CapabilityDef(
+    id="usage_pause",
+    points=frozenset({Point.GATES, Point.TICK}),
+    revision=1,
+    departs_from=("C9",),
+    compat="usage_probe",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="pause",
+    make=make_pause,
+    codes=("paused", "resumed"),
+    measurements=(Measurement.MU,),
+    options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE),
+             Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE)),
+    requires=("usage_meter",),
+)
+
 # Longer reset messages (v0.6.14, the owner's answer of 2026-10-08): a message sent at a reset may be up to what one
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
 # nothing; reset_message reads whether it stands on, and when it does not, a waiting message over 2,000 is cancelled.
+# It requires nothing (v0.6.16-beta.3's audit of the registry for `requires`): it lengthens what reset_message and
+# prompt_queue send, either one, so neither is a requirement - requiring one would turn on a feature a person who wants
+# longer queued prompts never asked for. No capability of the registry before v0.6.16-beta.3 needs another; the pairs
+# are new: the usage meter, which Wrap up near a limit and Pause near a limit require.
 LONG_RESET_MESSAGE = CapabilityDef(
     id="long_reset_message",
     kind=CapabilityKind.ACTION,
@@ -774,6 +930,7 @@ COMPAT_REPORT = CapabilityDef(
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
+               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION,
                LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 REGISTRY = Registry(DEFINITIONS)
@@ -785,8 +942,12 @@ REGISTRY = Registry(DEFINITIONS)
 # after a usage limit with no hands, 2) what saves the person work, 3) the other common failures, 4) rare
 # cases and expert settings. A measurement's warning never pushes a capability down. Every capability of
 # DEFINITIONS appears here exactly once (test_advanced_registry holds it).
-SHOWN_ORDER = ("compat_report", "start_with_codex", "queue_for_open", "marker_free_continuation", "reset_credit",
-               "early_reset", "parallel_dispatch", "reset_message", "long_reset_message", "keep_going",
+SHOWN_ORDER = ("compat_report", "start_with_codex",
+               # v0.6.16-beta.3: which conversations are recovered at all, beside what starts the recovering.
+               "every_conversation", "queue_for_open", "marker_free_continuation", "reset_credit",
+               "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
+               # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
+               "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",
                "prompt_queue", "empty_response", "once_more_when_unsure", "send_now", "capacity_retry",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
                "structured_rules")

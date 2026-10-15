@@ -83,9 +83,21 @@ class DetectMixin:
             progress = self.source.progress(row["thread_id"], row["ordinal"])
         except Exception:
             progress = {}
-        if progress.get("later_turn"):
+        if progress.get("later_turn") and not self._only_wrap_ups_after(row):
             return "superseded_by_user", "later_turn_exists"
         return "superseded", "latest_turn_changed"
+
+    def _only_wrap_ups_after(self, row) -> bool:
+        """Whether every turn after this record's is one a wrap-up of this product's started (v0.6.16-beta.3): then
+        the failure that follows is the one recovered, and this one is superseded - never by the person's work."""
+        thread = row["thread_id"]
+        if not self._wrap_up_markers().get(thread):
+            return False
+        try:
+            later = self.source.later_turns(thread, row["ordinal"], self.proof(row))
+        except Exception:
+            return False
+        return bool(later) and not self.persons_turns(thread, later)
 
     def detection_since(self, settings) -> float:
         """Where the look-back window opens (A16): automatic recovery turned on, minus the look-back."""

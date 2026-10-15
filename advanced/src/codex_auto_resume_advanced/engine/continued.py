@@ -16,7 +16,7 @@ import json
 from codex_auto_resume import continuation
 from codex_auto_resume.domain import ids
 
-from ..vocabulary import RecordState
+from ..vocabulary import ContinuationKind, RecordState
 
 
 def answer_key(*parts) -> str:
@@ -40,8 +40,10 @@ def handed(row) -> dict | None:
     key = row.get("record_id")
     if key is None or row.get("finished_at") is not None:
         return None
+    # A wrap-up (v0.6.16-beta.3, engine/usage.py) is core's WRAP_UP: sent only while its turn still runs.
+    purpose = "wrap_up" if row.get("kind") == ContinuationKind.WRAP_UP else "continuation"
     own = {"record_id": key, "thread_id": row["thread_id"], "marker": ids.short_marker(key),
-           "purpose": "continuation", "ordinal": row["ordinal"]}
+           "purpose": purpose, "ordinal": row["ordinal"]}
     if row["record_state"] == RecordState.IN_FLIGHT:
         return dict(own, state="in_flight", words=None, sent_at=row.get("launching_at") or row.get("claimed_at"),
                     queue_id=row.get("queue_id"), withdraw=bool(row.get("withdraw")))

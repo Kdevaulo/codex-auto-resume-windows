@@ -81,7 +81,7 @@ class PlugRecordsMixin:
         """Whether a waiting record's words are a person's own that may be sent (A26, A27 as P2 keeps
         them): checked here again, whatever the plug checked, and a record whose words fail is dropped."""
         try:
-            if record["purpose"] == RecordPurpose.CONTINUATION:
+            if record["purpose"] in (RecordPurpose.CONTINUATION, RecordPurpose.WRAP_UP):
                 continuation.validate_continuation(record["words"])
             else:
                 continuation.validate_prompt(record["words"])
@@ -97,6 +97,11 @@ class PlugRecordsMixin:
         latest = self.source.latest(thread)
         if latest is None:
             return RecordMove.WAITING, "identity", "not_user_conversation"
+        if record["purpose"] == RecordPurpose.WRAP_UP:
+            # v0.6.16-beta.3: a wrap-up goes only into the very turn it was made for, while it still runs.
+            if latest.get("ordinal") != record["ordinal"] or latest.get("status") != "inProgress":
+                return RecordMove.SUPERSEDED, "identity", "latest_turn_changed"
+            return None
         if record["purpose"] != RecordPurpose.CONTINUATION:
             return None
         if (latest.get("ordinal") != record["ordinal"] or latest.get("status") not in FINAL
@@ -110,6 +115,32 @@ class PlugRecordsMixin:
         if move in ENDED:
             self._flying().pop(record["record_id"], None)
         self.plug.moved(told, move)
+
+    def _wrap_up_markers(self) -> dict:
+        """The markers of the wrap-ups delivered in each conversation in this process (v0.6.16-beta.3), by thread."""
+        found = self.__dict__.setdefault("_wrap_ups", {})
+        if len(found) > NOTED_LIMIT:
+            found.clear()
+        return found
+
+    def persons_turns(self, thread, turns) -> list:
+        """`turns` (later_turns') less those a wrap-up of this product's started (v0.6.16-beta.3, usage_wrap_up): its
+        message is the product's own, so the turn it starts is never the person's work (A17) and never supersedes a
+        recovery as theirs. Known for the wrap-ups delivered while this process ran; a turn that cannot be looked at
+        is the person's, as before."""
+        markers = sorted(self._wrap_up_markers().get(thread, ()))
+        if not markers:
+            return list(turns)
+        kept = []
+        for turn in turns:
+            try:
+                ours = turn.get("turn_id") is not None and bool(self.source.turn_markers(thread, turn["turn_id"],
+                                                                                          markers))
+            except Exception:
+                ours = False
+            if not ours:
+                kept.append(turn)
+        return kept
 
     def _flying(self) -> dict:
         """The plug's records this engine watched in flight (v0.6.15-beta), by id, until each ends: what a Pause
@@ -271,6 +302,9 @@ class PlugRecordsMixin:
         a day after it was sent with none there - and never sent again."""
         thread = record["thread_id"]
         if self.source.marker_rows(thread, record["marker"]):
+            if record.get("purpose") == RecordPurpose.WRAP_UP:
+                # v0.6.16-beta.3: the turn it started is this product's own, never the person's work (persons_turns).
+                self._wrap_up_markers().setdefault(thread, set()).add(record["marker"])
             self._record_told(record, RecordMove.DELIVERED)
             return
         queued = record["queue_id"] is not None and self.source.queue_row(thread, record["queue_id"], record["marker"])

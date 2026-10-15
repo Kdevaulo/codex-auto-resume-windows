@@ -124,6 +124,9 @@ ENGINE_TO_SOURCE = {
     # v0.6.12: whether Codex's history has caught up and how many turns run and items wait, asked only
     # for an armed power action whose own checks have passed - counts and sizes, never content.
     "activity",
+    # v0.6.16-beta.3: which conversations besides a person's own its reads take up (P19) - set on it by the engine
+    # from the plug's answer each tick, never read back; the standard edition sets the empty set, A15 as ever.
+    "widened",
     # v0.6.16-beta.3: why each failed turn the failure scan did not bring was passed over, for a skip
     # line written once per turn (issue #27) - ids, lifecycle columns and kind words only.
     "passed_over",
@@ -144,7 +147,8 @@ ENGINE_TO_SOURCE = {
 # through its own claim, pre-send look and launch guard where it would otherwise wait (A11).
 # `admission` is P17: whether a failure core never recovers alone is taken up (v0.6.14). `wants` is
 # not a point: whether the plug may answer at one now, so core makes that point's reads only then.
-ENGINE_TO_PLUG = {"admission", "delivery", "gate", "moved", "null", "outcome", "partition", "records",
+# `eligibility` is P19 (v0.6.16-beta.3): which conversations besides a person's own detection takes up.
+ENGINE_TO_PLUG = {"admission", "delivery", "eligibility", "gate", "moved", "null", "outcome", "partition", "records",
                   "schedule", "sender", "text", "tick", "unloaded", "wants"}
 # `claim_ledger_checked` is how the claim asks: it says whether that one call raised, so a
 # failure on another thread holding the same plug is not read as this claim's (domain/plug.py).
