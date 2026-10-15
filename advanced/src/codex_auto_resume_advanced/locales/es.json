@@ -178,6 +178,7 @@
   "page.refused.prompt_refused": "Ese mensaje no se puede poner en cola: está vacío o es demasiado largo, contiene una marca de este producto o es una de sus propias continuaciones.",
   "page.refused.queue_full": "Hay tantos mensajes en cola como se permite: cinco por conversación, veinte en total. Cancela uno para poner otro.",
   "page.refused.requirement": "Lo que esta función necesita no se pudo activar con ella, así que no se activó nada. Inténtalo de nuevo en un momento.",
+  "page.refused.requirement_failed_here": "Una función que esta necesita no superó una comprobación de compatibilidad en este equipo, así que no se activó ninguna de las dos.",
   "page.refused.resets_full": "Ya esperan tantos como se permite. Cancela uno para añadir otro.",
   "page.refused.rule_decision": "Este código puede referirse a algo que decide una persona, como una política, un presupuesto o un permiso, así que ninguna regla puede reintentarlo.",
   "page.refused.rule_known": "El producto ya conoce este código, así que una regla no puede cambiar lo que hace.",

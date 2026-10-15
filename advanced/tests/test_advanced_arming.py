@@ -757,7 +757,9 @@ class RemainingRefusalTests(WarningCase):
                                  "STALE_CONFIRMATION", "STALE_GENERATION", "STATE_UNAVAILABLE",
                                  # v0.6.16-beta.3: the `also` list did not carry exactly the requirements
                                  # that are off, or one of them failed its own confirmation.
-                                 "REQUIREMENT_REFUSED"})
+                                 "REQUIREMENT_REFUSED",
+                                 # and a requirement graded Failed here keeps the dependent off.
+                                 "REQUIREMENT_FAILED_HERE"})
         self.assertNotIn("not_permitted", {str(word) for word in Refusal})
 
 

@@ -159,7 +159,7 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
 # one confirmation that turns on what it needs too, what turning a requirement off turned off first, and the words for
 # a dependent read down because what it needs is off.
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
-    "requires", "confirm.requires", "confirm.requirement", "done.on_with", "done.also_off", "refused.requirement",
+    "requires", "confirm.requires", "confirm.requirement", "done.on_with", "done.also_off", "refused.requirement", "refused.requirement_failed_here",
     "tripped.requirement_off", "kept.requirement_off"))
 # The usage meter's, the wrap-up's and the pause's choices (v0.6.16-beta.3, issue #29): each OptionKey's label, and
 # how its values are said.

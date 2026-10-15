@@ -121,6 +121,16 @@ class OneConfirmationTests(RequireCase):
         self.assertTrue(self._arm("test_dep")["done"])
         self.assertEqual(self._states()["test_dep"], ArmingState.ARMED)
 
+    def test_a_requirement_failed_here_refuses_the_whole_arm_whatever_is_confirmed(self):
+        """The owner's rule: an administrator's policy or a Failed-here grade on the required one keeps the dependent
+        off, with the reason - a Failed-here warning confirmed in `also` turns neither on."""
+        self.compat = _view_both(req_state="FAILED_HERE")
+        shown = [str(word) for word in self.rt.arming.warnings(self.rt.registry.get("test_req"))]
+        self.assertIn("failed_here", shown)
+        result = self._arm("test_dep", also=[dict(self._also_entry(), warnings=shown)])
+        self.assertEqual((result["done"], result["refusal"]), (False, Refusal.REQUIREMENT_FAILED_HERE))
+        self.assertEqual(self._states(), {"test_req": ArmingState.OFF, "test_dep": ArmingState.OFF})
+
     def test_watching_the_dependent_needs_no_requirement(self):
         result = self._arm("test_dep", state="shadow")
         self.assertTrue(result["done"], result)

@@ -178,6 +178,7 @@
   "page.refused.prompt_refused": "Không thể xếp hàng tin nhắn này: nó trống hoặc quá dài, chứa dấu của sản phẩm này, hoặc là một lời tiếp tục của chính sản phẩm.",
   "page.refused.queue_full": "Đã có đủ số tin nhắn được phép: năm cho mỗi cuộc trò chuyện, hai mươi tổng cộng. Hủy một tin để xếp tin khác.",
   "page.refused.requirement": "Những gì tính năng này cần không thể bật cùng với nó, nên chưa có gì được bật. Hãy thử lại sau giây lát.",
+  "page.refused.requirement_failed_here": "Một tính năng mà tính năng này cần đã không vượt qua kiểm tra tương thích trên máy tính này, nên không tính năng nào được bật.",
   "page.refused.resets_full": "Số mục đang chờ đã đạt mức tối đa. Hãy hủy một mục để thêm mục khác.",
   "page.refused.rule_decision": "Mã này có thể chỉ điều do một người quyết định, như chính sách, ngân sách hay quyền, nên không quy tắc nào được thử lại nó.",
   "page.refused.rule_known": "Sản phẩm đã biết mã này nên quy tắc không thể thay đổi việc nó làm.",

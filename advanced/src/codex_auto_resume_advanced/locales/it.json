@@ -178,6 +178,7 @@
   "page.refused.prompt_refused": "Quel messaggio non può essere messo in coda: è vuoto o troppo lungo, contiene un segno di questo prodotto o è una delle sue continuazioni.",
   "page.refused.queue_full": "Sono in coda tutti i messaggi consentiti: cinque per conversazione, venti in tutto. Annullane uno per metterne un altro.",
   "page.refused.requirement": "Ciò che questa funzione richiede non si è potuto attivare insieme a lei, quindi non è stato attivato nulla. Riprova tra un attimo.",
+  "page.refused.requirement_failed_here": "Una funzione di cui questa ha bisogno non ha superato un controllo di compatibilità su questo computer, quindi nessuna delle due è stata attivata.",
   "page.refused.resets_full": "Ne attendono già quanti consentito. Annullane uno per aggiungerne un altro.",
   "page.refused.rule_decision": "Questo codice può indicare qualcosa che decide una persona, come una politica, un budget o un permesso, quindi nessuna regola può riprovarlo.",
   "page.refused.rule_known": "Il prodotto conosce già questo codice, quindi una regola non può cambiare ciò che fa.",

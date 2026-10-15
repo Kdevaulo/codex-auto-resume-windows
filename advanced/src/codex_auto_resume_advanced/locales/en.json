@@ -526,6 +526,7 @@
   "page.done.on_with": "{name} is on, and so is what it needs: {names}.",
   "page.done.also_off": "{names} turned off first, because it needs {name}. Then {name} turned off.",
   "page.refused.requirement": "What this feature needs could not be turned on with it, so nothing was turned on. Try again in a moment.",
+  "page.refused.requirement_failed_here": "A feature this one needs failed a compatibility check on this computer, so neither was turned on.",
   "page.tripped.requirement_off": "Turned off: a feature it needs is no longer on.",
   "page.kept.requirement_off": "It stayed on although a feature it needs is no longer on.",
   "name.every_conversation": "Recover every conversation but Codex's own",

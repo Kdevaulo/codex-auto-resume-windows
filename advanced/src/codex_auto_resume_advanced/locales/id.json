@@ -178,6 +178,7 @@
   "page.refused.prompt_refused": "Pesan itu tidak bisa diantrekan: kosong atau terlalu panjang, berisi penanda produk ini, atau salah satu lanjutan milik produk.",
   "page.refused.queue_full": "Sudah sebanyak yang diizinkan: lima per percakapan, dua puluh seluruhnya. Batalkan satu untuk mengantrekan yang lain.",
   "page.refused.requirement": "Yang dibutuhkan fitur ini tidak dapat dinyalakan bersamanya, jadi tidak ada yang dinyalakan. Coba lagi sebentar lagi.",
+  "page.refused.requirement_failed_here": "Fitur yang dibutuhkan fitur ini gagal dalam pemeriksaan kompatibilitas di komputer ini, jadi keduanya tidak dinyalakan.",
   "page.refused.resets_full": "Sudah ada sebanyak yang diizinkan yang menunggu. Batalkan satu untuk menambah yang lain.",
   "page.refused.rule_decision": "Kode ini mungkin menyebut sesuatu yang diputuskan seseorang, seperti kebijakan, anggaran, atau izin, jadi tidak ada aturan yang dapat mencobanya ulang.",
   "page.refused.rule_known": "Produk sudah mengenali kode ini, jadi aturan tidak dapat mengubah apa yang dilakukannya.",

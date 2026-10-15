@@ -178,6 +178,7 @@
   "page.refused.prompt_refused": "Essa mensagem não pode ir para a fila: está vazia ou longa demais, contém uma marca deste produto ou é uma das continuações dele.",
   "page.refused.queue_full": "Já há tantas mensagens na fila quanto o permitido: cinco por conversa, vinte no total. Cancele uma para colocar outra.",
   "page.refused.requirement": "O que este recurso precisa não pôde ser ligado junto, então nada foi ligado. Tente de novo daqui a pouco.",
+  "page.refused.requirement_failed_here": "Um recurso de que este precisa falhou em uma verificação de compatibilidade neste computador, então nenhum dos dois foi ativado.",
   "page.refused.resets_full": "Já há tantos aguardando quanto o permitido. Cancele um para adicionar outro.",
   "page.refused.rule_decision": "Este código pode indicar algo que uma pessoa decide, como uma política, um orçamento ou uma permissão, então nenhuma regra pode tentá-lo de novo.",
   "page.refused.rule_known": "O produto já conhece este código, então uma regra não pode mudar o que ele faz.",

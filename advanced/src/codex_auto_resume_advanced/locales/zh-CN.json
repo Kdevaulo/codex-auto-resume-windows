@@ -178,6 +178,7 @@
   "page.refused.prompt_refused": "无法排队这条消息：它为空或过长、含有本产品的标记，或是产品自己的续写。",
   "page.refused.queue_full": "排队的消息已达上限：每个对话五条，总共二十条。取消一条后才能再排队。",
   "page.refused.requirement": "这项功能所需的功能无法一并开启，所以什么都没有开启。请稍后再试。",
+  "page.refused.requirement_failed_here": "此功能所需的功能未通过此电脑上的兼容性检查，因此两者都未开启。",
   "page.refused.resets_full": "等待中的数量已达上限。取消一个后才能再添加。",
   "page.refused.rule_decision": "此代码可能表示由人决定的事情，例如策略、预算或权限，因此任何规则都不能重试它。",
   "page.refused.rule_known": "产品已识别此代码，因此规则无法改变它的处理方式。",

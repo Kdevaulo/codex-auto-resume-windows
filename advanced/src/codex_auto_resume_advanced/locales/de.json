@@ -178,6 +178,7 @@
   "page.refused.prompt_refused": "Diese Nachricht kann nicht eingereiht werden: Sie ist leer oder zu lang, enthält eine Markierung dieses Produkts oder ist eine seiner eigenen Fortsetzungen.",
   "page.refused.queue_full": "So viele Nachrichten sind eingereiht, wie dürfen: fünf je Unterhaltung, zwanzig insgesamt. Brechen Sie eine ab, um eine andere einzureihen.",
   "page.refused.requirement": "Was diese Funktion benötigt, ließ sich nicht mit einschalten, deshalb wurde nichts eingeschaltet. Versuchen Sie es gleich noch einmal.",
+  "page.refused.requirement_failed_here": "Eine Funktion, die diese braucht, hat auf diesem Computer eine Kompatibilitätsprüfung nicht bestanden, daher wurde keine von beiden eingeschaltet.",
   "page.refused.resets_full": "Es warten schon so viele wie erlaubt. Brechen Sie eines ab, um ein weiteres hinzuzufügen.",
   "page.refused.rule_decision": "Dieser Code kann etwas bezeichnen, das ein Mensch entscheidet, etwa eine Richtlinie, ein Budget oder eine Berechtigung, daher kann keine Regel ihn wiederholen.",
   "page.refused.rule_known": "Das Produkt kennt diesen Code bereits, daher kann eine Regel nichts daran ändern, was es tut.",

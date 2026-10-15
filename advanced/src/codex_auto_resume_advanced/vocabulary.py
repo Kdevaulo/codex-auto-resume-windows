@@ -146,6 +146,9 @@ class Refusal(StrEnum):
     # Turning a capability on with its requirements in the one confirmation (v0.6.16-beta.3): the `also` list did
     # not carry exactly the requirements that are off, or one of them was refused its own confirmation.
     REQUIREMENT_REFUSED = "requirement_refused"
+    # A requirement's compatibility grade is Failed here on this PC: like a policy on it, it keeps the dependent off,
+    # whatever is confirmed - the owner's rule for `requires`.
+    REQUIREMENT_FAILED_HERE = "requirement_failed_here"
 
 
 class JournalCode(StrEnum):

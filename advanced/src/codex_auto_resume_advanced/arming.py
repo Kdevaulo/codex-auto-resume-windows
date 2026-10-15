@@ -726,6 +726,11 @@ class Arming:
             states = self.current(view=view, policy=policy)
         except StateError:
             return refused(Refusal.STATE_UNAVAILABLE)
+        # A requirement graded Failed here keeps the dependent off, as a policy on it does: no confirmation turns it on.
+        for other in self.registry.requires(capability):
+            other_def = self.registry.get(other)
+            if other_def is not None and ArmingWarning.FAILED_HERE in self.warnings(other_def, view):
+                return refused(Refusal.REQUIREMENT_FAILED_HERE)
         needed = [other for other in self.registry.requires(capability)
                   if states.get(other, ArmingState.OFF) != ArmingState.ARMED]
         entries = {}

@@ -178,6 +178,7 @@
   "page.refused.prompt_refused": "Tej wiadomości nie można dodać do kolejki: jest pusta lub za długa, zawiera znacznik tego produktu albo jest jedną z jego kontynuacji.",
   "page.refused.queue_full": "W kolejce jest tyle wiadomości, ile można: pięć na rozmowę, dwadzieścia łącznie. Anuluj jedną, aby dodać inną.",
   "page.refused.requirement": "Tego, czego wymaga ta funkcja, nie udało się włączyć razem z nią, więc nic nie włączono. Spróbuj ponownie za chwilę.",
+  "page.refused.requirement_failed_here": "Funkcja, której ta potrzebuje, nie przeszła testu zgodności na tym komputerze, więc żadna z nich nie została włączona.",
   "page.refused.resets_full": "Czeka już tyle, ile może. Anuluj jedną, aby dodać kolejną.",
   "page.refused.rule_decision": "Ten kod może oznaczać coś, o czym decyduje człowiek, na przykład zasadę, budżet lub uprawnienie, więc żadna reguła nie może go ponowić.",
   "page.refused.rule_known": "Produkt już zna ten kod, więc reguła nie może zmienić tego, co robi.",
