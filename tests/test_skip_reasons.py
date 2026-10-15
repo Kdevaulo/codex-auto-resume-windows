@@ -20,6 +20,8 @@ if _HERE not in sys.path:
 from codexsim import BASE, new_id, transient_error  # noqa: E402
 from codex_auto_resume import logbook, settings  # noqa: E402
 from codex_auto_resume.domain import skips  # noqa: E402
+from codex_auto_resume.engine import Engine, detect  # noqa: E402
+from unittest.mock import patch  # noqa: E402
 from test_continuation_split import SplitHome  # noqa: E402
 from test_engine import Harness  # noqa: E402
 
@@ -152,6 +154,75 @@ class SkipReasonTests(SkipCase):
         h.home.fail_transient(T2)
         self.ticks(h)
         self.assertEqual(self.seen(h), ["0", "2"])
+
+
+class NoFloodTests(SkipCase):
+    """Never a flood: a start over many failed turns, a watcher started again, more turns than it keeps."""
+
+    def logged(self, root, path=None):
+        """An EngineLog writing to a file of the test's own (`path`, else a new one), as the watcher's does."""
+        path = path or Path(root) / ("log-%d.log" % len(self._loggers))
+        logger = logging.getLogger("test_skip_reasons.%d.%d" % (id(self), len(self._loggers)))
+        logger.propagate = False
+        logger.setLevel(logging.INFO)
+        handler = logging.FileHandler(path, encoding="utf-8")
+        logger.addHandler(handler)
+        self._loggers.append((logger, handler))
+        self.addCleanup(self.close_loggers)                       # before the folder it writes in goes
+        return logbook.EngineLog(logger), path
+
+    def setUp(self):
+        self._loggers = []
+
+    def close_loggers(self):
+        for logger, handler in self._loggers:
+            logger.removeHandler(handler)
+            handler.close()
+
+    def subagents(self, h, count):
+        for _ in range(count):
+            thread = new_id()
+            h.home.add_thread(thread, thread_source="subagent")
+            h.home.fail_transient(thread)
+
+    def engine(self, h, log):
+        h.engine = Engine(h.store, h.source, h.backend, clock=lambda: h.now, log=log, options=h.options,
+                          notify=lambda *args: None)
+
+    @staticmethod
+    def lines(path):
+        return [line for line in path.read_text(encoding="utf-8").splitlines() if "not taken up (" in line]
+
+    def test_a_watcher_started_again_does_not_say_again_what_its_log_holds(self):
+        h = self.harness()
+        self.subagents(h, 3)
+        log, path = self.logged(h.root)
+        self.engine(h, log)
+        self.ticks(h)
+        self.assertEqual(len(self.lines(path)), 3)
+        again, _ = self.logged(h.root, path)                      # the same file, as a watcher started again has
+        self.engine(h, again)
+        self.ticks(h)
+        self.assertEqual(len(self.lines(path)), 3)
+
+    def test_hundreds_at_once_are_said_in_a_few_lines_and_a_count(self):
+        h = self.harness()
+        self.subagents(h, detect.SKIPS_AT_ONCE + 10)
+        self.ticks(h)
+        self.assertEqual(len(self.skips(h)), detect.SKIPS_AT_ONCE)
+        self.assertEqual([entry[2] for entry in h.logs if entry[1] == "not_taken_up_more"], ["10"])
+
+    def test_past_what_it_keeps_nothing_is_said_twice(self):
+        h = self.harness()
+        log, path = self.logged(h.root)
+        self.engine(h, log)
+        self.subagents(h, 8)
+        with patch.object(detect, "SKIPS_KEPT", 5):
+            for _ in range(6):
+                h.tick(advance=30)
+        found = self.lines(path)
+        self.assertEqual(len(found), len(set(found)), "a turn said twice")
+        self.assertEqual(len(found), 8)
 
 
 class SkipLineTests(unittest.TestCase):

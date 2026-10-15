@@ -186,7 +186,7 @@ class OptionsMixin:
         self._random = random.Random()
         self._declined = set()
         # v0.6.16-beta.3 (issue #27): skip lines written, turns explained, failed turns seen, "off" said.
-        self._skips_told, self._passed_known, self._seen_failed, self._off_told = set(), set(), None, False
+        self._skips_told, self._passed_known, self._seen_failed, self._off_told, self._passed_since = {}, {}, None, False, None
         # v0.6.14: when each failure the edition's plug did not take up was last put to it (P17), the
         # record looked at early now and when the last early window opened (EARLY, engine/relaxed.py).
         self._unadmitted = {}

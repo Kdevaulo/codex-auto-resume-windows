@@ -141,6 +141,7 @@ _MESSAGES = {
     # automatic recovery is off, said once each time it is found off (engine/detect.py).
     ("failed_turns_seen", None): "{detail} failed turn(s) seen since the look-back window opened",
     (skips.RECOVERY_OFF, None): "automatic recovery is off; no failed turn is taken up until it is on again",
+    ("not_taken_up_more", None): "{detail} more failed turns were not taken up; the Diagnostics check says why for each",
 }
 
 # v0.6.16-beta.3 (issue #27): why a failed turn was not taken up, said once per turn and reason
@@ -223,11 +224,36 @@ class EngineLog:
 
     def __init__(self, logger: logging.Logger):
         self.logger = logger
+        self._said = None          # the (turn, reason) pairs the log already holds a skip line for
+
+    # v0.6.16-beta.3: how much of the log is read back, once, for the skip lines a watcher before this one wrote.
+    SAID_BYTES = 2 * 1024 * 1024
+
+    def _already_said(self) -> set:
+        """The (turn, reason) of every skip line in the end of the log files this logger writes, read once: so a
+        watcher started again does not say again what the one before it said (engine/detect.py)."""
+        if self._said is None:
+            self._said = set()
+            for handler in self.logger.handlers:
+                name = getattr(handler, "baseFilename", None)
+                for path in ([Path(name + ".1"), Path(name)] if name else []):
+                    try:
+                        with path.open("rb") as stream:
+                            stream.seek(max(0, stream.seek(0, 2) - self.SAID_BYTES))
+                            text = stream.read().decode("utf-8", errors="replace")
+                    except OSError:
+                        continue
+                    for found in SKIP_LINE.finditer(text):
+                        self._said.add((found.group("turn"), found.group("reason")))
+        return self._said
 
     def __call__(self, thread_id, code, detail=None):
         # Engine transitions call log(thread, state, reason); events call log(thread, code, detail).
         if code == SKIPPED and isinstance(detail, tuple) and len(detail) == 3:
-            self.logger.info(skipped(thread_id, *detail))
+            said = self._already_said()
+            if (detail[0], detail[1]) not in said:
+                said.add((detail[0], detail[1]))
+                self.logger.info(skipped(thread_id, *detail))
             return
         reason = None
         if code in STATE_CODES:
