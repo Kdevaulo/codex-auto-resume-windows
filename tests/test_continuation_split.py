@@ -199,6 +199,33 @@ class SplitReadTests(SplitCase):
         self.assertIsNone(self.source.latest(A), "B is not followed: A's own turns, of which there are none")
         self.assertEqual(self.source.turn_chain(A), (A,))
 
+    def test_a_stray_file_named_after_another_conversations_id_never_joins_the_chain(self):
+        """A file named <A>_<X> whose first line is another conversation's: X is not one of A's ids."""
+        self.home.add_turn(A, status="completed")
+        x = self.home.rotate(OTHER)
+        stray = self.home.root / "sessions" / ("rollout-2026-10-14T11-00-00-%s_%s.jsonl" % (A, x))
+        stray.write_bytes(self.home.rollout(x).read_bytes())
+        b = self.home.rotate(A)                                    # A now under B, no turn there yet
+        failed = self.home.fail_usage(OTHER)                        # OTHER's failure, under X
+        rollout._SPLITS.clear()
+        self.assertEqual(self.source.turn_chain(A), (A, b))
+        self.assertEqual(self.source.latest(A)["status"], "completed", "A's own turn, not OTHER's failure")
+        self.assertEqual([(entry["thread_id"], entry["turn_id"]) for entry in self.failures()], [(OTHER, failed)])
+
+    def test_a_stray_file_whose_first_line_is_another_conversations_never_joins_the_chain(self):
+        """The same, where no conversation's current file names X any more: only its first line tells."""
+        self.home.add_turn(A, status="completed")
+        x = self.home.rotate(OTHER)
+        failed = self.home.fail_usage(OTHER)                        # OTHER's failure, under X
+        stray = self.home.root / "sessions" / ("rollout-2026-10-14T11-00-00-%s_%s.jsonl" % (A, x))
+        stray.write_bytes(self.home.rollout(x).read_bytes())
+        self.home.rotate(OTHER)                                     # OTHER goes on under Y, no turn there yet
+        b = self.home.rotate(A)
+        rollout._SPLITS.clear()
+        self.assertEqual(self.source.turn_chain(A), (A, b))
+        self.assertEqual(self.source.latest(A)["status"], "completed")
+        self.assertEqual([(entry["thread_id"], entry["turn_id"]) for entry in self.failures()], [(OTHER, failed)])
+
     def test_a_file_named_otherwise_is_not_a_split(self):
         b = self.home.rotate(A)
         self.home.fail_usage(A)

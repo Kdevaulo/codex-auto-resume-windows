@@ -96,11 +96,12 @@ def meta_id(path):
 
 
 def named_after(home, turns_id) -> tuple:
-    """The conversation ids whose files, by name, hold `turns_id`'s turns (`<id>_<turns_id>.jsonl`) - listed again,
-    once for each id and at most AGAIN times a minute, where the listing names none: a split newer than the listing
+    """The conversation ids whose files, by name and first line, hold `turns_id`'s turns (`<id>_<turns_id>.jsonl`) -
+    listed again, once for each id and at most AGAIN times a minute, where the listing names none: a split newer than the listing
     is found at once, and many ids no file names cost a few listings."""
-    def named(listing):
-        return tuple(owner for owner, pairs in listing.items() if any(pair[0] == turns_id for pair in pairs))
+    def named(listing):                     # a file whose first line is another conversation's names no one
+        return tuple(owner for owner, pairs in listing.items()
+                     if any(other == turns_id and meta_id(file) == owner for other, file in pairs))
     found = named(_splits(home))
     now = time.monotonic()
     recent = _RELISTED.setdefault(str(home), [])
