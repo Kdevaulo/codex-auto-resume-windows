@@ -73,6 +73,7 @@ WHERE = {
     wire.CheckUsage: [("bridge:detection-check", "result.usage")],
     wire.CheckNotices: [("bridge:detection-check", "result.notices")],
     wire.CheckCodex: [("bridge:detection-check", "result.codex")],
+    wire.CheckLeftOut: [("bridge:detection-check", "result.left_out")],
     # v0.6.12: the power action after usage-limit recoveries - what the card draws, what an arming
     # answers, what the status carries while the file exists, and what turning it off says.
     wire.PowerView: POWER,

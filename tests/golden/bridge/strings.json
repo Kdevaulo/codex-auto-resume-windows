@@ -1088,7 +1088,9 @@
           "check.reason.conversation_off": "recovery is turned off for this conversation",
           "check.reason.recovery_off": "automatic recovery is off",
           "check.reason.watcher_stopped": "the watcher is not running",
-          "check.reason.not_failed": "its latest turn did not fail"
+          "check.reason.not_failed": "its latest turn did not fail",
+          "check.left_out": "{n} older conversations are not shown (only the newest {newest}).",
+          "check.unchecked": "{n} conversations could not be checked in time."
         },
         "preference": "system",
         "system_language": "en",

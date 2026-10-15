@@ -164,6 +164,46 @@ class FactTests(CheckupCase):
         self.assertEqual(before, after)
 
 
+class BoundTests(CheckupCase):
+    """A big Codex home is checked within the window's wait: the newest conversations, and what was left out."""
+
+    def many(self, count):
+        rows, state = [], []
+        for number in range(count):
+            thread = "0a1b2c3d-0006-7000-8000-%012d" % number
+            path = self.codex.root / "sessions" / ("rollout-x-%s.jsonl" % thread)
+            path.write_bytes(json.dumps({"type": "session_meta", "payload": {
+                "id": thread, "originator": "Codex Desktop", "source": "vscode", "thread_source": "user"}}).encode()
+                + bytes([10]))
+            state.append((thread, str(path)))
+            rows.append((thread, "0a1b2c3d-0007-7000-8000-%012d" % number, 5, "failed",
+                         json.dumps({"codexErrorInfo": "usageLimitExceeded"}), int(NOW - 3600 - number),
+                         int(NOW - 3500 - number)))
+        self.codex.add_thread(A)
+        with self.codex._db("thread_history_1.sqlite") as db:
+            db.executemany("INSERT INTO thread_turns (thread_id, turn_id, rollout_ordinal, status, error_json, "
+                           "started_at, completed_at) VALUES (?,?,?,?,?,?,?)", rows)
+        with self.codex._db("state_5.sqlite") as db:
+            db.executemany("INSERT INTO threads (id, rollout_path, source, thread_source, archived, history_mode) "
+                           "VALUES (?,?,'vscode','user',0,'paginated')", state)
+
+    def test_only_the_newest_conversations_and_it_says_how_many_more(self):
+        self.many(checkup.NEWEST + 50)
+        result = self.run_check()
+        self.assertEqual(len(self.rows(result)), checkup.NEWEST)
+        self.assertEqual(result["left_out"], {"conversations": 50, "unchecked": 0})
+        self.assertIn("50 older conversations are not shown (only the newest %d)." % checkup.NEWEST,
+                      "\n".join(result["lines"]))
+
+    def test_past_its_time_it_stops_and_says_how_many_it_did_not_check(self):
+        self.many(30)
+        with patch.object(checkup, "SECONDS", -1):
+            result = self.run_check()
+        self.assertEqual(self.rows(result), [])
+        self.assertEqual(result["left_out"]["unchecked"], 30)
+        self.assertIn("30 conversations could not be checked in time.", "\n".join(result["lines"]))
+
+
 class SurfaceTests(CheckupCase):
     def test_the_bridge_answers_it(self):
         self.codex.fail_usage(A)

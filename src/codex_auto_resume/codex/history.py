@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from pathlib import Path, PureWindowsPath
 import sqlite3
+import time
 from .. import failures, guards, machine, projects
 from ..domain import ids, skips
 from .errors import SourceError
@@ -165,11 +166,9 @@ class HistoryMixin:
 
     def latest_failures(self, since: float, *, needs_you=frozenset(), admissible=False,
                         shapes=False) -> list[dict]:
-        """Every conversation's latest turn that failed since `since` and that this product would
-        recover (payload.detect). `needs_you` (v0.6.11) adds, from the same read, those whose category
-        is one of these - failures that need a person (needsyou.KINDS) - normalized the same way and
-        with the id `detect` would have given them, but never through `detect`, so none of them can
-        ever become a record to recover (A14). Empty, the default, and this is v0.6.10's read.
+        """Every conversation's latest turn that failed since `since` and that this product would recover
+        (payload.detect). `needs_you` (v0.6.11) adds those of these categories (needsyou.KINDS), normalized the
+        same way with the id `detect` would give, but never through it: none can become a record (A14).
 
         v0.6.14, only while the plug wants P17 (domain/plug.py): `admissible` adds, marked so, those
         it may take up (failures.ADMISSIBLE), and `shapes` gives each entry its error's shape - never a
@@ -194,13 +193,16 @@ class HistoryMixin:
                 result.append(judge(rollout.placed(row, owner, index), needs_you, admissible, shapes))
         return result
 
-    def passed_over(self, since: float, before: float, *, every_status=False, known=frozenset()) -> dict:
+    def passed_over(self, since: float, before: float, *, every_status=False, known=frozenset(), newest=None,
+                    deadline=None) -> dict:
         """What latest_failures does not bring, and why (v0.6.16-beta.3, issue #27). "passed": each failed turn
         completed at `before` or later - or, with `every_status` (the Diagnostics check), every conversation's
         latest turn - whose turn id is not in `known`, with the reason (domain/skips.py) it stops at, in the
         order latest_failures decides: a later turn (A17), before `since` (A16), its conversation (A15,
         `_owner`), its kind (A13); None where it would be brought, or is no failure. "seen": how many failed
-        latest turns from `since` on the read held. Lifecycle columns, ids and kind words only."""
+        latest turns from `since` on the read held. Lifecycle columns, ids and kind words only. With `newest`
+        (every_status only) the most recent that many conversations, "more" saying how many are left out; past
+        `deadline` (time.monotonic) nothing more is explained, "unchecked" saying how many were not."""
         if not epoch(since) or not epoch(before):
             raise SourceError("Invalid detection start timestamp")
         with self._db("history") as connection:
@@ -208,10 +210,16 @@ class HistoryMixin:
                 "SELECT t.thread_id,t.turn_id,t.status,t.started_at,t.completed_at,t.rollout_ordinal,t.error_json,"
                 "EXISTS (SELECT 1 FROM thread_turns n WHERE n.thread_id=t.thread_id "
                 "AND n.rollout_ordinal>t.rollout_ordinal) AS later FROM thread_turns t "
-                "WHERE (t.status='failed' OR ?) AND coalesce(t.completed_at,t.started_at)>=?",
+                "WHERE (t.status='failed' OR ?) AND coalesce(t.completed_at,t.started_at)>=?" + (
+                    " AND NOT EXISTS (SELECT 1 FROM thread_turns n WHERE n.thread_id=t.thread_id AND n.rollout_ordinal"
+                    ">t.rollout_ordinal) ORDER BY coalesce(t.completed_at,t.started_at) DESC" if newest else ""),
                 (1 if every_status else 0, before)).fetchall()
-        seen, found = 0, []
+        more, rows = max(0, len(rows) - (newest or len(rows))), rows[:newest] if newest else rows
+        seen, found, unchecked = 0, [], 0
         for row in rows:
+            if deadline is not None and time.monotonic() > deadline:
+                unchecked += 1
+                continue
             failed, when, later = row["status"] == "failed", row["completed_at"], bool(row["later"])
             inside = epoch(when) and when >= since
             seen += int(failed and inside and not later)
@@ -228,15 +236,12 @@ class HistoryMixin:
                           "status": _turn_status(row["status"]), "category": category,
                           "completed_at": when if epoch(when) else None,
                           "reason": why[0] if why else None, "kind": why[1] if why else None})
-        return {"seen": seen, "passed": found}
+        return {"seen": seen, "passed": found, "more": more, "unchecked": unchecked}
 
     def stalled_turns(self, since: float, quiet_seconds: float, now: float) -> list[dict]:
-        """Conversations whose latest turn is still in progress and has recorded nothing new for
-        `quiet_seconds` (v0.6.11, a needs-you notice): the turn's lifecycle columns and the time of its
-        newest item, and nothing of any item's content, which is never selected (B7, B9). It says that
-        nothing moved, never why. Only a desktop-app conversation of a person's own, as detection
-        (A15); none at all where Codex's items carry no time (B5). Each: thread_id, turn_id, and when
-        it last moved."""
+        """Conversations whose latest turn is still in progress and recorded nothing new for `quiet_seconds`
+        (v0.6.11, a needs-you notice): lifecycle columns and its newest item's time, never content (B7, B9);
+        only a person's own desktop conversation (A15), none where items carry no time (B5)."""
         if not epoch(since) or type(quiet_seconds) is not int or quiet_seconds <= 0:
             raise SourceError("Invalid stall window")
         with self._db("history") as connection:

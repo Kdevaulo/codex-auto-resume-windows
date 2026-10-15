@@ -163,12 +163,19 @@ class CheckCodex(TypedDict):
     engine_found: bool
 
 
+class CheckLeftOut(TypedDict):
+    """What the check did not show: older conversations past its newest NEWEST, and those it had no time for."""
+    conversations: int
+    unchecked: int
+
+
 class DetectionCheck(TypedDict):
     """`detection-check`: why a failure was not taken up, as the watcher's own functions answer it now - the
     summary's code, the parts, and `lines`, all of it in the Interface language, the summary first."""
     summary: str
     watcher_running: bool
     conversations: list[CheckConversation]
+    left_out: CheckLeftOut
     split: list[dict[str, str]]
     homes: list[CheckHome]
     cloud_tasks: int | None
@@ -474,4 +481,5 @@ CONTRACTS = (RecordView, PendingRow, TimelineEvent, Receipt, UsageWindow, UsageR
              StatusSnapshot, Outcomes, Statistics, CompatEngine, CompatData, CompatCapability,
              CompatReported, CompatView, SchemaField, OwnValue, DemoRow, DemoReply, LogLine, LogSearch,
              StateAccessReply, PowerArmed, PowerShown, PowerLast, PowerView, PowerChoice, PowerOptions,
-             PowerDisarmed, CheckConversation, CheckHome, CheckUsage, CheckNotices, CheckCodex, DetectionCheck)
+             PowerDisarmed, CheckConversation, CheckHome, CheckUsage, CheckNotices, CheckCodex, CheckLeftOut,
+             DetectionCheck)

@@ -31,8 +31,12 @@ from .diagnostics import Redactor, _compatibility
 from .domain import skips
 from .engine import Engine
 
-# How far back conversations are looked at, and the most skip lines shown.
+# How far back conversations are looked at, how many of them at most (the newest), the longest the check may take
+# explaining them - well under the Dashboard's wait for a bridge answer (gui/Dashboard.cs, 30 s) - and the most
+# skip lines shown.
 HOURS = 72
+NEWEST = 200
+SECONDS = 10.0
 SKIP_LINES = 20
 # The windows of a usage reading the check names, by their length in minutes.
 FIVE_HOURS, WEEK = 300, 10080
@@ -113,7 +117,8 @@ def _skip_lines(control, redact):
 def _conversations(control, sources, engine_for, now, redact):
     """Part 1 and part 2 for every home: each recent conversation's latest turn, and for one the failure
     scan brings, the engine's own remaining reasons and the records it already has of that turn."""
-    found, homes = [], []
+    found, homes, left = [], [], {"conversations": 0, "unchecked": 0}
+    deadline = time.monotonic() + SECONDS
     with control._open() as store:
         stored = store.settings()
         records = store.all_records()
@@ -129,10 +134,13 @@ def _conversations(control, sources, engine_for, now, redact):
             engine = engine_for(store, source)
             since = engine.detection_since(stored)
             try:
-                read = source.passed_over(since, now - HOURS * 3600, every_status=True)
+                read = source.passed_over(since, now - HOURS * 3600, every_status=True, newest=NEWEST,
+                                          deadline=deadline)
             except Exception:
                 home["readable"] = False
                 continue
+            left["conversations"] += read["more"]
+            left["unchecked"] += read["unchecked"]
             for entry in read["passed"]:
                 row = {"thread": redact.alias(entry["thread_id"], "thread"), "home": label,
                        "status": entry["status"], "category": entry["category"],
@@ -154,7 +162,7 @@ def _conversations(control, sources, engine_for, now, redact):
     for home in homes:
         home["current"] = bool(written) and home["history_written"] == max(written)
     found.sort(key=lambda row: row["completed_at"] or 0)
-    return found, homes, stored
+    return found, homes, stored, left
 
 
 def _summary(rows, watcher_running, cloud):
@@ -213,7 +221,7 @@ def run(control, sources=None, *, now=None, redact=None, locale=None, presence=N
         engine.apply_policy(values, held)
         return engine
 
-    rows, homes, stored = _conversations(control, sources, engine_for, now, redact)
+    rows, homes, stored, left = _conversations(control, sources, engine_for, now, redact)
     try:
         status = control.get_status()
     except Exception:
@@ -231,7 +239,7 @@ def run(control, sources=None, *, now=None, redact=None, locale=None, presence=N
         codex = {"version": None, "tier": None, "engine_found": False}
     cloud = [home["cloud_tasks"] for home in homes if isinstance(home["cloud_tasks"], int)]
     result = {"summary": _summary(rows, running, sum(cloud)), "watcher_running": running,
-              "conversations": rows,
+              "conversations": rows, "left_out": left,
               "split": sorted({(row["thread"], row["turns_under"]) for row in rows if row["turns_under"]}),
               "homes": homes, "cloud_tasks": sum(cloud) if cloud else None,
               "usage": _usage(status, now), "notices": notices, "codex": codex,
@@ -254,6 +262,10 @@ def lines(result, now, locale) -> list:
     said.append(t("check.part1", hours=str(HOURS)))
     if not result["conversations"]:
         said.append("  " + t("check.none_recent", hours=str(HOURS)))
+    if result["left_out"]["conversations"]:
+        said.append("  " + t("check.left_out", n=str(result["left_out"]["conversations"]), newest=str(NEWEST)))
+    if result["left_out"]["unchecked"]:
+        said.append("  " + t("check.unchecked", n=str(result["left_out"]["unchecked"])))
     for row in result["conversations"]:
         if row["brought"]:
             verdict = t("check.yes")
