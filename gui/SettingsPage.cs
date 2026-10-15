@@ -1504,9 +1504,9 @@ namespace CodexAutoResume
                     else registeredThen(null);
                 };
                 if (startup == null || startupKnown || startAtSignIn == startupBaseline) { decide(); return; }
-                CallAsync("status", null, delegate(Dictionary<string, object> read)
+                CallAsync("status", null, delegate(Dictionary<string, object> reply)
                 {
-                    var status = Ok(read) ? Map(read, "status") : null;
+                    var status = Ok(reply) ? Map(reply, "status") : null;
                     if (status != null) KnowStartup(status, startup);
                     entryUnread = !startupKnown;
                     decide();
