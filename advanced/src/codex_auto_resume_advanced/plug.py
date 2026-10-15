@@ -96,6 +96,9 @@ class AdvancedPlug(Plug):
     def admission(self, failure):
         return self.runtime.ask(Point.ADMISSION, failure)
 
+    def eligibility(self):
+        return self.runtime.eligibility()
+
     def wants(self, point):
         """Whether a capability may answer at `point` now (core's Plug.wants), so core makes the
         reads that point needs only then (runtime.py)."""

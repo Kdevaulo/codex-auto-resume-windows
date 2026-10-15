@@ -551,7 +551,8 @@ capability, in plain words.
 **Who turns a capability on, and what turns it off.**
 
 - **Only the Dashboard's bridge turns one on.** Every capability starts off, and entering the
-  edition turns every one off. A capability is turned on, or set to watch first, one at a time and
+  edition turns every one off. A capability is turned on, or set to watch first, one at a time - or
+  turned on together with what it needs, in one confirmation that shows every statement involved - and
   only by a request on the local bridge the Dashboard uses (`controlcli serve`), which must still
   carry what the person has just been shown: the statement revision they read, the generation the
   list was read at - so that nothing turned off since is undone by a request that had not seen it -

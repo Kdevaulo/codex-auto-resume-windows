@@ -65,6 +65,32 @@ class PageTests(PageCase):
             "generation": script["advanced-list"][0]["result"]["generation"]}
 
     @classmethod
+    def scenario_requires(cls, bridge):
+        """v0.6.16-beta.3: Turn on for Wrap up near a limit while the usage meter it needs is off - one question with
+        both statements, one yes, and the request carries the meter's confirmation in `also`."""
+        bridge.measured = {}
+        script = cls.opening(bridge, "en")
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "usage_wrap_up"},
+                 {"do": "reply", "key": "advanced-arm", "with": [{"ok": True, "result": {"done": True}}]},
+                 {"do": "press", "button": "on"}]
+        return "en", {"answers": [True], "script": script, "steps": steps}, {
+            "wrap": script["advanced-statement usage_wrap_up"][0]["result"],
+            "meter": script["advanced-statement usage_meter"][0]["result"],
+            "generation": script["advanced-list"][0]["result"]["generation"]}
+
+    @classmethod
+    def scenario_required_off(cls, bridge):
+        """v0.6.16-beta.3: Turn off for the usage meter while Wrap up near a limit needs it: the note names the wrap-up
+        first, as the bridge's `also_off` does."""
+        cls.watched(bridge, "usage_meter", "armed")
+        script = cls.opening(bridge, "en")
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "usage_meter"},
+                 {"do": "reply", "key": "advanced-disarm",
+                  "with": [{"ok": True, "result": {"done": True, "changed": True, "also_off": ["usage_wrap_up"]}}]},
+                 {"do": "press", "button": "off"}]
+        return "en", {"script": script, "steps": steps}, {}
+
+    @classmethod
     def scenario_declined(cls, bridge):
         """Turn on and Watch first, both answered Cancel: nothing is sent."""
         script = cls.opening(bridge, "de")
@@ -300,9 +326,10 @@ class PageTests(PageCase):
         words = expected["words"]
         self.assertEqual([row[:2] for row in result["rows"]],
                          [[words["name." + capability], words["state.off"]] for capability in SHOWN])
-        self.assertEqual(SHOWN[:3], ["compat_report", "start_with_codex", "queue_for_open"])
+        # v0.6.16-beta.3: which conversations are recovered at all, right after what starts the recovering.
+        self.assertEqual(SHOWN[:4], ["compat_report", "start_with_codex", "every_conversation", "queue_for_open"])
         self.assertEqual(sorted(SHOWN), sorted(IDS))
-        self.assertEqual(len(IDS), 21)
+        self.assertEqual(len(IDS), 25)                  # v0.6.16-beta.3: every conversation, the usage meter, the wrap-up, the pause
         self.assertEqual(result["page"], "advanced")
         # The row chosen is the capability open, and nothing else is.
         self.assertEqual(result["open"], IDS[1])
@@ -374,6 +401,39 @@ class PageTests(PageCase):
                 self.assertEqual(item["confirmed_warnings"], json.loads(arm_line.split(" ", 1)[1])["warnings"])
             finally:
                 bridge.close()
+
+    def test_what_it_needs_is_asked_for_in_the_same_question_and_turned_on_with_it(self):
+        """Fails with the page's requirement handling reverted: the request would carry no `also`, which the real
+        bridge refuses (requirement_refused)."""
+        result, expected = self.of("scenario_requires")
+        (question,) = result["asked"]
+        self.assertIn("It needs Usage meter, so turning it on turns that on too.", question)
+        self.assertIn("Needed by it: Usage meter", question)
+        for shown in (expected["wrap"], expected["meter"]):
+            for field in shown["fields"]:
+                self.assertIn(field["text"], question)
+        (arm,) = sent(result, "advanced-arm")
+        meter = expected["meter"]
+        self.assertEqual(arm["also"], [{"capability": "usage_meter", "revision": meter["revision"],
+                                        "engine_version": meter["engine_version"],
+                                        "warnings": [item["warning"] for item in meter["warnings"]["items"]]}])
+        self.assertEqual(result["note"], "Wrap up near a limit is on, and so is what it needs: Usage meter.")
+        with tempfile.TemporaryDirectory() as home:
+            bridge = Bridge(Path(home))
+            try:
+                bridge.measured = {}
+                arm_line = next(line for line in result["sent"] if line.startswith("advanced-arm "))
+                reply = bridge.request(arm_line)["result"]
+                self.assertTrue(reply["done"], reply)
+                states = {entry["id"]: entry["state"] for entry in bridge("advanced-list", {})["result"]["capabilities"]}
+                self.assertEqual((states["usage_wrap_up"], states["usage_meter"]), ("armed", "armed"))
+            finally:
+                bridge.close()
+
+    def test_turning_off_what_another_needs_names_that_one_first(self):
+        result, _ = self.of("scenario_required_off")
+        self.assertEqual(result["note"], "Wrap up near a limit turned off first, because it needs Usage meter. "
+                                         "Then Usage meter turned off.")
 
     def test_cancel_sends_nothing(self):
         result, _ = self.of("scenario_declined")

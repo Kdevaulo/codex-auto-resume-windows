@@ -85,6 +85,34 @@ class PurposeTests(RecordCase):
                 self.assertEqual(plughands.records_of([bad]), ())
 
 
+class WrapUpTests(RecordCase):
+    """v0.6.16-beta.3 (issue #29): a WRAP_UP, the advanced edition's wrap-up near a usage limit, goes only into the very
+    turn it was made for while that turn still runs - Codex's queue delivers it when the turn ends - and is superseded
+    otherwise, never sent into a turn it was not made for."""
+    WORDS = "Please finish the current step, then stop."
+
+    def wrap_up(self, ordinal):
+        return record(words=self.WORDS, purpose="wrap_up", ordinal=ordinal)
+
+    def test_it_goes_while_its_turn_is_the_latest_and_still_running(self):
+        self.h.home.add_turn(T1, status="inProgress", progress=False)
+        plug = self.plug(self.wrap_up(latest_ordinal(self.h)))
+        self.h.tick()
+        self.assertEqual(self.h.backend.send_calls, [(T1, self.WORDS + "\n\n" + ids.short_marker(KEY))])
+        self.assertEqual(plug.moves, [("sent", None, None)])
+
+    def test_after_its_turn_ended_it_is_superseded_and_never_sent(self):
+        """Fails with core's rule for a wrap-up reverted: a turn that ended would be sent a wrap-up after it."""
+        plug = self.plug(self.wrap_up(latest_ordinal(self.h)))          # the latest turn here is completed
+        self.h.tick()
+        self.assertEqual(self.h.backend.send_calls, [])
+        self.assertEqual(plug.moves, [("superseded", "identity", "latest_turn_changed")])
+
+    def test_what_core_takes_of_one_needs_an_ordinal_and_catalog_words(self):
+        self.assertEqual(plughands.records_of([self.wrap_up(1)])[0]["purpose"], "wrap_up")
+        self.assertEqual(plughands.records_of([dict(record(), purpose="wrap_up")]), ())   # no ordinal
+
+
 class InFlightTests(RecordCase):
     def sent(self, plug=None, **changes):
         """The record sent, and Codex holding it in its queue: what P2 hands over of it then."""

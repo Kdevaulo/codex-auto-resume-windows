@@ -59,6 +59,18 @@ class SplitKeepCase(KeepCase):
         self.assertEqual(turns.between(T1, 5, turns.latest(T1).ordinal), 1, "B's first turn lies between")
         self.assertEqual(turns.latest(T1).turn_id, last)
 
+    def test_a_turn_running_under_b_is_its_conversation_running(self):
+        """The wrap-up's candidates (usage_wrap_up, `running`) are named as core names them: a turn running under B
+        is A's, so core's own reader - which knows no B - can judge it."""
+        self.h.home.add_thread(T1)
+        self.h.home.add_turn(T1, status="completed", completed=int(self.h.now) - 300)
+        self.h.home.rotate(T1)
+        going = self.h.home.add_turn(T1, status="inProgress", started=int(self.h.now) - 60, user_text=None,
+                                     progress=False)
+        turns = Turns(self.h.home.root)
+        self.assertEqual(turns.running(), [T1])
+        self.assertEqual((turns.latest(T1).turn_id, turns.latest(T1).status), (going, "inProgress"))
+
 
 class RestartedKeepCase(SplitKeepCase):
     HOME = Restarted

@@ -671,6 +671,7 @@
   "msg.toast_memory_stopped_next": "Er wurde zwischen zwei Prüfungen beendet, daher ging nichts Wartendes verloren. Starten Sie ihn im Dashboard wieder.",
   "msg.toast_memory_warning": "Der Watcher belegt viel Arbeitsspeicher",
   "msg.toast_memory_warning_next": "Er überwacht weiter. Die Diagnose zeigt, wie viel er höchstens belegt hat.",
+  "msg.toast_near_limit": "Die Codex-Nutzung ist nahe an einem Limit",
   "msg.toast_no_progress_body": "Die Wiederherstellung brachte keinen Fortschritt und wurde daher gestoppt.",
   "msg.toast_notify_only": "Diese Unterhaltung benachrichtigt nur; nichts wird automatisch fortgesetzt.",
   "msg.toast_objection": "Wird um {time} fortgesetzt, wenn Sie es nicht stoppen.",

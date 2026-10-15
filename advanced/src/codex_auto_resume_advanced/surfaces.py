@@ -56,7 +56,7 @@ ARGUMENTS = {
     BridgeCommand.ADVANCED_WORDS: frozenset({"locale"}),
     BridgeCommand.ADVANCED_STATEMENT: frozenset({"capability", "locale"}),
     BridgeCommand.ADVANCED_ARM: frozenset({"capability", "state", "revision", "generation",
-                                           "engine_version", "warnings"}),
+                                           "engine_version", "warnings", "also"}),
     BridgeCommand.ADVANCED_DISARM: frozenset({"capability"}),
     BridgeCommand.ADVANCED_DISARM_ALL: frozenset(),
     BridgeCommand.ADVANCED_CEILING: frozenset({"global_hourly", "generation"}),
@@ -144,6 +144,8 @@ def answer(runtime, name, facts):
         return diagnostics(runtime)
     if name == Surface.STATUS:
         return status(runtime)
+    if name == Surface.TRAY:
+        return dict(badge(runtime), **meter_view(runtime))
     if name in BADGE_SURFACES:
         return badge(runtime)
     if not isinstance(facts, dict):
@@ -181,7 +183,46 @@ def status(runtime) -> dict:
         shown.update(prompt_queue.counts(runtime))
     except Exception:
         pass
+    shown.update(meter_view(runtime))
     return shown
+
+
+def meter_view(runtime) -> dict:
+    """The usage meter's last reading, for the tooltip and the popup (v0.6.16-beta.3, issue #29) - only while the
+    meter is on, and {} otherwise, so with it off nothing here changes: {"meter": {"read_at", "windows": [each
+    window's bucket, window_minutes, used_percent, reset_at and band - warn, wrap_up, pause or none, by the
+    percentages of the stages that are on], "notices": [a warning the meter showed in the last NOTICE_FOR seconds:
+    its key, window_minutes, used_percent, reset_at]}}. Numbers and closed words only, as core's own reading is."""
+    from .engine import usage
+    try:
+        states = runtime.states()
+        if states.get(usage.METER) != ArmingState.ARMED:
+            return {}
+        rows = runtime.state.meter()
+        now = runtime.clock()
+        options = {capability: runtime.state.options(capability)
+                   for capability in (usage.METER, usage.WRAP_UP, usage.PAUSE)}
+    except Exception:
+        return {}
+    if not rows:
+        return {}
+    shown, notices = [], []
+    for (bucket, minutes), row in sorted(rows.items()):
+        band = "none"
+        for capability, word in ((usage.PAUSE, "pause"), (usage.WRAP_UP, "wrap_up"), (usage.METER, "warn")):
+            if (states.get(capability) == ArmingState.ARMED
+                    and usage.reached(row, usage.percent(options[capability], capability, minutes), now)):
+                band = word
+                break
+        shown.append({"bucket": bucket, "window_minutes": minutes, "used_percent": row["used_percent"],
+                      "reset_at": row["reset_at"], "band": band})
+        warned = row["warned_at"]
+        if (warned is not None and 0 <= now - warned < usage.NOTICE_FOR and row["warned_reset_at"] == row["reset_at"]
+                and row["reset_at"] is not None):
+            notices.append({"key": "%s:%d:%d" % (bucket, minutes, row["reset_at"]), "window_minutes": minutes,
+                            "used_percent": row["used_percent"], "reset_at": row["reset_at"]})
+    return {"meter": {"read_at": max(row["read_at"] for row in rows.values()), "windows": shown,
+                      "notices": notices}}
 
 
 def diagnostics(runtime) -> dict:
@@ -234,7 +275,8 @@ def bridge(runtime, command, argument):
         return arming.arm(argument.get("capability"), state=argument.get("state"),
                           revision=argument.get("revision"), generation=argument.get("generation"),
                           acknowledged_version=argument.get("engine_version"),
-                          warnings=argument.get("warnings"), actor=Actor.DASHBOARD)
+                          warnings=argument.get("warnings"), also=argument.get("also"),
+                          actor=Actor.DASHBOARD)
     if command == BridgeCommand.ADVANCED_DISARM:
         return arming.disarm(argument.get("capability"), actor=Actor.DASHBOARD)
     if command == BridgeCommand.ADVANCED_DISARM_ALL:

@@ -121,9 +121,7 @@ class OptionsMixin:
         self._usage_cache = None
         # v0.6.11: records whose task changed under the task-changed guard's Tell, said on their
         # continuation's notice (engine/guard.py); and jitter's draw, asked only while it is on.
-        self._told = set()
-        self._random = random.Random()
-        self._declined = set()
+        self._told, self._declined, self._random = set(), set(), random.Random()
         # v0.6.16-beta.3 (issue #27): skip lines written, turns explained, failed turns seen, "off" said.
         self._skips_told, self._passed_known, self._seen_failed, self._off_told, self._passed_since = {}, {}, None, False, None
         # v0.6.14: when each failure the edition's plug did not take up was last put to it (P17), the

@@ -18,8 +18,8 @@ from .. import failures, guards, machine, projects
 from ..domain import ids, skips
 from .errors import SourceError
 from .labels import _label
-from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, OWN_THREAD_SOURCES, PROGRESS_ITEM_TYPES, _json,
-                     _turn_status, epoch, normalize)
+from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, PROGRESS_ITEM_TYPES, _json, _turn_status, epoch,
+                     normalize, taken_thread_source)
 from . import rollout, workspace
 from .payload import (_choose_reset, _item_is_ours, _needing, _queue_has_marker, detect,  # noqa: F401
                       judge, later_turn, marker_row)
@@ -40,7 +40,7 @@ class HistoryMixin:
             return None, (skips.UNKNOWN_CONVERSATION, None)
         for wrong, word in ((row["source"] != "vscode", "source " + skips.kind(row["source"])),
                             (row["archived"] != 0, "archived"),
-                            (row["thread_source"] not in OWN_THREAD_SOURCES,
+                            (not taken_thread_source(row["thread_source"], self.widened),
                              "thread_source " + skips.kind(row["thread_source"])),
                             (row["history_mode"] != "paginated", "history_mode " + skips.kind(row["history_mode"]))):
             if wrong:

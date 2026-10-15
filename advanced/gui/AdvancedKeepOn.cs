@@ -91,6 +91,8 @@ namespace CodexAutoResume
                 return Word("page.kept.engine_changed", "It stayed on although the version of Codex changed. Turn it on again to confirm this version.");
             if (notice == "not_delivered_on_open")
                 return Word("page.kept.not_delivered_on_open", "It stayed on although Codex did not run a message queued for a conversation when it was opened.");
+            if (notice == "requirement_off")
+                return Word("page.kept.requirement_off", "It stayed on although a feature it needs is no longer on.");
             return null;
         }
 

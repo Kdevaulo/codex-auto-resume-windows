@@ -96,6 +96,8 @@ NOT_SCENARIOS = {
     "test_homes": "builds one engine per Codex home over codexsim homes, the default home's with a recording plug "
                   "and every other's with the NULL plug by design (runtime/homes.py) - the neutral plug is the "
                   "point it holds the other homes to",
+    "test_eligibility": "reads a Codex home through the source alone at the widening P19 names, and gives an engine "
+                        "plugs whose P19 answer it sets - the widening the neutral plug never asks for",
     "test_downgrade": "sends one continuation with this version's engine only to leave it queued, then "
                       "downgrades the state and runs v0.6.10's tagged watcher on it in a process of its "
                       "own, which no plug of this version reaches",
@@ -106,7 +108,9 @@ FIRST = ("test_outcomes",)
 # have to reach every one, or a point nothing reaches would pass for a neutral one.
 ENGINE_POINTS = frozenset({Point.RECORDS, Point.GATES, Point.TEXT, Point.SENDER, Point.OUTCOME,
                            Point.SCHEDULE, Point.TICK, Point.CLAIM_LEDGER, Point.CONCURRENCY,
-                           Point.MOVED, Point.DELIVERY, Point.UNLOADED, Point.ADMISSION})
+                           Point.MOVED, Point.DELIVERY, Point.UNLOADED, Point.ADMISSION,
+                           # v0.6.16-beta.3: which conversations are taken up, asked once a tick.
+                           Point.ELIGIBILITY})
 # What a moment read off the wall clock while a pair ran is written as, in rows and calls alike.
 WALL_CLOCK = "<wall clock>"
 # What a scenario is asked of Codex: every call the engine can make of a backend.
@@ -218,6 +222,10 @@ class DeferringPlug(Plug):
     def admission(self, failure):
         self.asked.add(Point.ADMISSION)
         return super().admission(failure)
+
+    def eligibility(self):
+        self.asked.add(Point.ELIGIBILITY)
+        return super().eligibility()
 
     def wants(self, point):
         """Every point, as a plug with a capability on there would say: core makes the reads that
