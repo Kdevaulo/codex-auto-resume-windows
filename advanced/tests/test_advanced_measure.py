@@ -25,6 +25,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
+import uuid
 
 import advancedcase as ac  # noqa: E402
 from codex_auto_resume import control, controlcli  # noqa: E402
@@ -1422,12 +1423,48 @@ class ReadOnlyProbeTests(unittest.TestCase):
                              {False})
 
     def test_the_ipc_look_itself_opens_for_reading_only(self):
-        """Read from the source: live_ipc opens the pipe 'rb' and writes nothing to it."""
+        """Read from the source: the look opens the pipe GENERIC_READ alone and writes nothing to it."""
         import inspect
-        source = inspect.getsource(measure.live_ipc)
-        self.assertIn('"rb"', source)
-        for written in (".write(", '"wb"', '"r+b"', '"ab"'):
+        source = inspect.getsource(measure.live_ipc) + inspect.getsource(measure._ipc_look)
+        self.assertIn("CreateFileW(_IPC_PIPE, GENERIC_READ, 0,", source)
+        for written in (".write(", "WriteFile", "GENERIC_WRITE", "0x40000000, 3", '"wb"', '"r+b"', '"ab"'):
             self.assertNotIn(written, source)
+
+    @unittest.skipUnless(sys.platform == "win32", "a Windows named pipe")
+    def test_the_ipc_look_gives_up_on_a_server_that_never_writes(self):
+        """A server that waits for its client's first frame writes nothing to one that never writes: the look
+        cancels its read after _IPC_WAIT_MS and says no_answer, instead of waiting for good; one that writes a
+        header is read. Each against a scratch pipe of this test's own, never codex-ipc."""
+        import ctypes
+        import threading
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.CreateNamedPipeW.restype = wintypes.HANDLE
+        k32.CreateNamedPipeW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD,
+                                         wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p]
+        k32.ConnectNamedPipe.argtypes = [wintypes.HANDLE, ctypes.c_void_p]
+        k32.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p, ctypes.c_void_p]
+        k32.CloseHandle.argtypes = [wintypes.HANDLE]
+        for writes, expected in ((False, {"opened": True, "frame_read": False, "no_answer": True}),
+                                 (True, {"opened": True, "frame_read": True, "no_answer": False})):
+            with self.subTest(writes=writes):
+                name = r"\\.\pipe\car-test-ipc-%s" % uuid.uuid4().hex
+                server = k32.CreateNamedPipeW(name, 3, 0, 1, 4096, 4096, 0, None)
+                self.assertNotIn(server, (None, wintypes.HANDLE(-1).value))
+                self.addCleanup(k32.CloseHandle, server)
+
+                def serve(server=server, writes=writes):
+                    k32.ConnectNamedPipe(server, None)
+                    if writes:
+                        k32.WriteFile(server, b"\x10\x00\x00\x00", 4, None, None)
+                threading.Thread(target=serve, daemon=True).start()
+                answer = {}
+                with patch.object(measure, "_IPC_PIPE", name), patch.object(measure, "_IPC_WAIT_MS", 1500):
+                    look = threading.Thread(target=lambda: answer.update(measure.live_ipc()()), daemon=True)
+                    look.start()
+                    look.join(20)
+                self.assertFalse(look.is_alive(), "the look never returned")
+                self.assertEqual({key: answer[key] for key in expected}, expected)
 
     def test_the_shared_server_probe_reads_the_help_for_the_setting(self):
         seen = self.run_one(Measurement.MAWS, cli=lambda args: "env CODEX_APP_SERVER_WS_URL sets the server")

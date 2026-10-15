@@ -738,7 +738,7 @@ def _mipc(ctx):
     stop-now and send-now would need and is not built here, so the person confirms the rest."""
     look = ctx.ipc_look()
     observed = {"pipe_exists": bool(look.get("exists")), "pipe_opened": bool(look.get("opened")),
-                "frame_read": bool(look.get("frame_read"))}
+                "frame_read": bool(look.get("frame_read")), "no_answer": bool(look.get("no_answer"))}
     return _blocked("a read-only look at the Desktop's IPC pipe: it is never written to. Confirm whether a turn of "
                     "a conversation the app holds can be started, interrupted, or added to through it - stop-now "
                     "and send-now wait on this answer - then set the verdict", **observed)
@@ -932,6 +932,9 @@ def live_launcher(paths):
 _CLI_HELP_SECONDS = 20
 _IPC_PIPE = r"\\.\pipe\codex-ipc"
 _IPC_FRAME_HEADER = 4            # the 4-byte little-endian length prefix (sybxxx/codex-auto-retry)
+# How long the look waits for that header: a server that answers only once a client has written its first frame
+# writes nothing to one that never writes, so the read is cancelled after this and the look says no_answer.
+_IPC_WAIT_MS = 2000
 
 
 def live_cli(backend=None, paths=None):
@@ -956,23 +959,72 @@ def live_cli(backend=None, paths=None):
 
 def live_ipc():
     """The real IPC-pipe look (v0.6.16-beta.3, MIPC): it opens the Desktop's own named pipe for reading
-    only, reads up to the 4-byte frame header, and closes it - it writes nothing, starts nothing,
-    interrupts nothing. {exists, opened, frame_read}, each a boolean. A test wires a fake instead."""
+    only (GENERIC_READ, overlapped), waits at most _IPC_WAIT_MS for the 4-byte frame header, cancels the read
+    if none came, and closes the pipe - it writes nothing, starts nothing, interrupts nothing.
+    {exists, opened, frame_read, no_answer}, each a boolean. A test wires a fake instead."""
     def ipc():
-        found = {"exists": False, "opened": False, "frame_read": False}
+        found = {"exists": False, "opened": False, "frame_read": False, "no_answer": False}
         try:
-            # Opened for reading alone; closed at once. Nothing is ever written to the pipe.
-            with open(_IPC_PIPE, "rb", buffering=0) as pipe:
-                found["exists"] = found["opened"] = True
-                header = pipe.read(_IPC_FRAME_HEADER)
-                found["frame_read"] = isinstance(header, (bytes, bytearray)) and len(header) == _IPC_FRAME_HEADER
-        except FileNotFoundError:
+            return _ipc_look(found)
+        except Exception:
             return found
-        except OSError:
-            found["exists"] = True            # the pipe is there but could not be opened or read now
-        return found
-
     return ipc
+
+
+def _ipc_look(found):
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateFileW.restype = wintypes.HANDLE
+    k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+                                wintypes.DWORD, wintypes.HANDLE]
+    k32.CreateEventW.restype = wintypes.HANDLE
+    k32.CreateEventW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
+    k32.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p, ctypes.c_void_p]
+    k32.GetOverlappedResult.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD),
+                                        wintypes.BOOL]
+    k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    k32.WaitForSingleObject.restype = wintypes.DWORD
+    k32.CancelIoEx.argtypes = [wintypes.HANDLE, ctypes.c_void_p]
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+    class OVERLAPPED(ctypes.Structure):
+        _fields_ = [("Internal", ctypes.c_void_p), ("InternalHigh", ctypes.c_void_p), ("Offset", wintypes.DWORD),
+                    ("OffsetHigh", wintypes.DWORD), ("hEvent", wintypes.HANDLE)]
+
+    GENERIC_READ, OPEN_EXISTING, FILE_FLAG_OVERLAPPED = 0x80000000, 3, 0x40000000
+    NOT_FOUND, IO_PENDING, WAIT_OBJECT_0 = (2, 3), 997, 0
+    invalid = wintypes.HANDLE(-1).value
+    # Opened for reading alone; closed below whatever happens. Nothing is ever written to the pipe.
+    pipe = k32.CreateFileW(_IPC_PIPE, GENERIC_READ, 0, None, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, None)
+    if pipe in (None, invalid):
+        if ctypes.get_last_error() not in NOT_FOUND:
+            found["exists"] = True              # the pipe is there but could not be opened now
+        return found
+    found["exists"] = found["opened"] = True
+    event = k32.CreateEventW(None, True, False, None)
+    try:
+        if not event:
+            return found
+        overlapped = OVERLAPPED(hEvent=event)
+        header = ctypes.create_string_buffer(_IPC_FRAME_HEADER)
+        count = wintypes.DWORD(0)
+        started = k32.ReadFile(pipe, header, _IPC_FRAME_HEADER, None, ctypes.byref(overlapped))
+        if not started and ctypes.get_last_error() != IO_PENDING:
+            return found
+        if k32.WaitForSingleObject(event, _IPC_WAIT_MS) != WAIT_OBJECT_0:
+            # Nothing came: the read is cancelled, and waited out, before its buffer goes.
+            k32.CancelIoEx(pipe, ctypes.byref(overlapped))
+            k32.GetOverlappedResult(pipe, ctypes.byref(overlapped), ctypes.byref(count), True)
+            found["no_answer"] = True
+            return found
+        if k32.GetOverlappedResult(pipe, ctypes.byref(overlapped), ctypes.byref(count), False):
+            found["frame_read"] = count.value == _IPC_FRAME_HEADER
+        return found
+    finally:
+        if event:
+            k32.CloseHandle(event)
+        k32.CloseHandle(pipe)
 
 
 def complete(measurement, verdict, note, *, backend=None, versions=None, clock=time.time,
