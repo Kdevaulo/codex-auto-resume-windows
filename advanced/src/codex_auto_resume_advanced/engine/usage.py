@@ -30,14 +30,18 @@ reads each window on its own percentage.
 from __future__ import annotations
 
 from codex_auto_resume.domain.plug import DEFER, Alternative
+from codex_auto_resume.domain.plughands import RECORDS_LIMIT, Widening
 
 from .. import statement
 from ..codex import credits, inuse
 from ..codex.turns import Turns
-from ..vocabulary import ContinuationKind, OptionKey, RecordState
+from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
 from .continued import answer_key, handed, words_pass
 
 METER, WRAP_UP, PAUSE = "usage_meter", "usage_wrap_up", "usage_pause"
+# Recover every conversation (engine/everyconversation.py): while it is on, core takes up P19's widening, and so does
+# the wrap-up - never more than core would recover.
+EVERY_CONVERSATION = "every_conversation"
 FIVE_HOUR, WEEKLY = 300, 10080
 WINDOWS = (FIVE_HOUR, WEEKLY)
 # The choices a person picks from: the meter's spacing in minutes, a percentage, the wrap-up's wording.
@@ -174,19 +178,33 @@ class UsageMeter:
 # ---------------------------------------------------------------------------- the wrap-up
 class UsageWrapUp:
     """usage_wrap_up's code: at P8 the conversations to ask, at P2 the messages waiting."""
-    __slots__ = ("paths", "_scoped", "_home", "_looked")
+    __slots__ = ("paths", "_scoped", "_home", "_looked", "_turn")
 
     def __init__(self, paths, *, home=None):
         self.paths = paths
         self._scoped = None
         self._home = home
         self._looked = None
+        self._turn = 0
 
     def bind(self, scoped):
         self._scoped = scoped
 
     def _codex_home(self):
         return self._home if self._home is not None else inuse.home(self.paths)
+
+    def _source(self):
+        """Core's own reader of the Codex home, judging a conversation as core does (codex/history._metadata): a
+        person's own - or, while Recover every conversation is on, P19's widening - and never a kind Codex makes for
+        itself (a subagent, a review, a memory pass, an agent-made conversation). Its `latest` is None for any other."""
+        from codex_auto_resume.codex import LocalSource
+        source = LocalSource(self._codex_home())
+        try:
+            widened = self._scoped.armed(EVERY_CONVERSATION) is True
+        except Exception:
+            widened = False
+        source.widened = frozenset({Widening.EVERY_DESKTOP}) if widened else frozenset()
+        return source
 
     def tick(self, view):
         scoped = self._scoped
@@ -216,10 +234,11 @@ class UsageWrapUp:
         if not words_pass(words):
             return
         turns = Turns(self._codex_home())
+        source = self._source()
         for thread in turns.running():
             try:
-                if view.thread_enabled(thread) is not True:
-                    continue
+                if view.thread_enabled(thread) is not True or source.latest(thread) is None:
+                    continue                    # switched off, or not a conversation core would recover
                 turn = turns.latest(thread)
             except Exception:
                 continue
@@ -240,8 +259,45 @@ class UsageWrapUp:
             rows = scoped.continuations.mine()
         except Exception:
             return DEFER
-        found = [handed(row) for row in rows if row["record_state"] == RecordState.WAITING]
-        return [record for record in found if record is not None] or DEFER
+        waiting = [row for row in rows if row["record_state"] == RecordState.WAITING]
+        if waiting:
+            waiting = self._still_due(waiting)
+        found = [record for record in (handed(row) for row in waiting) if record is not None]
+        # Core tries RECORDS_LIMIT a tick: past it, those waiting are handed from a place that moves on each tick, so
+        # none waits behind the others for good (as engine/resetmessage.py hands its messages).
+        if len(found) > RECORDS_LIMIT:
+            start = (self._turn * RECORDS_LIMIT) % len(found)
+            found = found[start:] + found[:start]
+            self._turn += 1
+        return found or DEFER
+
+    def _still_due(self, waiting) -> list:
+        """The waiting ones whose conversation core would still recover and whose turn is still the latest and still
+        running; every other one ends superseded here - core would keep it waiting for good (not a conversation it
+        takes up) or drop it (its turn moved on), and either way it would take a place among core's few a tick.
+        Where Codex's files cannot be read now, each is left as it is, for the next tick."""
+        try:
+            source = self._source()
+        except Exception:
+            return waiting
+        kept, ended = [], set()
+        for row in waiting:
+            thread = row["thread_id"]
+            try:
+                latest = source.latest(thread)
+            except Exception:
+                kept.append(row)
+                continue
+            if (latest is not None and latest.get("ordinal") == row["ordinal"]
+                    and latest.get("status") == "inProgress"):
+                kept.append(row)
+            elif thread not in ended:
+                ended.add(thread)
+                try:
+                    self._scoped.continuations.end(ContinuationReason.SUPERSEDED, thread_id=thread)
+                except Exception:
+                    pass
+        return [row for row in kept if row["thread_id"] not in ended]
 
     def _count(self, code) -> None:
         try:

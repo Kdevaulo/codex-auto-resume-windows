@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 import unittest
+import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -23,7 +24,7 @@ from codex_auto_resume.domain.plug import DEFER, Alternative, Point, Surface  # 
 from codex_auto_resume_advanced import registry, statement, surfaces  # noqa: E402
 from codex_auto_resume_advanced.engine import usage  # noqa: E402
 from codex_auto_resume_advanced.registry import USAGE_METER, USAGE_PAUSE, USAGE_WRAP_UP, Registry  # noqa: E402
-from codex_auto_resume_advanced.vocabulary import Actor, ArmingState, OptionKey, OffReason  # noqa: E402
+from codex_auto_resume_advanced.vocabulary import Actor, ArmingState, ContinuationKind, OptionKey, OffReason  # noqa: E402
 from test_engine import T1  # noqa: E402
 
 ENGINE = ac.ENGINE
@@ -296,6 +297,43 @@ class WrapUpTests(TakingCase):
         self.assertEqual(self.h.backend.send_calls, [])
         row = plug.runtime.state.continuations(capability=self.cap, pending=None)[0]
         self.assertEqual(row["reason"], "superseded")
+
+    def test_a_conversation_codex_makes_for_itself_gets_none(self):
+        """Only a conversation core would recover is asked: a subagent, a review, a memory pass and an agent-made
+        conversation running beside the person's own get no wrap-up, which core would keep waiting for good."""
+        plug, _turn = self.running()
+        internal = []
+        for kind in ("subagent", "guardian_review", "memory_consolidation", "agent_created_thread"):
+            thread = str(uuid.uuid4())
+            self.h.home.add_thread(thread, thread_source=kind)
+            self.h.home.add_turn(thread, status="inProgress", progress=False)
+            self.h.backend.loaded_map[thread] = "loaded"
+            internal.append(thread)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        rows = plug.runtime.state.continuations(capability=self.cap, pending=None)
+        self.assertEqual({row["thread_id"] for row in rows}, {T1})
+        self.assertEqual([thread for thread, _p in self.h.backend.send_calls], [T1])
+
+    def test_rows_core_would_never_send_end_and_crowd_out_none(self):
+        """Ten left waiting where core would never send them - conversations it does not take up - end superseded at
+        the next P2, and the person's own conversation is sent its wrap-up beside them."""
+        plug, _turn = self.running()
+        stale = []
+        for index in range(10):
+            thread = str(uuid.uuid4())
+            self.h.home.add_thread(thread, thread_source="subagent")
+            self.h.home.add_turn(thread, status="inProgress", progress=False)
+            key = "%064x" % (9000 + index)
+            self.assertTrue(plug.runtime.state.add_continuation(key, self.cap, ContinuationKind.WRAP_UP, thread,
+                                                                statement.CATALOGS.text("continue.wrap_up.short"),
+                                                                ordinal=0))
+            stale.append(thread)
+        for _ in range(4):
+            self.h.tick(advance=61)
+        self.assertEqual([thread for thread, _p in self.h.backend.send_calls], [T1])
+        rows = {row["thread_id"]: row for row in plug.runtime.state.continuations(capability=self.cap, pending=None)}
+        self.assertEqual({rows[thread]["reason"] for thread in stale}, {"superseded"})
 
 
 if __name__ == "__main__":
