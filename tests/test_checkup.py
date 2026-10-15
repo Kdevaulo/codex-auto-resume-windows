@@ -19,7 +19,7 @@ if _HERE not in sys.path:
 
 from codexsim import BASE  # noqa: E402
 from codex_auto_resume import checkup, controlcli, diagnostics, logbook  # noqa: E402
-from codex_auto_resume.codex import LocalSource, history  # noqa: E402
+from codex_auto_resume.codex import LocalSource, values  # noqa: E402
 from codex_auto_resume.domain import skips  # noqa: E402
 from codex_auto_resume.store import Store  # noqa: E402
 from test_continuation_split import SplitHome  # noqa: E402
@@ -78,7 +78,8 @@ class VerdictTests(CheckupCase):
         self.codex.add_thread(A, thread_source="chatgpt_handoff", originator="codex_work_desktop")
         self.codex.fail_usage(A)
         self.assertTrue(self.rows(self.run_check())[0]["brought"])
-        with patch.object(history, "OWN_THREAD_SOURCES", frozenset({"user"})):
+        # The rule lives in codex/values.py since P19 (taken_thread_source), read where it is asked.
+        with patch.object(values, "OWN_THREAD_SOURCES", frozenset({"user"})):
             self.assertEqual(self.rows(self.run_check())[0]["reason"], skips.OTHER_KIND)
 
     def test_recovery_off_and_a_conversation_switched_off_are_named(self):
