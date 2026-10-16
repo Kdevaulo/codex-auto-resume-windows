@@ -427,6 +427,12 @@ namespace CodexAutoResume
                         if (found == null || !found.Enabled) disabled.Add(what);
                         else Pressed.Invoke(found, new object[] { EventArgs.Empty });
                     }
+                    else if (what == "run_stop")
+                    {
+                        Button stop = form.runStops.Find(delegate(Button each) { return Equals(each.Tag, Str(step, "key")); });
+                        if (stop == null || !stop.Enabled) disabled.Add("run_stop");
+                        else Pressed.Invoke(stop, new object[] { EventArgs.Empty });
+                    }
                     else if (what == "remove")
                     {
                         Button remove = form.ruleRemoves.Find(delegate(Button each) { return Equals(each.Tag, Get(step, "rule")); });
@@ -608,6 +614,11 @@ namespace CodexAutoResume
             var waiting = new List<object>();
             foreach (Button send in sendNowButtons) waiting.Add(send.Tag);
             look["send_now"] = waiting;
+            // The turns run here: what each Stop... names (v0.6.16-beta.4); and Pending's and History's rows as the
+            // lists draw them - each cell's text - where those pages are built.
+            look["run_stops"] = Tags(runStops);
+            look["pending_rows"] = ListCells(pendingList);
+            look["history_rows"] = ListCells(historyList);
             // The open reset action's form - what each drop-down offers and holds, the count of the words, whether Add can
             // be pressed - and the rules its Cancel, Go on counting and Use a reset credit now... buttons name; and
             // Pending's scheduled group: whether it shows, its lines and what its Cancel buttons name.
@@ -664,6 +675,19 @@ namespace CodexAutoResume
             report["holds"] = (double)reopenHolds;
             look["report"] = report;
             return look;
+        }
+
+        private static List<object> ListCells(ListView list)
+        {
+            var rows = new List<object>();
+            if (list != null)
+                foreach (ListViewItem item in list.Items)
+                {
+                    var row = new List<object>();
+                    for (int cell = 0; cell < item.SubItems.Count; cell++) row.Add(item.SubItems[cell].Text);
+                    rows.Add(row);
+                }
+            return rows;
         }
 
         private static List<object> Tags(List<Button> buttons)
