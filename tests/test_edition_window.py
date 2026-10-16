@@ -237,7 +237,7 @@ class WindowTests(unittest.TestCase):
     def test_the_standard_window_is_the_file_it_would_be_without_the_points(self):
         """The measurement the plan asked for: declaring the points and calling them changes
         not one byte of the standard executable."""
-        self.assertEqual(self.cut_lines, 5 + 6, "five declarations and six calls")
+        self.assertEqual(self.cut_lines, 6 + 7, "six declarations and seven calls")
         self.assertEqual(self.standard, (self.work / "without" / WINDOW).read_bytes())
         self.assertEqual((self.work / "standard" / LAUNCHER).read_bytes(),
                          (self.work / "without" / LAUNCHER).read_bytes())

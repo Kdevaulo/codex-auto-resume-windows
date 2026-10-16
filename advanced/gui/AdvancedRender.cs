@@ -6,8 +6,9 @@
 // The render mode puts the window in each frame's state as far as the standard window goes - a page, a section, a
 // scroll, a face - and hands the frame here (RenderStateNamed, a point gui/Dashboard.cs declares). A frame on this page
 // shows it once this edition has answered with its words; opens the capability it names, waiting until its statement
-// and what it keeps have been read and shown; scrolls the open capability's column; and, for the compatibility report,
-// writes the report and checks what sending would write, each from the job's replies, as a person's clicks would. Each
+// and what it keeps have been read and shown; for the compatibility report, writes the report and checks what sending
+// would write, each from the job's replies, as a person's clicks would; and scrolls the open capability's column, to a
+// part the frame names or by turns of the wheel. Each
 // is waited for until it is drawn. A capability this tree does not have, a statement that was not read, or a report
 // that was not written stops the job: a picture is never of something else.
 //
@@ -57,6 +58,8 @@ namespace CodexAutoResume
                 RenderReport(open, report);
                 moved = true;
             }
+            string show = Str(frame, "show");
+            if (show != null) RenderShow(show);
             var scroll = Map(frame, "scroll");
             if (scroll != null && advancedScroll != null)
             {
@@ -89,6 +92,33 @@ namespace CodexAutoResume
                 if (!RenderUntil(ReportEnded) || reportChecked == null)
                     throw new InvalidDataException("what sending would write was not checked: " + (reportTold ?? "no answer"));
             }
+        }
+
+        // How far above the part a frame shows the column stops, in logical pixels: the caption or line over it shows too.
+        private const int RenderShowLead = 40;
+
+        /// The open capability's column scrolled so the part `name` names stands at its top: `report`, the report's card;
+        /// `report.file`, the whole file; `report.check`, what checking found. One that does not show stops the job.
+        private void RenderShow(string name)
+        {
+            Control part = name == "report.file" ? (Control)reportFile : name == "report.check" ? reportCheck
+                         : name == "report" ? (Control)reportLogin : null;
+            Control card = part;
+            while (card != null && card.Parent != advancedStack) card = card.Parent;
+            if (part == null || card == null || advancedScroll == null)
+                throw new InvalidDataException("no part called " + name + " shows on " + advancedOpen);
+            Materialise(this);
+            PerformLayout();
+            int top = name == "report" ? card.Top - card.Margin.Top : InStack(part) - Px(RenderShowLead);
+            ((ISoftScroller)advancedScroll).ScrollTo(Math.Max(0, top));
+        }
+
+        /// Where `control` stands in the open capability's column, from the positions of it and everything round it.
+        private int InStack(Control control)
+        {
+            int y = 0;
+            for (Control c = control; c != null && c != advancedStack; c = c.Parent) y += c.Top;
+            return y;
         }
 
         /// Whether the report's job has ended - read now, rather than at its timer's next tick.
