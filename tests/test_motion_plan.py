@@ -189,6 +189,15 @@ class ClockTests(unittest.TestCase):
         self.assertEqual([frame.t for frame in filled], [0, 40, 80, 120, 160, 200, 333])
         self.assertEqual(state(filled[-1])["page"], "pending")
 
+    def test_a_moment_too_close_to_another_adds_no_frame(self):
+        frames = motion_plan.expand(plan_of({"hold": 300}, {"set": {"page": "pending"}, "hold": 300}))
+        filled = motion_plan.fill(frames, 600, 10, also=(108, 133, 290, 595))
+        self.assertEqual([frame.t for frame in filled], [0, 100, 133, 200, 300, 400, 500])
+        motion_plan.delays([frame.t for frame in filled], 600)
+        readme = motion_plan.load(make_motion.plan_path("readme-en"))
+        icon = [1092.0 + 1.37 * n for n in range(0, 20000, 7)]
+        make_motion.schedule(readme, icon)
+
     def test_delays_are_whole_hundredths_that_sum_to_the_picture(self):
         self.assertEqual(motion_plan.delays([0, 40, 77, 120], 1000), [4, 4, 4, 88])
         with self.assertRaises(PlanError):

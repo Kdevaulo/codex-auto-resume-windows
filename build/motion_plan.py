@@ -35,6 +35,7 @@ the card's light, the tray icon - is drawn at that moment, so a plan only says w
 """
 from __future__ import annotations
 
+import bisect
 import copy
 import json
 import math
@@ -55,6 +56,8 @@ STEPS = ("hold", "set", "move", "hover", "press", "card", "wheel", "open", "rows
 HOLDING = ("set", "open", "choose")
 # The shortest a frame is held, in hundredths of a second: browsers show 10 ms or less as 100 ms.
 SHORTEST = 2
+# The least two frames' moments may be apart, in ms, and still be held SHORTEST hundredths each once rounded.
+CLOSEST = 10 * SHORTEST + 5
 # How long a click's ripple lasts (TOOLING 2.3), in ms.
 RIPPLE_MS = 240
 NAME = re.compile(r"(page\.(%s)|section\.(%s)|save|restore|start|close|setting\.[a-z_]+|row\.[A-Za-z_-]+|card\.[a-z_]+)\Z"
@@ -397,8 +400,17 @@ def fill(frames: list, end: int, per_second: int, also=(), first_hold: int = 0, 
         for start in sorted({frame.ripple[1] for frame in frames if frame.ripple}):
             moments.update(range(start, start + RIPPLE_MS, ripple_step))
     moments = {at for at in moments if at >= first_hold}
-    have = {frame.t for frame in frames}
-    added = sorted(at for at in moments if 0 <= at < end and at not in have and at >= frames[0].t)
+    # A frame added this close to another would be held under SHORTEST hundredths once both are rounded to
+    # hundredths: the steps' own frames win, and of two added ones the earlier.
+    have = sorted({frame.t for frame in frames} | {end})
+    added, kept = [], None
+    for at in sorted(at for at in moments if frames[0].t <= at < end):
+        place = bisect.bisect_left(have, at)
+        near = [abs(at - have[i]) for i in (place - 1, place) if 0 <= i < len(have)]
+        if min(near) < CLOSEST or (kept is not None and at - kept < CLOSEST):
+            continue
+        added.append(at)
+        kept = at
     out, index = [], 0
     for frame in frames:
         while index < len(added) and added[index] < frame.t:
