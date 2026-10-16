@@ -346,6 +346,12 @@ class UsageWrapUp:
                 continue
             if latest is None or latest.status == "inProgress":
                 continue                                          # still working: looked at again
+            newer = _after_wrap_up(turns, thread, wrap["ordinal"], latest.ordinal)
+            if newer is None:
+                continue                                          # not read: looked at again
+            if newer:
+                handle.note(key, ContinuationKind.AFTER_RESET, thread, ContinuationReason.SUPERSEDED)
+                continue                                          # newer work came after the wrap-up's own turn (A17)
             if latest.status != "completed":
                 handle.note(key, ContinuationKind.AFTER_RESET, thread, ContinuationReason.HANDED_OVER)
                 continue                                          # a failure is core's; a stop, the forced stop's
@@ -420,6 +426,21 @@ class UsageWrapUp:
             self._scoped.count(code)
         except Exception:
             pass
+
+
+def _after_wrap_up(turns, thread, made_for, latest):
+    """Whether a turn came after the wrap-up's own - the turn it was made for (`made_for`), or the very next one, which
+    the wrap-up started: True where `latest` is later than both, None where that cannot be read."""
+    if type(made_for) is not int or type(latest) is not int:
+        return None
+    if latest == made_for:
+        return False
+    if latest < made_for:
+        return True
+    try:
+        return turns.between(thread, made_for, latest) != 0
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------- the pause

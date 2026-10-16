@@ -492,6 +492,33 @@ class WrapUpTests(TakingCase):
         _plug, wrapped, _delivered, after = self.wrapped_then("interrupted")
         self.assertEqual(after, [], "a turn stopped is not the wrap-up's to continue")
 
+    def test_after_the_reset_newer_work_of_the_person_wins_and_nothing_is_sent(self):
+        """A17: a turn of the person's own after the wrap-up's turn - nothing is queued onto it after the reset."""
+        plug, turn = self.running()
+        self.language(plug, "en")
+        self.h.backend.after_accept = "queue"
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        wrapped = len(self.h.backend.send_calls)
+        self.assertEqual(wrapped, 1)
+        self.h.home.set_turn(T1, turn, status="completed", completed_at=int(self.h.now))
+        self.h.home.dispatch(T1, status="completed", progress=True)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.h.home.add_turn(T1, user_text="my own newer question")
+        for _ in range(2):
+            self.h.tick(advance=61)
+        reset = plug.runtime.state.meter()[("codex", 300)]["reset_at"]
+        self.h.now = reset + 120
+        plug.runtime.state.save_meter([{"bucket": "codex", "window_minutes": 300, "used_percent": 2,
+                                        "reset_at": reset + 5 * 3600}], at=self.h.now)
+        for _ in range(4):
+            self.h.tick(advance=61)
+        self.assertEqual(self.h.backend.send_calls[wrapped:], [])
+        reasons = [row["reason"] for row in plug.runtime.state.continuations(capability=self.cap, pending=None)
+                   if row["kind"] == "after_reset"]
+        self.assertEqual(reasons, ["superseded"])
+
     def test_a_window_switched_off_gets_no_wrap_up(self):
         """v0.6.16-beta.4 (e): the five-hour window over its wrap-up percentage but switched off in the meter's choices -
         nothing is sent; both windows off, the meter still shows usage and nothing acts."""
