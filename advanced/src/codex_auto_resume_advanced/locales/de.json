@@ -91,6 +91,7 @@
   "page.row.kind.cli": "CLI",
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "Führen Sie /compact in Codex aus; danach geht es weiter",
+  "page.row.model_not_restored": "Diese Unterhaltung nutzt jetzt ein anderes Modell; stellen Sie es in Codex zurück",
   "page.done.send_now": "Angefragt. Besteht sie jede Prüfung, sendet der Wächter sie beim nächsten Blick; die Liste zeigt, was geschehen ist.",
   "page.done.watch": "„{name}“ wird beobachtet. Sie tut noch nichts.",
   "page.hourly": "Nachrichten pro Stunde, alle erweiterten Funktionen zusammen",

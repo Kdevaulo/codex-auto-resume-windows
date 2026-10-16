@@ -584,5 +584,6 @@
   "page.row.kind.cli": "CLI",
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "Run /compact in Codex; it continues after",
+  "page.row.model_not_restored": "This conversation now uses another model; switch it back in Codex",
   "page.keep_on.never": "It cannot be kept on: turning itself off when something goes wrong is what keeps it safe."
 }

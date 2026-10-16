@@ -91,6 +91,7 @@
   "page.row.kind.cli": "CLI",
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "הריצו /compact ב-Codex; היא תמשיך אחר כך",
+  "page.row.model_not_restored": "השיחה הזו משתמשת עכשיו במודל אחר; החזירו אותו ב-Codex",
   "page.done.send_now": "התבקש. אם כל הבדיקות עוברות, המשגיח שולח אותו במבט הבא; הרשימה מראה מה קרה.",
   "page.done.watch": "יש מעקב אחרי \"{name}\". היא עדיין לא עושה דבר.",
   "page.hourly": "הודעות בשעה, כל התכונות המתקדמות יחד",

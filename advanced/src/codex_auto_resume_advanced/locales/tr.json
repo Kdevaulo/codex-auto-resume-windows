@@ -91,6 +91,7 @@
   "page.row.kind.cli": "CLI",
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "Codex'te /compact çalıştırın; ardından devam eder",
+  "page.row.model_not_restored": "Bu konuşma artık başka bir model kullanıyor; Codex'te geri değiştirin",
   "page.done.send_now": "İstendi. Tüm denetimlerden geçerse gözcü onu bir sonraki bakışında gönderir; liste ne olduğunu gösterir.",
   "page.done.watch": "\"{name}\" izleniyor. Henüz hiçbir şey yapmıyor.",
   "page.hourly": "Saatlik gönderim, tüm gelişmiş özellikler toplamı",

@@ -91,6 +91,7 @@
   "page.row.kind.cli": "CLI",
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "شغّل /compact في Codex؛ وتستمر بعد ذلك",
+  "page.row.model_not_restored": "تستخدم هذه المحادثة الآن نموذجًا آخر؛ أعِده في Codex",
   "page.done.send_now": "طُلب ذلك. إن اجتازت كل الفحوص، يرسلها المراقب في نظرته التالية؛ وتُظهر القائمة ما حدث.",
   "page.done.watch": "«{name}» قيد المراقبة. لا تفعل شيئًا بعد.",
   "page.hourly": "مرات الإرسال في الساعة، لكل الميزات المتقدمة معًا",

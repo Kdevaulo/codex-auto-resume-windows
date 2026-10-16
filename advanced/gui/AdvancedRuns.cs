@@ -13,7 +13,9 @@
 //
 // And what Pending and History say of a row this edition had a hand in (CellsWritten): words joined to a cell's own
 // line - " · CLI" or " · VS Code" after the conversation of a terminal's or VS Code's (other_sessions), and "Run
-// /compact in Codex; it continues after" after the status of a full conversation waiting for it (compact_continue) - from what the
+// /compact in Codex; it continues after" after the status of a full conversation waiting for it (compact_continue), and
+// that a conversation now uses another model after the status of one whose own model Codex would not put back
+// (model_fallback) - from what the
 // status the window already reads carries of each row, by its interruption id (surfaces.rows). No cell, column or
 // element of its own: as a second Codex home's alias joins the label line (v0.6.15-beta).
 //
@@ -113,6 +115,9 @@ namespace CodexAutoResume
             // A full conversation waiting for the person's /compact in the Codex app says so in its status (compact_continue).
             if (pending && Listed(said, "compacting", key))
                 cells[1] += " · " + Word("page.row.compact", "Run /compact in Codex; it continues after");
+            // A model a fallback turn ran on that Codex would not put back, in Pending and History alike (model_fallback).
+            if (Listed(said, "model_not_restored", key))
+                cells[1] += " · " + Word("page.row.model_not_restored", "This conversation now uses another model; switch it back in Codex");
         }
 
         /// Whether the list `name` of what the status says of the rows names `key`.

@@ -91,6 +91,7 @@
   "page.row.kind.cli": "CLI",
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "Hãy chạy /compact trong Codex; sau đó sẽ tiếp tục",
+  "page.row.model_not_restored": "Cuộc trò chuyện này hiện dùng một mô hình khác; hãy đổi lại trong Codex",
   "page.done.send_now": "Đã yêu cầu. Nếu qua mọi bước kiểm tra, trình theo dõi gửi nó ở lần xem kế tiếp; danh sách cho thấy điều đã xảy ra.",
   "page.done.watch": "\"{name}\" đang được quan sát. Nó chưa làm gì cả.",
   "page.hourly": "Số lần gửi mỗi giờ, tính chung mọi tính năng nâng cao",

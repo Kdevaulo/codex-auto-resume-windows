@@ -23,7 +23,7 @@ from test_advanced_other_sessions import SessionsCase  # noqa: E402
 from test_advanced_compact_continue import CONTEXT_FULL, CompactCase  # noqa: E402
 from codex_auto_resume import l10n  # noqa: E402
 from codex_auto_resume_advanced import statement, surfaces  # noqa: E402
-from codex_auto_resume_advanced.vocabulary import Actor  # noqa: E402
+from codex_auto_resume_advanced.vocabulary import Actor, RunEnd  # noqa: E402
 from test_engine import T1, T2  # noqa: E402
 from test_session_kinds import CLI, IDE  # noqa: E402
 
@@ -93,6 +93,41 @@ class KindTests(RowsCase):
         self.assertEqual(surfaces.rows(plug.runtime, store=self.h.store, source=Broken()), {})
 
 
+class ModelTests(RowsCase):
+    """A turn model_fallback ran on Codex's default model whose conversation's own model Codex would not put back
+    (design-4 6, the review's finding 22): its id in "model_not_restored" while the model is owed - whatever the
+    capability stands at now - so Pending and History say "This conversation now uses another model; switch it back
+    in Codex", with no model's name."""
+    KEY, OTHER, LIVE = "%064x" % 11, "%064x" % 12, "%064x" % 13
+
+    def owed(self):
+        plug = self.armed()
+        state, now = plug.runtime.state, self.h.now
+        for key in (self.KEY, self.OTHER, self.LIVE):
+            state.run_owed(key, "model_fallback", T1, "gpt-own-model", started_at=now - 600, ends_by=now + 3000)
+        state.run_ended(self.KEY, RunEnd.COMPLETED)
+        state.run_ended(self.OTHER, RunEnd.INTERRUPTED)
+        self.assertTrue(state.run_restored(self.OTHER), "put back and read back")
+        return plug
+
+    def test_a_model_codex_would_not_put_back_is_said_until_it_is(self):
+        """Fails with surfaces.rows' model_not_restored reverted: the statement's promise would go unkept."""
+        plug = self.owed()
+        self.assertEqual(self.rows(plug)["model_not_restored"], [self.KEY])
+        plug.runtime.state.run_restored(self.KEY)
+        self.assertNotIn("model_not_restored", self.rows(plug))
+
+    def test_it_is_said_with_every_capability_off_and_names_no_model(self):
+        plug = self.owed()
+        self.assertTrue(plug.runtime.arming.disarm(self.cap, actor=Actor.DASHBOARD)["done"])
+        plug.runtime.states(fresh=True)
+        shown = surfaces.rows(plug.runtime)
+        self.assertEqual(shown, {"model_not_restored": [self.KEY]})
+        self.assertNotIn("gpt-own-model", repr(shown))
+        for locale in l10n.LOCALES:
+            self.assertNotIn("{", statement.CATALOGS.catalog(locale)["page.row.model_not_restored"], locale)
+
+
 class CompactingTests(CompactCase):
     """A full conversation held for the person's /compact (compact_continue, design-4 5.2): its id in "compacting",
     so Pending's status says "Run /compact in Codex; it continues after"."""
@@ -149,6 +184,13 @@ class WindowTests(unittest.TestCase):
         self.assertIn('cells[0] += " · " + Word("page.row.kind.cli", "CLI")', body)
         self.assertIn('cells[0] += " · " + Word("page.row.kind.ide", "VS Code")', body)
         self.assertNotRegex(body, r"\bnew\s+(Label|Panel|ColumnHeader|ListViewItem)\b", "no element of its own")
+
+    def test_a_model_not_put_back_joins_the_status_line_of_pending_and_history(self):
+        """Fails with the words taken out of CellsWritten."""
+        body = written(RUNS)
+        self.assertIn('if (Listed(said, "model_not_restored", key))', body)
+        self.assertIn('cells[1] += " · " + Word("page.row.model_not_restored", "This conversation now uses another '
+                      'model; switch it back in Codex")', body)
 
     def test_the_compact_hint_joins_pendings_status_line_only(self):
         """Fails with the hint taken out of CellsWritten."""

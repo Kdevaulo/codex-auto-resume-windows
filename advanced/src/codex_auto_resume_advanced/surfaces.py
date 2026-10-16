@@ -392,23 +392,34 @@ def rows(runtime, *, store=None, source=None) -> dict:
     interruption id - words of this edition's own, never a conversation's: {"kinds": {id: "cli" or "ide"}} for a
     conversation of a terminal's Codex TUI or of VS Code (other_sessions: " · CLI" or " · VS Code" on its label line);
     {"compacting": [id, ...]} for a full conversation compact_continue holds until the person runs /compact in the
-    Codex app (its row's status says so). Each part only where there is something in it, and read only while the
-    capability it is of stands on (or, for the kinds, watched), so with none of them on nothing is read at all.
-    `store` is core's state and `source` the Codex home's reader - the Dashboard's own, by default; a test's."""
-    from .registry import COMPACT_CONTINUE, OTHER_SESSIONS
+    Codex app (its row's status says so); {"model_not_restored": [id, ...]} for a turn model_fallback ran on Codex's
+    default model whose conversation's own model Codex would not put back - its row says to switch it back in Codex,
+    in words with no model's name (the review's finding 22), for as long as it is owed (state/runs.py), whatever the
+    capability stands at now. Each part only where there is something in it, and read only while the capability it
+    is of stands on (or, for the kinds, watched) - a model owed back aside, which is the edition's own state - so with
+    none of them on nothing of core's or Codex's is read at all. `store` is core's state and `source` the Codex
+    home's reader - the Dashboard's own, by default; a test's."""
+    from .registry import COMPACT_CONTINUE, MODEL_FALLBACK, OTHER_SESSIONS
     try:
         states = runtime.states()
     except Exception:
         return {}
+    shown = {}
+    try:
+        owed = [row["interruption_id"] for row in runtime.state.runs_owed(MODEL_FALLBACK.id)
+                if row["ended_at"] is not None]
+    except Exception:
+        owed = []
+    if owed:
+        shown["model_not_restored"] = owed
     kinds_wanted = states.get(OTHER_SESSIONS.id, ArmingState.OFF) != ArmingState.OFF
     compact_wanted = states.get(COMPACT_CONTINUE.id, ArmingState.OFF) == ArmingState.ARMED
     if not (kinds_wanted or compact_wanted):
-        return {}
-    shown = {}
+        return shown
     try:
         listed = _listed(runtime, store)
     except Exception:
-        return {}
+        return shown
     if kinds_wanted:
         try:
             reader = source if source is not None else _source(runtime)

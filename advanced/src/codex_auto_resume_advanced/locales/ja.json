@@ -91,6 +91,7 @@
   "page.row.kind.cli": "CLI",
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "Codex で /compact を実行してください。その後に続行します",
+  "page.row.model_not_restored": "この会話は今は別のモデルを使っています。Codex で元に戻してください",
   "page.done.send_now": "依頼しました。すべての確認を通れば、監視プロセスが次の確認のときに送ります。結果は一覧に表示されます。",
   "page.done.watch": "{name} を様子見しています。まだ何もしません。",
   "page.hourly": "1 時間の送信回数（すべての高度な機能の合計）",
