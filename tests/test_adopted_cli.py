@@ -19,11 +19,11 @@ from test_engine import T1, EngineCase  # noqa: E402
 from codex_auto_resume.codex import eligibility  # noqa: E402
 
 
-def conversation(home, thread_id, *, row_source, meta_source, originator, thread_source="user"):
-    """A conversation whose threads row and rollout first line say what each is given."""
+def conversation(home, thread_id, *, row_source, meta_source, originator, thread_source="user", **more):
+    """A conversation whose threads row and rollout first line say what each is given (`more`: the first line's)."""
     path = home.rollout(thread_id)
     meta = {"type": "session_meta", "payload": {"id": thread_id, "originator": originator, "source": meta_source,
-                                                "thread_source": thread_source}}
+                                                "thread_source": thread_source, **more}}
     path.write_bytes(json.dumps(meta).encode("utf-8") + b"\n")
     with home._db("state_5.sqlite") as db:
         db.execute("INSERT INTO threads (id, rollout_path, source, thread_source, archived, history_mode, name) "
@@ -44,6 +44,17 @@ class AdoptedTests(EngineCase):
         """Fails with the adopted shape reverted: "not taken up (other_kind: originator codex-tui)"."""
         self.assertEqual(len(self.detected(row_source="vscode", meta_source="cli", originator="codex-tui")), 1)
 
+    def test_a_tui_conversation_the_app_forked_is_taken_up(self):
+        """Measured on app 26.1013 / codex-cli 0.163.0-alpha.10.2: "continue in a new chat" on a TUI conversation makes
+        a fork whose row is the app's and whose first line says originator codex-tui, source vscode. Fails with the
+        forked shape reverted: not taken up."""
+        fork = {"forked_from_id": "0a1b2c3d-0001-7000-8000-0000000000f0", "forked_from_ordinal_exclusive": 3}
+        self.assertEqual(len(self.detected(row_source="vscode", meta_source="vscode", originator="codex-tui",
+                                           **fork)), 1)
+        self.assertEqual(self.detected(row_source="cli", meta_source="vscode", originator="codex-tui", **fork), [])
+        self.assertEqual(self.detected(row_source="vscode", meta_source="vscode", originator="codex-tui",
+                                       thread_source="subagent", **fork), [])
+
     def test_a_tui_conversation_the_app_never_took_over_is_not(self):
         self.assertEqual(self.detected(row_source="cli", meta_source="cli", originator="codex-tui"), [])
 
@@ -56,7 +67,9 @@ class AdoptedTests(EngineCase):
         self.assertEqual(eligibility.kind_of("vscode", {"source": "cli", "originator": "codex-tui"}), "desktop")
         self.assertIsNone(eligibility.kind_of("vscode", {"source": "cli", "originator": "codex_exec"}))
         self.assertIsNone(eligibility.kind_of("cli", {"source": "cli", "originator": "codex-tui"}))
-        self.assertIsNone(eligibility.kind_of("vscode", {"source": "vscode", "originator": "codex-tui"}))
+        self.assertEqual(eligibility.kind_of("vscode", {"source": "vscode", "originator": "codex-tui"}), "desktop")
+        self.assertIsNone(eligibility.kind_of("cli", {"source": "vscode", "originator": "codex-tui"}))
+        self.assertIsNone(eligibility.kind_of("vscode", {"source": "vscode", "originator": "codex_exec"}))
 
 
 if __name__ == "__main__":

@@ -22,13 +22,18 @@ ORIGINATORS_IDE = frozenset({"codex_vscode"})
 KINDS = {"desktop": ("vscode", "vscode", DESKTOP_ORIGINATORS), "cli": ("cli", "cli", ORIGINATORS_CLI),
          "ide": ("vscode", "vscode", ORIGINATORS_IDE),
          # issue #37: a CLI conversation the Desktop app took over - the app's own, always (values.ADOPTED_ORIGINATORS).
-         "adopted": ("vscode", "cli", ADOPTED_ORIGINATORS)}
-# The kinds taken up whatever the plug names: the app's own, and those it took over from the CLI.
-APPS = ("desktop", "adopted")
+         "adopted": ("vscode", "cli", ADOPTED_ORIGINATORS),
+         # and one the app forked from it ("continue in a new chat"): the fork's first line keeps the TUI's originator
+         # but says source vscode (measured on app 26.1013 / codex-cli 0.163.0-alpha.10.2) - the app's own too.
+         "forked": ("vscode", "vscode", ADOPTED_ORIGINATORS)}
+# The kinds taken up whatever the plug names: the app's own, and those it took over or forked from the CLI. Each
+# still needs the app's row (row_problem: source vscode, a person's thread_source, not archived, paginated).
+APPS = ("desktop", "adopted", "forked")
 
 
 def _shapes(kinds):
-    return [(kind, KINDS[kind]) for kind in ("desktop", "adopted", "cli", "ide") if kind in APPS or kind in kinds]
+    return [(kind, KINDS[kind]) for kind in ("desktop", "adopted", "forked", "cli", "ide")
+            if kind in APPS or kind in kinds]
 
 
 def source_taken(source, kinds=frozenset()) -> bool:
@@ -62,4 +67,4 @@ def kind_of(source, payload, kinds=frozenset()):
         return None
     found = next((kind for kind, shape in _shapes(kinds) if source == shape[0] and payload.get("source") == shape[1]
                   and payload.get("originator") in shape[2]), None)
-    return "desktop" if found == "adopted" else found
+    return "desktop" if found in ("adopted", "forked") else found

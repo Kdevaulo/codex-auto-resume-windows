@@ -45,8 +45,9 @@ def taken_thread_source(value, widened=frozenset()) -> bool:
 DESKTOP_ORIGINATORS = frozenset({"Codex Desktop", "codex_work_desktop"})
 # v0.6.16-beta.4 (issue #37): a conversation started in the Codex CLI's TUI and continued in the Desktop app is the
 # app's - Codex rewrites its threads row to source vscode when the app takes it over, while the rollout's first line
-# keeps the CLI's originator and source. Only with that row (codex/eligibility.py): a TUI conversation the app never
-# took over (threads source cli) stays the edition's other_sessions' to name.
+# keeps the CLI's originator and source - and a fork the app made of it keeps the originator with source vscode. Only
+# with that row (codex/eligibility.py): a TUI conversation the app never took over (threads source cli) stays the
+# edition's other_sessions' to name.
 ADOPTED_ORIGINATORS = frozenset({"codex-tui"})
 
 KNOWN_STATUSES = machine.TURN_STATUSES - {"other"}      # Codex's own four; "other" is ours
