@@ -201,8 +201,10 @@ class RoutesMixin:
         if row.get("recovery_client_id") != ids.continuation_client_id(row["interruption_id"]):
             return False
         current = self.store.get(row["interruption_id"])
-        if current is None or not self.store.correlate(row["interruption_id"], turn_id, self.clock(),
-                                                       client_id=row["recovery_client_id"], status="inProgress"):
+        if current is None:
+            return False
+        if not self.store.correlate(row["interruption_id"], turn_id, self.clock(), client_id=row["recovery_client_id"],
+                                    status="inProgress"):
             return False
         self.moved(current, "turn_started")
         self.log(row["thread_id"], "turn_started", None)

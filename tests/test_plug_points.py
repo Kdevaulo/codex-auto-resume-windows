@@ -1354,6 +1354,8 @@ PERSONS = frozenset({"cancel_interruption", "cancel_thread", "restore_budget_det
 MOVING = frozenset({"AnnounceMixin.transition", "AnnounceMixin._release", "DispatchMixin.dispatch",
                     "ReconcileMixin.withdraw", "ReconcileMixin.settle", "ReconcileMixin.correlate",
                     "RoutesMixin._resume_unloaded",
+                    # v0.6.16-beta.4: a turn started with no words, correlated by the turn id its route returned (M3B).
+                    "RoutesMixin._silent_proven",
                     # v0.6.16-beta.4: the waiting records of a kind the plug no longer watches (P18).
                     "KindsMixin.session_kinds"})
 
@@ -1728,7 +1730,7 @@ class MovedTests(PluggedCase):
                                         self.assertTrue(_told_after(block, index),
                                                         "moves a record and does not tell the plug")
         self.assertEqual(set(moving), MOVING)
-        self.assertEqual(len(moving), 10, "every store call that moves a record, counted")
+        self.assertEqual(len(moving), 11, "every store call that moves a record, counted")
 
     def test_a_persons_own_moves_are_not_told_and_the_contract_says_so(self):
         """P14 tells what the engine writes. A cancel, or the attempts given back, is written by
