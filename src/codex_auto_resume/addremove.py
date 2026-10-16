@@ -30,6 +30,9 @@ UNINSTALL_ROOT = r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
 BASE_NAME = "CodexAutoResume"
 PUBLISHER = "songyb111-gachon"
 DEFAULT_DISPLAY_NAME = "Codex Auto Resume"
+# Set by install.ps1 around the engine's uninstall step: the installer removes the entry itself once every removal
+# has succeeded, so a failed uninstall stays listed and can be run again.
+KEEP_ENTRY_ENV = "CODEX_AUTO_RESUME_KEEP_ENTRY"
 KEPT_FOLDER = "uninstall"
 KEPT_SCRIPT = "install.ps1"
 EDITIONS = ("standard", "advanced")

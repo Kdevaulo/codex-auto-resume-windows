@@ -456,6 +456,55 @@ function Install-KeptUninstaller {
     return $true
 }
 
+function Read-UninstallEntry {
+    # The two values that say whose an entry in Add or remove programs is, or $null when there is none. The only
+    # read of the registry in this file, and one of the two calls into it (Remove-UninstallEntry is the other);
+    # tests stand in for both, so none of them reaches the real one.
+    param([string]$Name)
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\' + $Name)
+    if ($null -eq $key) { return $null }
+    try {
+        return @{ InstallLocation = [string]$key.GetValue('InstallLocation'); UninstallString = [string]$key.GetValue('UninstallString') }
+    } finally { $key.Close() }
+}
+
+function Remove-UninstallEntry {
+    param([string]$Name)
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\' + $Name, $false)
+}
+
+function Remove-OwnUninstallEntry {
+    <#
+        Take this installation's entry in Add or remove programs away, and nobody else's.
+
+        Called once, after every removal has succeeded: until then a failed uninstall stays listed, and the
+        entry's own command is what runs it again. The engine writes the entry (src/codex_auto_resume/
+        addremove.py) and would remove it too, early, in its own uninstall step; it is told not to
+        (CODEX_AUTO_RESUME_KEEP_ENTRY) so that this is the only place it goes.
+
+        An entry is this installation's when it is installed at this root and its command runs this root's
+        kept uninstaller - the engine's own rule, in the same two conditions. One of the two fixed names, which
+        differ by edition and never exist together; an entry that says anything else is left as it is.
+    #>
+    param([string]$Root)
+    $kept = Join-Path (Join-Path $Root 'uninstall') 'install.ps1'
+    foreach ($name in @('CodexAutoResume', 'CodexAutoResumeAdvanced')) {
+        try {
+            $entry = Read-UninstallEntry $name
+            if ($null -eq $entry) { continue }
+            $here = (Resolve-Canonical $entry.InstallLocation) -eq (Resolve-Canonical $Root)
+            $runs = $false
+            if ($entry.UninstallString -cmatch '-File "([^"]+)"') { $runs = (Resolve-Canonical $Matches[1]) -eq (Resolve-Canonical $kept) }
+            if ($here -and $runs) {
+                Step 'Removing the entry in Add or remove programs'
+                Remove-UninstallEntry $name
+            }
+        } catch {
+            Warn ('Could not remove the entry in Add or remove programs: ' + $_.Exception.Message)
+        }
+    }
+}
+
 function Write-CopyJournal {
     <#
         Write down what is about to be moved aside, before any of it moves.
@@ -617,7 +666,9 @@ if ($Uninstall) {
         # running or its state cannot be verified, and throwing the code away meant
         # deleting the engine and the interpreter out from under a live watcher and
         # then printing "Removed." over the top of its refusal.
-        $code = Invoke-Setup $setupArgs
+        # The engine is asked to leave the entry in Add or remove programs for the end of this branch.
+        $env:CODEX_AUTO_RESUME_KEEP_ENTRY = '1'
+        try { $code = Invoke-Setup $setupArgs } finally { Remove-Item Env:\CODEX_AUTO_RESUME_KEEP_ENTRY -ErrorAction SilentlyContinue }
         if ($code -ne 0) {
             Fail 'The watcher could not be stopped, so nothing was removed.'
             Write-Host '       Close the ChatGPT/Codex app, wait a moment, and run this again.'
@@ -729,6 +780,8 @@ if ($Uninstall) {
     # So the check comes first, and the proof only goes when there is nothing left to do.
     # The copy journal is ours too, and an installation being removed has nothing left to
     # put back, so it goes with the rest rather than outliving the thing it described.
+    # Every removal that can fail has succeeded: only now does the program leave the list of installed programs.
+    Remove-OwnUninstallEntry $OwnedHome
     # This script may be the copy being removed: PowerShell has read all of it, and nothing holds the file.
     $kept = Join-Path $OwnedHome 'uninstall'
     $keptItem = Get-Item -LiteralPath $kept -Force -ErrorAction SilentlyContinue
