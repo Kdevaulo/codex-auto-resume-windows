@@ -9,7 +9,7 @@ applied after the settings are read, never written into the file.
 """
 from __future__ import annotations
 
-from .. import config, homes, managed, settings
+from .. import config, homes, managed, notice_kinds, settings
 from ..store import StoreError
 from ..win import folderid, policykeys
 from .errors import ControlError, _thread_id
@@ -54,6 +54,7 @@ class SettingsMixin:
                 if refused is not None:
                     raise ControlError("%s is set by your administrator" % refused, code="managed_by_policy")
             self._strict_homes(changes)
+            changes = self._keep_unlisted_kinds(changes)
             saved = settings.update(self.settings_path(), changes)
         except settings.SettingsError as exc:
             # The sentence is the validator's own and names the setting it refused. The
@@ -111,6 +112,20 @@ class SettingsMixin:
             return settings.validate_update({"custom_message": text})["custom_message"]
         except settings.SettingsError as exc:
             raise ControlError(str(exc), code="request_failed") from None
+
+    def _keep_unlisted_kinds(self, changes):
+        """v0.6.16: the kinds of notice that stay on screen as written, with every stored id this process lists no
+        kind for kept after them - an edition's, chosen while it ran - so a Save made where it has no box (the
+        standard Dashboard) never drops it, as notice_kinds.coerce promises. The edition's plug is taken first, so
+        its kinds are this process's own and ticking one off removes it."""
+        if not isinstance(changes, dict) or not isinstance(changes.get(notice_kinds.FIELD), list):
+            return changes
+        self.plug
+        written = changes[notice_kinds.FIELD]
+        listed = set(notice_kinds.ids())
+        stored = notice_kinds.coerce(settings.load(self.settings_path()).get(notice_kinds.FIELD), [])
+        kept = [kind for kind in stored if kind not in listed and kind not in written]
+        return dict(changes, **{notice_kinds.FIELD: written + kept}) if kept else changes
 
     @staticmethod
     def _strict_homes(changes) -> None:

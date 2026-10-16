@@ -29,6 +29,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from codex_auto_resume import l10n, notice_card, notice_kinds, notifier, notify, settings  # noqa: E402
+from codex_auto_resume.domain.plug import NULL  # noqa: E402
 import guiscan  # noqa: E402
 from test_notice_card import EVENTS, FULL, THREAD, build, captured_xml  # noqa: E402
 
@@ -129,6 +130,26 @@ class SettingTests(unittest.TestCase):
             entry = [entry for entry in settings.describe() if entry["name"] == notice_kinds.FIELD][0]
         self.assertEqual(entry["kinds"], list(CORE_IDS) + ["near_limit"])
         self.assertEqual(entry["labels"], {"near_limit": "Near a limit (ja)"})
+
+    def test_a_save_where_an_edition_s_kind_has_no_box_keeps_it(self):
+        """The standard Dashboard draws no box for an edition's kind, and its Save sends what its boxes say; the
+        control layer keeps every stored id this process lists no kind for, so a choice made in the advanced
+        edition outlives a switch to the standard one (notice_kinds.coerce) - and where the kind is listed, ticking
+        it off removes it."""
+        import tempfile
+        from codex_auto_resume import config, control
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        paths = config.Paths(Path(folder.name) / "home")
+        layer = control.Control(paths, plug=NULL)              # the standard edition's, whatever lane this is
+        settings.update(paths.settings_file, {notice_kinds.FIELD: ["interruption", "near_limit"]})
+        saved = layer.update_settings({notice_kinds.FIELD: ["starting"]})
+        self.assertEqual(saved[notice_kinds.FIELD], ["starting", "near_limit"], "the edition's id is carried through")
+        self.assertEqual(settings.load(paths.settings_file)[notice_kinds.FIELD], ["starting", "near_limit"])
+        self.assertEqual(layer.update_settings({"notifications": True})[notice_kinds.FIELD], ["starting", "near_limit"])
+        notice_kinds.register("near_limit", ("near_limit",), words())
+        self.assertEqual(layer.update_settings({notice_kinds.FIELD: ["starting"]})[notice_kinds.FIELD], ["starting"],
+                         "listed here, so ticked off here")
 
 
 class PerKindTests(unittest.TestCase):
