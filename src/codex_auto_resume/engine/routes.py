@@ -22,8 +22,9 @@ from ..domain import ids
 from ..domain.plug import QUEUED, DEFER, Alternative, Point
 
 # Where P16 is asked (v0.6.16-beta.4): a conversation the running app does not hold, and one nothing holds while the
-# app is not running (Backend.holder's word for it).
-APP_FREE, NOBODY = "app_free", "none"
+# app is not running (Backend.holder's word for it). OURS is Backend.holder's word for an app server this process
+# started and holds: no other holder at a route's last look, and never a reason to ask P16.
+APP_FREE, NOBODY, OURS = "app_free", "none", "ours"
 
 
 class RoutesMixin:
@@ -82,10 +83,14 @@ class RoutesMixin:
         vector["thread_available"] = machine.gate(machine.PASS, machine.PLUGGED)
         return route
 
-    def _unheld_now(self, thread_id) -> bool:
-        """Whether, now, the Codex app is still not running and nothing holds `thread_id` - a look that fails, no."""
+    def _unheld_now(self, thread_id, ours=False) -> bool:
+        """Whether, now, the Codex app is still not running and nothing holds `thread_id` - a look that fails, no.
+        With `ours` - the route's own last look - an app server this process started and holds counts as no other
+        holder: the route's server holds the writer lock from its thread/resume until it lets go, so without it no
+        turn could ever start; any other holder still says no."""
         try:
-            return self.backend.app_identity() is None and self._holder(thread_id) == NOBODY
+            return (self.backend.app_identity() is None
+                    and self._holder(thread_id) in ((NOBODY, OURS) if ours else (NOBODY,)))
         except Exception:
             return False
 
@@ -133,7 +138,7 @@ class RoutesMixin:
 
         def still_unloaded() -> bool:
             if app is None:
-                return self._unheld_now(thread_id)
+                return self._unheld_now(thread_id, ours=True)
             try:
                 return (self.backend.app_identity() == app
                         and self.backend.loaded(thread_id, app) == "notLoaded")

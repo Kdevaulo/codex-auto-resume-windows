@@ -32,6 +32,7 @@ import threading
 import time
 
 from codex_auto_resume.codex.appserver import PROTOCOL_METHODS
+from codex_auto_resume.codex.pairing import own_server, own_server_gone
 from codex_auto_resume.win.kernel import NO_WINDOW
 
 from ..vocabulary import Measurement
@@ -300,6 +301,9 @@ class Session:
                                encoding="utf-8", errors="replace", bufsize=1,
                                creationflags=NO_WINDOW, close_fds=True, shell=False,
                                cwd=str(self.backend.codex_home), env=self.backend._environment())
+        # Counted as our own app server by the pid and creation time of this spawn (core's pairing.own_server): a
+        # route's last look takes the writer lock it holds after thread/resume as no other holder (engine/routes.py).
+        self._own = own_server(getattr(self.process, "pid", None))
         try:
             self.reader = threading.Thread(target=self._read, daemon=True)
             self.reader.start()
@@ -438,6 +442,7 @@ class Session:
                 process.terminate()      # only our own one-turn helper
                 process.wait(timeout=4)
         finally:
+            own_server_gone(getattr(self, "_own", None))
             if getattr(self, "reader", None) is not None:
                 self.reader.join(timeout=1)
             if process.stdout:

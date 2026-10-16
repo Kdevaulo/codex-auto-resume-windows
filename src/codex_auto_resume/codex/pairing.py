@@ -6,6 +6,7 @@ import os
 from pathlib import Path, PureWindowsPath
 import re
 import subprocess as S
+import threading
 
 from ..domain.errors import AdapterError
 from ..win.inventory import resource_users
@@ -148,6 +149,42 @@ def app_running(rows) -> bool:
     root = str(Path(program_files) / "WindowsApps").lower() + "\\openai.codex_"
     return any(isinstance(row, dict) and isinstance(row.get("path"), str) and row["path"].lower().startswith(root)
                for row in rows)
+
+
+# The app servers this process started and still holds (v0.6.16-beta.4): each one's pid and creation time, read from
+# our own spawn while its handle is ours - so the pid cannot be reused under it - and never matched by name or path.
+_OWN = set()
+_OWN_LOCK = threading.Lock()
+
+
+def own_server(pid):
+    """Count `pid`, a process this one has just started and holds, as an app server of our own: its identity read now.
+    The mark to hand `own_server_gone` when it is shut, or None where it could not be read (then it never counts)."""
+    if type(pid) is not int or pid <= 0:
+        return None
+    try:
+        held = process_identity(pid)
+    except (AdapterError, OSError, ValueError):
+        return None
+    mark = (held["pid"], held["created"])
+    with _OWN_LOCK:
+        _OWN.add(mark)
+    return mark
+
+
+def own_server_gone(mark) -> None:
+    """The app server `own_server` counted, shut: it no longer counts."""
+    with _OWN_LOCK:
+        _OWN.discard(mark)
+
+
+def own_holder(user) -> bool:
+    """Whether the Restart Manager holder `user` is an app server this process started and still holds - the same pid
+    AND creation time as at our spawn (`own_server`)."""
+    if not isinstance(user, dict):
+        return False
+    with _OWN_LOCK:
+        return (user.get("pid"), user.get("created")) in _OWN
 
 
 def session_kind(rows, user, codex_exe) -> bool:

@@ -115,6 +115,64 @@ class LoadedTests(unittest.TestCase):
             self.assertEqual(self.loaded([{"pid": 30, "created": 300}], rows(tui)), "elsewhere")
 
 
+class OwnServerTests(unittest.TestCase):
+    """With the Codex app closed, a route's own app server - this process's child - holds the writer lock once it has
+    resumed the conversation: Backend.holder says "ours" only for the pid AND creation time of our own spawn
+    (pairing.own_server), and the route's last look (engine/routes.py) takes that, and nothing else, as no holder."""
+
+    def setUp(self):
+        self.backend = w.Backend(Path("state"), Path(ENGINE))
+        for patcher in (patch.object(self.backend, "_compatible"),
+                        patch.dict(os.environ, {"USERPROFILE": PROFILE, "ProgramW6432": r"C:\Program Files"})):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.child = {"pid": 30, "parent": os.getpid(), "path": ENGINE}
+
+    def own(self, created=300):
+        with patch.object(pairing, "process_identity", return_value={"pid": 30, "path": ENGINE.lower(),
+                                                                     "created": created}):
+            mark = pairing.own_server(30)
+        self.addCleanup(pairing.own_server_gone, mark)
+        return mark
+
+    def holder(self, users):
+        def app_identity():
+            self.backend._rows = [dict(self.child)]       # Codex closed: only our own server runs
+            return None
+        with patch.object(self.backend, "app_identity", side_effect=app_identity), \
+                patch.object(transport, "resource_users", return_value=users), \
+                patch.object(pairing, "process_identity", return_value={"pid": 30, "path": ENGINE.lower(),
+                                                                        "created": 300}):
+            self.backend.app_identity()
+            return self.backend.holder(THREAD), self.last_look(ours=True), self.last_look(ours=False)
+
+    def last_look(self, ours):
+        from codex_auto_resume.engine.routes import RoutesMixin
+
+        class Engine(RoutesMixin):
+            backend = self.backend
+        return Engine()._unheld_now(THREAD, ours=ours)
+
+    def test_the_lock_our_own_server_holds_is_ours_and_passes_the_last_look(self):
+        """Fails with the own-server word reverted: "unknown", and no headless turn ever starts."""
+        self.own()
+        self.assertEqual(self.holder([{"pid": 30, "created": 300}]), ("ours", True, False))
+
+    def test_never_by_its_name_a_server_we_did_not_count_is_unknown(self):
+        self.assertEqual(self.holder([{"pid": 30, "created": 300}]), ("unknown", False, False))
+
+    def test_a_reused_pid_is_not_ours(self):
+        self.own(created=299)
+        self.assertEqual(self.holder([{"pid": 30, "created": 300}]), ("unknown", False, False))
+
+    def test_a_server_shut_no_longer_counts(self):
+        pairing.own_server_gone(self.own())
+        self.assertEqual(self.holder([{"pid": 30, "created": 300}]), ("unknown", False, False))
+
+    def test_nothing_holding_it_passes_both_looks(self):
+        self.assertEqual(self.holder([]), ("none", True, True))
+
+
 class WaitTests(EngineCase):
     def test_a_conversation_another_session_holds_waits_with_its_own_reason_and_nothing_is_sent(self):
         """Fails with dispatch's reason reverted: loaded_state_unknown, UNKNOWN."""

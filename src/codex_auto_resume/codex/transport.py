@@ -17,7 +17,7 @@ from .. import machine
 from ..domain import ids, vocabulary
 from ..win.inventory import resource_users
 from ..win.kernel import NO_WINDOW
-from .pairing import app_running, desktop_pair, engines_instead, inventory, session_kind
+from .pairing import app_running, desktop_pair, engines_instead, inventory, own_holder, session_kind
 from .appserver import PROTOCOL_METHODS, Protocol
 from .errors import AdapterError
 from .usage import parse_usage
@@ -243,8 +243,10 @@ class Backend:
         """v0.6.16-beta.4: who holds conversation `thread_id`'s writer lock while the Codex app is not running - asked
         by the engine only where its plug wants P16 (engine/delivery.py): "none" - the last app_identity() read the
         processes and found no process of the app's package, and the Restart Manager finds no holder (B12) -;
-        "session", one holder that is another Codex session (pairing.session_kind); and "unknown" for anything else,
-        a failure included. The rows are the ones the app's pairing read: no process is started for it."""
+        "session", one holder that is another Codex session (pairing.session_kind); "ours", one holder that is an app
+        server this process started and still holds, by the pid and creation time of our own spawn (pairing.own_holder):
+        what a route that has just resumed the conversation on its own server meets at its last look; and "unknown" for
+        anything else, a failure included. The rows are the ones the app's pairing read: no process is started for it."""
         try:
             canonical_uuid(thread_id)
             self._compatible()
@@ -256,6 +258,8 @@ class Backend:
                 return "none"
             if len(users) == 1 and session_kind(rows, users[0], self.codex_exe):
                 return "session"
+            if len(users) == 1 and own_holder(users[0]):
+                return "ours"
             return "unknown"
         except (AdapterError, ValueError, OSError, KeyError, TypeError):
             return "unknown"

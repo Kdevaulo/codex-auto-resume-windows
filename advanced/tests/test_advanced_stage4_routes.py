@@ -85,6 +85,36 @@ class HeadlessSettingsTests(unittest.TestCase):
                                 (Measurement.M6, {})])
 
 
+class OwnServerTests(unittest.TestCase):
+    def test_a_session_counts_its_own_spawn_as_ours_until_it_is_shut(self):
+        """Fails with the count reverted: the writer lock our server holds after thread/resume reads "unknown" at the
+        route's last look, and no headless turn ever starts (core's Backend.holder, engine/routes.py)."""
+        seen = []
+
+        class Pipe:
+            def write(self, text):
+                raise OSError("the server went away")
+
+            def readline(self, *unused):
+                return ""
+
+            def close(self):
+                pass
+
+        class Process:
+            pid, stdin, stdout = 4242, Pipe(), Pipe()
+
+            def wait(self, timeout=None):
+                return 0
+
+        with patch.object(protocol.S, "Popen", lambda argv, **keywords: Process()), \
+                patch.object(protocol, "own_server", lambda pid: seen.append(("counted", pid)) or (pid, 1)), \
+                patch.object(protocol, "own_server_gone", lambda mark: seen.append(("gone", mark))):
+            with self.assertRaises(Exception):
+                protocol.Session(Backend(), capability="headless_run").__enter__()
+        self.assertEqual(seen, [("counted", 4242), ("gone", (4242, 1))])
+
+
 class RestoreTests(unittest.TestCase):
     class Session:
         def __init__(self, model):

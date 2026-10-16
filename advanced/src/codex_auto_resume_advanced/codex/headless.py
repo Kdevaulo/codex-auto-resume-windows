@@ -15,7 +15,9 @@ guard, and decided the words (core's engine/dispatch.py) - this starts the one t
    approvals that go to the person (`user`), an approval policy that is a word, no permission profile in force -
    and anything else (full access, an outside sandbox, another reviewer, a word this does not know) refused before
    anything starts (Q4: `refused_settings`);
-4. core's look at whether the conversation is still unheld and the app still closed, asked again;
+4. core's look at whether the conversation is still unheld and the app still closed, asked again - the writer lock
+   our own server took at thread/resume counted as no other holder (core's pairing.own_server, by the pid and
+   creation time of the spawn), any other holder still a no;
 5. turn/start with core's words (or none, SILENT) under the client id core derived - or, in compact mode,
    thread/compact/start; a refusal Codex answered is "not started", no answer is "unknown" (A6);
 6. "ran" (or "accepted" for a compaction) with the turn's id, and the open session handed to the follower.

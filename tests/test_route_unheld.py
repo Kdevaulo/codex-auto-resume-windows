@@ -205,6 +205,40 @@ class WordsTests(UnheldCase):
         self.assertIn(row["state"], machine.WAITING, row["state"])
         self.assertEqual(row["chain_continuations"], 0, "its claim given back")
 
+    def test_its_own_server_holding_the_lock_at_the_last_look_still_runs(self):
+        """A route's own app server holds the writer lock from its thread/resume on (Backend.holder: "ours"): the last
+        look takes it as no other holder. Fails with the look reverted to "none" alone: no turn could ever start."""
+        h = self.h
+
+        def resumed_on_our_server():
+            h.backend.holder_map[T1] = "ours"
+        route = Headless(h, during=resumed_on_our_server)
+        self.armed(route)
+        self.closed()
+        h.tick()
+        self.assertIs(route.calls[0]["unheld"], True)
+        self.assertEqual(h.record()["state"], "queued")
+
+    def test_another_holder_at_the_last_look_still_stops_it(self):
+        h = self.h
+
+        def a_terminal_takes_it():
+            h.backend.holder_map[T1] = "session"
+        route = Headless(h, during=a_terminal_takes_it)
+        self.armed(route)
+        self.closed()
+        h.tick()
+        self.assertIs(route.calls[0]["unheld"], False)
+        self.assertIn(h.record()["state"], machine.WAITING)
+
+    def test_our_own_server_is_never_a_reason_to_ask_p16(self):
+        route = Headless(self.h)
+        self.armed(route)
+        self.closed(holder="ours")
+        self.h.tick()
+        self.assertEqual(route.calls, [])
+        self.assertEqual(self.h.record()["last_error"], "desktop_app_unavailable")
+
     def test_a_holder_appearing_before_the_claim_stops_it(self):
         h = self.h
         route = Headless(h)
