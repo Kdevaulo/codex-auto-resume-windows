@@ -310,6 +310,50 @@ namespace CodexAutoResume
         }
     }
 
+    /// An update's time limit, which the Notes page does not count against (v0.6.16): the time a person spends reading
+    /// what is new is theirs, not the installer's, so a long read never ends as "still running" with nothing installed.
+    /// Told the time in milliseconds, never reading a clock itself, so the rule can be checked without waiting.
+    internal sealed class InstallerClock
+    {
+        private readonly long limit;
+        private readonly object gate = new object();
+        private long paused;
+        private long since = -1;
+
+        internal InstallerClock(long limit)
+        {
+            this.limit = limit;
+        }
+
+        /// The question is shown at `now`: the wait from here on is the person's.
+        internal void Pause(long now)
+        {
+            lock (gate) if (since < 0) since = now;
+        }
+
+        /// The question is answered at `now`: the installer's time runs again.
+        internal void Resume(long now)
+        {
+            lock (gate)
+            {
+                if (since < 0) return;
+                paused += Math.Max(0, now - since);
+                since = -1;
+            }
+        }
+
+        /// Whether the installer has had its whole time at `now`, less every wait on the question - never while one is
+        /// being asked.
+        internal bool Over(long now)
+        {
+            lock (gate)
+            {
+                if (since >= 0) return false;
+                return now - paused >= limit;
+            }
+        }
+    }
+
     /// How far along the installer is: read from the lines install.ps1 and the bootstrap print, never from a timer.
     ///
     /// Each line a step of theirs begins with moves the bar to that step's place and names the step; a line it does

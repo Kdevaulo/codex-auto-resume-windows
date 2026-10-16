@@ -228,6 +228,17 @@ $docs = [string]$env:CAR_DOCS
 $out.file = @(($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ko'))),
               ($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ja'))),
               ($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'en'))))
+
+# An update's time limit, which the Notes page's wait does not count against.
+$ClockType = T 'InstallerClock'
+function NewClock($limit) { $ClockType.GetConstructors($any)[0].Invoke([object[]]@([long]$limit)) }
+$clock = NewClock 1000
+$out.clock = @((CallOn $clock 'Over' @([long]999)), (CallOn $clock 'Over' @([long]1000)))
+$clock = NewClock 1000
+$null = CallOn $clock 'Pause' @([long]100)
+$out.clock += (CallOn $clock 'Over' @([long]1500000))
+$null = CallOn $clock 'Resume' @([long]5000)
+$out.clock += @((CallOn $clock 'Over' @([long]5500)), (CallOn $clock 'Over' @([long]5899)), (CallOn $clock 'Over' @([long]5900)))
 $out | ConvertTo-Json -Depth 6 -Compress
 """
 
@@ -411,6 +422,19 @@ class FlowTests(unittest.TestCase):
         self.assertFalse(any("](" in line or "**" in line for line in brief), brief)
         self.assertEqual(self.answer["file"], [str(self.docs / "CHANGELOG.ko.md"), str(self.docs / "CHANGELOG.md"),
                                                str(self.docs / "CHANGELOG.md")])
+
+    def test_the_notes_pages_wait_is_not_the_installers_time(self):
+        """Staying on the Notes page past the update's limit (20 minutes) reported "still running" with nothing
+        installed, and left the bootstrap parked on its input until the window closed. The limit counts only the
+        installer's time: none passes while the question is shown, and the wait is taken off once it is answered."""
+        self.assertEqual(self.answer["clock"], [False, True, False, False, False, True])
+        start = guiscan.member_body("SettingsForm", "StartBootstrap")
+        self.assertNotIn("process.WaitForExit(milliseconds)", start)
+        self.assertIn("var clock = new InstallerClock(milliseconds);", start)
+        self.assertIn("if (clock.Over(time.ElapsedMilliseconds)) return \"running\";", start)
+        asking = start[start.index("clock.Pause(time.ElapsedMilliseconds);"):]
+        self.assertLess(asking.index("asked(notes)"), asking.index("clock.Resume(time.ElapsedMilliseconds);"),
+                        "the clock waits as long as the question does")
 
     def test_each_code_says_what_it_means(self):
         outcome = self.answer["outcome"]

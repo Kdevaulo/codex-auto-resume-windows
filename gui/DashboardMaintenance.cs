@@ -443,7 +443,8 @@ namespace CodexAutoResume
             });
         }
 
-        /// Runs this installation's scripts/bootstrap.ps1 with `flag` and waits for it at most `milliseconds`:
+        /// Runs this installation's scripts/bootstrap.ps1 with `flag` and waits for it at most `milliseconds` - not
+        /// counting the time the update's Notes page waits for the person's answer (InstallerClock, v0.6.16):
         /// "done", with what it printed, what it wrote to its error stream and its exit code; "incomplete" where
         /// Windows PowerShell is not there to run it; "running" where it has not finished - never killed, for it
         /// may be part way through replacing an installation, and half an installation is worse than a slow one;
@@ -487,6 +488,9 @@ namespace CodexAutoResume
                     // Line by line where the installer window is told each one (Heard), whole otherwise.
                     Action<string> heard = Heard;
                     Func<string, bool> asked = Asked;
+                    // The time limit, less the time the Notes page waits for the person (InstallerClock).
+                    Stopwatch time = Stopwatch.StartNew();
+                    var clock = new InstallerClock(milliseconds);
                     Task<string> output = heard == null ? process.StandardOutput.ReadToEndAsync()
                                         : Task.Factory.StartNew<string>(delegate
                                           {
@@ -500,7 +504,10 @@ namespace CodexAutoResume
                                                       notes = line.Substring("notes: ".Length).Trim();
                                                   else if (asked != null && line.StartsWith("ask: ", StringComparison.Ordinal))
                                                   {
-                                                      bool go = asked(notes);
+                                                      clock.Pause(time.ElapsedMilliseconds);
+                                                      bool go;
+                                                      try { go = asked(notes); }
+                                                      finally { clock.Resume(time.ElapsedMilliseconds); }
                                                       process.StandardInput.WriteLine(go ? "install" : "later");
                                                       process.StandardInput.Flush();
                                                   }
@@ -508,7 +515,8 @@ namespace CodexAutoResume
                                               return lines.ToString();
                                           });
                     Task<string> failure = process.StandardError.ReadToEndAsync();
-                    if (!process.WaitForExit(milliseconds)) return "running";
+                    while (!process.WaitForExit(250))
+                        if (clock.Over(time.ElapsedMilliseconds)) return "running";
                     output.Wait(5000);
                     failure.Wait(5000);
                     printed = output.IsCompleted ? output.Result : "";
