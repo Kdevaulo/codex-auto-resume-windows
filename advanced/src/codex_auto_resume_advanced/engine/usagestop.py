@@ -36,6 +36,10 @@ from .usage import AFTER_RESET_KEY, EVERY_CONVERSATION, NOTICE_FOR, ON, WRAP_UP,
 FINAL = frozenset({"completed", "failed", "interrupted"})
 # How many notices the stop keeps for the icon to show (each once in a watcher's life, by its key).
 NOTICES_KEPT = 16
+# A start after the reset that failed is asked again after this long, doubled at each failure up to BACKOFF_MOST - never
+# every tick, each of which may wait for the app's answers.
+BACKOFF_SECONDS = 300
+BACKOFF_MOST = 3600
 
 
 class _StopErrand:
@@ -60,7 +64,7 @@ class _StopErrand:
 class UsageStop(UsagePause):
     """usage_pause's code from v0.6.16-beta.4: the pause's holding, and the forced stop and its continuation after
     the reset. `stop`, `start` and `home` are seams a test fills (ipc.stop_turn, ipc.start_turn, the Codex home)."""
-    __slots__ = ("_stop", "_start", "_home", "_notices")
+    __slots__ = ("_stop", "_start", "_home", "_notices", "_backoff")
 
     def __init__(self, paths, *, stop=None, start=None, home=None):
         super().__init__(paths)
@@ -68,6 +72,7 @@ class UsageStop(UsagePause):
         self._start = start
         self._home = home
         self._notices = []
+        self._backoff = {}                   # {continuation: (failures, when it is asked again)}, in this process
 
     # ---------------------------------------------------------------- reading Codex
     def _codex_home(self):
@@ -202,13 +207,19 @@ class UsageStop(UsagePause):
                 continue
             if latest.status not in FINAL:
                 continue
+            failures, again = self._backoff.get(row["record_id"], (0, 0))
+            if now < again:
+                continue                                                # failed lately: asked again later
             word = start(thread, row["words"] + "\n\n" + ids.short_marker(row["record_id"]), gate=guard)
             if word == ipc.Stop.HELD:
                 continue                                                # held by core: asked again when it lets go
             if word == ipc.Start.STARTED:
+                self._backoff.pop(row["record_id"], None)
                 handle.end(ContinuationReason.SENT, thread_id=thread)
                 self._count("continued")
             else:
+                self._backoff[row["record_id"]] = (failures + 1,
+                                                   now + min(BACKOFF_SECONDS * 2 ** failures, BACKOFF_MOST))
                 self._count("not_continued")
                 self._notice("not_continued", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"})
 

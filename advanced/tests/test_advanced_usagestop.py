@@ -187,9 +187,32 @@ class AfterResetTests(StopCase):
         self.h.tick(advance=61)
         self.assertIn("not_continued", self.kinds(plug))
         self.start_answer = ipc.Start.STARTED
-        self.h.tick(advance=61)
+        self.h.tick(advance=301)
         self.assertEqual(len(self.starts), 2, "tried again once it is open")
         self.assertIn("pause.continued", self.journal(plug))
+
+    def test_a_failing_start_is_asked_again_later_not_every_tick(self):
+        """Each start may wait for the app's answers inside the watcher's tick: one that fails is asked again after
+        five minutes, then ten, twenty - up to an hour."""
+        plug, turn = self.running()
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        self.after_reset(plug, turn)
+        self.start_answer = ipc.Stop.NO_ANSWER
+        self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 1)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 1, "not again within five minutes")
+        self.h.tick(advance=180)
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.starts), 2, "again after five")
+        for _ in range(8):
+            self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 2, "then after ten")
+        self.h.tick(advance=180)
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.starts), 3)
 
 
 class CoreGuardTests(StopCase):
