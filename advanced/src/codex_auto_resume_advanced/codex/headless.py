@@ -16,7 +16,7 @@ guard, and decided the words (core's engine/dispatch.py) - this starts the one t
    built-in workspace or read-only one (PROFILES) -
    and anything else (full access, an outside sandbox, another reviewer, a word this does not know) refused before
    anything starts (Q4: `refused_settings`);
-4. core's look at whether the conversation is still unheld and the app still closed, asked again - the writer lock
+4. core's look - consent still given, the conversation still unheld and the app still closed - asked again: the lock
    our own server took at thread/resume counted as no other holder (core's pairing.own_server, by the pid and
    creation time of the spawn), any other holder still a no;
 5. turn/start with core's words (or none, SILENT) under the client id core derived - or, in compact mode,

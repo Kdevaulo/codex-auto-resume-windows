@@ -106,8 +106,9 @@ class RoutesMixin:
         with the conversation still not held by the app `app` and usage still there (`dispatch`).
 
         The route is handed `still_unloaded`, core's look at the conversation made again when it
-        is asked - never the cached one: the app `app` still there and saying notLoaded, and
-        anything else, a look that fails included, is no. A route opens a session with Codex
+        is asked - never the cached one: consent still given (the launch guard's own check, read
+        again), and the app `app` still there and saying notLoaded; anything else, a look that
+        fails included, is no. A route opens a session with Codex
         before it changes anything, which takes seconds, and the app may open the conversation in
         them; asked at the last moment, the look keeps the route from changing a conversation the
         app has just taken, and the route answers not started."""
@@ -136,7 +137,19 @@ class RoutesMixin:
         if once is not None and not self._spend_once_words(claim, once):
             message = plain                 # never sent twice (the words for this time, as a send's)
 
+        refused = []
+
         def still_unloaded() -> bool:
+            # Consent again, as the launch guard asks it (store.submission_guard): a Cancel, Pause or observe-only set
+            # while the route's session started, resumed and listed - seconds each - stops it here, before anything
+            # changes in Codex, as the guard stops a send or a channel's add.
+            try:
+                with self.store.submission_guard(key) as permitted:
+                    if permitted is not True:
+                        refused.append(True)
+                        return False
+            except Exception:
+                return False
             if app is None:
                 return self._unheld_now(thread_id, ours=True)
             try:
@@ -156,6 +169,8 @@ class RoutesMixin:
             response = {"outcome": "unknown"}
         if not isinstance(response, dict):
             response = {"outcome": "unknown"}
+        if refused and response.get("outcome") == "not_started":
+            response = dict(response, error_code="queue_consent_refused")     # a Cancel is settled as one
         try:
             self._after_resume(current, response)
         except Exception:

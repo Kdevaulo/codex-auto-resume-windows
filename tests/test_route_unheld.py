@@ -239,6 +239,34 @@ class WordsTests(UnheldCase):
         self.assertEqual(route.calls, [])
         self.assertEqual(self.h.record()["last_error"], "desktop_app_unavailable")
 
+    def test_a_cancel_or_pause_set_while_the_route_starts_stops_it_at_the_last_look(self):
+        """Core's Route lets the launch guard go before the route's session starts, resumes and lists models (each up
+        to 25 s); the last look asks consent again. Fails with that re-check reverted: the turn ran after a Cancel."""
+        for stop, state in (("cancel", "cancelled"), ("pause", None), ("observe only", None)):
+            with self.subTest(stop):
+                h = self.fresh()
+
+                def set_meanwhile():
+                    key = h.record()["interruption_id"]
+                    if stop == "cancel":
+                        h.store.cancel_interruption(key, h.now)
+                    elif stop == "pause":
+                        h.store.set_enabled(False, h.now)
+                    else:
+                        h.store.set_observe_only(True)
+                route = Headless(h, during=set_meanwhile)
+                self.armed(route, h)
+                self.closed(h)
+                h.tick()
+                self.assertIs(route.calls[0]["unheld"], False)
+                self.assertEqual(h.home.queued(T1), [], "nothing started in Codex")
+                row = h.record()
+                if state is not None:
+                    self.assertEqual((row["state"], row["last_error"]), (state, "user_cancelled"))
+                else:
+                    self.assertIn(row["state"], machine.WAITING, row["state"])
+                    self.assertEqual(row["chain_continuations"], 0, "its claim given back")
+
     def test_a_holder_appearing_before_the_claim_stops_it(self):
         h = self.h
         route = Headless(h)
