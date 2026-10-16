@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import sys
 import unittest
 
@@ -52,6 +53,45 @@ class OutcomeTests(unittest.TestCase):
     def test_a_completion_beside_a_pass_or_a_fail_does_not_change_it(self):
         """Only a blocked probe is completed by hand (evidence.complete refuses the rest)."""
         self.assertEqual(evidence.outcome(record("fail", "pass"))[0], Verdict.FAIL)
+
+
+# Where the editions page says a measurement is still open: "**Measurement MU: not settled yet**", "**MT: not made
+# yet**", and the Korean page's "**측정 MU: 아직 정해지지 않음**".
+OPEN_WORDS = (re.compile(r"\*\*(?:Measurements?\s+)?([A-Z][A-Z0-9]*):\s+not\s+(?:settled|made)\s+yet"),
+              re.compile(r"\*\*(?:측정\s+)?([A-Z][A-Z0-9]*):\s+아직\s+(?:정해지지\s+않음|하지\s+않음)"))
+
+
+class EditionsPageTests(unittest.TestCase):
+    def test_the_editions_page_never_calls_a_measurement_the_table_settles_open(self):
+        """MU passed on 2026-10-10, and the page went on saying "not settled yet" beside two capabilities."""
+        for name in ("EDITIONS.md", "EDITIONS.ko.md"):
+            path = ac.ROOT / "docs" / name
+            if not path.is_file():
+                continue                                    # main carries no Korean page
+            text = path.read_text(encoding="utf-8")
+            for pattern in OPEN_WORDS:
+                for found in pattern.finditer(text):
+                    try:
+                        measurement = Measurement(found.group(1).lower())
+                    except ValueError:
+                        continue
+                    with self.subTest(page=name, measurement=measurement):
+                        self.assertNotIn(measurement, measured.MEASURED, "settled in measured.py, open on the page")
+
+    def test_the_feature_matrix_cites_the_near_limit_capabilities_and_keep_it_on_turning_one_on(self):
+        """v0.6.16-beta.4's usage meter, wrap-up, forced stop over the pipe, continuation after the reset, custom numbers
+        and wordings, and Keep it on that turns a capability on: each with its rows and their tests, in both languages."""
+        for name in ("FEATURE_MATRIX.md", "FEATURE_MATRIX.ko.md"):
+            path = ac.ROOT / "docs" / name
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8")
+            for cited in ("test_advanced_usagestop.py:StopTests", "test_advanced_usagestop.py:AfterResetTests",
+                          "test_advanced_ipc.py:StopTests", "test_advanced_usage.py:MeterTests",
+                          "test_advanced_usage.py:WrapUpTests", "test_advanced_wordings.py:CheckTests",
+                          "test_advanced_state_v6.py:VersionSixTests", "KeepItOnTurnsItOnTests"):
+                with self.subTest(page=name, cited=cited):
+                    self.assertIn(cited, text)
 
 
 class TableTests(unittest.TestCase):

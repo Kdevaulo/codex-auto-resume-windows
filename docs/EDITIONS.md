@@ -705,7 +705,8 @@ reading that cannot be read is shown as nothing and warns of nothing.
 **Departs from** [C4](STANDARDS.md#c-network) (nothing happens on its own, on a schedule) and
 [C9](STANDARDS.md#c-network) (usage is read only when a recovery is due).
 
-**Ceilings.** None come into play: it sends nothing. **Measurement MU: not settled yet.**
+**Ceilings.** None come into play: it sends nothing. **Measurement MU: passed** on codex-cli
+0.162.0-alpha.17.2 (2026-10-10).
 
 ### Wrap up near a limit
 
@@ -764,7 +765,8 @@ is a turn started through the app's channel, not `codex queue`), [B3](STANDARDS.
 reading) and [H6](STANDARDS.md#h-user-control) (a running turn is stopped).
 
 **Ceilings.** One stop and one continuation a conversation a window. **Measurement MIPC: passed** (codex-cli
-0.162.0-alpha.17.2, app 26.1007.9446.0); **MU: not settled yet.**
+0.162.0-alpha.17.2, app 26.1007.9446.0; again on 0.163.0-alpha.10.2, app 26.1013.3656.0, with the stop that
+names its turn - f16c9ca2 on measure-20261017); **MU: passed** (codex-cli 0.162.0-alpha.17.2, 2026-10-10).
 
 ### Compatibility report
 
