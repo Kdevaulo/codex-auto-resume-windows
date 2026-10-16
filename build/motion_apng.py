@@ -32,7 +32,7 @@ SHORTEST = 2                         # hundredths of a second
 APNG_KEEP, APNG_OVER = 0, 1
 LEVEL = 9
 # Changed rows this many unchanged rows apart are written as rectangles of their own (`patches`).
-BAND_GAP = 48
+BAND_GAP = 32
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -126,30 +126,69 @@ def changed(before: bytes, after: bytes, width: int, height: int):
 
 
 def patches(before: bytes, after: bytes, width: int, height: int) -> list:
-    """The rectangles that differ between two RGB pictures, one per band of changed rows that BAND_GAP unchanged rows
-    keep apart from the next: a breathing light at the top of the picture and the tray icon at its bottom are two
-    small rectangles, where one round both would be most of the picture. [] when they are the same."""
+    """The rectangles that differ between two RGB pictures, cut apart wherever BAND_GAP unchanged rows or columns lie
+    between changes: a breathing light at the top of the picture and the tray icon at its bottom, or the card's light
+    and a pointer beside it, are small rectangles each, where one round them would be much of the picture. Largest
+    first; [] when the pictures are the same."""
     if before == after:
         return []
+    found = []
+    _cut(before, after, width, (0, 0, width, height), found)
+    return sorted(found, key=lambda box: (-box[2] * box[3], box[1], box[0]))
+
+
+def _tight(before: bytes, after: bytes, width: int, box: tuple):
+    """The smallest rectangle inside `box` that holds every change there, or None."""
+    left0, top0, wide, tall = box
     stride = width * 3
-    rows = [y for y in range(height) if before[y * stride:(y + 1) * stride] != after[y * stride:(y + 1) * stride]]
-    bands, start = [], rows[0]
-    for previous, row in zip(rows, rows[1:]):
-        if row - previous > BAND_GAP:
-            bands.append((start, previous))
-            start = row
-    bands.append((start, rows[-1]))
-    boxes = []
-    for top, bottom in bands:
-        left, right = width, -1
-        for y in range(top, bottom + 1):
-            a, b = before[y * stride:(y + 1) * stride], after[y * stride:(y + 1) * stride]
-            if a == b:
-                continue
-            left = min(left, _same_prefix(a, b, width))
-            right = max(right, width - 1 - _same_suffix(a, b, width))
-        boxes.append((left, top, right - left + 1, bottom - top + 1))
-    return boxes
+    rows = []
+    left, right = left0 + wide, left0 - 1
+    for y in range(top0, top0 + tall):
+        a = before[y * stride + left0 * 3:y * stride + (left0 + wide) * 3]
+        b = after[y * stride + left0 * 3:y * stride + (left0 + wide) * 3]
+        if a == b:
+            continue
+        rows.append(y)
+        left = min(left, left0 + _same_prefix(a, b, wide))
+        right = max(right, left0 + wide - 1 - _same_suffix(a, b, wide))
+    if not rows:
+        return None
+    return left, rows[0], right - left + 1, rows[-1] - rows[0] + 1
+
+
+def _cut(before: bytes, after: bytes, width: int, box: tuple, found: list) -> None:
+    box = _tight(before, after, width, box)
+    if box is None:
+        return
+    left, top, wide, tall = box
+    stride = width * 3
+    # Rows: a run of BAND_GAP unchanged rows inside the rectangle.
+    run = 0
+    for y in range(top, top + tall):
+        same = before[y * stride + left * 3:y * stride + (left + wide) * 3] ==             after[y * stride + left * 3:y * stride + (left + wide) * 3]
+        run = run + 1 if same else 0
+        if run >= BAND_GAP:
+            _cut(before, after, width, (left, top, wide, y - top + 1), found)
+            _cut(before, after, width, (left, y + 1, wide, top + tall - y - 1), found)
+            return
+    # Columns: a strip BAND_GAP wide unchanged on every row of the rectangle, looked for every half of it.
+    for x in range(left + 1, left + wide - BAND_GAP, max(1, BAND_GAP // 2)):
+        if all(before[y * stride + x * 3:y * stride + (x + BAND_GAP) * 3] ==
+               after[y * stride + x * 3:y * stride + (x + BAND_GAP) * 3] for y in range(top, top + tall)):
+            _cut(before, after, width, (left, top, x - left, tall), found)
+            _cut(before, after, width, (x + BAND_GAP, top, left + wide - x - BAND_GAP, tall), found)
+            return
+    found.append(box)
+
+
+def _join(one: tuple, other: tuple) -> tuple:
+    left, top = min(one[0], other[0]), min(one[1], other[1])
+    return (left, top, max(one[0] + one[2], other[0] + other[2]) - left,
+            max(one[1] + one[3], other[1] + other[3]) - top)
+
+
+def _area(box: tuple) -> int:
+    return box[2] * box[3]
 
 
 def _delay(hundredths: int) -> tuple:
@@ -179,8 +218,12 @@ def assemble(path, width: int, height: int, frames, *, still: bytes | None = Non
             (later[-1] if later else first)[0] += delay
             continue
         boxes = patches(previous, picture, width, height)
-        if len(boxes) > 1 and delay < len(boxes) * SHORTEST:
-            boxes = [changed(previous, picture, width, height)]
+        while len(boxes) > max(1, delay // SHORTEST):
+            # Not time enough to show each for SHORTEST: the two that make the smallest rectangle together are one.
+            pairs = [(i, j) for i in range(len(boxes)) for j in range(i + 1, len(boxes))]
+            i, j = min(pairs, key=lambda pair: _area(_join(boxes[pair[0]], boxes[pair[1]])))
+            rest = [box for index, box in enumerate(boxes) if index not in (i, j)]
+            boxes = sorted(rest + [_join(boxes[i], boxes[j])], key=lambda box: (-box[2] * box[3], box[1], box[0]))
         # Each rectangle but the last is shown for the shortest time a browser keeps, the last for the rest.
         for number, box in enumerate(boxes):
             last = number == len(boxes) - 1

@@ -138,6 +138,31 @@ class SplitTests(unittest.TestCase):
         self.assertEqual(report.hundredths, 23)
 
 
+class CutTests(unittest.TestCase):
+    def test_changes_side_by_side_are_cut_apart_by_the_columns_between_them(self):
+        width, height = 200, 40
+        before = bytes(bytes(GROUND) * (width * height))
+        after = bytearray(before)
+        for x, y in ((5, 10), (6, 30), (150, 12), (160, 20)):
+            after[(y * width + x) * 3] = 0
+        boxes = motion_apng.patches(before, bytes(after), width, height)
+        self.assertEqual(sorted(boxes), [(5, 10, 2, 21), (150, 12, 11, 9)])
+        self.assertEqual(motion_apng.patches(before, before, width, height), [])
+
+    def test_a_frame_too_short_for_every_rectangle_joins_the_two_nearest(self):
+        width, height = 200, 200
+        before = bytes(bytes(GROUND) * (width * height))
+        after = bytearray(before)
+        for x, y in ((5, 5), (190, 190), (150, 185)):
+            after[(y * width + x) * 3] = 0
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "short.png"
+            motion_apng.assemble(path, width, height, iter([(4, "A", before), (4, "B", bytes(after))]))
+            boxes = [frame["box"] for frame in read_apng(path.read_bytes())["frames"]][1:]
+        self.assertEqual(sorted(boxes), [(5, 5, 1, 1), (150, 185, 41, 6)],
+                         "the two far corners would have made one rectangle of the whole picture")
+
+
 class ChangedTests(unittest.TestCase):
     def test_the_rectangle_is_the_smallest_that_holds_every_change(self):
         generator = random.Random(7)
