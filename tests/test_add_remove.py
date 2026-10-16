@@ -31,6 +31,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "build"))
 
 from codex_auto_resume import addremove, config, startup  # noqa: E402
 import test_installer as installer  # noqa: E402  (its helpers: block, run_probe, ps_literal, VOICE)
@@ -655,7 +656,8 @@ class WiringTests(Entry):
         text = (ROOT / "scripts" / "plugin_setup.py").read_text(encoding="utf-8")
         self.assertIn("addremove.register(home, edition.name().value, config.version(),", text)
         self.assertIn("addremove.display_name(config.PROJECT_ROOT / config.PLUGIN_MANIFEST))", text)
-        self.assertEqual(text.count("addremove."), 2)
+        setup = text[text.index("def cmd_setup"):text.index("def cmd_enable")]
+        self.assertEqual(setup.count("addremove."), 2)
         for forbidden in ("winreg", "CurrentVersion"):
             self.assertNotIn(forbidden, text)
 
@@ -671,6 +673,126 @@ class WiringTests(Entry):
             if "CurrentVersion\\Uninstall" in path.read_text(encoding="utf-8", errors="replace"):
                 found.append(path.name)
         self.assertEqual(found, ["addremove.py"])
+
+
+@unittest.skipUnless(WINDOWS, "the registry is Windows'")
+class RemoveEntryTests(Entry):
+    """`plugin_setup.py remove-entry`: what a hand-over to an older version runs first."""
+
+    def remove(self):
+        import plugin_setup
+        out = io.StringIO()
+        with patch.dict(os.environ, {plugin_setup.ENV_RUNTIME_HOME: str(self.home)}), contextlib.redirect_stdout(out):
+            code = plugin_setup.cmd_remove_entry(None)
+        return code, out.getvalue().strip()
+
+    def test_the_entry_and_the_kept_uninstaller_are_both_taken_away(self):
+        addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
+        code, out = self.remove()
+        self.assertEqual((code, out), (0, "entry: removed"))
+        self.assertEqual(self.registry.keys, {})
+        self.assertFalse((self.home / "uninstall").exists(), "the script and its folder go with it")
+        self.assertEqual(self.remove(), (0, "entry: none"))
+
+    def test_an_entry_of_another_installation_stays_and_so_does_what_is_not_ours(self):
+        addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
+        key = self.registry.keys[addremove.key_path("standard")]
+        key["InstallLocation"] = (str(Path(self.temp.name) / "other"), 1)
+        (self.home / "uninstall" / "notes.txt").write_text("not ours", encoding="utf-8")
+        code, out = self.remove()
+        self.assertEqual(code, 0, out)
+        self.assertIn(addremove.key_path("standard"), self.registry.keys)
+        self.assertTrue((self.home / "uninstall" / "notes.txt").is_file())
+        self.assertFalse((self.home / "uninstall" / "install.ps1").exists())
+
+    def test_a_junction_is_not_followed_when_the_kept_uninstaller_is_removed(self):
+        outside = Path(self.temp.name) / "outside"
+        outside.mkdir()
+        (outside / "install.ps1").write_text("# someone else's", encoding="utf-8")
+        shutil.rmtree(self.home / "uninstall")
+        made = subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(self.home / "uninstall"), str(outside)],
+                              capture_output=True, creationflags=NO_WINDOW)
+        if made.returncode != 0:
+            self.skipTest("no junction could be made here")
+        self.assertFalse(addremove.remove_kept(self.home))
+        self.assertTrue((outside / "install.ps1").is_file())
+
+    def test_the_command_is_the_one_the_bootstrap_runs(self):
+        import plugin_setup
+        parsed = plugin_setup.build_parser().parse_args(["remove-entry"])
+        self.assertEqual(parsed.command, "remove-entry")
+        self.assertIs(plugin_setup.COMMANDS["remove-entry"], plugin_setup.cmd_remove_entry)
+
+
+BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
+
+
+@unittest.skipUnless(WINDOWS and installer.POWERSHELL, "the bootstrap is PowerShell on Windows")
+class HandOverTests(unittest.TestCase):
+    """The bootstrap's hand-over to a version that does not know the entry, both ways: the entry goes first when
+    the picked version is older than the one that has it, and stays for any other."""
+
+    def setUp(self):
+        self.text = BOOTSTRAP.read_text(encoding="utf-8")
+
+    def decide(self, installed: str, target: str, code: int = 0) -> tuple:
+        text = self.text
+        source = installer.VOICE
+        source += installer.block(text, "function Get-VersionParts", "function Format-UnreadVersion")
+        source += installer.block(text, "function Compare-ProductVersion", "function Get-NewestPublishedVersion")
+        source += installer.block(text, "function Remove-EntryBeforeOlder", "function Start-CurrentWatcher")
+        source += re.search(r"(?m)^\$EntryFrom = '[^']+'$", text).group(0) + "\n"
+        script = ("$global:calls = @()\n"
+                  "function Invoke-InstalledSetup { param([string]$Home_, [string[]]$Arguments) "
+                  "$global:calls += ($Arguments -join ' '); "
+                  "return [pscustomobject]@{ Printed = @(); Code = %d } }\n"
+                  "$answer = Remove-EntryBeforeOlder -Home_ 'C:\\scratch' -Installed %s -Target %s\n"
+                  "'answer: ' + $answer\n'calls: ' + ($global:calls -join '|')\n"
+                  % (code, installer.ps_literal(installed), installer.ps_literal(target)))
+        done = installer.run_probe(source, script)
+        answer = re.search(r"answer: (\w+)", done.stdout)
+        calls = re.search(r"calls: (.*)", done.stdout)
+        self.assertTrue(answer and calls, done.stdout + done.stderr)
+        return answer.group(1), calls.group(1).strip()
+
+    def test_going_back_to_a_version_before_the_entry_removes_it_first(self):
+        for installed, target in (("0.6.16", "0.6.15"), ("0.6.17", "0.6.14"), ("0.6.16", "0.6.16-beta.3"),
+                                  ("0.6.16-beta.4", "0.6.12"), ("0.6.16", "0.6.2")):
+            with self.subTest(installed=installed, target=target):
+                self.assertEqual(self.decide(installed, target), ("removed", "remove-entry"))
+
+    def test_any_other_pick_leaves_the_entry_alone(self):
+        for installed, target in (("0.6.16", "0.6.16"), ("0.6.17", "0.6.16"), ("0.6.16", "0.6.17"),
+                                  ("0.6.16", "0.6.18-beta.2")):
+            with self.subTest(installed=installed, target=target):
+                self.assertEqual(self.decide(installed, target), ("kept", ""))
+
+    def test_an_installation_older_than_the_entry_has_no_such_command_to_run(self):
+        for installed, target in (("0.6.15", "0.6.12"), ("0.6.12", "0.6.11"), ("0.6.15", "0.6.16")):
+            with self.subTest(installed=installed, target=target):
+                self.assertEqual(self.decide(installed, target), ("none", ""))
+
+    def test_a_removal_that_failed_says_so_and_an_engine_without_the_command_is_not_a_failure(self):
+        self.assertEqual(self.decide("0.6.16", "0.6.15", code=1), ("failed", "remove-entry"))
+        self.assertEqual(self.decide("0.6.16-beta.3", "0.6.15", code=2), ("none", "remove-entry"))
+
+    def test_an_unreadable_version_runs_nothing(self):
+        self.assertEqual(self.decide("garbage", "0.6.15"), ("none", ""))
+
+    def test_it_runs_for_a_pick_after_the_state_is_converted_and_before_the_installer(self):
+        text = self.text
+        call = text.index("Remove-EntryBeforeOlder -Home_ $installHome")
+        self.assertGreater(call, text.index("Convert-StateForOlder -Home_ $installHome -To $pickSchema"))
+        self.assertLess(call, text.index("& $installer @arguments"))
+        self.assertIn("    if ($Pick) {\n        $entry = Remove-EntryBeforeOlder", text.replace("\r\n", "\n"))
+        self.assertEqual(text.count("Remove-EntryBeforeOlder -Home_"), 1)
+
+    def test_one_number_for_the_first_version_in_every_place(self):
+        from codex_auto_resume import addremove as module
+        import winget_manifests
+        found = re.search(r"(?m)^\$EntryFrom = '([^']+)'$", self.text).group(1)
+        self.assertEqual(found, module.FIRST_VERSION)
+        self.assertEqual(found, winget_manifests.UNATTENDED_FROM)
 
 
 if __name__ == "__main__":

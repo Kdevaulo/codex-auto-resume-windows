@@ -458,6 +458,20 @@ def cmd_uninstall(args) -> int:
     return EXIT_OK
 
 
+def cmd_remove_entry(args) -> int:
+    """Take this installation's entry in Add or remove programs and the uninstaller kept for it away. What a
+    hand-over to a version that knows neither runs first, so it leaves neither behind."""
+    home = runtime_home()
+    try:
+        removed = addremove.unregister(home)
+    except startup.StartupError as exc:
+        print("entry: failed %s" % exc)
+        return EXIT_ERROR
+    kept = addremove.remove_kept(home)
+    print("entry: removed" if removed or kept else "entry: none")
+    return EXIT_OK
+
+
 def cmd_downgrade_state(args) -> int:
     """For Install another version... (the bootstrap's -Pick): the state converted for an older
     release, the watcher asked to stop and waited for first, and one line saying what was done
@@ -500,6 +514,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("uninstall", help="remove the watcher, autostart and registrations")
     p.add_argument("--purge", action="store_true",
                    help="also delete settings, pending recoveries and logs")
+    sub.add_parser("remove-entry", help="remove the Add or remove programs entry and the uninstaller kept for it")
     p = sub.add_parser("logs")
     p.add_argument("-n", "--lines", type=int, default=30)
     p = sub.add_parser("downgrade-state", help="convert the state for an older release (v0.6.0 to v0.6.14)")
@@ -515,7 +530,7 @@ COMMANDS = {
     "setup": cmd_setup, "status": cmd_status, "pending": cmd_pending, "enable": cmd_enable,
     "disable": cmd_disable, "cancel": cmd_cancel, "uninstall": cmd_uninstall,
     "verify-home": cmd_verify_home,
-    "claim-home": cmd_claim_home, "downgrade-state": cmd_downgrade_state,
+    "claim-home": cmd_claim_home, "downgrade-state": cmd_downgrade_state, "remove-entry": cmd_remove_entry,
     "stop": passthrough("stop"), "doctor": passthrough("doctor"), "logs": passthrough("logs"),
 }
 

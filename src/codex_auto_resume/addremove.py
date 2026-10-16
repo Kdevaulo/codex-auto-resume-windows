@@ -30,6 +30,9 @@ UNINSTALL_ROOT = r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
 BASE_NAME = "CodexAutoResume"
 PUBLISHER = "songyb111-gachon"
 DEFAULT_DISPLAY_NAME = "Codex Auto Resume"
+# The first version that writes the entry and keeps the uninstaller. The bootstrap, the winget manifests and the tests
+# hold their own copies of this number to it; a hand-over to an older version removes the entry first.
+FIRST_VERSION = "0.6.16"
 # Set by install.ps1 around the engine's uninstall step: the installer removes the entry itself once every removal
 # has succeeded, so a failed uninstall stays listed and can be run again.
 KEEP_ENTRY_ENV = "CODEX_AUTO_RESUME_KEEP_ENTRY"
@@ -68,6 +71,18 @@ def _plain(path, directory: bool) -> bool:
 def kept_uninstaller_present(home) -> bool:
     """The kept uninstaller is there, and so is the folder it is in, as plain files and not links (F4)."""
     return _plain(Path(home) / KEPT_FOLDER, True) and _plain(kept_script(home), False)
+
+
+def remove_kept(home) -> bool:
+    """Delete the kept uninstaller, and its folder once empty. Only plain ones; True when the script is gone."""
+    if not kept_uninstaller_present(home):
+        return False
+    try:
+        kept_script(home).unlink()
+        (Path(home) / KEPT_FOLDER).rmdir()
+    except OSError:
+        pass
+    return not kept_script(home).exists()
 
 
 def powershell() -> Path:
