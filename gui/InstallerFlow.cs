@@ -1,0 +1,552 @@
+// Codex Auto Resume - the installer window's steps and choices, apart from any window.
+//
+// The setup programs (build/setup/Setup.cs), the Dashboard's update and the entry in Add or remove programs
+// all show one window (InstallerWindow). What it asks, which switches each answer becomes, how far along the
+// installer is and what its exit code means are decided here, with no control in sight, so each rule can be
+// checked without a window (tests/test_installer_window.py).
+//
+// It asks only what the installer really has a choice about. install.ps1 decides everything else itself -
+// where it installs, that it adds the plugin to Codex, that an update keeps the settings and the sign-in
+// choice - and the window says those as facts. The answers become the installer's own switches: -SkipStartup,
+// -AllowEditionChange and, for an uninstall, -Purge. -Silent is always passed, because the window is the one
+// asking and nothing may wait for a key in a console nobody sees.
+//
+// C# 5 only: the setup programs are compiled by the in-box csc (build/make_setup.py), as the window is.
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
+
+namespace CodexAutoResume
+{
+    internal sealed class InstallerFlow
+    {
+        internal const string Install = "install";
+        internal const string Update = "update";
+        internal const string Uninstall = "uninstall";
+
+        internal const string Welcome = "welcome";
+        internal const string Options = "options";
+        internal const string Confirm = "confirm";
+        internal const string Progress = "progress";
+        internal const string Finish = "finish";
+
+        internal const string Standard = "standard";
+        internal const string Advanced = "advanced";
+
+        /// install.ps1's code for an archive of the other edition when no change was asked for: nothing changed.
+        internal const int EditionChangeRefused = 14;
+        /// The window's own code for a run that has not finished in the time it was given (the Dashboard's update):
+        /// never ended by force, for it may be part way through replacing an installation.
+        internal const int StillRunning = -2;
+        /// The window's own code for an installer that could not be started at all.
+        internal const int NotStarted = -1;
+
+        /// The package whose presence makes a tree the advanced edition (src/codex_auto_resume/edition.py).
+        internal const string AdvancedPackage = "codex_auto_resume_advanced";
+
+        internal readonly string Mode;
+        /// Where the installation is or will be: install.ps1's $InstallHome.
+        internal readonly string Home;
+        /// The edition this archive installs, or the installation's own for an update or an uninstall.
+        internal readonly string Edition;
+        /// The edition installed in Home now, or null where nothing is.
+        internal readonly string Installed;
+        internal readonly string Version;
+
+        /// Run at Windows sign-in, on a first installation: off is -SkipStartup.
+        internal bool StartAtSignIn = true;
+        /// Replace the other edition, which is installed: -AllowEditionChange. Off until it is asked for.
+        internal bool ChangeEdition;
+        /// Delete the settings and the recovery history too, on an uninstall: -Purge. Off until it is asked for.
+        internal bool Purge;
+        /// Open the Dashboard once it is done.
+        internal bool OpenDashboard = true;
+
+        internal InstallerFlow(string mode, string home, string edition, string installed, string version)
+        {
+            Mode = mode == Update || mode == Uninstall ? mode : Install;
+            Home = home ?? "";
+            Edition = edition == Advanced ? Advanced : Standard;
+            Installed = installed == Advanced || installed == Standard ? installed : null;
+            Version = version ?? "";
+        }
+
+        /// Whether there is an installation here already: then this is an update or a repair, and install.ps1 keeps
+        /// the settings, everything waiting and the sign-in choice (--keep-state) - there is nothing to ask about them.
+        internal bool Upgrade { get { return Installed != null; } }
+
+        /// Whether the other edition is installed here: then installing is a change of edition, asked for or refused.
+        internal bool EditionChange { get { return Installed != null && Installed != Edition; } }
+
+        /// The pages the window goes through, in order.
+        internal string[] Pages()
+        {
+            if (Mode == Update) return new[] { Progress, Finish };
+            if (Mode == Uninstall) return new[] { Confirm, Progress, Finish };
+            return new[] { Welcome, Options, Progress, Finish };
+        }
+
+        /// Whether the page that starts the run may start it: an edition change only once it is asked for.
+        internal bool CanStart()
+        {
+            return Mode != Install || !EditionChange || ChangeEdition;
+        }
+
+        /// The switches the installer is given for the answers: Install.cmd's and install.ps1's own words. `given`
+        /// are the ones the setup program itself was started with, which a window still passes on.
+        internal List<string> Switches(IEnumerable<string> given)
+        {
+            var switches = new List<string>();
+            if (Mode == Uninstall)
+            {
+                switches.Add("-Uninstall");
+                if (Purge) switches.Add("-Purge");
+            }
+            else if (Mode == Install)
+            {
+                // A first installation's choice only: on an update install.ps1 keeps the sign-in entry as it is.
+                if (!Upgrade && !StartAtSignIn) switches.Add("-SkipStartup");
+                if (EditionChange && ChangeEdition) switches.Add("-AllowEditionChange");
+            }
+            if (given != null)
+            {
+                foreach (string word in given)
+                {
+                    if (Has(switches, word) || IsAnswered(word)) continue;
+                    switches.Add(word);
+                }
+            }
+            switches.Add("-Silent");
+            return switches;
+        }
+
+        // The switches the answers above decide, which a setup program's own command line only presets.
+        private static bool IsAnswered(string word)
+        {
+            foreach (string answered in new[] { "-SkipStartup", "-AllowEditionChange", "-Silent", "-Uninstall", "-Purge" })
+                if (string.Equals(word, answered, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        internal static bool Has(IEnumerable<string> words, string word)
+        {
+            if (words == null) return false;
+            foreach (string each in words)
+                if (string.Equals(each, word, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// install.ps1's $InstallHome: CODEX_AUTO_RESUME_PLUGIN_HOME where it is set, else .codex-auto-resume in the
+        /// profile. Pure.
+        internal static string HomeFrom(string pluginHome, string profile)
+        {
+            if (!string.IsNullOrWhiteSpace(pluginHome)) return pluginHome;
+            return Path.Combine(profile ?? "", ".codex-auto-resume");
+        }
+
+        /// The edition of the tree whose `src` folder this is, by install.ps1's own rule (Get-Edition): the advanced
+        /// package's folder, in exactly that case, with an __init__.py in it. A tree that is not there is null.
+        internal static string EditionOfSource(string src)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(src) || !Directory.Exists(src)) return null;
+                foreach (string folder in Directory.GetDirectories(src))
+                {
+                    if (!string.Equals(Path.GetFileName(folder), AdvancedPackage, StringComparison.Ordinal)) continue;
+                    if (File.Exists(Path.Combine(folder, "__init__.py"))) return Advanced;
+                }
+                return Standard;
+            }
+            catch (Exception)
+            {
+                return Standard;
+            }
+        }
+
+        /// The edition installed at `home`, as install.ps1 reads it before it moves anything: none where there is
+        /// no app folder (a first installation), else the edition of app\src.
+        internal static string InstalledAt(string home)
+        {
+            try
+            {
+                string app = Path.Combine(home ?? "", "app");
+                if (!Directory.Exists(app)) return null;
+                return EditionOfSource(Path.Combine(app, "src")) ?? Standard;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// The edition an archive installs, from its entries' names: the same rule, read inside the ZIP.
+        internal static string EditionOfEntries(IEnumerable<string> names)
+        {
+            string wanted = "payload/app/src/" + AdvancedPackage + "/__init__.py";
+            foreach (string name in names)
+                if (string.Equals(name, wanted, StringComparison.Ordinal)) return Advanced;
+            return Standard;
+        }
+
+        /// A JSON object read from `text`, or null where there is no text or it is not one.
+        internal static Dictionary<string, object> ParseObject(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return null;
+            try { return Json.Parse(text) as Dictionary<string, object>; }
+            catch (Exception) { return null; }
+        }
+
+        /// The version a plugin.json names, or "" where it names none.
+        internal static string VersionOf(string pluginJson)
+        {
+            var manifest = ParseObject(pluginJson);
+            object version;
+            return manifest != null && manifest.TryGetValue("version", out version) && version is string ? (string)version : "";
+        }
+    }
+
+    /// How far along the installer is: read from the lines install.ps1 and the bootstrap print, never from a timer.
+    ///
+    /// Each line a step of theirs begins with moves the bar to that step's place and names the step; a line it does
+    /// not know leaves both as they were, and the bar never goes back. The lines are the scripts' own English ones,
+    /// which they print in every language - the words the setup step prints in the person's language are never
+    /// read. The setup program's own two steps, checking its archive and unpacking it, come first (Unpacked).
+    internal static class InstallerProgress
+    {
+        internal struct Milestone
+        {
+            internal readonly string Starts;
+            internal readonly double At;
+            internal readonly string Step;
+
+            internal Milestone(string starts, double at, string step)
+            {
+                Starts = starts;
+                At = at;
+                Step = step;
+            }
+        }
+
+        /// Where unpacking ends and install.ps1 begins, for a setup program.
+        internal const double UnpackedAt = 0.25;
+
+        // install.ps1, in the order it prints them (build/install/install.ps1).
+        private static readonly Milestone[] Installing =
+        {
+            new Milestone("edition: ", 0.27, "codex"),
+            new Milestone("[ok] Found Codex", 0.30, "files"),
+            new Milestone("Installing program files", 0.33, "files"),
+            new Milestone("Updating program files", 0.33, "files"),
+            new Milestone("Stopping the running watcher", 0.40, "watcher"),
+            new Milestone("[ok] Bundled Python", 0.60, "plugin"),
+            new Milestone("Registering the Codex plugin", 0.62, "plugin"),
+            new Milestone("Setting up the watcher", 0.78, "setup"),
+            new Milestone("Checking the installation", 0.92, "check"),
+        };
+
+        // scripts/bootstrap.ps1 -Update, then the install.ps1 it runs. The bootstrap prints `edition:` before it
+        // downloads anything, so that line is not a step here.
+        private static readonly Milestone[] Updating =
+        {
+            new Milestone("Asking github.com which release is newest", 0.05, "ask"),
+            new Milestone("Asking api.github.com for this repository's list of releases", 0.05, "ask"),
+            new Milestone("Downloading v", 0.10, "download"),
+            new Milestone("SHA-256 ", 0.25, "verify"),
+            new Milestone("[ok] SHA-256", 0.25, "verify"),
+            new Milestone("[ok] Archive contents verified", 0.30, "verify"),
+            new Milestone("Installing", 0.35, "files"),
+            new Milestone("[ok] Found Codex", 0.40, "files"),
+            new Milestone("Updating program files", 0.45, "files"),
+            new Milestone("Installing program files", 0.45, "files"),
+            new Milestone("Stopping the running watcher", 0.50, "watcher"),
+            new Milestone("[ok] Bundled Python", 0.65, "plugin"),
+            new Milestone("Registering the Codex plugin", 0.68, "plugin"),
+            new Milestone("Setting up the watcher", 0.80, "setup"),
+            new Milestone("Checking the installation", 0.92, "check"),
+        };
+
+        // install.ps1 -Uninstall.
+        private static readonly Milestone[] Removing =
+        {
+            new Milestone("Removing the watcher, autostart", 0.15, "unregister"),
+            new Milestone("Removing the Codex plugin", 0.40, "remove_plugin"),
+            new Milestone("The Codex plugin is not installed", 0.40, "remove_plugin"),
+            new Milestone("Removing the marketplace", 0.50, "remove_plugin"),
+            new Milestone("Removing program files", 0.60, "remove_files"),
+            new Milestone("Releasing the files", 0.70, "remove_files"),
+            new Milestone("Removed", 0.95, "finishing"),
+        };
+
+        internal static Milestone[] Of(string mode)
+        {
+            return mode == InstallerFlow.Update ? Updating : mode == InstallerFlow.Uninstall ? Removing : Installing;
+        }
+
+        /// The bar's place and step after `line`, from where they were: forward only, and only on a known step.
+        /// True when the line moved either. Pure.
+        internal static bool Advance(string mode, string line, ref double at, ref string step)
+        {
+            string said = (line ?? "").Trim();
+            if (said.Length == 0) return false;
+            foreach (Milestone milestone in Of(mode))
+            {
+                if (!said.StartsWith(milestone.Starts, StringComparison.Ordinal)) continue;
+                if (milestone.At <= at) return false;
+                at = milestone.At;
+                step = milestone.Step;
+                return true;
+            }
+            return false;
+        }
+
+        /// The bar's place while a setup program unpacks entry `done` of `total`: from nothing to UnpackedAt.
+        internal static double Unpacked(int done, int total)
+        {
+            if (total <= 0) return 0.0;
+            return UnpackedAt * Math.Min(1.0, Math.Max(0.0, (double)done / total));
+        }
+    }
+
+    /// The installer's words, from the product's own catalog - the strings of the language the window speaks - with
+    /// the English beside each key for a catalog that lacks it. A catalog is what the bridge answers, or one of the
+    /// product's locales\<language>.json, read from the archive a setup program carries or from the installation.
+    internal sealed class InstallerWords
+    {
+        private readonly Dictionary<string, object> catalog;
+        internal readonly string Language;
+
+        internal InstallerWords(Dictionary<string, object> catalog, string language)
+        {
+            this.catalog = catalog ?? new Dictionary<string, object>();
+            Language = string.IsNullOrEmpty(language) ? "en" : language;
+        }
+
+        internal Dictionary<string, object> Catalog { get { return catalog; } }
+
+        /// The words of `key` in the catalog, else `english`, with each `{name}` in `pairs` (name, value, ...) put in.
+        internal string Say(string key, string english, params string[] pairs)
+        {
+            object found;
+            string text = catalog.TryGetValue(key, out found) && found is string && ((string)found).Length > 0
+                        ? (string)found : english ?? key;
+            for (int i = 0; i + 1 < pairs.Length; i += 2) text = text.Replace("{" + pairs[i] + "}", pairs[i + 1] ?? "");
+            return text;
+        }
+
+        /// The word of an edition: the catalog's edition.standard or edition.advanced.
+        internal string EditionWord(string edition)
+        {
+            return edition == InstallerFlow.Advanced ? Say("edition.advanced", "Advanced") : Say("edition.standard", "Standard");
+        }
+
+        // Each step's key and its English, in no order that matters. A table rather than a switch: the in-box
+        // compiler gives a long string switch a class with a random name, and the setup programs are reproducible
+        // (build/normalize_pe.py refuses it).
+        private static readonly string[] Steps =
+        {
+            "verify_setup", "Checking the setup program",
+            "unpack", "Unpacking the files",
+            "codex", "Looking for Codex",
+            "files", "Copying the program files",
+            "watcher", "Stopping the watcher that is running",
+            "plugin", "Adding the plugin to Codex",
+            "setup", "Setting up the watcher",
+            "check", "Checking the installation",
+            "ask", "Asking GitHub for the newest release",
+            "download", "Downloading",
+            "verify", "Verifying the download",
+            "unregister", "Removing the watcher and what it registered",
+            "remove_plugin", "Removing the plugin from Codex",
+            "remove_files", "Removing the program files",
+            "finishing", "Finishing",
+        };
+
+        /// The steps' keys, for the tests: each is installer.step.<key> in the catalogs.
+        internal static List<string> StepKeys()
+        {
+            var keys = new List<string> { "starting" };
+            for (int i = 0; i < Steps.Length; i += 2) keys.Add(Steps[i]);
+            return keys;
+        }
+
+        /// What a step is called while it runs.
+        internal string Step(string step)
+        {
+            for (int i = 0; i < Steps.Length; i += 2)
+                if (Steps[i] == step) return Say("installer.step." + step, Steps[i + 1]);
+            return Say("installer.step.starting", "Starting");
+        }
+
+        /// The headline of a finished run: what was done, or that it did not finish and with which code.
+        internal string Outcome(string mode, int code)
+        {
+            if (code == 0)
+            {
+                if (mode == InstallerFlow.Uninstall) return Say("installer.done.removed", "Codex Auto Resume is removed.");
+                if (mode == InstallerFlow.Update) return Say("installer.done.updated", "Codex Auto Resume is updated.");
+                return Say("installer.done.installed", "Codex Auto Resume is installed.");
+            }
+            if (code == InstallerFlow.StillRunning)
+                return Say("installer.done.still_running", "It is taking longer than usual and is still working in the background. Look at the Dashboard again in a few minutes.");
+            if (code == InstallerFlow.NotStarted)
+                return Say("installer.done.not_started", "The installer could not be started.");
+            return Say("installer.done.failed", "It did not finish (exit code {code}).", "code",
+                       code.ToString(CultureInfo.InvariantCulture));
+        }
+
+        /// What a failure's code says beyond the headline, or null for the codes that say nothing more.
+        internal string Explain(int code)
+        {
+            if (code == InstallerFlow.EditionChangeRefused)
+                return Say("installer.done.edition_kept", "The other edition is installed here, and it was not changed.");
+            if (code >= 40 && code <= 46)
+                return Say("installer.done.setup_stopped", "The setup program stopped before the installer ran. The log says why.");
+            return null;
+        }
+    }
+
+    /// The languages the window speaks and how the first one is chosen: src/codex_auto_resume/l10n.py's rules
+    /// (normalize, from_system), and its endonyms, which the language picker shows and nothing beside them.
+    internal static class InstallerLanguages
+    {
+        /// Every catalog, English first, as l10n.LOCALES. ar and he are held (l10n.HELD): laid out and audited, never
+        /// offered, never reached from Windows.
+        internal static readonly string[] All =
+        {
+            "en", "ko", "ja", "zh-CN", "zh-TW", "es", "de", "fr", "pt-BR", "ru", "it", "tr", "pl", "uk", "vi", "id",
+            "ar", "he",
+        };
+
+        internal static readonly string[] Held = { "ar", "he" };
+
+        // The languages whose subtag is their catalog's name (l10n._LANGUAGE_HOME, the rest of it is in Normalize).
+        private static readonly string[] Own =
+        {
+            "en", "ko", "ja", "es", "de", "fr", "ru", "it", "tr", "pl", "uk", "vi", "id", "ar", "he",
+        };
+
+        internal static readonly Dictionary<string, string> Endonyms = MakeEndonyms();
+
+        private static Dictionary<string, string> MakeEndonyms()
+        {
+            var names = new Dictionary<string, string>();
+            names["en"] = "English";
+            names["ko"] = "한국어";
+            names["ja"] = "日本語";
+            names["zh-CN"] = "简体中文";
+            names["zh-TW"] = "繁體中文";
+            names["es"] = "Español";
+            names["de"] = "Deutsch";
+            names["fr"] = "Français";
+            names["pt-BR"] = "Português (Brasil)";
+            names["ru"] = "Русский";
+            names["it"] = "Italiano";
+            names["tr"] = "Türkçe";
+            names["pl"] = "Polski";
+            names["uk"] = "Українська";
+            names["vi"] = "Tiếng Việt";
+            names["id"] = "Bahasa Indonesia";
+            names["ar"] = "العربية";
+            names["he"] = "עברית";
+            return names;
+        }
+
+        /// The languages a person can pick: every catalog but the held ones.
+        internal static List<string> Offered()
+        {
+            var offered = new List<string>();
+            foreach (string locale in All)
+                if (Array.IndexOf(Held, locale) < 0) offered.Add(locale);
+            return offered;
+        }
+
+        /// The offered language a tag belongs to, or null: l10n.normalize. Pure.
+        internal static string Normalize(string tag)
+        {
+            if (tag == null) return null;
+            var parts = new List<string>();
+            foreach (string part in tag.Trim().Replace('_', '-').Split('-'))
+                if (part.Length > 0) parts.Add(part.ToLowerInvariant());
+            if (parts.Count == 0) return null;
+            string language = parts[0];
+            if (language == "zh")
+            {
+                for (int i = 1; i < parts.Count; i++)
+                {
+                    string part = parts[i];
+                    if (part == "hant" || part == "tw" || part == "hk" || part == "mo") return "zh-TW";
+                    if (part == "hans") return "zh-CN";
+                }
+                return "zh-CN";
+            }
+            string home = Array.IndexOf(Own, language) >= 0 ? language
+                        : language == "pt" ? "pt-BR" : language == "in" ? "id" : language == "iw" ? "he" : null;
+            if (home == null) return null;
+            return Array.IndexOf(Held, home) >= 0 ? null : home;
+        }
+
+        /// The language Windows asks for, or English: only the most preferred one counts (l10n.from_system). Pure.
+        internal static string FromSystem(IList<string> preferred)
+        {
+            if (preferred != null && preferred.Count > 0)
+            {
+                string found = Normalize(preferred[0]);
+                if (found != null) return found;
+            }
+            return "en";
+        }
+
+        /// The language a stored Interface language names (l10n.resolve): an offered one as it is, `system` or
+        /// anything unknown as Windows has it, and a stored one this build does not offer as English. Pure.
+        internal static string Resolve(string stored, IList<string> preferred)
+        {
+            string chosen = (stored ?? "").Trim();
+            if (chosen.Length > 0 && chosen != "system")
+            {
+                if (Offered().Contains(chosen)) return chosen;
+                return Normalize(chosen) ?? "en";
+            }
+            return FromSystem(preferred);
+        }
+
+        /// The person's own override, then Windows' preferred UI languages, most preferred first (l10n.preferred_languages).
+        internal static List<string> Preferred()
+        {
+            var found = new List<string>();
+            string own = Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_LANG");
+            if (!string.IsNullOrWhiteSpace(own))
+            {
+                found.Add(own.Trim());
+                return found;
+            }
+            try
+            {
+                int count, size = 0;
+                if (GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, out count, null, ref size) && size > 0)
+                {
+                    var buffer = new char[size];
+                    if (GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, out count, buffer, ref size))
+                        foreach (string tag in new string(buffer, 0, Math.Min(size, buffer.Length)).Split('\0'))
+                            if (tag.Length > 0) found.Add(tag);
+                }
+            }
+            catch (Exception) { /* Windows could not be asked: English */ }
+            return found;
+        }
+
+        private const int MUI_LANGUAGE_NAME = 0x8;
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern bool GetUserPreferredUILanguages(int flags, out int count, char[] buffer, ref int size);
+
+        /// Whether a language is written right to left.
+        internal static bool RightToLeft(string locale)
+        {
+            return locale == "ar" || locale == "he";
+        }
+    }
+}
