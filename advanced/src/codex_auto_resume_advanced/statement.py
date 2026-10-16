@@ -107,7 +107,8 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "watchlog.answer.as_server_5xx", "watchlog.answer.as_stream_interrupted", "watchlog.answer.capacity",
     "watchlog.answer.early", "watchlog.answer.resend", "watchlog.answer.send_now", "watchlog.answer.text",
     "watchlog.answer.sender", "watchlog.answer.tick", "watchlog.answer.start_route", "watchlog.answer.unloaded",
-    "watchlog.answer.concurrency", "watchlog.answer.queue_for_open",
+    "watchlog.answer.concurrency", "watchlog.answer.queue_for_open", "watchlog.answer.to_session",
+    "watchlog.answer.silent",
     # v0.6.16-beta.3: a message a watched capability would have sent.
     "watchlog.answer.records",
     "watchlog.answer.other",
@@ -163,6 +164,14 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "requires", "confirm.requires", "confirm.requirement", "done.on_with", "done.also_off", "refused.requirement", "refused.requirement_failed_here", "refused.failed_here",
     "tripped.requirement_off", "kept.requirement_off"))
+# Stage 4's tripwires (v0.6.16-beta.4): another session that did not take what was queued for it (other_sessions), and
+# Codex refusing a turn with no words (silent_continuation).
+PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
+    "tripped.not_dispatched_by_session", "kept.not_dispatched_by_session", "tripped.refused_by_codex",
+    "kept.refused_by_codex",
+    # The turns run here, each with its Stop (advanced/gui/AdvancedRuns.cs), and a capability never kept on.
+    "runs.title", "runs.none", "runs.until", "runs.stopping", "runs.stop", "runs.conversation", "confirm.run_stop",
+    "done.run_stop", "keep_on.never"))
 # The usage meter's, the wrap-up's and the pause's choices (v0.6.16-beta.3, issue #29): each OptionKey's label, and
 # how its values are said.
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (

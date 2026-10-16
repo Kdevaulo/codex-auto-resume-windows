@@ -1339,7 +1339,10 @@ MOVERS = frozenset({"reserve_detailed", "release_claim", "release_withdrawn", "c
                     "update",
                     # v0.6.14: reserve_detailed's own claim of a resend, which the engine reaches
                     # only through it (store/ledger.py).
-                    "_resend_claim"})
+                    "_resend_claim",
+                    # v0.6.16-beta.4: the waiting records of a kind of conversation the plug no longer watches
+                    # (P18, engine/kinds.py), each told to the plug as cancelled.
+                    "cancel_waiting"})
 # The store calls a person's action makes that move a record (store/actions.py): cancelling one,
 # cancelling a conversation, giving the attempts back. The engine never makes them, and no plug
 # is told of them: P14 tells what the engine writes.
@@ -1350,7 +1353,11 @@ PERSONS = frozenset({"cancel_interruption", "cancel_thread", "restore_budget_det
 # v0.6.11 stage 3b: and the claim of a route the plug names for a conversation not held (P16).
 MOVING = frozenset({"AnnounceMixin.transition", "AnnounceMixin._release", "DispatchMixin.dispatch",
                     "ReconcileMixin.withdraw", "ReconcileMixin.settle", "ReconcileMixin.correlate",
-                    "DeliveryMixin._resume_unloaded"})
+                    "RoutesMixin._resume_unloaded",
+                    # v0.6.16-beta.4: a turn started with no words, correlated by the turn id its route returned (M3B).
+                    "RoutesMixin._silent_proven",
+                    # v0.6.16-beta.4: the waiting records of a kind the plug no longer watches (P18).
+                    "KindsMixin.session_kinds"})
 
 
 def _moves_a_record(function, call) -> bool:
@@ -1723,7 +1730,7 @@ class MovedTests(PluggedCase):
                                         self.assertTrue(_told_after(block, index),
                                                         "moves a record and does not tell the plug")
         self.assertEqual(set(moving), MOVING)
-        self.assertEqual(len(moving), 9, "every store call that moves a record, counted")
+        self.assertEqual(len(moving), 11, "every store call that moves a record, counted")
 
     def test_a_persons_own_moves_are_not_told_and_the_contract_says_so(self):
         """P14 tells what the engine writes. A cancel, or the attempts given back, is written by

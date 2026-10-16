@@ -108,7 +108,7 @@ class NullPlugTests(unittest.TestCase):
         self.assertGreaterEqual(plug.PLUG_API, 1)
         # 3 (v0.6.14): P8's errand, and P2's records carried out - a package written for 2 is refused. 4
         # (v0.6.15-beta): P12's whole number of workers carried out, P2's purposes and moves.
-        self.assertEqual(plug.PLUG_API, 4)
+        self.assertEqual(plug.PLUG_API, 5)
 
 
 class RecordingPlug(Plug):
@@ -160,19 +160,22 @@ class ClosedAlternativeTests(unittest.TestCase):
 
         v0.6.15-beta: and P16 takes QUEUE_FOR_OPEN, which no point's alternatives list: core's ordinary send,
         left in Codex's queue for when the conversation is opened, kept only while the plug says so and seven
-        days and an hour at most (engine/foropen.py)."""
+        days and an hour at most (engine/foropen.py); and (v0.6.16-beta.4) TO_SESSION, the same send for a
+        conversation another Codex session holds (engine/tosession.py)."""
         take_up = {Alternative.ADMIT, Alternative.CAPACITY} | set(plug.PACED_AS)
         self.assertEqual(plug.TAKE_UP, take_up)
-        self.assertEqual(plug.ANSWERS, plug.RESTRICTIONS | {Alternative.CLIENT_ID, Alternative.EARLY,
-                                                            Alternative.RESEND, Alternative.SEND_NOW,
-                                                            Alternative.QUEUE_FOR_OPEN} | take_up)
+        self.assertEqual(plug.ANSWERS, plug.RESTRICTIONS | {Alternative.CLIENT_ID, Alternative.SILENT,
+                                                            Alternative.EARLY, Alternative.RESEND, Alternative.SEND_NOW,
+                                                            Alternative.QUEUE_FOR_OPEN, Alternative.TO_SESSION}
+                         | take_up)
         self.assertEqual(plug.ANSWERS, frozenset(Alternative))
         for point, accepted in plug.ALTERNATIVES.items():
             with self.subTest(point):
                 self.assertIn(point, Point)
                 if point not in (Point.DELIVERY, Point.GATES, Point.ADMISSION, Point.SCHEDULE):
                     self.assertLessEqual(accepted, plug.RESTRICTIONS)
-        self.assertEqual(plug.ALTERNATIVES[Point.DELIVERY], frozenset({Alternative.CLIENT_ID}))
+        # v0.6.16-beta.4: and SILENT, carried out only through a route that takes words (engine/routes.py).
+        self.assertEqual(plug.ALTERNATIVES[Point.DELIVERY], frozenset({Alternative.CLIENT_ID, Alternative.SILENT}))
         self.assertEqual(plug.ALTERNATIVES[Point.GATES], plug.RESTRICTIONS | take_up)
         self.assertEqual(plug.ALTERNATIVES[Point.ADMISSION], take_up)
         # And P7 may look at a usage-limited record early (EARLY), send an uncertain submission once
@@ -258,6 +261,8 @@ class GuardTests(unittest.TestCase):
                     self.assertEqual(answer, 1, "one send after another (v0.6.15-beta, plughands.workers)")
                 elif point is Point.ELIGIBILITY:
                     self.assertEqual(answer, frozenset(), "a person's own conversations alone (A15, plughands.widening_of)")
+                elif point is Point.SESSIONS:
+                    self.assertEqual(answer, frozenset(), "the app's conversations alone (A15, plughands.kinds_of)")
                 else:
                     self.assertIs(answer, DEFER)
         self.assertEqual(guarded.failures, 0)

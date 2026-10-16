@@ -21,6 +21,12 @@ SUPERSEDE_WITHDRAWALS = frozenset({"superseded", "superseded_by_user", "user_que
 # no longer keeps it there or seven days and an hour passed, or when the conversation was opened and Codex did not
 # deliver it: given back to waiting once nothing ran, to go the ordinary way.
 RELEASABLE_WITHDRAWALS = frozenset({"paused", "observe_only", "window_ended", "not_delivered_on_open"})
+# v0.6.16-beta.4: what a continuation sent to another Codex session (P16's TO_SESSION, engine/tosession.py) is taken
+# back for, and the word every schema-5 reader knows each is stored as - both releasable alike (the review's blocker 2).
+SESSION_WITHDRAWALS = {"session_ended": "window_ended", "session_expired": "not_delivered_on_open"}
+# The reasons a withdrawal waits on while a later turn is not yet knowable - it may be the item running: foropen's
+# not_delivered_on_open (v0.6.15-beta), and every one of a continuation sent to another session.
+UNDETERMINED_WAITS = frozenset({"not_delivered_on_open", "expired", *SESSION_WITHDRAWALS})
 TURN_STATUSES = frozenset(TurnStatus)
 # v0.6.15-beta: what a watcher found of each Codex home it is set to watch (runtime/homes.py).
 HOME_STATES = tuple(HomeState)

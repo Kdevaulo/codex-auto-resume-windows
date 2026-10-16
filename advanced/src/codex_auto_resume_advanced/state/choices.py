@@ -198,6 +198,7 @@ class Scoped:
         # another capability stands on now.
         from .continuations import ContinuationsHandle
         from .meter import MeterHandle
+        from .runs import RunsHandle
         from .prompts import PromptsHandle
         from .resets import ResetsHandle
         self._reads.update({
@@ -208,6 +209,8 @@ class Scoped:
             "prompts": PromptsHandle(state, capability, on),
             # v0.6.16-beta.3: the usage meter's last reading (state/meter.py) - read by the wrap-up and the pause too.
             "meter": MeterHandle(state, capability, on),
+            # v0.6.16-beta.4: a headless capability's own runs (state/runs.py).
+            "runs": RunsHandle(state, capability, on),
             "passed": lambda measurement: verdict is not None and verdict(measurement) == "pass",
             "failed": lambda measurement: verdict is not None and verdict(measurement) == "fail",
             "armed": lambda other: armed is not None and armed(other) is True,

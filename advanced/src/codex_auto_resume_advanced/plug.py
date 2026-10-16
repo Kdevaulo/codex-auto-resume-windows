@@ -16,7 +16,7 @@ from codex_auto_resume.domain.plug import Edition, Plug, Point
 
 # Written out rather than read from core. The check is whether this package was written for the
 # core beside it, and a number taken from that core would agree with any core at all.
-PLUG_API = 4
+PLUG_API = 5
 
 
 class AdvancedPlug(Plug):
@@ -95,6 +95,9 @@ class AdvancedPlug(Plug):
 
     def admission(self, failure):
         return self.runtime.ask(Point.ADMISSION, failure)
+
+    def sessions(self):
+        return self.runtime.sessions()
 
     def eligibility(self):
         return self.runtime.eligibility()

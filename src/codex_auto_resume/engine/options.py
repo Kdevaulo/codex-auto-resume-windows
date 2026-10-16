@@ -56,6 +56,9 @@ class OptionsMixin:
         self.open_store, self._pool, self._held_slot, self._pooling = open_store, None, None, False
         # v0.6.16-beta.3: the words for this time (oncewords.py), None for none, and what each send spent.
         self.once_words, self._once_sent = once_words, {}
+        # v0.6.16-beta.4: the session - (pid, creation time) - each conversation sent to another Codex session was
+        # held by when P16 answered TO_SESSION, for the re-check under the dispatch lock (engine/tosession.py).
+        self._session_holders = {}
         self.log = log or (lambda *args: None)
         self.notify = notify or (lambda *args: None)
         self.language = language or "en"

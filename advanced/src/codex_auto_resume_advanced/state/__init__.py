@@ -17,6 +17,8 @@ it at all: a secret goes to Windows Credential Manager (credentials.py).
     continuations  the edition's own continuations, and the conversations kept going (v0.6.15-beta)
     prompts   a person's queued prompts (v0.6.15-beta)
     meter     the usage meter's last reading of each window, and what each stage acted for (v0.6.16-beta.3)
+    runs      a turn run here (v0.6.16-beta.4)
+    chat      the Dashboard's chat messages (v0.6.16-beta.4)
 """
 from __future__ import annotations
 
@@ -29,13 +31,16 @@ from .journal import EVENT_LIMIT, EVENT_MAX_AGE, WATCH_LIMIT, JournalMixin  # no
 from .prompts import PromptMovesMixin, PromptsMixin
 from .records import RecordsMixin
 from .resets import ResetsMixin
+from .runs import RunsMixin
+from .chat import ChatMixin
 from .schema import ATTACHED, FILE_NAME, SCHEMA_VERSION, TABLES  # noqa: F401
 from .session import SessionMixin, StaleGeneration, StateError  # noqa: F401
 from .spend import SpendMixin
 
 
 class AdvancedState(SessionMixin, ArmingMixin, SpendMixin, RecordsMixin, JournalMixin, ChoicesMixin,
-                    ResetsMixin, ContinuationsMixin, PromptsMixin, PromptMovesMixin, MeterMixin):
+                    ResetsMixin, ContinuationsMixin, PromptsMixin, PromptMovesMixin, MeterMixin, RunsMixin,
+                    ChatMixin):
     """One installation's advanced state, for one process: opened when first needed."""
 
     def __init__(self, paths, *, registry=REGISTRY, **options):

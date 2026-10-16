@@ -79,7 +79,11 @@ class VocabularyTests(unittest.TestCase):
                           # v0.6.15-beta: queue_for_open's, Codex not running on open what was queued for it.
                           "not_delivered_on_open",
                           # v0.6.16-beta.3: a capability it requires is not on (registry.CapabilityDef.requires).
-                          "requirement_off"})
+                          "requirement_off",
+                          # v0.6.16-beta.4: other_sessions', a session that did not take what was queued for it.
+                          "not_dispatched_by_session",
+                          # and silent_continuation's, Codex refusing a turn with no words.
+                          "refused_by_codex"})
 
 
 class FileTests(StateCase):
@@ -970,7 +974,7 @@ class BoundTests(StateCase):
 
     def test_the_watch_bound_sits_inside_the_journal_s(self):
         from codex_auto_resume_advanced import registry
-        self.assertEqual(WATCH_LIMIT, 180, "250 until v0.6.15-beta, then 200 until v0.6.16-beta.3, when they grew to 25")
+        self.assertEqual(WATCH_LIMIT, 150, "250 until v0.6.15-beta, 200 until v0.6.16-beta.3 (25), 180 until beta.4 (30)")
         # Every capability watched at once, each at its bound, still fits inside the journal's.
         self.assertLess(len(registry.DEFINITIONS) * WATCH_LIMIT, EVENT_LIMIT)
         # The journal's own bound cuts every other line first: newer lines of another capability,

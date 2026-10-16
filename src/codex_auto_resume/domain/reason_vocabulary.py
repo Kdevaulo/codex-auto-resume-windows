@@ -39,6 +39,8 @@ class ReasonCode(StrEnum):
     DESKTOP_APP_UNAVAILABLE = "desktop_app_unavailable"
     NOTLOADED = "notLoaded"
     LOADED_STATE_UNKNOWN = "loaded_state_unknown"
+    # v0.6.16-beta.4: open in another Codex session - a terminal or VS Code - which the app's queue cannot reach.
+    HELD_BY_OTHER_SESSION = "held_by_other_session"
     LOADED_RECHECK_FAILED = "loaded_recheck_failed"
     USAGE_UNAVAILABLE = "usage_unavailable"
     USAGE_UNKNOWN = "usage_unknown"
@@ -79,6 +81,15 @@ class ReasonCode(StrEnum):
     # going back to a version that watches one home, another home's waiting records (store/downgrade.py).
     HOME_REMOVED = "home_removed"
     HOME_NOT_WATCHED = "home_not_watched"
+    # v0.6.16-beta.4: a kind of conversation the plug no longer watches (P18) - a terminal's, VS Code's - cancels the
+    # waiting records of its conversations.
+    SESSION_KIND_OFF = "session_kind_off"
+    # v0.6.16-beta.4: one sent to a conversation another Codex session held (P16's TO_SESSION), taken back because
+    # that session let go of it, or did not take it within the delivery window. Shown reasons only: what is stored as
+    # the withdrawal's own word is window_ended or not_delivered_on_open, which v0.6.15-beta and beta.2 read and
+    # release alike, so no older reader meets a word it refuses (the review's blocker 2).
+    SESSION_ENDED = "session_ended"
+    SESSION_EXPIRED = "session_expired"
     # sending and receipts
     AWAITING_DELIVERY_RECEIPT = "awaiting_delivery_receipt"
     QUEUE_RESULT_UNKNOWN_DO_NOT_RESEND = "queue_result_unknown_do_not_resend"

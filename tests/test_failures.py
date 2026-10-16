@@ -279,7 +279,8 @@ class FenceTests(unittest.TestCase):
             "approv", "auth", "sign", "login", "credential", "token", "cancel", "abort", "interrupt",
             "user", "billing", "payment", "credit", "plan", "safety", "violation", "moderat", "blocked",
             "sandbox", "context"))
-        self.assertEqual(failures.ADMISSIBLE, {"unknown", "terminal_auth", "terminal_failure"})
+        # v0.6.16-beta.4: and a full context window, for Codex's contextWindowExceeded alone (test_compaction_core).
+        self.assertEqual(failures.ADMISSIBLE, {"unknown", "terminal_auth", "terminal_failure", "terminal_invalid"})
         self.assertEqual(set(PACED_AS.values()), failures.TRANSIENT)
 
     def test_only_a_plain_code_of_an_unknown_failure_is_taken_up_or_paced(self):

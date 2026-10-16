@@ -43,7 +43,7 @@ import srcscan  # noqa: E402
 from codex_auto_resume.domain import compat_vocabulary as c, plug as p, vocabulary as v  # noqa: E402
 from codex_auto_resume.domain import power_vocabulary as pw  # noqa: E402
 from codex_auto_resume.domain import reason_vocabulary as rv  # noqa: E402
-from codex_auto_resume.domain import plughands  # noqa: E402
+from codex_auto_resume.domain import plughands, plugwords  # noqa: E402
 
 # "module.NAME" -> (kind, length, digest), or the text of a single word.
 LISTS = {
@@ -69,7 +69,8 @@ LISTS = {
     # took up (P17) that nothing takes up now, and one taken up a day ago; and capacity_window, capacity
     # retries past their twelve hours on the clock.
     # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
-    "machine.REASONS": ("set", 74, "5c6aa62cce9a0415"),
+    # v0.6.16-beta.4: held_by_other_session - open in a terminal's or VS Code's Codex session.
+    "machine.REASONS": ("set", 78, "79c222542ea40f29"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -90,7 +91,8 @@ LISTS = {
     # and `resend`, submission_safe passed for an uncertain submission sent once more (engine/resend.py),
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
     # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
-    "machine.GATE_REASONS": ("set", 91, "409337d90aa93a63"),
+    # v0.6.16-beta.4: and held_by_other_session.
+    "machine.GATE_REASONS": ("set", 96, "4b69890ae6ed4c9e"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",
@@ -207,14 +209,15 @@ LISTS = {
     # and EARLY, P7's look at a usage-limited record before its time; and the form a failure's error took.
     # And RESEND, P7's word for an uncertain submission sent once more, which core proves may go, and
     # SEND_NOW, its word for a waiting record a person asked to send now.
-    "domain.plug.POINTS": ("tuple", 17, "8a5a44aaca6902c5"),   # v0.6.16-beta.3: P19 eligibility
-    "domain.plug.ANSWERS": ("set", 13, "dcf766b4e83e21eb"),
+    "domain.plug.POINTS": ("tuple", 18, "99df46d4da526400"),   # v0.6.16-beta.3: P19 eligibility; beta.4: P18
+    "domain.plug.ANSWERS": ("set", 15, "f05b746425d54856"),
     "domain.plug.FAILURE_FORMS": ("tuple", 5, "bcc0ad1bd6f81009"),
     "domain.plug.SURFACES": ("tuple", 5, "d41ac5a6d67be21b"),
     # v0.6.14: what core did with a record of the plug's own (P2), as P14 tells it.
     "domain.plug.RECORD_MOVES": ("tuple", 10, "b4dae164afc55dd3"),
     "domain.plug.RECORD_PURPOSES": ("tuple", 3, "43433c43e9c5b2be"),   # v0.6.16-beta.3: wrap_up
     "domain.plughands.WIDENINGS": ("tuple", 1, "dc457abadb3a5b04"),   # v0.6.16-beta.3: P19's answer
+    "domain.plughands.SESSION_KINDS": ("tuple", 2, "c2b8c09ae74e62ba"),   # v0.6.16-beta.4: P18's answer
     "domain.plug.EXTRA": "advanced",
 }
 
@@ -224,7 +227,8 @@ RETURNED = {
     ("Backend.send", "outcome"): {"accepted", "not_started", "unknown"},
     ("Backend.send", "error_code"): {"queue_preflight_failed", "queue_consent_refused", "queue_spawn_failed",
                                      "queue_response_unconfirmed", "queue_timeout", "queue_result_unknown"},
-    ("Backend.loaded", None): {"loaded", "notLoaded", "unknown"},
+    # v0.6.16-beta.4: elsewhere - another Codex session (a terminal or VS Code) holds it.
+    ("Backend.loaded", None): {"loaded", "notLoaded", "unknown", "elsewhere"},
     ("WatcherMixin.start_watcher", "state"): {"already-running"},
     ("await_watcher", "state"): {"running", "exited", "unconfirmed"},
     ("WatcherMixin.stop_watcher", "state"): {"not-running"},
@@ -400,6 +404,7 @@ HOMES = {
     p.RecordMove: ("list", "domain.plug.RECORD_MOVES"),
     p.RecordPurpose: ("list", "domain.plug.RECORD_PURPOSES"),
     p.Widening: ("list", "domain.plughands.WIDENINGS"),
+    p.SessionKind: ("list", "domain.plughands.SESSION_KINDS"),
     # v0.6.12: the power action's own words, beside domain/vocabulary.py at its line budget.
     pw.PowerAction: ("list", "poweraction.ACTIONS"),
     pw.PowerAfter: ("list", "poweraction.AFTERS"),
@@ -415,12 +420,12 @@ HOMES = {
 
 def enums():
     """Every vocabulary the four modules define: `domain/vocabulary.py`; `domain/compat_vocabulary.py`,
-    the registry's, out of it since v0.6.11 and named through it still; `domain/plug.py`, whose six
-    are the plug interface's own; `domain/power_vocabulary.py`, the power action's (v0.6.12); and
+    the registry's, out of it since v0.6.11 and named through it still; `domain/plugwords.py`, whose six
+    are the plug interface's own (in domain/plug.py until v0.6.16-beta.4, and named through it still); `domain/power_vocabulary.py`, the power action's (v0.6.12); and
     `domain/reason_vocabulary.py`, the reasons and a Codex home's states (v0.6.15-beta); and
     `domain/plughands.py`, P2's moves and purposes beside the hands core holds (v0.6.15-beta). Each
     is held to every rule here all the same."""
-    return [value for module in (v, c, p, pw, rv, plughands) for value in vars(module).values()
+    return [value for module in (v, c, plugwords, pw, rv, plughands) for value in vars(module).values()
             if inspect.isclass(value) and issubclass(value, StrEnum) and value is not StrEnum
             and value.__module__ == module.__name__]
 

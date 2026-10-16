@@ -88,15 +88,21 @@ class TableTests(unittest.TestCase):
         first message at 01:39 opened a new window resetting at 06:39, and its reset time stayed there.
         2026-10-16: MIPC passed (the Desktop's IPC pipe starts, adds to and interrupts a turn the app holds), MAWS
         failed (no documented shared app-server), MCLOUD failed - partial: `codex cloud` reads a task's state, nothing
-        continues one."""
+        continues one. 2026-10-15 and 16, stage 4's nine: MC1 (a queued message shows at once as the person's own
+        and runs), MXA (a person's /compact leaves compaction and reasoning only), MX (thread/compact/start compacts
+        headless) and MF (a model at turn/start, put back by thread/settings/update and read back) passed; MB (Codex
+        refuses any write under model_providers.openai), MO and MC2 (partial), M3B (an empty turn leaves no client
+        id) and M6B (the sandbox helper asked for elevation) failed."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
                                   Measurement.M6, Measurement.M7, Measurement.MA, Measurement.MH,
                                   Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR,
-                                  Measurement.MN, Measurement.MU, Measurement.MIPC})
+                                  Measurement.MN, Measurement.MU, Measurement.MIPC, Measurement.MC1,
+                                  Measurement.MXA, Measurement.MX, Measurement.MF})
         self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4, Measurement.MAWS,
-                                  Measurement.MCLOUD})
+                                  Measurement.MCLOUD, Measurement.MB, Measurement.MO, Measurement.MC2,
+                                  Measurement.M3B, Measurement.M6B})
         self.assertEqual(set(Measurement) - passed - failed,
                          # v0.6.15-beta's own, for several conversations at once: not made yet.
                          {Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK, Measurement.MT})

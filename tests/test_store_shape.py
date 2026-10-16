@@ -83,6 +83,8 @@ METHODS = {
     "_add_schema_5", "_migrate_4_to_5",
     # and a Codex home's waiting records cancelled when it is removed, and the homes they are of.
     "cancel_home", "home_keys",
+    # v0.6.16-beta.4: the waiting records of a kind of conversation the plug no longer watches (P18).
+    "cancel_waiting",
 }
 
 # Reachable as `store.<name>` before the split, and still.

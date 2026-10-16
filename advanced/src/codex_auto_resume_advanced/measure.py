@@ -22,6 +22,7 @@ Codex or starts a real process.
 """
 from __future__ import annotations
 
+from pathlib import Path
 import sys
 import time
 import uuid
@@ -34,7 +35,7 @@ from codex_auto_resume.domain.ids import is_uuid
 from . import evidence
 from .codex import credits, inuse
 from .codex.protocol import Session, SessionRefused, methods_for
-from .vocabulary import Measurement, NoteCode, SpendOutcome, Verdict
+from .vocabulary import Measurement, NoteCode, ObservedWord, SpendOutcome, Verdict
 
 MEASUREMENTS = tuple(Measurement)
 
@@ -86,6 +87,21 @@ class Context:
         if self._session_factory is None:
             raise EvidenceUnavailable("no session was provided")
         return self._session_factory(self.measurement)
+
+    def open_scratch(self, home):
+        """MB's session (v0.6.16-beta.4): one opened on the Codex home `home` the harness made, never the person's -
+        only through a factory that takes one (its `home` argument); any other is refused, so MB never writes a
+        configuration it did not make."""
+        import inspect
+        if self._session_factory is None:
+            raise EvidenceUnavailable("no session was provided")
+        try:
+            takes = "home" in inspect.signature(self._session_factory).parameters
+        except (TypeError, ValueError):
+            takes = False
+        if not takes:
+            raise EvidenceUnavailable("this session cannot be opened on a scratch Codex home")
+        return self._session_factory(self.measurement, home=home)
 
     def given(self, observed) -> dict:
         """The probe's observation, with whether a real thread was given added - a boolean, and
@@ -310,12 +326,16 @@ _M6_INTERRUPT_SECONDS = 15.0     # how long an interrupted turn has to say how i
 _M6_POLL_SECONDS = 0.25
 
 
-def _await_turn(session, thread, turn_id, seconds):
+def _await_turn(session, thread, turn_id, seconds, seen=None):
     """Follow the session's notifications until the turn completes or `seconds` pass. Returns
-    the turn's closed status word, or None when it did not say it ended."""
+    the turn's closed status word, or None when it did not say it ended. `seen` (v0.6.16-beta.4), a
+    list, is given every notification drained on the way, for a probe that reads an item's kind."""
     deadline = time.monotonic() + seconds
     while True:
-        status = _completed_status(session.drain_events(), thread, turn_id)
+        events = session.drain_events()
+        if seen is not None:
+            seen.extend(events)
+        status = _completed_status(events, thread, turn_id)
         if status is not None:
             return status
         if time.monotonic() >= deadline:
@@ -783,6 +803,524 @@ def _mcloud(ctx):
                 "state_read_present": bool(present) and any(word in lowered for word in _CLOUD_STATE_WORDS)}
     return _blocked("a read-only look for a `codex cloud` command and a supported way to read a cloud task's state. "
                     "Confirm against Codex, then set the verdict", **observed)
+# --------------------------------------------------------------------------- stage 4 (v0.6.16-beta.4)
+# Nine more, each what a stage-4 capability's route rests on. Two sittings: Codex closed (M6B, MX, MF, M3B; MB on
+# a scratch Codex home of the harness's own) and Codex open (MO with a TUI and VS Code, MXA, MC1, MC2). Every
+# observation is a boolean, a count, a bucket or a closed word (vocabulary.ObservedWord), never a name, a model, a
+# path or anything a turn said.
+def _word(value, known) -> str:
+    """`value` as an observation may hold it: one of `known`, or "other" - never the value itself."""
+    return value if isinstance(value, str) and value in known else str(ObservedWord.OTHER)
+
+
+SANDBOXES = frozenset({"readOnly", "workspaceWrite", "externalSandbox", "dangerFullAccess"})
+POLICIES = frozenset({"untrusted", "on-failure", "on-request", "never"})
+
+
+def _settings(resumed) -> dict:
+    """The saved settings a thread/resume answered, as closed words: its sandbox's kind, its approval policy (a
+    word, or "granular" for an object), its approvals' reviewer, and whether a permission profile is in force -
+    never the profile, a folder or a model."""
+    resumed = resumed if isinstance(resumed, dict) else {}
+    sandbox = resumed.get("sandbox")
+    policy = resumed.get("approvalPolicy")
+    return {"sandbox": _word(sandbox.get("type") if isinstance(sandbox, dict) else None, SANDBOXES),
+            "approval_policy": str(ObservedWord.GRANULAR) if isinstance(policy, dict) else _word(policy, POLICIES),
+            "reviewer": _word(resumed.get("approvalsReviewer"), {"user"}),
+            "permission_profile_set": resumed.get("activePermissionProfile") is not None}
+
+
+def _turn_id(started):
+    turn = started.get("turn") if isinstance(started, dict) else None
+    return turn.get("id") if isinstance(turn, dict) and isinstance(turn.get("id"), str) else None
+
+
+def _follow(session, thread, turn_id, seconds):
+    """A turn followed to its end, or interrupted at `seconds`: (its status or None, whether it ended by itself)."""
+    status = _await_turn(session, thread, turn_id, seconds)
+    ended = status is not None
+    if not ended and turn_id is not None:
+        try:
+            session.call("turn/interrupt", {"threadId": thread, "turnId": turn_id})
+            status = _await_turn(session, thread, turn_id, _M6_INTERRUPT_SECONDS)
+        except AdapterError:
+            pass
+    return status, ended
+
+
+def _unsubscribed(session, thread) -> bool:
+    try:
+        session.call("thread/unsubscribe", {"threadId": thread})
+        return True
+    except AdapterError:
+        return False                          # the session's exit tries once more
+
+
+def _app_running(ctx) -> bool:
+    """Whether the Codex app is running now, as core's pairing reads it - False where it cannot say."""
+    try:
+        return ctx.backend is not None and ctx.backend.app_identity() is not None
+    except Exception:
+        return False
+
+
+def _m6b(ctx):
+    """A headless turn on the thread's own saved settings (headless_run, and every route that stands on it): Codex
+    closed, the owner names a throwaway conversation saved with workspace-write and on-request (or never) approvals.
+    The thread is resumed with no override at all - the model, sandbox, approvals and folder Codex saved apply - and
+    one turn asks for `whoami`, which those settings may run; every approval it asks is declined, and the turn is
+    followed to its end or interrupted at the bound, then let go. It records the saved settings' closed words, how
+    many it declined, the status, whether it ended by itself - and whether the Codex app was running at the end, for
+    an owner who starts it during a second run to say what the app showed (Q3, decided again on it)."""
+    with ctx.open() as session:
+        resumed = session.call("thread/resume", {"threadId": ctx.probe_thread, "excludeTurns": True})
+        started = session.call("turn/start", {"threadId": ctx.probe_thread,
+                                              "input": [{"type": "text", "text": _M6_PROMPT}]})
+        status, ended = _follow(session, ctx.probe_thread, _turn_id(started), _M6_TURN_SECONDS)
+        unsubscribed = _unsubscribed(session, ctx.probe_thread)
+        declined = session.declined_count()
+    observed = dict(_settings(resumed), approvals_declined=declined, turn_ended_by_itself=ended,
+                    unsubscribed=unsubscribed, app_running_after=_app_running(ctx))
+    if status is not None:
+        observed["turn_status"] = status
+    return _blocked("confirm no window or console appeared and the turn shows in Codex afterwards; start the Codex "
+                    "app during a second run, open the conversation and say what it showed, then set the verdict",
+                    **observed)
+
+
+# MO's words: the sources a `threads` row says, and the originators the edition takes a terminal's and VS Code's
+# conversations by (core's codex/eligibility.ORIGINATORS) - as MO first recorded them on codex-cli 0.162.0-alpha.17.2
+# (2026-10-16): the TUI writes codex-tui, the VS Code extension codex_vscode.
+SOURCES = frozenset({"cli", "vscode", "exec", "mcp"})
+ORIGINATOR_WORDS = {"codex-tui": ObservedWord.CLI_ORIGINATOR, "codex_vscode": ObservedWord.IDE_ORIGINATOR,
+                    "Codex Desktop": ObservedWord.DESKTOP}
+
+
+def _holder(ctx, home):
+    """Who holds the conversation's writer lock, as core's pairing tells it: none, the app, another session, or
+    unknown - a word, never a process."""
+    from codex_auto_resume.codex import pairing
+    from codex_auto_resume.win.inventory import resource_users
+    try:
+        users = resource_users(Path(home) / "thread-writer-locks" / (ctx.probe_thread + ".lock"))
+        if not users:
+            return str(ObservedWord.NONE)
+        app = ctx.backend.app_identity()
+        server = app.get("server") if isinstance(app, dict) else None
+        if isinstance(server, dict) and users == [{key: server.get(key) for key in ("pid", "created")}]:
+            return str(ObservedWord.APP)
+        if len(users) == 1 and pairing.session_kind(pairing.inventory(), users[0], ctx.backend.codex_exe):
+            return str(ObservedWord.SESSION)
+    except Exception:
+        pass
+    return str(ObservedWord.UNKNOWN)
+
+
+def _mo(ctx):
+    """CLI, TUI and VS Code conversations (other_sessions): the owner runs one TUI (`codex --no-daemon` from the
+    app's engine) and opens one VS Code extension conversation, each a throwaway, idle, and names one of them - then
+    the other. Nothing is asked over the protocol: the conversation's `threads` row (its source, thread source and
+    history mode), its rollout's first line (its originator and source, and whether it names a CLI version) and who
+    holds its writer lock (codex/sessions.py, core's pairing) - each recorded as a closed word."""
+    from .codex import sessions
+    home = getattr(ctx.backend, "codex_home", None)
+    if not ctx.thread_given or home is None:
+        return _blocked("run one TUI and open one VS Code conversation, then name one of them", row_read=False)
+    try:
+        row, first = sessions.Origins(home).origin(ctx.probe_thread)
+    except Exception:
+        return _blocked("the conversation's row or its first line could not be read", row_read=False)
+    observed = {"row_read": row is not None, "first_line_read": first is not None}
+    if row is not None:
+        observed.update(source=_word(row.get("source"), SOURCES),
+                        thread_source=_word(row.get("thread_source"), {"user"}),
+                        history_mode=_word(row.get("history_mode"), {"paginated"}))
+    if first is not None:
+        originator = first.get("originator")
+        observed.update(originator=str(ORIGINATOR_WORDS.get(originator, ObservedWord.OTHER)
+                                       if isinstance(originator, str) else ObservedWord.OTHER),
+                        meta_source=_word(first.get("source"), SOURCES),
+                        cli_version_present=isinstance(first.get("cli_version"), str))
+    observed["holder"] = _holder(ctx, home)
+    return _blocked("run it for the TUI's conversation and for VS Code's, confirm each is held by a session, then "
+                    "set the verdict", **observed)
+
+
+def _seconds(span) -> str:
+    """A span in seconds as a bucket, never the number."""
+    if span < 10:
+        return str(ObservedWord.UNDER_10S)
+    if span < 60:
+        return str(ObservedWord.UNDER_60S)
+    return str(ObservedWord.UNDER_600S if span < 600 else ObservedWord.OVER_600S)
+
+
+# The item kinds a compaction turn leaves, counted per kind (B9's list; no content): the compaction and the reasoning
+# around it, and no message of a person's.
+COMPACTION_KINDS = frozenset({"contextCompaction", "reasoning"})
+
+
+def _latest_kinds(ctx):
+    """The conversation's latest turn from Codex's history (codex/turns.py): (its status or None, whether its kinds
+    are only compaction and reasoning, whether it holds a person's message) - by kind alone, never a word."""
+    from .codex import turns
+    home = getattr(ctx.backend, "codex_home", None)
+    found = turns.Turns(home).latest(ctx.probe_thread) if home is not None else None
+    if found is None:
+        return None, False, False
+    kinds = {kind for kind, count in found.kinds.items() if count}
+    return found.status, bool(kinds) and kinds <= COMPACTION_KINDS, "userMessage" in kinds
+
+
+def _item_kind(event):
+    """The kind of the item an item/started or item/completed notification names, or None - never its words."""
+    if not isinstance(event, dict) or event.get("method") not in ("item/started", "item/completed"):
+        return None
+    params = event.get("params")
+    item = params.get("item") if isinstance(params, dict) else None
+    kind = item.get("type") if isinstance(item, dict) else None
+    return kind if isinstance(kind, str) else None
+
+
+def _mx(ctx):
+    """A full conversation compacted here (compact_continue's headless half): Codex closed, a throwaway conversation
+    with some history. The thread is resumed, thread/compact/start asked, the compaction's turn followed to its end
+    or the bound, and the thread let go. It records whether the compaction was accepted, whether a contextCompaction
+    item was seen, the turn's status, how long it took (a bucket), and whether the history's latest turn then holds
+    compaction and reasoning only."""
+    began = time.monotonic()
+    seen = []
+    with ctx.open() as session:
+        session.call("thread/resume", {"threadId": ctx.probe_thread, "excludeTurns": True})
+        accepted = session.call("thread/compact/start", {"threadId": ctx.probe_thread})
+        status = _await_turn(session, ctx.probe_thread, None, _M6_TURN_SECONDS, seen=seen)
+        unsubscribed = _unsubscribed(session, ctx.probe_thread)
+    span = time.monotonic() - began
+    try:
+        only = _latest_kinds(ctx)[1]
+    except Exception:
+        only = False
+    observed = {"compact_accepted": isinstance(accepted, dict),
+                "compaction_item_seen": any(_item_kind(event) == "contextCompaction" for event in seen),
+                "turn_ended": status is not None, "seconds": _seconds(span), "latest_compaction_only": only,
+                "unsubscribed": unsubscribed}
+    if status is not None:
+        observed["turn_status"] = status
+    return _blocked("confirm the conversation shows as compacted in Codex afterwards, then set the verdict", **observed)
+
+
+def _mxa(ctx):
+    """A person's own /compact (compact_continue's app half): in a throwaway the app holds, the owner runs /compact in
+    Codex and names the conversation. No call: the latest turn's item kinds, counted, and whether it holds a person's
+    message - whether Codex records the command as one decides whether core's ordinary send may follow it."""
+    if not ctx.thread_given:
+        return _blocked("run /compact in a throwaway conversation the app holds, then name it", history_read=False)
+    try:
+        status, only, user = _latest_kinds(ctx)
+    except Exception:
+        return _blocked("the turn history could not be read", history_read=False)
+    observed = {"history_read": True, "compaction_only": only, "user_item_present": user}
+    if status is not None:
+        observed["turn_status"] = status
+    return _blocked("confirm the latest turn is the /compact you ran, then set the verdict", **observed)
+
+
+def _model_of(resumed):
+    model = resumed.get("model") if isinstance(resumed, dict) else None
+    return model if isinstance(model, str) and model else None
+
+
+def _default_model(listed):
+    """The model Codex marks its default (model/list's `isDefault`), or None - used here, never recorded."""
+    data = listed.get("data") if isinstance(listed, dict) else None
+    for entry in data if isinstance(data, list) else ():
+        if isinstance(entry, dict) and entry.get("isDefault") is True:
+            model = entry.get("model") or entry.get("id")
+            return model if isinstance(model, str) and model else None
+    return None
+
+
+def _one_turn(ctx, resume, start):
+    """One session: the thread resumed with `resume`, one short turn started with `start` followed, and let go."""
+    with ctx.open() as session:
+        session.call("thread/resume", dict(resume, threadId=ctx.probe_thread, excludeTurns=True))
+        started = session.call("turn/start", dict(start, threadId=ctx.probe_thread,
+                                                  input=[{"type": "text", "text": _M2B_PROMPT}]))
+        status, _ended = _follow(session, ctx.probe_thread, _turn_id(started), _M6_TURN_SECONDS)
+        _unsubscribed(session, ctx.probe_thread)
+    return status, session
+
+
+def _resumed_model(ctx):
+    with ctx.open() as session:
+        model = _model_of(session.call("thread/resume", {"threadId": ctx.probe_thread, "excludeTurns": True}))
+        _unsubscribed(session, ctx.probe_thread)
+    return model
+
+
+def _mf(ctx):
+    """Another model at capacity (model_fallback): Codex closed, a throwaway conversation not on Codex's default model.
+    Which of two routes leaves nothing to put back: a `model` override at thread/resume, for that session only
+    (resumed again without one, the thread's own model is back), or `model` on turn/start restored after the turn by
+    thread/settings/update and read back. Booleans only: never a model's name."""
+    with ctx.open() as session:
+        original = _model_of(session.call("thread/resume", {"threadId": ctx.probe_thread, "excludeTurns": True}))
+        default = _default_model(session.call("model/list", {}))
+        _unsubscribed(session, ctx.probe_thread)
+    observed = {"default_found": default is not None,
+                "default_differs": default is not None and original is not None and default != original}
+    if not observed["default_differs"]:
+        return _blocked("name a throwaway conversation that is not on Codex's default model", **observed)
+    status, _session = _one_turn(ctx, {"model": default}, {})
+    observed["resume_override_session_only"] = _resumed_model(ctx) == original
+    with ctx.open() as session:
+        session.call("thread/resume", {"threadId": ctx.probe_thread, "excludeTurns": True})
+        started = session.call("turn/start", {"threadId": ctx.probe_thread, "model": default,
+                                              "input": [{"type": "text", "text": _M2B_PROMPT}]})
+        _follow(session, ctx.probe_thread, _turn_id(started), _M6_TURN_SECONDS)
+        session.call("thread/settings/update", {"threadId": ctx.probe_thread, "model": original})
+        _unsubscribed(session, ctx.probe_thread)
+    observed["restore_read_back"] = _resumed_model(ctx) == original
+    if status is not None:
+        observed["turn_status"] = status
+    passed = observed["resume_override_session_only"] or observed["restore_read_back"]
+    return (Verdict.PASS if passed else Verdict.FAIL, observed,
+            None if passed else "neither route left the conversation on its own model")
+
+
+def _client_recorded(ctx, client_id) -> bool:
+    """Whether Codex's history keeps `client_id` on a person's message of the conversation (core's own read)."""
+    from codex_auto_resume.codex import LocalSource
+    home = getattr(ctx.backend, "codex_home", None)
+    try:
+        return home is not None and bool(LocalSource(home).marker_rows(ctx.probe_thread, client_id))
+    except Exception:
+        return False
+
+
+def _m3b(ctx):
+    """A turn with no words (silent_continuation): Codex closed, a throwaway conversation. The thread is resumed and a
+    turn started with no input under a client id of no one's, followed, and let go; Codex refusing it is the probe's
+    fail with its code (probe). It records whether a turn started, its status, and whether Codex's history keeps that
+    client id on a message - which is what would prove a continuation with no words."""
+    with ctx.open() as session:
+        session.call("thread/resume", {"threadId": ctx.probe_thread, "excludeTurns": True})
+        started = session.call("turn/start", {"threadId": ctx.probe_thread, "input": [],
+                                              "clientUserMessageId": _SAMPLE_M3B_CLIENT_ID})
+        status, ended = _follow(session, ctx.probe_thread, _turn_id(started), _M6_TURN_SECONDS)
+        unsubscribed = _unsubscribed(session, ctx.probe_thread)
+    observed = {"turn_started": _turn_id(started) is not None, "turn_ended_by_itself": ended,
+                "client_id_recorded": _client_recorded(ctx, _SAMPLE_M3B_CLIENT_ID), "unsubscribed": unsubscribed,
+                "turn_in_history": _turn_in_history(ctx, _turn_id(started))}
+    if status is not None:
+        observed["turn_status"] = status
+    # v0.6.16-beta.4: the turn id turn/start returned, found in Codex's history, is the proof (the route correlates it
+    # at once); no client id is kept on a turn with no words (2026-10-16).
+    passed = observed["turn_started"] and observed["turn_in_history"]
+    return (Verdict.PASS if passed else Verdict.FAIL, observed,
+            None if passed else "no turn started, or none in the history by the id it was started under")
+
+
+def _turn_in_history(ctx, turn_id) -> bool:
+    """Whether Codex's history says the turn `turn_id` is the probe's conversation's latest (ids only)."""
+    from .codex.turns import Turns
+    home = getattr(ctx.backend, "codex_home", None)
+    if home is None or turn_id is None:
+        return False
+    try:
+        latest = Turns(home).latest(ctx.probe_thread)
+    except Exception:
+        return False
+    return latest is not None and latest.turn_id == turn_id
+
+
+# Codex's own retry settings (codex_retry_settings): the two keys, as config/value/write names them.
+RETRY_KEYS = ("model_providers.openai.request_max_retries", "model_providers.openai.stream_max_retries")
+
+
+def _config_value(read, key):
+    """The value `key` has in the configuration a config/read answered, or None."""
+    value = read.get("config") if isinstance(read, dict) else None
+    for part in key.split("."):
+        value = value.get(part) if isinstance(value, dict) else None
+    return value
+
+
+def _version_of(read):
+    found = read.get("version") if isinstance(read, dict) else None
+    return found if isinstance(found, (str, int)) and not isinstance(found, bool) else None
+
+
+def _mb(ctx):
+    """Codex's own config writes (codex_retry_settings), on a scratch Codex home the harness makes and removes - no
+    config of the person's is ever opened or written: config/read with its layers, both keys written (upsert) and read
+    back, the first one removed and read back, and a write against a stale version refused. Booleans only."""
+    import shutil
+    import tempfile
+    scratch = Path(tempfile.mkdtemp(prefix="car-mb-"))
+    conflict = False
+    try:
+        with ctx.open_scratch(scratch) as session:
+            before = back = session.call("config/read", {"includeLayers": True})
+            written = []
+            for key in RETRY_KEYS:
+                written.append(session.call("config/value/write", {"keyPath": key, "value": _MB_VALUE,
+                                                                   "mergeStrategy": "upsert",
+                                                                   "expectedVersion": _version_of(back)}))
+                back = session.call("config/read", {"includeLayers": True})
+            session.call("config/value/write", {"keyPath": RETRY_KEYS[0], "value": None, "mergeStrategy": "replace",
+                                                "expectedVersion": _version_of(back)})
+            removed = session.call("config/read", {"includeLayers": True})
+            try:
+                session.call("config/value/write", {"keyPath": RETRY_KEYS[1], "value": _MB_VALUE + 1,
+                                                    "mergeStrategy": "upsert", "expectedVersion": _version_of(before)})
+            except AdapterError as exc:
+                conflict = hasattr(exc, "method")
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    observed = {"write_accepted": all(isinstance(answer, dict) for answer in written),
+                "read_back": all(_config_value(back, key) == _MB_VALUE for key in RETRY_KEYS),
+                "removal_restores": (_config_value(removed, RETRY_KEYS[0]) is None
+                                     and _config_value(before, RETRY_KEYS[0]) is None),
+                "version_conflict_refused": conflict}
+    passed = all(observed.values())
+    return (Verdict.PASS if passed else Verdict.FAIL, dict(observed, scratch_home=True),
+            None if passed else "a write, its read back, its removal or the stale version did not hold")
+
+
+def _mc1(ctx):
+    """A person's message from the Dashboard (codex_chat): the owner names a throwaway conversation the app holds,
+    idle. One short message is added to its queue under a client id of no one's - thread/queue/add, M7's call, with
+    no marker - and the queue followed until the app takes it; then whether Codex's history shows a turn within ten
+    seconds, and the client id on its message. That it showed at once as the person's own, with nothing to say a
+    program sent it, is what the person watching confirms."""
+    with ctx.open() as session:
+        added = session.call("thread/queue/add", {"threadId": ctx.probe_thread,
+                                                  "clientUserMessageId": _SAMPLE_MC1_CLIENT_ID,
+                                                  "input": [{"type": "text", "text": _M2B_PROMPT}]})
+        began = time.monotonic()
+        taken = _await_taken(session, ctx.probe_thread, _SAMPLE_MC1_CLIENT_ID, _MC1_QUEUE_SECONDS)
+    waited = time.monotonic() - began
+    started = False
+    deadline = time.monotonic() + _MC1_START_SECONDS
+    while taken:
+        try:
+            started = _latest_kinds(ctx)[0] in ("inProgress", "completed")
+        except Exception:
+            started = False
+        if started or time.monotonic() >= deadline:
+            break
+        time.sleep(_M2B_POLL_SECONDS)
+    observed = {"add_accepted": isinstance(added, dict), "taken": taken, "taken_seconds": _seconds(waited),
+                "turn_started": started, "client_id_on_user_item": _client_recorded(ctx, _SAMPLE_MC1_CLIENT_ID)}
+    return _blocked("confirm the message showed at once as your own, nothing marked it as sent by a program, and the "
+                    "turn ran as one you typed, then set the verdict", **observed)
+
+
+class _Watch:
+    """What MC2 sees of one conversation, look after look: when the history first said a new latest turn was in
+    progress and when it ended, when the rollout's newest event first said a task started and ended, whether the
+    reply's item was there when the history said it ended, and whether either showed a wait for an approval. The
+    times are the harness's own clock, in memory, and recorded only as which came first and a bucket."""
+    STARTED = frozenset({"task_started"})
+    ENDED = frozenset({"task_complete", "turn_aborted"})
+    APPROVAL = frozenset({"exec_approval_request", "apply_patch_approval_request", "request_permissions"})
+
+    def __init__(self, home, thread):
+        from .codex import sessions, turns
+        self.turns, self.origins, self.thread = turns.Turns(home), sessions.Origins(home), thread
+        self.first_turn = self.first_event = None
+        self.db_start = self.db_end = self.rollout_start = self.rollout_end = None
+        self.reply_ready = self.waited_db = self.waited_rollout = False
+        self._looked, self._offset = False, None
+
+    def look(self, now):
+        found = self.turns.latest(self.thread)
+        # v0.6.16-beta.4: every event the rollout gained since the last look, in order - a task that started and
+        # ended between two looks was missed by its newest alone.
+        kinds, self._offset = self.origins.events_since(self.thread, self._offset)
+        kind = kinds[-1] if kinds else None
+        if not self._looked:
+            self._looked = True
+            self.first_turn, self.first_event = (found.turn_id if found is not None else None), kind
+            return
+        for seen in kinds[:-1]:
+            self._event(seen, now)
+        fresh = found is not None and found.turn_id != self.first_turn
+        if fresh and found.status == "inProgress" and self.db_start is None:
+            self.db_start = now
+        if fresh and found.status in ("completed", "failed", "interrupted") and self.db_end is None:
+            self.db_start = self.db_start if self.db_start is not None else now
+            self.db_end = now
+            self.reply_ready = found.kinds.get("agentMessage", 0) > 0
+        if fresh and found.status == "other":
+            self.waited_db = True
+        self._event(kind, now)
+
+    def _event(self, kind, now):
+        if kind in self.STARTED and self.rollout_start is None:
+            self.rollout_start = now
+        if kind in self.ENDED and self.rollout_start is not None and self.rollout_end is None:
+            self.rollout_end = now
+        if kind in self.APPROVAL:
+            self.waited_rollout = True
+
+    def settled(self) -> bool:
+        return self.db_end is not None and self.rollout_end is not None
+
+    @staticmethod
+    def _first(db, rollout) -> str:
+        if db is None and rollout is None:
+            return str(ObservedWord.NEITHER)
+        if rollout is None or (db is not None and db < rollout):
+            return str(ObservedWord.DB)
+        if db is None or rollout < db:
+            return str(ObservedWord.ROLLOUT)
+        return str(ObservedWord.SAME)
+
+    def observed(self) -> dict:
+        found = {"started_first": self._first(self.db_start, self.rollout_start),
+                 "finished_first": self._first(self.db_end, self.rollout_end),
+                 "reply_item_ready_at_final": self.reply_ready,
+                 "approval_wait_seen_db": self.waited_db, "approval_wait_seen_rollout": self.waited_rollout}
+        if self.settled():
+            lag = abs(self.db_end - self.rollout_end)
+            found["finished_lag"] = str(ObservedWord.UNDER_1S if lag < 1 else ObservedWord.S1_TO_5 if lag <= 5
+                                        else ObservedWord.OVER_5S)
+        return found
+
+
+def _mc2(ctx):
+    """Where chat reads "in progress" from (codex_chat): the owner names a throwaway conversation, then sends one short
+    prompt in the app and one that asks for an approval. No call: every quarter second for five minutes, the latest
+    turn's status from Codex's history (codex/turns.py) and the kind of the rollout's newest event (codex/sessions.py
+    - its type, never a payload). It records which said first that a turn started and that it ended, the lag between
+    them (a bucket), whether the reply's item was there when the history said it ended, and whether either showed
+    the turn waiting for an approval."""
+    home = getattr(ctx.backend, "codex_home", None)
+    if not ctx.thread_given or home is None:
+        return _blocked("name a throwaway conversation, then send a prompt in it", history_read=False)
+    watch = _Watch(home, ctx.probe_thread)
+    deadline = time.monotonic() + _MC2_SECONDS
+    try:
+        while True:
+            watch.look(time.monotonic())
+            if watch.settled() or time.monotonic() >= deadline:
+                break
+            time.sleep(_MC2_POLL_SECONDS)
+    except Exception:
+        return _blocked("the history or the rollout could not be read", history_read=False)
+    return _blocked("confirm the two prompts were sent while this ran, then set the verdict",
+                    history_read=True, **watch.observed())
+
+
+_SAMPLE_M3B_CLIENT_ID = "00000000-0000-7000-8000-000000000003"
+_SAMPLE_MC1_CLIENT_ID = "00000000-0000-7000-8000-000000000004"
+_MB_VALUE = 8                    # the value MB writes: the retry settings' default (codex_retry_settings)
+_MC1_QUEUE_SECONDS = 60.0        # how long MC1 follows the queue for the app to take its item
+_MC1_START_SECONDS = 10.0        # and then the history for the turn it starts
+_MC2_SECONDS = 300.0
+_MC2_POLL_SECONDS = 0.25
 
 
 PROBES = {
@@ -794,6 +1332,8 @@ PROBES = {
     Measurement.MQ: _mq, Measurement.ME: _me, Measurement.MS: _ms, Measurement.MK: _mk,
     Measurement.MT: _mt,
     Measurement.MIPC: _mipc, Measurement.MAWS: _maws, Measurement.MCLOUD: _mcloud,
+    Measurement.M6B: _m6b, Measurement.MO: _mo, Measurement.MX: _mx, Measurement.MXA: _mxa, Measurement.MF: _mf,
+    Measurement.M3B: _m3b, Measurement.MB: _mb, Measurement.MC1: _mc1, Measurement.MC2: _mc2,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe
@@ -914,8 +1454,17 @@ def live_session_factory(paths, backend=None):
     the alpha exists for that - so it is thin and does the discovery core already does. `backend`
     is the one the run's record reads its Codex version from, so the session and the record are
     of the same Codex."""
-    def factory(measurement):
-        return Session(backend if backend is not None else live_backend(paths), measurement)
+    def factory(measurement, home=None):
+        used = backend if backend is not None else live_backend(paths)
+        if home is not None:
+            # MB (v0.6.16-beta.4): the same Codex on a scratch home the harness made, never the person's.
+            from codex_auto_resume.codex.transport import Backend
+            used = Backend(home, used.codex_exe)
+        # M6B (v0.6.16-beta.4): the headless turn's server starts as the route starts it (codex/headless.py).
+        from .codex.headless import HEADLESS_CONFIG
+        if measurement == Measurement.M6B:
+            return Session(used, measurement, config=HEADLESS_CONFIG)
+        return Session(used, measurement)
 
     return factory
 

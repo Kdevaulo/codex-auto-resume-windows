@@ -28,6 +28,8 @@ CAPABILITY = "queue_for_open"
 DAYS = (3, 4, 5, 6, 7)
 DEFAULT_DAYS = 3
 DAY = 86400
+# Where core asks P16 for a conversation the running app does not hold (core's engine/delivery.APP_FREE).
+APP_FREE = "app_free"
 
 
 def watching(record) -> bool:
@@ -53,6 +55,10 @@ class QueueForOpen:
         scoped = self._scoped
         key = record.get("interruption_id") if isinstance(record, dict) else None
         if scoped is None or not isinstance(key, str):
+            return DEFER
+        # v0.6.16-beta.4: queued only for a conversation the running app does not hold - never one asked with the
+        # app closed or held by another session; the watch, which hands neither, asks only whether to keep it.
+        if not watching(record) and record.get("holder") != APP_FREE:
             return DEFER
         try:
             override = scoped.request(key)

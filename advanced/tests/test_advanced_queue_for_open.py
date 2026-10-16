@@ -116,7 +116,8 @@ class QueueTests(ForOpenCase):
         ids = [definition.id for definition in registry.DEFINITIONS]
         self.assertLess(ids.index("goal_continuation"), ids.index(self.cap))
         self.assertEqual(tuple(d.id for d in registry.REGISTRY.at(Point.UNLOADED)),
-                         ("goal_continuation", "queue_for_open"))
+                         ("goal_continuation", "queue_for_open", "compact_continue", "model_fallback",
+                          "headless_run", "other_sessions"))
 
 
 class TripwireTests(ForOpenCase):

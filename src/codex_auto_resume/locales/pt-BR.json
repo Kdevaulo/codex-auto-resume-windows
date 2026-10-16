@@ -1076,6 +1076,7 @@
   "why.engine_incompatible": "Esta versão do Codex não tem suporte, então nada é enviado.",
   "why.engine_unknown": "Ainda não se sabe se esta versão do Codex tem suporte.",
   "why.held": "A conversa ou o projeto dela pergunta primeiro a você: nada é enviado até você deixá-la continuar.",
+  "why.held_by_other_session": "Aberta em outra sessão do Codex (um terminal ou o VS Code); continua assim que o app do Codex a assumir.",
   "why.home_lock_unavailable": "Outro monitor está no controle desta pasta do Codex.",
   "why.home_removed": "A pasta do Codex dela foi removida nas Configurações, então ela não será retomada.",
   "why.loaded_state_unknown": "Ainda não dá para saber se a conversa está aberta.",

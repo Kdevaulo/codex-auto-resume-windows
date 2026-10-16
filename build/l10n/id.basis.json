@@ -1076,6 +1076,7 @@
   "why.engine_incompatible": "7e79374c230bab1e",
   "why.engine_unknown": "3442ef8437855db4",
   "why.held": "4508803feec1ffbb",
+  "why.held_by_other_session": "2b48bb7f2dba23db",
   "why.home_lock_unavailable": "61df82c1c884a2ef",
   "why.home_removed": "3d22edcf2c1ae774",
   "why.loaded_state_unknown": "607dba1fb60e3c33",

@@ -32,6 +32,7 @@ import threading
 import time
 
 from codex_auto_resume.codex.appserver import PROTOCOL_METHODS
+from codex_auto_resume.codex.pairing import own_server, own_server_gone
 from codex_auto_resume.win.kernel import NO_WINDOW
 
 from ..vocabulary import Measurement
@@ -79,6 +80,21 @@ MEASUREMENT_METHODS = {
     Measurement.MIPC: (),
     Measurement.MAWS: (),
     Measurement.MCLOUD: (),
+    # v0.6.16-beta.4 (stage 4). M6B runs one headless turn on the thread's saved settings, as M6 did on forced ones;
+    # MX asks thread/compact/start on our own server and lets go; MF reads Codex's models, overrides one at resume or
+    # on a turn, and restores it with thread/settings/update; M3B starts a turn with no input; MB writes and reads
+    # Codex's config on a scratch home; MC1 adds one item to a queue the app holds, as M7 did. MO, MXA and MC2 read
+    # Codex's files only.
+    Measurement.M6B: ("thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe"),
+    Measurement.MO: (),
+    Measurement.MX: ("thread/resume", "thread/compact/start", "thread/unsubscribe"),
+    Measurement.MXA: (),
+    Measurement.MF: ("thread/resume", "model/list", "turn/start", "turn/interrupt", "thread/settings/update",
+                     "thread/unsubscribe"),
+    Measurement.M3B: ("thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe"),
+    Measurement.MB: ("config/read", "config/value/write"),
+    Measurement.MC1: ("thread/queue/add", "thread/queue/list"),
+    Measurement.MC2: (),
 }
 
 # The methods a capability's own route may call, beyond `initialize` - each one a measurement
@@ -95,6 +111,17 @@ CAPABILITY_METHODS = {
     "reset_credit": ("account/rateLimits/read", "account/rateLimitResetCredit/consume"),
     # A message sent at a reset (engine/resetmessage.py) reads usage, to count the resets, and nothing else.
     "reset_message": ("account/rateLimits/read",),
+    # v0.6.16-beta.4: a turn run here (codex/headless.py) - resumed, started, interrupted, let go - as M6 and M6B did;
+    # never a compaction or another model, which are compact_continue's and model_fallback's own rows.
+    "headless_run": ("thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe"),
+    # A full conversation compacted here, then continued (engine/compact.py): the headless route's calls and the one
+    # compaction MX asked.
+    "compact_continue": ("thread/resume", "thread/compact/start", "turn/start", "turn/interrupt",
+                         "thread/unsubscribe"),
+    # One turn on Codex's default model (engine/fallback.py): what MF asked - the model read, the turn, the
+    # conversation's own model put back.
+    "model_fallback": ("thread/resume", "model/list", "turn/start", "turn/interrupt", "thread/settings/update",
+                       "thread/unsubscribe"),
     # The usage meter (engine/usage.py, v0.6.16-beta.3) reads usage on its schedule, and nothing else.
     "usage_meter": ("account/rateLimits/read",),
 }
@@ -245,10 +272,12 @@ class Session:
     CAPABILITY_METHODS: the marker-free continuation's channel opens one to add the one item core
     hands it, the way the measurement that proved the call opened one.
     """
-    def __init__(self, backend, measurement=None, *, capability=None):
+    def __init__(self, backend, measurement=None, *, capability=None, config=()):
         if (measurement is None) == (capability is None):
             raise ValueError("a session is opened for one measurement or one capability")
         self.backend = backend
+        # v0.6.16-beta.4: Codex's own `-c key=value` settings the server starts with (codex/headless.HEADLESS_CONFIG).
+        self.config = tuple(config)
         self.measurement = Measurement(measurement) if measurement is not None else None
         self.allowed = (methods_for(self.measurement) if capability is None
                         else methods_for_capability(capability))
@@ -266,11 +295,15 @@ class Session:
 
     def __enter__(self):
         self.backend._compatible()
-        self.process = S.Popen(self.backend._argv() + ["app-server", "--stdio"],
+        settings = [part for key, value in self.config for part in ("-c", "%s=%s" % (key, value))]
+        self.process = S.Popen(self.backend._argv() + settings + ["app-server", "--stdio"],
                                stdin=S.PIPE, stdout=S.PIPE, stderr=S.DEVNULL, text=True,
                                encoding="utf-8", errors="replace", bufsize=1,
                                creationflags=NO_WINDOW, close_fds=True, shell=False,
                                cwd=str(self.backend.codex_home), env=self.backend._environment())
+        # Counted as our own app server by the pid and creation time of this spawn (core's pairing.own_server): a
+        # route's last look takes the writer lock it holds after thread/resume as no other holder (engine/routes.py).
+        self._own = own_server(getattr(self.process, "pid", None))
         try:
             self.reader = threading.Thread(target=self._read, daemon=True)
             self.reader.start()
@@ -409,6 +442,7 @@ class Session:
                 process.terminate()      # only our own one-turn helper
                 process.wait(timeout=4)
         finally:
+            own_server_gone(getattr(self, "_own", None))
             if getattr(self, "reader", None) is not None:
                 self.reader.join(timeout=1)
             if process.stdout:

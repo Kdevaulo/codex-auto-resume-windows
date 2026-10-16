@@ -1,6 +1,7 @@
 """The advanced state's version 6 (v0.6.16-beta.4, the owner's additions to issue #29): the wrap-up's switches and
 numbers in `options`, the continuation after the reset in `continuations`, and a person's own wording in `wordings` -
-a version-5 file brought to it with every row kept, and the way down as every earlier version has it.
+a version-5 file brought to it with every row kept, and on through stage 4's version 7 (test_advanced_state_v7), and
+the way down as every earlier version has it.
 
     PYTHONPATH=src python -m unittest discover -s advanced/tests
 """
@@ -55,13 +56,17 @@ class VersionSixTests(StateCase):
         return path
 
     def test_a_version_five_file_is_brought_to_six_and_keeps_every_row(self):
+        """A beta.3 file takes version 6's step and then stage 4's (7), both in one opening."""
         path = self.version_five()
         state = self.state()
         self.assertEqual(state.arming()["test_wake"]["state"], "shadow")
         state.close()
         with contextlib.closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 6)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.SCHEMA_VERSION)
+            self.assertEqual(schema_module.SCHEMA_VERSION, 7)
             self.assertEqual(AdvancedState._tables(connection), schema_module.TABLES)
+            for name in schema_module.STAGE4_TABLES:
+                self.assertEqual(connection.execute("SELECT count(*) FROM %s" % name).fetchone()[0], 0)
             self.assertEqual(connection.execute("SELECT * FROM options").fetchall(),
                              [("usage_wrap_up", "wrap_five_hour", 90)])
             self.assertEqual(connection.execute("SELECT answer_id FROM continuations").fetchall(), [(KEY,)])
@@ -79,18 +84,18 @@ class VersionSixTests(StateCase):
                 connection.execute("INSERT INTO wordings VALUES ('usage_wrap_up', 'anything', 'words', 1.0)")
 
     def test_the_way_down_is_every_capability_off_and_nothing_written(self):
-        """A build that knows only version 5 refuses a version-6 file as newer - every capability off - and writes
-        nothing to it, a wording kept there included."""
+        """A build that knows only version 5 (v0.6.16-beta.3) refuses this version's file as newer - every capability
+        off - and writes nothing to it, a wording kept there included."""
         state = self.state()
         state.move("test_wake", "shadow", actor="dashboard", revision=1)
         state.close()
         path = self.paths.advanced_dir / schema_module.FILE_NAME
         with contextlib.closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 6)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.SCHEMA_VERSION)
             connection.execute("INSERT INTO wordings VALUES ('usage_wrap_up', 'wrap_custom_weekly', 'Stop soon.', 1.0)")
             connection.commit()
         before = path.read_bytes()
-        with patch.object(session, "SCHEMA_VERSION", schema_module.SCHEMA_VERSION - 1):
+        with patch.object(session, "SCHEMA_VERSION", 5):
             older = AdvancedState(self.paths, registry=ac.Registry((ac.definition(),)), clock=lambda: self.now)
             self.addCleanup(older.close)
             with self.assertRaises(StateError):

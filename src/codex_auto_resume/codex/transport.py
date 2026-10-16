@@ -17,7 +17,7 @@ from .. import machine
 from ..domain import ids, vocabulary
 from ..win.inventory import resource_users
 from ..win.kernel import NO_WINDOW
-from .pairing import desktop_pair, engines_instead, inventory
+from .pairing import app_running, desktop_pair, engines_instead, inventory, own_holder, session_kind
 from .appserver import PROTOCOL_METHODS, Protocol
 from .errors import AdapterError
 from .usage import parse_usage
@@ -71,6 +71,10 @@ class Backend:
         # v0.6.15-beta: a Codex home other than the default is the app's only while its server holds that
         # home's database open (codex/pairing.py); the default home is paired as it always was.
         self.require_holder = require_holder
+        # v0.6.16-beta.4: the one holder - its pid and creation time - of the conversation the last loaded() said is
+        # "elsewhere", and None after any other answer: what the re-check under the dispatch lock holds a continuation
+        # sent to another Codex session to (engine/tosession.py).
+        self.session_holder = None
         self._version_signature = None
         self._last_checks = None
         self.engine_version = None
@@ -79,6 +83,10 @@ class Backend:
         # none of them ran this engine - an update that started the app's server from another
         # build - and nothing whenever that is not what the last pairing saw (app_identity).
         self.served_elsewhere = frozenset()
+        # v0.6.16-beta.4: the inventory rows the last app_identity() read - in memory only, for loaded() and holder()
+        # to tell another Codex session holding a conversation from anything unknown without reading them again -
+        # or None where that look could not read them.
+        self._rows = None
 
     def _environment(self):
         env = os.environ.copy()
@@ -186,7 +194,8 @@ class Backend:
         self.served_elsewhere = frozenset()
         try:
             self._compatible()
-            rows = inventory()
+            self._rows = None
+            rows = self._rows = inventory()
             try:
                 if self.require_holder:
                     return desktop_pair(rows, self.codex_exe, self.codex_home, require_holder=True)
@@ -200,6 +209,7 @@ class Backend:
             return None
 
     def loaded(self, thread_id, app_identity):
+        self.session_holder = None
         try:
             canonical_uuid(thread_id)
             self._compatible()
@@ -222,9 +232,41 @@ class Backend:
             # open" already means "the app server holds the writer lock". We deliberately
             # do NOT probe with LockFileEx: on a momentarily free range that call would
             # ACQUIRE the app's own exclusive lock and could make the app's try_lock fail.
-            if users != [expected] or self.app_identity() != app_identity:
+            if users == [expected] and self.app_identity() == app_identity:
+                return "loaded"
+            # v0.6.16-beta.4: one holder that is another Codex session - a terminal's TUI or VS Code's server
+            # (pairing.session_kind), with the app identity still the same - is "elsewhere": it waits with its
+            # own reason, and nothing is sent. Anything else fails closed, as always.
+            if (len(users) == 1 and users != [expected] and self.app_identity() == app_identity
+                    and session_kind(self._rows, users[0], self.codex_exe)):
+                self.session_holder = (users[0]["pid"], users[0]["created"])
+                return "elsewhere"
+            return "unknown"
+        except (AdapterError, ValueError, OSError, KeyError, TypeError):
+            return "unknown"
+
+    def holder(self, thread_id):
+        """v0.6.16-beta.4: who holds conversation `thread_id`'s writer lock while the Codex app is not running - asked
+        by the engine only where its plug wants P16 (engine/delivery.py): "none" - the last app_identity() read the
+        processes and found no process of the app's package, and the Restart Manager finds no holder (B12) -;
+        "session", one holder that is another Codex session (pairing.session_kind); "ours", one holder that is an app
+        server this process started and still holds, by the pid and creation time of our own spawn (pairing.own_holder):
+        what a route that has just resumed the conversation on its own server meets at its last look; and "unknown" for
+        anything else, a failure included. The rows are the ones the app's pairing read: no process is started for it."""
+        try:
+            canonical_uuid(thread_id)
+            self._compatible()
+            rows = self._rows
+            if rows is None or app_running(rows):
                 return "unknown"
-            return "loaded"
+            users = resource_users(self.codex_home / "thread-writer-locks" / (thread_id + ".lock"))
+            if not users:
+                return "none"
+            if len(users) == 1 and session_kind(rows, users[0], self.codex_exe):
+                return "session"
+            if len(users) == 1 and own_holder(users[0]):
+                return "ours"
+            return "unknown"
         except (AdapterError, ValueError, OSError, KeyError, TypeError):
             return "unknown"
 

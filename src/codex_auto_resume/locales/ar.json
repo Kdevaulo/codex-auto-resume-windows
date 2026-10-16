@@ -1076,6 +1076,7 @@
   "why.engine_incompatible": "إصدار Codex هذا غير مدعوم، لذا لا يُرسل شيء.",
   "why.engine_unknown": "لا يُعرف بعد ما إذا كان إصدار Codex هذا مدعومًا.",
   "why.held": "محادثتها أو مشروعها يسألك أولًا: لا يُرسل شيء حتى تسمح لها بالمتابعة.",
+  "why.held_by_other_session": "مفتوحة في جلسة Codex أخرى (طرفية أو VS Code)؛ تستمر بمجرد أن يمسكها تطبيق Codex.",
   "why.home_lock_unavailable": "مراقِب آخر مسؤول عن مجلد Codex هذا.",
   "why.home_removed": "أُزيل مجلد Codex الخاص به من الإعدادات، لذلك لن يُستأنف.",
   "why.loaded_state_unknown": "لا يمكن بعد معرفة ما إذا كانت المحادثة مفتوحة.",

@@ -1076,6 +1076,7 @@
   "why.engine_incompatible": "Cette version de Codex n'est pas prise en charge, donc rien n'est envoyé.",
   "why.engine_unknown": "On ne sait pas encore si cette version de Codex est prise en charge.",
   "why.held": "Sa conversation ou son projet vous demande d'abord : rien n'est envoyé tant que vous ne la laissez pas continuer.",
+  "why.held_by_other_session": "Ouverte dans une autre session Codex (un terminal ou VS Code) ; elle reprend dès que l’app Codex la détient.",
   "why.home_lock_unavailable": "Un autre surveillant est responsable de ce dossier Codex.",
   "why.home_removed": "Son dossier Codex a été retiré dans les Paramètres ; il ne sera donc pas repris.",
   "why.loaded_state_unknown": "On ne peut pas encore dire si la conversation est ouverte.",

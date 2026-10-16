@@ -67,17 +67,27 @@ class OffReason(StrEnum):
     # down by an administrator's policy, or its compatibility failed here (v0.6.16-beta.3): a capability is only as
     # on as what it needs.
     REQUIREMENT_OFF = "requirement_off"
+    # A continuation sent to a conversation another Codex session held - a terminal's, VS Code's - was taken back
+    # because that session did not take it within core's delivery window (v0.6.16-beta.4, other_sessions): what M5
+    # measured did not hold on this Codex.
+    NOT_DISPATCHED_BY_SESSION = "not_dispatched_by_session"
+    # Codex refused a turn started with no input (v0.6.16-beta.4, silent_continuation): what M3B measured did not
+    # hold on this Codex.
+    REFUSED_BY_CODEX = "refused_by_codex"
 
 
 TRIPWIRES = frozenset({OffReason.SUBMISSION_UNKNOWN, OffReason.LOCAL_CHECK_FAILED,
                        OffReason.FAILED_HERE, OffReason.INCOMPATIBLE, OffReason.HOOK_EXCEPTION,
                        OffReason.STATEMENT_CHANGED, OffReason.MEASUREMENT_FAILED,
-                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF})
+                       OffReason.DUPLICATE_SEEN, OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF,
+                       OffReason.NOT_DISPATCHED_BY_SESSION, OffReason.REFUSED_BY_CODEX})
 # What a capability kept on (KeepOn, K8) notes instead of turning off, most serious first: the order
 # in which one notice gives way to another (state/arming.py, note_kept). A notice only ever rises.
 KEPT_NOTICES = (OffReason.DUPLICATE_SEEN, OffReason.STATEMENT_CHANGED, OffReason.FAILED_HERE,
                 OffReason.LOCAL_CHECK_FAILED, OffReason.INCOMPATIBLE, OffReason.MEASUREMENT_FAILED,
-                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.REQUIREMENT_OFF, OffReason.ENGINE_CHANGED,
+                OffReason.NOT_DELIVERED_ON_OPEN, OffReason.NOT_DISPATCHED_BY_SESSION, OffReason.REFUSED_BY_CODEX,
+                OffReason.REQUIREMENT_OFF,
+                OffReason.ENGINE_CHANGED,
                 OffReason.SUBMISSION_UNKNOWN, OffReason.HOOK_EXCEPTION)
 
 
@@ -340,6 +350,8 @@ class BridgeCommand(StrEnum):
     ADVANCED_REPORT_CHECK = "advanced-report-check"
     ADVANCED_REPORT_SEND = "advanced-report-send"
     ADVANCED_REPORT_JOB = "advanced-report-job"
+    # v0.6.16-beta.4: a person's Stop of a turn run here (engine/headless.py) - the Dashboard's alone, never MCP.
+    ADVANCED_HEADLESS_STOP = "advanced-headless-stop"
 
 
 class Measurement(StrEnum):
@@ -401,6 +413,99 @@ class Measurement(StrEnum):
     MIPC = "mipc"
     MAWS = "maws"
     MCLOUD = "mcloud"
+    # v0.6.16-beta.4 (stage 4). With Codex closed: a headless turn on the thread's own saved settings, a command
+    # run under them, every approval declined (M6B); thread/compact/start on our own server, and the turn it leaves
+    # (MX); a model override at resume lasting the session only, or a restore by thread/settings/update read back
+    # (MF); a turn started with no input, proven by its client id (M3B); and Codex's own config writes on a scratch
+    # home - read back, removed, a stale version refused (MB). With Codex open: a terminal's TUI and VS Code's
+    # conversations - their source, originator and holder (MO); a person's own /compact in the app (MXA); a message
+    # queued with no marker showing as the person's own (MC1); and which of the history and the rollout says first
+    # that a turn started and ended (MC2).
+    M6B = "m6b"
+    MO = "mo"
+    MX = "mx"
+    MXA = "mxa"
+    MF = "mf"
+    M3B = "m3b"
+    MB = "mb"
+    MC1 = "mc1"
+    MC2 = "mc2"
+
+
+class ObservedWord(StrEnum):
+    """The closed words a stage-4 measurement's observation may hold besides booleans and counts (v0.6.16-beta.4,
+    evidence.CLOSED_WORDS): a thread's saved sandbox and approval policy and its reviewer, as Codex's schema names
+    them; a conversation's source, thread source, history mode, originator and holder; and the buckets a span or a
+    lag is kept in, and which of two came first - never a model, a name, a path or anything a turn said."""
+    READONLY = "readOnly"
+    WORKSPACEWRITE = "workspaceWrite"
+    EXTERNALSANDBOX = "externalSandbox"
+    DANGERFULLACCESS = "dangerFullAccess"
+    UNTRUSTED = "untrusted"
+    ON_FAILURE = "on-failure"
+    ON_REQUEST = "on-request"
+    NEVER = "never"
+    GRANULAR = "granular"
+    USER = "user"
+    CLI = "cli"
+    VSCODE = "vscode"
+    EXEC = "exec"
+    MCP = "mcp"
+    PAGINATED = "paginated"
+    CLI_ORIGINATOR = "cli_originator"
+    IDE_ORIGINATOR = "ide_originator"
+    DESKTOP = "desktop"
+    APP = "app"
+    SESSION = "session"
+    NONE = "none"
+    UNKNOWN = "unknown"
+    OTHER = "other"
+    UNDER_1S = "under_1s"
+    S1_TO_5 = "s1_to_5"
+    OVER_5S = "over_5s"
+    UNDER_10S = "under_10s"
+    UNDER_60S = "under_60s"
+    UNDER_600S = "under_600s"
+    OVER_600S = "over_600s"
+    DB = "db"
+    ROLLOUT = "rollout"
+    SAME = "same"
+    NEITHER = "neither"
+
+
+class RunEnd(StrEnum):
+    """How a turn run here ended (v0.6.16-beta.4, codex/headless.py): it completed, failed or was interrupted - by a
+    person's Stop, or the watcher leaving - by itself; its cap ended it; the Codex app started and it gave way (Q3);
+    nothing was left to follow it (lost); or the conversation's saved settings were refused before anything started."""
+    COMPLETED = "completed"
+    FAILED = "failed"
+    INTERRUPTED = "interrupted"
+    CAPPED = "capped"
+    YIELDED = "yielded"
+    LOST = "lost"
+    REFUSED_SETTINGS = "refused_settings"
+
+
+class ChatState(StrEnum):
+    """Where a message of the Dashboard's chat stands (v0.6.16-beta.4, state/chat.py): waiting to be handed to core,
+    in flight - claimed and sent, watched - or finished, done or cancelled. Only one waiting holds its words."""
+    WAITING = "waiting"
+    IN_FLIGHT = "in_flight"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+class ChatReason(StrEnum):
+    """Why a chat message stands where it stands: Codex took it and its turn started (delivered); Codex did not take
+    it within three minutes and it was taken back (not_taken); a Pause took it back (withdrawn); a person cancelled
+    it; chat was turned off; its conversation was switched off; or what came of it cannot be proven (unknown)."""
+    DELIVERED = "delivered"
+    NOT_TAKEN = "not_taken"
+    WITHDRAWN = "withdrawn"
+    CANCELLED = "cancelled"
+    TURNED_OFF = "turned_off"
+    CONVERSATION_OFF = "conversation_off"
+    UNKNOWN = "unknown"
 
 
 class RuleState(StrEnum):

@@ -179,7 +179,7 @@ class ReconcileMixin:
         # v0.6.16-beta.3: a turn a wrap-up of this product's started is not someone else's (persons_turns).
         turns = self.persons_turns(thread, self.source.later_turns(thread, row["ordinal"], marker))
         undetermined = any(turn["kind"] == "undetermined" for turn in turns)
-        if any(turn["kind"] == "foreign" for turn in turns):
+        if any(self.foreign(row, turn) for turn in turns):
             return "superseded_by_user"
         if self.source.foreign_queued(thread, marker):
             return "user_queued_input"
@@ -191,10 +191,10 @@ class ReconcileMixin:
             uncertain = row["state"] == "submission_unknown" or machine.was_resent(row)   # v0.6.14
             return reason + "_unknown" if uncertain else reason
         loaded = self.loaded(thread)
-        if self.for_open(row):
-            reason = self._open_reason(row, loaded, now)
+        if self.for_open(row) or self.to_session(row):          # v0.6.16-beta.4: or sent to another session
+            reason = (self._open_reason if self.for_open(row) else self._session_reason)(row, loaded, now)
             if reason is not None:
-                return _UNDETERMINED if undetermined and reason == "not_delivered_on_open" else reason
+                return _UNDETERMINED if undetermined and reason in machine.UNDETERMINED_WAITS else reason
         elif loaded == "notLoaded":
             return "not_loaded"
         elif now - (row.get("submitted_at") or now) >= self.options["delivery_timeout_seconds"]:
@@ -213,6 +213,7 @@ class ReconcileMixin:
         """Delete our queued item. A successful delete is not proof that it never ran:
         Codex can report the delete after the turn has already started. The settle
         that follows decides."""
+        shown, reason = reason, machine.SESSION_WITHDRAWALS.get(reason, reason)    # v0.6.16-beta.4 (tosession.py)
         now = self.clock()
         thread, marker = row["thread_id"], self.proof(row)
         results = [self._delete(thread, queue_id) for queue_id in queue_ids]
@@ -221,10 +222,10 @@ class ReconcileMixin:
                               flags=machine.FLAG_WITHDRAW_DELETED,
                               state="withdrawn_unconfirmed", withdraw_reason=reason,
                               withdrawn_at=now, withdraw_deleted=True, queue_id=queue_ids[0],
-                              last_error=reason, next_retry_at=now + 1)
+                              last_error=shown, next_retry_at=now + 1)
             # P14 is told why (v0.6.15-beta): a tripwire reads not_delivered_on_open there.
             self.moved(dict(row, withdraw_reason=reason), "withdrawn_unconfirmed")
-            self.log(thread, "withdrawn_unconfirmed", reason)
+            self.log(thread, "withdrawn_unconfirmed", shown)
             return
         remaining = self.source.queued_rows(thread, marker)
         if remaining:
@@ -243,9 +244,9 @@ class ReconcileMixin:
         # Gone, but not by our hand: dispatched, or removed in Codex.
         self.store.update(row["interruption_id"], at=now, event="withdraw",
                           state="withdrawn_unconfirmed", withdraw_reason=reason, withdrawn_at=now,
-                          withdraw_deleted=False, last_error=reason, next_retry_at=now + 1)
+                          withdraw_deleted=False, last_error=shown, next_retry_at=now + 1)
         self.moved(dict(row, withdraw_reason=reason), "withdrawn_unconfirmed")
-        self.log(thread, "withdrawn_unconfirmed", reason)
+        self.log(thread, "withdrawn_unconfirmed", shown)
 
     def settle(self, row):
         """Decide what a withdrawn item became, once it can be decided.
@@ -323,12 +324,12 @@ class ReconcileMixin:
                 self.transition(row, "submission_unknown", "ambiguous_receipt", delay=900)
             return
         turns = self.source.later_turns(row["thread_id"], row["ordinal"], self.proof(row))
-        before_ours = any(turn["kind"] == "foreign" and turn["ordinal"] < found["ordinal"]
+        before_ours = any(self.foreign(row, turn) and turn["ordinal"] < found["ordinal"]
                           for turn in turns)
         withdrawn = row["state"] == "withdrawn_unconfirmed"
         after_user = before_ours or row["withdraw_reason"] in machine.SUPERSEDE_WITHDRAWALS
         extra = None
-        if withdrawn and row["withdraw_reason"] in machine.RELEASABLE_WITHDRAWALS:
+        if withdrawn and row["withdraw_reason"] in machine.RELEASABLE_WITHDRAWALS and not self.to_session(row):
             extra = ("dispatched_while_paused" if row["withdraw_reason"] == "paused"
                      else "dispatched_while_observing")
         elif withdrawn and row["withdraw_deleted"]:

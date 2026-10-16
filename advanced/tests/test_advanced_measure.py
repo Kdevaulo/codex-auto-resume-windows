@@ -84,11 +84,16 @@ def setUpModule():
     _M6_TIMING = (measure._M6_TURN_SECONDS, measure._M6_INTERRUPT_SECONDS, measure._M6_POLL_SECONDS)
     measure._M6_TURN_SECONDS, measure._M6_INTERRUPT_SECONDS, measure._M6_POLL_SECONDS = 0.05, 0.05, 0.01
     _MU_SPACING, measure._MU_SPACING = measure._MU_SPACING, 0.0
+    # v0.6.16-beta.4: MC1 follows a queue for a minute and MC2 a conversation for five; a fake does neither.
+    global _STAGE4_TIMING
+    _STAGE4_TIMING = (measure._MC1_QUEUE_SECONDS, measure._MC1_START_SECONDS, measure._MC2_SECONDS)
+    measure._MC1_QUEUE_SECONDS, measure._MC1_START_SECONDS, measure._MC2_SECONDS = 0.05, 0.05, 0.05
 
 
 def tearDownModule():
     measure._M6_TURN_SECONDS, measure._M6_INTERRUPT_SECONDS, measure._M6_POLL_SECONDS = _M6_TIMING
     measure._MU_SPACING = _MU_SPACING
+    measure._MC1_QUEUE_SECONDS, measure._MC1_START_SECONDS, measure._MC2_SECONDS = _STAGE4_TIMING
 
 
 # A UUID a person might type as the throwaway conversation. It is a Codex thread id in shape, and

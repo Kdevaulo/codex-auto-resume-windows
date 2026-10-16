@@ -91,6 +91,7 @@ ARGUMENTS = {
     BridgeCommand.ADVANCED_REPORT_CHECK: frozenset({"sha256"}),
     BridgeCommand.ADVANCED_REPORT_SEND: frozenset({"sha256", "writes", "word"}),
     BridgeCommand.ADVANCED_REPORT_JOB: frozenset({"job"}),
+    BridgeCommand.ADVANCED_HEADLESS_STOP: frozenset({"interruption_id"}),
 }
 # The compatibility report's commands (report/flow.py), answered by the action itself.
 REPORT_COMMANDS = frozenset({BridgeCommand.ADVANCED_REPORT_BUILD, BridgeCommand.ADVANCED_REPORT_SAVE,
@@ -186,6 +187,10 @@ def status(runtime) -> dict:
     except Exception:
         pass
     shown.update(meter_view(runtime))
+    # v0.6.16-beta.4: the turns run here now, only where there are any.
+    found = runs(runtime)
+    if found:
+        shown["runs"] = found
     return shown
 
 
@@ -321,6 +326,8 @@ def bridge(runtime, command, argument):
     if command == BridgeCommand.ADVANCED_SEND_NOW:
         from .control import sendnow
         return sendnow.request(runtime, argument.get("interruption_id"))
+    if command == BridgeCommand.ADVANCED_HEADLESS_STOP:
+        return headless_stop(runtime, argument.get("interruption_id"))
     if command == BridgeCommand.ADVANCED_WATCH_LOG:
         from . import watchlog
         return watchlog.view(runtime, argument.get("capability"))
@@ -349,6 +356,40 @@ def bridge(runtime, command, argument):
                                   actor=Actor.DASHBOARD)
     return arming.set_global_hourly(argument.get("global_hourly"), generation=argument.get("generation"),
                                     actor=Actor.DASHBOARD)
+
+
+def headless_stop(runtime, interruption_id):
+    """advanced-headless-stop (v0.6.16-beta.4): a person's Stop of the turn run here for `interruption_id`, asked
+    from the Dashboard - written for the watcher's next tick to hand on (engine/headless.py), and the watcher woken.
+    Refused for an id of the wrong shape and where no such run is going. Never an MCP tool's."""
+    from codex_auto_resume.domain import ids
+    from .control.sendnow import wake
+    from .state import StateError
+    if not ids.is_interruption_id(interruption_id):
+        return {"done": False, "refusal": Refusal.INVALID_REQUEST}
+    try:
+        stopped = runtime.state.run_stop(interruption_id, at=runtime.clock())
+    except StateError:
+        return {"done": False, "refusal": Refusal.STATE_UNAVAILABLE}
+    if not stopped:
+        return {"done": False, "refusal": Refusal.NOT_ON}
+    try:
+        wake(runtime.paths)
+    except Exception:
+        pass                                         # the Stop stands; the next tick finds it
+    return {"done": True, "refusal": None}
+
+
+def runs(runtime) -> list:
+    """The turns run here now, as Pending shows them (v0.6.16-beta.4): each one's interruption id, which capability
+    runs it, when it began and by when its cap ends it, and whether a Stop was asked - never a conversation's word."""
+    try:
+        return [{"interruption_id": row["interruption_id"], "capability": row["capability"],
+                 "started_at": row["started_at"], "ends_by": row["ends_by"],
+                 "stopping": row["stop_requested_at"] is not None}
+                for row in runtime.state.runs(live=True)]
+    except Exception:
+        return []
 
 
 def resets(runtime, command, argument):

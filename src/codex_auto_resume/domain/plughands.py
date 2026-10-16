@@ -54,6 +54,30 @@ class Widening(StrEnum):
 WIDENINGS = tuple(Widening)
 
 
+class SessionKind(StrEnum):
+    """Which conversations besides the Codex app's a plug may ask core to watch (P18, v0.6.16-beta.4): those a
+    terminal's Codex TUI runs, and those of the VS Code extension (codex/eligibility.py)."""
+    CLI = "cli"
+    IDE = "ide"
+
+
+SESSION_KINDS = tuple(SessionKind)
+
+
+def kinds_of(answer) -> frozenset:
+    """What core takes of P18's answer: the SessionKind words in a set, a frozenset or a tuple of them - and the empty
+    set, the app's conversations alone as always, for anything else: DEFER, a word, a list holding another word."""
+    if type(answer) not in (set, frozenset, tuple):
+        return frozenset()
+    try:
+        found = frozenset(answer)
+        if not all(type(word) in (str, SessionKind) and word in tuple(SessionKind) for word in found):
+            return frozenset()
+        return frozenset(SessionKind(word) for word in found)
+    except Exception:
+        return frozenset()
+
+
 def widening_of(answer) -> frozenset:
     """What core takes of P19's answer: the Widening words in a set, a frozenset or a tuple of them - and the empty set,
     a person's own conversations alone as always, for anything else: DEFER, a word, a list holding another word."""
@@ -143,20 +167,30 @@ class Route:
 
     `still_unloaded` is core's own look at whether the app still does not hold the conversation
     (engine/delivery.py), handed on, when core gives one, for the route to ask at the last moment
-    before it changes anything in Codex: the app may open the conversation while a session starts."""
-    __slots__ = ("_resume",)
+    before it changes anything in Codex: the app may open the conversation while a session starts.
 
-    def __init__(self, resume):
-        self._resume = resume
+    `words` (v0.6.16-beta.4): a route that takes them - one whose plug object says `takes_words` - is
+    handed the continuation core decided before the claim, as for a send, and the client id core
+    derived; one that does not is called exactly as before."""
+    __slots__ = ("_resume", "words")
 
-    def resume(self, thread_id, *, launch_guard=None, still_unloaded=None):
+    def __init__(self, resume, words=False):
+        self._resume, self.words = resume, words is True
+
+    @property
+    def takes_words(self) -> bool:
+        """Whether this route is handed core's words (`words`): what the plug's object said, held to True itself."""
+        return self.words
+
+    def resume(self, thread_id, *, launch_guard=None, still_unloaded=None, words=None, client_id=None):
         with launch_guard if launch_guard is not None else nullcontext(True) as permitted:
             pass
         if permitted is not True:
             return {"outcome": "not_started", "error_code": "queue_consent_refused"}
-        if still_unloaded is None:
-            return self._resume(thread_id, launch_guard=nullcontext(True))
-        return self._resume(thread_id, launch_guard=nullcontext(True), still_unloaded=still_unloaded)
+        handed = {} if still_unloaded is None else {"still_unloaded": still_unloaded}
+        if self.words:
+            handed.update(words=words, client_id=client_id)
+        return self._resume(thread_id, launch_guard=nullcontext(True), **handed)
 
 
 class _Once:

@@ -1076,6 +1076,7 @@
   "why.engine_incompatible": "Phiên bản Codex này không được hỗ trợ, nên không gửi gì.",
   "why.engine_unknown": "Chưa biết phiên bản Codex này có được hỗ trợ hay không.",
   "why.held": "Cuộc trò chuyện hoặc dự án của nó yêu cầu hỏi bạn trước: không gửi gì cho đến khi bạn cho phép tiếp tục.",
+  "why.held_by_other_session": "Đang mở trong một phiên Codex khác (terminal hoặc VS Code); sẽ tiếp tục khi ứng dụng Codex giữ nó.",
   "why.home_lock_unavailable": "Một bộ theo dõi khác đang phụ trách thư mục Codex này.",
   "why.home_removed": "Thư mục Codex của nó đã bị gỡ trong Cài đặt nên sẽ không được tiếp tục.",
   "why.loaded_state_unknown": "Chưa biết được cuộc trò chuyện có đang mở hay không.",
