@@ -267,8 +267,9 @@ ceiling is above the standard edition's five, because it departs from A20.
 ### Compact a full conversation, then continue
 
 **What it does.** When a turn fails because the conversation is longer than its model's context window, the
-conversation is compacted and then continued once. If the Codex app has the conversation open, Pending asks
-you to run `/compact` in Codex, and once you have, the ordinary continuation follows. If nothing has it open
+conversation is compacted and then continued once. If the Codex app has the conversation open, the recovery
+waits, shown in Pending as scheduled, until you run `/compact` in Codex yourself; once you have, the ordinary
+continuation follows. If nothing has it open
 and Codex is closed, it is compacted here, on Codex's own app server, then continued here as Run a
 conversation here while Codex is closed would. Codex's own automatic compaction comes first; this is for when
 it did not. The program never sends `/compact` itself: a queued `/compact` reaches Codex as plain text.

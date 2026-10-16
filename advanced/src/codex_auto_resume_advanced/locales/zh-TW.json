@@ -434,7 +434,7 @@
   "statement.codex_gave_up.risks": "Codex 已經試過好幾次，所以再試並不是一次全新的嘗試：它可能以同樣的方式失敗，並消耗你的使用量。無法證明已送達的接續訊息絕不會再次傳送，而且此功能會自行關閉。",
   "statement.codex_gave_up.stop": "在儀表板中關閉它或改為觀察，或關閉所有進階功能；之後它等待傳送的復原會在不傳送的情況下結束。",
   "statement.compact_continue.departs": "0.5（透過 thread/resume 執行自己的回合）、A2、A11、B3、B4、E8 和 F8（與 Codex 關閉時在此執行對話相同）、A13 和 A14（處理內容長度失敗）、A16（接續訊息接在壓縮回合之後，因此該失敗不再是最新回合）、A17（壓縮回合不會取代它）以及 A26（標準版不復原的失敗所用的接續訊息措辭）。",
-  "statement.compact_continue.does": "當某個回合因對話比其模型的內容視窗更長而失敗時，會先壓縮對話，再繼續一次。如果 Codex 應用程式開啟著該對話，待處理會請你在 Codex 中執行 /compact，你執行之後，隨後進行一般的接續。如果沒有任何地方開啟它且 Codex 已關閉，則在此處、在 Codex 自己的應用程式伺服器上壓縮（thread/compact/start），再像 Codex 關閉時在此執行對話那樣在此處繼續。Codex 自己的自動壓縮優先；此功能用於它沒有發生的情況。",
+  "statement.compact_continue.does": "當某個回合因對話比其模型的內容視窗更長而失敗時，會先壓縮對話，再繼續一次。如果 Codex 應用程式開啟著該對話，復原會等待（待處理中顯示為已排程），直到你自己在 Codex 中執行 /compact；你執行之後，隨後進行一般的接續。如果沒有任何地方開啟它且 Codex 已關閉，則在此處、在 Codex 自己的應用程式伺服器上壓縮（thread/compact/start），再像 Codex 關閉時在此執行對話那樣在此處繼續。Codex 自己的自動壓縮優先；此功能用於它沒有發生的情況。",
   "statement.compact_continue.instead": "標準版絕不會重試已滿的內容視窗：它會告訴你對話太長，請壓縮它或開始新的對話。",
   "statement.compact_continue.risks": "壓縮會遺失較早對話的細節。如果壓縮失敗或在十分鐘內沒有結束，或一天內沒有發生任何壓縮，復原就以其本來的失敗結束。壓縮在此處（MX）以及在你執行 /compact 之後（MX A）是否表現正常，並未在每個 Codex 版本上量測過。",
   "statement.compact_continue.stop": "在這裡關閉它，或關閉所有進階功能；已滿的對話隨後會依標準版的方式結束。",
