@@ -123,11 +123,13 @@ class UsageStop(UsagePause):
                 word = stop(thread, turn.turn_id)
             except Exception:
                 word = ipc.Stop.BROKEN
-            if word != ipc.Stop.STOPPED:
+            if word not in (ipc.Stop.STOPPED, ipc.Stop.UNCONFIRMED):
                 self._count("not_stopped")
                 self._notice("not_stopped", window)
                 continue
-            self._count("stopped")
+            # A stop with no answer in time may have been made: kept as one, so the queue the app may have paused is
+            # let go by the continuation after the reset, or the person asked to press Resume.
+            self._count("stopped" if word == ipc.Stop.STOPPED else "stop_unconfirmed")
             if not self._remember(thread, turn, window):
                 # No continuation after the reset will start a turn there, which is what lets the paused queue go.
                 self._count("resume_unproven")

@@ -107,6 +107,21 @@ class StopTests(StopCase):
         self.assertEqual(plug.runtime.state.continuations(capability=self.cap, pending=None), [],
                          "nothing it did not stop is continued by it")
 
+    def test_a_stop_with_no_answer_in_time_is_kept_as_one_that_may_have_been_made(self):
+        """The app may have stopped it, and paused its queue: it is continued after the reset like a stopped one, so
+        that queue is let go - never left with nothing to say or to do."""
+        self.stop_answer = ipc.Stop.UNCONFIRMED
+        plug, turn = self.running()
+        for _ in range(2):
+            self.h.tick(advance=61)
+        self.assertIn("pause.stop_unconfirmed", self.journal(plug))
+        (row,) = plug.runtime.state.continuations(capability=self.cap, pending=None)
+        self.assertEqual(row["kind"], "after_reset")
+        self.after_reset(plug, turn)
+        for _ in range(2):
+            self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 1)
+
     def test_a_window_switched_off_is_never_stopped(self):
         plug, _turn = self.running()
         assert plug.runtime.arming.set_option("usage_meter", OptionKey.WINDOW_FIVE_HOUR, 2,
@@ -179,6 +194,16 @@ class NoContinuationTests(StopCase):
         self.assertIn("pause.resume_unproven", self.journal(plug))
         self.assertEqual(self.kinds(plug), ["press_resume"])
         self.assertEqual(plug.runtime.state.continuations(capability=self.cap, pending=None), [])
+
+    def test_a_stop_with_no_answer_asks_for_resume_too_where_nothing_will_continue_it(self):
+        self.stop_answer = ipc.Stop.UNCONFIRMED
+        plug, _turn = self.running()
+        assert plug.runtime.arming.set_option("usage_wrap_up", OptionKey.WRAP_AFTER_RESET, 2,
+                                              generation=plug.runtime.state.meta()["generation"],
+                                              actor=Actor.DASHBOARD)["done"]
+        for _ in range(2):
+            self.h.tick(advance=61)
+        self.assertEqual(self.kinds(plug), ["press_resume"])
 
 
 @unittest.skipUnless(sys.platform == "win32", "a Windows named pipe")

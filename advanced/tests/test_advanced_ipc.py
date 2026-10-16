@@ -73,8 +73,9 @@ class StopTests(unittest.TestCase):
                               ipc.Stop.VERSION_MISMATCH),
                              ({"thread-follower-interrupt-turn": {"resultType": "error", "error": "whatever it says"}},
                               ipc.Stop.REFUSED),
-                             ({"thread-follower-interrupt-turn": None}, ipc.Stop.NO_ANSWER)):
-            with self.subTest(word=word), patch.object(ipc, "READ_SECONDS", 1.0):
+                             ({"thread-owner-discovery": None}, ipc.Stop.NO_ANSWER),
+                             ({"thread-follower-interrupt-turn": None}, ipc.Stop.UNCONFIRMED)):
+            with self.subTest(word=word), patch.object(ipc, "READ_SECONDS", 1.0),                     patch.object(ipc, "INTERRUPT_SECONDS", 1.0):
                 self.assertEqual(self.stop(self.app(**script)), word)
         with patch.object(ipc, "PIPE", r"\\.\pipe\car-test-ipc-none-%d" % id(self)):
             self.assertEqual(ipc.stop_turn(THREAD), ipc.Stop.NO_PIPE, "the app not running")
@@ -133,6 +134,29 @@ class DeadlineTests(unittest.TestCase):
         with patch.object(ipc, "READ_SECONDS", 1.0):
             self.assertEqual(ipc.stop_turn(THREAD, TURN, channel=channel), ipc.Stop.NO_ANSWER)
         self.assertLess(time.monotonic() - began, 2.5, "one deadline, not one per frame")
+
+    def test_the_stop_waits_longer_than_the_rest_and_no_answer_to_it_is_unconfirmed_not_failed(self):
+        """An interrupt answered after 6 s was a no_answer, and the queue the app paused was left with nothing to let
+        it go: the stop has a wait of its own (INTERRUPT_SECONDS), and silence after it is UNCONFIRMED."""
+        self.assertGreaterEqual(ipc.INTERRUPT_SECONDS, 30.0)
+
+        def slow(request):
+            if request["method"] == "thread-follower-interrupt-turn":
+                time.sleep(1.0)
+            result = {"initialize": {"clientId": "c"}, "thread-follower-interrupt-turn": {"interruptedTurnId": TURN}}
+            return {"type": "response", "requestId": request["requestId"], "resultType": "success",
+                    "result": result.get(request["method"], {}), "handledByClientId": "owner"}
+        with patch.object(ipc, "READ_SECONDS", 0.5):
+            self.assertEqual(ipc.stop_turn(THREAD, TURN, channel=_Channel(slow)), ipc.Stop.STOPPED,
+                             "a stop answered after the other requests' wait")
+
+        def silent_stop(request):
+            if request["method"] == "thread-follower-interrupt-turn":
+                return _broadcast(request)
+            return slow(request)
+        with patch.object(ipc, "INTERRUPT_SECONDS", 0.5):
+            self.assertEqual(ipc.stop_turn(THREAD, TURN, channel=_Channel(silent_stop, every=0.05)),
+                             ipc.Stop.UNCONFIRMED)
 
     def test_many_broadcasts_before_the_answer_still_reach_it(self):
         counts = {}

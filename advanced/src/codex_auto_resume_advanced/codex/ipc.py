@@ -31,6 +31,9 @@ from enum import StrEnum
 PIPE = r"\\.\pipe\codex-ipc"
 # Each request's whole wait for its answer, from when it is written - one deadline, however many frames come first.
 READ_SECONDS = 5.0
+# The stop's own wait, longer: it took 1.1 s live (MIPC, 2026-10-16), the MIPC probe allowed 60 s; an answer slower than
+# this is taken as a stop that may have been made (UNCONFIRMED), never as one that was not.
+INTERRUPT_SECONDS = 30.0
 # The most frames that are not the answer (the app's broadcasts, other clients' replies) taken while one is awaited.
 FRAMES_LIMIT = 200
 # The longest frame taken: the app's broadcasts can be long, a reply to these never is.
@@ -61,6 +64,9 @@ class Stop(StrEnum):
     VERSION_MISMATCH = "version_mismatch"    # the app's build checks another version of a request
     NO_PIPE = "no_pipe"                      # the pipe is not there: the app is not running
     NO_ANSWER = "no_answer"                  # it did not answer in time
+    # The stop was asked and no answer came within INTERRUPT_SECONDS: it may have been made - so the caller keeps the
+    # conversation for its continuation after the reset, which is what lets a queue the app paused go.
+    UNCONFIRMED = "unconfirmed"
     REFUSED = "refused"                      # any other answer than success
     BROKEN = "broken"                        # a frame that is not one, or the pipe failing under us
 
@@ -254,8 +260,13 @@ def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
         if not isinstance(owner, str) or not owner:
             return Stop.NO_CLIENT
         shape = INTERRUPT_EXPECTING if turn_id else REQUESTS["thread-follower-interrupt-turn"]
-        answer = _request(opened, client, "thread-follower-interrupt-turn", shape,
-                          {"thread": thread_id, "turn": turn_id}, target=owner)
+        try:
+            answer = _request(opened, client, "thread-follower-interrupt-turn", shape,
+                              {"thread": thread_id, "turn": turn_id}, target=owner, seconds=INTERRUPT_SECONDS)
+        except _Failed as failed:
+            if failed.word == Stop.NO_ANSWER:
+                return Stop.UNCONFIRMED
+            raise
         return _stopped(answer, turn_id)
     except _Failed as failed:
         return failed.word
