@@ -21,12 +21,14 @@ own script. Reproduced before the fix.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALL = ROOT / "build" / "install" / "install.ps1"
+POWERSHELL = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
 LAUNCHERS = [ROOT / "build" / "install" / "Install.cmd", ROOT / "build" / "install" / "Uninstall.cmd"]
 
 
@@ -164,13 +166,122 @@ class DashboardAfterUpdateTests(unittest.TestCase):
             self.assertNotIn(kill, asked)
 
     def test_it_opens_again_after_setup_in_the_form_its_own_reopen_wrote(self):
-        reopen = self.block("$reopenRequest = Join-Path (Join-Path $InstallHome 'config') 'reopen-after-update.txt'",
-                            "Write-Host ''\nif ($script:Failed)")
-        self.assertLess(self.text.index("$null = Invoke-Setup @('doctor')"), self.text.index(reopen))
-        self.assertIn("if ($dashboardsOpen -and (Test-Path -LiteralPath $reopenRequest -PathType Leaf)) {", reopen)
-        self.assertIn("$reopenLine -cmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$'", reopen)
-        self.assertIn("-NoNewWindow", reopen)
+        reopen = self.block("function Open-ClosedDashboard {", "# From here on, the Dashboard windows")
+        self.assertLess(self.text.index("$null = Invoke-Setup @('doctor')"), self.text.index("Open-ClosedDashboard -Updated"))
+        self.assertIn("if ($null -eq $script:DashboardsAskedAt -or $script:DashboardsReopened) { return }", reopen)
+        self.assertIn("$line -cnotmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$'", reopen)
         self.assertIn('internal const string UpdateReopenFile = "reopen-after-update.txt";', self.window)
+
+    # ------------------------------------------------------------------ every way out (v0.6.16 review)
+    def run_reopen(self, records, asked=True, calls=("-Updated",), start_process=None):
+        """Open-ClosedDashboard, lifted from install.ps1 with the helpers it calls, in a scratch home whose config
+        folder holds `records` - (name, line, seconds the record was written before the request, or None for
+        after it). Start-Process is a stub that writes down what it was asked to start, unless `start_process` is
+        given. Returns (what it printed, what it started, the records left)."""
+        import subprocess
+        import tempfile
+        from test_installer import VOICE, block, ps_literal
+        if not POWERSHELL.is_file():
+            self.skipTest("Windows PowerShell")
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder) / "home"
+            (home / "config").mkdir(parents=True)
+            (home / "CodexAutoResumeSettings.exe").write_bytes(b"")
+            started = Path(folder) / "started.txt"
+            source = VOICE
+            source += block(self.text, "function Resolve-Canonical {", "function Get-Edition {")
+            source += block(self.text, "function Remove-OwnedItem {", "function Invoke-Setup {")
+            source += block(self.text, "function Open-ClosedDashboard {", "# From here on, the Dashboard windows")
+            source += start_process or ("function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory, "
+                                        "[switch]$NoNewWindow) Add-Content -LiteralPath %s -Value ([string]$ArgumentList) }\n"
+                                        % ps_literal(started))
+            script = ["$ErrorActionPreference = 'Stop'",
+                      "$OwnedHome = %s" % ps_literal(home), "$InstallHome = $OwnedHome",
+                      "$script:DashboardsReopened = $false",
+                      "$now = [DateTime]::UtcNow",
+                      "$script:DashboardsAskedAt = %s" % ("$now" if asked else "$null")]
+            for name, line, before in records:
+                path = ps_literal(home / "config" / name)
+                script.append("[IO.File]::WriteAllText(%s, %s)" % (path, ps_literal(line)))
+                when = "$now.AddSeconds(%d)" % (-before if before is not None else 1)
+                script.append("(Get-Item -LiteralPath %s).LastWriteTimeUtc = %s" % (path, when))
+            script += ["Open-ClosedDashboard %s" % call for call in calls]
+            probe = Path(folder) / "probe.ps1"
+            probe.write_text(source + "\n" + "\n".join(script) + "\n", encoding="utf-8-sig")
+            done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe)], capture_output=True, text=True, encoding="utf-8",
+                                  errors="replace", timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            lines = started.read_text(encoding="utf-8").split() if started.exists() else []
+            return done.stdout, lines, sorted(os.listdir(home / "config"))
+
+    def test_a_record_is_opened_once_and_removed_and_a_stale_one_is_only_removed(self):
+        """A record an earlier update left behind - written before this run asked - is never opened, and none is
+        left for a later update to open."""
+        said, started, left = self.run_reopen([("reopen-after-update.txt", "--page=history --reopened=1", None)],
+                                              calls=("-Updated", "", "-Updated"))
+        self.assertEqual(started, ["--page=history", "--reopened=1"], "opened once, however often it is called")
+        self.assertIn("[ok] The Dashboard was opened again on the new version", said)
+        self.assertEqual(left, [])
+        said, started, left = self.run_reopen([("reopen-after-update.txt", "--page=history --reopened=1", 3600)])
+        self.assertEqual(started, [], "a stale record was opened")
+        self.assertEqual(left, [], "a stale record was left for a later update")
+        said, started, left = self.run_reopen([("reopen-after-update.txt", "--page=history", None)], asked=False)
+        self.assertEqual(started, [], "nothing was asked to close, so nothing opens")
+
+    def test_an_update_that_stops_opens_the_dashboard_again_as_it_was(self):
+        said, started, _ = self.run_reopen([("reopen-after-update.txt", "--page=settings --reopened=2", None)],
+                                           calls=("",))
+        self.assertEqual(started, ["--page=settings", "--reopened=2"])
+        self.assertIn("[ok] The Dashboard was opened again", said)
+        self.assertNotIn("on the new version", said)
+
+    def test_every_way_out_once_the_dashboard_was_asked_opens_it_again(self):
+        """install.ps1 closed the Dashboard, then could stop with 1 (put back, setup failed) before the reopen,
+        which left the person's Dashboard closed. Every `exit` after the close step is inside the `try` whose
+        `finally` opens it again, that `try` is the script's last statement, and a stale record is removed before
+        the windows are asked."""
+        import subprocess
+        import tempfile
+        if not POWERSHELL.is_file():
+            self.skipTest("Windows PowerShell")
+        probe_text = (
+            "$ast = [System.Management.Automation.Language.Parser]::ParseFile($args[0], [ref]$null, [ref]$null)\n"
+            "$tries = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.TryStatementAst] -and "
+            "$n.Finally -and $n.Finally.Extent.Text -match 'Open-ClosedDashboard' }, $true))\n"
+            "'tries ' + $tries.Count\n"
+            "$try = $tries[0]\n"
+            "'body ' + $try.Body.Extent.StartLineNumber + ' ' + $try.Body.Extent.EndLineNumber\n"
+            "'last ' + [object]::ReferenceEquals($ast.EndBlock.Statements[$ast.EndBlock.Statements.Count - 1], $try)\n"
+            "foreach ($e in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.ExitStatementAst] }, $true)) {\n"
+            "    'exit ' + $e.Extent.StartLineNumber }\n")
+        with tempfile.TemporaryDirectory() as folder:
+            probe = Path(folder) / "ast.ps1"
+            probe.write_text(probe_text, encoding="utf-8-sig")
+            done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe), str(INSTALL)], capture_output=True, text=True, timeout=120,
+                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        found = {}
+        for line in done.stdout.splitlines():
+            key, _, value = line.partition(" ")
+            found.setdefault(key, []).append(value)
+        self.assertEqual(found.get("tries"), ["1"], done.stdout + done.stderr)
+        self.assertEqual(found.get("last"), ["True"], "nothing after the try may end the script")
+        start, end = (int(n) for n in found["body"][0].split())
+        lines = self.text.splitlines()
+
+        def line_of(piece):
+            return next(number for number, line in enumerate(lines, 1) if piece in line)
+
+        asked = line_of("$dashboardsOpen = $upgrade -and (Get-OwnedDashboardProcess).Count -gt 0")
+        self.assertLess(start, asked, "the try begins before the Dashboard is asked to close")
+        late = [int(number) for number in found.get("exit", []) if int(number) > start]
+        self.assertGreaterEqual(len(late), 4, "the exits after the close step were found")
+        for number in late:
+            self.assertLess(number, end, "an exit after the close step lies outside the try: " + lines[number - 1])
+        stale = next(number for number, line in enumerate(lines, 1)
+                     if number > start and "-Filter 'reopen-after-update*.txt'" in line)
+        self.assertLess(stale, asked, "a record an earlier update left is removed before the windows are asked")
 
     def test_the_window_closes_through_its_own_close_and_keeps_unsaved_changes(self):
         body = self.window[self.window.index("private void CloseForUpdate()"):]
