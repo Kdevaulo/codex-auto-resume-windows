@@ -171,7 +171,36 @@ class DashboardAfterUpdateTests(unittest.TestCase):
         self.assertLess(self.text.index("$null = Invoke-Setup @('doctor')"), self.text.index("Open-ClosedDashboard -Updated"))
         self.assertIn("if ($null -eq $script:DashboardsAskedAt -or $script:DashboardsReopened) { return }", reopen)
         self.assertIn("$line -cnotmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$'", reopen)
-        self.assertIn('internal const string UpdateReopenFile = "reopen-after-update.txt";', self.window)
+
+    def test_each_window_writes_a_record_of_its_own_and_its_own_pick_never_closes_it(self):
+        """Two windows wrote the one reopen-after-update.txt, so only the last opened again; and InstallPick never set
+        updatingHere, so with a second window open the window picking a version closed mid-pick and never said how it
+        went. Each window now writes reopen-after-update-<its process id>.txt, and the installer opens each record
+        named so - two windows open again as two - and only those."""
+        import guiscan
+        name = guiscan.member_body("SettingsForm", "UpdateReopenFile")
+        self.assertIn('"reopen-after-update-" + process.ToString(CultureInfo.InvariantCulture) + ".txt"', name)
+        close = guiscan.member_body("SettingsForm", "CloseForUpdate")
+        self.assertIn("UpdateReopenFile(Process.GetCurrentProcess().Id)", close)
+        self.assertIn("if (updatingHere ||", close)
+        for member in ("InstallUpdate", "InstallPick"):
+            body = guiscan.member_body("SettingsForm", member)
+            with self.subTest(member):
+                on = body.index("updatingHere = true;")
+                self.assertLess(on, body.index("StartBootstrap(" if member == "InstallPick" else "RunBootstrap("),
+                                "set before the bootstrap starts")
+                self.assertGreater(body.index("updatingHere = false;"), on, "and cleared once it has ended")
+        pick = guiscan.member_body("SettingsForm", "InstallPick")
+        finish = pick[pick.index("MethodInvoker finish = delegate"):]
+        self.assertIn("updatingHere = false;", finish, "cleared on the window's thread, once the pick has ended")
+        said, started, left = self.run_reopen([("reopen-after-update-101.txt", "--page=history --reopened=1", None),
+                                               ("reopen-after-update-202.txt", "--page=settings --reopened=1", None),
+                                               ("reopen-after-update.txt", "--page=pending --reopened=1", None),
+                                               ("reopen-after-update-x.txt", "--page=pending --reopened=1", None)])
+        self.assertEqual(sorted(started), sorted(["--page=history", "--page=settings", "--reopened=1", "--reopened=1"]),
+                         "each window's own record, and nothing else")
+        self.assertEqual(said.count("[ok] The Dashboard was opened again on the new version"), 2)
+        self.assertEqual(left, [], "every record is removed, opened or not")
 
     # ------------------------------------------------------------------ every way out (v0.6.16 review)
     def run_reopen(self, records, asked=True, calls=("-Updated",), dashboard=None):
@@ -246,19 +275,19 @@ class DashboardAfterUpdateTests(unittest.TestCase):
     def test_a_record_is_opened_once_and_removed_and_a_stale_one_is_only_removed(self):
         """A record an earlier update left behind - written before this run asked - is never opened, and none is
         left for a later update to open."""
-        said, started, left = self.run_reopen([("reopen-after-update.txt", "--page=history --reopened=1", None)],
+        said, started, left = self.run_reopen([("reopen-after-update-4242.txt", "--page=history --reopened=1", None)],
                                               calls=("-Updated", "", "-Updated"))
         self.assertEqual(started, ["--page=history", "--reopened=1"], "opened once, however often it is called")
         self.assertIn("[ok] The Dashboard was opened again on the new version", said)
         self.assertEqual(left, [])
-        said, started, left = self.run_reopen([("reopen-after-update.txt", "--page=history --reopened=1", 3600)])
+        said, started, left = self.run_reopen([("reopen-after-update-4242.txt", "--page=history --reopened=1", 3600)])
         self.assertEqual(started, [], "a stale record was opened")
         self.assertEqual(left, [], "a stale record was left for a later update")
-        said, started, left = self.run_reopen([("reopen-after-update.txt", "--page=history", None)], asked=False)
+        said, started, left = self.run_reopen([("reopen-after-update-4242.txt", "--page=history", None)], asked=False)
         self.assertEqual(started, [], "nothing was asked to close, so nothing opens")
 
     def test_an_update_that_stops_opens_the_dashboard_again_as_it_was(self):
-        said, started, _ = self.run_reopen([("reopen-after-update.txt", "--page=settings --reopened=2", None)],
+        said, started, _ = self.run_reopen([("reopen-after-update-4242.txt", "--page=settings --reopened=2", None)],
                                            calls=("",))
         self.assertEqual(started, ["--page=settings", "--reopened=2"])
         self.assertIn("[ok] The Dashboard was opened again", said)
@@ -285,7 +314,7 @@ class DashboardAfterUpdateTests(unittest.TestCase):
             subprocess.run([str(csc), "/nologo", "/target:winexe", "/out:" + str(exe), str(source)], check=True,
                            capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             begun = time.monotonic()
-            said, started, _ = self.run_reopen([("reopen-after-update.txt", "--page=overview --reopened=1", None)],
+            said, started, _ = self.run_reopen([("reopen-after-update-4242.txt", "--page=overview --reopened=1", None)],
                                                dashboard=exe)
             took = time.monotonic() - begun
         self.assertIn("[ok] The Dashboard was opened again on the new version", said)

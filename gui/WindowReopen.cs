@@ -701,10 +701,15 @@ namespace CodexAutoResume
         // where it is - its own reopen's arguments - for the installer to open the new version with, once it has run.
         // With unsaved Settings changes it keeps them and stays open: the installer waits a minute and goes on, and
         // this window runs the previous version until it is opened again. The update this window started itself
-        // (InstallUpdate, InstallPick) is never one it closes for: it opens the new version itself.
+        // (InstallUpdate, InstallPick: updatingHere) is never one it closes for: it opens the new version itself.
 
-        /// What an update writes beside the settings, read by the installer once (install.ps1).
-        internal const string UpdateReopenFile = "reopen-after-update.txt";
+        /// What an update writes beside the settings, read by the installer once (install.ps1, Open-ClosedDashboard):
+        /// one record for each window, named by its process, so two windows open again as two and neither's place is
+        /// written over by the other's.
+        internal static string UpdateReopenFile(int process)
+        {
+            return "reopen-after-update-" + process.ToString(CultureInfo.InvariantCulture) + ".txt";
+        }
 
         private System.Threading.EventWaitHandle updateClose;
         private System.Threading.RegisteredWaitHandle updateWait;
@@ -760,7 +765,8 @@ namespace CodexAutoResume
             {
                 string config = Path.Combine(installRoot, "config");
                 if (Directory.Exists(config))
-                    File.WriteAllText(Path.Combine(config, UpdateReopenFile), arguments, new UTF8Encoding(false));
+                    File.WriteAllText(Path.Combine(config, UpdateReopenFile(Process.GetCurrentProcess().Id)), arguments,
+                                      new UTF8Encoding(false));
             }
             catch (Exception) { /* it closes all the same; the installer opens nothing it was not told of */ }
             Close();

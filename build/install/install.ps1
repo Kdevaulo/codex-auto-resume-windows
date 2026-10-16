@@ -916,8 +916,9 @@ function Open-ClosedDashboard {
         arguments it wrote are its own reopen's (WindowReopen.ReopenArguments), taken only in that form, and it
         checks each again. On every way out once the windows were asked - an update that finished, and one that
         stopped or was put back (the `finally` at the end) - so an update that fails never leaves the person's
-        Dashboard closed. Only a record written after this run asked is opened, and every record is removed once
-        read: none is left behind for a later update to open. Nothing is opened that was not open before. Once.
+        Dashboard closed. Each window writes a record of its own, reopen-after-update-<its process id>.txt, so two
+        windows open again as two. Only a record written after this run asked is opened, and every record is removed
+        once read: none is left behind for a later update to open. Nothing is opened that was not open before. Once.
     #>
     param([switch]$Updated)
     if ($null -eq $script:DashboardsAskedAt -or $script:DashboardsReopened) { return }
@@ -929,6 +930,7 @@ function Open-ClosedDashboard {
         $fresh = $record.LastWriteTimeUtc -ge $script:DashboardsAskedAt
         $line = ([string](Get-Content -LiteralPath $record.FullName -Raw -ErrorAction SilentlyContinue)).Trim()
         $null = Remove-OwnedItem $record.FullName
+        if ($record.Name -cnotmatch '^reopen-after-update-[0-9]{1,10}\.txt$') { continue }
         if (-not $fresh -or -not (Test-Path -LiteralPath $dashboard -PathType Leaf)) { continue }
         if ($line -cnotmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$') { continue }
         try {
@@ -1029,7 +1031,7 @@ try {
 
     # The Dashboard, as the watcher (v0.6.16, the owner: after an update everything runs on the new version). An
     # open window of this installation is asked to close itself, through its own close: it writes where it was
-    # (config\reopen-after-update.txt) and closes - unless it has unsaved Settings changes, which it keeps, and then
+    # (config\reopen-after-update-<its process id>.txt) and closes - unless it has unsaved Settings changes, which it keeps, and then
     # it stays open. This waits a minute for them, as the watcher above is waited for, and goes on either way: a
     # window that stayed runs the previous version until it is opened again, and says nothing is lost. Nothing is
     # ended by force. The window opens again where it was once setup has run (below) - and on every other way out
