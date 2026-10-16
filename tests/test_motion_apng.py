@@ -113,6 +113,31 @@ class AssembleTests(unittest.TestCase):
             self.write(still=png(picture(3), WIDTH, HEIGHT, 1))
 
 
+class SplitTests(unittest.TestCase):
+    def test_changes_far_apart_are_two_small_rectangles_and_the_picture_comes_out_whole(self):
+        tall = 200
+        ground = bytes(GROUND) * (WIDTH * tall)
+
+        def lit(top_colour, bottom_colour):
+            out = bytearray(ground)
+            out[(3 * WIDTH + 2) * 3:(3 * WIDTH + 2) * 3 + 3] = bytes(top_colour)
+            out[(190 * WIDTH + 30) * 3:(190 * WIDTH + 30) * 3 + 3] = bytes(bottom_colour)
+            return bytes(out)
+        given = [(10, "A", lit((1, 1, 1), (2, 2, 2))), (10, "B", lit((9, 9, 9), (8, 8, 8))),
+                 (3, "C", lit((5, 5, 5), (6, 6, 6)))]
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "split.png"
+            report = motion_apng.assemble(path, WIDTH, tall, iter(given))
+            apng = read_apng(path.read_bytes())
+        boxes = [frame["box"] for frame in apng["frames"]]
+        self.assertEqual(boxes[1:3], [(2, 3, 1, 1), (30, 190, 1, 1)], "two rectangles, not one round both")
+        self.assertEqual([frame["delay"] for frame in apng["frames"]][1:3], [Fraction(2, 100), Fraction(8, 100)])
+        self.assertEqual(boxes[3], (2, 3, 29, 188), "too short a frame to split is one rectangle")
+        shown = list(composite(apng))
+        self.assertTrue(shown[2] == given[1][2] and shown[3] == given[2][2])
+        self.assertEqual(report.hundredths, 23)
+
+
 class ChangedTests(unittest.TestCase):
     def test_the_rectangle_is_the_smallest_that_holds_every_change(self):
         generator = random.Random(7)

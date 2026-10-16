@@ -3,7 +3,9 @@
 Generalised from make_screenshots.write_apng_patches and make_social.write_motion: the first frame is written whole
 - and, where a still of it exists, as that still's PNG chunk for chunk, so a viewer that does not animate shows
 exactly the still - and every later frame as the one rectangle that changed since the frame before, drawn over it
-(APNG_KEEP, APNG_OVER; every pixel opaque, so it is exact). A frame the same as the one before only lengthens it.
+(APNG_KEEP, APNG_OVER; every pixel opaque, so it is exact) - or, where its changes lie far apart, one rectangle
+each, all but the last shown for the shortest time a browser keeps (`patches`). A frame the same as the one before
+only lengthens it.
 Delays are whole hundredths of a second, never under SHORTEST: browsers show 10 ms or less as 100 ms. No palette, no
 dither, nothing lossy - the reason it is an APNG and not a GIF (make_social.py's docstring).
 
@@ -29,6 +31,8 @@ for _path in (str(ROOT / "src"), str(ROOT / "build")):
 SHORTEST = 2                         # hundredths of a second
 APNG_KEEP, APNG_OVER = 0, 1
 LEVEL = 9
+# Changed rows this many unchanged rows apart are written as rectangles of their own (`patches`).
+BAND_GAP = 48
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -121,6 +125,33 @@ def changed(before: bytes, after: bytes, width: int, height: int):
     return left, top, right - left + 1, bottom - top + 1
 
 
+def patches(before: bytes, after: bytes, width: int, height: int) -> list:
+    """The rectangles that differ between two RGB pictures, one per band of changed rows that BAND_GAP unchanged rows
+    keep apart from the next: a breathing light at the top of the picture and the tray icon at its bottom are two
+    small rectangles, where one round both would be most of the picture. [] when they are the same."""
+    if before == after:
+        return []
+    stride = width * 3
+    rows = [y for y in range(height) if before[y * stride:(y + 1) * stride] != after[y * stride:(y + 1) * stride]]
+    bands, start = [], rows[0]
+    for previous, row in zip(rows, rows[1:]):
+        if row - previous > BAND_GAP:
+            bands.append((start, previous))
+            start = row
+    bands.append((start, rows[-1]))
+    boxes = []
+    for top, bottom in bands:
+        left, right = width, -1
+        for y in range(top, bottom + 1):
+            a, b = before[y * stride:(y + 1) * stride], after[y * stride:(y + 1) * stride]
+            if a == b:
+                continue
+            left = min(left, _same_prefix(a, b, width))
+            right = max(right, width - 1 - _same_suffix(a, b, width))
+        boxes.append((left, top, right - left + 1, bottom - top + 1))
+    return boxes
+
+
 def _delay(hundredths: int) -> tuple:
     if hundredths < SHORTEST:
         raise ValueError("a frame held %d hundredths of a second: browsers show at least %d" % (hundredths, SHORTEST))
@@ -147,7 +178,13 @@ def assemble(path, width: int, height: int, frames, *, still: bytes | None = Non
         if picture == previous:
             (later[-1] if later else first)[0] += delay
             continue
-        later.append([delay, scene, picture, changed(previous, picture, width, height)])
+        boxes = patches(previous, picture, width, height)
+        if len(boxes) > 1 and delay < len(boxes) * SHORTEST:
+            boxes = [changed(previous, picture, width, height)]
+        # Each rectangle but the last is shown for the shortest time a browser keeps, the last for the rest.
+        for number, box in enumerate(boxes):
+            last = number == len(boxes) - 1
+            later.append([delay - (len(boxes) - 1) * SHORTEST if last else SHORTEST, scene, picture, box])
         previous = picture
     body, sequence = bytearray(), 1
     for delay, scene, picture, box in later:
