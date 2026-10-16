@@ -494,6 +494,10 @@ class KeyTests(Entry):
         self.assertTrue(addremove.owned(values, self.home))
         window = (ROOT / "gui" / "SettingsRemove.cs").read_text(encoding="utf-8")
         self.assertIn('internal const string Asked = "%s";' % addremove.WINDOW_SWITCH, window)
+        # A command line that is not the installation's own says so in the uninstall's window, finished before it
+        # began, never in Windows' own box (tests/test_gui_v066_dialog.py counts the one box the program keeps).
+        self.assertNotIn("MessageBox.Show", window)
+        self.assertIn("window.Finished(InstallerFlow.NotStarted, NotItsOwn", window)
 
     def test_a_home_with_spaces_is_one_argument(self):
         home = Path(self.temp.name) / "Example User" / ".codex-auto-resume"

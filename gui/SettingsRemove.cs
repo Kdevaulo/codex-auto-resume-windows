@@ -41,20 +41,57 @@ namespace CodexAutoResume
         internal static int Run(string[] argv)
         {
             string self = typeof(SettingsRemove).Assembly.Location;
-            if (argv[0] == Asked) return argv.Length == 2 ? CopyAndStart(self, argv[1]) : Refuse("");
+            string beside = Path.GetDirectoryName(self);
+            if (argv[0] == Asked) return argv.Length == 2 ? CopyAndStart(self, argv[1]) : Refuse("", beside);
             int parent;
             if (argv.Length != 3 || !int.TryParse(argv[2], NumberStyles.None, CultureInfo.InvariantCulture, out parent))
-                return Refuse("");
+                return Refuse("", beside);
             return Removing(self, argv[1], parent);
         }
 
-        private static int Refuse(string where)
+        internal const string NotItsOwn = "Codex Auto Resume cannot be removed from here: this is not its installation's own uninstaller.";
+
+        /// Says the uninstall cannot run from here in the uninstall's own window, as every question the window asks is
+        /// drawn by the window (tests/test_gui_v066_dialog.py): finished before it began, with the reason in its log,
+        /// in the words and the look of the installation at `home` where they can be read, and English's where not.
+        private static int Refuse(string where, string home)
         {
-            // Before there is a window or a catalog: Windows' own box, in English, as Program.Main says it.
-            MessageBox.Show("Codex Auto Resume cannot be removed from here: this is not its installation's own " +
-                            "uninstaller." + (where.Length > 0 ? Environment.NewLine + Environment.NewLine + where : ""),
-                            "Codex Auto Resume", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            try
+            {
+                Font font = Look(home);
+                var flow = new InstallerFlow(InstallerFlow.Uninstall, home, InstallerFlow.InstalledAt(home), null, VersionAt(home));
+                var window = new InstallerWindow(flow, Words(home), null, null, null, font);
+                window.Finished(InstallerFlow.NotStarted, NotItsOwn + (where.Length > 0 ? "\n" + where : ""));
+                Application.Run(window);
+            }
+            catch (Exception) { /* nothing to draw it with: the code is all that is left to say it */ }
             return 1;
+        }
+
+        /// The theme, design, motion and text size the installation at `home` stores, adopted; the window's font.
+        private static Font Look(string home)
+        {
+            string theme, design;
+            bool reduce;
+            Theme.Stored(home, out theme, out design, out reduce);
+            Soft.ReduceMotionSetting = reduce;
+            Palette.AdoptDesign(design);
+            Palette.Adopt(Theme.Current(theme));
+            double read = TextScale.Read();
+            SettingsForm.AdoptTextSize(read, TextScale.Fitting(read, Screen.PrimaryScreen.WorkingArea.Size, SettingsForm.DpiScale));
+            return TextScale.Apply(SystemFonts.MessageBoxFont, read, SettingsForm.TextSize);
+        }
+
+        /// The installation's words, in the language its settings store or Windows prefers.
+        private static InstallerWords Words(string home)
+        {
+            string language = InstallerLanguages.Resolve(StoredLanguage(home), InstallerLanguages.Preferred());
+            return new InstallerWords(Catalog(Path.Combine(home, "app"), language), language);
+        }
+
+        private static string VersionAt(string home)
+        {
+            return InstallerFlow.VersionOf(Read(Path.Combine(Path.Combine(Path.Combine(home, "app"), ".codex-plugin"), "plugin.json")));
         }
 
         /// The kept uninstaller of the installation this program is in, or null when `named` is not it.
@@ -77,11 +114,11 @@ namespace CodexAutoResume
         private static int CopyAndStart(string self, string named)
         {
             string home = Path.GetDirectoryName(self);
-            if (KeptScript(home, named) == null) return Refuse(named);
+            if (KeptScript(home, named) == null) return Refuse(named, home);
             try
             {
                 string folder = Path.Combine(Path.GetTempPath(), FolderPrefix + Guid.NewGuid().ToString("N").Substring(0, 16));
-                if (Directory.Exists(folder) || File.Exists(folder)) return Refuse(folder);
+                if (Directory.Exists(folder) || File.Exists(folder)) return Refuse(folder, home);
                 Directory.CreateDirectory(folder);
                 string copy = Path.Combine(folder, Path.GetFileName(self));
                 File.Copy(self, copy, false);
@@ -95,7 +132,7 @@ namespace CodexAutoResume
             }
             catch (Exception error)
             {
-                return Refuse(error.Message);
+                return Refuse(error.Message, home);
             }
         }
 
@@ -107,28 +144,16 @@ namespace CodexAutoResume
             bool ours = Path.GetFileName(folder).StartsWith(FolderPrefix, StringComparison.Ordinal) &&
                         string.Equals(Path.GetFullPath(Path.GetDirectoryName(folder)).TrimEnd('\\'),
                                       Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
-            if (kept == null || !ours) return Refuse(home);
+            if (kept == null || !ours) return Refuse(home, home);
             try
             {
                 using (Process before = Process.GetProcessById(parent)) before.WaitForExit(15000);
             }
             catch (ArgumentException) { /* it has already ended */ }
 
-            string theme, design;
-            bool reduce;
-            Theme.Stored(home, out theme, out design, out reduce);
-            Soft.ReduceMotionSetting = reduce;
-            Palette.AdoptDesign(design);
-            Palette.Adopt(Theme.Current(theme));
-            double read = TextScale.Read();
-            SettingsForm.AdoptTextSize(read, TextScale.Fitting(read, Screen.PrimaryScreen.WorkingArea.Size, SettingsForm.DpiScale));
-            Font font = TextScale.Apply(SystemFonts.MessageBoxFont, read, SettingsForm.TextSize);
-
-            string app = Path.Combine(home, "app");
-            string language = InstallerLanguages.Resolve(StoredLanguage(home), InstallerLanguages.Preferred());
-            var flow = new InstallerFlow(InstallerFlow.Uninstall, home, InstallerFlow.InstalledAt(home), null,
-                                         InstallerFlow.VersionOf(Read(Path.Combine(Path.Combine(app, ".codex-plugin"), "plugin.json"))));
-            var window = new InstallerWindow(flow, new InstallerWords(Catalog(app, language), language), null,
+            Font font = Look(home);
+            var flow = new InstallerFlow(InstallerFlow.Uninstall, home, InstallerFlow.InstalledAt(home), null, VersionAt(home));
+            var window = new InstallerWindow(flow, Words(home), null,
                 delegate(InstallerFlow answered, Action<string> heard, Action<double> unpacked)
                 {
                     return Uninstall(home, kept, answered.Switches(null), heard);

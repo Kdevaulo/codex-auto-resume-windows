@@ -648,7 +648,7 @@ class SourceTests(unittest.TestCase):
 
     def test_the_uninstall_runs_only_this_installations_kept_script_and_tidies_only_its_own_folder(self):
         self.assertIn('Path.Combine(Path.Combine(home, "uninstall"), "install.ps1")', REMOVE)
-        self.assertIn("if (KeptScript(home, named) == null) return Refuse(named);", REMOVE)
+        self.assertIn("if (KeptScript(home, named) == null) return Refuse(named, home);", REMOVE)
         self.assertIn("'CodexAutoResume-Uninstall-*'", REMOVE)
         self.assertIn('internal const string FolderPrefix = "CodexAutoResume-Uninstall-";', REMOVE)
         tidy = REMOVE[REMOVE.index("internal const string TidyScript ="):REMOVE.index("private static void Tidy(")]
