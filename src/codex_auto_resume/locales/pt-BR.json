@@ -707,6 +707,7 @@
   "msg.setup_autostart": "Ele também será iniciado automaticamente quando você entrar no Windows.",
   "msg.setup_done": "A retomada automática está configurada e o monitor está em execução.",
   "msg.setup_incomplete": "A instalação não foi concluída: falha ao preparar o estado de recuperação ou ao ativar a recuperação. Execute `doctor` para ver o motivo.",
+  "msg.setup_left_stopped": "A retomada automática foi atualizada. O monitor não estava em execução antes da atualização, por isso continua parado: inicie-o pelo Dashboard quando quiser.",
   "msg.setup_unconfirmed": "A retomada automática está configurada, mas não foi possível confirmar que o monitor está em execução. Abra o Dashboard ou execute `doctor` para verificar.",
   "msg.toast_after_sleep": "Este PC ficou em suspensão por {time}",
   "msg.toast_after_sleep_count": "Tarefas que venceram durante a suspensão aguardam você: {n}",

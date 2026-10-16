@@ -707,6 +707,7 @@
   "msg.setup_autostart": "Windows에 로그인할 때도 자동으로 시작됩니다.",
   "msg.setup_done": "자동 재개가 설정되었고 워처가 실행 중입니다.",
   "msg.setup_incomplete": "설정을 끝내지 못했습니다. 복구 상태를 준비하거나 자동 복구를 켜는 단계가 실패했습니다. `doctor`를 실행해 이유를 확인하세요.",
+  "msg.setup_left_stopped": "자동 재개가 업데이트되었습니다. 업데이트 전에 워처가 실행 중이 아니었으므로 멈춘 채로 두었습니다. 원할 때 대시보드에서 시작하세요.",
   "msg.setup_unconfirmed": "자동 재개는 설정되었지만 워처가 실행 중인지 확인하지 못했습니다. 대시보드를 열거나 `doctor`를 실행해 확인하세요.",
   "msg.toast_after_sleep": "이 PC가 {time} 동안 절전했습니다",
   "msg.toast_after_sleep_count": "절전 중에 예정 시각이 된 작업이 기다립니다: {n}개",

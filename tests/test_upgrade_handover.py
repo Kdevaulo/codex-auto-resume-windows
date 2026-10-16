@@ -111,5 +111,25 @@ class UpgradeHandoverTests(unittest.TestCase):
         self.assertNotIn("Stop watcher", branch)
 
 
+class RestartAfterUpdateTests(unittest.TestCase):
+    """v0.6.16, the owner: after an update everything that ran before runs again, on the new version, by itself -
+    and nothing the person had turned off. The handover above stops the old watcher; whether one ran is read before
+    it does, and the setup that follows is told when none did (--watcher-was-stopped), so it starts the new one
+    only where it runs at sign-in anyway (scripts/plugin_setup.py, tests/test_plugin.py holds that half). The
+    notification-area icon is the watcher's own (STANDARDS F8), so it comes back with it."""
+
+    def setUp(self):
+        self.text = INSTALL.read_text(encoding="utf-8")
+
+    def test_whether_a_watcher_ran_is_read_before_it_is_stopped(self):
+        read = self.text.index("$watcherWasRunning = (Get-OwnedWatcherProcess).Count -gt 0")
+        self.assertLess(read, self.text.index("Stopping the running watcher so the new version takes over"))
+        self.assertLess(read, self.text.index("if ($watcherWasRunning) {"))
+
+    def test_the_update_tells_setup_when_no_watcher_ran(self):
+        told = self.text.index("if ($upgrade -and -not $watcherWasRunning) { $setupArgs += '--watcher-was-stopped' }")
+        self.assertLess(self.text.index("$setupArgs = @('setup')"), told)
+        self.assertIn("$code = Invoke-Setup $setupArgs", self.text[told:], "and setup runs with it after")
+
 if __name__ == "__main__":
     unittest.main()

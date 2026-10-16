@@ -707,6 +707,7 @@
   "msg.setup_autostart": "Nó cũng sẽ tự khởi động khi bạn đăng nhập Windows.",
   "msg.setup_done": "Tự động tiếp tục đã được thiết lập và bộ theo dõi đang chạy.",
   "msg.setup_incomplete": "Thiết lập chưa hoàn tất: việc chuẩn bị trạng thái khôi phục hoặc bật khôi phục đã thất bại. Hãy chạy `doctor` để xem lý do.",
+  "msg.setup_left_stopped": "Tự động tiếp tục đã được cập nhật. Bộ theo dõi không chạy trước khi cập nhật nên vẫn được để dừng: hãy khởi động nó từ Bảng điều khiển khi bạn cần.",
   "msg.setup_unconfirmed": "Tự động tiếp tục đã được thiết lập, nhưng không xác nhận được bộ theo dõi đang chạy. Hãy mở Bảng điều khiển, hoặc chạy `doctor`, để kiểm tra.",
   "msg.toast_after_sleep": "PC này đã ngủ {time}",
   "msg.toast_after_sleep_count": "Tác vụ đến hạn trong lúc ngủ đang chờ bạn: {n}",

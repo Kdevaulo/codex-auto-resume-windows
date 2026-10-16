@@ -934,7 +934,10 @@ foreach ($stale in (Get-ChildItem -Path $OwnedHome -Directory -Filter '*.old-*' 
 # If it does not finish within the wait, the upgrade still completes and says plainly
 # that the old version is still running and how to replace it.
 $previousWatcherStillRunning = $false
-if ((Get-OwnedWatcherProcess).Count -gt 0) {
+# Whether a watcher of this installation ran before the update: the setup below starts the new version's again only
+# then, or where it runs at sign-in anyway - never one the person had stopped (--watcher-was-stopped, v0.6.16).
+$watcherWasRunning = (Get-OwnedWatcherProcess).Count -gt 0
+if ($watcherWasRunning) {
     Step 'Stopping the running watcher so the new version takes over'
     if ((Test-Path $Python) -and (Test-Path (Join-Path $AppDir 'scripts\plugin_setup.py'))) {
         $null = Invoke-Setup @('stop')
@@ -1138,6 +1141,7 @@ elseif (-not $upgrade -and $edition -eq 'advanced' -and $advancedLeft) {
     $setupArgs += @('--edition-from', 'standard')
 }
 if ($SkipStartup) { $setupArgs += '--no-startup' }
+if ($upgrade -and -not $watcherWasRunning) { $setupArgs += '--watcher-was-stopped' }
 # 2 means everything was done but the watcher was not seen running - a real outcome that
 # is neither success nor failure. Treating it as failure would roll back a good install;
 # treating it as success is how this script came to end with "Installed and running."

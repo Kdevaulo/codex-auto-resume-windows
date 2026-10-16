@@ -285,7 +285,12 @@ def cmd_setup(args) -> int:
                            addremove.display_name(config.PROJECT_ROOT / config.PLUGIN_MANIFEST))
     except startup.StartupError:
         pass
-    started = start_watcher(home)
+    # v0.6.16: an update starts again what it stopped, and nothing the person had turned off. The installer says
+    # --watcher-was-stopped when no watcher of this installation ran before it; the watcher is then started only
+    # where it would run at the next sign-in anyway. A first installation, and every other repair, starts it as before.
+    left_stopped = (keep_state and getattr(args, "watcher_was_stopped", False)
+                    and not control.Control(config.Paths(home)).startup_enabled())
+    started = "left-stopped" if left_stopped else start_watcher(home)
     say("ready_title")
     print()
     say("ready_defaults")
@@ -296,14 +301,14 @@ def cmd_setup(args) -> int:
     if incomplete:
         say("setup_incomplete")
     else:
-        say("setup_done" if confirmed else "setup_unconfirmed")
+        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else "setup_unconfirmed")
     if register_startup:
         say("setup_autostart")
     print()
     print("state: %s" % home)
     if incomplete:
         return EXIT_ERROR
-    return EXIT_OK if confirmed else EXIT_UNCONFIRMED
+    return EXIT_OK if confirmed or left_stopped else EXIT_UNCONFIRMED
 
 
 def cmd_enable(args) -> int:
@@ -500,6 +505,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "sign-in autostart that is not already there")
     p.add_argument("--edition-from", choices=edition.EDITIONS, metavar="EDITION",
                    help="the edition the installer replaced (standard or advanced)")
+    p.add_argument("--watcher-was-stopped", action="store_true",
+                   help="with --keep-state: no watcher ran before the update, so it is started only where it "
+                        "runs at sign-in")
     sub.add_parser("status")
     sub.add_parser("pending")
     sub.add_parser("enable")

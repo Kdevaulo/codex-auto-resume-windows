@@ -707,6 +707,7 @@
   "msg.setup_autostart": "59db4dfdd93f4256",
   "msg.setup_done": "baffe83d079f2725",
   "msg.setup_incomplete": "1222ed6425f78ce7",
+  "msg.setup_left_stopped": "330089e0e2999b87",
   "msg.setup_unconfirmed": "5ce70d5d620b9e41",
   "msg.toast_after_sleep": "eceef120c76eca92",
   "msg.toast_after_sleep_count": "f14feb180a5e8633",

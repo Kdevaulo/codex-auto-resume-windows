@@ -707,6 +707,7 @@
   "msg.setup_autostart": "Ayrıca Windows'ta oturum açtığınızda otomatik olarak başlayacak.",
   "msg.setup_done": "Otomatik sürdürme kuruldu ve izleyici çalışıyor.",
   "msg.setup_incomplete": "Kurulum tamamlanmadı: kurtarma durumunu hazırlama veya kurtarmayı açma başarısız oldu. Nedenini görmek için `doctor` komutunu çalıştırın.",
+  "msg.setup_left_stopped": "Otomatik sürdürme güncellendi. İzleyici güncellemeden önce çalışmıyordu, bu yüzden durdurulmuş olarak bırakıldı: istediğinizde Gösterge Paneli'nden başlatın.",
   "msg.setup_unconfirmed": "Otomatik sürdürme kuruldu, ancak izleyicinin çalıştığı doğrulanamadı. Kontrol etmek için Gösterge Paneli'ni açın veya `doctor` komutunu çalıştırın.",
   "msg.toast_after_sleep": "Bu bilgisayar {time} uyku modunda kaldı",
   "msg.toast_after_sleep_count": "Uyku sırasında zamanı gelen ve sizi bekleyen görevler: {n}",

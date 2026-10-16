@@ -707,6 +707,7 @@
   "msg.setup_autostart": "Si avvierà anche automaticamente quando accedi a Windows.",
   "msg.setup_done": "La ripresa automatica è configurata e il monitor è in esecuzione.",
   "msg.setup_incomplete": "La configurazione non è stata completata: la preparazione dello stato di recupero o l'attivazione del recupero non è riuscita. Esegui `doctor` per scoprire il motivo.",
+  "msg.setup_left_stopped": "La ripresa automatica è aggiornata. Il monitor non era in esecuzione prima dell'aggiornamento, quindi è rimasto fermo: avvialo dalla Dashboard quando vuoi.",
   "msg.setup_unconfirmed": "La ripresa automatica è configurata, ma non è stato possibile confermare che il monitor sia in esecuzione. Apri la Dashboard, o esegui `doctor`, per controllare.",
   "msg.toast_after_sleep": "Questo PC è rimasto in sospensione per {time}",
   "msg.toast_after_sleep_count": "Attività scadute durante la sospensione che ti aspettano: {n}",

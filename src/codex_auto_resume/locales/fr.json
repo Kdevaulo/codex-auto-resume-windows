@@ -707,6 +707,7 @@
   "msg.setup_autostart": "Il démarrera aussi automatiquement lorsque vous vous connecterez à Windows.",
   "msg.setup_done": "La reprise automatique est configurée et le surveillant est en cours d'exécution.",
   "msg.setup_incomplete": "L'installation n'a pas abouti : la préparation de l'état de récupération ou l'activation de la récupération a échoué. Exécutez `doctor` pour en connaître la raison.",
+  "msg.setup_left_stopped": "La reprise automatique est mise à jour. Le surveillant ne tournait pas avant la mise à jour, il reste donc arrêté : démarrez-le depuis le Tableau de bord quand vous le souhaitez.",
   "msg.setup_unconfirmed": "La reprise automatique est configurée, mais impossible de confirmer que le surveillant est en cours d'exécution. Ouvrez le Tableau de bord ou exécutez `doctor` pour vérifier.",
   "msg.toast_after_sleep": "Ce PC est resté en veille {time}",
   "msg.toast_after_sleep_count": "Des tâches arrivées à échéance pendant la veille vous attendent : {n}",

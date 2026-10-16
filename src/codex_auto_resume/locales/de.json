@@ -707,6 +707,7 @@
   "msg.setup_autostart": "Der Watcher startet außerdem automatisch, wenn Sie sich bei Windows anmelden.",
   "msg.setup_done": "Automatisches Fortsetzen ist eingerichtet, und der Watcher läuft.",
   "msg.setup_incomplete": "Die Einrichtung wurde nicht abgeschlossen: Das Vorbereiten des Wiederherstellungszustands oder das Aktivieren der Wiederherstellung ist fehlgeschlagen. Führen Sie `doctor` aus, um die Ursache zu sehen.",
+  "msg.setup_left_stopped": "Automatisches Fortsetzen ist aktualisiert. Der Watcher lief vor dem Update nicht und bleibt daher gestoppt: Starten Sie ihn im Dashboard, wenn Sie ihn brauchen.",
   "msg.setup_unconfirmed": "Automatisches Fortsetzen ist eingerichtet, aber es konnte nicht bestätigt werden, dass der Watcher läuft. Öffnen Sie zur Prüfung das Dashboard, oder führen Sie `doctor` aus.",
   "msg.toast_after_sleep": "Dieser PC war {time} im Energiesparmodus",
   "msg.toast_after_sleep_count": "Aufgaben, die währenddessen fällig wurden, warten auf Sie: {n}",

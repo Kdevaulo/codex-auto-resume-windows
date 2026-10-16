@@ -707,6 +707,7 @@
   "msg.setup_autostart": "También se iniciará automáticamente cuando inicies sesión en Windows.",
   "msg.setup_done": "La reanudación automática está configurada y el monitor se está ejecutando.",
   "msg.setup_incomplete": "El programa de instalación no terminó: falló la preparación del estado de recuperación o la activación de la recuperación. Ejecuta `doctor` para ver por qué.",
+  "msg.setup_left_stopped": "La reanudación automática se ha actualizado. El monitor no se estaba ejecutando antes de la actualización, así que sigue detenido: inícialo desde el Panel cuando lo quieras.",
   "msg.setup_unconfirmed": "La reanudación automática está configurada, pero no se pudo confirmar que el monitor se esté ejecutando. Abre el Panel o ejecuta `doctor` para comprobarlo.",
   "msg.toast_after_sleep": "Este PC estuvo en suspensión {time}",
   "msg.toast_after_sleep_count": "Tareas que vencieron durante la suspensión te esperan: {n}",
