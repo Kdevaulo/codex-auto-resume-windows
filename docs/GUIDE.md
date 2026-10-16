@@ -118,8 +118,12 @@ is beside it. Started from a command line, it passes switches such as `-SkipStar
 From v0.6.16, `-Silent` installs without a question and without waiting for a key:
 `CodexAutoResume-Setup-vX.Y.Z.exe -Silent`, which is how `winget` runs it. Nothing else changes: it prints what
 it prints and ends with the exit code it ends with otherwise (0 done, 1 stopped, 14 when the other edition is
-installed, in which case nothing is changed, since nobody can be asked). The same switch works on the archive's
-`Install.cmd` and `Uninstall.cmd`, and the setup program does not wait for Enter when it stops.
+installed, in which case nothing is changed, since nobody can be asked). It is a Windows program rather than a
+console one, so that no console window opens when it is double-clicked, and PowerShell does not wait for a Windows
+program it only starts: there, run `cmd /c CodexAutoResume-Setup-vX.Y.Z.exe -Silent`, which waits, shows its lines
+and leaves its exit code in `$LASTEXITCODE`. `winget`, a `.cmd` script and `cmd /c` wait for it as they are. The
+same switch works on the archive's `Install.cmd` and `Uninstall.cmd`, and the setup program does not wait for Enter
+when it stops.
 
 From v0.6.16 an installation also appears in Windows' Settings > Apps and in `winget list`, as *Codex Auto Resume*
 (*Codex Auto Resume Advanced* for the advanced edition), for your Windows user only. Its Uninstall button runs the

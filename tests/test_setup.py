@@ -415,6 +415,7 @@ class SilentTests(unittest.TestCase):
     def setUpClass(cls):
         cls.work = Path(tempfile.mkdtemp(prefix="setup-silent-"))
         _, exe = build_around(TEST_ENTRIES, cls.work)
+        cls.exe = exe
         image = bytearray(exe.read_bytes())
         start, end = make_setup.carried_span(bytes(image))
         image[(start + end) // 2] ^= 0x01
@@ -429,6 +430,38 @@ class SilentTests(unittest.TestCase):
         done = Scratch(self).run(self.damaged, "-Silent")
         self.assertEqual(done.returncode, 43)
         self.assertIn(b"its SHA-256 differs", done.stderr)
+
+    def test_the_guides_way_to_run_it_from_powershell_waits_and_gives_the_exit_code(self):
+        """The setup program is a Windows program (/target:winexe), so `& Setup.exe -Silent` in PowerShell returns
+        at once with no $LASTEXITCODE, while the guide promised it prints and ends with its code. The guide now
+        gives the waiting form; it is run here as written, in PowerShell, around a test archive whose Install.cmd
+        says a line and ends with 7 - and the bare form beside it, which does not wait."""
+        exe = self.exe
+        powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+        documents = {"docs/GUIDE.md": not languages.generated_ko_branch(), "docs/GUIDE.ko.md": True}
+        forms = {}
+        for name, present in documents.items():
+            if present and (ROOT / name).is_file():
+                spans = re.findall(r"`(cmd /c CodexAutoResume-Setup-vX\.Y\.Z\.exe -Silent)`", (ROOT / name).read_text(encoding="utf-8"))
+                self.assertEqual(len(spans), 1, "%s gives the form PowerShell waits with" % name)
+                forms[name] = spans[0]
+        self.assertTrue(forms)
+        forms["the bare form"] = "& .\\CodexAutoResume-Setup-vX.Y.Z.exe -Silent"
+        for name, form in forms.items():
+            with self.subTest(name):
+                scratch = Scratch(self)
+                shutil.copyfile(exe, scratch.base / "CodexAutoResume-Setup-vX.Y.Z.exe")
+                environment = dict(os.environ, TEMP=str(scratch.temp), TMP=str(scratch.temp),
+                                   SETUP_TEST_RECORD=str(scratch.record), SETUP_TEST_EXIT="7")
+                done = subprocess.run([str(powershell), "-NoProfile", "-NonInteractive", "-Command",
+                                       form + "; 'code=' + $LASTEXITCODE"], capture_output=True, stdin=subprocess.DEVNULL,
+                                      cwd=str(scratch.base), env=environment, timeout=180, creationflags=NO_WINDOW)
+                out = done.stdout.decode("utf-8", "replace")
+                if name == "the bare form":
+                    self.assertNotIn("code=7", out, "PowerShell waited for a Windows program after all")
+                else:
+                    self.assertIn("said by Install.cmd", out)
+                    self.assertIn("code=7", out)
 
 
 def method(name: str) -> str:
