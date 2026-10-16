@@ -248,7 +248,7 @@ foreach ($case in @(@('plain'), @('uninstall', '-Uninstall'), @('purge', '-unins
     $flow = $SetupType.GetMethod('FlowFor', $any).Invoke($null, [object[]]@($given, 'C:\Users\ExampleUser\.codex-auto-resume',
                                                                             'standard', 'standard', '9.9.9'))
     $out.setup[$case[0]] = @([string]$FlowType.GetField('Mode', $any).GetValue($flow), (CallOn $flow 'Pages' @())[0],
-                             (Switches $flow $given) -join ' ')
+                             ((Switches $flow $given) -join ' '))
 }
 $out | ConvertTo-Json -Depth 6 -Compress
 """
