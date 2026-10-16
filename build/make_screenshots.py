@@ -2835,6 +2835,10 @@ def render_window(targets: dict, theme: str | None = None, design: str | None = 
         now = time.time()
         seed_window_state(home, codex, now)
         word = seed_compatibility(home, codex, local, now)
+        # The heartbeat the envelope's installation has, with its usage reading (sample_usage): the capture's
+        # mutex holder beats every second with no reading, which leaves this one as it is. Until v0.6.16 only the
+        # envelope had it, so the window was photographed with no "Codex usage, read ..." line the envelope said.
+        write_heartbeat(config.Paths(home), now, word)
         owner_only(config.Paths(home).state_dir)
         # The window reads conversation names from Codex's own state, found through
         # CODEX_HOME - pointed here at the synthetic one, so a capture can never show,
