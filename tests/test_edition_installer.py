@@ -41,6 +41,9 @@ SYSTEM = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
 POWERSHELL = SYSTEM / "WindowsPowerShell" / "v1.0" / "powershell.exe"
 CMD = SYSTEM / "cmd.exe"
 PACKAGE = editions.PACKAGE
+# No watcher runs in a scratch installation (the region's Get-OwnedWatcherProcess), so an update tells setup that
+# none ran before it, and setup leaves the new one stopped unless it runs at sign-in (v0.6.16, tests/test_upgrade_handover.py).
+STOPPED = "--watcher-was-stopped"
 
 REGION = r"""
 $ErrorActionPreference = 'Stop'
@@ -165,7 +168,7 @@ class EditionChangeTests(unittest.TestCase):
                          '{"enabled": false}')
         self.assertEqual(sorted(path.name for path in self.home.iterdir()), ["app", "config", "runtime"],
                          "a copy moved aside, or the journal, was left behind")
-        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "advanced"])
+        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "advanced", STOPPED])
 
     def test_a_move_to_the_advanced_edition_tells_setup_where_it_came_from(self):
         """The new edition's own setup is what starts every advanced feature off
@@ -174,7 +177,7 @@ class EditionChangeTests(unittest.TestCase):
         code, output, setup = self.run_region(allow=True)
         self.assertEqual(code, 0, output[-1500:])
         self.assertTrue((self.package / "__init__.py").is_file())
-        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "standard"])
+        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "standard", STOPPED])
         self.assertIn("Standard edition -> Advanced edition", output)
 
     def test_the_same_edition_is_an_ordinary_upgrade(self):
@@ -186,7 +189,7 @@ class EditionChangeTests(unittest.TestCase):
                 code, output, setup = self.run_region()
                 self.assertEqual(code, 0, output[-1500:])
                 self.assertNotIn(" -> ", output)
-                self.assertEqual(setup, ["setup", "--keep-state"])
+                self.assertEqual(setup, ["setup", "--keep-state", STOPPED])
                 self.assertEqual(self.package.exists(), edition == "advanced")
 
     def test_a_first_install_changes_no_edition(self):
