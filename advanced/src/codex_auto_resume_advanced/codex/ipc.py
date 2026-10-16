@@ -10,8 +10,9 @@ its restart. And, after the window resets, `thread-follower-start-turn` - a turn
 continuation, which goes past that paused queue - for a conversation it stopped (start_turn); measured 2026-10-16,
 once that turn completes the app sends what was queued by itself and the pause is gone, so nothing else is asked of
 the queue (`thread-follower-set-queued-follow-ups-state` is not needed). Every frame is 4 bytes of little-endian
-length and UTF-8 JSON. Each read waits at most READ_SECONDS (an overlapped read, cancelled and waited out, then the
-pipe closed - as the MIPC look does); nothing here waits for good.
+length and UTF-8 JSON. Each request has one deadline for its whole answer, READ_SECONDS from when it is written,
+however many broadcasts come first (an overlapped read, cancelled and waited out, then the pipe closed - as the MIPC
+look does); nothing here waits for good.
 
 The app checks each request's version exactly, and a new app build may move one: the versions are pinned in
 REQUESTS, every request's shape is there too, and a version mismatch is an answer like any other failure - the
@@ -23,12 +24,15 @@ from __future__ import annotations
 
 import json
 import struct
+import time
 import uuid
 from enum import StrEnum
 
 PIPE = r"\\.\pipe\codex-ipc"
-# Each read of a frame waits at most this long; a whole stop, a few reads.
+# Each request's whole wait for its answer, from when it is written - one deadline, however many frames come first.
 READ_SECONDS = 5.0
+# The most frames that are not the answer (the app's broadcasts, other clients' replies) taken while one is awaited.
+FRAMES_LIMIT = 200
 # The longest frame taken: the app's broadcasts can be long, a reply to these never is.
 FRAME_LIMIT = 8 * 1024 * 1024
 # The request shapes and the versions the app checks exactly (the MIPC record, 2026-10-16; app 26.1007). Filled with
@@ -189,7 +193,9 @@ class Channel:
             self._pipe = None
 
 
-def _request(channel, client, method, shape, fields, target=None, reads=20):
+def _request(channel, client, method, shape, fields, target=None, seconds=None):
+    """One request and its answer, within one deadline (`seconds`, READ_SECONDS unless given) from its writing."""
+    deadline = time.monotonic() + (READ_SECONDS if seconds is None else seconds)
     version, params = shape
     key = str(uuid.uuid4())
     message = {"type": "request", "requestId": key, "sourceClientId": client, "version": version,
@@ -197,8 +203,11 @@ def _request(channel, client, method, shape, fields, target=None, reads=20):
     if target is not None:
         message["targetClientId"] = target
     channel.write(message)
-    for _ in range(reads):
-        found = channel.read()
+    for _ in range(FRAMES_LIMIT + 1):
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
+        found = channel.read(left)
         if found.get("type") == "client-discovery-request":
             channel.write({"type": "client-discovery-response", "requestId": found.get("requestId"),
                            "response": {"canHandle": False}})

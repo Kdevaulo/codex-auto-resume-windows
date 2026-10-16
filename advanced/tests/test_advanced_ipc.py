@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import time
 import unittest
 from unittest.mock import patch
 
@@ -99,6 +100,52 @@ class StopTests(unittest.TestCase):
 
     def test_the_real_pipe_is_named_once_and_never_written_by_a_test(self):
         self.assertEqual(ipc.PIPE, r"\\.\pipe\codex-ipc")
+
+
+class _Channel:
+    """A channel with no pipe: what it is written is kept, and each read gives the next frame `frames` makes after
+    `every` seconds."""
+
+    def __init__(self, frames, every=0.0):
+        self.frames, self.every, self.written = frames, every, []
+
+    def write(self, message):
+        self.written.append(message)
+
+    def read(self, seconds=None):
+        time.sleep(self.every)
+        return self.frames(self.written[-1])
+
+    def close(self):
+        pass
+
+
+def _broadcast(_request):
+    return {"type": "broadcast", "method": "thread-stream-state-changed", "params": {}}
+
+
+class DeadlineTests(unittest.TestCase):
+    """Each request has one deadline for its whole answer, and frames that are not the answer do not use it up."""
+
+    def test_a_trickle_of_broadcasts_never_stretches_a_request_past_its_deadline(self):
+        channel = _Channel(_broadcast, every=0.25)
+        began = time.monotonic()
+        with patch.object(ipc, "READ_SECONDS", 1.0):
+            self.assertEqual(ipc.stop_turn(THREAD, TURN, channel=channel), ipc.Stop.NO_ANSWER)
+        self.assertLess(time.monotonic() - began, 2.5, "one deadline, not one per frame")
+
+    def test_many_broadcasts_before_the_answer_still_reach_it(self):
+        counts = {}
+
+        def frames(request):
+            seen = counts.setdefault(request["requestId"], [0])
+            seen[0] += 1
+            if seen[0] <= 25:
+                return _broadcast(request)
+            result = {"initialize": {"clientId": "c"}, "thread-follower-interrupt-turn": {"interruptedTurnId": TURN}}
+            return {"type": "response", "requestId": request["requestId"], "resultType": "success",
+                    "result": result.get(request["method"], {}), "handledByClientId": "owner"}
+        self.assertEqual(ipc.stop_turn(THREAD, TURN, channel=_Channel(frames)), ipc.Stop.STOPPED)
 
 
 if __name__ == "__main__":
