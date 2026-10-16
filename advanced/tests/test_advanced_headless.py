@@ -128,6 +128,11 @@ class StepTests(RouteCase):
                  "outside sandbox": {"sandbox": {"type": "externalSandbox"}},
                  "another reviewer": {"approvalsReviewer": "auto"},
                  "a permission profile": {"activePermissionProfile": {"kind": "full"}},
+                 "a profile of the person's own": {"activePermissionProfile": {"id": "mine"}},
+                 "a built-in profile extended": {"activePermissionProfile": {"id": ":workspace", "extends": "mine"}},
+                 "a full-access profile": {"activePermissionProfile": {"id": ":danger-full-access"}},
+                 "a profile with more said": {"activePermissionProfile": {"id": ":workspace", "network": True}},
+                 "an unreadable profile": {"activePermissionProfile": ":workspace"},
                  "a granular policy": {"approvalPolicy": {"granular": {}}},
                  "nothing said": {"sandbox": None}}
         for name, change in cases.items():
@@ -140,6 +145,17 @@ class StepTests(RouteCase):
                 self.assertNotIn("turn/start", self.servers[0].methods())
                 self.assertTrue(self.servers[0].closed)
                 self.assertIsNone(self.follower.live())
+
+    def test_codexs_built_in_workspace_profile_runs_as_m6b_found_it(self):
+        """M6B on 0.162 (docs/evidence/live/measurement-m6b.json): an ordinary conversation saved workspaceWrite /
+        on-request / user reports a permission profile. Fails with the profile refused: refused_settings, no turn."""
+        for profile in ({"id": ":workspace"}, {"id": ":workspace", "extends": None}, {"id": ":read-only"}):
+            with self.subTest(profile):
+                self.servers = []
+                route = self.route(replies={"thread/resume": dict(SAVED, activePermissionProfile=profile)})
+                self.assertEqual(self.resume(route), {"outcome": "ran", "turn_id": TURN})
+                self.assertIsNone(route.refused)
+                self.assertEqual(self.ended()["end"], RunEnd.COMPLETED)
 
     def test_a_session_that_does_not_open_or_a_resume_refused_starts_nothing(self):
         def failing(asked):

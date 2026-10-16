@@ -12,7 +12,8 @@ guard, and decided the words (core's engine/dispatch.py) - this starts the one t
    (protocol.CAPABILITY_METHODS) - headless_run's cannot compact or change a model;
 2. thread/resume with no override at all: the model, sandbox, approvals and folder Codex saved for the thread apply;
 3. those settings read from the answer as closed words, against an allow-list - a readOnly or workspaceWrite sandbox,
-   approvals that go to the person (`user`), an approval policy that is a word, no permission profile in force -
+   approvals that go to the person (`user`), an approval policy that is a word, no permission profile or only Codex's
+   built-in workspace or read-only one (PROFILES) -
    and anything else (full access, an outside sandbox, another reviewer, a word this does not know) refused before
    anything starts (Q4: `refused_settings`);
 4. core's look at whether the conversation is still unheld and the app still closed, asked again - the writer lock
@@ -46,6 +47,12 @@ from .protocol import Session, SessionRefused
 SANDBOXES = frozenset({"readOnly", "workspaceWrite"})
 POLICIES = frozenset({"untrusted", "on-failure", "on-request", "never"})
 REVIEWERS = frozenset({"user"})
+# The permission profiles a headless turn may run under. 0.162's ActivePermissionProfile carries only an `id` - Codex's
+# built-in `:workspace`, or a profile of the person's own (`[permissions.<id>]`) - and the `extends` of a profile of
+# their own; M6B found one set (permission_profile_set) on an ordinary conversation saved workspaceWrite / on-request /
+# user. Codex's built-in workspace and read-only profiles, extending nothing, grant no more than the sandbox word
+# beside them says; a profile of the person's own may grant anything, so it is refused, as any other id or shape.
+PROFILES = frozenset({":workspace", ":read-only"})
 # How long an interrupted turn has to end, how long a compaction may take, how often the follower looks.
 INTERRUPT_SECONDS = 15.0
 COMPACT_SECONDS = 600.0
@@ -75,7 +82,15 @@ def settings_allowed(resumed) -> bool:
     return (isinstance(sandbox, dict) and sandbox.get("type") in SANDBOXES
             and isinstance(policy, str) and policy in POLICIES
             and resumed.get("approvalsReviewer") in REVIEWERS
-            and resumed.get("activePermissionProfile") is None)
+            and _profile_allowed(resumed.get("activePermissionProfile")))
+
+
+def _profile_allowed(profile) -> bool:
+    """None (no profile reported), or one of Codex's built-in PROFILES extending nothing, with no other field."""
+    if profile is None:
+        return True
+    return (isinstance(profile, dict) and set(profile) <= {"id", "extends"} and profile.get("id") in PROFILES
+            and profile.get("extends") is None)
 
 
 def _model(resumed):
