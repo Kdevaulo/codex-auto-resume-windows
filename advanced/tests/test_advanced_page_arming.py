@@ -329,7 +329,9 @@ class PageTests(PageCase):
         # v0.6.16-beta.3: which conversations are recovered at all, right after what starts the recovering.
         self.assertEqual(SHOWN[:4], ["compat_report", "start_with_codex", "every_conversation", "queue_for_open"])
         self.assertEqual(sorted(SHOWN), sorted(IDS))
-        self.assertEqual(len(IDS), 25)                  # v0.6.16-beta.3: every conversation, the usage meter, the wrap-up, the pause
+        # v0.6.16-beta.3: every conversation, the usage meter, the wrap-up, the pause; beta.4: a conversation run here,
+        # other sessions, compacting, the model fallback, no words.
+        self.assertEqual(len(IDS), 30)
         self.assertEqual(result["page"], "advanced")
         # The row chosen is the capability open, and nothing else is.
         self.assertEqual(result["open"], IDS[1])
