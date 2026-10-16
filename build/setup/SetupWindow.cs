@@ -51,14 +51,10 @@ namespace CodexAutoResumeSetup
             Archive carried = new Archive(archive);
             string home = InstallerFlow.HomeFrom(Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_PLUGIN_HOME"),
                                                  Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-            var flow = new InstallerFlow(InstallerFlow.Install, home, carried.Edition, InstallerFlow.InstalledAt(home),
-                                         carried.Version);
-            // What the command line already says, as the window's first answers.
-            flow.StartAtSignIn = !InstallerFlow.Has(arguments, "-SkipStartup");
-            flow.ChangeEdition = InstallerFlow.Has(arguments, "-AllowEditionChange");
+            var flow = FlowFor(arguments, home, carried.Edition, InstallerFlow.InstalledAt(home), carried.Version);
             string language = InstallerLanguages.FromSystem(InstallerLanguages.Preferred());
             // An update says from what to what, and what is new in the version this program carries (v0.6.16).
-            if (flow.Upgrade)
+            if (flow.Upgrade && flow.Mode == InstallerFlow.Install)
             {
                 flow.From = InstallerFlow.VersionOf(Read(Path.Combine(Path.Combine(Path.Combine(home, "app"), ".codex-plugin"),
                                                                       "plugin.json")));
@@ -72,6 +68,19 @@ namespace CodexAutoResumeSetup
             Application.Run(window);
             if (window.OpenDashboard) OpenDashboard(flow.Home);
             return window.Code == int.MinValue ? Codes.Cancelled : window.Code;
+        }
+
+        /// What the window shows for the command line it was started with: the uninstall with -Uninstall, as Install.cmd
+        /// runs it (the switch is the window's answer from then on, so it shows the uninstall rather than dropping it),
+        /// and the installation otherwise; -SkipStartup, -AllowEditionChange and -Purge as its first answers. Pure.
+        internal static InstallerFlow FlowFor(string[] arguments, string home, string edition, string installed, string version)
+        {
+            string mode = InstallerFlow.Has(arguments, "-Uninstall") ? InstallerFlow.Uninstall : InstallerFlow.Install;
+            var flow = new InstallerFlow(mode, home, edition, installed, version);
+            flow.StartAtSignIn = !InstallerFlow.Has(arguments, "-SkipStartup");
+            flow.ChangeEdition = InstallerFlow.Has(arguments, "-AllowEditionChange");
+            flow.Purge = InstallerFlow.Has(arguments, "-Purge");
+            return flow;
         }
 
         private static string Read(string path)

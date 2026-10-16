@@ -924,6 +924,17 @@ function Open-ClosedDashboard {
     if ($null -eq $script:DashboardsAskedAt -or $script:DashboardsReopened) { return }
     $script:DashboardsReopened = $true
     $dashboard = Join-Path $InstallHome 'CodexAutoResumeSettings.exe'
+    # Only the words the window's own ParseArguments takes (gui/WindowReopen.cs): its pages, sections, themes and
+    # designs by name, the bounds and the frame as numbers, a generation from 1 to 9 and a place for the keyboard it
+    # gives - nothing else, such as the window's --uninstall. The numbers' ranges are the window's to check again.
+    $pages = 'overview|pending|history|statistics|diagnostics|settings'
+    $sections = 'general|recovery|continuation|appearance|advanced'
+    $word = '--settings|--maximized|--page=(' + $pages + ')|--section=(' + $sections + ')' +
+            '|--theme=(system|light|dark)|--design=(soft|classic|plain)' +
+            '|--bounds=(-[0-9]{1,5}|[0-9]{1,6}),(-[0-9]{1,5}|[0-9]{1,6}),[0-9]{1,6},[0-9]{1,6}' +
+            '|--frame=[0-9]{1,2},[0-9]{1,2},[0-9]{1,2},[0-9]{1,2}|--reopened=[1-9]' +
+            '|--focus=(save|restore|close|start|page\.(' + $pages + ')|section\.(' + $sections + ')|setting\.[a-z0-9_]{1,64})'
+    $rule = '^(' + $word + ')( (' + $word + '))*$'
     $records = @(Get-ChildItem -LiteralPath (Join-Path $InstallHome 'config') -File -Filter 'reopen-after-update*.txt' `
                                -ErrorAction SilentlyContinue)
     foreach ($record in $records) {
@@ -932,7 +943,7 @@ function Open-ClosedDashboard {
         $null = Remove-OwnedItem $record.FullName
         if ($record.Name -cnotmatch '^reopen-after-update-[0-9]{1,10}\.txt$') { continue }
         if (-not $fresh -or -not (Test-Path -LiteralPath $dashboard -PathType Leaf)) { continue }
-        if ($line -cnotmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$') { continue }
+        if ($line -cnotmatch $rule) { continue }
         try {
             # Through the shell, never -NoNewWindow: that hands the window this script's own output and error handles,
             # so whoever reads them - the Dashboard that started an update, `$o = & Setup.exe -Silent` - waited for

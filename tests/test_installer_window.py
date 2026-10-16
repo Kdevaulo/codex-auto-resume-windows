@@ -239,6 +239,17 @@ $null = CallOn $clock 'Pause' @([long]100)
 $out.clock += (CallOn $clock 'Over' @([long]1500000))
 $null = CallOn $clock 'Resume' @([long]5000)
 $out.clock += @((CallOn $clock 'Over' @([long]5500)), (CallOn $clock 'Over' @([long]5899)), (CallOn $clock 'Over' @([long]5900)))
+
+# What a setup program's window shows for its command line.
+$SetupType = $assembly.GetType('CodexAutoResumeSetup.SetupWindow', $true)
+$out.setup = @{}
+foreach ($case in @(@('plain'), @('uninstall', '-Uninstall'), @('purge', '-uninstall', '-Purge'), @('skip', '-SkipStartup'))) {
+    $given = [string[]]@($case | Select-Object -Skip 1)
+    $flow = $SetupType.GetMethod('FlowFor', $any).Invoke($null, [object[]]@($given, 'C:\Users\ExampleUser\.codex-auto-resume',
+                                                                            'standard', 'standard', '9.9.9'))
+    $out.setup[$case[0]] = @([string]$FlowType.GetField('Mode', $any).GetValue($flow), (CallOn $flow 'Pages' @())[0],
+                             (Switches $flow $given) -join ' ')
+}
 $out | ConvertTo-Json -Depth 6 -Compress
 """
 
@@ -435,6 +446,14 @@ class FlowTests(unittest.TestCase):
         asking = start[start.index("clock.Pause(time.ElapsedMilliseconds);"):]
         self.assertLess(asking.index("asked(notes)"), asking.index("clock.Resume(time.ElapsedMilliseconds);"),
                         "the clock waits as long as the question does")
+
+    def test_a_setup_program_given_uninstall_shows_the_uninstall(self):
+        """`Setup.exe -Uninstall` without -Silent dropped the switch (it is one the window answers) and showed the
+        installation. It shows the uninstall, which passes -Uninstall on, with -Purge as its first answer."""
+        self.assertEqual(self.answer["setup"], {"plain": ["install", "welcome", "-Silent"],
+                                                "uninstall": ["uninstall", "confirm", "-Uninstall -Silent"],
+                                                "purge": ["uninstall", "confirm", "-Uninstall -Purge -Silent"],
+                                                "skip": ["install", "welcome", "-Silent"]})
 
     def test_each_code_says_what_it_means(self):
         outcome = self.answer["outcome"]

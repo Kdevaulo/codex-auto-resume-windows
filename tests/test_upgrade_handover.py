@@ -170,7 +170,42 @@ class DashboardAfterUpdateTests(unittest.TestCase):
         reopen = self.block("function Open-ClosedDashboard {", "# From here on, the Dashboard windows")
         self.assertLess(self.text.index("$null = Invoke-Setup @('doctor')"), self.text.index("Open-ClosedDashboard -Updated"))
         self.assertIn("if ($null -eq $script:DashboardsAskedAt -or $script:DashboardsReopened) { return }", reopen)
-        self.assertIn("$line -cnotmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$'", reopen)
+        self.assertIn("if ($line -cnotmatch $rule) { continue }", reopen)
+
+    def test_a_record_opens_only_with_the_words_the_windows_own_parse_takes(self):
+        """The record's rule took any --word=value of letters, digits and a few marks, so it let through words
+        ParseArguments does not take - the window's own --uninstall among them. It now takes exactly the words
+        ParseArguments does, read here from the window's own lists so the two cannot part."""
+        def names(source, field):
+            text = (ROOT / "gui" / source).read_text(encoding="utf-8")
+            found = re.search(r"%s = \{([^}]*)\}" % field, text)
+            return re.findall(r'"([a-z]+)"', found.group(1))
+        pages, sections = names("Dashboard.cs", "PageOrder"), names("SettingsApp.cs", "SectionOrder")
+        self.assertIn("history", pages)
+        self.assertIn("appearance", sections)
+        brand = (ROOT / "gui" / "Brand.cs").read_text(encoding="utf-8")
+        designs = re.findall(r'text == "([a-z]+)"', brand[brand.index("internal static string DesignOf("):][:400])
+        self.assertEqual(sorted(designs), ["classic", "plain", "soft"])
+        accepted = (["--page=" + page for page in pages] + ["--section=" + section for section in sections] +
+                    ["--theme=" + theme for theme in ("system", "light", "dark")] +
+                    ["--design=" + design for design in designs] +
+                    ["--focus=page." + page for page in pages] + ["--focus=section." + section for section in sections] +
+                    ["--settings", "--maximized", "--reopened=1", "--reopened=9", "--bounds=-120,0,1024,768",
+                     "--bounds=100,-32768,800,600", "--frame=7,0,7,7", "--focus=save", "--focus=start",
+                     "--focus=setting.notify_on_failure",
+                     "--page=history --section=general --bounds=10,20,800,600 --maximized --frame=8,0,8,8 "
+                     "--theme=dark --design=classic --reopened=2 --focus=page.history"])
+        refused = ["--uninstall", "--uninstall C:\\Users\\ExampleUser", "--page=nowhere", "--page=History", "--settings=1",
+                   "--theme=blue", "--design=Soft", "--reopened=0", "--reopened=10", "--bounds=1,2,3",
+                   "--bounds=1,2,-3,4", "--frame=100,0,0,0", "--focus=setting.Name", "--focus=nowhere",
+                   "--reopened=\u0661", "--page=history  --maximized", "--page=history --hook",
+                   "--page=history\n--uninstall", "-page=history", "--page=history;calc"]
+        for words, opened in ((accepted, len(accepted)), (refused, 0)):
+            records = [("reopen-after-update-%d.txt" % (100 + number), line, None) for number, line in enumerate(words)]
+            said, _, left = self.run_reopen(records)
+            with self.subTest(opened=opened):
+                self.assertEqual(said.count("[ok] The Dashboard was opened again"), opened, said)
+                self.assertEqual(left, [])
 
     def test_each_window_writes_a_record_of_its_own_and_its_own_pick_never_closes_it(self):
         """Two windows wrote the one reopen-after-update.txt, so only the last opened again; and InstallPick never set
