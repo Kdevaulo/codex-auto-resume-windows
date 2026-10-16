@@ -95,8 +95,6 @@ NOT_SCENARIOS = {
                             "which the neutral plug never does - such a failure is never registered there",
     "test_silent_core": "gives every engine a plug that answers SILENT at P15 and a route that takes words "
                         "(v0.6.16-beta.4), which the neutral plug never does - every continuation carries its words there",
-    "test_adopted_cli": "drives the engine against codexsim with a CLI conversation the Desktop app took over "
-                        "(issue #37), which v0.6.10's package - the scenarios' other run - does not take up",
     "test_plug_record_purposes": "gives every engine a plug with continuations and messages of its own (P2), to hold "
                                  "what each purpose may and may not be sent as",
     "test_power_action": "builds an engine with no store or backend only to ask engine.activity, which reads a "
