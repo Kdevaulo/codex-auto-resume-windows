@@ -106,7 +106,10 @@ Dashboard's look and in your Windows language (you can pick another): it says wh
 edition and version, and where; asks only what the installer has a choice about - whether to run at
 Windows sign-in on a first installation, and whether to change the edition when the other one is
 installed - shows how far the installer is and which step it is on, and ends by saying whether it
-finished, with the installer's exit code and its log, and offers to open the Dashboard. No console window
+finished, with the installer's exit code and its log, and offers to open the Dashboard. Run where its own
+version is installed already, it first offers Repair, which installs it again in place and keeps your settings,
+everything waiting and the sign-in choice, or Remove, the uninstall with its question about the settings and the
+recovery history; a newer version updates as before, and `-Silent` asks neither. No console window
 opens. When it updates an installation whose Dashboard is open, it asks that Dashboard to close and opens it again
 on the new version where it was, as it starts the watcher again; a Dashboard with unsaved Settings changes keeps
 them and stays open, on the previous version until you open it again. With `-Silent` it does the same. It downloads nothing, needs no administrator rights and brings no Python of its

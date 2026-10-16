@@ -51,15 +51,14 @@ namespace CodexAutoResumeSetup
             Archive carried = new Archive(archive);
             string home = InstallerFlow.HomeFrom(Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_PLUGIN_HOME"),
                                                  Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-            var flow = FlowFor(arguments, home, carried.Edition, InstallerFlow.InstalledAt(home), carried.Version);
+            string installed = InstallerFlow.InstalledAt(home);
+            string from = installed == null ? "" : InstallerFlow.VersionOf(
+                Read(Path.Combine(Path.Combine(Path.Combine(home, "app"), ".codex-plugin"), "plugin.json")));
+            var flow = FlowFor(arguments, home, carried.Edition, installed, carried.Version, from);
             string language = InstallerLanguages.FromSystem(InstallerLanguages.Preferred());
-            // An update says from what to what, and what is new in the version this program carries (v0.6.16).
-            if (flow.Upgrade && flow.Mode == InstallerFlow.Install)
-            {
-                flow.From = InstallerFlow.VersionOf(Read(Path.Combine(Path.Combine(Path.Combine(home, "app"), ".codex-plugin"),
-                                                                      "plugin.json")));
-                flow.NotesText = carried.Notes(language);
-            }
+            // An update says from what to what, and what is new in the version this program carries (v0.6.16); a repair
+            // of the same version has nothing new to say.
+            if (flow.Upgrade && flow.Mode == InstallerFlow.Install && !flow.Maintaining) flow.NotesText = carried.Notes(language);
             var window = new InstallerWindow(flow, carried.Words(language), carried.Words,
                 delegate(InstallerFlow answered, Action<string> heard, Action<double> unpacked)
                 {
@@ -72,14 +71,20 @@ namespace CodexAutoResumeSetup
 
         /// What the window shows for the command line it was started with: the uninstall with -Uninstall, as Install.cmd
         /// runs it (the switch is the window's answer from then on, so it shows the uninstall rather than dropping it),
-        /// and the installation otherwise; -SkipStartup, -AllowEditionChange and -Purge as its first answers. Pure.
-        internal static InstallerFlow FlowFor(string[] arguments, string home, string edition, string installed, string version)
+        /// and the installation otherwise; -SkipStartup, -AllowEditionChange and -Purge as its first answers. Over its
+        /// own version (`from`, the installed one), installed already in its edition, it asks Repair or Remove first,
+        /// as an ordinary program's installer does (v0.6.16, the owner); a newer version updates, as before. Pure.
+        internal static InstallerFlow FlowFor(string[] arguments, string home, string edition, string installed, string version,
+                                              string from)
         {
             string mode = InstallerFlow.Has(arguments, "-Uninstall") ? InstallerFlow.Uninstall : InstallerFlow.Install;
             var flow = new InstallerFlow(mode, home, edition, installed, version);
             flow.StartAtSignIn = !InstallerFlow.Has(arguments, "-SkipStartup");
             flow.ChangeEdition = InstallerFlow.Has(arguments, "-AllowEditionChange");
             flow.Purge = InstallerFlow.Has(arguments, "-Purge");
+            flow.From = from ?? "";
+            flow.Maintaining = mode == InstallerFlow.Install && flow.Upgrade && !flow.EditionChange &&
+                               flow.From.Length > 0 && flow.From == flow.Version;
             return flow;
         }
 
@@ -232,6 +237,13 @@ namespace CodexAutoResume
                 cases.Add(Case("update", new InstallerFlow(InstallerFlow.Install, home, InstallerFlow.Advanced, InstallerFlow.Advanced, "0.6.16")));
                 cases.Add(Case("edition", new InstallerFlow(InstallerFlow.Install, home, InstallerFlow.Standard, InstallerFlow.Advanced, "0.6.16")));
                 cases.Add(Case("edition-advanced", new InstallerFlow(InstallerFlow.Install, home, InstallerFlow.Advanced, InstallerFlow.Standard, "0.6.16")));
+                var repair = new InstallerFlow(InstallerFlow.Install, home, InstallerFlow.Standard, InstallerFlow.Standard, "0.6.16");
+                repair.Maintaining = true;
+                cases.Add(Case("repair", repair));
+                var remove = new InstallerFlow(InstallerFlow.Install, home, InstallerFlow.Standard, InstallerFlow.Standard, "0.6.16");
+                remove.Maintaining = true;
+                remove.Choose(true);
+                cases.Add(Case("repair-remove", remove));
                 cases.Add(Case("dashboard-update", new InstallerFlow(InstallerFlow.Update, home, InstallerFlow.Standard, InstallerFlow.Standard, "0.6.16")));
                 cases.Add(Case("uninstall", new InstallerFlow(InstallerFlow.Uninstall, home, InstallerFlow.Standard, InstallerFlow.Standard, "0.6.16")));
                 foreach (KeyValuePair<string, InstallerFlow> each in cases)

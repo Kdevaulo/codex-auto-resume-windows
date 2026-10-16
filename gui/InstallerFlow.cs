@@ -34,6 +34,9 @@ namespace CodexAutoResume
         internal const string Finish = "finish";
         /// The update's own page (v0.6.16): the version it goes to and what is new in it, before anything is installed.
         internal const string Notes = "notes";
+        /// A setup program's first page where its own version is installed already (v0.6.16, the owner): Repair or
+        /// Remove, as an ordinary program's installer offers.
+        internal const string Maintain = "maintain";
 
         internal const string Standard = "standard";
         internal const string Advanced = "advanced";
@@ -51,7 +54,8 @@ namespace CodexAutoResume
         /// The package whose presence makes a tree the advanced edition (src/codex_auto_resume/edition.py).
         internal const string AdvancedPackage = "codex_auto_resume_advanced";
 
-        internal readonly string Mode;
+        /// Install, Update or Uninstall. Remove on the Maintain page makes an installation the uninstall (Choose).
+        internal string Mode;
         /// Where the installation is or will be: install.ps1's $InstallHome.
         internal readonly string Home;
         /// The edition this archive installs, or the installation's own for an update or an uninstall.
@@ -70,6 +74,9 @@ namespace CodexAutoResume
         internal bool OpenDashboard = true;
         /// The version installed now, for "vX -> vY" ("" where none is, or it cannot be read).
         internal string From = "";
+        /// A setup program run over its own version, installed already in its edition: the window asks Repair or
+        /// Remove first (Maintain). Never with -Silent, which shows no window and asks nothing.
+        internal bool Maintaining;
         /// What is new in Version: its section of the changelog the archive carries, or null where there is none.
         internal string NotesText;
 
@@ -92,11 +99,23 @@ namespace CodexAutoResume
         /// The pages the window goes through, in order.
         internal string[] Pages()
         {
+            // Repair runs from the first page; Remove goes on to the uninstall's own (Choose).
+            if (Maintaining) return new[] { Maintain, Confirm, Progress, Finish };
             // The Notes page comes between the download and the install (InstallerWindow.Ask).
             if (Mode == Update) return new[] { Progress, Notes, Finish };
             if (Mode == Uninstall) return new[] { Confirm, Progress, Finish };
             return new[] { Welcome, Options, Progress, Finish };
         }
+
+        /// The Maintain page's answer: Remove makes this the uninstall, with its own question about the settings;
+        /// Repair keeps it the installation, which install.ps1 runs over the same version in place.
+        internal void Choose(bool remove)
+        {
+            if (Maintaining) Mode = remove ? Uninstall : Install;
+        }
+
+        /// Whether this run repairs the installation: the Maintain page's Repair.
+        internal bool Repair { get { return Maintaining && Mode == Install; } }
 
         /// Whether the page that starts the run may start it: an edition change only once it is asked for.
         internal bool CanStart()

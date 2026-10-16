@@ -246,10 +246,42 @@ $out.setup = @{}
 foreach ($case in @(@('plain'), @('uninstall', '-Uninstall'), @('purge', '-uninstall', '-Purge'), @('skip', '-SkipStartup'))) {
     $given = [string[]]@($case | Select-Object -Skip 1)
     $flow = $SetupType.GetMethod('FlowFor', $any).Invoke($null, [object[]]@($given, 'C:\Users\ExampleUser\.codex-auto-resume',
-                                                                            'standard', 'standard', '9.9.9'))
+                                                                            'standard', 'standard', '9.9.9', '9.9.8'))
     $out.setup[$case[0]] = @([string]$FlowType.GetField('Mode', $any).GetValue($flow), (CallOn $flow 'Pages' @())[0],
                              ((Switches $flow $given) -join ' '))
 }
+
+# Over its own version, installed already: Repair or Remove first (the owner, 2026-10-17); a newer one updates.
+function SetupFlow($given, $installed, $from) {
+    $SetupType.GetMethod('FlowFor', $any).Invoke($null, [object[]]@([string[]]@($given), 'C:\Users\ExampleUser\.codex-auto-resume',
+                                                                      'standard', $installed, '9.9.9', $from))
+}
+function Told($flow, $given) {
+    @([string]$FlowType.GetField('Mode', $any).GetValue($flow), ((CallOn $flow 'Pages' @()) -join ' '),
+      ((Switches $flow $given) -join ' '), [bool](Of $flow 'Repair'))
+}
+$out.maintain = @{}
+$same = SetupFlow @() 'standard' '9.9.9'
+$out.maintain.repair = Told $same @()
+$null = CallOn $same 'Choose' @($true)
+$out.maintain.remove = Told $same @()
+$null = CallOn $same 'Choose' @($false)
+$out.maintain.repair_again = Told $same @()
+$out.maintain.older = Told (SetupFlow @() 'standard' '9.9.8') @()
+$out.maintain.other_edition = Told (SetupFlow @() 'advanced' '9.9.9') @()
+$out.maintain.asked_uninstall = Told (SetupFlow @('-Uninstall') 'standard' '9.9.9') @('-Uninstall')
+$out.maintain.unreadable = Told (SetupFlow @() 'standard' '') @()
+# The window over it, built and never shown: its first page, the two ways on it and what the button says.
+$maintaining = $WindowType.GetConstructors($any)[0].Invoke([object[]]@((SetupFlow @() 'standard' '9.9.9'), $english, $null, $null, $null, $font))
+$ways = @(@(CallOn $maintaining 'ShownRows' @()) | Where-Object { $_.GetType().Name -eq 'ChoiceCard' })
+$button = $WindowType.GetField('forward', $any).GetValue($maintaining)
+$out.maintain.window = @((Of $maintaining 'Page'), $ways.Count, [string]$button.Text, @($ways | ForEach-Object { $_.Checked }))
+$ways[1].Checked = $true
+$out.maintain.window_remove = @([string]$FlowType.GetField('Mode', $any).GetValue((Of $maintaining 'Flow')), [string]$button.Text)
+$ways[0].Checked = $true
+$out.maintain.window_repair = @([string]$FlowType.GetField('Mode', $any).GetValue((Of $maintaining 'Flow')), [string]$button.Text)
+$null = CallOn $maintaining 'Finished' @(0, "  Checking the installation")
+$out.maintain.finished = [string](@(CallOn $maintaining 'ShownRows' @())[0].Text)
 $out | ConvertTo-Json -Depth 6 -Compress
 """
 
@@ -454,6 +486,27 @@ class FlowTests(unittest.TestCase):
                                                 "uninstall": ["uninstall", "confirm", "-Uninstall -Silent"],
                                                 "purge": ["uninstall", "confirm", "-Uninstall -Purge -Silent"],
                                                 "skip": ["install", "welcome", "-Silent"]})
+
+    def test_over_its_own_version_it_offers_repair_and_remove(self):
+        """The owner, 2026-10-17: a setup program run where its own version is installed already offers Repair and
+        Remove on its first page, as an ordinary program's installer does. Repair installs it again in place, as
+        install.ps1 runs over the same version; Remove goes on to the uninstall with its question about the settings.
+        A newer version updates as before, the other edition is asked about as before, an explicit -Uninstall is the
+        uninstall, and a version that cannot be read is no reason to offer either."""
+        maintain = self.answer["maintain"]
+        pages = "maintain confirm progress finish"
+        self.assertEqual(maintain["repair"], ["install", pages, "-Silent", True])
+        self.assertEqual(maintain["remove"], ["uninstall", pages, "-Uninstall -Silent", False])
+        self.assertEqual(maintain["repair_again"], ["install", pages, "-Silent", True])
+        ordinary = ["install", "welcome options progress finish", "-Silent", False]
+        self.assertEqual(maintain["older"], ordinary)
+        self.assertEqual(maintain["other_edition"], ordinary)
+        self.assertEqual(maintain["unreadable"], ordinary)
+        self.assertEqual(maintain["asked_uninstall"], ["uninstall", "confirm progress finish", "-Uninstall -Silent", False])
+        self.assertEqual(maintain["window"], ["maintain", 2, "Repair", [True, False]], "Repair is the default")
+        self.assertEqual(maintain["window_remove"], ["uninstall", "Next"])
+        self.assertEqual(maintain["window_repair"], ["install", "Repair"])
+        self.assertEqual(maintain["finished"], "Codex Auto Resume is repaired.")
 
     def test_each_code_says_what_it_means(self):
         outcome = self.answer["outcome"]

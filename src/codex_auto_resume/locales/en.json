@@ -1153,5 +1153,11 @@
   "installer.update.heading": "v{from} → v{to}",
   "installer.update.whats_new": "What's new",
   "installer.update.no_notes": "What is new in this version could not be read from the download.",
-  "installer.done.updated_to": "Updated to v{version}"
+  "installer.done.updated_to": "Updated to v{version}",
+  "installer.maintain.heading": "Version {version} is already installed",
+  "installer.maintain.repair": "Repair",
+  "installer.maintain.repair_help": "Installs this version again in place. Your settings, everything waiting and your sign-in choice are kept.",
+  "installer.maintain.remove_help": "Removes Codex Auto Resume from this PC. Next, you choose whether the settings and the recovery history go too.",
+  "installer.progress.repairing": "Repairing",
+  "installer.done.repaired": "Codex Auto Resume is repaired."
 }

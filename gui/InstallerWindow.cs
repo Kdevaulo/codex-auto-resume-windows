@@ -273,6 +273,8 @@ namespace CodexAutoResume
         {
             if (page == InstallerFlow.Finish) { Close(); return; }
             if (page == InstallerFlow.Notes) { Answer(true); return; }
+            // Repair starts here; Remove goes on to the uninstall's question.
+            if (page == InstallerFlow.Maintain && flow.Mode != InstallerFlow.Uninstall) { Start(); return; }
             if (page == InstallerFlow.Options || page == InstallerFlow.Confirm) { Start(); return; }
             Go(1);
         }
@@ -300,6 +302,9 @@ namespace CodexAutoResume
                          : name == InstallerFlow.Notes ? words.Say("installer.update", "Update")
                          : name == InstallerFlow.Finish ? words.Say("installer.finish", "Finish")
                          : name == InstallerFlow.Confirm ? words.Say("installer.remove", "Remove")
+                         : name == InstallerFlow.Maintain ? (flow.Mode == InstallerFlow.Uninstall
+                                                             ? words.Say("installer.next", "Next")
+                                                             : words.Say("installer.maintain.repair", "Repair"))
                          : name == InstallerFlow.Options ? (flow.Upgrade && !flow.EditionChange
                                                             ? words.Say("installer.update", "Update")
                                                             : words.Say("action.install", "Install"))
@@ -317,7 +322,9 @@ namespace CodexAutoResume
             rows.Clear();
             stepLabel = null;
             busyNote = null;
-            switch (name)
+            // Not a seventh case: a string switch that long is compiled to a class named at random (build/normalize_pe.py).
+            if (name == InstallerFlow.Maintain) BuildMaintain();
+            else switch (name)
             {
                 case InstallerFlow.Welcome: BuildWelcome(); break;
                 case InstallerFlow.Options: BuildOptions(); break;
@@ -437,6 +444,39 @@ namespace CodexAutoResume
             if (flow.Upgrade && !flow.EditionChange && flow.NotesText != null) WhatsNew(16);
         }
 
+        /// A setup program over its own version, installed already (v0.6.16, the owner): Repair - install it again in
+        /// place, everything kept - or Remove, which goes on to the uninstall's own question. Repair is the default.
+        private void BuildMaintain()
+        {
+            Row(Words(words.Say("installer.maintain.heading", "Version {version} is already installed", "version", flow.Version),
+                      "title", Palette.Ink), 0);
+            Row(Words(words.Say("installer.options.location", "Installed in"), "label", Palette.Secondary), 8);
+            Row(Words(flow.Home, null, Palette.Ink), 2);
+            Row(Way(false, words.Say("installer.maintain.repair", "Repair"),
+                    words.Say("installer.maintain.repair_help", "Installs this version again in place. Your settings, everything waiting and your sign-in choice are kept.")), 16);
+            Row(Way(true, words.Say("installer.remove", "Remove"),
+                    words.Say("installer.maintain.remove_help", "Removes Codex Auto Resume from this PC. Next, you choose whether the settings and the recovery history go too.")), 8);
+        }
+
+        /// One of the Maintain page's two ways, chosen when it is the flow's own.
+        private ChoiceCard Way(bool remove, string title, string help)
+        {
+            var way = new ChoiceCard(remove ? InstallerFlow.Uninstall : InstallerFlow.Install, title, help);
+            way.Font = Font;
+            way.ForeColor = Palette.Ink;
+            way.BackColor = Palette.Card;
+            way.UseMnemonic = false;
+            way.Checked = (flow.Mode == InstallerFlow.Uninstall) == remove;
+            way.CheckedChanged += delegate
+            {
+                if (!way.Checked) return;
+                flow.Choose(remove);
+                forward.Text = remove ? words.Say("installer.next", "Next") : words.Say("installer.maintain.repair", "Repair");
+                PerformLayout();
+            };
+            return way;
+        }
+
         private void BuildConfirm()
         {
             Row(Words(words.Say("installer.uninstall.heading", "Remove Codex Auto Resume"), "title", Palette.Ink), 0);
@@ -450,6 +490,7 @@ namespace CodexAutoResume
         private void BuildProgress()
         {
             string heading = flow.Mode == InstallerFlow.Uninstall ? words.Say("installer.progress.removing", "Removing")
+                           : flow.Repair ? words.Say("installer.progress.repairing", "Repairing")
                            : flow.Mode == InstallerFlow.Update ? words.Say("installer.progress.updating", "Updating")
                            : words.Say("installer.progress.installing", "Installing");
             Row(Words(heading, "title", Palette.Ink), 0);
@@ -516,6 +557,7 @@ namespace CodexAutoResume
         {
             Row(Words(flow.Mode == InstallerFlow.Update && code == 0
                       ? words.Say("installer.done.updated_to", "Updated to v{version}", "version", flow.Version)
+                      : flow.Repair && code == 0 ? words.Say("installer.done.repaired", "Codex Auto Resume is repaired.")
                       : words.Outcome(flow.Mode, code), "title", Palette.Ink), 0);
             if (flow.Mode == InstallerFlow.Update && code == 0 && !string.IsNullOrEmpty(flow.NotesText))
                 Row(Words(InstallerNotes.Brief(flow.NotesText, 4), null, Palette.Secondary), 8);
@@ -581,6 +623,7 @@ namespace CodexAutoResume
             if (control == notesArea) return Px(page == InstallerFlow.Notes ? 220 : 140);
             if (control == bar) return Px(10);
             if (control is SoftCombo) return SoftCombo.FieldHeight;
+            if (control is ChoiceCard) return ((ChoiceCard)control).HeightFor(width);
             if (control is LinkLabel)
                 return TextRenderer.MeasureText(control.Text, control.Font, new Size(width, 0),
                                                 TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
