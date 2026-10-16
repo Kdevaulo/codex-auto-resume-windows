@@ -64,7 +64,7 @@ class _StopErrand:
 class UsageStop(UsagePause):
     """usage_pause's code from v0.6.16-beta.4: the pause's holding, and the forced stop and its continuation after
     the reset. `stop`, `start` and `home` are seams a test fills (ipc.stop_turn, ipc.start_turn, the Codex home)."""
-    __slots__ = ("_stop", "_start", "_home", "_notices", "_backoff")
+    __slots__ = ("_stop", "_start", "_home", "_notices", "_backoff", "_stopped")
 
     def __init__(self, paths, *, stop=None, start=None, home=None):
         super().__init__(paths)
@@ -73,6 +73,7 @@ class UsageStop(UsagePause):
         self._home = home
         self._notices = []
         self._backoff = {}                   # {continuation: (failures, when it is asked again)}, in this process
+        self._stopped = []                   # the windows stopped, (bucket, minutes, reset_at): once each per reset
 
     # ---------------------------------------------------------------- reading Codex
     def _codex_home(self):
@@ -101,7 +102,7 @@ class UsageStop(UsagePause):
         scoped = self._scoped
         if scoped is None:
             return DEFER
-        newly, targets = self._mark(), []
+        newly, targets = self._once(self._mark()), []
         if newly:
             try:
                 targets = self._running(view)
@@ -110,6 +111,18 @@ class UsageStop(UsagePause):
         if not targets and not self._waiting():
             return DEFER
         return _StopErrand(self, view, targets, newly[0] if newly else None)
+
+    def _once(self, newly) -> list:
+        """The windows newly held that were not stopped already for this reset: a window switched off and on again
+        is held again, but a turn the person resumed in it is not stopped a second time."""
+        fresh = []
+        for row in newly:
+            key = (row["bucket"], row["minutes"], row["reset_at"])
+            if key not in self._stopped:
+                self._stopped.append(key)
+                fresh.append(row)
+        del self._stopped[:-NOTICES_KEPT]
+        return fresh
 
     def _running(self, view) -> list:
         """(thread, turn) of each conversation switched on, of the kind core recovers, whose latest turn runs."""

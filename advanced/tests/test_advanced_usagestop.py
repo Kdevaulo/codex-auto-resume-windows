@@ -146,6 +146,24 @@ class StopTests(StopCase):
         self.assertEqual(self.stops, [])
 
 
+class OncePerResetTests(StopCase):
+    def test_a_window_switched_off_and_on_again_does_not_stop_a_turn_the_person_resumed(self):
+        plug, turn = self.running()
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        self.assertEqual(len(self.stops), 1)
+        self.h.home.set_turn(T1, turn, status="interrupted", completed_at=int(self.h.now))
+        self.h.home.add_turn(T1, status="inProgress", progress=False)        # the person pressed Resume
+        for value in (2, 1):
+            assert plug.runtime.arming.set_option("usage_meter", OptionKey.WINDOW_FIVE_HOUR, value,
+                                                  generation=plug.runtime.state.meta()["generation"],
+                                                  actor=Actor.DASHBOARD)["done"]
+            self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        self.assertEqual(len(self.stops), 1, "one stop per window per reset")
+        self.assertIs(plug.runtime.ask(Point.GATES, "usage", CORE, {}), Alternative.HOLD, "held again all the same")
+
+
 class AfterResetTests(StopCase):
     def test_a_stopped_conversation_is_continued_once_after_the_reset_by_a_turn_the_app_starts(self):
         plug, turn = self.running()
