@@ -97,6 +97,12 @@ ALLOWED = {
     ("install/install.ps1", PACKAGE):
         "tells which edition the payload it installs is, the same way",
 }
+# The same for the setup programs (h), outside the archive they carry: the installer window they show tells which
+# edition is installed, and which one the archive is, by install.ps1's rule (InstallerFlow.EditionOfSource). (d) asks
+# the same of the settings window, which carries that window too, only for the advanced window's own names.
+SETUP_ALLOWED = {
+    PACKAGE: "the installer window tells which edition is installed and which the archive is (gui/InstallerFlow.cs)",
+}
 # Shorter names and plain words - `create`, `Registry`, `VALUES` - are English (or SQL) as often
 # as they are code, and would be found in any text; the checks look for the ones that can only be
 # ours (`distinctive`) everywhere, and a capitalised word only among code's identifiers
@@ -570,6 +576,8 @@ def check_setups(standard_zip: bytes, advanced_zip: bytes, standard_setup: bytes
             continue
         outside = image[:start] + image[end:]
         for name in sorted(advanced.window | {PACKAGE, SKILL, SENTINEL}):
+            if name in SETUP_ALLOWED:
+                continue
             if _holds(outside, name, word=name not in (PACKAGE, SKILL, SENTINEL)):
                 found.append("(h) the standard setup program holds %s" % name)
         for literal in sorted(advanced.literals):

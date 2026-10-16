@@ -180,6 +180,8 @@ _LOCAL = {
     "gui/SoftTheme.cs": {"MOTION"},
     # v0.6.15-beta: the homes the card writes back - their folders and aliases - and the request it writes them in.
     "gui/SettingsHomes.cs": {"entry", "changes"},
+    # v0.6.16: the installer window reads a plugin.json's version, never a reply.
+    "gui/InstallerFlow.cs": {"manifest"},
 }
 
 # The window was two files until v0.6.10-alpha, when each became several. The three tables above
