@@ -2809,6 +2809,18 @@ def owner_only(folder: Path) -> None:
                    check=True, capture_output=True, creationflags=NO_WINDOW)
 
 
+def capture_moment(clock=time.time) -> float:
+    """The moment a capture's records are seeded at and the window is told it is (Soft.StillNow): now, in whole
+    seconds.
+
+    The window prints a time of day as the seeded moment's distance from StillNow laid on WINDOW_CLOCK, and a
+    reading's resets are whole seconds after the seed (sample_usage: int(now) + ...). Seeded at a fractional now,
+    every reset came out that fraction of a second early on the window's clock - the weekly reset, which falls on a
+    whole minute, read 12:59 where the envelope's (seeded at the whole ENVELOPE_NOW) and the README motion's read
+    13:00, depending only on the instant the capture began. Whole, the two are the same to the second."""
+    return float(int(clock()))
+
+
 def render_window(targets: dict, theme: str | None = None, design: str | None = None,
                   captured=None) -> dict:
     """Capture each page of the window, with the watcher's mutex held but no watcher running.
@@ -2832,7 +2844,7 @@ def render_window(targets: dict, theme: str | None = None, design: str | None = 
         workspace = Path(name)
         home = scratch_installation(workspace, theme, design)
         codex, local = workspace / "codex", workspace / "LocalAppData"
-        now = time.time()
+        now = capture_moment()
         seed_window_state(home, codex, now)
         word = seed_compatibility(home, codex, local, now)
         # The heartbeat the envelope's installation has, with its usage reading (sample_usage): the capture's

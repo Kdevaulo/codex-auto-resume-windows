@@ -51,5 +51,33 @@ class CaptureHeartbeatTests(unittest.TestCase):
                          "the holder's beat dropped the reading the pictures show")
 
 
+
+class CaptureMomentTests(unittest.TestCase):
+    """The window prints a reset as its distance from StillNow laid on WINDOW_CLOCK (SettingsForm.ClockTime, to the
+    minute). Seeded at a fractional now, the weekly reset - a whole minute after POPUP_NOW - came out a fraction of a
+    second before it: 12:59 in the stills, 13:00 in the envelope and the README motion."""
+
+    @staticmethod
+    def shown(now: float) -> list:
+        """Each reset of the sample reading as the window shows it: seconds since 1970 on the pictures' clock."""
+        _read_at, windows = make_screenshots.sample_usage(now)
+        return [window["reset_at"] - now + make_screenshots.WINDOW_CLOCK for window in windows]
+
+    def test_a_capture_begun_at_any_instant_shows_the_envelope_s_resets_to_the_second(self):
+        envelope = self.shown(make_screenshots.ENVELOPE_NOW)
+        for instant in (1_900_000_000.0, 1_900_000_000.01, 1_900_000_000.5, 1_900_000_000.999):
+            with self.subTest(instant=instant):
+                moment = make_screenshots.capture_moment(lambda instant=instant: instant)
+                self.assertEqual(self.shown(moment), envelope)
+                self.assertEqual([int(at // 60) for at in self.shown(moment)], [int(at // 60) for at in envelope],
+                                 "a reset on another minute than the envelope's")
+
+    def test_the_capture_seeds_and_tells_the_window_that_moment(self):
+        source = inspect.getsource(make_screenshots.render_window)
+        self.assertIn("now = capture_moment()", source)
+        self.assertNotIn("time.time()", source)
+        self.assertIn("CODEX_AR_STILL_NOW=repr(now)", source)
+
+
 if __name__ == "__main__":
     unittest.main()
