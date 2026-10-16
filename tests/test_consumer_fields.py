@@ -180,6 +180,9 @@ _LOCAL = {
     "gui/SoftTheme.cs": {"MOTION"},
     # v0.6.15-beta: the homes the card writes back - their folders and aliases - and the request it writes them in.
     "gui/SettingsHomes.cs": {"entry", "changes"},
+    # v0.6.16: the render mode's job (build/motion_window.py writes it, not the bridge): the job, its forms and
+    # frames, and a frame's own parts - never a reply's.
+    "gui/WindowRender.cs": {"job", "forms", "frame", "answer", "combo", "listed", "scroll", "Map(forms, locale)"},
 }
 
 # The window was two files until v0.6.10-alpha, when each became several. The three tables above
@@ -215,6 +218,7 @@ LOCAL = _spread(_LOCAL)
 
 # Reads by a name computed from nothing literal, which no golden can check, each with its reason.
 UNCHECKED = {
+    ("gui/WindowRender.cs", "forms", "locale"): "the render job's replies for each language its frames are in",
     ("gui/DashboardData.cs", "map", "key"): "the accessor helpers themselves (Number, Str, Items, Map)",
     ("gui/DashboardCompat.cs", "capabilities", "name"): "each capability the report carries, in the "
                                                    "order the window lists them",
