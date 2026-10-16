@@ -723,7 +723,9 @@ _WEEK = 10080
 _WS_URL = "CODEX_APP_SERVER_WS_URL"
 # The words the engine's help might name a shared-backend switch with (membership only; never recorded).
 _SHARED_SWITCH_WORDS = ("shared app-server", "shared-app-server", "shared backend", "shared-backend",
-                        "app-server-ws", "app_server_ws")
+                        "app-server-ws", "app_server_ws",
+                        # 2026-10-16 (MAWS): the words a later help may use for one the Desktop app shares locally.
+                        "shared local app-server")
 # The words that would say a `codex cloud` help offers a state/status read (membership only).
 _CLOUD_STATE_WORDS = ("status", "state", "show", "list", "watch", "logs")
 

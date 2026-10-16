@@ -45,4 +45,10 @@ MEASURED = {
     Measurement.MN: (Verdict.PASS, CLI_0162_ALPHA_17_2),
     # 2026-10-13, after a 5-hour reset that passed with no Codex use.
     Measurement.MU: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    # 2026-10-16 (records 22f19fb7, da367839, f0f1f1fd): the Desktop's IPC pipe starts, adds to and interrupts a turn of
+    # a conversation the app holds; Codex documents no supported shared app-server the app uses; `codex cloud` reads a
+    # cloud task's state but nothing continues one - partial, which is not a pass.
+    Measurement.MIPC: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MAWS: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    Measurement.MCLOUD: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
 }
