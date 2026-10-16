@@ -269,15 +269,9 @@ class SimBackend:
         return dict(self.app) if self.app else None
 
     def loaded(self, thread_id, app_identity):
-        # v0.6.16-beta.4: who holds a conversation "elsewhere" - (pid, creation time), session_map's or one default
-        # session's - as the real Backend keeps it for the TO_SESSION re-check (engine/tosession.py).
-        self.session_holder = None
         if not app_identity or app_identity != self.app:
             return "unknown"
-        found = self.loaded_map.get(thread_id, "notLoaded")
-        if found == "elsewhere":
-            self.session_holder = getattr(self, "session_map", {}).get(thread_id, (7, 70))
-        return found
+        return self.loaded_map.get(thread_id, "notLoaded")
 
     def usage(self):
         return dict(self.usage_result)

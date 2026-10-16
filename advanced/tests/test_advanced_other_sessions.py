@@ -26,10 +26,17 @@ from codex_auto_resume_advanced.vocabulary import (Actor, ArmingState, ArmingWar
                                                    Measurement, OffReason, Refusal, Verdict)
 from test_engine import T1, T2  # noqa: E402
 from test_session_kinds import CLI, IDE, add_thread  # noqa: E402
+from sessionsim import holding_sessions  # noqa: E402
 
 
 class SessionsCase(TakingCase):
     DEFINITION = OTHER_SESSIONS
+
+    def fresh(self, **kwargs):
+        # Who holds a conversation "elsewhere", as the real Backend keeps it (tests/sessionsim.py).
+        made = super().fresh(**kwargs)
+        holding_sessions(made.backend)
+        return made
 
     def arm(self, plug, state="armed", capability=None, **changes):
         """Armed as a person arms it: confirming the warnings its statement shows - M5 and MO unmeasured here."""

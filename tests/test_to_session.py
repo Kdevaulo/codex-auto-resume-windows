@@ -17,6 +17,7 @@ if _HERE not in sys.path:
 
 from test_engine import T1  # noqa: E402
 from test_plug_points import Asked, Channel, PluggedCase  # noqa: E402
+from sessionsim import holding_sessions  # noqa: E402
 from codex_auto_resume import machine  # noqa: E402
 from codex_auto_resume.domain.plug import Alternative, DEFER  # noqa: E402
 from codex_auto_resume.engine.tosession import STORED  # noqa: E402
@@ -31,6 +32,12 @@ BETA2_RELEASABLE = frozenset({"paused", "observe_only", "window_ended", "not_del
 
 
 class SessionCase(PluggedCase):
+    def fresh(self, **kwargs):
+        # Who holds it, as the real Backend keeps it (tests/sessionsim.py; codexsim stays v0.6.10's).
+        made = super().fresh(**kwargs)
+        holding_sessions(made.backend)
+        return made
+
     def queued(self, h=None, **answers):
         """A usage-limited conversation another session holds, sent for that session to take."""
         h = h or self.h
