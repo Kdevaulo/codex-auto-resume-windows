@@ -898,7 +898,7 @@ USAGE_PAUSE = CapabilityDef(
     journal_prefix="pause",
     make=make_pause,
     codes=("paused", "resumed", "stopped", "not_stopped", "resume_unproven", "continued", "not_continued"),
-    measurements=(Measurement.MU,),
+    measurements=(Measurement.MU, Measurement.MIPC),
     options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE),
              Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE)),
     requires=("usage_meter",),

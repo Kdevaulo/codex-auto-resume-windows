@@ -745,8 +745,8 @@ and the program sends no further continuation until that window resets: recoveri
 edition's own continuations are held. It works only for a conversation the Codex app has open; where it
 cannot stop a turn - the app does not have the conversation open, is not running, or its build no longer
 answers this request as measured - it only holds, and a notice says the turn could not be stopped. Codex
-pauses a stopped conversation's queue, and that survives the app's restart: a notice asks you to press Resume
-in Codex. When the window resets, a conversation it stopped is continued once (*Continue after the reset*, a
+pauses a stopped conversation's queue, and that survives the app's restart, until the turn started after the
+reset lets it go; with Continue after the reset off, a notice asks you to press Resume in Codex. When the window resets, a conversation it stopped is continued once (*Continue after the reset*, a
 choice of Wrap up near a limit, on by default) by a turn started through the same channel - past the paused
 queue - only if nothing newer happened there and the app has it open; otherwise it waits, and a notice says
 to open it in Codex. Messages you queued yourself, and anything you type in Codex, are not touched.
