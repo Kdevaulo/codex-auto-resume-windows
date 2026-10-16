@@ -1071,6 +1071,7 @@
   "why.engine_unknown": "Bu Codex sürümünün desteklenip desteklenmediği henüz bilinmiyor.",
   "why.held": "Sohbeti veya projesi önce size soruyor: siz devam etmesine izin verene kadar hiçbir şey gönderilmez.",
   "why.held_by_other_session": "Başka bir Codex oturumunda açık (bir terminal veya VS Code); Codex uygulaması tuttuğunda devam eder.",
+  "why.version_newer_than_engine": "Bu sohbeti en son buradakinden daha yeni bir Codex çalıştırdı; Codex güncellendiğinde devam eder.",
   "why.home_lock_unavailable": "Bu Codex klasöründen başka bir izleyici sorumlu.",
   "why.home_removed": "Codex klasörü Ayarlar'da kaldırıldığı için sürdürülmeyecek.",
   "why.loaded_state_unknown": "Sohbetin açık olup olmadığı henüz anlaşılamıyor.",

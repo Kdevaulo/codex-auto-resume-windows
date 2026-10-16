@@ -1071,6 +1071,7 @@
   "why.engine_unknown": "尚不清楚是否支援此 Codex 版本。",
   "why.held": "它的對話或專案要求先詢問您：在您允許它接續之前，不會傳送任何內容。",
   "why.held_by_other_session": "已在另一個 Codex 工作階段(終端機或 VS Code)中開啟;Codex 應用程式接手後即繼續。",
+  "why.version_newer_than_engine": "上次執行此對話的 Codex 比這裡的版本更新;更新 Codex 後即繼續。",
   "why.home_lock_unavailable": "另一個監看程式正在負責此 Codex 資料夾。",
   "why.home_removed": "它的 Codex 主目錄已在設定中移除，因此不會恢復。",
   "why.loaded_state_unknown": "暫時無法判斷此對話是否已開啟。",

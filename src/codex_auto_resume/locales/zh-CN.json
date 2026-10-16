@@ -1071,6 +1071,7 @@
   "why.engine_unknown": "尚不清楚是否支持此 Codex 版本。",
   "why.held": "它的对话或项目要求先问你：在你允许它继续之前，不会发送任何内容。",
   "why.held_by_other_session": "已在另一个 Codex 会话(终端或 VS Code)中打开;Codex 应用接管后即继续。",
+  "why.version_newer_than_engine": "上次运行此对话的 Codex 比这里的版本更新;更新 Codex 后即继续。",
   "why.home_lock_unavailable": "另一个监视程序正在负责此 Codex 文件夹。",
   "why.home_removed": "它的 Codex 主目录已在设置中移除，因此不会恢复。",
   "why.loaded_state_unknown": "暂时无法判断此对话是否已打开。",

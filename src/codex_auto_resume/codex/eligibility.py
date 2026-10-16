@@ -60,6 +60,16 @@ def originator_taken(source, originator, kinds=frozenset()) -> bool:
     return any(source == shape[0] and originator in shape[2] for _kind, shape in _shapes(kinds))
 
 
+def newer_than_engine(cli_version, engine_version) -> bool:
+    """Whether the Codex a conversation's first line says wrote it (`cli_version`) is newer than the engine's own
+    `codex --version`, both read as the compatibility data reads a version (compat/model.parse_version); False where
+    either cannot be read - a guard that only ever holds back, never a refusal on a guess."""
+    from ..compat.model import parse_version
+    written = parse_version("codex-cli " + cli_version) if isinstance(cli_version, str) else None
+    engine = parse_version(engine_version)
+    return written is not None and engine is not None and written > engine
+
+
 def kind_of(source, payload, kinds=frozenset()):
     """The kind - "desktop", "cli" or "ide" - a conversation is, by its row's source and its first line's
     originator and source, of the app's and `kinds`; None for anything else."""

@@ -317,6 +317,11 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     ("controlcli", "interface"): ("cost", "the strings request only: the window's catalogue"),
     ("diagnostics", "compatio"): ("cost", "the compatibility section of the export only"),
     ("mcp.server", "compat"): ("cost", "the compatibility summary in get_status only"),
+    # v0.6.16-beta.4: the version skew guard, only for a terminal's or VS Code's conversation a plug names (P18).
+    ("codex.eligibility", "compat"): ("cost", "a Codex version read as the compatibility data reads one, only for "
+                                              "a kind of conversation a plug names"),
+    ("codex.eligibility", "compat.model"): ("cost", "a Codex version read as the compatibility data reads one, only "
+                                                    "for a kind of conversation a plug names"),
     ("mcp.server", "compatio"): ("cost", "the compatibility summary in get_status only"),
     ("mcp.server", "mcp.panel"): ("cost", "the panel's page, only when Codex reads the resource"),
     ("notify", "reasons"): ("cost", "a reason's label, for a transient toast only"),

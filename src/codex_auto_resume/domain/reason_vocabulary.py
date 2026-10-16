@@ -41,6 +41,9 @@ class ReasonCode(StrEnum):
     LOADED_STATE_UNKNOWN = "loaded_state_unknown"
     # v0.6.16-beta.4: open in another Codex session - a terminal or VS Code - which the app's queue cannot reach.
     HELD_BY_OTHER_SESSION = "held_by_other_session"
+    # v0.6.16-beta.4: a terminal's or VS Code's conversation a newer Codex wrote than the engine is (`codex --version`):
+    # it waits for Codex to be updated (engine/kinds.py, only while the plug names such a kind).
+    VERSION_NEWER_THAN_ENGINE = "version_newer_than_engine"
     LOADED_RECHECK_FAILED = "loaded_recheck_failed"
     USAGE_UNAVAILABLE = "usage_unavailable"
     USAGE_UNKNOWN = "usage_unknown"

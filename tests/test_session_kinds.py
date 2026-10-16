@@ -19,18 +19,23 @@ if _HERE not in sys.path:
 
 from test_engine import T1, T2, archive  # noqa: E402
 from test_plug_points import Asked, PluggedCase  # noqa: E402
-from codex_auto_resume.codex import eligibility  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+from codex_auto_resume import machine  # noqa: E402
+from codex_auto_resume.codex import LocalSource, eligibility  # noqa: E402
 from codex_auto_resume.domain.plughands import SessionKind, kinds_of  # noqa: E402
 
 CLI = {"source": "cli", "originator": "codex-tui"}
 IDE = {"source": "vscode", "originator": "codex_vscode"}
 
 
-def add_thread(home, thread_id, *, source, originator, thread_source="user"):
-    """A conversation as a terminal's Codex TUI or VS Code records one - codexsim (v0.6.10's file) makes the app's."""
+def add_thread(home, thread_id, *, source, originator, thread_source="user", cli_version=None):
+    """A conversation as a terminal's Codex TUI or VS Code records one - codexsim (v0.6.10's file) makes the app's -
+    with the Codex version that wrote it on its first line where `cli_version` is given, as Codex writes it."""
     path = home.rollout(thread_id)
     meta = {"type": "session_meta", "payload": {"id": thread_id, "originator": originator, "source": source,
                                                 "thread_source": thread_source}}
+    if cli_version is not None:
+        meta["payload"]["cli_version"] = cli_version
     path.write_bytes(json.dumps(meta).encode("utf-8") + b"\n")
     with home._db("state_5.sqlite") as db:
         db.execute("INSERT INTO threads (id, rollout_path, source, thread_source, archived, history_mode, name) "
@@ -104,6 +109,69 @@ class DetectionTests(KindsCase):
         self.h.store.set_enabled(False, self.h.now)
         self.h.tick()
         self.assertNotIn("sessions", plug.hooks())
+
+
+class VersionSkewTests(KindsCase):
+    """Design-4 4.3: a terminal's or VS Code's conversation whose first line says a Codex newer than the engine's
+    `codex --version` wrote it waits, identity / version_newer_than_engine, and nothing is sent."""
+    ENGINE = "codex-cli 0.162.0-alpha.17.2"
+
+    def skewed(self, kind, written, *, named=("cli", "ide")):
+        if named:
+            self.watching(set(named))
+        self.h.backend.engine_version = self.ENGINE
+        add_thread(self.h.home, T1, cli_version=written, **kind)
+        self.ready_after_reset(self.h, thread_id=T1)
+        self.h.tick()
+        return self.h.record(T1)
+
+    def test_one_a_newer_codex_wrote_waits_and_nothing_is_sent(self):
+        """Fails with the guard reverted: it would be sent to an engine older than what wrote it."""
+        for kind, written in ((CLI, "0.163.0"), (IDE, "0.162.0")):
+            with self.subTest(kind=kind["originator"]):
+                self.setUp()
+                row = self.skewed(kind, written)
+                self.assertEqual((row["state"], row["last_error"]),
+                                 ("waiting_for_loaded_thread", "version_newer_than_engine"))
+                self.assertEqual(machine.decode_gates(row["gate_eval"])["identity"],
+                                 (machine.WAIT, "version_newer_than_engine"))
+                self.assertEqual(self.h.backend.send_calls, [])
+
+    def test_one_the_same_or_an_older_codex_wrote_is_sent(self):
+        for written in ("0.162.0-alpha.17.2", "0.161.0", None, "not a version"):
+            with self.subTest(written=written):
+                self.setUp()
+                self.skewed(CLI, written)
+                self.h.tick(advance=1)
+                self.assertEqual(len(self.h.backend.send_calls), 1)
+
+    def test_an_engine_version_that_cannot_be_read_holds_nothing_back(self):
+        self.h.backend.engine_version = None
+        self.watching({"cli"})
+        add_thread(self.h.home, T1, cli_version="0.163.0", **CLI)
+        self.ready_after_reset(self.h, thread_id=T1)
+        self.h.tick()
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.h.backend.send_calls), 1)
+
+    def test_the_apps_own_conversation_is_never_held_and_with_no_kind_named_nothing_is_read(self):
+        """The standard edition, which names no kind, reads no version: A15 and B6 as ever."""
+        with patch.object(LocalSource, "written_by", side_effect=AssertionError("read with no kind named")):
+            self.skewed({"source": "vscode", "originator": "Codex Desktop"}, "9.0.0", named=())
+            self.h.tick(advance=1)
+        self.assertEqual(len(self.h.backend.send_calls), 1)
+        self.setUp()
+        self.skewed({"source": "vscode", "originator": "Codex Desktop"}, "9.0.0")
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.h.backend.send_calls), 1, "the app's own conversation is the app's to run")
+
+    def test_versions_are_read_as_the_compatibility_data_reads_them(self):
+        newer = eligibility.newer_than_engine
+        self.assertTrue(newer("0.162.0", "codex-cli 0.162.0-alpha.17.2"), "a release after its pre-release")
+        self.assertFalse(newer("0.162.0-alpha.17.2", "codex-cli 0.162.0"))
+        self.assertTrue(newer("0.162.0-alpha.18", "codex-cli 0.162.0-alpha.17.2"))
+        for written, engine in ((None, "codex-cli 0.1.0"), ("0.2.0", None), ("0.2.0", "something else"), (3, "x")):
+            self.assertFalse(newer(written, engine))
 
 
 class ShrinkTests(KindsCase):

@@ -1071,6 +1071,7 @@
   "why.engine_unknown": "この Codex のバージョンに対応しているかどうかは、まだわかりません。",
   "why.held": "会話またはプロジェクトが先に確認を求めています。続行を許可するまで何も送信されません。",
   "why.held_by_other_session": "別の Codex セッション(ターミナルまたは VS Code)で開かれています。Codex アプリが保持したら続行します。",
+  "why.version_newer_than_engine": "この会話を最後に実行したのは、ここにあるものより新しい Codex です。Codex を更新すると続行します。",
   "why.home_lock_unavailable": "別の監視プロセスがこの Codex フォルダーを担当しています。",
   "why.home_removed": "設定でこの Codex ホームが削除されたため、再開しません。",
   "why.loaded_state_unknown": "会話が開いているかどうか、まだ判断できません。",

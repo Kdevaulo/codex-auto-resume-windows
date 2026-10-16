@@ -16,6 +16,20 @@ OFF = "session_kind_off"
 
 
 class KindsMixin:
+    def newer_than_engine(self, row) -> bool:
+        """Whether `row`'s conversation is of a kind the plug names - a terminal's, VS Code's - and its file's first
+        line says a Codex newer than the engine's `codex --version` wrote it (the version skew guard): continued by an
+        older engine, such a conversation may be read or written in a shape that engine does not know, so it waits,
+        identity / version_newer_than_engine, until Codex is updated. False with no kind named - the standard
+        edition's always, which reads nothing for it - and where either version cannot be read."""
+        kinds = self.__dict__.get("_session_kinds", frozenset())
+        if not kinds:
+            return False
+        try:
+            return self.source.newer_than_engine(row["thread_id"], kinds, getattr(self.backend, "engine_version", None))
+        except Exception:
+            return False
+
     def session_kinds(self):
         kinds = self.plug.sessions()
         before = self.__dict__.get("_session_kinds", frozenset())

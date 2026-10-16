@@ -1071,6 +1071,7 @@
   "why.engine_unknown": "Belum diketahui apakah versi Codex ini didukung.",
   "why.held": "Percakapan atau proyeknya menanyai Anda dulu: tidak ada yang dikirim sampai Anda mengizinkannya berlanjut.",
   "why.held_by_other_session": "Terbuka di sesi Codex lain (terminal atau VS Code); dilanjutkan setelah aplikasi Codex memegangnya.",
+  "why.version_newer_than_engine": "Codex yang lebih baru daripada yang ada di sini terakhir menjalankan percakapan ini; dilanjutkan setelah Codex diperbarui.",
   "why.home_lock_unavailable": "Pemantau lain bertanggung jawab atas folder Codex ini.",
   "why.home_removed": "Folder Codex-nya dihapus di Pengaturan, jadi tidak akan dilanjutkan.",
   "why.loaded_state_unknown": "Belum dapat diketahui apakah percakapan terbuka.",

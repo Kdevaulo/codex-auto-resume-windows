@@ -495,7 +495,7 @@
   "statement.once_more_when_unsure.instead": "標準版從不重傳送達情況不確定的接續訊息。它會追蹤 24 小時以防訊息送達，否則就讓它維持不確定。",
   "statement.once_more_when_unsure.risks": "如果第一則接續訊息其實遲到了，對話會收到兩次同樣的接續，Codex 可能把同樣的工作做兩次；之後如果發現兩個標記，此功能會自行關閉。文字會依當時的設定重新產生。守護行程重新啟動後無法證明歷史一直是最新的，因此不會重傳任何內容。",
   "statement.once_more_when_unsure.stop": "在這裡關閉它、從 Codex 中關閉它，或一次關閉所有進階功能。之後不確定的接續訊息只會像標準版一樣被追蹤。",
-  "statement.other_sessions.departs": "A15（只偵測桌面應用程式的對話）和 A11（在應用程式以外的 Codex 工作階段持有對話時傳送）。它遵守 A2、A3、A4、A17、H4 和 H6：一條通道、確切的對話、標記、較新的工作優先，以及暫停和取消會取回排入佇列的接續訊息。",
+  "statement.other_sessions.departs": "A15（只偵測桌面應用程式的對話）、A11（在應用程式以外的 Codex 工作階段持有對話時傳送）和 B6（從這類對話的第一行讀取寫下它的 Codex 版本，並在該版本比這裡的 Codex 更新時等待）。它遵守 A2、A3、A4、A17、H4 和 H6：一條通道、確切的對話、標記、較新的工作優先，以及暫停和取消會取回排入佇列的接續訊息。",
   "statement.other_sessions.does": "還會發現你在終端機（Codex CLI 和 TUI）或 VS Code 擴充功能中執行的對話的失敗，並像復原 Codex 應用程式的對話一樣復原它們：當另一個 Codex 工作階段持有這樣的對話時，接續訊息會透過 codex queue 送出，讓那個工作階段接手；如果那個工作階段先結束，接續訊息會被取回並重新等待。如果同時開啟了 Codex 關閉時在此執行對話，則沒有任何工作階段持有的對話會在此處執行。",
   "statement.other_sessions.instead": "標準版只查看 Codex 應用程式自己的對話，並在另一個 Codex 工作階段持有某個對話時以自己的原因等待。",
   "statement.other_sessions.risks": "Codex 用來區分這些對話的字詞（MO）並未在每個 Codex 版本上量測過：錯誤的字詞什麼也找不到，絕不會找到錯誤的對話。工作階段結束時若接續訊息仍在佇列中，就把它留給取回，而無法取回的訊息絕不會被傳送兩次。",

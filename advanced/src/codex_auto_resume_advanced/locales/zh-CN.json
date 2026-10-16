@@ -495,7 +495,7 @@
   "statement.once_more_when_unsure.instead": "标准版从不重发送达情况不确定的续接消息。它会跟踪 24 小时以防消息送达，否则就让它保持不确定。",
   "statement.once_more_when_unsure.risks": "如果第一条续接消息其实迟到了，对话会收到两次同样的续接，Codex 可能把同样的工作做两次；之后如果发现两个标记，此功能会自行关闭。文字会按当时的设置重新生成。守护进程重启后无法证明历史一直是最新的，因此不会重发任何内容。",
   "statement.once_more_when_unsure.stop": "在这里关闭它、从 Codex 中关闭它，或一次关闭所有高级功能。之后不确定的续接消息只会像标准版一样被跟踪。",
-  "statement.other_sessions.departs": "A15（只检测桌面应用的对话）和 A11（在应用以外的 Codex 会话持有对话时发送）。它遵守 A2、A3、A4、A17、H4 和 H6：一条通道、确切的对话、标记、较新的工作优先，以及暂停和取消会取回排队中的续写消息。",
+  "statement.other_sessions.departs": "A15（只检测桌面应用的对话）、A11（在应用以外的 Codex 会话持有对话时发送）和 B6（从这类对话的第一行读取写下它的 Codex 版本，并在该版本比这里的 Codex 更新时等待）。它遵守 A2、A3、A4、A17、H4 和 H6：一条通道、确切的对话、标记、较新的工作优先，以及暂停和取消会取回排队中的续写消息。",
   "statement.other_sessions.does": "还会发现你在终端（Codex CLI 和 TUI）或 VS Code 扩展中运行的对话的失败，并像恢复 Codex 应用的对话一样恢复它们：当另一个 Codex 会话持有这样的对话时，续写消息会通过 codex queue 发出，让那个会话接手；如果那个会话先结束，续写消息会被取回并重新等待。如果同时开启了 Codex 关闭时在此运行对话，则没有任何会话持有的对话会在此处运行。",
   "statement.other_sessions.instead": "标准版只查看 Codex 应用自己的对话，并在另一个 Codex 会话持有某个对话时以自己的原因等待。",
   "statement.other_sessions.risks": "Codex 用来区分这些对话的字词（MO）并未在每个 Codex 版本上测量过：错误的字词什么也找不到，绝不会找到错误的对话。会话结束时若续写消息仍在排队，就把它留给取回，而无法取回的消息绝不会被发送两次。",

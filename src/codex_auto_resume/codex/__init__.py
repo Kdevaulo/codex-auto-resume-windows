@@ -24,6 +24,7 @@ from .values import (KNOWN_STATUSES, MAX_ITEM_BYTES, MAX_META_BYTES,  # noqa: F4
 from .paths import DB_KINDS, _safe_path  # noqa: F401
 from .payload import _choose_reset, _content_has_marker, _queue_has_marker, admissible, detect  # noqa: F401
 from .schema import SchemaMixin
+from . import eligibility, rollout
 
 
 class LocalSource(SchemaMixin, HistoryMixin):
@@ -35,6 +36,22 @@ class LocalSource(SchemaMixin, HistoryMixin):
     # P18 (v0.6.16-beta.4): the kinds of conversation besides the app's `_eligibility` takes up (codex/eligibility.py),
     # set by the engine from its plug each tick; empty, the standard edition's always.
     session_kinds = frozenset()
+
+    def newer_than_engine(self, thread_id: str, kinds, engine_version) -> bool:
+        """Whether a conversation of one of `kinds` (P18) says a Codex newer than `engine_version` (the engine's
+        `codex --version`) wrote it - the version skew guard (eligibility.newer_than_engine); False with no kind."""
+        return bool(kinds) and eligibility.newer_than_engine(self.written_by(thread_id, kinds), engine_version)
+
+    def written_by(self, thread_id: str, kinds):
+        """The Codex version a conversation of one of `kinds` (P18) - a terminal's, VS Code's, never the app's own -
+        says wrote it: its file's first line's `cli_version` (B6, the line `_eligibility` reads), or None. Read only for
+        a kind a plug names, so the standard edition, which names none, never reads it."""
+        if not kinds or self.taken(thread_id, frozenset()) or not self.taken(thread_id, kinds):
+            return None
+        path = self._rollout_path(thread_id)
+        payload = None if path is None else rollout.session_meta(path)
+        version = payload.get("cli_version") if isinstance(payload, dict) else None
+        return version if isinstance(version, str) else None
 
     def elsewhere(self, codex_home) -> "LocalSource":
         """A reader of another Codex home, made as this one is (v0.6.15-beta): for the labels of that home's records,
