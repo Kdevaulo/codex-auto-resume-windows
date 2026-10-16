@@ -205,6 +205,27 @@ class CompactingTests(CompactCase):
                 self.assertIn(words["page.row.compact"], words["statement.compact_continue.does"])
 
 
+class OneStopTests(unittest.TestCase):
+    """A turn run here is stopped in one place: Stop... on the Advanced features page's runs card (AdvancedRuns.cs),
+    never a second button on Pending (no two ways to one result; DECISIONS 2026-10-17, I1.m) - and the statement
+    says where it is, in every language."""
+
+    def test_the_statement_points_to_the_card_in_every_language(self):
+        """Fails with the statement pointing at a Stop on Pending's row again."""
+        for locale in l10n.LOCALES:
+            with self.subTest(locale):
+                words = statement.CATALOGS.catalog(locale)
+                said = words["statement.headless_run.stop"]
+                self.assertIn(words["page.runs.title"], said)
+                self.assertIn(words["page.runs.stop"], said)
+                self.assertNotIn("Pending", statement.CATALOGS.catalog("en")["statement.headless_run.stop"])
+
+    def test_only_the_runs_card_sends_a_stop(self):
+        sending = sorted(path.name for path in (ROOT / "advanced" / "gui").glob("*.cs")
+                         if '"advanced-headless-stop"' in path.read_text(encoding="utf-8"))
+        self.assertEqual(sending, [RUNS.name])
+
+
 class WindowTests(unittest.TestCase):
     """The window's half, read as text: the standard window's point, and the overlay's body of it."""
 
