@@ -159,22 +159,15 @@ namespace CodexAutoResume
         /// Whether the page the window opened on is drawn from every answer it asked for, and nothing is moving.
         private bool Settled()
         {
-            return SettledOn(firstPage);
-        }
-
-        /// Whether `page` is in front, drawn from every answer it asked for, and nothing is moving: for the page the
-        /// window opened on (Settled), and for each page the render mode turns to (WindowRender.cs).
-        private bool SettledOn(string page)
-        {
-            if (!shown || currentPage != page) return false;
+            if (!shown || currentPage != firstPage) return false;
             if (!settingsRead || readingSettings || reopening || pendingSchema != null || buildQueued) return false;
             if (busy > 0 || refreshing || loadingStats || loadingCompat || readingFailure || acknowledging) return false;
             if (bridge.InFlight > 0 || Transition.Moving > 0) return false;
             if (previewTimer != null && previewTimer.Enabled) return false;
-            if (page == "settings") return previewToken > 0;
+            if (firstPage == "settings") return previewToken > 0;
             if (snapshot == null) return false;
-            if (page == "statistics") return statsToken > 0;
-            if (page == "diagnostics") return compatView != null || compatUnreadable;
+            if (firstPage == "statistics") return statsToken > 0;
+            if (firstPage == "diagnostics") return compatView != null || compatUnreadable;
             return true;
         }
 

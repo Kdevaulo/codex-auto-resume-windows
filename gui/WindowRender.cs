@@ -2,7 +2,7 @@
 // motion pictures (build/make_motion.py).
 //
 // Never a window a person opens: it runs only when build/motion_window.py names a render job in
-// CODEX_AR_RENDER_PLAN beside a capture's CODEX_AR_STILL_READY, and then the window is built as LayoutAudit
+// CODEX_AR_RENDER_PLAN beside a capture's event (Soft.StillReady), and then the window is built as LayoutAudit
 // builds it - never shown, not even a top-level window - answered from the job's own canned replies instead of
 // a bridge, so nothing is read from an installation, nothing is written anywhere but the job's folder, and no
 // process is started. For each frame of the job it is put in a state - a page, a Settings section, a scroll
@@ -116,7 +116,8 @@ namespace CodexAutoResume
             string formLocale = null;
             try
             {
-                string theme = Str(job, "theme") ?? "light", design = Str(job, "design") ?? "soft";
+                string theme = Str(job, "theme"), design = Str(job, "design");
+                if (theme == null || design == null) throw new InvalidDataException("the job names no theme or design");
                 Theme.Opened = theme;
                 Design.Opened = design;
                 Palette.AdoptDesign(design);
@@ -198,7 +199,9 @@ namespace CodexAutoResume
                 Application.RaiseIdle(EventArgs.Empty);
                 Materialise(this);
                 if (!settle) return true;
-                if (!SettledOn(currentPage ?? firstPage)) { since = -1; }
+                // Settled asks about the page the window opened on: the page in front is that page here.
+                firstPage = currentPage ?? firstPage;
+                if (!Settled()) { since = -1; }
                 else if (since < 0) { since = ticks; still.Restart(); }
                 else if (ticks != since && still.ElapsedMilliseconds >= 250) return true;
                 System.Threading.Thread.Sleep(10);
@@ -206,7 +209,7 @@ namespace CodexAutoResume
             return false;
         }
 
-        /// What the window is still waiting for, of everything SettledOn asks.
+        /// What the window is still waiting for, of everything Settled asks.
         private string Unsettled()
         {
             var waiting = new List<string>();
