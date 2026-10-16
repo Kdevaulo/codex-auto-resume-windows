@@ -197,6 +197,19 @@ class CustomNumberTests(UsageCase):
         self.assertEqual(self.rt.state.options("usage_pause")[OptionKey.PAUSE_FIVE_HOUR], 92)
         self.assertNotIn("warning", self.set("usage_pause", OptionKey.PAUSE_FIVE_HOUR, 97))
 
+    def test_a_value_stored_out_of_order_by_an_older_beta_blocks_only_changes_to_its_own_window(self):
+        """beta.3 took any preset with no order check: a wrap-up at 96, at or above the words' 95, may be stored. A
+        change elsewhere - the spacing, the other window - is taken; one to that window must leave it in order."""
+        state = self.rt.state
+        state.set_option("usage_wrap_up", OptionKey.WRAP_FIVE_HOUR, 96, generation=state.meta()["generation"],
+                         actor=Actor.DASHBOARD)
+        self.assertTrue(self.set("usage_meter", OptionKey.POLL_MINUTES, 30)["done"], "the spacing")
+        self.assertTrue(self.set("usage_wrap_up", OptionKey.WRAP_WEEKLY, 88)["done"], "the other window")
+        self.assertTrue(self.set("usage_wrap_up", OptionKey.WRAP_STYLE, 2)["done"], "the wording")
+        self.assertEqual(self.set("usage_meter", OptionKey.WARN_FIVE_HOUR, 80)["refusal"], Refusal.OPTION_ORDER,
+                         "its own window is still checked")
+        self.assertTrue(self.set("usage_wrap_up", OptionKey.WRAP_FIVE_HOUR, 94)["done"], "and may be put in order")
+
     def test_the_meter_reads_at_a_spacing_typed_in(self):
         self.on("usage_meter")
         self.assertTrue(self.set("usage_meter", OptionKey.POLL_MINUTES, 7)["done"])

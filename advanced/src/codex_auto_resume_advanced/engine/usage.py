@@ -525,13 +525,20 @@ class UsagePause:
             pass
 
 
-def order_problem(values) -> tuple:
+def touched(key) -> tuple:
+    """The windows whose order an option bears on: its own window for a percentage, none for anything else."""
+    return tuple(minutes for minutes in WINDOWS if key == STOP_WORDS_OPTIONS[minutes]
+                 or any(key == stages[minutes] for stages in STAGE_OPTIONS.values()))
+
+
+def order_problem(values, windows_=WINDOWS) -> tuple:
     """Item (j) of the owner's additions, for each window: the warning at or below the wrap-up, and the wrap-up below the
     stop the words ask for - else ("order", None); a forced stop below the words' stop only warns ("stop_before_words"),
     as it would cut Codex off before it stops itself - never refuses. `values` is {capability: its options} as they
-    would be; (refusal word or None, warning word or None)."""
+    would be, `windows_` the windows looked at - a change, only those it touches (`touched`), so a value an older
+    beta stored out of order never blocks a change to anything else; (refusal word or None, warning word or None)."""
     warning = None
-    for minutes in WINDOWS:
+    for minutes in windows_:
         warn = values.get(METER, {}).get(STAGE_OPTIONS[METER][minutes], DEFAULT_WARN)
         wrap = values.get(WRAP_UP, {}).get(STAGE_OPTIONS[WRAP_UP][minutes], DEFAULT_WRAP)
         words = values.get(WRAP_UP, {}).get(STOP_WORDS_OPTIONS[minutes], DEFAULT_STOP_WORDS)
