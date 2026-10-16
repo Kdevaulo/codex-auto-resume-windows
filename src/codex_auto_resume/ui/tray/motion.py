@@ -194,14 +194,36 @@ def icon_frame(state, elapsed_ms, since_entered_ms=None, *, reduced=False, fine=
     return (0, top)
 
 
+# Windows' timer tick, which a timer's interval is rounded up to (ICON_MOTION's frame rates are just inside it).
+TIMER_TICK_MS = 1000.0 / 64
+
+
+def _watching_rest_ms(elapsed_ms):
+    """How long the head still rests at home after watching's sweep before the next breath begins, in ms, or None
+    while it breathes or travels."""
+    breath, motion = float(brand.GLOW["monitoring_ms"]), ICON_MOTION
+    sweeps = motion["sweep_breaths"]
+    out, hold = breath * sweeps * motion["sweep_out"], breath * sweeps * motion["sweep_hold"]
+    start, cycle = breath * motion["breaths"], breath * (motion["breaths"] + sweeps)
+    into = elapsed_ms % cycle
+    return cycle - into if into - start >= 2 * out + hold else None
+
+
 def icon_frame_ms(state, elapsed_ms, since_entered_ms=None, *, reduced=False, fine=1):
     """How soon the next frame is due, in ms, or None when nothing moves (no timer at all). With `fine` steps
-    (the notification area's) watching's sweep glides at ICON_MOTION glide_frame_ms."""
+    (the notification area's) watching's sweep glides at ICON_MOTION glide_frame_ms - and once it is home, where
+    nothing changes until the next breath, the timer waits for that in one go: as many glide frames as reach it,
+    so it wakes on the very tick a frame each glide would have, with no wake between that finds nothing to do."""
     if reduced:
         return None
     if icon_turn(state, elapsed_ms) is not None:
         if int(fine) > 1 and state == "watching":
-            return ICON_MOTION["glide_frame_ms"]
+            glide = ICON_MOTION["glide_frame_ms"]
+            rest = _watching_rest_ms(elapsed_ms)
+            if rest is not None:
+                each = math.ceil(glide / TIMER_TICK_MS) * TIMER_TICK_MS
+                return glide * max(1, int(math.ceil(rest / each - 1e-9)))
+            return glide
         return ICON_MOTION["turn_frame_ms"]
     if state in ICON_BREATHS:
         return ICON_MOTION["breathe_frame_ms"]

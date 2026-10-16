@@ -731,6 +731,39 @@ class GlideTests(unittest.TestCase):
                     self.assertEqual(level, plain_level)
                     self.assertLessEqual(abs(fine - plain * self.FINE), self.FINE // 2)
 
+    def test_at_home_after_the_sweep_the_timer_waits_for_the_next_breath_in_one_go(self):
+        """Home after watching's sweep, nothing changes until the next breath: a frame each glide there woke the
+        icon about 49 times a cycle for nothing. It now waits for the breath in one go - as many glide frames as
+        reach it, so it wakes on the tick the glide would have - and over two whole loops it shows the very frames
+        it showed, at the very moments, as many of them; only the wakes that changed nothing are gone."""
+        def old_rule(at):
+            if tray.icon_turn("watching", at) is not None:
+                return MOTION["glide_frame_ms"]
+            return MOTION["breathe_frame_ms"]
+
+        def run(rule):
+            at, shown, wakes, resting = 0.0, [], 0, 0
+            while at < 2 * LOOP:
+                frame = tray.icon_frame("watching", at, at, fine=self.FINE)
+                if not shown or shown[-1][1] != frame:
+                    shown.append((at, frame))
+                wakes += 1
+                if tray.icon_turn("watching", at) == 0.0 and (at % LOOP) - SWEEP_AT > 2 * SWEEPS["watching"][1]:
+                    resting += 1
+                at += math.ceil(rule(at) / TICK - 1e-9) * TICK
+            return shown, wakes, resting
+
+        new_shown, new_wakes, new_resting = run(lambda at: tray.icon_frame_ms("watching", at, at, fine=self.FINE))
+        old_shown, old_wakes, old_resting = run(old_rule)
+        self.assertEqual(new_shown, old_shown, "the same frames at the same moments")
+        self.assertGreaterEqual(old_resting, 2 * 40)
+        self.assertLessEqual(new_resting, 2 * 2, "a wake or so a rest, not one a glide")
+        self.assertLessEqual(new_wakes, old_wakes - 2 * 40)
+        # The breath and the sweep themselves keep their rates; the plain table and the quick sweeps never rest so.
+        self.assertEqual(tray.icon_frame_ms("watching", SWEEP_AT + 10, fine=self.FINE), MOTION["glide_frame_ms"])
+        self.assertEqual(tray.icon_frame_ms("watching", LOOP - 1000), MOTION["turn_frame_ms"])
+        self.assertEqual(tray.icon_frame_ms("watching", 10, fine=self.FINE), MOTION["breathe_frame_ms"])
+
     def test_the_icon_builds_the_fine_table_and_steps_and_times_by_the_table_it_has(self):
         built = []
         with unittest.mock.patch.object(animation, "build_icon_frames",
