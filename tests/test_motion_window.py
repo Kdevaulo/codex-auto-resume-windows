@@ -82,11 +82,12 @@ class JobTests(unittest.TestCase):
         self.assertEqual(job["targets"], ["page.history", "row.en"])
         self.assertEqual((job["theme"], job["design"]), ("light", "soft"))
 
-    def test_replies_carry_no_usage_reading_as_the_captured_pictures_show_none(self):
-        reply = {"ok": True, "status": {"watcher": {"running": True, "usage": [1, []]}},
-                 "watcher": {"usage": None, "pid": 1}}
-        motion_window._as_captured(reply)
-        self.assertEqual(reply, {"ok": True, "status": {"watcher": {"running": True}}, "watcher": {"pid": 1}})
+    def test_replies_keep_the_usage_reading_the_captured_pictures_show(self):
+        """The captures write the envelope's heartbeat (test_still_usage), so the motion keeps its usage reading
+        as the pinned installation gives it: nothing is taken out of a reply."""
+        replies = {item["command"]: item["reply"] for item in motion_window.answers("en")}
+        self.assertIsNotNone(replies["status"]["status"]["watcher"].get("usage"))
+        self.assertIsNotNone(replies["dashboard"]["status"]["watcher"].get("usage"))
 
     def test_the_pictures_are_rebuilt_whole_from_each_frame_s_rectangle(self):
         with tempfile.TemporaryDirectory() as name:

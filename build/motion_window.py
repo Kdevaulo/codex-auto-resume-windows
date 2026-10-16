@@ -95,25 +95,7 @@ def answers(locale: str, stored: dict | None = None) -> list:
     failed = [item["command"] for item in out if not item["reply"].get("ok")]
     if failed:
         raise RuntimeError("the pinned installation could not answer %s" % failed)
-    for item in out:
-        _as_captured(item["reply"])
     return out
-
-
-def _as_captured(value) -> None:
-    """A reply as the captured pictures' bridge gives it: the watcher's heartbeat there is written every second by
-    the capture's own mutex holder (make_screenshots.HOLD_MUTEX), which hands it no usage reading, so the window
-    pictured shows none - while the pinned installation's heartbeat carries one (write_heartbeat). The motion shows
-    what the pictures show: the watcher's `usage` is taken out wherever a reply carries the watcher."""
-    if isinstance(value, dict):
-        watcher = value.get("watcher")
-        if isinstance(watcher, dict):
-            watcher.pop("usage", None)
-        for item in value.values():
-            _as_captured(item)
-    elif isinstance(value, list):
-        for item in value:
-            _as_captured(item)
 
 
 def frame_state(frame: motion_plan.Frame, index: int) -> dict:
