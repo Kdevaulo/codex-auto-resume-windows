@@ -280,6 +280,10 @@ namespace CodexAutoResume
 
         /// Runs the bootstrap to install one version - `-Update` for the release the check found, `-Version <v>` for the
         /// pre-release a person said yes to - and says how it went.
+        ///
+        /// v0.6.16: in the installer window (InstallerWindow), as a setup program installs: how far it is, from the
+        /// lines the bootstrap and the installer print (Heard), then whether it finished, with its code and its log -
+        /// and, where it did, "Open the Dashboard", which opens this installation's new Dashboard in place of this one.
         private void InstallUpdate(string root, string script, string flag, string version)
         {
             // Who is running now. `code_version` is no use for this: an old watcher reads the
@@ -288,26 +292,66 @@ namespace CodexAutoResume
             string before = WatcherIdentity();
             SetBusy(true);
             diagUpdate.Text = S("diag.update_installing", "installing...");
+            string answer = "failed", from = null, to = null, detail = "", compatibility = null, prerelease = null;
+            string edition = InstallerFlow.EditionOfSource(Path.Combine(Path.Combine(root, "app"), "src"));
+            var flow = new InstallerFlow(InstallerFlow.Update, root, edition, edition, version);
+            var window = new InstallerWindow(flow, new InstallerWords(strings, openedLanguage), null,
+                delegate(InstallerFlow answered, Action<string> line, Action<double> unpacked)
+                {
+                    Heard = line;
+                    try
+                    {
+                        RunBootstrap(root, script, flag, UpdateMilliseconds,
+                                     out answer, out from, out to, out detail, out compatibility, out prerelease);
+                    }
+                    finally { Heard = null; }
+                    return answer == "installed" ? 0 : answer == "running" ? InstallerFlow.StillRunning
+                         : answer == "incomplete" ? InstallerFlow.NotStarted : HeardCode == 0 ? 1 : HeardCode;
+                }, null, Font);
+            window.ShowDialog(this);
+            if (answer == "installed" && window.OpenDashboard && OpenNewDashboard(root))
+            {
+                Close();
+                return;
+            }
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
-                string answer, from, to, detail, compatibility, prerelease;
-                RunBootstrap(root, script, flag, UpdateMilliseconds,
-                             out answer, out from, out to, out detail, out compatibility, out prerelease);
                 Dictionary<string, object> live = CheckAfterRefresh(bridge, compatibility);
                 MethodInvoker finish = delegate
                 {
                     SetBusy(false);
                     ReportCompatibilityLine(compatibility, live);
                     if (answer == "installed") AfterUpdate(before, version, detail);
-                    else
-                    {
-                        diagUpdate.Text = UpdateFact(answer, from, to);
-                        ReportUpdate(answer, from, to, detail);
-                    }
+                    // The window has said what happened, with the log: the card keeps the one-line fact.
+                    else diagUpdate.Text = UpdateFact(answer, from, to);
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(finish); }
                 catch (Exception) { }
             });
+        }
+
+        /// The update's lines, for the installer window: told each line StartBootstrap reads while it is set, on the
+        /// worker the window runs the update on, and the bootstrap's exit code once it has ended (HeardCode).
+        [ThreadStatic] private static Action<string> Heard;
+        [ThreadStatic] private static int HeardCode;
+
+        /// This installation's Dashboard, the new version the update has just put in place, started by its full path.
+        private static bool OpenNewDashboard(string root)
+        {
+            string exe = Path.Combine(root, "CodexAutoResumeSettings.exe");
+            if (!File.Exists(exe)) return false;
+            try
+            {
+                var start = new ProcessStartInfo(exe);
+                start.UseShellExecute = false;
+                start.WorkingDirectory = root;
+                Process.Start(start).Dispose();
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         /// The identity of the process holding the watcher's heartbeat, or null where there
@@ -398,7 +442,20 @@ namespace CodexAutoResume
                 info.StandardErrorEncoding = Encoding.UTF8;
                 using (Process process = Process.Start(info))
                 {
-                    Task<string> output = process.StandardOutput.ReadToEndAsync();
+                    // Line by line where the installer window is told each one (Heard), whole otherwise.
+                    Action<string> heard = Heard;
+                    Task<string> output = heard == null ? process.StandardOutput.ReadToEndAsync()
+                                        : Task.Factory.StartNew<string>(delegate
+                                          {
+                                              var lines = new StringBuilder();
+                                              string line;
+                                              while ((line = process.StandardOutput.ReadLine()) != null)
+                                              {
+                                                  lines.Append(line).Append('\n');
+                                                  heard(line);
+                                              }
+                                              return lines.ToString();
+                                          });
                     Task<string> failure = process.StandardError.ReadToEndAsync();
                     if (!process.WaitForExit(milliseconds)) return "running";
                     output.Wait(5000);
@@ -406,6 +463,8 @@ namespace CodexAutoResume
                     printed = output.IsCompleted ? output.Result : "";
                     errors = failure.IsCompleted ? failure.Result : "";
                     code = process.ExitCode;
+                    HeardCode = code;
+                    if (heard != null && errors.Length > 0) foreach (string line in errors.Replace("\r", "").Split('\n')) heard(line);
                     return "done";
                 }
             }

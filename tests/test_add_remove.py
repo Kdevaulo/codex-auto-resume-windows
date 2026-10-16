@@ -402,6 +402,23 @@ class KeyTests(Entry):
                                     str(self.home / "uninstall" / "install.ps1"), "-Uninstall"])
         self.assertEqual(quiet, loud + ["-Silent"])
 
+    def test_with_the_dashboard_program_there_the_command_a_person_runs_opens_the_installer_window(self):
+        """v0.6.16: Settings > Apps runs the installation's own Dashboard program with --uninstall and the kept
+        script (gui/SettingsRemove.cs), which shows the uninstall in the installer window; the quiet command, the
+        one winget runs, is the kept script itself with -Silent and no window, as it was. Either names the kept
+        script, so the key is this installation's by the same rule."""
+        (self.home / addremove.WINDOW).write_bytes(b"MZ not a program")
+        addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
+        values = self.values()
+        loud, quiet = startup.parse_command(values["UninstallString"]), startup.parse_command(values["QuietUninstallString"])
+        self.assertEqual(loud, [str(self.home / "CodexAutoResumeSettings.exe"), "--uninstall",
+                                str(self.home / "uninstall" / "install.ps1")])
+        self.assertEqual(quiet[0].lower(), str(addremove.powershell()).lower())
+        self.assertEqual(quiet[-2:], ["-Uninstall", "-Silent"])
+        self.assertTrue(addremove.owned(values, self.home))
+        window = (ROOT / "gui" / "SettingsRemove.cs").read_text(encoding="utf-8")
+        self.assertIn('internal const string Asked = "%s";' % addremove.WINDOW_SWITCH, window)
+
     def test_a_home_with_spaces_is_one_argument(self):
         home = Path(self.temp.name) / "Example User" / ".codex-auto-resume"
         (home / "uninstall").mkdir(parents=True)

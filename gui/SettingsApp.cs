@@ -1067,6 +1067,8 @@ namespace CodexAutoResume
             Application.SetCompatibleTextRenderingDefault(false);
             // Only a window build/capture_window.ps1 started: the mouse changes nothing it draws.
             SettingsForm.ShutOutPointer();
+            // v0.6.16: the entry in Add or remove programs, in the installer window (SettingsRemove), and nothing else.
+            if (SettingsRemove.IsAsked(argv)) return SettingsRemove.Run(argv);
 
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
             var bridge = new Bridge(root);

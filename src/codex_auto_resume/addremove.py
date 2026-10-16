@@ -4,7 +4,10 @@ Settings > Apps, `winget list`, `winget upgrade` and `winget uninstall` all find
 key under the current user's Uninstall key. This writes that one key, per user, with the values Windows reads from
 it: the name and version and publisher people see, where the program is, and the command that removes it - the
 installer's own uninstall, kept as a copy in the installation (`uninstall\\install.ps1`, put there by the
-installer), and the same command with -Silent for a caller that cannot answer or press a key.
+installer), and the same command with -Silent for a caller that cannot answer or press a key. Since v0.6.16 the
+command a person runs from Settings > Apps shows it in the installer window: the installation's own Dashboard
+program with `--uninstall` and that kept script (gui/SettingsRemove.cs), which runs the script's uninstall with
+-Silent and shows how far it is; the quiet command still runs the script itself, with no window.
 
 One key per edition, by a fixed name (`CodexAutoResume`, and the advanced edition's with its word added), and only
 one of them at a time: an edition change writes the new edition's and takes the other's away, a repair or an
@@ -31,6 +34,9 @@ PUBLISHER = "songyb111-gachon"
 DEFAULT_DISPLAY_NAME = "Codex Auto Resume"
 KEPT_FOLDER = "uninstall"
 KEPT_SCRIPT = "install.ps1"
+# The installation's Dashboard program, which shows the uninstall in the installer window (gui/SettingsRemove.cs).
+WINDOW = "CodexAutoResumeSettings.exe"
+WINDOW_SWITCH = "--uninstall"
 EDITIONS = ("standard", "advanced")
 VALUE_NAMES = ("DisplayName", "DisplayVersion", "Publisher", "InstallLocation", "UninstallString",
                "QuietUninstallString", "NoModify", "NoRepair")
@@ -55,8 +61,14 @@ def powershell() -> Path:
 
 
 def uninstall_command(home, silent: bool = False) -> str:
-    """The kept uninstaller, run by PowerShell by its full path as Install.cmd runs it. -Silent is the switch
-    that asks nothing and waits for no key; the installer accepts it and the .cmd launchers act on it."""
+    """The kept uninstaller. Quiet, it is run by PowerShell by its full path as Install.cmd runs it, with -Silent,
+    the switch that asks nothing and waits for no key. Otherwise it is shown in the installer window, by the
+    installation's own Dashboard program naming the same kept script - where that program is there, and by
+    PowerShell as the quiet command runs it, without -Silent, where it is not."""
+    window = Path(home) / WINDOW
+    if not silent and window.is_file():
+        return " ".join(startup.quote_argument(argument)
+                        for argument in (str(window), WINDOW_SWITCH, str(kept_script(home))))
     argv = [str(powershell()), "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
             str(kept_script(home)), "-Uninstall"]
     if silent:
