@@ -6,6 +6,13 @@ on:
     branches: [main, dev, refactor]
   pull_request:
   workflow_dispatch:
+    inputs:
+      quick:
+        # A work branch's check before it is merged (2026-10-17): one Python per edition, so several branches'
+        # runs fit the concurrent-job limit at once. A push or a run without it is the whole matrix as always.
+        description: "One Python (3.13) per edition, for checking a work branch"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,6 +61,9 @@ jobs:
         # PARTS below is the length of this list; tests/test_split_runs.py holds the two together,
         # so no part of a lane can be dropped by changing one of them.
         part: [1, 2, 3, 4]
+        # A quick run (workflow_dispatch input `quick`) keeps 3.13 alone: the others and the pre-release lane are
+        # excluded. Without the input the expression is an empty list and the matrix is whole.
+        exclude: ${{ fromJSON(inputs.quick && '[{"python-version": "3.12"}, {"python-version": "3.14"}, {"python-version": "3.15"}]' || '[]') }}
         include:
           # The next Python, while it is still a release candidate. It is not decoration:
           # it compiles the sources and runs the same suite, and a failure is annotated
