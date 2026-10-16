@@ -46,7 +46,7 @@ from dataclasses import dataclass, replace
 import re
 import threading
 
-from . import demo, l10n, notice_presence, notify, reasons, settings
+from . import demo, l10n, notice_kinds, notice_presence, notify, reasons, settings
 
 # The setting that turns the card off (settings.py, the "windows" group, default on).
 CARD_SETTING = "notification_card"
@@ -94,7 +94,8 @@ class Notice:
     itself - the arguments `notify.show` receives - as sorted (name, value) pairs; `key` is the
     exact conversation id, so a newer card for the same conversation replaces the older one;
     `click` (v0.6.16) is where a click on the notice itself goes - the card's face, the toast's body
-    (its `launch`) - as click_uri decided it, or "" for nowhere.
+    (its `launch`) - as click_uri decided it, or "" for nowhere; `stays` (v0.6.16) is whether it stays on
+    screen until clicked, its kind being one a person chose (notice_kinds).
     """
     kind: str
     status: str
@@ -108,6 +109,7 @@ class Notice:
     locale: str
     key: str | None = None
     click: str = ""
+    stays: bool = False
 
     def toast_content(self) -> dict:
         """The toast, as `notify.show_content` takes it."""
@@ -202,18 +204,24 @@ def click_uri(kind, actions, key, destination=DEFAULT_CLICK) -> str:
     return notify.open_uri(notice_page(kind, actions))
 
 
-def _with_click(notice, destination=DEFAULT_CLICK):
-    """The notice with its click decided, and the toast's body sent there too (its `launch`)."""
+def _with_click(notice, destination=DEFAULT_CLICK, stay=()):
+    """The notice with its click decided, and the toast's body sent there too (its `launch`); and whether it stays
+    until clicked - its kind among `stay`, the ids a person chose (notice_kinds) - which the toast carries too."""
     if notice is None:
         return None
     click = click_uri(notice.kind, notice.actions, notice.key, destination)
-    return replace(notice, click=click, content=_frozen(dict(notice.toast_content(), launch=click)))
+    stays = notice_kinds.stays(notice.kind, {notice_kinds.FIELD: list(stay or ())})
+    content = dict(notice.toast_content(), launch=click)
+    if stays:
+        content["stays"] = True
+    return replace(notice, click=click, stays=stays, content=_frozen(content))
 
 
-def build(event, detail, identity=None, *, sound=False, destination=DEFAULT_CLICK):
+def build(event, detail, identity=None, *, sound=False, destination=DEFAULT_CLICK, stay=()):
     """The Notice for one engine event, or None for an event that is never announced; a click on it goes to
-    `destination` (click_destination of the settings), as click_uri decides."""
-    return _with_click(_build(event, detail, identity, sound=sound), destination)
+    `destination` (click_destination of the settings), as click_uri decides, and it stays on screen until clicked
+    when its kind is among `stay` (notice_kinds.chosen of the settings)."""
+    return _with_click(_build(event, detail, identity, sound=sound), destination, stay)
 
 
 def _build(event, detail, identity=None, *, sound=False):
@@ -321,14 +329,14 @@ def show_demo(notice, *, inbox=None, setting=True, probe=None) -> bool:
     return inbox.post(notice)
 
 
-def build_power_stopped() -> Notice:
+def build_power_stopped(stay=()) -> Notice:
     """What a power action's stop button says afterwards, from a card or a toast (v0.6.12)."""
-    return _with_click(_notice("power_stopped", notify.power_content("power_stopped", {}), key=None))
+    return _with_click(_notice("power_stopped", notify.power_content("power_stopped", {}), key=None), stay=stay)
 
 
-def build_cancelled(thread_id) -> Notice:
+def build_cancelled(thread_id, stay=()) -> Notice:
     """What a cancel from a notification button says afterwards, as `notify.cancelled` does."""
-    return _with_click(_notice("cancelled", notify.cancelled_content(thread_id), key=thread_id))
+    return _with_click(_notice("cancelled", notify.cancelled_content(thread_id), key=thread_id), stay=stay)
 
 
 # --------------------------------------------------------------------------- the handover
@@ -449,7 +457,7 @@ def complete(notice, card_shown, *, show=notify.show_content) -> bool:
 
 
 # ------------------------------------------------------------------------- the buttons
-def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None, open_link=None) -> str:
+def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None, open_link=None, stay=()) -> str:
     """Do what a card button's URI asks, in process. Returns what happened, as one word.
 
     "opened" / "not_installed"  an open URI: `open_dashboard(page)` for one of the window's pages
@@ -499,7 +507,7 @@ def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None,
         return "opened" if opened else "not_installed"
     nonce = notify.parse_power_stop_uri(uri)
     if nonce is not None:
-        return _power_stop(nonce, control, announce, say)
+        return _power_stop(nonce, control, announce, say, stay)
     interruption_id = notify.parse_cancel_uri(uri)
     if interruption_id is None or control is None:
         say("notification card: a button was ignored (%s)" % ("malformed or unsupported URI"
@@ -523,13 +531,13 @@ def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None,
         say("thread %s: cancelled from a notification card" % thread_id)
     if announce is not None and thread_id:
         try:
-            announce(build_cancelled(thread_id))
+            announce(build_cancelled(thread_id, stay))
         except Exception:
             pass
     return "cancelled"
 
 
-def _power_stop(nonce, control, announce, say) -> str:
+def _power_stop(nonce, control, announce, say, stay=()) -> str:
     """A power action's stop button (v0.6.12, the A28 amendment), from a card or a toast - the toast's
     `activate` (commands/watcher.py) comes here too, so the press does one thing on either route.
 
@@ -556,7 +564,7 @@ def _power_stop(nonce, control, announce, say) -> str:
     say("power action stopped from a notification; this PC stays on this time")
     if announce is not None:
         try:
-            announce(build_power_stopped())
+            announce(build_power_stopped(stay))
         except Exception:
             pass
     return "stopped"

@@ -150,7 +150,9 @@ class SettingsMixin:
     def describe_settings(self) -> list:
         """settings.describe(), with `"managed": true` on each setting a policy key decides while
         one does - which every surface draws greyed, as set by your administrator. With no key set,
-        exactly settings.describe()."""
+        exactly settings.describe(). The edition's plug is taken first (v0.6.16): making it is when an edition registers
+        its kinds of notice (notice_kinds.register), which the schema lists among the ones that may stay on screen."""
+        self.plug
         described = settings.describe()
         decided = managed.fields(self.managed())
         if decided:

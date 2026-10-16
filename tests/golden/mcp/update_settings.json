@@ -87,7 +87,8 @@
               "memory_guard": "off",
               "memory_guard_limit": "mb1024",
               "status_file": false,
-              "notice_click": "page"
+              "notice_click": "page",
+              "notices_stay": []
             }
           }
         }

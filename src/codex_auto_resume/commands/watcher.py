@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from .. import config, notifier, notify
+from .. import config, notice_kinds, notifier, notify
 from ..app import EXIT_ERROR, EXIT_OK
 from ..store import LegacyStore
 from ..windows import WakeEvent
@@ -52,7 +52,7 @@ def cmd_activate(args) -> int:
         from ..control import Control
         done = notifier.activate(args.uri, control=Control(app.paths),
                                  announce=lambda notice: notifier.deliver(notice, inbox=None, setting=False),
-                                 log=app.logger.info)
+                                 log=app.logger.info, stay=notice_kinds.chosen(app.settings))
         return EXIT_OK if done == "stopped" else EXIT_ERROR
     interruption_id = notify.parse_cancel_uri(args.uri)
     if interruption_id is None:

@@ -457,7 +457,7 @@ class SchemaField(TypedDict):
     name: str
     type: str
     group: str
-    default: bool | int | float | str | None
+    default: bool | int | float | str | list[str] | None
     # Only where they mean something: a reason's own setting has its category, the switch that
     # turns a whole group on or off is its master, and the rest belong to one kind of editor.
     category: NotRequired[str]
@@ -476,6 +476,11 @@ class SchemaField(TypedDict):
     managed: NotRequired[bool]
     # v0.6.11: Custom... - a value of the person's own it takes besides its choices.
     custom: NotRequired[OwnValue]
+    # v0.6.16: the kinds of notice that may stay on screen until clicked (notice_kinds): their ids in the order
+    # listed, the catalog key each of core's is named by, and the words an edition registered its own with.
+    kinds: NotRequired[list[str]]
+    keys: NotRequired[dict[str, str]]
+    labels: NotRequired[dict[str, str]]
 
 
 # Every contract, by name, for the test that holds each to the goldens.

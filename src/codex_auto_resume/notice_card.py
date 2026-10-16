@@ -422,11 +422,16 @@ class CardMotion:
         return self.phase in ("enter", "exit", "return") and not self.reduced
 
     def wait_ms(self, now_ms):
-        """How long nothing will change, when nothing is moving: the rest of the hold, or None."""
+        """How long nothing will change, when nothing is moving: the rest of the hold, or None - also for a hold
+        that lasts until the card is clicked (UNTIL_CLICKED), which no timer ends."""
         self._advance(now_ms)
-        if self.phase == "hold" and not self.paused:
+        if self.phase == "hold" and not self.paused and not math.isinf(self.hold_left):
             return max(0.0, self.hold_left - (now_ms - self.since))
         return None
+
+
+# v0.6.16: the hold of a card that stays until it is clicked (notice_kinds): one that never runs out.
+UNTIL_CLICKED = math.inf
 
 
 def hold_ms(message_duration_ms=None) -> float:

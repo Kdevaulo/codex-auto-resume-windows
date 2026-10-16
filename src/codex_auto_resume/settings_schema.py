@@ -8,7 +8,7 @@ nothing of it, and the two make no cycle.
 """
 from __future__ import annotations
 
-from . import continuation, ladder, memguard, ownvalues, power, statusfile
+from . import continuation, l10n, ladder, memguard, notice_kinds, ownvalues, power, statusfile
 
 
 def describe(settings) -> list:
@@ -41,6 +41,15 @@ def describe(settings) -> list:
             # what moves is not Codex's to change (mcp.tools.PANEL_APPEARANCE). The panel draws in
             # both since v0.6.10, as well as following the host's own reduced-motion preference.
             entry["group"] = "appearance"
+        elif name == notice_kinds.FIELD:
+            # v0.6.16: which kinds of notice stay on screen until clicked. A desktop preference like the card itself,
+            # so outside what the Codex panel and MCP may change - the owner's choice - and drawn by the Dashboard
+            # in its Notifications card: one box per kind, each named by core's catalog key or by the words an
+            # edition registered it with, in the language this process speaks.
+            entry["group"] = "windows"
+            entry["kinds"] = list(notice_kinds.ids())
+            entry["keys"] = {kind.id: kind.key for kind in notice_kinds.kinds() if kind.key is not None}
+            entry["labels"] = notice_kinds.edition_labels(l10n.current())
         elif name in ("show_tray", "notification_card", "start_with_codex", power.KEEP_AWAKE_FIELD,
                       power.AWAKE_CAP_FIELD, memguard.GUARD_FIELD, memguard.LIMIT_FIELD, statusfile.FIELD):
             # A desktop preference, beside "run at sign-in" - not a notification, and

@@ -120,7 +120,9 @@ ITEM = {_q(name): item for item, names in {
                # v0.6.12: when the power action after usage-limit recoveries may act, which a person arms.
                "poweraction",
                # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them.
-               "homes"),
+               "homes",
+               # v0.6.16: the kinds of notice a person can keep on screen until clicked, and an edition's.
+               "notice_kinds"),
     "machine": ("machine", "domain", "domain.errors", "domain.ids", "domain.public",
                 "domain.states", "domain.vocabulary",
                 # v0.6.11: the registry's vocabularies, out of domain/vocabulary.py.

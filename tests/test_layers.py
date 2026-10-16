@@ -92,7 +92,9 @@ LAYER = {_q(name): layer for layer, names in {
                "poweraction",
                # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them - pure
                # but for the look at a folder; its identity is handed in from win/folderid.py.
-               "homes"),
+               "homes",
+               # v0.6.16: the kinds of notice that may stay on screen until clicked - pure but for the catalogs.
+               "notice_kinds"),
     "adapters": ("store", "openstate", "codex", "windows", "compat", "compatio", "startup", "shortcut",
                  # v0.6.16-beta.3: the words for this time's file beside the state, written under its lock.
                  "oncewords",

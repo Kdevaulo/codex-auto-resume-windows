@@ -19,7 +19,8 @@ import time
 import traceback
 import uuid
 
-from .. import compatio, config, edition, l10n, managed, needsyou, notifier, notify, oncewords, settings as policy
+from .. import (compatio, config, edition, l10n, managed, needsyou, notice_kinds, notifier, notify, oncewords,
+               settings as policy)
 from ..codex import LocalSource
 from ..codex.chains import memory as chain_memory
 from ..codex.pairing import app_engines
@@ -418,7 +419,8 @@ class App(WatchLoop):
             # v0.6.11: a needs-you notice carries the sound its person chose, if any (notify.py).
             sound = event == needsyou.EVENT and self.settings.get(needsyou.SOUND_FIELD) is True
             notice = notifier.build(event, detail, identity, sound=sound,
-                                    destination=notifier.click_destination(self.settings))
+                                    destination=notifier.click_destination(self.settings),
+                                    stay=notice_kinds.chosen(self.settings))
             if notice is None:
                 return False
             return notifier.deliver(notice, inbox=self._inbox,
@@ -441,7 +443,8 @@ class App(WatchLoop):
         # countdown's carries the promised way to stop it (Q8). Windows' Do not disturb may still hide one.
         if event not in notifier.POWER_EVENTS and not policy.notification_enabled(self.settings, event):
             return False
-        notice = notifier.build(event, detail, destination=notifier.click_destination(self.settings))
+        notice = notifier.build(event, detail, destination=notifier.click_destination(self.settings),
+                                stay=notice_kinds.chosen(self.settings))
         if notice is None:
             return False
         card = not final and self.settings.get(notifier.CARD_SETTING, True) is True
@@ -463,7 +466,8 @@ class App(WatchLoop):
                                  announce=lambda notice: notifier.deliver(
                                      notice, inbox=self._inbox,
                                      setting=self.settings.get(notifier.CARD_SETTING, True) is True),
-                                 log=self.logger.info, open_link=notify.open_in_codex)
+                                 log=self.logger.info, open_link=notify.open_in_codex,
+                                 stay=notice_kinds.chosen(self.settings))
 
     def _demo(self):
         """Show me what happens (v0.6.11), asked from Diagnostics: one made-up card, on a worker thread

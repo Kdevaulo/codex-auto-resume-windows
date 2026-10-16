@@ -21,8 +21,8 @@ from pathlib import Path
 import sys
 import tempfile
 
-from . import (continuation, failures, guards, homes, l10n, ladder, memguard, needsyou, ownvalues, power,
-               projects, quiet, reasons, settings_schema, statusfile)
+from . import (continuation, failures, guards, homes, l10n, ladder, memguard, needsyou, notice_kinds, ownvalues,
+               power, projects, quiet, reasons, settings_schema, statusfile)
 from .domain.vocabulary import (Design, ImportanceTier, NewConversationPolicy, NotifyEvent,
                                 ProjectPolicy, Theme)
 
@@ -291,6 +291,9 @@ FIELDS[homes.FIELD] = ([], homes.coerce)
 # until v0.6.16-beta.4's chat is merged it waits in NOT_YET_OFFERED and every click opens the page.
 NOTICE_CLICKS = ("page", "chat", "codex")
 FIELDS["notice_click"] = ("page", lambda v, d: _choice(v, d, NOTICE_CLICKS))
+# v0.6.16: the kinds of notice that stay on screen until clicked (notice_kinds.py) - none by default, each going away
+# by itself after a while as before. Offered in the Dashboard's Notifications card alone (settings_schema).
+FIELDS[notice_kinds.FIELD] = ([], notice_kinds.coerce)
 
 
 def is_custom_text(name) -> bool:

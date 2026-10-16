@@ -79,7 +79,8 @@
           "memory_guard_limit": "mb1024",
           "status_file": false,
           "codex_homes": [],
-          "notice_click": "page"
+          "notice_click": "page",
+          "notices_stay": []
         }
       }
     },
@@ -163,7 +164,8 @@
           "memory_guard_limit": "mb1024",
           "status_file": false,
           "codex_homes": [],
-          "notice_click": "page"
+          "notice_click": "page",
+          "notices_stay": []
         }
       }
     },
@@ -268,7 +270,8 @@
           "memory_guard_limit": "mb1024",
           "status_file": false,
           "codex_homes": [],
-          "notice_click": "page"
+          "notice_click": "page",
+          "notices_stay": []
         }
       }
     },

@@ -197,6 +197,8 @@ MAX_TOAST_ACTIONS = 5
 # by the toast's own audio element - so it is Windows that plays it, and Windows' Do not disturb and
 # Focus that hold it back with the toast. Otherwise a needs-you toast is silent; no other toast changes.
 NEEDS_YOU_SOUND = "ms-winsoundevent:Notification.Reminder"
+# v0.6.16: the sound every other toast has always had, named only where a reminder would otherwise change it.
+DEFAULT_SOUND = "ms-winsoundevent:Notification.Default"
 
 
 def _audio(silent, sound) -> str:
@@ -208,7 +210,7 @@ def _audio(silent, sound) -> str:
 
 
 def _toast_xml(title, body, button=None, uri=None, extra=(), more=(), silent=False, sound=None,
-               launch=None) -> str:
+               launch=None, stays=False) -> str:
     # Imported when a toast is built, not when this module is: `xml.sax` brings about
     # ninety modules with it, `urllib.request`, `http.client`, `email` and `ssl` among
     # them, and every process that imports the watcher paid for them whether or not it
@@ -223,6 +225,10 @@ def _toast_xml(title, body, button=None, uri=None, extra=(), more=(), silent=Fal
             '<action content=%s activationType="protocol" arguments=%s/>' % (
                 quoteattr(label), quoteattr(target))
             for label, target in pairs[:MAX_TOAST_ACTIONS])
+    elif stays:
+        # A toast that stays needs a button to go (Windows keeps a reminder only while it has one): Windows' own
+        # Dismiss, in Windows' own words - no word of ours.
+        actions = '<actions><action activationType="system" arguments="dismiss" content=""/></actions>'
     # Trimmed here rather than at the call sites, so no future caller can silently
     # lose a line to the platform limit.
     lines = [line for line in ([title] + list(extra) + [body]) if line][:MAX_TOAST_LINES]
@@ -230,15 +236,23 @@ def _toast_xml(title, body, button=None, uri=None, extra=(), more=(), silent=Fal
     # The history copy (`silent`) makes no sound. Without it the document is byte for byte
     # what it was before v0.6.5; tests/test_notice_card.py holds every toast to a golden.
     audio = _audio(silent, sound)
+    if stays and not audio:
+        # A reminder would ring Windows' reminder sound; one that stays rings what it always rang.
+        audio = '<audio src="%s"/>' % DEFAULT_SOUND
     # v0.6.16: a click on the toast's body (`launch`, a protocol activation, as its buttons are) goes where a click on
     # the card's goes - notifier.click_uri decides it. Without one the element is what it always was.
     opens = ' launch=%s activationType="protocol"' % quoteattr(launch) if launch else ""
+    # v0.6.16: a notice of a kind a person keeps on screen until clicked (notice_kinds) is Windows' reminder, which
+    # stays until it is clicked or dismissed. Without it the element is what it always was.
+    if stays:
+        opens += ' scenario="reminder"'
     return ('<toast duration="long"%s><visual><binding template="ToastGeneric">'
             '%s</binding></visual>%s%s</toast>' % (opens, text, audio, actions))
 
 
 def show(title: str, body: str, *, button: str | None = None, uri: str | None = None,
-         extra=(), more=(), silent: bool = False, sound: bool | None = None, launch: str | None = None) -> bool:
+         extra=(), more=(), silent: bool = False, sound: bool | None = None, launch: str | None = None,
+         stays: bool = False) -> bool:
     """Best effort. Returns True only when PowerShell reported success.
 
     The toast document travels as an environment variable into a constant script, never
@@ -256,7 +270,7 @@ def show(title: str, body: str, *, button: str | None = None, uri: str | None = 
         return False
     values = {"XML": _toast_xml(title, body, button, uri, extra, more, silent=silent is True,
                                 sound=sound if isinstance(sound, bool) else None,
-                                launch=launch if isinstance(launch, str) else None),
+                                launch=launch if isinstance(launch, str) else None, stays=stays is True),
               "AUMID": aumid()}
     if silent is True:
         values["SILENT"] = "1"
@@ -338,7 +352,7 @@ def _content(title, body, *, button=None, uri=None, extra=(), more=(), sound=Non
 
 def show_content(content: dict, *, silent: bool = False) -> bool:
     """Raise the toast one of the `*_content` functions describes."""
-    options = {name: content[name] for name in ("button", "uri", "extra", "more", "sound", "launch")
+    options = {name: content[name] for name in ("button", "uri", "extra", "more", "sound", "launch", "stays")
                if name in content}
     if silent is True:
         options["silent"] = True
