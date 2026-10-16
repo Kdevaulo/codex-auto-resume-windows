@@ -90,6 +90,19 @@ class RunTests(StateCase):
             state.run_ended(KEY, "exploded")
 
 
+    def test_only_ended_runs_older_than_asked_of_the_capability_asked_are_pruned(self):
+        state = self.state()
+        other = "%064x" % 79
+        state.run_started(KEY, "headless_run", ac.THREAD, started_at=self.now, ends_by=self.now + 1)
+        state.run_started(other, "model_fallback", ac.THREAD, started_at=self.now, ends_by=self.now + 1)
+        state.run_ended(KEY, RunEnd.COMPLETED, at=self.now)
+        state.run_ended(other, RunEnd.COMPLETED, at=self.now)
+        state.run_started(RECORD, "headless_run", ac.THREAD, started_at=self.now, ends_by=self.now + 1)
+        self.assertEqual(state.prune_runs(self.now + 1, capability="headless_run"), 1)
+        self.assertEqual(sorted(row["interruption_id"] for row in state.runs(live=False)), sorted([other, RECORD]))
+        self.assertEqual(state.prune_runs(self.now, capability="model_fallback"), 0, "not older than asked")
+
+
 class ChatTests(StateCase):
     def test_words_are_kept_only_while_a_message_waits(self):
         state = self.state()

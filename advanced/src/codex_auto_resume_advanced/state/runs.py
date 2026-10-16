@@ -67,14 +67,16 @@ class RunsMixin:
                 % (", ".join(_RUN_COLUMNS), "WHERE end IS NULL" if live else ""), (int(limit),)).fetchall()
         return [dict(zip(_RUN_COLUMNS, row)) for row in rows]
 
-    def prune_runs(self, before) -> int:
-        """Ended runs older than `before`, gone."""
+    def prune_runs(self, before, *, capability=None) -> int:
+        """Ended runs older than `before` - only `capability`'s, where given - gone."""
         _timestamp(before, "before")
+        if capability is not None:
+            _capability(capability)
         with self._transaction(create=False) as connection:
             if connection is None:
                 return 0
-            return connection.execute("DELETE FROM headless_runs WHERE end IS NOT NULL AND ended_at < ?",
-                                      (before,)).rowcount
+            return connection.execute("DELETE FROM headless_runs WHERE end IS NOT NULL AND ended_at < ? AND "
+                                      "(? IS NULL OR capability = ?)", (before, capability, capability)).rowcount
 
 
 class RunsHandle:
@@ -95,6 +97,8 @@ class RunsHandle:
                 key, capability, thread_id, started_at=started_at, ends_by=ends_by),
             # An end is written whatever the capability stands at: the run happened.
             "ended": lambda key, end: state.run_ended(key, end),
+            # Ended rows older than `before` gone, whatever the capability stands at (engine/headless.follow_up).
+            "prune": lambda before: state.prune_runs(before, capability=capability),
         }
 
     def __getattr__(self, name):

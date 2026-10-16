@@ -15,8 +15,9 @@ watcher (one at a time, R3). The turn is capped at the person's Hours (1 to 6, 1
 Pending's row (advanced-headless-stop, the Dashboard's bridge alone - never MCP) interrupts it, and so does the Codex
 app starting (Q3: at once, until a measurement shows what the app does then).
 
-At P8 it does the bookkeeping the route's own thread may not: it writes the live run's row (state/runs.py) for the
-Dashboard, reads a Stop asked from the bridge and hands it on, and journals how each run ended (its codes). Until M6B -
+At P8 it does the bookkeeping the route's own thread may not - one path for all three run kinds (`follow_up`): it
+writes the live run's row (state/runs.py) for the Dashboard, reads a Stop asked from the bridge and hands it on,
+journals how each run ended (its codes), ends a row no thread follows LOST and prunes old ended rows. Until M6B -
 a headless turn on the thread's own saved settings - passes for the Codex in force, its statement carries the
 UNMEASURED warning (arming.warnings_for).
 """
@@ -95,34 +96,44 @@ class HeadlessRunCode:
         return route
 
     def tick(self, view):
-        """P8: the live run's row written, a Stop from the bridge handed on, and how each run ended journalled -
-        what the route's own thread may not do. Never an errand: nothing here asks Codex anything."""
-        scoped = self._scoped
-        if scoped is None:
-            return DEFER
-        runs = scoped.runs
-        live = self.follower.live()
-        try:
-            if live is not None and live["capability"] == CAPABILITY:
-                stored = {row["interruption_id"]: row for row in runs.live()}
-                row = stored.get(live["key"])
-                if row is None:
-                    runs.started(live["key"], live["thread_id"], started_at=live["started_at"],
-                                 ends_by=live["ends_by"])
-                elif row.get("stop_requested_at") is not None:
-                    self.follower.stop(live["key"], RunEnd.INTERRUPTED)
-            for refused in [route for route in self._routes.values() if route.refused is not None]:
-                scoped.count(str(refused.refused))
-                refused.refused = None
-            for ended in self.follower.drain(CAPABILITY):
-                runs.ended(ended["key"], ended["end"])
-                scoped.count(str(ended["end"]))
-            for row in runs.live():
-                if live is None or row["interruption_id"] != live["key"]:
-                    runs.ended(row["interruption_id"], RunEnd.LOST)       # a run no thread follows any more
-        except Exception:
-            pass                                       # the next tick writes what this one could not
+        """P8: the bookkeeping every run kind shares (`follow_up`)."""
+        return follow_up(self._scoped, self.follower, CAPABILITY, self._routes.values())
+
+
+def follow_up(scoped, follower, capability, routes=(), on_end=None):
+    """P8 of each of the three run kinds - headless_run, compact_continue, model_fallback - the one path: the live
+    run's row written; a person's Stop asked from the bridge (its row's stop_requested_at) handed to the follower;
+    a refusal before anything started and how each run ended journalled, `on_end` told of each end; every row of
+    this capability no thread follows any more - a watcher restarted mid-run - ended LOST, so no row stays running
+    with a Stop that reaches nothing; and ended rows older than KEEP_ENDED pruned. What the route's own thread may
+    not do. Never an errand: nothing here asks Codex anything. DEFER."""
+    if scoped is None:
         return DEFER
+    try:
+        runs = scoped.runs
+        live = follower.live()
+        live = live if live is not None and live["capability"] == capability else None
+        if live is not None:
+            row = {row["interruption_id"]: row for row in runs.live()}.get(live["key"])
+            if row is None:
+                runs.started(live["key"], live["thread_id"], started_at=live["started_at"], ends_by=live["ends_by"])
+            elif row.get("stop_requested_at") is not None:
+                follower.stop(live["key"], RunEnd.INTERRUPTED)
+        for refused in [route for route in routes if route.refused is not None]:
+            scoped.count(str(refused.refused))
+            refused.refused = None
+        for ended in follower.drain(capability):
+            runs.ended(ended["key"], ended["end"])
+            scoped.count(str(ended["end"]))
+            if on_end is not None:
+                on_end(ended)
+        for row in runs.live():
+            if live is None or row["interruption_id"] != live["key"]:
+                runs.ended(row["interruption_id"], RunEnd.LOST)           # a run no thread follows any more
+        runs.prune(scoped.now() - KEEP_ENDED)
+    except Exception:
+        pass                                           # the next tick writes what this one could not
+    return DEFER
 
 
 def make(paths) -> HeadlessRunCode:

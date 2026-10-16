@@ -194,6 +194,92 @@ class StopTests(HeadlessCase):
         self.assertNotIn("advanced-headless-stop", [tool["name"] for tool in surfaces.TOOLS])
 
 
+class FollowUpTests(unittest.TestCase):
+    """P8 of all three run kinds is one path (engine/headless.follow_up): a Dashboard Stop reaches the follower, a row
+    no thread follows - a watcher restarted mid-run - is ended LOST, and ended rows older than KEEP_ENDED go."""
+    KEY = "%064x" % 9
+
+    class Runs:
+        def __init__(self, rows):
+            self.rows, self.ended_as, self.pruned = rows, [], []
+
+        def live(self):
+            return [row for row in self.rows if row["interruption_id"] not in dict(self.ended_as)]
+
+        def started(self, *unused, **ignored):
+            pass
+
+        def ended(self, key, end):
+            self.ended_as.append((key, str(end)))
+
+        def prune(self, before):
+            self.pruned.append(before)
+
+    class Scoped:
+        def __init__(self, runs):
+            self.runs, self.counted = runs, []
+
+        def options(self):
+            return {}
+
+        def count(self, code):
+            self.counted.append(code)
+
+        def now(self):
+            return 1_000_000.0
+
+    class Follower:
+        def __init__(self, capability, live=True):
+            self.capability, self.is_live, self.stopped = capability, live, []
+
+        def live(self):
+            return {"key": FollowUpTests.KEY, "capability": self.capability, "thread_id": T1, "started_at": 1,
+                    "ends_by": 2} if self.is_live else None
+
+        def stop(self, key=None, reason=None):
+            self.stopped.append(key)
+            return True
+
+        def drain(self, capability):
+            return []
+
+    def kinds(self):
+        from codex_auto_resume_advanced.engine.compact import CompactContinue
+        from codex_auto_resume_advanced.engine.fallback import ModelFallback
+        return {"headless_run": HeadlessRunCode, "compact_continue": CompactContinue, "model_fallback": ModelFallback}
+
+    def tick(self, made, capability, follower, stop_requested_at=None):
+        runs = self.Runs([{"interruption_id": self.KEY, "capability": capability, "thread_id": T1,
+                           "stop_requested_at": stop_requested_at}])
+        code = made(None, session=lambda asked: None, follower=follower, app_running=lambda: False)
+        code.bind(self.Scoped(runs))
+        self.assertIs(code.tick(None), DEFER)
+        return runs
+
+    def test_a_dashboard_stop_reaches_the_follower_for_every_run_kind(self):
+        """Fails with compact_continue's and model_fallback's own ticks back: the Stop said Asked and did nothing."""
+        for capability, made in self.kinds().items():
+            with self.subTest(capability):
+                follower = self.Follower(capability)
+                runs = self.tick(made, capability, follower, stop_requested_at=5.0)
+                self.assertEqual(follower.stopped, [self.KEY])
+                self.assertEqual(runs.ended_as, [], "still followed: ended when the follower says so")
+
+    def test_a_row_no_thread_follows_is_ended_lost_for_every_run_kind(self):
+        """Fails with those ticks back: after a restart the row stayed running, with a Stop button, for ever."""
+        for capability, made in self.kinds().items():
+            with self.subTest(capability):
+                runs = self.tick(made, capability, self.Follower(capability, live=False), stop_requested_at=5.0)
+                self.assertEqual(runs.ended_as, [(self.KEY, str(RunEnd.LOST))])
+
+    def test_ended_rows_older_than_a_day_are_pruned_for_every_run_kind(self):
+        from codex_auto_resume_advanced.engine.headless import KEEP_ENDED
+        for capability, made in self.kinds().items():
+            with self.subTest(capability):
+                runs = self.tick(made, capability, self.Follower(capability))
+                self.assertEqual(runs.pruned, [1_000_000.0 - KEEP_ENDED])
+
+
 class RegistryTests(HeadlessCase):
     def test_it_answers_at_p16_after_queue_for_open_and_departs_from_what_the_design_says(self):
         definition = registry.HEADLESS_RUN

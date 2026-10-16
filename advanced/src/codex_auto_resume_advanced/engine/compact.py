@@ -28,7 +28,7 @@ from codex_auto_resume.domain.plug import DEFER, Alternative
 
 from ..codex import headless, inuse
 from ..codex.turns import Turns
-from .headless import HOUR, _app_running, unheld
+from .headless import HOUR, _app_running, follow_up, unheld
 
 CAPABILITY = "compact_continue"
 KIND = "terminal_invalid"
@@ -43,7 +43,7 @@ class CompactContinue:
     """The capability's code: its hooks at P17, P3 and P16, and P8 for its runs. `bind` gives it its view of the
     state (state.Scoped). Its seams are the tests': `turns` reads the latest turn (None: the Codex home's,
     codex/inuse.py), `session`, `follower` and `app_running` are the headless route's."""
-    __slots__ = ("paths", "_scoped", "_turns", "_open", "follower", "_app")
+    __slots__ = ("paths", "_scoped", "_turns", "_open", "follower", "_app", "_routes")
 
     def __init__(self, paths, *, turns=None, session=None, follower=None, app_running=None):
         self.paths, self._scoped = paths, None
@@ -51,6 +51,7 @@ class CompactContinue:
         self._open = session if session is not None else headless.live_session(paths)
         self.follower = follower or headless.FOLLOWER
         self._app = app_running if app_running is not None else _app_running(paths)
+        self._routes = {}
 
     def bind(self, scoped):
         self._scoped = scoped
@@ -113,27 +114,16 @@ class CompactContinue:
         compacted = self._compacted(record)
         if compacted is None or compacted == "failed":
             return DEFER
-        return headless.HeadlessRun(CAPABILITY, key=key, session=self._open, follower=self.follower,
-                                    seconds=HOUR, mode=headless.TURN if compacted else headless.COMPACT,
-                                    app_running=self._app)
+        route = headless.HeadlessRun(CAPABILITY, key=key, session=self._open, follower=self.follower,
+                                     seconds=HOUR, mode=headless.TURN if compacted else headless.COMPACT,
+                                     app_running=self._app)
+        self._routes = {key: route}
+        return route
 
     def tick(self, view):
-        """P8: how each run ended, journalled in its own words, and the live one's row written."""
-        scoped = self._scoped
-        if scoped is None:
-            return DEFER
-        try:
-            live = self.follower.live()
-            if live is not None and live["capability"] == CAPABILITY and not any(
-                    row["interruption_id"] == live["key"] for row in scoped.runs.live()):
-                scoped.runs.started(live["key"], live["thread_id"], started_at=live["started_at"],
-                                    ends_by=live["ends_by"])
-            for ended in self.follower.drain(CAPABILITY):
-                scoped.runs.ended(ended["key"], ended["end"])
-                scoped.count(str(ended["end"]))
-        except Exception:
-            pass
-        return DEFER
+        """P8: the run kinds' one path (engine/headless.follow_up): how each run ended journalled, the live one's row
+        written, a Stop handed on, a row no thread follows ended LOST."""
+        return follow_up(self._scoped, self.follower, CAPABILITY, self._routes.values())
 
 
 def make(paths) -> CompactContinue:

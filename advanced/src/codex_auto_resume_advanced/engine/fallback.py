@@ -22,7 +22,7 @@ from codex_auto_resume.domain.plug import DEFER
 from ..codex import headless, inuse
 from ..codex.turns import Turns
 from ..vocabulary import OptionKey
-from .headless import HOUR, _app_running, unheld
+from .headless import HOUR, _app_running, follow_up, unheld
 
 CAPABILITY = "model_fallback"
 KIND = "server_5xx"
@@ -34,13 +34,14 @@ NOT_RESTORED = "model_not_restored"
 
 class ModelFallback:
     """The capability's code: its hooks at P16 and P8. `bind` gives it its view of the state (state.Scoped)."""
-    __slots__ = ("paths", "_scoped", "_turns", "_open", "follower", "_app")
+    __slots__ = ("paths", "_scoped", "_turns", "_open", "follower", "_app", "_routes")
 
     def __init__(self, paths, *, turns=None, session=None, follower=None, app_running=None):
         self.paths, self._scoped, self._turns = paths, None, turns
         self._open = session if session is not None else headless.live_session(paths)
         self.follower = follower or headless.FOLLOWER
         self._app = app_running if app_running is not None else _app_running(paths)
+        self._routes = {}
 
     def bind(self, scoped):
         self._scoped = scoped
@@ -67,28 +68,20 @@ class ModelFallback:
                 or self._scoped is None or self.follower.live() is not None
                 or (record.get("chain_continuations") or 0) < self._attempts() or not self._overloaded(record)):
             return DEFER
-        return headless.HeadlessRun(CAPABILITY, key=key, session=self._open, follower=self.follower,
-                                    seconds=HOUR, mode=headless.FALLBACK, app_running=self._app)
+        route = headless.HeadlessRun(CAPABILITY, key=key, session=self._open, follower=self.follower,
+                                     seconds=HOUR, mode=headless.FALLBACK, app_running=self._app)
+        self._routes = {key: route}
+        return route
 
     def tick(self, view):
-        """P8: how each run ended, and a model Codex would not put back, journalled; the live run's row written."""
+        """P8: the run kinds' one path (engine/headless.follow_up) - a Stop handed on, a row no thread follows ended
+        LOST - and a model Codex would not put back journalled."""
         scoped = self._scoped
-        if scoped is None:
-            return DEFER
-        try:
-            live = self.follower.live()
-            if live is not None and live["capability"] == CAPABILITY and not any(
-                    row["interruption_id"] == live["key"] for row in scoped.runs.live()):
-                scoped.runs.started(live["key"], live["thread_id"], started_at=live["started_at"],
-                                    ends_by=live["ends_by"])
-            for ended in self.follower.drain(CAPABILITY):
-                scoped.runs.ended(ended["key"], ended["end"])
-                scoped.count(str(ended["end"]))
-                if ended.get("model_restored") is False:
-                    scoped.count(NOT_RESTORED)
-        except Exception:
-            pass
-        return DEFER
+
+        def told(ended):
+            if ended.get("model_restored") is False:
+                scoped.count(NOT_RESTORED)
+        return follow_up(scoped, self.follower, CAPABILITY, self._routes.values(), on_end=told)
 
 
 def make(paths) -> ModelFallback:
