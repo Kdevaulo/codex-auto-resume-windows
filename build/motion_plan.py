@@ -56,8 +56,10 @@ STEPS = ("hold", "set", "move", "hover", "press", "card", "wheel", "open", "rows
 HOLDING = ("set", "open", "choose")
 # The shortest a frame is held, in hundredths of a second: browsers show 10 ms or less as 100 ms.
 SHORTEST = 2
-# The least two frames' moments may be apart, in ms, and still be held SHORTEST hundredths each once rounded.
-CLOSEST = 10 * SHORTEST + 5
+# The least an added frame's moment may be from another's, in ms: room, once rounded to hundredths, for its changes
+# to be written as two rectangles of SHORTEST each (motion_apng.patches) - a light at the top of the picture and the
+# tray icon at its bottom - rather than one round both.
+CLOSEST = 2 * 10 * SHORTEST + 5
 # How long a click's ripple lasts (TOOLING 2.3), in ms.
 RIPPLE_MS = 240
 NAME = re.compile(r"(page\.(%s)|section\.(%s)|save|restore|start|close|setting\.[a-z_]+|row\.[A-Za-z_-]+|card\.[a-z_]+)\Z"
@@ -396,21 +398,17 @@ def fill(frames: list, end: int, per_second: int, also=(), first_hold: int = 0, 
     if step:
         moments.update(int(round(index * step)) for index in range(int(math.ceil(end / step))))
     moments.update(int(round(at)) for at in also)
+    ripples = set()
     if ripple_step:
         for start in sorted({frame.ripple[1] for frame in frames if frame.ripple}):
-            moments.update(range(start, start + RIPPLE_MS, ripple_step))
-    moments = {at for at in moments if at >= first_hold}
-    # A frame added this close to another would be held under SHORTEST hundredths once both are rounded to
-    # hundredths: the steps' own frames win, and of two added ones the earlier.
+            ripples.update(range(start, start + RIPPLE_MS, ripple_step))
     have = sorted({frame.t for frame in frames} | {end})
-    added, kept = [], None
-    for at in sorted(at for at in moments if frames[0].t <= at < end):
-        place = bisect.bisect_left(have, at)
-        near = [abs(at - have[i]) for i in (place - 1, place) if 0 <= i < len(have)]
-        if min(near) < CLOSEST or (kept is not None and at - kept < CLOSEST):
-            continue
-        added.append(at)
-        kept = at
+    # A ripple's frames are steps of their own, kept wherever a browser can show them apart from the steps' frames.
+    ripples = _apart(sorted(at for at in ripples if frames[0].t <= at < end), have, 10 * SHORTEST + 5)
+    have = sorted(set(have) | set(ripples))
+    # The lights' and the icon's are kept CLOSEST from every other: of two of them, the earlier.
+    added = _apart(sorted(at for at in moments if first_hold <= at < end and at >= frames[0].t), have, CLOSEST)
+    added = sorted(set(added) | set(ripples))
     out, index = [], 0
     for frame in frames:
         while index < len(added) and added[index] < frame.t:
@@ -421,6 +419,20 @@ def fill(frames: list, end: int, per_second: int, also=(), first_hold: int = 0, 
         out.append(out[-1]._replace(t=added[index]))
         index += 1
     return out
+
+
+def _apart(candidates: list, fixed: list, gap: int) -> list:
+    """The candidates at least `gap` ms from every fixed moment and from the candidate kept before them."""
+    kept, last = [], None
+    for at in candidates:
+        place = bisect.bisect_left(fixed, at)
+        if any(abs(at - fixed[i]) < gap for i in (place - 1, place) if 0 <= i < len(fixed)):
+            continue
+        if last is not None and at - last < gap:
+            continue
+        kept.append(at)
+        last = at
+    return kept
 
 
 def delays(moments: list, end: int) -> list:

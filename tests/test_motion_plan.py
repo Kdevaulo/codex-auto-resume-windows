@@ -191,8 +191,9 @@ class ClockTests(unittest.TestCase):
 
     def test_a_moment_too_close_to_another_adds_no_frame(self):
         frames = motion_plan.expand(plan_of({"hold": 300}, {"set": {"page": "pending"}, "hold": 300}))
-        filled = motion_plan.fill(frames, 600, 10, also=(108, 133, 290, 595))
-        self.assertEqual([frame.t for frame in filled], [0, 100, 133, 200, 300, 400, 500])
+        filled = motion_plan.fill(frames, 600, 10, also=(108, 150, 290, 595))
+        self.assertEqual([frame.t for frame in filled], [0, 100, 150, 200, 300, 400, 500])
+        self.assertTrue(all(b.t - a.t >= 40 for a, b in zip(filled, filled[1:])))
         motion_plan.delays([frame.t for frame in filled], 600)
         readme = motion_plan.load(make_motion.plan_path("readme-en"))
         icon = [1092.0 + 1.37 * n for n in range(0, 20000, 7)]
