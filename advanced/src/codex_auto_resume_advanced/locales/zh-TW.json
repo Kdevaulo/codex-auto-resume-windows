@@ -92,6 +92,7 @@
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "請在 Codex 中執行 /compact；之後即繼續",
   "page.row.model_not_restored": "此對話現在使用另一個模型；請在 Codex 中切換回去",
+  "page.row.silent": "無文字繼續，已憑其 ID 證實",
   "page.done.send_now": "已要求。如果每一項檢查都通過，守護行程會在下一次查看時傳送它；清單會顯示結果。",
   "page.done.watch": "正在觀察「{name}」。它還不會做任何事。",
   "page.hourly": "每小時傳送次數（所有進階功能合計）",

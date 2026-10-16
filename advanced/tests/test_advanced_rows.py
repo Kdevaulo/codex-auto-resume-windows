@@ -22,6 +22,7 @@ from advancedcase import ROOT  # noqa: E402
 from test_advanced_other_sessions import SessionsCase  # noqa: E402
 from test_advanced_compact_continue import CONTEXT_FULL, CompactCase  # noqa: E402
 from codex_auto_resume import l10n  # noqa: E402
+from codex_auto_resume.domain import ids  # noqa: E402
 from codex_auto_resume_advanced import statement, surfaces  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import Actor, RunEnd  # noqa: E402
 from test_engine import T1, T2  # noqa: E402
@@ -128,6 +129,40 @@ class ModelTests(RowsCase):
             self.assertNotIn("{", statement.CATALOGS.catalog(locale)["page.row.model_not_restored"], locale)
 
 
+class SilentTests(RowsCase):
+    """A continuation a turn run here started with no words, proven by its id (silent_continuation, design-4 7): its
+    id in "silent", so History says "continued with no words, proven by its id"."""
+
+    def ran(self):
+        """Three recoveries, each continued by a turn run here or not: with no words (the derived client id, as core's
+        routes._silent writes it), with words and the marker, and by the derived id with no run here (a marker-free
+        send through a channel)."""
+        plug = self.armed()
+        for thread in (T1, T2, T3):
+            self.ready_after_reset(self.h, thread_id=thread)
+        keys = self.keys()
+        state, now = plug.runtime.state, self.h.now
+        for thread in (T1, T2):
+            state.run_started(keys[thread], "headless_run", thread, started_at=now - 60, ends_by=now + 3540)
+            state.run_ended(keys[thread], RunEnd.COMPLETED)
+        for thread in (T1, T3):
+            self.h.store.update(keys[thread], at=now, recovery_client_id=ids.continuation_client_id(keys[thread]))
+        return plug, keys
+
+    def test_one_a_turn_run_here_started_with_no_words_is_said(self):
+        """Fails with surfaces.rows' silent reverted: History would not say how it was continued."""
+        plug, keys = self.ran()
+        self.assertEqual(self.rows(plug)["silent"], [keys[T1]])
+
+    def test_it_is_said_with_every_capability_off(self):
+        plug, keys = self.ran()
+        self.assertTrue(plug.runtime.arming.disarm(self.cap, actor=Actor.DASHBOARD)["done"])
+        plug.runtime.states(fresh=True)
+        listed = surfaces._listed
+        with patch.object(surfaces, "_listed", lambda runtime, store: listed(runtime, self.h.store)):
+            self.assertEqual(surfaces.rows(plug.runtime, store=self.h.store), {"silent": [keys[T1]]})
+
+
 class CompactingTests(CompactCase):
     """A full conversation held for the person's /compact (compact_continue, design-4 5.2): its id in "compacting",
     so Pending's status says "Run /compact in Codex; it continues after"."""
@@ -191,6 +226,12 @@ class WindowTests(unittest.TestCase):
         self.assertIn('if (Listed(said, "model_not_restored", key))', body)
         self.assertIn('cells[1] += " · " + Word("page.row.model_not_restored", "This conversation now uses another '
                       'model; switch it back in Codex")', body)
+
+    def test_a_continuation_with_no_words_joins_historys_outcome_line_only(self):
+        """Fails with the words taken out of CellsWritten."""
+        body = written(RUNS)
+        self.assertIn('if (!pending && Listed(said, "silent", key))', body)
+        self.assertIn('cells[1] += " · " + Word("page.row.silent", "continued with no words, proven by its id")', body)
 
     def test_the_compact_hint_joins_pendings_status_line_only(self):
         """Fails with the hint taken out of CellsWritten."""

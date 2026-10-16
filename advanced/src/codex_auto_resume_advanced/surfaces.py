@@ -395,7 +395,9 @@ def rows(runtime, *, store=None, source=None) -> dict:
     Codex app (its row's status says so); {"model_not_restored": [id, ...]} for a turn model_fallback ran on Codex's
     default model whose conversation's own model Codex would not put back - its row says to switch it back in Codex,
     in words with no model's name (the review's finding 22), for as long as it is owed (state/runs.py), whatever the
-    capability stands at now. Each part only where there is something in it, and read only while the capability it
+    capability stands at now; {"silent": [id, ...]} for a continuation a turn run here started with no words and
+    proved by its id (silent_continuation: History says so), while the edition keeps that run (engine/headless.py,
+    KEEP_ENDED). Each part only where there is something in it, and read only while the capability it
     is of stands on (or, for the kinds, watched) - a model owed back aside, which is the edition's own state - so with
     none of them on nothing of core's or Codex's is read at all. `store` is core's state and `source` the Codex
     home's reader - the Dashboard's own, by default; a test's."""
@@ -412,6 +414,9 @@ def rows(runtime, *, store=None, source=None) -> dict:
         owed = []
     if owed:
         shown["model_not_restored"] = owed
+    silent = _silent(runtime, store)
+    if silent:
+        shown["silent"] = silent
     kinds_wanted = states.get(OTHER_SESSIONS.id, ArmingState.OFF) != ArmingState.OFF
     compact_wanted = states.get(COMPACT_CONTINUE.id, ArmingState.OFF) == ArmingState.ARMED
     if not (kinds_wanted or compact_wanted):
@@ -434,6 +439,38 @@ def rows(runtime, *, store=None, source=None) -> dict:
         if compacting:
             shown["compacting"] = compacting
     return shown
+
+
+def _silent(runtime, store) -> list:
+    """The interruptions a turn run here continued with no words (P15's SILENT): a run of headless_run's or
+    compact_continue's the edition still keeps whose core record went by the client id core derives for it
+    (engine/routes._silent) - the proof by id, which a marker-free send through a channel never had from a run here.
+    Core's state is opened only where there is such a run."""
+    from codex_auto_resume.domain import ids
+    from codex_auto_resume.store import Store
+    try:
+        keys = [row["interruption_id"] for row in runtime.state.runs(live=False, limit=ROWS_READ)
+                if row["capability"] in ("headless_run", "compact_continue") and row["ended_at"] is not None]
+    except Exception:
+        return []
+    if not keys:
+        return []
+    try:
+        if store is None:
+            with Store(runtime.paths.state_dir) as opened:
+                return _silent_of(opened, keys, ids)
+        return _silent_of(store, keys, ids)
+    except Exception:
+        return []
+
+
+def _silent_of(store, keys, ids) -> list:
+    found = []
+    for key in keys:
+        row = store.get(key)
+        if row is not None and row.get("recovery_client_id") == ids.continuation_client_id(key):
+            found.append(key)
+    return found
 
 
 def _compacting(row) -> bool:

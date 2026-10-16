@@ -92,6 +92,7 @@
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "Ejecuta /compact en Codex; después continúa",
   "page.row.model_not_restored": "Esta conversación usa ahora otro modelo; vuelve a cambiarlo en Codex",
+  "page.row.silent": "continuada sin palabras, comprobada por su id",
   "page.done.send_now": "Pedido. Si pasa todas las comprobaciones, el vigilante la envía en su próxima revisión; la lista muestra lo que ocurrió.",
   "page.done.watch": "«{name}» está en observación. Todavía no hace nada.",
   "page.hourly": "Envíos por hora, todas las funciones avanzadas juntas",

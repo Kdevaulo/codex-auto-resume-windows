@@ -92,6 +92,7 @@
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "Codex에서 /compact를 실행하세요. 그 뒤에 이어집니다",
   "page.row.model_not_restored": "이 대화는 지금 다른 모델을 씁니다. Codex에서 되돌리세요",
+  "page.row.silent": "말 없이 이어짐, ID로 확인됨",
   "page.done.send_now": "요청했습니다. 모든 확인을 통과하면 감시자가 다음에 살펴볼 때 보냅니다. 결과는 목록에 나타납니다.",
   "page.done.watch": "{name} 기능을 지켜보는 중입니다. 아직 아무것도 하지 않습니다.",
   "page.hourly": "시간당 보내는 횟수, 모든 고급 기능 합계",

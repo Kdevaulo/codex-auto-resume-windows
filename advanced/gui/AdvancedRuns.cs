@@ -15,7 +15,8 @@
 // line - " · CLI" or " · VS Code" after the conversation of a terminal's or VS Code's (other_sessions), and "Run
 // /compact in Codex; it continues after" after the status of a full conversation waiting for it (compact_continue), and
 // that a conversation now uses another model after the status of one whose own model Codex would not put back
-// (model_fallback) - from what the
+// (model_fallback), and "continued with no words, proven by its id" after History's outcome of one a turn run here
+// started with no words (silent_continuation) - from what the
 // status the window already reads carries of each row, by its interruption id (surfaces.rows). No cell, column or
 // element of its own: as a second Codex home's alias joins the label line (v0.6.15-beta).
 //
@@ -118,6 +119,9 @@ namespace CodexAutoResume
             // A model a fallback turn ran on that Codex would not put back, in Pending and History alike (model_fallback).
             if (Listed(said, "model_not_restored", key))
                 cells[1] += " · " + Word("page.row.model_not_restored", "This conversation now uses another model; switch it back in Codex");
+            // A continuation a turn run here started with no words, in History (silent_continuation).
+            if (!pending && Listed(said, "silent", key))
+                cells[1] += " · " + Word("page.row.silent", "continued with no words, proven by its id");
         }
 
         /// Whether the list `name` of what the status says of the rows names `key`.

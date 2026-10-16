@@ -92,6 +92,7 @@
   "page.row.kind.ide": "VS Code",
   "page.row.compact": "Jalankan /compact di Codex; setelah itu dilanjutkan",
   "page.row.model_not_restored": "Percakapan ini sekarang memakai model lain; kembalikan di Codex",
+  "page.row.silent": "dilanjutkan tanpa kata, dibuktikan dengan id-nya",
   "page.done.send_now": "Diminta. Jika lolos setiap pemeriksaan, pengawas mengirimnya pada pemeriksaan berikutnya; daftar menunjukkan apa yang terjadi.",
   "page.done.watch": "\"{name}\" sedang diamati. Fitur ini belum melakukan apa pun.",
   "page.hourly": "Pengiriman per jam, semua fitur tingkat lanjut digabung",
