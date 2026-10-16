@@ -147,6 +147,10 @@ class TripwireTests(SessionsCase):
                                              confirmed=["keep_on"], actor=Actor.DASHBOARD)
         self.assertEqual((refused["done"], refused["refusal"]), (False, Refusal.INVALID_REQUEST))
         self.assertIs(OTHER_SESSIONS.keepable, False)
+        # Nor by the arm's own Keep it on, which turns a capability on as it keeps it on (v0.6.16-beta.4).
+        refused = self.arm(plug, keep_on=True)
+        self.assertEqual((refused["done"], refused["refusal"]), (False, Refusal.INVALID_REQUEST))
+        self.assertFalse(runtime.state.arming()[self.cap].get("keep_on"))
         self.assertIn(OffReason.NOT_DISPATCHED_BY_SESSION, registry_tripwires())
 
     def test_unmeasured_on_this_codex_is_a_warning_to_confirm_never_a_refusal(self):

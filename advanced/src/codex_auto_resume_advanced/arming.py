@@ -720,7 +720,8 @@ class Arming:
 
         `keep_on` (v0.6.16-beta.4, the owner's "Keep it on turns it on"): turn it on AND keep it on (K8) in the
         same confirmation - only for ARMED, refused like any arm, and refused too where its own compatibility is
-        Failed here (FAILED_HERE): Keep it on never turns itself off, so it is not taken on a grade that failed.
+        Failed here (FAILED_HERE): Keep it on never turns itself off, so it is not taken on a grade that failed - and
+        never for a capability that may not be kept on (registry.keepable, INVALID_REQUEST).
 
         {"done": bool, "refusal": Refusal or None, "warnings": the warnings that hold now, once
         read, "generation": the generation after}."""
@@ -740,7 +741,9 @@ class Arming:
                 or type(generation) is not int or confirmed is None
                 or not (acknowledged_version is None or isinstance(acknowledged_version, str))
                 or not (also is None or isinstance(also, (list, tuple)))
-                or type(keep_on) is not bool or (keep_on and state != ArmingState.ARMED)):
+                or type(keep_on) is not bool or (keep_on and state != ArmingState.ARMED)
+                # Never one whose tripwire is what stops it doing harm (registry.keepable), as set_keep_on refuses it.
+                or (keep_on and not definition.keepable)):
             return refused(Refusal.INVALID_REQUEST)
         view = self.view()
 
