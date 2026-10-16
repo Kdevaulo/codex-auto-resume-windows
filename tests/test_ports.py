@@ -113,7 +113,10 @@ ENGINE_TO_STORE = {
 ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "holder", "loaded", "send", "usage",
                      # v0.6.16-beta.4: who holds a conversation loaded() said is "elsewhere" (pid, creation time), for
                      # the TO_SESSION re-check under the dispatch lock (engine/tosession.py) - read, never set.
-                     "session_holder"}
+                     "session_holder",
+                     # v0.6.16-beta.4: the engine's own `codex --version`, which the version skew guard holds a terminal's
+                     # or VS Code's conversation to (engine/kinds.py) - read only while the plug names such a kind.
+                     "engine_version"}
 BACKEND_NAMES = ("backend", "sender")
 # What it reads out of Codex's own files, through the source: the turns, the markers that say a
 # continuation of ours is in the queue, what a recovered turn produced, and the projection's age.
@@ -124,6 +127,8 @@ ENGINE_TO_SOURCE = {
     # v0.6.16-beta.4: the kinds of conversation besides the app's the plug names (P18), set once a tick, and whether a
     # conversation is taken up with some of them - asked only when a kind leaves.
     "session_kinds", "taken",
+    # and whether such a conversation says a newer Codex wrote it than the engine is (the version skew guard).
+    "newer_than_engine",
     # v0.6.11: the key of a conversation's project, asked only when Settings let some projects
     # resume and not others (projects.asks) - never at the defaults.
     "project_key",
