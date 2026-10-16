@@ -31,6 +31,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "build"))
 
 from codex_auto_resume import addremove, config, startup  # noqa: E402
 import test_installer as installer  # noqa: E402  (its helpers: block, run_probe, ps_literal, VOICE)
@@ -248,7 +249,9 @@ class InstallerFlowTests(unittest.TestCase):
         self.assertEqual(self.text.count("Install-KeptUninstaller -Source"), 1)
 
     def test_the_installer_writes_no_registry_key_itself(self):
-        for forbidden in ("New-ItemProperty", "Set-ItemProperty", "reg add", "reg.exe", "HKCU:", "Registry]::"):
+        # It reads and deletes the one entry (below); it writes nothing.
+        for forbidden in ("New-ItemProperty", "Set-ItemProperty", "reg add", "reg.exe", "HKCU:", "CreateSubKey",
+                          "SetValue", "HKLM"):
             self.assertNotIn(forbidden, self.text)
 
     def test_the_uninstall_removes_the_kept_folder_after_the_program_files_and_before_the_proof(self):
@@ -258,14 +261,26 @@ class InstallerFlowTests(unittest.TestCase):
         self.assertLess(removal, branch.index("'.owned-by-codex-auto-resume'"))
         self.assertIn("-not $keptItem.LinkType", branch)
 
-    def uninstall_tail(self, home: Path, kept: bool, link: Path | None = None):
+    def uninstall_tail(self, home: Path, entries: dict | None = None, log: Path | None = None):
+        """The uninstall branch from "$codex = Get-CodexCli" on, in a scratch installation. `entries` is the fake
+        registry, name -> (install location, uninstall command), and `log` collects the names removed from it."""
         text = self.text
         source = installer.VOICE + installer.block(text, "function Quote-Argument", "function Invoke-Setup")
         source += "\nfunction Fail { param([string]$m) $script:Failed = $true; Write-Host $m }\n"
+        source += installer.block(text, "function Remove-OwnUninstallEntry", "function Write-CopyJournal")
+        stub = ["$global:Entries = @{}"]
+        for name, (location, command) in (entries or {}).items():
+            stub.append("$global:Entries[%s] = @{ InstallLocation = %s; UninstallString = %s }"
+                        % (installer.ps_literal(name), installer.ps_literal(location), installer.ps_literal(command)))
+        stub.append("function Read-UninstallEntry { param([string]$Name) if ($global:Entries.ContainsKey($Name)) { "
+                    "return $global:Entries[$Name] } return $null }")
+        stub.append("function Remove-UninstallEntry { param([string]$Name) Add-Content -LiteralPath %s -Value $Name; "
+                    "$global:Entries.Remove($Name) }" % installer.ps_literal(log or (home.parent / "removed.txt")))
         script = ("$OwnedHome = %s\n$InstallHome = $OwnedHome\n$AppDir = Join-Path $OwnedHome app\n"
                   "$RunDir = Join-Path $OwnedHome runtime\n$PluginCacheRoot = Join-Path $OwnedHome cache\n"
                   "$PluginName = 'fixture-plugin'\n$MarketplaceName = 'fixture-market'\n$script:Failed = $false\n"
                   "$Purge = $false\n" % installer.ps_literal(home))
+        script += "\n".join(stub) + "\n"
         script += ("function Get-CodexCli { return $null }\nfunction Get-OwnedMcpProcess { return ,@() }\n")
         branch = installer.block(text, "# ----------------------------------------------------------------------- uninstall",
                                  "# -------------------------------------------------------------------------- install")
@@ -287,7 +302,7 @@ class InstallerFlowTests(unittest.TestCase):
     def test_uninstalling_takes_the_kept_copy_and_keeps_the_settings(self):
         with tempfile.TemporaryDirectory() as name:
             home = self.installation(Path(name))
-            done = self.uninstall_tail(home, kept=True)
+            done = self.uninstall_tail(home)
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             self.assertFalse((home / "uninstall").exists(), "the kept uninstaller goes with the program")
             self.assertTrue((home / "config" / "settings.json").is_file())
@@ -303,8 +318,69 @@ class InstallerFlowTests(unittest.TestCase):
                                   capture_output=True, creationflags=NO_WINDOW)
             if made.returncode != 0:
                 self.skipTest("no junction could be made here")
-            done = self.uninstall_tail(home, kept=True)
+            done = self.uninstall_tail(home)
             self.assertTrue((outside / "precious.txt").is_file(), done.stdout + done.stderr)
+
+
+    def entry_for(self, home: Path, location: Path | None = None, script: Path | None = None) -> tuple:
+        kept = script or (home / "uninstall" / "install.ps1")
+        command = ('"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile '
+                   '-ExecutionPolicy Bypass -File "%s" -Uninstall' % kept)
+        return (str(location or home), command)
+
+    def test_the_entry_goes_when_everything_else_has_and_not_before(self):
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            log = Path(name) / "removed.txt"
+            done = self.uninstall_tail(home, {"CodexAutoResume": self.entry_for(home)}, log)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertEqual(log.read_text(encoding="utf-8").split(), ["CodexAutoResume"])
+            self.assertIn("Removing the entry in Add or remove programs", done.stdout)
+            self.assertFalse((home / "app").exists())
+
+    def test_a_failed_uninstall_stays_listed_and_can_be_run_again(self):
+        """A program file held open: the uninstall stops with 1 and the entry, the kept uninstaller and the
+        program are all still there, so Settings > Apps offers the same uninstall again."""
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            window = home / "CodexAutoResumeSettings.exe"
+            window.write_text("fixture", encoding="utf-8")
+            log = Path(name) / "removed.txt"
+            with window.open("rb"):
+                done = self.uninstall_tail(home, {"CodexAutoResume": self.entry_for(home)}, log)
+            self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+            self.assertIn("run this uninstaller again", done.stdout)
+            self.assertFalse(log.exists(), "the entry was removed although the uninstall failed")
+            self.assertTrue((home / "app").is_dir())
+            self.assertTrue((home / "uninstall" / "install.ps1").is_file())
+
+    def test_an_entry_that_is_not_this_installations_is_left_where_it_is(self):
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            other = Path(name) / "other-home"
+            other.mkdir()
+            log = Path(name) / "removed.txt"
+            entries = {"CodexAutoResume": self.entry_for(home, location=other),
+                       "CodexAutoResumeAdvanced": self.entry_for(home, script=other / "uninstall" / "install.ps1")}
+            done = self.uninstall_tail(home, entries, log)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertFalse(log.exists(), "an entry of another installation was removed")
+
+    def test_the_engine_is_told_to_leave_the_entry_for_the_end(self):
+        branch = installer.block(self.text, "if ($Uninstall)",
+                                 "# -------------------------------------------------------------------------- install")
+        self.assertLess(branch.index("$env:CODEX_AUTO_RESUME_KEEP_ENTRY = '1'"), branch.index("Invoke-Setup $setupArgs"))
+        self.assertIn("finally { $env:CODEX_AUTO_RESUME_KEEP_ENTRY = $null }", branch)
+        self.assertGreater(branch.index("Remove-OwnUninstallEntry $OwnedHome"),
+                           branch.index("Some program files are still in use"))
+        self.assertEqual(branch.count("Remove-OwnUninstallEntry $OwnedHome"), 1)
+        self.assertEqual(addremove.KEEP_ENTRY_ENV, "CODEX_AUTO_RESUME_KEEP_ENTRY")
+
+    def test_the_two_registry_calls_are_the_only_ones_and_only_open_and_delete_the_uninstall_key(self):
+        calls = re.findall(r"\[Microsoft\.Win32\.Registry\]::\w+\.\w+\(", self.text)
+        self.assertEqual(sorted(calls), ["[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKey(",
+                                         "[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("])
+        self.assertEqual(self.text.count("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\"), 2)
 
 
 # ---------------------------------------------------------------------------------------------------- the key
@@ -464,6 +540,36 @@ class KeyTests(Entry):
         self.assertEqual(addremove.register(self.home, "sideways", "1.2.3", "x"), [])
         self.assertEqual(self.registry.keys, {})
 
+    def junction(self, link: Path, target: Path):
+        made = subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(link), str(target)], capture_output=True,
+                              creationflags=NO_WINDOW)
+        if made.returncode != 0:
+            self.skipTest("no junction could be made here")
+
+    def test_a_junction_where_the_kept_folder_should_be_gets_no_entry(self):
+        """The installer refuses a junction as the kept folder and keeps nothing; the engine must not then write a key
+        whose command runs whatever the junction points at (F4)."""
+        outside = Path(self.temp.name) / "outside"
+        outside.mkdir()
+        (outside / "install.ps1").write_text("# someone else's", encoding="utf-8")
+        shutil.rmtree(self.home / "uninstall")
+        self.junction(self.home / "uninstall", outside)
+        self.assertTrue(addremove.kept_script(self.home).is_file(), "is_file() follows it: the thing to refuse")
+        self.assertEqual(addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume"), [])
+        self.assertEqual(self.registry.keys, {})
+
+    def test_a_junction_in_the_place_of_the_kept_script_gets_no_entry_either(self):
+        outside = Path(self.temp.name) / "outside-folder"
+        outside.mkdir()
+        (self.home / "uninstall" / "install.ps1").unlink()
+        self.junction(self.home / "uninstall" / "install.ps1", outside)
+        self.assertEqual(addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume"), [])
+        self.assertEqual(self.registry.keys, {})
+
+    def test_an_ordinary_kept_folder_and_script_are_plain(self):
+        self.assertTrue(addremove.kept_uninstaller_present(self.home))
+        self.assertFalse(addremove.kept_uninstaller_present(Path(self.temp.name) / "nowhere"))
+
     def test_the_display_name_is_the_installed_manifests_and_the_publisher_is_the_plugin_author(self):
         manifest = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8-sig"))
         self.assertEqual(addremove.display_name(ROOT / ".codex-plugin" / "plugin.json"), manifest["interface"]["displayName"])
@@ -542,11 +648,33 @@ class WiringTests(Entry):
         self.assertNotIn(addremove.key_path("standard"), self.registry.keys)
         self.assertIn("entry in Add or remove programs", out.getvalue())
 
+    def uninstall(self, **environment):
+        from codex_auto_resume import cli, shortcut
+        out = io.StringIO()
+        with patch.object(shortcut, "uninstall", return_value=False), patch.dict(
+                os.environ, dict({"LOCALAPPDATA": str(Path(self.temp.name) / "none"),
+                                  "CODEX_HOME": str(Path(self.temp.name) / "codex"),
+                                  config.ENV_HOME: str(self.home)}, **environment)), \
+                contextlib.redirect_stdout(out):
+            code = cli.main(["--home", str(self.home), "uninstall", "--keep-state"])
+        return code, out.getvalue()
+
+    def test_asked_to_keep_the_entry_the_engines_uninstall_leaves_it_for_the_installer(self):
+        addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
+        code, out = self.uninstall(**{addremove.KEEP_ENTRY_ENV: "1"})
+        self.assertEqual(code, 0, out)
+        self.assertIn(addremove.key_path("standard"), self.registry.keys, "the engine removed it early")
+        self.assertNotIn("entry in Add or remove programs", out)
+        code, out = self.uninstall()
+        self.assertEqual(code, 0, out)
+        self.assertNotIn(addremove.key_path("standard"), self.registry.keys, "asked nothing, it still removes it")
+
     def test_the_bridges_setup_registers_only_through_this_module(self):
         text = (ROOT / "scripts" / "plugin_setup.py").read_text(encoding="utf-8")
         self.assertIn("addremove.register(home, edition.name().value, config.version(),", text)
         self.assertIn("addremove.display_name(config.PROJECT_ROOT / config.PLUGIN_MANIFEST))", text)
-        self.assertEqual(text.count("addremove."), 2)
+        setup = text[text.index("def cmd_setup"):text.index("def cmd_enable")]
+        self.assertEqual(setup.count("addremove."), 2)
         for forbidden in ("winreg", "CurrentVersion"):
             self.assertNotIn(forbidden, text)
 
@@ -562,6 +690,126 @@ class WiringTests(Entry):
             if "CurrentVersion\\Uninstall" in path.read_text(encoding="utf-8", errors="replace"):
                 found.append(path.name)
         self.assertEqual(found, ["addremove.py"])
+
+
+@unittest.skipUnless(WINDOWS, "the registry is Windows'")
+class RemoveEntryTests(Entry):
+    """`plugin_setup.py remove-entry`: what a hand-over to an older version runs first."""
+
+    def remove(self):
+        import plugin_setup
+        out = io.StringIO()
+        with patch.dict(os.environ, {plugin_setup.ENV_RUNTIME_HOME: str(self.home)}), contextlib.redirect_stdout(out):
+            code = plugin_setup.cmd_remove_entry(None)
+        return code, out.getvalue().strip()
+
+    def test_the_entry_and_the_kept_uninstaller_are_both_taken_away(self):
+        addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
+        code, out = self.remove()
+        self.assertEqual((code, out), (0, "entry: removed"))
+        self.assertEqual(self.registry.keys, {})
+        self.assertFalse((self.home / "uninstall").exists(), "the script and its folder go with it")
+        self.assertEqual(self.remove(), (0, "entry: none"))
+
+    def test_an_entry_of_another_installation_stays_and_so_does_what_is_not_ours(self):
+        addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
+        key = self.registry.keys[addremove.key_path("standard")]
+        key["InstallLocation"] = (str(Path(self.temp.name) / "other"), 1)
+        (self.home / "uninstall" / "notes.txt").write_text("not ours", encoding="utf-8")
+        code, out = self.remove()
+        self.assertEqual(code, 0, out)
+        self.assertIn(addremove.key_path("standard"), self.registry.keys)
+        self.assertTrue((self.home / "uninstall" / "notes.txt").is_file())
+        self.assertFalse((self.home / "uninstall" / "install.ps1").exists())
+
+    def test_a_junction_is_not_followed_when_the_kept_uninstaller_is_removed(self):
+        outside = Path(self.temp.name) / "outside"
+        outside.mkdir()
+        (outside / "install.ps1").write_text("# someone else's", encoding="utf-8")
+        shutil.rmtree(self.home / "uninstall")
+        made = subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(self.home / "uninstall"), str(outside)],
+                              capture_output=True, creationflags=NO_WINDOW)
+        if made.returncode != 0:
+            self.skipTest("no junction could be made here")
+        self.assertFalse(addremove.remove_kept(self.home))
+        self.assertTrue((outside / "install.ps1").is_file())
+
+    def test_the_command_is_the_one_the_bootstrap_runs(self):
+        import plugin_setup
+        parsed = plugin_setup.build_parser().parse_args(["remove-entry"])
+        self.assertEqual(parsed.command, "remove-entry")
+        self.assertIs(plugin_setup.COMMANDS["remove-entry"], plugin_setup.cmd_remove_entry)
+
+
+BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
+
+
+@unittest.skipUnless(WINDOWS and installer.POWERSHELL, "the bootstrap is PowerShell on Windows")
+class HandOverTests(unittest.TestCase):
+    """The bootstrap's hand-over to a version that does not know the entry, both ways: the entry goes first when
+    the picked version is older than the one that has it, and stays for any other."""
+
+    def setUp(self):
+        self.text = BOOTSTRAP.read_text(encoding="utf-8")
+
+    def decide(self, installed: str, target: str, code: int = 0) -> tuple:
+        text = self.text
+        source = installer.VOICE
+        source += installer.block(text, "function Get-VersionParts", "function Format-UnreadVersion")
+        source += installer.block(text, "function Compare-ProductVersion", "function Get-NewestPublishedVersion")
+        source += installer.block(text, "function Remove-EntryBeforeOlder", "function Start-CurrentWatcher")
+        source += re.search(r"(?m)^\$EntryFrom = '[^']+'$", text).group(0) + "\n"
+        script = ("$global:calls = @()\n"
+                  "function Invoke-InstalledSetup { param([string]$Home_, [string[]]$Arguments) "
+                  "$global:calls += ($Arguments -join ' '); "
+                  "return [pscustomobject]@{ Printed = @(); Code = %d } }\n"
+                  "$answer = Remove-EntryBeforeOlder -Home_ 'C:\\scratch' -Installed %s -Target %s\n"
+                  "'answer: ' + $answer\n'calls: ' + ($global:calls -join '|')\n"
+                  % (code, installer.ps_literal(installed), installer.ps_literal(target)))
+        done = installer.run_probe(source, script)
+        answer = re.search(r"answer: (\w+)", done.stdout)
+        calls = re.search(r"calls: (.*)", done.stdout)
+        self.assertTrue(answer and calls, done.stdout + done.stderr)
+        return answer.group(1), calls.group(1).strip()
+
+    def test_going_back_to_a_version_before_the_entry_removes_it_first(self):
+        for installed, target in (("0.6.16", "0.6.15"), ("0.6.17", "0.6.14"), ("0.6.16", "0.6.16-beta.3"),
+                                  ("0.6.16-beta.4", "0.6.12"), ("0.6.16", "0.6.2")):
+            with self.subTest(installed=installed, target=target):
+                self.assertEqual(self.decide(installed, target), ("removed", "remove-entry"))
+
+    def test_any_other_pick_leaves_the_entry_alone(self):
+        for installed, target in (("0.6.16", "0.6.16"), ("0.6.17", "0.6.16"), ("0.6.16", "0.6.17"),
+                                  ("0.6.16", "0.6.18-beta.2")):
+            with self.subTest(installed=installed, target=target):
+                self.assertEqual(self.decide(installed, target), ("kept", ""))
+
+    def test_an_installation_older_than_the_entry_has_no_such_command_to_run(self):
+        for installed, target in (("0.6.15", "0.6.12"), ("0.6.12", "0.6.11"), ("0.6.15", "0.6.16")):
+            with self.subTest(installed=installed, target=target):
+                self.assertEqual(self.decide(installed, target), ("none", ""))
+
+    def test_a_removal_that_failed_says_so_and_an_engine_without_the_command_is_not_a_failure(self):
+        self.assertEqual(self.decide("0.6.16", "0.6.15", code=1), ("failed", "remove-entry"))
+        self.assertEqual(self.decide("0.6.16-beta.3", "0.6.15", code=2), ("none", "remove-entry"))
+
+    def test_an_unreadable_version_runs_nothing(self):
+        self.assertEqual(self.decide("garbage", "0.6.15"), ("none", ""))
+
+    def test_it_runs_for_a_pick_after_the_state_is_converted_and_before_the_installer(self):
+        text = self.text
+        call = text.index("Remove-EntryBeforeOlder -Home_ $installHome")
+        self.assertGreater(call, text.index("Convert-StateForOlder -Home_ $installHome -To $pickSchema"))
+        self.assertLess(call, text.index("& $installer @arguments"))
+        self.assertIn("    if ($Pick) {\n        $entry = Remove-EntryBeforeOlder", text.replace("\r\n", "\n"))
+        self.assertEqual(text.count("Remove-EntryBeforeOlder -Home_"), 1)
+
+    def test_one_number_for_the_first_version_in_every_place(self):
+        from codex_auto_resume import addremove as module
+        import winget_manifests
+        found = re.search(r"(?m)^\$EntryFrom = '([^']+)'$", self.text).group(1)
+        self.assertEqual(found, module.FIRST_VERSION)
+        self.assertEqual(found, winget_manifests.UNATTENDED_FROM)
 
 
 if __name__ == "__main__":

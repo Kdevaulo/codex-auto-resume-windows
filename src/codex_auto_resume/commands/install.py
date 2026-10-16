@@ -171,9 +171,10 @@ def cmd_uninstall(args) -> int:
             _print("kept the codex-auto-resume: protocol: it points at a different installation")
     except startup.StartupError as exc:
         _print("warning: %s" % exc)
-    # The entry in Add or remove programs goes the same way: only the one that names this installation.
+    # The entry in Add or remove programs goes the same way: only the one that names this installation. Not when
+    # the installer asked to keep it: it removes the entry itself after the last removal has succeeded.
     try:
-        if addremove.unregister(paths.home):
+        if not os.environ.get(addremove.KEEP_ENTRY_ENV) and addremove.unregister(paths.home):
             removed.append("entry in Add or remove programs")
     except startup.StartupError as exc:
         _print("warning: %s" % exc)

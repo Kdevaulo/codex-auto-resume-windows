@@ -275,6 +275,11 @@ $ExitOtherEdition = 14
 # (src/codex_auto_resume/managed.py, VALUES): a value that guards a feature no older version has
 # is not among them, since no older version could do what it holds back.
 $PickFloor = '0.6.2'
+# The first version that lists the installation in Add or remove programs and keeps an uninstaller for that entry
+# (src/codex_auto_resume/addremove.py, FIRST_VERSION). A pick of anything older removes both first, since that
+# version's own installer and uninstaller know neither and would leave an entry that says the wrong version and
+# points at an uninstaller nothing removes.
+$EntryFrom = '0.6.16'
 $EditionsSince = '0.6.11-alpha'
 $PolicySince = '0.6.11-beta'
 $PolicyKeys = @('HKEY_LOCAL_MACHINE', 'HKEY_CURRENT_USER')
@@ -1216,6 +1221,31 @@ function Convert-StateForOlder {
     return 'failed'
 }
 
+function Remove-EntryBeforeOlder {
+    <#
+        Before the installer of a version that does not know the entry in Add or remove programs runs over one
+        that does: the installed version's own `remove-entry`, which takes the entry and the uninstaller kept
+        for it away. 'removed' (or nothing there to remove), 'kept' when the target keeps the entry itself,
+        'none' when the installed version has no such command, 'failed' when it could not. A pre-release of the
+        entry's own release may or may not have the command yet, so it is tried, and an engine that does not
+        know it (argparse's 2) answers 'none'.
+    #>
+    param([string]$Home_, [string]$Installed, [string]$Target)
+    try {
+        $has = @(Get-VersionParts $Installed)
+        $first = @(Get-VersionParts $EntryFrom)
+        for ($i = 0; $i -lt 3; $i++) {
+            if ($has[$i] -lt $first[$i]) { return 'none' }
+            if ($has[$i] -gt $first[$i]) { break }
+        }
+        if ((Compare-ProductVersion -Left $Target -Right $EntryFrom) -ge 0) { return 'kept' }
+    } catch { return 'none' }
+    $done = Invoke-InstalledSetup -Home_ $Home_ -Arguments @('remove-entry')
+    if ($done.Code -eq 0) { return 'removed' }
+    if ($done.Code -eq 2) { return 'none' }
+    return 'failed'
+}
+
 function Start-CurrentWatcher {
     # The installed version's watcher started again, after a conversion that failed: `setup
     # --keep-state`, the repair branch's own run, which changes no decision a person made.
@@ -1744,6 +1774,12 @@ try {
             }
             if ($converted -clike 'converted *') { Write-Host ('pick: state ' + $converted) }
         }
+    }
+
+    if ($Pick) {
+        $entry = Remove-EntryBeforeOlder -Home_ $installHome -Installed ([string]$installed) -Target $target
+        if ($entry -ceq 'removed') { Step 'The entry in Add or remove programs and its uninstaller were removed; that version has neither.' }
+        elseif ($entry -ceq 'failed') { Fail 'The entry in Add or remove programs could not be removed first; it may name a version that is no longer installed.' }
     }
 
     Step 'Installing'

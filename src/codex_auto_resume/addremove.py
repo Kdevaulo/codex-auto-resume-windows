@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import stat
 
 from . import startup
 
@@ -32,6 +33,12 @@ UNINSTALL_ROOT = r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
 BASE_NAME = "CodexAutoResume"
 PUBLISHER = "songyb111-gachon"
 DEFAULT_DISPLAY_NAME = "Codex Auto Resume"
+# The first version that writes the entry and keeps the uninstaller. The bootstrap, the winget manifests and the tests
+# hold their own copies of this number to it; a hand-over to an older version removes the entry first.
+FIRST_VERSION = "0.6.16"
+# Set by install.ps1 around the engine's uninstall step: the installer removes the entry itself once every removal
+# has succeeded, so a failed uninstall stays listed and can be run again.
+KEEP_ENTRY_ENV = "CODEX_AUTO_RESUME_KEEP_ENTRY"
 KEPT_FOLDER = "uninstall"
 KEPT_SCRIPT = "install.ps1"
 # The installation's Dashboard program, which shows the uninstall in the installer window (gui/SettingsRemove.cs).
@@ -53,6 +60,35 @@ def key_path(edition: str) -> str:
 
 def kept_script(home) -> Path:
     return Path(home) / KEPT_FOLDER / KEPT_SCRIPT
+
+
+def _plain(path, directory: bool) -> bool:
+    """An ordinary folder or file: not a symbolic link, not a junction or any other reparse point, which is
+    followed by is_file() and so by a command that runs what it points at."""
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return False
+    if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+        return False
+    return stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+
+
+def kept_uninstaller_present(home) -> bool:
+    """The kept uninstaller is there, and so is the folder it is in, as plain files and not links (F4)."""
+    return _plain(Path(home) / KEPT_FOLDER, True) and _plain(kept_script(home), False)
+
+
+def remove_kept(home) -> bool:
+    """Delete the kept uninstaller, and its folder once empty. Only plain ones; True when the script is gone."""
+    if not kept_uninstaller_present(home):
+        return False
+    try:
+        kept_script(home).unlink()
+        (Path(home) / KEPT_FOLDER).rmdir()
+    except OSError:
+        pass
+    return not kept_script(home).exists()
 
 
 def powershell() -> Path:
@@ -125,7 +161,7 @@ def register(home, edition: str, version: str, name: str | None = None) -> list[
     this installation's. Nothing is written unless the kept uninstaller is there for the key to name, and
     nothing is written over a key of that name that is not this installation's. Returns what was done."""
     done = []
-    if edition not in EDITIONS or not kept_script(home).is_file() or not version or version == "unknown":
+    if edition not in EDITIONS or not kept_uninstaller_present(home) or not version or version == "unknown":
         return done
     existing = read(edition)
     if existing is not None and not owned(existing, home):
