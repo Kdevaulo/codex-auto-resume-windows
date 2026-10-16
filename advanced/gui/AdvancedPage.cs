@@ -237,12 +237,11 @@ namespace CodexAutoResume
             return state == StateArmed || state == StateShadow;
         }
 
-        /// v0.6.16-beta.3: a row's state in the list - its word, and "· kept on" after it for one kept on (KeptOn) - as text in
-        /// the flat row, nothing drawn.
+        /// A row's state in the list as text in the flat row, nothing drawn: for one kept on (KeptOn), Keep it on alone -
+        /// the owner's word for it (v0.6.16-beta.4: kept on is on, so "On · kept on" said it twice).
         private string ListState(Dictionary<string, object> row)
         {
-            string word = StateWord(Str(row, "state"));
-            return KeptOn(row) ? word + " · " + Word("page.state_kept_on", "kept on") : word;
+            return KeptOn(row) ? Word("page.keep_on", "Keep it on") : StateWord(Str(row, "state"));
         }
 
         private string StateWord(string state)
@@ -624,6 +623,12 @@ namespace CodexAutoResume
                 MethodInvoker after = done;
                 done = delegate { ReadPrompts(after); };
             }
+            // v0.6.16-beta.4: the wrap-up's own wordings (AdvancedUsage.cs).
+            if (id == WrapUpId)
+            {
+                MethodInvoker after = done;
+                done = delegate { ReadWordings(after); };
+            }
             bool rules = Equals(Get(item, "rules_editor"), true), samples = Equals(Get(item, "samples"), true);
             MethodInvoker readWatch = delegate
             {
@@ -852,7 +857,7 @@ namespace CodexAutoResume
                            WatchShown(advancedOpen) + "|" +
                            KeptShown(item) + "|" +
                            (IsReport(item) ? ReportShown() : "") + "|" +
-                           ResetsShown(item) + "|" + KeepGoingShown(item) + "|" + QueueShown(item);
+                           ResetsShown(item) + "|" + KeepGoingShown(item) + "|" + QueueShown(item) + "|" + WordingsShown(item);
             if (shown == advancedShown)
             {
                 UpdateAdvancedButtons();
@@ -869,6 +874,7 @@ namespace CodexAutoResume
             advancedStack.RowStyles.Clear();
             advancedHourly = null;
             advancedChoices.Clear();
+            ForgetCustomEntries();
             ruleRemoves.Clear();
             ruleTag = ruleFrom = ruleTo = null;
             ruleKind = ruleSampled = null;
@@ -901,12 +907,10 @@ namespace CodexAutoResume
             // Its name and where it stands; what an administrator refuses of it; and what its statement warns of now.
             TableLayoutPanel head = NewGroup(AdvancedName(id), advancedStack);
             TableLayoutPanel facts = Facts(head);
-            Fact(facts, Word("page.col_state", "State")).Text = StateWord(Str(item, "state"));
-            // v0.6.16-beta.3: whether it is kept on, right under where it stands - while it is on or watched (AdvancedKeepOn.cs);
-            // the owner found it too far down the page, under its statement and its limits.
-            BuildKeepOn(item, head);
+            Fact(facts, Word("page.col_state", "State")).Text = ListState(item);
             // That it turned itself off, and why, where it did - a tripwire, or a new version of Codex - in the accent, as
-            // what a policy refuses is: a person who turned it on finds it off, and is told it was not someone else.
+            // what a policy refuses is: a person who turned it on finds it off, and is told it was not someone else. Right
+            // under where it stands, before Keep it on, which (v0.6.16-beta.4) an off capability is offered too.
             string tripped = TrippedText(item);
             if (tripped != null)
             {
@@ -915,6 +919,9 @@ namespace CodexAutoResume
                 line.Margin = Pad(0, Brand.SpaceS, 0, 0);
                 head.Controls.Add(line);
             }
+            // v0.6.16-beta.3: whether it is kept on, right under where it stands (AdvancedKeepOn.cs); the owner found it too
+            // far down the page, under its statement and its limits.
+            BuildKeepOn(item, head);
             // What a kept-on capability noted in place of turning itself off (K8), in the accent beside it: turning it on
             // again is how the person confirms again.
             string kept = KeptText(item);
@@ -1057,6 +1064,17 @@ namespace CodexAutoResume
                         if (number == value) index = combo.Items.Count;
                         combo.Items.Add(new Choice(number.ToString(CultureInfo.InvariantCulture), OptionText(key, number)));
                     }
+                    // v0.6.16-beta.4 (f): a number typed in beside the presets - shown as it is where it is one - and
+                    // Custom... last, which opens the box it is typed in (AdvancedUsage.cs).
+                    if (CustomRange(option) != null)
+                    {
+                        if (index < 0 && value > 0)
+                        {
+                            index = combo.Items.Count;
+                            combo.Items.Add(new Choice(value.ToString(CultureInfo.InvariantCulture), OptionText(key, value)));
+                        }
+                        combo.Items.Add(new Choice(CustomChoice, Word("page.option.custom", "Custom...")));
+                    }
                     if (index >= 0) combo.SelectedIndex = index;
                 }
                 finally
@@ -1070,7 +1088,10 @@ namespace CodexAutoResume
                 combo.SelectionChangeCommitted += delegate { SetAdvancedOption(id, key, chosen); };
                 card.Controls.Add(NewRow(label, combo));
                 advancedChoices.Add(combo);
+                BuildCustomEntry(id, key, label, CustomRange(option), card);
             }
+            // v0.6.16-beta.4: the wrap-up's Custom wording, under its drop-downs (AdvancedUsage.cs).
+            BuildWordings(id, options, card);
         }
 
         /// One value of a choice as the drop-down shows it: hours with their unit, a count as a number.
@@ -1079,11 +1100,15 @@ namespace CodexAutoResume
             if (key == "ceiling_hours") return Word("page.option.hours", "{n} h", "n", value);
             // v0.6.16-beta.3 (issue #29): the meter's spacing, a stage's percentage, the wrap-up's wording.
             if (key == "poll_minutes") return Word("page.option.minutes", "{n} min", "n", value);
+            // v0.6.16-beta.4: a switch's two values (1 on, 2 off).
+            if (key == "wrap_reset_time" || key == "wrap_after_reset" || key.StartsWith("window_", StringComparison.Ordinal))
+                return value == 1 ? Word("page.option.on", "On") : Word("page.option.off", "Off");
             if (key == "wrap_style")
                 return Word("page.option.style." + value.ToString(CultureInfo.InvariantCulture),
-                            value == 1 ? "Short" : value == 3 ? "Detailed" : "Standard");
+                            value == 1 ? "Short" : value == 3 ? "Detailed" : value == 4 ? "With the numbers" :
+                            value == 5 ? "Custom" : "Standard");
             if (key.StartsWith("warn_", StringComparison.Ordinal) || key.StartsWith("wrap_", StringComparison.Ordinal) ||
-                key.StartsWith("pause_", StringComparison.Ordinal))
+                key.StartsWith("pause_", StringComparison.Ordinal) || key.StartsWith("stop_words_", StringComparison.Ordinal))
                 return Word("page.option.percent", "{n}%", "n", value);
             return value.ToString(CultureInfo.CurrentCulture);
         }
@@ -1091,8 +1116,21 @@ namespace CodexAutoResume
         private void SetAdvancedOption(string id, string key, SoftCombo combo)
         {
             var choice = combo.SelectedItem as Choice;
-            if (choiceFilling || choice == null || advancedListing == null || busy > 0) return;
-            string argument = "{\"capability\":" + Json.Escape(id) + ",\"key\":" + Json.Escape(key) + ",\"value\":" + choice.Value +
+            if (choiceFilling || choice == null) return;
+            if (choice.Value == CustomChoice)
+            {
+                OpenCustomEntry(key);                            // (f): the number is typed in, and set with Set
+                return;
+            }
+            if (advancedListing == null || busy > 0) return;
+            SetAdvancedOptionValue(id, key, choice.Value);
+        }
+
+        /// One choice sent as `value` - a preset, or (v0.6.16-beta.4) a number typed in - against the generation the page
+        /// read; the drop-down then shows what holds.
+        private void SetAdvancedOptionValue(string id, string key, string value)
+        {
+            string argument = "{\"capability\":" + Json.Escape(id) + ",\"key\":" + Json.Escape(key) + ",\"value\":" + value +
                               ",\"generation\":" + AdvancedGeneration() + "}";
             string name = AdvancedName(id);
             AdvancedCall("advanced-option", argument, true, delegate(Dictionary<string, object> reply)
@@ -1100,7 +1138,11 @@ namespace CodexAutoResume
                 Dictionary<string, object> result = AdvancedResult(reply);
                 // The drop-down shows what holds after, whatever it was left on.
                 advancedShown = null;
-                if (AdvancedDone(result)) SetNote(advancedNote, Word("page.done.option", "{name} uses this from now on.", "name", name));
+                if (AdvancedDone(result))
+                    SetNote(advancedNote, Str(result, "warning") == "stop_before_words"
+                        // v0.6.16-beta.4 (j): taken, and said what it may do - never refused.
+                        ? Word("page.warn.stop_before_words", "Saved. The forced stop is below the stop the wrap-up's words ask for, so it may stop Codex before Codex stops itself.")
+                        : Word("page.done.option", "{name} uses this from now on.", "name", name));
                 ReadAdvanced(null);
                 if (!AdvancedDone(result)) TellAdvanced(KeptRefusal(Str(result, "refusal")));
             });
@@ -1303,6 +1345,8 @@ namespace CodexAutoResume
                 return Word("page.refused.rule_overlap", "Another rule already covers this code and these status numbers.");
             if (refusal == "rules_full")
                 return Word("page.rules.full", "There are ten rules. Remove one to add another.");
+            if (refusal == "option_order")
+                return Word("page.refused.option_order", "For each window, the warning must be at or below the wrap-up, and the wrap-up below the stop its words ask for. Nothing was changed.");
             if (refusal == "option_invalid")
                 return Word("page.refused.option", "That choice is not one this feature offers. Nothing was changed.");
             if (refusal == "stale_generation" || refusal == "unknown_rule")
@@ -1426,6 +1470,7 @@ namespace CodexAutoResume
             foreach (Button remove in ruleRemoves) remove.Enabled = listed;
             if (ruleAdd != null) ruleAdd.Enabled = listed;
             UpdateKeptButtons(idle);
+            UpdateWordingButtons(idle);
             UpdateResetButtons(idle);
             UpdateKeepGoingButtons(idle);
             UpdateQueueButtons(idle);
@@ -1512,6 +1557,13 @@ namespace CodexAutoResume
         /// because something changed after it was shown.
         private void ArmAdvanced(string id, string state, int round)
         {
+            ArmAdvanced(id, state, round, false);
+        }
+
+        /// With `keep` (v0.6.16-beta.4, the owner's "Keep it on turns it on"): turn it on and keep it on, in this one
+        /// confirmation - Keep it on's warning before the statement it confirms, and keep_on sent with the arm.
+        private void ArmAdvanced(string id, string state, int round, bool keep)
+        {
             // Asked again, after something changed: what holds now may not be askable at all, and the person who said
             // yes is told why nothing was turned on (ArmHeld). The first time, the button could not have been pressed.
             string held = ArmHeld(id, state);
@@ -1534,23 +1586,30 @@ namespace CodexAutoResume
                     return;
                 }
                 readNeedsAt = round;
-                ReadNeeds(unread, delegate { ArmAdvanced(id, state, round); });
+                ReadNeeds(unread, delegate { ArmAdvanced(id, state, round, keep); });
                 return;
             }
             var needed = new List<Dictionary<string, object>>();
             foreach (string need in needs) needed.Add(AdvancedStatement(need));
             // What is sent is decided here, from what the dialog is about to show, and from nothing read later.
             string argument = ArmArgument(id, state, Whole(Get(advancedListing, "generation")), statement, needed);
-            string affirm = state == StateArmed ? Word("page.turn_on", "Turn on") : Word("page.watch", "Watch first");
+            if (keep) argument = argument.Substring(0, argument.Length - 1) + ",\"keep_on\":true}";
+            string affirm = keep ? Affirm(Word("page.keep_on.turn_on", "Keep it on..."))
+                          : state == StateArmed ? Word("page.turn_on", "Turn on") : Word("page.watch", "Watch first");
+            string question = ArmQuestion(name, state, statement, round > 0, needs, needed);
+            if (keep)
+                question = Word("page.confirm.keep_on", "Keep {name} on? It will not turn itself off. When what it does changes, a warning appears, a part of it fails, a continuation it sent cannot be proven to have arrived, or Codex is updated, it stays on and this page tells you; a part that fails skips only that one recovery. You can always turn it off here, from Codex or with every advanced feature at once. Its limits stay, and your administrator's policy still applies.", "name", name)
+                           + Environment.NewLine + Environment.NewLine + question;
             // The safe answer is the default: Enter and Escape leave it as it is, and only the button that names the
             // action says yes (Dialog, as the update check's offer of a pre-release asks).
-            if (!AskAdvanced(ArmQuestion(name, state, statement, round > 0, needs, needed), affirm)) return;
+            if (!AskAdvanced(question, affirm)) return;
             AdvancedCall("advanced-arm", argument, true, delegate(Dictionary<string, object> reply)
             {
                 Dictionary<string, object> result = AdvancedResult(reply);
                 if (AdvancedDone(result))
                 {
-                    string done = state != StateArmed ? Word("page.done.watch", "{name} is being watched. It does nothing yet.", "name", name)
+                    string done = keep ? Word("page.done.keep_on", "{name} is kept on.", "name", name)
+                                  : state != StateArmed ? Word("page.done.watch", "{name} is being watched. It does nothing yet.", "name", name)
                                   : needs.Count > 0 ? Word("page.done.on_with", "{name} is on, and so is what it needs: {names}.", "name", name)
                                                       .Replace("{names}", NamesOf(needs))
                                   : Word("page.done.on", "{name} is on.", "name", name);
@@ -1566,7 +1625,7 @@ namespace CodexAutoResume
                     // Something changed after the page showed it - a capability turned off elsewhere, a new statement, a
                     // warning, a Codex version: what holds now is read, and asked about again - or, where it cannot be,
                     // the person is told why not.
-                    ReadAdvanced(delegate { ArmAdvanced(id, state, round + 1); });
+                    ReadAdvanced(delegate { ArmAdvanced(id, state, round + 1, keep); });
                     return;
                 }
                 ReadAdvanced(null);
@@ -1786,6 +1845,8 @@ namespace CodexAutoResume
                 return Word("page.policy.shadow_only", "Your administrator's Windows policy lets this feature be watched, not turned on.");
             if (StaleRefusal(refusal))
                 return Word("page.refused.changed", "It kept changing while you read it, so nothing was turned on. Try again in a moment.");
+            if (refusal == "failed_here")
+                return Word("page.refused.failed_here", "A compatibility check of what it relies on failed on this computer, so it cannot be kept on. You can still turn it on.");
             if (refusal == "requirement_failed_here")
                 return Word("page.refused.requirement_failed_here", "A feature this one needs failed a compatibility check on this computer, so neither was turned on.");
             if (refusal == null || refusal == "state_unavailable")

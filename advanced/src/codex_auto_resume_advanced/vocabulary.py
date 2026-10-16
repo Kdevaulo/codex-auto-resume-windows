@@ -149,6 +149,13 @@ class Refusal(StrEnum):
     # A requirement's compatibility grade is Failed here on this PC: like a policy on it, it keeps the dependent off,
     # whatever is confirmed - the owner's rule for `requires`.
     REQUIREMENT_FAILED_HERE = "requirement_failed_here"
+    # Keep it on (v0.6.16-beta.4) for a capability whose compatibility is Failed here: never kept on that way.
+    FAILED_HERE = "failed_here"
+    # A person's own wording the custom continuation text's checks refuse, or a key the capability does not keep.
+    WORDING_INVALID = "wording_invalid"
+    # v0.6.16-beta.4 (j): a near-limit percentage out of order - a window's warning above its wrap-up, or the wrap-up at
+    # or above the stop its words ask for.
+    OPTION_ORDER = "option_order"
 
 
 class JournalCode(StrEnum):
@@ -216,6 +223,22 @@ class OptionKey(StrEnum):
     WRAP_STYLE = "wrap_style"
     PAUSE_FIVE_HOUR = "pause_five_hour"
     PAUSE_WEEKLY = "pause_weekly"
+    # v0.6.16-beta.4 (the owner's additions to issue #29), each 1 on or 2 off where it is a switch: each window acted
+    # on or not, the stop percentage the wrap-up's words ask Codex to stop at in each window (a request, apart from
+    # the forced stop's own, PAUSE_*), whether the words carry the reset time, and one continuation after the reset.
+    WINDOW_FIVE_HOUR = "window_five_hour"
+    WINDOW_WEEKLY = "window_weekly"
+    STOP_WORDS_FIVE_HOUR = "stop_words_five_hour"
+    STOP_WORDS_WEEKLY = "stop_words_weekly"
+    WRAP_RESET_TIME = "wrap_reset_time"
+    WRAP_AFTER_RESET = "wrap_after_reset"
+
+
+class WordingKey(StrEnum):
+    """A person's own wording a capability keeps (v0.6.16-beta.4, state `wordings`): text, never logged, checked as
+    the custom continuation text is (continuation.MAX_CUSTOM_LENGTH)."""
+    WRAP_CUSTOM_FIVE_HOUR = "wrap_custom_five_hour"
+    WRAP_CUSTOM_WEEKLY = "wrap_custom_weekly"
 
 
 class KeepOn(StrEnum):
@@ -282,6 +305,10 @@ class BridgeCommand(StrEnum):
     # Keep on (v0.6.14, K8): set or let go for one capability that is on or watched, the Dashboard's
     # alone, after its warning, against the generation the page read; no MCP tool reaches it.
     ADVANCED_KEEP_ON = "advanced-keep-on"
+    # v0.6.16-beta.4: a capability's own wordings read, and one set or taken away (the wrap-up's Custom text) - the
+    # Dashboard's alone, against the generation the page read; no MCP tool reaches them.
+    ADVANCED_WORDINGS = "advanced-wordings"
+    ADVANCED_WORDING = "advanced-wording"
     # Send now (v0.6.14): a person's request that one waiting recovery go at the watcher's next look,
     # by its interruption id, the Dashboard's alone while Send now is on; no MCP tool reaches it.
     ADVANCED_SEND_NOW = "advanced-send-now"
@@ -554,6 +581,9 @@ class ContinuationKind(StrEnum):
     # v0.6.16-beta.3 (issue #29): a conversation with a turn running asked to wrap up, once for each usage window
     # that reached the percentage a person chose (usage_wrap_up), sent while that turn is still the latest.
     WRAP_UP = "wrap_up"
+    # v0.6.16-beta.4: one continuation when the window resets, to a conversation that was wrapped up or stopped and
+    # then ended well - sent only while its turn is still the latest, final and with nothing after it.
+    AFTER_RESET = "after_reset"
 
 
 class ContinuationReason(StrEnum):

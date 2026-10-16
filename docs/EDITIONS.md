@@ -54,7 +54,7 @@ it again, or your administrator's policy now refuses it, it says that nothing wa
 The page reads the list again after everything you do there, and whenever the watcher says a
 capability was turned on or off, here or anywhere else.
 
-**What one needs, it turns on with it.** A capability can need another: Wrap up near a limit and Pause
+**What one needs, it turns on with it.** A capability can need another: Wrap up near a limit and Stop
 near a limit both need the usage meter. Turning one on when what it needs is off asks once, with every
 statement involved in front of you - its own, then each one it needs - and that one yes turns them all on;
 if your administrator's policy refuses any of them, or any statement changed, nothing is turned on. Its
@@ -93,8 +93,11 @@ page says so under the capability's state, and why. You can turn it on again, wi
 it then reads (K7). A continuation sent once more and then found twice turns off what sent it again:
 Once more when unsure itself, or the *Also send again when unsure* of a capability kept on.
 
-**Keep it on.** On the page, a capability that is on or watched can be kept on, after its own warning.
-Kept on, it does not turn itself off for any of the tripwires above, nor for a new version of Codex:
+**Keep it on.** On the page, any capability can be kept on: *Keep it on...* turns it on as well, in the one
+confirmation turning it on asks - its warning, then its statement and what it needs - and is refused as
+turning it on is, and also where its own compatibility check failed on this PC. Kept on is on: the list
+and the page say *Keep it on* for it, and setting it to watch takes Keep it on away. Kept on, it does not
+turn itself off for any of the tripwires above, nor for a new version of Codex:
 the page notes the most serious of them under its state until you turn it on again; a part of it that
 fails skips only that one recovery; and a send it made whose delivery cannot be proven is held, as the
 standard edition holds one. A Codex version or a compatibility grade that cannot be read still holds
@@ -130,7 +133,7 @@ Codex; nothing runs it unless a person asks, and [SECURITY.md](SECURITY.md) says
 
 Twenty-five: seventeen that change how a recovery is made, which conversations are recovered or what
 follows a turn, three that send at a time you pick - the two at a usage reset, and queued messages - three
-before a usage limit is reached - the usage meter, and the wrap-up and the pause that need it - and two
+before a usage limit is reached - the usage meter, and the wrap-up and the forced stop that need it - and two
 actions: Longer messages, which only lets a message be longer, and the compatibility report, which only you
 start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
 is opened - ten on measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
@@ -685,10 +688,14 @@ It rests on no measurement.
 ### Usage meter
 
 **What it does.** While the Codex app runs, reads your Codex usage on its own every 5 to 60 minutes, as you
-choose - 15 by default - and shows it in the icon's tooltip and the popup. When the five-hour or the weekly
-window reaches the percentage you set for a warning (85% by default, each window its own), it shows a
-notice, once for that window. The reading is only shown: whether a recovery may go is still decided by the
-reading the program makes when a recovery is due.
+choose or type in - 15 by default - and shows it in the icon's tooltip and the popup. When a window reaches
+the percentage you set for a warning (85% by default, each window its own), it shows a notice, once for that
+window. Each window - the five-hour and the weekly - can be switched off on its own: it is still read and
+shown, and nothing warns, wraps up or stops for it. Every number on the page has *Custom...* beside its
+choices, checked before it is saved - a whole percentage from 1 to 100, a spacing from 5 to 60 minutes - and
+for each window the warning stays at or below the wrap-up, and the wrap-up below the stop its words ask for.
+The reading is only shown: whether a recovery may go is still decided by the reading the program makes when
+a recovery is due.
 
 **When it helps.** When you want to see how close a limit is before it is reached.
 
@@ -702,17 +709,25 @@ reading that cannot be read is shown as nothing and warns of nothing.
 
 ### Wrap up near a limit
 
-**What it does.** Needs the usage meter, which turns on with it. When the five-hour or the weekly window
-reaches the percentage you set (90% by default, each window its own), each conversation that is switched on
-and has a turn running is sent one message, once for that window: "Please finish the current step, then
-stop." - or, as you choose, the short "Please stop now." or the detailed "Commit what is pending, write down
-where you are and what is left, then stop." It goes through Codex's queue as every continuation does, so
-Codex delivers it when the current turn ends.
+**What it does.** Needs the usage meter, which turns on with it. When a window it may act on reaches the
+percentage you set (90% by default, each window its own), each conversation that is switched on and has a
+turn running is sent one message, once for that window, in the wording you pick: the standard "Please finish
+the current step, then stop.", the short "Please stop now.", the detailed "Commit what is pending, write down
+where you are and what is left, then stop.", one with the numbers - "You have used 90% of the five-hour limit.
+Get ready to stop safely, and stop when it reaches 95%." (the stop it asks for is its own number, apart from
+Stop near a limit's) - or your own words for each window, which may hold {percent}, {window}, {stop_at} and
+{reset} and are checked as a custom continuation message is. *Include the reset time* (on by default) adds
+when that window resets. The page shows, under the choice, exactly what would be sent for each window, in
+your continuation language. It goes through Codex's queue as every continuation does, so Codex delivers it
+when the current turn ends. With *Continue after the reset* (on by default), a conversation that then ended
+well is sent one continuation once the window resets - only if nothing newer happened there, and while the
+app has it open.
 
 **When it helps.** When you would rather a long turn stopped at a good place than ran into the limit.
 
 **What it risks.** The message arrives only when the current turn ends, which may be after the limit is
-reached: it cannot stop a turn midway. A turn that ended before the message went gets none.
+reached: it cannot stop a turn midway - Stop near a limit can. A turn that ended before the message went
+gets none. Your own words are sent as you wrote them, with only the numbers filled in.
 
 **Departs from** [A13](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (only failures are recovered) and
 [A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (words of its own).
@@ -720,24 +735,36 @@ reached: it cannot stop a turn midway. A turn that ended before the message went
 **Ceilings.** 12 a day, and 2 in any one conversation - the five-hour and the weekly window's. **Measurement
 MT: not made yet.**
 
-### Pause near a limit
+### Stop near a limit
 
-**What it does.** Needs the usage meter, which turns on with it. When the five-hour or the weekly window
-reaches the percentage you set (95% by default, each window its own), the program sends no further
-continuation until that window resets: recoveries wait, and the advanced edition's own continuations are
-held. Messages you queued yourself, and anything you type in Codex, are not touched. After the reset,
-recoveries go on as they always do.
+**What it does.** Needs the usage meter, which turns on with it. (Pause near a limit until v0.6.16-beta.4.)
+When a window it may act on reaches the stop percentage you set (97% by default, each window its own), each
+conversation that is switched on and has a turn running is stopped, as the Stop button in the Codex app
+stops one - through the app's own internal channel, the `\\.\pipe\codex-ipc` pipe, once for that window -
+and the program sends no further continuation until that window resets: recoveries wait, and the advanced
+edition's own continuations are held. It works only for a conversation the Codex app has open; where it
+cannot stop a turn - the app does not have the conversation open, is not running, or its build no longer
+answers this request as measured - it only holds, and a notice says the turn could not be stopped. Codex
+pauses a stopped conversation's queue, and that survives the app's restart, until the turn started after the
+reset lets it go; with Continue after the reset off, a notice asks you to press Resume in Codex. When the window resets, a conversation it stopped is continued once (*Continue after the reset*, a
+choice of Wrap up near a limit, on by default) by a turn started through the same channel - past the paused
+queue - only if nothing newer happened there and the app has it open; otherwise it waits, and a notice says
+to open it in Codex. Messages you queued yourself, and anything you type in Codex, are not touched.
 
-**When it helps.** When you would rather keep the last of a window's usage for yourself.
+**When it helps.** When you would rather a turn stopped before the limit than ran into it.
 
-**What it risks.** Work may wait that could still have run in the usage left. A reading that is old may hold
-recoveries until the reset time it last showed; a window that resets early is seen at the meter's next
-reading.
+**What it risks.** A stopped turn may leave work half done; the wrap-up's words ask Codex to stop safely
+first. The app's internal channel is not a documented interface: a new Codex app may change it, and then
+nothing is stopped. Work may wait that could still have run in the usage left, and an old or wrong reading
+may stop a turn or hold recoveries too early.
 
-**Departs from** [C9](STANDARDS.md#c-network): it decides on the usage meter's reading, taken when no
-recovery was due.
+**Departs from** [A2](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (its continuation after the reset
+is a turn started through the app's channel, not `codex queue`), [B3](STANDARDS.md#b-what-it-reads-and-how)
+(Codex's state changed through that channel), [C9](STANDARDS.md#c-network) (it decides on the usage meter's
+reading) and [H6](STANDARDS.md#h-user-control) (a running turn is stopped).
 
-**Ceilings.** None come into play: it holds, and sends nothing. **Measurement MU: not settled yet.**
+**Ceilings.** One stop and one continuation a conversation a window. **Measurement MIPC: passed** (codex-cli
+0.162.0-alpha.17.2, app 26.1007.9446.0); **MU: not settled yet.**
 
 ### Compatibility report
 

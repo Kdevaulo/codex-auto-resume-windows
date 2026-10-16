@@ -89,9 +89,11 @@ class SettingTests(KeepOnCase):
                                                  "arguments": {}})
         self.assertIs(mcp["data"]["capabilities"][0]["keep_on"], True)
 
-    def test_only_the_dashboard_for_one_on_or_watched_after_its_warning_and_generation(self):
+    def test_only_the_dashboard_for_one_on_after_its_warning_and_generation(self):
         self.assertEqual(self.keep()["refusal"], Refusal.NOT_ON, "nothing to keep on")
         self.armed(state="shadow", keep=False)
+        self.assertEqual(self.keep()["refusal"], Refusal.NOT_ON, "watched is not on: Keep it on turns it on (arm)")
+        self.armed(keep=False)
         for changes, refusal in (({"actor": Actor.MCP}, Refusal.NOT_THE_DASHBOARD),
                                  ({"actor": Actor.TRAY}, Refusal.NOT_THE_DASHBOARD),
                                  ({"confirmed": None}, Refusal.STALE_CONFIRMATION),
@@ -152,7 +154,7 @@ class SettingTests(KeepOnCase):
         self.setUp()
         self.armed()
         self.assertTrue(self.arm(self.rt, state="shadow")["done"])
-        self.assertTrue(self.row()["keep_on"], "moving between on and watching keeps it")
+        self.assertFalse(self.row()["keep_on"], "kept on is on (v0.6.16-beta.4): set to watch, it is not kept on")
 
     def test_it_is_set_through_the_bridge_and_no_mcp_tool_reaches_it(self):
         self.armed(keep=False)
@@ -168,6 +170,51 @@ class SettingTests(KeepOnCase):
         self.assertEqual(len(tools), 3)
         for tool in tools:
             self.assertNotIn("keep", tool)
+
+
+class KeepItOnTurnsItOnTests(KeepOnCase):
+    """v0.6.16-beta.4, the owner's rule: turning Keep it on on turns the capability on too, in the arm's one
+    confirmation - its statement and warnings - refused as an arm is, and on a Failed-here grade."""
+
+    def test_from_off_or_watched_one_yes_turns_it_on_and_keeps_it_on(self):
+        for start in (None, "shadow"):
+            with self.subTest(start=start):
+                self.setUp()
+                if start:
+                    self.armed(state=start, keep=False)
+                before = self.generation()
+                found = self.arm(self.rt, keep_on=True)
+                self.assertEqual((found["done"], found["generation"]), (True, before + 1), found)
+                self.assertEqual((self.row()["state"], self.row()["keep_on"]), (ArmingState.ARMED, True))
+                self.assertIn(JournalCode.KEEP_ON, [entry["code"] for entry in self.rt.state.journal()])
+
+    def test_on_already_it_is_kept_on_by_the_same_request(self):
+        self.armed(keep=False)
+        found = self.arm(self.rt, keep_on=True)
+        self.assertTrue(found["done"], found)
+        self.assertTrue(self.row()["keep_on"])
+
+    def test_refused_as_an_arm_is_and_on_a_failed_here_grade(self):
+        for given, refusal in ((policy.Policy(forbid=True), Refusal.FORBIDDEN_BY_POLICY),
+                               (policy.Policy(force_shadow=True), Refusal.SHADOW_FORCED_BY_POLICY)):
+            with self.subTest(given):
+                self.policy = given
+                self.assertEqual(self.arm(self.rt, keep_on=True)["refusal"], refusal)
+                self.assertIsNone(self.row())
+        self.policy = policy.NONE
+        self.assertEqual(self.arm(self.rt, keep_on=True, state="shadow")["refusal"], Refusal.INVALID_REQUEST)
+        self.compat = ac.view("FAILED_HERE", reason="local_check_failed_here")
+        warned = [str(word) for word in self.rt.arming.warnings(self.rt.registry.get("test_wake"))]
+        self.assertEqual(self.arm(self.rt, keep_on=True, warnings=warned)["refusal"], Refusal.FAILED_HERE)
+        self.assertIsNone(self.row())
+        self.assertTrue(self.arm(self.rt, warnings=warned)["done"], "turning it on alone is a warning, as before")
+
+    def test_through_the_bridge(self):
+        found = surfaces.answer(self.rt, "bridge", {"command": "advanced-arm", "argument": {
+            "capability": "test_wake", "state": "armed", "revision": 1, "generation": self.generation(),
+            "engine_version": ac.ENGINE, "warnings": [], "keep_on": True}})
+        self.assertTrue(found["done"], found)
+        self.assertEqual((self.row()["state"], self.row()["keep_on"]), (ArmingState.ARMED, True))
 
 
 class KeptTests(KeepOnCase):
@@ -360,7 +407,7 @@ class SendAgainSettingTests(KeepOnCase):
         self.addCleanup(where.cleanup)
         self.catalogs = ac.catalogs(where.name, ac.definition(), action)
         self.rt = self.runtime(ac.definition(), action)
-        self.assertTrue(self.arm(self.rt, capability="test_report", state="shadow")["done"])
+        self.assertTrue(self.arm(self.rt, capability="test_report", state="armed")["done"])
         self.assertTrue(self.keep(capability="test_report")["done"])
         refused = self.rt.arming.set_keep_on("test_report", True, send_again=True, generation=self.generation(),
                                              confirmed=["keep_on", "send_again"], actor=Actor.DASHBOARD)

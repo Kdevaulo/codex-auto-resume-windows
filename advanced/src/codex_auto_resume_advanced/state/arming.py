@@ -8,9 +8,9 @@ which arming.standing reads so that a warning they confirmed never trips what th
 This is only the writing. Who may move a capability, and when, is `arming.py`'s to decide; here
 each move is one transaction that checks its words, bumps the generation and journals itself.
 
-Keep on (v0.6.14, K8) is a row in `options` (KeepOn), set and let go for a capability that is on or
-watched, a move like any other but for `since`, which it never touches; every move to off takes it
-away. Send again (v0.6.14) is a second row beside it, only ever with it. A kept-on capability's notice - what would have turned it off - is its row's `reason`, which a
+Keep on (v0.6.14, K8) is a row in `options` (KeepOn), set and let go for a capability that is on (from
+v0.6.16-beta.4; watched before), a move like any other but for `since`, which it never touches; every move to off or
+to watching takes it away, and an arm can set it with the move (move_set's `keep`: Keep it on turns it on). Send again (v0.6.14) is a second row beside it, only ever with it. A kept-on capability's notice - what would have turned it off - is its row's `reason`, which a
 row that is not off held nowhere before: written only as it rises (KEPT_NOTICES), with no generation,
 and taken away by the next arm, the person confirming again.
 
@@ -124,9 +124,11 @@ class ArmingMixin:
             if generation is not None and generation != current:
                 raise StaleGeneration("stale generation")
             before = connection.execute("SELECT * FROM arming WHERE capability=?", (capability,)).fetchone()
+            if state != ArmingState.ARMED:
+                # v0.6.16-beta.4: Keep it on is on, never watching: any move off or to watching takes it away.
+                connection.execute("DELETE FROM options WHERE capability=? AND " + _KEPT, (capability,))
             if state == ArmingState.OFF:
                 revision = engine_version = warnings = None
-                connection.execute("DELETE FROM options WHERE capability=? AND " + _KEPT, (capability,))
                 if before is None or _row(before)["state"] == ArmingState.OFF:
                     return False, current
             elif before is not None and _row(before)["state"] == state and (
@@ -155,7 +157,7 @@ class ArmingMixin:
             self._note(connection, now, code, capability=capability, reason=reason, actor=actor)
             return True, current + 1
 
-    def move_set(self, moves, *, actor, generation, at=None) -> tuple:
+    def move_set(self, moves, *, actor, generation, at=None, keep=()) -> tuple:
         """Turn on a capability and the requirements it carries, all in one transaction (v0.6.16-beta.3,
         registry.CapabilityDef.requires): `moves` is a list of (capability, state, revision, engine_version,
         warnings), the dependent and each required capability it turns on with it. The generation is checked
@@ -164,13 +166,16 @@ class ArmingMixin:
 
         Every state is SHADOW or ARMED (a set only turns on); each capability is of the registry. A move to
         where it already stands, as it stands, writes nothing but is not an error - a requirement already on
-        is left as it is."""
+        is left as it is. `keep` (v0.6.16-beta.4) names those of the set, each turned on, kept on in the same
+        transaction (Keep it on turns it on: the one confirmation)."""
         prepared = []
         for capability, state, revision, engine_version, warnings in moves:
             state = _word(state, ArmingState, "state")
             if state == ArmingState.OFF or self.registry.get(capability) is None:
                 raise StateError("a set only turns capabilities on")
             prepared.append((capability, state, revision, engine_version, _joined(warnings)))
+        if not set(keep) <= {capability for capability, state, *_ in prepared if state == ArmingState.ARMED}:
+            raise StateError("only a capability turned on in the set is kept on")
         actor = _word(actor, Actor, "actor")
         now = self._now(at)
         with self._transaction(create=True) as connection:
@@ -190,6 +195,14 @@ class ArmingMixin:
                     (capability, state, now, actor, None, revision, engine_version, warnings))
                 self._note(connection, now, _CODES.get(state), capability=capability, actor=actor)
                 written += 1
+            for capability in keep:
+                held = connection.execute("SELECT 1 FROM options WHERE capability=? AND choice=?",
+                                          (capability, str(KeepOn.KEEP_ON))).fetchone()
+                if held is None:
+                    connection.execute("INSERT INTO options (capability, choice, value) VALUES (?,?,1)",
+                                       (capability, str(KeepOn.KEEP_ON)))
+                    self._note(connection, now, JournalCode.KEEP_ON, capability=capability, actor=actor)
+                    written += 1
             if written:
                 connection.execute("UPDATE meta SET generation = generation + 1")
                 return written, current + 1

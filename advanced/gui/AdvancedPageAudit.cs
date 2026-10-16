@@ -291,6 +291,8 @@ namespace CodexAutoResume
         ///   {"do": "rule", "tag": ..., "sampled": ...,        a new rule's fields filled - its code typed, or taken from the
         ///    "from": ..., "to": ..., "kind": ...}             samples' drop-down - and Add rule pressed, if it can be
         ///   {"do": "remove", "rule": n}                       that rule's Remove pressed, if it can be
+        ///   {"do": "wording", "key": ..., "text": ...}         a wrap-up wording box filled and its Save words pressed
+        ///   {"do": "custom_option", "key": ..., "text": ...}   Custom... chosen in that choice's drop-down, typed, Set pressed
         ///   {"do": "send_now", "id": ...}                     that waiting recovery's Send now pressed, if it can be
         ///   {"do": "reset_add", "family": "bucket minutes",   a reset form filled - its window chosen first, then which
         ///    "ordinal": ..., "repeat": once|every,            one, how often and whether it asks, or the conversation and
@@ -385,6 +387,35 @@ namespace CodexAutoResume
                             form.ruleTo.Box.Text = Str(step, "to") ?? "";
                             if (Str(step, "kind") != null) Choose(form.ruleKind, Str(step, "kind"));
                             Pressed.Invoke(form.ruleAdd, new object[] { EventArgs.Empty });
+                        }
+                    }
+                    else if (what == "custom_option")
+                    {
+                        SoftCombo combo = form.advancedChoices.Find(delegate(SoftCombo each) { return Equals(each.Tag, Str(step, "key")); });
+                        SoftTextArea box;
+                        Button set;
+                        if (combo == null || !combo.Enabled || !form.customBoxes.TryGetValue(Str(step, "key") ?? "", out box) ||
+                            !form.customSets.TryGetValue(Str(step, "key") ?? "", out set))
+                            disabled.Add("custom_option");
+                        else
+                        {
+                            Choose(combo, CustomChoice);
+                            Committed.Invoke(combo, new object[] { EventArgs.Empty });
+                            box.Box.Text = Str(step, "text") ?? "";
+                            Pressed.Invoke(set, new object[] { EventArgs.Empty });
+                        }
+                    }
+                    else if (what == "wording")
+                    {
+                        SoftTextArea box;
+                        Button save;
+                        if (!form.wordingBoxes.TryGetValue(Str(step, "key") ?? "", out box) ||
+                            !form.wordingSaves.TryGetValue(Str(step, "key") ?? "", out save) || !save.Enabled)
+                            disabled.Add("wording");
+                        else
+                        {
+                            box.Box.Text = Str(step, "text") ?? "";
+                            Pressed.Invoke(save, new object[] { EventArgs.Empty });
                         }
                     }
                     else if (what == "send_now")
@@ -605,6 +636,17 @@ namespace CodexAutoResume
             kept["send_again"] = sendAgainButton == null ? (object)null : sendAgainButton.Enabled;
             kept["let_go"] = letGoButton == null ? (object)null : letGoButton.Enabled;
             look["kept"] = kept;
+            // v0.6.16-beta.4: the wrap-up's wording boxes, by key, with what each holds now.
+            var wordings = new Dictionary<string, object>();
+            foreach (KeyValuePair<string, SoftTextArea> box in wordingBoxes) wordings[box.Key] = box.Value.Box.Text;
+            look["wordings"] = wordings;
+            var previewed = new List<object>();
+            foreach (Label line in previewLines) previewed.Add(line.Text);
+            look["previews"] = previewed;
+            // (f): each customizable choice's box, by key, and whether it shows.
+            var entries = new Dictionary<string, object>();
+            foreach (string key in customRows.Keys) entries[key] = customOpen.Contains(key);
+            look["custom"] = entries;
             var waiting = new List<object>();
             foreach (Button send in sendNowButtons) waiting.Add(send.Tag);
             look["send_now"] = waiting;

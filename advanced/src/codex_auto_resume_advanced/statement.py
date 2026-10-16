@@ -91,8 +91,6 @@ PAGE_KEYS = tuple(PAGE_PREFIX + name for name in (
     "sample.status", "sample.count",
     # v0.6.14: Keep it on, what a kept-on capability noted instead of turning itself off, and Send now.
     "keep_on", "keep_on.off", "keep_on.on", "keep_on.again", "keep_on.turn_on", "keep_on.send_again",
-    # v0.6.16-beta.3: "· kept on" after a kept-on capability's state in the list.
-    "state_kept_on",
     "keep_on.turn_off", "confirm.keep_on", "confirm.send_again", "done.keep_on", "done.keep_on_off",
     "refused.not_on", "kept.statement_changed", "kept.measurement_failed", "kept.failed_here", "kept.incompatible",
     "kept.local_check_failed", "kept.hook_exception", "kept.submission_unknown", "kept.engine_changed",
@@ -163,14 +161,30 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
 # one confirmation that turns on what it needs too, what turning a requirement off turned off first, and the words for
 # a dependent read down because what it needs is off.
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
-    "requires", "confirm.requires", "confirm.requirement", "done.on_with", "done.also_off", "refused.requirement", "refused.requirement_failed_here",
+    "requires", "confirm.requires", "confirm.requirement", "done.on_with", "done.also_off", "refused.requirement", "refused.requirement_failed_here", "refused.failed_here",
     "tripped.requirement_off", "kept.requirement_off"))
 # The usage meter's, the wrap-up's and the pause's choices (v0.6.16-beta.3, issue #29): each OptionKey's label, and
 # how its values are said.
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "option.poll_minutes", "option.warn_five_hour", "option.warn_weekly", "option.wrap_five_hour",
     "option.wrap_weekly", "option.wrap_style", "option.pause_five_hour", "option.pause_weekly",
-    "option.minutes", "option.percent", "option.style.1", "option.style.2", "option.style.3"))
+    "option.minutes", "option.percent", "option.style.1", "option.style.2", "option.style.3",
+    # v0.6.16-beta.4: the wording with the numbers, and the stop percentage the words name, each window its own.
+    "option.style.4", "option.stop_words_five_hour", "option.stop_words_weekly",
+    # (i) Include the reset time, and how an on/off choice says its two values.
+    "option.wrap_reset_time", "option.on", "option.off", "option.wrap_after_reset",
+    # (b) the Custom wording: its boxes, what they may hold, Save words, and each check that refuses one.
+    "option.style.5", "wording.help", "wording.wrap_custom_five_hour", "wording.wrap_custom_weekly", "wording.save",
+    "done.wording", "refused.wording.empty", "refused.wording.too_long", "refused.wording.control",
+    "refused.wording.marker", "refused.wording.placeholder",
+    # (a) what is sent, exactly, for each window, under the wording choice.
+    "preview.title", "preview.300", "preview.10080",
+    # (e) each window acted on or not.
+    "option.window_five_hour", "option.window_weekly",
+    # (f) a number typed in beside the presets.
+    "option.custom", "option.set", "option.range", "refused.option_range",
+    # (j) the percentages of a window in order, and the forced stop below the words' stop only said.
+    "refused.option_order", "warn.stop_before_words"))
 # The edition's own continuations' words (v0.6.15-beta): what empty_response, subagent_parent and keep_going send -
 # fixed, each passing core's continuation.validate_continuation in every language (nothing is filled in but, for a
 # subagent's line, its id and a closed kind word).
@@ -179,7 +193,16 @@ CONTINUATION_KEYS = ((CONTINUE_PREFIX + "empty_response", CONTINUE_PREFIX + "sub
                       CONTINUE_PREFIX + "keep_going",
                       # v0.6.16-beta.3: the wrap-up's three wordings (engine/usage.py).
                       CONTINUE_PREFIX + "wrap_up.short", CONTINUE_PREFIX + "wrap_up.standard",
-                      CONTINUE_PREFIX + "wrap_up.detailed")
+                      CONTINUE_PREFIX + "wrap_up.detailed",
+                      # v0.6.16-beta.4: the wording with the numbers and the windows it names (engine/wrapwords.py) -
+                      # filled in, so held to core's check only once filled (wrapwords.render).
+                      CONTINUE_PREFIX + "wrap_up.numbers", CONTINUE_PREFIX + "wrap_up.window.five_hour",
+                      CONTINUE_PREFIX + "wrap_up.window.weekly",
+                      # (i): when the window resets, said with core's hour and minute; a weekly reset's date.
+                      CONTINUE_PREFIX + "wrap_up.resets_at", CONTINUE_PREFIX + "wrap_up.resets_on",
+                      CONTINUE_PREFIX + "wrap_up.date",
+                      # (h, g): the continuation after the reset (engine/usagestop.py).
+                      CONTINUE_PREFIX + "after_reset")
                      + tuple(CONTINUE_PREFIX + "subagent.kind." + kind
                              for kind in ("usage_limit", "temporary", "interrupted", "error")))
 

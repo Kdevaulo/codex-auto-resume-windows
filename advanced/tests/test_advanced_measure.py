@@ -1483,6 +1483,9 @@ class ReadOnlyProbeTests(unittest.TestCase):
                                                                 "shared_switch_documented")},
                          {"help_read": True, "ws_url_documented": False, "shared_switch_documented": False})
         self.assertEqual(self.observed(self.run_one(Measurement.MAWS))["help_read"], False)
+        local = self.run_one(Measurement.MAWS, cli=lambda args: "Options: --listen ws://... joins the Shared Local "
+                                                                "App-Server the desktop app runs")
+        self.assertEqual(self.observed(local)["shared_switch_documented"], True, "2026-10-16: 'shared local app-server'")
         # The call it makes is the engine's own help for the app-server, read-only.
         asked = []
         self.run_one(Measurement.MAWS, cli=lambda args: asked.append(args) or "")

@@ -56,8 +56,10 @@ ARGUMENTS = {
     BridgeCommand.ADVANCED_WORDS: frozenset({"locale"}),
     BridgeCommand.ADVANCED_STATEMENT: frozenset({"capability", "locale"}),
     BridgeCommand.ADVANCED_ARM: frozenset({"capability", "state", "revision", "generation",
-                                           "engine_version", "warnings", "also"}),
+                                           "engine_version", "warnings", "also", "keep_on"}),
     BridgeCommand.ADVANCED_DISARM: frozenset({"capability"}),
+    BridgeCommand.ADVANCED_WORDINGS: frozenset({"capability"}),
+    BridgeCommand.ADVANCED_WORDING: frozenset({"capability", "key", "words", "generation"}),
     BridgeCommand.ADVANCED_DISARM_ALL: frozenset(),
     BridgeCommand.ADVANCED_CEILING: frozenset({"global_hourly", "generation"}),
     BridgeCommand.MEASURE: frozenset({"measurement", "thread", "may_spend"}),
@@ -207,10 +209,11 @@ def meter_view(runtime) -> dict:
     if not rows:
         return {}
     shown, notices = [], []
+    on = usage.acting(options[usage.METER])
     for (bucket, minutes), row in sorted(rows.items()):
         band = "none"
         for capability, word in ((usage.PAUSE, "pause"), (usage.WRAP_UP, "wrap_up"), (usage.METER, "warn")):
-            if (states.get(capability) == ArmingState.ARMED
+            if (minutes in on and states.get(capability) == ArmingState.ARMED
                     and usage.reached(row, usage.percent(options[capability], capability, minutes), now)):
                 band = word
                 break
@@ -220,7 +223,16 @@ def meter_view(runtime) -> dict:
         if (warned is not None and 0 <= now - warned < usage.NOTICE_FOR and row["warned_reset_at"] == row["reset_at"]
                 and row["reset_at"] is not None):
             notices.append({"key": "%s:%d:%d" % (bucket, minutes, row["reset_at"]), "window_minutes": minutes,
-                            "used_percent": row["used_percent"], "reset_at": row["reset_at"]})
+                            "used_percent": row["used_percent"], "reset_at": row["reset_at"], "kind": "warn"})
+    # v0.6.16-beta.4 (h): what the forced stop has to say - a turn it could not stop, a queue to Resume in Codex, a
+    # conversation it could not continue after the reset.
+    if states.get(usage.PAUSE) == ArmingState.ARMED:
+        try:
+            said = runtime._code_of(runtime.registry.get(usage.PAUSE)).notices(now)
+        except Exception:
+            said = []
+        for notice in said:
+            notices.append(dict(notice, used_percent=None))
     return {"meter": {"read_at": max(row["read_at"] for row in rows.values()), "windows": shown,
                       "notices": notices}}
 
@@ -276,9 +288,14 @@ def bridge(runtime, command, argument):
                           revision=argument.get("revision"), generation=argument.get("generation"),
                           acknowledged_version=argument.get("engine_version"),
                           warnings=argument.get("warnings"), also=argument.get("also"),
-                          actor=Actor.DASHBOARD)
+                          keep_on=argument.get("keep_on", False), actor=Actor.DASHBOARD)
     if command == BridgeCommand.ADVANCED_DISARM:
         return arming.disarm(argument.get("capability"), actor=Actor.DASHBOARD)
+    if command == BridgeCommand.ADVANCED_WORDINGS:
+        return arming.wordings_view(argument.get("capability"))
+    if command == BridgeCommand.ADVANCED_WORDING:
+        return arming.set_wording(argument.get("capability"), argument.get("key"), argument.get("words"),
+                                  generation=argument.get("generation"), actor=Actor.DASHBOARD)
     if command == BridgeCommand.ADVANCED_DISARM_ALL:
         return arming.all_off(actor=Actor.DASHBOARD)
     if command == BridgeCommand.MEASURE:

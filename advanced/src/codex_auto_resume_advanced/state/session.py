@@ -33,8 +33,8 @@ from codex_auto_resume import config, machine
 from codex_auto_resume.domain import ids
 
 from .schema import (ADD_RESETS, ATTACHED, FILE_NAME, SCHEMA_VERSION, STATEMENTS, TABLES, TABLES_V1,
-                     TABLES_V2, TABLES_V3, TABLES_V3_BEFORE_RESETS, TABLES_V4, UPGRADE_FROM_1, UPGRADE_FROM_2,
-                     UPGRADE_FROM_3, UPGRADE_FROM_4)
+                     TABLES_V2, TABLES_V3, TABLES_V3_BEFORE_RESETS, TABLES_V4, TABLES_V5, UPGRADE_FROM_1,
+                     UPGRADE_FROM_2, UPGRADE_FROM_3, UPGRADE_FROM_4, UPGRADE_FROM_5)
 
 
 class StateError(RuntimeError):
@@ -189,7 +189,7 @@ class SessionMixin:
             raise StateError("the advanced state was written by a newer version")
         for old, shape, steps in ((1, TABLES_V1, UPGRADE_FROM_1), (2, TABLES_V2, UPGRADE_FROM_2),
                                   (3, TABLES_V3_BEFORE_RESETS, ADD_RESETS), (3, TABLES_V3, UPGRADE_FROM_3),
-                                  (4, TABLES_V4, UPGRADE_FROM_4)):
+                                  (4, TABLES_V4, UPGRADE_FROM_4), (5, TABLES_V5, UPGRADE_FROM_5)):
             if version == old and tables == shape:
                 for statement in steps:
                     connection.execute(statement)

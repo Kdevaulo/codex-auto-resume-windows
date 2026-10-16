@@ -87,11 +87,12 @@ from .engine.goal import make as make_goal_continuation
 from .engine.markerfree import make as make_marker_free
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
-from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STYLE, DEFAULT_WARN, DEFAULT_WRAP, PERCENTS,
+from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STOP_WORDS, DEFAULT_STYLE, DEFAULT_WARN,
+                           DEFAULT_WRAP, ON, PERCENT_RANGE, PERCENTS, POLL_RANGE, SWITCH,
                            POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
-from .vocabulary import CapabilityKind, Measurement, OptionKey
+from .vocabulary import CapabilityKind, Measurement, OptionKey, WordingKey
 
 # The one ceiling over every capability together: advanced sends an hour. It is also the highest
 # value a person may set it to - it can be lowered and never raised.
@@ -129,6 +130,15 @@ class Option:
     key: OptionKey             # what the choice is
     choices: tuple             # the values it may take: whole numbers from 1, smallest first
     default: int               # the one it has until a person picks another; one of the choices
+    # v0.6.16-beta.4 (item (f), "이런 수치들은 직접 입력도 가능해야 한다니까"): (lowest, highest) a person may type in
+    # beside the choices - any whole number in it - or None where only the choices are taken.
+    custom: tuple | None = None
+
+    def takes(self, value) -> bool:
+        """Whether `value` is one this choice takes: one of its choices, or a whole number in its custom range."""
+        if type(value) is not int:
+            return False
+        return value in self.choices or (self.custom is not None and self.custom[0] <= value <= self.custom[1])
 
 
 @dataclass(frozen=True)
@@ -149,6 +159,8 @@ class CapabilityDef:
     resends: bool = False
     requires: tuple = ()
     kind: CapabilityKind = CapabilityKind.ROUTE
+    # v0.6.16-beta.4: the WordingKeys of a person's own text it keeps (state `wordings`): the wrap-up's Custom text.
+    wordings: tuple = ()
 
     def option(self, key) -> Option | None:
         """The choice of `key` this capability offers, or None."""
@@ -168,7 +180,11 @@ def _option_problem(option) -> bool:
             or not isinstance(option.choices, tuple) or not option.choices
             or not all(_count(value) for value in option.choices)
             or list(option.choices) != sorted(set(option.choices))
-            or not _count(option.default) or option.default not in option.choices)
+            or not _count(option.default) or option.default not in option.choices
+            or not (option.custom is None or (isinstance(option.custom, tuple) and len(option.custom) == 2
+                                              and all(_count(end) for end in option.custom)
+                                              and option.custom[0] <= option.choices[0]
+                                              and option.choices[-1] <= option.custom[1])))
 
 
 def problems(definition) -> list:
@@ -816,7 +832,7 @@ EVERY_CONVERSATION = CapabilityDef(
 USAGE_METER = CapabilityDef(
     id="usage_meter",
     points=frozenset({Point.TICK}),
-    revision=1,
+    revision=2,
     departs_from=("C4", "C9"),
     compat="usage_probe",
     ceilings=Ceilings(per_day=1, per_conversation=1),
@@ -824,9 +840,11 @@ USAGE_METER = CapabilityDef(
     make=make_meter,
     codes=("read", "unreadable", "warned"),
     measurements=(Measurement.MU,),
-    options=(Option(OptionKey.POLL_MINUTES, POLL_CHOICES, DEFAULT_POLL),
-             Option(OptionKey.WARN_FIVE_HOUR, PERCENTS, DEFAULT_WARN),
-             Option(OptionKey.WARN_WEEKLY, PERCENTS, DEFAULT_WARN)),
+    options=(Option(OptionKey.POLL_MINUTES, POLL_CHOICES, DEFAULT_POLL, custom=POLL_RANGE),
+             Option(OptionKey.WARN_FIVE_HOUR, PERCENTS, DEFAULT_WARN, custom=PERCENT_RANGE),
+             Option(OptionKey.WARN_WEEKLY, PERCENTS, DEFAULT_WARN, custom=PERCENT_RANGE),
+             Option(OptionKey.WINDOW_FIVE_HOUR, SWITCH, ON),
+             Option(OptionKey.WINDOW_WEEKLY, SWITCH, ON)),
 )
 
 # Wrap up near a limit (v0.6.16-beta.3, issue #29; the v0.6.11 design's "Near-limit wrap-up nudge"). At P8, when the
@@ -841,40 +859,48 @@ USAGE_METER = CapabilityDef(
 USAGE_WRAP_UP = CapabilityDef(
     id="usage_wrap_up",
     points=frozenset({Point.TICK, Point.RECORDS}),
-    revision=1,
+    revision=2,
     departs_from=("A13", "A26"),
     compat="exact_thread_recovery",
     ceilings=Ceilings(per_day=12, per_conversation=2),
     journal_prefix="wrap",
     make=make_wrap_up,
-    codes=("found", "sent", "delivered", "unknown", "superseded"),
+    codes=("found", "sent", "delivered", "unknown", "superseded", "continued"),
     measurements=(Measurement.MT,),
-    options=(Option(OptionKey.WRAP_FIVE_HOUR, PERCENTS, DEFAULT_WRAP),
-             Option(OptionKey.WRAP_WEEKLY, PERCENTS, DEFAULT_WRAP),
-             Option(OptionKey.WRAP_STYLE, STYLES, DEFAULT_STYLE)),
+    options=(Option(OptionKey.WRAP_FIVE_HOUR, PERCENTS, DEFAULT_WRAP, custom=PERCENT_RANGE),
+             Option(OptionKey.WRAP_WEEKLY, PERCENTS, DEFAULT_WRAP, custom=PERCENT_RANGE),
+             Option(OptionKey.STOP_WORDS_FIVE_HOUR, PERCENTS, DEFAULT_STOP_WORDS, custom=PERCENT_RANGE),
+             Option(OptionKey.STOP_WORDS_WEEKLY, PERCENTS, DEFAULT_STOP_WORDS, custom=PERCENT_RANGE),
+             Option(OptionKey.WRAP_STYLE, STYLES, DEFAULT_STYLE),
+             Option(OptionKey.WRAP_RESET_TIME, SWITCH, ON),
+             Option(OptionKey.WRAP_AFTER_RESET, SWITCH, ON)),
+    wordings=(WordingKey.WRAP_CUSTOM_FIVE_HOUR, WordingKey.WRAP_CUSTOM_WEEKLY),
     requires=("usage_meter",),
 )
 
-# Pause near a limit (v0.6.16-beta.3, issue #29). At P8, when the meter's reading of the five-hour or the weekly
-# window is at the person's pause percentage (95 by default, each its own), the window is marked held until its reset
-# (state/meter.py); at P3 it answers HOLD for every record of core's while one is held, and the edition's own
-# continuations waiting are not handed to core (`holds`, runtime.records). A person's own messages, a wrap-up and
-# anything typed in Codex are untouched. It lets go when the window resets. It departs from C9 (it acts on a reading
-# taken when no recovery is due - the meter's), stands on usage_probe and rests on MU. It sends nothing: a HOLD is a
-# restriction, never paid for, so its ceilings are the schema's floor. It requires the meter.
+# Stop near a limit (v0.6.16-beta.4, item (h); Pause near a limit in v0.6.16-beta.3). At P8, when the meter's reading of
+# a window switched on is at the person's stop percentage (97 by default, each its own), the window is marked held until
+# its reset (state/meter.py) - at P3 HOLD for every record of core's, and the edition's own continuations waiting not
+# handed to core (`holds`) - and each conversation switched on whose turn runs is stopped through the Codex app's own
+# IPC channel (engine/usagestop.py, codex/ipc.py; measurement MIPC), falling back to the hold alone, with a notice, where
+# it cannot; after the reset a conversation it stopped is continued once by a turn the app starts (Continue after the
+# reset). A person's own messages, a wrap-up and anything typed in Codex are untouched. It departs from A2 (a turn
+# started through the app's channel, not `codex queue`), B3 (Codex's state changed through that channel), C9 (it acts
+# on the meter's reading) and H6 (a running turn is stopped), stands on usage_probe and rests on MU. Its ceilings are
+# the schema's floor - one stop and one continuation a conversation a window. It requires the meter.
 USAGE_PAUSE = CapabilityDef(
     id="usage_pause",
     points=frozenset({Point.GATES, Point.TICK}),
-    revision=1,
-    departs_from=("C9",),
+    revision=2,
+    departs_from=("A2", "B3", "C9", "H6"),
     compat="usage_probe",
     ceilings=Ceilings(per_day=1, per_conversation=1),
     journal_prefix="pause",
     make=make_pause,
-    codes=("paused", "resumed"),
-    measurements=(Measurement.MU,),
-    options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE),
-             Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE)),
+    codes=("paused", "resumed", "stopped", "not_stopped", "resume_unproven", "continued", "not_continued"),
+    measurements=(Measurement.MU, Measurement.MIPC),
+    options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE),
+             Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE)),
     requires=("usage_meter",),
 )
 
