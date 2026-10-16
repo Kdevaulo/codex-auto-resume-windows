@@ -370,7 +370,7 @@ class InstallerFlowTests(unittest.TestCase):
         branch = installer.block(self.text, "if ($Uninstall)",
                                  "# -------------------------------------------------------------------------- install")
         self.assertLess(branch.index("$env:CODEX_AUTO_RESUME_KEEP_ENTRY = '1'"), branch.index("Invoke-Setup $setupArgs"))
-        self.assertIn("finally { Remove-Item Env:\\CODEX_AUTO_RESUME_KEEP_ENTRY", branch)
+        self.assertIn("finally { $env:CODEX_AUTO_RESUME_KEEP_ENTRY = $null }", branch)
         self.assertGreater(branch.index("Remove-OwnUninstallEntry $OwnedHome"),
                            branch.index("Some program files are still in use"))
         self.assertEqual(branch.count("Remove-OwnUninstallEntry $OwnedHome"), 1)

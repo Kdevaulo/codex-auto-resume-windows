@@ -668,7 +668,7 @@ if ($Uninstall) {
         # then printing "Removed." over the top of its refusal.
         # The engine is asked to leave the entry in Add or remove programs for the end of this branch.
         $env:CODEX_AUTO_RESUME_KEEP_ENTRY = '1'
-        try { $code = Invoke-Setup $setupArgs } finally { Remove-Item Env:\CODEX_AUTO_RESUME_KEEP_ENTRY -ErrorAction SilentlyContinue }
+        try { $code = Invoke-Setup $setupArgs } finally { $env:CODEX_AUTO_RESUME_KEEP_ENTRY = $null }
         if ($code -ne 0) {
             Fail 'The watcher could not be stopped, so nothing was removed.'
             Write-Host '       Close the ChatGPT/Codex app, wait a moment, and run this again.'
