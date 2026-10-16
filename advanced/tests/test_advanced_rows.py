@@ -20,7 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from advancedcase import ROOT  # noqa: E402
 from test_advanced_other_sessions import SessionsCase  # noqa: E402
-from codex_auto_resume_advanced import surfaces  # noqa: E402
+from test_advanced_compact_continue import CONTEXT_FULL, CompactCase  # noqa: E402
+from codex_auto_resume import l10n  # noqa: E402
+from codex_auto_resume_advanced import statement, surfaces  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import Actor  # noqa: E402
 from test_engine import T1, T2  # noqa: E402
 from test_session_kinds import CLI, IDE  # noqa: E402
@@ -91,6 +93,48 @@ class KindTests(RowsCase):
         self.assertEqual(surfaces.rows(plug.runtime, store=self.h.store, source=Broken()), {})
 
 
+class CompactingTests(CompactCase):
+    """A full conversation held for the person's /compact (compact_continue, design-4 5.2): its id in "compacting",
+    so Pending's status says "Run /compact in Codex; it continues after"."""
+
+    def rows(self, plug):
+        return surfaces.rows(plug.runtime, store=self.h.store, source=self.h.source)
+
+    def held(self):
+        plug = self.armed()
+        self.failing(CONTEXT_FULL)
+        for _ in range(15):
+            self.h.tick(advance=60)
+        (row,) = self.h.records()
+        self.assertEqual(self.h.backend.send_calls, [])
+        return plug, row
+
+    def test_held_for_the_persons_compact_it_is_named(self):
+        """Fails with surfaces.rows' compacting reverted: Pending would not ask for /compact."""
+        plug, row = self.held()
+        self.assertEqual(self.rows(plug), {"compacting": [row["interruption_id"]]})
+
+    def test_once_compacted_and_continued_it_is_not(self):
+        plug, row = self.held()
+        self.compaction()
+        for _ in range(3):
+            self.h.tick(advance=60)
+        self.assertEqual(len(self.h.backend.send_calls), 1)
+        self.assertEqual(self.rows(plug), {})
+
+    def test_watched_it_holds_nothing_and_nothing_is_said(self):
+        plug = self.armed(state="shadow")
+        self.failing(CONTEXT_FULL)
+        self.h.tick()
+        self.assertEqual(self.rows(plug), {})
+
+    def test_the_statement_says_what_the_row_says_in_every_language(self):
+        for locale in l10n.LOCALES:
+            with self.subTest(locale):
+                words = statement.CATALOGS.catalog(locale)
+                self.assertIn(words["page.row.compact"], words["statement.compact_continue.does"])
+
+
 class WindowTests(unittest.TestCase):
     """The window's half, read as text: the standard window's point, and the overlay's body of it."""
 
@@ -105,6 +149,12 @@ class WindowTests(unittest.TestCase):
         self.assertIn('cells[0] += " · " + Word("page.row.kind.cli", "CLI")', body)
         self.assertIn('cells[0] += " · " + Word("page.row.kind.ide", "VS Code")', body)
         self.assertNotRegex(body, r"\bnew\s+(Label|Panel|ColumnHeader|ListViewItem)\b", "no element of its own")
+
+    def test_the_compact_hint_joins_pendings_status_line_only(self):
+        """Fails with the hint taken out of CellsWritten."""
+        body = written(RUNS)
+        self.assertIn('if (pending && Listed(said, "compacting", key))', body)
+        self.assertIn('cells[1] += " · " + Word("page.row.compact", "Run /compact in Codex; it continues after")', body)
 
 
 if __name__ == "__main__":

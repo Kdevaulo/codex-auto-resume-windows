@@ -390,32 +390,52 @@ _KINDS = {}
 def rows(runtime, *, store=None, source=None) -> dict:
     """What Pending and History say beside a row this edition had a hand in (P10, v0.6.16-beta.4), keyed by
     interruption id - words of this edition's own, never a conversation's: {"kinds": {id: "cli" or "ide"}} for a
-    conversation of a terminal's Codex TUI or of VS Code (other_sessions: " · CLI" or " · VS Code" on its label line).
-    Each part only where there is something in it, and read only while the capability it is of stands on or watched,
-    so with none of them on nothing is read at all. `store` is core's state and `source` the Codex home's reader -
-    the Dashboard's own, by default; a test's."""
-    from .registry import OTHER_SESSIONS
+    conversation of a terminal's Codex TUI or of VS Code (other_sessions: " · CLI" or " · VS Code" on its label line);
+    {"compacting": [id, ...]} for a full conversation compact_continue holds until the person runs /compact in the
+    Codex app (its row's status says so). Each part only where there is something in it, and read only while the
+    capability it is of stands on (or, for the kinds, watched), so with none of them on nothing is read at all.
+    `store` is core's state and `source` the Codex home's reader - the Dashboard's own, by default; a test's."""
+    from .registry import COMPACT_CONTINUE, OTHER_SESSIONS
     try:
         states = runtime.states()
     except Exception:
         return {}
-    wanted = states.get(OTHER_SESSIONS.id, ArmingState.OFF) != ArmingState.OFF
-    if not wanted:
+    kinds_wanted = states.get(OTHER_SESSIONS.id, ArmingState.OFF) != ArmingState.OFF
+    compact_wanted = states.get(COMPACT_CONTINUE.id, ArmingState.OFF) == ArmingState.ARMED
+    if not (kinds_wanted or compact_wanted):
         return {}
     shown = {}
     try:
         listed = _listed(runtime, store)
     except Exception:
         return {}
-    try:
-        reader = source if source is not None else _source(runtime)
-        kinds = {key: kind for key, kind in ((row["interruption_id"], _kind(reader, row["thread_id"]))
-                                             for row in listed if not row.get("home_key")) if kind}
-    except Exception:
-        kinds = {}
-    if kinds:
-        shown["kinds"] = kinds
+    if kinds_wanted:
+        try:
+            reader = source if source is not None else _source(runtime)
+            kinds = {key: kind for key, kind in ((row["interruption_id"], _kind(reader, row["thread_id"]))
+                                                 for row in listed if not row.get("home_key")) if kind}
+        except Exception:
+            kinds = {}
+        if kinds:
+            shown["kinds"] = kinds
+    if compact_wanted:
+        compacting = [row["interruption_id"] for row in listed if _compacting(row)]
+        if compacting:
+            shown["compacting"] = compacting
     return shown
+
+
+def _compacting(row) -> bool:
+    """Whether core's record `row` is a full conversation compact_continue holds for the person's /compact: still
+    waiting, of its kind, its conversation available to the app and held there at P3 (engine/compact.py)."""
+    from codex_auto_resume import machine
+    from .engine.compact import KIND
+    if row.get("category") != KIND or row.get("state") not in machine.WAITING or not row.get("gate_eval"):
+        return False
+    try:
+        return machine.decode_gates(row["gate_eval"]).get("thread_available") == (machine.WAIT, machine.HELD)
+    except Exception:
+        return False
 
 
 def _listed(runtime, store) -> list:

@@ -12,7 +12,8 @@
 // Nothing here draws anything the page does not draw already: the card, the help lines and the buttons are Send now's.
 //
 // And what Pending and History say of a row this edition had a hand in (CellsWritten): words joined to a cell's own
-// line - " · CLI" or " · VS Code" after the conversation of a terminal's or VS Code's (other_sessions) - from what the
+// line - " · CLI" or " · VS Code" after the conversation of a terminal's or VS Code's (other_sessions), and "Run
+// /compact in Codex; it continues after" after the status of a full conversation waiting for it (compact_continue) - from what the
 // status the window already reads carries of each row, by its interruption id (surfaces.rows). No cell, column or
 // element of its own: as a second Codex home's alias joins the label line (v0.6.15-beta).
 //
@@ -109,6 +110,17 @@ namespace CodexAutoResume
             string kind = Str(Map(said, "kinds"), key);
             if (kind == "cli") cells[0] += " · " + Word("page.row.kind.cli", "CLI");
             else if (kind == "ide") cells[0] += " · " + Word("page.row.kind.ide", "VS Code");
+            // A full conversation waiting for the person's /compact in the Codex app says so in its status (compact_continue).
+            if (pending && Listed(said, "compacting", key))
+                cells[1] += " · " + Word("page.row.compact", "Run /compact in Codex; it continues after");
+        }
+
+        /// Whether the list `name` of what the status says of the rows names `key`.
+        private static bool Listed(Dictionary<string, object> said, string name, string key)
+        {
+            foreach (object entry in Items(said, name) ?? new List<object>())
+                if (entry as string == key) return true;
+            return false;
         }
 
         /// Ask, then hand the watcher one run's Stop: the turn is interrupted at its next look.
