@@ -110,7 +110,10 @@ ENGINE_TO_STORE = {
 # are read as this seam.
 # v0.6.16-beta.4: and who holds a conversation while the app is not running - asked only while the plug wants P16
 # (engine/routes.py), so never by the standard edition.
-ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "holder", "loaded", "send", "usage"}
+ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "holder", "loaded", "send", "usage",
+                     # v0.6.16-beta.4: who holds a conversation loaded() said is "elsewhere" (pid, creation time), for
+                     # the TO_SESSION re-check under the dispatch lock (engine/tosession.py) - read, never set.
+                     "session_holder"}
 BACKEND_NAMES = ("backend", "sender")
 # What it reads out of Codex's own files, through the source: the turns, the markers that say a
 # continuation of ours is in the queue, what a recovered turn produced, and the projection's age.
