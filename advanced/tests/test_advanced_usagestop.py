@@ -26,6 +26,18 @@ from test_engine import T1  # noqa: E402
 CORE = {"interruption_id": "a" * 64, "thread_id": T1}
 
 
+def _through(gate, record, answer):
+    """A seam's request as ipc makes it: written inside core's errand guard, never where it refuses (HELD)."""
+    if gate is not None:
+        with gate() as permitted:
+            if permitted is not True:
+                return ipc.Stop.HELD
+            record()
+    else:
+        record()
+    return answer
+
+
 class StopCase(TakingCase):
     DEFINITION = USAGE_PAUSE
     BESIDE = (USAGE_METER,)
@@ -54,8 +66,10 @@ class StopCase(TakingCase):
         settings.save(plug.paths.settings_file, values)
         code = self.code(plug)
         code._home = self.h.home.root
-        code._stop = lambda thread, turn: self.stops.append((thread, turn)) or self.stop_answer
-        code._start = lambda thread, text: self.starts.append((thread, text)) or self.start_answer
+        code._stop = lambda thread, turn, gate=None: _through(gate, lambda: self.stops.append((thread, turn)),
+                                                              self.stop_answer)
+        code._start = lambda thread, text, gate=None: _through(gate, lambda: self.starts.append((thread, text)),
+                                                               self.start_answer)
         self.h.backend.loaded_map[T1] = "loaded"
         turn = self.h.home.add_turn(T1, status="inProgress", progress=False)
         self.reset = int(self.h.now) + 3600
@@ -176,6 +190,44 @@ class AfterResetTests(StopCase):
         self.h.tick(advance=61)
         self.assertEqual(len(self.starts), 2, "tried again once it is open")
         self.assertIn("pause.continued", self.journal(plug))
+
+
+class CoreGuardTests(StopCase):
+    """The stop and the start after the reset are each written inside core's errand guard, as credits' request is:
+    Observe only, a Pause, an administrator's DisableAutoResume and quiet hours hold them as they hold every send."""
+
+    def test_observe_only_stops_nothing(self):
+        plug, _turn = self.running()
+        self.h.store.set_observe_only(True)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.assertEqual(self.stops, [])
+        self.assertIn("pause.held", self.journal(plug))
+        self.assertIs(plug.runtime.ask(Point.GATES, "usage", CORE, {}), Alternative.HOLD, "the window is held still")
+
+    def test_observe_only_starts_nothing_after_the_reset_and_the_start_waits_for_it_to_end(self):
+        plug, turn = self.running()
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        self.after_reset(plug, turn)
+        self.h.store.set_observe_only(True)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.assertEqual(self.starts, [])
+        self.h.store.set_observe_only(False)
+        self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 1, "asked once observing ends")
+
+    def test_an_administrators_disable_holds_both(self):
+        plug, turn = self.running()
+        with patch.object(type(self.h.engine), "errand_held", lambda _self: True):
+            for _ in range(2):
+                self.h.tick(advance=61)
+            self.assertEqual(self.stops, [])
+            self.after_reset(plug, turn)
+            for _ in range(2):
+                self.h.tick(advance=61)
+        self.assertEqual(self.starts, [])
 
 
 class NoContinuationTests(StopCase):

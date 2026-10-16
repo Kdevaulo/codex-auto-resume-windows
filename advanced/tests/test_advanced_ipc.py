@@ -29,6 +29,12 @@ class StopTests(unittest.TestCase):
         self.addCleanup(found.close)
         return found
 
+    def channel(self, app):
+        """A channel to `app`, closed before the app is (a pipe left open would hold its server's read)."""
+        found = ipc.Channel(app.name)
+        self.addCleanup(found.close)
+        return found
+
     def stop(self, app, turn=None):
         return ipc.stop_turn(THREAD, turn, channel=ipc.Channel(app.name))
 
@@ -79,6 +85,28 @@ class StopTests(unittest.TestCase):
                 self.assertEqual(self.stop(self.app(**script)), word)
         with patch.object(ipc, "PIPE", r"\\.\pipe\car-test-ipc-none-%d" % id(self)):
             self.assertEqual(ipc.stop_turn(THREAD), ipc.Stop.NO_PIPE, "the app not running")
+
+    def test_the_stop_and_the_start_are_written_only_inside_cores_guard(self):
+        from contextlib import contextmanager
+        entered = []
+
+        def gate(permitted):
+            @contextmanager
+            def one():
+                entered.append(permitted)
+                yield permitted
+            return one
+        app = self.app()
+        self.assertEqual(ipc.stop_turn(THREAD, TURN, channel=self.channel(app), gate=gate(False)), ipc.Stop.HELD)
+        self.assertEqual([seen[0] for seen in app.seen], ["initialize", "thread-owner-discovery"], "never written")
+        other = self.app()
+        self.assertEqual(ipc.start_turn(THREAD, "x", channel=self.channel(other), gate=gate(False)),
+                         ipc.Stop.HELD)
+        self.assertNotIn("thread-follower-start-turn", [seen[0] for seen in other.seen])
+        third = self.app()
+        self.assertEqual(ipc.stop_turn(THREAD, TURN, channel=self.channel(third), gate=gate(True)),
+                         ipc.Stop.STOPPED)
+        self.assertEqual(entered, [False, False, True], "one guard, around the one request that cannot be undone")
 
     def test_nothing_is_asked_of_the_queue(self):
         """Measured 2026-10-16: the turn started after the reset is what lets the paused queue go - the stop asks the

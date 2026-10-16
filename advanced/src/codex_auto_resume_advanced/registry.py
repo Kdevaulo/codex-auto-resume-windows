@@ -897,7 +897,7 @@ USAGE_PAUSE = CapabilityDef(
     ceilings=Ceilings(per_day=1, per_conversation=1),
     journal_prefix="pause",
     make=make_pause,
-    codes=("paused", "resumed", "stopped", "not_stopped", "stop_unconfirmed", "resume_unproven", "continued",
+    codes=("paused", "resumed", "stopped", "not_stopped", "stop_unconfirmed", "held", "resume_unproven", "continued",
            "not_continued"),
     measurements=(Measurement.MU, Measurement.MIPC),
     options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE),

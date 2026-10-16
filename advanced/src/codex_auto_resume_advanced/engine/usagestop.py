@@ -39,13 +39,22 @@ NOTICES_KEPT = 16
 
 
 class _StopErrand:
-    __slots__ = ("code", "targets", "window")
+    """P8's errand, run by core last in the tick with its guards (domain/plughands.Errand): the stops due and the
+    continuations after a reset, each request to the app written inside one of core's errand guards - so a Pause,
+    Observe only, an administrator's DisableAutoResume and quiet hours hold both, as they hold every send."""
+    __slots__ = ("code", "view", "targets", "window")
 
-    def __init__(self, code, targets, window):
-        self.code, self.targets, self.window = code, targets, window
+    def __init__(self, code, view, targets, window):
+        self.code, self.view, self.targets, self.window = code, view, targets, window
 
     def run(self, guard):
-        return self.code.stop_all(self.targets, self.window)
+        if self.targets:
+            self.code.stop_all(self.targets, self.window, guard)
+        try:
+            self.code.after_reset(self.view, guard)
+        except Exception:
+            pass
+        return None
 
 
 class UsageStop(UsagePause):
@@ -87,18 +96,15 @@ class UsageStop(UsagePause):
         scoped = self._scoped
         if scoped is None:
             return DEFER
-        newly = self._mark()
-        try:
-            self._after_reset(view)
-        except Exception:
-            pass
-        if not newly:
+        newly, targets = self._mark(), []
+        if newly:
+            try:
+                targets = self._running(view)
+            except Exception:
+                targets = []
+        if not targets and not self._waiting():
             return DEFER
-        try:
-            targets = self._running(view)
-        except Exception:
-            return DEFER
-        return _StopErrand(self, targets, newly[0]) if targets else DEFER
+        return _StopErrand(self, view, targets, newly[0] if newly else None)
 
     def _running(self, view) -> list:
         """(thread, turn) of each conversation switched on, of the kind core recovers, whose latest turn runs."""
@@ -114,15 +120,19 @@ class UsageStop(UsagePause):
                 found.append((thread, turn))
         return found
 
-    def stop_all(self, targets, window):
-        """The errand: each running turn stopped through the app; what came of each journalled and, where it matters,
-        said in a notice; each one stopped remembered for its continuation after the reset."""
+    def stop_all(self, targets, window, guard=None):
+        """The errand: each running turn stopped through the app, inside one of core's guards (`guard`); what came of
+        each journalled and, where it matters, said in a notice; each one stopped remembered for its continuation after
+        the reset. One the guard refused is not asked, and nothing is said of it."""
         stop = self._stop or ipc.stop_turn
         for thread, turn in targets:
             try:
-                word = stop(thread, turn.turn_id)
+                word = stop(thread, turn.turn_id, gate=guard)
             except Exception:
                 word = ipc.Stop.BROKEN
+            if word == ipc.Stop.HELD:
+                self._count("held")
+                continue
             if word not in (ipc.Stop.STOPPED, ipc.Stop.UNCONFIRMED):
                 self._count("not_stopped")
                 self._notice("not_stopped", window)
@@ -155,14 +165,22 @@ class UsageStop(UsagePause):
         except Exception:
             return False
 
-    def _after_reset(self, view) -> None:
-        """Each conversation it stopped whose window has reset: continued once by a turn the app starts, while the
-        stopped turn is still its latest, ended, with nothing after it, and the app holds it; ended where newer work
-        came; waiting, with a notice, where the app does not hold it."""
+    def _waiting(self) -> list:
+        """The continuations after a reset that wait."""
+        try:
+            return [row for row in self._scoped.continuations.mine() if row["record_state"] == RecordState.WAITING
+                    and row["kind"] == ContinuationKind.AFTER_RESET and row["words"]]
+        except Exception:
+            return []
+
+    def after_reset(self, view, guard=None) -> None:
+        """Each conversation it stopped whose window has reset: continued once by a turn the app starts - its request
+        written inside one of core's guards (`guard`), and waiting while that refuses - while the stopped turn is still
+        its latest, ended, with nothing after it, and the app holds it; ended where newer work came; waiting, with a
+        notice, where the app does not hold it."""
         scoped = self._scoped
         handle = scoped.continuations
-        waiting = [row for row in handle.mine() if row["record_state"] == RecordState.WAITING
-                   and row["kind"] == ContinuationKind.AFTER_RESET and row["words"]]
+        waiting = self._waiting()
         if not waiting:
             return
         now, rows = scoped.now(), scoped.meter.rows()
@@ -184,7 +202,9 @@ class UsageStop(UsagePause):
                 continue
             if latest.status not in FINAL:
                 continue
-            word = start(thread, row["words"] + "\n\n" + ids.short_marker(row["record_id"]))
+            word = start(thread, row["words"] + "\n\n" + ids.short_marker(row["record_id"]), gate=guard)
+            if word == ipc.Stop.HELD:
+                continue                                                # held by core: asked again when it lets go
             if word == ipc.Start.STARTED:
                 handle.end(ContinuationReason.SENT, thread_id=thread)
                 self._count("continued")

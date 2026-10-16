@@ -69,6 +69,9 @@ class Stop(StrEnum):
     UNCONFIRMED = "unconfirmed"
     REFUSED = "refused"                      # any other answer than success
     BROKEN = "broken"                        # a frame that is not one, or the pipe failing under us
+    # Core's errand guard refused the one request that cannot be taken back - recovery paused or only observed, an
+    # administrator's DisableAutoResume, quiet hours - so it was never written.
+    HELD = "held"
 
 
 class Start(StrEnum):
@@ -199,16 +202,25 @@ class Channel:
             self._pipe = None
 
 
-def _request(channel, client, method, shape, fields, target=None, seconds=None):
-    """One request and its answer, within one deadline (`seconds`, READ_SECONDS unless given) from its writing."""
-    deadline = time.monotonic() + (READ_SECONDS if seconds is None else seconds)
+def _request(channel, client, method, shape, fields, target=None, seconds=None, gate=None):
+    """One request and its answer, within one deadline (`seconds`, READ_SECONDS unless given) from its writing.
+    `gate`, for the one request that cannot be taken back: core's errand guard, entered around its writing alone (the
+    answer is waited for outside it, as the queue launch lets its guard go before the receipt); refused, it is never
+    written (HELD)."""
     version, params = shape
     key = str(uuid.uuid4())
     message = {"type": "request", "requestId": key, "sourceClientId": client, "version": version,
                "method": method, "params": _filled(params, fields)}
     if target is not None:
         message["targetClientId"] = target
-    channel.write(message)
+    if gate is None:
+        channel.write(message)
+    else:
+        with gate() as permitted:
+            if permitted is not True:
+                raise _Failed(Stop.HELD)
+            channel.write(message)
+    deadline = time.monotonic() + (READ_SECONDS if seconds is None else seconds)
     for _ in range(FRAMES_LIMIT + 1):
         left = deadline - time.monotonic()
         if left <= 0:
@@ -241,9 +253,10 @@ def _stopped(answer, turn_id):
     return Stop.STOPPED if not turn_id or stopped == turn_id else Stop.NOT_STOPPED
 
 
-def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
+def stop_turn(thread_id, turn_id=None, *, channel=None, gate=None) -> tuple:
     """Stop the running turn of `thread_id` the app holds: the Stop word of what came of it. `turn_id`, where known,
-    makes it the v4 stop that names it. `channel` is a seam (a Channel of a test's own pipe)."""
+    makes it the v4 stop that names it. `gate` is core's errand guard, around the stop's writing (HELD where it
+    refuses). `channel` is a seam (a Channel of a test's own pipe)."""
     try:
         opened = channel if channel is not None else Channel()
     except _Failed as failed:
@@ -262,7 +275,8 @@ def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
         shape = INTERRUPT_EXPECTING if turn_id else REQUESTS["thread-follower-interrupt-turn"]
         try:
             answer = _request(opened, client, "thread-follower-interrupt-turn", shape,
-                              {"thread": thread_id, "turn": turn_id}, target=owner, seconds=INTERRUPT_SECONDS)
+                              {"thread": thread_id, "turn": turn_id}, target=owner, seconds=INTERRUPT_SECONDS,
+                              gate=gate)
         except _Failed as failed:
             if failed.word == Stop.NO_ANSWER:
                 return Stop.UNCONFIRMED
@@ -276,10 +290,11 @@ def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
         opened.close()
 
 
-def start_turn(thread_id, text, *, channel=None):
+def start_turn(thread_id, text, *, channel=None, gate=None):
     """Start a turn of `thread_id` the app holds with `text` - the product's continuation after a window reset, for a
     conversation the forced stop stopped (its queue may be paused): Start.STARTED, or the Stop word of what failed -
-    NO_CLIENT above all, the app not holding the conversation. `channel` is a seam (a Channel of a test's own pipe)."""
+    NO_CLIENT above all, the app not holding the conversation. `gate` is core's errand guard, around the start's
+    writing (HELD where it refuses). `channel` is a seam (a Channel of a test's own pipe)."""
     try:
         opened = channel if channel is not None else Channel()
     except _Failed as failed:
@@ -296,7 +311,7 @@ def start_turn(thread_id, text, *, channel=None):
         if not isinstance(owner, str) or not owner:
             return Stop.NO_CLIENT
         _request(opened, client, "thread-follower-start-turn", REQUESTS["thread-follower-start-turn"],
-                 {"thread": thread_id, "message": str(uuid.uuid4()), "text": text}, target=owner)
+                 {"thread": thread_id, "message": str(uuid.uuid4()), "text": text}, target=owner, gate=gate)
         return Start.STARTED
     except _Failed as failed:
         return failed.word
