@@ -447,6 +447,36 @@ class KeyTests(Entry):
         self.assertEqual(addremove.register(self.home, "sideways", "1.2.3", "x"), [])
         self.assertEqual(self.registry.keys, {})
 
+    def junction(self, link: Path, target: Path):
+        made = subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(link), str(target)], capture_output=True,
+                              creationflags=NO_WINDOW)
+        if made.returncode != 0:
+            self.skipTest("no junction could be made here")
+
+    def test_a_junction_where_the_kept_folder_should_be_gets_no_entry(self):
+        """The installer refuses a junction at uninstall\ and keeps nothing; the engine must not then write a key
+        whose command runs whatever the junction points at (F4)."""
+        outside = Path(self.temp.name) / "outside"
+        outside.mkdir()
+        (outside / "install.ps1").write_text("# someone else's", encoding="utf-8")
+        shutil.rmtree(self.home / "uninstall")
+        self.junction(self.home / "uninstall", outside)
+        self.assertTrue(addremove.kept_script(self.home).is_file(), "is_file() follows it: the thing to refuse")
+        self.assertEqual(addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume"), [])
+        self.assertEqual(self.registry.keys, {})
+
+    def test_a_junction_in_the_place_of_the_kept_script_gets_no_entry_either(self):
+        outside = Path(self.temp.name) / "outside-folder"
+        outside.mkdir()
+        (self.home / "uninstall" / "install.ps1").unlink()
+        self.junction(self.home / "uninstall" / "install.ps1", outside)
+        self.assertEqual(addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume"), [])
+        self.assertEqual(self.registry.keys, {})
+
+    def test_an_ordinary_kept_folder_and_script_are_plain(self):
+        self.assertTrue(addremove.kept_uninstaller_present(self.home))
+        self.assertFalse(addremove.kept_uninstaller_present(Path(self.temp.name) / "nowhere"))
+
     def test_the_display_name_is_the_installed_manifests_and_the_publisher_is_the_plugin_author(self):
         manifest = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8-sig"))
         self.assertEqual(addremove.display_name(ROOT / ".codex-plugin" / "plugin.json"), manifest["interface"]["displayName"])

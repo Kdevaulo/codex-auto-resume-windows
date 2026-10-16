@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import stat
 
 from . import startup
 
@@ -47,6 +48,23 @@ def key_path(edition: str) -> str:
 
 def kept_script(home) -> Path:
     return Path(home) / KEPT_FOLDER / KEPT_SCRIPT
+
+
+def _plain(path, directory: bool) -> bool:
+    """An ordinary folder or file: not a symbolic link, not a junction or any other reparse point, which is
+    followed by is_file() and so by a command that runs what it points at."""
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return False
+    if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+        return False
+    return stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+
+
+def kept_uninstaller_present(home) -> bool:
+    """The kept uninstaller is there, and so is the folder it is in, as plain files and not links (F4)."""
+    return _plain(Path(home) / KEPT_FOLDER, True) and _plain(kept_script(home), False)
 
 
 def powershell() -> Path:
@@ -113,7 +131,7 @@ def register(home, edition: str, version: str, name: str | None = None) -> list[
     this installation's. Nothing is written unless the kept uninstaller is there for the key to name, and
     nothing is written over a key of that name that is not this installation's. Returns what was done."""
     done = []
-    if edition not in EDITIONS or not kept_script(home).is_file() or not version or version == "unknown":
+    if edition not in EDITIONS or not kept_uninstaller_present(home) or not version or version == "unknown":
         return done
     existing = read(edition)
     if existing is not None and not owned(existing, home):
