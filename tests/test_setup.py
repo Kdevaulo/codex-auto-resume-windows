@@ -442,7 +442,8 @@ class SilentTests(unittest.TestCase):
         forms = {}
         for name, present in documents.items():
             if present and (ROOT / name).is_file():
-                spans = re.findall(r"`(cmd /c CodexAutoResume-Setup-vX\.Y\.Z\.exe -Silent)`", (ROOT / name).read_text(encoding="utf-8"))
+                spans = re.findall(r"`(cmd /c \.\\CodexAutoResume-Setup-vX\.Y\.Z\.exe -Silent)`",
+                                   (ROOT / name).read_text(encoding="utf-8"))
                 self.assertEqual(len(spans), 1, "%s gives the form PowerShell waits with" % name)
                 forms[name] = spans[0]
         self.assertTrue(forms)

@@ -109,7 +109,7 @@ digest와 대조해 다르면 멈추고, 임시 폴더 안에 새로 만든 자�
 것이 없습니다. 출력도 종료 코드도 스위치가 없을 때와 같습니다(0은 완료, 1은 중단, 14는 다른 판이 설치돼 있어
 아무것도 바꾸지 않고 끝난 경우로, 물어볼 사람이 없기 때문입니다). 두 번 클릭할 때 콘솔 창이 열리지 않도록 콘솔
 프로그램이 아니라 Windows 프로그램으로 만들어졌는데, PowerShell은 시작하기만 한 Windows 프로그램을 기다리지 않습니다.
-PowerShell에서는 `cmd /c CodexAutoResume-Setup-vX.Y.Z.exe -Silent`로 실행하세요. 끝날 때까지 기다리고, 출력을
+PowerShell에서는 설치 파일이 있는 폴더에서 `cmd /c .\CodexAutoResume-Setup-vX.Y.Z.exe -Silent`로 실행하세요. 끝날 때까지 기다리고, 출력을
 보여 주고, 종료 코드를 `$LASTEXITCODE`에 남깁니다. `winget`, `.cmd` 스크립트, `cmd /c`는 그대로 기다립니다. 같은
 스위치를 압축 파일의 `Install.cmd`와 `Uninstall.cmd`에도 쓸 수 있고, 설치 파일은 멈출 때 Enter를 기다리지 않습니다.
 
