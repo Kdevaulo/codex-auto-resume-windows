@@ -627,29 +627,35 @@ except Exception as exc:
 class SetupStartTests(unittest.TestCase):
     """build/setup/Setup.cs, the setup program each release ships beside its archive (build/make_setup.py).
 
-    The person double-clicks it as they would Install.cmd, and Windows gives a console program a console
-    of its own for that - the installer's console, where Install.cmd has always asked its questions. The
-    one program it starts is that archive's Install.cmd, through cmd.exe, and it shares that console:
-    no console of its own, no window of its own, and nothing else is started."""
+    Until v0.6.16 it was a console program, and Install.cmd shared the console Windows gave it. Since then it is a
+    Windows program: double-clicked it is the installer window (build/setup/SetupWindow.cs), and no console window
+    opens at all - a console program gets one from Windows before its first line runs. The one program Setup.cs
+    starts is still the archive's Install.cmd, through cmd.exe, and it gets no window either: CREATE_NO_WINDOW, its
+    output read through pipes. The window starts one program more once it has finished, the Dashboard, which is a
+    Windows program too."""
 
     def setUp(self):
         self.source = _read("build/setup/Setup.cs")
+        self.window = _read("build/setup/SetupWindow.cs")
         self.builder = _read("build/make_setup.py")
 
-    def test_it_is_a_console_program_the_person_starts(self):
-        self.assertIn('"/target:exe"', self.builder)
-        self.assertNotIn("winexe", self.builder)
+    def test_it_is_a_windows_program_the_person_starts(self):
+        self.assertIn('"/target:winexe"', self.builder)
+        self.assertNotIn('"/target:exe"', self.builder)
 
-    def test_its_one_start_shares_its_console(self):
+    def test_its_one_start_has_no_window(self):
         self.assertEqual(len(re.findall(r"\bProcess\.Start\(", self.source)), 1)
         self.assertEqual(len(re.findall(r"new ProcessStartInfo\(", self.source)), 1)
         self.assertIn("start.UseShellExecute = false;", self.source)
-        # No CreateNoWindow either way: the default is the console it was started in, which is the point.
-        for other in ("CreateNoWindow", "CREATE_NEW_CONSOLE", "DETACHED_PROCESS", "WindowStyle", "AllocConsole",
-                      "CreateProcess", "WinExec"):
+        self.assertIn("start.CreateNoWindow = true;", self.source)
+        for other in ("CREATE_NEW_CONSOLE", "DETACHED_PROCESS", "WindowStyle", "AllocConsole", "CreateProcess",
+                      "WinExec"):
             with self.subTest(other):
-                self.assertNotIn(other, self.source)
-        self.assertIsNone(re.search(r"(?<!Use)ShellExecute", self.source))
+                self.assertNotIn(other, self.source + self.window)
+        self.assertIsNone(re.search(r"(?<!Use)ShellExecute", self.source + self.window))
+        # The Dashboard, a Windows program, by its full path in the installation it has just made.
+        self.assertEqual(len(re.findall(r"\bProcess\.Start\(", self.window)), 1)
+        self.assertIn("start.UseShellExecute = false;", self.window)
 
     def test_its_build_gets_no_window(self):
         self.assertIn('NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)', self.builder)
