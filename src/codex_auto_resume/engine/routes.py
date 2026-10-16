@@ -168,6 +168,20 @@ class RoutesMixin:
             self.store.update(row["interruption_id"], at=self.clock(), recovery_client_id=None)
         return silent
 
+    def _silent_proven(self, row, turn_id) -> bool:
+        """A turn started with no words (P15's SILENT) keeps no client id on any item (M3B, 2026-10-16): the turn id
+        the route's turn/start returned is its proof, correlated at once - as the watch correlates a marker it finds.
+        Any other record is left to the watch. Whether it was."""
+        if row.get("recovery_client_id") != ids.continuation_client_id(row["interruption_id"]):
+            return False
+        current = self.store.get(row["interruption_id"])
+        if current is None or not self.store.correlate(row["interruption_id"], turn_id, self.clock(),
+                                                       client_id=row["recovery_client_id"], status="inProgress"):
+            return False
+        self.moved(current, "turn_started")
+        self.log(row["thread_id"], "turn_started", None)
+        return True
+
     def _after_resume(self, row, response):
         """What came of a route (P16). Accepted: nothing was queued, and the conversation goes on
         when the app opens it, so the record waits again - the claim still counted against the
@@ -186,6 +200,7 @@ class RoutesMixin:
             self.transition(reserved, "queued", None, delay=1, event="submitted", queue_id=None)
             self.log(row["thread_id"], "continuation_submitted", None)
             self.announce("starting", reserved, **self._told_of(row))
+            self._silent_proven(reserved, response["turn_id"])
         elif outcome == "not_started":
             refused = response.get("error_code") == "queue_consent_refused"
             target = ("cancelled" if refused and reserved["cancel_requested"]
