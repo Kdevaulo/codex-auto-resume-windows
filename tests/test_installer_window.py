@@ -406,8 +406,10 @@ class CatalogTests(unittest.TestCase):
             with self.subTest(key):
                 self.assertEqual(english.get(key), fallback.replace('\\"', '"'))
         for locale in l10n.LOCALES:
+            # The file itself: l10n.catalog fills a missing key in with English.
+            own = json.loads((l10n.DIRECTORY / ("%s.json" % locale)).read_text(encoding="utf-8"))
             with self.subTest(locale=locale):
-                self.assertEqual(sorted(key for key in said if key not in l10n.catalog(locale)), [])
+                self.assertEqual(sorted(key for key in said if key not in own), [])
 
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
