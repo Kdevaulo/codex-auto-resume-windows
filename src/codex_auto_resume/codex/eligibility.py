@@ -14,17 +14,21 @@ Pure: nothing here reads or writes.
 from __future__ import annotations
 
 from ..domain import skips
-from .values import DESKTOP_ORIGINATORS, taken_thread_source
+from .values import ADOPTED_ORIGINATORS, DESKTOP_ORIGINATORS, taken_thread_source
 
 ORIGINATORS_CLI = frozenset({"codex-tui"})
 ORIGINATORS_IDE = frozenset({"codex_vscode"})
 # (threads.source, the first line's source, its originators) for each kind: the app's, and the two a plug may name.
 KINDS = {"desktop": ("vscode", "vscode", DESKTOP_ORIGINATORS), "cli": ("cli", "cli", ORIGINATORS_CLI),
-         "ide": ("vscode", "vscode", ORIGINATORS_IDE)}
+         "ide": ("vscode", "vscode", ORIGINATORS_IDE),
+         # issue #37: a CLI conversation the Desktop app took over - the app's own, always (values.ADOPTED_ORIGINATORS).
+         "adopted": ("vscode", "cli", ADOPTED_ORIGINATORS)}
+# The kinds taken up whatever the plug names: the app's own, and those it took over from the CLI.
+APPS = ("desktop", "adopted")
 
 
 def _shapes(kinds):
-    return [(kind, KINDS[kind]) for kind in ("desktop", "cli", "ide") if kind == "desktop" or kind in kinds]
+    return [(kind, KINDS[kind]) for kind in ("desktop", "adopted", "cli", "ide") if kind in APPS or kind in kinds]
 
 
 def source_taken(source, kinds=frozenset()) -> bool:
@@ -56,5 +60,6 @@ def kind_of(source, payload, kinds=frozenset()):
     originator and source, of the app's and `kinds`; None for anything else."""
     if not isinstance(payload, dict):
         return None
-    return next((kind for kind, shape in _shapes(kinds) if source == shape[0] and payload.get("source") == shape[1]
-                 and payload.get("originator") in shape[2]), None)
+    found = next((kind for kind, shape in _shapes(kinds) if source == shape[0] and payload.get("source") == shape[1]
+                  and payload.get("originator") in shape[2]), None)
+    return "desktop" if found == "adopted" else found
