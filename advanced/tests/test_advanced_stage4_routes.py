@@ -82,7 +82,7 @@ class HeadlessSettingsTests(unittest.TestCase):
             factory(Measurement.M6B)
             factory(Measurement.M6)
         self.assertEqual(made, [(Measurement.M6B, {"config": headless.HEADLESS_CONFIG}),
-                                (Measurement.M6, {"config": ()})])
+                                (Measurement.M6, {})])
 
 
 class RestoreTests(unittest.TestCase):

@@ -89,6 +89,39 @@ class Origins:
                          "cli_version": payload.get("cli_version")}
         return row, first
 
+    def events_since(self, thread_id, offset):
+        """([the payload type of each complete line the rollout gained after byte `offset`, in order], the offset to
+        look from next) - the end of the file where `offset` is None (the first look); ([], offset) where there is no
+        rollout. At most TAIL_BYTES are read; nothing of a payload but its type is looked at."""
+        row = self._row(thread_id)
+        path = self._rollout(thread_id, row.get("rollout_path")) if row is not None else None
+        if path is None:
+            return [], offset
+        try:
+            with path.open("rb") as stream:
+                stream.seek(0, 2)
+                size = stream.tell()
+                if offset is None or offset > size:
+                    return [], size
+                start = max(offset, size - TAIL_BYTES)
+                stream.seek(start)
+                data = stream.read(size - start)
+        except OSError:
+            raise TurnsUnavailable("the rollout cannot be read") from None
+        complete = data[:data.rfind(b"\n") + 1]
+        kinds = []
+        for line in complete.split(b"\n"):
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line.decode("utf-8"))
+            except (ValueError, UnicodeError):
+                kinds.append("other")
+                continue
+            payload = event.get("payload") if isinstance(event, dict) else None
+            kinds.append(_word(payload.get("type") if isinstance(payload, dict) else None))
+        return kinds, start + len(complete)
+
     def newest_event(self, thread_id):
         """(the newest complete line's type, its payload's type) of the conversation's rollout, each a word or
         "other" - or None where there is no rollout to read. Nothing of a payload but its type is looked at."""

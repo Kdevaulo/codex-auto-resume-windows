@@ -246,6 +246,16 @@ class M3BTests(ProbeCase):
         self.assertEqual(start["input"], [])
         self.assertEqual(start["clientUserMessageId"], measure._SAMPLE_M3B_CLIENT_ID)
 
+    def test_judged_by_the_turn_id_it_was_started_under_never_a_client_id(self):
+        """v0.6.16-beta.4: a turn with no words keeps no client id (2026-10-16); the turn id turn/start returned, found
+        in Codex's history, is the proof. Fails with the client-id rule back."""
+        with patch.object(measure, "_turn_in_history", lambda ctx, turn: turn == TURN),                 patch.object(measure, "_client_recorded", lambda ctx, client: False):
+            _summary, record = self.run_one(Measurement.M3B)
+        self.assertEqual(record["verdict"], "pass", record)
+        with patch.object(measure, "_turn_in_history", lambda ctx, turn: False):
+            _summary, record = self.run_one(Measurement.M3B)
+        self.assertEqual(record["verdict"], "fail")
+
     def test_codex_refusing_empty_input_is_a_fail_with_its_code(self):
         with patch.dict(REPLIES, {Measurement.M3B: {"turn/start": refused("turn/start")}}):
             _summary, record = self.run_one(Measurement.M3B)
@@ -346,17 +356,30 @@ class FileReaderTests(ProbeCase):
             def __init__(self, status):
                 self.turn_id, self.status, self.kinds = later, status, {"agentMessage": 1}
         statuses = iter([None, Turn("inProgress"), Turn("completed"), Turn("completed")])
-        events = iter([("event_msg", "task_started"), ("event_msg", "task_started"), ("event_msg", "task_started"),
-                       ("event_msg", "task_complete")])
+        # v0.6.16-beta.4: what the rollout gained since each look (sessions.Origins.events_since).
+        events = iter([["task_started"], ["task_started"], [], ["task_complete"]])
         watch.turns = type("T", (), {"latest": lambda self, thread: next(statuses)})()
-        watch.origins = type("O", (), {"newest_event": lambda self, thread: next(events)})()
-        watch.thread = THREAD
+        watch.origins = type("O", (), {"events_since": lambda self, thread, offset: (next(events), 0)})()
+        watch.thread, watch._offset = THREAD, None
         for now in (1.0, 2.0, 3.0, 9.0):
             watch.look(now)
         self.assertTrue(watch.settled())
         self.assertEqual(watch.observed(), {"started_first": "rollout", "finished_first": "db",
                                             "reply_item_ready_at_final": True, "approval_wait_seen_db": False,
                                             "approval_wait_seen_rollout": False, "finished_lag": "over_5s"})
+
+    def test_mc2_reads_a_task_that_started_and_ended_between_two_looks(self):
+        """Fails with the newest event alone (2026-10-16): the start would be missed and the run never settle."""
+        watch = measure._Watch.__new__(measure._Watch)
+        watch.first_turn, watch.first_event, watch._looked = TURN, None, True
+        watch.db_start = watch.db_end = watch.rollout_start = watch.rollout_end = None
+        watch.reply_ready = watch.waited_db = watch.waited_rollout = False
+        watch.turns = type("T", (), {"latest": lambda self, thread: None})()
+        watch.origins = type("O", (), {"events_since": lambda self, thread, offset: (
+            ["task_started", "agent_message", "task_complete"], 0)})()
+        watch.thread, watch._offset = THREAD, None
+        watch.look(2.0)
+        self.assertEqual((watch.rollout_start, watch.rollout_end), (2.0, 2.0))
 
 
 if __name__ == "__main__":

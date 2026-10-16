@@ -52,6 +52,9 @@ POLL_SECONDS = 0.5
 APP_LOOK_SECONDS = 10.0
 # Modes: one turn of words, a compaction, one turn on another model.
 TURN, COMPACT, FALLBACK = "turn", "compact", "fallback"
+# How the Codex app starts its engine on Windows, and so how a turn run here starts its own (M6B, 2026-10-16): without
+# these the sandbox's setup helper asked for elevation and the turn's command never ran. Never anything that elevates.
+HEADLESS_CONFIG = (("windows.sandbox", '"mxc"'), ("features.prefer_mxc", "true"))
 # Whether Codex refused a turn with no input in this process (silent_continuation, M3B): from then on the capability
 # answers DEFER, so the next attempt carries words, and it trips (REFUSED_BY_CODEX, runtime.moved).
 EMPTY_REFUSED = False
@@ -238,12 +241,14 @@ class Follower:
 
     @staticmethod
     def _restore(session, thread_id, model) -> bool:
-        """The conversation's own model put back (fallback mode): whether Codex took it."""
+        """The conversation's own model put back (fallback mode) and read back on a plain resume - MF's route 2, never
+        a model given at thread/resume, which the thread keeps: whether the conversation is on its own model again."""
         try:
             session.call("thread/settings/update", {"threadId": thread_id, "model": model})
-            return True
+            resumed = session.call("thread/resume", {"threadId": thread_id, "excludeTurns": True})
         except Exception:
             return False
+        return _model(resumed) == model
 
 
 # The one follower of this process, and the watcher leaving stops what it follows first.
@@ -381,5 +386,5 @@ def live_session(paths):
     methods (protocol.CAPABILITY_METHODS). Never reached by a test."""
     def factory(capability):
         from . import inuse
-        return Session(inuse.backend(paths), capability=capability)
+        return Session(inuse.backend(paths), capability=capability, config=HEADLESS_CONFIG)
     return factory

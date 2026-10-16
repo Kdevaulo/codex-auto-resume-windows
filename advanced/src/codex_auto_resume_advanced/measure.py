@@ -1108,12 +1108,28 @@ def _m3b(ctx):
         status, ended = _follow(session, ctx.probe_thread, _turn_id(started), _M6_TURN_SECONDS)
         unsubscribed = _unsubscribed(session, ctx.probe_thread)
     observed = {"turn_started": _turn_id(started) is not None, "turn_ended_by_itself": ended,
-                "client_id_recorded": _client_recorded(ctx, _SAMPLE_M3B_CLIENT_ID), "unsubscribed": unsubscribed}
+                "client_id_recorded": _client_recorded(ctx, _SAMPLE_M3B_CLIENT_ID), "unsubscribed": unsubscribed,
+                "turn_in_history": _turn_in_history(ctx, _turn_id(started))}
     if status is not None:
         observed["turn_status"] = status
-    passed = observed["turn_started"] and observed["client_id_recorded"]
+    # v0.6.16-beta.4: the turn id turn/start returned, found in Codex's history, is the proof (the route correlates it
+    # at once); no client id is kept on a turn with no words (2026-10-16).
+    passed = observed["turn_started"] and observed["turn_in_history"]
     return (Verdict.PASS if passed else Verdict.FAIL, observed,
-            None if passed else "no turn started, or no client id to prove it by")
+            None if passed else "no turn started, or none in the history by the id it was started under")
+
+
+def _turn_in_history(ctx, turn_id) -> bool:
+    """Whether Codex's history says the turn `turn_id` is the probe's conversation's latest (ids only)."""
+    from .codex.turns import Turns
+    home = getattr(ctx.backend, "codex_home", None)
+    if home is None or turn_id is None:
+        return False
+    try:
+        latest = Turns(home).latest(ctx.probe_thread)
+    except Exception:
+        return False
+    return latest is not None and latest.turn_id == turn_id
 
 
 # Codex's own retry settings (codex_retry_settings): the two keys, as config/value/write names them.
@@ -1214,16 +1230,20 @@ class _Watch:
         self.first_turn = self.first_event = None
         self.db_start = self.db_end = self.rollout_start = self.rollout_end = None
         self.reply_ready = self.waited_db = self.waited_rollout = False
-        self._looked = False
+        self._looked, self._offset = False, None
 
     def look(self, now):
         found = self.turns.latest(self.thread)
-        event = self.origins.newest_event(self.thread)
-        kind = event[1] if event is not None else None
+        # v0.6.16-beta.4: every event the rollout gained since the last look, in order - a task that started and
+        # ended between two looks was missed by its newest alone.
+        kinds, self._offset = self.origins.events_since(self.thread, self._offset)
+        kind = kinds[-1] if kinds else None
         if not self._looked:
             self._looked = True
             self.first_turn, self.first_event = (found.turn_id if found is not None else None), kind
             return
+        for seen in kinds[:-1]:
+            self._event(seen, now)
         fresh = found is not None and found.turn_id != self.first_turn
         if fresh and found.status == "inProgress" and self.db_start is None:
             self.db_start = now
@@ -1233,6 +1253,9 @@ class _Watch:
             self.reply_ready = found.kinds.get("agentMessage", 0) > 0
         if fresh and found.status == "other":
             self.waited_db = True
+        self._event(kind, now)
+
+    def _event(self, kind, now):
         if kind in self.STARTED and self.rollout_start is None:
             self.rollout_start = now
         if kind in self.ENDED and self.rollout_start is not None and self.rollout_end is None:
@@ -1435,6 +1458,10 @@ def live_session_factory(paths, backend=None):
             # MB (v0.6.16-beta.4): the same Codex on a scratch home the harness made, never the person's.
             from codex_auto_resume.codex.transport import Backend
             used = Backend(home, used.codex_exe)
+        # M6B (v0.6.16-beta.4): the headless turn's server starts as the route starts it (codex/headless.py).
+        from .codex.headless import HEADLESS_CONFIG
+        if measurement == Measurement.M6B:
+            return Session(used, measurement, config=HEADLESS_CONFIG)
         return Session(used, measurement)
 
     return factory

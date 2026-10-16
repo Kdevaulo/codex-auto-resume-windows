@@ -271,10 +271,12 @@ class Session:
     CAPABILITY_METHODS: the marker-free continuation's channel opens one to add the one item core
     hands it, the way the measurement that proved the call opened one.
     """
-    def __init__(self, backend, measurement=None, *, capability=None):
+    def __init__(self, backend, measurement=None, *, capability=None, config=()):
         if (measurement is None) == (capability is None):
             raise ValueError("a session is opened for one measurement or one capability")
         self.backend = backend
+        # v0.6.16-beta.4: Codex's own `-c key=value` settings the server starts with (codex/headless.HEADLESS_CONFIG).
+        self.config = tuple(config)
         self.measurement = Measurement(measurement) if measurement is not None else None
         self.allowed = (methods_for(self.measurement) if capability is None
                         else methods_for_capability(capability))
@@ -292,7 +294,8 @@ class Session:
 
     def __enter__(self):
         self.backend._compatible()
-        self.process = S.Popen(self.backend._argv() + ["app-server", "--stdio"],
+        settings = [part for key, value in self.config for part in ("-c", "%s=%s" % (key, value))]
+        self.process = S.Popen(self.backend._argv() + settings + ["app-server", "--stdio"],
                                stdin=S.PIPE, stdout=S.PIPE, stderr=S.DEVNULL, text=True,
                                encoding="utf-8", errors="replace", bufsize=1,
                                creationflags=NO_WINDOW, close_fds=True, shell=False,
