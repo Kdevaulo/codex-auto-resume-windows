@@ -86,6 +86,8 @@ _MESSAGES = {
     ("waiting_for_loaded_thread", "loaded_state_unknown"): "loaded state unknown; waiting safely without queueing",
     ("waiting_for_loaded_thread", "held_by_other_session"):
         "open in another Codex session (a terminal or VS Code); waiting until Codex holds it",
+    ("waiting_for_loaded_thread", "version_newer_than_engine"):
+        "a newer Codex wrote this conversation than the engine here; waiting until Codex is updated",
     ("waiting_for_loaded_thread", "loaded_recheck_failed"): "loaded re-check failed at dispatch time; waiting",
     ("waiting_for_usage", "usage_unavailable"): "usage still unavailable; waiting for reset",
     ("waiting_for_usage", "usage_unknown"): "usage status unknown; waiting without queueing",

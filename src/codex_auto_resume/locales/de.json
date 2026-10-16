@@ -1077,6 +1077,7 @@
   "why.engine_unknown": "Ob diese Codex-Version unterstützt wird, ist noch nicht bekannt.",
   "why.held": "Ihre Unterhaltung oder ihr Projekt fragt Sie zuerst: Es wird nichts gesendet, bis Sie sie fortfahren lassen.",
   "why.held_by_other_session": "In einer anderen Codex-Sitzung geöffnet (einem Terminal oder VS Code); es geht weiter, sobald die Codex-App sie hält.",
+  "why.version_newer_than_engine": "Ein neueres Codex als das hier hat diese Unterhaltung zuletzt ausgeführt; es geht weiter, sobald Codex aktualisiert ist.",
   "why.home_lock_unavailable": "Ein anderer Watcher ist für diesen Codex-Ordner zuständig.",
   "why.home_removed": "Sein Codex-Verzeichnis wurde in den Einstellungen entfernt, daher wird es nicht fortgesetzt.",
   "why.loaded_state_unknown": "Ob die Unterhaltung geöffnet ist, lässt sich noch nicht sagen.",

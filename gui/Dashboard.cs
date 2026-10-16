@@ -803,6 +803,9 @@ namespace CodexAutoResume
         // Pending has been built but for its buttons (BuildPending): what the advanced edition has
         // waiting for a reset - its own rules, not recoveries - is shown under the list (v0.6.14).
         partial void PendingBuilt(Panel page);
+        // The cells of one row of Pending (`pending`) or History have been written (Cells): what the advanced edition
+        // says of a row it had a hand in joins the cell's line, never a cell or a column of its own (v0.6.16-beta.4).
+        partial void CellsWritten(Dictionary<string, object> row, bool pending, string[] cells);
         // One argument of the window's command line has been read (ParseArguments): a page of
         // the advanced edition's, or the keyboard on its tab, is one the standard checks refuse.
         static partial void ArgumentParsed(string argument, OpenRequest request);

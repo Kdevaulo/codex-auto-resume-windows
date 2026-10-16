@@ -87,12 +87,14 @@ class TripTests(TakingCase):
         self.assertEqual(plug.runtime.states(fresh=True).get(self.cap, ArmingState.OFF), ArmingState.OFF)
         self.assertEqual(plug.runtime.state.arming()[self.cap]["reason"], OffReason.REFUSED_BY_CODEX)
 
-    def test_it_may_not_be_kept_on_and_is_listed_last(self):
+    def test_it_may_not_be_kept_on_and_is_listed_beside_marker_free_continuation(self):
+        """DECISIONS Q12: beside the other continuation that goes without a marker. Fails with it listed last again."""
         plug = self.on()
         refused = plug.runtime.arming.set_keep_on(self.cap, True, generation=plug.runtime.state.meta()["generation"],
                                                   confirmed=["keep_on"], actor=Actor.DASHBOARD)
         self.assertEqual((refused["done"], refused["refusal"]), (False, Refusal.INVALID_REQUEST))
-        self.assertEqual(registry.SHOWN_ORDER[-1], self.cap)
+        shown = registry.SHOWN_ORDER
+        self.assertEqual(shown.index(self.cap), shown.index("marker_free_continuation") + 1)
 
     def test_unmeasured_on_this_codex_is_a_warning_never_a_refusal(self):
         plug = self.advanced()

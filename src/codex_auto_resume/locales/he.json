@@ -1077,6 +1077,7 @@
   "why.engine_unknown": "עדיין לא ידוע אם גרסת Codex זו נתמכת.",
   "why.held": "השיחה שלה או הפרויקט שלה שואלים אותך קודם: דבר לא יישלח עד לאישורך להמשיך.",
   "why.held_by_other_session": "פתוחה בהפעלה אחרת של Codex (מסוף או VS Code); היא תמשיך ברגע שאפליקציית Codex תחזיק בה.",
+  "why.version_newer_than_engine": "גרסת Codex חדשה יותר מזו שכאן הריצה את השיחה הזו לאחרונה; היא תמשיך ברגע ש-Codex יעודכן.",
   "why.home_lock_unavailable": "תהליך ניטור אחר אחראי על תיקיית Codex הזו.",
   "why.home_removed": "תיקיית Codex שלה הוסרה בהגדרות, ולכן היא לא תמשיך.",
   "why.loaded_state_unknown": "עדיין לא ניתן לדעת אם השיחה פתוחה.",

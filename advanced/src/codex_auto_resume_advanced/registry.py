@@ -509,14 +509,16 @@ HEADLESS_RUN = CapabilityDef(
 # its marker, for that session to take (M5) - taken back when that session lets go of it, and given back to waiting;
 # taken back because the session did not take it within core's delivery window, it turns off
 # (NOT_DISPATCHED_BY_SESSION), and so it may not be kept on (keepable). It departs from A15 (only the app's
-# conversations are detected) and A11 (sent while a session other than the app holds the conversation), keeps A2, A3,
+# conversations are detected), A11 (sent while a session other than the app holds the conversation) and B6 (the
+# version skew guard reads which Codex wrote such a conversation off its file's first line, core's engine/kinds.py,
+# and waits while that is newer than the engine), keeps A2, A3,
 # A4, A17, H4 and H6, stands on thread_eligibility and rests on M5 and MO - the words that tell these conversations
 # apart, a warning until MO passes for the Codex in force. Ceilings: three a conversation, two dozen a day.
 OTHER_SESSIONS = CapabilityDef(
     id="other_sessions",
     points=frozenset({Point.SESSIONS, Point.UNLOADED}),
     revision=1,
-    departs_from=("A11", "A15"),
+    departs_from=("A11", "A15", "B6"),
     compat="thread_eligibility",
     ceilings=Ceilings(per_day=24, per_conversation=3),
     journal_prefix="sess",
@@ -1138,7 +1140,10 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                # v0.6.16-beta.3: which conversations are recovered at all, beside what starts the recovering.
                "every_conversation", "queue_for_open",
                # v0.6.16-beta.4: what gets a conversation going when nothing holds it, beside queue for opening (Q12).
-               "headless_run", "other_sessions", "marker_free_continuation", "reset_credit",
+               "headless_run", "other_sessions", "marker_free_continuation",
+               # v0.6.16-beta.4: how a turn run here starts, beside the other continuation that goes without a marker
+               # (DECISIONS Q12).
+               "silent_continuation", "reset_credit",
                "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
                # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
                "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",
@@ -1146,9 +1151,7 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                # v0.6.16-beta.4: what a failure of Codex's own is taken up with, beside the capacity retry (Q12).
                "compact_continue", "model_fallback",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
-               "structured_rules",
-               # v0.6.16-beta.4: how a turn run here starts, last (Q12).
-               "silent_continuation")
+               "structured_rules")
 
 
 def shown(registry) -> tuple:

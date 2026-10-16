@@ -690,6 +690,7 @@
   "why.notLoaded": "The conversation is not open in the Codex app.",
   "why.loaded_state_unknown": "Whether the conversation is open cannot be told yet.",
   "why.held_by_other_session": "Open in another Codex session (a terminal or VS Code); it continues once the Codex app holds it.",
+  "why.version_newer_than_engine": "A newer Codex than the one here last ran this conversation; it continues once Codex is updated.",
   "why.usage_unavailable": "Usage is not available yet.",
   "why.usage_unknown": "Usage could not be read, so it waits rather than guess.",
   "why.user_input_queued": "Something of yours is queued in this conversation and goes first.",

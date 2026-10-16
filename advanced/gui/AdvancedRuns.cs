@@ -11,6 +11,15 @@
 //
 // Nothing here draws anything the page does not draw already: the card, the help lines and the buttons are Send now's.
 //
+// And what Pending and History say of a row this edition had a hand in (CellsWritten): words joined to a cell's own
+// line - " · CLI" or " · VS Code" after the conversation of a terminal's or VS Code's (other_sessions), and "Run
+// /compact in Codex; it continues after" after the status of a full conversation waiting for it (compact_continue), and
+// that a conversation now uses another model after the status of one whose own model Codex would not put back
+// (model_fallback), and "continued with no words, proven by its id" after History's outcome of one a turn run here
+// started with no words (silent_continuation) - from what the
+// status the window already reads carries of each row, by its interruption id (surfaces.rows). No cell, column or
+// element of its own: as a second Codex home's alias joins the label line (v0.6.15-beta).
+//
 // C# 5 (the in-box compiler), as the rest of the window.
 
 using System;
@@ -92,6 +101,35 @@ namespace CodexAutoResume
                 stop.AccessibleName = Word("page.runs.stop", "Stop...") + " " + conversation;
                 runStops.Add(stop);
             }
+        }
+
+        /// What this edition says of one row of Pending (`pending`) or History, joined to its cells' lines: the kind of
+        /// conversation after its label, from the status of the snapshot being shown (surfaces.rows).
+        partial void CellsWritten(Dictionary<string, object> row, bool pending, string[] cells)
+        {
+            string key = Str(row, "interruption_id");
+            Dictionary<string, object> said = Map(Map(snapshot, "status"), "advanced");
+            if (key == null || said == null) return;
+            string kind = Str(Map(said, "kinds"), key);
+            if (kind == "cli") cells[0] += " · " + Word("page.row.kind.cli", "CLI");
+            else if (kind == "ide") cells[0] += " · " + Word("page.row.kind.ide", "VS Code");
+            // A full conversation waiting for the person's /compact in the Codex app says so in its status (compact_continue).
+            if (pending && Listed(said, "compacting", key))
+                cells[1] += " · " + Word("page.row.compact", "Run /compact in Codex; it continues after");
+            // A model a fallback turn ran on that Codex would not put back, in Pending and History alike (model_fallback).
+            if (Listed(said, "model_not_restored", key))
+                cells[1] += " · " + Word("page.row.model_not_restored", "This conversation now uses another model; switch it back in Codex");
+            // A continuation a turn run here started with no words, in History (silent_continuation).
+            if (!pending && Listed(said, "silent", key))
+                cells[1] += " · " + Word("page.row.silent", "continued with no words, proven by its id");
+        }
+
+        /// Whether the list `name` of what the status says of the rows names `key`.
+        private static bool Listed(Dictionary<string, object> said, string name, string key)
+        {
+            foreach (object entry in Items(said, name) ?? new List<object>())
+                if (entry as string == key) return true;
+            return false;
         }
 
         /// Ask, then hand the watcher one run's Stop: the turn is interrupted at its next look.

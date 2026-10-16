@@ -121,13 +121,12 @@ class ShippedTests(unittest.TestCase):
 
     # The order a person reads them in (the owner's, 2026-10-10): the compatibility report first, then by importance.
     SHOWN = ("compat_report", "start_with_codex", "every_conversation", "queue_for_open", "headless_run",
-             "other_sessions", "marker_free_continuation", "reset_credit",
+             "other_sessions", "marker_free_continuation", "silent_continuation", "reset_credit",
              "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
              "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
              "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "compact_continue", "model_fallback",
              "codex_gave_up",
-             "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules",
-             "silent_continuation")
+             "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules")
 
     def test_the_shown_order_names_every_capability_of_the_registry_exactly_once(self):
         order, ids = registry.SHOWN_ORDER, registry.REGISTRY.ids

@@ -8,15 +8,17 @@ Held against the shipped definition and statement and against core's own engine,
 """
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
+import re
 import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from takingcase import TakingCase  # noqa: E402
-from advancedcase import ENGINE  # noqa: E402
+from advancedcase import ENGINE, ROOT  # noqa: E402
 from codex_auto_resume.domain.plug import DEFER, Alternative, Point  # noqa: E402
 from codex_auto_resume_advanced import registry  # noqa: E402
 from codex_auto_resume_advanced.codex import headless  # noqa: E402
@@ -153,6 +155,61 @@ class RegistryTests(CompactCase):
         self.measured = {}
         self.arm(plug)
         self.assertEqual(plug.runtime.states(fresh=True)[self.cap], ArmingState.ARMED)
+
+
+class NoSlashTextTests(unittest.TestCase):
+    """Design-4 5.2 and 12: no source file of either edition sends a text beginning with "/" - a queued slash command
+    (M7: Codex keeps a queued /compact as plain text, so the queue never compacts; a person runs /compact). Read as
+    source, so a text a later change adds is found before it is ever sent: every string the code of either edition
+    holds that is shaped as a slash command, and every template a continuation or a message of this product is made of,
+    in every language."""
+    # Shaped as a slash command: "/" and a word, alone or before more - never a path such as "/pull/".
+    COMMAND = re.compile(r"^\s*/[A-Za-z][\w-]*(\s|$)")
+    # The one string allowed, and why: M7's own probe queues "/compact" once, by hand, on its own probe conversation, to
+    # measure that Codex keeps it as plain text (measure.py, _m7) - a measurement, never a recovery's or a person's.
+    ALLOWED = {("codex_auto_resume_advanced/measure.py", "_m7", "/compact")}
+
+    @staticmethod
+    def sources():
+        for root in (ROOT / "src", ROOT / "advanced" / "src"):
+            for path in sorted(root.rglob("*.py")):
+                yield path.relative_to(root).as_posix(), path
+
+    def commands(self) -> set:
+        """(file, function, text) for every string constant shaped as a slash command, docstrings left out."""
+        found = set()
+        for name, path in self.sources():
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            documented = {id(node.body[0].value) for node in ast.walk(tree)
+                          if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                          and node.body and isinstance(node.body[0], ast.Expr)
+                          and isinstance(node.body[0].value, ast.Constant)}
+            for function in [tree] + [node for node in ast.walk(tree)
+                                      if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+                owner = getattr(function, "name", None)
+                for node in ast.walk(function):
+                    if (isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in documented
+                            and self.COMMAND.match(node.value)):
+                        found.add((name, owner, node.value.strip()))
+        # A constant inside a function is found from the module too; the function's own name is the one kept.
+        return {entry for entry in found if entry[1] is not None
+                or not any(other[0] == entry[0] and other[2] == entry[2] and other[1] for other in found)}
+
+    def test_no_source_holds_a_slash_command_but_m7s_probe(self):
+        """Fails with any text such as "/compact" added to a send of either edition."""
+        self.assertEqual(self.commands(), self.ALLOWED)
+
+    def test_no_template_of_a_continuation_or_a_message_begins_with_a_slash(self):
+        catalogs = [(ROOT / "src" / "codex_auto_resume" / "locales", ("continuation.",)),
+                    (ROOT / "advanced" / "src" / "codex_auto_resume_advanced" / "locales", ("continue.",))]
+        checked = 0
+        for folder, prefixes in catalogs:
+            for path in sorted(folder.glob("*.json")):
+                for key, text in json.loads(path.read_text(encoding="utf-8")).items():
+                    if key.startswith(prefixes):
+                        checked += 1
+                        self.assertFalse(text.lstrip().startswith("/"), "%s %s" % (path.name, key))
+        self.assertGreater(checked, 18 * 20, "the templates were found")
 
 
 if __name__ == "__main__":

@@ -69,8 +69,9 @@ LISTS = {
     # took up (P17) that nothing takes up now, and one taken up a day ago; and capacity_window, capacity
     # retries past their twelve hours on the clock.
     # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
-    # v0.6.16-beta.4: held_by_other_session - open in a terminal's or VS Code's Codex session.
-    "machine.REASONS": ("set", 78, "79c222542ea40f29"),
+    # v0.6.16-beta.4: held_by_other_session - open in a terminal's or VS Code's Codex session - and
+    # version_newer_than_engine, one of those a newer Codex wrote than the engine here (the version skew guard).
+    "machine.REASONS": ("set", 79, "39ba6491b60545fe"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -91,8 +92,8 @@ LISTS = {
     # and `resend`, submission_safe passed for an uncertain submission sent once more (engine/resend.py),
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
     # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
-    # v0.6.16-beta.4: and held_by_other_session.
-    "machine.GATE_REASONS": ("set", 96, "4b69890ae6ed4c9e"),
+    # v0.6.16-beta.4: and held_by_other_session and version_newer_than_engine.
+    "machine.GATE_REASONS": ("set", 97, "13e59554471e7298"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",

@@ -1077,6 +1077,7 @@
   "why.engine_unknown": "Aún no se sabe si esta versión de Codex es compatible.",
   "why.held": "Su conversación o su proyecto te pregunta primero: no se envía nada hasta que la dejes continuar.",
   "why.held_by_other_session": "Abierta en otra sesión de Codex (una terminal o VS Code); continúa en cuanto la app de Codex la tenga.",
+  "why.version_newer_than_engine": "Una versión de Codex más nueva que la de aquí ejecutó esta conversación por última vez; continúa en cuanto Codex se actualice.",
   "why.home_lock_unavailable": "Otro monitor está a cargo de esta carpeta de Codex.",
   "why.home_removed": "Su carpeta de Codex se quitó en Configuración, así que no se reanudará.",
   "why.loaded_state_unknown": "Aún no se sabe si la conversación está abierta.",

@@ -187,10 +187,12 @@ def status(runtime) -> dict:
     except Exception:
         pass
     shown.update(meter_view(runtime))
-    # v0.6.16-beta.4: the turns run here now, only where there are any.
+    # v0.6.16-beta.4: the turns run here now, only where there are any - and what Pending and History say of a row
+    # the edition had a hand in, keyed by interruption id, only where there is something to say.
     found = runs(runtime)
     if found:
         shown["runs"] = found
+    shown.update(rows(runtime))
     return shown
 
 
@@ -390,6 +392,155 @@ def runs(runtime) -> list:
                 for row in runtime.state.runs(live=True)]
     except Exception:
         return []
+
+
+# ---------------------------------------------------------------------------- Pending's and History's rows
+# The rows Pending and History list (control/records: the records still going, and the newest 200), and how long a
+# conversation's kind is kept once read: a conversation the Codex app takes over from a terminal (issue #37) is the
+# app's own from then on, so a kind is read again after a while.
+ROWS_READ = 200
+KIND_SECONDS = 600.0
+# {(Codex home, conversation id): (its kind or None, when it was read)}, for the life of the bridge's process.
+_KINDS = {}
+
+
+def rows(runtime, *, store=None, source=None) -> dict:
+    """What Pending and History say beside a row this edition had a hand in (P10, v0.6.16-beta.4), keyed by
+    interruption id - words of this edition's own, never a conversation's: {"kinds": {id: "cli" or "ide"}} for a
+    conversation of a terminal's Codex TUI or of VS Code (other_sessions: " · CLI" or " · VS Code" on its label line);
+    {"compacting": [id, ...]} for a full conversation compact_continue holds until the person runs /compact in the
+    Codex app (its row's status says so); {"model_not_restored": [id, ...]} for a turn model_fallback ran on Codex's
+    default model whose conversation's own model Codex would not put back - its row says to switch it back in Codex,
+    in words with no model's name (the review's finding 22), for as long as it is owed (state/runs.py), whatever the
+    capability stands at now; {"silent": [id, ...]} for a continuation a turn run here started with no words and
+    proved by its id (silent_continuation: History says so), while the edition keeps that run (engine/headless.py,
+    KEEP_ENDED). Each part only where there is something in it, and read only while the capability it
+    is of stands on (or, for the kinds, watched) - a model owed back aside, which is the edition's own state - so with
+    none of them on nothing of core's or Codex's is read at all. `store` is core's state and `source` the Codex
+    home's reader - the Dashboard's own, by default; a test's."""
+    from .registry import COMPACT_CONTINUE, MODEL_FALLBACK, OTHER_SESSIONS
+    try:
+        states = runtime.states()
+    except Exception:
+        return {}
+    shown = {}
+    try:
+        owed = [row["interruption_id"] for row in runtime.state.runs_owed(MODEL_FALLBACK.id)
+                if row["ended_at"] is not None]
+    except Exception:
+        owed = []
+    if owed:
+        shown["model_not_restored"] = owed
+    silent = _silent(runtime, store)
+    if silent:
+        shown["silent"] = silent
+    kinds_wanted = states.get(OTHER_SESSIONS.id, ArmingState.OFF) != ArmingState.OFF
+    compact_wanted = states.get(COMPACT_CONTINUE.id, ArmingState.OFF) == ArmingState.ARMED
+    if not (kinds_wanted or compact_wanted):
+        return shown
+    try:
+        listed = _listed(runtime, store)
+    except Exception:
+        return shown
+    if kinds_wanted:
+        try:
+            reader = source if source is not None else _source(runtime)
+            kinds = {key: kind for key, kind in ((row["interruption_id"], _kind(reader, row["thread_id"]))
+                                                 for row in listed if not row.get("home_key")) if kind}
+        except Exception:
+            kinds = {}
+        if kinds:
+            shown["kinds"] = kinds
+    if compact_wanted:
+        compacting = [row["interruption_id"] for row in listed if _compacting(row)]
+        if compacting:
+            shown["compacting"] = compacting
+    return shown
+
+
+def _silent(runtime, store) -> list:
+    """The interruptions a turn run here continued with no words (P15's SILENT): a run of headless_run's or
+    compact_continue's the edition still keeps whose core record went by the client id core derives for it
+    (engine/routes._silent) - the proof by id, which a marker-free send through a channel never had from a run here.
+    Core's state is opened only where there is such a run."""
+    from codex_auto_resume.domain import ids
+    from codex_auto_resume.store import Store
+    try:
+        keys = [row["interruption_id"] for row in runtime.state.runs(live=False, limit=ROWS_READ)
+                if row["capability"] in ("headless_run", "compact_continue") and row["ended_at"] is not None]
+    except Exception:
+        return []
+    if not keys:
+        return []
+    try:
+        if store is None:
+            with Store(runtime.paths.state_dir) as opened:
+                return _silent_of(opened, keys, ids)
+        return _silent_of(store, keys, ids)
+    except Exception:
+        return []
+
+
+def _silent_of(store, keys, ids) -> list:
+    found = []
+    for key in keys:
+        row = store.get(key)
+        if row is not None and row.get("recovery_client_id") == ids.continuation_client_id(key):
+            found.append(key)
+    return found
+
+
+def _compacting(row) -> bool:
+    """Whether core's record `row` is a full conversation compact_continue holds for the person's /compact: still
+    waiting, of its kind, its conversation available to the app and held there at P3 (engine/compact.py)."""
+    from codex_auto_resume import machine
+    from .engine.compact import KIND
+    if row.get("category") != KIND or row.get("state") not in machine.WAITING or not row.get("gate_eval"):
+        return False
+    try:
+        return machine.decode_gates(row["gate_eval"]).get("thread_available") == (machine.WAIT, machine.HELD)
+    except Exception:
+        return False
+
+
+def _listed(runtime, store) -> list:
+    """The records Pending and History list, each once: those still going, then the newest ROWS_READ."""
+    from codex_auto_resume.store import Store
+    if store is None:
+        with Store(runtime.paths.state_dir) as opened:
+            return _listed(runtime, opened)
+    seen, found = set(), []
+    for row in store.pending() + store.history(limit=ROWS_READ):
+        if row["interruption_id"] not in seen:
+            seen.add(row["interruption_id"])
+            found.append(row)
+    return found
+
+
+def _source(runtime):
+    from codex_auto_resume.codex import LocalSource
+    from .codex import inuse
+    return LocalSource(inuse.home(runtime.paths))
+
+
+def _kind(source, thread_id):
+    """"cli" or "ide" for a conversation of a terminal's Codex TUI or of VS Code, judged as core judges one
+    (LocalSource.taken: its row and its file's first line); None for the app's own - one it took over or forked from
+    a terminal among them - and for anything else. Kept KIND_SECONDS; one that cannot be read is not kept."""
+    from time import monotonic
+    from codex_auto_resume.domain.plughands import SessionKind
+    key, now = (str(getattr(source, "home", "")), thread_id), monotonic()
+    held = _KINDS.get(key)
+    if held is not None and 0 <= now - held[1] < KIND_SECONDS:
+        return held[0]
+    found = None
+    if not source.taken(thread_id, frozenset()):
+        found = next((str(kind) for kind in (SessionKind.CLI, SessionKind.IDE)
+                      if source.taken(thread_id, frozenset({kind}))), None)
+    if len(_KINDS) > 4096:
+        _KINDS.clear()
+    _KINDS[key] = (found, now)
+    return found
 
 
 def resets(runtime, command, argument):
