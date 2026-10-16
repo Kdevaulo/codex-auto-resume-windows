@@ -12,7 +12,7 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-for _path in (str(ROOT / "src"), str(ROOT / "build")):
+for _path in (str(ROOT / "src"), str(ROOT / "build"), str(ROOT / "tests")):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
@@ -141,6 +141,34 @@ class CardFramesTests(unittest.TestCase):
                                                   gap=gap, spacing=gap)
         self.assertEqual(self.frames.place, want[0])
         self.assertEqual(self.frames.place[0] + self.frames.card.size[0], WORK[2] - gap)
+
+
+@unittest.skipUnless(os.name == "nt", "the card is drawn with Windows' GDI+")
+class CardPictureTests(unittest.TestCase):
+    """make_motion draws a plan with no window - the card on its own - on the plain canvas."""
+
+    def test_the_card_rises_rests_and_leaves_on_the_plain_canvas(self):
+        import tempfile
+        import make_motion
+        import motion_plan
+        from test_social_motion import composite, read_apng
+        plan = {"format": motion_plan.FORMAT, "name": "card-test", "locale": "en",
+                "canvas": {"size": [776, 600], "ground": "canvas", "theme": "light", "design": "soft"},
+                "card": {"scale": 2.0, "locale": "en", "at": [52, 52]}, "pointer": {"rest": [820, 660]},
+                "scenes": [{"id": "A", "steps": [{"card": "enter", "frames": 3, "step": 120}, {"hold": 200},
+                                                 {"card": "leave", "frames": 2, "step": 120}, {"hold": 100}]}]}
+        motion_plan.check(plan)
+        with tempfile.TemporaryDirectory() as name:
+            plan["output"] = str(Path(name) / "card.png")
+            report = make_motion.make(plan, None, Path(name) / "work")
+            shown = list(composite(read_apng(Path(plan["output"]).read_bytes())))
+        ground = canvas_colour()
+        self.assertEqual(shown[0], ground * (776 * 600), "frame 1 is the empty canvas the card rises onto")
+        self.assertEqual(shown[-1], ground * (776 * 600), "it ends where it loops back to")
+        middle = shown[len(shown) // 2]
+        at = ((52 + 60) * 776 + 52 + 60) * 3
+        self.assertNotEqual(middle[at:at + 3], ground, "the card stands at its place")
+        self.assertEqual(report.hundredths, motion_plan.plan_end(plan) // 10)
 
 
 class LayTests(unittest.TestCase):

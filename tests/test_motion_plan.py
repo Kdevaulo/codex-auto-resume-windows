@@ -69,6 +69,35 @@ class ReadmePlanTests(unittest.TestCase):
         self.assertEqual(frames[last].scene, "S3")
 
 
+class CardPlanTests(unittest.TestCase):
+    def test_the_card_on_its_own_is_planned_in_both_languages_and_drawn_only_when_named(self):
+        self.assertEqual(make_motion.CARD_PLANS, ("card-en", "card-ko"))
+        self.assertEqual(make_motion.ALL_PLANS, make_motion.PLAN_NAMES + make_motion.CARD_PLANS)
+        for name, output in (("card-en", "docs/images/notification-card-motion.png"),
+                             ("card-ko", "docs/images/notification-card-motion-ko.png")):
+            with self.subTest(name):
+                plan = motion_plan.load(make_motion.plan_path(name))
+                self.assertEqual(plan["output"], output)
+                self.assertNotIn("window", plan)
+                self.assertNotIn("taskbar", plan)
+                self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]), ([776, 600], 2.0))
+                self.assertLessEqual(plan["budget"]["cap"], 1000000)
+                frames = motion_plan.expand(plan)
+                self.assertEqual(dict(frames[0].card)["born"], 0, "frame 1 is the card about to rise")
+                self.assertEqual(frames[-1].card, (), "it ends on the empty ground it loops back to")
+                self.assertEqual(make_motion.icon_moments(plan, motion_plan.plan_end(plan)), [])
+
+    def test_what_the_card_picture_is_made_from_is_the_card_not_the_window(self):
+        import make_screenshots as shots
+        from unittest import mock
+        plan = motion_plan.load(make_motion.plan_path("card-en"))
+        before = make_motion.render_input(plan)
+        with mock.patch.object(shots, "window_digest", return_value="moved"):
+            self.assertEqual(make_motion.render_input(plan), before)
+        with mock.patch.object(shots, "card_drawing", return_value="moved"):
+            self.assertNotEqual(make_motion.render_input(plan), before)
+
+
 class StepTests(unittest.TestCase):
     def test_a_cut_changes_the_window_at_once_and_leaves_the_section_with_its_page(self):
         frames = motion_plan.expand(plan_of({"set": {"page": "settings", "section": "general"}, "hold": 100},

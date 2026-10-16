@@ -44,6 +44,10 @@ for _path in (str(ROOT / "src"), str(ROOT / "build")):
 import motion_plan  # noqa: E402
 
 PLAN_NAMES = ("readme-en", "readme-ko")
+# The notification card on its own (APNG-storyboard.md section 5): drawn only when named, or with --all - the
+# final's picture pass draws it beside the README's two.
+CARD_PLANS = ("card-en", "card-ko")
+ALL_PLANS = PLAN_NAMES + CARD_PLANS
 MANIFEST = ROOT / "assets" / "motion.json"
 # What the picture is made from, beside the window, the card and the icon: these files.
 CODE = ("build/make_motion.py", "build/motion_plan.py", "build/motion_window.py", "build/motion_card.py",
@@ -103,7 +107,9 @@ def describe(plan: dict, also=()) -> str:
 
 # ---------------------------------------------------------------------------------------------------- inputs
 def icon_moments(plan: dict, end: int) -> list:
-    """The moments the tray icon's own timer shows a new frame at, over the picture."""
+    """The moments the tray icon's own timer shows a new frame at, over the picture: none without a taskbar."""
+    if "taskbar" not in plan:
+        return []
     import make_screenshots
     state = (plan.get("taskbar") or {}).get("icon", {}).get("state", "watching")
     return [at for at, _position, _level in make_screenshots.icon_timeline(state, 0.0, float(end))]
@@ -114,11 +120,15 @@ def render_input(plan: dict) -> str:
     icon, the catalogs of its languages, the still its frame is taken from and this generator's own files - so a
     change to any of them marks the picture stale (tests/test_motion_fidelity.py)."""
     import make_screenshots as shots
-    parts = [json.dumps(plan, sort_keys=True, ensure_ascii=False), shots.window_digest(), shots.card_drawing(),
-             shots.icon_drawing()]
+    parts = [json.dumps(plan, sort_keys=True, ensure_ascii=False), shots.card_drawing()]
+    if "window" in plan:
+        parts.append(shots.window_digest())
+    if "taskbar" in plan:
+        parts.append(shots.icon_drawing())
     for locale in sorted(plan.get("forms") or {plan.get("locale", "en"): {}}):
         parts.append(shots.input_digest(ROOT / "src" / "codex_auto_resume" / "locales" / ("%s.json" % locale)))
-    parts.append(shots.input_digest(ROOT / plan["window"]["still"]))
+    if "window" in plan:
+        parts.append(shots.input_digest(ROOT / plan["window"]["still"]))
     parts += [shots.input_digest(ROOT / name) for name in CODE]
     return hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
 
@@ -134,8 +144,10 @@ def write_manifest(manifest: dict) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------- making one
-def make(plan: dict, exe: Path, work: Path, forms=None) -> object:
-    """Draws `plan`'s picture into its output and returns the assembler's Report."""
+def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
+    """Draws `plan`'s picture into its output and returns the assembler's Report. A plan with no `window` (the card
+    on its own) is drawn on the plain canvas and needs no window (`exe` may be None); one with no `taskbar` has no
+    strip and no icon; `card.at`, where given, is where the settled card's top-left stands."""
     import make_screenshots as shots
     import motion_apng
     import motion_card
@@ -145,42 +157,54 @@ def make(plan: dict, exe: Path, work: Path, forms=None) -> object:
     from codex_auto_resume.ui import tray
     end = motion_plan.plan_end(plan)
     frames, _held, _end = schedule(plan, icon_moments(plan, end))
-    job = motion_window.job(plan, frames, work / "frames", forms)
-    result = motion_window.render(exe, job, work)
-    pictures = motion_window.pictures(result, work / "frames")
     canvas = plan["canvas"]
     width, height = canvas["size"]
     theme, design = canvas.get("theme", "light"), canvas.get("design", brand.DEFAULT_DESIGN)
     ground = tuple(brand.rgb(brand.palette(theme, design)[canvas.get("ground", "canvas")]))
-    still = shots.read_png(ROOT / plan["window"]["still"])
-    chrome = motion_compose.WindowChrome(still, tuple(result["client"]), size=(width, height),
-                                         at=tuple(plan["window"]["at"]), ground=ground,
-                                         scale=float(result.get("dpi_scale") or 1.5))
-    origin = chrome.client_origin()
-    strip = plan["taskbar"]
-    icon = strip["icon"]
-    icon_left = width - icon["right"] - icon["size"]
-    icon_top = strip["top"] + (strip["height"] - icon["size"]) // 2
-    icons = tray.IconFrames(icon["size"])
+    if "window" in plan:
+        job = motion_window.job(plan, frames, work / "frames", forms)
+        result = motion_window.render(exe, job, work)
+        pictures = motion_window.pictures(result, work / "frames")
+        still = shots.read_png(ROOT / plan["window"]["still"])
+        chrome = motion_compose.WindowChrome(still, tuple(result["client"]), size=(width, height),
+                                             at=tuple(plan["window"]["at"]), ground=ground,
+                                             scale=float(result.get("dpi_scale") or 1.5))
+        origin = chrome.client_origin()
+    else:
+        pictures, chrome, origin = None, None, (0, 0)
+        plain = bytes(ground) * (width * height)
+    strip = plan.get("taskbar")
+    anchor = None
+    if strip:
+        icon = strip["icon"]
+        icon_left = width - icon["right"] - icon["size"]
+        icon_top = strip["top"] + (strip["height"] - icon["size"]) // 2
+        icons = tray.IconFrames(icon["size"])
+        anchor = (icon_left, icon_top, icon_left + icon["size"], icon_top + icon["size"])
     card_plan = plan["card"]
     card = motion_card.CardFrames(card_plan.get("locale", plan["locale"]), scale=card_plan["scale"],
-                                  work=(0, 0, width, strip["top"]), monitor=(0, 0, width, height),
-                                  anchor=(icon_left, icon_top, icon_left + icon["size"], icon_top + icon["size"]),
-                                  theme=theme, design=design)
+                                  work=(0, 0, width, strip["top"] if strip else height),
+                                  monitor=(0, 0, width, height), anchor=anchor, theme=theme, design=design)
+    if "at" in card_plan:
+        card.place = tuple(card_plan["at"])
     accent = tuple(brand.rgb(brand.palette(theme, design)["accent"]))
     scale = float((plan.get("pointer") or {}).get("scale", 1.5))
     seen_bounds, standing = {}, {}
 
     def draw(frame):
-        index, client, bounds = next(pictures)
-        seen_bounds.update(bounds)
-        picture = chrome.frame(client)
-        motion_compose.draw_strip(picture, width, height, strip["top"], strip["height"],
-                                  tuple(brand.rgb(strip["colour"])))
-        position, level = tray.icon_frame(icon["state"], frame.t, frame.t)
-        head = tray.icon_level_colour(tray.icon_head_colour(icon["state"]), level)
-        motion_compose.draw_icon(picture, width, height, icons.compose(position, head), icon["size"], icon_left,
-                                 icon_top)
+        if pictures is not None:
+            _index, client, bounds = next(pictures)
+            seen_bounds.update(bounds)
+            picture = chrome.frame(client)
+        else:
+            picture = bytearray(plain)
+        if strip:
+            motion_compose.draw_strip(picture, width, height, strip["top"], strip["height"],
+                                      tuple(brand.rgb(strip["colour"])))
+            position, level = tray.icon_frame(icon["state"], frame.t, frame.t)
+            head = tray.icon_level_colour(tray.icon_head_colour(icon["state"]), level)
+            motion_compose.draw_icon(picture, width, height, icons.compose(position, head), icon["size"],
+                                     icon_left, icon_top)
         state = dict(frame.card) if frame.card else None
         if state is not None:
             card.lay_on(picture, width, height, card.drawn(frame.t, state["born"], hover=state["hover"],
@@ -210,7 +234,8 @@ def make(plan: dict, exe: Path, work: Path, forms=None) -> object:
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    names = [item for item in argv if not item.startswith("--")] or list(PLAN_NAMES)
+    names = [item for item in argv if not item.startswith("--")] or list(ALL_PLANS if "--all" in argv
+                                                                          else PLAN_NAMES)
     plans = [motion_plan.load(plan_path(name)) for name in names]
     if "--dry-run" in argv:
         for plan in plans:
@@ -220,21 +245,24 @@ def main(argv=None) -> int:
     import make_screenshots as shots
     import motion_fidelity
     import motion_window
+    # A card on its own has no window: no stills to be fresh, no window to hold to them.
+    windowed = any("window" in plan for plan in plans)
     recorded = json.loads(shots.MANIFEST.read_text(encoding="utf-8"))
-    if shots.system_dpi() != recorded.get("system_dpi"):
+    if windowed and shots.system_dpi() != recorded.get("system_dpi"):
         raise SystemExit("the display is at %s DPI and the stills were captured at %s: make them again first"
                          % (shots.system_dpi(), recorded.get("system_dpi")))
-    if recorded["inputs"].get("<window sources>") != shots.window_digest():
+    if windowed and recorded["inputs"].get("<window sources>") != shots.window_digest():
         raise SystemExit("the window's stills are stale: run build/make_screenshots.py first")
     manifest = read_manifest()
     with tempfile.TemporaryDirectory() as name:
         work = Path(name)
-        exe = motion_window.compile_window(work)
-        locales = sorted({locale for plan in plans for locale in plan.get("forms", {})})
+        exe = motion_window.compile_window(work) if windowed else None
+        locales = sorted({locale for plan in plans if "window" in plan for locale in plan.get("forms", {})})
         forms = {locale: {"answers": motion_window.answers(locale)} for locale in locales}
-        results = motion_fidelity.check(exe, work, locales, forms)
-        manifest["fidelity"] = dict(results, window=shots.window_digest())
-        write_manifest(manifest)
+        results = motion_fidelity.check(exe, work, locales, forms) if windowed else {}
+        if windowed:
+            manifest["fidelity"] = dict(results, window=shots.window_digest())
+            write_manifest(manifest)
         failed = sorted(key for key, result in results.items() if not result["passed"])
         for key in sorted(results):
             result = results[key]

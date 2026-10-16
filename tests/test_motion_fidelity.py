@@ -128,7 +128,7 @@ class LiveTests(unittest.TestCase):
 class MadeTests(unittest.TestCase):
     def test_a_made_picture_is_the_bytes_its_manifest_records_from_the_inputs_it_records(self):
         manifest = make_motion.read_manifest()
-        for name in make_motion.PLAN_NAMES:
+        for name in make_motion.ALL_PLANS:
             plan = motion_plan.load(make_motion.plan_path(name))
             output = ROOT / plan["output"]
             with self.subTest(name):
@@ -142,9 +142,10 @@ class MadeTests(unittest.TestCase):
                 self.assertEqual(manifest["inputs"].get("<motion:%s>" % name), make_motion.render_input(plan),
                                  "what %s is made from moved: run build/make_motion.py" % plan["output"])
                 self.assertLessEqual(recorded["bytes"], plan["budget"]["cap"])
-                self.assertTrue(manifest["fidelity"] and all(result["passed"] for key, result in
-                                                             manifest["fidelity"].items() if key != "window"),
-                                "it was made from a window that is not the captured one")
+                if "window" in plan:
+                    self.assertTrue(manifest["fidelity"] and all(result["passed"] for key, result in
+                                                                 manifest["fidelity"].items() if key != "window"),
+                                    "it was made from a window that is not the captured one")
 
     def test_what_a_picture_is_made_from_moves_with_its_plan_its_code_and_its_drawing(self):
         import make_screenshots as shots

@@ -1,0 +1,16 @@
+{
+  "format": "car-motion/1",
+  "name": "card-ko",
+  "output": "docs/images/notification-card-motion-ko.png",
+  "locale": "ko",
+  "scenes_from": "card-scenes.json",
+  "values": {},
+  "canvas": {"size": [776, 600], "ground": "canvas", "theme": "light", "design": "soft"},
+  "card": {"scale": 2.0, "locale": "ko", "at": [52, 52]},
+  "pointer": {"rest": [820, 660], "scale": 2.0},
+  "lights_per_second": 10,
+  "first_hold": 0,
+  "ripple_step": 40,
+  "length": [4000, 8000],
+  "budget": {"target": 450000, "cap": 1000000}
+}
