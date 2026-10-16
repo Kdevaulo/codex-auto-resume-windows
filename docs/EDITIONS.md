@@ -104,7 +104,8 @@ when unsure*, after a warning of its own: such a send is then sent once more und
 more when unsure below, so the capability departs from what that one departs from too, and only where
 your administrator's policy allows Once more when unsure as well; a continuation sent again and found
 twice turns that choice off, and the capability stays on. The compatibility report sends nothing to
-Codex, so it has no such choice. The policy reads a kept-on capability down
+Codex, so it has no such choice. Recover CLI, TUI and VS Code conversations and Continue with no words cannot
+be kept on at all; the page does not offer it for them. The policy reads a kept-on capability down
 as any other, by the capability's own id: no policy value reaches Keep it on alone (K8).
 
 **Your administrator's policy.** Three values under `Software\Policies\CodexAutoResume`, in
@@ -128,12 +129,14 @@ Codex; nothing runs it unless a person asks, and [SECURITY.md](SECURITY.md) says
 
 ## Today's capabilities
 
-Twenty-five: seventeen that change how a recovery is made, which conversations are recovered or what
+Thirty: twenty-two that change how a recovery is made, which conversations are recovered or what
 follows a turn, three that send at a time you pick - the two at a usage reset, and queued messages - three
 before a usage limit is reached - the usage meter, and the wrap-up and the pause that need it - and two
 actions: Longer messages, which only lets a message be longer, and the compatibility report, which only you
 start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
-is opened - ten on measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
+is opened. Of the five added in v0.6.16-beta.4, three rest on a measurement that was made and on others not made
+yet - running a conversation here, the other sessions and compacting a full conversation - and two on measurements
+not made yet. Ten more rest on measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
 owner's machine, first on `codex-cli 0.158.0-alpha.2.1` and again on `codex-cli 0.162.0-alpha.17.2`;
 its record is in [`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a
 measurement not made yet, a capability's statement carries the warning that it was not measured there.
@@ -260,6 +263,52 @@ A22 (waits come only from the retry timing you chose), [B9](STANDARDS.md#b-what-
 
 **Ceilings.** 48 a day, and 48 in any one conversation - the one capability whose conversation
 ceiling is above the standard edition's five, because it departs from A20.
+
+### Compact a full conversation, then continue
+
+**What it does.** When a turn fails because the conversation is longer than its model's context window, the
+conversation is compacted and then continued once. If the Codex app has the conversation open, Pending asks
+you to run `/compact` in Codex, and once you have, the ordinary continuation follows. If nothing has it open
+and Codex is closed, it is compacted here, on Codex's own app server, then continued here as Run a
+conversation here while Codex is closed would. Codex's own automatic compaction comes first; this is for when
+it did not. The program never sends `/compact` itself: a queued `/compact` reaches Codex as plain text.
+
+**When it helps.** When a conversation has grown too long, Codex's own compaction did not save it, and you
+would rather it were compacted and carried on than left stopped.
+
+**What it risks.** A compaction loses detail of the earlier conversation. If the compaction fails or does not
+end within ten minutes, or none comes within a day, the recovery ends as the failure it is. That a
+compaction behaves here (MX) and after your own `/compact` (MXA) has not been measured.
+
+**Departs from** [0.5](STANDARDS.md#0-the-edition-boundary), A2, A11, B3, B4, E8 and F8 (as Run a
+conversation here while Codex is closed), A13 and A14 (a context-length failure is taken up), A16 (the
+continuation follows the compaction turn, so the failure is no longer the latest turn), A17 (a compaction
+turn does not supersede the record) and A26 (the continuation's words for a failure the standard edition does
+not recover).
+
+**Ceilings.** 6 a day, and 2 in any one conversation - the compaction's and its continuation's.
+**Measurement M7: made** (a queued `/compact` reaches Codex as plain text). **MX and MXA: not made yet** - a
+warning each.
+
+### Use Codex's default model when one is at capacity
+
+**What it does.** When a turn keeps failing because its model is at capacity, for as many attempts as you
+choose (one to three, two by default), and nothing has the conversation open while Codex is closed, it runs
+the next turn here on Codex's default model instead, then puts the conversation's own model back. Only where
+the conversation is on another model than the default; never for a usage, rate, sign-in or billing failure.
+
+**When it helps.** When a model stays at capacity and you would rather the conversation went on, on another
+model, than waited.
+
+**What it risks.** The turn runs on another model, which may answer differently. If Codex refuses to put the
+conversation's model back, Pending and History say so, and you switch it back in Codex. Which way puts it
+back (MF) has not been measured.
+
+**Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (it changes and replays a model setting, and runs
+a turn of its own), A2, A11, B3, B4, E8 and F8 (as Run a conversation here while Codex is closed) and
+[B9](STANDARDS.md#b-what-it-reads-and-how) (it reads Codex's error code, not only a kind).
+
+**Ceilings.** 6 a day, and 2 in any one conversation. **Measurement MF: not made yet** - a warning.
 
 ### Rules for Codex's error codes
 
@@ -572,6 +621,61 @@ chance that a conversation will be opened). It keeps A17, H4 and H6: every withd
 **Ceilings.** 12 a day, and 3 in any one conversation. **Measurement M1: made** on `codex-cli
 0.158.0-alpha.2.1`; on any other version, a warning.
 
+### Run a conversation here while Codex is closed
+
+**What it does.** When a recovery is due in a conversation that nothing has open - the Codex app is closed
+and no terminal or VS Code session holds it - it runs that one turn here, on Codex's own app server on this
+PC, with the program's ordinary continuation, marker included, and the settings Codex saved for that
+conversation. Every approval the turn asks for is declined: open the conversation in Codex to approve. The
+turn runs for the hours you choose at most, one to six (one by default), and is stopped at once when the
+Codex app starts. A running turn can be stopped from the Dashboard (the Advanced features page); no Codex
+tool (MCP) can stop it.
+
+**When it helps.** When a limit resets or a request fails while Codex is closed, and you want the
+conversation to go on without opening the app.
+
+**What it risks.** Work is done while nobody watches, within the conversation's own saved permissions: a
+command those settings allow can run. A conversation saved with full access, with an outside sandbox or
+with approvals that go to anyone but you is refused before anything starts. While the turn runs, the
+conversation is busy for Codex. That a turn on a conversation's own settings behaves (M6B) has not been
+measured.
+
+**Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (it wakes a conversation and runs a turn of
+its own), A2 (a way to Codex beside `codex queue`), [A11](STANDARDS.md#a-what-it-may-send-to-codex-and-when)
+(something is done for a conversation the app does not hold), [B3 and B4](STANDARDS.md#b-what-it-reads-and-how)
+(more of Codex's app server) and [E8 and F8](STANDARDS.md#e-failure-behaviour) (a Codex helper process that
+lives for the turn, which this program ends). It keeps A4: the continuation carries its marker, and the
+marker proves its arrival.
+
+**Ceilings.** 12 a day, and 3 in any one conversation. **Measurement M6: made** on `codex-cli
+0.162.0-alpha.17.2`. **M6B: not made yet** - a warning.
+
+### Recover CLI, TUI and VS Code conversations
+
+**What it does.** Also finds the failures of conversations you run in a terminal (the Codex CLI and TUI) or
+in the VS Code extension, and recovers them as it recovers the Codex app's. While another Codex session
+holds such a conversation, the continuation goes through `codex queue` for that session to take; if that
+session ends first, the continuation is taken back and waits again. With Run a conversation here while Codex
+is closed also on, a conversation nothing holds is run here.
+
+**When it helps.** When you work in a terminal or in VS Code and want those conversations to go on after a
+usage limit or a failure as the app's do. The standard edition looks only at the app's conversations, and a
+conversation held by another session waits with a reason of its own.
+
+**What it risks.** The words Codex uses to tell these conversations apart (MO) have not been measured again
+on every version of Codex: a wrong word finds nothing, never the wrong conversation. A session that ends with
+the continuation still queued leaves it to be taken back, and one that cannot be taken back is never sent
+twice. A session that did not take a queued message within three minutes turns this off, so it cannot be kept
+on.
+
+**Departs from** [A15](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (only the desktop app's
+conversations are detected) and A11 (it sends while a Codex session other than the app holds the
+conversation). It keeps A2, A3, A4, A17, H4 and H6: one channel, the exact conversation, the marker, newer
+work wins, and Pause and Cancel take a queued continuation back.
+
+**Ceilings.** 24 a day, and 3 in any one conversation. **Measurement M5: made** on `codex-cli
+0.162.0-alpha.17.2`. **MO: a warning** until it is measured again for your version of Codex.
+
 ### Continue a turn that ended with no reply
 
 **What it does.** When a turn in a conversation of yours ended with no reply - Codex completed it with only
@@ -738,6 +842,24 @@ reading.
 recovery was due.
 
 **Ceilings.** None come into play: it holds, and sends nothing. **Measurement MU: not settled yet.**
+
+### Continue with no words
+
+**What it does.** When a conversation is run here while Codex is closed, its continuation is started with no
+words at all, so nothing extra appears in the conversation; the id it was started under proves its arrival.
+It continues nothing by itself: it changes only how Run a conversation here while Codex is closed, or a
+compacted conversation's continuation, starts its turn. Where Codex refuses a turn with no words, that turn
+is started with the usual words instead, and this turns itself off.
+
+**When it helps.** When you would rather the program's sentence did not appear in a conversation.
+
+**What it risks.** Whether Codex starts a turn with no words, and keeps its id (M3B), has not been measured.
+Where Codex refuses it, this stops answering for that version of Codex. It cannot be kept on.
+
+**Departs from** [A4](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (no marker: the turn is proven by
+its id) and A26 (no words at all).
+
+**Ceilings.** 24 a day, and 5 in any one conversation. **Measurement M3B: not made yet** - a warning.
 
 ### Compatibility report
 

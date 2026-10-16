@@ -497,6 +497,12 @@ conversation", and which the command line prints beside the state. It
 will not use GUI automation, will not force the conversation open, and will not queue a message on
 the off chance.
 
+A conversation that is open in another Codex session - a terminal's Codex TUI or the VS Code extension - is
+a different case. The Codex app does not hold it, but it is not unloaded either: another session has it
+open. It waits with a reason of its own, "Open in another Codex session (a terminal or VS Code); it
+continues once the Codex app holds it.", and nothing is sent to it. It continues once the Codex app holds
+the conversation.
+
 This is not fully unattended auto-resume across app restarts, and this guide will not pretend otherwise.
 
 ## Project direction
@@ -671,6 +677,17 @@ Never recovered — these need a person, and retrying only wastes attempts:
 user cancellation · permission · approval required · content policy · invalid request ·
 context length exceeded · permanent authentication (401/403, `unauthorized`) · `badRequest` ·
 `sandboxError` · `responseTooManyFailedAttempts` with any status but 429 · **anything unrecognised**.
+
+A conversation that another Codex session holds - a terminal's TUI or the VS Code extension - is not a
+failure to recover: it waits, with a reason of its own, until the Codex app holds it, and nothing is
+sent to it.
+
+Codex itself retries a failed request a few times before a turn fails.
+
+A turn that fails because the conversation is longer than its model's context window is never retried
+by the standard edition.
+Codex compacts on its own first; when a turn still fails, run `/compact` in Codex yourself and continue.
+This program never sends `/compact`: a queued "/compact" reaches Codex as plain text.
 
 Classification is structural: it reads the `codexErrorInfo` variant Codex writes, then an HTTP status
 carried by that variant. Message text is consulted only when there is no structured code at all, and

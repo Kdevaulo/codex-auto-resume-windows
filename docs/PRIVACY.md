@@ -791,13 +791,19 @@ installed, to reach GitHub, and only when you start it (*What it sends to GitHub
   pinned ChatGPT address - that call, after `initialize`, `thread/queue/add` (the continuation's
   words, under a client id derived from the interruption) and `thread/goal/set` (a goal's status),
   and nothing else.
-- **What reaches OpenAI.** Nothing new from a capability, except that while the early usage-reset
+- **What reaches OpenAI.** Nothing new from a capability, except the turn run while Codex is closed
+  (the next bullet) and that, while the early usage-reset
   check is on, Codex is asked about your usage every five minutes while a conversation waits for a
   reset (`account/rateLimits/read`, as the standard edition asks when a recovery is due): the resumed
   turn still runs in your Codex desktop app. A marker-free continuation arrives without the `[codex-auto-resume:…]` marker,
   and Codex keeps the client id on the message. A goal set active is left for Codex to carry on when
   the app next opens the conversation, under your own Codex settings. A measurement is the
   exception, below.
+- **A conversation run while Codex is closed.** With the advanced edition's feature that runs a
+  conversation here while Codex is closed, and the features that build on it, a turn runs on Codex's own
+  app server on this PC, started by this program and signed in as you, under the conversation's own
+  saved settings. Like every turn it reaches OpenAI through Codex. The program reads only the kinds of
+  items the turn left and Codex's error codes, never what anyone wrote.
 - **What it stores.** `config/advanced/advanced.sqlite`, made only when something is first turned
   on or changed: each capability's state, since when, from which surface and why, the statement
   revision and the Codex version it was turned on for, and the warnings confirmed; each unit a
