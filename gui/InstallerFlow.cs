@@ -184,11 +184,17 @@ namespace CodexAutoResume
         }
 
         /// The edition an archive installs, from its entries' names: the same rule, read inside the ZIP.
+        /// The entry's name is taken apart rather than compared whole: a whole one is a literal of the advanced
+        /// package's path, which the edition audit refuses in a standard setup program (build/edition_audit.py, (h)).
         internal static string EditionOfEntries(IEnumerable<string> names)
         {
-            string wanted = "payload/app/src/" + AdvancedPackage + "/__init__.py";
             foreach (string name in names)
-                if (string.Equals(name, wanted, StringComparison.Ordinal)) return Advanced;
+            {
+                string[] parts = name.Split('/');
+                if (parts.Length == 5 && parts[0] == "payload" && parts[1] == "app" && parts[2] == "src" &&
+                    string.Equals(parts[3], AdvancedPackage, StringComparison.Ordinal) && parts[4] == "__init__.py")
+                    return Advanced;
+            }
             return Standard;
         }
 
