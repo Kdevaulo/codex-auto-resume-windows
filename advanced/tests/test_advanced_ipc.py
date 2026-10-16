@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from codex_auto_resume_advanced.codex import ipc  # noqa: E402
 
-THREAD = "019a0000-0000-7000-8000-00000000a001"
-TURN = "019a0000-0000-7000-8000-00000000b002"
+THREAD = "aaaaaaaa-0000-7000-8000-00000000a001"
+TURN = "bbbbbbbb-0000-7000-8000-00000000b002"
 
 
 @unittest.skipUnless(sys.platform == "win32", "a Windows named pipe")
