@@ -1006,7 +1006,7 @@ class Arming:
                 values = None
             if values is not None and option is not None and option.takes(value):
                 values.setdefault(capability, {})[option.key] = value
-                problem, warning = usage.order_problem(values)
+                problem, warning = usage.order_problem(values, usage.touched(option.key))
                 if problem is not None:
                     return {"done": False, "refusal": Refusal.OPTION_ORDER, "generation": self._generation()}
                 if warning is not None:

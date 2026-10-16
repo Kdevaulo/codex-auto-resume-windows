@@ -1,6 +1,7 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
 """The Codex Desktop app's own IPC pipe, \\\\.\\pipe\\codex-ipc - for the forced stop near a usage limit alone
-(v0.6.16-beta.4, usage_pause; measurement MIPC passed on codex-cli 0.162.0-alpha.17.2 with app 26.1007.9446.0).
+(v0.6.16-beta.4, usage_pause; measurement MIPC passed on codex-cli 0.162.0-alpha.17.2 with app 26.1007.9446.0, and
+again on 0.163.0-alpha.10.2 with app 26.1013.3656.0 - f16c9ca2 on measure-20261017 - where v4 was measured too).
 
 What it does, and nothing else: open the pipe, `initialize`, ask `thread-owner-discovery` which client of the app
 holds the conversation, and ask that client `thread-follower-interrupt-turn` (mode "system") for it - the stop a
@@ -9,8 +10,9 @@ its restart. And, after the window resets, `thread-follower-start-turn` - a turn
 continuation, which goes past that paused queue - for a conversation it stopped (start_turn); measured 2026-10-16,
 once that turn completes the app sends what was queued by itself and the pause is gone, so nothing else is asked of
 the queue (`thread-follower-set-queued-follow-ups-state` is not needed). Every frame is 4 bytes of little-endian
-length and UTF-8 JSON. Each read waits at most READ_SECONDS (an overlapped read, cancelled and waited out, then the
-pipe closed - as the MIPC look does); nothing here waits for good.
+length and UTF-8 JSON. Each request has one deadline for its whole answer, READ_SECONDS from when it is written,
+however many broadcasts come first (an overlapped read, cancelled and waited out, then the pipe closed - as the MIPC
+look does); nothing here waits for good.
 
 The app checks each request's version exactly, and a new app build may move one: the versions are pinned in
 REQUESTS, every request's shape is there too, and a version mismatch is an answer like any other failure - the
@@ -22,12 +24,18 @@ from __future__ import annotations
 
 import json
 import struct
+import time
 import uuid
 from enum import StrEnum
 
 PIPE = r"\\.\pipe\codex-ipc"
-# Each read of a frame waits at most this long; a whole stop, a few reads.
+# Each request's whole wait for its answer, from when it is written - one deadline, however many frames come first.
 READ_SECONDS = 5.0
+# The stop's own wait, longer: it took 1.1 s live (MIPC, 2026-10-16), the MIPC probe allowed 60 s; an answer slower than
+# this is taken as a stop that may have been made (UNCONFIRMED), never as one that was not.
+INTERRUPT_SECONDS = 30.0
+# The most frames that are not the answer (the app's broadcasts, other clients' replies) taken while one is awaited.
+FRAMES_LIMIT = 200
 # The longest frame taken: the app's broadcasts can be long, a reply to these never is.
 FRAME_LIMIT = 8 * 1024 * 1024
 # The request shapes and the versions the app checks exactly (the MIPC record, 2026-10-16; app 26.1007). Filled with
@@ -49,12 +57,21 @@ INTERRUPT_EXPECTING = (4, {"conversationId": "{thread}", "mode": "system", "expe
 class Stop(StrEnum):
     """What came of one forced stop - the closed words the journal keeps."""
     STOPPED = "stopped"                      # the app stopped the turn
+    # The app answered success but named no stopped turn, or another one: v4 with a stale or made-up expectedTurnId
+    # is a silent no-op, the turn still running (MIPC-v4, codex-cli 0.163 / app 26.1013, 2026-10-17).
+    NOT_STOPPED = "not_stopped"
     NO_CLIENT = "no_client"                  # the app does not hold the conversation (not open, or not running)
     VERSION_MISMATCH = "version_mismatch"    # the app's build checks another version of a request
     NO_PIPE = "no_pipe"                      # the pipe is not there: the app is not running
     NO_ANSWER = "no_answer"                  # it did not answer in time
+    # The stop was asked and no answer came within INTERRUPT_SECONDS: it may have been made - so the caller keeps the
+    # conversation for its continuation after the reset, which is what lets a queue the app paused go.
+    UNCONFIRMED = "unconfirmed"
     REFUSED = "refused"                      # any other answer than success
     BROKEN = "broken"                        # a frame that is not one, or the pipe failing under us
+    # Core's errand guard refused the one request that cannot be taken back - recovery paused or only observed, an
+    # administrator's DisableAutoResume, quiet hours - so it was never written.
+    HELD = "held"
 
 
 class Start(StrEnum):
@@ -185,16 +202,30 @@ class Channel:
             self._pipe = None
 
 
-def _request(channel, client, method, shape, fields, target=None, reads=20):
+def _request(channel, client, method, shape, fields, target=None, seconds=None, gate=None):
+    """One request and its answer, within one deadline (`seconds`, READ_SECONDS unless given) from its writing.
+    `gate`, for the one request that cannot be taken back: core's errand guard, entered around its writing alone (the
+    answer is waited for outside it, as the queue launch lets its guard go before the receipt); refused, it is never
+    written (HELD)."""
     version, params = shape
     key = str(uuid.uuid4())
     message = {"type": "request", "requestId": key, "sourceClientId": client, "version": version,
                "method": method, "params": _filled(params, fields)}
     if target is not None:
         message["targetClientId"] = target
-    channel.write(message)
-    for _ in range(reads):
-        found = channel.read()
+    if gate is None:
+        channel.write(message)
+    else:
+        with gate() as permitted:
+            if permitted is not True:
+                raise _Failed(Stop.HELD)
+            channel.write(message)
+    deadline = time.monotonic() + (READ_SECONDS if seconds is None else seconds)
+    for _ in range(FRAMES_LIMIT + 1):
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
+        found = channel.read(left)
         if found.get("type") == "client-discovery-request":
             channel.write({"type": "client-discovery-response", "requestId": found.get("requestId"),
                            "response": {"canHandle": False}})
@@ -212,9 +243,20 @@ def _request(channel, client, method, shape, fields, target=None, reads=20):
     raise _Failed(Stop.NO_ANSWER)
 
 
-def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
+def _stopped(answer, turn_id):
+    """STOPPED only where the app names the turn it stopped - the one expected (v4), or any (v3, no turn known): a
+    success that names none, or another, stopped nothing (MIPC-v4, 2026-10-17)."""
+    result = answer.get("result")
+    stopped = result.get("interruptedTurnId") if isinstance(result, dict) else None
+    if not isinstance(stopped, str) or not stopped:
+        return Stop.NOT_STOPPED
+    return Stop.STOPPED if not turn_id or stopped == turn_id else Stop.NOT_STOPPED
+
+
+def stop_turn(thread_id, turn_id=None, *, channel=None, gate=None) -> tuple:
     """Stop the running turn of `thread_id` the app holds: the Stop word of what came of it. `turn_id`, where known,
-    makes it the v4 stop that names it. `channel` is a seam (a Channel of a test's own pipe)."""
+    makes it the v4 stop that names it. `gate` is core's errand guard, around the stop's writing (HELD where it
+    refuses). `channel` is a seam (a Channel of a test's own pipe)."""
     try:
         opened = channel if channel is not None else Channel()
     except _Failed as failed:
@@ -231,9 +273,15 @@ def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
         if not isinstance(owner, str) or not owner:
             return Stop.NO_CLIENT
         shape = INTERRUPT_EXPECTING if turn_id else REQUESTS["thread-follower-interrupt-turn"]
-        _request(opened, client, "thread-follower-interrupt-turn", shape, {"thread": thread_id, "turn": turn_id},
-                 target=owner)
-        return Stop.STOPPED
+        try:
+            answer = _request(opened, client, "thread-follower-interrupt-turn", shape,
+                              {"thread": thread_id, "turn": turn_id}, target=owner, seconds=INTERRUPT_SECONDS,
+                              gate=gate)
+        except _Failed as failed:
+            if failed.word == Stop.NO_ANSWER:
+                return Stop.UNCONFIRMED
+            raise
+        return _stopped(answer, turn_id)
     except _Failed as failed:
         return failed.word
     except Exception:
@@ -242,10 +290,11 @@ def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
         opened.close()
 
 
-def start_turn(thread_id, text, *, channel=None):
+def start_turn(thread_id, text, *, channel=None, gate=None):
     """Start a turn of `thread_id` the app holds with `text` - the product's continuation after a window reset, for a
     conversation the forced stop stopped (its queue may be paused): Start.STARTED, or the Stop word of what failed -
-    NO_CLIENT above all, the app not holding the conversation. `channel` is a seam (a Channel of a test's own pipe)."""
+    NO_CLIENT above all, the app not holding the conversation. `gate` is core's errand guard, around the start's
+    writing (HELD where it refuses). `channel` is a seam (a Channel of a test's own pipe)."""
     try:
         opened = channel if channel is not None else Channel()
     except _Failed as failed:
@@ -262,7 +311,7 @@ def start_turn(thread_id, text, *, channel=None):
         if not isinstance(owner, str) or not owner:
             return Stop.NO_CLIENT
         _request(opened, client, "thread-follower-start-turn", REQUESTS["thread-follower-start-turn"],
-                 {"thread": thread_id, "message": str(uuid.uuid4()), "text": text}, target=owner)
+                 {"thread": thread_id, "message": str(uuid.uuid4()), "text": text}, target=owner, gate=gate)
         return Start.STARTED
     except _Failed as failed:
         return failed.word

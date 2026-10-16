@@ -346,6 +346,12 @@ class UsageWrapUp:
                 continue
             if latest is None or latest.status == "inProgress":
                 continue                                          # still working: looked at again
+            newer = _after_wrap_up(turns, thread, wrap["ordinal"], latest.ordinal)
+            if newer is None:
+                continue                                          # not read: looked at again
+            if newer:
+                handle.note(key, ContinuationKind.AFTER_RESET, thread, ContinuationReason.SUPERSEDED)
+                continue                                          # newer work came after the wrap-up's own turn (A17)
             if latest.status != "completed":
                 handle.note(key, ContinuationKind.AFTER_RESET, thread, ContinuationReason.HANDED_OVER)
                 continue                                          # a failure is core's; a stop, the forced stop's
@@ -420,6 +426,21 @@ class UsageWrapUp:
             self._scoped.count(code)
         except Exception:
             pass
+
+
+def _after_wrap_up(turns, thread, made_for, latest):
+    """Whether a turn came after the wrap-up's own - the turn it was made for (`made_for`), or the very next one, which
+    the wrap-up started: True where `latest` is later than both, None where that cannot be read."""
+    if type(made_for) is not int or type(latest) is not int:
+        return None
+    if latest == made_for:
+        return False
+    if latest < made_for:
+        return True
+    try:
+        return turns.between(thread, made_for, latest) != 0
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------- the pause
@@ -504,13 +525,20 @@ class UsagePause:
             pass
 
 
-def order_problem(values) -> tuple:
+def touched(key) -> tuple:
+    """The windows whose order an option bears on: its own window for a percentage, none for anything else."""
+    return tuple(minutes for minutes in WINDOWS if key == STOP_WORDS_OPTIONS[minutes]
+                 or any(key == stages[minutes] for stages in STAGE_OPTIONS.values()))
+
+
+def order_problem(values, windows_=WINDOWS) -> tuple:
     """Item (j) of the owner's additions, for each window: the warning at or below the wrap-up, and the wrap-up below the
     stop the words ask for - else ("order", None); a forced stop below the words' stop only warns ("stop_before_words"),
     as it would cut Codex off before it stops itself - never refuses. `values` is {capability: its options} as they
-    would be; (refusal word or None, warning word or None)."""
+    would be, `windows_` the windows looked at - a change, only those it touches (`touched`), so a value an older
+    beta stored out of order never blocks a change to anything else; (refusal word or None, warning word or None)."""
     warning = None
-    for minutes in WINDOWS:
+    for minutes in windows_:
         warn = values.get(METER, {}).get(STAGE_OPTIONS[METER][minutes], DEFAULT_WARN)
         wrap = values.get(WRAP_UP, {}).get(STAGE_OPTIONS[WRAP_UP][minutes], DEFAULT_WRAP)
         words = values.get(WRAP_UP, {}).get(STOP_WORDS_OPTIONS[minutes], DEFAULT_STOP_WORDS)

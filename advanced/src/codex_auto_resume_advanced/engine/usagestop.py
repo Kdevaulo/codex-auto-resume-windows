@@ -36,22 +36,35 @@ from .usage import AFTER_RESET_KEY, EVERY_CONVERSATION, NOTICE_FOR, ON, WRAP_UP,
 FINAL = frozenset({"completed", "failed", "interrupted"})
 # How many notices the stop keeps for the icon to show (each once in a watcher's life, by its key).
 NOTICES_KEPT = 16
+# A start after the reset that failed is asked again after this long, doubled at each failure up to BACKOFF_MOST - never
+# every tick, each of which may wait for the app's answers.
+BACKOFF_SECONDS = 300
+BACKOFF_MOST = 3600
 
 
 class _StopErrand:
-    __slots__ = ("code", "targets", "window")
+    """P8's errand, run by core last in the tick with its guards (domain/plughands.Errand): the stops due and the
+    continuations after a reset, each request to the app written inside one of core's errand guards - so a Pause,
+    Observe only, an administrator's DisableAutoResume and quiet hours hold both, as they hold every send."""
+    __slots__ = ("code", "view", "targets", "window")
 
-    def __init__(self, code, targets, window):
-        self.code, self.targets, self.window = code, targets, window
+    def __init__(self, code, view, targets, window):
+        self.code, self.view, self.targets, self.window = code, view, targets, window
 
     def run(self, guard):
-        return self.code.stop_all(self.targets, self.window)
+        if self.targets:
+            self.code.stop_all(self.targets, self.window, guard)
+        try:
+            self.code.after_reset(self.view, guard)
+        except Exception:
+            pass
+        return None
 
 
 class UsageStop(UsagePause):
     """usage_pause's code from v0.6.16-beta.4: the pause's holding, and the forced stop and its continuation after
     the reset. `stop`, `start` and `home` are seams a test fills (ipc.stop_turn, ipc.start_turn, the Codex home)."""
-    __slots__ = ("_stop", "_start", "_home", "_notices")
+    __slots__ = ("_stop", "_start", "_home", "_notices", "_backoff", "_stopped")
 
     def __init__(self, paths, *, stop=None, start=None, home=None):
         super().__init__(paths)
@@ -59,6 +72,8 @@ class UsageStop(UsagePause):
         self._start = start
         self._home = home
         self._notices = []
+        self._backoff = {}                   # {continuation: (failures, when it is asked again)}, in this process
+        self._stopped = []                   # the windows stopped, (bucket, minutes, reset_at): once each per reset
 
     # ---------------------------------------------------------------- reading Codex
     def _codex_home(self):
@@ -87,18 +102,27 @@ class UsageStop(UsagePause):
         scoped = self._scoped
         if scoped is None:
             return DEFER
-        newly = self._mark()
-        try:
-            self._after_reset(view)
-        except Exception:
-            pass
-        if not newly:
+        newly, targets = self._once(self._mark()), []
+        if newly:
+            try:
+                targets = self._running(view)
+            except Exception:
+                targets = []
+        if not targets and not self._waiting():
             return DEFER
-        try:
-            targets = self._running(view)
-        except Exception:
-            return DEFER
-        return _StopErrand(self, targets, newly[0]) if targets else DEFER
+        return _StopErrand(self, view, targets, newly[0] if newly else None)
+
+    def _once(self, newly) -> list:
+        """The windows newly held that were not stopped already for this reset: a window switched off and on again
+        is held again, but a turn the person resumed in it is not stopped a second time."""
+        fresh = []
+        for row in newly:
+            key = (row["bucket"], row["minutes"], row["reset_at"])
+            if key not in self._stopped:
+                self._stopped.append(key)
+                fresh.append(row)
+        del self._stopped[:-NOTICES_KEPT]
+        return fresh
 
     def _running(self, view) -> list:
         """(thread, turn) of each conversation switched on, of the kind core recovers, whose latest turn runs."""
@@ -114,20 +138,26 @@ class UsageStop(UsagePause):
                 found.append((thread, turn))
         return found
 
-    def stop_all(self, targets, window):
-        """The errand: each running turn stopped through the app; what came of each journalled and, where it matters,
-        said in a notice; each one stopped remembered for its continuation after the reset."""
+    def stop_all(self, targets, window, guard=None):
+        """The errand: each running turn stopped through the app, inside one of core's guards (`guard`); what came of
+        each journalled and, where it matters, said in a notice; each one stopped remembered for its continuation after
+        the reset. One the guard refused is not asked, and nothing is said of it."""
         stop = self._stop or ipc.stop_turn
         for thread, turn in targets:
             try:
-                word = stop(thread, turn.turn_id)
+                word = stop(thread, turn.turn_id, gate=guard)
             except Exception:
                 word = ipc.Stop.BROKEN
-            if word != ipc.Stop.STOPPED:
+            if word == ipc.Stop.HELD:
+                self._count("held")
+                continue
+            if word not in (ipc.Stop.STOPPED, ipc.Stop.UNCONFIRMED):
                 self._count("not_stopped")
                 self._notice("not_stopped", window)
                 continue
-            self._count("stopped")
+            # A stop with no answer in time may have been made: kept as one, so the queue the app may have paused is
+            # let go by the continuation after the reset, or the person asked to press Resume.
+            self._count("stopped" if word == ipc.Stop.STOPPED else "stop_unconfirmed")
             if not self._remember(thread, turn, window):
                 # No continuation after the reset will start a turn there, which is what lets the paused queue go.
                 self._count("resume_unproven")
@@ -153,14 +183,22 @@ class UsageStop(UsagePause):
         except Exception:
             return False
 
-    def _after_reset(self, view) -> None:
-        """Each conversation it stopped whose window has reset: continued once by a turn the app starts, while the
-        stopped turn is still its latest, ended, with nothing after it, and the app holds it; ended where newer work
-        came; waiting, with a notice, where the app does not hold it."""
+    def _waiting(self) -> list:
+        """The continuations after a reset that wait."""
+        try:
+            return [row for row in self._scoped.continuations.mine() if row["record_state"] == RecordState.WAITING
+                    and row["kind"] == ContinuationKind.AFTER_RESET and row["words"]]
+        except Exception:
+            return []
+
+    def after_reset(self, view, guard=None) -> None:
+        """Each conversation it stopped whose window has reset: continued once by a turn the app starts - its request
+        written inside one of core's guards (`guard`), and waiting while that refuses - while the stopped turn is still
+        its latest, ended, with nothing after it, and the app holds it; ended where newer work came; waiting, with a
+        notice, where the app does not hold it."""
         scoped = self._scoped
         handle = scoped.continuations
-        waiting = [row for row in handle.mine() if row["record_state"] == RecordState.WAITING
-                   and row["kind"] == ContinuationKind.AFTER_RESET and row["words"]]
+        waiting = self._waiting()
         if not waiting:
             return
         now, rows = scoped.now(), scoped.meter.rows()
@@ -182,11 +220,19 @@ class UsageStop(UsagePause):
                 continue
             if latest.status not in FINAL:
                 continue
-            word = start(thread, row["words"] + "\n\n" + ids.short_marker(row["record_id"]))
+            failures, again = self._backoff.get(row["record_id"], (0, 0))
+            if now < again:
+                continue                                                # failed lately: asked again later
+            word = start(thread, row["words"] + "\n\n" + ids.short_marker(row["record_id"]), gate=guard)
+            if word == ipc.Stop.HELD:
+                continue                                                # held by core: asked again when it lets go
             if word == ipc.Start.STARTED:
+                self._backoff.pop(row["record_id"], None)
                 handle.end(ContinuationReason.SENT, thread_id=thread)
                 self._count("continued")
             else:
+                self._backoff[row["record_id"]] = (failures + 1,
+                                                   now + min(BACKOFF_SECONDS * 2 ** failures, BACKOFF_MOST))
                 self._count("not_continued")
                 self._notice("not_continued", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"})
 

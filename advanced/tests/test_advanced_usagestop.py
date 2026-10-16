@@ -26,6 +26,18 @@ from test_engine import T1  # noqa: E402
 CORE = {"interruption_id": "a" * 64, "thread_id": T1}
 
 
+def _through(gate, record, answer):
+    """A seam's request as ipc makes it: written inside core's errand guard, never where it refuses (HELD)."""
+    if gate is not None:
+        with gate() as permitted:
+            if permitted is not True:
+                return ipc.Stop.HELD
+            record()
+    else:
+        record()
+    return answer
+
+
 class StopCase(TakingCase):
     DEFINITION = USAGE_PAUSE
     BESIDE = (USAGE_METER,)
@@ -54,8 +66,10 @@ class StopCase(TakingCase):
         settings.save(plug.paths.settings_file, values)
         code = self.code(plug)
         code._home = self.h.home.root
-        code._stop = lambda thread, turn: self.stops.append((thread, turn)) or self.stop_answer
-        code._start = lambda thread, text: self.starts.append((thread, text)) or self.start_answer
+        code._stop = lambda thread, turn, gate=None: _through(gate, lambda: self.stops.append((thread, turn)),
+                                                              self.stop_answer)
+        code._start = lambda thread, text, gate=None: _through(gate, lambda: self.starts.append((thread, text)),
+                                                               self.start_answer)
         self.h.backend.loaded_map[T1] = "loaded"
         turn = self.h.home.add_turn(T1, status="inProgress", progress=False)
         self.reset = int(self.h.now) + 3600
@@ -107,6 +121,21 @@ class StopTests(StopCase):
         self.assertEqual(plug.runtime.state.continuations(capability=self.cap, pending=None), [],
                          "nothing it did not stop is continued by it")
 
+    def test_a_stop_with_no_answer_in_time_is_kept_as_one_that_may_have_been_made(self):
+        """The app may have stopped it, and paused its queue: it is continued after the reset like a stopped one, so
+        that queue is let go - never left with nothing to say or to do."""
+        self.stop_answer = ipc.Stop.UNCONFIRMED
+        plug, turn = self.running()
+        for _ in range(2):
+            self.h.tick(advance=61)
+        self.assertIn("pause.stop_unconfirmed", self.journal(plug))
+        (row,) = plug.runtime.state.continuations(capability=self.cap, pending=None)
+        self.assertEqual(row["kind"], "after_reset")
+        self.after_reset(plug, turn)
+        for _ in range(2):
+            self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 1)
+
     def test_a_window_switched_off_is_never_stopped(self):
         plug, _turn = self.running()
         assert plug.runtime.arming.set_option("usage_meter", OptionKey.WINDOW_FIVE_HOUR, 2,
@@ -115,6 +144,24 @@ class StopTests(StopCase):
         for _ in range(3):
             self.h.tick(advance=61)
         self.assertEqual(self.stops, [])
+
+
+class OncePerResetTests(StopCase):
+    def test_a_window_switched_off_and_on_again_does_not_stop_a_turn_the_person_resumed(self):
+        plug, turn = self.running()
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        self.assertEqual(len(self.stops), 1)
+        self.h.home.set_turn(T1, turn, status="interrupted", completed_at=int(self.h.now))
+        self.h.home.add_turn(T1, status="inProgress", progress=False)        # the person pressed Resume
+        for value in (2, 1):
+            assert plug.runtime.arming.set_option("usage_meter", OptionKey.WINDOW_FIVE_HOUR, value,
+                                                  generation=plug.runtime.state.meta()["generation"],
+                                                  actor=Actor.DASHBOARD)["done"]
+            self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        self.assertEqual(len(self.stops), 1, "one stop per window per reset")
+        self.assertIs(plug.runtime.ask(Point.GATES, "usage", CORE, {}), Alternative.HOLD, "held again all the same")
 
 
 class AfterResetTests(StopCase):
@@ -158,9 +205,70 @@ class AfterResetTests(StopCase):
         self.h.tick(advance=61)
         self.assertIn("not_continued", self.kinds(plug))
         self.start_answer = ipc.Start.STARTED
-        self.h.tick(advance=61)
+        self.h.tick(advance=301)
         self.assertEqual(len(self.starts), 2, "tried again once it is open")
         self.assertIn("pause.continued", self.journal(plug))
+
+    def test_a_failing_start_is_asked_again_later_not_every_tick(self):
+        """Each start may wait for the app's answers inside the watcher's tick: one that fails is asked again after
+        five minutes, then ten, twenty - up to an hour."""
+        plug, turn = self.running()
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        self.after_reset(plug, turn)
+        self.start_answer = ipc.Stop.NO_ANSWER
+        self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 1)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 1, "not again within five minutes")
+        self.h.tick(advance=180)
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.starts), 2, "again after five")
+        for _ in range(8):
+            self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 2, "then after ten")
+        self.h.tick(advance=180)
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.starts), 3)
+
+
+class CoreGuardTests(StopCase):
+    """The stop and the start after the reset are each written inside core's errand guard, as credits' request is:
+    Observe only, a Pause, an administrator's DisableAutoResume and quiet hours hold them as they hold every send."""
+
+    def test_observe_only_stops_nothing(self):
+        plug, _turn = self.running()
+        self.h.store.set_observe_only(True)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.assertEqual(self.stops, [])
+        self.assertIn("pause.held", self.journal(plug))
+        self.assertIs(plug.runtime.ask(Point.GATES, "usage", CORE, {}), Alternative.HOLD, "the window is held still")
+
+    def test_observe_only_starts_nothing_after_the_reset_and_the_start_waits_for_it_to_end(self):
+        plug, turn = self.running()
+        self.h.tick(advance=61)
+        self.h.tick(advance=61)
+        self.after_reset(plug, turn)
+        self.h.store.set_observe_only(True)
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.assertEqual(self.starts, [])
+        self.h.store.set_observe_only(False)
+        self.h.tick(advance=61)
+        self.assertEqual(len(self.starts), 1, "asked once observing ends")
+
+    def test_an_administrators_disable_holds_both(self):
+        plug, turn = self.running()
+        with patch.object(type(self.h.engine), "errand_held", lambda _self: True):
+            for _ in range(2):
+                self.h.tick(advance=61)
+            self.assertEqual(self.stops, [])
+            self.after_reset(plug, turn)
+            for _ in range(2):
+                self.h.tick(advance=61)
+        self.assertEqual(self.starts, [])
 
 
 class NoContinuationTests(StopCase):
@@ -179,6 +287,16 @@ class NoContinuationTests(StopCase):
         self.assertIn("pause.resume_unproven", self.journal(plug))
         self.assertEqual(self.kinds(plug), ["press_resume"])
         self.assertEqual(plug.runtime.state.continuations(capability=self.cap, pending=None), [])
+
+    def test_a_stop_with_no_answer_asks_for_resume_too_where_nothing_will_continue_it(self):
+        self.stop_answer = ipc.Stop.UNCONFIRMED
+        plug, _turn = self.running()
+        assert plug.runtime.arming.set_option("usage_wrap_up", OptionKey.WRAP_AFTER_RESET, 2,
+                                              generation=plug.runtime.state.meta()["generation"],
+                                              actor=Actor.DASHBOARD)["done"]
+        for _ in range(2):
+            self.h.tick(advance=61)
+        self.assertEqual(self.kinds(plug), ["press_resume"])
 
 
 @unittest.skipUnless(sys.platform == "win32", "a Windows named pipe")
