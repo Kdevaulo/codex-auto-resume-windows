@@ -352,14 +352,16 @@ VERDICT_CASES = [
     row("0.6.11-beta", "offered older,prerelease,convert3", older=True),
     row("0.6.14-beta", "offered newer,prerelease,convert3", offer="0.6.14-beta"),
     row("0.6.15-beta", "offered newer,prerelease,kept", offer="0.6.15-beta"),
-    # The advanced settings: an advanced target on an older form than this version's (5, from 0.6.16-beta.3)
-    # cannot read them - every one of these - and one on this form can.
+    # The advanced settings: an advanced target on an older form than this version's (6, from 0.6.16-beta.4; 5 from
+    # beta.3) cannot read them - every one of these - and one on this form can.
     row("0.6.11-beta", "offered older,prerelease,convert3,advanced-off", edition="advanced",
         installed_edition="advanced", older=True),
     row("0.6.11-beta.2", "offered older,prerelease,convert3,advanced-off", edition="advanced", installed_edition="advanced",
         older=True),
     row("0.6.13", "offered newer,release,convert3,edition,advanced-off", edition="advanced", latest="0.6.14"),
-    row("0.6.16-beta.3", "offered newer,prerelease,kept", edition="advanced", installed_edition="advanced",
+    row("0.6.16-beta.3", "offered newer,prerelease,kept,advanced-off", edition="advanced",
+        installed_edition="advanced", newer=True),
+    row("0.6.16-beta.4", "offered newer,prerelease,kept", edition="advanced", installed_edition="advanced",
         newer=True),
 ]
 
@@ -513,7 +515,8 @@ class ListingTests(unittest.TestCase):
         self.assertEqual(c["StateSchemaSince"], [["0.6.16-beta", 5], ["0.6.15", 4], ["0.6.15-beta", 5], ["0.6.11-beta", 4], ["0.6.0", 3]])
         self.assertEqual(c["StateSchemaSince"][0][1], SCHEMA_VERSION, "the first row is this version's own schema")
         # The advanced settings' form likewise: v0.6.15 is v0.6.14's (form 3) between two form-4 pre-releases.
-        self.assertEqual(c["AdvancedStateSince"], [["0.6.16-beta.3", 5], ["0.6.16-beta", 4], ["0.6.15", 3],
+        self.assertEqual(c["AdvancedStateSince"], [["0.6.16-beta.4", 6], ["0.6.16-beta.3", 5], ["0.6.16-beta", 4],
+                                                   ["0.6.15", 3],
                                                    ["0.6.15-beta", 4], ["0.6.14", 3], ["0.6.11-beta.2", 2],
                                                    ["0.6.11-alpha", 1]])
         self.assertEqual(c["AdvancedStateSince"][0][1], advanced_schema_version(ROOT),

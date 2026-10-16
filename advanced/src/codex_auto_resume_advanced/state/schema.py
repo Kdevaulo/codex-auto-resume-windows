@@ -76,9 +76,10 @@ from ..vocabulary import (ArmingState, ChatReason, ChatState, ContinuationKind, 
                           KeepOn, KeepReason, KeepState, OptionKey, OverrideKind, PromptEvery, PromptReason,
                           PromptState, PromptTrigger, RecordState, RuleReason, RuleState, RunEnd, SpendOutcome)
 
-# Stage 4's version (v0.6.16-beta.4): the one place it is numbered, the step after the version before it.
-STAGE4_VERSION = 6
-SCHEMA_VERSION = STAGE4_VERSION
+# Stage 4's version (v0.6.16-beta.4): the one place it is numbered - a literal, which the setup's version picker reads
+# (tests/test_version_picker.py) - the step after the version before it.
+SCHEMA_VERSION = 6
+STAGE4_VERSION = SCHEMA_VERSION
 FILE_NAME = "advanced.sqlite"
 # The name the file is attached under on core's connection, inside the one claim (ledger.py).
 ATTACHED = "advanced"
