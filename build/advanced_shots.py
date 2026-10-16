@@ -19,8 +19,8 @@ seed it: each capability turned on or watched by the bridge's advanced-arm with 
 (requirements with it), the reset message, the credit rule, the queued messages and the rule for an error code added
 by their own bridge commands, and the samples of failures nothing classified kept by the state's own `admit` and
 `taken`. No SQL is written here, so the seed follows the advanced state's schema as it moves (5 now; 6 with the
-usage numbers; 7 with stage 4). Ids the edition draws at random are drawn from a counter while it is seeded, and the
-report's jobs are renamed, so the same tree gives the same answers and the same bytes.
+usage numbers; 7 with stage 4). The report's jobs, which the edition names at random, are renamed for what they are,
+so the same tree gives the same answers and the same bytes.
 
 What a picture needs of the advanced edition is named in NEEDS, the one table: a capability, a choice, a bridge
 command, a module or a window source. A picture whose needs this tree does not have stops the run with "not in this
@@ -38,7 +38,6 @@ from __future__ import annotations
 from contextlib import ExitStack, contextmanager
 import hashlib
 import importlib.util
-import itertools
 import json
 import os
 from pathlib import Path
@@ -219,20 +218,6 @@ def require(shots) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------- the seed
-@contextmanager
-def drawn_in_order():
-    """While the seed is written: every id the advanced edition draws at random (secrets.token_hex - a reset message's
-    record, a report's job) drawn from a counter instead, so the same seed gives the same answers."""
-    import secrets
-    from unittest import mock
-    counter = itertools.count(1)
-
-    def token_hex(nbytes=32):
-        return hashlib.sha256(b"advanced-shots %d" % next(counter)).hexdigest()[:2 * nbytes]
-    with mock.patch.object(secrets, "token_hex", token_hex):
-        yield
-
-
 def usage_reading(five_hour):
     """make_screenshots.sample_usage with the five-hour window at `five_hour` percent (None: as the stills read it)."""
     import make_screenshots as shots
@@ -323,7 +308,6 @@ def advanced_installation(workspace: Path, variant: str = "base"):
     with ExitStack() as stack:
         stack.enter_context(mock.patch.object(shots, "sample_usage", usage_reading(VARIANTS[variant]["five_hour"])))
         core = stack.enter_context(shots.pinned_installation(Path(workspace)))
-        stack.enter_context(drawn_in_order())
         # The watcher's wake for a scratch home names its own event, and is not needed: the render asks nobody.
         stack.enter_context(mock.patch.object(sendnow, "wake", return_value=False))
         # No gh: the report's check says how to send it on the web, on every machine (P5's four web steps).
