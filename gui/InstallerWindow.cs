@@ -13,6 +13,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
@@ -372,7 +373,12 @@ namespace CodexAutoResume
 
         private static void OpenGuide()
         {
-            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Guide) { UseShellExecute = true }); }
+            try
+            {
+                var start = new ProcessStartInfo(Guide);
+                start.UseShellExecute = true;
+                Process.Start(start);
+            }
             catch (Exception) { /* no browser: nothing to open it in */ }
         }
 

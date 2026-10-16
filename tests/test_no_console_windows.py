@@ -493,6 +493,13 @@ class WindowStartTests(unittest.TestCase):
             "the window starting itself again, compiled /target:winexe by build/make_gui.ps1",
         ("gui/DashboardMaintenance.cs", '"explorer.exe"'):
             "File Explorer on the logs folder the person asked to open, through the shell",
+        # v0.6.16, the installer window's three.
+        ("gui/DashboardMaintenance.cs", "exe"):
+            "the installation's new Dashboard after an update, CodexAutoResumeSettings.exe, built /target:winexe",
+        ("gui/SettingsRemove.cs", "copy"):
+            "the window's own copy in the temporary folder, which shows the uninstall: the same /target:winexe program",
+        ("gui/InstallerWindow.cs", "Guide"):
+            "the guide's web page the person asked to read, in their browser, through the shell",
     }
 
     @staticmethod
