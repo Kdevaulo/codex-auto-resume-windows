@@ -91,6 +91,8 @@ from .engine.fallback import (ATTEMPTS as FALLBACK_ATTEMPTS, DEFAULT_ATTEMPTS as
 from .engine.goal import make as make_goal_continuation
 from .engine.headless import DEFAULT_HOURS as HEADLESS_DEFAULT_HOURS, HOURS as HEADLESS_HOURS, make as make_headless_run
 from .engine.markerfree import make as make_marker_free
+from .engine.retries import (ATTEMPTS as RETRY_ATTEMPTS, DEFAULT_ATTEMPTS as RETRY_DEFAULT_ATTEMPTS,
+                             make as make_retry_settings)
 from .engine.sessions import make as make_other_sessions
 from .engine.silent import make as make_silent_continuation
 from .engine.oncemore import make as make_once_more
@@ -99,7 +101,7 @@ from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STYLE, DEFAULT_W
                            POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
 from .report import make as make_compat_report
 from .standards import DEPARTABLE
-from .vocabulary import CapabilityKind, Measurement, OptionKey, RunEnd
+from .vocabulary import CapabilityKind, Measurement, OptionKey, RunEnd, Verdict
 
 # The one ceiling over every capability together: advanced sends an hour. It is also the highest
 # value a person may set it to - it can be lowered and never raised.
@@ -1061,7 +1063,41 @@ DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, COMPACT_CONT
                USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION, SILENT_CONTINUATION,
                LONG_RESET_MESSAGE,
                COMPAT_REPORT)
-REGISTRY = Registry(DEFINITIONS)
+# Codex's own retry settings (stage 4's item 6): Attempts (6, 8, 10 or 12; 8 by default) for both of its built-in
+# provider's retry keys, written at P8 and put back (engine/retries.py). MB failed on codex-cli 0.162.0-alpha.17.2 -
+# Codex refuses any write under model_providers.openai - so it waits in WAITING: hidden, its statement unwritten.
+CODEX_RETRY_SETTINGS = CapabilityDef(
+    id="codex_retry_settings",
+    points=frozenset({Point.TICK}),
+    revision=1,
+    departs_from=("B3", "B4"),
+    compat="engine_present",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="retry",
+    make=make_retry_settings,
+    options=(Option(OptionKey.ATTEMPTS, RETRY_ATTEMPTS, RETRY_DEFAULT_ATTEMPTS),),
+    measurements=(Measurement.MB,),
+)
+
+# The one gate for a capability that cannot work on any Codex measured so far (the owner's rule of 2026-10-16): each
+# here, with the measurement that must pass first, is hidden - not in the registry this edition runs, so no row, no
+# statement and no switch anywhere - until that measurement passes (measured.MEASURED), and then offered after
+# DEFINITIONS. Its code and its probe stay in the tree.
+WAITING = ((CODEX_RETRY_SETTINGS, Measurement.MB),)
+
+
+def offered(measured) -> tuple:
+    """The waiting capabilities `measured` (measured.MEASURED's shape) lets out: those whose measurement passed."""
+    return tuple(definition for definition, measurement in WAITING
+                 if (measured.get(measurement) or (None,))[0] == Verdict.PASS)
+
+
+def _registry():
+    from .measured import MEASURED
+    return Registry(DEFINITIONS + offered(MEASURED))
+
+
+REGISTRY = _registry()
 
 # The order a person sees them in - the Dashboard's Advanced features page and every list arming.listing
 # answers - which is not the order above: that one decides which answers first, and this one only what is
