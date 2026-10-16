@@ -451,16 +451,33 @@ class PowerShellTests(unittest.TestCase):
         self.assertIn("build/install/install.ps1", POWERSHELL)
         self.assertIn("build/install/Install.cmd", CMD)
 
+    # Starts of a Windows program, which gets no console from Windows whichever way it is started, so it goes through
+    # the shell: -NoNewWindow would hand it the script's own output handles, and whoever reads them would wait for
+    # the program to close. (file, -FilePath as written) -> (what it is, the assignment that says so).
+    GUI_STARTS = {
+        ("build/install/install.ps1", "$dashboard"):
+            ("the Dashboard an update closed, opened again: CodexAutoResumeSettings.exe, built /target:winexe",
+             "$dashboard = Join-Path $InstallHome 'CodexAutoResumeSettings.exe'"),
+    }
+
     def test_every_start_process_shares_the_console_or_hides_its_own(self):
-        offenders, seen = [], 0
+        offenders, seen, windowed = [], 0, set()
         for name, text in self.texts().items():
             for line in _statements(text):
                 if re.search(r"\bStart-Process\b", line, re.I):
                     seen += 1
+                    target = re.search(r"-FilePath\s+(\S+)", line)
+                    key = (name, target.group(1) if target else None)
+                    if key in self.GUI_STARTS:
+                        windowed.add(key)
+                        self.assertIn(self.GUI_STARTS[key][1], text, "the target is the Windows program named")
+                        self.assertNotRegex(line, r"-NoNewWindow\b|-Redirect", "a Windows program gets no handle of ours")
+                        continue
                     if not re.search(r"-NoNewWindow\b|-WindowStyle\s+['\"]?Hidden\b", line, re.I):
                         offenders.append("%s: %s" % (name, line.strip()))
         self.assertGreaterEqual(seen, 1, "install.ps1 starts codex.exe with Start-Process")
         self.assertEqual(offenders, [], "\n".join(offenders))
+        self.assertEqual(windowed, set(self.GUI_STARTS), "a Windows program's start is no longer where it was named")
 
     def test_nothing_else_opens_a_console(self):
         offenders = []

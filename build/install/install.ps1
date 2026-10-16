@@ -932,7 +932,11 @@ function Open-ClosedDashboard {
         if (-not $fresh -or -not (Test-Path -LiteralPath $dashboard -PathType Leaf)) { continue }
         if ($line -cnotmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$') { continue }
         try {
-            Start-Process -FilePath $dashboard -ArgumentList $line -WorkingDirectory $InstallHome -NoNewWindow
+            # Through the shell, never -NoNewWindow: that hands the window this script's own output and error handles,
+            # so whoever reads them - the Dashboard that started an update, `$o = & Setup.exe -Silent` - waited for
+            # this Dashboard to close before it saw the end. The Dashboard is a Windows program, built
+            # /target:winexe, so the shell opens no console for it.
+            Start-Process -FilePath $dashboard -ArgumentList $line -WorkingDirectory $InstallHome
             if ($Updated) { Ok 'The Dashboard was opened again on the new version' }
             else { Ok 'The Dashboard was opened again' }
         } catch {

@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import re
+import shutil
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -173,28 +174,33 @@ class DashboardAfterUpdateTests(unittest.TestCase):
         self.assertIn('internal const string UpdateReopenFile = "reopen-after-update.txt";', self.window)
 
     # ------------------------------------------------------------------ every way out (v0.6.16 review)
-    def run_reopen(self, records, asked=True, calls=("-Updated",), start_process=None):
+    def run_reopen(self, records, asked=True, calls=("-Updated",), dashboard=None):
         """Open-ClosedDashboard, lifted from install.ps1 with the helpers it calls, in a scratch home whose config
         folder holds `records` - (name, line, seconds the record was written before the request, or None for
-        after it). Start-Process is a stub that writes down what it was asked to start, unless `start_process` is
-        given. Returns (what it printed, what it started, the records left)."""
+        after it). Start-Process is a stub that writes down what it was asked to start - unless `dashboard` is a
+        program to stand in for the Dashboard, which the real Start-Process starts, and which is ended here once
+        it has written its process id. Returns (what it printed, what it started, the records left)."""
         import subprocess
         import tempfile
         from test_installer import VOICE, block, ps_literal
         if not POWERSHELL.is_file():
             self.skipTest("Windows PowerShell")
-        with tempfile.TemporaryDirectory() as folder:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
             home = Path(folder) / "home"
             (home / "config").mkdir(parents=True)
-            (home / "CodexAutoResumeSettings.exe").write_bytes(b"")
+            if dashboard:
+                shutil.copyfile(dashboard, home / "CodexAutoResumeSettings.exe")
+            else:
+                (home / "CodexAutoResumeSettings.exe").write_bytes(b"")
             started = Path(folder) / "started.txt"
             source = VOICE
             source += block(self.text, "function Resolve-Canonical {", "function Get-Edition {")
             source += block(self.text, "function Remove-OwnedItem {", "function Invoke-Setup {")
             source += block(self.text, "function Open-ClosedDashboard {", "# From here on, the Dashboard windows")
-            source += start_process or ("function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory, "
-                                        "[switch]$NoNewWindow) Add-Content -LiteralPath %s -Value ([string]$ArgumentList) }\n"
-                                        % ps_literal(started))
+            if not dashboard:
+                source += ("function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory, "
+                           "[switch]$NoNewWindow) Add-Content -LiteralPath %s -Value ([string]$ArgumentList) }\n"
+                           % ps_literal(started))
             script = ["$ErrorActionPreference = 'Stop'",
                       "$OwnedHome = %s" % ps_literal(home), "$InstallHome = $OwnedHome",
                       "$script:DashboardsReopened = $false",
@@ -211,9 +217,31 @@ class DashboardAfterUpdateTests(unittest.TestCase):
             done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                                    "-File", str(probe)], capture_output=True, text=True, encoding="utf-8",
                                   errors="replace", timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if dashboard:
+                lines = [str(self.end_stand_in(home / "stand-in.pid"))]
+            else:
+                lines = started.read_text(encoding="utf-8").split() if started.exists() else []
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-            lines = started.read_text(encoding="utf-8").split() if started.exists() else []
             return done.stdout, lines, sorted(os.listdir(home / "config"))
+
+    @staticmethod
+    def end_stand_in(pid_file):
+        """Ends the stand-in Dashboard this test started, by the process id it wrote; its id, or None if it never
+        wrote one."""
+        import signal
+        import time
+        deadline = time.monotonic() + 15
+        while not pid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.2)
+        try:
+            pid = int(pid_file.read_text(encoding="ascii").strip())
+        except (OSError, ValueError):
+            return None
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+        return pid
 
     def test_a_record_is_opened_once_and_removed_and_a_stale_one_is_only_removed(self):
         """A record an earlier update left behind - written before this run asked - is never opened, and none is
@@ -235,6 +263,34 @@ class DashboardAfterUpdateTests(unittest.TestCase):
         self.assertEqual(started, ["--page=settings", "--reopened=2"])
         self.assertIn("[ok] The Dashboard was opened again", said)
         self.assertNotIn("on the new version", said)
+
+    def test_the_dashboard_opened_again_holds_none_of_the_installers_handles(self):
+        """Started with -NoNewWindow, the Dashboard opened again inherited install.ps1's output pipe: a parent that
+        reads it to the end - the Dashboard that started an update (StartBootstrap gave up after 5 s and reported a
+        failure), `$o = & Setup.exe -Silent` - waited for that Dashboard to close. Here a stand-in Dashboard, a
+        Windows program that stays a minute, is opened by the real Start-Process under a parent reading the
+        output to its end, as those do: the end comes when the installer's part does, not when the stand-in goes."""
+        import subprocess
+        import tempfile
+        import time
+        csc = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Microsoft.NET" / "Framework64" / "v4.0.30319" / "csc.exe"
+        if not csc.is_file():
+            self.skipTest("the in-box C# compiler")
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "StandIn.cs"
+            source.write_text('class P { static void Main() { System.IO.File.WriteAllText("stand-in.pid", '
+                              'System.Diagnostics.Process.GetCurrentProcess().Id.ToString()); '
+                              'System.Threading.Thread.Sleep(60000); } }', encoding="utf-8")
+            exe = Path(folder) / "StandIn.exe"
+            subprocess.run([str(csc), "/nologo", "/target:winexe", "/out:" + str(exe), str(source)], check=True,
+                           capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            begun = time.monotonic()
+            said, started, _ = self.run_reopen([("reopen-after-update.txt", "--page=overview --reopened=1", None)],
+                                               dashboard=exe)
+            took = time.monotonic() - begun
+        self.assertIn("[ok] The Dashboard was opened again on the new version", said)
+        self.assertNotEqual(started, ["None"], "the stand-in Dashboard never started")
+        self.assertLess(took, 30, "the output's end waited for the Dashboard opened again to close")
 
     def test_every_way_out_once_the_dashboard_was_asked_opens_it_again(self):
         """install.ps1 closed the Dashboard, then could stop with 1 (put back, setup failed) before the reopen,
