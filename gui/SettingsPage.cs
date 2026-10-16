@@ -815,7 +815,7 @@ namespace CodexAutoResume
             combo.Width = Px(300);
             IgnoreWheel(combo);
             Dictionary<string, object> field;
-            List<object> choices = fields.TryGetValue(name, out field) ? Items(field, "kinds") : null;
+            List<object> choices = fields.TryGetValue(name, out field) ? Items(field, "choices") : null;
             if (choices == null) choices = new List<object>();
             string value = Str(current, name);
             int index = 0;
@@ -1039,7 +1039,7 @@ namespace CodexAutoResume
             var combo = new SoftCombo();
             IgnoreWheel(combo);
             string name = Str(field, "name");
-            List<object> choices = Items(field, "kinds") ?? new List<object>();
+            List<object> choices = Items(field, "choices") ?? new List<object>();
             string value = name == null ? null : Str(current, name);
             var items = new List<Choice>();
             foreach (object choice in choices)

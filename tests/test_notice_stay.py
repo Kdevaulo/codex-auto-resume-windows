@@ -249,6 +249,9 @@ class WindowTests(unittest.TestCase):
             self.assertIn(needed, build_stay)
         self.assertIn('json.Append(Json.Escape(pair.Key));', guiscan.member_body("SettingsForm", "StayJson"))
         self.assertIn('internal const string StayField = "notices_stay";', guiscan.whole())
+        # The kinds are their own key: every drop-down still lists its `choices` (a rename of one once emptied them).
+        self.assertIn('Items(field, "choices")', guiscan.member_body("SettingsForm", "ChoiceCombo"))
+        self.assertNotIn('"kinds"', guiscan.member_body("SettingsForm", "ChoiceCombo"))
         self.assertEqual(notice_kinds.FIELD, "notices_stay")
 
 
