@@ -1,0 +1,25 @@
+{
+  "format": "codex-auto-resume-measurement/1",
+  "step": "mx",
+  "verdict": "blocked",
+  "recorded_at": "2026-10-15T22:12Z",
+  "product_version": "0.6.16-beta.3",
+  "codex_version": "codex-cli 0.162.0-alpha.17.2",
+  "windows_build": "10.0.26300",
+  "observed": {
+    "compact_accepted": true,
+    "compaction_item_seen": true,
+    "turn_ended": true,
+    "seconds": "under_60s",
+    "latest_compaction_only": true,
+    "unsubscribed": true,
+    "turn_status": "completed",
+    "thread_given": true
+  },
+  "note": "confirm the conversation shows as compacted in Codex afterwards, then set the verdict",
+  "completion": {
+    "verdict": "pass",
+    "note": "as_expected",
+    "recorded_at": "2026-10-15T22:20Z"
+  }
+}

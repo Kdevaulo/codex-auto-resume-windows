@@ -45,4 +45,15 @@ MEASURED = {
     Measurement.MN: (Verdict.PASS, CLI_0162_ALPHA_17_2),
     # 2026-10-13, after a 5-hour reset that passed with no Codex use.
     Measurement.MU: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    # 2026-10-15 and 16, stage 4's nine (v0.6.16-beta.4), Codex closed or open as each needs.
+    Measurement.MC1: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MXA: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MX: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MF: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    # A fail narrows a route or is its capability's warning, never its end (the owner's rule).
+    Measurement.MB: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    Measurement.MO: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    Measurement.MC2: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    Measurement.M3B: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    Measurement.M6B: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
 }
