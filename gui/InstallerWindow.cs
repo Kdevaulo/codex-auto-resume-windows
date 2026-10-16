@@ -60,6 +60,8 @@ namespace CodexAutoResume
 
         private string page;
         private bool running, logShown, unconfirmed, previousRunning, closingAsked;
+        // The installer opened again the Dashboard that was open before it (install.ps1): there is none to offer.
+        private bool reopened;
         // Which buttons the page has. Kept here, not read back from Visible: a control answers false there until its
         // window is on screen, and the window is measured and audited before it is (Fit, InstallerAudit).
         private bool backShown, cancelShown, forwardShown;
@@ -77,7 +79,7 @@ namespace CodexAutoResume
         {
             get
             {
-                return code == 0 && flow.Mode != InstallerFlow.Uninstall &&
+                return code == 0 && flow.Mode != InstallerFlow.Uninstall && !reopened &&
                        (flow.Mode == InstallerFlow.Update || flow.OpenDashboard);
             }
         }
@@ -526,7 +528,7 @@ namespace CodexAutoResume
             if (code != 0 && code != InstallerFlow.StillRunning)
                 Row(Words(words.Say("installer.done.read_log", "The log below is what the installer said."), null, Palette.Secondary), 8);
             // An update's Dashboard comes back by itself (OpenDashboard); a first installation asks.
-            if (code == 0 && flow.Mode == InstallerFlow.Install)
+            if (code == 0 && flow.Mode == InstallerFlow.Install && !reopened)
                 Row(Choice(words.Say("installer.done.open", "Open the Dashboard"), flow.OpenDashboard, true,
                            delegate(bool on) { flow.OpenDashboard = on; }), 16);
             if (code == 0) Row(LogToggle(), 16);
@@ -625,6 +627,7 @@ namespace CodexAutoResume
             string said = (line ?? "").Trim();
             if (said.StartsWith("The watcher could not be confirmed running", StringComparison.Ordinal)) unconfirmed = true;
             if (said.StartsWith("The previous version of the watcher was asked to stop", StringComparison.Ordinal)) previousRunning = true;
+            if (said.StartsWith("[ok] The Dashboard was opened again on the new version", StringComparison.Ordinal)) reopened = true;
             if (InstallerProgress.Advance(flow.Mode, line, ref at, ref step)) ShowStep();
         }
 

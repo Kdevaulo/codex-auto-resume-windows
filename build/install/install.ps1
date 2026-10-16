@@ -271,6 +271,39 @@ function Get-OwnedMcpProcess {
     return ,$found
 }
 
+function Get-OwnedDashboardProcess {
+    <#
+        This installation's Dashboard windows that are open, found as the MCP launchers are: by their
+        executable's path inside the installation, never by name alone. The one that started this update
+        (CODEX_AUTO_RESUME_UPDATING_DASHBOARD, its process id) is not among them: it waits for this, and
+        opens the new version itself once it is done.
+    #>
+    $found = @()
+    $starter = 0
+    [void][int]::TryParse([string]$env:CODEX_AUTO_RESUME_UPDATING_DASHBOARD, [ref]$starter)
+    $all = @(Get-CimInstance Win32_Process -Filter "Name='CodexAutoResumeSettings.exe'" -ErrorAction SilentlyContinue)
+    foreach ($process in $all) {
+        $exe = $process.ExecutablePath
+        if ([string]::IsNullOrWhiteSpace($exe) -or $process.ProcessId -eq $starter) { continue }
+        if (Test-PathInside $exe $OwnedHome) { $found += $process }
+    }
+    return ,$found
+}
+
+function Get-UpdateEventName {
+    <#
+        The event an update sets to ask this installation's Dashboard windows to close themselves - the
+        window's own close, never anything ended from outside (gui/WindowReopen.cs, WatchForUpdate). Named
+        after the installation's folder, so another installation's windows never hear it: the first sixteen
+        hex digits of the SHA-256 of its full path in lower case, as UTF-8.
+    #>
+    param([string]$Root)
+    $full = [IO.Path]::GetFullPath($Root).TrimEnd('\').ToLowerInvariant()
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $hash = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($full)) } finally { $sha.Dispose() }
+    return 'Local\CodexAutoResume.CloseForUpdate.' + (-join ($hash[0..7] | ForEach-Object { $_.ToString('x2') }))
+}
+
 function Get-OwnedWatcherProcess {
     <#
         The watcher belonging to this installation, if one is running.
@@ -954,6 +987,36 @@ if ($watcherWasRunning) {
     }
 }
 
+# The Dashboard, as the watcher (v0.6.16, the owner: after an update everything runs on the new version). An
+# open window of this installation is asked to close itself, through its own close: it writes where it was
+# (config\reopen-after-update.txt) and closes - unless it has unsaved Settings changes, which it keeps, and then
+# it stays open. This waits a minute for them, as the watcher above is waited for, and goes on either way: a
+# window that stayed runs the previous version until it is opened again, and says nothing is lost. Nothing is
+# ended by force. The window opens again on the new version, where it was, once setup has run (below).
+$dashboardsOpen = $upgrade -and (Get-OwnedDashboardProcess).Count -gt 0
+if ($dashboardsOpen) {
+    Step 'Closing the Dashboard so it opens again on the new version'
+    $closeEvents = @()
+    foreach ($root in @($InstallHome, $OwnedHome) | Select-Object -Unique) {
+        try {
+            $closeEvent = New-Object System.Threading.EventWaitHandle($false,
+                [System.Threading.EventResetMode]::ManualReset, (Get-UpdateEventName $root))
+            [void]$closeEvent.Set()
+            $closeEvents += $closeEvent
+        } catch { }
+    }
+    $deadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $deadline -and (Get-OwnedDashboardProcess).Count -gt 0) {
+        Start-Sleep -Milliseconds 500
+    }
+    foreach ($closeEvent in $closeEvents) { [void]$closeEvent.Reset(); $closeEvent.Dispose() }
+    if ((Get-OwnedDashboardProcess).Count -gt 0) {
+        Warn 'A Dashboard window with unsaved changes stayed open; it runs the previous version until it is opened again.'
+    } else {
+        Ok 'The Dashboard closed'
+    }
+}
+
 # Replace only the program directories. Settings, state and logs sit beside them and are
 # deliberately not in this list, so an upgrade cannot lose a pending recovery.
 #
@@ -1157,6 +1220,26 @@ if ($code -ne 0 -and -not $watcherUnconfirmed) {
 Step 'Checking the installation'
 $null = Invoke-Setup @('doctor')
 if ($LASTEXITCODE -ne 0) { Warn 'The health check reported a problem. Recovery is installed but may not be ready.' }
+
+# The Dashboard that closed for this update opens again on the new version, where it was: the arguments it wrote
+# are its own reopen's (WindowReopen.ReopenArguments), taken only in that form, and it checks each again. Nothing is
+# opened that was not open before.
+$reopenRequest = Join-Path (Join-Path $InstallHome 'config') 'reopen-after-update.txt'
+if ($dashboardsOpen -and (Test-Path -LiteralPath $reopenRequest -PathType Leaf)) {
+    $reopenLine = [string](Get-Content -LiteralPath $reopenRequest -Raw -ErrorAction SilentlyContinue)
+    $null = Remove-OwnedItem $reopenRequest
+    $reopenLine = $reopenLine.Trim()
+    $dashboard = Join-Path $InstallHome 'CodexAutoResumeSettings.exe'
+    if ($reopenLine -cmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$' -and
+        (Test-Path -LiteralPath $dashboard -PathType Leaf)) {
+        try {
+            Start-Process -FilePath $dashboard -ArgumentList $reopenLine -WorkingDirectory $InstallHome -NoNewWindow
+            Ok 'The Dashboard was opened again on the new version'
+        } catch {
+            Warn 'The Dashboard could not be opened again; open it from the Start menu.'
+        }
+    }
+}
 
 Write-Host ''
 if ($script:Failed) { Write-Host 'Finished with problems. See the messages above.'; exit 1 }

@@ -107,7 +107,9 @@ edition and version, and where; asks only what the installer has a choice about 
 Windows sign-in on a first installation, and whether to change the edition when the other one is
 installed - shows how far the installer is and which step it is on, and ends by saying whether it
 finished, with the installer's exit code and its log, and offers to open the Dashboard. No console window
-opens. It downloads nothing, needs no administrator rights and brings no Python of its
+opens. When it updates an installation whose Dashboard is open, it asks that Dashboard to close and opens it again
+on the new version where it was, as it starts the watcher again; a Dashboard with unsaved Settings changes keeps
+them and stays open, on the previous version until you open it again. With `-Silent` it does the same. It downloads nothing, needs no administrator rights and brings no Python of its
 own: the installation runs on the Python inside the archive. It loads DLLs from Windows' System32
 folder only, so a DLL lying beside it in Downloads is never loaded, and it stops if a `.config` file
 is beside it. Started from a command line, it passes switches such as `-SkipStartup` on to

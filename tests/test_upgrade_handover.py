@@ -131,5 +131,84 @@ class RestartAfterUpdateTests(unittest.TestCase):
         self.assertLess(self.text.index("$setupArgs = @('setup')"), told)
         self.assertIn("$code = Invoke-Setup $setupArgs", self.text[told:], "and setup runs with it after")
 
+class DashboardAfterUpdateTests(unittest.TestCase):
+    """v0.6.16: an update from a setup program or with -Silent, while this installation's Dashboard is open, asks it
+    to close itself - its own close, through an event named after the installation, never anything ended from
+    outside - waits a minute for it as the watcher is waited for, and opens it again on the new version where it
+    was. A window with unsaved Settings changes keeps them and stays open, and the update goes on. The Dashboard
+    that started the update itself is left alone: it opens the new version on its own."""
+
+    def setUp(self):
+        self.text = INSTALL.read_text(encoding="utf-8")
+        self.window = (ROOT / "gui" / "WindowReopen.cs").read_text(encoding="utf-8")
+        self.update = (ROOT / "gui" / "DashboardMaintenance.cs").read_text(encoding="utf-8")
+
+    def block(self, start, end):
+        return self.text[self.text.index(start):self.text.index(end, self.text.index(start))]
+
+    def test_only_this_installations_dashboards_but_the_one_that_started_the_update(self):
+        found = self.block("function Get-OwnedDashboardProcess {", "function Get-UpdateEventName {")
+        self.assertIn("-Filter \"Name='CodexAutoResumeSettings.exe'\"", found)
+        self.assertIn("if (Test-PathInside $exe $OwnedHome) { $found += $process }", found)
+        self.assertIn("$process.ProcessId -eq $starter", found)
+        self.assertIn('[void][int]::TryParse([string]$env:CODEX_AUTO_RESUME_UPDATING_DASHBOARD, [ref]$starter)', found)
+        self.assertIn('info.EnvironmentVariables["CODEX_AUTO_RESUME_UPDATING_DASHBOARD"] =', self.update)
+
+    def test_the_dashboard_is_asked_before_the_files_move_and_never_ended(self):
+        asked = self.block("$dashboardsOpen = $upgrade -and (Get-OwnedDashboardProcess).Count -gt 0",
+                           "$pairs = @(@{ src = 'app'")
+        self.assertIn("[void]$closeEvent.Set()", asked)
+        self.assertIn("$deadline = (Get-Date).AddSeconds(60)", asked)
+        self.assertIn("[void]$closeEvent.Reset(); $closeEvent.Dispose()", asked)
+        for kill in ("Stop-Process", "Kill(", "taskkill", "CloseMainWindow"):
+            self.assertNotIn(kill, asked)
+
+    def test_it_opens_again_after_setup_in_the_form_its_own_reopen_wrote(self):
+        reopen = self.block("$reopenRequest = Join-Path (Join-Path $InstallHome 'config') 'reopen-after-update.txt'",
+                            "Write-Host ''\nif ($script:Failed)")
+        self.assertLess(self.text.index("$null = Invoke-Setup @('doctor')"), self.text.index(reopen))
+        self.assertIn("if ($dashboardsOpen -and (Test-Path -LiteralPath $reopenRequest -PathType Leaf)) {", reopen)
+        self.assertIn("$reopenLine -cmatch '^--[a-z]+(=[A-Za-z0-9,._-]+)?( --[a-z]+(=[A-Za-z0-9,._-]+)?)*$'", reopen)
+        self.assertIn("-NoNewWindow", reopen)
+        self.assertIn('internal const string UpdateReopenFile = "reopen-after-update.txt";', self.window)
+
+    def test_the_window_closes_through_its_own_close_and_keeps_unsaved_changes(self):
+        body = self.window[self.window.index("private void CloseForUpdate()"):]
+        body = body[:body.index("\n        }\n")]
+        self.assertIn("if (updatingHere || reopening || auditing || Dirty()) return;", body)
+        self.assertLess(body.index("Dirty()"), body.index("File.WriteAllText("))
+        self.assertTrue(body.rstrip().endswith("Close();"), "its own close, last")
+        self.assertIn("updatingHere = true;", self.update)
+        self.assertIn("WatchForUpdate();", (ROOT / "gui" / "SettingsApp.cs").read_text(encoding="utf-8"))
+
+    def test_both_sides_name_the_event_alike(self):
+        """The window's name (UpdateEventName) and the installer's (Get-UpdateEventName), against Python's."""
+        import hashlib
+        import os
+        import subprocess
+        source = self.block("function Get-UpdateEventName {", "function Get-OwnedWatcherProcess {")
+        script = source + "\nforeach ($p in $args) { Get-UpdateEventName $p }\n"
+        homes = [r"C:\Users\ExampleUser\.codex-auto-resume", "C:\\Users\\ExampleUser\\.Codex-Auto-Resume\\",
+                 r"D:\x y\z"]
+        expected = ["Local\\CodexAutoResume.CloseForUpdate." +
+                    hashlib.sha256(home.rstrip("\\").lower().encode("utf-8")).hexdigest()[:16] for home in homes]
+        powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+        if not powershell.is_file():
+            self.skipTest("Windows PowerShell")
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            probe = Path(folder) / "name.ps1"
+            probe.write_text(script, encoding="utf-8-sig")
+            done = subprocess.run([str(powershell), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe), *homes], capture_output=True, text=True, timeout=120,
+                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(done.stdout.split(), expected, done.stderr)
+        name = self.window[self.window.index("internal static string UpdateEventName(string root)"):]
+        name = name[:name.index("\n        }\n")]
+        for piece in ("Path.GetFullPath(root).TrimEnd('\\\\').ToLowerInvariant()", "new UTF8Encoding(false).GetBytes(full)",
+                      'new StringBuilder("Local\\\\CodexAutoResume.CloseForUpdate.")', "for (int i = 0; i < 8; i++)",
+                      'hash[i].ToString("x2", CultureInfo.InvariantCulture)'):
+            self.assertIn(piece, name)
+
 if __name__ == "__main__":
     unittest.main()

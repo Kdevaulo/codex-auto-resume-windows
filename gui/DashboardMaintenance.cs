@@ -293,6 +293,8 @@ namespace CodexAutoResume
             // they are replaced, so only a start time that moved says a watcher restarted.
             string before = WatcherIdentity();
             SetBusy(true);
+            // The installer's request to close (WatchForUpdate) is not this window's to answer while it runs its own.
+            updatingHere = true;
             diagUpdate.Text = S("diag.update_installing", "installing...");
             string answer = "failed", from = null, to = null, detail = "", compatibility = null, prerelease = null;
             string app = Path.Combine(root, "app");
@@ -323,6 +325,7 @@ namespace CodexAutoResume
                          : answer == "incomplete" ? InstallerFlow.NotStarted : HeardCode == 0 ? 1 : HeardCode;
                 }, null, Font);
             window.ShowDialog(this);
+            updatingHere = false;
             if (answer == "later")
             {
                 // Put off: the release is still there to install, as the check found it.
@@ -467,6 +470,10 @@ namespace CodexAutoResume
                 // The installation this window belongs to, not whichever one the environment
                 // happens to name.
                 info.EnvironmentVariables["CODEX_AUTO_RESUME_PLUGIN_HOME"] = root;
+                // This window, which waits for the bootstrap: the installer leaves it open (install.ps1,
+                // Get-OwnedDashboardProcess), and it opens the new version itself.
+                info.EnvironmentVariables["CODEX_AUTO_RESUME_UPDATING_DASHBOARD"] =
+                    Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
                 info.CreateNoWindow = true;
                 info.RedirectStandardOutput = true;
                 info.RedirectStandardError = true;

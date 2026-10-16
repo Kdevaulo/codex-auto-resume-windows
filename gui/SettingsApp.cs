@@ -621,6 +621,8 @@ namespace CodexAutoResume
                 BuildEditorsLater();
                 // Only a window build/capture_window.ps1 started, which says when it may be photographed.
                 WatchForStill();
+                // v0.6.16: an update from a setup program closes this window and opens it again on the new version.
+                WatchForUpdate();
             };
             FormClosed += delegate { StopClock(); bridge.Stop(); };
         }

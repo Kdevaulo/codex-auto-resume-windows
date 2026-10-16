@@ -694,5 +694,76 @@ namespace CodexAutoResume
             if (ticks % 2 == 0) WatchSettings();
             if (recheck) CheckReopen(false);
         }
+
+        // ------------------------------------------------------------------ an update from elsewhere (v0.6.16)
+        // A setup program, or an update with -Silent, that replaces this installation asks its open windows to close
+        // (install.ps1, Get-UpdateEventName): through the window's own close, as a person closes it. The window writes
+        // where it is - its own reopen's arguments - for the installer to open the new version with, once it has run.
+        // With unsaved Settings changes it keeps them and stays open: the installer waits a minute and goes on, and
+        // this window runs the previous version until it is opened again. The update this window started itself
+        // (InstallUpdate, InstallPick) is never one it closes for: it opens the new version itself.
+
+        /// What an update writes beside the settings, read by the installer once (install.ps1).
+        internal const string UpdateReopenFile = "reopen-after-update.txt";
+
+        private System.Threading.EventWaitHandle updateClose;
+        private System.Threading.RegisteredWaitHandle updateWait;
+        /// While this window's own update runs: the close an installer asks for is not this window's to answer.
+        private bool updatingHere;
+
+        /// The event an update sets for the installation at `root`: the first sixteen hex digits of the SHA-256 of its
+        /// full path in lower case, as UTF-8 - install.ps1's Get-UpdateEventName, the same. Pure.
+        internal static string UpdateEventName(string root)
+        {
+            string full = Path.GetFullPath(root).TrimEnd('\\').ToLowerInvariant();
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(new UTF8Encoding(false).GetBytes(full));
+                var hex = new StringBuilder("Local\\CodexAutoResume.CloseForUpdate.");
+                for (int i = 0; i < 8; i++) hex.Append(hash[i].ToString("x2", CultureInfo.InvariantCulture));
+                return hex.ToString();
+            }
+        }
+
+        /// Listens for an update's request, once the window is on screen.
+        private void WatchForUpdate()
+        {
+            if (auditing || installRoot == null) return;
+            try
+            {
+                updateClose = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.ManualReset,
+                                                                    UpdateEventName(installRoot));
+                updateWait = System.Threading.ThreadPool.RegisterWaitForSingleObject(updateClose, delegate
+                {
+                    try { if (IsHandleCreated && !IsDisposed) BeginInvoke(new MethodInvoker(CloseForUpdate)); }
+                    catch (Exception) { }
+                }, null, -1, true);
+                FormClosed += delegate
+                {
+                    try { updateWait.Unregister(null); updateClose.Dispose(); }
+                    catch (Exception) { }
+                };
+            }
+            catch (Exception) { /* no event to listen on: an update leaves this window as it always did */ }
+        }
+
+        /// The update's request: where this window is, written for the installer, and the window's own close - unless
+        /// it is this window's own update, or there are unsaved edits, which are never thrown away for an update.
+        private void CloseForUpdate()
+        {
+            if (updatingHere || reopening || auditing || Dirty()) return;
+            bool normal = WindowState == FormWindowState.Normal;
+            string arguments = ReopenArguments(currentPage ?? firstPage, currentSection, normal ? Bounds : RestoreBounds,
+                                               WindowState == FormWindowState.Maximized, storedTheme, storedDesign,
+                                               NextGeneration(false, request.Generation), invisibleFrame, FocusName());
+            try
+            {
+                string config = Path.Combine(installRoot, "config");
+                if (Directory.Exists(config))
+                    File.WriteAllText(Path.Combine(config, UpdateReopenFile), arguments, new UTF8Encoding(false));
+            }
+            catch (Exception) { /* it closes all the same; the installer opens nothing it was not told of */ }
+            Close();
+        }
     }
 }
