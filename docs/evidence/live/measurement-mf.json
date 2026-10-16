@@ -1,0 +1,17 @@
+{
+  "format": "codex-auto-resume-measurement/1",
+  "step": "mf",
+  "verdict": "pass",
+  "recorded_at": "2026-10-16T04:18Z",
+  "product_version": "0.6.16-beta.3",
+  "codex_version": "codex-cli 0.162.0-alpha.17.2",
+  "windows_build": "10.0.26300",
+  "observed": {
+    "default_found": true,
+    "default_differs": true,
+    "resume_override_session_only": false,
+    "restore_read_back": true,
+    "turn_status": "completed",
+    "thread_given": true
+  }
+}
