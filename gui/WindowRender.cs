@@ -126,6 +126,12 @@ namespace CodexAutoResume
                 AdoptTextSize(text, TextScale.Fitting(text, Screen.PrimaryScreen.WorkingArea.Size, DpiScale));
                 Soft.StillLightMs = 0;
                 PersistentBridge.Answers = RenderAnswer;
+                // The job's command line, read as the window's own is (ParseArguments), for what a page takes from it:
+                // the advanced edition's `--capability=`. The standard window takes nothing here.
+                var arguments = new List<string>();
+                foreach (object argument in Items(job, "arguments") ?? new List<object>())
+                    arguments.Add(Convert.ToString(argument, CultureInfo.InvariantCulture));
+                ParseArguments(arguments.ToArray());
                 var forms = Map(job, "forms") ?? new Dictionary<string, object>();
                 var targets = Items(job, "targets") ?? new List<object>();
                 foreach (object item in Items(job, "frames") ?? new List<object>())
@@ -245,11 +251,14 @@ namespace CodexAutoResume
         {
             bool moved = false;
             string page = Str(frame, "page") ?? "overview";
-            if (currentPage != page)
+            if (currentPage != page && Array.IndexOf(PageOrder, page) >= 0)
             {
                 ShowPage(page);
                 moved = true;
             }
+            RenderStateNamed(frame, writer, ref moved);
+            // A page this window does not have is never drawn as another: the job stops.
+            if (currentPage != page) throw new InvalidDataException("no page called " + page + " is in this window");
             string section = Str(frame, "section");
             if (page == "settings" && section != null && currentSection != section)
             {

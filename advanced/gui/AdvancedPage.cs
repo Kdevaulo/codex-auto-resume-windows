@@ -364,12 +364,25 @@ namespace CodexAutoResume
         }
 
         /// The window's command line as ParseArguments reads it, with this page's name where a page or the keyboard's
-        /// place may be named: `--page=advanced` and `--focus=page.advanced`, which the standard window ignores.
+        /// place may be named: `--page=advanced` and `--focus=page.advanced`, which the standard window ignores - and
+        /// (v0.6.16) `--capability=<id>`, the capability open when the list is first read, where the list has it.
         static partial void ArgumentParsed(string argument, OpenRequest request)
         {
             if (argument == "--page=" + AdvancedPageName) request.Page = AdvancedPageName;
             else if (argument == "--focus=page." + AdvancedPageName) request.Focus = "page." + AdvancedPageName;
+            else if (argument.StartsWith(CapabilityArgument, StringComparison.Ordinal))
+            {
+                string id = argument.Substring(CapabilityArgument.Length);
+                if (CapabilityShape.IsMatch(id)) askedCapability = id;
+            }
         }
+
+        // The capability the command line asked to be open (`--capability=`), until the list is read; a capability's id
+        // as the registry spells them.
+        private const string CapabilityArgument = "--capability=";
+        private static readonly System.Text.RegularExpressions.Regex CapabilityShape =
+            new System.Text.RegularExpressions.Regex("^[a-z][a-z_]{0,63}$");
+        private static string askedCapability;
 
         /// What a window that reopens itself passes on, with this page where it is the one on screen or where the
         /// keyboard is: the standard arguments name only the standard window's pages.
@@ -690,8 +703,10 @@ namespace CodexAutoResume
             advancedListing = read ? result : null;
             if (read && AdvancedItem(advancedOpen) == null)
             {
-                advancedOpen = null;
-                foreach (object entry in Items(result, "capabilities"))
+                // The one the command line asked for (`--capability=`), where the list has it; the first otherwise.
+                advancedOpen = AdvancedItem(askedCapability) != null ? askedCapability : null;
+                askedCapability = null;
+                foreach (object entry in advancedOpen != null ? new List<object>() : Items(result, "capabilities"))
                 {
                     advancedOpen = Str(entry as Dictionary<string, object>, "id");
                     if (advancedOpen != null) break;

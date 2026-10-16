@@ -12,7 +12,8 @@
 # points gui/Dashboard.cs declares (DashboardBuilt, SnapshotApplied, PendingBuilt), its Keep it on and Send
 # now cards (v0.6.14), its watch log - what a watched capability would have done (v0.6.14) - the reset
 # actions' rules on it and on Pending (v0.6.14), the compatibility report's card on it, and the page's own
-# audit - and (v0.6.15-beta) keep going's card, and the prompt queue's on it and on Pending.
+# audit - and (v0.6.15-beta) keep going's card, and the prompt queue's on it and on Pending - and (v0.6.16) the page
+# in the render mode the documentation's pictures are drawn in.
 
 [advanced]
 advanced/gui/AdvancedPage.cs
@@ -23,3 +24,4 @@ advanced/gui/AdvancedKeepGoing.cs
 advanced/gui/AdvancedQueue.cs
 advanced/gui/AdvancedReport.cs
 advanced/gui/AdvancedPageAudit.cs
+advanced/gui/AdvancedRender.cs
