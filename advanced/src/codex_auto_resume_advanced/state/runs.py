@@ -3,15 +3,19 @@
 
     headless_runs  one row for each turn run here, keyed by the interruption it continues: which capability ran it,
                    in which conversation, when it began and by when its cap ends it, a person's Stop asked from the
-                   Dashboard's bridge, and how it ended (RunEnd) - written only by the capability's P8 tick in the
-                   watcher, from what the follower told it (codex/headless.py), and by a Stop; read by the Dashboard
+                   Dashboard's bridge, and how it ended (RunEnd) - written by the capability's P8 tick in the watcher,
+                   from what the follower told it (codex/headless.py), and by a Stop; read by the Dashboard - and, for
+                   a model_fallback turn, `restore_model`: the conversation's own model, written before its turn/start
+                   and cleared once it is read back put back, so a watcher stopped mid-turn puts it back after a
+                   restart (engine/fallback.py)
 
-It holds no word of a conversation, no model's name and no path.
+It holds no word of a conversation and no path; the one name it keeps is a model's, Codex's own word for it, only
+while it is owed back.
 """
 from __future__ import annotations
 
 from ..vocabulary import RunEnd
-from .schema import HEADLESS_CAPABILITIES
+from .schema import HEADLESS_CAPABILITIES, MODEL_NAME
 from .session import StateError, _key, _thread, _timestamp, _word
 
 
@@ -22,7 +26,7 @@ def _capability(value):
 
 
 _RUN_COLUMNS = ("interruption_id", "capability", "thread_id", "started_at", "ends_by", "stop_requested_at",
-                "ended_at", "end")
+                "ended_at", "end", "restore_model")
 
 
 class RunsMixin:
@@ -39,6 +43,41 @@ class RunsMixin:
                 "(?,?,?,?,?) ON CONFLICT(interruption_id) DO UPDATE SET capability=excluded.capability, "
                 "thread_id=excluded.thread_id, started_at=excluded.started_at, ends_by=excluded.ends_by, "
                 "ended_at=NULL, end=NULL", (key, capability, thread_id, started, ends))
+
+    def run_owed(self, key, capability, thread_id, model, *, started_at, ends_by) -> None:
+        """A fallback turn about to start: its row written with the model it owes the conversation back, before its
+        turn/start - so the debt outlives the watcher."""
+        _key(key, "run key")
+        _capability(capability)
+        _thread(thread_id)
+        if not isinstance(model, str) or not 0 < len(model) <= MODEL_NAME:
+            raise StateError("invalid model")
+        started, ends = _timestamp(started_at, "started_at"), _timestamp(ends_by, "ends_by")
+        with self._transaction() as connection:
+            connection.execute(
+                "INSERT INTO headless_runs (interruption_id, capability, thread_id, started_at, ends_by, "
+                "restore_model) VALUES (?,?,?,?,?,?) ON CONFLICT(interruption_id) DO UPDATE SET "
+                "capability=excluded.capability, thread_id=excluded.thread_id, started_at=excluded.started_at, "
+                "ends_by=excluded.ends_by, ended_at=NULL, end=NULL, restore_model=excluded.restore_model",
+                (key, capability, thread_id, started, ends, model))
+
+    def run_restored(self, key) -> bool:
+        """The model a run owed put back and read back: owed no more. False where none was owed."""
+        _key(key, "run key")
+        with self._transaction() as connection:
+            return connection.execute("UPDATE headless_runs SET restore_model=NULL WHERE interruption_id=? AND "
+                                      "restore_model IS NOT NULL", (key,)).rowcount == 1
+
+    def runs_owed(self, capability) -> list:
+        """`capability`'s runs that still owe their conversation its model, the oldest first, ended or not."""
+        _capability(capability)
+        with self._read() as connection:
+            if connection is None:
+                return []
+            rows = connection.execute(
+                "SELECT %s FROM headless_runs WHERE capability=? AND restore_model IS NOT NULL ORDER BY started_at"
+                % ", ".join(_RUN_COLUMNS), (capability,)).fetchall()
+        return [dict(zip(_RUN_COLUMNS, row)) for row in rows]
 
     def run_ended(self, key, end, *, at=None) -> bool:
         """A run's end, as the follower told it; False where there was no such run."""
@@ -68,7 +107,7 @@ class RunsMixin:
         return [dict(zip(_RUN_COLUMNS, row)) for row in rows]
 
     def prune_runs(self, before, *, capability=None) -> int:
-        """Ended runs older than `before` - only `capability`'s, where given - gone."""
+        """Ended runs older than `before` - only `capability`'s, where given - gone; never one still owing a model."""
         _timestamp(before, "before")
         if capability is not None:
             _capability(capability)
@@ -76,7 +115,8 @@ class RunsMixin:
             if connection is None:
                 return 0
             return connection.execute("DELETE FROM headless_runs WHERE end IS NOT NULL AND ended_at < ? AND "
-                                      "(? IS NULL OR capability = ?)", (before, capability, capability)).rowcount
+                                      "restore_model IS NULL AND (? IS NULL OR capability = ?)",
+                                      (before, capability, capability)).rowcount
 
 
 class RunsHandle:
@@ -97,6 +137,11 @@ class RunsHandle:
                 key, capability, thread_id, started_at=started_at, ends_by=ends_by),
             # An end is written whatever the capability stands at: the run happened.
             "ended": lambda key, end: state.run_ended(key, end),
+            # A fallback turn's model owed back, and put back (engine/fallback.py): written whatever it stands at.
+            "owe": lambda key, thread_id, model, *, started_at, ends_by: state.run_owed(
+                key, capability, thread_id, model, started_at=started_at, ends_by=ends_by),
+            "restored": lambda key: state.run_restored(key),
+            "owed": lambda: state.runs_owed(capability),
             # Ended rows older than `before` gone, whatever the capability stands at (engine/headless.follow_up).
             "prune": lambda before: state.prune_runs(before, capability=capability),
         }

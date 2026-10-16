@@ -21,7 +21,9 @@ guard, and decided the words (core's engine/dispatch.py) - this starts the one t
    creation time of the spawn), any other holder still a no;
 5. turn/start with core's words (or none, SILENT) under the client id core derived - or, in compact mode,
    thread/compact/start; a refusal Codex answered is "not started", no answer is "unknown" (A6);
-6. "ran" (or "accepted" for a compaction) with the turn's id, and the open session handed to the follower.
+6. "ran" (or "accepted" for a compaction) with the turn's id, and the open session handed to the follower. A
+   fallback turn's model is stored as owed back before its turn/start, and put back here on every path that does
+   not hand the session over.
 
 The follower - one daemon thread, at most one run in the whole process - follows that one turn to its end and never
 starts another: it answers every request Codex makes with that request's refusal (protocol.reply_to), interrupts the
@@ -164,6 +166,12 @@ class Follower:
                 run["stop"] = RunEnd(reason)
             return True
 
+    def told(self, key, capability, end, model_restored=None) -> None:
+        """How a run ended, for the capability's P8 tick to take (`drain`): the follower's own end, or a fallback turn
+        the route never handed over, whose model it put back itself (HeadlessRun.resume)."""
+        with self.lock:
+            self.ends.append({"key": key, "capability": capability, "end": str(end), "model_restored": model_restored})
+
     def drain(self, capability) -> list:
         """What every run of `capability` that ended came to since its last drain: [{key, capability, end,
         model_restored}] - another capability's left for its own tick."""
@@ -215,8 +223,7 @@ class Follower:
             _close(session)
             with self.lock:
                 self._run = None
-                self.ends.append({"key": key, "capability": capability, "end": str(end),
-                                  "model_restored": restored})
+            self.told(key, capability, end, restored)
 
     def _until_end(self, session, thread_id, turn_id, seconds, mode, app_running):
         deadline = self.clock() + seconds
@@ -292,12 +299,14 @@ class HeadlessRun:
     `session` opens the session (a factory of none, given the capability's id; None: a live one against the Codex
     the watcher drives - codex/inuse.py); `follower` is the process's one (FOLLOWER); `seconds` the cap of the
     turn; `mode` TURN, COMPACT or FALLBACK, with `model` the one a FALLBACK turn runs on; `app_running` the look
-    at whether the Codex app has started (None: never asked); `key` the interruption the run is for."""
+    at whether the Codex app has started (None: never asked); `key` the interruption the run is for; `owe` - a
+    FALLBACK turn's - writes the conversation's own model down as owed back, given (thread_id, model, seconds), True
+    once it is stored: asked before turn/start, and no turn starts where it is not (engine/fallback.py)."""
     takes_words = True
 
     def __init__(self, capability, *, key, session, follower=None, seconds=3600, mode=TURN, model=None,
-                 app_running=None):
-        self.capability, self.key, self._open = capability, key, session
+                 app_running=None, owe=None):
+        self.capability, self.key, self._open, self.owe = capability, key, session, owe
         self.follower = follower or FOLLOWER
         self.seconds, self.mode, self.model, self.app_running = seconds, mode, model, app_running
         # What the last resume came to before a turn started, for the capability's journal: refused_settings, or None.
@@ -319,7 +328,7 @@ class HeadlessRun:
             session.__enter__()
         except Exception:
             return dict(SPAWN_FAILED)
-        handed = False
+        handed, owing, answered = False, None, None
         try:
             try:
                 resumed = session.call("thread/resume", {"threadId": thread_id, "excludeTurns": True})
@@ -340,6 +349,12 @@ class HeadlessRun:
                     return dict(PREFLIGHT)
             if still_unloaded is not None and not _yes(still_unloaded):
                 return dict(PREFLIGHT)
+            if self.mode == FALLBACK:
+                # The conversation's own model stored as owed back before anything can change it: a watcher stopped
+                # mid-turn puts it back after a restart (engine/fallback.py). Not stored, nothing starts.
+                if self.owe is not None and not _yes(lambda: self.owe(thread_id, original, self.seconds)):
+                    return dict(PREFLIGHT)
+                owing = original
             answered = self._start(session, thread_id, words, client_id)
             if answered.get("outcome") not in ("ran", "accepted"):
                 return answered
@@ -355,6 +370,12 @@ class HeadlessRun:
             return {"outcome": "unknown", "error_code": "queue_result_unknown"}
         finally:
             if not handed:
+                if owing is not None:
+                    # A fallback turn/start asked and never handed over - refused, unanswered, a turn id not a turn's,
+                    # or a run already live: the model put back here, on every one of those paths.
+                    refused = isinstance(answered, dict) and answered.get("outcome") == "not_started"
+                    self.follower.told(self.key, self.capability, RunEnd.FAILED if refused else RunEnd.LOST,
+                                       Follower._restore(session, thread_id, owing))
                 _close(session)
 
     def _start(self, session, thread_id, words, client_id):

@@ -60,7 +60,8 @@ there, untouched, for a build that knows them, and the standard edition never op
 Stage 4's version (v0.6.16-beta.4; the owner's yes of 2026-10-11) adds two tables and remakes none - the file before
 it is brought to it by two CREATE TABLE statements, every row kept (UPGRADE_TO_STAGE4):
 
-    headless_runs  a turn run here while it runs, a person's Stop of it, and how it ended (state/runs.py)
+    headless_runs  a turn run here while it runs, a person's Stop of it, how it ended, and the model a fallback
+                   turn owes the conversation back until it is put back (state/runs.py)
     chat_messages  the Dashboard's chat messages: their words only until sent (state/chat.py)
 
 The way down is the same: an older build refuses the file as newer, every capability off.
@@ -119,7 +120,7 @@ TABLES = {
               "paused_reset_at"),
     # Stage 4 (v0.6.16-beta.4): a turn run here, and the Dashboard's chat.
     "headless_runs": ("interruption_id", "capability", "thread_id", "started_at", "ends_by", "stop_requested_at",
-                      "ended_at", "end"),
+                      "ended_at", "end", "restore_model"),
     "chat_messages": ("chat_id", "thread_id", "words", "state", "reason", "record_id", "created_at", "sent_at",
                       "finished_at"),
 }
@@ -130,6 +131,8 @@ V5_TABLES = ("meter",)
 STAGE4_TABLES = ("headless_runs", "chat_messages")
 # The capabilities whose turns `headless_runs` holds.
 HEADLESS_CAPABILITIES = ("headless_run", "compact_continue", "model_fallback")
+# A model's name at most, as Codex says it (codex/headless.py reads no longer one): what a fallback turn owes back.
+MODEL_NAME = 128
 # A chat message's words at most (A27's length).
 CHAT_WORDS = 2000
 # The reset actions' tables, the last four of version 3 (v0.6.14).
@@ -499,9 +502,12 @@ _STATEMENTS_STAGE4 = (
         stop_requested_at REAL,
         ended_at REAL,
         end TEXT CHECK (end IS NULL OR end IN (%s)),
+        restore_model TEXT CHECK (restore_model IS NULL OR (typeof(restore_model) = 'text'
+                                  AND length(restore_model) BETWEEN 1 AND %d AND capability = 'model_fallback')),
         CHECK ((end IS NULL) = (ended_at IS NULL))
     )""" % ("CHECK (length(interruption_id) = 64 AND interruption_id NOT GLOB '*[^0-9a-f]*')",
-            _one_of("capability", HEADLESS_CAPABILITIES), _UUID, ", ".join("'%s'" % word for word in RunEnd)),
+            _one_of("capability", HEADLESS_CAPABILITIES), _UUID, ", ".join("'%s'" % word for word in RunEnd),
+            MODEL_NAME),
     """CREATE TABLE chat_messages (
         chat_id INTEGER PRIMARY KEY AUTOINCREMENT,
         thread_id TEXT NOT NULL %s,

@@ -103,6 +103,24 @@ class RunTests(StateCase):
         self.assertEqual(state.prune_runs(self.now, capability="model_fallback"), 0, "not older than asked")
 
 
+    def test_a_fallback_turns_model_is_kept_owed_until_put_back(self):
+        state = self.state()
+        state.run_owed(KEY, "model_fallback", ac.THREAD, "its-own-model", started_at=self.now, ends_by=self.now + 1)
+        state.run_started(KEY, "model_fallback", ac.THREAD, started_at=self.now, ends_by=self.now + 1)
+        state.run_ended(KEY, RunEnd.LOST, at=self.now)
+        self.assertEqual([row["restore_model"] for row in state.runs_owed("model_fallback")], ["its-own-model"])
+        self.assertEqual(state.prune_runs(self.now + 1), 0, "never pruned while owed")
+        self.assertTrue(state.run_restored(KEY))
+        self.assertEqual(state.runs_owed("model_fallback"), [])
+        self.assertEqual(state.prune_runs(self.now + 1), 1)
+
+    def test_only_a_fallback_turn_owes_a_model(self):
+        state = self.state()
+        for capability, model in (("headless_run", "m"), ("model_fallback", ""), ("model_fallback", "m" * 129)):
+            with self.assertRaises((StateError, sqlite3.IntegrityError)):
+                state.run_owed(KEY, capability, ac.THREAD, model, started_at=self.now, ends_by=self.now)
+
+
 class ChatTests(StateCase):
     def test_words_are_kept_only_while_a_message_waits(self):
         state = self.state()

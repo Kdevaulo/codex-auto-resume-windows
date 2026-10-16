@@ -12,6 +12,11 @@ turn ends. Which of that and a resume-only override is the route is MF's to sett
 force the statement carries the UNMEASURED warning. A restore Codex refused is journalled `model_not_restored`, a
 closed word with no model's name, which Pending and History say in words (D4: the journal keeps codes only).
 
+The conversation's own model is stored as owed back (state/runs.py, `restore_model`) before the turn/start, and
+cleared only once it reads back put back. A debt left - a watcher stopped mid-turn, a restore Codex refused - is
+P8's errand: with no run live, Codex closed and nothing holding the conversation, it is put back, the one write
+inside core's errand guard, and read back.
+
 Never for a usage, rate, sign-in or billing failure: only server_5xx with Codex's capacity code.
 """
 from __future__ import annotations
@@ -20,6 +25,7 @@ from codex_auto_resume.domain import ids
 from codex_auto_resume.domain.plug import DEFER
 
 from ..codex import headless, inuse
+from ..codex.headless import _close, _model
 from ..codex.turns import Turns
 from ..vocabulary import OptionKey
 from .headless import HOUR, _app_running, follow_up, unheld
@@ -30,18 +36,22 @@ CODE = "serverOverloaded"
 ATTEMPTS = (1, 2, 3)
 DEFAULT_ATTEMPTS = 2
 NOT_RESTORED = "model_not_restored"
+# How often a model still owed back is tried again, in seconds: a restore Codex refuses is not asked every tick.
+RESTORE_EVERY = 600
 
 
 class ModelFallback:
     """The capability's code: its hooks at P16 and P8. `bind` gives it its view of the state (state.Scoped)."""
-    __slots__ = ("paths", "_scoped", "_turns", "_open", "follower", "_app", "_routes")
+    __slots__ = ("paths", "_scoped", "_turns", "_open", "follower", "_app", "_routes", "_unheld", "_tried")
 
-    def __init__(self, paths, *, turns=None, session=None, follower=None, app_running=None):
+    def __init__(self, paths, *, turns=None, session=None, follower=None, app_running=None, unheld_now=None):
         self.paths, self._scoped, self._turns = paths, None, turns
         self._open = session if session is not None else headless.live_session(paths)
         self.follower = follower or headless.FOLLOWER
         self._app = app_running if app_running is not None else _app_running(paths)
         self._routes = {}
+        self._unheld = unheld_now if unheld_now is not None else _unheld_now(paths)
+        self._tried = {}
 
     def bind(self, scoped):
         self._scoped = scoped
@@ -69,19 +79,81 @@ class ModelFallback:
                 or (record.get("chain_continuations") or 0) < self._attempts() or not self._overloaded(record)):
             return DEFER
         route = headless.HeadlessRun(CAPABILITY, key=key, session=self._open, follower=self.follower,
-                                     seconds=HOUR, mode=headless.FALLBACK, app_running=self._app)
+                                     seconds=HOUR, mode=headless.FALLBACK, app_running=self._app,
+                                     owe=lambda thread_id, model, seconds: self._owe(key, thread_id, model, seconds))
         self._routes = {key: route}
         return route
 
+    def _owe(self, key, thread_id, model, seconds) -> bool:
+        now = self._scoped.now()
+        self._scoped.runs.owe(key, thread_id, model, started_at=now, ends_by=now + seconds)
+        return True
+
     def tick(self, view):
         """P8: the run kinds' one path (engine/headless.follow_up) - a Stop handed on, a row no thread follows ended
-        LOST - and a model Codex would not put back journalled."""
+        LOST - a model put back cleared from the debt, one Codex would not put back journalled; then, while a debt is
+        left and no run is live, the errand that puts it back."""
         scoped = self._scoped
 
         def told(ended):
-            if ended.get("model_restored") is False:
+            if ended.get("model_restored") is True:
+                scoped.runs.restored(ended["key"])
+            elif ended.get("model_restored") is False:
                 scoped.count(NOT_RESTORED)
-        return follow_up(scoped, self.follower, CAPABILITY, self._routes.values(), on_end=told)
+        follow_up(scoped, self.follower, CAPABILITY, self._routes.values(), on_end=told)
+        try:
+            owed = [row for row in (scoped.runs.owed() if scoped is not None and self.follower.live() is None else ())
+                    if scoped.now() - self._tried.get(row["interruption_id"], float("-inf")) >= RESTORE_EVERY]
+        except Exception:
+            owed = []
+        return _Restore(self, owed[0]) if owed else DEFER
+
+
+class _Restore:
+    """P8's errand: the model a fallback turn still owes its conversation put back - only while no run is live, Codex
+    is closed and nothing holds the conversation; the one write inside core's errand guard, read back outside it."""
+    __slots__ = ("code", "row")
+
+    def __init__(self, code, row):
+        self.code, self.row = code, row
+
+    def run(self, guard):
+        code, thread, model = self.code, self.row["thread_id"], self.row["restore_model"]
+        try:
+            if code.follower.live() is not None or code._unheld(thread) is not True:
+                return
+            code._tried[self.row["interruption_id"]] = code._scoped.now()
+            session = code._open(CAPABILITY)
+            session.__enter__()
+        except Exception:
+            return
+        restored, asked = False, False
+        try:
+            session.call("thread/resume", {"threadId": thread, "excludeTurns": True})
+            with guard() as permitted:
+                if permitted is not True:
+                    return
+                asked = True
+                session.call("thread/settings/update", {"threadId": thread, "model": model})
+            resumed = session.call("thread/resume", {"threadId": thread, "excludeTurns": True})
+            restored = _model(resumed) == model
+        except Exception:
+            restored = False
+        finally:
+            _close(session)
+        if restored:
+            code._scoped.runs.restored(self.row["interruption_id"])
+        elif asked:
+            code._scoped.count(NOT_RESTORED)
+
+
+def _unheld_now(paths):
+    """The look at a thread before its model is put back: the Codex app not running and nothing holding it (core's
+    Backend.holder), on a backend made for the look."""
+    def look(thread_id) -> bool:
+        backend = inuse.backend(paths)
+        return backend.app_identity() is None and backend.holder(thread_id) == "none"
+    return look
 
 
 def make(paths) -> ModelFallback:

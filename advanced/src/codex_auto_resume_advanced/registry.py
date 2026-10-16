@@ -538,7 +538,9 @@ COMPACT_CONTINUE = CapabilityDef(
 # coded serverOverloaded whose task has had the person's Attempts (1 to 3, 2 by default) of continuations, and only
 # where nothing holds the conversation while Codex is closed, it is the headless route in fallback mode: one turn on
 # Codex's own default model where the conversation is on another, the conversation's own model put back before it
-# lets go (codex/headless.py); at P8 it journals each run, and a model Codex would not put back (model_not_restored).
+# lets go (codex/headless.py), on every path; at P8 it journals each run, and a model Codex would not put back
+# (model_not_restored) - and, where one is still owed (stored before the turn/start: a watcher stopped mid-turn), puts
+# it back as its errand, with no run live, Codex closed and nothing holding the conversation.
 # It departs from 0.5 (it changes and replays a model setting), A2, A11, B3, B4, E8 and F8 (as headless_run) and B9
 # (it reads Codex's error code), stands on transient_classification and rests on MF. Ceilings: two a conversation,
 # six a day. Before headless_run in DEFINITIONS, so its own case is its route's at P16.
