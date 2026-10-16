@@ -842,11 +842,6 @@ Three things the owner asked for on 2026-10-16, for the v0.6.16 final:
 - a smaller edition label,
 - a click on a popup's body opens its page.
 
-And one the owner added the same day: recovering a Codex cloud task, in the advanced edition and off by default -
-through the Codex app's own internal channel where the app shows the task as a conversation, and otherwise started
-again as a new cloud task with `codex cloud exec` once the limit resets - if the measurements allow it (Codex's own
-`codex cloud` command reads a task's state but cannot continue one: measurement MCLOUD, 2026-10-16).
-
 ### Also moved here
 
 - **Watching several Codex homes**, a standard-edition addition that waited on measurement MH, which
