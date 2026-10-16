@@ -101,8 +101,13 @@ The setup program is the release archive of [From the release archive](#from-the
 in one file. It carries that archive byte for byte, with the archive's SHA-256 beside it. When you
 start it, it checks the archive against that digest and stops if they differ, unpacks it into a new
 folder of its own in your temporary folder, runs the archive's own `Install.cmd` there - the same
-installer, asking the same questions in the same console window, and ending the same way - and then
-removes that folder. It downloads nothing, needs no administrator rights and brings no Python of its
+installer - and then removes that folder. From v0.6.16 it does this in a window of its own, in the
+Dashboard's look and in your Windows language (you can pick another): it says what it installs, which
+edition and version, and where; asks only what the installer has a choice about - whether to run at
+Windows sign-in on a first installation, and whether to change the edition when the other one is
+installed - shows how far the installer is and which step it is on, and ends by saying whether it
+finished, with the installer's exit code and its log, and offers to open the Dashboard. No console window
+opens. It downloads nothing, needs no administrator rights and brings no Python of its
 own: the installation runs on the Python inside the archive. It loads DLLs from Windows' System32
 folder only, so a DLL lying beside it in Downloads is never loaded, and it stops if a `.config` file
 is beside it. Started from a command line, it passes switches such as `-SkipStartup` on to
@@ -116,7 +121,9 @@ installed, in which case nothing is changed, since nobody can be asked). The sam
 
 From v0.6.16 an installation also appears in Windows' Settings > Apps and in `winget list`, as *Codex Auto Resume*
 (*Codex Auto Resume Advanced* for the advanced edition), for your Windows user only. Its Uninstall button runs the
-uninstaller the installer keeps in `%USERPROFILE%\.codex-auto-resume\uninstall\`, the same one as `Uninstall.cmd`.
+uninstaller the installer keeps in `%USERPROFILE%\.codex-auto-resume\uninstall\`, the same one as `Uninstall.cmd`, in
+the same installer window: it asks whether to delete the settings and the recovery history too, and shows the
+removal as it goes. `winget uninstall` runs the same uninstaller with `-Silent`, with no window.
 A change of edition replaces the entry with the other edition's, and an update rewrites it. An installation placed
 elsewhere with `CODEX_AUTO_RESUME_PLUGIN_HOME` gets neither the kept uninstaller nor an entry.
 
@@ -218,7 +225,9 @@ and the Dashboard's Diagnostics says so too until the copy is replaced. `Uninsta
 Codex to remove it, removes it; see [Uninstall](#uninstall) for what each route leaves behind.
 
 **Check for updates**, on the Dashboard's Diagnostics page, asks GitHub whether a newer release has
-been published and offers to install it. From v0.6.11 it also looks for a newer *pre-release*: an
+been published and offers to install it. From v0.6.16 the install runs in the setup program's window, which
+shows how far it is and its log, and once it is done offers to open the new version's Dashboard in place of this
+one. From v0.6.11 it also looks for a newer *pre-release*: an
 `-alpha` or `-beta` build published before its release is finished, and tested less than a release.
 When there is one newer than both the version you have and the newest release, and no release to
 offer first, it asks whether to install it - and **Not now** is the button Enter presses. Saying yes
