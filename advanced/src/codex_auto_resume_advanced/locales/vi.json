@@ -88,6 +88,8 @@
   "page.done.rule_added": "Đã thêm quy tắc.",
   "page.done.rule_removed": "Đã xóa quy tắc.",
   "page.done.run_stop": "Đã yêu cầu. Trình theo dõi sẽ dừng lượt ở lần kiểm tra tiếp theo.",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.done.send_now": "Đã yêu cầu. Nếu qua mọi bước kiểm tra, trình theo dõi gửi nó ở lần xem kế tiếp; danh sách cho thấy điều đã xảy ra.",
   "page.done.watch": "\"{name}\" đang được quan sát. Nó chưa làm gì cả.",
   "page.hourly": "Số lần gửi mỗi giờ, tính chung mọi tính năng nâng cao",

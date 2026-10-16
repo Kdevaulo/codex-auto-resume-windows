@@ -88,6 +88,8 @@
   "page.done.rule_added": "أُضيفت القاعدة.",
   "page.done.rule_removed": "حُذفت القاعدة.",
   "page.done.run_stop": "تم الطلب. يوقف المراقب الدورة عند نظرته التالية.",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.done.send_now": "طُلب ذلك. إن اجتازت كل الفحوص، يرسلها المراقب في نظرته التالية؛ وتُظهر القائمة ما حدث.",
   "page.done.watch": "«{name}» قيد المراقبة. لا تفعل شيئًا بعد.",
   "page.hourly": "مرات الإرسال في الساعة، لكل الميزات المتقدمة معًا",

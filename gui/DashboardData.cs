@@ -723,10 +723,12 @@ namespace CodexAutoResume
         // is kept by the clock.
         private string[] Cells(Dictionary<string, object> row, bool pending)
         {
-            return pending
+            string[] cells = pending
                 ? new[] { Labelled(row), CodeLabel(row), KindLabel(row), null, Attempts(row), "" }
                 : new[] { Labelled(row), CodeLabel(row), KindLabel(row),
                           When(Number(row, "detected_at")), When(Number(row, "outcome_at")) };
+            CellsWritten(row, pending, cells);
+            return cells;
         }
 
         /// v0.6.11: the attempts a task has used beside those it may have now - "3/4", and "19/6" after the limit was

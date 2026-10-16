@@ -139,7 +139,7 @@ class PointTests(unittest.TestCase):
         found = points()
         self.assertEqual(found, {"DashboardBuilt": "gui/Dashboard.cs", "SnapshotApplied": "gui/Dashboard.cs",
                                  "PendingBuilt": "gui/Dashboard.cs", "ArgumentParsed": "gui/Dashboard.cs",
-                                 "ReopenArgumentsWritten": "gui/Dashboard.cs"})
+                                 "ReopenArgumentsWritten": "gui/Dashboard.cs", "CellsWritten": "gui/Dashboard.cs"})
         # No other shape of partial method: one with a body in a standard source would be
         # compiled into the standard window, which is the whole thing this rules out.
         whole = guiscan.whole()
@@ -155,7 +155,7 @@ class PointTests(unittest.TestCase):
                         self.assertRegex(line, r"^\s*%s\([^;]*\);\s*$" % point)
                         calls[point] = calls.get(point, 0) + 1
         self.assertEqual(calls, {"DashboardBuilt": 1, "SnapshotApplied": 2, "PendingBuilt": 1, "ArgumentParsed": 1,
-                                 "ReopenArgumentsWritten": 1})
+                                 "ReopenArgumentsWritten": 1, "CellsWritten": 1})
 
 
 def copy_window(target: Path) -> Path:

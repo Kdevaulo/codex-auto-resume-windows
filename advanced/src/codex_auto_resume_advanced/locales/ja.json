@@ -88,6 +88,8 @@
   "page.done.rule_added": "ルールを追加しました。",
   "page.done.rule_removed": "ルールを削除しました。",
   "page.done.run_stop": "依頼しました。監視は次の確認時にターンを停止します。",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.done.send_now": "依頼しました。すべての確認を通れば、監視プロセスが次の確認のときに送ります。結果は一覧に表示されます。",
   "page.done.watch": "{name} を様子見しています。まだ何もしません。",
   "page.hourly": "1 時間の送信回数（すべての高度な機能の合計）",

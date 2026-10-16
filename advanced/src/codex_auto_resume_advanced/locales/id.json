@@ -88,6 +88,8 @@
   "page.done.rule_added": "Aturan ditambahkan.",
   "page.done.rule_removed": "Aturan dihapus.",
   "page.done.run_stop": "Diminta. Pengawas menghentikan giliran pada pemeriksaan berikutnya.",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.done.send_now": "Diminta. Jika lolos setiap pemeriksaan, pengawas mengirimnya pada pemeriksaan berikutnya; daftar menunjukkan apa yang terjadi.",
   "page.done.watch": "\"{name}\" sedang diamati. Fitur ini belum melakukan apa pun.",
   "page.hourly": "Pengiriman per jam, semua fitur tingkat lanjut digabung",

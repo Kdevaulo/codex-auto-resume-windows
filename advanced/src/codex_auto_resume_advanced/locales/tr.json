@@ -88,6 +88,8 @@
   "page.done.rule_added": "Kural eklendi.",
   "page.done.rule_removed": "Kural kaldırıldı.",
   "page.done.run_stop": "İstendi. Gözcü turu bir sonraki bakışında durdurur.",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.done.send_now": "İstendi. Tüm denetimlerden geçerse gözcü onu bir sonraki bakışında gönderir; liste ne olduğunu gösterir.",
   "page.done.watch": "\"{name}\" izleniyor. Henüz hiçbir şey yapmıyor.",
   "page.hourly": "Saatlik gönderim, tüm gelişmiş özellikler toplamı",

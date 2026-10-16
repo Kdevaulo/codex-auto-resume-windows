@@ -581,5 +581,7 @@
   "page.runs.conversation": "A conversation",
   "page.confirm.run_stop": "Stop this turn? Codex interrupts it at the watcher's next look, as Stop in Codex would, and the recovery ends as that turn ends.",
   "page.done.run_stop": "Asked. The watcher stops the turn at its next look.",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.keep_on.never": "It cannot be kept on: turning itself off when something goes wrong is what keeps it safe."
 }

@@ -88,6 +88,8 @@
   "page.done.rule_added": "已添加规则。",
   "page.done.rule_removed": "已删除规则。",
   "page.done.run_stop": "已请求。监视程序会在下次查看时停止该回合。",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.done.send_now": "已请求。如果每一项检查都通过，守护进程会在下一次查看时发送它；列表会显示结果。",
   "page.done.watch": "正在观察“{name}”。它还不会做任何事。",
   "page.hourly": "每小时发送次数（所有高级功能合计）",

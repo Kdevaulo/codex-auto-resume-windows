@@ -88,6 +88,8 @@
   "page.done.rule_added": "A regra foi adicionada.",
   "page.done.rule_removed": "A regra foi removida.",
   "page.done.run_stop": "Pedido. O vigia para o turno na próxima verificação.",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.done.send_now": "Pedido feito. Se passar em todas as verificações, o vigia a envia na próxima verificação; a lista mostra o que aconteceu.",
   "page.done.watch": "\"{name}\" está em observação. Ainda não faz nada.",
   "page.hourly": "Envios por hora, todos os recursos avançados juntos",

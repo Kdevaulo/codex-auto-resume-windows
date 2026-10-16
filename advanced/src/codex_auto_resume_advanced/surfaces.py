@@ -185,10 +185,12 @@ def status(runtime) -> dict:
     except Exception:
         pass
     shown.update(meter_view(runtime))
-    # v0.6.16-beta.4: the turns run here now, only where there are any.
+    # v0.6.16-beta.4: the turns run here now, only where there are any - and what Pending and History say of a row
+    # the edition had a hand in, keyed by interruption id, only where there is something to say.
     found = runs(runtime)
     if found:
         shown["runs"] = found
+    shown.update(rows(runtime))
     return shown
 
 
@@ -373,6 +375,87 @@ def runs(runtime) -> list:
                 for row in runtime.state.runs(live=True)]
     except Exception:
         return []
+
+
+# ---------------------------------------------------------------------------- Pending's and History's rows
+# The rows Pending and History list (control/records: the records still going, and the newest 200), and how long a
+# conversation's kind is kept once read: a conversation the Codex app takes over from a terminal (issue #37) is the
+# app's own from then on, so a kind is read again after a while.
+ROWS_READ = 200
+KIND_SECONDS = 600.0
+# {(Codex home, conversation id): (its kind or None, when it was read)}, for the life of the bridge's process.
+_KINDS = {}
+
+
+def rows(runtime, *, store=None, source=None) -> dict:
+    """What Pending and History say beside a row this edition had a hand in (P10, v0.6.16-beta.4), keyed by
+    interruption id - words of this edition's own, never a conversation's: {"kinds": {id: "cli" or "ide"}} for a
+    conversation of a terminal's Codex TUI or of VS Code (other_sessions: " · CLI" or " · VS Code" on its label line).
+    Each part only where there is something in it, and read only while the capability it is of stands on or watched,
+    so with none of them on nothing is read at all. `store` is core's state and `source` the Codex home's reader -
+    the Dashboard's own, by default; a test's."""
+    from .registry import OTHER_SESSIONS
+    try:
+        states = runtime.states()
+    except Exception:
+        return {}
+    wanted = states.get(OTHER_SESSIONS.id, ArmingState.OFF) != ArmingState.OFF
+    if not wanted:
+        return {}
+    shown = {}
+    try:
+        listed = _listed(runtime, store)
+    except Exception:
+        return {}
+    try:
+        reader = source if source is not None else _source(runtime)
+        kinds = {key: kind for key, kind in ((row["interruption_id"], _kind(reader, row["thread_id"]))
+                                             for row in listed if not row.get("home_key")) if kind}
+    except Exception:
+        kinds = {}
+    if kinds:
+        shown["kinds"] = kinds
+    return shown
+
+
+def _listed(runtime, store) -> list:
+    """The records Pending and History list, each once: those still going, then the newest ROWS_READ."""
+    from codex_auto_resume.store import Store
+    if store is None:
+        with Store(runtime.paths.state_dir) as opened:
+            return _listed(runtime, opened)
+    seen, found = set(), []
+    for row in store.pending() + store.history(limit=ROWS_READ):
+        if row["interruption_id"] not in seen:
+            seen.add(row["interruption_id"])
+            found.append(row)
+    return found
+
+
+def _source(runtime):
+    from codex_auto_resume.codex import LocalSource
+    from .codex import inuse
+    return LocalSource(inuse.home(runtime.paths))
+
+
+def _kind(source, thread_id):
+    """"cli" or "ide" for a conversation of a terminal's Codex TUI or of VS Code, judged as core judges one
+    (LocalSource.taken: its row and its file's first line); None for the app's own - one it took over or forked from
+    a terminal among them - and for anything else. Kept KIND_SECONDS; one that cannot be read is not kept."""
+    from time import monotonic
+    from codex_auto_resume.domain.plughands import SessionKind
+    key, now = (str(getattr(source, "home", "")), thread_id), monotonic()
+    held = _KINDS.get(key)
+    if held is not None and 0 <= now - held[1] < KIND_SECONDS:
+        return held[0]
+    found = None
+    if not source.taken(thread_id, frozenset()):
+        found = next((str(kind) for kind in (SessionKind.CLI, SessionKind.IDE)
+                      if source.taken(thread_id, frozenset({kind}))), None)
+    if len(_KINDS) > 4096:
+        _KINDS.clear()
+    _KINDS[key] = (found, now)
+    return found
 
 
 def resets(runtime, command, argument):

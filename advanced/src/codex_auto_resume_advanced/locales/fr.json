@@ -88,6 +88,8 @@
   "page.done.rule_added": "La règle a été ajoutée.",
   "page.done.rule_removed": "La règle a été supprimée.",
   "page.done.run_stop": "Demandé. Le veilleur arrête le tour à son prochain coup d'œil.",
+  "page.row.kind.cli": "CLI",
+  "page.row.kind.ide": "VS Code",
   "page.done.send_now": "Demandé. Si tous les contrôles passent, la sentinelle l'envoie à son prochain examen ; la liste montre ce qui s'est passé.",
   "page.done.watch": "« {name} » est en observation. Elle ne fait encore rien.",
   "page.hourly": "Envois par heure, toutes fonctions avancées confondues",

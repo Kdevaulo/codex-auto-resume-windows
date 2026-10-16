@@ -11,6 +11,11 @@
 //
 // Nothing here draws anything the page does not draw already: the card, the help lines and the buttons are Send now's.
 //
+// And what Pending and History say of a row this edition had a hand in (CellsWritten): words joined to a cell's own
+// line - " · CLI" or " · VS Code" after the conversation of a terminal's or VS Code's (other_sessions) - from what the
+// status the window already reads carries of each row, by its interruption id (surfaces.rows). No cell, column or
+// element of its own: as a second Codex home's alias joins the label line (v0.6.15-beta).
+//
 // C# 5 (the in-box compiler), as the rest of the window.
 
 using System;
@@ -92,6 +97,18 @@ namespace CodexAutoResume
                 stop.AccessibleName = Word("page.runs.stop", "Stop...") + " " + conversation;
                 runStops.Add(stop);
             }
+        }
+
+        /// What this edition says of one row of Pending (`pending`) or History, joined to its cells' lines: the kind of
+        /// conversation after its label, from the status of the snapshot being shown (surfaces.rows).
+        partial void CellsWritten(Dictionary<string, object> row, bool pending, string[] cells)
+        {
+            string key = Str(row, "interruption_id");
+            Dictionary<string, object> said = Map(Map(snapshot, "status"), "advanced");
+            if (key == null || said == null) return;
+            string kind = Str(Map(said, "kinds"), key);
+            if (kind == "cli") cells[0] += " · " + Word("page.row.kind.cli", "CLI");
+            else if (kind == "ide") cells[0] += " · " + Word("page.row.kind.ide", "VS Code");
         }
 
         /// Ask, then hand the watcher one run's Stop: the turn is interrupted at its next look.
