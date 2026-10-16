@@ -177,6 +177,11 @@ class Route:
     def __init__(self, resume, words=False):
         self._resume, self.words = resume, words is True
 
+    @property
+    def takes_words(self) -> bool:
+        """Whether this route is handed core's words (`words`): what the plug's object said, held to True itself."""
+        return self.words
+
     def resume(self, thread_id, *, launch_guard=None, still_unloaded=None, words=None, client_id=None):
         with launch_guard if launch_guard is not None else nullcontext(True) as permitted:
             pass

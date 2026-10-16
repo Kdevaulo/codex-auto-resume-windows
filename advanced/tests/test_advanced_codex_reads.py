@@ -197,7 +197,7 @@ class StatementTests(unittest.TestCase):
                     for name in CONTENT:
                         if statement is lineage.CHILD_TURN and name == "error_json":
                             continue
-                        # v0.6.16-beta.4: a failed turn's error, dropped to Codex's code at once (Turns.error_code).
+                        # v0.6.16-beta.4: a failed turn's error, dropped to Codex's code at once (Turns.turn_code).
                         if statement is turns.ERROR and name == "error_json":
                             self.assertEqual(columns, "error_json")
                             continue

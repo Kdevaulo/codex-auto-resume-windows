@@ -164,7 +164,7 @@ class Turns:
             return Turn(turn_id, status, bool(errored), completed, bool(final), index * SPAN + ordinal, kinds)
         return self._read(run)
 
-    def error_code(self, thread_id, turn_id):
+    def turn_code(self, thread_id, turn_id):
         """Codex's code for the error of turn `turn_id` (core's failures.shape: a known code, or one of its shape), or
         None - the error itself dropped at once, never kept or returned."""
         if not ids.is_uuid(thread_id) or not ids.is_uuid(turn_id):

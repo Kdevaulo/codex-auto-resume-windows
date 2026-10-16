@@ -53,10 +53,10 @@ class ModelFallback:
         return chosen if chosen in ATTEMPTS else DEFAULT_ATTEMPTS
 
     def _overloaded(self, record) -> bool:
-        """Whether the record's failed turn is Codex's capacity code (codex/turns.error_code - a code, never words)."""
+        """Whether the record's failed turn is Codex's capacity code (codex/turns.turn_code - a code, never words)."""
         try:
             turns = self._turns if self._turns is not None else Turns(inuse.home(self.paths))
-            return turns.error_code(record["thread_id"], record["turn_id"]) == CODE
+            return turns.turn_code(record["thread_id"], record["turn_id"]) == CODE
         except Exception:
             return False
 

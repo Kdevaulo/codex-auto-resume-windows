@@ -34,7 +34,7 @@ class Codes:
     def __init__(self, code):
         self.code = code
 
-    def error_code(self, thread_id, turn_id):
+    def turn_code(self, thread_id, turn_id):
         return self.code
 
 
@@ -109,10 +109,10 @@ class ErrorCodeTests(unittest.TestCase):
             home = CodexHome(Path(folder))
             turn = home.add_turn(T1, None, "failed", progress=False, error_json=json.dumps(
                 {"codexErrorInfo": "serverOverloaded", "message": "secret words"}))
-            self.assertEqual(Turns(home.root).error_code(T1, turn), "serverOverloaded")
+            self.assertEqual(Turns(home.root).turn_code(T1, turn), "serverOverloaded")
             other = home.add_turn(T1, None, "failed", progress=False, error_json="not json")
-            self.assertIsNone(Turns(home.root).error_code(T1, other))
-            self.assertIsNone(Turns(home.root).error_code(T1, new_id()))
+            self.assertIsNone(Turns(home.root).turn_code(T1, other))
+            self.assertIsNone(Turns(home.root).turn_code(T1, new_id()))
 
 
 class RegistryTests(TakingCase):
