@@ -93,6 +93,10 @@ namespace CodexAutoResume
                 return Word("page.kept.not_delivered_on_open", "It stayed on although Codex did not run a message queued for a conversation when it was opened.");
             if (notice == "requirement_off")
                 return Word("page.kept.requirement_off", "It stayed on although a feature it needs is no longer on.");
+            if (notice == "not_dispatched_by_session")
+                return Word("page.kept.not_dispatched_by_session", "It stayed on although a terminal or VS Code session did not take a message queued for it in time.");
+            if (notice == "refused_by_codex")
+                return Word("page.kept.refused_by_codex", "It stayed on although Codex refused to start a turn with no words.");
             return null;
         }
 
@@ -118,7 +122,10 @@ namespace CodexAutoResume
                                    : Word("page.keep_on.on", "Kept on: it does not turn itself off."));
             state.ForeColor = Ink;
             card.Controls.Add(state);
-            if (!kept) keepOnButton = CardButton(card, Word("page.keep_on.turn_on", "Keep it on..."), delegate { KeepOnAdvanced(id, false); });
+            // v0.6.16-beta.4: never for one whose turning itself off is what keeps it safe (registry.keepable).
+            if (!kept && Equals(Get(item, "keepable"), false))
+                card.Controls.Add(HelpText(Word("page.keep_on.never", "It cannot be kept on: turning itself off when something goes wrong is what keeps it safe.")));
+            else if (!kept) keepOnButton = CardButton(card, Word("page.keep_on.turn_on", "Keep it on..."), delegate { KeepOnAdvanced(id, false); });
             if (kept && !again && !Equals(Get(item, "resends"), true) && !IsAction(item))
                 sendAgainButton = CardButton(card, Word("page.keep_on.send_again", "Also send again when unsure..."),
                                              delegate { KeepOnAdvanced(id, true); });

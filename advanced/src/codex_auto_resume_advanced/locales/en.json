@@ -572,5 +572,14 @@
   "statement.silent_continuation.risks": "Whether Codex starts a turn with no words, and keeps its id (M3B), has not been measured on every Codex version. Where Codex refuses it, that turn is started with the usual words instead, and this stops answering for that Codex version.",
   "statement.silent_continuation.stop": "Turn it off here or turn every advanced feature off; continuations then carry their words and marker again.",
   "page.tripped.refused_by_codex": "Turned off: Codex refused to start a turn with no words.",
-  "page.kept.refused_by_codex": "It stayed on although Codex refused to start a turn with no words."
+  "page.kept.refused_by_codex": "It stayed on although Codex refused to start a turn with no words.",
+  "page.runs.title": "Turns run here now",
+  "page.runs.none": "No turn is running here.",
+  "page.runs.until": "until {time} at most",
+  "page.runs.stopping": "Stopping...",
+  "page.runs.stop": "Stop...",
+  "page.runs.conversation": "A conversation",
+  "page.confirm.run_stop": "Stop this turn? Codex interrupts it at the watcher's next look, as Stop in Codex would, and the recovery ends as that turn ends.",
+  "page.done.run_stop": "Asked. The watcher stops the turn at its next look.",
+  "page.keep_on.never": "It cannot be kept on: turning itself off when something goes wrong is what keeps it safe."
 }

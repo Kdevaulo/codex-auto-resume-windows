@@ -169,6 +169,8 @@ namespace CodexAutoResume
             if (reply == null) return;
             // The recoveries waiting now, which Send now's card offers (AdvancedKeepOn.cs).
             advancedPending = Items(reply, "pending");
+            // The turns run here now, which the running capabilities' card lists (AdvancedRuns.cs, v0.6.16-beta.4).
+            RunsApplied(reply);
             // The reset rules waiting, read again when the status's counts of them change (AdvancedResets.cs).
             ResetCountsApplied(reply);
             if (advancedWords == null)
@@ -852,7 +854,7 @@ namespace CodexAutoResume
                            WatchShown(advancedOpen) + "|" +
                            KeptShown(item) + "|" +
                            (IsReport(item) ? ReportShown() : "") + "|" +
-                           ResetsShown(item) + "|" + KeepGoingShown(item) + "|" + QueueShown(item);
+                           ResetsShown(item) + "|" + KeepGoingShown(item) + "|" + QueueShown(item) + "|" + RunsShown(item);
             if (shown == advancedShown)
             {
                 UpdateAdvancedButtons();
@@ -1016,6 +1018,8 @@ namespace CodexAutoResume
 
             // Under its limits (v0.6.14): Send now's waiting recoveries. Keep it on is in the head card (v0.6.16-beta.3).
             BuildSendNow(item);
+            // The turns run here now, each with its Stop (v0.6.16-beta.4, AdvancedRuns.cs).
+            BuildRuns(item);
             // The reset actions' rules and the form they are added with (AdvancedResets.cs); the conversations kept going
             // and the queued prompts (v0.6.15-beta) - each while its capability is on or, from v0.6.16-beta.3, watched.
             BuildResets(item);
@@ -1394,6 +1398,10 @@ namespace CodexAutoResume
                 said = Word("page.tripped.not_delivered_on_open", "Turned off: a conversation was opened and Codex did not run the message queued for it.");
             else if (reason == "requirement_off")
                 said = Word("page.tripped.requirement_off", "Turned off: a feature it needs is no longer on.");
+            else if (reason == "not_dispatched_by_session")
+                said = Word("page.tripped.not_dispatched_by_session", "Turned off: a terminal or VS Code session did not take a message queued for it in time.");
+            else if (reason == "refused_by_codex")
+                said = Word("page.tripped.refused_by_codex", "Turned off: Codex refused to start a turn with no words.");
             return said ?? Word("page.tripped", "It turned itself off.");
         }
 

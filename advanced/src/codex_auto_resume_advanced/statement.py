@@ -170,7 +170,10 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
 # Codex refusing a turn with no words (silent_continuation).
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "tripped.not_dispatched_by_session", "kept.not_dispatched_by_session", "tripped.refused_by_codex",
-    "kept.refused_by_codex"))
+    "kept.refused_by_codex",
+    # The turns run here, each with its Stop (advanced/gui/AdvancedRuns.cs), and a capability never kept on.
+    "runs.title", "runs.none", "runs.until", "runs.stopping", "runs.stop", "runs.conversation", "confirm.run_stop",
+    "done.run_stop", "keep_on.never"))
 # The usage meter's, the wrap-up's and the pause's choices (v0.6.16-beta.3, issue #29): each OptionKey's label, and
 # how its values are said.
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
