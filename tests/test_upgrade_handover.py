@@ -369,13 +369,35 @@ class DashboardAfterUpdateTests(unittest.TestCase):
         self.assertLess(stale, asked, "a record an earlier update left is removed before the windows are asked")
 
     def test_the_window_closes_through_its_own_close_and_keeps_unsaved_changes(self):
-        body = self.window[self.window.index("private void CloseForUpdate()"):]
-        body = body[:body.index("\n        }\n")]
-        self.assertIn("if (updatingHere || reopening || auditing || Dirty()) return;", body)
+        import guiscan
+        body = guiscan.member_body("SettingsForm", "CloseForUpdate")
+        self.assertIn("if (updatingHere || reopening || auditing || Dirty())", body)
         self.assertLess(body.index("Dirty()"), body.index("File.WriteAllText("))
-        self.assertTrue(body.rstrip().endswith("Close();"), "its own close, last")
+        self.assertTrue(body.rstrip().rstrip("}").rstrip().endswith("Close();"), "its own close, last")
         self.assertIn("updatingHere = true;", self.update)
         self.assertIn("WatchForUpdate();", (ROOT / "gui" / "SettingsApp.cs").read_text(encoding="utf-8"))
+
+    def test_a_request_the_window_does_not_answer_leaves_it_listening_for_the_next(self):
+        """The wait is registered to run once (executeOnlyOnce), so a CloseForUpdate that returned early - unsaved
+        Settings changes, or the window's own update - stopped listening for good: a later setup program waited a
+        minute and said unsaved changes kept the window open that were long gone. An early return marks the window
+        to listen again, and the clock registers the wait again once the installer has reset the event - never while
+        it is still set, which would hear the same request again at once."""
+        import guiscan
+        close = guiscan.member_body("SettingsForm", "CloseForUpdate")
+        early = close[close.index("if (updatingHere || reopening || auditing || Dirty())"):close.index("bool normal")]
+        self.assertIn("updateRearm = true;", early)
+        self.assertLess(early.index("updateRearm = true;"), early.index("return;"))
+        self.assertIn("if (updateRearm) ListenForUpdateAgain();", guiscan.member_body("SettingsForm", "TickReopen"))
+        again = guiscan.member_body("SettingsForm", "ListenForUpdateAgain")
+        self.assertIn("updateClose.WaitOne(0)) return;", again, "not while the request is still set")
+        self.assertLess(again.index("updateClose.WaitOne(0)) return;"), again.index("updateRearm = false;"))
+        self.assertIn("updateWait.Unregister(null);", again)
+        self.assertIn("RegisterWaitForSingleObject(updateClose, UpdateHeard, null, -1, true)", again)
+        watch = guiscan.member_body("SettingsForm", "WatchForUpdate")
+        self.assertIn("RegisterWaitForSingleObject(updateClose, UpdateHeard, null, -1, true)", watch,
+                      "the first wait and the ones after it hear alike")
+        self.assertIn("BeginInvoke(new MethodInvoker(CloseForUpdate))", guiscan.member_body("SettingsForm", "UpdateHeard"))
 
     def test_both_sides_name_the_event_alike(self):
         """The window's name (UpdateEventName) and the installer's (Get-UpdateEventName), against Python's."""
