@@ -30,13 +30,16 @@ class ToSessionMixin:
         return machine.decode_gates(row.get("gate_eval")).get("thread_available") == (machine.PASS, machine.SESSION)
 
     def _session(self, row, loaded, vector):
-        """P16 for a conversation another Codex session holds: TO_SESSION, with the holder's identity kept for the
-        re-check under the lock - or None, core's own wait (held_by_other_session)."""
-        if loaded != "elsewhere" or vector["consent"][0] != machine.PASS:
+        """P16 for a conversation another Codex session holds: TO_SESSION, with the holder's identity - the pid and
+        creation time Backend.loaded read (`session_holder`) - kept for the re-check under the lock (routes.py,
+        `_still_where`); or None, core's own wait (held_by_other_session), where it said none."""
+        held = getattr(self.backend, "session_holder", None)
+        if loaded != "elsewhere" or vector["consent"][0] != machine.PASS or held is None:
             return None
         answer = self.plug.unloaded(dict(row, holder="session", app=True))
         if answer is not Alternative.TO_SESSION:
             return None
+        self._session_holders[row["thread_id"]] = held
         vector["thread_available"] = machine.gate(machine.PASS, machine.SESSION)
         return Alternative.TO_SESSION
 

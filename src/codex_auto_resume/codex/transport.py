@@ -71,6 +71,10 @@ class Backend:
         # v0.6.15-beta: a Codex home other than the default is the app's only while its server holds that
         # home's database open (codex/pairing.py); the default home is paired as it always was.
         self.require_holder = require_holder
+        # v0.6.16-beta.4: the one holder - its pid and creation time - of the conversation the last loaded() said is
+        # "elsewhere", and None after any other answer: what the re-check under the dispatch lock holds a continuation
+        # sent to another Codex session to (engine/tosession.py).
+        self.session_holder = None
         self._version_signature = None
         self._last_checks = None
         self.engine_version = None
@@ -205,6 +209,7 @@ class Backend:
             return None
 
     def loaded(self, thread_id, app_identity):
+        self.session_holder = None
         try:
             canonical_uuid(thread_id)
             self._compatible()
@@ -234,6 +239,7 @@ class Backend:
             # own reason, and nothing is sent. Anything else fails closed, as always.
             if (len(users) == 1 and users != [expected] and self.app_identity() == app_identity
                     and session_kind(self._rows, users[0], self.codex_exe)):
+                self.session_holder = (users[0]["pid"], users[0]["created"])
                 return "elsewhere"
             return "unknown"
         except (AdapterError, ValueError, OSError, KeyError, TypeError):

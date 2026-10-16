@@ -71,6 +71,9 @@ class LoadedTests(unittest.TestCase):
         """Fails with the classification reverted: it read "unknown"."""
         tui = {"pid": 30, "parent": 5, "path": ENGINE}
         self.assertEqual(self.loaded([{"pid": 30, "created": 300}], rows(tui)), "elsewhere")
+        self.assertEqual(self.backend.session_holder, (30, 300), "who holds it, for the re-check (tosession.py)")
+        self.assertEqual(self.loaded([], rows(tui)), "notLoaded")
+        self.assertIsNone(self.backend.session_holder, "no stale holder after another answer")
 
     def test_the_vs_code_extensions_own_engine_is_elsewhere(self):
         ide = {"pid": 40, "parent": 6, "path": EXTENSION}

@@ -84,6 +84,34 @@ class SendTests(SessionCase):
         self.assertEqual(h.backend.send_calls, [])
         self.assertEqual(h.record()["last_error"], "loaded_recheck_failed")
 
+    def test_another_session_holding_it_at_the_recheck_sends_nothing(self):
+        """Only the SAME session - the pid and creation time loaded() read when P16 answered - may still hold it at
+        the re-check under the lock. Fails with the re-check reverted to "elsewhere" alone: sent to a stranger."""
+        h = self.h
+        self.ready_after_reset(loaded=False)
+        h.backend.loaded_map[T1] = "elsewhere"
+        h.backend.session_map = {T1: (30, 300)}
+
+        def answer(record):
+            if record.get("holder") == "session":
+                h.backend.session_map = {T1: (31, 310)}     # that terminal closed, another opened it before the claim
+                return Alternative.TO_SESSION
+            return DEFER
+        self.plugged(Asked(unloaded=answer))
+        h.tick()
+        self.assertEqual(h.backend.send_calls, [])
+        self.assertEqual(h.record()["last_error"], "loaded_recheck_failed")
+
+    def test_a_session_whose_identity_could_not_be_read_is_never_sent_to(self):
+        h = self.h
+        self.ready_after_reset(loaded=False)
+        h.backend.loaded_map[T1] = "elsewhere"
+        h.backend.session_map = {T1: None}
+        self.plugged(Asked(unloaded=Alternative.TO_SESSION))
+        h.tick()
+        self.assertEqual(h.backend.send_calls, [])
+        self.assertEqual(h.record()["last_error"], "held_by_other_session")
+
     def test_a_channel_waits_with_its_own_reason(self):
         h = self.h
         self.ready_after_reset(loaded=False)

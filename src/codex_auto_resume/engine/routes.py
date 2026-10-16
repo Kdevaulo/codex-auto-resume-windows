@@ -40,12 +40,18 @@ class RoutesMixin:
 
     def _still_where(self, thread_id, app, route) -> bool:
         """The re-check under the dispatch lock: the same app, holding the conversation for a send or not holding it
-        for a route - or, with no app (v0.6.16-beta.4), still none, and nothing holding it."""
+        for a route - or, with no app (v0.6.16-beta.4), still none, and nothing holding it; for TO_SESSION, the SAME
+        session still holding it, by the pid and creation time kept when P16 answered (engine/tosession.py)."""
         if app is None:
             return self._unheld_now(thread_id)
-        return (self.backend.app_identity() == app
-                and self.backend.loaded(thread_id, app) == ("loaded" if route is None else "elsewhere"
-                                                            if route is Alternative.TO_SESSION else "notLoaded"))
+        if self.backend.app_identity() != app:
+            return False
+        loaded = self.backend.loaded(thread_id, app)
+        if route is Alternative.TO_SESSION:
+            kept = self._session_holders.pop(thread_id, None)
+            return (loaded == "elsewhere" and kept is not None
+                    and getattr(self.backend, "session_holder", None) == kept)
+        return loaded == ("loaded" if route is None else "notLoaded")
 
     def _unloaded(self, row, loaded, vector):
         """P16: the route the plug names for `row`, whose conversation the app does not hold, or
