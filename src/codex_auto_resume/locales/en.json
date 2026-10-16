@@ -1103,7 +1103,6 @@
   "installer.done.previous_running": "The previous watcher is still finishing what it was doing. Once it has stopped, start the watcher from the Dashboard.",
   "installer.done.read_log": "The log below is what the installer said.",
   "installer.done.removed": "Codex Auto Resume is removed.",
-  "installer.done.reopen": "Open the Dashboard again, in the new version",
   "installer.done.setup_stopped": "The setup program stopped before the installer ran. The log says why.",
   "installer.done.still_running": "It is taking longer than usual and is still working in the background. Look at the Dashboard again in a few minutes.",
   "installer.done.unconfirmed": "The watcher could not be confirmed running, so nothing is being watched yet. Start it from the Dashboard.",
@@ -1150,5 +1149,9 @@
   "installer.welcome.guide": "Read the guide",
   "installer.welcome.heading": "Welcome",
   "installer.welcome.what": "When a Codex conversation stops at a usage limit or a dropped connection, Codex Auto Resume carries it on by itself once it can.",
-  "msg.setup_left_stopped": "Auto resume is updated. The watcher was not running before the update, so it was left stopped: start it from the Dashboard when you want it."
+  "msg.setup_left_stopped": "Auto resume is updated. The watcher was not running before the update, so it was left stopped: start it from the Dashboard when you want it.",
+  "installer.update.heading": "v{from} → v{to}",
+  "installer.update.whats_new": "What's new",
+  "installer.update.no_notes": "What is new in this version could not be read from the download.",
+  "installer.done.updated_to": "Updated to v{version}"
 }

@@ -29,6 +29,7 @@ namespace CodexAutoResumeSetup
     {
         internal const string Locales = "payload/app/src/codex_auto_resume/locales/";
         internal const string Manifest = "payload/app/.codex-plugin/plugin.json";
+        internal const string Docs = "payload/app/docs/";
         internal const string Dashboard = "CodexAutoResumeSettings.exe";
 
         // A stop said before there is a window: Windows' own message box, in English, as Setup.cs says it.
@@ -56,6 +57,13 @@ namespace CodexAutoResumeSetup
             flow.StartAtSignIn = !InstallerFlow.Has(arguments, "-SkipStartup");
             flow.ChangeEdition = InstallerFlow.Has(arguments, "-AllowEditionChange");
             string language = InstallerLanguages.FromSystem(InstallerLanguages.Preferred());
+            // An update says from what to what, and what is new in the version this program carries (v0.6.16).
+            if (flow.Upgrade)
+            {
+                flow.From = InstallerFlow.VersionOf(Read(Path.Combine(Path.Combine(Path.Combine(home, "app"), ".codex-plugin"),
+                                                                      "plugin.json")));
+                flow.NotesText = carried.Notes(language);
+            }
             var window = new InstallerWindow(flow, carried.Words(language), carried.Words,
                 delegate(InstallerFlow answered, Action<string> heard, Action<double> unpacked)
                 {
@@ -64,6 +72,12 @@ namespace CodexAutoResumeSetup
             Application.Run(window);
             if (window.OpenDashboard) OpenDashboard(flow.Home);
             return window.Code == int.MinValue ? Codes.Cancelled : window.Code;
+        }
+
+        private static string Read(string path)
+        {
+            try { return File.Exists(path) ? File.ReadAllText(path, new UTF8Encoding(false)).TrimStart('\uFEFF') : null; }
+            catch (Exception) { return null; }
         }
 
         // The Dashboard of the installation just made: its own program, by its full path, which is a window and
@@ -121,6 +135,14 @@ namespace CodexAutoResumeSetup
                 {
                     return null;
                 }
+            }
+
+            /// What is new in the version it carries: its section of the changelog in the archive, the language's own
+            /// where the archive has one (InstallerNotes).
+            internal string Notes(string language)
+            {
+                string own = language == "en" ? null : Text(Docs + "CHANGELOG." + language + ".md");
+                return InstallerNotes.Section(own ?? Text(Docs + "CHANGELOG.md"), Version);
             }
 
             /// The words of `language`, from the catalog the archive carries; English's where it has none.
@@ -205,6 +227,12 @@ namespace CodexAutoResume
                 cases.Add(Case("uninstall", new InstallerFlow(InstallerFlow.Uninstall, home, InstallerFlow.Standard, InstallerFlow.Standard, "0.6.16")));
                 foreach (KeyValuePair<string, InstallerFlow> each in cases)
                 {
+                    // An update's pages carry what is new: a changelog section, its lines as long as the real ones.
+                    if (each.Value.Upgrade && !each.Value.EditionChange || each.Value.Mode == InstallerFlow.Update)
+                    {
+                        each.Value.From = "0.6.15";
+                        each.Value.NotesText = SampleNotes;
+                    }
                     foreach (int ended in Endings())
                     {
                         using (var window = new InstallerWindow(each.Value, words, delegate(string other) { return words; },
@@ -252,6 +280,13 @@ namespace CodexAutoResume
             endings.Add(InstallerFlow.StillRunning);
             return endings;
         }
+
+        private const string SampleNotes =
+            "v0.6.16 - The installer has a window of its own, and an update shows what is new before it installs\n\n" +
+            "**Both editions.** The setup programs, the Dashboard's update and the uninstall in Settings > Apps show " +
+            "the installer window, in the Dashboard's design and the person's language, at every text size.\n" +
+            "- After an update everything that ran before runs again, on the new version, by itself.\n" +
+            "- A watcher the person had stopped is left stopped.\n";
 
         private static KeyValuePair<string, InstallerFlow> Case(string name, InstallerFlow flow)
         {

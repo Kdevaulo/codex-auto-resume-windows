@@ -140,7 +140,7 @@ namespace CodexAutoResume
 
         private static string Read(string path)
         {
-            try { return File.Exists(path) ? File.ReadAllText(path, new UTF8Encoding(false)).TrimStart('﻿') : null; }
+            try { return File.Exists(path) ? File.ReadAllText(path, new UTF8Encoding(false)).TrimStart('\uFEFF') : null; }
             catch (Exception) { return null; }
         }
 

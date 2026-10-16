@@ -50,6 +50,11 @@ namespace CodexAutoResume
         private readonly SoftButton cancel = new SoftButton(false);
         private readonly InstallerBar bar = new InstallerBar();
         private readonly SoftTextArea logArea = new SoftTextArea();
+        // What is new in the version an update goes to (v0.6.16): the Notes page, and an update's Options page.
+        private readonly SoftTextArea notesArea = new SoftTextArea();
+        // The Notes page's answer, which the run waits for on its worker (Ask).
+        private readonly System.Threading.ManualResetEvent answered = new System.Threading.ManualResetEvent(false);
+        private bool go;
         private readonly StringBuilder log = new StringBuilder();
         private readonly List<KeyValuePair<Control, int>> rows = new List<KeyValuePair<Control, int>>();
 
@@ -67,7 +72,15 @@ namespace CodexAutoResume
         internal int Code { get { return code; } }
 
         /// Whether the person left "Open the Dashboard" on, for a run that succeeded.
-        internal bool OpenDashboard { get { return code == 0 && flow.OpenDashboard && flow.Mode != InstallerFlow.Uninstall; } }
+        /// An update opens the new Dashboard by itself: the Dashboard it was started from ran before it (v0.6.16).
+        internal bool OpenDashboard
+        {
+            get
+            {
+                return code == 0 && flow.Mode != InstallerFlow.Uninstall &&
+                       (flow.Mode == InstallerFlow.Update || flow.OpenDashboard);
+            }
+        }
 
         internal InstallerFlow Flow { get { return flow; } }
 
@@ -129,7 +142,7 @@ namespace CodexAutoResume
 
             back.Click += delegate { Go(-1); };
             forward.Click += delegate { Forward(); };
-            cancel.Click += delegate { Close(); };
+            cancel.Click += delegate { if (page == InstallerFlow.Notes) Answer(false); else Close(); };
             foreach (SoftButton button in new[] { cancel, back, forward })
             {
                 button.AutoSize = true;
@@ -143,6 +156,8 @@ namespace CodexAutoResume
             logArea.Box.ReadOnly = true;
             logArea.Box.WordWrap = false;
             logArea.Box.ScrollBars = ScrollBars.Both;
+            notesArea.Box.ReadOnly = true;
+            notesArea.Box.WordWrap = true;
 
             Adopt(words);
             page = flow.Pages()[0];
@@ -171,6 +186,9 @@ namespace CodexAutoResume
             version.Set(string.IsNullOrEmpty(flow.Version) ? "" : "v" + flow.Version, words.EditionWord(flow.Edition));
             logArea.Font = Font;
             logArea.Box.Font = Font;
+            notesArea.Font = Font;
+            notesArea.Box.Font = Font;
+            notesArea.Box.AccessibleName = words.Say("installer.update.whats_new", "What's new");
             logArea.Box.AccessibleName = words.Say("installer.log.name", "Log");
             cancel.Text = words.Say("action.cancel", "Cancel");
             back.Text = words.Say("installer.back", "Back");
@@ -252,6 +270,7 @@ namespace CodexAutoResume
         private void Forward()
         {
             if (page == InstallerFlow.Finish) { Close(); return; }
+            if (page == InstallerFlow.Notes) { Answer(true); return; }
             if (page == InstallerFlow.Options || page == InstallerFlow.Confirm) { Start(); return; }
             Go(1);
         }
@@ -266,12 +285,18 @@ namespace CodexAutoResume
             Arrange(Inner(ClientSize.Width > 0 ? ClientSize.Width : Px(OpeningWidth)));
             string[] pages = flow.Pages();
             int index = Array.IndexOf(pages, name);
-            back.Visible = backShown = index > 0 && name != InstallerFlow.Progress && name != InstallerFlow.Finish;
+            back.Visible = backShown = index > 0 && name != InstallerFlow.Progress && name != InstallerFlow.Finish &&
+                                      name != InstallerFlow.Notes;
             cancel.Visible = cancelShown = name != InstallerFlow.Finish;
             cancel.Enabled = name != InstallerFlow.Progress;
             forward.Visible = forwardShown = name != InstallerFlow.Progress;
             forward.Enabled = name != InstallerFlow.Options || flow.CanStart();
-            forward.Text = name == InstallerFlow.Finish ? words.Say("installer.finish", "Finish")
+            cancel.Text = name == InstallerFlow.Notes ? words.Say("action.not_now", "Not now")
+                        : words.Say("action.cancel", "Cancel");
+            forward.Text = name == InstallerFlow.Finish && flow.Mode == InstallerFlow.Update && code == 0
+                           ? words.Say("installer.done.open", "Open the Dashboard")
+                         : name == InstallerFlow.Notes ? words.Say("installer.update", "Update")
+                         : name == InstallerFlow.Finish ? words.Say("installer.finish", "Finish")
                          : name == InstallerFlow.Confirm ? words.Say("installer.remove", "Remove")
                          : name == InstallerFlow.Options ? (flow.Upgrade && !flow.EditionChange
                                                             ? words.Say("installer.update", "Update")
@@ -296,6 +321,7 @@ namespace CodexAutoResume
                 case InstallerFlow.Options: BuildOptions(); break;
                 case InstallerFlow.Confirm: BuildConfirm(); break;
                 case InstallerFlow.Progress: BuildProgress(); break;
+                case InstallerFlow.Notes: BuildNotes(); break;
                 default: BuildFinish(); break;
             }
             foreach (KeyValuePair<Control, int> row in rows) sheet.Controls.Add(row.Key);
@@ -405,6 +431,8 @@ namespace CodexAutoResume
                 Row(Choice(words.Say("field.startup", "Run at Windows sign-in"), flow.StartAtSignIn, false,
                            delegate(bool on) { flow.StartAtSignIn = on; }), 16);
             Row(Words(words.Say("installer.options.plugin", "The plugin - its panel and its skill - is added to Codex as part of every installation."), null, Palette.Secondary), 16);
+            // An update says what it updates to, as the Dashboard's does (BuildNotes).
+            if (flow.Upgrade && !flow.EditionChange && flow.NotesText != null) WhatsNew(16);
         }
 
         private void BuildConfirm()
@@ -435,9 +463,60 @@ namespace CodexAutoResume
             Row(logArea, 6);
         }
 
+        /// The update's own page (v0.6.16, the owner: an update should show itself): the version it goes from and to,
+        /// and what is new in it, read from the archive it has downloaded and checked - before anything is installed.
+        /// Update goes on; Later installs nothing.
+        private void BuildNotes()
+        {
+            Row(Words(Versions(), "title", Palette.Ink), 0);
+            WhatsNew(8);
+        }
+
+        private string Versions()
+        {
+            return string.IsNullOrEmpty(flow.From)
+                ? "v" + flow.Version
+                : words.Say("installer.update.heading", "v{from} \u2192 v{to}", "from", flow.From, "to", flow.Version);
+        }
+
+        private void WhatsNew(int gap)
+        {
+            if (page != InstallerFlow.Notes) Row(Words(Versions(), "label", Palette.Ink), gap);
+            Row(Words(words.Say("installer.update.whats_new", "What's new"), "label", Palette.Secondary), page == InstallerFlow.Notes ? gap : 6);
+            notesArea.Box.Text = flow.NotesText ?? words.Say("installer.update.no_notes", "What is new in this version could not be read from the download.");
+            Row(notesArea, 6);
+        }
+
+        /// The Notes page's answer, from its buttons or the window's close: Update goes on with the install, Later and
+        /// a close end the run with nothing installed.
+        private void Answer(bool update)
+        {
+            go = update;
+            answered.Set();
+            if (update) ShowPage(InstallerFlow.Progress);
+            else forward.Enabled = cancel.Enabled = false;
+        }
+
+        /// Shows the Notes page with what is new, and waits for the person's answer: on the run's worker, never on the
+        /// window's own thread. False when the window is gone.
+        internal bool Ask(string notes)
+        {
+            Post(delegate
+            {
+                flow.NotesText = notes;
+                ShowPage(InstallerFlow.Notes);
+            });
+            answered.WaitOne();
+            return go;
+        }
+
         private void BuildFinish()
         {
-            Row(Words(words.Outcome(flow.Mode, code), "title", Palette.Ink), 0);
+            Row(Words(flow.Mode == InstallerFlow.Update && code == 0
+                      ? words.Say("installer.done.updated_to", "Updated to v{version}", "version", flow.Version)
+                      : words.Outcome(flow.Mode, code), "title", Palette.Ink), 0);
+            if (flow.Mode == InstallerFlow.Update && code == 0 && !string.IsNullOrEmpty(flow.NotesText))
+                Row(Words(InstallerNotes.Brief(flow.NotesText, 4), null, Palette.Secondary), 8);
             string more = code == 0 ? null : words.Explain(code);
             if (more != null) Row(Words(more, null, Palette.Ink), 8);
             if (code == 0 && unconfirmed)
@@ -446,10 +525,9 @@ namespace CodexAutoResume
                 Row(new SoftCallout(words.Say("installer.done.previous_running", "The previous watcher is still finishing what it was doing. Once it has stopped, start the watcher from the Dashboard.")), 12);
             if (code != 0 && code != InstallerFlow.StillRunning)
                 Row(Words(words.Say("installer.done.read_log", "The log below is what the installer said."), null, Palette.Secondary), 8);
-            if (code == 0 && flow.Mode != InstallerFlow.Uninstall)
-                Row(Choice(flow.Mode == InstallerFlow.Update
-                           ? words.Say("installer.done.reopen", "Open the Dashboard again, in the new version")
-                           : words.Say("installer.done.open", "Open the Dashboard"), flow.OpenDashboard, true,
+            // An update's Dashboard comes back by itself (OpenDashboard); a first installation asks.
+            if (code == 0 && flow.Mode == InstallerFlow.Install)
+                Row(Choice(words.Say("installer.done.open", "Open the Dashboard"), flow.OpenDashboard, true,
                            delegate(bool on) { flow.OpenDashboard = on; }), 16);
             if (code == 0) Row(LogToggle(), 16);
             else logShown = true;
@@ -498,6 +576,7 @@ namespace CodexAutoResume
         private int HeightAt(Control control, int width)
         {
             if (control == logArea) return Px(150);
+            if (control == notesArea) return Px(page == InstallerFlow.Notes ? 220 : 140);
             if (control == bar) return Px(10);
             if (control is SoftCombo) return SoftCombo.FieldHeight;
             if (control is LinkLabel)
@@ -568,6 +647,14 @@ namespace CodexAutoResume
 
         private void Ended(int ended)
         {
+            if (ended == InstallerFlow.Later)
+            {
+                // Put off on the Notes page: nothing was installed, and there is nothing more to say.
+                running = false;
+                code = ended;
+                Close();
+                return;
+            }
             running = false;
             code = ended;
             at = ended == 0 ? 1.0 : at;
@@ -583,6 +670,13 @@ namespace CodexAutoResume
         {
             // Never while the installer runs: half an installation is worse than a slow one. Windows signing out or
             // shutting down is not asked, and ends the installer with it.
+            if (running && e.CloseReason == CloseReason.UserClosing && page == InstallerFlow.Notes)
+            {
+                // Closing the Notes page is Later: the run ends with nothing installed, and the window with it.
+                e.Cancel = true;
+                if (forward.Enabled) Answer(false);
+                return;
+            }
             if (running && e.CloseReason == CloseReason.UserClosing)
             {
                 e.Cancel = true;
@@ -591,6 +685,12 @@ namespace CodexAutoResume
                 return;
             }
             base.OnFormClosing(e);
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            answered.Set();
+            base.OnFormClosed(e);
         }
 
         /// Every control on the page that is shown, for the layout audit.

@@ -201,6 +201,30 @@ $out.window.after = @((Of $built 'Page'), (Of $built 'Code'), (Of $built 'OpenDa
 $done = $WindowType.GetConstructors($any)[0].Invoke([object[]]@((NewFlow 'install' 'standard' $null), $english, $null, $null, $null, $font))
 $null = CallOn $done 'Finished' @(0, "The watcher could not be confirmed running, so nothing is being watched yet.")
 $out.window.done = @((Of $done 'Page'), (Of $done 'Code'), (Of $done 'OpenDashboard'))
+
+# An update (v0.6.16): its Notes page, the Dashboard it opens by itself, and Later, which closes with nothing installed.
+$update = NewFlow 'update' 'standard' 'standard'
+$FlowType.GetField('From', $any).SetValue($update, '9.9.8')
+$updating = $WindowType.GetConstructors($any)[0].Invoke([object[]]@($update, $english, $null, $null, $null, $font))
+$null = CallOn $updating 'Finished' @(0, "  Checking the installation")
+$out.updated = @((Of $updating 'Page'), (Of $updating 'Code'), (Of $updating 'OpenDashboard'))
+$out.updated_switches = @(@(CallOn $updating 'ShownRows' @()) | Where-Object { $_.GetType().Name -eq 'SoftCheck' }).Count
+$later = $WindowType.GetConstructors($any)[0].Invoke([object[]]@((NewFlow 'update' 'standard' 'standard'), $english, $null, $null, $null, $font))
+$null = CallOn $later 'Finished' @(-3, "update: later 9.9.8 9.9.9")
+$out.later = @((Of $later 'Code'), (Of $later 'OpenDashboard'), $later.IsDisposed)
+
+# What is new: a version's section of a changelog, its brief, and which file is read.
+$notes = T 'InstallerNotes'
+$changelog = [IO.File]::ReadAllText($env:CAR_CHANGELOG, [Text.Encoding]::UTF8)
+$out.notes = @{}
+foreach ($version in @('0.6.16-beta.3', '0.6.16-beta', '0.6.16', '9.9.9')) {
+    $out.notes[$version] = $notes.GetMethod('Section', $any).Invoke($null, [object[]]@($changelog, $version))
+}
+$out.brief = $notes.GetMethod('Brief', $any).Invoke($null, [object[]]@([string]$out.notes['0.6.16-beta.3'], 3))
+$docs = [string]$env:CAR_DOCS
+$out.file = @(($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ko'))),
+              ($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ja'))),
+              ($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'en'))))
 $out | ConvertTo-Json -Depth 6 -Compress
 """
 
@@ -268,10 +292,16 @@ class FlowTests(unittest.TestCase):
         standard_home = cls.work / "homes" / "standard"
         shutil.copytree(cls.work / "trees" / "standard", standard_home / "app")
         homes["standard"] = str(standard_home)
+        docs = cls.work / "docs"
+        docs.mkdir()
+        for name in ("CHANGELOG.md", "CHANGELOG.ko.md"):
+            (docs / name).write_text("# Changelog\n", encoding="utf-8")
         source = cls.work / "input.json"
         source.write_text(json.dumps({"lines": {"install": INSTALLING, "update": UPDATING, "uninstall": REMOVING},
                                       "tags": cls.TAGS, "trees": trees, "homes": homes}), encoding="utf-8")
-        cls.result = _powershell(PROBE, cls.work, 600, CAR_EXE=str(exe), CAR_INPUT=str(source))
+        cls.result = _powershell(PROBE, cls.work, 600, CAR_EXE=str(exe), CAR_INPUT=str(source),
+                                 CAR_CHANGELOG=str(ROOT / "docs" / "CHANGELOG.md"), CAR_DOCS=str(docs))
+        cls.docs = docs
         cls.answer = json.loads(cls.result.stdout) if cls.result.returncode == 0 and cls.result.stdout.strip() else {}
 
     @classmethod
@@ -284,7 +314,7 @@ class FlowTests(unittest.TestCase):
 
     def test_each_way_it_is_shown_has_its_pages(self):
         self.assertEqual(self.answer["pages"], {"install": ["welcome", "options", "progress", "finish"],
-                                                "update": ["progress", "finish"],
+                                                "update": ["progress", "notes", "finish"],
                                                 "uninstall": ["confirm", "progress", "finish"]})
 
     def test_each_answer_is_one_of_install_ps1s_own_switches_and_silent_is_always_passed(self):
@@ -357,6 +387,26 @@ class FlowTests(unittest.TestCase):
         self.assertIn("$InstallHome = Join-Path $env:USERPROFILE '.codex-auto-resume'", INSTALL_PS1)
         self.assertEqual(self.answer["version"], ["1.2.3", ""])
 
+    def test_an_update_shows_what_is_new_and_opens_the_dashboard_by_itself(self):
+        """v0.6.16, the owner: an update shows itself - from what to what and what is new, before it installs, and
+        "Updated to" after - and the Dashboard it was started from comes back on the new version by itself. Later
+        closes the window with nothing installed and nothing opened."""
+        self.assertEqual(self.answer["updated"], ["finish", 0, True])
+        self.assertEqual(self.answer["updated_switches"], 0, "nothing to tick: the Dashboard comes back by itself")
+        self.assertEqual(self.answer["later"], [-3, False, True])
+
+    def test_what_is_new_is_the_versions_own_section_of_the_changelog(self):
+        notes = self.answer["notes"]
+        self.assertTrue(notes["0.6.16-beta.3"].startswith("v0.6.16-beta.3 \u2014 Words for this time"), notes["0.6.16-beta.3"][:80])
+        self.assertNotIn("## v0.6.16-beta.2", notes["0.6.16-beta.3"], "it ends where the next version begins")
+        self.assertTrue(notes["0.6.16-beta"].startswith("v0.6.16-beta \u2014 "), "not v0.6.16-beta.3's, whose name begins alike")
+        self.assertIsNone(notes["9.9.9"])
+        brief = self.answer["brief"].splitlines()
+        self.assertEqual(len(brief), 3)
+        self.assertFalse(any("](" in line or "**" in line for line in brief), brief)
+        self.assertEqual(self.answer["file"], [str(self.docs / "CHANGELOG.ko.md"), str(self.docs / "CHANGELOG.md"),
+                                               str(self.docs / "CHANGELOG.md")])
+
     def test_each_code_says_what_it_means(self):
         outcome = self.answer["outcome"]
         self.assertEqual(outcome["0"], ["Codex Auto Resume is installed.", None])
@@ -394,6 +444,8 @@ class CatalogTests(unittest.TestCase):
     def said(self) -> dict:
         text = FLOW + WINDOW
         keys = dict(re.findall(r'Say\("([a-z_.]+)",\s*"((?:[^"\\]|\\.)*)"', text))
+        # C#'s \uXXXX escapes, as the compiled words have them.
+        keys = {key: re.sub(r"\\u([0-9A-Fa-f]{4})", lambda m: chr(int(m.group(1), 16)), value) for key, value in keys.items()}
         steps = re.findall(r'"([^"]+)"', re.search(r"Steps =\s*\{(.*?)\};", FLOW, re.S).group(1))
         keys.update({"installer.step." + steps[i]: steps[i + 1] for i in range(0, len(steps), 2)})
         return keys
@@ -503,10 +555,29 @@ class SourceTests(unittest.TestCase):
         main = guiscan.member_body("Program", "Main")
         self.assertLess(main.index("SettingsRemove.IsAsked(argv)"), main.index("new Bridge(root)"))
 
+    def test_the_dashboards_update_asks_after_the_verified_download_and_before_the_install(self):
+        """The bootstrap's -AskFirst stops between its checks of the download and the installer: the changelog's
+        folder, the question, and only `install` on its input goes on (`update: later` and 16 otherwise). The
+        Dashboard writes the person's answer there, and reads `later` as an update put off, not one that failed."""
+        verified = BOOTSTRAP.index("Ok ('Archive contents verified as Codex Auto Resume v' + $target)")
+        asked = BOOTSTRAP.index("Write-Host ('ask: install v' + $target)")
+        self.assertLess(verified, asked)
+        self.assertLess(asked, BOOTSTRAP.index("$installer = Join-Path $unpacked 'install\\install.ps1'"))
+        self.assertIn("if ($answer -cne 'install') {", BOOTSTRAP)
+        self.assertIn("$ExitLater = 16", BOOTSTRAP)
+        update = guiscan.member_body("SettingsForm", "InstallUpdate")
+        self.assertIn('flag + " -AskFirst"', update)
+        self.assertIn("window.Ask(InstallerNotes.Section(", update)
+        start = guiscan.member_body("SettingsForm", "StartBootstrap")
+        self.assertIn('process.StandardInput.WriteLine(go ? "install" : "later");', start)
+        self.assertIn("if (Asked != null) info.RedirectStandardInput = true;", start)
+        self.assertIn('else if (code == UpdateLater && said == "later") answer = "later";',
+                      guiscan.member_body("SettingsForm", "RunBootstrap"))
+
     def test_the_dashboards_update_runs_in_the_window_through_the_one_start_of_the_bootstrap(self):
         update = guiscan.member_body("SettingsForm", "InstallUpdate")
         self.assertIn("new InstallerWindow(flow,", update)
-        self.assertIn("RunBootstrap(root, script, flag, UpdateMilliseconds,", update)
+        self.assertIn('RunBootstrap(root, script, flag + " -AskFirst", UpdateMilliseconds,', update)
         self.assertIn("window.ShowDialog(this);", update)
         start = guiscan.member_body("SettingsForm", "StartBootstrap")
         self.assertIn("Action<string> heard = Heard;", start)

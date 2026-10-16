@@ -225,9 +225,13 @@ and the Dashboard's Diagnostics says so too until the copy is replaced. `Uninsta
 Codex to remove it, removes it; see [Uninstall](#uninstall) for what each route leaves behind.
 
 **Check for updates**, on the Dashboard's Diagnostics page, asks GitHub whether a newer release has
-been published and offers to install it. From v0.6.16 the install runs in the setup program's window, which
-shows how far it is and its log, and once it is done offers to open the new version's Dashboard in place of this
-one. From v0.6.11 it also looks for a newer *pre-release*: an
+been published and offers to install it. From v0.6.16 the install runs in the setup program's window: once the
+download is checked it shows the version it goes from and to and what is new in it, read from that download, and
+installs only when you press **Update** (**Not now** installs nothing); then it shows how far it is and its log, and
+"Updated to" with the first lines of what is new. Everything that ran before then runs again on the new version by
+itself: the watcher - unless you had stopped it and it does not run at sign-in - with its notification-area icon,
+and this Dashboard, which opens again in the new version. An update with `-Silent` starts the watcher again the same
+way, and opens no window. From v0.6.11 it also looks for a newer *pre-release*: an
 `-alpha` or `-beta` build published before its release is finished, and tested less than a release.
 When there is one newer than both the version you have and the newest release, and no release to
 offer first, it asks whether to install it - and **Not now** is the button Enter presses. Saying yes

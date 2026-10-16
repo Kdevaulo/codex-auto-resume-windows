@@ -32,6 +32,8 @@ namespace CodexAutoResume
         internal const string Confirm = "confirm";
         internal const string Progress = "progress";
         internal const string Finish = "finish";
+        /// The update's own page (v0.6.16): the version it goes to and what is new in it, before anything is installed.
+        internal const string Notes = "notes";
 
         internal const string Standard = "standard";
         internal const string Advanced = "advanced";
@@ -43,6 +45,8 @@ namespace CodexAutoResume
         internal const int StillRunning = -2;
         /// The window's own code for an installer that could not be started at all.
         internal const int NotStarted = -1;
+        /// The window's own code for an update the person put off on the Notes page: nothing was installed.
+        internal const int Later = -3;
 
         /// The package whose presence makes a tree the advanced edition (src/codex_auto_resume/edition.py).
         internal const string AdvancedPackage = "codex_auto_resume_advanced";
@@ -64,6 +68,10 @@ namespace CodexAutoResume
         internal bool Purge;
         /// Open the Dashboard once it is done.
         internal bool OpenDashboard = true;
+        /// The version installed now, for "vX -> vY" ("" where none is, or it cannot be read).
+        internal string From = "";
+        /// What is new in Version: its section of the changelog the archive carries, or null where there is none.
+        internal string NotesText;
 
         internal InstallerFlow(string mode, string home, string edition, string installed, string version)
         {
@@ -84,7 +92,8 @@ namespace CodexAutoResume
         /// The pages the window goes through, in order.
         internal string[] Pages()
         {
-            if (Mode == Update) return new[] { Progress, Finish };
+            // The Notes page comes between the download and the install (InstallerWindow.Ask).
+            if (Mode == Update) return new[] { Progress, Notes, Finish };
             if (Mode == Uninstall) return new[] { Confirm, Progress, Finish };
             return new[] { Welcome, Options, Progress, Finish };
         }
@@ -212,6 +221,92 @@ namespace CodexAutoResume
             var manifest = ParseObject(pluginJson);
             object version;
             return manifest != null && manifest.TryGetValue("version", out version) && version is string ? (string)version : "";
+        }
+    }
+
+    /// What is new in a version (v0.6.16): its section of the changelog an archive carries, docs\CHANGELOG.md - or the
+    /// person's language's, CHANGELOG.<language>.md, where the archive carries one. Pure but for FileFor.
+    internal static class InstallerNotes
+    {
+        /// The changelog to read in `docs`: the language's own where it is there, else the English one.
+        internal static string FileFor(string docs, string language)
+        {
+            try
+            {
+                string own = Path.Combine(docs ?? "", "CHANGELOG." + (language ?? "en") + ".md");
+                if (language != null && language != "en" && File.Exists(own)) return own;
+                return Path.Combine(docs ?? "", "CHANGELOG.md");
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// `version`'s section of `changelog`: from its "## v<version>" heading, without the "## ", to the next
+        /// section's heading; null where there is none.
+        internal static string Section(string changelog, string version)
+        {
+            if (string.IsNullOrEmpty(changelog) || string.IsNullOrEmpty(version)) return null;
+            string[] lines = changelog.Replace("\r\n", "\n").Split('\n');
+            string heading = "## v" + version;
+            var found = new StringBuilder();
+            bool inside = false;
+            foreach (string line in lines)
+            {
+                if (line.StartsWith("## ", StringComparison.Ordinal))
+                {
+                    if (inside) break;
+                    inside = line == heading || line.StartsWith(heading + " ", StringComparison.Ordinal);
+                    if (inside) found.Append(line.Substring(3)).Append('\n');
+                    continue;
+                }
+                if (inside) found.Append(line).Append('\n');
+            }
+            return found.Length > 0 ? found.ToString().Trim() : null;
+        }
+
+        /// The first `count` lines of a section worth reading on their own: no link lines, no Markdown marks.
+        internal static string Brief(string section, int count)
+        {
+            if (string.IsNullOrEmpty(section)) return "";
+            var kept = new List<string>();
+            foreach (string raw in section.Split('\n'))
+            {
+                string line = Plain(raw.Trim());
+                if (line.Length == 0) continue;
+                kept.Add(line);
+                if (kept.Count >= count) break;
+            }
+            return string.Join(Environment.NewLine, kept.ToArray());
+        }
+
+        /// A line as it reads: [text](link) as its text, ** and ` taken out; a line that was only a link is nothing.
+        internal static string Plain(string line)
+        {
+            var text = new StringBuilder();
+            int i = 0;
+            while (i < line.Length)
+            {
+                int close = line[i] == '[' ? line.IndexOf("](", i, StringComparison.Ordinal) : -1;
+                int end = close > 0 ? line.IndexOf(')', close) : -1;
+                if (close > 0 && end > 0)
+                {
+                    text.Append(line, i + 1, close - i - 1);
+                    i = end + 1;
+                    continue;
+                }
+                text.Append(line[i]);
+                i++;
+            }
+            string plain = text.ToString().Replace("**", "").Replace("`", "").Trim();
+            return IsOnlyALink(line) ? "" : plain;
+        }
+
+        private static bool IsOnlyALink(string line)
+        {
+            return line.StartsWith("[", StringComparison.Ordinal) && line.EndsWith(")", StringComparison.Ordinal) &&
+                   line.IndexOf("](", StringComparison.Ordinal) == line.LastIndexOf("](", StringComparison.Ordinal);
         }
     }
 
