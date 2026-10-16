@@ -682,7 +682,7 @@ class WiringTests(Entry):
         text = (ROOT / "scripts" / "plugin_setup.py").read_text(encoding="utf-8")
         setup = text[text.index("def cmd_setup"):text.index("def cmd_enable")]
         self.assertLess(setup.index("startup.install_protocol"), setup.index("addremove.register"))
-        self.assertLess(setup.index("addremove.register"), setup.index("started = start_watcher(home)"))
+        self.assertLess(setup.index("addremove.register"), setup.index("start_watcher(home)"))
 
     def test_the_only_registry_code_added_lives_in_the_one_module(self):
         found = []
