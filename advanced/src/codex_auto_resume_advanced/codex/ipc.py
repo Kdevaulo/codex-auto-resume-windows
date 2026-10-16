@@ -4,12 +4,13 @@
 
 What it does, and nothing else: open the pipe, `initialize`, ask `thread-owner-discovery` which client of the app
 holds the conversation, and ask that client `thread-follower-interrupt-turn` (mode "system") for it - the stop a
-person makes with the app's own Stop button. Then (off until a measurement says how) put the conversation's queue
-back to running, which the app pauses after a stop - a pause that survives the app's restart. And, after the window
-resets, `thread-follower-start-turn` - a turn started with the product's own continuation, which goes past that paused
-queue - for a conversation it stopped (start_turn). Every frame is 4 bytes of little-endian length and UTF-8 JSON.
-Each read waits at most READ_SECONDS (an overlapped read, cancelled and waited out, then the pipe closed - as the
-MIPC look does); nothing here waits for good.
+person makes with the app's own Stop button. The app then pauses that conversation's queue, a pause that survives
+its restart. And, after the window resets, `thread-follower-start-turn` - a turn started with the product's own
+continuation, which goes past that paused queue - for a conversation it stopped (start_turn); measured 2026-10-16,
+once that turn completes the app sends what was queued by itself and the pause is gone, so nothing else is asked of
+the queue (`thread-follower-set-queued-follow-ups-state` is not needed). Every frame is 4 bytes of little-endian
+length and UTF-8 JSON. Each read waits at most READ_SECONDS (an overlapped read, cancelled and waited out, then the
+pipe closed - as the MIPC look does); nothing here waits for good.
 
 The app checks each request's version exactly, and a new app build may move one: the versions are pinned in
 REQUESTS, every request's shape is there too, and a version mismatch is an answer like any other failure - the
@@ -30,7 +31,7 @@ READ_SECONDS = 5.0
 # The longest frame taken: the app's broadcasts can be long, a reply to these never is.
 FRAME_LIMIT = 8 * 1024 * 1024
 # The request shapes and the versions the app checks exactly (the MIPC record, 2026-10-16; app 26.1007). Filled with
-# {thread}, {client}; the queue's (QUEUE_RESUME) is not measured yet and is None: no request is made for it.
+# {thread}, {turn}, {message} and {text} where each request names them.
 CLIENT_TYPE = "codex-auto-resume"
 REQUESTS = {
     "initialize": (0, {"clientType": CLIENT_TYPE}),
@@ -43,9 +44,6 @@ REQUESTS = {
 }
 # v4 of the stop names the running turn it expects to stop, so a turn begun in between is never stopped.
 INTERRUPT_EXPECTING = (4, {"conversationId": "{thread}", "mode": "system", "expectedTurnId": "{turn}"})
-# Putting the queue back to running after a stop (thread-follower-set-queued-follow-ups-state v1, which REPLACES the
-# queued list): not measured yet - None until it is, and then the stop's caller tells the person to press Resume.
-QUEUE_RESUME = None
 
 
 class Stop(StrEnum):
@@ -57,12 +55,6 @@ class Stop(StrEnum):
     NO_ANSWER = "no_answer"                  # it did not answer in time
     REFUSED = "refused"                      # any other answer than success
     BROKEN = "broken"                        # a frame that is not one, or the pipe failing under us
-
-
-class Resume(StrEnum):
-    """What came of putting the queue back to running after a stop."""
-    RESUMED = "resumed"
-    UNPROVEN = "unproven"                    # not measured, or not answered success: the person presses Resume
 
 
 class Start(StrEnum):
@@ -221,31 +213,31 @@ def _request(channel, client, method, shape, fields, target=None, reads=20):
 
 
 def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
-    """Stop the running turn of `thread_id` the app holds: (Stop word, Resume word or None). `turn_id`, where known,
+    """Stop the running turn of `thread_id` the app holds: the Stop word of what came of it. `turn_id`, where known,
     makes it the v4 stop that names it. `channel` is a seam (a Channel of a test's own pipe)."""
     try:
         opened = channel if channel is not None else Channel()
     except _Failed as failed:
-        return failed.word, None
+        return failed.word
     except Exception:
-        return Stop.BROKEN, None
+        return Stop.BROKEN
     try:
         hello = _request(opened, "initializing-client", "initialize", REQUESTS["initialize"], {})
         client = (hello.get("result") or {}).get("clientId")
         if not isinstance(client, str) or not client:
-            return Stop.REFUSED, None
+            return Stop.REFUSED
         owner = _request(opened, client, "thread-owner-discovery", REQUESTS["thread-owner-discovery"],
                          {"thread": thread_id}).get("handledByClientId")
         if not isinstance(owner, str) or not owner:
-            return Stop.NO_CLIENT, None
+            return Stop.NO_CLIENT
         shape = INTERRUPT_EXPECTING if turn_id else REQUESTS["thread-follower-interrupt-turn"]
         _request(opened, client, "thread-follower-interrupt-turn", shape, {"thread": thread_id, "turn": turn_id},
                  target=owner)
-        return Stop.STOPPED, _resume(opened, client, owner, thread_id)
+        return Stop.STOPPED
     except _Failed as failed:
-        return failed.word, None
+        return failed.word
     except Exception:
-        return Stop.BROKEN, None
+        return Stop.BROKEN
     finally:
         opened.close()
 
@@ -278,15 +270,3 @@ def start_turn(thread_id, text, *, channel=None):
         return Stop.BROKEN
     finally:
         opened.close()
-
-
-def _resume(channel, client, owner, thread_id):
-    """The queue put back to running after the stop - only once QUEUE_RESUME is measured; until then UNPROVEN."""
-    if QUEUE_RESUME is None:
-        return Resume.UNPROVEN
-    try:
-        _request(channel, client, "thread-follower-set-queued-follow-ups-state", QUEUE_RESUME,
-                 {"thread": thread_id}, target=owner)
-    except Exception:
-        return Resume.UNPROVEN
-    return Resume.RESUMED

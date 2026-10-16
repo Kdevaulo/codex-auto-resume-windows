@@ -9,14 +9,14 @@ measurement MIPC): the stop the person would make, once for that window. It work
 open; where it cannot stop one - the app does not hold it, the app is not running, its build checks another version of
 the request, it does not answer - it falls back to holding, and a notice says the turn could not be stopped.
 
-A stopped conversation's queue is paused by the app, and the pause survives the app's restart: the product puts it
-back to running only once that request is measured (ipc.QUEUE_RESUME), and until then a notice tells the person to
-press Resume in Codex. When the window resets, a conversation it stopped is continued once - Continue after the reset,
+A stopped conversation's queue is paused by the app, and the pause survives the app's restart. When the window resets, a conversation it stopped is continued once - Continue after the reset,
 the wrap-up's choice, on by default - by a turn started through the same channel (ipc.start_turn), which goes past the
 paused queue; only while that turn of the stop is still the conversation's latest, ended, with nothing after it (A17)
 and the app holds the conversation (A11). It is kept in `continuations` (ContinuationKind.AFTER_RESET, its window's
 length in minutes in `chain`), so a restart forgets nothing; where the app does not hold the conversation it waits, and
-a notice says to open it in Codex.
+a notice says to open it in Codex. That turn is also what lets the queue go: once it completes, the app sends what was
+queued and the pause is gone (measured 2026-10-16). Where Continue after the reset is off, nothing will, and a notice
+asks the person to press Resume in Codex.
 
 Every outcome is one closed word, journalled (registry codes); never a conversation's words.
 """
@@ -120,37 +120,38 @@ class UsageStop(UsagePause):
         stop = self._stop or ipc.stop_turn
         for thread, turn in targets:
             try:
-                word, resumed = stop(thread, turn.turn_id)
+                word = stop(thread, turn.turn_id)
             except Exception:
-                word, resumed = ipc.Stop.BROKEN, None
+                word = ipc.Stop.BROKEN
             if word != ipc.Stop.STOPPED:
                 self._count("not_stopped")
                 self._notice("not_stopped", window)
                 continue
             self._count("stopped")
-            if resumed != ipc.Resume.RESUMED:
+            if not self._remember(thread, turn, window):
+                # No continuation after the reset will start a turn there, which is what lets the paused queue go.
                 self._count("resume_unproven")
                 self._notice("press_resume", window)
-            self._remember(thread, turn, window)
         return None
 
-    def _remember(self, thread, turn, window) -> None:
+    def _remember(self, thread, turn, window) -> bool:
         """A conversation it stopped, kept for one continuation after its window resets - where Continue after the
-        reset (the wrap-up's choice) is on."""
+        reset (the wrap-up's choice) is on. Whether one is kept."""
         scoped = self._scoped
         try:
             if scoped.options_of(WRAP_UP).get(OptionKey.WRAP_AFTER_RESET, ON) != ON:
-                return
+                return False
             words = statement.CATALOGS.text(AFTER_RESET_KEY, self._locale())
             if not words_pass(words):
-                return
+                return False
             key = answer_key(ContinuationKind.AFTER_RESET, thread, window["bucket"], window["minutes"],
                              window["reset_at"])
             if scoped.continuations.get(key) is None:
                 scoped.continuations.add(key, ContinuationKind.AFTER_RESET, thread, words, ordinal=turn.ordinal,
                                          chain=window["minutes"])
+            return True
         except Exception:
-            pass
+            return False
 
     def _after_reset(self, view) -> None:
         """Each conversation it stopped whose window has reset: continued once by a turn the app starts, while the

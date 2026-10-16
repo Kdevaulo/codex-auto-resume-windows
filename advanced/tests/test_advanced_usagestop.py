@@ -18,7 +18,7 @@ from takingcase import TakingCase  # noqa: E402
 from codex_auto_resume.domain.plug import Alternative, Point  # noqa: E402
 from codex_auto_resume_advanced import statement, surfaces  # noqa: E402
 from codex_auto_resume_advanced.codex import ipc  # noqa: E402
-from codex_auto_resume_advanced.registry import USAGE_METER, USAGE_PAUSE  # noqa: E402
+from codex_auto_resume_advanced.registry import USAGE_METER, USAGE_PAUSE, USAGE_WRAP_UP  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import Actor, OptionKey  # noqa: E402
 from test_advanced_usage import _view_all  # noqa: E402
 from test_engine import T1  # noqa: E402
@@ -34,7 +34,7 @@ class StopCase(TakingCase):
         super().setUp()
         self.compat = _view_all()
         self.stops, self.starts = [], []
-        self.stop_answer = (ipc.Stop.STOPPED, ipc.Resume.UNPROVEN)
+        self.stop_answer = ipc.Stop.STOPPED
         self.start_answer = ipc.Start.STARTED
 
     def arm(self, plug, state="armed", capability=None, **changes):
@@ -87,8 +87,8 @@ class StopTests(StopCase):
         self.assertIs(plug.runtime.ask(Point.GATES, "usage", CORE, {}), Alternative.HOLD)
         codes = self.journal(plug)
         self.assertIn("pause.stopped", codes)
-        self.assertIn("pause.resume_unproven", codes)
-        self.assertEqual(self.kinds(plug), ["press_resume"], "the queue it paused: press Resume in Codex")
+        self.assertNotIn("pause.resume_unproven", codes, "the turn started after the reset lets the queue go")
+        self.assertEqual(self.kinds(plug), [])
 
     def test_below_it_nothing_is_stopped(self):
         self.running(percent=96)
@@ -97,7 +97,7 @@ class StopTests(StopCase):
         self.assertEqual(self.stops, [])
 
     def test_where_it_cannot_stop_it_holds_and_says_so(self):
-        self.stop_answer = (ipc.Stop.NO_CLIENT, None)
+        self.stop_answer = ipc.Stop.NO_CLIENT
         plug, _turn = self.running()
         for _ in range(2):
             self.h.tick(advance=61)
@@ -163,9 +163,27 @@ class AfterResetTests(StopCase):
         self.assertIn("pause.continued", self.journal(plug))
 
 
+class NoContinuationTests(StopCase):
+    """Continue after the reset off (the wrap-up's choice): nothing will start a turn there, which is what lets the
+    paused queue go - so the person is asked to press Resume in Codex."""
+    BESIDE = (USAGE_METER, USAGE_WRAP_UP)
+
+    def test_with_continue_after_the_reset_off_the_person_is_asked_to_press_resume(self):
+        plug, _turn = self.running()
+        assert plug.runtime.arming.set_option("usage_wrap_up", OptionKey.WRAP_AFTER_RESET, 2,
+                                              generation=plug.runtime.state.meta()["generation"],
+                                              actor=Actor.DASHBOARD)["done"]
+        for _ in range(2):
+            self.h.tick(advance=61)
+        self.assertEqual(len(self.stops), 1)
+        self.assertIn("pause.resume_unproven", self.journal(plug))
+        self.assertEqual(self.kinds(plug), ["press_resume"])
+        self.assertEqual(plug.runtime.state.continuations(capability=self.cap, pending=None), [])
+
+
 @unittest.skipUnless(sys.platform == "win32", "a Windows named pipe")
 class ThroughThePipeTests(StopCase):
-    def test_the_stop_goes_through_the_apps_channel_and_an_unproven_resume_is_said(self):
+    def test_the_stop_goes_through_the_apps_channel(self):
         import fakeipc
         app = fakeipc.FakeApp()
         self.addCleanup(app.close)
@@ -177,7 +195,7 @@ class ThroughThePipeTests(StopCase):
         self.assertEqual([seen[0] for seen in app.seen],
                          ["initialize", "thread-owner-discovery", "thread-follower-interrupt-turn"])
         self.assertEqual(app.seen[-1][2], {"conversationId": T1, "mode": "system", "expectedTurnId": turn})
-        self.assertEqual(self.kinds(plug), ["press_resume"])
+        self.assertEqual(self.kinds(plug), [])
 
 
 if __name__ == "__main__":

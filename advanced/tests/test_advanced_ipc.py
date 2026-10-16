@@ -33,7 +33,7 @@ class StopTests(unittest.TestCase):
 
     def test_a_stop_is_initialize_then_the_owner_then_the_stop_mode_system_to_that_owner(self):
         app = self.app()
-        self.assertEqual(self.stop(app), (ipc.Stop.STOPPED, ipc.Resume.UNPROVEN))
+        self.assertEqual(self.stop(app), ipc.Stop.STOPPED)
         self.assertEqual([(method, version) for method, version, _params, _target in app.seen],
                          [("initialize", 0), ("thread-owner-discovery", 1), ("thread-follower-interrupt-turn", 3)])
         self.assertEqual(app.seen[1][2], {"hostId": "local", "conversationId": THREAD})
@@ -55,19 +55,17 @@ class StopTests(unittest.TestCase):
                               ipc.Stop.REFUSED),
                              ({"thread-follower-interrupt-turn": None}, ipc.Stop.NO_ANSWER)):
             with self.subTest(word=word), patch.object(ipc, "READ_SECONDS", 1.0):
-                self.assertEqual(self.stop(self.app(**script)), (word, None))
+                self.assertEqual(self.stop(self.app(**script)), word)
         with patch.object(ipc, "PIPE", r"\\.\pipe\car-test-ipc-none-%d" % id(self)):
-            self.assertEqual(ipc.stop_turn(THREAD), (ipc.Stop.NO_PIPE, None), "the app not running")
+            self.assertEqual(ipc.stop_turn(THREAD), ipc.Stop.NO_PIPE, "the app not running")
 
-    def test_the_queue_is_put_back_only_once_its_request_is_measured(self):
-        shape = (1, {"conversationId": "{thread}"})
-        with patch.object(ipc, "QUEUE_RESUME", shape):
-            app = self.app()
-            self.assertEqual(self.stop(app), (ipc.Stop.STOPPED, ipc.Resume.RESUMED))
-            self.assertEqual(app.seen[-1][:2], ("thread-follower-set-queued-follow-ups-state", 1))
-            refused = self.app(**{"thread-follower-set-queued-follow-ups-state": {"resultType": "error",
-                                                                                   "error": "no"}})
-            self.assertEqual(self.stop(refused), (ipc.Stop.STOPPED, ipc.Resume.UNPROVEN))
+    def test_nothing_is_asked_of_the_queue(self):
+        """Measured 2026-10-16: the turn started after the reset is what lets the paused queue go - the stop asks the
+        app for nothing more than the stop."""
+        app = self.app()
+        self.stop(app)
+        self.assertNotIn("thread-follower-set-queued-follow-ups-state", [seen[0] for seen in app.seen])
+        self.assertFalse(hasattr(ipc, "QUEUE_RESUME"))
 
     def test_a_turn_started_after_the_reset_carries_the_words(self):
         app = self.app()
