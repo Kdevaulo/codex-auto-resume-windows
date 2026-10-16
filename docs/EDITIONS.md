@@ -140,7 +140,8 @@ start. Four rest on a measurement each that was made - the first three, and queu
 is opened. Of the five added in v0.6.16-beta.4, three rest on a measurement that was made and on others not made
 yet - running a conversation here, the other sessions and compacting a full conversation - and two on measurements
 not made yet. Ten more rest on measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
-owner's machine, first on `codex-cli 0.158.0-alpha.2.1` and again on `codex-cli 0.162.0-alpha.17.2`;
+owner's machine, first on `codex-cli 0.158.0-alpha.2.1`, again on `codex-cli 0.162.0-alpha.17.2` and, for those this release's
+capabilities rest on, once more on `codex-cli 0.163.0-alpha.10.2` (2026-10-17);
 its record is in [`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a
 measurement not made yet, a capability's statement carries the warning that it was not measured there.
 
@@ -206,7 +207,7 @@ goal active again through Codex's own app server (`thread/goal/set`), so that Co
 on when the app next opens the conversation. It never creates a goal and never reads or changes what
 the goal says. While the app has the conversation open, the continuation goes through Codex's queue
 as in the standard edition, except where measurement M2b passed for your version of Codex - so far
-`codex-cli 0.162.0-alpha.17.2`: there it sets the paused goal active first and then adds the
+`codex-cli 0.163.0-alpha.10.2`: there it sets the paused goal active first and then adds the
 continuation to the conversation's queue, as M2b did. While a goal it set active carries the
 conversation on, the standard continuation waits, for up to ten minutes, so the two do not both run.
 
@@ -231,7 +232,7 @@ Codex to stop it.
 **Ceilings.** 12 a day, and 3 in any one conversation.
 
 **Measurement M2: failed**, for a conversation the app holds; its statement shows that as a warning.
-**Measurement M2b: passed** on `codex-cli 0.162.0-alpha.17.2` - a goal set active beside a queued turn
+**Measurement M2b: passed** on `codex-cli 0.163.0-alpha.10.2` - a goal set active beside a queued turn
 carries on while the app holds the conversation - so on that version it acts there too; on any other,
 a conversation the app holds gets the standard continuation alone.
 
@@ -623,7 +624,7 @@ is taken back, sent the ordinary way, and this turns itself off.
 chance that a conversation will be opened). It keeps A17, H4 and H6: every withdrawal still happens at once.
 
 **Ceilings.** 12 a day, and 3 in any one conversation. **Measurement M1: made** on `codex-cli
-0.158.0-alpha.2.1`; on any other version, a warning.
+0.163.0-alpha.10.2`; on any other version, a warning.
 
 ### Run a conversation here while Codex is closed
 
@@ -652,7 +653,7 @@ lives for the turn, which this program ends). It keeps A4: the continuation carr
 marker proves its arrival.
 
 **Ceilings.** 12 a day, and 3 in any one conversation. **Measurement M6: made** on `codex-cli
-0.162.0-alpha.17.2`. **M6B: not made yet** - a warning.
+0.163.0-alpha.10.2`. **M6B: not made yet** - a warning.
 
 ### Recover CLI, TUI and VS Code conversations
 
@@ -678,7 +679,7 @@ conversation). It keeps A2, A3, A4, A17, H4 and H6: one channel, the exact conve
 work wins, and Pause and Cancel take a queued continuation back.
 
 **Ceilings.** 24 a day, and 3 in any one conversation. **Measurement M5: made** on `codex-cli
-0.162.0-alpha.17.2`. **MO: a warning** until it is measured again for your version of Codex.
+0.163.0-alpha.10.2`. **MO: a warning** until it is measured again for your version of Codex.
 
 ### Continue a turn that ended with no reply
 
@@ -869,7 +870,7 @@ is a turn started through the app's channel, not `codex queue`), [B3](STANDARDS.
 reading) and [H6](STANDARDS.md#h-user-control) (a running turn is stopped).
 
 **Ceilings.** One stop and one continuation a conversation a window. **Measurement MIPC: passed** (codex-cli
-0.162.0-alpha.17.2, app 26.1007.9446.0); **MU: not settled yet.**
+0.163.0-alpha.10.2, app 26.1013.3656.0); **MU: not settled yet.**
 
 ### Continue with no words
 

@@ -23,22 +23,26 @@ from .vocabulary import Measurement, Verdict
 # words the Compatibility Registry's view carries as the engine version. Every earlier reading
 # (codex-cli 0.158.0-alpha.2.1, 2026-09-26 and 09-28) was made again on it.
 CLI_0162_ALPHA_17_2 = "codex-cli 0.162.0-alpha.17.2"
+# The Codex of 2026-10-17 (app 26.1013.3656.0): the readings the beta.4 capabilities rest on were made
+# again on it - MW, M1, M2b, M5, M6, M7, MP1-MP3, MIPC, and stage 4's MO, M6B, MX, MF and M3B. The rest
+# stay on the engine they were made on, and a statement on 0.163 calls them unmeasured.
+CLI_0163_ALPHA_10_2 = "codex-cli 0.163.0-alpha.10.2"
 
 MEASURED = {
-    Measurement.M1: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.M1: (Verdict.PASS, CLI_0163_ALPHA_10_2),
     Measurement.M2: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
-    Measurement.M2B: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.M2B: (Verdict.PASS, CLI_0163_ALPHA_10_2),
     Measurement.M3: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
     Measurement.M4: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
-    Measurement.M5: (Verdict.PASS, CLI_0162_ALPHA_17_2),
-    Measurement.M6: (Verdict.PASS, CLI_0162_ALPHA_17_2),
-    Measurement.M7: (Verdict.PASS, CLI_0162_ALPHA_17_2),
-    Measurement.MW: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.M5: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.M6: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.M7: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.MW: (Verdict.PASS, CLI_0163_ALPHA_10_2),
     Measurement.MA: (Verdict.PASS, CLI_0162_ALPHA_17_2),
     Measurement.MH: (Verdict.PASS, CLI_0162_ALPHA_17_2),
-    Measurement.MP1: (Verdict.PASS, CLI_0162_ALPHA_17_2),
-    Measurement.MP2: (Verdict.PASS, CLI_0162_ALPHA_17_2),
-    Measurement.MP3: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MP1: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.MP2: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.MP3: (Verdict.PASS, CLI_0163_ALPHA_10_2),
     # 2026-10-11, at the owner's word that one reset credit may be spent.
     Measurement.MR: (Verdict.PASS, CLI_0162_ALPHA_17_2),
     # 2026-10-11, once that credit was spent and the account had none left.
@@ -48,18 +52,19 @@ MEASURED = {
     # 2026-10-16 (records 22f19fb7, da367839, f0f1f1fd): the Desktop's IPC pipe starts, adds to and interrupts a turn of
     # a conversation the app holds; Codex documents no supported shared app-server the app uses; `codex cloud` reads a
     # cloud task's state but nothing continues one - partial, which is not a pass.
-    Measurement.MIPC: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MIPC: (Verdict.PASS, CLI_0163_ALPHA_10_2),
     Measurement.MAWS: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
     Measurement.MCLOUD: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
     # 2026-10-15 and 16, stage 4's nine (v0.6.16-beta.4), Codex closed or open as each needs.
     Measurement.MC1: (Verdict.PASS, CLI_0162_ALPHA_17_2),
     Measurement.MXA: (Verdict.PASS, CLI_0162_ALPHA_17_2),
-    Measurement.MX: (Verdict.PASS, CLI_0162_ALPHA_17_2),
-    Measurement.MF: (Verdict.PASS, CLI_0162_ALPHA_17_2),
+    Measurement.MX: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.MF: (Verdict.PASS, CLI_0163_ALPHA_10_2),
     # A fail narrows a route or is its capability's warning, never its end (the owner's rule).
     Measurement.MB: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
-    Measurement.MO: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
     Measurement.MC2: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
-    Measurement.M3B: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
-    Measurement.M6B: (Verdict.FAIL, CLI_0162_ALPHA_17_2),
+    # 2026-10-17, made again on codex-cli 0.163.0-alpha.10.2: all three passed there (they had failed on 0.162).
+    Measurement.MO: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.M3B: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.M6B: (Verdict.PASS, CLI_0163_ALPHA_10_2),
 }

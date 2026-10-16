@@ -92,17 +92,27 @@ class TableTests(unittest.TestCase):
         and runs), MXA (a person's /compact leaves compaction and reasoning only), MX (thread/compact/start compacts
         headless) and MF (a model at turn/start, put back by thread/settings/update and read back) passed; MB (Codex
         refuses any write under model_providers.openai), MO and MC2 (partial), M3B (an empty turn leaves no client
-        id) and M6B (the sandbox helper asked for elevation) failed."""
+        id) and M6B (the sandbox helper asked for elevation) failed on 0.162.
+        2026-10-17, on codex-cli 0.163.0-alpha.10.2 (app 26.1013.3656.0) the main session measured again MW, M1, M2b,
+        M5, M6, M7, MP1-MP3, MIPC and stage 4's MO, M6B, MX, MF and M3B, and every one passed - MO, M6B and M3B,
+        which had failed on 0.162, among them. The others stay as they were made, so on 0.163 they read as
+        unmeasured; MAWS, MCLOUD and MB are as before."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
                                   Measurement.M6, Measurement.M7, Measurement.MA, Measurement.MH,
                                   Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR,
                                   Measurement.MN, Measurement.MU, Measurement.MIPC, Measurement.MC1,
-                                  Measurement.MXA, Measurement.MX, Measurement.MF})
-        self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4, Measurement.MAWS,
-                                  Measurement.MCLOUD, Measurement.MB, Measurement.MO, Measurement.MC2,
+                                  Measurement.MXA, Measurement.MX, Measurement.MF, Measurement.MO,
                                   Measurement.M3B, Measurement.M6B})
+        self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4, Measurement.MAWS,
+                                  Measurement.MCLOUD, Measurement.MB, Measurement.MC2})
+        new = "codex-cli 0.163.0-alpha.10.2"
+        again = {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5, Measurement.M6,
+                 Measurement.M7, Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MIPC,
+                 Measurement.MO, Measurement.M6B, Measurement.MX, Measurement.MF, Measurement.M3B}
+        self.assertEqual({m for m, (_v, version) in measured.MEASURED.items() if version == new}, again)
+        self.assertTrue(all(measured.MEASURED[m][0] == Verdict.PASS for m in again))
         self.assertEqual(set(Measurement) - passed - failed,
                          # v0.6.15-beta's own, for several conversations at once: not made yet.
                          {Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK, Measurement.MT})
