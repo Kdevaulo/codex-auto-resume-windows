@@ -21,6 +21,12 @@ from pathlib import Path
 import re
 import sys
 
+_HERE = str(Path(__file__).resolve().parent)
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+import make_setup  # noqa: E402  (the one place that names the setup programs)
+
 ROOT = Path(__file__).resolve().parents[1]
 CHANGELOG = ROOT / "docs" / "CHANGELOG.md"
 # The folder the changelog's relative links are written from, as the root sees it.
@@ -73,6 +79,30 @@ def section(text: str, version: str) -> str:
     return body
 
 
+REPO = "https://github.com/songyb111-gachon/codex-auto-resume-windows"
+
+
+def download_block(version: str) -> str:
+    """The first lines of every release page: direct links to the tag's two setup programs, so
+    nobody has to scroll to Assets. The file names come from make_setup, which builds them."""
+    version = str(version).lstrip("v")
+    tag = "v" + version
+
+    def link(label, edition):
+        return "[%s edition \u2014 Setup.exe](%s/releases/download/%s/%s)" % (
+            label, REPO, tag, make_setup.setup_name(edition, version))
+
+    return ("**\u2b07 Download:** %s \u00b7 %s\n"
+            "<sub>Run the one you want. The ZIP archives and their SHA-256 files are under Assets below; "
+            "how to check them: [VERIFY.md](%s/blob/main/docs/VERIFY.md).</sub>\n"
+            % (link("Standard", "standard"), link("Advanced", "advanced"), REPO))
+
+
+def notes(text: str, version: str) -> str:
+    """The release body: the download block, a blank line, then the rebased changelog section."""
+    return download_block(version) + "\n" + rebase(section(text, version))
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Print a version's changelog section.")
     parser.add_argument("version", help="version, with or without a leading v")
@@ -81,7 +111,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     text = Path(args.changelog).read_text(encoding="utf-8")
-    body = rebase(section(text, args.version))
+    body = notes(text, args.version)
     if args.output:
         Path(args.output).write_text(body + "\n", encoding="utf-8")
     else:
