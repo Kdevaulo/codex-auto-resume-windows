@@ -38,6 +38,9 @@ class FakeApp:
         self.script = dict(script or {})
         self.seen = []
         self.broadcast_first = True
+        # The turn the app has running: None takes any expectedTurnId as it (and names "t" to a v3 stop); a turn id
+        # makes a v4 stop naming another a silent success that names no stopped turn, as the app does (MIPC-v4).
+        self.running = None
         self._handle = _K32.CreateNamedPipeW(self.name, 3, 0, 1, 65536, 65536, 0, None)
         if self._handle in (None, wintypes.HANDLE(-1).value):
             raise OSError("no scratch pipe")
@@ -70,21 +73,25 @@ class FakeApp:
                 self.seen.append((method, request.get("version"), request.get("params"), request.get("targetClientId")))
                 if self.broadcast_first:
                     self._write({"type": "broadcast", "method": "thread-stream-state-changed", "params": {}})
-                reply = self.script.get(method, self._default(method))
+                reply = self.script.get(method, self._default(method, request.get("params") or {}))
                 if reply is None:
                     continue                                   # silent
                 self._write(dict({"type": "response", "requestId": request.get("requestId")}, **reply))
         except Exception:
             return
 
-    @staticmethod
-    def _default(method):
+    def _default(self, method, params):
         if method == "initialize":
             return {"resultType": "success", "result": {"clientId": CLIENT}}
         if method == "thread-owner-discovery":
             return {"resultType": "success", "handledByClientId": OWNER, "result": {"supportsUntrustedAppInput": True}}
         if method == "thread-follower-interrupt-turn":
-            return {"resultType": "success", "result": {"interruptedTurnId": "t", "ok": True}}
+            expected = params.get("expectedTurnId")
+            if expected is None:
+                return {"resultType": "success", "result": {"interruptedTurnId": self.running or "t"}}
+            if self.running is not None and expected != self.running:
+                return {"resultType": "success", "result": {}}
+            return {"resultType": "success", "result": {"interruptedTurnId": expected}}
         if method == "thread-follower-set-queued-follow-ups-state":
             return {"resultType": "success", "result": {}}
         if method == "thread-follower-start-turn":

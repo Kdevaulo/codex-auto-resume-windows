@@ -45,6 +45,25 @@ class StopTests(unittest.TestCase):
         self.assertEqual(app.seen[2][:3], ("thread-follower-interrupt-turn", 4,
                                            {"conversationId": THREAD, "mode": "system", "expectedTurnId": TURN}))
 
+    def test_a_success_counts_as_a_stop_only_when_it_names_the_turn_it_stopped(self):
+        """MIPC-v4 (codex-cli 0.163, app 26.1013): v4 with a stale or made-up expectedTurnId answers success with no
+        interruptedTurnId and the turn runs on - a silent no-op, never counted as a stop."""
+        app = self.app()
+        app.running = TURN
+        self.assertEqual(self.stop(app, TURN), ipc.Stop.STOPPED, "the right turn: stopped")
+        stale = self.app()
+        stale.running = TURN
+        self.assertEqual(self.stop(stale, "cccccccc-0000-7000-8000-00000000c003"), ipc.Stop.NOT_STOPPED,
+                         "a stale turn: success naming none, nothing stopped")
+        for result in ({}, {"interruptedTurnId": ""}, {"interruptedTurnId": "another"}, None):
+            with self.subTest(result=result):
+                named = self.app(**{"thread-follower-interrupt-turn": {"resultType": "success", "result": result}})
+                self.assertEqual(self.stop(named, TURN), ipc.Stop.NOT_STOPPED)
+        for result, word in (({"interruptedTurnId": "any"}, ipc.Stop.STOPPED), ({}, ipc.Stop.NOT_STOPPED)):
+            with self.subTest(v3=result):
+                named = self.app(**{"thread-follower-interrupt-turn": {"resultType": "success", "result": result}})
+                self.assertEqual(self.stop(named), word, "v3, no turn known: any turn named is the stop")
+
     def test_each_failure_is_one_closed_word_and_nothing_waits_for_good(self):
         for script, word in (({"thread-owner-discovery": {"resultType": "error", "error": "no-client-found"}},
                               ipc.Stop.NO_CLIENT),

@@ -1,6 +1,7 @@
 # ADVANCED-EDITION-CODE: in the advanced edition's archive, never the standard one's.
 """The Codex Desktop app's own IPC pipe, \\\\.\\pipe\\codex-ipc - for the forced stop near a usage limit alone
-(v0.6.16-beta.4, usage_pause; measurement MIPC passed on codex-cli 0.162.0-alpha.17.2 with app 26.1007.9446.0).
+(v0.6.16-beta.4, usage_pause; measurement MIPC passed on codex-cli 0.162.0-alpha.17.2 with app 26.1007.9446.0, and
+again on 0.163.0-alpha.10.2 with app 26.1013.3656.0 - f16c9ca2 on measure-20261017 - where v4 was measured too).
 
 What it does, and nothing else: open the pipe, `initialize`, ask `thread-owner-discovery` which client of the app
 holds the conversation, and ask that client `thread-follower-interrupt-turn` (mode "system") for it - the stop a
@@ -49,6 +50,9 @@ INTERRUPT_EXPECTING = (4, {"conversationId": "{thread}", "mode": "system", "expe
 class Stop(StrEnum):
     """What came of one forced stop - the closed words the journal keeps."""
     STOPPED = "stopped"                      # the app stopped the turn
+    # The app answered success but named no stopped turn, or another one: v4 with a stale or made-up expectedTurnId
+    # is a silent no-op, the turn still running (MIPC-v4, codex-cli 0.163 / app 26.1013, 2026-10-17).
+    NOT_STOPPED = "not_stopped"
     NO_CLIENT = "no_client"                  # the app does not hold the conversation (not open, or not running)
     VERSION_MISMATCH = "version_mismatch"    # the app's build checks another version of a request
     NO_PIPE = "no_pipe"                      # the pipe is not there: the app is not running
@@ -212,6 +216,16 @@ def _request(channel, client, method, shape, fields, target=None, reads=20):
     raise _Failed(Stop.NO_ANSWER)
 
 
+def _stopped(answer, turn_id):
+    """STOPPED only where the app names the turn it stopped - the one expected (v4), or any (v3, no turn known): a
+    success that names none, or another, stopped nothing (MIPC-v4, 2026-10-17)."""
+    result = answer.get("result")
+    stopped = result.get("interruptedTurnId") if isinstance(result, dict) else None
+    if not isinstance(stopped, str) or not stopped:
+        return Stop.NOT_STOPPED
+    return Stop.STOPPED if not turn_id or stopped == turn_id else Stop.NOT_STOPPED
+
+
 def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
     """Stop the running turn of `thread_id` the app holds: the Stop word of what came of it. `turn_id`, where known,
     makes it the v4 stop that names it. `channel` is a seam (a Channel of a test's own pipe)."""
@@ -231,9 +245,9 @@ def stop_turn(thread_id, turn_id=None, *, channel=None) -> tuple:
         if not isinstance(owner, str) or not owner:
             return Stop.NO_CLIENT
         shape = INTERRUPT_EXPECTING if turn_id else REQUESTS["thread-follower-interrupt-turn"]
-        _request(opened, client, "thread-follower-interrupt-turn", shape, {"thread": thread_id, "turn": turn_id},
-                 target=owner)
-        return Stop.STOPPED
+        answer = _request(opened, client, "thread-follower-interrupt-turn", shape,
+                          {"thread": thread_id, "turn": turn_id}, target=owner)
+        return _stopped(answer, turn_id)
     except _Failed as failed:
         return failed.word
     except Exception:
