@@ -74,9 +74,14 @@ class RegistryTests(unittest.TestCase):
     def test_every_notice_but_a_demo_is_one_kind_s_and_an_edition_s_notice_is_none_until_registered(self):
         covered = [notice for kind in notice_kinds.kinds() for notice in kind.notices]
         self.assertEqual(len(covered), len(set(covered)), "a notice is one kind's")
-        self.assertEqual(set(covered), set(notifier.STATUS) - {"demo", "near_limit"})
+        # The advanced edition's usage notices - the warning and (v0.6.16) the forced stop's three - are its own kinds.
+        edition_notices = {"near_limit"} | {"near_limit_" + said for said in notify.NEAR_LIMIT_KINDS}
+        self.assertEqual(len(edition_notices), 4)
+        self.assertEqual(set(covered), set(notifier.STATUS) - {"demo"} - edition_notices)
         self.assertIsNone(notice_kinds.kind_of("demo"))
-        self.assertIsNone(notice_kinds.kind_of("near_limit"), "the advanced edition registers its own")
+        for notice in sorted(edition_notices):
+            with self.subTest(notice=notice):
+                self.assertIsNone(notice_kinds.kind_of(notice), "the advanced edition registers its own")
 
     def test_an_edition_registers_a_kind_with_its_words_in_every_language(self):
         made = notice_kinds.register("near_limit", ("near_limit",), words("Near a limit"))

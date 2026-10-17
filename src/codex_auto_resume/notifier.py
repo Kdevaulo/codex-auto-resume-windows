@@ -67,6 +67,11 @@ NOTICE_STATUS = {
     "memory_stopped": "attention",  # v0.6.11: and stopped for it
     "demo": "waiting",              # v0.6.11: Show me what happens - made-up words, inert buttons
     "near_limit": "attention",      # v0.6.16-beta.3: the advanced edition's usage meter at a warning (issue #29)
+    # v0.6.16: and its forced stop's three (notify.NEAR_LIMIT_KINDS), each a kind of its own, so each can be kept on
+    # screen until clicked apart from the warning (notice_kinds: the advanced edition registers all four).
+    "near_limit_not_stopped": "attention",
+    "near_limit_press_resume": "attention",
+    "near_limit_not_continued": "attention",
 }
 # v0.6.12: the power action after usage-limit recoveries (runtime/afterwork.py), whose kinds are words of
 # its own (domain/power_vocabulary.PowerNotice). Its notices are raised whatever the notification switches
@@ -287,9 +292,12 @@ def _build(event, detail, identity=None, *, sound=False):
         return _notice(event, notify.memory_content(event, detail.get("used"), detail.get("limit")), key=None)
     if event == "near_limit":
         # v0.6.16-beta.3 (issue #29): the advanced edition's usage meter reached a warning. About a usage window,
-        # not a conversation, so it has no key and replaces no card; its one button opens the Dashboard.
-        return _notice("near_limit", notify.near_limit_content(detail.get("minutes"), detail.get("percent"),
-                                                               detail.get("reset_at"), detail.get("kind")), key=None)
+        # not a conversation, so it has no key and replaces no card; its one button opens the Dashboard. From v0.6.16
+        # the forced stop's notices (a `kind` of notify.NEAR_LIMIT_KINDS) are notices of their own kinds.
+        said = detail.get("kind")
+        return _notice("near_limit_" + said if said in notify.NEAR_LIMIT_KINDS else "near_limit",
+                       notify.near_limit_content(detail.get("minutes"), detail.get("percent"),
+                                                 detail.get("reset_at"), said), key=None)
     if event in POWER_EVENTS:
         # v0.6.12: the power action (runtime/afterwork.py). About this PC, not a conversation, so it has
         # no key and replaces no card. Only the countdown's has a stop button, named by its batch (A28).

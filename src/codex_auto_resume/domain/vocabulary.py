@@ -604,3 +604,8 @@ class NoticeKind(StrEnum):
     DEMO = "demo"
     # v0.6.16-beta.3: the advanced edition's usage meter at a warning (issue #29) - shown only from its plug's surface.
     NEAR_LIMIT = "near_limit"
+    # v0.6.16: what the advanced edition's forced stop near a limit says (notify.NEAR_LIMIT_KINDS), each a kind of its
+    # own, so a person can keep one on screen and not the warning.
+    NEAR_LIMIT_NOT_STOPPED = "near_limit_not_stopped"
+    NEAR_LIMIT_PRESS_RESUME = "near_limit_press_resume"
+    NEAR_LIMIT_NOT_CONTINUED = "near_limit_not_continued"
