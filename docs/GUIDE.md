@@ -378,7 +378,7 @@ all at once. From v0.6.16 **Rescan and reconcile**, after Cancel all, looks at e
 again by the watcher's own rules, once you confirm. One is retired - stopped as replaced by your own
 work - only on proof: its exact failed turn in Codex's history followed by a turn you started (a
 continuation of this tool's never counts), or, while that history has not caught up with the
-conversation's file, the same in the file itself. One that is still its conversation's latest failure
+conversation's file, the same in the file itself, where nothing after a rollback counts. One that is still its conversation's latest failure
 is left waiting exactly as it was, under every check - the reset's grace, a postponement, a hold, the
 switches and the budgets - and the watcher is woken to look at whatever is due. Anything it cannot
 decide stays as it is and is counted as unresolved, and a recovery that changed while it looked is
