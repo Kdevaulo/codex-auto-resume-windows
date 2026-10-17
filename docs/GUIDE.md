@@ -931,7 +931,8 @@ A notification goes away by itself after a while. **Keep on screen until clicked
 General > Notifications, lists each kind of notification - an interruption detected, a recovery
 starting, resumed, could not resume, stopped trying, cancelled, a conversation that needs you, tasks
 waiting after a long sleep, the watcher's memory, and the power action after usage-limit recoveries;
-the advanced edition adds its usage meter's warning - and a kind ticked there stays on screen until
+the advanced edition adds its usage meter's warning and each of its three notices about a stop near a
+limit - and a kind ticked there stays on screen until
 you click it: the card stays beside the notification area, and Windows' own notification stays as a
 reminder until you close it, with a button to close it where it has none. None is ticked at first.
 

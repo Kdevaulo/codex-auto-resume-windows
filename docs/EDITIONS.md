@@ -857,7 +857,9 @@ pauses a stopped conversation's queue, and that survives the app's restart, unti
 reset lets it go; with Continue after the reset off, a notice asks you to press Resume in Codex. When the window resets, a conversation it stopped is continued once (*Continue after the reset*, a
 choice of Wrap up near a limit, on by default) by a turn started through the same channel - past the paused
 queue - only if nothing newer happened there and the app has it open; otherwise it waits, and a notice says
-to open it in Codex. Messages you queued yourself, and anything you type in Codex, are not touched.
+to open it in Codex. Messages you queued yourself, and anything you type in Codex, are not touched. Each of
+these three notices, and the meter's warning, is a kind of its own under *Keep on screen until clicked*
+(Settings > General > Notifications), and a click on one opens the Dashboard.
 
 **When it helps.** When you would rather a turn stopped before the limit than ran into it.
 
