@@ -385,12 +385,26 @@ namespace CodexAutoResume
                 // Its own placement, against the window's client area for a screen: where it opens under the field.
                 Rectangle screenField = combo.RectangleToScreen(combo.ClientRectangle);
                 Rectangle area = RectangleToScreen(new Rectangle(Point.Empty, ClientSize));
-                Bitmap image = list.PaintSettled(hovered, area);
+                // As it opens it fades in and rises into place (SoftDropList.Show and Tick): `appear_ms` into that.
+                object appearing;
+                double appear = listed.TryGetValue("appear_ms", out appearing) && appearing != null
+                    ? Convert.ToDouble(appearing, CultureInfo.InvariantCulture) : -1;
+                Bitmap image = list.PaintAt(hovered, area, appear);
                 if (image == null) return picture;
                 Rectangle card = list.Card;
                 Padding margin = list.Margin;
-                int left = field.X + card.X - screenField.X - margin.Left, top = field.Y + card.Y - screenField.Y - margin.Top;
-                using (Graphics g = Graphics.FromImage(picture)) g.DrawImage(image, left, top, image.Width, image.Height);
+                int rise = list.CardOnScreen.Y - card.Y;
+                int left = field.X + card.X - screenField.X - margin.Left;
+                int top = field.Y + card.Y - screenField.Y - margin.Top + rise;
+                using (Graphics g = Graphics.FromImage(picture))
+                using (var faded = new ImageAttributes())
+                {
+                    var matrix = new ColorMatrix();
+                    matrix.Matrix33 = list.Alpha / 255f;
+                    faded.SetColorMatrix(matrix);
+                    g.DrawImage(image, new Rectangle(left, top, image.Width, image.Height), 0, 0, image.Width, image.Height,
+                                GraphicsUnit.Pixel, faded);
+                }
                 renderRows = new Dictionary<string, Rectangle>();
                 for (int i = 0; i < combo.Items.Count; i++)
                 {

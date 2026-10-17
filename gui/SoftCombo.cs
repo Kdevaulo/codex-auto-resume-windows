@@ -1103,13 +1103,22 @@ namespace CodexAutoResume
         /// picture of the window itself could hold.
         internal Bitmap PaintSettled(int hovered, Rectangle area)
         {
+            return PaintAt(hovered, area, -1);
+        }
+
+        /// The same, `appearing` ms into the fade and rise Show starts it with (Tick's own arithmetic), or settled
+        /// when that is below zero or past the transition: its Alpha and CardOnScreen say where it is then.
+        internal Bitmap PaintAt(int hovered, Rectangle area, double appearing)
+        {
             Rectangle saved = Area;
             Area = area;
             try { Measure(); }
             finally { Area = saved; }
             Reveal(combo.SelectedIndex);
-            alpha = 255;
-            rise = 0;
+            double t = appearing < 0 ? 1.0 : appearing / Math.Max(1, Motion.Duration);
+            double eased = Motion.Ease(t);
+            alpha = t >= 1.0 ? 255 : (int)Math.Round(255 * eased);
+            rise = t >= 1.0 ? 0 : (int)Math.Round(Soft.Px(Brand.SpaceXs) * (1.0 - eased));
             hover = hovered;
             Render();
             return image;
