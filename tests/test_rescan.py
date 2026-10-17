@@ -53,7 +53,7 @@ class RescanCase(ControlTestCase):
         self.asked = []
 
     # ------------------------------------------------------------------ helpers
-    def fail(self, thread=A, **kwargs):
+    def failure(self, thread=A, **kwargs):
         """A usage-limit failure in `thread`, registered as the watcher registers it; returns its record."""
         self.codex.add_thread(thread)
         turn = self.codex.fail_usage(thread, **kwargs)
@@ -122,7 +122,7 @@ class EvidenceTests(RescanCase):
     """Retired only on a person's turn after the exact failed turn; uncertain is unresolved."""
 
     def test_a_persons_later_turn_retires_the_wait(self):
-        row = self.fail()
+        row = self.failure()
         self.person()
         result = self.run_rescan()
         self.assertEqual(self.outcome(result, row["interruption_id"]), ("retired", "later_turn_exists"))
@@ -132,7 +132,7 @@ class EvidenceTests(RescanCase):
 
     def test_a_held_or_postponed_wait_is_retired_too(self):
         """The case the watcher never looks at: a wait held for a person, or postponed, is not due."""
-        row = self.fail()
+        row = self.failure()
         with Store(self.paths.state_dir) as store:
             store.hold_waiting([row["interruption_id"]], "ask", NOW, actor="gui")
             store.postpone(row["interruption_id"], A, NOW + 3600, NOW, actor="gui")
@@ -140,13 +140,13 @@ class EvidenceTests(RescanCase):
         self.assertEqual(self.outcome(self.run_rescan(), row["interruption_id"])[0], "retired")
 
     def test_the_latest_failure_is_rechecked_and_left_waiting(self):
-        row = self.fail()
+        row = self.failure()
         result = self.run_rescan()
         self.assertEqual(self.outcome(result, row["interruption_id"]), ("rechecked", None))
         self.assertEqual(self.record(row["interruption_id"])["state"], "waiting_poll")
 
     def test_a_turn_our_own_continuation_started_is_no_evidence(self):
-        row = self.fail()
+        row = self.failure()
         self.person(user_text="carry on\n\n" + row["marker"])
         result = self.run_rescan()
         self.assertEqual(self.outcome(result, row["interruption_id"]), ("unresolved", "latest_turn_changed"))
@@ -154,7 +154,7 @@ class EvidenceTests(RescanCase):
 
     def test_a_turn_another_record_of_ours_started_is_no_evidence(self):
         """Own continuation markers are excluded - any record's of the conversation, not only this one's."""
-        row = self.fail()
+        row = self.failure()
         earlier = ids.short_marker("b" * 64)
         sibling = dict(row, interruption_id="b" * 64, turn_id="0a1b2c3d-0039-7000-8000-0000000000ff",
                        ordinal=row["ordinal"] - 1)
@@ -166,12 +166,12 @@ class EvidenceTests(RescanCase):
         self.assertEqual(self.outcome(result, row["interruption_id"])[0], "unresolved")
 
     def test_a_turn_with_no_message_of_a_persons_is_no_evidence(self):
-        row = self.fail()
+        row = self.failure()
         self.person(user_text=None)
         self.assertEqual(self.outcome(self.run_rescan(), row["interruption_id"])[0], "unresolved")
 
     def test_a_turn_still_starting_is_no_evidence(self):
-        row = self.fail()
+        row = self.failure()
         self.codex.add_turn(A, status="inProgress", first_user=False)
         self.assertEqual(self.outcome(self.run_rescan(), row["interruption_id"])[0], "unresolved")
 
@@ -195,7 +195,7 @@ class StaleProjectionTests(RescanCase):
 
     def split_failure(self):
         """issue #39's case: the conversation's file is replaced by A_B, its history behind it."""
-        row = self.fail()
+        row = self.failure()
         self.codex.rotate(A)
         return row
 
@@ -226,7 +226,7 @@ class StaleProjectionTests(RescanCase):
         self.assertEqual(self.outcome(self.run_rescan(), row["interruption_id"]), ("unresolved", "projection_stale"))
 
     def test_a_stale_projection_in_one_file_too(self):
-        row = self.fail()
+        row = self.failure()
         self.stale()
         self.events_in_file(A, self.user_message())
         result = self.run_rescan()
@@ -275,7 +275,7 @@ class GateTests(RescanCase):
     """A valid wait is rechecked by leaving it to every normal gate: nothing about it moves."""
 
     def test_a_rechecked_wait_keeps_its_schedule_its_hold_its_postponement_and_its_budgets(self):
-        row = self.fail()
+        row = self.failure()
         key = row["interruption_id"]
         self.write("UPDATE interruptions SET state='waiting_reset', reset_at=?, next_retry_at=?, recovery_attempts=2 "
                    "WHERE interruption_id=?", RESET, RESET + 60, key)
@@ -307,7 +307,7 @@ class RaceTests(RescanCase):
         return judged
 
     def test_a_record_cancelled_mid_scan_is_skipped(self):
-        row = self.fail()
+        row = self.failure()
         self.person()
         result = self.run_rescan(self.changing(lambda row: self.control.cancel_interruption(row["interruption_id"])))
         self.assertEqual(self.outcome(result, row["interruption_id"]), ("changed", None))
@@ -317,7 +317,7 @@ class RaceTests(RescanCase):
         self.assertNotIn("rescan_retired", self.events(row["interruption_id"]))
 
     def test_a_record_the_watcher_claimed_mid_scan_is_skipped(self):
-        row = self.fail()
+        row = self.failure()
         self.person()
         result = self.run_rescan(self.changing(lambda row: self.write(
             "UPDATE interruptions SET state='submitting', submitted_at=? WHERE interruption_id=?", NOW,
@@ -330,12 +330,12 @@ class RaceTests(RescanCase):
                        lambda row: self.control.postpone(row["interruption_id"], A, minutes=30)):
             with self.subTest(change=change):
                 self.write("DELETE FROM interruptions")
-                row = self.fail()
+                row = self.failure()
                 result = self.run_rescan(self.changing(change))
                 self.assertEqual(self.outcome(result, row["interruption_id"])[0], "changed")
 
     def test_a_poll_that_only_moved_the_next_look_is_no_change(self):
-        row = self.fail()
+        row = self.failure()
         self.person()
         result = self.run_rescan(self.changing(lambda row: self.write(
             "UPDATE interruptions SET next_retry_at=?, last_error='projection_stale' WHERE interruption_id=?",
@@ -351,15 +351,15 @@ class LeftAloneTests(RescanCase):
                 for path in sorted(self.codex.root.rglob("*")) if path.is_file()}
 
     def test_cancelled_finished_and_in_flight_records_are_never_asked_about_or_changed(self):
-        waiting = self.fail()
-        queued = self.fail(OTHER)
+        waiting = self.failure()
+        queued = self.failure(OTHER)
         self.write("UPDATE interruptions SET state='queued', submitted_at=?, queue_id=? WHERE interruption_id=?",
                    NOW, "0a1b2c3d-0039-7000-8000-0000000000aa", queued["interruption_id"])
         third = "0a1b2c3d-0039-7000-8000-000000000003"
-        cancelled = self.fail(third)
+        cancelled = self.failure(third)
         self.control.cancel_interruption(cancelled["interruption_id"])
         fourth = "0a1b2c3d-0039-7000-8000-000000000004"
-        asking = self.fail(fourth)
+        asking = self.failure(fourth)
         self.write("UPDATE interruptions SET cancel_requested=1 WHERE interruption_id=?", asking["interruption_id"])
         for thread in (A, OTHER, third, fourth):
             self.person(thread)
@@ -377,7 +377,7 @@ class LeftAloneTests(RescanCase):
             self.assertEqual(after[key], before[key])
 
     def test_nothing_is_written_to_codex_and_no_budget_is_given_back(self):
-        row = self.fail()
+        row = self.failure()
         self.write("UPDATE interruptions SET recovery_attempts=3, budget_resets=1 WHERE interruption_id=?",
                    row["interruption_id"])
         self.person()
@@ -393,13 +393,13 @@ class LeftAloneTests(RescanCase):
         self.assertIsNone(engine.store)
 
     def test_a_record_of_a_home_no_longer_in_settings_is_unresolved(self):
-        row = self.fail()
+        row = self.failure()
         self.write("UPDATE interruptions SET home_key=? WHERE interruption_id=?", "c" * 64, row["interruption_id"])
         self.person()
         self.assertEqual(self.outcome(self.run_rescan(), row["interruption_id"]), ("unresolved", "home_unknown"))
 
     def test_records_not_reached_in_time_are_unresolved(self):
-        row = self.fail()
+        row = self.failure()
         self.person()
         self.assertEqual(self.outcome(self.run_rescan(self.judge(seconds=-1)), row["interruption_id"]),
                          ("unresolved", "out_of_time"))
@@ -407,11 +407,11 @@ class LeftAloneTests(RescanCase):
 
 class AnswerTests(RescanCase):
     def test_each_outcome_is_counted_and_journalled_in_its_own_word(self):
-        retired = self.fail()
+        retired = self.failure()
         self.person()
-        rechecked = self.fail(OTHER)
+        rechecked = self.failure(OTHER)
         third = "0a1b2c3d-0039-7000-8000-000000000003"
-        unresolved = self.fail(third)
+        unresolved = self.failure(third)
         self.person(third, user_text=None)
         result = self.run_rescan()
         self.assertEqual({name: result[name] for name in ("retired", "rechecked", "unresolved", "changed")},
@@ -421,14 +421,14 @@ class AnswerTests(RescanCase):
             self.assertEqual(self.events(row["interruption_id"])[-1], word)
 
     def test_the_timeline_keeps_the_code_of_a_record_left_as_it_was(self):
-        row = self.fail()
+        row = self.failure()
         self.run_rescan()
         events = self.control.timeline(row["interruption_id"])["events"]
         self.assertEqual(events[-1]["code"], "rescan_rechecked")
         self.assertEqual(events[-1]["to_code"], events[-2]["to_code"])
 
     def test_the_bridge_answers_with_no_argument(self):
-        row = self.fail()
+        row = self.failure()
         self.person()
         reply = controlcli.dispatch(self.control, "rescan", {})
         self.assertTrue(reply["ok"], reply)
@@ -443,7 +443,7 @@ class AnswerTests(RescanCase):
 
     def test_no_bulk_retry_hides_inside_it(self):
         """It brings nothing forward: no Retry now for everything, which the layer never offers."""
-        row = self.fail()
+        row = self.failure()
         before = self.record(row["interruption_id"])
         self.run_rescan()
         after = self.record(row["interruption_id"])
