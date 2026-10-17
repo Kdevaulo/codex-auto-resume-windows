@@ -1,14 +1,29 @@
-# Codex Auto Resume
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-motion-dark.png">
+    <img src="assets/logo-motion.png" alt="Codex Auto Resume" width="96">
+  </picture>
+</p>
 
-**Windows에서 사용량 한도가 풀리면 똑같은 그 Codex 작업을 자동으로 이어 갑니다.**
+<h1 align="center">Codex Auto Resume</h1>
 
-[![tests](https://github.com/songyb111-gachon/codex-auto-resume-windows/actions/workflows/test.yml/badge.svg)](https://github.com/songyb111-gachon/codex-auto-resume-windows/actions/workflows/test.yml)
-[![latest release](https://img.shields.io/github/v/release/songyb111-gachon/codex-auto-resume-windows?label=release)](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/latest)
-[![platform: Windows 10/11](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4)](#설치)
-[![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![languages: 16](https://img.shields.io/badge/languages-16-0891b2)](docs/GUIDE.ko.md#언어)
+<p align="center"><b>Windows에서 사용량 한도가 풀리면 똑같은 그 Codex 작업을 자동으로 이어 갑니다.</b></p>
 
-<sub>🇺🇸 <a href="README.md">English README</a> · 프로그램은 열여섯 개 언어로 표시됩니다: English · 한국어 · 日本語 · 简体中文 · 繁體中文 · Español · Deutsch · Français · Português (Brasil) · Русский · Italiano · Türkçe · Polski · Українська · Tiếng Việt · Bahasa Indonesia</sub>
+<p align="center">
+<a href="https://github.com/songyb111-gachon/codex-auto-resume-windows/actions/workflows/test.yml"><img src="https://github.com/songyb111-gachon/codex-auto-resume-windows/actions/workflows/test.yml/badge.svg" alt="tests"></a>
+<a href="https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/latest"><img src="https://img.shields.io/github/v/release/songyb111-gachon/codex-auto-resume-windows?label=release" alt="latest release"></a>
+<a href="#설치"><img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4" alt="platform: Windows 10/11"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license: MIT"></a>
+<a href="docs/GUIDE.ko.md#언어"><img src="https://img.shields.io/badge/languages-16-0891b2" alt="languages: 16"></a>
+</p>
+
+<p align="center"><sub>🇺🇸 <a href="README.md">English README</a> · 프로그램은 열여섯 개 언어로 표시됩니다: English · 한국어 · 日本語 · 简体中文 · 繁體中文 · Español · Deutsch · Français · Português (Brasil) · Русский · Italiano · Türkçe · Polski · Українська · Tiếng Việt · Bahasa Indonesia</sub></p>
+
+<p align="center">
+<img src="docs/images/readme-motion-ko.png" alt="합성한 예시 데이터로 제품 자신의 그리기 코드가 그린 Codex Auto Resume 대시보드의 동작. 복구 2건이 대기 중인 개요, 포인터가 대기 중을 열고 기록·통계·진단을 차례로 누른 뒤 설정을 열어 스크롤, 화면 언어를 English로 바꿔 저장하자 창이 영어로 다시 열림" width="796">
+</p>
+
+<p align="center"><sub>UUID로 찾는 바로 그 대화 · Codex가 알려 주는 초기화 시각 · 확실하지 않으면 기다림 · 텔레메트리 없음 · 표준판과 고급판</sub></p>
 
 Codex가 작업 도중에 멈추고 오전 6시 34분에 다시 해 보라고 말합니다. 오전 6시 34분에 사용자는
 자고 있고, 아침에 보면 작업은 멈춘 그 자리 그대로입니다.
@@ -38,27 +53,35 @@ Codex Auto Resume는 정해 둔 몇 시간이 아니라 Codex가 직접 알려 �
 | **언어** | English · 한국어 · 日本語 · 简体中文 · 繁體中文 · Español · Deutsch · Français · Português (Brasil) · Русский · Italiano · Türkçe · Polski · Українська · Tiếng Việt · Bahasa Indonesia |
 | **개인정보** | 텔레메트리 없음, 분석 없음, 자동 업데이트 확인 없음. Codex에서 설치하면 GitHub에서 릴리스를 내려받고, 창의 *업데이트 확인*은 눌렀을 때만 GitHub에 가장 최근 릴리스를 묻고, 더 새로운 사전 릴리스가 있는지 api.github.com에서 릴리스 목록을 읽습니다. *다른 버전 설치...*는 열 때와 버전을 확인할 때 그 목록 전체를 api.github.com에서 읽고, 확인한 버전만 내려받습니다. 워처에는 네트워크 코드가 없으며, 사용량 확인과 재개된 턴은 여느 Codex 통신처럼 Codex를 통해 OpenAI로 갑니다 |
 
+> [!IMPORTANT]
 > **먼저 알아두실 제한 하나.** 복구 메시지가 전달되려면 Codex가 그 대화를 열어 둔 상태여야 합니다.
 > 앱을 재시작했다면 그 대화를 한 번만 열어 주시면 이후는 알아서 진행됩니다.
-> [왜 그런지](#먼저-읽어야-할-제한-사항)
+> [왜 그런지](#먼저-읽어야-할-제한-사항). 고급판에서는 기능을 켜 두면 [Codex가 닫혀 있을 때 여기서 대신 실행](docs/EDITIONS.ko.md#codex가-닫혀-있을-때-여기서-대화-실행하기)할
+> 수도 있습니다.
 
 ## 설치
 
 **Windows 10/11. Python 불필요. 관리자 권한 불필요.**
 
-두 가지 판이 있고, 그 가운데 하나를 설치합니다.
+두 가지 판이 있고, 그 가운데 하나를 설치합니다. 기본이자 아래 경로들이 설치하는 **표준판**은 이 프로젝트의
+기준을 모두 지키며, 이 페이지의 약속도 모두 그 안에 들어 있습니다. **고급판**은 저마다 그 기준 가운데 적어도
+하나를 일부러 벗어나는 기능을 더한 판으로, 그 기능은 모두 꺼져 있다가 대시보드의 **고급 기능** 페이지에서 켤
+때만 켜집니다. 이름에 `Advanced`가 들어간 파일을 받거나 Codex에게 고급판을 설치해 달라고 하세요. 업데이트는
+지금 판 안에서 이뤄지고, 다른 판을 그 위에 설치하면 설정과 기다리는 모든 것을 그대로 둔 채 판이 바뀝니다.
+기능마다 무엇을 하고 무엇을 감수하는지는 [docs/EDITIONS.ko.md](docs/EDITIONS.ko.md)에 있습니다.
 
-- **표준판**이 기본이며, 아래 경로들이 설치하는 판입니다. 이 프로젝트의 기준을 모두 지키고, 이 페이지의
-  약속도 모두 그 안에 들어 있습니다.
-- **고급판**은 같은 프로그램에, 저마다 그 기준 가운데 적어도 하나를 일부러 벗어나고 어느 기준인지 밝히는
-  기능들을 더한 판입니다. 그 기능들은 모두 꺼져 있다가, 대시보드의 **고급 기능** 페이지에서 경고를 읽고 켤 때만
-  켜집니다. 고급판을 설치하려면 이름에 `Advanced`가 들어간 파일을 받거나, Codex에게 고급판을 설치해 달라고
-  하세요. 기능마다 무엇을 하고 무엇을 감수하는지는 [docs/EDITIONS.ko.md](docs/EDITIONS.ko.md)에 있습니다.
-- **판 바꾸기**: 업데이트는 지금 설치된 판 안에서 이뤄집니다. 판을 바꾸려면 다른 판을 그 위에 설치합니다.
-  바꾸기 전에 무엇이 달라지는지 먼저 알려 주고, 설정과 재개를 기다리는 모든 것은 그대로 두며, 고급 기능은
-  모두 꺼진 채 시작합니다.
+### 설치 프로그램으로 설치 (권장)
 
-### Codex에서 설치 (권장)
+`CodexAutoResume-Setup-vX.Y.Z.exe`를 받아 더블클릭합니다. 링크는
+[릴리스 페이지](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/latest) 맨 위에 있습니다.
+설치 창이 이 Windows 계정에만 설치하며, 압축을 풀 필요가 없습니다. 예전 버전 위에서 실행하면 업데이트 전에
+바뀐 점을 먼저 보여 주고, 업데이트 뒤에는 감시기를 다시 시작하고 열려 있던 대시보드를 다시 엽니다. 같은 버전
+위에서 실행하면 **복구**와 **제거**를 고를 수 있습니다. 코드 서명이 없어 *Windows의 PC 보호*(Windows protected
+your PC) 창이 뜰 수 있는데, 그때는 **추가 정보**를 누른 뒤 **실행**을 누릅니다. 먼저 확인하는 방법은
+[docs/VERIFY.ko.md](docs/VERIFY.ko.md#내려받은-설치-파일을-실행하기-전에)에 있습니다.
+
+<details>
+<summary><b>Codex에서 설치</b></summary>
 
 플러그인을 추가한 뒤, Codex에게 **auto resume 설정해줘** 라고 말하면 됩니다.
 
@@ -71,15 +94,10 @@ codex plugin add codex-auto-resume@codex-auto-resume-windows
 [`scripts/release.json`](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/scripts/release.json)에 그 버전용으로 기록된 digest와 SHA-256을
 대조한 뒤 이 Windows 계정에만 설치합니다.
 
-### 설치 파일로 설치
+</details>
 
-[최신 릴리스](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/latest)에서
-`CodexAutoResume-Setup-vX.Y.Z.exe`를 받아(v0.6.10과 그 전의 릴리스에는 없습니다) 더블클릭합니다. 아래의
-릴리스 압축 파일을 담고 있어 그 `Install.cmd`를 실행하므로 압축을 풀 필요가 없습니다. 코드 서명이 없어
-*Windows의 PC 보호*(Windows protected your PC) 창이 뜰 수 있는데, 그때는 **추가 정보**를 누른 뒤 **실행**을 누릅니다.
-먼저 확인하는 방법은 [docs/VERIFY.ko.md](docs/VERIFY.ko.md#내려받은-설치-파일을-실행하기-전에)에 있습니다.
-
-### 릴리스 압축 파일로 설치
+<details>
+<summary><b>릴리스 압축 파일로 설치</b></summary>
 
 1. [최신 릴리스](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/latest)에서
    `CodexAutoResume-vX.Y.Z-win-x64.zip`을 받습니다.
@@ -93,6 +111,8 @@ codex plugin add codex-auto-resume@codex-auto-resume-windows
    [`scripts/release.json`](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/scripts/release.json)에 그 버전용으로 기록된 값과 같아야 합니다.
    자세한 확인 방법은 [docs/VERIFY.ko.md](docs/VERIFY.ko.md)에 있습니다.
 3. 압축을 풀고 `Install.cmd`를 실행합니다.
+
+</details>
 
 ### 어느 쪽이든
 
@@ -115,14 +135,24 @@ codex plugin add codex-auto-resume@codex-auto-resume-windows
 상태 불빛은 어디에 있든 숨을 쉽니다. 알림 카드, 대시보드, Codex 안의 패널, 알림 영역 아이콘 모두
 그렇고, 아래 그림들도 함께 숨 쉽니다.
 
-제품이 그리는 알림 카드입니다.
+<p align="center">
+<img src="docs/images/notification-card-motion-ko.png" alt="제품이 보여 주는 그대로의 알림 카드. 제품의 코드가 예시 데이터로 그렸습니다: example-project, Codex 사용 한도 도달, 이 작업은 08:42에 다시 이어집니다. 카드가 사라졌다가 알림 영역 옆에 다시 떠오릅니다" width="388">
+</p>
 
+<p align="center"><sub>제품이 그리는 알림 카드</sub></p>
+
+<p align="center">
+<img src="docs/images/tray-popup-ko.png" alt="알림 영역 팝업. 대기 중 상태, 약 1분 30초 뒤 다음 확인, 대기 중인 작업 세 개가 각각 중단 종류, 다음 확인 시각, 자동 이어 가기 스위치와 함께 보이고, 자동 복구 일시 정지와 대시보드 열기 버튼" width="360">
+</p>
+
+<p align="center"><sub>알림 영역 아이콘을 누르면 열리는 창</sub></p>
+
+<details>
+<summary><b>대시보드와 아이콘, 정지 그림</b></summary>
+
+<p align="center">
 <img src="docs/images/notification-card-ko.png" alt="밝은 테마의 알림 카드. 청록색 상태 불빛과 사용량 제한 칩이 달린 Codex Auto Resume, 작업 이름 example-project, 'Codex 사용량 한도에 도달했습니다. 08:42에 이 작업을 자동으로 재개합니다.'라는 줄, 대화의 정확한 식별자, 재개하지 않음과 대시보드 열기 버튼" width="388">
-
-Codex 안의 패널입니다. Codex 창을 찍은 사진이 아니라, 플러그인이 Codex에 넘기는 바로 그 리소스를
-그대로 그린 패널 자신의 페이지입니다.
-
-<img src="docs/images/settings-panel-ko.png" alt="Codex Auto Resume 패널. 복구 2건이 대기 중이라는 상태 카드, 자동 이어 가기 스위치가 달린 대기 중인 대화 두 개, 화면 언어, 복구할 장애 종류, 접힌 한도와 알림, 이어서 하기 언어와 메시지 스타일, 사용량 한도에 보낼 기본 메시지의 미리보기" width="680">
+</p>
 
 시작 메뉴에서 여는 대시보드입니다. 합성한 예시 데이터로 그렸으며, 그림 속 대화는 누구의 작업도 아닌
 예시입니다.
@@ -135,7 +165,13 @@ Codex 안의 패널입니다. Codex 창을 찍은 사진이 아니라, 플러그
 
 움직이는 알림 영역 아이콘입니다.
 
+Codex 안의 패널입니다(대시보드보다 덜 쓰여서 여기 접어 둡니다). Codex 창을 찍은 사진이 아니라 플러그인이 Codex에 넘기는 바로 그 리소스를 그린 것입니다.
+
+<img src="docs/images/settings-panel-ko.png" alt="Codex Auto Resume 패널. 복구 2건이 대기 중이라는 상태 카드, 자동 이어 가기 스위치가 달린 대기 중인 대화 두 개, 화면 언어, 복구할 장애 종류, 접힌 한도와 알림, 이어서 하기 언어와 메시지 스타일, 사용량 한도에 보낼 기본 메시지의 미리보기" width="388">
+
 <img src="docs/images/icon-motion.png" alt="알림 영역 아이콘의 움직임을 아이콘 자신의 프레임으로 그린 모습(밝은 작업 표시줄). 왼쪽부터 감시 중(밝은 머리가 숨 쉰 뒤 가장 밝은 채로 고리의 흰 획을 따라 시계 방향으로 쓸고 갔다가 돌아옵니다), 복구 중(계속 나갔다 돌아옵니다), 확인 필요(주황색으로 제자리에서 천천히 숨 쉽니다), 실패(빨간색으로 복구 중보다 두 배 빠르게 나갔다 돌아오면서 깜빡입니다), 일시 정지(회색으로 멈춰 있습니다)" width="360">
+
+</details>
 
 모든 부분을 모든 테마와 언어로 보려면 [전체 안내서](docs/GUIDE.ko.md#화면)를 보세요.
 
@@ -146,7 +182,9 @@ Codex 안의 패널입니다. Codex 창을 찍은 사진이 아니라, 플러그
 방법은 없습니다. 그런 메시지는 나중에 그 대화를 다시 불러올 때 Codex가 전달할 수도 있습니다. 그래서 이
 도구는 방금 불러와 있음을 확인한 대화에만 메시지를 넣고, 불러오지 않은 대화는 **사용자가 앱에서 그 대화를
 직접 열어야만** 이어 갑니다. 화면 자동 조작을 쓰거나, 대화를 억지로 열거나, 혹시나 해서 메시지를 넣지
-않습니다. 그 근거가 된 측정은 [전체 안내서](docs/GUIDE.ko.md#먼저-읽어야-할-제한-사항)에 있습니다.
+않습니다. 그 근거가 된 측정은 [전체 안내서](docs/GUIDE.ko.md#먼저-읽어야-할-제한-사항)에 있습니다. 이것은 표준판의 규칙입니다. 고급판은 켜 두면
+Codex 앱이 닫혀 있을 때 그 턴을 직접 실행하거나, 대화를 열 때 실행되도록 이어가기 메시지를 Codex 대기열에 넣어
+둘 수 있습니다. 둘 다 [docs/EDITIONS.ko.md](docs/EDITIONS.ko.md#codex가-닫혀-있을-때-여기서-대화-실행하기)에 있습니다.
 
 ## 안전과 개인정보
 
@@ -166,34 +204,31 @@ Codex 안의 패널입니다. Codex 창을 찍은 사진이 아니라, 플러그
 
 ## 제거
 
-릴리스 압축 파일의 `Uninstall.cmd`를 실행하거나, Codex에게 auto resume 제거를 요청하면 됩니다.
+Windows **설정 > 앱**에서 제거하거나, 설치 프로그램을 다시 실행해 **제거**를 고르거나, 릴리스 압축 파일의
+`Uninstall.cmd`를 실행하거나, Codex에게 auto resume 제거를 요청하면 됩니다.
 기본적으로 설정과 대기 중인 재개는 남겨 두므로 다시 설치해도 잃지 않고, `Uninstall.cmd -Purge`는 이것까지
 지웁니다. 자기 것임을 증명할 수 있는 것만 지웁니다. 이 도구의 provenance marker가 있는 디렉터리와, 이
 설치본에 속한 Windows 등록만 지웁니다.
 
 ## 더 알아보기
 
-- **[전체 안내서](docs/GUIDE.ko.md)**: 위의 모든 내용과 모든 설정, 알림, 안전 모델, 개인정보
-- 내려받은 압축 파일 확인과 릴리스 다시 빌드하기: [docs/VERIFY.ko.md](docs/VERIFY.ko.md)
-- 이 제품이 한다고 말하는 모든 것과 그 근거 등급: [docs/FEATURE_MATRIX.ko.md](docs/FEATURE_MATRIX.ko.md)
-- 플러그인 계층, 설치 스크립트가 가져오고 확인하는 것, 업데이트와 제거: [docs/PLUGIN.ko.md](docs/PLUGIN.ko.md)
-- 같은 영역의 다른 프로젝트들, 그리고 각각이 이 제품보다 잘하는 점: [docs/COMPARISON.ko.md](docs/COMPARISON.ko.md)
-- 앞으로의 방향(약속이 아니라 계획): [docs/ROADMAP.ko.md](docs/ROADMAP.ko.md)
-- 표준판과 고급판이 각각 무엇인지, 고급 기능 하나하나가 무엇을 하고 무엇을 감수하는지, 판을 고르고 바꾸는 방법:
-  [EDITIONS.ko.md](docs/EDITIONS.ko.md)
-- 이 제품이 지키는 모든 기준을 id별로, 저마다 어떻게 지켜지는지와 그것을 지키는 테스트와 함께:
-  [STANDARDS.ko.md](docs/STANDARDS.ko.md)
-- 무엇을 읽고, 무엇을 저장하고, 무엇을 어디로 보내는지: [PRIVACY.ko.md](docs/PRIVACY.ko.md)
-- 보안 모델과 취약점 신고: [SECURITY.ko.md](docs/SECURITY.ko.md)
-- 문제 종류별로 어디에 신고하는지, 그리고 공개 이슈에 붙여넣으면 안 되는 것: [SUPPORT.ko.md](docs/SUPPORT.ko.md)
-- 테스트, 릴리스 빌드, 그리고 변경이 지켜야 하는 안전 속성: [CONTRIBUTING.ko.md](docs/CONTRIBUTING.ko.md)
-- 변경 이력: [CHANGELOG.ko.md](docs/CHANGELOG.ko.md)
-- 기여자: [CONTRIBUTORS.ko.md](docs/CONTRIBUTORS.ko.md)
-- 이 제품이 내 PC와 내 Codex 버전에서 어떻게 동작했는지 보고하기(별도 도구):
-  [codex-compat-reporter](https://github.com/songyb111-gachon/codex-compat-reporter). 횟수와 상태와
-  시각만 담은 파일 하나를 쓰고, 보내기 전에 내가 먼저 읽습니다. 대화 내용도 식별자도 경로도 들어가지
-  않습니다. 그렇게 온 보고는 **보고됨**이라는 별도 등급으로만 세며, 어떤 버전도 검증됨이나 점검됨으로
-  올리지 않습니다.
+| | |
+| --- | --- |
+| **[전체 안내서](docs/GUIDE.ko.md)** | 위의 모든 내용과 모든 설정, 알림, 명령줄, 안전 모델, 개인정보, 테스트. |
+| [docs/VERIFY.ko.md](docs/VERIFY.ko.md) | 내려받은 압축 파일이 이 프로젝트가 공개한 바로 그 파일인지 확인하는 법과 릴리스를 다시 빌드하는 법. |
+| [docs/FEATURE_MATRIX.ko.md](docs/FEATURE_MATRIX.ko.md) | 이 제품이 한다고 말하는 모든 기능과, 그 기능이 실제로 얻은 근거. |
+| [docs/PLUGIN.ko.md](docs/PLUGIN.ko.md) | Codex 플러그인 계층: 설치 스크립트가 가져오고 확인하는 것, 업데이트와 제거. |
+| [docs/COMPARISON.ko.md](docs/COMPARISON.ko.md) | 같은 영역의 다른 프로젝트들과, 각각이 이 제품보다 잘하는 점. |
+| [docs/ROADMAP.ko.md](docs/ROADMAP.ko.md) | 릴리스별로 본 앞으로의 방향: 약속이 아니라 계획. |
+| [docs/EDITIONS.ko.md](docs/EDITIONS.ko.md) | 표준판과 고급판이 각각 무엇인지, 고급 기능 하나하나가 무엇을 하고 무엇을 감수하는지, 판을 고르고 바꾸는 법. |
+| [docs/STANDARDS.ko.md](docs/STANDARDS.ko.md) | 이 제품이 지키는 모든 기준을 id별로, 저마다 어떻게 지켜지는지와 그것을 지키는 테스트와 함께. |
+| [PRIVACY.ko.md](docs/PRIVACY.ko.md) | 무엇을 읽고, 무엇을 저장하고, 무엇을 어디로 보내는지. |
+| [SECURITY.ko.md](docs/SECURITY.ko.md) | 위협 모델과 취약점 신고 방법. |
+| [SUPPORT.ko.md](docs/SUPPORT.ko.md) | 문제 종류별로 어디에 신고하는지, 그리고 공개 이슈에 붙여넣으면 안 되는 것. |
+| [CONTRIBUTING.ko.md](docs/CONTRIBUTING.ko.md) | 테스트, 릴리스 빌드, 그리고 변경이 지켜야 하는 안전 속성. |
+| [CHANGELOG.ko.md](docs/CHANGELOG.ko.md) | 릴리스마다 바뀐 것. |
+| [CONTRIBUTORS.ko.md](docs/CONTRIBUTORS.ko.md) | 만든 사람과 도운 도구, 그리고 문제를 알려 주고 기능을 제안하고 시험해 준 분들. |
+| [codex-compat-reporter](https://github.com/songyb111-gachon/codex-compat-reporter) | 이 제품이 내 PC와 내 Codex 버전에서 어떻게 동작했는지 보고하는 별도 도구. 횟수와 상태와 시각만 담은 파일 하나를 쓰고(대화 내용도 식별자도 경로도 없음), 보내기 전에 내가 먼저 읽습니다. 그렇게 온 보고는 **보고됨**이라는 별도 등급으로만 세며, 어떤 버전도 검증됨이나 점검됨으로 올리지 않습니다. |
 
 ## 만든 사람과 라이선스
 
