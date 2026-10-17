@@ -1724,6 +1724,15 @@ class WindowsTests(unittest.TestCase):
     def test_a_switch_glides_only_once_its_change_is_confirmed_and_then_the_timer_stops(self):
         window = self.still_window()
         target = ("check", "b" * 64)
+        # What this test asks is the switch's own motion. Two things outside it stopped that motion on the CI's
+        # Python 3.13 runner only (dev runs 38989648177 and 38996545524, never here): another window taking the
+        # foreground, which hides the popup as a click elsewhere does, and Windows' High Contrast being read
+        # again when the answer brings the settings. Both are held for this test as reduced motion already is.
+        contrast = unittest.mock.patch.object(popup.theme, "high_contrast", lambda: False)
+        contrast.start()
+        self.addCleanup(contrast.stop)
+        hidden = []
+        window.hide = lambda *args, **kwargs: hidden.append(args)
         try:
             self.assertTrue(window._switches[target])
             window._activate(target)
@@ -1737,7 +1746,8 @@ class WindowsTests(unittest.TestCase):
             deadline = time.monotonic() + 15
             while target not in window._glides and time.monotonic() < deadline:
                 self.pump(0.005)
-            self.assertIn(target, window._glides)
+            self.assertIn(target, window._glides, "visible=%r reduced=%r contrast=%r hide asked %d time(s)"
+                          % (window.visible, window._reduced, window._contrast, len(hidden)))
             started, begin, end = window._glides[target]
             self.assertEqual((begin, end), (1.0, 0.0))
             self.assertTrue(window._frame_running)
