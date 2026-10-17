@@ -1,4 +1,4 @@
-"""The social preview's motion: one cycle of the watching icon's motion on the card, as an APNG, under 8 MB.
+"""The social preview's motion: one cycle of the watching icon's motion on the card, as an APNG, under 1 MB.
 
 build/make_social.py writes docs/images/social-preview-motion.png: an animated PNG whose default image is the
 still card's PNG itself, and whose later frames are only the head's changed rectangle, the icon's own curve
@@ -107,9 +107,13 @@ def read_apng(raw: bytes, known=None) -> dict:
     width, height, depth, colour, _c, _f, interlace = struct.unpack(">IIBBBBB", dict(parts)[b"IHDR"])
     if (depth, colour, interlace) != (8, 2, 0):
         raise ValueError("not 8-bit RGB without interlace")
-    frames, current, sequence, idat, plays, count = [], None, 0, bytearray(), None, None
+    frames, current, sequence, idat, plays, count, key = [], None, 0, bytearray(), None, None, None
     for kind, data in parts:
-        if kind == b"acTL":
+        if kind == b"tRNS":
+            if idat:
+                raise ValueError("tRNS after IDAT")
+            key = bytes(value & 0xFF for value in struct.unpack(">HHH", data))
+        elif kind == b"acTL":
             count, plays = struct.unpack(">II", data)
         elif kind == b"fcTL":
             number, w, h, x, y, num, den, dispose, blend = struct.unpack(">IIIIIHHBB", data)
@@ -144,12 +148,13 @@ def read_apng(raw: bytes, known=None) -> dict:
     if count is not None and count != len(frames):
         raise ValueError("acTL says %d frames, %d are there" % (count, len(frames)))
     return {"width": width, "height": height, "plays": plays, "default": default, "frames": frames,
-            "idat": idats}
+            "idat": idats, "key": key}
 
 
 def composite(apng: dict, box=None):
     """Each frame's picture, RGB, as a viewer shows it: dispose 0 keeps the frame, 1 clears its rectangle,
-    2 restores what was before it; an opaque frame's blend 'over' is its 'source'.
+    2 restores what was before it; blend 'over' leaves what is under a pixel of the tRNS colour (transparent), and is
+    'source' for every other pixel, which is opaque.
 
     With `box` (left, top, width, height) only that crop of each picture is made: frame 1 may cover more than the
     box (its part inside is drawn), but every later frame must lie inside it, or this raises - so outside the box
@@ -164,9 +169,16 @@ def composite(apng: dict, box=None):
             raise ValueError("frame %d's rectangle %r is outside the box %r" % (index + 1, frame["box"], box))
         x0, y0, x1, y1 = max(x, left), max(y, top), min(x + w, left + wide), min(y + h, top + tall)
         before = bytes(canvas)
+        keyed = apng.get("key") if frame["blend"] == 1 else None
         for row in range(y0, y1):
             at, source = ((row - top) * wide + x0 - left) * 3, ((row - y) * w + x0 - x) * 3
-            canvas[at:at + (x1 - x0) * 3] = frame["pixels"][source:source + (x1 - x0) * 3]
+            line = frame["pixels"][source:source + (x1 - x0) * 3]
+            if keyed is None or keyed not in line:
+                canvas[at:at + (x1 - x0) * 3] = line
+                continue
+            for i in range(0, len(line), 3):
+                if line[i:i + 3] != keyed:
+                    canvas[at + i:at + i + 3] = line[i:i + 3]
         yield bytes(canvas)
         if frame["dispose"] == 1:
             for row in range(y0, y1):
@@ -243,6 +255,32 @@ class TheReaderReadsTheWriter(unittest.TestCase):
         self.assertEqual([frame["delay"] for frame in apng["frames"]], [delay for delay, _ in pictures])
         same(self, list(composite(apng)), [picture for _, picture in pictures], "the pictures")
         self.assertEqual(apng["frames"][1]["box"], (40, 30, 20, 1), "a later frame is more than what changed")
+
+    @mock.patch.object(make_social, "HEIGHT", 8)
+    @mock.patch.object(make_social, "WIDTH", 8)
+    def test_a_frames_unchanged_pixels_are_transparent_and_the_picture_exact(self):
+        """Inside a later frame's rectangle, the pixels it does not change are the tRNS colour - one no picture has -
+        so they compress to nothing and leave the frame before showing; every picture is still exact."""
+        first = bytes(range(8 * 8 * 3))
+        second = bytearray(first)
+        second[(2 * 8 + 1) * 3:(2 * 8 + 1) * 3 + 3] = bytes((250, 251, 252))
+        second[(5 * 8 + 6) * 3:(5 * 8 + 6) * 3 + 3] = bytes((253, 254, 255))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "keyed.png"
+            make_social.write_motion(path, still_png(8, 8, first), iter([(100, first), (25, bytes(second))]))
+            raw = path.read_bytes()
+            apng = read_apng(raw)
+        kinds = [kind for kind, _ in chunks(raw)]
+        self.assertLess(kinds.index(b"tRNS"), kinds.index(b"IDAT"))
+        key = apng["key"]
+        self.assertNotIn(key, {first[at:at + 3] for at in range(0, len(first), 3)} | {bytes(second[at:at + 3])
+                                                                                     for at in range(0, 192, 3)})
+        frame = apng["frames"][1]
+        self.assertEqual(frame["box"], (1, 2, 6, 4))
+        pixels = frame["pixels"]
+        keyed = sum(1 for at in range(0, len(pixels), 3) if pixels[at:at + 3] == key)
+        self.assertEqual(keyed, 6 * 4 - 2, "the unchanged pixels of the rectangle are written again")
+        same(self, list(composite(apng)), [first, bytes(second)], "the pictures")
 
     @mock.patch.object(make_social, "HEIGHT", 8)
     @mock.patch.object(make_social, "WIDTH", 8)
@@ -366,10 +404,11 @@ class TheScheduleIsTheIcons(unittest.TestCase):
         self.assertEqual(delays, [25, 1525])
 
     def test_its_bounds(self):
-        """The still card is what GitHub's social preview takes, under a megabyte; the motion's ceiling is 8 MB."""
-        self.assertEqual(make_social.STILL_LIMIT, 1000000)
-        self.assertEqual(make_social.MOTION_LIMIT, 8000000)
-        self.assertLess(STILL.stat().st_size, make_social.STILL_LIMIT)
+        """GitHub's social preview takes a PNG of less than a megabyte, and the moving card is the one uploaded: its
+        ceiling leaves room under that, and the still card is under it too."""
+        self.assertEqual(make_social.UPLOAD_LIMIT, 1000000)
+        self.assertLessEqual(make_social.MOTION_LIMIT, 950000)
+        self.assertLess(STILL.stat().st_size, make_social.UPLOAD_LIMIT)
 
 
 class TheCommittedMotion(unittest.TestCase):
@@ -406,8 +445,19 @@ class TheCommittedMotion(unittest.TestCase):
         """So outside the box every picture is frame 1, and comparing the box's crops compares the pictures."""
         self.assertIsNone(self.outside)
 
-    def test_it_is_under_its_ceiling(self):
+    def test_it_is_an_upload_github_takes(self):
+        """Under GitHub's megabyte with room to spare: the moving card is what Settings -> Social preview gets."""
+        self.assertLess(len(self.raw), 950000)
         self.assertLess(len(self.raw), make_social.MOTION_LIMIT)
+
+    def test_frame_one_has_no_transparent_pixel(self):
+        """The colour the later frames mark unchanged pixels with is in no pixel of the card, so the default image is
+        the card wholly opaque - and a later frame never marks a pixel it changes."""
+        key = self.apng["key"]
+        self.assertIsNotNone(key, "no tRNS: every later frame writes its unchanged ground again")
+        card = self.card
+        self.assertFalse(any(card[at:at + 3] == key for at in range(0, len(card), 3)), "the card has the key colour")
+        self.assertTrue(all(frame["blend"] == 1 for frame in self.apng["frames"]))
 
     def test_it_is_the_cards_size_and_loops_forever(self):
         self.assertEqual((self.apng["width"], self.apng["height"]), (make_social.WIDTH, make_social.HEIGHT))
