@@ -109,15 +109,7 @@ class DispatchMixin:
             vector["engine_compatible"] = machine.gate(machine.BLOCK, "projection_table_missing")
             self._wait(row, "waiting_for_app", "projection_table_missing", poll, vector)
             return
-        vector["identity"] = (machine.gate(machine.PASS) if fresh
-                              else machine.gate(machine.UNKNOWN, "projection_stale"))
-        if not fresh:
-            self._wait(row, "waiting_for_loaded_thread", "projection_stale", poll, vector)
-            return
-        if self.newer_than_engine(row):
-            # v0.6.16-beta.4: a terminal's or VS Code's conversation a newer Codex wrote waits for Codex to be updated.
-            vector["identity"] = machine.gate(machine.WAIT, "version_newer_than_engine")
-            self._wait(row, "waiting_for_loaded_thread", "version_newer_than_engine", poll, vector)
+        if self._identity_waits(row, vector, fresh, poll):          # engine/freshness.py
             return
         relaxed = self._known_failure(row, vector, now)
         if relaxed is False:

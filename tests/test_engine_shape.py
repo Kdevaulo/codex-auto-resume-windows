@@ -120,8 +120,12 @@ METHODS = {
     "_once_words", "_spend_once_words", "_prune_once_words",
     # v0.6.16-beta.4: P16 asked with the app closed and nothing holding the conversation, and the look made again.
     "_unheld", "_unheld_now", "_holder", "_route", "_still_where",
-    # and which conversations besides the app's are watched, asked once a tick (P18, engine/kinds.py);
-    "session_kinds",
+    # and which conversations besides the app's are watched, asked once a tick (P18, engine/kinds.py), and whether
+    # one of them a newer Codex wrote than the engine here (the version skew guard, design-4 4.3);
+    "session_kinds", "newer_than_engine",
+    # the identity gate - Codex's history caught up, and no newer Codex than the engine's - out of dispatch.py at
+    # its size (engine/freshness.py);
+    "_identity_waits",
     # a continuation sent to another Codex session (P16's TO_SESSION, engine/tosession.py);
     "to_session", "_session", "_session_reason",
     # and the compaction turns after a full context window (engine/compaction.py).

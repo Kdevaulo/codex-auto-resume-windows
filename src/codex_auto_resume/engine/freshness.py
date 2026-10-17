@@ -46,6 +46,22 @@ class FreshnessMixin:
         self._loaded_cache[thread_id] = (now, value)
         return value
 
+    def _identity_waits(self, row, vector, fresh, poll) -> bool:
+        """The identity gate, once the projection table is there: True, and the record waits, where Codex's history
+        is behind (projection_stale) or - v0.6.16-beta.4, only while the plug names a terminal's or VS Code's kind -
+        where a newer Codex wrote the conversation than the engine here is (version_newer_than_engine, engine/kinds.py:
+        it waits for Codex to be updated). False, the gate passed, otherwise."""
+        vector["identity"] = (machine.gate(machine.PASS) if fresh
+                              else machine.gate(machine.UNKNOWN, "projection_stale"))
+        if not fresh:
+            self._wait(row, "waiting_for_loaded_thread", "projection_stale", poll, vector)
+            return True
+        if self.newer_than_engine(row):
+            vector["identity"] = machine.gate(machine.WAIT, "version_newer_than_engine")
+            self._wait(row, "waiting_for_loaded_thread", "version_newer_than_engine", poll, vector)
+            return True
+        return False
+
     def _projection_now(self, thread_id):
         """Exactly current right now: True, False (behind, or not knowable), or None
         when the projection table itself is missing. Also records what was seen, so a
