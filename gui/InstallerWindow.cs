@@ -206,9 +206,13 @@ namespace CodexAutoResume
             string showing = page;
             foreach (string each in flow.Pages())
             {
+                // Each page measured as it is shown: what a page holds can depend on which page is showing (WhatsNew,
+                // and the notes' own height on the Notes page).
+                page = each;
                 Build(each);
                 tallest = Math.Max(tallest, Arrange(inner));
             }
+            page = showing;
             ClientSize = new Size(width, Px(16) + HeaderHeight() + Px(16) + tallest + Px(32) + Px(16) +
                                          Px(Brand.ButtonHeight) + Px(16));
             if (showing != null) ShowPage(showing);
