@@ -165,6 +165,15 @@ class EvidenceTests(RescanCase):
         result = self.run_rescan()
         self.assertEqual(self.outcome(result, row["interruption_id"])[0], "unresolved")
 
+    def test_a_turn_a_plug_records_marker_is_in_is_no_evidence(self):
+        """Review of issue #39: a wrap-up's message carries the short marker of a record only the advanced edition's
+        plug holds; the turn it starts is this product's, as the file is read, never a person's."""
+        row = self.failure()
+        self.person(user_text="wrap up " + ids.short_marker("d" * 64))
+        result = self.run_rescan()
+        self.assertEqual(self.outcome(result, row["interruption_id"]), ("unresolved", "latest_turn_changed"))
+        self.assertEqual(self.record(row["interruption_id"])["state"], "waiting_poll")
+
     def test_a_turn_with_no_message_of_a_persons_is_no_evidence(self):
         row = self.failure()
         self.person(user_text=None)

@@ -529,21 +529,21 @@ class HistoryMixin:
             counts = {row[0]: row[1] for row in connection.execute(
                 "SELECT item_type, count(*) FROM thread_items WHERE thread_id=? AND turn_id=? "
                 "GROUP BY item_type", (turns, turn_id)) if isinstance(row[0], str)}
-            foreign = connection.execute(
-                "SELECT count(*) FROM thread_items WHERE thread_id=? AND turn_id=? "
+            foreign, branded = connection.execute(          # branded: any marker of this product's (Rescan, #39)
+                "SELECT count(*), EXISTS(SELECT 1 FROM thread_items WHERE thread_id=? AND turn_id=? AND item_type="
+                "'userMessage' AND instr(item_json,?)>0) FROM thread_items WHERE thread_id=? AND turn_id=? "
                 "AND item_type='userMessage' AND instr(item_json,?)=0",
-                (turns, turn_id, marker)).fetchone()[0]
+                (turns, turn_id, ids.MARKER_PREFIX, turns, turn_id, marker)).fetchone()
             later_terminal = bool(type(turn["rollout_ordinal"]) is int and connection.execute(
                 "SELECT EXISTS(SELECT 1 FROM thread_turns WHERE %s "
                 "AND status IN ('completed','failed','interrupted'))" % self._after(chain, turn["rollout_ordinal"])[0],
                 self._after(chain, turn["rollout_ordinal"])[1]).fetchone()[0])
-        completed = turn["completed_at"]
         return {
             "found": True, "ordinal": turn["rollout_ordinal"],     # across a split (rollout.SPAN): Rescan's anchor
             "status": _turn_status(turn["status"]),
-            "completed_at": completed if epoch(completed) else None,
+            "completed_at": turn["completed_at"] if epoch(turn["completed_at"]) else None,
             "progress": any(counts.get(kind, 0) > 0 for kind in PROGRESS_ITEM_TYPES),
-            "foreign_user_messages": foreign,
+            "foreign_user_messages": foreign, "branded_user_messages": int(bool(branded)),
             "later_terminal": later_terminal,
             "compaction_only": "contextCompaction" in counts and set(counts) <= {"contextCompaction", "reasoning"},
         }

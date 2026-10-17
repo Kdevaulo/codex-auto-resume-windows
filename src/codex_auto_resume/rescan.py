@@ -68,7 +68,9 @@ def proofs(kin) -> tuple:
 def persons(engine, row, ours) -> list:
     """The turns after the record's exact failed turn that a person started: none unless that turn is found in the
     history at the ordinal the record holds (the anchor); then those the engine calls foreign and whose first user
-    message is a person's (payload.later_turn's later_turn_exists), less any a proof in `ours` is in."""
+    message is a person's (payload.later_turn's later_turn_exists), less any a proof in `ours` is in and any whose user
+    messages carry a marker of this product's at all (ids.MARKER_PREFIX, as the file is read): a wrap-up's, say, whose
+    record only the edition's plug holds."""
     source, thread = engine.source, row["thread_id"]
     proof = engine.proof(row)
     seen = source.turn_observation(thread, row["turn_id"], proof)
@@ -80,6 +82,8 @@ def persons(engine, row, ours) -> list:
             continue
         if source.turn_markers(thread, turn["turn_id"], ours):
             continue                     # one of this product's continuations started it, or is in it
+        if source.turn_observation(thread, turn["turn_id"], proof).get("branded_user_messages", 1):
+            continue                     # a message of this product's is in it, whichever record it was
         found.append(turn)
     return found
 
