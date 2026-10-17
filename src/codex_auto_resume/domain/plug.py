@@ -183,7 +183,8 @@ class Plug:
         the record as core held it before - so its `state` is the one it left. Every move the
         engine writes is told, a Pause's included, because this decides nothing: it is how a
         plug learns what the engine did, as it happened. A person's own moves - a cancel, the
-        attempts given back - are not told (Point, P14). Its answer is not read."""
+        attempts given back, a waiting record Rescan and reconcile retired - are not told (Point,
+        P14). Its answer is not read."""
         return DEFER
 
     def delivery(self, record):                       # P15
