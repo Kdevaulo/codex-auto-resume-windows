@@ -174,6 +174,17 @@ class EvidenceTests(RescanCase):
         self.assertEqual(self.outcome(result, row["interruption_id"]), ("unresolved", "latest_turn_changed"))
         self.assertEqual(self.record(row["interruption_id"])["state"], "waiting_poll")
 
+    def test_a_turn_whose_message_is_not_in_the_history_yet_is_no_evidence(self):
+        """Review of issue #39: a history behind can hold a turn's row, naming its first user message, before that
+        message; the row alone proves nothing, so the record stays unresolved."""
+        row = self.failure()
+        turn = self.person()
+        with self.codex._db("thread_history_1.sqlite") as db:
+            db.execute("DELETE FROM thread_items WHERE turn_id=? AND item_type='userMessage'", (turn,))
+        result = self.run_rescan()
+        self.assertEqual(self.outcome(result, row["interruption_id"]), ("unresolved", "message_not_projected"))
+        self.assertEqual(self.record(row["interruption_id"])["state"], "waiting_poll")
+
     def test_a_turn_with_no_message_of_a_persons_is_no_evidence(self):
         row = self.failure()
         self.person(user_text=None)

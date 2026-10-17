@@ -44,6 +44,8 @@ SECONDS = 20.0
 STALE, CHANGED_LATEST, UNREADABLE, TOO_LARGE, MARKER_FREE, HOME_UNKNOWN, OUT_OF_TIME, ROLLED_BACK = (
     "projection_stale", "latest_turn_changed", "unreadable", "too_large", "marker_free", "home_unknown",
     "out_of_time", "rolled_back")
+# A later turn whose row the history holds before its person's message: it stays unresolved, whatever else is read.
+UNPROJECTED = "message_not_projected"
 # The reason a retired record is stopped with: the engine's own, for a later turn (engine/detect.py).
 LATER_TURN = "later_turn_exists"
 
@@ -65,27 +67,33 @@ def proofs(kin) -> tuple:
     return tuple(sorted(proof for proof in found if ids.is_delivery_proof(proof))), free
 
 
-def persons(engine, row, ours) -> list:
+def persons(engine, row, ours) -> tuple:
     """The turns after the record's exact failed turn that a person started: none unless that turn is found in the
     history at the ordinal the record holds (the anchor); then those the engine calls foreign and whose first user
     message is a person's (payload.later_turn's later_turn_exists), less any a proof in `ours` is in and any whose user
     messages carry a marker of this product's at all (ids.MARKER_PREFIX, as the file is read): a wrap-up's, say, whose
-    record only the edition's plug holds."""
+    record only the edition's plug holds. Returns (those turns, whether one such turn's user message is not in the history
+    yet): a turn row the history holds before its message - it may be behind - proves nothing, and decides nothing
+    else either (`judge`)."""
     source, thread = engine.source, row["thread_id"]
     proof = engine.proof(row)
     seen = source.turn_observation(thread, row["turn_id"], proof)
     if not seen.get("found") or seen.get("ordinal") != row["ordinal"]:
-        return []
-    found = []
+        return [], False
+    found, unprojected = [], False
     for turn in engine.persons_turns(thread, source.later_turns(thread, row["ordinal"], proof)):
         if turn["turn_id"] is None or turn.get("reason") != LATER_TURN or not engine.foreign(row, turn):
             continue
         if source.turn_markers(thread, turn["turn_id"], ours):
             continue                     # one of this product's continuations started it, or is in it
-        if source.turn_observation(thread, turn["turn_id"], proof).get("branded_user_messages", 1):
+        observed = source.turn_observation(thread, turn["turn_id"], proof)
+        if observed.get("branded_user_messages", 1):
             continue                     # a message of this product's is in it, whichever record it was
+        if not observed.get("foreign_user_messages"):
+            unprojected = True           # its row is there, its person's message not yet
+            continue
         found.append(turn)
-    return found
+    return found, unprojected
 
 
 def judge(engine, row, kin, deadline=None) -> tuple:
@@ -96,10 +104,13 @@ def judge(engine, row, kin, deadline=None) -> tuple:
     thread = row["thread_id"]
     ours, free = proofs(kin)
     try:
-        if persons(engine, row, ours):
-            return RETIRED, LATER_TURN
+        found, unprojected = persons(engine, row, ours)
     except Exception:
         return UNRESOLVED, UNREADABLE
+    if found:
+        return RETIRED, LATER_TURN
+    if unprojected:
+        return UNRESOLVED, UNPROJECTED
     try:
         current = engine.fresh_throughout(thread, engine.clock())       # exactly current now, no grace
     except Exception:
