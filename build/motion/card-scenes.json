@@ -1,7 +1,7 @@
 [
-  {"id": "C0", "steps": [{"card": "shown", "frames": 1, "step": 40}, {"hold": 3460}]},
-  {"id": "C1", "steps": [{"card": "leave", "frames": 6, "step": 40}]},
+  {"id": "C0", "steps": [{"card": "shown", "frames": 1, "step": 16}, {"hold": 5984}]},
+  {"id": "C1", "steps": [{"card": "leave", "frames": 14, "step": 16}]},
   {"id": "C2", "steps": [{"hold": 600}]},
-  {"id": "C3", "steps": [{"card": "enter", "frames": 9, "step": 40}]},
-  {"id": "C4", "steps": [{"hold": 1240}]}
+  {"id": "C3", "steps": [{"card": "enter", "frames": 22, "step": 16}]},
+  {"id": "C4", "steps": [{"hold": 1248}]}
 ]

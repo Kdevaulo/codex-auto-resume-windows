@@ -6,5 +6,7 @@
   "size": 192,
   "dark": true,
   "state": "watching",
-  "budget": {"target": 300000, "cap": 600000}
+  "budget": {
+    "cap": 2000000
+  }
 }

@@ -6,7 +6,8 @@ exactly the still - and every later frame as the one rectangle that changed sinc
 (APNG_KEEP, APNG_OVER; every pixel opaque, so it is exact) - or, where its changes lie far apart, one rectangle
 each, all but the last shown for the shortest time a browser keeps (`patches`). A frame the same as the one before
 only lengthens it.
-Delays are whole hundredths of a second, never under SHORTEST: browsers show 10 ms or less as 100 ms. No palette, no
+Delays are whole milliseconds, written exactly, never under SHORTEST - the product's own quickest step (browsers show
+10 ms or less as 100 ms). Quality comes before size (the owner, 2026-10-18): nothing is thinned. No palette, no
 dither, nothing lossy - the reason it is an APNG and not a GIF (make_social.py's docstring).
 
 A picture whose ground is clear - the window on its own, the card on its own, the logo - is RGBA with straight alpha
@@ -32,7 +33,7 @@ for _path in (str(ROOT / "src"), str(ROOT / "build")):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-SHORTEST = 2                         # hundredths of a second
+SHORTEST = 15                        # ms
 APNG_KEEP = 0                        # dispose: leave the frame as it is
 APNG_SOURCE, APNG_OVER = 0, 1        # blend: replace the rectangle, or draw over it
 LEVEL = 9
@@ -51,11 +52,11 @@ class BudgetExceeded(ValueError):
 
 
 class Report(NamedTuple):
-    """What was written: its size, how many frames, how long it plays (hundredths), each scene's bytes, and whether
+    """What was written: its size, how many frames, how long it plays (ms), each scene's bytes, and whether
     it is over its target."""
     size: int
     frames: int
-    hundredths: int
+    ms: int
     scenes: dict
     over_target: bool
 
@@ -184,18 +185,18 @@ def _area(box: tuple) -> int:
     return box[2] * box[3]
 
 
-def _delay(hundredths: int) -> tuple:
-    if hundredths < SHORTEST:
-        raise ValueError("a frame held %d hundredths of a second: browsers show at least %d" % (hundredths, SHORTEST))
-    share = Fraction(hundredths, 100)
+def _delay(ms: int) -> tuple:
+    if ms < SHORTEST:
+        raise ValueError("a frame held %d ms: a picture here holds one at least %d" % (ms, SHORTEST))
+    share = Fraction(int(ms), 1000)
     if share.numerator > 0xFFFF or share.denominator > 0xFFFF:
-        raise ValueError("an APNG cannot hold a delay of %d hundredths" % hundredths)
+        raise ValueError("an APNG cannot hold a delay of %d ms" % ms)
     return share.numerator, share.denominator
 
 
 def assemble(path, width: int, height: int, frames, *, still: bytes | None = None, target: int | None = None,
              cap: int | None = None, alpha: bool = False) -> Report:
-    """Writes `frames` - (delay in hundredths, scene, picture) each, taken one at a time - to `path` as an APNG that
+    """Writes `frames` - (delay in ms, scene, picture) each, taken one at a time - to `path` as an APNG that
     loops forever, and reports it. A picture is RGB, or with `alpha` RGBA with straight alpha, every later rectangle
     then replacing what was under it. `still` is a PNG whose pixels frame 1 must be and whose chunks frame 1 is written
     as. Nothing is written when the picture is over `cap` (BudgetExceeded)."""

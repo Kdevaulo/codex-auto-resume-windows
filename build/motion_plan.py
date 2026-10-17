@@ -10,7 +10,7 @@ A plan is JSON:
 
     {"format": "car-motion/1", "name": "readme-en", "output": "docs/images/readme-motion.png",
      "scenes_from": "readme-scenes.json", "values": {"first": "en", "second": "ko"},
-     "lights_per_second": 10, "length": [25000, 35000], "budget": {"target": 3000000, "cap": 4000000},
+     "light_step_ms": 33, "length": [25000, 35000], "budget": {"cap": 9000000},
      ...the canvas, the window, the taskbar and the card (make_motion.py reads those)...}
 
 `scenes` (or the file `scenes_from` names, beside it) is a list of {"id", "steps"}. A `${name}` anywhere in the scenes
@@ -23,7 +23,7 @@ is replaced by `values[name]`, so one storyboard serves both READMEs. Each step 
     {"press": target, "frames": n, "step": ms}     ...its pressed face, and a ripple where the pointer is
     {"card": "enter" | "shown" | "leave", "frames": n, "step": ms}   ("shown": already at rest)
     {"wheel": notches, "frames": n, "step": ms}    the page scrolls as SoftPage glides it
-    {"open": "setting.<field>", "hold": ms}        the field's drop list opens
+    {"open": "setting.<field>", "frames": n, "step": ms, "hold": ms}   the field's drop list fades in, then holds
     {"rows": [value, ...], "step": ms}             the pointer's row in the open list, one after another
     {"choose": value, "hold": ms}                  the list closes with `value` shown (not saved)
 
@@ -54,12 +54,13 @@ SECTIONS = ("general", "recovery", "continuation", "appearance", "advanced")
 STEPS = ("hold", "set", "move", "hover", "press", "card", "wheel", "open", "rows", "choose")
 # The steps that may say how long their one frame holds.
 HOLDING = ("set", "open", "choose")
-# The shortest a frame is held, in hundredths of a second: browsers show 10 ms or less as 100 ms.
-SHORTEST = 2
-# The least an added frame's moment may be from another's, in ms: room, once rounded to hundredths, for its changes
-# to be written as two rectangles of SHORTEST each (motion_apng.patches) - a light at the top of the picture and the
+# The shortest a frame is held, in ms: the product's own quickest step (a scroll's glide and a drop list's fade tick
+# every 15 ms, the card's every 16). Delays are whole milliseconds, exact; browsers show 10 ms or less as 100 ms.
+SHORTEST = 15
+# The least an added frame's moment may be from another's, in ms: room for its changes to be written as two
+# rectangles of SHORTEST each (motion_apng.patches) - a light at the top of the picture and the
 # tray icon at its bottom - rather than one round both.
-CLOSEST = 2 * 10 * SHORTEST + 5
+CLOSEST = 2 * SHORTEST
 # How long a click's ripple lasts (TOOLING 2.3), in ms.
 RIPPLE_MS = 240
 NAME = re.compile(r"(page\.(%s)|section\.(%s)|save|restore|start|close|setting\.[a-z_]+|row\.[A-Za-z_-]+|card\.[a-z_]+)\Z"
@@ -144,7 +145,7 @@ def load(path) -> dict:
 
 def check(plan: dict) -> None:
     """Raises PlanError for a plan that cannot be drawn: an unknown step or state key, a page or name the window does
-    not have, a step with no frames or a delay under SHORTEST hundredths, or a picture outside its `length`."""
+    not have, a step with no frames or a delay under SHORTEST ms, or a picture outside its `length`."""
     scenes = plan.get("scenes")
     if not isinstance(scenes, list) or not scenes:
         raise PlanError("a plan has scenes")
@@ -164,7 +165,7 @@ def check(plan: dict) -> None:
                 raise PlanError("%s: a step has keys no step has: %s" % (name, sorted(unknown)))
             if "frames" in step and (not isinstance(step["frames"], int) or step["frames"] < 1):
                 raise PlanError("%s: a step draws at least one frame: %r" % (name, step))
-            if "step" in step and step["step"] < 10 * SHORTEST:
+            if "step" in step and step["step"] < SHORTEST:
                 raise PlanError("%s: %d ms is shorter than a browser shows a frame for" % (name, step["step"]))
             for key in ("move", "hover", "press"):
                 if key in step:
@@ -354,7 +355,15 @@ def _step(run, step):
         if not field.startswith("setting."):
             raise PlanError("%s: only a setting's drop-down opens a list, not %r" % (run.scene, field))
         _clear_faces(run)
-        run.window["droplist"] = {"field": field[len("setting."):], "hover": None}
+        # It fades in and rises into place as SoftDropList.Show animates it: a frame every `step` ms of that, the
+        # list `appear_ms` into it, then at rest.
+        count, gap = run.frames_of(step, 0, SHORTEST)
+        name = field[len("setting."):]
+        for index in range(count):
+            run.window["droplist"] = {"field": name, "hover": None, "appear_ms": index * gap}
+            run.emit(run.t + index * gap)
+        run.t += count * gap
+        run.window["droplist"] = {"field": name, "hover": None}
         run.emit()
         run.t += int(step.get("hold", 40))
         return
@@ -390,14 +399,15 @@ def _settle_scroll(run):
 
 
 # ---------------------------------------------------------------------------------------------------- the clock
-def fill(frames: list, end: int, per_second: int, also=(), first_hold: int = 0, ripple_step: int = 0) -> list:
-    """`frames` with a frame added wherever something moves by itself between two of them: on every 1000/per_second
-    ms of the picture's clock (the lights), at each moment in `also` (the tray icon's own frame times), and every
+def fill(frames: list, end: int, light_step: int, also=(), first_hold: int = 0, ripple_step: int = 0) -> list:
+    """`frames` with a frame added wherever something moves by itself between two of them: every `light_step` ms of
+    the picture's clock (the lights, at their own timer's step), at each moment in `also` (the tray icon's own frame
+    times), and every
     `ripple_step` ms while a click's ripple fades - each the state of the frame before it at its own moment. Nothing
     is added before `first_hold` (frame 1 is the still, held), at or past `end`, or where a frame already is."""
     if not frames:
         return []
-    step = 1000.0 / per_second if per_second else None
+    step = float(light_step) if light_step else None
     moments = set()
     if step:
         moments.update(int(round(index * step)) for index in range(int(math.ceil(end / step))))
@@ -408,7 +418,7 @@ def fill(frames: list, end: int, per_second: int, also=(), first_hold: int = 0, 
             ripples.update(range(start, start + RIPPLE_MS, ripple_step))
     have = sorted({frame.t for frame in frames} | {end})
     # A ripple's frames are steps of their own, kept wherever a browser can show them apart from the steps' frames.
-    ripples = _apart(sorted(at for at in ripples if frames[0].t <= at < end), have, 10 * SHORTEST + 5)
+    ripples = _apart(sorted(at for at in ripples if frames[0].t <= at < end), have, SHORTEST)
     have = sorted(set(have) | set(ripples))
     # The lights' and the icon's are kept CLOSEST from every other: of two of them, the earlier.
     added = _apart(sorted(at for at in moments if first_hold <= at < end and at >= frames[0].t), have, CLOSEST)
@@ -440,15 +450,14 @@ def _apart(candidates: list, fixed: list, gap: int) -> list:
 
 
 def delays(moments: list, end: int) -> list:
-    """Each frame's delay in hundredths of a second, from the moments (ms) the frames start at and the picture's end:
-    each frame starts on its own moment rounded, so rounding never adds up and the delays sum to the end exactly. A
-    moment under SHORTEST hundredths after the one before raises: the plan asked for a frame no browser shows."""
-    starts = [int(round(at / 10.0)) for at in moments] + [int(round(end / 10.0))]
+    """Each frame's delay in ms, from the moments (ms) the frames start at and the picture's end: they sum to the end
+    exactly. A moment under SHORTEST ms after the one before raises: the plan asked for a frame no browser shows."""
+    starts = [int(round(at)) for at in moments] + [int(round(end))]
     out = []
     for index in range(len(moments)):
         delay = starts[index + 1] - starts[index]
         if delay < SHORTEST:
-            raise PlanError("a frame at %d ms is held %d hundredths; a browser shows at least %d"
+            raise PlanError("a frame at %d ms is held %d ms; this picture shows a frame at least %d"
                             % (moments[index], delay, SHORTEST))
         out.append(delay)
     return out

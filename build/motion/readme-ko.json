@@ -47,15 +47,13 @@
     ],
     "scale": 1.5
   },
-  "lights_per_second": 10,
-  "first_hold": 400,
-  "ripple_step": 40,
+  "ripple_step": 16,
   "length": [
     25000,
     35000
   ],
   "budget": {
-    "target": 3000000,
-    "cap": 4000000
-  }
+    "cap": 9000000
+  },
+  "light_step_ms": 33
 }

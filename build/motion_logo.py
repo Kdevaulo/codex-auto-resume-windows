@@ -2,7 +2,8 @@
 
 Nothing here draws the mark or decides how it moves. Every frame's moment, head position and brightness is the
 icon's own (ui.tray.icon_frame, stepped by icon_frame_ms as the icon's timer steps, through make_social.schedule -
-one whole cycle of watching's motion, three breaths of the head and a sweep, so it loops without a seam), and every
+one whole cycle of watching's motion, three breaths of the head and a sweep, every frame the icon's timer shows, so
+it loops without a seam and nothing is thinned), and every
 head is the icon's own (ui.tray.IconFrames.compose at that position, in watching's colour at that breathing level).
 The rest of each frame is the logo itself (brand.icon_render, with assets/make_icon.py's LOGO_RIM for the dark one):
 a frame takes from the icon's frame only the pixels where it differs from the icon at rest, so frame 1 - the head
@@ -43,9 +44,21 @@ def static(size: int, dark: bool) -> bytes:
     return brand.icon_render(size, logo_rim(dark))
 
 
-def frames(plan: dict):
-    """(delay in hundredths, scene, RGBA) for one cycle of the icon's motion in `plan["state"]`, frame 1 at rest."""
+def cycle(state: str = "watching") -> list:
+    """[(delay in ms, head position, breathing level)] for one whole cycle of `state`'s motion from the moment it is
+    entered: every frame the icon's own timer shows (make_screenshots.icon_timeline, stepped by icon_frame_ms), each
+    held until the next - none merged, none dropped, at the icon's own cadence."""
+    import make_screenshots
     import make_social
+    loop = make_social.watching_loop_ms()
+    shown = make_screenshots.icon_timeline(state, 0.0, loop)
+    moments = [int(round(at)) for at, _position, _level in shown] + [int(round(loop))]
+    return [(moments[index + 1] - moments[index], position, level)
+            for index, (_at, position, level) in enumerate(shown)]
+
+
+def frames(plan: dict):
+    """(delay in ms, scene, RGBA) for one cycle of the icon's motion in `plan["state"]`, frame 1 at rest."""
     from codex_auto_resume.ui import tray
     size, state = int(plan["size"]), plan.get("state", "watching")
     if state != "watching":
@@ -54,7 +67,7 @@ def frames(plan: dict):
     icons = tray.IconFrames(size)
     top = tray.ICON_MOTION["levels"] - 1
     rest = icons.compose(0, tray.icon_level_colour(tray.icon_head_colour(state), top))
-    for delay, position, level in make_social.schedule():
+    for delay, position, level in cycle(state):
         moving = icons.compose(position, tray.icon_level_colour(tray.icon_head_colour(state), level))
         picture = bytearray(logo)
         for index in range(0, len(moving), 4):

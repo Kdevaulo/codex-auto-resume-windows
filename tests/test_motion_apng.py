@@ -41,10 +41,10 @@ def picture(square_x=None, fade=None) -> bytes:
 
 def frames():
     """(delay, scene, picture): a square crossing, a held frame repeated, a rectangle fading in."""
-    out = [(40, "S0", picture())]
-    out += [(4, "S1", picture(x)) for x in range(0, 30, 6)]
-    out += [(10, "S2", picture(27)), (10, "S2", picture(27))]
-    out += [(4, "S3", picture(27, fade)) for fade in (0.25, 0.5, 0.75)]
+    out = [(400, "S0", picture())]
+    out += [(16, "S1", picture(x)) for x in range(0, 30, 6)]
+    out += [(100, "S2", picture(27)), (100, "S2", picture(27))]
+    out += [(33, "S3", picture(27, fade)) for fade in (0.25, 0.5, 0.75)]
     return out
 
 
@@ -73,9 +73,10 @@ class AssembleTests(unittest.TestCase):
         for index, (got, (_delay, _scene, want)) in enumerate(zip(shown, unique)):
             self.assertTrue(got == want, "frame %d differs" % (index + 1))
         delays = [frame["delay"] for frame in apng["frames"]]
-        self.assertEqual(sum(delays), Fraction(sum(delay for delay, _scene, _picture in frames()), 100))
+        self.assertEqual(sum(delays), Fraction(sum(delay for delay, _scene, _picture in frames()), 1000))
         self.assertEqual(delays[6], Fraction(1, 5), "the repeated frame is one frame held for both")
-        self.assertEqual((report.frames, report.hundredths, report.size), (len(unique), 92, self.path.stat().st_size))
+        self.assertEqual(delays[1], Fraction(16, 1000), "a 16 ms step is written exactly")
+        self.assertEqual((report.frames, report.ms, report.size), (len(unique), 779, self.path.stat().st_size))
         self.assertTrue(all(frame["box"][2] * frame["box"][3] < WIDTH * HEIGHT for frame in apng["frames"][1:]),
                         "a later frame is only what changed")
 
@@ -88,7 +89,7 @@ class AssembleTests(unittest.TestCase):
 
     def test_a_frame_no_browser_shows_is_refused(self):
         with self.assertRaises(ValueError):
-            self.write([(4, "A", picture()), (1, "B", picture(3))])
+            self.write([(40, "A", picture()), (10, "B", picture(3))])
 
     def test_over_the_cap_nothing_is_written_and_each_scene_s_bytes_are_named(self):
         size = self.write().size
@@ -123,19 +124,19 @@ class SplitTests(unittest.TestCase):
             out[(3 * WIDTH + 2) * 3:(3 * WIDTH + 2) * 3 + 3] = bytes(top_colour)
             out[(190 * WIDTH + 30) * 3:(190 * WIDTH + 30) * 3 + 3] = bytes(bottom_colour)
             return bytes(out)
-        given = [(10, "A", lit((1, 1, 1), (2, 2, 2))), (10, "B", lit((9, 9, 9), (8, 8, 8))),
-                 (3, "C", lit((5, 5, 5), (6, 6, 6)))]
+        given = [(100, "A", lit((1, 1, 1), (2, 2, 2))), (100, "B", lit((9, 9, 9), (8, 8, 8))),
+                 (20, "C", lit((5, 5, 5), (6, 6, 6)))]
         with tempfile.TemporaryDirectory() as name:
             path = Path(name) / "split.png"
             report = motion_apng.assemble(path, WIDTH, tall, iter(given))
             apng = read_apng(path.read_bytes())
         boxes = [frame["box"] for frame in apng["frames"]]
         self.assertEqual(boxes[1:3], [(2, 3, 1, 1), (30, 190, 1, 1)], "two rectangles, not one round both")
-        self.assertEqual([frame["delay"] for frame in apng["frames"]][1:3], [Fraction(2, 100), Fraction(8, 100)])
+        self.assertEqual([frame["delay"] for frame in apng["frames"]][1:3], [Fraction(15, 1000), Fraction(85, 1000)])
         self.assertEqual(boxes[3], (2, 3, 29, 188), "too short a frame to split is one rectangle")
         shown = list(composite(apng))
         self.assertTrue(shown[2] == given[1][2] and shown[3] == given[2][2])
-        self.assertEqual(report.hundredths, 23)
+        self.assertEqual(report.ms, 220)
 
 
 class AlphaTests(unittest.TestCase):
@@ -175,7 +176,7 @@ class AlphaTests(unittest.TestCase):
         return shown
 
     def test_a_fading_square_fades_to_clear_and_not_to_the_frame_before(self):
-        given = [(10, "A", self.rgba(255)), (10, "B", self.rgba(128)), (10, "C", self.rgba(0))]
+        given = [(100, "A", self.rgba(255)), (100, "B", self.rgba(128)), (100, "C", self.rgba(0))]
         with tempfile.TemporaryDirectory() as name:
             path = Path(name) / "clear.png"
             report = motion_apng.assemble(path, WIDTH, HEIGHT, iter(given), alpha=True)
@@ -188,7 +189,7 @@ class AlphaTests(unittest.TestCase):
 
     def test_an_rgb_picture_is_refused_where_rgba_is_asked(self):
         with tempfile.TemporaryDirectory() as name, self.assertRaises(ValueError):
-            motion_apng.assemble(Path(name) / "x.png", WIDTH, HEIGHT, iter([(10, "A", picture())]), alpha=True)
+            motion_apng.assemble(Path(name) / "x.png", WIDTH, HEIGHT, iter([(100, "A", picture())]), alpha=True)
 
 
 class CutTests(unittest.TestCase):
@@ -210,7 +211,7 @@ class CutTests(unittest.TestCase):
             after[(y * width + x) * 3] = 0
         with tempfile.TemporaryDirectory() as name:
             path = Path(name) / "short.png"
-            motion_apng.assemble(path, width, height, iter([(4, "A", before), (4, "B", bytes(after))]))
+            motion_apng.assemble(path, width, height, iter([(40, "A", before), (40, "B", bytes(after))]))
             boxes = [frame["box"] for frame in read_apng(path.read_bytes())["frames"]][1:]
         self.assertEqual(sorted(boxes), [(5, 5, 1, 1), (150, 185, 41, 6)],
                          "the two far corners would have made one rectangle of the whole picture")

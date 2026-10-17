@@ -44,9 +44,13 @@ class LogoFrameTests(unittest.TestCase):
         self.assertEqual(motion_logo.logo_rim(False), 0.0)
 
     def test_it_is_one_cycle_of_the_icon_s_own_watching_schedule(self):
+        import make_screenshots
         import make_social
-        cycle = make_social.schedule()
+        cycle = motion_logo.cycle("watching")
         self.assertEqual([delay for delay, _scene, _picture in self.light], [delay for delay, _p, _l in cycle])
+        shown = make_screenshots.icon_timeline("watching", 0.0, make_social.watching_loop_ms())
+        self.assertEqual(len(cycle), len(shown), "every frame the icon's timer shows, none merged or dropped")
+        self.assertEqual(sum(delay for delay, _p, _l in cycle), make_social.watching_loop_ms())
         self.assertIn("sweep", {scene for _delay, scene, _picture in self.light})
         self.assertGreater(len({picture for _delay, _scene, picture in self.light}), 10, "the head moves")
 
@@ -77,7 +81,7 @@ class LogoFrameTests(unittest.TestCase):
         width, height, depth, colour = struct.unpack(">IIBB", raw[16:26])
         self.assertEqual((width, height, depth, colour), (SIZE, SIZE, 8, 6))
         self.assertGreater(report.frames, 10)
-        self.assertEqual(report.hundredths, sum(delay for delay, _s, _p in self.light))
+        self.assertEqual(report.ms, sum(delay for delay, _s, _p in self.light))
 
     def test_the_readme_logo_plans_are_drawn_at_192_within_their_budget(self):
         self.assertEqual(make_motion.LOGO_PLANS, ("logo-light", "logo-dark"))
@@ -85,7 +89,7 @@ class LogoFrameTests(unittest.TestCase):
             with self.subTest(name):
                 given = make_motion.load(name)
                 self.assertEqual((given["kind"], given["size"], given["dark"]), ("logo", 192, dark))
-                self.assertLessEqual(given["budget"]["target"], 300000)
+                self.assertEqual(given["budget"], {"cap": 2000000}, "quality first: a ceiling, no target")
 
     def test_what_the_logo_is_made_from_moves_with_the_icon_s_drawing_and_motion(self):
         import make_screenshots as shots

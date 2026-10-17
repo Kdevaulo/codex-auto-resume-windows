@@ -83,16 +83,16 @@ def load(name) -> dict:
 
 
 def schedule(plan: dict, also=()) -> tuple:
-    """(frames, delays in hundredths, end in ms): every frame the plan's steps emit, with the frames the lights, the
+    """(frames, delays in ms, end in ms): every frame the plan's steps emit, with the frames the lights, the
     ripples and `also` (the tray icon's frame times) add, each with the delay it is held for."""
     end = motion_plan.plan_end(plan)
-    frames = motion_plan.fill(motion_plan.expand(plan), end, int(plan.get("lights_per_second") or 0), also,
+    frames = motion_plan.fill(motion_plan.expand(plan), end, int(plan.get("light_step_ms") or 0), also,
                               first_hold=int(plan.get("first_hold") or 0), ripple_step=int(plan.get("ripple_step") or 0))
     return frames, motion_plan.delays([frame.t for frame in frames], end), end
 
 
 def run(plan: dict, draw, also=()):
-    """(delay in hundredths, scene, picture) for each frame of the plan, drawn by `draw(frame)`, one at a time: a
+    """(delay in ms, scene, picture) for each frame of the plan, drawn by `draw(frame)`, one at a time: a
     frame whose picture is the one before's only lengthens it, so a picture is written once however long it holds.
     The first is always frame 1, even when the next is the same."""
     frames, held, _end = schedule(plan, also)
@@ -117,8 +117,8 @@ def describe(plan: dict, also=()) -> str:
         entry = counts.setdefault(frame.scene, [0, 0, frame.t])
         entry[0] += 1
         entry[1] += delay
-    for scene, (count, hundredths, start) in counts.items():
-        lines.append("  %-5s at %6.2f s  %3d frames  %5.2f s" % (scene, start / 1000.0, count, hundredths / 100.0))
+    for scene, (count, ms, start) in counts.items():
+        lines.append("  %-5s at %6.2f s  %3d frames  %5.2f s" % (scene, start / 1000.0, count, ms / 1000.0))
     lines.append("  %d frames, %.2f s, %d window states, targets: %s"
                  % (len(frames), end / 1000.0, len(motion_plan.window_states(frames)),
                     ", ".join(sorted(motion_plan.pointer_targets(frames)))))
@@ -127,10 +127,10 @@ def describe(plan: dict, also=()) -> str:
 
 def describe_logo(plan: dict) -> str:
     """What a logo plan draws: one cycle of the icon's own motion."""
-    import make_social
-    cycle = make_social.schedule()
+    import motion_logo
+    cycle = motion_logo.cycle(plan.get("state", "watching"))
     return "  %d px, %s, one cycle of the icon's watching motion: %d frames, %.2f s" % (
-        plan["size"], "dark" if plan.get("dark") else "light", len(cycle), sum(item[0] for item in cycle) / 100.0)
+        plan["size"], "dark" if plan.get("dark") else "light", len(cycle), sum(item[0] for item in cycle) / 1000.0)
 
 
 # ---------------------------------------------------------------------------------------------------- inputs
@@ -325,10 +325,10 @@ def main(argv=None) -> int:
             manifest["inputs"]["<motion:%s>" % plan["name"]] = render_input(plan)
             manifest["images"][key] = {"sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
                                        "size": "%dx%d" % size, "bytes": report.size,
-                                       "frames": report.frames, "hundredths": report.hundredths,
+                                       "frames": report.frames, "ms": report.ms,
                                        "scenes": report.scenes}
             write_manifest(manifest)
-            print("%s  %d bytes, %d frames, %.2f s%s" % (key, report.size, report.frames, report.hundredths / 100.0,
+            print("%s  %d bytes, %d frames, %.2f s%s" % (key, report.size, report.frames, report.ms / 1000.0,
                                                          "  OVER THE TARGET" if report.over_target else ""))
     return 0
 
