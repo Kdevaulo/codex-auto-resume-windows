@@ -391,12 +391,14 @@ class ClaimTests(unittest.TestCase):
         self.readme = (ROOT / "README.ko.md").read_text(encoding="utf-8")
         self.security = (ROOT / "docs" / "SECURITY.ko.md").read_text(encoding="utf-8")
 
-    def test_the_korean_readme_leads_with_the_plugin_route(self):
+    def test_the_korean_readme_leads_with_the_setup_program_route(self):
         install = self.readme.index("## 설치")
+        setup = self.readme.index("설치 프로그램으로 설치 (권장)", install)
         plugin = self.readme.index("Codex에서 설치", install)
         archive = self.readme.index("릴리스 압축 파일로 설치", install)
+        self.assertLess(setup, plugin)
         self.assertLess(plugin, archive,
-                        "the plugin route is the recommended one and must come first")
+                        "the setup program is the recommended route and must come first, then the plugin")
 
     def test_the_korean_readme_admits_the_download(self):
         for required in ("GitHub", "HTTPS"):

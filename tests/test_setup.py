@@ -645,13 +645,19 @@ def _latest_release() -> tuple:
     return max(tuple(int(part) for part in version.split(".")) for version in releases)
 
 
-def _install_documents(english, korean):
+def _install_documents(english, korean, readme=None):
     """Each document with install instructions here, with what it is written in: dev has both languages, main
-    English only, and the generated ko branch has the Korean text under the English names."""
+    English only, and the generated ko branch has the Korean text under the English names. The README is the
+    short page (from the v0.6.16 final the setup program leads it), the guide keeps its own order of routes, so
+    `readme` gives the README's (English, Korean) if they differ from the guide's."""
     on_ko = languages.generated_ko_branch()
     documents = {"README.md": on_ko, "README.ko.md": True, "docs/GUIDE.md": on_ko, "docs/GUIDE.ko.md": True}
-    return {name: ((korean if is_korean else english), is_korean)
-            for name, is_korean in documents.items() if (ROOT / name).is_file()}
+    found = {}
+    for name, is_korean in documents.items():
+        if (ROOT / name).is_file():
+            own = readme if readme is not None and name.startswith("README") else (english, korean)
+            found[name] = ((own[1] if is_korean else own[0]), is_korean)
+    return found
 
 
 class DocsTests(unittest.TestCase):
@@ -667,21 +673,38 @@ class DocsTests(unittest.TestCase):
         latest = _latest_release()
         self.assertGreaterEqual(latest, SETUP_SINCE, "releases/latest answers with v%s, which has no setup program"
                                 % ".".join(map(str, latest)))
-        for name, (heading, korean) in _install_documents("### With the setup program", "### 설치 파일로 설치").items():
+        for name, (heading, korean) in _install_documents(
+                "### With the setup program", "### 설치 파일로 설치",
+                readme=("### With the setup program", "### 설치 프로그램으로 설치")).items():
             with self.subTest(name):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 section = text[text.index(heading):]
                 section = section[:section.index("\n### ", len(heading))]
-                self.assertEqual(re.findall(r"\]\((%s[^)\s]*)\)" % re.escape(RELEASES), section), [LATEST],
-                                 "the latest release, which carries the setup programs, and no other release page")
+                links = re.findall(r"\]\((%s[^)\s]*)\)" % re.escape(RELEASES), section)
+                if name.startswith("README"):
+                    # The README's section holds the setup program's paragraph and, folded under it, the plugin
+                    # and the archive routes, each of which may link the release page: every link is the latest
+                    # release, and there is at least one.
+                    self.assertTrue(links)
+                    self.assertEqual(set(links), {LATEST},
+                                     "the latest release, which carries the setup programs, and no other release page")
+                else:
+                    self.assertEqual(links, [LATEST],
+                                     "the latest release, which carries the setup programs, and no other release page")
                 if not korean:
-                    self.assertIn("from v0.6.11 on", section, "the release the setup programs start with")
+                    # The guide names the release the setup programs start with; the README says instead where
+                    # the setup program's link is, on every release page, which the check above keeps true.
+                    self.assertIn("at the top of every" if name.startswith("README") else "from v0.6.11 on",
+                                  section, "where the setup program is, and since which release")
 
     def test_the_recommended_route_comes_first(self):
-        """The owner, 2026-10-02: the recommended route belongs at the top. The setup program's route, new in
-        v0.6.11, had been put above it."""
+        """The owner, 2026-10-02: the recommended route belongs at the top. In the guide it is the plugin's; in the
+        README, from the v0.6.16 final (owner, 2026-10-16), it is the setup program's, and the plugin and the
+        archive routes follow it as folded sections."""
         for name, ((install, recommended), _) in _install_documents(
-                ("## Install", "### From Codex (recommended)"), ("## 설치", "### Codex에서 설치 (권장)")).items():
+                ("## Install", "### From Codex (recommended)"), ("## 설치", "### Codex에서 설치 (권장)"),
+                readme=(("## Install", "### With the setup program (recommended)"),
+                        ("## 설치", "### 설치 프로그램으로 설치 (권장)"))).items():
             with self.subTest(name):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 start = text.index("\n%s\n" % install)
