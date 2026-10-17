@@ -21,7 +21,7 @@ is replaced by `values[name]`, so one storyboard serves both READMEs. Each step 
     {"move": target, "frames": n, "step": ms}      the pointer travels to `target`, eased (brand.ease)
     {"hover": target, "frames": n, "step": ms}     the target shows its hover face
     {"press": target, "frames": n, "step": ms}     ...its pressed face, and a ripple where the pointer is
-    {"card": "enter" | "leave", "frames": n, "step": ms}
+    {"card": "enter" | "shown" | "leave", "frames": n, "step": ms}   ("shown": already at rest)
     {"wheel": notches, "frames": n, "step": ms}    the page scrolls as SoftPage glides it
     {"open": "setting.<field>", "hold": ms}        the field's drop list opens
     {"rows": [value, ...], "step": ms}             the pointer's row in the open list, one after another
@@ -211,7 +211,7 @@ class _Run:
         self.t = 0
         self.window = {"page": "overview", "locale": plan.get("locale", "en")}
         self.card = None
-        self.pointer = ("at", {"at": list(plan.get("pointer", {}).get("rest", [0, 0]))})
+        self.pointer = ("at", {"at": list((plan.get("pointer") or {}).get("rest", [0, 0]))})
         self.ripple = ()
         self.frames = []
         self.scene = ""
@@ -325,12 +325,16 @@ def _step(run, step):
         count, gap = run.frames_of(step, 9)
         if step["card"] == "enter":
             run.card = {"born": run.t, "hover": None, "pressed": None, "leave": None}
+        elif step["card"] == "shown":
+            # Already there: born one whole entrance ago, so it stands at rest from this moment on.
+            from codex_auto_resume import notice_card
+            run.card = {"born": run.t - notice_card.ENTRANCE_MS, "hover": None, "pressed": None, "leave": None}
         elif step["card"] == "leave":
             if run.card is None:
                 raise PlanError("%s: there is no card to leave" % run.scene)
             run.card["leave"] = run.t
         else:
-            raise PlanError("%s: a card enters or leaves, not %r" % (run.scene, step["card"]))
+            raise PlanError("%s: a card enters, is shown or leaves, not %r" % (run.scene, step["card"]))
         for index in range(count):
             run.emit(run.t + index * gap)
         run.t += count * gap

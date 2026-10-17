@@ -4,16 +4,58 @@
   "output": "docs/images/readme-motion-ko.png",
   "locale": "ko",
   "scenes_from": "readme-scenes.json",
-  "values": {"first": "ko", "second": "en", "rows": ["system", "en"], "scroll_over": {"by": [420, 380]}},
-  "forms": {"ko": {}, "en": {"interface_language": "en"}},
-  "canvas": {"size": [1600, 1152], "ground": "canvas", "theme": "light", "design": "soft"},
-  "window": {"at": [20, 16], "still": "assets/screenshot-dashboard.png"},
-  "taskbar": {"top": 1080, "height": 72, "colour": "#EEF0F3", "icon": {"size": 24, "right": 36, "state": "watching"}},
-  "card": {"scale": 1.5, "locale": "ko", "gap": 12},
-  "pointer": {"rest": [1180, 560], "scale": 1.5},
+  "values": {
+    "first": "ko",
+    "second": "en",
+    "rows": [
+      "system",
+      "en"
+    ],
+    "scroll_over": {
+      "by": [
+        420,
+        380
+      ]
+    }
+  },
+  "forms": {
+    "ko": {},
+    "en": {
+      "interface_language": "en"
+    }
+  },
+  "canvas": {
+    "size": [
+      1592,
+      1133
+    ],
+    "transparent": true,
+    "theme": "light",
+    "design": "soft"
+  },
+  "window": {
+    "at": [
+      46,
+      37
+    ],
+    "still": "assets/screenshot-dashboard.png"
+  },
+  "pointer": {
+    "rest": [
+      1200,
+      580
+    ],
+    "scale": 1.5
+  },
   "lights_per_second": 10,
   "first_hold": 400,
   "ripple_step": 40,
-  "length": [25000, 35000],
-  "budget": {"target": 3000000, "cap": 4000000}
+  "length": [
+    25000,
+    35000
+  ],
+  "budget": {
+    "target": 3000000,
+    "cap": 4000000
+  }
 }
