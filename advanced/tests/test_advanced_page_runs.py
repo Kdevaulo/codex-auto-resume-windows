@@ -64,7 +64,11 @@ class PageTests(PageCase):
         """Pending's and History's rows, with what the status says of four of them (surfaces.rows)."""
         script = cls.opening(bridge, "en")
         reply = snapshot()
-        pending, history = reply["pending"], reply["history"]
+        # The snapshot's History lists the waiting recoveries too (test_gui_layout.fullest_snapshot): the finished
+        # ones are those it has beside them.
+        pending = reply["pending"]
+        history = [row for row in reply["history"]
+                   if row["interruption_id"] not in {each["interruption_id"] for each in pending}]
         reply["status"]["advanced"].update({
             "kinds": {pending[0]["interruption_id"]: "cli", history[0]["interruption_id"]: "ide"},
             "compacting": [pending[1]["interruption_id"]],
@@ -109,7 +113,7 @@ class PageTests(PageCase):
         (shown,) = result["looks"]
         rows, done = shown["pending_rows"], shown["history_rows"]
         self.assertEqual(len(rows), len(pending))
-        self.assertEqual(len(done), len(history))
+        self.assertEqual(len(done), len(pending) + len(history))
         labels = [row[0] for row in rows]
         self.assertIn(pending[0]["name"] + " · " + words["page.row.kind.cli"], labels)
         self.assertTrue(any(row[1].endswith(" · " + words["page.row.compact"]) for row in rows), rows)
