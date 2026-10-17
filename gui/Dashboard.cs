@@ -102,6 +102,9 @@ namespace CodexAutoResume
             }
         }
 
+        /// The render mode's answers (WindowRender.cs), in place of any process: null for every window a person opens.
+        internal static Func<string, string, Dictionary<string, object>> Answers;
+
         internal Dictionary<string, object> Call(string command, string argument)
         {
             System.Threading.Interlocked.Increment(ref calls);
@@ -112,6 +115,7 @@ namespace CodexAutoResume
         private Dictionary<string, object> CallCounted(string command, string argument)
         {
             if (closed) throw new ObjectDisposedException("the window is closing");
+            if (Answers != null) return Answers(command, argument);
             lock (gate)
             {
                 if (closed) throw new ObjectDisposedException("the window is closing");
@@ -143,6 +147,7 @@ namespace CodexAutoResume
         internal Dictionary<string, object> CallOnce(string command, string argument)
         {
             if (closed) throw new ObjectDisposedException("the window is closing");
+            if (Answers != null) return Answers(command, argument);
             System.Threading.Interlocked.Increment(ref calls);
             try { return once.Call(command, argument); }
             finally { System.Threading.Interlocked.Decrement(ref calls); }

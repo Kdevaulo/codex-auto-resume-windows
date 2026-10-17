@@ -1071,6 +1071,9 @@ namespace CodexAutoResume
             SettingsForm.ShutOutPointer();
             // v0.6.16: the entry in Add or remove programs, in the installer window (SettingsRemove), and nothing else.
             if (SettingsRemove.IsAsked(argv)) return SettingsRemove.Run(argv);
+            // Only for build/make_motion.py: frames of the window drawn offscreen, and nothing else (WindowRender.cs).
+            string renderJob = SettingsForm.RenderJob;
+            if (renderJob != null) return SettingsForm.RenderFrames(renderJob);
 
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
             var bridge = new Bridge(root);

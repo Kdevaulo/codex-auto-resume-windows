@@ -41,6 +41,7 @@ gui/SettingsOwn.cs
 gui/WindowReopen.cs
 gui/WindowAudit.cs
 gui/SettingsRemove.cs
+gui/WindowRender.cs
 
 [dashboard]
 gui/Dashboard.cs

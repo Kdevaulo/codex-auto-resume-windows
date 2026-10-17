@@ -561,8 +561,9 @@ namespace CodexAutoResume
         /// brightnesses and every screenshot in the repository changed for a reason that was not
         /// the source. CODEX_AR_STILL_LIGHT=&lt;ms&gt; holds the breath still at that moment;
         /// build/capture_window.ps1 sets it to 0, where the breath is brightest. Read once, at
-        /// start, and never set by the product itself.
-        internal static readonly double StillLightMs = ReadStillLight();
+        /// start, and never set by the product itself - only by the render mode, which draws each
+        /// frame of a motion picture at its own moment (WindowRender.cs).
+        internal static double StillLightMs = ReadStillLight();
 
         /// The moment the window is to believe it is, in seconds since 1970, or -1 for the real
         /// clock - which is what anybody running the product gets.
