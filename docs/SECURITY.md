@@ -98,12 +98,23 @@ and caches, as any Codex process does.
 **Writes** at install time, for the current user only and never system-wide: a Start Menu
 shortcut, the sign-in autostart value unless you decline it, the notification sender identity
 Windows requires before it will draw a toast at all, and the handler for the notification
-button's own URL scheme. Through the `codex plugin` CLI it also registers a local plugin
+button's own URL scheme, and, from v0.6.16, the entry in Windows' Add or remove programs: one per-user key
+under `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall` (`CodexAutoResume`; the other edition's adds its
+word), naming this version and folder and the command that removes it, with a copy of the installer's own
+uninstall, `uninstall\install.ps1`, kept in the installation for that command to name. Through the `codex plugin`
+CLI it also registers a local plugin
 marketplace and this plugin in your Codex configuration, and asks Codex to refresh
 marketplaces. v0.5.7 and earlier releases run that refresh with no name, so Codex refreshes
 every Git marketplace you have configured. From v0.6.0, it names this product's own marketplace
 and refreshes only that one. Uninstalling removes all of these, under the ownership checks
 described below.
+
+**Writes** while updating or uninstalling, on this PC only, none of it sent anywhere. An update that asks an open
+Dashboard to close has that window write its page and position to `config\reopen-after-update-<process id>.txt`,
+which the installer reads once to open the new version where it was and deletes. The uninstall that Settings >
+Apps starts copies the Dashboard program into a new folder of its own in the temporary folder,
+`%TEMP%\CodexAutoResume-Uninstall-<random>`, so that the installation can be deleted while the window shows it;
+the folder is removed once the copy has ended.
 
 **Never reads**: `auth.json`, tokens, cookies, authorization headers, or process memory. The Codex
 processes it starts use Codex's own stored sign-in; this tool never sees it.
@@ -749,7 +760,7 @@ under.
   of your own, uninstalling this product leaves your configuration exactly where it is and says
   so. If Codex refuses a removal, that is reported as a refusal, never as a removal.
 - **Uninstalling: registry and Start Menu.** The sign-in entry, the notification identity, the
-  Start Menu shortcut and the `codex-auto-resume:` handler are per-user singletons that a second
+  Start Menu shortcut, the `codex-auto-resume:` handler and the Add or remove programs entry are per-user singletons that a second
   installation would overwrite, so each is removed only when it still belongs to the
   installation being removed.
 
