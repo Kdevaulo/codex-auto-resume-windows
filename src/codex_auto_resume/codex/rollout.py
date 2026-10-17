@@ -8,6 +8,7 @@ None of these readings is a statement to a database - codex/history.py keeps eve
     earlier        the ids it recorded them under before, by the names of its earlier files
     named_after    the conversations whose file names an id as theirs, by name
     reset_scan     the rate-limit snapshots just before a usage-limit failure, for the reset hint
+    superseded_in  whether a person's message came after a failed turn's end, for Rescan and reconcile (issue #39)
 
 The split is Codex's (openai/codex#43422, this project's issue #30): the `threads` row keeps the
 conversation's id A, but its current file is named `..._A_B.jsonl` and its turns are projected under B,
@@ -27,6 +28,13 @@ from .payload import _choose_reset
 from .values import MAX_ITEM_BYTES, MAX_META_BYTES, MAX_SCAN_BYTES, _json
 
 UNKNOWN_RESET = {"reset_at": None, "limit_type": "unknown", "uncertain": True}
+# What `superseded_in` finds (v0.6.16, issue #39): a person's message after the failed turn's own end; that end and
+# nothing of a person's after it; not that end at all; a file over RESCAN_BYTES; a file that cannot be read.
+LATER_MESSAGE, NOTHING_LATER, NO_ANCHOR, TOO_LARGE, UNREADABLE = (
+    "later_message", "nothing_later", "no_anchor", "too_large", "unreadable")
+# The largest file it reads, start to end, only when a person asks for it.
+RESCAN_BYTES = 32 * 1024 * 1024
+_OURS = ids.MARKER_PREFIX.encode("utf-8")
 # A turn's ordinal across a split conversation: the index of the id it is recorded under (A's own 0, then each
 # split id in order) times SPAN, plus its own rollout ordinal - so a turn of a later id always comes after every
 # turn of an earlier one, whatever Codex numbered it, and a conversation never split reads its ordinals as they are.
@@ -205,3 +213,47 @@ def reset_scan(path, end, turn_id, completed_at) -> dict:
                 if isinstance(bucket, str) and re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", bucket):
                     buckets[bucket] = limits
     return _choose_reset(buckets, completed_at) if found else dict(UNKNOWN_RESET)
+
+
+def superseded_in(path, turn_id, limit=None) -> str:
+    """Whether the file holds the exact end of the failed turn `turn_id` - its own task_complete event - and, after it, a
+    person's message: a user_message event that carries no marker of this product's (ids.MARKER_PREFIX, which every
+    continuation and every message the product writes carries). Read only on a person's Rescan and reconcile, and only
+    while Codex's history has not caught up with the file (rescan.py): the file whole, up to `limit` bytes, one line at
+    a time, each line parsed and dropped. Nothing of what a line says is kept; the answer is one of five words.
+
+    A line over MAX_ITEM_BYTES, a line that is not JSON and any event but those two are passed over, which can only
+    lose an answer, never make one: no anchor, nothing later. Where a person's message comes before that end, it is
+    not after it, so a conversation's earlier work - or a file that replays it (a split's, issue #30) - proves nothing."""
+    try:
+        size = path.stat().st_size
+        if size > (RESCAN_BYTES if limit is None else limit):
+            return TOO_LARGE
+        anchored, read = False, 0
+        with path.open("rb") as stream:
+            while read < size:
+                line = stream.readline(MAX_ITEM_BYTES + 1)
+                if not line:
+                    break
+                read += len(line)
+                if len(line) > MAX_ITEM_BYTES:
+                    while line and not line.endswith(b"\n"):             # the rest of a line too long to read
+                        line = stream.readline(MAX_ITEM_BYTES + 1)
+                        read += len(line)
+                    continue
+                if b'"event_msg"' not in line:
+                    continue
+                try:
+                    event = _json(line.decode("utf-8"))
+                except UnicodeError:
+                    continue
+                payload = event.get("payload") if isinstance(event, dict) and event.get("type") == "event_msg" else None
+                if not isinstance(payload, dict):
+                    continue
+                if not anchored:
+                    anchored = payload.get("type") == "task_complete" and payload.get("turn_id") == turn_id
+                elif payload.get("type") == "user_message" and _OURS not in line:
+                    return LATER_MESSAGE
+    except (OSError, ValueError):
+        return UNREADABLE
+    return NOTHING_LATER if anchored else NO_ANCHOR

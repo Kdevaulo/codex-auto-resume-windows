@@ -539,7 +539,7 @@ class HistoryMixin:
                 self._after(chain, turn["rollout_ordinal"])[1]).fetchone()[0])
         completed = turn["completed_at"]
         return {
-            "found": True,
+            "found": True, "ordinal": turn["rollout_ordinal"],     # across a split (rollout.SPAN): Rescan's anchor
             "status": _turn_status(turn["status"]),
             "completed_at": completed if epoch(completed) else None,
             "progress": any(counts.get(kind, 0) > 0 for kind in PROGRESS_ITEM_TYPES),
