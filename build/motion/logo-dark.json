@@ -8,5 +8,6 @@
   "state": "watching",
   "budget": {
     "cap": 2000000
-  }
+  },
+  "step_ms": 25
 }

@@ -43,16 +43,43 @@ class LogoFrameTests(unittest.TestCase):
         self.assertGreater(motion_logo.logo_rim(True), 0.0)
         self.assertEqual(motion_logo.logo_rim(False), 0.0)
 
-    def test_it_is_one_cycle_of_the_icon_s_own_watching_schedule(self):
-        import make_screenshots
+    def test_it_samples_the_icon_s_own_curve_every_25_ms_through_one_whole_loop(self):
+        """The owner, 2026-10-18: the logo is not the tray, so the tray's 156 ms step does not bind it - the same
+        curve, sampled at 30 frames a second or finer. A logo drawn at the tray's steps again fails here."""
         import make_social
         cycle = motion_logo.cycle("watching")
-        self.assertEqual([delay for delay, _scene, _picture in self.light], [delay for delay, _p, _l in cycle])
-        shown = make_screenshots.icon_timeline("watching", 0.0, make_social.watching_loop_ms())
-        self.assertEqual(len(cycle), len(shown), "every frame the icon's timer shows, none merged or dropped")
-        self.assertEqual(sum(delay for delay, _p, _l in cycle), make_social.watching_loop_ms())
+        delays = [delay for delay, _angle, _dim in cycle]
+        self.assertLessEqual(max(delays), 33, "coarser than thirty frames a second")
+        self.assertEqual(set(delays), {motion_logo.STEP_MS})
+        self.assertEqual(sum(delays), make_social.watching_loop_ms(), "one whole loop: it repeats without a seam")
+        self.assertEqual([delay for delay, _scene, _picture in self.light], delays)
         self.assertIn("sweep", {scene for _delay, scene, _picture in self.light})
-        self.assertGreater(len({picture for _delay, _scene, picture in self.light}), 10, "the head moves")
+        self.assertGreater(len({picture for _delay, _scene, picture in self.light}), len(delays) // 3,
+                           "the head moves far more often than at the tray's steps")
+
+    def test_each_sample_is_the_icon_s_breath_and_sweep_at_that_moment(self):
+        from codex_auto_resume import brand
+        from codex_auto_resume.ui import tray
+        rest, top = brand.ICON_SHAPE["arc_end"], tray.ICON_MOTION["levels"] - 1
+        colour = tray.icon_head_colour("watching")
+        seen = {"breath": 0, "sweep": 0}
+        for index, (_delay, angle, dim) in enumerate(motion_logo.cycle("watching")):
+            at = index * motion_logo.STEP_MS
+            turn = tray.icon_turn("watching", at)
+            if turn is not None:
+                self.assertAlmostEqual(angle, rest - turn)
+                self.assertEqual(dim, 0.0, "it sweeps at full colour, as the icon does")
+                seen["sweep"] += turn > 0
+                continue
+            position, level = tray.icon_frame("watching", at, at)
+            self.assertEqual((angle, position), (rest, 0))
+            stepped, smooth = tray.icon_level_colour(colour, level), motion_logo.tint(colour, dim)
+            spread = max(abs(a - b) for a, b in zip(tray.icon_level_colour(colour, 0), colour)) / float(top)
+            self.assertTrue(all(abs(a - b) <= spread + 1 for a, b in zip(stepped, smooth)),
+                            "the tint is the tray's own level, unrounded")
+            seen["breath"] += 1
+        self.assertGreater(seen["sweep"], 100)
+        self.assertGreater(seen["breath"], 400)
 
     def test_only_the_icon_s_head_moves_and_the_rim_and_corners_stay(self):
         from codex_auto_resume import brand
@@ -88,7 +115,8 @@ class LogoFrameTests(unittest.TestCase):
         for name, dark in (("logo-light", False), ("logo-dark", True)):
             with self.subTest(name):
                 given = make_motion.load(name)
-                self.assertEqual((given["kind"], given["size"], given["dark"]), ("logo", 192, dark))
+                self.assertEqual((given["kind"], given["size"], given["dark"], given["step_ms"]),
+                                 ("logo", 192, dark, motion_logo.STEP_MS))
                 self.assertEqual(given["budget"], {"cap": 2000000}, "quality first: a ceiling, no target")
 
     def test_what_the_logo_is_made_from_moves_with_the_icon_s_drawing_and_motion(self):
