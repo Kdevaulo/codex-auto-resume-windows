@@ -188,7 +188,22 @@ class EvidenceTests(RescanCase):
     def test_a_turn_with_no_message_of_a_persons_is_no_evidence(self):
         row = self.failure()
         self.person(user_text=None)
-        self.assertEqual(self.outcome(self.run_rescan(), row["interruption_id"])[0], "unresolved")
+        self.assertEqual(self.outcome(self.run_rescan(), row["interruption_id"]), ("unresolved", "latest_turn_changed"),
+                         "passed over as no person's turn, not left as one whose message is still to come")
+
+    def test_a_turn_a_marker_free_continuation_of_ours_started_is_no_evidence(self):
+        """Own continuations excluded by every proof a record holds - the client id of one sent with no marker too,
+        which carries no marker prefix to be known by."""
+        row = self.failure()
+        sibling = dict(row, interruption_id="e" * 64, turn_id="0a1b2c3d-0039-7000-8000-0000000000ee",
+                       ordinal=row["ordinal"] - 1)
+        self.register(sibling)
+        client = ids.continuation_client_id("e" * 64)
+        self.write("UPDATE interruptions SET recovery_client_id=? WHERE interruption_id=?", client, "e" * 64)
+        self.control.cancel_interruption("e" * 64)
+        self.person(user_text="carry on", client_id=client)
+        result = self.run_rescan()
+        self.assertEqual(self.outcome(result, row["interruption_id"]), ("unresolved", "latest_turn_changed"))
 
     def test_a_turn_still_starting_is_no_evidence(self):
         row = self.failure()
