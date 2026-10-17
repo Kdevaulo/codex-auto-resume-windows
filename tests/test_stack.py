@@ -210,7 +210,7 @@ ITEM = {_q(name): item for item, names in {
                  "win.powerdown",
                  # v0.6.15-beta: which folder a path names, whatever its spelling.
                  "win.folderid",
-                 "pwsh", "shortcut", "startup"),
+                 "pwsh", "shortcut", "startup", "addremove"),
     "config": ("", "config", "logbook"),
 }.items() for name in names}
 

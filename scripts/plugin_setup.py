@@ -38,7 +38,7 @@ EXIT_ERROR = 1
 EXIT_UNCONFIRMED = 2
 
 sys.path.insert(0, str(PLUGIN_ROOT / "src"))
-from codex_auto_resume import config, control, edition, l10n, startup # noqa: E402
+from codex_auto_resume import addremove, config, control, edition, l10n, startup # noqa: E402
 from codex_auto_resume.app import App                        # noqa: E402
 
 
@@ -279,7 +279,18 @@ def cmd_setup(args) -> int:
         startup.install_protocol(notification_command(home))
     except startup.StartupError:
         pass
-    started = start_watcher(home)
+    # The entry in Add or remove programs, where the installer has kept an uninstaller for it to name.
+    try:
+        addremove.register(home, edition.name().value, config.version(),
+                           addremove.display_name(config.PROJECT_ROOT / config.PLUGIN_MANIFEST))
+    except startup.StartupError:
+        pass
+    # v0.6.16: an update starts again what it stopped, and nothing the person had turned off. The installer says
+    # --watcher-was-stopped when no watcher of this installation ran before it; the watcher is then started only
+    # where it would run at the next sign-in anyway. A first installation, and every other repair, starts it as before.
+    left_stopped = (keep_state and getattr(args, "watcher_was_stopped", False)
+                    and not control.Control(config.Paths(home)).startup_enabled())
+    started = "left-stopped" if left_stopped else start_watcher(home)
     say("ready_title")
     print()
     say("ready_defaults")
@@ -290,14 +301,14 @@ def cmd_setup(args) -> int:
     if incomplete:
         say("setup_incomplete")
     else:
-        say("setup_done" if confirmed else "setup_unconfirmed")
+        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else "setup_unconfirmed")
     if register_startup:
         say("setup_autostart")
     print()
     print("state: %s" % home)
     if incomplete:
         return EXIT_ERROR
-    return EXIT_OK if confirmed else EXIT_UNCONFIRMED
+    return EXIT_OK if confirmed or left_stopped else EXIT_UNCONFIRMED
 
 
 def cmd_enable(args) -> int:
@@ -452,6 +463,20 @@ def cmd_uninstall(args) -> int:
     return EXIT_OK
 
 
+def cmd_remove_entry(args) -> int:
+    """Take this installation's entry in Add or remove programs and the uninstaller kept for it away. What a
+    hand-over to a version that knows neither runs first, so it leaves neither behind."""
+    home = runtime_home()
+    try:
+        removed = addremove.unregister(home)
+    except startup.StartupError as exc:
+        print("entry: failed %s" % exc)
+        return EXIT_ERROR
+    kept = addremove.remove_kept(home)
+    print("entry: removed" if removed or kept else "entry: none")
+    return EXIT_OK
+
+
 def cmd_downgrade_state(args) -> int:
     """For Install another version... (the bootstrap's -Pick): the state converted for an older
     release, the watcher asked to stop and waited for first, and one line saying what was done
@@ -480,6 +505,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "sign-in autostart that is not already there")
     p.add_argument("--edition-from", choices=edition.EDITIONS, metavar="EDITION",
                    help="the edition the installer replaced (standard or advanced)")
+    p.add_argument("--watcher-was-stopped", action="store_true",
+                   help="with --keep-state: no watcher ran before the update, so it is started only where it "
+                        "runs at sign-in")
     sub.add_parser("status")
     sub.add_parser("pending")
     sub.add_parser("enable")
@@ -494,6 +522,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("uninstall", help="remove the watcher, autostart and registrations")
     p.add_argument("--purge", action="store_true",
                    help="also delete settings, pending recoveries and logs")
+    sub.add_parser("remove-entry", help="remove the Add or remove programs entry and the uninstaller kept for it")
     p = sub.add_parser("logs")
     p.add_argument("-n", "--lines", type=int, default=30)
     p = sub.add_parser("downgrade-state", help="convert the state for an older release (v0.6.0 to v0.6.14)")
@@ -509,7 +538,7 @@ COMMANDS = {
     "setup": cmd_setup, "status": cmd_status, "pending": cmd_pending, "enable": cmd_enable,
     "disable": cmd_disable, "cancel": cmd_cancel, "uninstall": cmd_uninstall,
     "verify-home": cmd_verify_home,
-    "claim-home": cmd_claim_home, "downgrade-state": cmd_downgrade_state,
+    "claim-home": cmd_claim_home, "downgrade-state": cmd_downgrade_state, "remove-entry": cmd_remove_entry,
     "stop": passthrough("stop"), "doctor": passthrough("doctor"), "logs": passthrough("logs"),
 }
 

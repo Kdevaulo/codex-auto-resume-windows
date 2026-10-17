@@ -306,6 +306,7 @@ class SourceTests(unittest.TestCase):
             "BuildOwnValue.unitCombo",      # the Custom... dialog's own unit
             "BuildStatistics.period",       # how far back the Statistics page counts: no setting, never kept
             "PowerCombo.combo",             # v0.6.12: the power action's four rows - an act, armed by its button, no setting
+            "BuildWelcome.picker",          # v0.6.16: the installer window's language, by its endonym - never kept
         ]))
         # main has no Korean documents, and the generated ko branch writes GUIDE.md in Korean.
         english = ("### Values of your own", "**Period** on the Statistics page")

@@ -815,6 +815,11 @@ class UninstallRegistrationFailureTests(unittest.TestCase):
         source = VOICE + block(text, "function Quote-Argument", "function Invoke-Setup")
         source += ("\nfunction Fail { param([string]$m) "
                    "$script:Failed = $true; Write-Host $m }\n")
+        # The branch ends by removing the entry in Add or remove programs; here there is none, and the two
+        # calls into the registry are stood in for, so the real one is never asked.
+        source += block(text, "function Remove-OwnUninstallEntry", "function Write-CopyJournal")
+        source += ("\nfunction Read-UninstallEntry { param([string]$Name) return $null }\n"
+                   "function Remove-UninstallEntry { param([string]$Name) throw 'the registry was asked' }\n")
         script = ("$OwnedHome = %s\n$InstallHome = $OwnedHome\n"
                   "$AppDir = Join-Path $OwnedHome app\n$RunDir = Join-Path $OwnedHome runtime\n"
                   "$PluginCacheRoot = Join-Path $OwnedHome cache\n"

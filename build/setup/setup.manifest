@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity version="1.0.0.0" name="CodexAutoResume.Setup" />
+  <!-- Per-monitor DPI, as the settings window's own manifest says it (gui/app.manifest): its window is sharp at
+       every scaling, and drawn at the size the window's controls measure themselves in. -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">permonitorv2,permonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
   <!-- Runs as the signed-in user: no elevation, ever. The installer it hands over to needs none. -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>

@@ -13,12 +13,16 @@
 //      already there, a junction included, and held open so it cannot be swapped while it is used - and unpacks
 //      the archive into it, refusing any entry that would land anywhere else. A long temporary folder does not
 //      stop it: the files are written by their \\?\ names, which have no 260-character limit;
-//   5. runs that archive's own Install.cmd by its full path, in that folder, as a double-click in Explorer runs
-//      it: the same installer, asking the same questions in this same console, with the arguments given here
-//      passed on;
-//   6. removes the folder, and ends with Install.cmd's exit code. Closing the console window ends a console
-//      program a few seconds after Windows tells it so, and ends Install.cmd with it: the folder is removed in
-//      those seconds, so a window closed at Install.cmd's last "Press any key" leaves nothing behind either.
+//   5. runs that archive's own Install.cmd by its full path, in that folder, with the arguments given here passed
+//      on, and with no window of its own (CREATE_NO_WINDOW): what it prints is passed on to this program's own
+//      output, byte for byte, or read line by line by the window below;
+//   6. removes the folder, and ends with Install.cmd's exit code.
+// Double-clicked it is a window (v0.6.16, SetupWindow, gui/InstallerWindow.cs): the product's own installer
+// window, which says what it installs, asks what Install.cmd would ask - and only that - and shows how far
+// install.ps1 is from the lines it prints, then whether it finished and with which code, and its log. It is a
+// Windows program, so no console window opens at all; the window answers for Install.cmd, which it runs with
+// -Silent. With -Silent on its own command line (winget, a script) there is no window and nothing is asked:
+// it does what it did before v0.6.16, and ends with the same exit codes.
 // No network, no administrator rights (its manifest asks for none) and no Python of its own: the archive
 // carries the Python the installer uses.
 //
@@ -32,7 +36,8 @@
 // folder that is already there.
 //
 // Its own messages are in English, as Install.cmd's and the installer's are: it runs before anything of the
-// product is on the machine, and hands over to that installer within a second.
+// product is on the machine. The window speaks the product's languages, from the catalogs in the archive it
+// carries.
 //
 // C# 5 only: this is compiled by the in-box csc (build/make_setup.py).
 using System;
@@ -65,25 +70,35 @@ namespace CodexAutoResumeSetup
         internal const int NoFolder = 44;
         internal const int NotUnpacked = 45;
         internal const int NotStarted = 46;
+        internal const int Cancelled = 47;
     }
 
     internal static class Program
     {
         // First of all, before anything loads a DLL: DLLs from System32 alone, or nothing runs. The rest is in a
-        // method of its own, so compiling this one loads nothing more.
+        // method of its own, so compiling this one loads nothing more. A single-threaded apartment, for the window.
+        [STAThread]
         static int Main(string[] arguments)
         {
             if (!Dlls.FromSystem32Only())
             {
-                return Say.Stopped(Codes.Unguarded, Dlls.Unguarded, !Hook(arguments));
+                return Say.Stopped(Codes.Unguarded, Dlls.Unguarded, Waits(arguments));
             }
             string config = Dlls.ConfigBeside();
             if (config != null)
             {
                 return Say.Stopped(Codes.Configured, string.Format(CultureInfo.InvariantCulture, Dlls.Configured,
-                                                                   config), !Hook(arguments));
+                                                                   config), Waits(arguments));
             }
             return Started(arguments, Hook(arguments));
+        }
+
+        // Whether a stop is told to someone who waits for it - in a message box, where there is no console, or
+        // with Enter, alone in a console of its own: not under a test's hook, and not with -Silent, which is what
+        // a caller that has no one to tell passes (winget, a script). It is also whether there is a window.
+        static bool Waits(string[] arguments)
+        {
+            return !Hook(arguments) && !Passed.Silent(arguments);
         }
 
         // A test's hook, which never waits for Enter: every one begins with two hyphens, and nothing Install.cmd
@@ -96,18 +111,21 @@ namespace CodexAutoResumeSetup
         [MethodImpl(MethodImplOptions.NoInlining)]
         static int Started(string[] arguments, bool hook)
         {
+            bool wait = !hook && !Passed.Silent(arguments);
             bool modules = arguments.Length == 1 && arguments[0] == "--loaded-modules";
             string into = arguments.Length == 2 && arguments[0] == "--unpack-into" ? arguments[1] : null;
             if (hook ? !(modules || (into != null && Passed.Name(into))) : !Passed.Acceptable(arguments))
             {
-                return Say.Stopped(Codes.Arguments, Passed.Refused, !hook);
+                return Say.Stopped(Codes.Arguments, Passed.Refused, wait);
+            }
+            if (wait)
+            {
+                return Windowed(arguments);
             }
             byte[] archive = Carried.Read();
             if (archive == null)
             {
-                return Say.Stopped(Codes.Damaged, "This setup program stops here: the archive it carries is not the " +
-                                   "one it was built with (its SHA-256 differs). The file is damaged - download it " +
-                                   "again.", !hook);
+                return Say.Stopped(Codes.Damaged, Damaged, wait);
             }
             // Before the folder is made, so a console window closed at any moment after it finds it removed.
             Closing.Watch();
@@ -116,7 +134,7 @@ namespace CodexAutoResumeSetup
                                          out reason);
             if (folder == null)
             {
-                return Say.Stopped(Codes.NoFolder, reason, !hook);
+                return Say.Stopped(Codes.NoFolder, reason, wait);
             }
             try
             {
@@ -133,13 +151,13 @@ namespace CodexAutoResumeSetup
                 }
                 if (failed != null)
                 {
-                    return Say.Stopped(Codes.NotUnpacked, "This setup program stops here: " + failed, !hook);
+                    return Say.Stopped(Codes.NotUnpacked, "This setup program stops here: " + failed, wait);
                 }
                 if (modules)
                 {
                     Say.Raw(Json.Array(Loaded()) + "\n");
                 }
-                return hook ? 0 : Install(folder.Path, arguments);
+                return hook ? 0 : Install(folder.Path, arguments, null);
             }
             finally
             {
@@ -161,30 +179,105 @@ namespace CodexAutoResumeSetup
             }
         }
 
+        const string Damaged = "This setup program stops here: the archive it carries is not the one it was built " +
+                               "with (its SHA-256 differs). The file is damaged - download it again.";
+
+        // The window: the archive checked as above, then SetupWindow asks what Install.cmd would ask and runs
+        // InstallFrom with the answers, which are Install.cmd's own switches and -Silent.
+        static int Windowed(string[] arguments)
+        {
+            byte[] archive = Carried.Read();
+            if (archive == null)
+            {
+                return Say.Stopped(Codes.Damaged, Damaged, Waits(arguments));
+            }
+            return SetupWindow.Run(archive, arguments, delegate(IList<string> switches, Action<string> heard,
+                                                                Action<double> unpacked)
+            {
+                return InstallFrom(archive, switches, heard, unpacked);
+            });
+        }
+
+        // What Started does with the archive, for the window: a fresh folder, the archive unpacked into it - its
+        // share of the bar entry by entry - Install.cmd run there with `switches`, each line it prints `heard`, and
+        // the folder removed. The window is not closed while Install.cmd runs (InstallerWindow.OnFormClosing).
+        static int InstallFrom(byte[] archive, IList<string> switches, Action<string> heard, Action<double> unpacked)
+        {
+            string reason;
+            Folder folder = Folder.Fresh("CodexAutoResume-Setup-" + Guid.NewGuid().ToString("N").Substring(0, 16),
+                                         out reason);
+            if (folder == null)
+            {
+                heard(reason);
+                return Codes.NoFolder;
+            }
+            try
+            {
+                heard("Codex Auto Resume setup: unpacking " + Embedded.Archive + " into " + folder.Path);
+                string failed = Unpacking.Into(archive, folder.Path, delegate(int done, int total)
+                {
+                    unpacked(total > 0 ? (double)done / total : 1.0);
+                });
+                if (failed != null)
+                {
+                    heard("This setup program stops here: " + failed);
+                    return Codes.NotUnpacked;
+                }
+                return Install(folder.Path, switches, heard);
+            }
+            finally
+            {
+                // What Install.cmd started may hold a file a moment longer than Install.cmd itself.
+                bool removed = folder.Remove();
+                for (int tries = 0; !removed && tries < 10; tries++)
+                {
+                    Thread.Sleep(300);
+                    removed = folder.Remove();
+                }
+                if (!removed)
+                {
+                    heard("The temporary folder " + folder.Path + " could not be removed completely. It holds only " +
+                          "an unpacked copy of " + Embedded.Archive + ", and can be deleted.");
+                }
+            }
+        }
+
         // Install.cmd as Explorer runs a double-clicked one - cmd.exe /c with the script's full path, in the
         // script's folder - from System32 by its full path, with /d so no AutoRun command of the machine's runs
-        // first and moves it elsewhere. It shares this console: the person answers its questions here. Ctrl+C
-        // is Install.cmd's to answer, so this program outlives it and still removes the folder
-        // (Closing.OutliveCtrlC). Closing the console window is not anyone's to answer: it ends Install.cmd, and
-        // this program waits a moment for that and goes on to remove the folder (Closing).
-        static int Install(string folder, string[] arguments)
+        // first and moves it elsewhere. This is a Windows program, with no console to share, so cmd.exe gets a
+        // console of its own that has no window (CREATE_NO_WINDOW) and nothing to read: what it and the installer
+        // print comes back through pipes, and goes on to this program's own output byte for byte - or, for the
+        // window, line by line to `heard`. Ctrl+C, where a console is there to press it in, is Install.cmd's to
+        // answer, so this program outlives it and still removes the folder (Closing.OutliveCtrlC).
+        static int Install(string folder, IList<string> arguments, Action<string> heard)
         {
             string script = Path.Combine(folder, "Install.cmd");
             if (!File.Exists(script))
             {
-                return Say.Stopped(Codes.NotStarted, "This setup program stops here: the archive it carries has no " +
-                                   "Install.cmd.", true);
+                const string none = "This setup program stops here: the archive it carries has no Install.cmd.";
+                if (heard != null)
+                {
+                    heard(none);
+                }
+                return Say.Stopped(Codes.NotStarted, none, heard == null && !Passed.Silent(arguments));
             }
             ProcessStartInfo start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"));
             start.Arguments = "/d /s /c \"\"" + script + "\"" +
-                              (arguments.Length > 0 ? " " + string.Join(" ", arguments) : "") + "\"";
+                              (arguments.Count > 0 ? " " + string.Join(" ", arguments) : "") + "\"";
             start.WorkingDirectory = folder;
             start.UseShellExecute = false;
+            start.CreateNoWindow = true;
+            start.RedirectStandardInput = true;
+            start.RedirectStandardOutput = true;
+            start.RedirectStandardError = true;
             Closing.OutliveCtrlC();
             try
             {
                 using (Process run = Process.Start(start))
                 {
+                    run.StandardInput.Close();
+                    Thread output = Pass(run.StandardOutput.BaseStream, false, heard);
+                    Thread errors = Pass(run.StandardError.BaseStream, true, heard);
                     while (!run.WaitForExit(200))
                     {
                         if (Closing.Now)
@@ -193,16 +286,61 @@ namespace CodexAutoResumeSetup
                             break;
                         }
                     }
-                    // Not exited only when the window was closed and Windows is about to end this program: the code
-                    // reaches no one then.
+                    if (run.HasExited)
+                    {
+                        output.Join(5000);
+                        errors.Join(5000);
+                    }
+                    // Not exited only when the console was closed and Windows is about to end this program: the
+                    // code reaches no one then.
                     return run.HasExited ? run.ExitCode : Codes.NotStarted;
                 }
             }
             catch (Win32Exception error)
             {
-                return Say.Stopped(Codes.NotStarted, "This setup program stops here: Install.cmd could not be " +
-                                   "started (" + error.Message + ").", true);
+                string said = "This setup program stops here: Install.cmd could not be started (" + error.Message + ").";
+                if (heard != null)
+                {
+                    heard(said);
+                }
+                return Say.Stopped(Codes.NotStarted, said, heard == null && !Passed.Silent(arguments));
             }
+        }
+
+        // What Install.cmd prints, on a thread of its own: on to this program's output or error, byte for byte,
+        // or to `heard` line by line, read as the UTF-8 it is written in (Install.cmd sets code page 65001, and
+        // install.ps1 its output encoding).
+        static Thread Pass(Stream from, bool error, Action<string> heard)
+        {
+            Thread pump = new Thread(delegate()
+            {
+                try
+                {
+                    if (heard == null)
+                    {
+                        using (Stream to = error ? Console.OpenStandardError() : Console.OpenStandardOutput())
+                        {
+                            from.CopyTo(to);
+                        }
+                        return;
+                    }
+                    using (StreamReader reader = new StreamReader(from, new UTF8Encoding(false)))
+                    {
+                        string line;
+                        while ((line = reader.ReadLine()) != null)
+                        {
+                            heard(line);
+                        }
+                    }
+                }
+                catch (IOException)
+                {
+                    // Nobody reads this program's output any more: Install.cmd goes on all the same.
+                }
+            });
+            pump.IsBackground = true;
+            pump.Start();
+            return pump;
         }
 
         static List<string> Loaded()
@@ -275,6 +413,19 @@ namespace CodexAutoResumeSetup
         internal const string Refused =
             "This setup program stops here: it passes on to Install.cmd only switches and plain words - letters, " +
             "digits and hyphens, such as -SkipStartup - and was given something else.";
+
+        // -Silent, as Install.cmd and Uninstall.cmd read it: nothing is asked and nothing waits for a key.
+        public static bool Silent(IEnumerable<string> arguments)
+        {
+            foreach (string argument in arguments)
+            {
+                if (string.Equals(argument, "-Silent", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         public static bool Acceptable(string[] arguments)
         {
@@ -482,7 +633,9 @@ namespace CodexAutoResumeSetup
     // release's own archive has none of these; this is so that no archive could.
     internal static class Unpacking
     {
-        public static string Into(byte[] archive, string folder)
+        // Telling `done`, where there is one, how many of the archive's entries are unpacked of how many, as it goes:
+        // the window's bar (SetupWindow).
+        public static string Into(byte[] archive, string folder, Action<int, int> done)
         {
             string root = Path.GetFullPath(folder).TrimEnd('\\') + "\\";
             int files = 0;
@@ -490,8 +643,13 @@ namespace CodexAutoResumeSetup
             {
                 using (ZipArchive zip = new ZipArchive(new MemoryStream(archive, false), ZipArchiveMode.Read))
                 {
+                    int entries = zip.Entries.Count, seen = 0;
                     foreach (ZipArchiveEntry entry in zip.Entries)
                     {
+                        if (done != null)
+                        {
+                            done(seen++, entries);
+                        }
                         string name = entry.FullName;
                         bool directory = name.EndsWith("/", StringComparison.Ordinal);
                         if (!Plain(directory ? name.Substring(0, name.Length - 1) : name))
@@ -540,7 +698,16 @@ namespace CodexAutoResumeSetup
             {
                 return "the archive could not be unpacked (" + error.Message + ").";
             }
+            if (done != null && files > 0)
+            {
+                done(1, 1);
+            }
             return files > 0 ? null : "the archive it carries is empty.";
+        }
+
+        public static string Into(byte[] archive, string folder)
+        {
+            return Into(archive, folder, null);
         }
 
         static bool Plain(string name)
@@ -670,9 +837,9 @@ namespace CodexAutoResumeSetup
         }
     }
 
-    // The console: what this program says, and whether it has to wait before the window closes. A double-click
-    // gives a console program a window of its own that closes the moment it ends, so a message it stops with
-    // waits for Enter there - and only there: in a console someone else opened, or for a test, it does not.
+    // What this program says, and whether someone has to read it before it ends. Double-clicked it has no console
+    // (it is a Windows program), so a message it stops with is shown in a message box; alone in a console of its
+    // own it would wait for Enter there; in a console someone else opened, for a test or with -Silent, neither.
     internal static class Say
     {
         [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
@@ -695,10 +862,16 @@ namespace CodexAutoResumeSetup
         public static int Stopped(int code, string text, bool wait)
         {
             Console.Error.WriteLine(text);
-            if (wait && GetConsoleProcessList(new uint[2], 2) == 1)
+            uint processes = GetConsoleProcessList(new uint[2], 2);
+            if (wait && processes == 1)
             {
                 Console.Error.WriteLine("Press Enter to close this window.");
                 Console.In.ReadLine();
+            }
+            else if (wait && processes == 0)
+            {
+                // A Windows program with no console, double-clicked: a message box is where it is read.
+                SetupWindow.Tell(text);
             }
             return code;
         }

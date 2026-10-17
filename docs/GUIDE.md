@@ -101,12 +101,40 @@ The setup program is the release archive of [From the release archive](#from-the
 in one file. It carries that archive byte for byte, with the archive's SHA-256 beside it. When you
 start it, it checks the archive against that digest and stops if they differ, unpacks it into a new
 folder of its own in your temporary folder, runs the archive's own `Install.cmd` there - the same
-installer, asking the same questions in the same console window, and ending the same way - and then
-removes that folder. It downloads nothing, needs no administrator rights and brings no Python of its
+installer - and then removes that folder. From v0.6.16 it does this in a window of its own, in the
+Dashboard's look and in your Windows language (you can pick another): it says what it installs, which
+edition and version, and where; asks only what the installer has a choice about - whether to run at
+Windows sign-in on a first installation, and whether to change the edition when the other one is
+installed - shows how far the installer is and which step it is on, and ends by saying whether it
+finished, with the installer's exit code and its log, and offers to open the Dashboard. Run where its own
+version is installed already, it first offers Repair, which installs it again in place and keeps your settings,
+everything waiting and the sign-in choice, or Remove, the uninstall with its question about the settings and the
+recovery history; a newer version updates as before, and `-Silent` asks neither. No console window
+opens. When it updates an installation whose Dashboard is open, it asks that Dashboard to close and opens it again
+on the new version where it was, as it starts the watcher again; a Dashboard with unsaved Settings changes keeps
+them and stays open, on the previous version until you open it again. With `-Silent` it does the same. It downloads nothing, needs no administrator rights and brings no Python of its
 own: the installation runs on the Python inside the archive. It loads DLLs from Windows' System32
 folder only, so a DLL lying beside it in Downloads is never loaded, and it stops if a `.config` file
 is beside it. Started from a command line, it passes switches such as `-SkipStartup` on to
 `Install.cmd`, and refuses anything but switches and plain words.
+
+From v0.6.16, `-Silent` installs without a question and without waiting for a key:
+`CodexAutoResume-Setup-vX.Y.Z.exe -Silent`, which is how `winget` runs it. Nothing else changes: it prints what
+it prints and ends with the exit code it ends with otherwise (0 done, 1 stopped, 14 when the other edition is
+installed, in which case nothing is changed, since nobody can be asked). It is a Windows program rather than a
+console one, so that no console window opens when it is double-clicked, and PowerShell does not wait for a Windows
+program it only starts: there, in the folder it is in, run `cmd /c .\CodexAutoResume-Setup-vX.Y.Z.exe -Silent`,
+which waits, shows its lines and leaves its exit code in `$LASTEXITCODE`. `winget`, a `.cmd` script and `cmd /c` wait for it as they are. The
+same switch works on the archive's `Install.cmd` and `Uninstall.cmd`, and the setup program does not wait for Enter
+when it stops.
+
+From v0.6.16 an installation also appears in Windows' Settings > Apps and in `winget list`, as *Codex Auto Resume*
+(*Codex Auto Resume Advanced* for the advanced edition), for your Windows user only. Its Uninstall button runs the
+uninstaller the installer keeps in `%USERPROFILE%\.codex-auto-resume\uninstall\`, the same one as `Uninstall.cmd`, in
+the same installer window: it asks whether to delete the settings and the recovery history too, and shows the
+removal as it goes. `winget uninstall` runs the same uninstaller with `-Silent`, with no window.
+A change of edition replaces the entry with the other edition's, and an update rewrites it. An installation placed
+elsewhere with `CODEX_AUTO_RESUME_PLUGIN_HOME` gets neither the kept uninstaller nor an entry.
 
 It is not code-signed (see the end of [From the release archive](#from-the-release-archive)), so
 SmartScreen may show *Windows protected your PC* when you start it. Choose **More info**, then
@@ -206,7 +234,13 @@ and the Dashboard's Diagnostics says so too until the copy is replaced. `Uninsta
 Codex to remove it, removes it; see [Uninstall](#uninstall) for what each route leaves behind.
 
 **Check for updates**, on the Dashboard's Diagnostics page, asks GitHub whether a newer release has
-been published and offers to install it. From v0.6.11 it also looks for a newer *pre-release*: an
+been published and offers to install it. From v0.6.16 the install runs in the setup program's window: once the
+download is checked it shows the version it goes from and to and what is new in it, read from that download, and
+installs only when you press **Update** (**Not now** installs nothing); then it shows how far it is and its log, and
+"Updated to" with the first lines of what is new. Everything that ran before then runs again on the new version by
+itself: the watcher - unless you had stopped it and it does not run at sign-in - with its notification-area icon,
+and this Dashboard, which opens again in the new version. An update with `-Silent` starts the watcher again the same
+way, and opens no window. From v0.6.11 it also looks for a newer *pre-release*: an
 `-alpha` or `-beta` build published before its release is finished, and tested less than a release.
 When there is one newer than both the version you have and the newest release, and no release to
 offer first, it asks whether to install it - and **Not now** is the button Enter presses. Saying yes
@@ -1514,7 +1548,10 @@ error logs; `logs\launcher.log` and `logs\codex-start.log` stay), so reinstallin
 removes its Windows registrations and the plugin, and keeps your settings and pending
 recoveries unless you ask it to delete them too; it leaves the installation folder, which still
 holds the program files, for you to delete. `Uninstall.cmd` also removes this product's
-marketplace from Codex while it still points at this installation.
+marketplace from Codex while it still points at this installation. From v0.6.16 it, and Settings > Apps and
+`winget uninstall` with it (`-Silent` for no questions), also remove the installation's entry in Add or remove
+programs and the uninstaller kept for it - each only while it names this installation; an entry of that name that
+names another is left as it is.
 
 From a source checkout, the same command-line tool also deletes this tool's own state and logs
 (`--keep-logs` keeps the logs; `--keep-state` keeps settings and pending recoveries):

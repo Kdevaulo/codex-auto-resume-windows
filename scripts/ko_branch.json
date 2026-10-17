@@ -42,6 +42,7 @@
   "intentionally_english": {
     "LICENSE": "The authoritative licence text. A translation would be a second licence.",
     "skills/codex-auto-resume/SKILL.md": "Instructions Codex reads to operate the plugin, not prose a person reads. Translating it would make the two branches behave differently, which is exactly what generating ko from main exists to prevent.",
+    "docs/WINGET.md": "A maintainer's note on submitting the winget manifests, read by the one person who submits them, who reads English; the files it describes are English.",
     ".github/GENERATED-BRANCH.md": "Written by the generator, for maintainers, and only exists on ko."
   },
   "_reviewed_comment": [
@@ -70,11 +71,11 @@
     "docs/DEVELOPMENT.md": "e62cfbe43c855d5c87bfce8e0d69eba649f625f3f1d508818d8126de723b73de",
     "docs/PLUGIN.md": "e61e04ca4f08f01dc2e1ab89d8f443a2f6915b8ff38bbddce63900ddde42c945",
     "docs/VERIFY.md": "64c0d82d1101d02429707828e326dc29caed063d041b500ae5c88bbb9a0bc2e7",
-    "docs/FEATURE_MATRIX.md": "590d8bbf646a4b6521cf47842faf3fc7bab72d5eadb1f250e336dd836b7c6ed4",
+    "docs/FEATURE_MATRIX.md": "73a14524dd33443c386678229b0cadb7482216274534ccbb9e8c8c8261d3643d",
     "docs/LIVE_ACCEPTANCE.md": "0c7c71b31d40ac1a4af254808730f3dfe17d30713373fb84c8c97e237808e11f",
     "docs/ROADMAP.md": "22994c5fd1a8fac3b15f35cb4c4ff87055e22454869886b5135ea80eca234767",
-    "docs/GUIDE.md": "b2d60919aba0c91a9f6be614fa7e28af8654a2cb5413e56e16afe3f7685de3b2",
-    "docs/STANDARDS.md": "497908cb6975a1f5c444d1569059cbcb20e7277b6c4071f09e08d9fa3501bd75",
+    "docs/GUIDE.md": "f09dacdd98331fec84f6924c96d028e0c197235a12e24db2d0ca118f86cdc7fc",
+    "docs/STANDARDS.md": "5fb6c013e28a81b96f9fc5faefee87dc41129d212af40b7613624293170805d9",
     "docs/EDITIONS.md": "bda522b134c433a5ed623d93a82daa685165704188541598bdae0fe39a19a066"
   }
 }

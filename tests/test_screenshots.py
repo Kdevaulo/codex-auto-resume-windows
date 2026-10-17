@@ -2345,8 +2345,15 @@ class FasterRunTests(unittest.TestCase):
         # in one place; nothing the product runs names it.
         named = {path.name for path in guiscan.sources() if "CODEX_AR_STILL_READY" in path.read_text(encoding="utf-8")}
         self.assertEqual(named, {"SoftTheme.cs"})
-        setting = {path.name for path in guiscan.sources() if "EventWaitHandle" in path.read_text(encoding="utf-8")}
+        texts = {path.name: path.read_text(encoding="utf-8") for path in guiscan.sources()}
+        setting = {name for name, text in texts.items() if "EventWaitHandle.OpenExisting(Soft.StillReady)" in text}
         self.assertEqual(setting, {"DashboardData.cs"})
+        # One other file names a wait handle (v0.6.16): the update's close request, which the window only waits on.
+        # It is never set by the window, and it is never the capture's.
+        handles = {name for name, text in texts.items() if "EventWaitHandle" in text}
+        self.assertEqual(handles, {"DashboardData.cs", "WindowReopen.cs"})
+        self.assertNotIn("StillReady", texts["WindowReopen.cs"])
+        self.assertNotIn(".Set()", texts["WindowReopen.cs"])
         self.assertEqual([path for path in srcscan.package_files()
                           if "CODEX_AR_STILL_READY" in srcscan.read(path)], [])
 

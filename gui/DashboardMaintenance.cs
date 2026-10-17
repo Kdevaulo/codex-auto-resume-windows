@@ -207,6 +207,8 @@ namespace CodexAutoResume
         private const int UpdateAvailable = 10;
         private const int UpdateLocalNewer = 11;
         private const int UpdateUnavailable = 12;
+        // v0.6.16: the person put the update off on its Notes page (the bootstrap's -AskFirst, `update: later`).
+        private const int UpdateLater = 16;
         // One request against a redirect. An install downloads a release and runs the
         // installer over it, on whatever connection the machine has.
         private const int CheckMilliseconds = 120000;
@@ -280,6 +282,10 @@ namespace CodexAutoResume
 
         /// Runs the bootstrap to install one version - `-Update` for the release the check found, `-Version <v>` for the
         /// pre-release a person said yes to - and says how it went.
+        ///
+        /// v0.6.16: in the installer window (InstallerWindow), as a setup program installs: how far it is, from the
+        /// lines the bootstrap and the installer print (Heard), then whether it finished, with its code and its log -
+        /// and, where it did, "Open the Dashboard", which opens this installation's new Dashboard in place of this one.
         private void InstallUpdate(string root, string script, string flag, string version)
         {
             // Who is running now. `code_version` is no use for this: an old watcher reads the
@@ -287,27 +293,101 @@ namespace CodexAutoResume
             // they are replaced, so only a start time that moved says a watcher restarted.
             string before = WatcherIdentity();
             SetBusy(true);
+            // The installer's request to close (WatchForUpdate) is not this window's to answer while it runs its own.
+            updatingHere = true;
             diagUpdate.Text = S("diag.update_installing", "installing...");
+            string answer = "failed", from = null, to = null, detail = "", compatibility = null, prerelease = null;
+            string app = Path.Combine(root, "app");
+            string edition = InstallerFlow.EditionOfSource(Path.Combine(app, "src"));
+            var flow = new InstallerFlow(InstallerFlow.Update, root, edition, edition, version);
+            // v0.6.16, the owner: an update shows itself - from what to what, and what is new, before it installs.
+            flow.From = InstallerFlow.VersionOf(ReadText(Path.Combine(Path.Combine(app, ".codex-plugin"), "plugin.json")));
+            var words = new InstallerWords(strings, openedLanguage);
+            InstallerWindow window = null;
+            window = new InstallerWindow(flow, words, null,
+                delegate(InstallerFlow answered, Action<string> line, Action<double> unpacked)
+                {
+                    Heard = line;
+                    // The verified download's changelog, in the person's language where the archive carries it.
+                    Asked = delegate(string docs)
+                    {
+                        string file = InstallerNotes.FileFor(docs, words.Language);
+                        return window.Ask(InstallerNotes.Section(ReadText(file), version));
+                    };
+                    try
+                    {
+                        RunBootstrap(root, script, flag + " -AskFirst", UpdateMilliseconds,
+                                     out answer, out from, out to, out detail, out compatibility, out prerelease);
+                    }
+                    finally { Heard = null; Asked = null; }
+                    return answer == "installed" ? 0 : answer == "later" ? InstallerFlow.Later
+                         : answer == "running" ? InstallerFlow.StillRunning
+                         : answer == "incomplete" ? InstallerFlow.NotStarted : HeardCode == 0 ? 1 : HeardCode;
+                }, null, Font);
+            window.ShowDialog(this);
+            updatingHere = false;
+            if (answer == "later")
+            {
+                // Put off: the release is still there to install, as the check found it.
+                SetBusy(false);
+                diagUpdate.Text = UpdateFact("available", from, to);
+                return;
+            }
+            // v0.6.16, the owner: what ran before an update runs again on the new version by itself - this Dashboard
+            // too. The installer starts the watcher again (install.ps1, --watcher-was-stopped); the new Dashboard is
+            // opened here, and this one, the old version's, closes.
+            if (answer == "installed" && window.OpenDashboard && OpenNewDashboard(root))
+            {
+                Close();
+                return;
+            }
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
-                string answer, from, to, detail, compatibility, prerelease;
-                RunBootstrap(root, script, flag, UpdateMilliseconds,
-                             out answer, out from, out to, out detail, out compatibility, out prerelease);
                 Dictionary<string, object> live = CheckAfterRefresh(bridge, compatibility);
                 MethodInvoker finish = delegate
                 {
                     SetBusy(false);
                     ReportCompatibilityLine(compatibility, live);
                     if (answer == "installed") AfterUpdate(before, version, detail);
-                    else
-                    {
-                        diagUpdate.Text = UpdateFact(answer, from, to);
-                        ReportUpdate(answer, from, to, detail);
-                    }
+                    // The window has said what happened, with the log: the card keeps the one-line fact.
+                    else diagUpdate.Text = UpdateFact(answer, from, to);
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(finish); }
                 catch (Exception) { }
             });
+        }
+
+        /// The update's lines, for the installer window: told each line StartBootstrap reads while it is set, on the
+        /// worker the window runs the update on, and the bootstrap's exit code once it has ended (HeardCode).
+        [ThreadStatic] private static Action<string> Heard;
+        /// The update's question, with -AskFirst: told the changelog's folder of the verified download, it shows what is
+        /// new and answers whether to go on (InstallerWindow.Ask); the answer is written to the bootstrap's input.
+        [ThreadStatic] private static Func<string, bool> Asked;
+
+        private static string ReadText(string path)
+        {
+            try { return path != null && File.Exists(path) ? File.ReadAllText(path, new UTF8Encoding(false)).TrimStart('\uFEFF') : null; }
+            catch (Exception) { return null; }
+        }
+        [ThreadStatic] private static int HeardCode;
+
+        /// This installation's Dashboard, the new version the update has just put in place, started by its full path.
+        private static bool OpenNewDashboard(string root)
+        {
+            string exe = Path.Combine(root, "CodexAutoResumeSettings.exe");
+            if (!File.Exists(exe)) return false;
+            try
+            {
+                var start = new ProcessStartInfo(exe);
+                start.UseShellExecute = false;
+                start.WorkingDirectory = root;
+                Process.Start(start).Dispose();
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         /// The identity of the process holding the watcher's heartbeat, or null where there
@@ -363,7 +443,8 @@ namespace CodexAutoResume
             });
         }
 
-        /// Runs this installation's scripts/bootstrap.ps1 with `flag` and waits for it at most `milliseconds`:
+        /// Runs this installation's scripts/bootstrap.ps1 with `flag` and waits for it at most `milliseconds` - not
+        /// counting the time the update's Notes page waits for the person's answer (InstallerClock, v0.6.16):
         /// "done", with what it printed, what it wrote to its error stream and its exit code; "incomplete" where
         /// Windows PowerShell is not there to run it; "running" where it has not finished - never killed, for it
         /// may be part way through replacing an installation, and half an installation is worse than a slow one;
@@ -390,22 +471,59 @@ namespace CodexAutoResume
                 // The installation this window belongs to, not whichever one the environment
                 // happens to name.
                 info.EnvironmentVariables["CODEX_AUTO_RESUME_PLUGIN_HOME"] = root;
+                // This window, which waits for the bootstrap: the installer leaves it open (install.ps1,
+                // Get-OwnedDashboardProcess), and it opens the new version itself.
+                info.EnvironmentVariables["CODEX_AUTO_RESUME_UPDATING_DASHBOARD"] =
+                    Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
                 info.CreateNoWindow = true;
                 info.RedirectStandardOutput = true;
                 info.RedirectStandardError = true;
+                // The update's answer goes in on the input (-AskFirst); nothing else reads it.
+                if (Asked != null) info.RedirectStandardInput = true;
                 // UTF-8, as the script writes it: the setup step's lines may be Korean (issue #33).
                 info.StandardOutputEncoding = Encoding.UTF8;
                 info.StandardErrorEncoding = Encoding.UTF8;
                 using (Process process = Process.Start(info))
                 {
-                    Task<string> output = process.StandardOutput.ReadToEndAsync();
+                    // Line by line where the installer window is told each one (Heard), whole otherwise.
+                    Action<string> heard = Heard;
+                    Func<string, bool> asked = Asked;
+                    // The time limit, less the time the Notes page waits for the person (InstallerClock).
+                    Stopwatch time = Stopwatch.StartNew();
+                    var clock = new InstallerClock(milliseconds);
+                    Task<string> output = heard == null ? process.StandardOutput.ReadToEndAsync()
+                                        : Task.Factory.StartNew<string>(delegate
+                                          {
+                                              var lines = new StringBuilder();
+                                              string line, notes = null;
+                                              while ((line = process.StandardOutput.ReadLine()) != null)
+                                              {
+                                                  lines.Append(line).Append('\n');
+                                                  heard(line);
+                                                  if (line.StartsWith("notes: ", StringComparison.Ordinal))
+                                                      notes = line.Substring("notes: ".Length).Trim();
+                                                  else if (asked != null && line.StartsWith("ask: ", StringComparison.Ordinal))
+                                                  {
+                                                      clock.Pause(time.ElapsedMilliseconds);
+                                                      bool go;
+                                                      try { go = asked(notes); }
+                                                      finally { clock.Resume(time.ElapsedMilliseconds); }
+                                                      process.StandardInput.WriteLine(go ? "install" : "later");
+                                                      process.StandardInput.Flush();
+                                                  }
+                                              }
+                                              return lines.ToString();
+                                          });
                     Task<string> failure = process.StandardError.ReadToEndAsync();
-                    if (!process.WaitForExit(milliseconds)) return "running";
+                    while (!process.WaitForExit(250))
+                        if (clock.Over(time.ElapsedMilliseconds)) return "running";
                     output.Wait(5000);
                     failure.Wait(5000);
                     printed = output.IsCompleted ? output.Result : "";
                     errors = failure.IsCompleted ? failure.Result : "";
                     code = process.ExitCode;
+                    HeardCode = code;
+                    if (heard != null && errors.Length > 0) foreach (string line in errors.Replace("\r", "").Split('\n')) heard(line);
                     return "done";
                 }
             }
@@ -459,6 +577,7 @@ namespace CodexAutoResume
             else if (code == UpdateUnavailable && said == "unavailable") answer = "unavailable";
             // An install runs on past the line and exits with the installer's code.
             else if (code == 0 && said == "available") answer = "installed";
+            else if (code == UpdateLater && said == "later") answer = "later";
         }
 
         /// The one-line fact beside "Updates" on the Health card.

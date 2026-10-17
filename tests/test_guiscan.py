@@ -106,8 +106,9 @@ class SliceTests(unittest.TestCase):
                    if "partial class SettingsForm" in guiscan.read(name)]
         self.assertEqual(len(parts), len(holders))
         self.assertGreater(len(parts), 4, "it was four, in two files, before v0.6.10-alpha")
+        # v0.6.16: SettingsRemove.cs, the uninstall's own start of the installer window, is no part of the form either.
         self.assertEqual(sorted(set(guiscan.window_sources()) - set(holders)),
-                         ["gui/WindowJson.cs"], "the one window source that is not the form")
+                         ["gui/SettingsRemove.cs", "gui/WindowJson.cs"], "the window sources that are not the form")
         for part in parts:
             with self.subTest(part.splitlines()[0].strip()[:40]):
                 self.assertIn("partial", part.splitlines()[0])
@@ -147,8 +148,11 @@ class SliceTests(unittest.TestCase):
         # SoftMenu and its renderer, a Pending row's own menu in the window's colours. 60 since stage 2c: SoftTip,
         # a line's whole text in the window's colours, and TextScale, Windows' text size, beside Theme. 61 with
         # Typeface beside it: which face a language is set in (win/typeface.py's rule). 62 with VersionLabel: the edition
-        # after the version as quiet secondary text (the owner's decision of 2026-10-02).
-        self.assertEqual(len(set(declared)), 62, "the window's types")
+        # after the version as quiet secondary text (the owner's decision of 2026-10-02). 70 since v0.6.16: the installer
+        # window - InstallerFlow, InstallerProgress, InstallerWords, InstallerLanguages, InstallerWindow, InstallerSheet
+        # and InstallerBar - and SettingsRemove, the uninstall's start of it. 71 with InstallerNotes, what is new in the
+        # version an update goes to; 72 with InstallerClock, the update's time limit less the Notes page's wait.
+        self.assertEqual(len(set(declared)), 72, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,

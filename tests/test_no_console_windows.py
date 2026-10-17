@@ -451,16 +451,33 @@ class PowerShellTests(unittest.TestCase):
         self.assertIn("build/install/install.ps1", POWERSHELL)
         self.assertIn("build/install/Install.cmd", CMD)
 
+    # Starts of a Windows program, which gets no console from Windows whichever way it is started, so it goes through
+    # the shell: -NoNewWindow would hand it the script's own output handles, and whoever reads them would wait for
+    # the program to close. (file, -FilePath as written) -> (what it is, the assignment that says so).
+    GUI_STARTS = {
+        ("build/install/install.ps1", "$dashboard"):
+            ("the Dashboard an update closed, opened again: CodexAutoResumeSettings.exe, built /target:winexe",
+             "$dashboard = Join-Path $InstallHome 'CodexAutoResumeSettings.exe'"),
+    }
+
     def test_every_start_process_shares_the_console_or_hides_its_own(self):
-        offenders, seen = [], 0
+        offenders, seen, windowed = [], 0, set()
         for name, text in self.texts().items():
             for line in _statements(text):
                 if re.search(r"\bStart-Process\b", line, re.I):
                     seen += 1
+                    target = re.search(r"-FilePath\s+(\S+)", line)
+                    key = (name, target.group(1) if target else None)
+                    if key in self.GUI_STARTS:
+                        windowed.add(key)
+                        self.assertIn(self.GUI_STARTS[key][1], text, "the target is the Windows program named")
+                        self.assertNotRegex(line, r"-NoNewWindow\b|-Redirect", "a Windows program gets no handle of ours")
+                        continue
                     if not re.search(r"-NoNewWindow\b|-WindowStyle\s+['\"]?Hidden\b", line, re.I):
                         offenders.append("%s: %s" % (name, line.strip()))
         self.assertGreaterEqual(seen, 1, "install.ps1 starts codex.exe with Start-Process")
         self.assertEqual(offenders, [], "\n".join(offenders))
+        self.assertEqual(windowed, set(self.GUI_STARTS), "a Windows program's start is no longer where it was named")
 
     def test_nothing_else_opens_a_console(self):
         offenders = []
@@ -493,6 +510,13 @@ class WindowStartTests(unittest.TestCase):
             "the window starting itself again, compiled /target:winexe by build/make_gui.ps1",
         ("gui/DashboardMaintenance.cs", '"explorer.exe"'):
             "File Explorer on the logs folder the person asked to open, through the shell",
+        # v0.6.16, the installer window's three.
+        ("gui/DashboardMaintenance.cs", "exe"):
+            "the installation's new Dashboard after an update, CodexAutoResumeSettings.exe, built /target:winexe",
+        ("gui/SettingsRemove.cs", "copy"):
+            "the window's own copy in the temporary folder, which shows the uninstall: the same /target:winexe program",
+        ("gui/InstallerWindow.cs", "Guide"):
+            "the guide's web page the person asked to read, in their browser, through the shell",
     }
 
     @staticmethod
@@ -627,29 +651,35 @@ except Exception as exc:
 class SetupStartTests(unittest.TestCase):
     """build/setup/Setup.cs, the setup program each release ships beside its archive (build/make_setup.py).
 
-    The person double-clicks it as they would Install.cmd, and Windows gives a console program a console
-    of its own for that - the installer's console, where Install.cmd has always asked its questions. The
-    one program it starts is that archive's Install.cmd, through cmd.exe, and it shares that console:
-    no console of its own, no window of its own, and nothing else is started."""
+    Until v0.6.16 it was a console program, and Install.cmd shared the console Windows gave it. Since then it is a
+    Windows program: double-clicked it is the installer window (build/setup/SetupWindow.cs), and no console window
+    opens at all - a console program gets one from Windows before its first line runs. The one program Setup.cs
+    starts is still the archive's Install.cmd, through cmd.exe, and it gets no window either: CREATE_NO_WINDOW, its
+    output read through pipes. The window starts one program more once it has finished, the Dashboard, which is a
+    Windows program too."""
 
     def setUp(self):
         self.source = _read("build/setup/Setup.cs")
+        self.window = _read("build/setup/SetupWindow.cs")
         self.builder = _read("build/make_setup.py")
 
-    def test_it_is_a_console_program_the_person_starts(self):
-        self.assertIn('"/target:exe"', self.builder)
-        self.assertNotIn("winexe", self.builder)
+    def test_it_is_a_windows_program_the_person_starts(self):
+        self.assertIn('"/target:winexe"', self.builder)
+        self.assertNotIn('"/target:exe"', self.builder)
 
-    def test_its_one_start_shares_its_console(self):
+    def test_its_one_start_has_no_window(self):
         self.assertEqual(len(re.findall(r"\bProcess\.Start\(", self.source)), 1)
         self.assertEqual(len(re.findall(r"new ProcessStartInfo\(", self.source)), 1)
         self.assertIn("start.UseShellExecute = false;", self.source)
-        # No CreateNoWindow either way: the default is the console it was started in, which is the point.
-        for other in ("CreateNoWindow", "CREATE_NEW_CONSOLE", "DETACHED_PROCESS", "WindowStyle", "AllocConsole",
-                      "CreateProcess", "WinExec"):
+        self.assertIn("start.CreateNoWindow = true;", self.source)
+        for other in ("CREATE_NEW_CONSOLE", "DETACHED_PROCESS", "WindowStyle", "AllocConsole", "CreateProcess",
+                      "WinExec"):
             with self.subTest(other):
-                self.assertNotIn(other, self.source)
-        self.assertIsNone(re.search(r"(?<!Use)ShellExecute", self.source))
+                self.assertNotIn(other, self.source + self.window)
+        self.assertIsNone(re.search(r"(?<!Use)ShellExecute", self.source + self.window))
+        # The Dashboard, a Windows program, by its full path in the installation it has just made.
+        self.assertEqual(len(re.findall(r"\bProcess\.Start\(", self.window)), 1)
+        self.assertIn("start.UseShellExecute = false;", self.window)
 
     def test_its_build_gets_no_window(self):
         self.assertIn('NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)', self.builder)

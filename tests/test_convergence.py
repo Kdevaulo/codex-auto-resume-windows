@@ -495,12 +495,13 @@ class BootstrapTests(unittest.TestCase):
         switch: it lists, and the one thing it puts into the list's address is a page number. -Pick
         (v0.6.12) carries the version a person picked, and Get-ChosenVersion rebuilds it from its
         integers (and one of two words), and it is installed only where the list still offers it
-        (tests/test_version_picker.py).
+        (tests/test_version_picker.py). -AskFirst (v0.6.16) is a switch: it only stops between the download's checks
+        and the installer to ask (tests/test_installer_window.py).
         """
         parameters = re.search(r"param\((.*?)\n\)", self.text, re.S).group(1)
         self.assertEqual(set(re.findall(r"\$(\w+)", parameters)),
                          {"Force", "NoStartup", "ArchivePath", "CheckOnly", "Update",
-                          "Compatibility", "Edition", "Version", "Versions", "Pick"})
+                          "Compatibility", "Edition", "Version", "Versions", "Pick", "AskFirst"})
         values = [name for name in re.findall(r"\[(\w+)\]\$(\w+)", parameters)]
         self.assertEqual([name for kind, name in values if kind != "switch"],
                          ["ArchivePath", "Edition", "Version", "Pick"])
@@ -559,6 +560,10 @@ class BootstrapTests(unittest.TestCase):
         # v0.6.12: a pick refused, which is no answer to the update question nor either refusal above.
         picked = codes.pop("ExitPickRefused")
         self.assertNotIn(picked, list(codes.values()) + [refused, other], "the pick's refusal shares a code")
+        # v0.6.16: an update put off on its Notes page (-AskFirst), which installed nothing and is no answer to the
+        # update question nor any refusal above.
+        later = codes.pop("ExitLater")
+        self.assertNotIn(later, list(codes.values()) + [refused, other, picked], "putting it off shares a code")
         self.assertEqual(set(codes), {"ExitCurrent", "ExitAvailable", "ExitLocalNewer",
                                       "ExitUnavailable"})
         self.assertEqual(len(set(codes.values())), 4, "two answers share a code")
