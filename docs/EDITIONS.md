@@ -137,9 +137,11 @@ follows a turn, three that send at a time you pick - the two at a usage reset, a
 before a usage limit is reached - the usage meter, and the wrap-up and the forced stop that need it - and two
 actions: Longer messages, which only lets a message be longer, and the compatibility report, which only you
 start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
-is opened. Of the five added in v0.6.16-beta.4, three rest on a measurement that was made and on others not made
-yet - running a conversation here, the other sessions and compacting a full conversation - and two on measurements
-not made yet. Ten more rest on measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
+is opened. All five added in v0.6.16-beta.4 rest on measurements that were made - running a conversation
+here, the other sessions, compacting a full conversation, another model at capacity and a continuation with
+no words - and four more (the reset credit, the reset message, the usage meter and the forced stop) rest on
+measurements made on `codex-cli 0.162.0-alpha.17.2` and, for the forced stop, again on the newer one. Six rest on
+measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
 owner's machine, first on `codex-cli 0.158.0-alpha.2.1`, again on `codex-cli 0.162.0-alpha.17.2` and, for those this release's
 capabilities rest on, once more on `codex-cli 0.163.0-alpha.10.2` (2026-10-17);
 its record is in [`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a
@@ -283,7 +285,7 @@ would rather it were compacted and carried on than left stopped.
 
 **What it risks.** A compaction loses detail of the earlier conversation. If the compaction fails or does not
 end within ten minutes, or none comes within a day, the recovery ends as the failure it is. That a
-compaction behaves here (MX) and after your own `/compact` (MXA) has not been measured.
+compaction behaves here (MX) and after your own `/compact` (MXA) was measured, but not on every version of Codex.
 
 **Departs from** [0.5](STANDARDS.md#0-the-edition-boundary), A2, A11, B3, B4, E8 and F8 (as Run a
 conversation here while Codex is closed), A13 and A14 (a context-length failure is taken up), A16 (the
@@ -292,8 +294,8 @@ turn does not supersede the record) and A26 (the continuation's words for a fail
 not recover).
 
 **Ceilings.** 6 a day, and 2 in any one conversation - the compaction's and its continuation's.
-**Measurement M7: made** (a queued `/compact` reaches Codex as plain text). **MX and MXA: not made yet** - a
-warning each.
+**Measurement M7: made** (a queued `/compact` reaches Codex as plain text) and **MX: passed** on `codex-cli
+0.163.0-alpha.10.2`; **MXA: passed** on `codex-cli 0.162.0-alpha.17.2`. On any other version, a warning each.
 
 ### Use Codex's default model when one is at capacity
 
@@ -666,8 +668,8 @@ is closed also on, a conversation nothing holds is run here.
 usage limit or a failure as the app's do. The standard edition looks only at the app's conversations, and a
 conversation held by another session waits with a reason of its own.
 
-**What it risks.** The words Codex uses to tell these conversations apart (MO) have not been measured again
-on every version of Codex: a wrong word finds nothing, never the wrong conversation. A session that ends with
+**What it risks.** The words Codex uses to tell these conversations apart (MO) were measured on
+`codex-cli 0.163.0-alpha.10.2` and may differ in another version of Codex: a wrong word finds nothing, never the wrong conversation. A session that ends with
 the continuation still queued leaves it to be taken back, and one that cannot be taken back is never sent
 twice. A session that did not take a queued message within three minutes turns this off, so it cannot be kept
 on.
@@ -678,7 +680,7 @@ conversation). It keeps A2, A3, A4, A17, H4 and H6: one channel, the exact conve
 work wins, and Pause and Cancel take a queued continuation back.
 
 **Ceilings.** 24 a day, and 3 in any one conversation. **Measurement M5: made** on `codex-cli
-0.163.0-alpha.10.2`. **MO: a warning** until it is measured again for your version of Codex.
+0.163.0-alpha.10.2`. **MO: passed** there too; on any other version, a warning.
 
 ### Continue a turn that ended with no reply
 
@@ -1009,8 +1011,9 @@ as below.
   [above](#todays-capabilities).
 - **A route of its own, and other kinds of session** - a conversation nothing holds, run through
   Codex's app server; CLI, TUI and IDE sessions; a full context compacted, then continued; another
-  model at capacity; a continuation with no words; a continuation inside the turn through a Codex
-  Stop hook; and Codex's own retry settings.
+  model at capacity; a continuation with no words - all built in v0.6.16-beta.4, described
+  [above](#todays-capabilities); and a continuation inside the turn through a Codex Stop hook, planned for
+  v0.6.17. (Codex's own retry settings are offered only once a measurement passes.)
 - **Around recovery** - a live usage meter, a wrap-up nudge near a limit and usage analytics; a
   provider status feed and push notifications through one courier process, the advanced edition's only
   outbound network code; a local API and web view, remote control over Telegram and a read-only view
