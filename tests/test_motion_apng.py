@@ -138,6 +138,59 @@ class SplitTests(unittest.TestCase):
         self.assertEqual(report.hundredths, 23)
 
 
+class AlphaTests(unittest.TestCase):
+    """A picture on a clear ground: RGBA, and every later rectangle replaces what was under it."""
+
+    @staticmethod
+    def rgba(alpha_of_square):
+        out = bytearray(WIDTH * HEIGHT * 4)
+        for y in range(4, 10):
+            for x in range(6, 12):
+                out[(y * WIDTH + x) * 4:(y * WIDTH + x) * 4 + 4] = bytes((20, 90, 200, alpha_of_square))
+        return bytes(out)
+
+    def read(self, raw):
+        from test_social_motion import unfilter
+        parts = chunks(raw)
+        width, height, depth, colour = struct.unpack(">IIBB", dict(parts)[b"IHDR"][:10])
+        self.assertEqual((depth, colour), (8, 6), "8-bit RGBA")
+        frames, current = [], None
+        for kind, data in parts:
+            if kind == b"fcTL":
+                current = {"control": struct.unpack(">IIIIIHHBB", data), "data": bytearray()}
+                frames.append(current)
+            elif kind == b"IDAT":
+                current["data"] += data
+            elif kind == b"fdAT":
+                current["data"] += data[4:]
+        canvas, shown = bytearray(width * height * 4), []
+        for frame in frames:
+            _n, w, h, x, y, _num, _den, dispose, blend = frame["control"]
+            self.assertEqual((dispose, blend), (0, 0), "kept, and laid as the source, never over")
+            pixels = unfilter(zlib.decompress(bytes(frame["data"])), w, h, 4)
+            for row in range(h):
+                at = ((y + row) * width + x) * 4
+                canvas[at:at + w * 4] = pixels[row * w * 4:(row + 1) * w * 4]
+            shown.append(bytes(canvas))
+        return shown
+
+    def test_a_fading_square_fades_to_clear_and_not_to_the_frame_before(self):
+        given = [(10, "A", self.rgba(255)), (10, "B", self.rgba(128)), (10, "C", self.rgba(0))]
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "clear.png"
+            report = motion_apng.assemble(path, WIDTH, HEIGHT, iter(given), alpha=True)
+            shown = self.read(path.read_bytes())
+            again = Path(name) / "again.png"
+            motion_apng.assemble(again, WIDTH, HEIGHT, iter(given), alpha=True)
+            self.assertEqual(again.read_bytes(), path.read_bytes())
+        self.assertEqual(shown, [picture for _delay, _scene, picture in given])
+        self.assertEqual(report.frames, 3)
+
+    def test_an_rgb_picture_is_refused_where_rgba_is_asked(self):
+        with tempfile.TemporaryDirectory() as name, self.assertRaises(ValueError):
+            motion_apng.assemble(Path(name) / "x.png", WIDTH, HEIGHT, iter([(10, "A", picture())]), alpha=True)
+
+
 class CutTests(unittest.TestCase):
     def test_changes_side_by_side_are_cut_apart_by_the_columns_between_them(self):
         width, height = 200, 40

@@ -9,6 +9,10 @@ only lengthens it.
 Delays are whole hundredths of a second, never under SHORTEST: browsers show 10 ms or less as 100 ms. No palette, no
 dither, nothing lossy - the reason it is an APNG and not a GIF (make_social.py's docstring).
 
+A picture whose ground is clear - the window on its own, the card on its own, the logo - is RGBA with straight alpha
+(`alpha=True`): every frame's rectangle then replaces what was there (APNG_SOURCE) instead of being laid over it,
+so a pixel that turns clearer - a card fading out - is clear and not the frame before showing through.
+
 The budget (APNG-storyboard.md section 2) is a target and a hard cap: over the cap the file is not written and
 BudgetExceeded names the bytes each scene took, largest first, so the levers can be pulled where they count; over the
 target it is written and the report says so. The same frames make the same bytes: nothing here reads a clock, a
@@ -29,7 +33,8 @@ for _path in (str(ROOT / "src"), str(ROOT / "build")):
         sys.path.insert(0, _path)
 
 SHORTEST = 2                         # hundredths of a second
-APNG_KEEP, APNG_OVER = 0, 1
+APNG_KEEP = 0                        # dispose: leave the frame as it is
+APNG_SOURCE, APNG_OVER = 0, 1        # blend: replace the rectangle, or draw over it
 LEVEL = 9
 # Changed rows this many unchanged rows apart are written as rectangles of their own (`patches`).
 BAND_GAP = 32
@@ -71,112 +76,100 @@ def chunks(raw: bytes) -> list:
     return out
 
 
-def rows(rgb: bytes, width: int, box: tuple) -> bytes:
-    """The scanlines of `box` (left, top, width, height) of an RGB picture `width` wide, each after PNG's filter byte 0."""
+def rows(rgb: bytes, width: int, box: tuple, bpp: int = 3) -> bytes:
+    """The scanlines of `box` (left, top, width, height) of a picture `width` wide, `bpp` bytes a pixel (3, RGB; 4,
+    RGBA), each after PNG's filter byte 0."""
     left, top, wide, tall = box
     out = bytearray()
     for y in range(top, top + tall):
         out.append(0)
-        out += rgb[(y * width + left) * 3:(y * width + left + wide) * 3]
+        out += rgb[(y * width + left) * bpp:(y * width + left + wide) * bpp]
     return bytes(out)
 
 
-def _same_prefix(a: bytes, b: bytes, pixels: int) -> int:
+def _same_prefix(a: bytes, b: bytes, pixels: int, bpp: int = 3) -> int:
     """How many whole pixels from the start of two rows are the same (binary search on slice equality)."""
     low, high = 0, pixels
     while low < high:
         middle = (low + high + 1) // 2
-        if a[:middle * 3] == b[:middle * 3]:
+        if a[:middle * bpp] == b[:middle * bpp]:
             low = middle
         else:
             high = middle - 1
     return low
 
 
-def _same_suffix(a: bytes, b: bytes, pixels: int) -> int:
+def _same_suffix(a: bytes, b: bytes, pixels: int, bpp: int = 3) -> int:
     low, high = 0, pixels
     while low < high:
         middle = (low + high + 1) // 2
-        if a[len(a) - middle * 3:] == b[len(b) - middle * 3:]:
+        if a[len(a) - middle * bpp:] == b[len(b) - middle * bpp:]:
             low = middle
         else:
             high = middle - 1
     return low
 
 
-def changed(before: bytes, after: bytes, width: int, height: int):
-    """The smallest (left, top, width, height) that differs between two RGB pictures, or None when they are the same."""
+def changed(before: bytes, after: bytes, width: int, height: int, bpp: int = 3):
+    """The smallest (left, top, width, height) that differs between two pictures, or None when they are the same."""
     if before == after:
         return None
-    stride = width * 3
-    top = 0
-    while before[top * stride:(top + 1) * stride] == after[top * stride:(top + 1) * stride]:
-        top += 1
-    bottom = height - 1
-    while before[bottom * stride:(bottom + 1) * stride] == after[bottom * stride:(bottom + 1) * stride]:
-        bottom -= 1
-    left, right = width, -1
-    for y in range(top, bottom + 1):
-        a, b = before[y * stride:(y + 1) * stride], after[y * stride:(y + 1) * stride]
-        if a == b:
-            continue
-        left = min(left, _same_prefix(a, b, width))
-        right = max(right, width - 1 - _same_suffix(a, b, width))
-    return left, top, right - left + 1, bottom - top + 1
+    return _tight(before, after, width, (0, 0, width, height), bpp)
 
 
-def patches(before: bytes, after: bytes, width: int, height: int) -> list:
-    """The rectangles that differ between two RGB pictures, cut apart wherever BAND_GAP unchanged rows or columns lie
+def patches(before: bytes, after: bytes, width: int, height: int, bpp: int = 3) -> list:
+    """The rectangles that differ between two pictures, cut apart wherever BAND_GAP unchanged rows or columns lie
     between changes: a breathing light at the top of the picture and the tray icon at its bottom, or the card's light
     and a pointer beside it, are small rectangles each, where one round them would be much of the picture. Largest
     first; [] when the pictures are the same."""
     if before == after:
         return []
     found = []
-    _cut(before, after, width, (0, 0, width, height), found)
+    _cut(before, after, width, (0, 0, width, height), found, bpp)
     return sorted(found, key=lambda box: (-box[2] * box[3], box[1], box[0]))
 
 
-def _tight(before: bytes, after: bytes, width: int, box: tuple):
+def _tight(before: bytes, after: bytes, width: int, box: tuple, bpp: int = 3):
     """The smallest rectangle inside `box` that holds every change there, or None."""
     left0, top0, wide, tall = box
-    stride = width * 3
-    rows = []
+    stride = width * bpp
+    found = []
     left, right = left0 + wide, left0 - 1
     for y in range(top0, top0 + tall):
-        a = before[y * stride + left0 * 3:y * stride + (left0 + wide) * 3]
-        b = after[y * stride + left0 * 3:y * stride + (left0 + wide) * 3]
+        a = before[y * stride + left0 * bpp:y * stride + (left0 + wide) * bpp]
+        b = after[y * stride + left0 * bpp:y * stride + (left0 + wide) * bpp]
         if a == b:
             continue
-        rows.append(y)
-        left = min(left, left0 + _same_prefix(a, b, wide))
-        right = max(right, left0 + wide - 1 - _same_suffix(a, b, wide))
-    if not rows:
+        found.append(y)
+        left = min(left, left0 + _same_prefix(a, b, wide, bpp))
+        right = max(right, left0 + wide - 1 - _same_suffix(a, b, wide, bpp))
+    if not found:
         return None
-    return left, rows[0], right - left + 1, rows[-1] - rows[0] + 1
+    return left, found[0], right - left + 1, found[-1] - found[0] + 1
 
 
-def _cut(before: bytes, after: bytes, width: int, box: tuple, found: list) -> None:
-    box = _tight(before, after, width, box)
+def _cut(before: bytes, after: bytes, width: int, box: tuple, found: list, bpp: int = 3) -> None:
+    box = _tight(before, after, width, box, bpp)
     if box is None:
         return
     left, top, wide, tall = box
-    stride = width * 3
+    stride = width * bpp
+
+    def span(y, x, count):
+        return slice(y * stride + x * bpp, y * stride + (x + count) * bpp)
     # Rows: a run of BAND_GAP unchanged rows inside the rectangle.
     run = 0
     for y in range(top, top + tall):
-        same = before[y * stride + left * 3:y * stride + (left + wide) * 3] ==             after[y * stride + left * 3:y * stride + (left + wide) * 3]
-        run = run + 1 if same else 0
+        run = run + 1 if before[span(y, left, wide)] == after[span(y, left, wide)] else 0
         if run >= BAND_GAP:
-            _cut(before, after, width, (left, top, wide, y - top + 1), found)
-            _cut(before, after, width, (left, y + 1, wide, top + tall - y - 1), found)
+            _cut(before, after, width, (left, top, wide, y - top + 1), found, bpp)
+            _cut(before, after, width, (left, y + 1, wide, top + tall - y - 1), found, bpp)
             return
     # Columns: a strip BAND_GAP wide unchanged on every row of the rectangle, looked for every half of it.
     for x in range(left + 1, left + wide - BAND_GAP, max(1, BAND_GAP // 2)):
-        if all(before[y * stride + x * 3:y * stride + (x + BAND_GAP) * 3] ==
-               after[y * stride + x * 3:y * stride + (x + BAND_GAP) * 3] for y in range(top, top + tall)):
-            _cut(before, after, width, (left, top, x - left, tall), found)
-            _cut(before, after, width, (x + BAND_GAP, top, left + wide - x - BAND_GAP, tall), found)
+        if all(before[span(y, x, BAND_GAP)] == after[span(y, x, BAND_GAP)] for y in range(top, top + tall)):
+            _cut(before, after, width, (left, top, x - left, tall), found, bpp)
+            _cut(before, after, width, (x + BAND_GAP, top, left + wide - x - BAND_GAP, tall), found, bpp)
             return
     found.append(box)
 
@@ -201,23 +194,28 @@ def _delay(hundredths: int) -> tuple:
 
 
 def assemble(path, width: int, height: int, frames, *, still: bytes | None = None, target: int | None = None,
-             cap: int | None = None) -> Report:
-    """Writes `frames` - (delay in hundredths, scene, RGB picture) each, taken one at a time - to `path` as an APNG that
-    loops forever, and reports it. `still` is a PNG whose pixels frame 1 must be and whose chunks frame 1 is written
+             cap: int | None = None, alpha: bool = False) -> Report:
+    """Writes `frames` - (delay in hundredths, scene, picture) each, taken one at a time - to `path` as an APNG that
+    loops forever, and reports it. A picture is RGB, or with `alpha` RGBA with straight alpha, every later rectangle
+    then replacing what was under it. `still` is a PNG whose pixels frame 1 must be and whose chunks frame 1 is written
     as. Nothing is written when the picture is over `cap` (BudgetExceeded)."""
+    bpp = 4 if alpha else 3
+    blend = APNG_SOURCE if alpha else APNG_OVER
     frames = iter(frames)
     first = next(frames, None)
     if first is None:
         raise ValueError("an APNG needs at least one picture")
     first = list(first)
+    if len(first[2]) != width * height * bpp:
+        raise ValueError("a frame of %d bytes in a %dx%d picture" % (len(first[2]), width, height))
     later, previous, scenes = [], first[2], {}
     for delay, scene, picture in frames:
-        if len(picture) != width * height * 3:
+        if len(picture) != width * height * bpp:
             raise ValueError("a frame of %d bytes in a %dx%d picture" % (len(picture), width, height))
         if picture == previous:
             (later[-1] if later else first)[0] += delay
             continue
-        boxes = patches(previous, picture, width, height)
+        boxes = patches(previous, picture, width, height, bpp)
         while len(boxes) > max(1, delay // SHORTEST):
             # Not time enough to show each for SHORTEST: the two that make the smallest rectangle together are one.
             pairs = [(i, j) for i in range(len(boxes)) for j in range(i + 1, len(boxes))]
@@ -233,22 +231,22 @@ def assemble(path, width: int, height: int, frames, *, still: bytes | None = Non
     for delay, scene, picture, box in later:
         numerator, denominator = _delay(delay)
         control = chunk(b"fcTL", struct.pack(">IIIIIHHBB", sequence, box[2], box[3], box[0], box[1],
-                                             numerator, denominator, APNG_KEEP, APNG_OVER))
-        data = chunk(b"fdAT", struct.pack(">I", sequence + 1) + zlib.compress(rows(picture, width, box), LEVEL))
+                                             numerator, denominator, APNG_KEEP, blend))
+        data = chunk(b"fdAT", struct.pack(">I", sequence + 1) + zlib.compress(rows(picture, width, box, bpp), LEVEL))
         body += control + data
         scenes[scene] = scenes.get(scene, 0) + len(control) + len(data)
         sequence += 2
     numerator, denominator = _delay(first[0])
     if still is not None:
-        header, idat = _still_chunks(still, width, height, first[2])
+        header, idat = _still_chunks(still, width, height, first[2], alpha)
     else:
-        header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
-        idat = [chunk(b"IDAT", zlib.compress(rows(first[2], width, (0, 0, width, height)), LEVEL))]
+        header = struct.pack(">IIBBBBB", width, height, 8, 6 if alpha else 2, 0, 0, 0)
+        idat = [chunk(b"IDAT", zlib.compress(rows(first[2], width, (0, 0, width, height), bpp), LEVEL))]
     head = bytearray(SIGNATURE)
     head += chunk(b"IHDR", header)
     head += chunk(b"acTL", struct.pack(">II", 1 + len(later), 0))
     head += chunk(b"fcTL", struct.pack(">IIIIIHHBB", 0, width, height, 0, 0, numerator, denominator,
-                                       APNG_KEEP, APNG_OVER))
+                                       APNG_KEEP, blend))
     whole = b"".join(idat)
     scenes[first[1]] = scenes.get(first[1], 0) + len(whole)
     out = bytes(head) + whole + bytes(body) + chunk(b"IEND", b"")
@@ -260,19 +258,26 @@ def assemble(path, width: int, height: int, frames, *, still: bytes | None = Non
                   target is not None and len(out) > target)
 
 
-def _still_chunks(still: bytes, width: int, height: int, picture: bytes) -> tuple:
-    """(IHDR data, [IDAT chunks as written]) of a still frame 1 must be: an 8-bit RGB PNG of the picture's size whose
-    pixels are frame 1's."""
+def _still_chunks(still: bytes, width: int, height: int, picture: bytes, alpha: bool = False) -> tuple:
+    """(IHDR data, [IDAT chunks as written]) of a still frame 1 must be: an 8-bit PNG of the picture's size and kind
+    (RGB; RGBA with `alpha`) whose pixels are frame 1's."""
     import make_screenshots
     import tempfile
     found = chunks(still)
     header = dict(found)[b"IHDR"]
-    if struct.unpack(">IIBBBBB", header) != (width, height, 8, 2, 0, 0, 0):
-        raise ValueError("the still is not an 8-bit RGB PNG of %dx%d" % (width, height))
+    if struct.unpack(">IIBBBBB", header) != (width, height, 8, 6 if alpha else 2, 0, 0, 0):
+        raise ValueError("the still is not an 8-bit %s PNG of %dx%d" % ("RGBA" if alpha else "RGB", width, height))
     with tempfile.TemporaryDirectory() as folder:
         copy = Path(folder) / "still.png"
         copy.write_bytes(still)
-        _w, _h, pixels = make_screenshots.read_png_rgb(copy)
+        _w, _h, rgb, clear = make_screenshots.read_png(copy)
+    if alpha:
+        pixels = bytearray(width * height * 4)
+        pixels[0::4], pixels[1::4], pixels[2::4] = rgb[0::3], rgb[1::3], rgb[2::3]
+        pixels[3::4] = clear if clear is not None else b"\xff" * (width * height)
+        pixels = bytes(pixels)
+    else:
+        pixels = rgb
     if pixels != picture:
         raise ValueError("frame 1 is not the still")
     return header, [chunk(kind, data) for kind, data in found if kind == b"IDAT"]
