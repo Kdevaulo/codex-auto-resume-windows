@@ -148,6 +148,10 @@ class Inventory:
                 words, literals = csharp(data.decode("utf-8"))
                 cs_words |= words
                 cs_literals |= literals
+        # A name Python's own standard library gives a module is no sign of the advanced edition: the
+        # bundled runtime spells it (python313.zip's _pyrepl/mypy.ini says `_overlapped`, which the advanced
+        # IPC also names a helper; v0.6.16-beta.4's first release run stopped on it).
+        declared -= set(getattr(sys, "stdlib_module_names", ()))
         strong = {PACKAGE, SKILL, SENTINEL}
         names = strong | {name for name in declared - core_words if distinctive(name)}
         # A one-word name is the core's own in the language whose core code uses it: `Verdict`
