@@ -408,7 +408,18 @@ already be in Codex is marked and taken back if it is still queued, and a finish
 marked too, so no later failure of that task can start a new chain from it. A turn already
 running in Codex is not stopped, and the confirmation says so. **Cancel all** does the same to
 every waiting recovery, one exact record at a time; there is deliberately no way to retry them
-all at once. **Turn off for this conversation** cancels its waiting recoveries and keeps
+all at once. From v0.6.16 **Rescan and reconcile**, after Cancel all, looks at every waiting recovery
+again by the watcher's own rules, once you confirm. One is retired - stopped as replaced by your own
+work - only on proof: its exact failed turn in Codex's history followed by a turn you started (a
+continuation of this tool's never counts), or, while that history has not caught up with the
+conversation's file, the same in the file itself, where nothing after a rollback counts. One that is still its conversation's latest failure
+is left waiting exactly as it was, under every check - the reset's grace, a postponement, a hold, the
+switches and the budgets - and the watcher is woken to look at whatever is due. Anything it cannot
+decide stays as it is and is counted as unresolved, and a recovery that changed while it looked is
+skipped. It sends nothing, writes nothing to Codex, gives no attempts back and brings nothing forward,
+and it leaves cancelled, finished and in-flight recoveries and History as they are; the note beside the
+buttons says how many were retired, rechecked, unresolved and changed meanwhile, and each one's
+Timeline says which. **Turn off for this conversation** cancels its waiting recoveries and keeps
 automatic recovery off for that conversation until you turn it back on — the Pending and History
 pages then offer **Turn on for this conversation**. From v0.6.11 each row also has a menu of its own,
 on a right click, Shift+F10 or the menu key: **Postpone** holds that task back 30 minutes, an hour,

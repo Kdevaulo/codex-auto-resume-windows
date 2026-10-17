@@ -137,6 +137,12 @@ class EventCode(StrEnum):
     # v0.6.11: one taken back for Observe only ran all the same; a person took their postponement away.
     DISPATCHED_WHILE_OBSERVING = "dispatched_while_observing"
     UNPOSTPONED = "unpostponed"
+    # v0.6.16 (issue #39): what a person's Rescan and reconcile found of one waiting record - retired on proof of
+    # newer work, still its conversation's latest failure, not decidable, or changed while it looked.
+    RESCAN_RETIRED = "rescan_retired"
+    RESCAN_RECHECKED = "rescan_rechecked"
+    RESCAN_UNRESOLVED = "rescan_unresolved"
+    RESCAN_CHANGED = "rescan_changed"
     OTHER = "other"
 
 

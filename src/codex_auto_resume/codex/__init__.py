@@ -25,6 +25,7 @@ from .paths import DB_KINDS, _safe_path  # noqa: F401
 from .payload import _choose_reset, _content_has_marker, _queue_has_marker, admissible, detect  # noqa: F401
 from .schema import SchemaMixin
 from . import eligibility, rollout
+from ..domain import ids
 
 
 class LocalSource(SchemaMixin, HistoryMixin):
@@ -52,6 +53,19 @@ class LocalSource(SchemaMixin, HistoryMixin):
         payload = None if path is None else rollout.session_meta(path)
         version = payload.get("cli_version") if isinstance(payload, dict) else None
         return version if isinstance(version, str) else None
+
+    def rescan_evidence(self, thread_id: str, turn_id: str) -> str:
+        """What the conversation's current file says of the failed turn `turn_id` (rollout.superseded_in), for a person's
+        Rescan and reconcile (v0.6.16, issue #39) while Codex's history is behind it: the file `_eligibility` names, so
+        one confined to the sessions folder whose first line says it is this conversation's - a split's A_B file too
+        (issue #30). rollout.UNREADABLE for anything that cannot be read, or for a conversation not taken up."""
+        if not ids.is_uuid(turn_id):
+            return rollout.UNREADABLE
+        try:
+            path = self._eligibility(thread_id, strict=True)[0]
+        except Exception:
+            return rollout.UNREADABLE
+        return rollout.UNREADABLE if path is None else rollout.superseded_in(path, turn_id)
 
     def elsewhere(self, codex_home) -> "LocalSource":
         """A reader of another Codex home, made as this one is (v0.6.15-beta): for the labels of that home's records,

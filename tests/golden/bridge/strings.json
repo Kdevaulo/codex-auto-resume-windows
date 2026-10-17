@@ -1179,7 +1179,14 @@
           "installer.maintain.repair_help": "Installs this version again in place. Your settings, everything waiting and your sign-in choice are kept.",
           "installer.maintain.remove_help": "Removes Codex Auto Resume from this PC. Next, you choose whether the settings and the recovery history go too.",
           "installer.progress.repairing": "Repairing",
-          "installer.done.repaired": "Codex Auto Resume is repaired."
+          "installer.done.repaired": "Codex Auto Resume is repaired.",
+          "action.rescan": "Rescan and reconcile",
+          "confirm.rescan": "Look at every waiting recovery again? One is retired only where Codex's history proves newer work of yours came after it; every other one keeps waiting, with every check, and nothing is sent.",
+          "result.rescan": "Retired: {retired} · Rechecked: {rechecked} · Unresolved: {unresolved} · Changed meanwhile: {changed}",
+          "event.rescan_retired": "Retired by Rescan: newer work came after it",
+          "event.rescan_rechecked": "Rescan: still the latest failure, left waiting",
+          "event.rescan_unresolved": "Rescan: could not be decided, left as it was",
+          "event.rescan_changed": "Rescan: changed meanwhile, left as it was"
         },
         "preference": "system",
         "system_language": "en",
