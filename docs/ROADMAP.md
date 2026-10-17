@@ -758,10 +758,10 @@ moved one on; the published v0.6.15-beta is published again as v0.6.16-beta.
 
 ## v0.6.16 — Most of the advanced edition
 
-**In development: v0.6.16-beta.3 ✅ is out: words for this time in the standard edition, with the other work
-that landed there. v0.6.16-beta.4 is in development: a route of its own, other kinds of session, and the usage
-capabilities finished. Before beta.3 came v0.6.16-beta.2, v0.6.15's fix on the beta line, and v0.6.16-beta
-(published first as v0.6.15-beta), the first pre-release: stage 3c and watching several Codex homes.**
+**In development: v0.6.16-beta.4 ✅ is out: a route of its own, other kinds of session, and the usage
+capabilities finished. Before it came v0.6.16-beta.3, words for this time in the standard edition with the other
+work that landed there; v0.6.16-beta.2, v0.6.15's fix on the beta line; and v0.6.16-beta (published first as
+v0.6.15-beta), the first pre-release: stage 3c and watching several Codex homes. Next, the final v0.6.16.**
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
@@ -806,7 +806,7 @@ finish its step, and a pause that holds our continuations until the reset
   [EDITIONS.md](EDITIONS.md#todays-capabilities). The measurements they rest on that are new - MQ, ME, MS,
   MK and MT - are not made yet, and each capability says so as a warning.
 
-### v0.6.16-beta.4 — A route of its own, and other kinds of session
+### v0.6.16-beta.4 ✅ — A route of its own, and other kinds of session
 
 - a conversation nothing holds, run headless through Codex's app server with the settings Codex
   saved for it,
