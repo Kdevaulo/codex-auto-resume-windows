@@ -542,13 +542,14 @@ namespace CodexAutoResume
             });
         }
 
-        /// The rescan's result line: each of its four counts in its place. Pure.
+        /// The rescan's result line: each of its four counts in its place, each read by its own name and written as Count writes it (DashboardCompat.cs). Pure.
         internal static string RescanNote(string template, Dictionary<string, object> result)
         {
-            string line = template;
-            foreach (string name in new[] { "retired", "rechecked", "unresolved", "changed" })
-                line = line.Replace("{" + name + "}", ((int)Number(result, name)).ToString(CultureInfo.InvariantCulture));
-            return line;
+            return template
+                .Replace("{retired}", Count(Number(result, "retired")))
+                .Replace("{rechecked}", Count(Number(result, "rechecked")))
+                .Replace("{unresolved}", Count(Number(result, "unresolved")))
+                .Replace("{changed}", Count(Number(result, "changed")));
         }
 
         /// What the watcher is doing, as the header's status light shows it: the light of the header's word
