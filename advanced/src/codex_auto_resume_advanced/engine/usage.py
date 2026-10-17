@@ -62,7 +62,9 @@ DEFAULT_STOP_WORDS = 95
 STOP_WORDS_OPTIONS = {FIVE_HOUR: OptionKey.STOP_WORDS_FIVE_HOUR, WEEKLY: OptionKey.STOP_WORDS_WEEKLY}
 # (g): the continuation after the reset (engine/usagestop.py says it for a conversation it stopped).
 AFTER_RESET_KEY = "continue.after_reset"
-# (e): each window acted on or not - the meter's own choice, which the warning, the wrap-up and the stop each follow.
+# (e): each window acted on or not - from v0.6.16 final each capability's own pair (the owner's request of 2026-10-18):
+# the meter's decides its warnings, the wrap-up's its messages, the stop's what it holds and stops. Until then the
+# meter's pair decided for all three; state/session.py carries a window switched off there over to the other two once.
 WINDOW_OPTIONS = {FIVE_HOUR: OptionKey.WINDOW_FIVE_HOUR, WEEKLY: OptionKey.WINDOW_WEEKLY}
 # (b): the wrap-up's Custom text for each window (state `wordings`).
 CUSTOM_WORDINGS = {FIVE_HOUR: WordingKey.WRAP_CUSTOM_FIVE_HOUR, WEEKLY: WordingKey.WRAP_CUSTOM_WEEKLY}
@@ -110,16 +112,18 @@ def _reset_since(rows, minutes, created_at, now) -> bool:
     return now >= reset + CLOSE_AFTER or reset - minutes * 60 > created_at
 
 
-def acting(meter_options) -> frozenset:
-    """The windows a person lets these capabilities act on (v0.6.16-beta.4, item (e)): each one switched on in the
-    meter's choices - both by default. Both off, the meter still reads and shows usage, and nothing acts."""
-    return frozenset(minutes for minutes, key in WINDOW_OPTIONS.items() if meter_options.get(key, ON) == ON)
+def acting(options) -> frozenset:
+    """The windows a person lets a capability act on (v0.6.16-beta.4, item (e)), from its own options: each one
+    switched on - both by default. Both off, it acts on neither (the page says so); the meter still reads and shows
+    usage whatever any switch says."""
+    return frozenset(minutes for minutes, key in WINDOW_OPTIONS.items() if options.get(key, ON) == ON)
 
 
 def _acting(scoped) -> frozenset:
-    """The windows acted on, as the meter's choices say; every window where they cannot be read."""
+    """The windows a capability acts on, as its own choices say (v0.6.16 final); every window where they cannot be
+    read."""
     try:
-        return acting(scoped.options_of(METER))
+        return acting(scoped.options())
     except Exception:
         return frozenset(WINDOWS)
 
@@ -205,7 +209,7 @@ class UsageMeter:
         on = acting(options)
         for row in windows(handle.rows()):
             if row["minutes"] not in on:
-                continue                                   # (e) a window switched off: shown, never warned of
+                continue                                   # (e) a window switched off for it: shown, never warned of
             if reached(row, percent(options, METER, row["minutes"]), now) and row["warned_reset_at"] != row["reset_at"]:
                 if handle.mark(row["bucket"], row["minutes"], warned_reset_at=row["reset_at"]):
                     self._count("warned")

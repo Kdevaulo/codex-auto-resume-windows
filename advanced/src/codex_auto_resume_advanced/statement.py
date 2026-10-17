@@ -192,8 +192,9 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "refused.wording.marker", "refused.wording.placeholder",
     # (a) what is sent, exactly, for each window, under the wording choice.
     "preview.title", "preview.300", "preview.10080",
-    # (e) each window acted on or not.
-    "option.window_five_hour", "option.window_weekly",
+    # (e) each window acted on or not - and (v0.6.16 final) a capability with both its windows off says it acts on
+    # neither.
+    "option.window_five_hour", "option.window_weekly", "option.no_window",
     # (f) a number typed in beside the presets.
     "option.custom", "option.set", "option.range", "refused.option_range",
     # (j) the percentages of a window in order, and the forced stop below the words' stop only said.

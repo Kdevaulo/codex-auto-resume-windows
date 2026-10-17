@@ -35,7 +35,8 @@ from codex_auto_resume.domain import ids
 from .schema import (ADD_RESETS, ATTACHED, FILE_NAME, SCHEMA_VERSION, STATEMENTS, TABLES, TABLES_V1,
                      TABLES_V2, TABLES_V3, TABLES_V3_BEFORE_RESETS, TABLES_V4, TABLES_V5, UPGRADE_FROM_1,
                      UPGRADE_FROM_2, UPGRADE_FROM_3, UPGRADE_FROM_4, UPGRADE_FROM_5, STAGE4_VERSION,
-                     TABLES_BEFORE_STAGE4, UPGRADE_TO_STAGE4)
+                     TABLES_BEFORE_STAGE4, UPGRADE_TO_STAGE4, WINDOW_CHOICES, WINDOW_FOLLOWERS, WINDOW_LEADER,
+                     WINDOW_OFF, WINDOW_ON)
 
 
 class StateError(RuntimeError):
@@ -201,7 +202,33 @@ class SessionMixin:
             raise StateError("unsupported or malformed advanced state")
         if connection.execute("SELECT count(*) FROM meta").fetchone()[0] != 1:
             raise StateError("malformed advanced state")
+        self._carry_windows(connection)
         return True
+
+    def _carry_windows(self, connection) -> None:
+        """The window switches carried over, once (v0.6.16 final): before it, the usage meter's pair decided whether
+        anything warned, wrapped up or stopped for a window; now Wrap up near a limit and Stop near a limit each have a
+        pair of their own. Each of their switches with no row yet is written as the meter's switch for that window stands
+        - off where the person had it off, on otherwise - so nothing acts after the update on a window that was off
+        before it. Once written, a row is never written here again, so the meter's switch decides only its warnings from
+        then on; a new file gets the four rows as it is made. Only a switch this registry's capability offers, in the
+        opening's own transaction - the one write a read makes, as an upgrade is - with no generation moved: what any
+        capability does is unchanged by it."""
+        wanted = []
+        for capability in WINDOW_FOLLOWERS:
+            definition = self.registry.get(capability)
+            wanted += [(capability, choice) for choice in WINDOW_CHOICES
+                       if definition is not None and definition.option(choice) is not None]
+        if not wanted:
+            return
+        held = {(row[0], row[1]): row[2] for row in connection.execute(
+            "SELECT capability, choice, value FROM options WHERE choice IN (?, ?)", WINDOW_CHOICES)}
+        for capability, choice in wanted:
+            if (capability, choice) in held:
+                continue
+            value = held.get((WINDOW_LEADER, choice), WINDOW_ON)
+            connection.execute("INSERT INTO options (capability, choice, value) VALUES (?,?,?)",
+                               (capability, choice, value if value in (WINDOW_ON, WINDOW_OFF) else WINDOW_ON))
 
     def close(self) -> None:
         with self._lock:

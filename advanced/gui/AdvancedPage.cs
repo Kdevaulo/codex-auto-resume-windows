@@ -1119,6 +1119,8 @@ namespace CodexAutoResume
                 advancedChoices.Add(combo);
                 BuildCustomEntry(id, key, label, CustomRange(option), card);
             }
+            // v0.6.16 final: a capability with both its windows switched off says it acts on neither (AdvancedUsage.cs).
+            BuildNoWindowNote(options, card);
             // v0.6.16-beta.4: the wrap-up's Custom wording, under its drop-downs (AdvancedUsage.cs).
             BuildWordings(id, options, card);
         }
