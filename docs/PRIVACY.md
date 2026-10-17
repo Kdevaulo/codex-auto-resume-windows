@@ -350,7 +350,7 @@ tool's own marker (below). It never selects the `title`, `preview` or
 message, and the conversation-name label comes from `threads.name` only. Identity always
 comes from the UUID, never from a label.
 
-Three reads pass over your conversation itself, and it is better to say so plainly:
+Four reads pass over your conversation itself, and it is better to say so plainly:
 
 - **For a usage limit only**, to find when the limit resets, it reads up to 8 MiB of the
   conversation's rollout file ending at the failure, into memory. That part of the file is
@@ -364,6 +364,11 @@ Three reads pass over your conversation itself, and it is better to say so plain
   whether a later turn has finished. Those rows are your conversation — the assistant's replies
   in that turn, and anyone else's messages in it — but only counts and yes/no answers come back,
   never text. What is kept is that turn's status and whether anything was produced in it.
+- **Only when you press Rescan and reconcile** (from v0.6.16), and only for a waiting recovery whose
+  conversation Codex's history has not caught up with, it reads that conversation's current rollout
+  file, up to 32 MiB, a line at a time, for the failed turn's own end and, after it, a message of
+  yours that carries no marker of this tool's. Each line is parsed and dropped; only the answer -
+  whether such a message is there - is kept.
 
 No conversation content from any of them is stored, logged or sent. What is kept is the reset
 time (which is also logged) and the limit's bucket name, and the id of the tool's own queued
