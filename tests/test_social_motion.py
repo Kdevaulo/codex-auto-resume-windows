@@ -357,6 +357,14 @@ class TheScheduleIsTheIcons(unittest.TestCase):
                      if any((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= reach * reach for cx, cy in centres)]
             self.assertEqual(make_social.head_mask(head, angle, left, top), every)
 
+    def test_the_pictures_keep_the_schedules_ms(self):
+        """motion_pictures hands write_motion each frame's delay as the schedule has it, in whole ms."""
+        rest = make_social.rest_head()
+        card = bytes(make_social.WIDTH * make_social.HEIGHT * 3)
+        delays = [delay for delay, _ in make_social.motion_pictures(card, {}, [(25,) + rest, (1525,) + rest],
+                                                                    (0, 0, (0.0, 0.0)))]
+        self.assertEqual(delays, [25, 1525])
+
     def test_its_bounds(self):
         """The still card is what GitHub's social preview takes, under a megabyte; the motion's ceiling is 8 MB."""
         self.assertEqual(make_social.STILL_LIMIT, 1000000)
