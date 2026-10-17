@@ -842,6 +842,15 @@ Three things the owner asked for on 2026-10-16, for the v0.6.16 final:
 - a smaller edition label,
 - a click on a popup's body opens its page.
 
+Also for the v0.6.16 final, and what the owner asked for as the beta line went on:
+
+- **Notices that stay on screen until clicked**, chosen for each kind of notice - the advanced edition's
+  kinds too, on the Dashboard alone,
+- **an update that explains itself**: the setup wizard, a notes page before the update and an "updated" page
+  after it, the watcher and any open Dashboard restarted on the new version, and *Repair* and *Remove* offered
+  when the same version is already installed,
+- **release pages that start with direct download links**, the setup program recommended first.
+
 ### Also moved here
 
 - **Watching several Codex homes**, a standard-edition addition that waited on measurement MH, which
@@ -882,6 +891,13 @@ capability.
 - where a click on a popup's body goes, when the chat is on: the person picks that conversation's chat here, or
   Codex at that conversation,
 - a message written while the limit is full, sent when it resets.
+
+### Compatibility data for the advanced edition
+
+- verdicts for each Codex engine, published by the admin program from the owner's records of the
+  measurements, in a file of its own for the advanced edition, so the validators of older releases are not
+  touched; installed advanced editions fetch it,
+- the reporter counts the advanced edition's outcomes as "reported" and never raises a verdict.
 
 ### Also moved here
 
