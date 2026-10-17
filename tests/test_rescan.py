@@ -362,6 +362,28 @@ class RaceTests(RescanCase):
                 result = self.run_rescan(self.changing(change))
                 self.assertEqual(self.outcome(result, row["interruption_id"])[0], "changed")
 
+    def test_a_record_that_cannot_be_applied_is_unresolved_and_the_scan_goes_on(self):
+        """Review of issue #39: one record's apply failing in any way costs that record alone."""
+        first, second = self.failure(), self.failure(OTHER)
+        self.person()
+        self.person(OTHER)
+        applied, calls = Store.rescan_apply, []
+
+        def flaky(store, key, *args, **kwargs):
+            calls.append(key)
+            if len(calls) == 1:
+                raise RuntimeError("the disk said no")
+            return applied(store, key, *args, **kwargs)
+        with patch.object(Store, "rescan_apply", flaky):
+            result = self.run_rescan()
+        hit = calls[0]
+        other = second if hit == first["interruption_id"] else first
+        self.assertEqual(self.outcome(result, hit), ("unresolved", "apply_failed"))
+        self.assertEqual(self.outcome(result, other["interruption_id"])[0], "retired", "the scan went on")
+        self.assertEqual((result["unresolved"], result["retired"]), (1, 1))
+        self.assertEqual(self.events(hit)[-1], "rescan_unresolved", "and the failed one is journalled")
+        self.assertEqual(self.record(hit)["state"], "waiting_poll")
+
     def test_a_poll_that_only_moved_the_next_look_is_no_change(self):
         row = self.failure()
         self.person()

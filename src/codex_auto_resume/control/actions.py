@@ -478,8 +478,17 @@ class ActionsMixin:
                 with self._open() as store:
                     applied = store.rescan_apply(row["interruption_id"], row, outcome, time.time(),
                                                  reason=reason, actor=actor)
-            except (ControlError, StoreError):
-                applied, outcome, reason = None, UNRESOLVED, "state_busy"      # not read again: nothing applied
+            except Exception as failed:
+                # Nothing was applied - the transaction was rolled back - and the scan goes on to the next record.
+                # This one is unresolved, and said so in its journal if the store can still write that much.
+                busy = isinstance(failed, (ControlError, StoreError))
+                applied, outcome, reason = None, UNRESOLVED, "state_busy" if busy else "apply_failed"
+                try:
+                    with self._open() as store:
+                        if not store.rescan_apply(row["interruption_id"], row, UNRESOLVED, time.time(), actor=actor):
+                            outcome, reason = CHANGED, None
+                except Exception:
+                    pass
             if applied is False:
                 outcome, reason = CHANGED, None
             counts[outcome] += 1
