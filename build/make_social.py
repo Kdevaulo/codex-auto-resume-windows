@@ -25,22 +25,25 @@ to write the HTML and stop, which is what to do on a machine with no Chromium.
 It also writes docs/images/social-preview-motion.png, an animated PNG: the same card, its mark
 moving exactly as the notification-area icon moves while the product is watching - three breaths
 of the head, then a sweep out clockwise along the white stroke and back - one whole cycle of it,
-22 s, looping forever. The motion is not drawn here: every frame's moment, head position and
-brightness is the icon's own (ui.tray.icon_frame, stepped by icon_frame_ms as the icon's timer
-steps, through make_screenshots.icon_timeline), and every picture of the head is Edge's, from the
-card's own page with the head's circle placed and tinted per frame - all of them in one headless
-run, a sprite sheet of the card clipped round the mark.
+22 s, looping forever. The motion is not drawn here: it is the icon's own curve (ui.tray.icon_turn
+for the sweep, brand._breath over the monitoring breath for the tint), sampled every 25 ms as the
+README's moving logo samples it (build/motion_logo.py: cycle, moment, tint) - the same curve as the
+tray's, only denser than the tray's timer can afford (the owner, 2026-10-18: "그 소셜 프리뷰도
+새로"). Every picture of the head is Edge's, from the card's own page with the head's circle placed
+at that sample's angle and tinted - a sprite sheet of the card clipped round the mark, in a few
+headless runs, each of which also draws the mark at rest to prove it draws the card's pixels.
 
 An APNG and not a GIF: a GIF holds 256 colours, and the card is two soft gradients and anti-aliased
 text, which a palette and its dither visibly degrade (the owner, on a first cut as a GIF). An APNG
 keeps every pixel: its default image is the card's PNG itself, chunk for chunk, so a viewer that
 does not animate PNGs - and most link unfurlers, which show one still picture anyway - shows
 exactly docs/images/social-preview.png, the mark at rest at full brightness. Each later frame is
-only the rectangle round the head that changed, so the whole cycle stays under GitHub's 1 MB.
+only the rectangle round the head that changed. Quality comes before size (the owner, 2026-10-18):
+the motion is held under MOTION_LIMIT (8 MB) and is no longer meant for GitHub's social preview
+upload, which takes a PNG of less than 1 MB - the still card, held under STILL_LIMIT, is that.
 
-Upload either the same way (Settings -> General -> Social preview -> Edit -> Upload an image; it
-takes a PNG of less than 1 MB): the motion file to have it move where it can, the still one for a
-card that never does. Pass --png-only to make only the still card.
+Upload the still card (Settings -> General -> Social preview -> Edit -> Upload an image). Pass
+--png-only to make only the still card.
 """
 from __future__ import annotations
 
@@ -63,10 +66,14 @@ MOTION = ROOT / "docs" / "images" / "social-preview-motion.png"
 WIDTH, HEIGHT = 1280, 640
 # The mark's side on the card (TEMPLATE's .mark) and in its SVG's own units.
 MARK_PX, SVG_BOX = 264, 512
-# GitHub takes a social preview of less than a megabyte.
-MOTION_LIMIT = 1000000
-# The shortest a frame is held, in hundredths of a second: browsers show 10 ms or less for 100 ms.
-SHORTEST = 2
+# GitHub takes a social preview of less than a megabyte: the still card is the one uploaded.
+STILL_LIMIT = 1000000
+# The moving card's ceiling: quality before size, so a ceiling and no target (the owner, 2026-10-18).
+MOTION_LIMIT = 8000000
+# How often the icon's curve is sampled, in ms: motion_logo's step, forty frames a second.
+STEP_MS = 25
+# Sprite cells per headless run, the mark at rest among them: a sheet of 8 x 6 cells.
+SPRITE_BATCH = 48
 # Room round the mark in each sprite cell, so its rounded corners' edges are inside the cell.
 CELL_PAD = 6
 # How far past the head's edge a frame takes its own pixels, for the edge Edge softens.
@@ -144,6 +151,8 @@ def rasterise(page: Path) -> None:
         width, height = struct.unpack(">II", header[16:24])
         if (width, height) != (WIDTH, HEIGHT):
             raise SystemExit("expected %dx%d, got %dx%d" % (WIDTH, HEIGHT, width, height))
+        if shot.stat().st_size >= STILL_LIMIT:
+            raise SystemExit("the card is %d bytes: GitHub takes less than %d" % (shot.stat().st_size, STILL_LIMIT))
         TARGET.parent.mkdir(parents=True, exist_ok=True)
         TARGET.write_bytes(shot.read_bytes())
 
@@ -162,43 +171,38 @@ def watching_loop_ms() -> float:
     return float(brand.GLOW["monitoring_ms"]) * (motion["breaths"] + motion["sweep_breaths"])
 
 
-def schedule() -> list:
-    """[(delay in hundredths of a second, head position, breathing level)] for one cycle of watching from the
-    moment it is entered: the frames the icon's own timer shows (make_screenshots.icon_timeline), each held until
-    the next, in the hundredths of a second browsers keep best. Each frame starts on its own moment rounded, so
-    rounding never adds up and the delays sum to the cycle exactly; a frame due less than SHORTEST after the one
-    before takes that one's place, and a frame the same as the one before only lengthens it."""
-    import make_screenshots
-    loop = watching_loop_ms()
-    total = int(round(loop / 10.0))
-    ticks = []                                       # [hundredth it starts, position, level]
-    for at, position, level in make_screenshots.icon_timeline("watching", 0.0, loop):
-        hundredth = int(round(at / 10.0))
-        if hundredth > total - SHORTEST:
-            break
-        if ticks and ticks[-1][1:] == [position, level]:
-            continue
-        if ticks and hundredth - ticks[-1][0] < SHORTEST:
-            ticks[-1][1:] = [position, level]
-            continue
-        ticks.append([hundredth, position, level])
+def rest_head() -> tuple:
+    """(angle, colour) of the head at rest: in its place at the sweep's end, in watching's full colour."""
+    from codex_auto_resume.ui import tray
+    return (round(brand.ICON_SHAPE["arc_end"], 6), tuple(tray.icon_head_colour("watching")))
+
+
+def schedule(step_ms: int = STEP_MS) -> list:
+    """[(delay in ms, head angle, head colour)] for one cycle of watching from the moment it is entered: the icon's own
+    curve sampled every `step_ms` (motion_logo.cycle - icon_turn's angle, the monitoring breath's tint), each sample
+    held until the next, the last to the cycle's end. A sample whose head is the one before's - the same angle and
+    the same colour - only lengthens that one, so no two frames running are the same picture. The delays sum to the
+    cycle exactly, and every one is a whole number of steps."""
+    import motion_logo
+    from codex_auto_resume.ui import tray
+    colour = tray.icon_head_colour("watching")
     out = []
-    for index, (hundredth, position, level) in enumerate(ticks):
-        following = ticks[index + 1][0] if index + 1 < len(ticks) else total
-        out.append((following - hundredth, position, level))
+    for delay, angle, dim in motion_logo.cycle("watching", step_ms):
+        head = (round(angle, 6), tuple(motion_logo.tint(colour, dim)))
+        if out and out[-1][1:] == head:
+            out[-1] = (out[-1][0] + delay,) + head
+        else:
+            out.append((delay,) + head)
     return out
 
 
-def mark_svg(svg: str, position: int, level: int) -> str:
-    """The mark's SVG with its head at `position` round the ring, in watching's colour at breathing `level`: the
-    head IconFrames draws for that frame, written as assets/make_icon.py writes it. Position 0 at the top level is
-    the SVG as it is, byte for byte."""
+def mark_svg(svg: str, angle: float, colour) -> str:
+    """The mark's SVG with its head at `angle` degrees round the ring in `colour` (red, green, blue): the head the
+    icon draws at that moment, written as assets/make_icon.py writes it. At rest - rest_head() - it is the SVG as it
+    is, byte for byte."""
     import re
-    from codex_auto_resume.ui import tray
-    angle = brand.ICON_SHAPE["arc_end"] - 360.0 * position / tray.ICON_MOTION["positions"]
     x, y = brand.icon_head_centre(angle)
     centre = SVG_BOX / 2.0
-    colour = tray.icon_level_colour(tray.icon_head_colour("watching"), level)
     head = '<circle cx="%.3f" cy="%.3f" r="%.3f" fill="#%02X%02X%02X"/>' % (
         (centre + x * centre, centre - y * centre, brand.ICON_SHAPE["head_radius"] * centre) + tuple(colour))
     made, count = re.subn(r'<circle [^>]*/>', lambda _match: head, svg)
@@ -230,20 +234,24 @@ def mark_box(rgb: bytes) -> tuple:
     return (int(left - CELL_PAD) // DITHER * DITHER, int(top - CELL_PAD) // DITHER * DITHER, head)
 
 
-def head_mask(head: tuple, position: int, left: int, top: int) -> list:
-    """The cell's pixel offsets a frame with the head at `position` takes from its own cell: those within reach of
-    the head at rest or at `position` (MASK_REACH past its edge, for the edge's softening). Everything else is the
+def head_mask(head: tuple, angle: float, left: int, top: int) -> list:
+    """The cell's pixel offsets a frame with the head at `angle` takes from its own cell: those within reach of
+    the head at rest or at `angle` (MASK_REACH past its edge, for the edge's softening). Everything else is the
     card's own pixel, so nothing but the head changes - however Edge's dither falls in a cell."""
-    from codex_auto_resume.ui import tray
     scale = MARK_PX / 2.0
     rest = brand.icon_head_centre()
-    there = brand.icon_head_centre(brand.ICON_SHAPE["arc_end"] - 360.0 * position / tray.ICON_MOTION["positions"])
+    there = brand.icon_head_centre(angle)
     reach = brand.ICON_SHAPE["head_radius"] * scale + MASK_REACH
     centres = [(head[0] - left, head[1] - top),
                (head[0] - left + (there[0] - rest[0]) * scale, head[1] - top - (there[1] - rest[1]) * scale)]
     cell = cell_size()
-    return [y * cell + x for y in range(cell) for x in range(cell)
-            if any((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= reach * reach for cx, cy in centres)]
+    offsets = set()
+    for cx, cy in centres:
+        for y in range(max(0, int(cy - reach) - 1), min(cell, int(cy + reach) + 2)):
+            for x in range(max(0, int(cx - reach) - 1), min(cell, int(cx + reach) + 2)):
+                if (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= reach * reach:
+                    offsets.add(y * cell + x)
+    return sorted(offsets)
 
 
 def cell_size() -> int:
@@ -253,7 +261,7 @@ def cell_size() -> int:
 
 
 def sprite_page(svg: str, heads: list, left: int, top: int) -> tuple:
-    """A page of cells, one per (position, level) of `heads`: each the whole card page in a frame of its own,
+    """A page of cells, one per (angle, colour) of `heads`: each the whole card page in a frame of its own,
     clipped to the box at (left, top) round the mark - so each is laid out and drawn as the card is, pixel for
     pixel. (html, columns, rows)."""
     import html
@@ -264,15 +272,24 @@ def sprite_page(svg: str, heads: list, left: int, top: int) -> tuple:
              ".c{position:absolute;width:%dpx;height:%dpx;overflow:hidden}"
              ".c iframe{position:absolute;left:%dpx;top:%dpx;width:%dpx;height:%dpx;border:0}</style>"
              % (cell, cell, -left, -top, WIDTH, HEIGHT)]
-    for index, (position, level) in enumerate(heads):
+    for index, (angle, colour) in enumerate(heads):
         parts.append('<div class="c" style="left:%dpx;top:%dpx"><iframe scrolling="no" srcdoc="%s"></iframe></div>'
                      % (index % columns * cell, index // columns * cell,
-                        html.escape(page_text(mark_svg(svg, position, level)), quote=True)))
+                        html.escape(page_text(mark_svg(svg, angle, colour)), quote=True)))
     return "".join(parts), columns, rows
 
 
-def render_sprites(svg: str, heads: list, left: int, top: int) -> dict:
-    """{(position, level): that cell's RGB}, every cell from one headless Edge run."""
+def sprite_batches(heads: list) -> list:
+    """`heads` in sheets of SPRITE_BATCH cells, the head at rest first in every one: each headless run then shows
+    that it draws the card's own pixels, not only the first."""
+    rest = rest_head()
+    moving = [head for head in heads if head != rest]
+    size = SPRITE_BATCH - 1
+    return [[rest] + moving[at:at + size] for at in range(0, max(1, len(moving)), size)]
+
+
+def render_sheet(svg: str, heads: list, left: int, top: int) -> dict:
+    """{(angle, colour): that cell's RGB}, every cell of `heads` from one headless Edge run."""
     import make_screenshots
     page_html, columns, rows = sprite_page(svg, heads, left, top)
     cell = cell_size()
@@ -298,6 +315,20 @@ def render_sprites(svg: str, heads: list, left: int, top: int) -> dict:
     return cells
 
 
+def render_sprites(svg: str, heads: list, left: int, top: int, card: bytes) -> dict:
+    """{(angle, colour): that cell's RGB} for every head, sprite_batches' sheets one headless run each. Each sheet's
+    mark at rest must be the card's within SPRITE_DRIFT (Edge's dither), or it is not the same picture."""
+    cells = {}
+    region = card_region(card, left, top)
+    for batch in sprite_batches(heads):
+        sheet = render_sheet(svg, batch, left, top)
+        drift = max(abs(one - other) for one, other in zip(sheet[batch[0]], region))
+        if drift > SPRITE_DRIFT:
+            raise SystemExit("a sprite sheet's mark at rest is %d levels off the card's: not the same picture" % drift)
+        cells.update(sheet)
+    return cells
+
+
 def card_region(rgb: bytes, left: int, top: int) -> bytes:
     """The card's pixels a sprite cell at (left, top) covers."""
     cell = cell_size()
@@ -306,21 +337,20 @@ def card_region(rgb: bytes, left: int, top: int) -> bytes:
 
 
 def motion_pictures(card: bytes, cells: dict, plan: list, box: tuple):
-    """(delay as a Fraction of a second, the whole frame's RGB) for each frame of `plan`, one at a time: the card,
-    with the pixels of the frame's head_mask taken from its cell. Every other pixel is the card's own, so only the
-    head ever changes, and the frame at rest is the card exactly."""
-    from fractions import Fraction
+    """(delay in ms, the whole frame's RGB) for each frame of `plan`, one at a time: the card, with the pixels of the
+    frame's head_mask taken from its cell. Every other pixel is the card's own, so only the head ever changes, and
+    the frame at rest is the card exactly."""
     cell = cell_size()
     left, top, head = box
-    rest = (0, top_level())
-    for delay, position, level in plan:
+    rest = rest_head()
+    for delay, angle, colour in plan:
         picture = bytearray(card)
-        if (position, level) != rest:
-            source = cells[(position, level)]
-            for offset in head_mask(head, position, left, top):
+        if (angle, colour) != rest:
+            source = cells[(angle, colour)]
+            for offset in head_mask(head, angle, left, top):
                 at = ((top + offset // cell) * WIDTH + left + offset % cell) * 3
                 picture[at:at + 3] = source[offset * 3:offset * 3 + 3]
-        yield Fraction(delay, 100), bytes(picture)
+        yield delay, bytes(picture)
 
 
 def png_chunks(raw: bytes) -> list:
@@ -337,7 +367,8 @@ def png_chunks(raw: bytes) -> list:
 
 def write_motion(path: Path, still: bytes, pictures) -> int:
     """An APNG that loops forever, whose default image is `still` - the card's PNG - chunk for chunk, so a viewer
-    without APNG shows exactly the card; returns its frame count. `pictures` is motion_pictures': the first is the
+    without APNG shows exactly the card; returns its frame count. `pictures` is motion_pictures' (a delay is whole ms,
+    or a Fraction of a second, as make_screenshots._delay_parts takes it): the first is the
     card, each later one is written as the rectangle that differs from the frame before, drawn over it with the
     frame before kept (APNG_KEEP, APNG_OVER - every pixel of the rectangle is opaque, so it is exact). The writing is
     make_screenshots.write_apng_patches', but for the default image, which that writes from pixels again."""
@@ -374,39 +405,36 @@ def write_motion(path: Path, still: bytes, pictures) -> int:
     return count
 
 
-def top_level() -> int:
-    """The head's full brightness, the top of the breath."""
-    from codex_auto_resume.ui import tray
-    return tray.ICON_MOTION["levels"] - 1
-
-
 def render_motion(svg: str) -> list:
-    """docs/images/social-preview-motion.png, from the card as it is and one sprite sheet of its mark; the plan."""
+    """docs/images/social-preview-motion.png, from the card as it is and sprite sheets of its mark; the plan."""
     import make_screenshots
     width, height, card = make_screenshots.read_png_rgb(TARGET)
     if (width, height) != (WIDTH, HEIGHT):
         raise SystemExit("the card is %dx%d" % (width, height))
     plan = schedule()
-    if plan[0][1:] != (0, top_level()):
+    if plan[0][1:] != rest_head():
         raise SystemExit("frame 1 is not the mark at rest at full brightness")
     box = mark_box(card)
     left, top, _head = box
-    heads = sorted({(position, level) for _, position, level in plan})
-    cells = render_sprites(svg, heads, left, top)
-    drift = max(abs(one - other) for one, other in zip(cells[plan[0][1:]], card_region(card, left, top)))
-    if drift > SPRITE_DRIFT:
-        raise SystemExit("the sprite sheet's mark at rest is %d levels off the card's: not the same picture" % drift)
+    heads = sorted({(angle, colour) for _, angle, colour in plan})
+    cells = render_sprites(svg, heads, left, top, card)
     count = write_motion(MOTION, TARGET.read_bytes(), motion_pictures(card, cells, plan, box))
     if count != len(plan):
         raise SystemExit("%d frames written of %d" % (count, len(plan)))
     size = MOTION.stat().st_size
     if size >= MOTION_LIMIT:
-        raise SystemExit("%s is %d bytes: GitHub takes less than %d" % (MOTION, size, MOTION_LIMIT))
+        raise SystemExit("%s is %d bytes: its ceiling is %d" % (MOTION, size, MOTION_LIMIT))
     return plan
 
 
 def main(argv=None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
+    """--page-only writes the page and stops; --png-only makes the still card alone; --out DIR writes both pictures
+    into DIR instead of docs/images (a scratch render, which leaves the committed pictures alone)."""
+    global TARGET, MOTION
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if "--out" in argv:
+        folder = Path(argv[argv.index("--out") + 1]).resolve()
+        TARGET, MOTION = folder / TARGET.name, folder / MOTION.name
     svg = (ROOT / "assets" / "brand" / "icon.svg").read_text(encoding="utf-8")
     PAGE.parent.mkdir(parents=True, exist_ok=True)
     PAGE.write_text(page_text(svg), encoding="utf-8")
@@ -416,14 +444,13 @@ def main(argv=None) -> int:
               % (WIDTH, HEIGHT))
         return 0
     rasterise(PAGE)
-    print("card  : %s (%dx%d, %d bytes)"
-          % (TARGET.relative_to(ROOT), WIDTH, HEIGHT, TARGET.stat().st_size))
+    print("card  : %s (%dx%d, %d bytes)" % (TARGET, WIDTH, HEIGHT, TARGET.stat().st_size))
     if "--png-only" not in argv:
         plan = render_motion(svg)
-        print("motion: %s (%d frames, %.2f s a cycle, %d bytes)"
-              % (MOTION.relative_to(ROOT), len(plan), sum(each[0] for each in plan) / 100.0,
-                 MOTION.stat().st_size))
-    print("upload: Settings -> General -> Social preview -> Edit -> Upload an image (either PNG)")
+        loop = sum(each[0] for each in plan)
+        print("motion: %s (%d frames, %.3f s a cycle, %.1f frames a second, %d bytes)"
+              % (MOTION, len(plan), loop / 1000.0, len(plan) * 1000.0 / loop, MOTION.stat().st_size))
+    print("upload: Settings -> General -> Social preview -> Edit -> Upload an image (the still card)")
     return 0
 
 
