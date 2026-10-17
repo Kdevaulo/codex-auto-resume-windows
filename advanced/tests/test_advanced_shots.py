@@ -24,6 +24,9 @@ for _path in (str(ROOT / "advanced" / "src"), str(ROOT / "src"), str(ROOT / "bui
 
 import advanced_shots as shots_made  # noqa: E402
 from advanced_shots import Need, Shot  # noqa: E402
+# Imported here, before any pinned clock, as the advanced package's report tests import it before this module runs:
+# the report a seed writes must still be stamped with the pinned clock (SeedTests' same-every-time).
+from codex_auto_resume_advanced.report import flow as _report_flow  # noqa: E402,F401
 
 BEFORE_AFTER = {"P1-before": "advanced-page-before", "P1-after": "advanced-page-after",
                 "P4-before": "advanced-scheduled-before", "P4-after": "advanced-scheduled-after",
