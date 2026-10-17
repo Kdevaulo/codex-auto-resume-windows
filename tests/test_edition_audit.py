@@ -145,6 +145,14 @@ class InventoryTests(unittest.TestCase):
         for name in ("CapabilityRegistry", "VALUE_WORDS", "Stage2"):
             self.assertIn(name, tree.names)
 
+    def test_a_name_the_standard_library_gives_a_module_is_not_an_advanced_name(self):
+        """The bundled runtime spells its own module names (python313.zip's _pyrepl/mypy.ini says
+        `_overlapped`), so an advanced helper named like one must not make the standard archive a leak."""
+        declared = ("# %s\ndef _overlapped():\n    pass\n\ndef _pipe_frame():\n    pass\n" % SENTINEL).encode("utf-8")
+        tree = audit.Inventory.build({"advanced/src/%s/codex/ipc.py" % PACKAGE: declared}, CORE_PYTHON)
+        self.assertNotIn("_overlapped", tree.names)
+        self.assertIn("_pipe_frame", tree.names)
+
     def test_a_capitalised_word_is_looked_for_among_codes_identifiers_and_nowhere_else(self):
         """Such a word is English as often as a name, so no text is searched for it - but the
         advanced tree's vocabulary enums and its tables are declared by such words, and one of
