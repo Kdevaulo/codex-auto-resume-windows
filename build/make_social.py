@@ -38,12 +38,12 @@ text, which a palette and its dither visibly degrade (the owner, on a first cut 
 keeps every pixel: its default image is the card's PNG itself, chunk for chunk, so a viewer that
 does not animate PNGs - and most link unfurlers, which show one still picture anyway - shows
 exactly docs/images/social-preview.png, the mark at rest at full brightness. Each later frame is
-only the rectangle round the head that changed. Quality comes before size (the owner, 2026-10-18):
-the motion is held under MOTION_LIMIT (8 MB) and is no longer meant for GitHub's social preview
-upload, which takes a PNG of less than 1 MB - the still card, held under STILL_LIMIT, is that.
+only the rectangle round the head that changed, its unchanged pixels written as a colour a tRNS
+chunk makes transparent (write_motion), so the whole cycle at 25 ms stays under MOTION_LIMIT -
+950 kB, under GitHub's megabyte with room to spare: the moving card is the one uploaded.
 
-Upload the still card (Settings -> General -> Social preview -> Edit -> Upload an image). Pass
---png-only to make only the still card.
+Upload it (Settings -> General -> Social preview -> Edit -> Upload an image; a PNG of less than
+1 MB). Pass --png-only to make only the still card.
 """
 from __future__ import annotations
 
@@ -66,10 +66,10 @@ MOTION = ROOT / "docs" / "images" / "social-preview-motion.png"
 WIDTH, HEIGHT = 1280, 640
 # The mark's side on the card (TEMPLATE's .mark) and in its SVG's own units.
 MARK_PX, SVG_BOX = 264, 512
-# GitHub takes a social preview of less than a megabyte: the still card is the one uploaded.
-STILL_LIMIT = 1000000
-# The moving card's ceiling: quality before size, so a ceiling and no target (the owner, 2026-10-18).
-MOTION_LIMIT = 8000000
+# GitHub takes a social preview of less than a megabyte, and the moving card is the one uploaded (the owner).
+UPLOAD_LIMIT = 1000000
+# The moving card's ceiling: under the upload's, with room to spare.
+MOTION_LIMIT = 950000
 # How often the icon's curve is sampled, in ms: motion_logo's step, forty frames a second.
 STEP_MS = 25
 # Sprite cells per headless run, the mark at rest among them: a sheet of 8 x 6 cells.
@@ -151,8 +151,8 @@ def rasterise(page: Path) -> None:
         width, height = struct.unpack(">II", header[16:24])
         if (width, height) != (WIDTH, HEIGHT):
             raise SystemExit("expected %dx%d, got %dx%d" % (WIDTH, HEIGHT, width, height))
-        if shot.stat().st_size >= STILL_LIMIT:
-            raise SystemExit("the card is %d bytes: GitHub takes less than %d" % (shot.stat().st_size, STILL_LIMIT))
+        if shot.stat().st_size >= UPLOAD_LIMIT:
+            raise SystemExit("the card is %d bytes: GitHub takes less than %d" % (shot.stat().st_size, UPLOAD_LIMIT))
         TARGET.parent.mkdir(parents=True, exist_ok=True)
         TARGET.write_bytes(shot.read_bytes())
 
@@ -365,13 +365,31 @@ def png_chunks(raw: bytes) -> list:
     return chunks
 
 
+def colour_key(colours) -> bytes:
+    """The first colour, counting up from black, that is in none of `colours` (3-byte RGB): the one a later frame
+    marks its unchanged pixels with."""
+    for red in range(256):
+        for green in range(256):
+            for blue in range(256):
+                colour = bytes((red, green, blue))
+                if colour not in colours:
+                    return colour
+    raise SystemExit("the motion uses every colour there is: none is left to mark an unchanged pixel")
+
+
 def write_motion(path: Path, still: bytes, pictures) -> int:
     """An APNG that loops forever, whose default image is `still` - the card's PNG - chunk for chunk, so a viewer
     without APNG shows exactly the card; returns its frame count. `pictures` is motion_pictures' (a delay is whole ms,
-    or a Fraction of a second, as make_screenshots._delay_parts takes it): the first is the
-    card, each later one is written as the rectangle that differs from the frame before, drawn over it with the
-    frame before kept (APNG_KEEP, APNG_OVER - every pixel of the rectangle is opaque, so it is exact). The writing is
-    make_screenshots.write_apng_patches', but for the default image, which that writes from pixels again."""
+    or a Fraction of a second, as make_screenshots._delay_parts takes it): the first is the card, each later one is
+    written as the rectangle that differs from the frame before, drawn over it with the frame before kept
+    (APNG_KEEP, APNG_OVER).
+
+    Inside that rectangle the pixels the frame does not change are written as one colour no frame has (colour_key),
+    which a tRNS chunk makes transparent: drawn over the frame before, they leave it as it was, so every picture is
+    exactly what it was, and the rectangle's unchanged ground - Edge's dither, which deflate cannot shrink - becomes
+    one flat colour, which it can. That is what keeps the cycle at 25 ms under GitHub's megabyte (the owner,
+    2026-10-18: the motion is the upload). The key is in no pixel of the card, so the default image, frame 1, is
+    the card exactly and wholly opaque."""
     import zlib
     import make_screenshots as shots
     chunks = png_chunks(still)
@@ -381,28 +399,39 @@ def write_motion(path: Path, still: bytes, pictures) -> int:
     pictures = iter(pictures)
     delay, previous = next(pictures)
     numerator, denominator = shots._delay_parts(delay)
-    body, sequence, count = bytearray(), 1, 1
+    colours = {bytes(previous[at:at + 3]) for at in range(0, len(previous), 3)}
+    later = []                                       # (delay, box, the box's new pixels, its pixels before)
     for delay, picture in pictures:
         box = shots._apng_changed(previous, picture, WIDTH, HEIGHT) or (0, 0, 1, 1)
+        after = shots._region(picture, WIDTH, box)
+        colours.update(after[at:at + 3] for at in range(0, len(after), 3))
+        later.append((delay, box, after, shots._region(previous, WIDTH, box)))
+        previous = picture
+    key = colour_key(colours)
+    body, sequence = bytearray(), 1
+    for delay, box, after, before in later:
         left, top, wide, tall = box
-        later = shots._delay_parts(delay)
+        keyed = bytearray(after)
+        for at in range(0, len(after), 3):
+            if after[at:at + 3] == before[at:at + 3]:
+                keyed[at:at + 3] = key
+        parts = shots._delay_parts(delay)
         body += shots._png_chunk(b"fcTL", struct.pack(">IIIIIHHBB", sequence, wide, tall, left, top,
-                                                      later[0], later[1], shots.APNG_KEEP, shots.APNG_OVER))
-        rows = shots._png_rows(shots._region(picture, WIDTH, box), wide, tall, wide, 0, 0)
+                                                      parts[0], parts[1], shots.APNG_KEEP, shots.APNG_OVER))
+        rows = shots._png_rows(bytes(keyed), wide, tall, wide, 0, 0)
         body += shots._png_chunk(b"fdAT", struct.pack(">I", sequence + 1) + zlib.compress(rows, 9))
         sequence += 2
-        count += 1
-        previous = picture
     out = bytearray(b"\x89PNG\r\n\x1a\n")
     out += shots._png_chunk(b"IHDR", header)
-    out += shots._png_chunk(b"acTL", struct.pack(">II", count, 0))
+    out += shots._png_chunk(b"acTL", struct.pack(">II", 1 + len(later), 0))
+    out += shots._png_chunk(b"tRNS", struct.pack(">HHH", *key))
     out += shots._png_chunk(b"fcTL", struct.pack(">IIIIIHHBB", 0, WIDTH, HEIGHT, 0, 0, numerator, denominator,
                                                  shots.APNG_KEEP, shots.APNG_OVER))
     out += b"".join(shots._png_chunk(kind, data) for kind, data in chunks if kind == b"IDAT")
     out += body
     out += shots._png_chunk(b"IEND", b"")
     shots.write_file(path, bytes(out))
-    return count
+    return 1 + len(later)
 
 
 def render_motion(svg: str) -> list:
@@ -423,7 +452,8 @@ def render_motion(svg: str) -> list:
         raise SystemExit("%d frames written of %d" % (count, len(plan)))
     size = MOTION.stat().st_size
     if size >= MOTION_LIMIT:
-        raise SystemExit("%s is %d bytes: its ceiling is %d" % (MOTION, size, MOTION_LIMIT))
+        raise SystemExit("%s is %d bytes: GitHub takes less than %d, and its ceiling is %d"
+                         % (MOTION, size, UPLOAD_LIMIT, MOTION_LIMIT))
     return plan
 
 
@@ -450,7 +480,7 @@ def main(argv=None) -> int:
         loop = sum(each[0] for each in plan)
         print("motion: %s (%d frames, %.3f s a cycle, %.1f frames a second, %d bytes)"
               % (MOTION, len(plan), loop / 1000.0, len(plan) * 1000.0 / loop, MOTION.stat().st_size))
-    print("upload: Settings -> General -> Social preview -> Edit -> Upload an image (the still card)")
+    print("upload: Settings -> General -> Social preview -> Edit -> Upload an image (the moving card)")
     return 0
 
 
