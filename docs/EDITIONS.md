@@ -948,8 +948,10 @@ Two editions installed side by side are not supported: one installation is one e
 
 Changing edition is a reinstall, never an update. Run the other edition's setup program, or its
 archive's `Install.cmd`: the installer says which edition is installed, what the change keeps and
-what it changes, and asks before it replaces anything (`Change the edition? [y/N]`; anything but yes
-changes nothing). From a command line, `scripts/bootstrap.ps1 -Edition Standard` or `-Edition
+what it changes, and asks before it replaces anything: the setup program in its window, where *Change the
+edition* has to be chosen before it will start, and `Install.cmd` with `Change the edition? [y/N]`, where
+anything but yes changes nothing. With `-Silent` nobody can be asked, so nothing is changed and it ends with
+exit code 14. From a command line, `scripts/bootstrap.ps1 -Edition Standard` or `-Edition
 Advanced` chooses the edition, and over the other edition it needs `-Force` as well. The change keeps
 your settings, your pause, everything waiting to resume and the sign-in choice, and every advanced
 capability starts off (K2). Codex's own copy of the plugin can stay the old edition's until Codex
@@ -995,32 +997,35 @@ limit to reset has ended. It keeps every standard (H14 and F15 in [STANDARDS.md]
 A28 amended by the owner for its stop button), so it is in the standard edition, off until a person
 turns it on in the Dashboard.
 
-Then, after v0.6.13's fix of how Codex's engine is found, v0.6.14 brings the first part of the rest
+Then, after v0.6.13's fix of how Codex's engine is found, v0.6.14 brought the first part of the rest
 of the advanced edition: the six capabilities [above](#todays-capabilities) that follow the goal
 continuation, and with them Once more when unsure, Send now, Keep it on, the compatibility report
-and the three for a usage reset you pick. It was to be the first of several pre-releases and is
-published as a final instead (owner, 2026-10-10). The rest moves to v0.6.15, each part published as
-a pre-release as it is finished. Each new capability is the advanced edition's alone, off until you
+and the three for a usage reset you pick. It was to be the first of several pre-releases and was
+published as a final instead (owner, 2026-10-10). v0.6.15 was a fix alone (owner, 2026-10-13), so the
+rest went to v0.6.16, which came in four pre-releases and is out: its first, v0.6.16-beta, built the
+six capabilities of stage 3c, and the next three a route of its own, other kinds of session and the
+usage capabilities. What is left - stage 5 and the chat inside the Dashboard - is v0.6.17, which begins
+with a pre-release, v0.6.17-alpha, and publishes each part as a pre-release as it is finished. Each new capability is the advanced edition's alone, off until you
 turn it on, with a statement that names the standards it departs from. This is a direction, not a
 promise; [ROADMAP.md](ROADMAP.md) has the whole list: the two additions in its v0.6.12 section, what
-is built in its v0.6.14 section, and the rest in its v0.6.15 section, under the same four headings
-as below.
+is built in its v0.6.14 and v0.6.16 sections, and the rest in its v0.6.17 section, under the same
+four headings as below.
 
 - **Recovery through the channels already in use** - several conversations at once,
   empty-response recovery, an unloaded conversation through a queue that waits for it, a subagent
   through its parent, keep going after a normal completion, and a prompt queue and recurring
-  wakes - all six built in its first pre-release, v0.6.15-beta, and described
+  wakes - all six built in v0.6.16's first pre-release, v0.6.16-beta (published first as v0.6.15-beta), and described
   [above](#todays-capabilities).
 - **A route of its own, and other kinds of session** - a conversation nothing holds, run through
   Codex's app server; CLI, TUI and IDE sessions; a full context compacted, then continued; another
   model at capacity; a continuation with no words - all built in v0.6.16-beta.4, described
   [above](#todays-capabilities); and a continuation inside the turn through a Codex Stop hook, planned for
   v0.6.17. (Codex's own retry settings are offered only once a measurement passes.)
-- **Around recovery** - a live usage meter, a wrap-up nudge near a limit and usage analytics; a
-  provider status feed and push notifications through one courier process, the advanced edition's only
+- **Around recovery** - usage analytics (the live usage meter and the wrap-up near a limit are built,
+  described [above](#todays-capabilities)); a provider status feed and push notifications through one courier process, the advanced edition's only
   outbound network code; a local API and web view, remote control over Telegram and a read-only view
   of other PCs; switching the Codex account on your command; a weekly update check while idle; crash
   supervision, a wake timer for a reset and *Open Codex* on the card.
 - **Also moved here** - watching several Codex homes, which the standard edition gains and
-  v0.6.15-beta built; Arabic and
+  v0.6.16-beta built; Arabic and
   Hebrew; winget manifests for both editions.
