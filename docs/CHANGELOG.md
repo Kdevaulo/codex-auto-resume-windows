@@ -1,5 +1,87 @@
 # Changelog
 
+## v0.6.16-beta.4 — A conversation nothing holds is run here, other kinds of session, and the usage capabilities finished
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta.3...v0.6.16-beta.4)
+
+**A pre-release: stage 4 of the advanced edition, the usage capabilities finished, and two fixes for both
+editions.** It is a GitHub pre-release, so `releases/latest` stays v0.6.15; an installation of v0.6.15 or of an
+earlier v0.6.16 beta is offered it by *Check for updates*, which asks first and says it is tested less, and
+*Install another version...* lists it. As with v0.6.16-beta.3, a plugin copy older than v0.6.11-beta.2's cannot
+read a numbered pre-release: set up and repair with the installation's own copy.
+
+**Going back.** The watcher's state stays schema 5. The advanced edition's own file is now version 7 - the
+turns run here, the Dashboard chat's table for v0.6.17, the wrap-up's switches and words - brought up from
+version 5 or 6 the first time it is opened, every row kept. An advanced version older than this one cannot read
+it and fails closed: every advanced feature is off there, and *Install another version...* says so before it
+installs one.
+
+### Both editions
+
+- **A conversation continued in, or forked by, the Codex Desktop is recovered as the app's own.** A conversation
+  started in the Codex CLI and then carried on in the Desktop app was reported as "not taken up (other_kind:
+  originator codex-tui)" when it hit a usage limit: Codex rewrites the conversation's row to the app's but its
+  first line keeps the CLI's originator. The same held for the conversation the app forks from a terminal's with
+  "continue in a new chat". Both are now taken up as the app's own; a terminal conversation the app never took
+  over, VS Code's own and a subagent's are not, and who holds a conversation still decides whether anything is
+  sent (reported by [@Kdevaulo](https://github.com/Kdevaulo),
+  [#37](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/37)).
+- **A conversation another Codex session holds waits, and nothing is sent to it.** A conversation open in a
+  terminal or in VS Code shows "Open in another Codex session (a terminal or VS Code); it continues once the Codex
+  app holds it." instead of being sent to; who holds it is read from the process list, and a holder that cannot
+  be named, two holders and a reused process id leave the state unknown.
+- **Release pages start with direct download links** to the tag's two setup programs, so the page you land on
+  from an update notice begins with what to download.
+- **Compatibility data 10** names codex-cli 0.163.0-alpha.10.2: checked in all twelve of its capabilities, none
+  verified yet.
+- **The guide says what Codex does about a full conversation**: Codex retries a failed request itself, the
+  standard edition never retries a turn that failed because the conversation outgrew its model's context window,
+  and the program never sends `/compact` - a queued `/compact` reaches Codex as plain text.
+- **The version picker reads the advanced edition's new file** and says that every advanced feature is off in an
+  advanced version older than this one.
+
+### Advanced edition
+
+- **Run a conversation here while Codex is closed.** When a recovery is due in a conversation nothing has open,
+  one turn runs here on Codex's own app server, with the program's ordinary continuation and marker and the
+  settings Codex saved for the conversation. Every approval is declined; a conversation saved with full access,
+  an outside sandbox or approvals that go to anyone else is refused before anything starts; the turn ends at the
+  hours you chose (one to six) or at once when the Codex app starts. **Turns run here now** on the Advanced
+  features page lists each turn with its cap and a Stop that asks first - the only way to stop one; no Codex tool
+  reaches it.
+- **Recover CLI, TUI and VS Code conversations.** Also finds the failures of conversations run in a terminal or
+  the VS Code extension. While another Codex session holds one, the continuation goes through `codex queue` for
+  that session; if the session ends first it is taken back. Pending and History add " · CLI" or " · VS Code" to
+  such a row, and one a newer Codex wrote than the engine installed waits until Codex is updated.
+- **Compact a full conversation, then continue.** A turn that failed because the conversation outgrew its model's
+  context window is compacted and continued once: where the app has it open, Pending says "Run /compact in Codex;
+  it continues after"; where nothing holds it and Codex is closed, it is compacted here. The program never sends
+  `/compact`.
+- **Use Codex's default model when one is at capacity.** After the attempts you chose (one to three) on a
+  conversation nothing holds, one turn runs on Codex's default model and the conversation's own model is put back
+  and read back; if Codex refuses, Pending and History say "This conversation now uses another model; switch it
+  back in Codex".
+- **Continue with no words.** A turn run here can start with no words, proven by the id it came back with, and
+  History says "continued with no words, proven by its id"; where Codex refuses it, the usual words are used and
+  the capability turns itself off. Codex's own retry settings are not offered: Codex refuses any write there.
+- **Usage meter, wrap-up and Stop near a limit, finished** (suggested by [@Hunweibyn](https://github.com/Hunweibyn),
+  [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)):
+  - the wrap-up's exact words are shown before they are sent, can be your own for each window, and can carry the
+    numbers (`{percent}`, `{window}`, `{stop_at}`) and the reset time;
+  - each usage window - the five-hour and the weekly - is switched on or off on its own;
+  - every number has *Custom...* beside its presets, checked before it is saved, with the reason shown;
+  - three numbers a window - where to warn, where to wrap up and where to stop the running turn - kept in order;
+  - the stop goes through the Codex app's own internal channel for a conversation the app has open, once a
+    window a reset, and where it cannot, our continuations are held and a notice says so;
+  - a conversation wrapped up or stopped is continued once after its window resets;
+  - the near-limit notices are in all 18 languages.
+- **Keep it on turns a capability on**, in one confirmation, and is refused for one that may not be kept on.
+- **Measurements made again on codex-cli 0.163.0-alpha.10.2** (app 26.1013.3656.0): MW, M1, M2b, M5, M6, M7,
+  MP1 to MP3, MIPC, MO, MX, MF, M3B and M6B all passed there. A capability whose measurement was not made on
+  your version of Codex shows it as a warning, as before.
+- **The Dashboard chat and the Codex Stop hook** are v0.6.17's; nothing of them is built here beyond the table
+  that stores the chat.
+
 ## v0.6.16-beta.3 — Words for this time, a conversation Codex records under another id, and a usage meter
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta.2...v0.6.16-beta.3)
