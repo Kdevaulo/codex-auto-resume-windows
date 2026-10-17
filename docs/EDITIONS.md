@@ -306,14 +306,14 @@ the conversation is on another model than the default; never for a usage, rate, 
 model, than waited.
 
 **What it risks.** The turn runs on another model, which may answer differently. If Codex refuses to put the
-conversation's model back, Pending and History say so, and you switch it back in Codex. Which way puts it
-back (MF) has not been measured.
+conversation's model back, Pending and History say so, and you switch it back in Codex. Putting it back
+through `thread/settings/update`, and reading it back, was measured (MF).
 
 **Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (it changes and replays a model setting, and runs
 a turn of its own), A2, A11, B3, B4, E8 and F8 (as Run a conversation here while Codex is closed) and
 [B9](STANDARDS.md#b-what-it-reads-and-how) (it reads Codex's error code, not only a kind).
 
-**Ceilings.** 6 a day, and 2 in any one conversation. **Measurement MF: not made yet** - a warning.
+**Ceilings.** 6 a day, and 2 in any one conversation. **Measurement MF: passed** on `codex-cli 0.163.0-alpha.10.2`; on any other version, a warning.
 
 ### Rules for Codex's error codes
 
@@ -642,8 +642,7 @@ conversation to go on without opening the app.
 **What it risks.** Work is done while nobody watches, within the conversation's own saved permissions: a
 command those settings allow can run. A conversation saved with full access, with an outside sandbox or
 with approvals that go to anyone but you is refused before anything starts. While the turn runs, the
-conversation is busy for Codex. That a turn on a conversation's own settings behaves (M6B) has not been
-measured.
+conversation is busy for Codex. That a turn on a conversation's own settings behaves was measured (M6B).
 
 **Departs from** [0.5](STANDARDS.md#0-the-edition-boundary) (it wakes a conversation and runs a turn of
 its own), A2 (a way to Codex beside `codex queue`), [A11](STANDARDS.md#a-what-it-may-send-to-codex-and-when)
@@ -653,7 +652,7 @@ lives for the turn, which this program ends). It keeps A4: the continuation carr
 marker proves its arrival.
 
 **Ceilings.** 12 a day, and 3 in any one conversation. **Measurement M6: made** on `codex-cli
-0.163.0-alpha.10.2`. **M6B: not made yet** - a warning.
+0.163.0-alpha.10.2`. **M6B: passed** there too; on any other version, a warning.
 
 ### Recover CLI, TUI and VS Code conversations
 
@@ -884,13 +883,13 @@ is started with the usual words instead, and this turns itself off.
 
 **When it helps.** When you would rather the program's sentence did not appear in a conversation.
 
-**What it risks.** Whether Codex starts a turn with no words, and keeps its id (M3B), has not been measured.
+**What it risks.** That Codex starts and ends a turn with no words was measured (M3B).
 Where Codex refuses it, this stops answering for that version of Codex. It cannot be kept on.
 
 **Departs from** [A4](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (no marker: the turn is proven by
 its id) and A26 (no words at all).
 
-**Ceilings.** 24 a day, and 5 in any one conversation. **Measurement M3B: not made yet** - a warning.
+**Ceilings.** 24 a day, and 5 in any one conversation. **Measurement M3B: passed** on `codex-cli 0.163.0-alpha.10.2`; on any other version, a warning.
 
 ### Compatibility report
 
