@@ -1101,5 +1101,12 @@
   "once.help": "Sent once, after the usual continuation message, the next time this task is continued. They start, speed up or skip nothing, and are deleted once they are sent or when the task ends without a send. Written only here, and sent exactly as you write them.",
   "once.set": "Words for this time are added to this task's next continuation.",
   "once.removed": "This task's next continuation is sent without words of yours.",
-  "explain.once_words": "Words for this time go with its next continuation, once."
+  "explain.once_words": "Words for this time go with its next continuation, once.",
+  "action.rescan": "Rescan and reconcile",
+  "confirm.rescan": "Look at every waiting recovery again? One is retired only where Codex's history proves newer work of yours came after it; every other one keeps waiting, with every check, and nothing is sent.",
+  "result.rescan": "Retired: {retired} · Rechecked: {rechecked} · Unresolved: {unresolved} · Changed meanwhile: {changed}",
+  "event.rescan_retired": "Retired by Rescan: newer work came after it",
+  "event.rescan_rechecked": "Rescan: still the latest failure, left waiting",
+  "event.rescan_unresolved": "Rescan: could not be decided, left as it was",
+  "event.rescan_changed": "Rescan: changed meanwhile, left as it was"
 }

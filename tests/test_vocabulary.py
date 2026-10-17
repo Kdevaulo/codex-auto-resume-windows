@@ -76,7 +76,9 @@ LISTS = {
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
     # same, and a person's own postponement taken away.
-    "machine.EVENT_CODES": ("set", 28, "338d004c0e77ba46"),
+    # v0.6.16 (issue #39): rescan_retired, rescan_rechecked, rescan_unresolved and rescan_changed - what a
+    # person's Rescan and reconcile found of each waiting record, one journal word for each outcome.
+    "machine.EVENT_CODES": ("set", 32, "405d5c00a0cd7440"),
     "machine.WAITING_CODES": ("set", 5, "aef153e5808afe46"),
     "machine.PUBLIC_CODES": ("set", 22, "33761768f9d99cd0"),
     "machine.PAGES": ("tuple", 6, "ffad1c9f0521398d"),
