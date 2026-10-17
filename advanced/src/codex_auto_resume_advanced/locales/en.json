@@ -507,8 +507,6 @@
   "page.option.stop_words_weekly": "Ask to stop at (weekly window)",
   "page.option.wrap_reset_time": "Include the reset time",
   "page.option.wrap_after_reset": "Continue after the reset",
-  "page.option.on": "On",
-  "page.option.off": "Off",
   "page.option.style.5": "Custom",
   "page.wording.help": "Your words may hold {percent}, {window}, {stop_at} and {reset}, each filled in when they are sent, and nothing else in braces. A window with no words of its own is sent the standard wording.",
   "page.wording.wrap_custom_five_hour": "Your words for the five-hour window",

@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Durmasını iste (haftalık pencere)",
   "page.option.wrap_reset_time": "Sıfırlanma zamanını ekle",
   "page.option.wrap_after_reset": "Sıfırlamadan sonra sürdür",
-  "page.option.on": "Açık",
-  "page.option.off": "Kapalı",
   "page.option.style.5": "Özel",
   "page.wording.help": "Sözleriniz {percent}, {window}, {stop_at} ve {reset} içerebilir; her biri gönderilirken doldurulur. Süslü parantez içinde başka bir şey olamaz. Kendi sözleri olmayan pencereye standart ifade gönderilir.",
   "page.wording.wrap_custom_five_hour": "Beş saatlik pencere için sözleriniz",

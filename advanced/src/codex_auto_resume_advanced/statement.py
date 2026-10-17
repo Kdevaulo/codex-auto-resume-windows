@@ -183,8 +183,9 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "option.minutes", "option.percent", "option.style.1", "option.style.2", "option.style.3",
     # v0.6.16-beta.4: the wording with the numbers, and the stop percentage the words name, each window its own.
     "option.style.4", "option.stop_words_five_hour", "option.stop_words_weekly",
-    # (i) Include the reset time, and how an on/off choice says its two values.
-    "option.wrap_reset_time", "option.on", "option.off", "option.wrap_after_reset",
+    # (i) Include the reset time, and Continue after the reset - each a switch on the page (v0.6.16 final), which says
+    # its two values itself, as every switch of the window does.
+    "option.wrap_reset_time", "option.wrap_after_reset",
     # (b) the Custom wording: its boxes, what they may hold, Save words, and each check that refuses one.
     "option.style.5", "wording.help", "wording.wrap_custom_five_hour", "wording.wrap_custom_weekly", "wording.save",
     "done.wording", "refused.wording.empty", "refused.wording.too_long", "refused.wording.control",

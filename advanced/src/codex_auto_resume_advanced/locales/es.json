@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Pedir que se detenga en (ventana semanal)",
   "page.option.wrap_reset_time": "Incluir la hora de restablecimiento",
   "page.option.wrap_after_reset": "Continuar tras el restablecimiento",
-  "page.option.on": "Activado",
-  "page.option.off": "Desactivado",
   "page.option.style.5": "Personalizado",
   "page.wording.help": "Tus palabras pueden contener {percent}, {window}, {stop_at} y {reset}, que se rellenan al enviarlas, y nada más entre llaves. Una ventana sin palabras propias recibe la redacción estándar.",
   "page.wording.wrap_custom_five_hour": "Tus palabras para la ventana de cinco horas",

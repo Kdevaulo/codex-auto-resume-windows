@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Yêu cầu dừng ở (khung hằng tuần)",
   "page.option.wrap_reset_time": "Kèm thời điểm đặt lại",
   "page.option.wrap_after_reset": "Tiếp tục sau khi đặt lại",
-  "page.option.on": "Bật",
-  "page.option.off": "Tắt",
   "page.option.style.5": "Tùy chỉnh",
   "page.wording.help": "Câu của bạn có thể chứa {percent}, {window}, {stop_at} và {reset}, mỗi mục được điền khi gửi, và không có gì khác trong ngoặc nhọn. Khung không có câu riêng sẽ nhận câu tiêu chuẩn.",
   "page.wording.wrap_custom_five_hour": "Câu của bạn cho khung năm giờ",

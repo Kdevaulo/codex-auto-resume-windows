@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Pedir para parar em (janela semanal)",
   "page.option.wrap_reset_time": "Incluir o horário de redefinição",
   "page.option.wrap_after_reset": "Continuar após a redefinição",
-  "page.option.on": "Ativado",
-  "page.option.off": "Desativado",
   "page.option.style.5": "Personalizado",
   "page.wording.help": "Suas palavras podem conter {percent}, {window}, {stop_at} e {reset}, preenchidos no envio, e nada mais entre chaves. Uma janela sem palavras próprias recebe a redação padrão.",
   "page.wording.wrap_custom_five_hour": "Suas palavras para a janela de cinco horas",

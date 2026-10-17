@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Poproś o zatrzymanie przy (okno tygodniowe)",
   "page.option.wrap_reset_time": "Podaj czas odnowienia",
   "page.option.wrap_after_reset": "Kontynuuj po odnowieniu",
-  "page.option.on": "Włączone",
-  "page.option.off": "Wyłączone",
   "page.option.style.5": "Własne",
   "page.wording.help": "Twój tekst może zawierać {percent}, {window}, {stop_at} i {reset}, uzupełniane przy wysyłaniu, i nic innego w nawiasach klamrowych. Okno bez własnego tekstu dostaje tekst standardowy.",
   "page.wording.wrap_custom_five_hour": "Twój tekst dla okna pięciogodzinnego",

@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Просить остановиться на (недельное окно)",
   "page.option.wrap_reset_time": "Указывать время обновления",
   "page.option.wrap_after_reset": "Продолжить после обновления",
-  "page.option.on": "Вкл.",
-  "page.option.off": "Выкл.",
   "page.option.style.5": "Свой текст",
   "page.wording.help": "В тексте можно писать {percent}, {window}, {stop_at} и {reset} - они заполняются при отправке, - и ничего другого в фигурных скобках. Окну без своего текста отправляется стандартный текст.",
   "page.wording.wrap_custom_five_hour": "Ваш текст для пятичасового окна",

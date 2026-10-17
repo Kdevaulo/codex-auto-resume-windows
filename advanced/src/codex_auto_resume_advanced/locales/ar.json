@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "اطلب التوقف عند (النافذة الأسبوعية)",
   "page.option.wrap_reset_time": "تضمين وقت إعادة الضبط",
   "page.option.wrap_after_reset": "المتابعة بعد إعادة الضبط",
-  "page.option.on": "تشغيل",
-  "page.option.off": "إيقاف",
   "page.option.style.5": "مخصص",
   "page.wording.help": "يمكن أن تحتوي كلماتك على {percent} و{window} و{stop_at} و{reset}، ويُملأ كل منها عند الإرسال، ولا شيء آخر بين أقواس. النافذة التي ليس لها كلمات خاصة بها تُرسل لها الصياغة القياسية.",
   "page.wording.wrap_custom_five_hour": "كلماتك لنافذة الساعات الخمس",

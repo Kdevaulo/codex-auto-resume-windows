@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "请求停止于（每周窗口）",
   "page.option.wrap_reset_time": "包含重置时间",
   "page.option.wrap_after_reset": "重置后继续",
-  "page.option.on": "开",
-  "page.option.off": "关",
   "page.option.style.5": "自定义",
   "page.wording.help": "你的文字可以包含 {percent}、{window}、{stop_at} 和 {reset}，发送时各自填入；花括号中不能有其他内容。没有自己文字的窗口会收到标准措辞。",
   "page.wording.wrap_custom_five_hour": "5 小时窗口的文字",

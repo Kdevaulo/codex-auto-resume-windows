@@ -104,6 +104,45 @@ class PageTests(PageCase):
         return "en", {"script": script, "steps": steps}, {
             "taken": taken["result"], "refused": refused["result"], "words": script["advanced-words"][0]["result"]["words"]}
 
+    @classmethod
+    def scenario_switches(cls, bridge):
+        """v0.6.16 final: the on/off choices drawn as switches - the meter's two windows, the wrap-up's Include the reset
+        time and Continue after the reset. The five-hour one pressed as UI Automation presses it, the weekly one by Space;
+        each sends Off with the generation the page read, and the page is drawn again from the list it reads - here the
+        same list, so both switches still show On: a switch moves only once the change is taken. Asked for the value it
+        already shows, nothing is sent."""
+        script = cls.opening(bridge, "en")
+        script["advanced-wordings"] = [bridge("advanced-wordings", {"capability": WRAP})]
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "usage_meter"},
+                 {"do": "look"},
+                 {"do": "reply", "key": "advanced-option", "with": [{"ok": True, "result": {"done": True}}]},
+                 {"do": "set_option", "key": "window_five_hour", "value": 2},
+                 {"do": "set_option", "key": "window_weekly", "value": 2, "by": "keyboard"},
+                 {"do": "set_option", "key": "window_weekly", "value": 1}, {"do": "look"},
+                 {"do": "choose", "id": WRAP}, {"do": "look"}]
+        return "en", {"script": script, "steps": steps}, {
+            "generation": script["advanced-list"][0]["result"]["generation"],
+            "words": script["advanced-words"][0]["result"]["words"]}
+
+    def test_on_off_choices_are_switches_that_move_only_once_the_change_is_taken(self):
+        result, expected = self.of("scenario_switches")
+        words = expected["words"]
+        first, after, wrap = result["looks"]
+        self.assertEqual(first["switches"], [
+            {"key": key, "on": True, "enabled": True, "name": words["page.option." + key], "role": "CheckButton"}
+            for key in ("window_five_hour", "window_weekly")])
+        self.assertEqual([choice["key"] for choice in first["choices"]], ["poll_minutes", "warn_five_hour", "warn_weekly"],
+                         "no on/off choice is a drop-down")
+        self.assertEqual(sent(result, "advanced-option"), [
+            {"capability": "usage_meter", "key": key, "value": 2, "generation": expected["generation"]}
+            for key in ("window_five_hour", "window_weekly")])
+        self.assertEqual([each["on"] for each in after["switches"]], [True, True], "drawn from what the list says")
+        self.assertEqual(result["disabled"], [])
+        keys = [each["key"] for each in wrap["switches"]]
+        self.assertLessEqual({"wrap_reset_time", "wrap_after_reset"}, set(keys))
+        self.assertFalse({"wrap_reset_time", "wrap_after_reset"} & {choice["key"] for choice in wrap["choices"]})
+        self.assertEqual({each["role"] for each in wrap["switches"]}, {"CheckButton"})
+
     def test_out_of_order_is_told_and_a_forced_stop_below_the_words_is_said(self):
         result, expected = self.of("scenario_order")
         words = expected["words"]

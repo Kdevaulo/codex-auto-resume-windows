@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "멈추라고 할 지점 (주간 창)",
   "page.option.wrap_reset_time": "초기화 시각 넣기",
   "page.option.wrap_after_reset": "초기화 뒤 이어 가기",
-  "page.option.on": "켜기",
-  "page.option.off": "끄기",
   "page.option.style.5": "직접 입력",
   "page.wording.help": "문구에 {percent}, {window}, {stop_at}, {reset}를 넣을 수 있고 보낼 때 각각 채워집니다. 그 밖의 것은 중괄호에 넣을 수 없습니다. 자기 문구가 없는 창에는 기본 문구가 보내집니다.",
   "page.wording.wrap_custom_five_hour": "5시간 창에 보낼 문구",

@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Просити зупинитися на (тижневе вікно)",
   "page.option.wrap_reset_time": "Вказувати час оновлення",
   "page.option.wrap_after_reset": "Продовжити після оновлення",
-  "page.option.on": "Увімк.",
-  "page.option.off": "Вимк.",
   "page.option.style.5": "Свій текст",
   "page.wording.help": "У тексті можна писати {percent}, {window}, {stop_at} і {reset} - їх заповнюють під час надсилання, - і нічого іншого у фігурних дужках. Вікну без власного тексту надсилається стандартний текст.",
   "page.wording.wrap_custom_five_hour": "Ваш текст для п'ятигодинного вікна",

@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "לבקש לעצור ב- (החלון השבועי)",
   "page.option.wrap_reset_time": "לכלול את זמן האיפוס",
   "page.option.wrap_after_reset": "המשך אחרי האיפוס",
-  "page.option.on": "פועל",
-  "page.option.off": "כבוי",
   "page.option.style.5": "מותאם אישית",
   "page.wording.help": "המילים שלך יכולות לכלול את {percent}, {window}, {stop_at} ו-{reset}, שימולאו בעת השליחה, ושום דבר אחר בסוגריים מסולסלים. חלון בלי מילים משלו יקבל את הניסוח הרגיל.",
   "page.wording.wrap_custom_five_hour": "המילים שלך לחלון חמש השעות",

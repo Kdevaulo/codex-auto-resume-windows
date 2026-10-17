@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Demander l'arrêt à (fenêtre hebdomadaire)",
   "page.option.wrap_reset_time": "Inclure l'heure de réinitialisation",
   "page.option.wrap_after_reset": "Reprendre après la réinitialisation",
-  "page.option.on": "Activé",
-  "page.option.off": "Désactivé",
   "page.option.style.5": "Personnalisé",
   "page.wording.help": "Vos mots peuvent contenir {percent}, {window}, {stop_at} et {reset}, remplis à l'envoi, et rien d'autre entre accolades. Une fenêtre sans mots à elle reçoit la formulation standard.",
   "page.wording.wrap_custom_five_hour": "Vos mots pour la fenêtre de cinq heures",

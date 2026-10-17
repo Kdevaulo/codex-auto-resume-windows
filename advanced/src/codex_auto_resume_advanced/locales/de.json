@@ -153,8 +153,6 @@
   "page.option.stop_words_weekly": "Um Anhalten bitten bei (Wochenfenster)",
   "page.option.wrap_reset_time": "Zeit des Zurücksetzens nennen",
   "page.option.wrap_after_reset": "Nach dem Zurücksetzen fortsetzen",
-  "page.option.on": "Ein",
-  "page.option.off": "Aus",
   "page.option.style.5": "Eigene",
   "page.wording.help": "Ihre Worte dürfen {percent}, {window}, {stop_at} und {reset} enthalten, die beim Senden ausgefüllt werden, und sonst nichts in geschweiften Klammern. Ein Fenster ohne eigene Worte erhält die Standardformulierung.",
   "page.wording.wrap_custom_five_hour": "Ihre Worte für das Fünf-Stunden-Fenster",

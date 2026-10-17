@@ -362,6 +362,23 @@ namespace CodexAutoResume
                             form.SetHourly(form.hourlyChosen);
                         }
                     }
+                    else if (what == "set_option" && form.advancedSwitches.Exists(delegate(SoftCheck each) { return Equals(each.Tag, Str(step, "key")); }))
+                    {
+                        // An on/off choice (v0.6.16 final): its switch pressed where the value asked for is not the one it
+                        // shows - as UI Automation presses it, its default action, or with "by": "keyboard" as Space does -
+                        // and nothing sent where it is.
+                        SoftCheck toggle = form.advancedSwitches.Find(delegate(SoftCheck each) { return Equals(each.Tag, Str(step, "key")); });
+                        if (!toggle.Enabled) disabled.Add("set_option");
+                        else if ((Whole(Get(step, "value")) == SwitchOn) != toggle.Checked)
+                        {
+                            if (Str(step, "by") == "keyboard")
+                            {
+                                KeyGoesDown.Invoke(toggle, new object[] { new KeyEventArgs(Keys.Space) });
+                                KeyComesUp.Invoke(toggle, new object[] { new KeyEventArgs(Keys.Space) });
+                            }
+                            else toggle.AccessibilityObject.DoDefaultAction();
+                        }
+                    }
                     else if (what == "set_option")
                     {
                         SoftCombo combo = form.advancedChoices.Find(delegate(SoftCombo each) { return Equals(each.Tag, Str(step, "key")); });
@@ -519,6 +536,11 @@ namespace CodexAutoResume
         // Control.OnClick, which raises Click as a press of the button does.
         private static readonly System.Reflection.MethodInfo Pressed =
             typeof(Control).GetMethod("OnClick", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        // Control.OnKeyDown and OnKeyUp, which a key pressed and let go on the focused control raises: Space on a switch.
+        private static readonly System.Reflection.MethodInfo KeyGoesDown =
+            typeof(Control).GetMethod("OnKeyDown", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        private static readonly System.Reflection.MethodInfo KeyComesUp =
+            typeof(Control).GetMethod("OnKeyUp", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         // ComboBox.OnSelectionChangeCommitted, which a choice taken from the list raises.
         private static readonly System.Reflection.MethodInfo Committed =
             typeof(ComboBox).GetMethod("OnSelectionChangeCommitted", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -623,6 +645,20 @@ namespace CodexAutoResume
                 choices.Add(choice);
             }
             look["choices"] = choices;
+            // Its on/off choices (v0.6.16 final), each a switch: on or off as drawn, whether it can be pressed, and what a
+            // screen reader is told - its name and its role.
+            var switches = new List<object>();
+            foreach (SoftCheck toggle in advancedSwitches)
+            {
+                var each = new Dictionary<string, object>();
+                each["key"] = toggle.Tag as string;
+                each["on"] = toggle.Checked;
+                each["enabled"] = toggle.Enabled;
+                each["name"] = toggle.AccessibleName;
+                each["role"] = toggle.AccessibilityObject.Role.ToString();
+                switches.Add(each);
+            }
+            look["switches"] = switches;
             if (ruleRemoves.Count > 0 || ruleAdd != null)
             {
                 var editor = new Dictionary<string, object>();
