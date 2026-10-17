@@ -1,5 +1,128 @@
 # Changelog
 
+## v0.6.16 — Rescan and reconcile, a setup program that is an installer, notices that stay until clicked, and most of the advanced edition
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15...v0.6.16)
+
+**From v0.6.15, an ordinary update.** It is the latest release, for both editions, so v0.6.15's *Check for updates*
+offers it in the edition you have, and the plugin in Codex installs it too. It is the final of a line that went out
+in four pre-releases ([v0.6.16-beta](#v0616-beta-several-conversations-at-once-several-codex-homes-and-five-more-ways-to-go-on), [beta.2](#v0616-beta2-conversations-chatgpt-hands-over-and-the-ones-codex-labels-not-at-all-are-recovered), [beta.3](#v0616-beta3-words-for-this-time-a-conversation-codex-records-under-another-id-and-a-usage-meter) and [beta.4](#v0616-beta4-a-conversation-nothing-holds-is-run-here-other-kinds-of-session-and-the-usage-capabilities-finished); an installation
+of any of them is offered it as an ordinary update, being newer), and carries all of them, with what was built
+since beta.4. **The standard edition's improvements** are *Rescan and reconcile* on the Pending page
+([#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)), a setup program that is an
+installer and an update that shows what it is doing, notices you can keep on screen until clicked, words for one
+recovery's next send, up to three more Codex homes, and a conversation Codex records under another id followed.
+The advanced edition's capabilities are listed below, each off until you turn it on.
+
+**Going back.** The watcher's state stays schema 5, as every v0.6.16 beta's. The advanced edition's own file stays
+version 7, as beta.4's - brought up from version 4, 5 or 6 the first time it is opened, every row kept. An advanced
+version older than v0.6.16-beta.4 cannot read it and fails closed: every advanced feature is off there, and
+*Install another version...* says so before it installs one. Going back to v0.6.14 or v0.6.13 converts the state
+down first, which *Install another version...* does for you.
+
+### Both editions
+
+#### New since v0.6.16-beta.4
+
+- **Rescan and reconcile on the Pending page** (the standard edition's improvement). After *Cancel all*, a button
+  that reads every waiting recovery again, once you confirm. It retires a wait only on positive proof that newer
+  work in that conversation superseded it - the failed turn found exactly, a later message of the person's,
+  nothing claimed - rechecks the valid ones under every normal gate, leaves the uncertain ones as they are, and
+  re-reads each one before applying and skips any that changed. It sends nothing, writes nothing to Codex's files
+  and resets no budget; the note beside the buttons says how many were retired, rechecked, left unresolved and
+  changed meanwhile (reported by [@weng-wen-jun](https://github.com/weng-wen-jun),
+  [#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)). <!-- confirm after merge -->
+- **The setup program is an installer.** Double-clicked, it opens a window of its own in the Dashboard's design and
+  the product's eighteen languages: what it installs, which edition and version, and where; the few choices the
+  installer has; how far it is and which step it is on; and whether it finished, with the exit code and the log,
+  and a button that opens the Dashboard. Run where its own version is installed already, it offers **Repair** and
+  **Remove**. No console window opens, and `-Silent` asks nothing and shows nothing, with the same exit codes.
+- **An installation is listed in Windows' Settings > Apps** and in `winget list`, for your Windows user only. Its
+  Uninstall button shows the same window and asks whether to delete the settings and the history too; a failed
+  uninstall stays listed, and installing an older version leaves no entry naming a version that is not installed.
+  The winget manifests of both editions are made from a release's pinned archives ([WINGET.md](WINGET.md)).
+- **An update shows itself.** Before it installs, a notes page says from what version to what and what is new in
+  it, read from the verified download; afterwards an "Updated to" page says it is done. The watcher is started
+  again on the new version where one ran before or where it runs at sign-in, and one you had stopped stays
+  stopped. An open Dashboard is asked to close and opens again on the new version where it was; one with unsaved
+  Settings changes keeps them and stays open.
+- **Notices that stay until clicked, chosen for each kind.** *Settings > General > Notifications* lists each kind
+  of notice with a box, and a kind ticked there stays on screen until you click it. None is ticked at first.
+- **A click on a notice itself opens its page** - the card's face, or the body of Windows' own notification - the
+  page its Open Dashboard button opens.
+- **A smoother tray icon while it idles**, in finer steps of the same drawing, and **a smaller edition label**
+  beside the version.
+- **The README is the short one**: the setup program first, the Dashboard shown in motion, and one table of what to
+  read next.
+- **Compatibility data 11** names codex-cli 0.163.0-alpha.10.2 as verified in eight capabilities, after a real
+  recovery on it. <!-- confirm after merge -->
+- **The compatibility report stamps a report with the process's clock**, not the clock its module was imported
+  under.
+
+#### Since v0.6.15, in the betas
+
+- **[v0.6.16-beta](#v0616-beta-several-conversations-at-once-several-codex-homes-and-five-more-ways-to-go-on): several Codex homes.** One watcher recovers in up to three more `CODEX_HOME` folders,
+  each with an alias and locked by its folder; only the Dashboard writes them.
+- **[beta.2](#v0616-beta2-conversations-chatgpt-hands-over-and-the-ones-codex-labels-not-at-all-are-recovered): v0.6.15's fix** for conversations ChatGPT hands over and the ones Codex labels not at all, on
+  the beta line ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27), reported by
+  [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), proved by
+  [@ZionZhang42](https://github.com/ZionZhang42)). It is in v0.6.15 too.
+- **[beta.3](#v0616-beta3-words-for-this-time-a-conversation-codex-records-under-another-id-and-a-usage-meter): words for this time** on one waiting recovery (standards A26 and A27, amended by the owner); a
+  conversation whose turns Codex records under another id is followed there (reported by
+  [@aca22jy](https://github.com/aca22jy),
+  [#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)); every failed turn not taken up is
+  logged once, with why, and Diagnostics can check why one was not (suggested by
+  [@barkshah2002-pixel](https://github.com/barkshah2002-pixel),
+  [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)); Run at Windows sign-in shows what
+  Windows really holds (#31); installing over a running v0.6.11 to v0.6.15 watcher reports no false failure (#33);
+  one-line text boxes show their whole line (#34).
+- **[beta.4](#v0616-beta4-a-conversation-nothing-holds-is-run-here-other-kinds-of-session-and-the-usage-capabilities-finished): other kinds of session.** A conversation continued in, or forked by, the Codex Desktop is
+  recovered as the app's own (reported by [@Kdevaulo](https://github.com/Kdevaulo),
+  [#37](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/37)); a conversation another Codex
+  session holds waits, and nothing is sent to it; release pages start with direct download links; the guide says
+  what Codex does about a full conversation; the version picker reads the advanced edition's new file.
+
+### Advanced edition
+
+#### New since v0.6.16-beta.4
+
+- **Every on/off choice on the Advanced features page is a switch**, as on the Settings page. **Wrap up near a
+  limit** and **Stop near a limit** each have their own five-hour and weekly switches, and the usage meter's pair
+  now decides only its warnings. An update keeps what a beta.4 meter's window switch meant: a window switched off
+  there stays off for the wrap-up and the stop (the owner's request). <!-- confirm after merge -->
+- **The notices near a limit are each a kind to keep on screen** - the usage meter's warning, a turn the forced
+  stop could not stop, a queue to resume in Codex, and a conversation that could not be continued after the
+  reset - each ticked or not on its own in the Notifications list.
+
+#### Since v0.6.15, in the betas
+
+- **[v0.6.16-beta](#v0616-beta-several-conversations-at-once-several-codex-homes-and-five-more-ways-to-go-on): six capabilities** - several conversations at once, queue for when a conversation is
+  opened, continue a turn that ended with no reply, tell a parent which of its subagents stopped, keep a
+  conversation going, and queue messages for later.
+- **[beta.3](#v0616-beta3-words-for-this-time-a-conversation-codex-records-under-another-id-and-a-usage-meter): what a capability needs is turned on with it**, in the one confirmation; a usage meter, Wrap
+  up near a limit and Pause near a limit; Recover every conversation but Codex's own; Keep it on sits in view; a
+  watched capability can be set up; Start with Codex starts the watcher after a restart too (suggested by
+  [@Hunweibyn](https://github.com/Hunweibyn),
+  [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
+- **[beta.4](#v0616-beta4-a-conversation-nothing-holds-is-run-here-other-kinds-of-session-and-the-usage-capabilities-finished): a route of its own and the usage capabilities finished.** A conversation nothing holds is run
+  here on Codex's own app server, with *Turns run here* and a Stop that asks first; CLI, TUI and VS Code
+  conversations are recovered; a full conversation is compacted and then continued; Codex's default model is used
+  when one is at capacity; a continuation can go with no words; the wrap-up's words are yours to write; each usage
+  window is on or off; every number has Custom beside its presets; a stop near a limit goes through the Codex
+  app's own channel; a conversation wrapped up or stopped is continued once after its window resets; *Keep it on*
+  turns a capability on (suggested by [@Hunweibyn](https://github.com/Hunweibyn),
+  [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
+- **Measurements made again** on codex-cli 0.163.0-alpha.10.2: MW, M1, M2b, M5, M6, M7, MP1 to MP3, MIPC, MO, MX,
+  MF, M3B and M6B all passed there. A capability whose measurement was not made on your version of Codex shows it
+  as a warning, as before.
+- **The Dashboard chat and the Codex Stop hook** are v0.6.17's.
+
+### For developers
+
+- The edition audit counts no name Python's standard library gives a module as a sign of the advanced edition.
+- `build/make_motion.py` draws the README's motion pictures from the window itself, offscreen, at the product's own
+  cadence, as lossless APNGs: the same frames always give the same bytes.
+
 ## v0.6.16-beta.4 — A conversation nothing holds is run here, other kinds of session, and the usage capabilities finished
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta.3...v0.6.16-beta.4)
