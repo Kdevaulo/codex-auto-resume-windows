@@ -234,7 +234,8 @@ class ToolSurfaceTests(McpTestCase):
         words = {"show_tray": "notification-area icon", "reduce_motion": "Reduce motion", "design": "the Design",
                  "notification_card": "the notification card", "keep_awake": "Keep this PC awake",
                  "keep_awake_hours": "how many hours", "memory_guard": "the memory guard",
-                 "memory_guard_limit": "its limit", "status_file": "the status file"}
+                 "memory_guard_limit": "its limit", "status_file": "the status file",
+                 "notices_stay": "which notifications stay on screen until clicked"}
         window_only = {entry["name"] for entry in settings.describe()
                        if entry.get("group") not in mcpserver.USER_GROUPS | {"advanced"}
                        and entry["name"] not in mcpserver.PANEL_APPEARANCE}

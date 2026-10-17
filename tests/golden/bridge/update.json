@@ -78,7 +78,9 @@
           "memory_guard": "off",
           "memory_guard_limit": "mb1024",
           "status_file": false,
-          "codex_homes": []
+          "codex_homes": [],
+          "notice_click": "page",
+          "notices_stay": []
         }
       }
     },
@@ -161,7 +163,9 @@
           "memory_guard": "off",
           "memory_guard_limit": "mb1024",
           "status_file": false,
-          "codex_homes": []
+          "codex_homes": [],
+          "notice_click": "page",
+          "notices_stay": []
         }
       }
     },
@@ -265,7 +269,9 @@
           "memory_guard": "off",
           "memory_guard_limit": "mb1024",
           "status_file": false,
-          "codex_homes": []
+          "codex_homes": [],
+          "notice_click": "page",
+          "notices_stay": []
         }
       }
     },

@@ -86,6 +86,8 @@ METHODS = {
     "power_batch_finish", "power_refused",
     # v0.6.16-beta.3: one waiting recovery's words for this time, read and written from the Dashboard alone.
     "once_words", "set_once_words",
+    # v0.6.16: a Save keeps the kinds of notice an edition registered that this process draws no box for.
+    "_keep_unlisted_kinds",
     "list_pending", "preview_continuation", "request_retry_now", "reset_recovery_budget",
     "restore_defaults", "_strict_homes", "homes_view", "set_enabled", "set_interruption_recovery", "set_startup_enabled",
     "set_thread_enabled", "settings_path", "start_for_codex", "start_watcher",

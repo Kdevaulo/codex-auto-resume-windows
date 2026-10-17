@@ -414,7 +414,10 @@ class ActivationTests(unittest.TestCase):
 
     def run_activate(self, uri, home):
         out = io.StringIO()
-        with contextlib.redirect_stdout(out), patch.object(notify, "cancelled", return_value=True):
+        from codex_auto_resume import notifier
+        self.delivered = []
+        with contextlib.redirect_stdout(out), patch.object(notify, "cancelled", return_value=True),                 patch.object(notifier, "deliver",
+                             lambda notice, **kwargs: self.delivered.append((notice, kwargs)) or ("toast", True)):
             code = cli.cmd_activate(self._args(uri, home))
         return code, out.getvalue()
 
@@ -465,6 +468,25 @@ class ActivationTests(unittest.TestCase):
         self.assertEqual(cancel.call_args.kwargs.get("actor"), "toast")
         thread_wide.assert_not_called()
         self.assertIn(THREAD, out)
+
+    def test_a_cancel_from_a_toast_says_so_as_a_card_s_cancel_does(self):
+        """v0.6.16: the notice raised after a toast's cancel is the card route's own (notifier.build_cancelled) - its
+        body opens History, and it stays on screen when the person keeps that kind there - as Windows' toast."""
+        from codex_auto_resume import config, notice_kinds, settings
+        record = {"thread_id": THREAD, "interruption_id": INTERRUPTION}
+        for chosen, stays in (([], False), (["cancelled"], True)):
+            with self.subTest(chosen=chosen):
+                settings.update(config.Paths(self.home).settings_file, {notice_kinds.FIELD: chosen})
+                with patch.object(Store, "get", return_value=record), patch.object(Store, "cancel_interruption"):
+                    code, _ = self.run_activate(notify.cancel_uri(INTERRUPTION), self.home)
+                self._close()
+                self.assertEqual(code, cli.EXIT_OK)
+                self.assertEqual(len(self.delivered), 1)
+                notice, options = self.delivered[0]
+                self.assertEqual((notice.kind, notice.key, notice.stays), ("cancelled", THREAD, stays))
+                self.assertEqual(notice.click, notify.open_uri("history"))
+                self.assertEqual(dict(notice.toast_content()).get("launch"), notify.open_uri("history"))
+                self.assertEqual(options, {"inbox": None, "setting": False}, "Windows' toast, never a card")
 
     def test_a_power_stop_goes_through_the_card_branch(self):
         """v0.6.12: a power-stop URI from a toast is handed to notifier.activate, as a card's press is."""

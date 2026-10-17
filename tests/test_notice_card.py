@@ -147,6 +147,22 @@ def build(event, detail, identity=FULL, thread=THREAD):
     return notifier.build(event, dict(detail, thread_id=thread), identity)
 
 
+# v0.6.16: a notice's toast says where a click on its body goes - one attribute pair on <toast>, its `launch`, which
+# tests/test_notice_click.py holds. Everything else in it is what v0.6.4 raised, and the goldens hold that.
+LAUNCH = re.compile(r' launch="[^"]*" activationType="protocol"')
+
+
+def without_launch(document):
+    """A notice's toast as v0.6.4 raised it: its one `launch` taken off, where it must be."""
+    assert len(LAUNCH.findall(document)) == 1 and document.startswith('<toast duration="long" launch='), document
+    return LAUNCH.sub("", document, count=1)
+
+
+def content_without_launch(content):
+    assert content.get("launch"), content
+    return {name: value for name, value in content.items() if name != "launch"}
+
+
 # ============================================================================ the decision
 class PolicyTests(unittest.TestCase):
     def test_the_card_needs_every_answer_to_be_exactly_the_allowing_one(self):
@@ -472,7 +488,7 @@ class CharacterizationTests(unittest.TestCase):
                             notice = notifier.build(event, dict(detail, thread_id=THREAD), identity)
                             return notice is not None and notifier.deliver(notice, inbox=None)
                         raised = captured_xml(announce)
-                        self.assertEqual([values["XML"] for values in raised], events[locale][name])
+                        self.assertEqual([without_launch(values["XML"]) for values in raised], events[locale][name])
 
     def test_the_watcher_still_raises_those_toasts_whatever_its_notifier_calls(self):
         """App._notifier end to end, against the same documents: this holds its wiring, before
@@ -489,7 +505,7 @@ class CharacterizationTests(unittest.TestCase):
                         host = types.SimpleNamespace(settings=everything, _inbox=None)
                         announce = app.App._notifier(host, source)
                         raised = captured_xml(lambda: announce(event, dict(detail, thread_id=THREAD)))
-                        self.assertEqual([values["XML"] for values in raised], events[locale][name])
+                        self.assertEqual([without_launch(values["XML"]) for values in raised], events[locale][name])
 
     def test_an_event_the_watcher_never_announced_builds_nothing(self):
         self.assertIsNone(notifier.build("tick", {"thread_id": THREAD}))
@@ -590,7 +606,7 @@ class NoticeTests(unittest.TestCase):
 
     def test_the_cancelled_notice_is_what_the_toast_button_raised(self):
         notice = notifier.build_cancelled(THREAD)
-        self.assertEqual(notice.toast_content(), notify.cancelled_content(THREAD))
+        self.assertEqual(content_without_launch(notice.toast_content()), notify.cancelled_content(THREAD))
         self.assertEqual(notice.status, "paused")
 
     def test_a_notice_speaks_the_interface_language(self):
@@ -733,7 +749,7 @@ class ActivateTests(unittest.TestCase):
         self.assertEqual(result, "cancelled")
         control.cancel_interruption.assert_called_once_with(INTERRUPTION, actor="toast")
         self.assertEqual([notice.kind for notice in announced], ["cancelled"])
-        self.assertEqual(announced[0].toast_content(), notify.cancelled_content(THREAD))
+        self.assertEqual(content_without_launch(announced[0].toast_content()), notify.cancelled_content(THREAD))
         # The control layer is asked for one thing, and one thing only.
         self.assertEqual([call[0] for call in control.method_calls], ["cancel_interruption"])
 
@@ -1450,9 +1466,12 @@ class SafetyTests(unittest.TestCase):
             self.assertNotIn(writer, text)
 
     def test_the_notifier_draws_nothing(self):
-        """v0.6.11 adds demo.py, the made-up task a demo card is built from, which draws nothing either."""
+        """v0.6.11 adds demo.py, the made-up task a demo card is built from, which draws nothing either; v0.6.16
+        settings, for the values of the setting that says where a click on a notice goes, and notice_kinds, which
+        says whether a notice stays on screen until clicked - both pure but for the catalogs."""
         package, _ = self.imports("notifier.py")
-        self.assertLessEqual(package, {"demo", "l10n", "notice_presence", "notify", "reasons"})
+        self.assertLessEqual(package, {"demo", "l10n", "notice_kinds", "notice_presence", "notify", "reasons",
+                                       "settings"})
 
     def test_no_new_module_raises_powershell_itself(self):
         for name in self.CARD + ("notifier.py", "notice_presence.py"):

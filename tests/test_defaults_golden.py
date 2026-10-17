@@ -8,7 +8,8 @@ that became 0 fails as surely as a changed number.
 
 A setting added since is named in ADDED with its default and why that default is v0.6.10's
 behaviour: off, none, every conversation, automatic, and the like. One that is not named there
-fails here, so nobody adds a setting without saying so.
+fails here, so nobody adds a setting without saying so. One entry says the opposite on purpose:
+v0.6.16's notice_click, the owner's deliberate change to what a click on a notice does.
 
 The golden is written from the tag, never by hand:
 
@@ -69,6 +70,13 @@ ADDED: dict = {
     "status_file": (False, "off: no status file is written"),
     "custom_message_by_thread": (None, "no conversation has a message of its own: each gets the style's, as in v0.6.10"),
     "codex_homes": ([], "none: the default Codex home alone is watched, as v0.6.10 watched it"),
+    # v0.6.16: the one entry here that does not keep v0.6.10's behaviour, and says so. A click on a notice's card or
+    # on the body of Windows' notification opens the Dashboard page the notice is about - the owner's deliberate
+    # change of 2026-10-15/16, which v0.6.16 makes for everyone; "page" names it. No surface offers this setting in
+    # v0.6.16, so a person cannot change it, and it touches nothing Codex is asked.
+    "notice_click": ("page", "not v0.6.10's: a click on a notice opens its Dashboard page, the owner's deliberate "
+                             "change of 2026-10-15/16, offered nowhere in v0.6.16"),
+    "notices_stay": ([], "none: no kind of notice stays until clicked, so each goes away by itself as in v0.6.10"),
 }
 
 

@@ -887,6 +887,20 @@ Doing nothing resumes — that is the default. **Don't resume** / **Don't retry*
 auto-resume for that one interruption and whatever continues it, and nothing else. **Open
 Dashboard** opens the Dashboard on its Pending page and does nothing more.
 
+From v0.6.16 a click on the notification itself - the card's face, or the body of Windows' own
+notification - opens the Dashboard on the page the notification is about: the page its **Open
+Dashboard** button opens, or, for a notification without that button, Pending while a continuation is
+being sent and History once it has ended. The card then goes, as a click always made it go; a right
+click only puts it away, and the buttons do what they always did.
+
+A notification goes away by itself after a while. **Keep on screen until clicked**, under Settings >
+General > Notifications, lists each kind of notification - an interruption detected, a recovery
+starting, resumed, could not resume, stopped trying, cancelled, a conversation that needs you, tasks
+waiting after a long sleep, the watcher's memory, and the power action after usage-limit recoveries;
+the advanced edition adds its usage meter's warning - and a kind ticked there stays on screen until
+you click it: the card stays beside the notification area, and Windows' own notification stays as a
+reminder until you close it, with a button to close it where it has none. None is ticked at first.
+
 From v0.6.11 a conversation can ask more of you first (see
 [Quiet hours and how a conversation resumes](#quiet-hours-and-how-a-conversation-resumes)), and the
 notification then says so instead of promising a resume: an interruption that waits for you says it

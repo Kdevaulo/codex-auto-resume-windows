@@ -665,7 +665,9 @@ class WrongTypeTests(unittest.TestCase):
     # and nothing takes a boolean but a boolean, because `bool` is an `int` in Python and
     # is not one in JSON.
     ACCEPTS = {"boolean": {"boolean"}, "integer": {"integer"},
-               "number": {"integer", "number"}, "string": {"string"}}
+               "number": {"integer", "number"}, "string": {"string"},
+               # v0.6.16: the kinds of notice that stay on screen until clicked, a list of ids (notice_kinds).
+               "array": {"array"}}
 
     def twins(self, entry):
         """The wrong-typed values that used to slip through for this field.

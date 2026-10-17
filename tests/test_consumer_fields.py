@@ -138,6 +138,9 @@ _RECEIVERS = {
         "limitSchema": [("bridge:describe", "schema{name}")],
         # v0.6.11: what a drop-down takes of a person's own (Custom...), and the sets of days a choice names.
         "custom": [("bridge:describe", "schema[].custom")],
+        # v0.6.16: the kinds of notice that may stay on screen: core's catalog keys, and an edition's words.
+        "keys": [("bridge:describe", "schema[].keys")],
+        "labels": [("bridge:describe", "schema[].labels")],
         "named": [("bridge:describe", "schema[].custom.named")],
         # The Save request, built by setting name: each must be a setting the bridge stores.
         "jsonValues": SETTINGS,
@@ -225,6 +228,8 @@ UNCHECKED = {
                                                "every_day, weekdays or weekends, as the schema carries them",
     ("gui/DashboardTools.cs", "held", "thread"): "one conversation's own message, by that conversation's id "
                                                  "(v0.6.11); the map is empty in every golden",
+    ("gui/SettingsPage.cs", "keys", "id"): "each kind of notice the schema lists, by its id (v0.6.16, notice_kinds)",
+    ("gui/SettingsPage.cs", "labels", "id"): "each kind an edition registered, by its id (v0.6.16, notice_kinds)",
 }
 
 # Dictionaries the window writes a request into, by setting name: a name written there is one the

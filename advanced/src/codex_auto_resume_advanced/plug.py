@@ -129,6 +129,22 @@ class AdvancedPlug(Plug):
         return None
 
 
+# v0.6.16: this edition's kinds of notice a person can keep on screen until clicked, as core's registry takes an
+# edition's (codex_auto_resume.notice_kinds.register): an id, the notifier kinds it covers, and its words in every
+# language. The usage meter's warning (issue #29) is the one there is; its words are its notice's own title.
+NOTICE_KINDS = (("near_limit", ("near_limit",), "msg.toast_near_limit"),)
+
+
+def register_notice_kinds():
+    """Register NOTICE_KINDS with core, which then lists them in Settings and keeps their notices on screen when a
+    person chose to. Registering again replaces, so a second plug in one process changes nothing."""
+    from codex_auto_resume import l10n, notice_kinds
+    for kind_id, notices, key in NOTICE_KINDS:
+        notice_kinds.register(kind_id, notices, {locale: l10n.text(key, locale) for locale in l10n.LOCALES})
+
+
 def create(paths) -> AdvancedPlug:
-    """The plug for the installation whose home is `paths`."""
+    """The plug for the installation whose home is `paths` - and this edition's kinds of notice, registered with core
+    as the plug is made (register_notice_kinds)."""
+    register_notice_kinds()
     return AdvancedPlug(paths)

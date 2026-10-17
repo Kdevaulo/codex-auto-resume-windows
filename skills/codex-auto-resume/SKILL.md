@@ -342,7 +342,8 @@ refused; never offer one past it or say a safety limit can be lifted. The window
 notification-area icon, Reduce motion (the one way to stop the animations), the Design (Soft, Classic
 or Plain), the notification card, and, from v0.6.11, Keep this PC awake while a task waits (and for how
 many hours at most), the memory guard (and its limit), and the status file for other tools - each a
-question of this PC rather than of recovery - and the Custom message text itself.
+question of this PC rather than of recovery - and, from v0.6.16, which notifications stay on screen until
+clicked, and the Custom message text itself.
 If the user asks for any of them, say it is changed in the Dashboard, under Settings. If the user wants to
 change what a Custom message says, tell them it is written in the Dashboard, under Settings >
 Continuation message. A message for one conversation alone (`custom_message_by_thread`, from v0.6.11)

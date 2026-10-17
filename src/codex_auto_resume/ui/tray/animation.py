@@ -12,7 +12,8 @@ import threading
 import time
 
 from ...tray_place import IconPlacement, battery_saver
-from .motion import (build_icon_frames,
+from .motion import (ICON_MOTION,
+                     build_icon_frames,
                      icon_frame,
                      icon_frame_ms,
                      icon_head_colour,
@@ -21,6 +22,14 @@ from .motion import (build_icon_frames,
                      icon_state)
 from .model import popup_attention
 from .win32 import NIF_ICON, NIM_MODIFY, NOTIFYICONDATAW, TIMER_FRAME, WM_TRAY_FRAMES, _dll
+
+# The notification area's finer steps (ICON_MOTION tray_fine): its table is built with them, and its frames and its
+# timer step by the steps of the table there is.
+TRAY_FINE = ICON_MOTION["tray_fine"]
+
+
+def _fine(frames) -> int:
+    return getattr(frames, "fine", 1)
 
 
 class AnimationMixin:
@@ -31,7 +40,7 @@ class AnimationMixin:
         """Build the frame table on a thread of its own; the icon's thread hears when it is done."""
         def build():
             try:
-                frames = build_icon_frames(size)
+                frames = build_icon_frames(size, fine=TRAY_FINE)
                 result = (frames, None if frames else "over its time budget")
             except Exception as exc:
                 result = (None, type(exc).__name__)
@@ -99,7 +108,7 @@ class AnimationMixin:
         state = self._icon_state or "watching"
         elapsed = (now - self._epoch) * 1000.0
         since = (now - self._state_since) * 1000.0
-        position, level = icon_frame(state, elapsed, since, reduced=not self._motion_allowed)
+        position, level = icon_frame(state, elapsed, since, reduced=not self._motion_allowed, fine=_fine(frames))
         head = icon_level_colour(icon_head_colour(state), level)
         key = (position, head)
         if key == self._frame_key and self._frame_icon:
@@ -149,7 +158,7 @@ class AnimationMixin:
         if self._frames and self._motion_allowed and self._icon_state is not None:
             now = time.monotonic()
             interval = icon_frame_ms(self._icon_state, (now - self._epoch) * 1000.0,
-                                     (now - self._state_since) * 1000.0)
+                                     (now - self._state_since) * 1000.0, fine=_fine(self._frames))
         if interval == self._motion_ms:
             return
         user32 = _dll("user32")

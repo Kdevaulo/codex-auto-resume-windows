@@ -19,7 +19,8 @@ import time
 import traceback
 import uuid
 
-from .. import compatio, config, edition, l10n, managed, needsyou, notifier, oncewords, settings as policy
+from .. import (compatio, config, edition, l10n, managed, needsyou, notice_kinds, notifier, notify, oncewords,
+               settings as policy)
 from ..codex import LocalSource
 from ..codex.chains import memory as chain_memory
 from ..codex.pairing import app_engines
@@ -417,7 +418,9 @@ class App(WatchLoop):
                 identity = None     # an unnamed task is still worth announcing
             # v0.6.11: a needs-you notice carries the sound its person chose, if any (notify.py).
             sound = event == needsyou.EVENT and self.settings.get(needsyou.SOUND_FIELD) is True
-            notice = notifier.build(event, detail, identity, sound=sound)
+            notice = notifier.build(event, detail, identity, sound=sound,
+                                    destination=notifier.click_destination(self.settings),
+                                    stay=notice_kinds.chosen(self.settings))
             if notice is None:
                 return False
             return notifier.deliver(notice, inbox=self._inbox,
@@ -440,7 +443,8 @@ class App(WatchLoop):
         # countdown's carries the promised way to stop it (Q8). Windows' Do not disturb may still hide one.
         if event not in notifier.POWER_EVENTS and not policy.notification_enabled(self.settings, event):
             return False
-        notice = notifier.build(event, detail)
+        notice = notifier.build(event, detail, destination=notifier.click_destination(self.settings),
+                                stay=notice_kinds.chosen(self.settings))
         if notice is None:
             return False
         card = not final and self.settings.get(notifier.CARD_SETTING, True) is True
@@ -450,8 +454,9 @@ class App(WatchLoop):
         """A card's button, on a worker thread: what its toast button would do, done in process.
 
         Only an open URI for one of the window's pages, or a cancel of one exact interruption
-        through the control layer with the toast's actor; everything else is ignored
-        (notifier.activate). What a cancel says afterwards goes out the way any notice does, and
+        through the control layer with the toast's actor - or, since v0.6.16, where a click on the
+        card itself goes, which may be the Codex app's link to its conversation; everything else is
+        ignored (notifier.activate). What a cancel says afterwards goes out the way any notice does, and
         what the press did - or why it did nothing - is one line in this log, as the toast's is.
         """
         from ..ui import tray
@@ -461,7 +466,8 @@ class App(WatchLoop):
                                  announce=lambda notice: notifier.deliver(
                                      notice, inbox=self._inbox,
                                      setting=self.settings.get(notifier.CARD_SETTING, True) is True),
-                                 log=self.logger.info)
+                                 log=self.logger.info, open_link=notify.open_in_codex,
+                                 stay=notice_kinds.chosen(self.settings))
 
     def _demo(self):
         """Show me what happens (v0.6.11), asked from Diagnostics: one made-up card, on a worker thread
