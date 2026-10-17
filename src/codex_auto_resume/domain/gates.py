@@ -39,6 +39,11 @@ POSTPONED, QUIET_HOURS, OBSERVE_ONLY = "postponed", "quiet_hours", "observe_only
 # edition's plug never asks, so no standard record is ever stored with it - and a record whose claim
 # was stored with it has been resent, for good (`was_resent`).
 RESEND = "resend"
+# v0.6.16-beta.4: thread_available passed for a conversation another Codex session holds - a terminal's, VS Code's
+# - sent to through the queue because the plug answered TO_SESSION (P16). The standard edition's plug never does, so
+# no standard record is ever stored with it. An older build reads it as "other": a pass of no kind it knows, which
+# it follows as an ordinary queued item - its own expiry, never a release.
+SESSION = "session"
 # And schedule passed - or attempt_budget - for a waiting record a person asked to send now (SEND_NOW):
 # its retry's wait, a postponement, and an attempt budget of the person's own, never an administrator's.
 SEND_NOW = "send_now"
@@ -48,7 +53,7 @@ GATE_REASONS = REASONS | frozenset({
     NOT_CHECKED, "paused", "thread_disabled", "cancel_requested", "not_due", "possibly_sent",
     "engine_incompatible", "engine_unknown", "projection_table_missing",
     "home_lock_unavailable", "identity_unreadable", "usage_available",
-    "ok", HELD, POSTPONED, QUIET_HOURS, OBSERVE_ONLY, PLUGGED, RESEND, SEND_NOW,
+    "ok", HELD, POSTPONED, QUIET_HOURS, OBSERVE_ONLY, PLUGGED, RESEND, SEND_NOW, SESSION,
 })
 # What an uncertain submission may be resent after (v0.6.14): its send's answer was unknown, or no
 # receipt came - never a withdrawal, a duplicate, an ambiguous receipt or anything else unsettled.

@@ -139,7 +139,7 @@ class PointTests(unittest.TestCase):
         found = points()
         self.assertEqual(found, {"DashboardBuilt": "gui/Dashboard.cs", "SnapshotApplied": "gui/Dashboard.cs",
                                  "PendingBuilt": "gui/Dashboard.cs", "ArgumentParsed": "gui/Dashboard.cs",
-                                 "ReopenArgumentsWritten": "gui/Dashboard.cs"})
+                                 "ReopenArgumentsWritten": "gui/Dashboard.cs", "CellsWritten": "gui/Dashboard.cs"})
         # No other shape of partial method: one with a body in a standard source would be
         # compiled into the standard window, which is the whole thing this rules out.
         whole = guiscan.whole()
@@ -155,7 +155,7 @@ class PointTests(unittest.TestCase):
                         self.assertRegex(line, r"^\s*%s\([^;]*\);\s*$" % point)
                         calls[point] = calls.get(point, 0) + 1
         self.assertEqual(calls, {"DashboardBuilt": 1, "SnapshotApplied": 2, "PendingBuilt": 1, "ArgumentParsed": 1,
-                                 "ReopenArgumentsWritten": 1})
+                                 "ReopenArgumentsWritten": 1, "CellsWritten": 1})
 
 
 def copy_window(target: Path) -> Path:
@@ -237,7 +237,9 @@ class WindowTests(unittest.TestCase):
     def test_the_standard_window_is_the_file_it_would_be_without_the_points(self):
         """The measurement the plan asked for: declaring the points and calling them changes
         not one byte of the standard executable."""
-        self.assertEqual(self.cut_lines, 5 + 6, "five declarations and six calls")
+        # v0.6.16-beta.4: CellsWritten - what the advanced edition says beside a Pending or History row - is the sixth
+        # point, declared once and called once (Cells).
+        self.assertEqual(self.cut_lines, 6 + 7, "six declarations and seven calls")
         self.assertEqual(self.standard, (self.work / "without" / WINDOW).read_bytes())
         self.assertEqual((self.work / "standard" / LAUNCHER).read_bytes(),
                          (self.work / "without" / LAUNCHER).read_bytes())

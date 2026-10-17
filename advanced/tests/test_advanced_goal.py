@@ -717,7 +717,8 @@ class RouteTests(unittest.TestCase):
 
     def test_it_answers_core_at_its_three_points(self):
         made = self.made(self.Session(self))
-        record = {"interruption_id": ac.KEY, "thread_id": T1, "category": "usage_limit"}
+        record = {"interruption_id": ac.KEY, "thread_id": T1, "category": "usage_limit", "holder": "app_free",
+                  "app": True}
         self.assertIs(made.unloaded(record), made)
         self.assertIs(made.unloaded(dict(record, category="server_overloaded")), DEFER)
         self.assertIs(made.sender(record, BACKEND), DEFER, "no M2b pass, no channel")
@@ -865,7 +866,8 @@ class CodexInUseTests(GoalCase):
         self.addCleanup(inuse.forget, plug.paths)
         plug.codex(self.exe, self.h.home.root)
         made = plug.runtime._code_of(GOAL_CONTINUATION)
-        record = {"interruption_id": ac.KEY, "thread_id": T1, "category": "usage_limit"}
+        record = {"interruption_id": ac.KEY, "thread_id": T1, "category": "usage_limit", "holder": "app_free",
+                  "app": True}
         self.assertIs(made.unloaded(record), made, "the goal paused by the limit, read where Codex keeps it")
         with patch.object(transport.Backend, "_compatible", lambda backend: {}):
             session = made._session()

@@ -85,6 +85,16 @@ NOT_SCENARIOS = {
     "test_plug_records": "gives every engine a plug with records of its own (P2), to hold each of their moves",
     "test_queue_for_open": "gives every engine a plug that answers QUEUE_FOR_OPEN at P16, which the neutral plug never "
                            "answers - a conversation the app does not hold waits there",
+    "test_route_unheld": "gives every engine a plug that wants P16 and names a route with the app closed (v0.6.16-beta.4), "
+                         "which the neutral plug never does - a conversation with no app waits there",
+    "test_to_session": "gives every engine a plug that answers TO_SESSION at P16 for a conversation another Codex session "
+                       "holds (v0.6.16-beta.4), which the neutral plug never answers - such a conversation waits there",
+    "test_session_kinds": "gives every engine a plug that names terminal and VS Code conversations at P18 "
+                          "(v0.6.16-beta.4), which the neutral plug never names - only the app's are detected there",
+    "test_compaction_core": "gives every engine a plug that takes a full context window up at P17 (v0.6.16-beta.4), "
+                            "which the neutral plug never does - such a failure is never registered there",
+    "test_silent_core": "gives every engine a plug that answers SILENT at P15 and a route that takes words "
+                        "(v0.6.16-beta.4), which the neutral plug never does - every continuation carries its words there",
     "test_plug_record_purposes": "gives every engine a plug with continuations and messages of its own (P2), to hold "
                                  "what each purpose may and may not be sent as",
     "test_power_action": "builds an engine with no store or backend only to ask engine.activity, which reads a "
@@ -110,7 +120,9 @@ ENGINE_POINTS = frozenset({Point.RECORDS, Point.GATES, Point.TEXT, Point.SENDER,
                            Point.SCHEDULE, Point.TICK, Point.CLAIM_LEDGER, Point.CONCURRENCY,
                            Point.MOVED, Point.DELIVERY, Point.UNLOADED, Point.ADMISSION,
                            # v0.6.16-beta.3: which conversations are taken up, asked once a tick.
-                           Point.ELIGIBILITY})
+                           Point.ELIGIBILITY,
+                           # v0.6.16-beta.4: and which besides the app's are watched (P18), once a tick too.
+                           Point.SESSIONS})
 # What a moment read off the wall clock while a pair ran is written as, in rows and calls alike.
 WALL_CLOCK = "<wall clock>"
 # What a scenario is asked of Codex: every call the engine can make of a backend.
@@ -226,6 +238,10 @@ class DeferringPlug(Plug):
     def eligibility(self):
         self.asked.add(Point.ELIGIBILITY)
         return super().eligibility()
+
+    def sessions(self):
+        self.asked.add(Point.SESSIONS)
+        return super().sessions()
 
     def wants(self, point):
         """Every point, as a plug with a capability on there would say: core makes the reads that

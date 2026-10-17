@@ -31,7 +31,15 @@ MIXINS = (package.OptionsMixin, package.AnnounceMixin, package.FreshnessMixin,
           package.ResendMixin,
           # and records of the edition's plug's own, tried like core's (P2).
           package.PlugRecordsMixin,
-          package.ForOpenMixin)
+          package.ForOpenMixin,
+          # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
+          package.RoutesMixin,
+          # and which conversations besides the app's are watched (P18).
+          package.KindsMixin,
+          # a continuation sent to a conversation another Codex session holds (P16's TO_SESSION),
+          package.ToSessionMixin,
+          # and a full context window's record, which a compaction turn supersedes nothing of.
+          package.CompactionMixin)
 
 # The forty-one methods the one class had, counted the day it was split.
 METHODS = {
@@ -110,6 +118,20 @@ METHODS = {
     "_wrap_up_markers", "persons_turns", "_only_wrap_ups_after",
     # v0.6.16-beta.3: the words for this time, added once, spent at the send, deleted when not waiting.
     "_once_words", "_spend_once_words", "_prune_once_words",
+    # v0.6.16-beta.4: P16 asked with the app closed and nothing holding the conversation, and the look made again.
+    "_unheld", "_unheld_now", "_holder", "_route", "_still_where",
+    # and which conversations besides the app's are watched, asked once a tick (P18, engine/kinds.py), and whether
+    # one of them a newer Codex wrote than the engine here (the version skew guard, design-4 4.3);
+    "session_kinds", "newer_than_engine",
+    # the identity gate - Codex's history caught up, and no newer Codex than the engine's - out of dispatch.py at
+    # its size (engine/freshness.py);
+    "_identity_waits",
+    # a continuation sent to another Codex session (P16's TO_SESSION, engine/tosession.py);
+    "to_session", "_session", "_session_reason",
+    # and the compaction turns after a full context window (engine/compaction.py).
+    "compacted_since", "compaction", "foreign",
+    # and P15's SILENT for a route that takes words (engine/routes.py), proven by the turn id it returned (M3B).
+    "_silent", "_silent_proven",
 }
 
 # What `from codex_auto_resume.engine import ...` has to keep answering (app.py, the tests).

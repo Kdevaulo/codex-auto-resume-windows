@@ -759,7 +759,9 @@ class RemainingRefusalTests(WarningCase):
                                  # that are off, or one of them failed its own confirmation.
                                  "REQUIREMENT_REFUSED",
                                  # and a requirement graded Failed here keeps the dependent off.
-                                 "REQUIREMENT_FAILED_HERE"})
+                                 "REQUIREMENT_FAILED_HERE",
+                                 # v0.6.16-beta.4: Keep it on, which turns it on, on its own Failed-here grade.
+                                 "FAILED_HERE"})
         self.assertNotIn("not_permitted", {str(word) for word in Refusal})
 
 

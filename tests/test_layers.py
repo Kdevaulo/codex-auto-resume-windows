@@ -61,6 +61,9 @@ LAYER = {_q(name): layer for layer, names in {
                "domain.plug", "domain.compat_vocabulary",
                # v0.6.14: what core holds of a channel, a route and an errand the plug names.
                "domain.plughands",
+               # v0.6.16-beta.4: the plug interface's own words, out of domain/plug.py at its line
+               # budget.
+               "domain.plugwords",
                # and what a usage reading keeps of Codex's reply, and nothing else.
                "domain.usage",
                # v0.6.12: the power action's words, out of domain/vocabulary.py at its line budget.
@@ -142,7 +145,9 @@ LAYER = {_q(name): layer for layer, names in {
                  "codex.workspace",
                  # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30),
                  # and the ids a split conversation has had, remembered.
-                 "codex.rollout", "codex.chains"),
+                 "codex.rollout", "codex.chains",
+                 # v0.6.16-beta.4: which kinds of conversation are taken up (P18), pure.
+                 "codex.eligibility"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch",
                "engine.freshness", "engine.options", "engine.outcome", "engine.reconcile",
                # v0.6.11: the waits and the two guards, as the engine asks them.
@@ -162,7 +167,12 @@ LAYER = {_q(name): layer for layer, names in {
                # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
                "engine.foropen",
                # v0.6.16-beta.3: the store as a plug is shown it, off options.py's page.
-               "engine.storeview"),
+               "engine.storeview",
+               # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
+               "engine.routes",
+               # and which conversations besides the app's are watched (P18), one sent to another session (P16),
+               # and a full context window's compaction turns.
+               "engine.kinds", "engine.tosession", "engine.compaction"),
     # v0.6.10-alpha: control.py became control/, ten files, `Control` composed from eight
     # mixins. `layer` is where the composition lives, so that the front holds no code.
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
@@ -307,6 +317,11 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     ("controlcli", "interface"): ("cost", "the strings request only: the window's catalogue"),
     ("diagnostics", "compatio"): ("cost", "the compatibility section of the export only"),
     ("mcp.server", "compat"): ("cost", "the compatibility summary in get_status only"),
+    # v0.6.16-beta.4: the version skew guard, only for a terminal's or VS Code's conversation a plug names (P18).
+    ("codex.eligibility", "compat"): ("cost", "a Codex version read as the compatibility data reads one, only for "
+                                              "a kind of conversation a plug names"),
+    ("codex.eligibility", "compat.model"): ("cost", "a Codex version read as the compatibility data reads one, only "
+                                                    "for a kind of conversation a plug names"),
     ("mcp.server", "compatio"): ("cost", "the compatibility summary in get_status only"),
     ("mcp.server", "mcp.panel"): ("cost", "the panel's page, only when Codex reads the resource"),
     ("notify", "reasons"): ("cost", "a reason's label, for a transient toast only"),

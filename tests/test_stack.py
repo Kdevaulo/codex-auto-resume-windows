@@ -92,7 +92,12 @@ ITEM = {_q(name): item for item, names in {
                # and a continuation queued for when its conversation is opened (P16's QUEUE_FOR_OPEN).
                "engine.foropen",
                # v0.6.16-beta.3: the store as a plug is shown it, off options.py's page.
-               "engine.storeview"),
+               "engine.storeview",
+               # v0.6.16-beta.4: a route the plug names for a conversation not held (P16), out of engine/delivery.py.
+               "engine.routes",
+               # and which conversations besides the app's are watched (P18), one sent to another session (P16),
+               # and a full context window's compaction turns.
+               "engine.kinds", "engine.tosession", "engine.compaction"),
     "policy": ("failures", "reasons", "settings", "settings_schema", "continuation", "openstate", "domain.gates",
                # what may be done at a tier, and with whose word: policy, not registry data
                "compat.permits",
@@ -101,6 +106,8 @@ ITEM = {_q(name): item for item, names in {
                "domain.plug", "edition",
                # v0.6.14: what core holds of a channel, a route and an errand a plug names.
                "domain.plughands",
+               # v0.6.16-beta.4: the plug interface's own words.
+               "domain.plugwords",
                # v0.6.11: quiet hours and a postponement's times - when, by the local clock - and
                # which projects may resume without a person; the retry ladders, which a person
                # chooses; and the two guards that may hold a waiting recovery.
@@ -156,7 +163,9 @@ ITEM = {_q(name): item for item, names in {
               "codex.workspace",
               # v0.6.16-beta.3: a conversation's rollout file, read no further than needed (issue #30),
               # and the ids a split conversation has had, remembered.
-              "codex.rollout", "codex.chains"),
+              "codex.rollout", "codex.chains",
+              # v0.6.16-beta.4: which kinds of conversation are taken up (P18), pure.
+              "codex.eligibility"),
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
                 "control.layer", "control.policy", "control.preview", "control.records",
                 "control.seen", "control.state", "control.watcher", "control.wire",

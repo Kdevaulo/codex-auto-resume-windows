@@ -18,18 +18,18 @@ from .. import failures, guards, machine, projects
 from ..domain import ids, skips
 from .errors import SourceError
 from .labels import _label
-from .values import (DESKTOP_ORIGINATORS, KNOWN_STATUSES, PROGRESS_ITEM_TYPES, _json, _turn_status, epoch,
-                     normalize, taken_thread_source)
-from . import rollout, workspace
+from .values import KNOWN_STATUSES, PROGRESS_ITEM_TYPES, _json, _turn_status, epoch, normalize
+from . import eligibility, rollout, workspace
 from .payload import (_choose_reset, _item_is_ours, _needing, _queue_has_marker, detect,  # noqa: F401
                       judge, later_turn, marker_row)
 
 
 class HistoryMixin:
-    def _eligibility(self, thread_id: str, strict: bool = False):
-        """(its file, None) for a desktop-app conversation of a person's own (A15), or (None, why not): a reason
-        of domain/skips.py and the kind word behind it. strict=True (latest) re-raises transient I/O as
-        SourceError so the engine defers instead of treating an unreadable rollout as "latest turn changed"."""
+    def _eligibility(self, thread_id: str, strict: bool = False, kinds=None):
+        """(its file, None) for a conversation taken up - a person's own desktop one (A15), or of a kind the plug names
+        (P18; `kinds`, else this tick's) - or (None, why not), a domain/skips.py reason and its kind word. strict=True
+        (latest) re-raises transient I/O as SourceError, so the engine defers rather than calling it changed."""
+        kinds = self.session_kinds if kinds is None else kinds
         if not ids.is_uuid(thread_id):
             return None, (skips.UNKNOWN_CONVERSATION, None)
         with self._db("state") as connection:
@@ -38,21 +38,18 @@ class HistoryMixin:
                 "FROM threads WHERE id=?", (thread_id,)).fetchone()
         if row is None:
             return None, (skips.UNKNOWN_CONVERSATION, None)
-        for wrong, word in ((row["source"] != "vscode", "source " + skips.kind(row["source"])),
-                            (row["archived"] != 0, "archived"),
-                            (not taken_thread_source(row["thread_source"], self.widened),
-                             "thread_source " + skips.kind(row["thread_source"])),
-                            (row["history_mode"] != "paginated", "history_mode " + skips.kind(row["history_mode"]))):
-            if wrong:
-                return None, (skips.OTHER_KIND, word)
+        word = eligibility.row_problem(dict(row), kinds, self.widened)
+        if word is not None:
+            return None, (skips.OTHER_KIND, word)
         try:
             path = rollout.confined(self.home, thread_id, row["rollout_path"])
             payload = None if path is None else rollout.session_meta(path)
             if payload is None or payload.get("id") != thread_id:
                 return None, (skips.OTHER_KIND, "file")
-            if payload.get("originator") not in DESKTOP_ORIGINATORS:
+            if not eligibility.originator_taken(row["source"], payload.get("originator"), kinds):
                 return None, (skips.OTHER_KIND, "originator " + skips.kind(payload.get("originator")))
-            if payload.get("source") != "vscode" or payload.get("thread_source") != row["thread_source"]:
+            if (eligibility.kind_of(row["source"], payload, kinds) is None
+                    or payload.get("thread_source") != row["thread_source"]):
                 return None, (skips.OTHER_KIND, "file " + skips.kind(payload.get("thread_source")))
             return path, None
         except OSError:
@@ -62,6 +59,10 @@ class HistoryMixin:
             return None, (skips.OTHER_KIND, "file")
         except (ValueError, UnicodeError):
             return None, (skips.OTHER_KIND, "file")
+
+    def taken(self, thread_id: str, kinds) -> bool:
+        """Whether `thread_id` is a conversation taken up with `kinds` watched (P18, engine/kinds.py)."""
+        return self._eligibility(thread_id, kinds=frozenset(kinds))[0] is not None
 
     def _chain(self, thread_id: str, strict: bool = False):
         """(its file, every id its turns are recorded under - its own first, each split id oldest first, the current
@@ -544,6 +545,7 @@ class HistoryMixin:
             "progress": any(counts.get(kind, 0) > 0 for kind in PROGRESS_ITEM_TYPES),
             "foreign_user_messages": foreign,
             "later_terminal": later_terminal,
+            "compaction_only": "contextCompaction" in counts and set(counts) <= {"contextCompaction", "reasoning"},
         }
 
     def turn_progress(self, thread_id: str, turn_id: str):

@@ -45,8 +45,17 @@ B4_METHODS = frozenset({"initialize", "initialized", "account/rateLimits/read", 
 READS = frozenset({"thread/loaded/list", "thread/queue/list", "thread/goal/get"})
 CHANGES = frozenset({"thread/queue/add", "thread/goal/set",
                      # v0.6.14: a reset credit spent changes the account's state (engine/credits.py).
-                     "account/rateLimitResetCredit/consume"})
-
+                     "account/rateLimitResetCredit/consume",
+                     # v0.6.16-beta.4: a turn run here - a conversation loaded, a turn started and interrupted, and
+                     # the conversation let go (codex/headless.py).
+                     "thread/resume", "turn/start", "turn/interrupt", "thread/unsubscribe",
+                     # and a conversation compacted (engine/compact.py), and a turn on Codex's default model, the
+                     # conversation's own put back after it (engine/fallback.py).
+                     "thread/compact/start", "thread/settings/update"})
+# v0.6.16-beta.4: Codex's models listed (engine/fallback.py).
+READS = READS | {"model/list"}
+# v0.6.16-beta.4: the capabilities that change Codex's state through the Codex app's IPC pipe (codex/ipc.py).
+IPC_CHANGES = frozenset({"usage_pause"})
 
 
 def standards_text(rule) -> str:
@@ -57,7 +66,10 @@ def standards_text(rule) -> str:
     raise AssertionError(f"{rule} is not in the standards file")
 
 class ShippedTests(unittest.TestCase):
-    SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open", "marker_free_continuation", "capacity_retry",
+    SHIPPED = ("start_with_codex", "goal_continuation", "queue_for_open",
+               # v0.6.16-beta.4: a full conversation compacted, then continued; a conversation nothing holds, run here
+               # while Codex is closed.
+               "compact_continue", "model_fallback", "headless_run", "other_sessions", "marker_free_continuation", "capacity_retry",
                "structured_rules", "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_credit",
                "reset_message", "early_reset", "once_more_when_unsure", "send_now", "parallel_dispatch",
                "prompt_queue", "empty_response", "subagent_parent", "keep_going",
@@ -65,6 +77,8 @@ class ShippedTests(unittest.TestCase):
                "usage_meter", "usage_wrap_up", "usage_pause",
                # and the widening to every conversation but Codex's own (P19).
                "every_conversation",
+               # v0.6.16-beta.4: how a turn run here starts.
+               "silent_continuation",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -82,20 +96,22 @@ class ShippedTests(unittest.TestCase):
         # answer at P17 and again at P3, in the order that is precedence where two would answer.
         answering = {Point.START_ROUTE: ("start_with_codex",),
                      Point.SCHEDULE: ("reset_credit", "early_reset", "once_more_when_unsure", "send_now"),
-                     Point.TICK: ("reset_credit", "reset_message", "empty_response", "subagent_parent",
+                     Point.TICK: ("compact_continue", "model_fallback", "headless_run", "reset_credit", "reset_message", "empty_response", "subagent_parent",
                                   "keep_going", "usage_meter", "usage_wrap_up", "usage_pause"),
                      Point.RECORDS: ("reset_message", "prompt_queue", "empty_response", "subagent_parent",
                                      "keep_going", "usage_wrap_up"),
                      # v0.6.15-beta: the lines a parent's continuation is given of its subagents' stops (5a).
                      Point.TEXT: ("subagent_parent",),
-                     Point.UNLOADED: ("goal_continuation", "queue_for_open"),
-                     Point.GATES: ("goal_continuation", "capacity_retry", "structured_rules",
+                     Point.UNLOADED: ("goal_continuation", "queue_for_open", "compact_continue", "model_fallback",
+                                      "headless_run", "other_sessions"),
+                     Point.SESSIONS: ("other_sessions",),
+                     Point.GATES: ("goal_continuation", "compact_continue", "capacity_retry", "structured_rules",
                                    "unknown_failure_budget", "codex_gave_up", "sign_in_retry", "reset_message",
                                    "early_reset", "usage_pause"),
-                     Point.ADMISSION: ("capacity_retry", "structured_rules", "unknown_failure_budget",
+                     Point.ADMISSION: ("compact_continue", "capacity_retry", "structured_rules", "unknown_failure_budget",
                                        "codex_gave_up", "sign_in_retry"),
                      Point.SENDER: ("goal_continuation", "marker_free_continuation"),
-                     Point.DELIVERY: ("marker_free_continuation",),
+                     Point.DELIVERY: ("marker_free_continuation", "silent_continuation"),
                      # v0.6.15-beta: several sends waiting for their receipts at once.
                      Point.CONCURRENCY: ("parallel_dispatch",),
                      # v0.6.16-beta.3: which conversations core takes up.
@@ -104,10 +120,12 @@ class ShippedTests(unittest.TestCase):
             self.assertEqual(tuple(d.id for d in registry.REGISTRY.at(point)), answering.get(point, ()))
 
     # The order a person reads them in (the owner's, 2026-10-10): the compatibility report first, then by importance.
-    SHOWN = ("compat_report", "start_with_codex", "every_conversation", "queue_for_open", "marker_free_continuation", "reset_credit",
+    SHOWN = ("compat_report", "start_with_codex", "every_conversation", "queue_for_open", "headless_run",
+             "other_sessions", "marker_free_continuation", "silent_continuation", "reset_credit",
              "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
              "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
-             "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "codex_gave_up",
+             "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "compact_continue", "model_fallback",
+             "codex_gave_up",
              "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules")
 
     def test_the_shown_order_names_every_capability_of_the_registry_exactly_once(self):
@@ -148,7 +166,9 @@ class ShippedTests(unittest.TestCase):
                 beyond = protocol.methods_for_capability(definition.id) - B4_METHODS
                 self.assertLessEqual(beyond, READS | CHANGES, "a method this table has not placed")
                 self.assertEqual("B4" in definition.departs_from, bool(beyond))
-                self.assertEqual("B3" in definition.departs_from, bool(beyond & CHANGES))
+                # v0.6.16-beta.4: the forced stop changes Codex's state through the app's own IPC channel (codex/ipc.py),
+                # not a session of its own - B3 all the same.
+                self.assertEqual("B3" in definition.departs_from, bool(beyond & CHANGES) or definition.id in IPC_CHANGES)
 
     def test_every_statement_names_every_standard_it_departs_from_in_every_language(self):
         for definition in registry.DEFINITIONS:

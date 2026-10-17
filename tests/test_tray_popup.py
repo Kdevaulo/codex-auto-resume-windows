@@ -1724,26 +1724,44 @@ class WindowsTests(unittest.TestCase):
     def test_a_switch_glides_only_once_its_change_is_confirmed_and_then_the_timer_stops(self):
         window = self.still_window()
         target = ("check", "b" * 64)
+        # A glide is short. On a slow runner (CI's 3.13 standard part 2, October 2026) one pump of the queue could
+        # take in the answer, start the glide, draw it and finish it, so a look at `_glides` between pumps found
+        # nothing although the switch had moved. Each glide is therefore recorded as it starts, where the window
+        # starts it, and the test asks of those records.
+        module = sys.modules[type(window).__module__]
+        real_next = module.next_glides
+        begun = []
+
+        def recording(seen, previous, glides, now, **options):
+            result = real_next(seen, previous, glides, now, **options)
+            if target in result and target not in glides:
+                begun.append(result[target])
+            return result
+
+        patcher = unittest.mock.patch.object(module, "next_glides", recording)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         try:
             self.assertTrue(window._switches[target])
             window._activate(target)
             # Asked, not yet answered: faded where it was, not moving.
             self.assertEqual(window._glides, {})
+            self.assertEqual(begun, [])
             self.assertTrue(next(item for item in window._plan["items"]
                                  if item["kind"] == "switch" and item["target"] == target)["busy"])
-            deadline = time.monotonic() + 3
-            while target not in window._glides and time.monotonic() < deadline:
+            deadline = time.monotonic() + 15
+            while not begun and time.monotonic() < deadline:
                 self.pump(0.005)
-            self.assertIn(target, window._glides)
-            started, begin, end = window._glides[target]
+            self.assertEqual(len(begun), 1, "the confirmed change started no glide, or more than one")
+            started, begin, end = begun[0]
             self.assertEqual((begin, end), (1.0, 0.0))
-            self.assertTrue(window._frame_running)
             deadline = time.monotonic() + 2
             while (window._glides or window._frame_running) and time.monotonic() < deadline:
                 self.pump(0.02)
             self.assertEqual(window._glides, {})
             self.assertFalse(window._frame_running, "a timer is left running with nothing moving")
             self.assertFalse(window._switches[target])
+            self.assertEqual(len(begun), 1, "the switch glided again")
         finally:
             window.destroy()
 

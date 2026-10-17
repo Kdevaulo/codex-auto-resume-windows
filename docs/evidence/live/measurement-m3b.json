@@ -1,0 +1,18 @@
+{
+  "format": "codex-auto-resume-measurement/1",
+  "step": "m3b",
+  "verdict": "pass",
+  "recorded_at": "2026-10-16T19:50Z",
+  "product_version": "0.6.16-beta.3",
+  "codex_version": "codex-cli 0.163.0-alpha.10.2",
+  "windows_build": "10.0.26300",
+  "observed": {
+    "turn_started": true,
+    "turn_ended_by_itself": true,
+    "client_id_recorded": false,
+    "unsubscribed": true,
+    "turn_in_history": true,
+    "turn_status": "completed",
+    "thread_given": true
+  }
+}

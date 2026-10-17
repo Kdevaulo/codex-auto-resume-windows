@@ -825,7 +825,7 @@ class WorkflowSecondsTests(unittest.TestCase):
     more than the read access the workflow has."""
 
     KEEP = "Keep this part's seconds per file"
-    PIN = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1"
+    PIN = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2"
     JOBS = {"test": ("Run the automated test suite",
                      "seconds-${{ matrix.edition }}-${{ matrix.python-version }}-${{ matrix.part }}"),
             "main-tree": ("Run the release lane on main's tree, this part", "seconds-release-main-tree-${{ matrix.part }}")}

@@ -607,4 +607,6 @@ class App(WatchLoop):
             shown.add(key)
             self._watcher_notice("near_limit", {"minutes": notice.get("window_minutes"),
                                                 "percent": notice.get("used_percent"),
-                                                "reset_at": notice.get("reset_at")})
+                                                "reset_at": notice.get("reset_at"),
+                                                # v0.6.16-beta.4: what the forced stop says, a closed word, else a warning
+                                                "kind": notice.get("kind")})

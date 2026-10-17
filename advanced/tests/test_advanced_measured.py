@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import sys
 import unittest
 
@@ -54,6 +55,45 @@ class OutcomeTests(unittest.TestCase):
         self.assertEqual(evidence.outcome(record("fail", "pass"))[0], Verdict.FAIL)
 
 
+# Where the editions page says a measurement is still open: "**Measurement MU: not settled yet**", "**MT: not made
+# yet**", and the Korean page's "**측정 MU: 아직 정해지지 않음**".
+OPEN_WORDS = (re.compile(r"\*\*(?:Measurements?\s+)?([A-Z][A-Z0-9]*):\s+not\s+(?:settled|made)\s+yet"),
+              re.compile(r"\*\*(?:측정\s+)?([A-Z][A-Z0-9]*):\s+아직\s+(?:정해지지\s+않음|하지\s+않음)"))
+
+
+class EditionsPageTests(unittest.TestCase):
+    def test_the_editions_page_never_calls_a_measurement_the_table_settles_open(self):
+        """MU passed on 2026-10-10, and the page went on saying "not settled yet" beside two capabilities."""
+        for name in ("EDITIONS.md", "EDITIONS.ko.md"):
+            path = ac.ROOT / "docs" / name
+            if not path.is_file():
+                continue                                    # main carries no Korean page
+            text = path.read_text(encoding="utf-8")
+            for pattern in OPEN_WORDS:
+                for found in pattern.finditer(text):
+                    try:
+                        measurement = Measurement(found.group(1).lower())
+                    except ValueError:
+                        continue
+                    with self.subTest(page=name, measurement=measurement):
+                        self.assertNotIn(measurement, measured.MEASURED, "settled in measured.py, open on the page")
+
+    def test_the_feature_matrix_cites_the_near_limit_capabilities_and_keep_it_on_turning_one_on(self):
+        """v0.6.16-beta.4's usage meter, wrap-up, forced stop over the pipe, continuation after the reset, custom numbers
+        and wordings, and Keep it on that turns a capability on: each with its rows and their tests, in both languages."""
+        for name in ("FEATURE_MATRIX.md", "FEATURE_MATRIX.ko.md"):
+            path = ac.ROOT / "docs" / name
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8")
+            for cited in ("test_advanced_usagestop.py:StopTests", "test_advanced_usagestop.py:AfterResetTests",
+                          "test_advanced_ipc.py:StopTests", "test_advanced_usage.py:MeterTests",
+                          "test_advanced_usage.py:WrapUpTests", "test_advanced_wordings.py:CheckTests",
+                          "test_advanced_state_v6.py:VersionSixTests", "KeepItOnTurnsItOnTests"):
+                with self.subTest(page=name, cited=cited):
+                    self.assertIn(cited, text)
+
+
 class TableTests(unittest.TestCase):
     def test_the_table_is_what_the_records_settle(self):
         if not RECORDS.is_dir():
@@ -85,19 +125,37 @@ class TableTests(unittest.TestCase):
         with its key, and the app ran a message afterwards (the usage read right after still showed the
         limit and no window changed). With none left, MN passed: both consumes said no_credit and the count
         stayed at zero. 2026-10-13, MU passed: the 5-hour window reset at 22:54 with no Codex use after it, the
-        first message at 01:39 opened a new window resetting at 06:39, and its reset time stayed there."""
+        first message at 01:39 opened a new window resetting at 06:39, and its reset time stayed there.
+        2026-10-16: MIPC passed (the Desktop's IPC pipe starts, adds to and interrupts a turn the app holds), MAWS
+        failed (no documented shared app-server), MCLOUD failed - partial: `codex cloud` reads a task's state, nothing
+        continues one. 2026-10-15 and 16, stage 4's nine: MC1 (a queued message shows at once as the person's own
+        and runs), MXA (a person's /compact leaves compaction and reasoning only), MX (thread/compact/start compacts
+        headless) and MF (a model at turn/start, put back by thread/settings/update and read back) passed; MB (Codex
+        refuses any write under model_providers.openai), MO and MC2 (partial), M3B (an empty turn leaves no client
+        id) and M6B (the sandbox helper asked for elevation) failed on 0.162.
+        2026-10-17, on codex-cli 0.163.0-alpha.10.2 (app 26.1013.3656.0) the main session measured again MW, M1, M2b,
+        M5, M6, M7, MP1-MP3, MIPC and stage 4's MO, M6B, MX, MF and M3B, and every one passed - MO, M6B and M3B,
+        which had failed on 0.162, among them. The others stay as they were made, so on 0.163 they read as
+        unmeasured; MAWS, MCLOUD and MB are as before."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
                                   Measurement.M6, Measurement.M7, Measurement.MA, Measurement.MH,
                                   Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR,
-                                  Measurement.MN, Measurement.MU})
-        self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4})
+                                  Measurement.MN, Measurement.MU, Measurement.MIPC, Measurement.MC1,
+                                  Measurement.MXA, Measurement.MX, Measurement.MF, Measurement.MO,
+                                  Measurement.M3B, Measurement.M6B})
+        self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4, Measurement.MAWS,
+                                  Measurement.MCLOUD, Measurement.MB, Measurement.MC2})
+        new = "codex-cli 0.163.0-alpha.10.2"
+        again = {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5, Measurement.M6,
+                 Measurement.M7, Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MIPC,
+                 Measurement.MO, Measurement.M6B, Measurement.MX, Measurement.MF, Measurement.M3B}
+        self.assertEqual({m for m, (_v, version) in measured.MEASURED.items() if version == new}, again)
+        self.assertTrue(all(measured.MEASURED[m][0] == Verdict.PASS for m in again))
         self.assertEqual(set(Measurement) - passed - failed,
                          # v0.6.15-beta's own, for several conversations at once: not made yet.
-                         {Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK, Measurement.MT,
-                          # v0.6.16-beta.3's read-only probes: the main session runs them on a real machine.
-                          Measurement.MIPC, Measurement.MAWS, Measurement.MCLOUD})
+                         {Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK, Measurement.MT})
 
 
 if __name__ == "__main__":

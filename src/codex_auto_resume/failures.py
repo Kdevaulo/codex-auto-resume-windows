@@ -198,7 +198,11 @@ def is_recoverable(category: str) -> bool:
 # standard edition never recovers alone, and the fence core holds every answer to. A code is a
 # structured value Codex chose - letters and digits - and never message text (B9).
 TAG_SHAPE = re.compile(r"[A-Za-z][A-Za-z0-9]{0,63}")
-ADMISSIBLE = frozenset({UNKNOWN, "terminal_auth", "terminal_failure"})
+# v0.6.16-beta.4: and a full context window - Codex's contextWindowExceeded alone (`admits`), which a compaction makes
+# room for; never another terminal_invalid code.
+ADMISSIBLE = frozenset({UNKNOWN, "terminal_auth", "terminal_failure", "terminal_invalid"})
+# The one code a terminal_invalid failure is taken up for (P17) - DECISION_FRAGMENTS' "context" keeps it out elsewhere.
+CONTEXT_FULL = "contextWindowExceeded"
 # A code containing one of these, ignoring case, may name something a person decides or must fix -
 # a policy, a budget, a permission, a sign-in, a cancel - so nothing ever takes it up or relaxes it.
 # Broad on purpose: a false match leaves a failure for the person, a miss could retry a refusal.
@@ -262,6 +266,8 @@ def admits(facts, answer) -> bool:
         return category == UNKNOWN and _plain_code(facts)
     if answer != Alternative.ADMIT:
         return False
+    if category == "terminal_invalid":
+        return code == CONTEXT_FULL
     if category == UNKNOWN:
         return _plain_code(facts)
     if category == "terminal_auth" and code == "unauthorized":

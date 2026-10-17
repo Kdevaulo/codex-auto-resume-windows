@@ -75,6 +75,8 @@ def names_on(source: str, receivers: tuple) -> set:
 # claiming the right to send, writing what happened, and the counters the budgets are made of.
 ENGINE_TO_STORE = {
     "get", "register", "update", "settings", "record_gates", "records_in", "correlate",
+    # v0.6.16-beta.4: the waiting records of a kind of conversation the plug no longer watches, cancelled (P18).
+    "cancel_waiting",
     "reserve_detailed", "claimed_on_thread", "others_in_flight", "recent_claims",
     "recent_claim_count", "release_claim", "release_withdrawn", "submission_guard",
     "thread_enabled",
@@ -106,7 +108,15 @@ ENGINE_TO_STORE = {
 # Since v0.6.11 the send is asked of `sender`, the one name dispatch binds to the backend - or to
 # a channel the edition's plug names at P5 (tests/test_structural_invariants.py) - so both names
 # are read as this seam.
-ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "loaded", "send", "usage"}
+# v0.6.16-beta.4: and who holds a conversation while the app is not running - asked only while the plug wants P16
+# (engine/routes.py), so never by the standard edition.
+ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "holder", "loaded", "send", "usage",
+                     # v0.6.16-beta.4: who holds a conversation loaded() said is "elsewhere" (pid, creation time), for
+                     # the TO_SESSION re-check under the dispatch lock (engine/tosession.py) - read, never set.
+                     "session_holder",
+                     # v0.6.16-beta.4: the engine's own `codex --version`, which the version skew guard holds a terminal's
+                     # or VS Code's conversation to (engine/kinds.py) - read only while the plug names such a kind.
+                     "engine_version"}
 BACKEND_NAMES = ("backend", "sender")
 # What it reads out of Codex's own files, through the source: the turns, the markers that say a
 # continuation of ours is in the queue, what a recovered turn produced, and the projection's age.
@@ -114,6 +124,11 @@ ENGINE_TO_SOURCE = {
     "latest", "later_turns", "latest_failures", "turn_markers", "turn_observation",
     "turn_progress", "progress", "projection", "marker_presence", "marker_rows", "queue_row",
     "queued_rows", "foreign_queued", "reset_hint",
+    # v0.6.16-beta.4: the kinds of conversation besides the app's the plug names (P18), set once a tick, and whether a
+    # conversation is taken up with some of them - asked only when a kind leaves.
+    "session_kinds", "taken",
+    # and whether such a conversation says a newer Codex wrote it than the engine is (the version skew guard).
+    "newer_than_engine",
     # v0.6.11: the key of a conversation's project, asked only when Settings let some projects
     # resume and not others (projects.asks) - never at the defaults.
     "project_key",
@@ -147,9 +162,10 @@ ENGINE_TO_SOURCE = {
 # through its own claim, pre-send look and launch guard where it would otherwise wait (A11).
 # `admission` is P17: whether a failure core never recovers alone is taken up (v0.6.14). `wants` is
 # not a point: whether the plug may answer at one now, so core makes that point's reads only then.
-# `eligibility` is P19 (v0.6.16-beta.3): which conversations besides a person's own detection takes up.
+# `eligibility` is P19 (v0.6.16-beta.3): which conversations besides a person's own detection takes up; `sessions` P18
+# (v0.6.16-beta.4): which conversations besides the app's are watched.
 ENGINE_TO_PLUG = {"admission", "delivery", "eligibility", "gate", "moved", "null", "outcome", "partition", "records",
-                  "schedule", "sender", "text", "tick", "unloaded", "wants"}
+                  "schedule", "sender", "sessions", "text", "tick", "unloaded", "wants"}
 # `claim_ledger_checked` is how the claim asks: it says whether that one call raised, so a
 # failure on another thread holding the same plug is not read as this claim's (domain/plug.py).
 STORE_TO_LEDGER = {"claim_ledger_checked", "null"}

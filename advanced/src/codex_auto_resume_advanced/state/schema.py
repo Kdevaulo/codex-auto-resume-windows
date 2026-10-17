@@ -56,6 +56,27 @@ A version-4 file is brought to it when it is opened (UPGRADE_FROM_4), after any 
 one every earlier version has: a build of version 4 or older refuses a version-5 file as newer, reads every
 capability as off, and writes nothing to it (session._prepare) - the person's choices and the meter's rows wait
 there, untouched, for a build that knows them, and the standard edition never opens the file at all.
+
+Version 6 (v0.6.16-beta.4, the owner's additions to issue #29) makes `options` and `continuations` again with their
+wider lists - each window on or off, the stop percentage the wrap-up's words name, Include the reset time and
+Continue after the reset (OptionKey), and the continuation after the reset (ContinuationKind.AFTER_RESET) - every row
+kept, and adds one table:
+
+    wordings       a person's own wording for a capability, by its key (WordingKey): the wrap-up's Custom text for
+                   each window - text of 1 to 2000 characters, as the custom continuation text is, never logged
+
+A version-5 file is brought to it when it is opened (UPGRADE_FROM_5); the way down is as before: a build of version 5
+or older refuses a version-6 file as newer, every capability reads off, and nothing is written to it.
+
+Version 7, stage 4's (v0.6.16-beta.4; the owner's yes of 2026-10-11), adds two tables and remakes none - a version-6
+file is brought to it by two CREATE TABLE statements, every row kept (UPGRADE_TO_STAGE4); an older one takes the
+earlier steps first:
+
+    headless_runs  a turn run here while it runs, a person's Stop of it, how it ended, and the model a fallback
+                   turn owes the conversation back until it is put back (state/runs.py)
+    chat_messages  the Dashboard's chat messages: their words only until sent (state/chat.py)
+
+The way down is the same: an older build refuses the file as newer, every capability off.
 """
 from __future__ import annotations
 
@@ -63,11 +84,15 @@ from codex_auto_resume import failures
 from codex_auto_resume.domain.plug import TAKE_UP, FailureForm
 
 from ..registry import GLOBAL_HOURLY
-from ..vocabulary import (ArmingState, ContinuationKind, ContinuationReason, KeepOn, KeepReason, KeepState,
-                          OptionKey, OverrideKind, PromptEvery, PromptReason, PromptState, PromptTrigger, RecordState,
-                          RuleReason, RuleState, SpendOutcome)
+from ..vocabulary import (ArmingState, ChatReason, ChatState, ContinuationKind, ContinuationReason,
+                          KeepOn, KeepReason, KeepState, OptionKey, OverrideKind, PromptEvery, PromptReason,
+                          PromptState, PromptTrigger, RecordState, RuleReason, RuleState, RunEnd, SpendOutcome,
+                          WordingKey)
 
-SCHEMA_VERSION = 5
+# Stage 4's version (v0.6.16-beta.4): the one place it is numbered - a literal, which the setup's version picker reads
+# (tests/test_version_picker.py) - the step after the version before it (6, the usage additions' own).
+SCHEMA_VERSION = 7
+STAGE4_VERSION = SCHEMA_VERSION
 FILE_NAME = "advanced.sqlite"
 # The name the file is attached under on core's connection, inside the one claim (ledger.py).
 ATTACHED = "advanced"
@@ -107,10 +132,29 @@ TABLES = {
     # Version 5 (v0.6.16-beta.3): the usage meter's last reading of each window, and what each stage acted for.
     "meter": ("bucket", "minutes", "used_percent", "reset_at", "read_at", "warned_reset_at", "warned_at",
               "paused_reset_at"),
+    # Version 6 (v0.6.16-beta.4): a person's own wording, by capability and key.
+    "wordings": ("capability", "choice", "words", "changed_at"),
+    # Stage 4 (v0.6.16-beta.4): a turn run here, and the Dashboard's chat.
+    "headless_runs": ("interruption_id", "capability", "thread_id", "started_at", "ends_by", "stop_requested_at",
+                      "ended_at", "end", "restore_model"),
+    "chat_messages": ("chat_id", "thread_id", "words", "state", "reason", "record_id", "created_at", "sent_at",
+                      "finished_at"),
 }
 V4_TABLES = ("continuations", "keep_going", "prompts")
 # Version 5's (v0.6.16-beta.3).
 V5_TABLES = ("meter",)
+# Version 6's (v0.6.16-beta.4).
+V6_TABLES = ("wordings",)
+# The longest wording kept: the custom continuation text's own bound (core's continuation.MAX_CUSTOM_LENGTH).
+WORDING_LIMIT = 2000
+# Stage 4's (v0.6.16-beta.4).
+STAGE4_TABLES = ("headless_runs", "chat_messages")
+# The capabilities whose turns `headless_runs` holds.
+HEADLESS_CAPABILITIES = ("headless_run", "compact_continue", "model_fallback")
+# A model's name at most, as Codex says it (codex/headless.py reads no longer one): what a fallback turn owes back.
+MODEL_NAME = 128
+# A chat message's words at most (A27's length).
+CHAT_WORDS = 2000
 # The reset actions' tables, the last four of version 3 (v0.6.14).
 RESET_TABLES = ("windows", "readings", "reset_rules", "credit_spends")
 # The buckets a usage window is kept under (core's domain/usage.BUCKETS), and the capabilities whose
@@ -118,7 +162,9 @@ RESET_TABLES = ("windows", "readings", "reset_rules", "credit_spends")
 BUCKETS = ("codex", "premium", "legacy", "other")
 RESET_CAPABILITIES = ("reset_credit", "reset_message")
 # The capabilities whose continuations `continuations` holds (v0.6.15-beta).
-CONTINUATION_CAPABILITIES = ("empty_response", "subagent_parent", "keep_going", "usage_wrap_up")
+CONTINUATION_CAPABILITIES = ("empty_response", "subagent_parent", "keep_going", "usage_wrap_up",
+                             # v0.6.16-beta.4 (version 6): the forced stop's continuation after the reset.
+                             "usage_pause")
 # The tables version 2 had: v0.6.11's and v0.6.12's file.
 # `records` before version 4 added its last two columns (queue_id, withdraw).
 RECORDS_V3 = TABLES["records"][:-2]
@@ -467,7 +513,49 @@ _STATEMENTS_V5 = (
     )""" % (_one_of("bucket", BUCKETS), _int("minutes", low=1, high=100800, null=False), _int("reset_at"),
             _int("warned_reset_at"), _int("paused_reset_at")),
 )
-STATEMENTS = (_STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + _STATEMENTS_V5
+# Version 6's own table (v0.6.16-beta.4): a person's own wording, text a person wrote and nothing else.
+_STATEMENTS_V6 = (
+    """CREATE TABLE wordings (
+        capability TEXT NOT NULL,
+        choice TEXT NOT NULL %s,
+        words TEXT NOT NULL CHECK (typeof(words) = 'text' AND length(words) BETWEEN 1 AND %d),
+        changed_at REAL NOT NULL,
+        PRIMARY KEY (capability, choice)
+    )""" % (_one_of("choice", WordingKey), WORDING_LIMIT),
+)
+# Stage 4's two tables (v0.6.16-beta.4): added, nothing remade.
+_STATEMENTS_STAGE4 = (
+    """CREATE TABLE headless_runs (
+        interruption_id TEXT PRIMARY KEY %s,
+        capability TEXT NOT NULL %s,
+        thread_id TEXT NOT NULL %s,
+        started_at REAL NOT NULL,
+        ends_by REAL NOT NULL,
+        stop_requested_at REAL,
+        ended_at REAL,
+        end TEXT CHECK (end IS NULL OR end IN (%s)),
+        restore_model TEXT CHECK (restore_model IS NULL OR (typeof(restore_model) = 'text'
+                                  AND length(restore_model) BETWEEN 1 AND %d AND capability = 'model_fallback')),
+        CHECK ((end IS NULL) = (ended_at IS NULL))
+    )""" % ("CHECK (length(interruption_id) = 64 AND interruption_id NOT GLOB '*[^0-9a-f]*')",
+            _one_of("capability", HEADLESS_CAPABILITIES), _UUID, ", ".join("'%s'" % word for word in RunEnd),
+            MODEL_NAME),
+    """CREATE TABLE chat_messages (
+        chat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id TEXT NOT NULL %s,
+        words TEXT CHECK (words IS NULL OR (typeof(words) = 'text' AND length(words) BETWEEN 1 AND %d)),
+        state TEXT NOT NULL %s,
+        reason TEXT CHECK (reason IS NULL OR reason IN (%s)),
+        record_id TEXT NOT NULL UNIQUE %s,
+        created_at REAL NOT NULL,
+        sent_at REAL,
+        finished_at REAL,
+        CHECK (words IS NULL OR state = '%s')
+    )""" % (_UUID, CHAT_WORDS, _one_of("state", ChatState), ", ".join("'%s'" % word for word in ChatReason),
+            "CHECK (length(record_id) = 64 AND record_id NOT GLOB '*[^0-9a-f]*')", ChatState.WAITING),
+    "CREATE INDEX chat_messages_thread ON chat_messages(thread_id, chat_id)",
+)
+STATEMENTS = (_STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + _STATEMENTS_V5 + _STATEMENTS_V6 + _STATEMENTS_STAGE4
               + ("PRAGMA user_version=%d" % SCHEMA_VERSION,))
 # Version 2's file exactly as v0.6.11 and v0.6.12 made it: what a test builds an older file from.
 STATEMENTS_V2 = _STATEMENTS_V2 + ("PRAGMA user_version=2",)
@@ -483,13 +571,14 @@ UPGRADE_FROM_2 = _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 STATEMENTS_V3 = _STATEMENTS_V2 + _STATEMENTS_V3 + ("PRAGMA user_version=3",)
 # A version-3 file a pre-release build made before the reset actions' tables (v0.6.14): those four
 # added, every row kept, its version unchanged.
-TABLES_V3_BEFORE_RESETS = dict({name: TABLES[name] for name in TABLES if name not in RESET_TABLES + V4_TABLES + V5_TABLES},
+TABLES_V3_BEFORE_RESETS = dict({name: TABLES[name] for name in TABLES
+                                if name not in RESET_TABLES + V4_TABLES + V5_TABLES + V6_TABLES + STAGE4_TABLES},
                                records=RECORDS_V3)
 ADD_RESETS = _STATEMENTS_RESETS
 # Version 4 (v0.6.15-beta): the tables whose CHECKs name a closed list that grew are made again with the new list, every
 # row kept - SQLite cannot change a CHECK in place - and the tables of 3c added. A version-3 file is brought to it.
 TABLES_V3 = {name: columns for name, columns in dict(TABLES, records=RECORDS_V3).items()
-             if name not in V4_TABLES + V5_TABLES}
+             if name not in V4_TABLES + V5_TABLES + V6_TABLES + STAGE4_TABLES}
 # The choices version 4 added to `options` (OptionKey): what a version-3 file's CHECK refuses.
 V4_OPTION_WORDS = ("workers", "days")
 # And to `overrides`.
@@ -515,7 +604,7 @@ UPGRADE_FROM_3 = (
 
 # Version 5 (v0.6.16-beta.3, issue #29): `options` and `continuations` made again with their wider lists, every row kept,
 # and the meter's table added. A version-4 file is brought to it; a version-3 one takes UPGRADE_FROM_3 first.
-TABLES_V4 = {name: columns for name, columns in TABLES.items() if name not in V5_TABLES}
+TABLES_V4 = {name: columns for name, columns in TABLES.items() if name not in V5_TABLES + V6_TABLES + STAGE4_TABLES}
 # The choices version 5 added to `options` (OptionKey), and the words to `continuations`: what a version-4 file refuses.
 V5_OPTION_WORDS = ("poll_minutes", "warn_five_hour", "warn_weekly", "wrap_five_hour", "wrap_weekly", "wrap_style",
                    "pause_five_hour", "pause_weekly")
@@ -525,3 +614,21 @@ UPGRADE_FROM_4 = (
     + _remade(next(s for s in _STATEMENTS_V4 if s.lstrip().startswith("CREATE TABLE continuations")), "continuations",
               TABLES["continuations"], "CREATE INDEX continuations_thread ON continuations(thread_id)", suffix="v5")
     + _STATEMENTS_V5 + ("PRAGMA user_version=5",))
+
+# Version 6 (v0.6.16-beta.4): `options` and `continuations` made again with their wider lists, every row kept, and the
+# wordings' table added. A version-5 file is brought to it; an older one takes the earlier steps first.
+TABLES_V5 = {name: columns for name, columns in TABLES.items() if name not in V6_TABLES + STAGE4_TABLES}
+# The choices version 6 added to `options` (OptionKey), and the kind to `continuations`: what a version-5 file refuses.
+V6_OPTION_WORDS = ("window_five_hour", "window_weekly", "stop_words_five_hour", "stop_words_weekly", "wrap_reset_time",
+                   "wrap_after_reset")
+V6_CONTINUATION_WORDS = ("after_reset", "usage_pause")
+UPGRADE_FROM_5 = (
+    _remade(_STATEMENTS_V3[0], "options", TABLES["options"], suffix="v6")
+    + _remade(next(s for s in _STATEMENTS_V4 if s.lstrip().startswith("CREATE TABLE continuations")), "continuations",
+              TABLES["continuations"], "CREATE INDEX continuations_thread ON continuations(thread_id)", suffix="v6")
+    + _STATEMENTS_V6 + ("PRAGMA user_version=6",))
+# Stage 4 (v0.6.16-beta.4): the version before it, and the step from it - two tables added, every row kept.
+TABLES_BEFORE_STAGE4 = {name: columns for name, columns in TABLES.items() if name not in STAGE4_TABLES}
+UPGRADE_TO_STAGE4 = _STATEMENTS_STAGE4 + ("PRAGMA user_version=%d" % STAGE4_VERSION,)
+STATEMENTS_BEFORE_STAGE4 = (_STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + _STATEMENTS_V5 + _STATEMENTS_V6
+                            + ("PRAGMA user_version=%d" % (STAGE4_VERSION - 1),))

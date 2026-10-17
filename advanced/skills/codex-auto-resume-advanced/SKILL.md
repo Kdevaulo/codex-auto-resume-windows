@@ -67,6 +67,29 @@ anywhere else, and do not present one as active unless `list_advanced_capabiliti
   edition. When arrival cannot be proven, the continuation is treated as uncertain and never sent
   again, and the capability turns itself off; the user can turn it on again in the Dashboard.
 
+- **Conversations nothing holds, and other sessions** (v0.6.16-beta.4). Each acts on its own once
+  the user turned it on, and none can be started, steered or stopped with a tool. *Run a
+  conversation here while Codex is closed* runs one turn, with the program's ordinary continuation,
+  on Codex's own app server, on the settings Codex saved for that conversation; every approval is
+  declined, a conversation saved with full access, an outside sandbox or approvals going to anyone
+  else is refused, and the turn ends at the hours the user chose or when the Codex app starts. It is
+  stopped only by the user, with Stop on the Advanced features page; no tool stops it, so never
+  claim to have. *Recover CLI, TUI and VS Code conversations* also finds the failures of those
+  sessions; Pending and History mark such a row "CLI" or "VS Code", and a conversation a newer Codex
+  wrote than the one installed waits for Codex to be updated. *Compact a full conversation, then
+  continue* waits, where the app has the conversation open, until the user runs `/compact` in Codex
+  and then continues it; the program never sends `/compact` itself. *Use Codex's default model when
+  one is at capacity* runs one turn on Codex's default model and puts the conversation's own model
+  back; if Codex refuses, Pending and History say so and the user switches it back in Codex.
+  *Continue with no words* starts those turns with no words, proven by their id, and turns itself
+  off where Codex refuses. Codex's own retry settings are not offered.
+- **The usage capabilities** (v0.6.16-beta.3 and -beta.4). *Usage meter* reads the usage and shows
+  it; *Wrap up near a limit* sends one message, in the wording the user picked or wrote, before a
+  window ends; *Stop near a limit* stops a running turn through the Codex app's own channel when
+  the stop percentage is reached and continues it once after the reset. Each window - the five-hour
+  and the weekly - is switched on or off on its own, every number has *Custom...* beside its
+  choices, and the exact words are shown before they can be sent. Words the user wrote are theirs:
+  never write them for the user: no tool sets or reads them back. All of it is set only in the Dashboard.
 - **Compatibility report.** Unlike the others it changes nothing about recovery: it is something the
   user starts in the Dashboard. It writes a compatibility report from this PC's own records - counts,
   states and times, no conversation text, ids or paths - shows the whole file, saves it where they

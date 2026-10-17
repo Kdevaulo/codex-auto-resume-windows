@@ -32,11 +32,15 @@ from __future__ import annotations
 from codex_auto_resume.domain.plug import DEFER, Alternative
 from codex_auto_resume.domain.plughands import RECORDS_LIMIT, Widening
 
+from codex_auto_resume import continuation, settings
+
 from .. import statement
+
 from ..codex import credits, inuse
 from ..codex.turns import Turns
-from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
-from .continued import answer_key, handed, words_pass
+from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState, WordingKey
+from .continued import answer_key, handed
+from .wrapwords import ON, SWITCH, DEFAULT_STYLE, STYLE_KEYS, STYLES, render  # noqa: F401 - the registry's, the tests'
 
 METER, WRAP_UP, PAUSE = "usage_meter", "usage_wrap_up", "usage_pause"
 # Recover every conversation (engine/everyconversation.py): while it is on, core takes up P19's widening, and so does
@@ -48,10 +52,20 @@ WINDOWS = (FIVE_HOUR, WEEKLY)
 POLL_CHOICES = (5, 10, 15, 20, 30, 45, 60)
 DEFAULT_POLL = 15
 PERCENTS = (50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 96, 97, 98, 99)
-DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 95
-STYLES = (1, 2, 3)
-DEFAULT_STYLE = 2
-STYLE_KEYS = {1: "continue.wrap_up.short", 2: "continue.wrap_up.standard", 3: "continue.wrap_up.detailed"}
+# v0.6.16-beta.4 (f): what a person may type in beside the choices - any whole percentage, any spacing of 5 to 60.
+PERCENT_RANGE = (1, 100)
+POLL_RANGE = (5, 60)
+# The forced stop's own percentage (usage_pause, v0.6.16-beta.4: 97, above the 95 the wrap-up's words ask for).
+DEFAULT_WARN, DEFAULT_WRAP, DEFAULT_PAUSE = 85, 90, 97
+# v0.6.16-beta.4: the stop percentage the wrap-up's words ask Codex to stop at (wrapwords.py), each window its own.
+DEFAULT_STOP_WORDS = 95
+STOP_WORDS_OPTIONS = {FIVE_HOUR: OptionKey.STOP_WORDS_FIVE_HOUR, WEEKLY: OptionKey.STOP_WORDS_WEEKLY}
+# (g): the continuation after the reset (engine/usagestop.py says it for a conversation it stopped).
+AFTER_RESET_KEY = "continue.after_reset"
+# (e): each window acted on or not - the meter's own choice, which the warning, the wrap-up and the stop each follow.
+WINDOW_OPTIONS = {FIVE_HOUR: OptionKey.WINDOW_FIVE_HOUR, WEEKLY: OptionKey.WINDOW_WEEKLY}
+# (b): the wrap-up's Custom text for each window (state `wordings`).
+CUSTOM_WORDINGS = {FIVE_HOUR: WordingKey.WRAP_CUSTOM_FIVE_HOUR, WEEKLY: WordingKey.WRAP_CUSTOM_WEEKLY}
 # Each capability's percentage option for each window.
 STAGE_OPTIONS = {METER: {FIVE_HOUR: OptionKey.WARN_FIVE_HOUR, WEEKLY: OptionKey.WARN_WEEKLY},
                  WRAP_UP: {FIVE_HOUR: OptionKey.WRAP_FIVE_HOUR, WEEKLY: OptionKey.WRAP_WEEKLY},
@@ -82,6 +96,32 @@ def reached(row, threshold, now) -> bool:
 def windows(rows):
     """The rows of the five-hour and the weekly windows, any bucket's."""
     return [row for row in rows.values() if row["minutes"] in WINDOWS]
+
+
+def _reset_since(rows, minutes, created_at, now) -> bool:
+    """Whether the window of `minutes` has reset since `created_at`: the meter's row of it shows a window begun after, or
+    the reset it showed has passed. With no row of it, a window's length after."""
+    found = [row for row in windows(rows) if row["minutes"] == minutes]
+    if not found:
+        return now - created_at >= minutes * 60
+    reset = found[0]["reset_at"]
+    if type(reset) is not int:
+        return False
+    return now >= reset + CLOSE_AFTER or reset - minutes * 60 > created_at
+
+
+def acting(meter_options) -> frozenset:
+    """The windows a person lets these capabilities act on (v0.6.16-beta.4, item (e)): each one switched on in the
+    meter's choices - both by default. Both off, the meter still reads and shows usage, and nothing acts."""
+    return frozenset(minutes for minutes, key in WINDOW_OPTIONS.items() if meter_options.get(key, ON) == ON)
+
+
+def _acting(scoped) -> frozenset:
+    """The windows acted on, as the meter's choices say; every window where they cannot be read."""
+    try:
+        return acting(scoped.options_of(METER))
+    except Exception:
+        return frozenset(WINDOWS)
 
 
 class _Errand:
@@ -162,7 +202,10 @@ class UsageMeter:
         handle.save(found)
         self._count("read")
         options = scoped.options()
+        on = acting(options)
         for row in windows(handle.rows()):
+            if row["minutes"] not in on:
+                continue                                   # (e) a window switched off: shown, never warned of
             if reached(row, percent(options, METER, row["minutes"]), now) and row["warned_reset_at"] != row["reset_at"]:
                 if handle.mark(row["bucket"], row["minutes"], warned_reset_at=row["reset_at"]):
                     self._count("warned")
@@ -218,6 +261,10 @@ class UsageWrapUp:
             self._look(view, now)
         except Exception:
             pass
+        try:
+            self._after_reset(view, now)
+        except Exception:
+            pass
         return DEFER
 
     def _look(self, view, now) -> None:
@@ -226,12 +273,31 @@ class UsageWrapUp:
         if not handle.on():
             return
         options = scoped.options()
-        due = [row for row in windows(scoped.meter.rows())
-               if now - row["read_at"] <= FRESH and reached(row, percent(options, WRAP_UP, row["minutes"]), now)]
+        on = _acting(scoped)
+        due = [row for row in windows(scoped.meter.rows()) if row["minutes"] in on
+               and now - row["read_at"] <= FRESH and reached(row, percent(options, WRAP_UP, row["minutes"]), now)]
         if not due:
             return
-        words = statement.CATALOGS.text(STYLE_KEYS.get(options.get(OptionKey.WRAP_STYLE), STYLE_KEYS[DEFAULT_STYLE]))
-        if not words_pass(words):
+        # v0.6.16-beta.4: the words of each window due - with the numbers where that wording is chosen - in the
+        # continuation language, made once a look (wrapwords.render).
+        try:
+            locale = continuation.resolve_locale(settings.load(self.paths.settings_file))
+        except Exception:
+            locale = None
+        try:
+            custom = scoped.wordings()
+        except Exception:
+            custom = {}
+        worded = []
+        for row in due:
+            words = render(style=options.get(OptionKey.WRAP_STYLE, DEFAULT_STYLE), minutes=row["minutes"],
+                           used=row["used_percent"], locale=locale,
+                           stop_at=options.get(STOP_WORDS_OPTIONS[row["minutes"]], DEFAULT_STOP_WORDS),
+                           reset_at=row["reset_at"], include_reset=options.get(OptionKey.WRAP_RESET_TIME, ON) == ON,
+                           custom=custom.get(CUSTOM_WORDINGS.get(row["minutes"])))
+            if words is not None:
+                worded.append((row, words))
+        if not worded:
             return
         turns = Turns(self._codex_home())
         source = self._source()
@@ -244,11 +310,60 @@ class UsageWrapUp:
                 continue
             if turn is None or turn.status != "inProgress":
                 continue
-            for row in due:
+            for row, words in worded:
                 key = answer_key(WRAP_UP, thread, row["bucket"], row["minutes"], row["reset_at"])
+                # Its window's length is kept in `chain` (v0.6.16-beta.4): what Continue after the reset reads it by.
                 if handle.get(key) is None and handle.add(key, ContinuationKind.WRAP_UP, thread, words,
-                                                          ordinal=turn.ordinal):
+                                                          ordinal=turn.ordinal, chain=row["minutes"]):
                     self._count("found")
+
+    def _after_reset(self, view, now) -> None:
+        """Continue after the reset (v0.6.16-beta.4, item (g), on by default): a conversation sent a wrap-up that then
+        ended well - its latest turn completed - is sent one continuation once the wrap-up's window resets, through
+        core's queue as every continuation goes: only while that turn is still the latest, ended, with nothing after it
+        (A17), and the app holds the conversation (A11), at core's gates. One that failed is core's recovery, one
+        stopped is the forced stop's (engine/usagestop.py): each is noted and left. Once for each wrap-up."""
+        scoped = self._scoped
+        handle = scoped.continuations
+        if not handle.on() or scoped.options().get(OptionKey.WRAP_AFTER_RESET, ON) != ON:
+            return
+        sent = [row for row in handle.mine(pending=None) if row["kind"] == ContinuationKind.WRAP_UP
+                and row["reason"] in (ContinuationReason.DELIVERED, ContinuationReason.SENT) and row["chain"] in WINDOWS]
+        if not sent:
+            return
+        rows, turns, source, words = scoped.meter.rows(), Turns(self._codex_home()), self._source(), None
+        for wrap in sent:
+            key = answer_key(ContinuationKind.AFTER_RESET, wrap["thread_id"], "wrap", wrap["chain"],
+                             int(wrap["created_at"]))
+            if handle.get(key) is not None or not _reset_since(rows, wrap["chain"], wrap["created_at"], now):
+                continue
+            thread = wrap["thread_id"]
+            try:
+                if view.thread_enabled(thread) is not True or source.latest(thread) is None:
+                    continue
+                latest = turns.latest(thread)
+            except Exception:
+                continue
+            if latest is None or latest.status == "inProgress":
+                continue                                          # still working: looked at again
+            newer = _after_wrap_up(turns, thread, wrap["ordinal"], latest.ordinal)
+            if newer is None:
+                continue                                          # not read: looked at again
+            if newer:
+                handle.note(key, ContinuationKind.AFTER_RESET, thread, ContinuationReason.SUPERSEDED)
+                continue                                          # newer work came after the wrap-up's own turn (A17)
+            if latest.status != "completed":
+                handle.note(key, ContinuationKind.AFTER_RESET, thread, ContinuationReason.HANDED_OVER)
+                continue                                          # a failure is core's; a stop, the forced stop's
+            if words is None:
+                try:
+                    words = statement.CATALOGS.text(AFTER_RESET_KEY,
+                                                    continuation.resolve_locale(settings.load(self.paths.settings_file)))
+                except Exception:
+                    words = statement.CATALOGS.text(AFTER_RESET_KEY)
+            if handle.add(key, ContinuationKind.AFTER_RESET, thread, words, ordinal=latest.ordinal,
+                          chain=wrap["chain"]):
+                self._count("continued")
 
     def records(self, view):
         """P2: every wrap-up waiting, with its words. One in flight is the runtime's to hand."""
@@ -260,8 +375,13 @@ class UsageWrapUp:
         except Exception:
             return DEFER
         waiting = [row for row in rows if row["record_state"] == RecordState.WAITING]
+        # The wrap-ups go only into the very turn they were made for (_still_due); a continuation after the reset is
+        # core's to check as every continuation is - its turn the latest, ended, nothing after it.
+        later = [row for row in waiting if row["kind"] == ContinuationKind.AFTER_RESET]
+        waiting = [row for row in waiting if row["kind"] != ContinuationKind.AFTER_RESET]
         if waiting:
-            waiting = self._still_due(waiting)
+            waiting = self._still_due(waiting, frozenset(row["thread_id"] for row in later))
+        waiting += later
         found = [record for record in (handed(row) for row in waiting) if record is not None]
         # Core tries RECORDS_LIMIT a tick: past it, those waiting are handed from a place that moves on each tick, so
         # none waits behind the others for good (as engine/resetmessage.py hands its messages).
@@ -271,7 +391,7 @@ class UsageWrapUp:
             self._turn += 1
         return found or DEFER
 
-    def _still_due(self, waiting) -> list:
+    def _still_due(self, waiting, spared=frozenset()) -> list:
         """The waiting ones whose conversation core would still recover and whose turn is still the latest and still
         running; every other one ends superseded here - core would keep it waiting for good (not a conversation it
         takes up) or drop it (its turn moved on), and either way it would take a place among core's few a tick.
@@ -293,6 +413,8 @@ class UsageWrapUp:
                 kept.append(row)
             elif thread not in ended:
                 ended.add(thread)
+                if thread in spared:
+                    continue                    # not handed; a continuation after the reset waits there, not ended
                 try:
                     self._scoped.continuations.end(ContinuationReason.SUPERSEDED, thread_id=thread)
                 except Exception:
@@ -304,6 +426,21 @@ class UsageWrapUp:
             self._scoped.count(code)
         except Exception:
             pass
+
+
+def _after_wrap_up(turns, thread, made_for, latest):
+    """Whether a turn came after the wrap-up's own - the turn it was made for (`made_for`), or the very next one, which
+    the wrap-up started: True where `latest` is later than both, None where that cannot be read."""
+    if type(made_for) is not int or type(latest) is not int:
+        return None
+    if latest == made_for:
+        return False
+    if latest < made_for:
+        return True
+    try:
+        return turns.between(thread, made_for, latest) != 0
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------- the pause
@@ -320,27 +457,37 @@ class UsagePause:
         self._scoped = scoped
 
     def tick(self, view):
+        if self._scoped is not None:
+            self._mark()
+        return DEFER
+
+    def _mark(self) -> list:
+        """The windows held and let go at P8, as their readings stand; the rows newly held this tick."""
         scoped = self._scoped
-        if scoped is None:
-            return DEFER
+        newly = []
         try:
             handle = scoped.meter
             if not handle.on():
-                return DEFER
+                return newly
             now = scoped.now()
             options = scoped.options()
+            on = _acting(scoped)
             for row in windows(handle.rows()):
-                over = reached(row, percent(options, PAUSE, row["minutes"]), now)
+                # (e) a window switched off is never held, and one held lets go when it is switched off.
+                acted = row["minutes"] in on
+                over = acted and reached(row, percent(options, PAUSE, row["minutes"]), now)
                 held = row["paused_reset_at"]
                 if over and held != row["reset_at"]:
                     if handle.mark(row["bucket"], row["minutes"], paused_reset_at=row["reset_at"]):
                         self._count("paused")
-                elif held is not None and not over and (held != row["reset_at"] or now >= held + CLOSE_AFTER):
+                        newly.append(row)
+                elif held is not None and not over and (not acted or held != row["reset_at"]
+                                                         or now >= held + CLOSE_AFTER):
                     if handle.mark(row["bucket"], row["minutes"], clear_pause=True):
                         self._count("resumed")
         except Exception:
             pass
-        return DEFER
+        return newly
 
     def holding(self) -> bool:
         """Whether a window the pause marked has not reset yet - its reset time not yet passed."""
@@ -378,6 +525,60 @@ class UsagePause:
             pass
 
 
+def touched(key) -> tuple:
+    """The windows whose order an option bears on: its own window for a percentage, none for anything else."""
+    return tuple(minutes for minutes in WINDOWS if key == STOP_WORDS_OPTIONS[minutes]
+                 or any(key == stages[minutes] for stages in STAGE_OPTIONS.values()))
+
+
+def order_problem(values, windows_=WINDOWS) -> tuple:
+    """Item (j) of the owner's additions, for each window: the warning at or below the wrap-up, and the wrap-up below the
+    stop the words ask for - else ("order", None); a forced stop below the words' stop only warns ("stop_before_words"),
+    as it would cut Codex off before it stops itself - never refuses. `values` is {capability: its options} as they
+    would be, `windows_` the windows looked at - a change, only those it touches (`touched`), so a value an older
+    beta stored out of order never blocks a change to anything else; (refusal word or None, warning word or None)."""
+    warning = None
+    for minutes in windows_:
+        warn = values.get(METER, {}).get(STAGE_OPTIONS[METER][minutes], DEFAULT_WARN)
+        wrap = values.get(WRAP_UP, {}).get(STAGE_OPTIONS[WRAP_UP][minutes], DEFAULT_WRAP)
+        words = values.get(WRAP_UP, {}).get(STOP_WORDS_OPTIONS[minutes], DEFAULT_STOP_WORDS)
+        forced = values.get(PAUSE, {}).get(STAGE_OPTIONS[PAUSE][minutes], DEFAULT_PAUSE)
+        if not warn <= wrap < words:
+            return "order", None
+        if forced < words:
+            warning = "stop_before_words"
+    return None, warning
+
+
+def previews(state, now) -> dict:
+    """What the wrap-up would send for each window now, exactly (v0.6.16-beta.4, item (a)): its wording, numbers,
+    reset time and Custom words as they stand, in the continuation language - for the page to show under the choice.
+    Of the meter's last reading of that window where there is one, else as if the window had just reached the wrap-up
+    percentage, resetting a window's length from now. {minutes: words or None}."""
+    try:
+        options, custom = state.options(WRAP_UP), state.wordings(WRAP_UP)
+        rows = {}
+        for row in windows(state.meter()):
+            rows.setdefault(row["minutes"], row)
+    except Exception:
+        return {}
+    try:
+        locale = continuation.resolve_locale(settings.load(state.paths.settings_file))
+    except Exception:
+        locale = None
+    found = {}
+    for minutes in WINDOWS:
+        row = rows.get(minutes)
+        live = row is not None and type(row["reset_at"]) is int and row["reset_at"] > now
+        found[minutes] = render(
+            style=options.get(OptionKey.WRAP_STYLE, DEFAULT_STYLE), minutes=minutes, locale=locale,
+            used=row["used_percent"] if live else options.get(STAGE_OPTIONS[WRAP_UP][minutes], DEFAULT_WRAP),
+            stop_at=options.get(STOP_WORDS_OPTIONS[minutes], DEFAULT_STOP_WORDS),
+            reset_at=row["reset_at"] if live else int(now) + minutes * 60,
+            include_reset=options.get(OptionKey.WRAP_RESET_TIME, ON) == ON, custom=custom.get(CUSTOM_WORDINGS[minutes]))
+    return found
+
+
 def make_meter(paths) -> UsageMeter:
     return UsageMeter(paths)
 
@@ -386,5 +587,7 @@ def make_wrap_up(paths) -> UsageWrapUp:
     return UsageWrapUp(paths)
 
 
-def make_pause(paths) -> UsagePause:
-    return UsagePause(paths)
+def make_pause(paths):
+    """usage_pause's code: from v0.6.16-beta.4 the forced stop (engine/usagestop.py), which holds as the pause held."""
+    from .usagestop import UsageStop
+    return UsageStop(paths)

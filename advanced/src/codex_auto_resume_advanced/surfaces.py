@@ -56,8 +56,10 @@ ARGUMENTS = {
     BridgeCommand.ADVANCED_WORDS: frozenset({"locale"}),
     BridgeCommand.ADVANCED_STATEMENT: frozenset({"capability", "locale"}),
     BridgeCommand.ADVANCED_ARM: frozenset({"capability", "state", "revision", "generation",
-                                           "engine_version", "warnings", "also"}),
+                                           "engine_version", "warnings", "also", "keep_on"}),
     BridgeCommand.ADVANCED_DISARM: frozenset({"capability"}),
+    BridgeCommand.ADVANCED_WORDINGS: frozenset({"capability"}),
+    BridgeCommand.ADVANCED_WORDING: frozenset({"capability", "key", "words", "generation"}),
     BridgeCommand.ADVANCED_DISARM_ALL: frozenset(),
     BridgeCommand.ADVANCED_CEILING: frozenset({"global_hourly", "generation"}),
     BridgeCommand.MEASURE: frozenset({"measurement", "thread", "may_spend"}),
@@ -89,6 +91,7 @@ ARGUMENTS = {
     BridgeCommand.ADVANCED_REPORT_CHECK: frozenset({"sha256"}),
     BridgeCommand.ADVANCED_REPORT_SEND: frozenset({"sha256", "writes", "word"}),
     BridgeCommand.ADVANCED_REPORT_JOB: frozenset({"job"}),
+    BridgeCommand.ADVANCED_HEADLESS_STOP: frozenset({"interruption_id"}),
 }
 # The compatibility report's commands (report/flow.py), answered by the action itself.
 REPORT_COMMANDS = frozenset({BridgeCommand.ADVANCED_REPORT_BUILD, BridgeCommand.ADVANCED_REPORT_SAVE,
@@ -184,6 +187,12 @@ def status(runtime) -> dict:
     except Exception:
         pass
     shown.update(meter_view(runtime))
+    # v0.6.16-beta.4: the turns run here now, only where there are any - and what Pending and History say of a row
+    # the edition had a hand in, keyed by interruption id, only where there is something to say.
+    found = runs(runtime)
+    if found:
+        shown["runs"] = found
+    shown.update(rows(runtime))
     return shown
 
 
@@ -207,10 +216,11 @@ def meter_view(runtime) -> dict:
     if not rows:
         return {}
     shown, notices = [], []
+    on = usage.acting(options[usage.METER])
     for (bucket, minutes), row in sorted(rows.items()):
         band = "none"
         for capability, word in ((usage.PAUSE, "pause"), (usage.WRAP_UP, "wrap_up"), (usage.METER, "warn")):
-            if (states.get(capability) == ArmingState.ARMED
+            if (minutes in on and states.get(capability) == ArmingState.ARMED
                     and usage.reached(row, usage.percent(options[capability], capability, minutes), now)):
                 band = word
                 break
@@ -220,7 +230,16 @@ def meter_view(runtime) -> dict:
         if (warned is not None and 0 <= now - warned < usage.NOTICE_FOR and row["warned_reset_at"] == row["reset_at"]
                 and row["reset_at"] is not None):
             notices.append({"key": "%s:%d:%d" % (bucket, minutes, row["reset_at"]), "window_minutes": minutes,
-                            "used_percent": row["used_percent"], "reset_at": row["reset_at"]})
+                            "used_percent": row["used_percent"], "reset_at": row["reset_at"], "kind": "warn"})
+    # v0.6.16-beta.4 (h): what the forced stop has to say - a turn it could not stop, a queue to Resume in Codex, a
+    # conversation it could not continue after the reset.
+    if states.get(usage.PAUSE) == ArmingState.ARMED:
+        try:
+            said = runtime._code_of(runtime.registry.get(usage.PAUSE)).notices(now)
+        except Exception:
+            said = []
+        for notice in said:
+            notices.append(dict(notice, used_percent=None))
     return {"meter": {"read_at": max(row["read_at"] for row in rows.values()), "windows": shown,
                       "notices": notices}}
 
@@ -276,9 +295,14 @@ def bridge(runtime, command, argument):
                           revision=argument.get("revision"), generation=argument.get("generation"),
                           acknowledged_version=argument.get("engine_version"),
                           warnings=argument.get("warnings"), also=argument.get("also"),
-                          actor=Actor.DASHBOARD)
+                          keep_on=argument.get("keep_on", False), actor=Actor.DASHBOARD)
     if command == BridgeCommand.ADVANCED_DISARM:
         return arming.disarm(argument.get("capability"), actor=Actor.DASHBOARD)
+    if command == BridgeCommand.ADVANCED_WORDINGS:
+        return arming.wordings_view(argument.get("capability"))
+    if command == BridgeCommand.ADVANCED_WORDING:
+        return arming.set_wording(argument.get("capability"), argument.get("key"), argument.get("words"),
+                                  generation=argument.get("generation"), actor=Actor.DASHBOARD)
     if command == BridgeCommand.ADVANCED_DISARM_ALL:
         return arming.all_off(actor=Actor.DASHBOARD)
     if command == BridgeCommand.MEASURE:
@@ -304,6 +328,8 @@ def bridge(runtime, command, argument):
     if command == BridgeCommand.ADVANCED_SEND_NOW:
         from .control import sendnow
         return sendnow.request(runtime, argument.get("interruption_id"))
+    if command == BridgeCommand.ADVANCED_HEADLESS_STOP:
+        return headless_stop(runtime, argument.get("interruption_id"))
     if command == BridgeCommand.ADVANCED_WATCH_LOG:
         from . import watchlog
         return watchlog.view(runtime, argument.get("capability"))
@@ -332,6 +358,189 @@ def bridge(runtime, command, argument):
                                   actor=Actor.DASHBOARD)
     return arming.set_global_hourly(argument.get("global_hourly"), generation=argument.get("generation"),
                                     actor=Actor.DASHBOARD)
+
+
+def headless_stop(runtime, interruption_id):
+    """advanced-headless-stop (v0.6.16-beta.4): a person's Stop of the turn run here for `interruption_id`, asked
+    from the Dashboard - written for the watcher's next tick to hand on (engine/headless.py), and the watcher woken.
+    Refused for an id of the wrong shape and where no such run is going. Never an MCP tool's."""
+    from codex_auto_resume.domain import ids
+    from .control.sendnow import wake
+    from .state import StateError
+    if not ids.is_interruption_id(interruption_id):
+        return {"done": False, "refusal": Refusal.INVALID_REQUEST}
+    try:
+        stopped = runtime.state.run_stop(interruption_id, at=runtime.clock())
+    except StateError:
+        return {"done": False, "refusal": Refusal.STATE_UNAVAILABLE}
+    if not stopped:
+        return {"done": False, "refusal": Refusal.NOT_ON}
+    try:
+        wake(runtime.paths)
+    except Exception:
+        pass                                         # the Stop stands; the next tick finds it
+    return {"done": True, "refusal": None}
+
+
+def runs(runtime) -> list:
+    """The turns run here now, as Pending shows them (v0.6.16-beta.4): each one's interruption id, which capability
+    runs it, when it began and by when its cap ends it, and whether a Stop was asked - never a conversation's word."""
+    try:
+        return [{"interruption_id": row["interruption_id"], "capability": row["capability"],
+                 "started_at": row["started_at"], "ends_by": row["ends_by"],
+                 "stopping": row["stop_requested_at"] is not None}
+                for row in runtime.state.runs(live=True)]
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------- Pending's and History's rows
+# The rows Pending and History list (control/records: the records still going, and the newest 200), and how long a
+# conversation's kind is kept once read: a conversation the Codex app takes over from a terminal (issue #37) is the
+# app's own from then on, so a kind is read again after a while.
+ROWS_READ = 200
+KIND_SECONDS = 600.0
+# {(Codex home, conversation id): (its kind or None, when it was read)}, for the life of the bridge's process.
+_KINDS = {}
+
+
+def rows(runtime, *, store=None, source=None) -> dict:
+    """What Pending and History say beside a row this edition had a hand in (P10, v0.6.16-beta.4), keyed by
+    interruption id - words of this edition's own, never a conversation's: {"kinds": {id: "cli" or "ide"}} for a
+    conversation of a terminal's Codex TUI or of VS Code (other_sessions: " · CLI" or " · VS Code" on its label line);
+    {"compacting": [id, ...]} for a full conversation compact_continue holds until the person runs /compact in the
+    Codex app (its row's status says so); {"model_not_restored": [id, ...]} for a turn model_fallback ran on Codex's
+    default model whose conversation's own model Codex would not put back - its row says to switch it back in Codex,
+    in words with no model's name (the review's finding 22), for as long as it is owed (state/runs.py), whatever the
+    capability stands at now; {"silent": [id, ...]} for a continuation a turn run here started with no words and
+    proved by its id (silent_continuation: History says so), while the edition keeps that run (engine/headless.py,
+    KEEP_ENDED). Each part only where there is something in it, and read only while the capability it
+    is of stands on (or, for the kinds, watched) - a model owed back aside, which is the edition's own state - so with
+    none of them on nothing of core's or Codex's is read at all. `store` is core's state and `source` the Codex
+    home's reader - the Dashboard's own, by default; a test's."""
+    from .registry import COMPACT_CONTINUE, MODEL_FALLBACK, OTHER_SESSIONS
+    try:
+        states = runtime.states()
+    except Exception:
+        return {}
+    shown = {}
+    try:
+        owed = [row["interruption_id"] for row in runtime.state.runs_owed(MODEL_FALLBACK.id)
+                if row["ended_at"] is not None]
+    except Exception:
+        owed = []
+    if owed:
+        shown["model_not_restored"] = owed
+    silent = _silent(runtime, store)
+    if silent:
+        shown["silent"] = silent
+    kinds_wanted = states.get(OTHER_SESSIONS.id, ArmingState.OFF) != ArmingState.OFF
+    compact_wanted = states.get(COMPACT_CONTINUE.id, ArmingState.OFF) == ArmingState.ARMED
+    if not (kinds_wanted or compact_wanted):
+        return shown
+    try:
+        listed = _listed(runtime, store)
+    except Exception:
+        return shown
+    if kinds_wanted:
+        try:
+            reader = source if source is not None else _source(runtime)
+            kinds = {key: kind for key, kind in ((row["interruption_id"], _kind(reader, row["thread_id"]))
+                                                 for row in listed if not row.get("home_key")) if kind}
+        except Exception:
+            kinds = {}
+        if kinds:
+            shown["kinds"] = kinds
+    if compact_wanted:
+        compacting = [row["interruption_id"] for row in listed if _compacting(row)]
+        if compacting:
+            shown["compacting"] = compacting
+    return shown
+
+
+def _silent(runtime, store) -> list:
+    """The interruptions a turn run here continued with no words (P15's SILENT): a run of headless_run's or
+    compact_continue's the edition still keeps whose core record went by the client id core derives for it
+    (engine/routes._silent) - the proof by id, which a marker-free send through a channel never had from a run here.
+    Core's state is opened only where there is such a run."""
+    from codex_auto_resume.domain import ids
+    from codex_auto_resume.store import Store
+    try:
+        keys = [row["interruption_id"] for row in runtime.state.runs(live=False, limit=ROWS_READ)
+                if row["capability"] in ("headless_run", "compact_continue") and row["ended_at"] is not None]
+    except Exception:
+        return []
+    if not keys:
+        return []
+    try:
+        if store is None:
+            with Store(runtime.paths.state_dir) as opened:
+                return _silent_of(opened, keys, ids)
+        return _silent_of(store, keys, ids)
+    except Exception:
+        return []
+
+
+def _silent_of(store, keys, ids) -> list:
+    found = []
+    for key in keys:
+        row = store.get(key)
+        if row is not None and row.get("recovery_client_id") == ids.continuation_client_id(key):
+            found.append(key)
+    return found
+
+
+def _compacting(row) -> bool:
+    """Whether core's record `row` is a full conversation compact_continue holds for the person's /compact: still
+    waiting, of its kind, its conversation available to the app and held there at P3 (engine/compact.py)."""
+    from codex_auto_resume import machine
+    from .engine.compact import KIND
+    if row.get("category") != KIND or row.get("state") not in machine.WAITING or not row.get("gate_eval"):
+        return False
+    try:
+        return machine.decode_gates(row["gate_eval"]).get("thread_available") == (machine.WAIT, machine.HELD)
+    except Exception:
+        return False
+
+
+def _listed(runtime, store) -> list:
+    """The records Pending and History list, each once: those still going, then the newest ROWS_READ."""
+    from codex_auto_resume.store import Store
+    if store is None:
+        with Store(runtime.paths.state_dir) as opened:
+            return _listed(runtime, opened)
+    seen, found = set(), []
+    for row in store.pending() + store.history(limit=ROWS_READ):
+        if row["interruption_id"] not in seen:
+            seen.add(row["interruption_id"])
+            found.append(row)
+    return found
+
+
+def _source(runtime):
+    from codex_auto_resume.codex import LocalSource
+    from .codex import inuse
+    return LocalSource(inuse.home(runtime.paths))
+
+
+def _kind(source, thread_id):
+    """"cli" or "ide" for a conversation of a terminal's Codex TUI or of VS Code, judged as core judges one
+    (LocalSource.taken: its row and its file's first line); None for the app's own - one it took over or forked from
+    a terminal among them - and for anything else. Kept KIND_SECONDS; one that cannot be read is not kept."""
+    from time import monotonic
+    from codex_auto_resume.domain.plughands import SessionKind
+    key, now = (str(getattr(source, "home", "")), thread_id), monotonic()
+    held = _KINDS.get(key)
+    if held is not None and 0 <= now - held[1] < KIND_SECONDS:
+        return held[0]
+    found = None
+    if not source.taken(thread_id, frozenset()):
+        found = next((str(kind) for kind in (SessionKind.CLI, SessionKind.IDE)
+                      if source.taken(thread_id, frozenset({kind}))), None)
+    if len(_KINDS) > 4096:
+        _KINDS.clear()
+    _KINDS[key] = (found, now)
+    return found
 
 
 def resets(runtime, command, argument):

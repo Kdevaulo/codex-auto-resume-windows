@@ -2,9 +2,10 @@
 //
 // Codex Auto Resume - the Advanced features page's Keep it on and Send now (v0.6.14, stage 3b).
 //
-// Keep it on (the owner's K8): for the open capability while it is on or watched, a card under its limits that says
-// whether it turns itself off when something it relies on goes wrong, and what it noted instead where it is kept on - and
-// three buttons, each shown where it can act: Keep it on..., Also send again when unsure... (with Keep on, never for a
+// Keep it on (the owner's K8): for the open capability, under where it stands, whether it turns itself off when something
+// it relies on goes wrong, and what it noted instead where it is kept on - and three buttons, each shown where it can
+// act: Keep it on... (from v0.6.16-beta.4 it turns the capability on as well, in the arm's one confirmation, so kept on
+// is always on and the page says Keep it on alone for it), Also send again when unsure... (with Keep on, never for a
 // capability that resends itself, nor for an action, which sends no continuation) and Let it turn itself off. Each
 // turn-on asks first in the window's own dialog, with its warning, the safe answer the default (AskAdvanced), and sends
 // exactly what that warning was, confirmed in its words (advanced-keep-on); letting go asks nothing, as turning off never
@@ -93,32 +94,39 @@ namespace CodexAutoResume
                 return Word("page.kept.not_delivered_on_open", "It stayed on although Codex did not run a message queued for a conversation when it was opened.");
             if (notice == "requirement_off")
                 return Word("page.kept.requirement_off", "It stayed on although a feature it needs is no longer on.");
+            if (notice == "not_dispatched_by_session")
+                return Word("page.kept.not_dispatched_by_session", "It stayed on although a terminal or VS Code session did not take a message queued for it in time.");
+            if (notice == "refused_by_codex")
+                return Word("page.kept.refused_by_codex", "It stayed on although Codex refused to start a turn with no words.");
             return null;
         }
 
         // ---------------------------------------------------------------- the cards
-        /// Whether a capability is kept on (K8): stored on or watched, with keep_on set - as KeptText reads it.
+        /// Whether a capability is kept on (K8): on, with keep_on set (v0.6.16-beta.4: kept on is on - never watching, never
+        /// off; where it reads anything else now, it shows that, not Keep it on).
         internal static bool KeptOn(Dictionary<string, object> item)
         {
-            return item != null && (Str(item, "stored") ?? StateOff) != StateOff && Equals(Get(item, "keep_on"), true);
+            return item != null && Str(item, "state") == StateArmed && Equals(Get(item, "keep_on"), true);
         }
 
-        /// The open capability's Keep it on, while it is stored on or watched: whether it turns itself off, and the
-        /// buttons that can act on that now - in its head card, under its title, right under where it stands
-        /// (v0.6.16-beta.3; until then a card of its own under its limits). The same words, buttons and flow.
+        /// The open capability's Keep it on: whether it turns itself off, and the buttons that can act on that now - in its
+        /// head card, under its title, right under where it stands (v0.6.16-beta.3). From v0.6.16-beta.4 for one off or
+        /// watched too: Keep it on... turns it on as it keeps it on, in the arm's one confirmation (ArmAdvanced, keep).
         private void BuildKeepOn(Dictionary<string, object> item, TableLayoutPanel card)
         {
             keepOnButton = sendAgainButton = letGoButton = null;
-            if ((Str(item, "stored") ?? StateOff) == StateOff) return;
             string id = Str(item, "id");
-            bool kept = Equals(Get(item, "keep_on"), true), again = Equals(Get(item, "send_again"), true);
+            bool kept = KeptOn(item), again = kept && Equals(Get(item, "send_again"), true);
             card.Controls.Add(Caption(Word("page.keep_on", "Keep it on")));
             Label state = HelpText(!kept ? Word("page.keep_on.off", "It turns itself off when something it relies on goes wrong.")
                                    : again ? Word("page.keep_on.again", "Kept on, and an uncertain continuation is sent once more.")
                                    : Word("page.keep_on.on", "Kept on: it does not turn itself off."));
             state.ForeColor = Ink;
             card.Controls.Add(state);
-            if (!kept) keepOnButton = CardButton(card, Word("page.keep_on.turn_on", "Keep it on..."), delegate { KeepOnAdvanced(id, false); });
+            // v0.6.16-beta.4: never for one whose turning itself off is what keeps it safe (registry.keepable).
+            if (!kept && Equals(Get(item, "keepable"), false))
+                card.Controls.Add(HelpText(Word("page.keep_on.never", "It cannot be kept on: turning itself off when something goes wrong is what keeps it safe.")));
+            else if (!kept) keepOnButton = CardButton(card, Word("page.keep_on.turn_on", "Keep it on..."), delegate { ArmAdvanced(id, StateArmed, 0, true); });
             if (kept && !again && !Equals(Get(item, "resends"), true) && !IsAction(item))
                 sendAgainButton = CardButton(card, Word("page.keep_on.send_again", "Also send again when unsure..."),
                                              delegate { KeepOnAdvanced(id, true); });
@@ -163,7 +171,7 @@ namespace CodexAutoResume
         {
             string id = advancedOpen;
             bool listed = idle && advancedListing != null && id != null;
-            if (keepOnButton != null) keepOnButton.Enabled = listed && PolicyAdmits(id) && Str(AdvancedItem(id), "state") != StateOff;
+            if (keepOnButton != null) keepOnButton.Enabled = listed && PolicyAdmits(id) && PolicyRefusalOf(id, StateArmed) == null;
             if (sendAgainButton != null)
                 sendAgainButton.Enabled = listed && PolicyAdmits(id) && PolicyAdmits("once_more_when_unsure") &&
                                           Str(AdvancedItem(id), "state") != StateOff;

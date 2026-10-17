@@ -181,6 +181,10 @@ class Scoped:
         self._reads = {
             "now": lambda: state.clock(),
             "options": lambda: state.options(capability),
+            # v0.6.16-beta.4: its own wordings (the wrap-up's Custom text), and another capability's choices read -
+            # the usage meter's windows on or off, which the wrap-up and the stop follow.
+            "wordings": lambda: state.wordings(capability),
+            "options_of": lambda other: state.options(other),
             "rules": lambda: state.rules() if rules_editor else [],
             "admission": admission,
             "count": count,
@@ -194,6 +198,7 @@ class Scoped:
         # another capability stands on now.
         from .continuations import ContinuationsHandle
         from .meter import MeterHandle
+        from .runs import RunsHandle
         from .prompts import PromptsHandle
         from .resets import ResetsHandle
         self._reads.update({
@@ -204,6 +209,8 @@ class Scoped:
             "prompts": PromptsHandle(state, capability, on),
             # v0.6.16-beta.3: the usage meter's last reading (state/meter.py) - read by the wrap-up and the pause too.
             "meter": MeterHandle(state, capability, on),
+            # v0.6.16-beta.4: a headless capability's own runs (state/runs.py).
+            "runs": RunsHandle(state, capability, on),
             "passed": lambda measurement: verdict is not None and verdict(measurement) == "pass",
             "failed": lambda measurement: verdict is not None and verdict(measurement) == "fail",
             "armed": lambda other: armed is not None and armed(other) is True,
@@ -233,7 +240,7 @@ class ChoicesMixin:
                 "SELECT choice, value FROM options WHERE capability=?", (capability,)).fetchall()
         for row in rows:
             option = definition.option(row["choice"])
-            if option is not None and row["value"] in option.choices:
+            if option is not None and option.takes(row["value"]):
                 found[option.key] = row["value"]
         return found
 
@@ -243,7 +250,7 @@ class ChoicesMixin:
         offer for it; StaleGeneration where anything moved since."""
         definition = self.registry.get(capability)
         option = definition.option(key) if definition is not None else None
-        if option is None or type(value) is not int or value not in option.choices:
+        if option is None or not option.takes(value):
             raise Refused(Refusal.OPTION_INVALID)
         actor = _word(actor, Actor, "actor")
         now = self._now(at)
@@ -252,6 +259,39 @@ class ChoicesMixin:
             connection.execute("INSERT INTO options (capability, choice, value) VALUES (?,?,?) "
                                "ON CONFLICT (capability, choice) DO UPDATE SET value=excluded.value",
                                (capability, str(option.key), value))
+            connection.execute("UPDATE meta SET generation = generation + 1")
+            self._note(connection, now, JournalCode.OPTION_CHANGED, capability=capability, actor=actor)
+            return current + 1
+
+    # ------------------------------------------------------------------ wordings (v0.6.16-beta.4)
+    def wordings(self, capability) -> dict:
+        """{WordingKey: text} of `capability`'s own wordings a person wrote - only the keys it keeps. Never logged."""
+        definition = self.registry.get(capability)
+        if definition is None or not definition.wordings:
+            return {}
+        with self._read() as connection:
+            rows = [] if connection is None else connection.execute(
+                "SELECT choice, words FROM wordings WHERE capability=?", (capability,)).fetchall()
+        return {row["choice"]: row["words"] for row in rows if row["choice"] in definition.wordings}
+
+    def set_wording(self, capability, key, words, *, generation, actor, at=None) -> int:
+        """A person's own wording set - or, with `words` None, taken away - against the generation the Dashboard read.
+        The generation after. Refused (WORDING_INVALID) for a key the capability does not keep; the words themselves
+        are the caller's to check (wrapwords.check_custom), the file's CHECK their length. Journalled as a choice
+        changed - the words never."""
+        definition = self.registry.get(capability)
+        if definition is None or key not in definition.wordings or not (words is None or isinstance(words, str)):
+            raise Refused(Refusal.WORDING_INVALID)
+        actor = _word(actor, Actor, "actor")
+        now = self._now(at)
+        with self._transaction() as connection:
+            current = self._current_generation(connection, generation)
+            if words is None:
+                connection.execute("DELETE FROM wordings WHERE capability=? AND choice=?", (capability, str(key)))
+            else:
+                connection.execute("INSERT INTO wordings (capability, choice, words, changed_at) VALUES (?,?,?,?) "
+                                   "ON CONFLICT (capability, choice) DO UPDATE SET words=excluded.words, "
+                                   "changed_at=excluded.changed_at", (capability, str(key), words, now))
             connection.execute("UPDATE meta SET generation = generation + 1")
             self._note(connection, now, JournalCode.OPTION_CHANGED, capability=capability, actor=actor)
             return current + 1

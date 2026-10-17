@@ -758,10 +758,10 @@ moved one on; the published v0.6.15-beta is published again as v0.6.16-beta.
 
 ## v0.6.16 — Most of the advanced edition
 
-**In development: v0.6.16-beta.3 ✅ is out: words for this time in the standard edition, with the other work
-that landed there. v0.6.16-beta.4 is in development: a route of its own, other kinds of session, and the usage
-capabilities finished. Before beta.3 came v0.6.16-beta.2, v0.6.15's fix on the beta line, and v0.6.16-beta
-(published first as v0.6.15-beta), the first pre-release: stage 3c and watching several Codex homes.**
+**In development: v0.6.16-beta.4 ✅ is out: a route of its own, other kinds of session, and the usage
+capabilities finished. Before it came v0.6.16-beta.3, words for this time in the standard edition with the other
+work that landed there; v0.6.16-beta.2, v0.6.15's fix on the beta line; and v0.6.16-beta (published first as
+v0.6.15-beta), the first pre-release: stage 3c and watching several Codex homes. Next, the final v0.6.16.**
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
@@ -806,7 +806,7 @@ finish its step, and a pause that holds our continuations until the reset
   [EDITIONS.md](EDITIONS.md#todays-capabilities). The measurements they rest on that are new - MQ, ME, MS,
   MK and MT - are not made yet, and each capability says so as a warning.
 
-### v0.6.16-beta.4 — A route of its own, and other kinds of session
+### v0.6.16-beta.4 ✅ — A route of its own, and other kinds of session
 
 - a conversation nothing holds, run headless through Codex's app server with the settings Codex
   saved for it,
@@ -814,15 +814,11 @@ finish its step, and a pause that holds our continuations until the reset
 - a full context window compacted, then continued,
 - another model when one is at capacity, on the headless route only,
 - a continuation with no words, where Codex allows it (the app's queue refused an empty one:
-  measurement M3),
-- Codex's own retry settings - measured on 2026-10-16 (MB): Codex refuses a change to its built-in provider's
-  settings, so the capability writes nothing and says so,
-- chatting with a Codex conversation inside the Dashboard - reading it and sending it a message -
-  which the owner asked for on 2026-10-02: advanced only, off by default, and on this PC only, never
-  through a remote channel; with no live output, only "in progress" while a turn runs and the result
-  once it ends; and approvals are still answered in Codex.
+  measurement M3).
 
-A continuation inside the turn, through a Codex Stop hook, was on this list; it is v0.6.17's.
+Codex's own retry settings are not offered until Codex allows changing its built-in provider's retry settings
+(measured on 2026-10-16, MB). A continuation inside the turn, through a Codex Stop hook, and chatting with a
+Codex conversation inside the Dashboard were on this list; both are v0.6.17's.
 
 #### The usage capabilities, finished
 
@@ -844,13 +840,16 @@ Three things the owner asked for on 2026-10-16, for the v0.6.16 final:
 
 - a smoother motion of the tray icon while it is idle,
 - a smaller edition label,
-- a click on a popup's body opens its page; with the in-app chat on, the person picks whether it opens that
-  conversation's chat here or Codex.
+- a click on a popup's body opens its page.
 
-And one the owner added the same day: recovering a Codex cloud task, in the advanced edition and off by default -
-through the Codex app's own internal channel where the app shows the task as a conversation, and otherwise started
-again as a new cloud task with `codex cloud exec` once the limit resets - if the measurements allow it (Codex's own
-`codex cloud` command reads a task's state but cannot continue one: measurement MCLOUD, 2026-10-16).
+Also for the v0.6.16 final, and what the owner asked for as the beta line went on:
+
+- **Notices that stay on screen until clicked**, chosen for each kind of notice - the advanced edition's
+  kinds too, on the Dashboard alone,
+- **an update that explains itself**: the setup wizard, a notes page before the update and an "updated" page
+  after it, the watcher and any open Dashboard restarted on the new version, and *Repair* and *Remove* offered
+  when the same version is already installed,
+- **release pages that start with direct download links**, the setup program recommended first.
 
 ### Also moved here
 
@@ -865,7 +864,7 @@ again as a new cloud task with `codex cloud exec` once the limit resets - if the
 ## v0.6.17 — The advanced edition's last stage
 
 Stage 5, moved out of v0.6.16 by the owner on 2026-10-16 so that the v0.6.16 final comes sooner, is a release
-of its own. As in v0.6.16, every capability here is the advanced edition's alone, off until a person turns it
+of its own, and the owner moved the in-app chat here the same day. As in v0.6.16, every capability here is the advanced edition's alone, off until a person turns it
 on, with a statement that names the standards it departs from; some rest on a measurement of the real Codex,
 and one that fails narrows the route, or becomes a warning the person confirms, and does not drop the
 capability.
@@ -881,6 +880,24 @@ capability.
 - switching the active Codex account on the person's command (measurement MA),
 - a weekly update check while idle,
 - crash supervision, a wake timer for a reset, and an *Open Codex* button on the card.
+
+### The chat inside the Dashboard
+
+- chatting with a Codex conversation inside the Dashboard - reading it and sending it a message -
+  which the owner asked for on 2026-10-02: advanced only, off by default, and on this PC only, never
+  through a remote channel; with no live output, only "in progress" while a turn runs and the result
+  once it ends; and approvals are still answered in Codex,
+- a *Chat* button beside *Advanced features* while the chat is on,
+- where a click on a popup's body goes, when the chat is on: the person picks that conversation's chat here, or
+  Codex at that conversation,
+- a message written while the limit is full, sent when it resets.
+
+### Compatibility data for the advanced edition
+
+- verdicts for each Codex engine, published by the admin program from the owner's records of the
+  measurements, in a file of its own for the advanced edition, so the validators of older releases are not
+  touched; installed advanced editions fetch it,
+- the reporter counts the advanced edition's outcomes as "reported" and never raises a verdict.
 
 ### Also moved here
 
@@ -1164,7 +1181,8 @@ Most of the advanced edition, in as many pre-releases as it needs
 
 v0.6.17
 The advanced edition's last stage: analytics, the courier, the loopback API and remote control,
-account switching, crash supervision, the Stop hook continuation, Arabic and Hebrew
+account switching, crash supervision, the chat inside the Dashboard, the Stop hook continuation,
+Arabic and Hebrew
 
         ↓
 

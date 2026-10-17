@@ -6,6 +6,7 @@ import os
 from pathlib import Path, PureWindowsPath
 import re
 import subprocess as S
+import threading
 
 from ..domain.errors import AdapterError
 from ..win.inventory import resource_users
@@ -122,6 +123,99 @@ def engines_instead(rows, codex_exe) -> frozenset:
         return frozenset()
     held = str(codex_exe).lower()
     return frozenset() if any(path.lower() == held for path in served) else served
+
+
+def _extension_engine(path) -> bool:
+    """Whether `path` is a codex.exe of the VS Code extension's own (`%USERPROFILE%\\.vscode\\extensions\\
+    openai.chatgpt-*\\...\\codex.exe`): compared here, and never kept."""
+    profile = os.environ.get("USERPROFILE")
+    if not profile or not isinstance(path, str):
+        return False
+    pattern = re.compile(re.escape(str(Path(profile) / ".vscode" / "extensions")) + r"\\openai\.chatgpt-[^\\]+\\(?:[^\\]+\\)*codex\.exe",
+                         re.I)
+    return bool(pattern.fullmatch(path))
+
+
+def app_running(rows) -> bool:
+    """Whether any process of the Codex app's package is among the inventory's rows (v0.6.16-beta.4): a main, a
+    child, or several - what makes "Codex is closed" untrue even where no one main pairs."""
+    try:
+        _app_main(rows)
+        return True
+    except AdapterError as error:
+        if str(error) != "desktop_main_missing_or_ambiguous":
+            return True
+    program_files = os.environ.get("ProgramW6432") or os.environ.get("ProgramFiles", r"C:\Program Files")
+    root = str(Path(program_files) / "WindowsApps").lower() + "\\openai.codex_"
+    return any(isinstance(row, dict) and isinstance(row.get("path"), str) and row["path"].lower().startswith(root)
+               for row in rows)
+
+
+# The app servers this process started and still holds (v0.6.16-beta.4): each one's pid and creation time, read from
+# our own spawn while its handle is ours - so the pid cannot be reused under it - and never matched by name or path.
+_OWN = set()
+_OWN_LOCK = threading.Lock()
+
+
+def own_server(pid):
+    """Count `pid`, a process this one has just started and holds, as an app server of our own: its identity read now.
+    The mark to hand `own_server_gone` when it is shut, or None where it could not be read (then it never counts)."""
+    if type(pid) is not int or pid <= 0:
+        return None
+    try:
+        held = process_identity(pid)
+    except (AdapterError, OSError, ValueError):
+        return None
+    mark = (held["pid"], held["created"])
+    with _OWN_LOCK:
+        _OWN.add(mark)
+    return mark
+
+
+def own_server_gone(mark) -> None:
+    """The app server `own_server` counted, shut: it no longer counts."""
+    with _OWN_LOCK:
+        _OWN.discard(mark)
+
+
+def own_holder(user) -> bool:
+    """Whether the Restart Manager holder `user` is an app server this process started and still holds - the same pid
+    AND creation time as at our spawn (`own_server`)."""
+    if not isinstance(user, dict):
+        return False
+    with _OWN_LOCK:
+        return (user.get("pid"), user.get("created")) in _OWN
+
+
+def session_kind(rows, user, codex_exe) -> bool:
+    """v0.6.16-beta.4: whether the one Restart Manager holder `user` of a conversation's writer lock is another Codex
+    session - a terminal's TUI or the VS Code extension's server - rather than the app's, ours or anything unknown.
+
+    Its inventory row, matched by pid, is a codex.exe that is either (a) the configured engine `codex_exe` run by
+    neither the one app main nor this process (a TUI the app's bundled engine runs with --no-daemon, M5; our own
+    headless app server is this process's child and never counts), or (b) the VS Code extension's own engine
+    (`_extension_engine`); and the process is still that image, created when the holder says - a reused pid fails
+    closed, as the app's server does. Anything else - another install, two rows, an unreadable path or a pid gone -
+    is no. Paths are compared, never kept (D2)."""
+    if not isinstance(user, dict) or not isinstance(rows, list):
+        return False
+    found = [row for row in rows if isinstance(row, dict) and row.get("pid") == user.get("pid")
+             and isinstance(row.get("path"), str) and PureWindowsPath(row["path"]).name.lower() == "codex.exe"]
+    if len(found) != 1 or found[0].get("parent") == os.getpid():
+        return False
+    row = found[0]
+    try:
+        main = _app_main(rows)["pid"]
+    except (AdapterError, KeyError, TypeError):
+        main = None
+    configured = row["path"].lower() == str(codex_exe).lower() and row.get("parent") != main
+    if not (configured or _extension_engine(row["path"])):
+        return False
+    try:
+        held = process_identity(row["pid"])
+    except (AdapterError, OSError):
+        return False
+    return held["path"] == row["path"].lower() and held["created"] == user.get("created")
 
 
 def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False):

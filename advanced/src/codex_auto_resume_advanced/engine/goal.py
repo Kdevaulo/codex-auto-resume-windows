@@ -62,6 +62,8 @@ ADD = "thread/queue/add"
 HOLD_SECONDS = 600
 # Records remembered for that, forgotten all at once past this many.
 SEEN_LIMIT = 4096
+# Where core asks P16 for a conversation the running app does not hold (core's engine/delivery.APP_FREE).
+APP_FREE = "app_free"
 
 
 def _usage_record(record) -> bool:
@@ -139,6 +141,10 @@ class GoalContinuation:
     def unloaded(self, record):
         """P16: this is the route for a conversation the app does not hold, where its goal is
         paused by the usage limit; DEFER - the standard edition's wait - anywhere else."""
+        # v0.6.16-beta.4: only for a conversation the running app does not hold (M2: a goal set while the app
+        # holds it is not seen) - never one asked with the app closed or held by another Codex session.
+        if not isinstance(record, dict) or record.get("holder") != APP_FREE:
+            return DEFER
         return self if self._limited(record) is not None else DEFER
 
     def gate(self, name, record, facts):

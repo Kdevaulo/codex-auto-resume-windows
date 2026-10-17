@@ -638,6 +638,24 @@ class ReleaseNotesTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.notes.section(self.changelog, "9.9.9")
 
+    def test_the_notes_start_with_direct_links_to_both_setup_programs_of_that_tag(self):
+        setup = _load("make_setup_for_notes", ROOT / "build" / "make_setup.py")
+        for version in ("0.6.15", "v0.6.16-beta.3", self.version):
+            with self.subTest(version):
+                bare = version.lstrip("v")
+                body = self.notes.download_block(version)
+                self.assertTrue(body.startswith("**\u2b07 Download:**"))
+                first, second = body.split("\n")[:2]
+                for edition in ("standard", "advanced"):
+                    self.assertIn("/releases/download/v%s/%s)" % (bare, setup.setup_name(edition, bare)), first)
+                self.assertTrue(second.startswith("<sub>"))
+
+    def test_the_block_comes_first_then_a_blank_line_then_the_changelog_section(self):
+        lines = self.notes.notes(self.changelog, self.version).split("\n")
+        self.assertTrue(lines[0].startswith("**\u2b07 Download:**"))
+        self.assertEqual(lines[2], "")
+        self.assertTrue(lines[3].strip())
+
     def test_a_prefix_version_does_not_match_a_longer_one(self):
         # Without a word boundary, "0.5" would match the "0.5.0" heading and publish
         # the wrong notes under the right name.

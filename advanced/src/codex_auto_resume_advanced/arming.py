@@ -702,7 +702,7 @@ class Arming:
 
     # ------------------------------------------------------------------ on
     def arm(self, capability, *, state, revision, generation, acknowledged_version=None,
-            warnings=None, also=None, actor) -> dict:
+            warnings=None, also=None, keep_on=False, actor) -> dict:
         """Move `capability` to watched (SHADOW) or on (ARMED), for a person in the Dashboard.
 
         `warnings` are the words of the statement's warnings the person confirmed (none, when
@@ -717,6 +717,11 @@ class Arming:
         requirements that are off, each confirmed as the capability itself is; a policy on any of them
         refuses the whole, so a required one an administrator forbids keeps the dependent off. Only for an
         ARMED request: watching needs no requirement, so `also` must be empty for SHADOW.
+
+        `keep_on` (v0.6.16-beta.4, the owner's "Keep it on turns it on"): turn it on AND keep it on (K8) in the
+        same confirmation - only for ARMED, refused like any arm, and refused too where its own compatibility is
+        Failed here (FAILED_HERE): Keep it on never turns itself off, so it is not taken on a grade that failed - and
+        never for a capability that may not be kept on (registry.keepable, INVALID_REQUEST).
 
         {"done": bool, "refusal": Refusal or None, "warnings": the warnings that hold now, once
         read, "generation": the generation after}."""
@@ -735,7 +740,10 @@ class Arming:
         if (state not in (ArmingState.SHADOW, ArmingState.ARMED) or type(revision) is not int
                 or type(generation) is not int or confirmed is None
                 or not (acknowledged_version is None or isinstance(acknowledged_version, str))
-                or not (also is None or isinstance(also, (list, tuple)))):
+                or not (also is None or isinstance(also, (list, tuple)))
+                or type(keep_on) is not bool or (keep_on and state != ArmingState.ARMED)
+                # Never one whose tripwire is what stops it doing harm (registry.keepable), as set_keep_on refuses it.
+                or (keep_on and not definition.keepable)):
             return refused(Refusal.INVALID_REQUEST)
         view = self.view()
 
@@ -807,6 +815,8 @@ class Arming:
         shown = self.warnings(definition, view)
         if reason is not None:
             return refused(reason)
+        if keep_on and ArmingWarning.FAILED_HERE in shown:
+            return refused(Refusal.FAILED_HERE)
         moves = [(capability, ArmingState.ARMED, revision, acknowledged_version, shown)]
         for other in needed:
             other_def = self.registry.get(other)
@@ -823,7 +833,8 @@ class Arming:
             moves.append((other, ArmingState.ARMED, other_revision, other_version,
                           self.warnings(other_def, view)))
         try:
-            _written, after = self.state.move_set(moves, actor=actor, generation=generation, at=self.clock())
+            _written, after = self.state.move_set(moves, actor=actor, generation=generation, at=self.clock(),
+                                                  keep=(capability,) if keep_on else ())
         except StaleGeneration:
             return refused(Refusal.STALE_GENERATION)
         except StateError:
@@ -904,7 +915,9 @@ class Arming:
         if (type(keep_on) is not bool or type(send_again) is not bool
                 or not (generation is None or type(generation) is int)
                 or (send_again and (not keep_on or definition.resends
-                                    or definition.kind == CapabilityKind.ACTION))):
+                                    or definition.kind == CapabilityKind.ACTION))
+                # v0.6.16-beta.4: never one whose tripwire is what stops it doing harm (registry.keepable).
+                or (keep_on and not definition.keepable)):
             return refused(Refusal.INVALID_REQUEST)
         try:
             row = self.state.arming().get(definition.id) or {}
@@ -919,7 +932,8 @@ class Arming:
                 return refused(Refusal.NOT_ALLOWED_BY_POLICY)
             if policy.force_shadow and row.get("state") == ArmingState.ARMED:
                 return refused(Refusal.SHADOW_FORCED_BY_POLICY)
-            if self.current(policy=policy).get(definition.id, ArmingState.OFF) == ArmingState.OFF:
+            # v0.6.16-beta.4: kept on is on - one watched or off is turned on and kept on through the arm (`keep_on`).
+            if self.current(policy=policy).get(definition.id, ArmingState.OFF) != ArmingState.ARMED:
                 return refused(Refusal.NOT_ON)
             if confirmed != wanted:
                 return refused(Refusal.STALE_CONFIRMATION)
@@ -979,8 +993,64 @@ class Arming:
             return {"done": False, "refusal": Refusal.NOT_THE_DASHBOARD}
         if self.registry.get(capability) is None:
             return {"done": False, "refusal": Refusal.UNKNOWN_CAPABILITY}
-        return self._chosen(lambda: {"generation": self.state.set_option(
-            capability, key, value, generation=generation, actor=actor, at=self.clock())})
+        # v0.6.16-beta.4 (j): the near-limit percentages of a window stay in order - checked as they would be after.
+        from .engine import usage
+        warned = {}
+        if capability in (usage.METER, usage.WRAP_UP, usage.PAUSE):
+            definition = self.registry.get(capability)
+            option = definition.option(key)
+            try:
+                values = {other: dict(self.state.options(other)) for other in (usage.METER, usage.WRAP_UP, usage.PAUSE)
+                          if self.registry.get(other) is not None}
+            except StateError:
+                values = None
+            if values is not None and option is not None and option.takes(value):
+                values.setdefault(capability, {})[option.key] = value
+                problem, warning = usage.order_problem(values, usage.touched(option.key))
+                if problem is not None:
+                    return {"done": False, "refusal": Refusal.OPTION_ORDER, "generation": self._generation()}
+                if warning is not None:
+                    warned = {"warning": warning}
+        return self._chosen(lambda: dict(warned, generation=self.state.set_option(
+            capability, key, value, generation=generation, actor=actor, at=self.clock())))
+
+    def wordings_view(self, capability) -> dict:
+        """A capability's own wordings as the Dashboard's page shows them, with what they may hold: the text a person
+        wrote for each key it keeps, the longest one may be, the placeholders it may write - and (v0.6.16-beta.4, (a))
+        what the wrap-up would send for each window now, exactly (usage.previews). Never logged, and read by the
+        Dashboard alone (no MCP tool reaches it)."""
+        from .engine import wrapwords
+        definition = self.registry.get(capability)
+        if definition is None or not definition.wordings:
+            return {"done": False, "refusal": Refusal.UNKNOWN_CAPABILITY}
+        try:
+            found = self.state.wordings(capability)
+        except StateError:
+            return {"done": False, "refusal": Refusal.STATE_UNAVAILABLE}
+        from .engine import usage
+        # (a): what would be sent for each window, exactly - shown under the wording choice.
+        shown = usage.previews(self.state, self.clock()) if capability == usage.WRAP_UP else {}
+        return {"done": True, "refusal": None, "wordings": {str(key): found.get(key) for key in definition.wordings},
+                "limit": wrapwords.continuation.MAX_CUSTOM_LENGTH, "placeholders": list(wrapwords.PLACEHOLDERS),
+                "previews": {str(minutes): words for minutes, words in shown.items()},
+                "generation": self._generation()}
+
+    def set_wording(self, capability, key, words, *, generation, actor) -> dict:
+        """A person's own wording set in the Dashboard - or taken away, `words` None - after the custom continuation
+        text's checks (wrapwords.check_custom): refused WORDING_INVALID with the `problem` word where they fail."""
+        from .engine import wrapwords
+        if actor != Actor.DASHBOARD:
+            return {"done": False, "refusal": Refusal.NOT_THE_DASHBOARD}
+        if self.registry.get(capability) is None:
+            return {"done": False, "refusal": Refusal.UNKNOWN_CAPABILITY}
+        if words is not None:
+            try:
+                wrapwords.check_custom(words)
+            except wrapwords.WordingError as error:
+                return {"done": False, "refusal": Refusal.WORDING_INVALID, "problem": error.code,
+                        "generation": self._generation()}
+        return self._chosen(lambda: {"generation": self.state.set_wording(
+            capability, key, words, generation=generation, actor=actor, at=self.clock())})
 
     def add_rule(self, tag, status_from, status_to, category, *, generation, actor) -> dict:
         """A rule for one of Codex's error codes, in the Dashboard (state/choices.rule_problem)."""
@@ -1009,8 +1079,9 @@ class Arming:
             values = self.state.options(definition.id)
         except StateError:
             values = {}
-        return [{"key": str(option.key), "choices": list(option.choices),
-                 "value": values.get(option.key, option.default), "default": option.default}
+        return [dict({"key": str(option.key), "choices": list(option.choices),
+                      "value": values.get(option.key, option.default), "default": option.default},
+                     **({"custom": list(option.custom)} if option.custom else {}))
                 for option in definition.options]
 
     def rules_view(self) -> dict:
@@ -1076,6 +1147,8 @@ class Arming:
                 # so is never given Send again.
                 "keep_on": bool(row.get("keep_on")), "send_again": bool(row.get("send_again")),
                 "notice": None if off else row.get("reason"), "resends": definition.resends,
+                # v0.6.16-beta.4: whether Keep on is offered at all (registry.keepable).
+                "keepable": definition.keepable,
                 "revision": definition.revision, "read_revision": row.get("statement_revision"),
                 "acknowledged_version": row.get("engine_version"),
                 "warnings": [str(word) for word in self.warnings(definition, view)],

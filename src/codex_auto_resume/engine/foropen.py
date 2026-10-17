@@ -21,10 +21,13 @@ class ForOpenMixin:
     def _not_for_open(self, current, route, sender, client, vector) -> bool:
         """P16's QUEUE_FOR_OPEN (v0.6.15-beta) goes the ordinary way - core's backend, its marker - or not at all: a
         channel or a client id the plug named waits for the conversation to be opened, as A11 says. True if it waits."""
-        if route is not Alternative.QUEUE_FOR_OPEN or (sender is self.backend and client is None):
+        if route not in (Alternative.QUEUE_FOR_OPEN, Alternative.TO_SESSION) or (
+                sender is self.backend and client is None):
             return False
-        vector["thread_available"] = machine.gate(machine.WAIT, "notLoaded")
-        self._wait(current, "waiting_for_loaded_thread", "notLoaded", self.options["state_poll_seconds"], vector)
+        # v0.6.16-beta.4: TO_SESSION goes the ordinary way too, or waits with its own reason.
+        reason = "notLoaded" if route is Alternative.QUEUE_FOR_OPEN else "held_by_other_session"
+        vector["thread_available"] = machine.gate(machine.WAIT, reason)
+        self._wait(current, "waiting_for_loaded_thread", reason, self.options["state_poll_seconds"], vector)
         return True
 
     @staticmethod

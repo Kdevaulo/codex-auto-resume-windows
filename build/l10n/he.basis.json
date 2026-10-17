@@ -672,6 +672,12 @@
   "msg.toast_memory_warning": "76eb2005f26c5cd9",
   "msg.toast_memory_warning_next": "827b52b77685ffa2",
   "msg.toast_near_limit": "6bb24e6112cd2d49",
+  "msg.toast_near_limit_not_stopped": "1831e80e9645897e",
+  "msg.near_limit_not_stopped_body": "372374268a86cb39",
+  "msg.toast_near_limit_press_resume": "efa62183faeeaf53",
+  "msg.near_limit_press_resume_body": "cef97562ea264ecb",
+  "msg.toast_near_limit_not_continued": "840a52dd68ae0e0d",
+  "msg.near_limit_not_continued_body": "89c1a0772ebcb963",
   "msg.toast_no_progress_body": "51238010e6d4dd05",
   "msg.toast_notify_only": "9f15f91ed7962171",
   "msg.toast_objection": "46c0a07a6eda536f",
@@ -1070,6 +1076,7 @@
   "why.engine_incompatible": "7e79374c230bab1e",
   "why.engine_unknown": "3442ef8437855db4",
   "why.held": "4508803feec1ffbb",
+  "why.held_by_other_session": "2b48bb7f2dba23db",
   "why.home_lock_unavailable": "61df82c1c884a2ef",
   "why.home_removed": "3d22edcf2c1ae774",
   "why.loaded_state_unknown": "607dba1fb60e3c33",
@@ -1092,6 +1099,7 @@
   "why.usage_unavailable": "88f76f5ad95c012f",
   "why.usage_unknown": "e3127a4e3b65e2c4",
   "why.user_input_queued": "d74d9559dedfd58e",
+  "why.version_newer_than_engine": "c0bb9a2b3eb1e700",
   "why.waiting_reset": "5c8e4bd1c77983b4",
   "why.workspace_changed": "a5c29672f6fee843"
 }
