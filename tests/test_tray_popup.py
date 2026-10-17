@@ -1731,7 +1731,10 @@ class WindowsTests(unittest.TestCase):
             self.assertEqual(window._glides, {})
             self.assertTrue(next(item for item in window._plan["items"]
                                  if item["kind"] == "switch" and item["target"] == target)["busy"])
-            deadline = time.monotonic() + 3
+            # The answer comes back through the window's own queue; on a loaded CI part it took over 3 s twice in one
+            # lane (dev run 38989648177, part 2 of 3.13 standard). The bound only limits the wait: nothing glides before
+            # the answer, as checked above.
+            deadline = time.monotonic() + 15
             while target not in window._glides and time.monotonic() < deadline:
                 self.pump(0.005)
             self.assertIn(target, window._glides)
