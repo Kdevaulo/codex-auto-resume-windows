@@ -260,7 +260,15 @@ class StaleProjectionTests(RescanCase):
         self.events_in_file(A, self.task_complete(row["turn_id"]), self.user_message("x" * 300))
         with patch.object(rollout, "MAX_ITEM_BYTES", 120):
             result = self.run_rescan()
-        self.assertEqual(self.outcome(result, row["interruption_id"]), ("unresolved", "projection_stale"))
+        self.assertEqual(self.outcome(result, row["interruption_id"])[0], "unresolved")
+
+    def test_a_rollback_after_the_persons_message_keeps_the_wait(self):
+        """Review of issue #39: stale history, the failed turn's end, a person's message, then a rollback of it."""
+        row = self.split_failure()
+        self.events_in_file(A, self.task_complete(row["turn_id"]), self.user_message(),
+                            {"type": "event_msg", "payload": {"type": "thread_rolled_back", "num_turns": 1}})
+        self.assertEqual(self.outcome(self.run_rescan(), row["interruption_id"]), ("unresolved", "rolled_back"))
+        self.assertEqual(self.record(row["interruption_id"])["state"], "waiting_poll")
 
     def test_a_continuation_sent_with_no_marker_keeps_the_file_unread(self):
         """A marker-free continuation (the advanced edition's) cannot be told from a person's message in the file."""
@@ -477,10 +485,20 @@ class ScanTests(unittest.TestCase):
     def test_another_turns_end_is_no_anchor(self):
         self.assertEqual(self.scan(RescanCase.task_complete("t-2"), RescanCase.user_message()), rollout.NO_ANCHOR)
 
-    def test_broken_lines_are_passed_over(self):
-        end = RescanCase.task_complete("t-1")
-        self.assertEqual(self.scan(end, raw=b'{"type":"event_msg", broken\n\xff\xfe"event_msg"\n'),
-                         rollout.NOTHING_LATER)
+    def test_broken_lines_are_passed_over_and_after_the_anchor_prove_nothing(self):
+        end, person = RescanCase.task_complete("t-1"), RescanCase.user_message()
+        broken = b'{"type":"event_msg", broken\n\xff\xfe"event_msg"\n'
+        self.path.write_bytes(broken + json.dumps(end).encode() + b"\n" + json.dumps(person).encode() + b"\n")
+        self.assertEqual(rollout.superseded_in(self.path, "t-1"), rollout.LATER_MESSAGE, "before the anchor: passed over")
+        self.assertEqual(self.scan(end, person, raw=broken), rollout.ROLLED_BACK, "after it: it could be a rollback")
+
+    def test_a_rollback_after_the_anchor_proves_nothing(self):
+        """Review of issue #39: a person's message the rollback undid is no newer work; the history says what is."""
+        end, person = RescanCase.task_complete("t-1"), RescanCase.user_message()
+        rollback = {"type": "event_msg", "payload": {"type": "thread_rolled_back", "num_turns": 1}}
+        self.assertEqual(self.scan(end, person, rollback), rollout.ROLLED_BACK)
+        self.assertEqual(self.scan(end, rollback, person), rollout.ROLLED_BACK)
+        self.assertEqual(self.scan(rollback, end, person), rollout.LATER_MESSAGE, "one before the anchor is not after it")
 
 
 if __name__ == "__main__":

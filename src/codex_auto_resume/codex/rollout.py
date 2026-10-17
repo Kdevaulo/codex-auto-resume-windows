@@ -29,9 +29,12 @@ from .values import MAX_ITEM_BYTES, MAX_META_BYTES, MAX_SCAN_BYTES, _json
 
 UNKNOWN_RESET = {"reset_at": None, "limit_type": "unknown", "uncertain": True}
 # What `superseded_in` finds (v0.6.16, issue #39): a person's message after the failed turn's own end; that end and
-# nothing of a person's after it; not that end at all; a file over RESCAN_BYTES; a file that cannot be read.
-LATER_MESSAGE, NOTHING_LATER, NO_ANCHOR, TOO_LARGE, UNREADABLE = (
-    "later_message", "nothing_later", "no_anchor", "too_large", "unreadable")
+# nothing of a person's after it; not that end at all; a file over RESCAN_BYTES; a file that cannot be read; and a
+# rollback - or a line that cannot be read - after that end, past which nothing in the file is proof of anything.
+LATER_MESSAGE, NOTHING_LATER, NO_ANCHOR, TOO_LARGE, UNREADABLE, ROLLED_BACK = (
+    "later_message", "nothing_later", "no_anchor", "too_large", "unreadable", "rolled_back")
+# What a rollback is written with (Codex's thread_rolled_back event): any line after the anchor that holds it.
+_ROLLBACK = b"rolled_back"
 # The largest file it reads, start to end, only when a person asks for it.
 RESCAN_BYTES = 32 * 1024 * 1024
 _OURS = ids.MARKER_PREFIX.encode("utf-8")
@@ -220,16 +223,21 @@ def superseded_in(path, turn_id, limit=None) -> str:
     person's message: a user_message event that carries no marker of this product's (ids.MARKER_PREFIX, which every
     continuation and every message the product writes carries). Read only on a person's Rescan and reconcile, and only
     while Codex's history has not caught up with the file (rescan.py): the file whole, up to `limit` bytes, one line at
-    a time, each line parsed and dropped. Nothing of what a line says is kept; the answer is one of five words.
+    a time, each line parsed and dropped. Nothing of what a line says is kept; the answer is one of six words.
 
     A line over MAX_ITEM_BYTES, a line that is not JSON and any event but those two are passed over, which can only
     lose an answer, never make one: no anchor, nothing later. Where a person's message comes before that end, it is
-    not after it, so a conversation's earlier work - or a file that replays it (a split's, issue #30) - proves nothing."""
+    not after it, so a conversation's earlier work - or a file that replays it (a split's, issue #30) - proves nothing.
+
+    A rollback undoes turns, and only Codex's history - which the engine reads, and which a rollback rewrites - says
+    which. So the whole file is read, and a rollback anywhere after the anchor (`_ROLLBACK`, whatever its event), or a
+    line after it that cannot be read and so could be one, means nothing after the anchor proves anything: ROLLED_BACK,
+    never LATER_MESSAGE, though a person's message came before it."""
     try:
         size = path.stat().st_size
         if size > (RESCAN_BYTES if limit is None else limit):
             return TOO_LARGE
-        anchored, read = False, 0
+        anchored, later, doubt, read = False, False, False, 0
         with path.open("rb") as stream:
             while read < size:
                 line = stream.readline(MAX_ITEM_BYTES + 1)
@@ -240,20 +248,29 @@ def superseded_in(path, turn_id, limit=None) -> str:
                     while line and not line.endswith(b"\n"):             # the rest of a line too long to read
                         line = stream.readline(MAX_ITEM_BYTES + 1)
                         read += len(line)
+                    doubt = doubt or anchored
+                    continue
+                if anchored and _ROLLBACK in line:
+                    doubt = True
                     continue
                 if b'"event_msg"' not in line:
                     continue
                 try:
                     event = _json(line.decode("utf-8"))
                 except UnicodeError:
+                    event = None
+                if not isinstance(event, dict):
+                    doubt = doubt or anchored
                     continue
-                payload = event.get("payload") if isinstance(event, dict) and event.get("type") == "event_msg" else None
+                payload = event.get("payload") if event.get("type") == "event_msg" else None
                 if not isinstance(payload, dict):
                     continue
                 if not anchored:
                     anchored = payload.get("type") == "task_complete" and payload.get("turn_id") == turn_id
                 elif payload.get("type") == "user_message" and _OURS not in line:
-                    return LATER_MESSAGE
+                    later = True
     except (OSError, ValueError):
         return UNREADABLE
-    return NOTHING_LATER if anchored else NO_ANCHOR
+    if not anchored:
+        return NO_ANCHOR
+    return ROLLED_BACK if doubt else LATER_MESSAGE if later else NOTHING_LATER

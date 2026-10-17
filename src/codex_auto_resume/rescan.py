@@ -41,9 +41,9 @@ from .store.actions import RECHECKED, RETIRED, UNRESOLVED
 # 30 s): a record not reached by then is unresolved.
 SECONDS = 20.0
 # Why a record is unresolved, as the answer says it.
-STALE, CHANGED_LATEST, UNREADABLE, TOO_LARGE, MARKER_FREE, HOME_UNKNOWN, OUT_OF_TIME = (
+STALE, CHANGED_LATEST, UNREADABLE, TOO_LARGE, MARKER_FREE, HOME_UNKNOWN, OUT_OF_TIME, ROLLED_BACK = (
     "projection_stale", "latest_turn_changed", "unreadable", "too_large", "marker_free", "home_unknown",
-    "out_of_time")
+    "out_of_time", "rolled_back")
 # The reason a retired record is stopped with: the engine's own, for a later turn (engine/detect.py).
 LATER_TURN = "later_turn_exists"
 
@@ -114,7 +114,9 @@ def judge(engine, row, kin, deadline=None) -> tuple:
         found = rollout.UNREADABLE
     if found == rollout.LATER_MESSAGE:
         return RETIRED, LATER_TURN
-    return UNRESOLVED, {rollout.TOO_LARGE: TOO_LARGE, rollout.UNREADABLE: UNREADABLE}.get(found, STALE)
+    # A rollback after the failed turn's end - which Codex's history, not the file, says the outcome of - proves nothing.
+    return UNRESOLVED, {rollout.TOO_LARGE: TOO_LARGE, rollout.UNREADABLE: UNREADABLE,
+                        rollout.ROLLED_BACK: ROLLED_BACK}.get(found, STALE)
 
 
 def sources_for(control) -> dict:
