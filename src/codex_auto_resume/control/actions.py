@@ -10,6 +10,7 @@ import time
 from .. import machine, oncewords, projects, quiet, settings
 from ..machine import CLAIMED, OBSERVING, WAITING
 from ..store import TERMINAL, StoreError
+from ..store.actions import CHANGED, RECHECKED, RETIRED, UNRESOLVED
 from ..windows import WakeEvent
 from .errors import (ControlError,
                      _REFUSALS_POSTPONE,
@@ -444,6 +445,56 @@ class ActionsMixin:
                 finished += 1
         return {"requested": len(keys), "cancelled": cancelled,
                 "already_finished": finished, "failed": failed}
+
+    def rescan_pending(self, judge, *, actor: str = "gui") -> dict:
+        """Rescan and reconcile (v0.6.16, issue #39): every waiting recovery looked at again, on a person's word, each
+        by its own interruption id.
+
+        `judge(row, kin)` answers (outcome, reason) for one waiting record - `kin` is every record this product holds
+        of its conversation - by the watcher's own rules (rescan.judge_for, handed in by the bridge: this layer builds
+        no reader and no engine of its own). Only a record that still waits, unsent and not cancelled, is asked about;
+        one claimed, in Codex, followed or cancelled is left exactly as it is, and so is every finished record and
+        all of History. Each finding is applied in a transaction of its own that reads the record again and skips it
+        if it changed meanwhile (store.rescan_apply): retired - superseded by a person's newer work, final - or left
+        to wait as it was, rechecked or unresolved. Nothing is sent, nothing is written to Codex, no budget is given
+        back and no schedule is brought forward: this is no Retry now for everything, which the layer deliberately
+        does not offer (cancel_all_pending). The watcher is woken once after a recheck, to look now at whatever is
+        due anyway."""
+        with self._open() as store:
+            everything = store.all_records()
+        waiting = [row for row in everything if row["state"] in WAITING and not row["cancel_requested"]
+                   and row["submitted_at"] is None and row["queue_id"] is None]
+        counts = {RETIRED: 0, RECHECKED: 0, UNRESOLVED: 0, CHANGED: 0}
+        found = []
+        for row in waiting:
+            kin = [other for other in everything if other["thread_id"] == row["thread_id"]]
+            try:
+                outcome, reason = judge(row, kin)
+            except Exception:
+                outcome, reason = UNRESOLVED, "unreadable"
+            if outcome not in (RETIRED, RECHECKED):
+                outcome = UNRESOLVED            # whatever else a judge answers decides nothing
+            try:
+                with self._open() as store:
+                    applied = store.rescan_apply(row["interruption_id"], row, outcome, time.time(),
+                                                 reason=reason, actor=actor)
+            except (ControlError, StoreError):
+                applied, outcome, reason = None, UNRESOLVED, "state_busy"      # not read again: nothing applied
+            if applied is False:
+                outcome, reason = CHANGED, None
+            counts[outcome] += 1
+            found.append({"interruption_id": row["interruption_id"], "thread_id": row["thread_id"],
+                          "outcome": outcome, "reason": reason})
+        woke = False
+        if counts[RECHECKED]:
+            try:
+                woke = bool(WakeEvent(str(self.paths.state_dir)).signal())
+            except Exception:
+                woke = False
+        return {"scanned": len(waiting),
+                "not_waiting": sum(1 for row in everything if row["state"] not in TERMINAL) - len(waiting),
+                "retired": counts[RETIRED], "rechecked": counts[RECHECKED], "unresolved": counts[UNRESOLVED],
+                "changed": counts[CHANGED], "records": found, "woke": woke}
 
     def clear_history(self, *, actor: str = "gui") -> dict:
         """Hide finished recoveries from the History view. Deletes nothing, cancels

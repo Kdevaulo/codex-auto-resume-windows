@@ -187,6 +187,8 @@ CONTROL_TO_STORE = {
     "set_observe_only", "hold_waiting",
     # and a person's own postponement taken away (Don't postpone).
     "unpostpone",
+    # v0.6.16: what Rescan and reconcile found of one waiting record, applied only if it did not change meanwhile.
+    "rescan_apply",
 }
 
 

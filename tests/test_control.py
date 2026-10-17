@@ -435,7 +435,10 @@ class NotARecoveryEngineTests(ControlTestCase):
             "engine": {"codex_auto_resume/runtime/app.py",
                        # v0.6.16-beta.3: Diagnostics' check asks the engine's own decisions, read only, and
                        # builds an engine that is never ticked (checkup.py, the watcher's item, not control).
-                       "codex_auto_resume/checkup.py"},
+                       "codex_auto_resume/checkup.py",
+                       # v0.6.16: and so does Rescan and reconcile, with no backend and no store (rescan.py, the
+                       # watcher's item too): control only applies what it is handed (issue #39).
+                       "codex_auto_resume/rescan.py"},
             # Since v0.6.10-alpha the engine is a package, and the one module of it that reads
             # Codex directly is `engine/detect.py` - the exception `tests/test_layers.py`
             # names, in the place it now lives.
@@ -448,7 +451,9 @@ class NotARecoveryEngineTests(ControlTestCase):
                          "codex_auto_resume/compat/cache.py", "codex_auto_resume/compat/evaluator.py",
                          "codex_auto_resume/compat/views.py",
                          # v0.6.16-beta.3: and the check reads each Codex home it knows (checkup.py).
-                         "codex_auto_resume/checkup.py"},
+                         "codex_auto_resume/checkup.py",
+                         # v0.6.16: and Rescan and reconcile reads each Codex home it knows (rescan.py).
+                         "codex_auto_resume/rescan.py"},
         }, "the set of modules that reach the engine or the source has changed")
 
 
@@ -614,7 +619,10 @@ class BridgeTests(ControlTestCase):
             "detection-check",
             # v0.6.16-beta.3: one waiting recovery's words for this time - a file write, sent later
             # by the watcher once, under every check, as a Custom message is.
-            "once-words"]))
+            "once-words",
+            # v0.6.16: Rescan and reconcile (issue #39) - a waiting recovery retired only on proof of newer work,
+            # every other one left to wait as it was. It can only reduce what runs; nothing is sent.
+            "rescan"]))
 
     def test_serve_answers_every_line_with_exactly_one_line(self):
         requests = "\n".join([

@@ -195,6 +195,8 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.homes",
               # v0.6.16-beta.3: and its own decisions asked on request, for Diagnostics' check (issue #27).
               "checkup",
+              # v0.6.16: and its own rules asked again of every waiting recovery, for Rescan and reconcile (issue #39).
+              "rescan",
               # v0.6.10-alpha: cli.py's command bodies became commands/; cli.py is the parser.
               "commands", "commands.base", "commands.install", "commands.records",
               "commands.status", "commands.watcher",
@@ -299,6 +301,8 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     # v0.6.16-beta.3: Diagnostics' check, which builds an engine, only when it is asked for or exported.
     ("controlcli", "checkup"): ("cost", "Diagnostics' check and the engine it asks, only when it runs"),
     ("commands.install", "checkup"): ("cost", "Diagnostics' check, only while a bundle is exported"),
+    # v0.6.16: Rescan and reconcile, which builds an engine for each Codex home, only when a person asks for it.
+    ("controlcli", "rescan"): ("cost", "Rescan and reconcile and the engines it asks, only when it runs"),
     # v0.6.15-beta: the Codex version in force, read only while another Codex home is added (homes.unmeasured).
     ("control.watcher", "compatio"): ("cost", "the compatibility report's Codex version, read only while another "
                                               "Codex home is added"),
