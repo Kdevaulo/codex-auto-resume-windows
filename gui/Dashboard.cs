@@ -730,6 +730,8 @@ namespace CodexAutoResume
         private ListView pendingList, historyList;
         private Label pendingEmpty, historyEmpty;
         private Button retryButton, cancelButton, timelineButton, threadButton, cancelAllButton;
+        // v0.6.16 (issue #39): every waiting recovery looked at again, after the person says yes.
+        private Button rescanButton;
         // Why the selected task is waiting.
         private GateList explainList;
         private Label explainAsOf;
