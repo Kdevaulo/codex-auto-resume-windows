@@ -168,7 +168,7 @@ class CardPictureTests(unittest.TestCase):
         middle = shown[len(shown) // 2]
         at = ((52 + 60) * 776 + 52 + 60) * 3
         self.assertNotEqual(middle[at:at + 3], ground, "the card stands at its place")
-        self.assertEqual(report.hundredths, motion_plan.plan_end(plan) // 10)
+        self.assertEqual(report.ms, motion_plan.plan_end(plan))
 
 
 class LayTests(unittest.TestCase):

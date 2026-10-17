@@ -4,6 +4,12 @@
     python -X utf8 build/make_motion.py readme-en       # one of them (a plan's name under build/motion/, or a path)
     python -X utf8 build/make_motion.py --dry-run       # only the frames each plan asks for, scene by scene
     python -X utf8 build/make_motion.py --fidelity      # only the window held to today's stills, recorded
+    python -X utf8 build/make_motion.py card-en card-ko # the notification card appearing, on its own
+    python -X utf8 build/make_motion.py logo-light logo-dark   # the README's logo, moving (build/motion_logo.py)
+    python -X utf8 build/make_motion.py --all           # all six: the final's picture pass
+
+The README's two show the Dashboard alone, everything outside the window transparent (RGBA); the card's two the
+card appearing as the product shows it, on the canvas colour; the logos the icon's own watching motion.
 
 A plan (build/motion_plan.py, build/motion/*.json) says what a person does, scene by scene, on one clock. Each frame
 is then drawn:
@@ -47,11 +53,13 @@ PLAN_NAMES = ("readme-en", "readme-ko")
 # The notification card on its own (APNG-storyboard.md section 5): drawn only when named, or with --all - the
 # final's picture pass draws it beside the README's two.
 CARD_PLANS = ("card-en", "card-ko")
-ALL_PLANS = PLAN_NAMES + CARD_PLANS
+# The README's logo, moving as the icon does while watching (build/motion_logo.py): by name, or with --all.
+LOGO_PLANS = ("logo-light", "logo-dark")
+ALL_PLANS = PLAN_NAMES + CARD_PLANS + LOGO_PLANS
 MANIFEST = ROOT / "assets" / "motion.json"
 # What the picture is made from, beside the window, the card and the icon: these files.
 CODE = ("build/make_motion.py", "build/motion_plan.py", "build/motion_window.py", "build/motion_card.py",
-        "build/motion_compose.py", "build/motion_apng.py", "build/motion_fidelity.py")
+        "build/motion_compose.py", "build/motion_apng.py", "build/motion_fidelity.py", "build/motion_logo.py")
 
 
 def plan_path(name) -> Path:
@@ -62,17 +70,29 @@ def plan_path(name) -> Path:
     return motion_plan.PLANS / ("%s.json" % name)
 
 
+def load(name) -> dict:
+    """A plan by name or path: a logo plan as it is written (it has no scenes - the icon's own cycle is its story),
+    every other one read and checked by motion_plan."""
+    path = plan_path(name)
+    plan = json.loads(path.read_text(encoding="utf-8"))
+    if plan.get("kind") == "logo":
+        if plan.get("format") != motion_plan.FORMAT or not {"name", "output", "size"} <= set(plan):
+            raise motion_plan.PlanError("%s is not a logo plan" % path.name)
+        return plan
+    return motion_plan.load(path)
+
+
 def schedule(plan: dict, also=()) -> tuple:
-    """(frames, delays in hundredths, end in ms): every frame the plan's steps emit, with the frames the lights, the
+    """(frames, delays in ms, end in ms): every frame the plan's steps emit, with the frames the lights, the
     ripples and `also` (the tray icon's frame times) add, each with the delay it is held for."""
     end = motion_plan.plan_end(plan)
-    frames = motion_plan.fill(motion_plan.expand(plan), end, int(plan.get("lights_per_second") or 0), also,
+    frames = motion_plan.fill(motion_plan.expand(plan), end, int(plan.get("light_step_ms") or 0), also,
                               first_hold=int(plan.get("first_hold") or 0), ripple_step=int(plan.get("ripple_step") or 0))
     return frames, motion_plan.delays([frame.t for frame in frames], end), end
 
 
 def run(plan: dict, draw, also=()):
-    """(delay in hundredths, scene, picture) for each frame of the plan, drawn by `draw(frame)`, one at a time: a
+    """(delay in ms, scene, picture) for each frame of the plan, drawn by `draw(frame)`, one at a time: a
     frame whose picture is the one before's only lengthens it, so a picture is written once however long it holds.
     The first is always frame 1, even when the next is the same."""
     frames, held, _end = schedule(plan, also)
@@ -97,12 +117,20 @@ def describe(plan: dict, also=()) -> str:
         entry = counts.setdefault(frame.scene, [0, 0, frame.t])
         entry[0] += 1
         entry[1] += delay
-    for scene, (count, hundredths, start) in counts.items():
-        lines.append("  %-5s at %6.2f s  %3d frames  %5.2f s" % (scene, start / 1000.0, count, hundredths / 100.0))
+    for scene, (count, ms, start) in counts.items():
+        lines.append("  %-5s at %6.2f s  %3d frames  %5.2f s" % (scene, start / 1000.0, count, ms / 1000.0))
     lines.append("  %d frames, %.2f s, %d window states, targets: %s"
                  % (len(frames), end / 1000.0, len(motion_plan.window_states(frames)),
                     ", ".join(sorted(motion_plan.pointer_targets(frames)))))
     return "\n".join(lines)
+
+
+def describe_logo(plan: dict) -> str:
+    """What a logo plan draws: one cycle of the icon's own motion."""
+    import motion_logo
+    cycle = motion_logo.cycle(plan.get("state", "watching"))
+    return "  %d px, %s, one cycle of the icon's watching motion: %d frames, %.2f s" % (
+        plan["size"], "dark" if plan.get("dark") else "light", len(cycle), sum(item[0] for item in cycle) / 1000.0)
 
 
 # ---------------------------------------------------------------------------------------------------- inputs
@@ -118,7 +146,10 @@ def icon_moments(plan: dict, end: int) -> list:
 def render_input(plan: dict) -> str:
     """The digest a motion picture is made from: its plan as read, the window's sources, what draws the card and the
     icon, the catalogs of its languages, the still its frame is taken from and this generator's own files - so a
-    change to any of them marks the picture stale (tests/test_motion_fidelity.py)."""
+    change to any of them marks the picture stale (tests/test_motion_fidelity.py). A logo's is motion_logo's."""
+    if plan.get("kind") == "logo":
+        import motion_logo
+        return motion_logo.render_input(plan)
     import make_screenshots as shots
     parts = [json.dumps(plan, sort_keys=True, ensure_ascii=False), shots.card_drawing()]
     if "window" in plan:
@@ -160,7 +191,9 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
     canvas = plan["canvas"]
     width, height = canvas["size"]
     theme, design = canvas.get("theme", "light"), canvas.get("design", brand.DEFAULT_DESIGN)
-    ground = tuple(brand.rgb(brand.palette(theme, design)[canvas.get("ground", "canvas")]))
+    # A clear canvas: everything outside what is pictured is transparent, RGBA (the window on its own).
+    clear = bool(canvas.get("transparent"))
+    ground = None if clear else tuple(brand.rgb(brand.palette(theme, design)[canvas.get("ground", "canvas")]))
     if "window" in plan:
         job = motion_window.job(plan, frames, work / "frames", forms)
         result = motion_window.render(exe, job, work)
@@ -172,7 +205,7 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
         origin = chrome.client_origin()
     else:
         pictures, chrome, origin = None, None, (0, 0)
-        plain = bytes(ground) * (width * height)
+        plain = bytes(width * height * 4) if clear else bytes(ground) * (width * height)
     strip = plan.get("taskbar")
     anchor = None
     if strip:
@@ -181,12 +214,13 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
         icon_top = strip["top"] + (strip["height"] - icon["size"]) // 2
         icons = tray.IconFrames(icon["size"])
         anchor = (icon_left, icon_top, icon_left + icon["size"], icon_top + icon["size"])
-    card_plan = plan["card"]
-    card = motion_card.CardFrames(card_plan.get("locale", plan["locale"]), scale=card_plan["scale"],
-                                  work=(0, 0, width, strip["top"] if strip else height),
-                                  monitor=(0, 0, width, height), anchor=anchor, theme=theme, design=design)
-    if "at" in card_plan:
-        card.place = tuple(card_plan["at"])
+    card_plan, card = plan.get("card"), None
+    if card_plan:
+        card = motion_card.CardFrames(card_plan.get("locale", plan["locale"]), scale=card_plan["scale"],
+                                      work=(0, 0, width, strip["top"] if strip else height),
+                                      monitor=(0, 0, width, height), anchor=anchor, theme=theme, design=design)
+        if "at" in card_plan:
+            card.place = tuple(card_plan["at"])
     accent = tuple(brand.rgb(brand.palette(theme, design)["accent"]))
     scale = float((plan.get("pointer") or {}).get("scale", 1.5))
     seen_bounds, standing = {}, {}
@@ -206,9 +240,11 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
             motion_compose.draw_icon(picture, width, height, icons.compose(position, head), icon["size"],
                                      icon_left, icon_top)
         state = dict(frame.card) if frame.card else None
-        if state is not None:
+        if state is not None and card is not None:
             card.lay_on(picture, width, height, card.drawn(frame.t, state["born"], hover=state["hover"],
                                                            pressed=state["pressed"], leave=state["leave"]))
+        if plan.get("pointer") is None:
+            return bytes(picture)                     # nobody points: the card appearing on its own
         # A pointer that has come to rest stays where it came to rest, whatever moves under it.
         if frame.pointer[0] == "at" and frame.pointer in standing:
             x, y = standing[frame.pointer]
@@ -227,20 +263,21 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
     try:
         return motion_apng.assemble(ROOT / plan["output"], width, height,
                                     run(plan, draw, icon_moments(plan, end)),
-                                    target=budget.get("target"), cap=budget.get("cap"))
+                                    target=budget.get("target"), cap=budget.get("cap"), alpha=clear)
     finally:
-        card.close()
+        if card is not None:
+            card.close()
 
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     names = [item for item in argv if not item.startswith("--")] or list(ALL_PLANS if "--all" in argv
                                                                           else PLAN_NAMES)
-    plans = [motion_plan.load(plan_path(name)) for name in names]
+    plans = [load(name) for name in names]
     if "--dry-run" in argv:
         for plan in plans:
             print("%s -> %s" % (plan["name"], plan.get("output")))
-            print(describe(plan))
+            print(describe_logo(plan) if plan.get("kind") == "logo" else describe(plan))
         return 0
     import make_screenshots as shots
     import motion_fidelity
@@ -274,18 +311,24 @@ def main(argv=None) -> int:
         if "--fidelity" in argv:
             return 0
         for plan in plans:
-            plan_forms = {locale: {"answers": motion_window.answers(locale, stored)}
-                          for locale, stored in plan.get("forms", {}).items()}
-            report = make(plan, exe, work / plan["name"], plan_forms)
+            if plan.get("kind") == "logo":
+                import motion_logo
+                report = motion_logo.make(plan)
+                size = (int(plan["size"]),) * 2
+            else:
+                plan_forms = {locale: {"answers": motion_window.answers(locale, stored)}
+                              for locale, stored in plan.get("forms", {}).items()}
+                report = make(plan, exe, work / plan["name"], plan_forms)
+                size = tuple(plan["canvas"]["size"])
             output = ROOT / plan["output"]
             key = str(Path(plan["output"])).replace("\\", "/")
             manifest["inputs"]["<motion:%s>" % plan["name"]] = render_input(plan)
             manifest["images"][key] = {"sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
-                                       "size": "%dx%d" % tuple(plan["canvas"]["size"]), "bytes": report.size,
-                                       "frames": report.frames, "hundredths": report.hundredths,
+                                       "size": "%dx%d" % size, "bytes": report.size,
+                                       "frames": report.frames, "ms": report.ms,
                                        "scenes": report.scenes}
             write_manifest(manifest)
-            print("%s  %d bytes, %d frames, %.2f s%s" % (key, report.size, report.frames, report.hundredths / 100.0,
+            print("%s  %d bytes, %d frames, %.2f s%s" % (key, report.size, report.frames, report.ms / 1000.0,
                                                          "  OVER THE TARGET" if report.over_target else ""))
     return 0
 

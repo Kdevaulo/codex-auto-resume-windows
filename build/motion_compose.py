@@ -92,10 +92,22 @@ def arrow_sprite(scale: float, pressed: bool = False) -> tuple:
 
 
 def _blend(canvas: bytearray, width: int, height: int, x: int, y: int, colour, coverage: int) -> None:
+    """`colour` at `coverage` (0-255) over one pixel of an RGB canvas - or of an RGBA one with straight alpha, where
+    what is under may itself be partly or wholly clear, as the ground of a window pictured on its own is."""
     if not coverage or x < 0 or y < 0 or x >= width or y >= height:
         return
-    at = (y * width + x) * 3
     keep = 255 - coverage
+    if len(canvas) == width * height * 4:
+        at = (y * width + x) * 4
+        under = canvas[at + 3] * keep
+        alpha = coverage * 255 + under                  # in 255ths of 255
+        if not alpha:
+            return
+        for c in range(3):
+            canvas[at + c] = (colour[c] * coverage * 255 + canvas[at + c] * under + alpha // 2) // alpha
+        canvas[at + 3] = (alpha + 127) // 255
+        return
+    at = (y * width + x) * 3
     for c in range(3):
         canvas[at + c] = (colour[c] * coverage + canvas[at + c] * keep + 127) // 255
 
@@ -137,9 +149,11 @@ class WindowChrome:
 
     `still` is (width, height, RGB, alpha or None) of a window picture as the generator writes it (the caption
     kept, the frame cut away, the corners Windows rounds left clear); `client` the client area's size the render
-    mode drew. The window's top-left goes at `at` on a canvas `size` in `ground`'s colour."""
+    mode drew. The window's top-left goes at `at` on a canvas `size` in `ground`'s colour - or, with `ground` None,
+    on a clear canvas: RGBA, every pixel outside the window and its shadow wholly transparent, the shadow and the
+    corners Windows rounds laid with their alpha, so the picture sits on any page."""
 
-    def __init__(self, still: tuple, client: tuple, *, size: tuple, at: tuple, ground: tuple, scale: float = 1.5):
+    def __init__(self, still: tuple, client: tuple, *, size: tuple, at: tuple, ground, scale: float = 1.5):
         width, height, rgb, alpha = still
         client_w, client_h = client
         if width != client_w or height < client_h:
@@ -149,7 +163,9 @@ class WindowChrome:
         self.caption = height - client_h
         self.alpha = alpha
         canvas_w, canvas_h = size
-        base = bytearray(bytes(ground) * (canvas_w * canvas_h))
+        self.bpp = 3 if ground is not None else 4
+        base = bytearray(bytes(ground) * (canvas_w * canvas_h)) if ground is not None else bytearray(
+            canvas_w * canvas_h * 4)
         self._shadow(base, scale)
         left, top = at
         for y in range(height):
@@ -197,15 +213,22 @@ class WindowChrome:
         left, top = self.client_origin()
         width, height = self.width, self.height - self.caption
         visible = min(width, canvas_w - left)
+        bpp = self.bpp
+        opaque = bytes((255,)) * visible
         for y in range(height):
             if top + y >= canvas_h:
                 break
-            at = ((top + y) * canvas_w + left) * 3
-            canvas[at:at + visible * 3] = client[y * width * 3:(y * width + visible) * 3]
+            at = ((top + y) * canvas_w + left) * bpp
+            source = client[y * width * 3:(y * width + visible) * 3]
+            if bpp == 3:
+                canvas[at:at + visible * 3] = source
+                continue
+            line = bytearray(visible * 4)
+            line[0::4], line[1::4], line[2::4], line[3::4] = source[0::3], source[1::3], source[2::3], opaque
+            canvas[at:at + visible * 4] = line
         for x, y, cover in self.corners:
-            at = ((top + y) * canvas_w + left + x) * 3
-            under = self.base[at:at + 3]
-            canvas[at:at + 3] = bytes(under)
+            at = ((top + y) * canvas_w + left + x) * bpp
+            canvas[at:at + bpp] = self.base[at:at + bpp]
             _blend(canvas, canvas_w, canvas_h, left + x, top + y, client[(y * width + x) * 3:(y * width + x) * 3 + 3],
                    cover)
         return canvas

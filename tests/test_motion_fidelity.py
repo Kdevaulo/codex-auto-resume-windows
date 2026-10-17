@@ -129,7 +129,7 @@ class MadeTests(unittest.TestCase):
     def test_a_made_picture_is_the_bytes_its_manifest_records_from_the_inputs_it_records(self):
         manifest = make_motion.read_manifest()
         for name in make_motion.ALL_PLANS:
-            plan = motion_plan.load(make_motion.plan_path(name))
+            plan = make_motion.load(name)
             output = ROOT / plan["output"]
             with self.subTest(name):
                 if not output.exists():
@@ -155,7 +155,7 @@ class MadeTests(unittest.TestCase):
         moved = copy.deepcopy(plan)
         moved["scenes"][0]["steps"][0]["hold"] += 100
         self.assertNotEqual(make_motion.render_input(moved), before)
-        for name in ("window_digest", "card_drawing", "icon_drawing"):
+        for name in ("window_digest", "card_drawing"):
             with self.subTest(name), mock.patch.object(shots, name, return_value="moved"):
                 self.assertNotEqual(make_motion.render_input(plan), before)
         real = shots.input_digest

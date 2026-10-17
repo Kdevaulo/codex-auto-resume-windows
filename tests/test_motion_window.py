@@ -55,6 +55,24 @@ class SourceTests(unittest.TestCase):
         answer = render[render.index("RenderAnswer(string command"):render.index("private static string Compact")]
         self.assertIn('refused["ok"] = false;', answer)
 
+    def test_the_drop_list_is_drawn_fading_in_and_rising_as_show_animates_it(self):
+        """The open list fades in and rises into place over the transition (SoftDropList.Show, Tick): a frame
+        `appear_ms` into it is drawn at the list's own alpha and rise, by the list's own arithmetic."""
+        combo = guiscan.read("gui/SoftCombo.cs")
+        paint = combo[combo.index("internal Bitmap PaintAt(int hovered, Rectangle area, double appearing)"):]
+        paint = paint[:paint.index("Render();")]
+        tick = combo[combo.index("private void Tick()"):]
+        tick = tick[:tick.index("Push();")]
+        for line in ("alpha = t >= 1.0 ? 255 : (int)Math.Round(255 * eased);",
+                     "rise = t >= 1.0 ? 0 : (int)Math.Round(Soft.Px(Brand.SpaceXs) * (1.0 - eased));"):
+            self.assertIn(line, tick, "Tick's own arithmetic moved")
+            self.assertIn(line, paint, "the render draws the list another way than Tick moves it")
+        render = guiscan.read("gui/WindowRender.cs")
+        self.assertIn('listed.TryGetValue("appear_ms", out appearing)', render)
+        self.assertIn("list.PaintAt(hovered, area, appear)", render)
+        self.assertIn("matrix.Matrix33 = list.Alpha / 255f;", render)
+        self.assertIn("int rise = list.CardOnScreen.Y - card.Y;", render)
+
     def test_a_rendered_window_never_reopens_itself(self):
         self.assertIn("rendering", guiscan.member_body("SettingsForm", "Reopen").split("\n", 3)[2])
 

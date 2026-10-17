@@ -5,12 +5,31 @@
   "locale": "ko",
   "scenes_from": "card-scenes.json",
   "values": {},
-  "canvas": {"size": [776, 600], "ground": "canvas", "theme": "light", "design": "soft"},
-  "card": {"scale": 2.0, "locale": "ko", "at": [52, 52]},
-  "pointer": {"rest": [820, 660], "scale": 2.0},
-  "lights_per_second": 10,
-  "first_hold": 0,
-  "ripple_step": 40,
-  "length": [4000, 8000],
-  "budget": {"target": 450000, "cap": 1000000}
+  "canvas": {
+    "size": [
+      776,
+      600
+    ],
+    "ground": "canvas",
+    "theme": "light",
+    "design": "soft"
+  },
+  "card": {
+    "scale": 2.0,
+    "locale": "ko",
+    "at": [
+      52,
+      52
+    ]
+  },
+  "pointer": null,
+  "ripple_step": 16,
+  "length": [
+    4000,
+    12000
+  ],
+  "budget": {
+    "cap": 4000000
+  },
+  "light_step_ms": 33
 }

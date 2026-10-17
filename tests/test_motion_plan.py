@@ -59,20 +59,29 @@ class ReadmePlanTests(unittest.TestCase):
                 self.assertEqual(plan["forms"][second], {"interface_language": second},
                                  "the window that opens after Save has the language stored")
 
-    def test_the_card_comes_and_goes_once(self):
-        frames = motion_plan.expand(motion_plan.load(make_motion.plan_path("readme-en")))
-        shown = [frame.card != () for frame in frames]
-        first = shown.index(True)
-        last = len(shown) - 1 - shown[::-1].index(True)
-        self.assertTrue(all(shown[first:last + 1]))
-        self.assertEqual(frames[first].scene, "S1")
-        self.assertEqual(frames[last].scene, "S3")
+    def test_the_readme_pictures_are_the_dashboard_alone_on_a_clear_canvas(self):
+        """The owner, 2026-10-18: the first motion picture holds the Dashboard only - no notification card, no
+        taskbar - and everything outside the window is transparent; it opens on the Overview and clicks Pending."""
+        for name in make_motion.PLAN_NAMES:
+            with self.subTest(name):
+                plan = motion_plan.load(make_motion.plan_path(name))
+                self.assertNotIn("card", plan)
+                self.assertNotIn("taskbar", plan)
+                self.assertIs(plan["canvas"].get("transparent"), True)
+                frames = motion_plan.expand(plan)
+                self.assertTrue(all(frame.card == () for frame in frames))
+                self.assertFalse([target for target in motion_plan.pointer_targets(frames)
+                                  if target.startswith("card.")])
+                pages = [state(frame)["page"] for frame in frames]
+                self.assertEqual(pages[0], "overview")
+                self.assertEqual(next(page for page in pages if page != "overview"), "pending")
 
 
 class CardPlanTests(unittest.TestCase):
     def test_the_card_on_its_own_is_planned_in_both_languages_and_drawn_only_when_named(self):
         self.assertEqual(make_motion.CARD_PLANS, ("card-en", "card-ko"))
-        self.assertEqual(make_motion.ALL_PLANS, make_motion.PLAN_NAMES + make_motion.CARD_PLANS)
+        self.assertEqual(make_motion.ALL_PLANS,
+                         make_motion.PLAN_NAMES + make_motion.CARD_PLANS + make_motion.LOGO_PLANS)
         for name, output in (("card-en", "docs/images/notification-card-motion.png"),
                              ("card-ko", "docs/images/notification-card-motion-ko.png")):
             with self.subTest(name):
@@ -81,10 +90,17 @@ class CardPlanTests(unittest.TestCase):
                 self.assertNotIn("window", plan)
                 self.assertNotIn("taskbar", plan)
                 self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]), ([776, 600], 2.0))
-                self.assertLessEqual(plan["budget"]["cap"], 1000000)
+                self.assertLessEqual(plan["budget"]["cap"], 4000000)
                 frames = motion_plan.expand(plan)
-                self.assertEqual(dict(frames[0].card)["born"], 0, "frame 1 is the card about to rise")
-                self.assertEqual(frames[-1].card, (), "it ends on the empty ground it loops back to")
+                from codex_auto_resume import notice_card
+                self.assertEqual(dict(frames[0].card)["born"], -notice_card.ENTRANCE_MS,
+                                 "frame 1 is the card at rest, as a viewer that does not animate shows it")
+                self.assertIsNone(plan["pointer"], "nobody points: it is the popup appearing on its own")
+                cards = [dict(frame.card) if frame.card else None for frame in frames]
+                self.assertIn(None, cards, "it leaves, the product's own exit")
+                gone = cards.index(None)
+                self.assertTrue(any(card and card["born"] > 0 for card in cards[gone:]), "and comes again")
+                self.assertIsNotNone(cards[-1], "it ends at rest, where it loops back to")
                 self.assertEqual(make_motion.icon_moments(plan, motion_plan.plan_end(plan)), [])
 
     def test_what_the_card_picture_is_made_from_is_the_card_not_the_window(self):
@@ -206,9 +222,9 @@ class CheckTests(unittest.TestCase):
 
 
 class ClockTests(unittest.TestCase):
-    def test_the_lights_add_a_frame_every_tenth_of_a_second_after_frame_one_holds(self):
+    def test_the_lights_add_a_frame_every_step_of_their_own_timer_after_frame_one_holds(self):
         frames = motion_plan.expand(plan_of({"hold": 1000}))
-        filled = motion_plan.fill(frames, 1000, 10, first_hold=400)
+        filled = motion_plan.fill(frames, 1000, 100, first_hold=400)
         self.assertEqual([frame.t for frame in filled], [0, 400, 500, 600, 700, 800, 900])
         self.assertTrue(all(frame.window == frames[0].window for frame in filled))
 
@@ -220,16 +236,17 @@ class ClockTests(unittest.TestCase):
 
     def test_a_moment_too_close_to_another_adds_no_frame(self):
         frames = motion_plan.expand(plan_of({"hold": 300}, {"set": {"page": "pending"}, "hold": 300}))
-        filled = motion_plan.fill(frames, 600, 10, also=(108, 150, 290, 595))
+        filled = motion_plan.fill(frames, 600, 100, also=(108, 150, 290, 595))
         self.assertEqual([frame.t for frame in filled], [0, 100, 150, 200, 300, 400, 500])
-        self.assertTrue(all(b.t - a.t >= 40 for a, b in zip(filled, filled[1:])))
+        self.assertTrue(all(b.t - a.t >= motion_plan.CLOSEST for a, b in zip(filled, filled[1:])))
         motion_plan.delays([frame.t for frame in filled], 600)
         readme = motion_plan.load(make_motion.plan_path("readme-en"))
         icon = [1092.0 + 1.37 * n for n in range(0, 20000, 7)]
         make_motion.schedule(readme, icon)
 
-    def test_delays_are_whole_hundredths_that_sum_to_the_picture(self):
-        self.assertEqual(motion_plan.delays([0, 40, 77, 120], 1000), [4, 4, 4, 88])
+    def test_delays_are_whole_milliseconds_that_sum_to_the_picture(self):
+        self.assertEqual(motion_plan.delays([0, 16, 32, 120], 1000), [16, 16, 88, 880])
+        self.assertEqual(motion_plan.SHORTEST, 15, "the product's own quickest step")
         with self.assertRaises(PlanError):
             motion_plan.delays([0, 10], 100)
 
@@ -238,10 +255,10 @@ class RunnerTests(unittest.TestCase):
     def test_a_picture_that_holds_is_written_once_for_as_long_as_it_holds(self):
         plan = plan_of({"hold": 300}, {"set": {"page": "pending"}, "hold": 300}, {"set": {"page": "overview"},
                                                                                  "hold": 200},
-                       lights_per_second=10)
+                       light_step_ms=100)
         drawn = list(make_motion.run(plan, lambda frame: state(frame)["page"].encode()))
         self.assertEqual([(delay, picture) for delay, _scene, picture in drawn],
-                         [(30, b"overview"), (30, b"pending"), (20, b"overview")])
+                         [(300, b"overview"), (300, b"pending"), (200, b"overview")])
 
     def test_the_dry_run_names_every_scene(self):
         text = make_motion.describe(motion_plan.load(make_motion.plan_path("readme-en")))
