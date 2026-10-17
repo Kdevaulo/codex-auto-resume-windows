@@ -129,7 +129,7 @@ class WorkflowAgreementTests(unittest.TestCase):
         """release.yml, sync-ko.yml and community-report.yml each choose a single interpreter."""
         for name in ("release.yml", "sync-ko.yml", "community-report.yml"):
             with self.subTest(name):
-                pinned = re.findall(r'python-version:\s*"(3\.\d+)"', workflow(name))
+                pinned = re.findall(r'python-version:\s*"(3\.\d+)(?:\.\d+)?"', workflow(name))
                 self.assertTrue(pinned, "%s pins no Python" % name)
                 for version in pinned:
                     self.assertIn(version, POLICY["blocking"],
@@ -138,7 +138,7 @@ class WorkflowAgreementTests(unittest.TestCase):
     def test_the_release_workflow_uses_the_version_the_policy_names(self):
         """The archive's bytes depend on it, so it is named rather than incidental - and the suite's
         parts, which the build waits for, run on the same one: the tests pass on the Python that builds."""
-        pinned = re.findall(r'python-version:\s*"(3\.\d+)"', workflow("release.yml"))
+        pinned = re.findall(r'python-version:\s*"(3\.\d+)(?:\.\d+)?"', workflow("release.yml"))
         self.assertEqual(pinned, [POLICY["release_build"]] * 2, "one for the test job and one for the build")
 
 
@@ -164,6 +164,26 @@ class BundledRuntimeTests(unittest.TestCase):
         """
         line = ".".join(POLICY["bundled_runtime"].split(".")[:2])
         self.assertIn(line, POLICY["blocking"])
+
+
+class ShippedRuntimeLaneTests(unittest.TestCase):
+    """The suite and the release build run on the Python a release bundles, to the patch.
+
+    2026-10-17: the runners moved 3.13 to 3.13.16 and the 3.13 lane alone went red on a tray-popup test that
+    passes on 3.13.15 - the version every user runs. A lane on a newer patch than the bundled one tests a
+    Python nobody has; a move of the bundled runtime is a change of its own, made here and tested first.
+    """
+
+    def patches(self, name):
+        return re.findall(r"3\.\d+\.\d+", workflow(name))
+
+    def test_the_test_workflow_runs_the_bundled_patch_in_its_lane(self):
+        found = self.patches("test.yml")
+        self.assertTrue(found, "test.yml lets the runner choose the 3.13 patch")
+        self.assertEqual(set(found), {POLICY["bundled_runtime"]})
+
+    def test_the_release_workflow_tests_and_builds_on_the_bundled_patch(self):
+        self.assertEqual(self.patches("release.yml"), [POLICY["bundled_runtime"]] * 2)
 
 
 class DocumentedMinimumTests(unittest.TestCase):
