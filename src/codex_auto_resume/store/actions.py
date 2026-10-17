@@ -16,6 +16,18 @@ MAX_BUDGET_RESETS = 3
 # keeps such a row visible until then, because it may still change.
 UNKNOWN_WINDOW = 24 * 3600
 
+# What a person's Rescan and reconcile finds of one waiting record (v0.6.16, issue #39), and the journal word each is
+# written under; a record that changed while it looked is skipped and written under RESCAN_CHANGED.
+RETIRED, RECHECKED, UNRESOLVED, CHANGED = "retired", "rechecked", "unresolved", "changed"
+RESCAN_EVENTS = {RETIRED: "rescan_retired", RECHECKED: "rescan_rechecked", UNRESOLVED: "rescan_unresolved"}
+RESCAN_CHANGED = "rescan_changed"
+# What a record must still hold, as the rescan read it, for what it found to be applied: who it is, where it stands,
+# and everything a person or the watcher can have done to it since - a send, a cancel, a hold, a postponement, a
+# Retry now, attempts given back. A poll that only moved its next look, or its reason, is no change to its finding.
+RESCAN_FIELDS = ("interruption_id", "thread_id", "turn_id", "ordinal", "home_key", "chain_origin_id", "category",
+                 "state", "cancel_requested", "submitted_at", "queue_id", "recovery_client_id", "hold", "not_before",
+                 "retry_now_count", "budget_resets", "attempt_count", "recovery_attempts")
+
 
 class ActionsMixin:
     # ------------------------------------------------------------ user actions
@@ -179,6 +191,38 @@ class ActionsMixin:
             self._event(connection, now, "retry_now", record=row, from_state=state, to_state=state,
                         reason="retry_now", actor=actor)
             return True, max(now, row["reset_at"] or 0, row["not_before"] or 0)
+
+    def rescan_apply(self, interruption_id: str, seen: dict, outcome: str, now: float, *, reason=None,
+                     actor: str = "gui") -> bool:
+        """What a person's Rescan and reconcile found of one waiting record, applied - or not (v0.6.16, issue #39).
+
+        The record is read again inside this one write transaction, and the finding is applied only if it is still
+        the record the rescan read (`seen`, RESCAN_FIELDS) and still waits unsent and uncancelled; otherwise nothing
+        changes but a journal line saying it changed meanwhile, and False is returned. RETIRED makes it
+        superseded_by_user, final, as the engine's own supersede does; RECHECKED and UNRESOLVED change nothing but
+        the journal - its schedule, its gates, its hold, its postponement and its budgets stay as they were. Nothing
+        is sent, and no other record is touched."""
+        _timestamp(now, "now")
+        if outcome not in RESCAN_EVENTS:
+            raise ValueError("not a rescan outcome")
+        reason = reason if reason in machine.REASONS else "later_turn_exists" if outcome == RETIRED else None
+        with self._transaction() as connection:
+            row = self._row(connection, interruption_id)
+            if row is None:
+                return False
+            if (any(row.get(field) != seen.get(field) for field in RESCAN_FIELDS) or row["state"] not in WAITING
+                    or row["cancel_requested"] or row["submitted_at"] is not None or row["queue_id"] is not None):
+                self._event(connection, now, RESCAN_CHANGED, record=row, from_state=row["state"],
+                            to_state=row["state"], actor=actor)
+                return False
+            target = "superseded_by_user" if outcome == RETIRED else row["state"]
+            if outcome == RETIRED:
+                connection.execute(
+                    "UPDATE interruptions SET state=?, last_error=?, outcome_at=?, next_retry_at=? "
+                    "WHERE interruption_id=?", (target, reason, now, now, interruption_id))
+            self._event(connection, now, RESCAN_EVENTS[outcome], record=row, from_state=row["state"],
+                        to_state=target, reason=reason, actor=actor)
+            return True
 
     def hide_history(self, now: float, *, actor: str = "gui") -> dict:
         """Clear recovery history from view. Display only; never deletes a row.
