@@ -100,6 +100,33 @@ class WindowTests(unittest.TestCase):
         self.assertLessEqual(below[0], further[0])
         self.assertEqual(pixel(chrome.base, 100, 99, 99), GROUND, "it is gone well away from the window")
 
+    def test_on_a_clear_canvas_only_the_window_and_its_shadow_are_not_transparent(self):
+        chrome = compose.WindowChrome(self.still(), (8, 4), size=(100, 100), at=(40, 30), ground=None, scale=1.0)
+        picture = chrome.frame(bytes((0, 200, 0)) * 32)
+        self.assertEqual(len(picture), 100 * 100 * 4, "RGBA")
+
+        def at(x, y):
+            return tuple(picture[(y * 100 + x) * 4:(y * 100 + x) * 4 + 4])
+        self.assertEqual(at(0, 0), (0, 0, 0, 0), "nothing painted outside the window: wholly transparent")
+        self.assertEqual(at(99, 99), (0, 0, 0, 0))
+        self.assertEqual(at(41, 30), (100, 0, 0, 255), "the caption, opaque")
+        self.assertEqual(at(42, 33), (0, 200, 0, 255), "the client area, opaque")
+        shadow = at(44, 40)
+        self.assertEqual(shadow[:3], (0, 0, 0))
+        self.assertTrue(0 < shadow[3] < 255, "the shadow is laid with its alpha")
+        corner = at(41, 35)
+        self.assertTrue(corner[3] < 255 and corner[1] > 0, "a corner Windows rounds is partly clear")
+        outside = sum(1 for x in range(100) for y in range(100)
+                      if at(x, y)[3] and not (10 <= x < 78 and 0 <= y < 76))
+        self.assertEqual(outside, 0, "nothing beyond the shadow's reach")
+
+    def test_the_pointer_on_a_clear_canvas_keeps_its_own_colour_and_coverage(self):
+        picture = bytearray(60 * 60 * 4)
+        compose.draw_pointer(picture, 60, 60, 20, 10)
+        inside = picture[((10 + 18) * 60 + 24) * 4:((10 + 18) * 60 + 24) * 4 + 4]
+        self.assertEqual(tuple(inside), (255, 255, 255, 255))
+        self.assertEqual(tuple(picture[0:4]), (0, 0, 0, 0))
+
     def test_a_still_of_another_window_is_refused(self):
         with self.assertRaises(ValueError):
             compose.WindowChrome(self.still(), (9, 4), size=(40, 30), at=(0, 0), ground=GROUND)
