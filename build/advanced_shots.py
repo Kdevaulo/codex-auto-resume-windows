@@ -24,9 +24,20 @@ so the same tree gives the same answers and the same bytes.
 
 What a picture needs of the advanced edition is named in NEEDS, the one table: a capability, a choice, a bridge
 command, a module or a window source. A picture whose needs this tree does not have stops the run with "not in this
-tree" before anything is drawn - the usage numbers (P8) and the pause near a limit (P7) arrive with v0.6.16-beta.4 -
-and a page, a capability or a report the window cannot show stops the render mode itself, so no picture is ever drawn
-of something else. Every read the window makes must be answered: one that is not stops the run.
+tree" before anything is drawn, and a page, a capability, a report or a Custom... the window cannot show stops the
+render mode itself, so no picture is ever drawn of something else. Every read the window makes must be answered: one
+that is not stops the run.
+
+The two pictures of v0.6.16-beta.4's usage numbers, settled at the final's merge (plans/v0616-advshots/STOP-NOTES.md):
+
+* P7-after, the Overview at 96 % of the five-hour window with the stop near a limit on. The status card's reason is the
+  one the window draws - "Waiting" over the two recoveries, and under them the usage line, the five-hour window at 96 %
+  and when it resets - because beta.4 holds core's records at their gate as any gate holds them (they keep waiting) and
+  draws no words of its own on the Overview: a picture never shows what the product does not draw.
+* P8, the usage meter's Choices card - both windows' warnings and each window's switch - scrolled to the top of the
+  column (`show` "choices": the statement above it scrolled away), with Custom... chosen on the five-hour warning and
+  a number typed in its box, not yet Set (`custom`): the one picture of "a Custom entry beside the presets". The meter
+  is on, as in P7 (the near_limit seed), so the card is of a capability in use.
 
 Into docs/images, the run first holds the window drawn offscreen to today's captured stills (motion_fidelity) and
 records the result, each picture's digest and what it was made from in assets/advanced-shots.json; a page that fails
@@ -71,8 +82,9 @@ WINDOWS = "10.0.26100"
 class Shot(NamedTuple):
     """One picture: its name (before-after.md's), its file under docs/images (`-ko` added in Korean), the edition whose
     window draws it, the page, the capability open, the seed it is drawn from (VARIANTS), whether the report is
-    written and checked first, and the part of the open capability's column scrolled to its top (AdvancedRender.cs's
-    RenderShow: report, report.file, report.check)."""
+    written and checked first, the part of the open capability's column scrolled to its top (AdvancedRender.cs's
+    RenderShow: report, report.file, report.check, choices), and the choice Custom... is chosen on, with the number typed
+    in its box - (key, text), or None (RenderCustom)."""
     name: str
     file: str
     edition: str
@@ -81,6 +93,7 @@ class Shot(NamedTuple):
     variant: str = "base"
     report: bool = False
     show: str | None = None
+    custom: tuple | None = None
 
 
 SHOTS = (
@@ -91,7 +104,8 @@ SHOTS = (
     Shot("P5", "advanced-report", "advanced", "advanced", "compat_report", report=True, show="report.file"),
     Shot("P7-before", "advanced-pause-before", "standard", "overview"),
     Shot("P7-after", "advanced-pause-after", "advanced", "overview", variant="near_limit"),
-    Shot("P8", "advanced-usage-numbers", "advanced", "advanced", "usage_meter"),
+    Shot("P8", "advanced-usage-numbers", "advanced", "advanced", "usage_meter", variant="near_limit", show="choices",
+         custom=("warn_five_hour", "88")),
 )
 
 
@@ -105,21 +119,19 @@ class Need(NamedTuple):
 
 
 BETA4 = "v0.6.16-beta.4"
-# The one table of what each advanced picture needs. P8's usage numbers and P7's pause near a limit arrive with
-# v0.6.16-beta.4 (its branches v0616b4-usage and b4-integration): until they are merged, both stop the run here.
+# The one table of what each advanced picture needs. P8's usage numbers and P7's stop near a limit came with
+# v0.6.16-beta.4, and what each shows of it was settled when it was merged (the module docstring).
 NEEDS = {
     "P1-after": (Need("capability", "compat_report", "v0.6.11"),),
     "P4-after": (Need("capability", "reset_message", "v0.6.14"), Need("capability", "reset_credit", "v0.6.14"),
                  Need("capability", "prompt_queue", "v0.6.15-beta"), Need("command", "advanced-prompts", "v0.6.15-beta")),
     "P5": (Need("capability", "compat_report", "v0.6.11"), Need("command", "advanced-report-check", "v0.6.14")),
     "P7-after": (Need("capability", "usage_meter", "v0.6.16-beta.3"), Need("capability", "usage_pause", "v0.6.16-beta.3"),
-                 # The forced stop near a limit, and what it says (h), which the status card's reason is.
-                 Need("module", "codex_auto_resume_advanced.engine.usagestop", BETA4),
-                 Need("decision", "P7: the status card's reason near a limit, once beta.4 shows it", BETA4)),
-    "P8": (Need("capability", "usage_meter", "v0.6.16-beta.3"),
-           Need("option", "window_five_hour", BETA4), Need("option", "stop_words_five_hour", BETA4),
-           Need("command", "advanced-wordings", BETA4), Need("source", "advanced/gui/AdvancedUsage.cs", BETA4),
-           Need("decision", "P8: the numbers card's scroll and its Custom field open, once beta.4 draws them", BETA4)),
+                 # The forced stop near a limit, which holds core's records at their gate as they wait for the reset.
+                 Need("module", "codex_auto_resume_advanced.engine.usagestop", BETA4)),
+    "P8": (Need("capability", "usage_meter", "v0.6.16-beta.3"), Need("capability", "usage_pause", "v0.6.16-beta.3"),
+           Need("option", "window_five_hour", BETA4), Need("option", "warn_five_hour", "v0.6.16-beta.3"),
+           Need("command", "advanced-wordings", BETA4), Need("source", "advanced/gui/AdvancedUsage.cs", BETA4)),
 }
 
 # Every capability the seed turns on ("armed") or watches ("shadow"), in this order; and each seed variant's own: the
@@ -468,6 +480,8 @@ def frame(each: Shot, locale: str, index: int) -> dict:
         state["report"] = {"login": LOGIN, "check": True}
     if each.show is not None:
         state["show"] = each.show
+    if each.custom is not None:
+        state["custom"] = {"key": each.custom[0], "text": each.custom[1]}
     return state
 
 

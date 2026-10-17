@@ -67,17 +67,17 @@ class NeedsTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "not in this tree"):
                 shots_made.main(["P1-after", "--out", str(ROOT / "nowhere")])
 
-    def test_what_beta4_brings_is_named_in_the_table_and_holds_its_pictures_back_until_it_is_there(self):
+    def test_what_beta4_brings_is_named_in_the_table_and_now_in_this_tree_every_picture_is_ready(self):
+        """v0.6.16 final: beta.4 is merged and P7's and P8's decisions are written in (the module docstring), so no
+        decision is left to hold a picture back and every picture this tree names can be drawn."""
         for name in ("P7-after", "P8"):
             with self.subTest(name):
                 coming = [need for need in shots_made.NEEDS[name] if need.comes == shots_made.BETA4]
-                self.assertTrue(coming)
-                self.assertTrue(any(need.kind == "decision" for need in coming),
-                                "what the picture shows of beta.4 is settled when beta.4 is merged")
-                self.assertTrue(shots_made.missing(shots_made.shot(name)))
-        for name in ("P1-after", "P4-after", "P5"):
-            with self.subTest(name):
-                self.assertEqual(shots_made.missing(shots_made.shot(name)), [])
+                self.assertTrue(coming, "what the picture shows of beta.4 is named")
+        self.assertEqual([need for needs in shots_made.NEEDS.values() for need in needs if need.kind == "decision"], [])
+        for each in shots_made.SHOTS:
+            with self.subTest(each.name):
+                self.assertEqual(shots_made.missing(each), [])
         # Every advanced picture names what it needs; a standard one needs nothing of the edition.
         for each in shots_made.SHOTS:
             self.assertEqual(each.name in shots_made.NEEDS, each.edition == "advanced", each.name)
@@ -185,6 +185,41 @@ class JobTests(unittest.TestCase):
         self.assertEqual(data["frames"][2]["report"], {"login": shots_made.LOGIN, "check": True})
         self.assertEqual(data["frames"][2]["show"], "report.file")
         self.assertEqual((data["theme"], data["design"], data["targets"]), ("light", "soft", []))
+
+    def test_p8_is_the_meter_s_choices_card_with_custom_open_on_the_five_hour_warning(self):
+        """The P8 decision (STOP-NOTES): the meter on, its column scrolled to the Choices card, Custom... chosen on the
+        five-hour warning with a number typed in - a number the card would take (its custom range), not a preset."""
+        each = shots_made.shot("P8")
+        data, _order = shots_made.job([each], ("en",), {"en": {}}, ROOT / "nowhere")
+        self.assertEqual(data["frames"][0], {"index": 0, "locale": "en", "page": "advanced", "light": 0,
+                                             "capability": "usage_meter", "show": "choices",
+                                             "custom": {"key": "warn_five_hour", "text": "88"}})
+        self.assertIn(("usage_meter", "armed"), shots_made.VARIANTS[each.variant]["turned"])
+        read, _envelope = shots_made.read_answers("advanced", each.variant, "en")
+        listing = [reply["result"] for command, _argument, reply in read if command == "advanced-list"][0]
+        meter = [item for item in listing["capabilities"] if item["id"] == "usage_meter"][0]
+        self.assertEqual(meter["state"], "armed")
+        option = [option for option in meter["options"] if option["key"] == "warn_five_hour"][0]
+        low, high = option["custom"]
+        self.assertTrue(low <= int(each.custom[1]) <= high)
+        self.assertNotIn(int(each.custom[1]), option["choices"], "a number of its own, beside the presets")
+        self.assertIn("warn_weekly", [option["key"] for option in meter["options"]], "both windows")
+
+    def test_p7_s_status_card_says_the_five_hour_window_at_96_and_the_recoveries_waiting(self):
+        """The P7 decision (STOP-NOTES): the reason the Overview's status card shows near a limit is the window's own -
+        the recoveries waiting under "Waiting" and the usage line with the five-hour window at 96 % and its reset -
+        with the stop near a limit on, and nothing of the edition's own words."""
+        each = shots_made.shot("P7-after")
+        self.assertEqual((each.page, each.variant, each.show, each.custom), ("overview", "near_limit", None, None))
+        read, _envelope = shots_made.read_answers("advanced", each.variant, "en")
+        status = [reply["status"] for command, _argument, reply in read if command == "status"][0]
+        windows = {window["window_minutes"]: window for window in status["watcher"]["usage"]["windows"]}
+        self.assertEqual(windows[300]["used_percent"], 96)
+        self.assertIsInstance(windows[300]["reset_at"], int)
+        self.assertEqual(status["pending"], 2)
+        listing = [reply["result"] for command, _argument, reply in read if command == "advanced-list"][0]
+        states = {item["id"]: item["state"] for item in listing["capabilities"]}
+        self.assertEqual((states["usage_meter"], states["usage_pause"]), ("armed", "armed"))
 
     def test_a_read_nobody_answered_or_anything_the_render_noted_stops_the_run(self):
         import motion_window

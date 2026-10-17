@@ -62,6 +62,20 @@ class RenderTests(unittest.TestCase):
         (asked,) = self.draw(self.advanced, [{"page": "advanced"}], "argument", ["--capability=reset_credit"])
         self.assertEqual(asked, credit, "the capability the command line names is the one open")
 
+    def test_the_usage_numbers_picture_scrolls_to_the_choices_and_opens_custom_on_the_five_hour_warning(self):
+        """v0.6.16 (P8): fails with RenderCustom or the `choices` part taken out - the column would stay at the top, or
+        Custom... stay shut."""
+        top, choices, custom = self.draw(self.advanced, [
+            {"page": "advanced", "capability": "usage_meter"},
+            {"page": "advanced", "capability": "usage_meter", "show": "choices"},
+            {"page": "advanced", "capability": "usage_meter", "show": "choices",
+             "custom": {"key": "warn_five_hour", "text": "88"}}], "usage")
+        self.assertNotEqual(top, choices, "the column is scrolled to the Choices card")
+        self.assertNotEqual(choices, custom, "Custom... is open, the number typed in its box")
+        with self.assertRaisesRegex(RuntimeError, "no choice called window_five_hour takes a number typed in"):
+            self.draw(self.advanced, [{"page": "advanced", "capability": "usage_meter",
+                                       "custom": {"key": "window_five_hour", "text": "1"}}], "switch")
+
     def test_a_page_or_a_capability_the_window_does_not_have_stops_the_render(self):
         """Fails with RenderState drawing what it has instead: the standard window's Overview for the advanced page."""
         with self.assertRaisesRegex(RuntimeError, "no page called advanced is in this window"):

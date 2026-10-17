@@ -7,8 +7,9 @@
 // scroll, a face - and hands the frame here (RenderStateNamed, a point gui/Dashboard.cs declares). A frame on this page
 // shows it once this edition has answered with its words; opens the capability it names, waiting until its statement
 // and what it keeps have been read and shown; for the compatibility report, writes the report and checks what sending
-// would write, each from the job's replies, as a person's clicks would; and scrolls the open capability's column, to a
-// part the frame names or by turns of the wheel. Each
+// would write, each from the job's replies, as a person's clicks would; chooses Custom... on a choice the frame names and
+// types its number in, as a person would, sending nothing (v0.6.16: the usage numbers' picture); and scrolls the open
+// capability's column, to a part the frame names or by turns of the wheel. Each
 // is waited for until it is drawn. A capability this tree does not have, a statement that was not read, or a report
 // that was not written stops the job: a picture is never of something else.
 //
@@ -58,6 +59,12 @@ namespace CodexAutoResume
                 RenderReport(open, report);
                 moved = true;
             }
+            var custom = Map(frame, "custom");
+            if (custom != null)
+            {
+                RenderCustom(Str(custom, "key"), Str(custom, "text"));
+                moved = true;
+            }
             string show = Str(frame, "show");
             if (show != null) RenderShow(show);
             var scroll = Map(frame, "scroll");
@@ -94,22 +101,39 @@ namespace CodexAutoResume
             }
         }
 
+        /// Custom... chosen on the open capability's choice `key`, as a choice from its list is taken - which opens the box a
+        /// number is typed in (AdvancedUsage.cs) and sends nothing - and `text` typed there, not yet Set. A choice the
+        /// open capability does not have, or one that takes no number typed in, stops the job.
+        private void RenderCustom(string key, string text)
+        {
+            SoftCombo combo = advancedChoices.Find(delegate(SoftCombo each) { return Equals(each.Tag, key); });
+            SoftTextArea box;
+            if (combo == null || !customBoxes.TryGetValue(key ?? "", out box))
+                throw new InvalidDataException("no choice called " + key + " takes a number typed in on " + advancedOpen);
+            Choose(combo, CustomChoice);
+            Committed.Invoke(combo, new object[] { EventArgs.Empty });
+            if (!customOpen.Contains(key)) throw new InvalidDataException("Custom... did not open on " + key);
+            box.Box.Text = text ?? "";
+        }
+
         // How far above the part a frame shows the column stops, in logical pixels: the caption or line over it shows too.
         private const int RenderShowLead = 40;
 
         /// The open capability's column scrolled so the part `name` names stands at its top: `report`, the report's card;
-        /// `report.file`, the whole file; `report.check`, what checking found. One that does not show stops the job.
+        /// `report.file`, the whole file; `report.check`, what checking found; (v0.6.16) `choices`, its Choices card. One
+        /// that does not show stops the job.
         private void RenderShow(string name)
         {
             Control part = name == "report.file" ? (Control)reportFile : name == "report.check" ? reportCheck
-                         : name == "report" ? (Control)reportLogin : null;
+                         : name == "report" ? (Control)reportLogin
+                         : name == "choices" && advancedChoices.Count > 0 ? advancedChoices[0] : null;
             Control card = part;
             while (card != null && card.Parent != advancedStack) card = card.Parent;
             if (part == null || card == null || advancedScroll == null)
                 throw new InvalidDataException("no part called " + name + " shows on " + advancedOpen);
             Materialise(this);
             PerformLayout();
-            int top = name == "report" ? card.Top - card.Margin.Top : InStack(part) - Px(RenderShowLead);
+            int top = name == "report" || name == "choices" ? card.Top - card.Margin.Top : InStack(part) - Px(RenderShowLead);
             ((ISoftScroller)advancedScroll).ScrollTo(Math.Max(0, top));
         }
 
