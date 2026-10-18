@@ -414,6 +414,14 @@ def read_answers(edition: str, variant: str, locale: str, report: bool = False) 
         with ExitStack() as stack:
             # The edition's own kinds of notice, whatever an earlier picture or test registered in this process.
             stack.enter_context(shots.edition_notice_kinds(edition))
+            # The machine's power actions pinned: the Dashboard reads Windows' own sleep states and hibernation
+            # (win/powerdown), which differ from PC to PC, so CI's runner read every picture as moved. Pinned as the PC
+            # the pictures are drawn on answers: no sleep state, hibernation and shutting down offered.
+            from unittest import mock
+            from codex_auto_resume.win import powerdown
+            stack.enter_context(mock.patch.object(powerdown, "available", side_effect=lambda action: {
+                powerdown.SLEEP: (False, powerdown.NO_SLEEP_STATE), powerdown.HIBERNATE: (True, None),
+                powerdown.SHUT_DOWN: (True, None)}.get(action, (False, None))))
             if edition == "advanced":
                 surface = stack.enter_context(advanced_installation(workspace, variant))
             else:

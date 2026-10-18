@@ -172,13 +172,28 @@ class ManifestTests(unittest.TestCase):
         finally:
             sys.path.pop(0)
 
+    def inputs_of_a_fresh_process(self) -> dict:
+        """render_inputs() asked in a process of its own, of the standard edition, as the generator is run. In the
+        advanced lanes an earlier test in this process can leave the advanced edition's state behind - its kinds of
+        notice, a loaded edition - and the panel's markup then read as moved there and nowhere else (the v0.6.16
+        final's dev CI, advanced lane part 4)."""
+        import subprocess
+        environment = {key: value for key, value in os.environ.items() if key != "CODEX_AR_EDITION"}
+        environment["PYTHONPATH"] = os.pathsep.join((str(ROOT / "src"), str(ROOT / "tests")))
+        code = ("import json, sys; sys.path.insert(0, %r); import make_screenshots as m; "
+                "inputs = m.render_inputs(); print(); print(json.dumps(inputs))" % str(ROOT / "build"))
+        done = subprocess.run([sys.executable, "-X", "utf8", "-c", code], capture_output=True, cwd=str(ROOT),
+                              env=environment, timeout=1800, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(done.returncode, 0, done.stderr.decode("utf-8", "replace")[-3000:])
+        return json.loads(done.stdout.decode("utf-8").strip().splitlines()[-1])
+
     def test_every_render_input_is_unchanged_since_the_images_were_made(self):
         """Asked of the generator, so the two can never disagree about what an input is.
 
         The panel's input is the markup it renders rather than the files that produce it,
         so this recomputes it rather than hashing a path.
         """
-        current = self.generator().render_inputs()
+        current = self.inputs_of_a_fresh_process()
         stale = []
         for name, recorded in self.manifest["inputs"].items():
             if name not in current:
