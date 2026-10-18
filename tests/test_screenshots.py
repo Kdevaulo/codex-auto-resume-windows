@@ -181,7 +181,7 @@ class ManifestTests(unittest.TestCase):
         environment = {key: value for key, value in os.environ.items() if key != "CODEX_AR_EDITION"}
         environment["PYTHONPATH"] = os.pathsep.join((str(ROOT / "src"), str(ROOT / "tests")))
         code = ("import json, sys; sys.path.insert(0, %r); import make_screenshots as m; "
-                "sys.stdout.write('\n' + json.dumps(m.render_inputs()))" % str(ROOT / "build"))
+                "inputs = m.render_inputs(); print(); print(json.dumps(inputs))" % str(ROOT / "build"))
         done = subprocess.run([sys.executable, "-X", "utf8", "-c", code], capture_output=True, cwd=str(ROOT),
                               env=environment, timeout=1800, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.assertEqual(done.returncode, 0, done.stderr.decode("utf-8", "replace")[-3000:])
