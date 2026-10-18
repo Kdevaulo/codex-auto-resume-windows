@@ -105,7 +105,8 @@ class CardPlanTests(unittest.TestCase):
                 self.assertEqual(plan["output"], output)
                 self.assertNotIn("window", plan)
                 self.assertNotIn("taskbar", plan)
-                self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]), ([776, 600], 2.0))
+                self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]),
+                                 ([776, {"card-en": 540, "card-ko": 524}[name]], 2.0))
                 self.assertLessEqual(plan["budget"]["cap"], 4000000)
                 frames = motion_plan.expand(plan)
                 from codex_auto_resume import notice_card

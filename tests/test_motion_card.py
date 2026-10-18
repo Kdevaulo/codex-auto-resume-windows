@@ -153,7 +153,7 @@ class CardPictureTests(unittest.TestCase):
         import motion_plan
         from test_social_motion import composite, read_apng
         plan = {"format": motion_plan.FORMAT, "name": "card-test", "locale": "en",
-                "canvas": {"size": [776, 600], "ground": "canvas", "theme": "light", "design": "soft"},
+                "canvas": {"size": [776, 540], "ground": "canvas", "theme": "light", "design": "soft"},
                 "card": {"scale": 2.0, "locale": "en", "at": [52, 52]}, "pointer": {"rest": [820, 660]},
                 "scenes": [{"id": "A", "steps": [{"card": "enter", "frames": 3, "step": 120}, {"hold": 200},
                                                  {"card": "leave", "frames": 2, "step": 120}, {"hold": 100}]}]}
@@ -163,12 +163,33 @@ class CardPictureTests(unittest.TestCase):
             report = make_motion.make(plan, None, Path(name) / "work")
             shown = list(composite(read_apng(Path(plan["output"]).read_bytes())))
         ground = canvas_colour()
-        self.assertEqual(shown[0], ground * (776 * 600), "frame 1 is the empty canvas the card rises onto")
-        self.assertEqual(shown[-1], ground * (776 * 600), "it ends where it loops back to")
+        self.assertEqual(shown[0], ground * (776 * 540), "frame 1 is the empty canvas the card rises onto")
+        self.assertEqual(shown[-1], ground * (776 * 540), "it ends where it loops back to")
         middle = shown[len(shown) // 2]
         at = ((52 + 60) * 776 + 52 + 60) * 3
         self.assertNotEqual(middle[at:at + 3], ground, "the card stands at its place")
         self.assertEqual(report.ms, motion_plan.plan_end(plan))
+
+
+@unittest.skipUnless(os.name == "nt", "the card is drawn with Windows' GDI+")
+class CardMarginsTests(unittest.TestCase):
+    def test_the_card_picture_has_the_same_margin_on_every_side_as_the_still_below_it(self):
+        """The owner, 2026-10-19: much more background lay below the card than above it. The canvas is the card and
+        its floating shadow's reach on all four sides - the size of the README's still card - and the card enters
+        from the bottom edge."""
+        import make_motion
+        import make_screenshots
+        import motion_plan
+        for name, locale in (("card-en", "en"), ("card-ko", "ko")):
+            with self.subTest(name):
+                plan = motion_plan.load(make_motion.plan_path(name))
+                still = make_screenshots._SettledCard(locale, "light", "soft", 2.0, None)
+                try:
+                    self.assertEqual(plan["canvas"]["size"], [still.width, still.height])
+                    self.assertEqual(plan["card"]["at"], [still.pad, still.pad])
+                finally:
+                    still.close()
+                self.assertNotIn("transparent", plan["canvas"], "the background stays as it is, not clear")
 
 
 class LayTests(unittest.TestCase):
