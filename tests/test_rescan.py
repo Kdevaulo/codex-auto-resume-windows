@@ -368,9 +368,15 @@ class RaceTests(RescanCase):
         self.assertEqual(self.outcome(result, row["interruption_id"])[0], "changed")
         self.assertEqual(self.record(row["interruption_id"])["state"], "submitting")
 
+    def store_does(self, name, *arguments):
+        """A person's Retry now or postponement as the store writes it, at the scenario's own time - not the
+        control layer's wall clock, which a run beside it under another plug would read differently."""
+        with Store(self.paths.state_dir) as store:
+            getattr(store, name)(*arguments, actor="gui")
+
     def test_a_record_postponed_or_retried_mid_scan_is_skipped(self):
-        for change in (lambda row: self.control.request_retry_now(row["interruption_id"]),
-                       lambda row: self.control.postpone(row["interruption_id"], A, minutes=30)):
+        for change in (lambda row: self.store_does("request_retry_now", row["interruption_id"], NOW),
+                       lambda row: self.store_does("postpone", row["interruption_id"], A, NOW + 1800, NOW)):
             with self.subTest(change=change):
                 self.write("DELETE FROM interruptions")
                 row = self.failure()

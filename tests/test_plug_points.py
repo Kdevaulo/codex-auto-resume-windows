@@ -1348,7 +1348,11 @@ MOVERS = frozenset({"reserve_detailed", "release_claim", "release_withdrawn", "c
 # is told of them: P14 tells what the engine writes.
 # v0.6.15-beta: and a Codex home a person took out of Settings, its waiting records cancelled by the watcher
 # (store/records.py cancel_home) - records of a home other than the default, whose engine's plug is NULL.
-PERSONS = frozenset({"cancel_interruption", "cancel_thread", "restore_budget_detailed", "cancel_home"})
+# v0.6.16 (issue #39): and a waiting record a person's Rescan and reconcile retired (store/actions.py rescan_apply),
+# applied by the control layer after the person confirmed it, in the Dashboard's process; it only ever moves a
+# record that waits unsent to superseded_by_user, never into or out of submission_unknown.
+PERSONS = frozenset({"cancel_interruption", "cancel_thread", "restore_budget_detailed", "cancel_home",
+                     "rescan_apply"})
 # Where the engine makes those calls today - so a new one is seen, and has to tell the plug too.
 # v0.6.11 stage 3b: and the claim of a route the plug names for a conversation not held (P16).
 MOVING = frozenset({"AnnounceMixin.transition", "AnnounceMixin._release", "DispatchMixin.dispatch",
@@ -1739,7 +1743,9 @@ class MovedTests(PluggedCase):
         loaded here, and the contract a plug's author reads says so. None of those writes moves
         a record into or out of submission_unknown, so no tripwire depends on hearing of it."""
         cases = {"cancel_interruption": ("waiting_reset", "cancelled"),
-                 "restore_budget_detailed": ("retry_budget_exhausted", "waiting_reset")}
+                 "restore_budget_detailed": ("retry_budget_exhausted", "waiting_reset"),
+                 # v0.6.16 (issue #39): a waiting record Rescan and reconcile retired.
+                 "rescan_apply": ("waiting_reset", "superseded_by_user")}
         for name, (before, after) in cases.items():
             with self.subTest(name):
                 h = self.fresh()
@@ -1751,7 +1757,10 @@ class MovedTests(PluggedCase):
                 plug = Asked()
                 self.plugged(plug, h)
                 self.assertEqual(h.record()["state"], before)
-                getattr(h.store, name)(key, h.now, actor="gui")
+                if name == "rescan_apply":
+                    h.store.rescan_apply(key, h.record(), "retired", h.now, actor="gui")
+                else:
+                    getattr(h.store, name)(key, h.now, actor="gui")
                 h.tick(advance=1)
                 self.assertEqual(self.told(plug, key), [])
                 self.assertIn((before, after, "gui"),

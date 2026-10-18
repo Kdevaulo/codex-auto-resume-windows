@@ -76,7 +76,10 @@ MODULES = ("test_compat_characterization", "test_compat_io", "test_correlation",
            # v0.6.16-beta.3: why a failed turn is passed over, said in the log; a conversation Codex records under
            # another id (issue #30); the Diagnostics check, which asks a built engine its own rule; and the words for
            # this time, added once to one recovery's continuation.
-           "test_skip_reasons", "test_continuation_split", "test_checkup", "test_once_words_engine")
+           "test_skip_reasons", "test_continuation_split", "test_checkup", "test_once_words_engine",
+           # v0.6.16 (issue #39): Rescan and reconcile, which asks engines it builds the engine's own rules of every
+           # waiting record and applies what they find - an advanced installation with nothing on finds the same.
+           "test_rescan")
 NOT_SCENARIOS = {
     "test_codex_schema": "reads a Codex home through the source alone; it builds no engine",
     "test_source": "reads a Codex home through the source alone; it builds no engine",

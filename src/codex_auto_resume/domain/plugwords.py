@@ -39,8 +39,9 @@ class Point(StrEnum):
     RecordMove's words.
 
     P14 is not a question: the engine tells the plug a record core holds has moved, as it writes
-    the move. A person's own moves - a cancel, or the attempts given back (store/actions.py, and
-    an older watcher's cancel, store/legacy.py) - are not told: what the person acted through
+    the move. A person's own moves - a cancel, the attempts given back, or a waiting record a
+    person's Rescan and reconcile retired as superseded_by_user (store/actions.py, and an older
+    watcher's cancel, store/legacy.py) - are not told: what the person acted through
     wrote them, most often in a process that holds no engine. None moves a record into or out of
     submission_unknown, and a plug finds where they left it at its next P2 or P8. Read back out of
     the journal instead, a move would be a second source of truth a pruned entry changes; and at
