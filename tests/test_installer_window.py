@@ -456,7 +456,11 @@ class FlowTests(unittest.TestCase):
 
     def test_what_is_new_is_the_versions_own_section_of_the_changelog(self):
         notes = self.answer["notes"]
-        self.assertTrue(notes["0.6.16-beta.3"].startswith("v0.6.16-beta.3 \u2014 Words for this time"), notes["0.6.16-beta.3"][:80])
+        # The section's own heading, as the changelog read here spells it: English on dev and main, Korean on the
+        # generated ko branch, whose docs/CHANGELOG.md is the Korean one.
+        heading = next(line[3:] for line in (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+                       if line.startswith("## v0.6.16-beta.3 "))
+        self.assertTrue(notes["0.6.16-beta.3"].startswith(heading), notes["0.6.16-beta.3"][:80])
         self.assertNotIn("## v0.6.16-beta.2", notes["0.6.16-beta.3"], "it ends where the next version begins")
         self.assertTrue(notes["0.6.16-beta"].startswith("v0.6.16-beta \u2014 "), "not v0.6.16-beta.3's, whose name begins alike")
         self.assertIsNone(notes["9.9.9"])
