@@ -90,6 +90,14 @@ down first, which *Install another version...* does for you.
   limit** and **Stop near a limit** each have their own five-hour and weekly switches, and the usage meter's pair
   now decides only its warnings. An update keeps what a beta.4 meter's window switch meant: a window switched off
   there stays off for the wrap-up and the stop (the owner's request).
+- **Custom... opens the Settings page's small dialog** for a number of your own - the range above it, the number,
+  *Use this value* and *Cancel* - instead of a row of its own under the drop-down; a value taken shows as its own item
+  before *Custom...*, and Cancel leaves the drop-down as it was (the owner's request).
+- **Reinstalling the same edition after an uninstall that kept your data works like an update**: the advanced
+  features you turned on, kept on and set up stay as they were. Installing the advanced edition after the standard
+  one still starts every advanced feature off (standard K2, as the owner amended it on 2026-10-18).
+- **A recovery waiting in a terminal or VS Code conversation ends as cancelled because that kind is off** when the
+  watcher starts with *Recover CLI, TUI and VS Code conversations* off, instead of being reported as superseded.
 - **The notices near a limit are each a kind to keep on screen** - the usage meter's warning, a turn the forced
   stop could not stop, a queue to resume in Codex, and a conversation that could not be continued after the
   reset - each ticked or not on its own in the Notifications list.
