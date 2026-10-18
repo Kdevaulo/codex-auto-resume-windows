@@ -638,6 +638,9 @@ def main(argv=None) -> int:
         if real:
             import motion_fidelity
             import motion_window
+            # motion_window.compile_window writes into a folder that must exist (make_motion hands it its own work
+            # folder); a fresh subfolder here did not, so csc could not write the window (2026-10-18).
+            (work / "fidelity").mkdir()
             results = motion_fidelity.check(motion_window.compile_window(work / "fidelity"), work, tuple(locales))
             manifest["fidelity"] = dict(results, window=shots.window_digest())
             write_manifest(manifest)
