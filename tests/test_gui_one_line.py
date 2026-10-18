@@ -167,7 +167,7 @@ class SourceTests(unittest.TestCase):
 
     def test_the_audit_checks_every_text_box_where_it_checks_every_name(self):
         self.assertIn("AuditTextLine(where, child, findings)", guiscan.member_body("SettingsForm", "AuditSpoken"))
-        own = guiscan.member_body("SettingsForm", "AuditOwnValues")
+        own = guiscan.member_body("SettingsForm", "AuditOwnDialog")
         self.assertIn("AuditLines = whole;", own, "a custom value's dialog is held to whole lines where it is whole")
         self.assertIn("AuditLines = true;", own, "and the check is on again for everything walked after it")
 

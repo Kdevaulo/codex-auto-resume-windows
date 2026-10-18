@@ -214,7 +214,9 @@
                 "keep_awake_hours": "h6",
                 "memory_guard": "off",
                 "memory_guard_limit": "mb1024",
-                "status_file": false
+                "status_file": false,
+                "notice_click": "page",
+                "notices_stay": []
               }
             },
             "schema": [
@@ -1184,6 +1186,37 @@
                 "default": false,
                 "type": "boolean",
                 "group": "windows"
+              },
+              {
+                "name": "notices_stay",
+                "default": [],
+                "type": "array",
+                "group": "windows",
+                "kinds": [
+                  "interruption",
+                  "starting",
+                  "resumed",
+                  "failed",
+                  "stopped",
+                  "cancelled",
+                  "needs_you",
+                  "after_sleep",
+                  "memory",
+                  "power"
+                ],
+                "keys": {
+                  "interruption": "field.notify_interruption",
+                  "starting": "field.notify_starting",
+                  "resumed": "msg.toast_resumed_title",
+                  "failed": "msg.toast_failed_title",
+                  "stopped": "field.notify_stopped",
+                  "cancelled": "msg.toast_cancelled_title",
+                  "needs_you": "field.notify_needs_you",
+                  "after_sleep": "stay.after_sleep",
+                  "memory": "msg.toast_memory_warning",
+                  "power": "power.title"
+                },
+                "labels": {}
               }
             ],
             "settings": {
@@ -1255,7 +1288,9 @@
               "keep_awake_hours": "h6",
               "memory_guard": "off",
               "memory_guard_limit": "mb1024",
-              "status_file": false
+              "status_file": false,
+              "notice_click": "page",
+              "notices_stay": []
             },
             "pending": [
               {

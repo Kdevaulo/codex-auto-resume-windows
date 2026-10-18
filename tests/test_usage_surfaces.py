@@ -121,6 +121,14 @@ class WatcherNoticeTests(unittest.TestCase):
         self.assertEqual(len(titles), 3)
         self.assertIn(l10n.message("toast_near_limit"), repr(notify.near_limit_content(300, 86, None)),
                       "a warning as before")
+        # v0.6.16: each is a notice of its own kind, so it can be kept on screen apart from the warning
+        # (notice_kinds); a warning, or a kind no one knows, is the warning's.
+        for kind in notify.NEAR_LIMIT_KINDS:
+            notice = notifier.build("near_limit", {"minutes": 300, "kind": kind})
+            self.assertEqual((notice.kind, notice.status, notice.key), ("near_limit_" + kind, "attention", None))
+        for kind in (None, "warn", "unheard_of"):
+            self.assertEqual(notifier.build("near_limit", {"minutes": 300, "percent": 90, "kind": kind}).kind,
+                             "near_limit")
 
 
 if __name__ == "__main__":

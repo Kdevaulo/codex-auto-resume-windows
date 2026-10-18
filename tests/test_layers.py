@@ -95,8 +95,12 @@ LAYER = {_q(name): layer for layer, names in {
                "poweraction",
                # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them - pure
                # but for the look at a folder; its identity is handed in from win/folderid.py.
-               "homes"),
+               "homes",
+               # v0.6.16: the kinds of notice that may stay on screen until clicked - pure but for the catalogs.
+               "notice_kinds"),
     "adapters": ("store", "openstate", "codex", "windows", "compat", "compatio", "startup", "shortcut",
+                 # v0.6.16: the entry in Add or remove programs, written through startup.
+                 "addremove",
                  # v0.6.16-beta.3: the words for this time's file beside the state, written under its lock.
                  "oncewords",
                  # v0.6.10-alpha: compat.py and compatio.py became compat/.
@@ -195,6 +199,8 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.homes",
               # v0.6.16-beta.3: and its own decisions asked on request, for Diagnostics' check (issue #27).
               "checkup",
+              # v0.6.16: and its own rules asked again of every waiting recovery, for Rescan and reconcile (issue #39).
+              "rescan",
               # v0.6.10-alpha: cli.py's command bodies became commands/; cli.py is the parser.
               "commands", "commands.base", "commands.install", "commands.records",
               "commands.status", "commands.watcher",
@@ -233,7 +239,7 @@ LAYER = {_q(name): layer for layer, names in {
 PLANNED = {_q(name) for name in ("codex", "win", "ui", "mcp", "domain.public")}
 STORE = {_q("store"), _q("openstate")}              # openstate moves into store/ as store/open.py
 CODEX = {_q("codex"), _q("windows"), _q("codex")}         # Codex's files and processes
-WIN = {_q(name) for name in ("windows", "startup", "shortcut", "pwsh", "notify", "notice_presence",
+WIN = {_q(name) for name in ("windows", "startup", "addremove", "shortcut", "pwsh", "notify", "notice_presence",
                              "tray_place", "win")}
 UI = {_q(name) for name in ("brand", "notice_card", "notice_window", "ui")}
 MCP = {_q("mcpserver"), _q("mcp")}
@@ -299,6 +305,8 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     # v0.6.16-beta.3: Diagnostics' check, which builds an engine, only when it is asked for or exported.
     ("controlcli", "checkup"): ("cost", "Diagnostics' check and the engine it asks, only when it runs"),
     ("commands.install", "checkup"): ("cost", "Diagnostics' check, only while a bundle is exported"),
+    # v0.6.16: Rescan and reconcile, which builds an engine for each Codex home, only when a person asks for it.
+    ("controlcli", "rescan"): ("cost", "Rescan and reconcile and the engines it asks, only when it runs"),
     # v0.6.15-beta: the Codex version in force, read only while another Codex home is added (homes.unmeasured).
     ("control.watcher", "compatio"): ("cost", "the compatibility report's Codex version, read only while another "
                                               "Codex home is added"),

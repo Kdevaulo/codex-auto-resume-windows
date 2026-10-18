@@ -350,7 +350,7 @@ tool's own marker (below). It never selects the `title`, `preview` or
 message, and the conversation-name label comes from `threads.name` only. Identity always
 comes from the UUID, never from a label.
 
-Three reads pass over your conversation itself, and it is better to say so plainly:
+Four reads pass over your conversation itself, and it is better to say so plainly:
 
 - **For a usage limit only**, to find when the limit resets, it reads up to 8 MiB of the
   conversation's rollout file ending at the failure, into memory. That part of the file is
@@ -364,6 +364,11 @@ Three reads pass over your conversation itself, and it is better to say so plain
   whether a later turn has finished. Those rows are your conversation — the assistant's replies
   in that turn, and anyone else's messages in it — but only counts and yes/no answers come back,
   never text. What is kept is that turn's status and whether anything was produced in it.
+- **Only when you press Rescan and reconcile** (from v0.6.16), and only for a waiting recovery whose
+  conversation Codex's history has not caught up with, it reads that conversation's current rollout
+  file, up to 32 MiB, a line at a time, for the failed turn's own end and, after it, a message of
+  yours that carries no marker of this tool's. Each line is parsed and dropped; only the answer -
+  whether such a message is there - is kept.
 
 No conversation content from any of them is stored, logged or sent. What is kept is the reset
 time (which is also logged) and the limit's bucket name, and the id of the tool's own queued
@@ -617,6 +622,10 @@ default (or wherever `CODEX_AUTO_RESUME_PLUGIN_HOME`, or failing that
   deleted when it holds nothing. The settings file never holds them, and the diagnostics bundle records
   only how many there are. It goes with the rest of `config/` under `Uninstall.cmd -Purge`, and the
   command line's `uninstall` deletes it unless you pass `--keep-state`;
+- `config/reopen-after-update-<process id>.txt`, from v0.6.16, only for the moment an update (the setup program,
+  or `-Silent`) asks an open Dashboard to close: the page the Dashboard was on, its place and size on screen,
+  its theme and design and which control had the focus - no conversation, path or text. The installer reads it
+  once to open the new version where it was, and deletes it;
 - `logs/` — `auto-resume.log`, what the watcher did, by reason code and conversation UUID;
   `errors.log`, the Python traceback when something goes wrong; `launcher.log`, a line
   per launch (and why, if one failed); and, from v0.6.9, `codex-start.log`, a line each time Codex
@@ -682,11 +691,18 @@ needing administrator rights and none of it containing anything about your conve
 Start Menu shortcut carrying the tool's notification identity, which Windows requires before
 it will draw a toast at all; the registry entry that gives that identity its name and icon;
 the sign-in autostart value (unless you skip it); and the handler for the notification
-button's `codex-auto-resume:` link. Through the `codex plugin` commands it registers this
+button's `codex-auto-resume:` link; and, from v0.6.16, the entry in Add or remove programs (one per-user key under
+Windows' Uninstall key that names the version, the folder and the command that removes it, with a copy of the
+installer's own uninstall, `uninstall\install.ps1`, kept in the installation for it to name). Through the `codex plugin` commands it registers this
 plugin and its local marketplace in your Codex configuration, and Codex keeps its own copy
-of the plugin. Uninstalling removes those Windows entries that belong to this installation,
-and asks Codex to remove the plugin and the marketplace only while they still point at this
+of the plugin. Uninstalling removes those Windows entries, the Add or remove programs entry among them, each only while it
+belongs to this installation, and asks Codex to remove the plugin and the marketplace only while they still point at this
 installation; Codex then removes its own copy.
+
+While the uninstall that Settings > Apps starts runs (v0.6.16), a copy of the Dashboard program is in a new folder
+of its own in your temporary folder, `CodexAutoResume-Uninstall-<random>`, so that the installation can be deleted
+while the window shows it. It holds the program and nothing of yours, and the folder is removed once the copy has
+ended.
 
 Uninstalling keeps the state directory by default so a reinstall does not lose pending
 recoveries; `Uninstall.cmd -Purge` removes it. You can delete it yourself at any time.

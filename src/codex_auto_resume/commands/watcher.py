@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from .. import config, notifier, notify
+from .. import config, notice_kinds, notifier, notify
 from ..app import EXIT_ERROR, EXIT_OK
 from ..store import LegacyStore
 from ..windows import WakeEvent
@@ -52,7 +52,7 @@ def cmd_activate(args) -> int:
         from ..control import Control
         done = notifier.activate(args.uri, control=Control(app.paths),
                                  announce=lambda notice: notifier.deliver(notice, inbox=None, setting=False),
-                                 log=app.logger.info)
+                                 log=app.logger.info, stay=notice_kinds.chosen(app.settings))
         return EXIT_OK if done == "stopped" else EXIT_ERROR
     interruption_id = notify.parse_cancel_uri(args.uri)
     if interruption_id is None:
@@ -76,6 +76,10 @@ def cmd_activate(args) -> int:
             thread_id = record["thread_id"]
             store.cancel_interruption(interruption_id, _now(), actor="toast")
     app.logger.info("thread %s: cancelled from the notification", thread_id)
-    notify.cancelled(thread_id)
+    # What it says afterwards is the notice a card's cancel announces (notifier.build_cancelled): the same words,
+    # a body that opens its page, and staying on screen when a person chose that kind (v0.6.16) - Windows' toast,
+    # as the power-stop branch above raises its own.
+    notifier.deliver(notifier.build_cancelled(thread_id, notice_kinds.chosen(app.settings)), inbox=None,
+                     setting=False)
     _print("thread %s cancelled" % thread_id)
     return EXIT_OK

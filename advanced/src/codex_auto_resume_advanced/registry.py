@@ -963,6 +963,7 @@ EVERY_CONVERSATION = CapabilityDef(
 # window. It never satisfies core's usage gate. It departs from C4 (it reads on a schedule, on its own) and C9 (usage
 # read when no recovery is due), stands on usage_probe and rests on MU. It sends nothing: its ceilings are the
 # schema's floor and never bind, as start_with_codex's. Wrap up near a limit and Pause near a limit require it.
+# Its two window switches decide only its warnings (v0.6.16 final): each of the other two has a pair of its own.
 USAGE_METER = CapabilityDef(
     id="usage_meter",
     points=frozenset({Point.TICK}),
@@ -1007,7 +1008,10 @@ USAGE_WRAP_UP = CapabilityDef(
              Option(OptionKey.STOP_WORDS_WEEKLY, PERCENTS, DEFAULT_STOP_WORDS, custom=PERCENT_RANGE),
              Option(OptionKey.WRAP_STYLE, STYLES, DEFAULT_STYLE),
              Option(OptionKey.WRAP_RESET_TIME, SWITCH, ON),
-             Option(OptionKey.WRAP_AFTER_RESET, SWITCH, ON)),
+             Option(OptionKey.WRAP_AFTER_RESET, SWITCH, ON),
+             # v0.6.16 final: the windows it acts on, its own pair (the meter's pair decided for all three before).
+             Option(OptionKey.WINDOW_FIVE_HOUR, SWITCH, ON),
+             Option(OptionKey.WINDOW_WEEKLY, SWITCH, ON)),
     wordings=(WordingKey.WRAP_CUSTOM_FIVE_HOUR, WordingKey.WRAP_CUSTOM_WEEKLY),
     requires=("usage_meter",),
 )
@@ -1035,7 +1039,10 @@ USAGE_PAUSE = CapabilityDef(
            "not_continued"),
     measurements=(Measurement.MU, Measurement.MIPC),
     options=(Option(OptionKey.PAUSE_FIVE_HOUR, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE),
-             Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE)),
+             Option(OptionKey.PAUSE_WEEKLY, PERCENTS, DEFAULT_PAUSE, custom=PERCENT_RANGE),
+             # v0.6.16 final: the windows it acts on, its own pair, as the wrap-up's.
+             Option(OptionKey.WINDOW_FIVE_HOUR, SWITCH, ON),
+             Option(OptionKey.WINDOW_WEEKLY, SWITCH, ON)),
     requires=("usage_meter",),
 )
 

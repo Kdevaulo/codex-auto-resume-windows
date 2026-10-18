@@ -73,7 +73,10 @@ PLAIN = ("status", "settings", "describe", "defaults", "pending", "pending-all",
          # v0.6.12: what the power action after usage-limit recoveries offers here, and what is armed.
          "power-action",
          # v0.6.16-beta.3: Diagnostics' check of why a failure was not taken up (checkup.py), read only.
-         "detection-check")
+         "detection-check",
+         # v0.6.16: Pending's Rescan and reconcile (issue #39) - each waiting recovery retired only on proof of newer
+         # work, or left to wait as it was; nothing sent (rescan.py, control.rescan_pending).
+         "rescan")
 WITH_ARGUMENT = ("update", "enabled", "startup", "cancel", "reset-budget", "retry-now",
                  "timeline", "statistics", "thread-enabled", "cancel-thread", "diagnostics",
                  "preview-continuation", "interruption-recovery",
@@ -452,6 +455,9 @@ def dispatch(control: Control, command: str, payload: dict) -> dict:
                 payload.get("interruption_id"), payload.get("thread_id"), _flag(payload))}
         if command == "cancel-all":
             return {"ok": True, "result": control.cancel_all_pending(actor="gui")}
+        if command == "rescan":
+            from . import rescan            # the engine's own rules, loaded only when a person asks for this
+            return {"ok": True, "result": control.rescan_pending(rescan.judge_for(control), actor="gui")}
         if command == "postpone":
             return {"ok": True, "result": control.postpone(
                 payload.get("interruption_id"), payload.get("thread_id"), until=payload.get("until"),

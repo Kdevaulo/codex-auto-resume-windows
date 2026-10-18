@@ -72,7 +72,9 @@ ITEM = {_q(name): item for item, names in {
                 # v0.6.15-beta: the other Codex homes a watcher holds.
                 "runtime.homes",
                 # v0.6.16-beta.3: its own decisions asked on request, for Diagnostics' check (issue #27).
-                "checkup"),
+                "checkup",
+                # v0.6.16: and its own rules asked again of every waiting recovery, for Rescan and reconcile (issue #39).
+                "rescan"),
     "engine": ("engine", "engine.announce", "engine.detect", "engine.dispatch", "engine.freshness",
                "engine.options", "engine.outcome",
                # v0.6.11: the waits and the two guards, as the engine asks them.
@@ -127,7 +129,9 @@ ITEM = {_q(name): item for item, names in {
                # v0.6.12: when the power action after usage-limit recoveries may act, which a person arms.
                "poweraction",
                # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them.
-               "homes"),
+               "homes",
+               # v0.6.16: the kinds of notice a person can keep on screen until clicked, and an edition's.
+               "notice_kinds"),
     "machine": ("machine", "domain", "domain.errors", "domain.ids", "domain.public",
                 "domain.states", "domain.vocabulary",
                 # v0.6.11: the registry's vocabularies, out of domain/vocabulary.py.
@@ -208,7 +212,7 @@ ITEM = {_q(name): item for item, names in {
                  "win.powerdown",
                  # v0.6.15-beta: which folder a path names, whatever its spelling.
                  "win.folderid",
-                 "pwsh", "shortcut", "startup"),
+                 "pwsh", "shortcut", "startup", "addremove"),
     "config": ("", "config", "logbook"),
 }.items() for name in names}
 

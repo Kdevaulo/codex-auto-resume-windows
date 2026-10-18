@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import time
 
-from .. import config, edition, notify, settings, shortcut, startup
+from .. import addremove, config, edition, notify, settings, shortcut, startup
 from ..app import EXIT_ERROR, EXIT_OK, App
 from ..domain.plug import DamagedPlug, Edition
 from ..store import LegacyStore, StoreError, downgrade_state
@@ -28,6 +28,9 @@ def cmd_install(args) -> int:
     _print("owned log directory   : %s" % app.paths.logs_dir)
     if getattr(args, "edition_from", None):
         _edition_changed(app, Edition(args.edition_from))
+    # The installer has read it by now (build/install/install.ps1): which edition was uninstalled here says nothing
+    # once a program is installed again, and a later install must not take an old one for the last word.
+    _forget_edition_left(app.paths)
     if args.startup:
         # Always register the home actually in effect. Passing it only when it came from
         # --home would let CODEX_AUTO_RESUME_HOME silently drop out at login, pointing the
@@ -102,6 +105,40 @@ def _edition_changed(app, previous: Edition) -> None:
     _print("edition               : %s (was %s)" % (plug.edition, previous))
 
 
+def _note_edition_left(paths) -> None:
+    """Say, beside the state an uninstall keeps, which edition it took away (v0.6.16).
+
+    The program goes and config/ stays, so nothing else says which edition ran here last. The installer reads this
+    (build/install/install.ps1) when it installs the advanced edition over advanced state with no program in the
+    home: the advanced edition here means the same edition is coming back, and its choices stay as an update keeps
+    them (K2, as the owner amended it on 2026-10-18); the standard edition, or nothing written - an uninstall by an
+    older version - means the advanced edition is entered, and every capability starts off. A failed write is said
+    and leaves the cautious reading."""
+    target = paths.edition_left_file
+    if not paths.owns(paths.state_dir) or config.is_link(target) or not paths.confined(target.parent):
+        return
+    temporary = paths.state_dir / ("edition-left.%d.tmp" % os.getpid())
+    try:
+        temporary.write_text(edition.name().value + "\n", encoding="ascii")
+        os.replace(temporary, target)
+    except OSError:
+        _print("warning: could not note which edition was uninstalled; reinstalling it starts its features off")
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+
+
+def _forget_edition_left(paths) -> None:
+    """Take _note_edition_left's note away, as every install does once the installer has read it."""
+    target = paths.edition_left_file
+    try:
+        if target.is_file() and not config.is_link(target) and paths.confined(target):
+            target.unlink()
+    except OSError:
+        pass
+
+
 def cmd_uninstall(args) -> int:
     paths = config.Paths(args.home)
     removed = []
@@ -171,6 +208,13 @@ def cmd_uninstall(args) -> int:
             _print("kept the codex-auto-resume: protocol: it points at a different installation")
     except startup.StartupError as exc:
         _print("warning: %s" % exc)
+    # The entry in Add or remove programs goes the same way: only the one that names this installation. Not when
+    # the installer asked to keep it: it removes the entry itself after the last removal has succeeded.
+    try:
+        if not os.environ.get(addremove.KEEP_ENTRY_ENV) and addremove.unregister(paths.home):
+            removed.append("entry in Add or remove programs")
+    except startup.StartupError as exc:
+        _print("warning: %s" % exc)
     # Any file handlers from an earlier command in this process must be closed first.
     import logging
     for logger_name in ("codex_auto_resume",):
@@ -209,6 +253,7 @@ def cmd_uninstall(args) -> int:
             pass
     _print("removed: %s" % (", ".join(removed) if removed else "nothing (already clean)"))
     if keep_state:
+        _note_edition_left(paths)
         _print("kept your settings and pending recoveries in %s" % paths.state_dir)
     for directory in skipped:
         _print("skipped %s (no provenance marker; not created by this tool, nothing deleted there)" % directory)

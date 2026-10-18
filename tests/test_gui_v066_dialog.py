@@ -310,7 +310,9 @@ class DialogTests(unittest.TestCase):
 # button, and is deliberately not among them.
 AFFIRMS = ("action.cancel", "action.cancel_all", "action.reset_budget", "action.thread_off", "action.install_prerelease",
            "action.thread_on", "action.resume", "action.clear_history", "action.stop_watcher",
-           "action.repair", "action.install", "action.restore")
+           "action.repair", "action.install", "action.restore",
+           # v0.6.16 (issue #39): Pending's Rescan and reconcile, the longest of them in several languages.
+           "action.rescan")
 
 FIT_PROBE = r"""
 $ErrorActionPreference = 'Stop'

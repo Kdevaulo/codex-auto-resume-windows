@@ -65,6 +65,8 @@ METHODS = {
     "launch_ends_with_job",
     # v0.6.11: a task's row menu - postpone it, let a held one continue, a conversation's tier.
     "_postpone_until", "postpone", "release_hold", "set_thread_tier",
+    # v0.6.16: Pending's Rescan and reconcile (issue #39), each waiting record judged by what the bridge hands in.
+    "rescan_pending",
     # and Always or Never for its project, and observe only written into the state.
     "set_project_rule", "_bound_record", "_project_of", "_observe_only",
     # and what an administrator's policy keys hold, which every setting is read through.
@@ -86,6 +88,8 @@ METHODS = {
     "power_batch_finish", "power_refused",
     # v0.6.16-beta.3: one waiting recovery's words for this time, read and written from the Dashboard alone.
     "once_words", "set_once_words",
+    # v0.6.16: a Save keeps the kinds of notice an edition registered that this process draws no box for.
+    "_keep_unlisted_kinds",
     "list_pending", "preview_continuation", "request_retry_now", "reset_recovery_budget",
     "restore_defaults", "_strict_homes", "homes_view", "set_enabled", "set_interruption_recovery", "set_startup_enabled",
     "set_thread_enabled", "settings_path", "start_for_codex", "start_watcher",

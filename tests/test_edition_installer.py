@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 _HERE = str(Path(__file__).resolve().parent)
 if _HERE not in sys.path:
@@ -41,6 +42,9 @@ SYSTEM = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
 POWERSHELL = SYSTEM / "WindowsPowerShell" / "v1.0" / "powershell.exe"
 CMD = SYSTEM / "cmd.exe"
 PACKAGE = editions.PACKAGE
+# No watcher runs in a scratch installation (the region's Get-OwnedWatcherProcess), so an update tells setup that
+# none ran before it, and setup leaves the new one stopped unless it runs at sign-in (v0.6.16, tests/test_upgrade_handover.py).
+STOPPED = "--watcher-was-stopped"
 
 REGION = r"""
 $ErrorActionPreference = 'Stop'
@@ -165,7 +169,7 @@ class EditionChangeTests(unittest.TestCase):
                          '{"enabled": false}')
         self.assertEqual(sorted(path.name for path in self.home.iterdir()), ["app", "config", "runtime"],
                          "a copy moved aside, or the journal, was left behind")
-        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "advanced"])
+        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "advanced", STOPPED])
 
     def test_a_move_to_the_advanced_edition_tells_setup_where_it_came_from(self):
         """The new edition's own setup is what starts every advanced feature off
@@ -174,7 +178,7 @@ class EditionChangeTests(unittest.TestCase):
         code, output, setup = self.run_region(allow=True)
         self.assertEqual(code, 0, output[-1500:])
         self.assertTrue((self.package / "__init__.py").is_file())
-        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "standard"])
+        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "standard", STOPPED])
         self.assertIn("Standard edition -> Advanced edition", output)
 
     def test_the_same_edition_is_an_ordinary_upgrade(self):
@@ -186,7 +190,7 @@ class EditionChangeTests(unittest.TestCase):
                 code, output, setup = self.run_region()
                 self.assertEqual(code, 0, output[-1500:])
                 self.assertNotIn(" -> ", output)
-                self.assertEqual(setup, ["setup", "--keep-state"])
+                self.assertEqual(setup, ["setup", "--keep-state", STOPPED])
                 self.assertEqual(self.package.exists(), edition == "advanced")
 
     def test_a_first_install_changes_no_edition(self):
@@ -217,6 +221,43 @@ class EditionChangeTests(unittest.TestCase):
                 self.assertEqual(setup, expected)
 
 
+    def test_the_same_edition_reinstalled_over_its_kept_state_keeps_its_choices(self):
+        """v0.6.16 (K2, as the owner amended it on 2026-10-18): an uninstall that kept the state notes which edition it
+        took away (commands/install.py). The advanced edition coming back over its own state is like an update, and
+        setup is told of no change, so every choice stays; a note of the standard edition, or no note - an uninstall
+        by an older version - is an entry, and every advanced feature starts off. The note is the one core writes."""
+        from codex_auto_resume import config, edition
+        from codex_auto_resume.commands import install
+        from codex_auto_resume.domain.plug import Edition
+        for left_by, expected in ((Edition.ADVANCED, ["setup"]),
+                                  (Edition.STANDARD, ["setup", "--edition-from", "standard"]),
+                                  (None, ["setup", "--edition-from", "standard"])):
+            with self.subTest(left_by=left_by):
+                shutil.rmtree(self.home, ignore_errors=True)
+                shutil.rmtree(self.payload, ignore_errors=True)
+                self.given(None, "advanced")
+                paths = config.Paths(self.home)
+                paths.ensure()
+                (self.home / "config" / "advanced").mkdir()
+                (self.home / "config" / "advanced" / "advanced.sqlite").write_bytes(b"armed")
+                if left_by is not None:
+                    with patch.object(edition, "name", return_value=left_by), \
+                            patch.object(install, "_print", lambda *_: None):
+                        install._note_edition_left(paths)
+                    self.assertTrue(paths.edition_left_file.is_file())
+                code, output, setup = self.run_region()
+                self.assertEqual(code, 0, output[-1500:])
+                self.assertEqual(setup, expected)
+        # Only the advanced archive is told anything, and an upgrade reads the installed tree instead.
+        shutil.rmtree(self.home, ignore_errors=True)
+        shutil.rmtree(self.payload, ignore_errors=True)
+        self.given("standard", "advanced")
+        (self.home / "config" / "edition-left.txt").write_text("advanced\n", encoding="ascii")
+        code, output, setup = self.run_region(allow=True)
+        self.assertEqual(code, 0, output[-1500:])
+        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "standard", STOPPED])
+
+
 class EditionChangeTextTests(unittest.TestCase):
     def setUp(self):
         self.text = INSTALLER.read_text(encoding="utf-8")
@@ -237,7 +278,7 @@ class EditionChangeTextTests(unittest.TestCase):
         ask - one number, or a refusal would reach the person as a failure with no question."""
         bootstrap = re.search(r"\$ExitOtherEdition = (\d+)", BOOTSTRAP.read_text(encoding="utf-8"))
         installer = re.search(r"\$EDITION_CHANGE_REFUSED = (\d+)", self.text)
-        launcher = re.search(r'if "%EXIT_CODE%"=="(\d+)" goto ask', LAUNCHER.read_text(encoding="utf-8"))
+        launcher = re.search(r'if "%EXIT_CODE%"=="(\d+)" if not defined SILENT goto ask', LAUNCHER.read_text(encoding="utf-8"))
         self.assertEqual({bootstrap.group(1), installer.group(1), launcher.group(1)}, {"14"})
         self.assertNotIn("exit 14", self.text, "by name, so the three can be found together")
 

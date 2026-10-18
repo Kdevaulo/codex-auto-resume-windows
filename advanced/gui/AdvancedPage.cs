@@ -119,6 +119,8 @@ namespace CodexAutoResume
         private Dictionary<string, object> advancedRules, advancedSamples;
         // The open capability's choices, its rules' Remove buttons and the editor of a new rule, as its cards were built.
         private readonly List<SoftCombo> advancedChoices = new List<SoftCombo>();
+        // Its on/off choices (v0.6.16 final), each the Dashboard's own switch, as they were built.
+        private readonly List<SoftCheck> advancedSwitches = new List<SoftCheck>();
         private readonly List<Button> ruleRemoves = new List<Button>();
         private SoftTextArea ruleTag, ruleFrom, ruleTo;
         private SoftCombo ruleKind, ruleSampled;
@@ -365,12 +367,25 @@ namespace CodexAutoResume
         }
 
         /// The window's command line as ParseArguments reads it, with this page's name where a page or the keyboard's
-        /// place may be named: `--page=advanced` and `--focus=page.advanced`, which the standard window ignores.
+        /// place may be named: `--page=advanced` and `--focus=page.advanced`, which the standard window ignores - and
+        /// (v0.6.16) `--capability=<id>`, the capability open when the list is first read, where the list has it.
         static partial void ArgumentParsed(string argument, OpenRequest request)
         {
             if (argument == "--page=" + AdvancedPageName) request.Page = AdvancedPageName;
             else if (argument == "--focus=page." + AdvancedPageName) request.Focus = "page." + AdvancedPageName;
+            else if (argument.StartsWith(CapabilityArgument, StringComparison.Ordinal))
+            {
+                string id = argument.Substring(CapabilityArgument.Length);
+                if (CapabilityShape.IsMatch(id)) askedCapability = id;
+            }
         }
+
+        // The capability the command line asked to be open (`--capability=`), until the list is read; a capability's id
+        // as the registry spells them.
+        private const string CapabilityArgument = "--capability=";
+        private static readonly System.Text.RegularExpressions.Regex CapabilityShape =
+            new System.Text.RegularExpressions.Regex("^[a-z][a-z_]{0,63}$");
+        private static string askedCapability;
 
         /// What a window that reopens itself passes on, with this page where it is the one on screen or where the
         /// keyboard is: the standard arguments name only the standard window's pages.
@@ -697,8 +712,10 @@ namespace CodexAutoResume
             advancedListing = read ? result : null;
             if (read && AdvancedItem(advancedOpen) == null)
             {
-                advancedOpen = null;
-                foreach (object entry in Items(result, "capabilities"))
+                // The one the command line asked for (`--capability=`), where the list has it; the first otherwise.
+                advancedOpen = AdvancedItem(askedCapability) != null ? askedCapability : null;
+                askedCapability = null;
+                foreach (object entry in advancedOpen != null ? new List<object>() : Items(result, "capabilities"))
                 {
                     advancedOpen = Str(entry as Dictionary<string, object>, "id");
                     if (advancedOpen != null) break;
@@ -877,6 +894,7 @@ namespace CodexAutoResume
             advancedStack.RowStyles.Clear();
             advancedHourly = null;
             advancedChoices.Clear();
+            advancedSwitches.Clear();
             ForgetCustomEntries();
             ruleRemoves.Clear();
             ruleTag = ruleFrom = ruleTo = null;
@@ -1046,8 +1064,9 @@ namespace CodexAutoResume
         }
 
         // ---------------------------------------------------------------- choices, rules and samples
-        /// A capability's own choices (registry.Option), one drop-down each at what the list says it is now; a choice made
-        /// is sent at once (advanced-option), with the generation the page read.
+        /// A capability's own choices (registry.Option), one drop-down each at what the list says it is now - or, for an
+        /// on/off choice, the switch every on-or-off setting of the window is; a choice made is sent at once
+        /// (advanced-option), with the generation the page read.
         private void BuildAdvancedChoices(string id, List<object> options)
         {
             TableLayoutPanel card = NewGroup(Word("page.options", "Choices"), advancedStack);
@@ -1056,6 +1075,11 @@ namespace CodexAutoResume
                 var option = entry as Dictionary<string, object>;
                 string key = Str(option, "key");
                 if (key == null) continue;
+                if (IsSwitchChoice(key))
+                {
+                    BuildAdvancedSwitch(id, key, Whole(Get(option, "value")) == SwitchOn, card);
+                    continue;
+                }
                 var combo = new SoftCombo();
                 combo.Width = Px(160);
                 IgnoreWheel(combo);
@@ -1069,8 +1093,8 @@ namespace CodexAutoResume
                         if (number == value) index = combo.Items.Count;
                         combo.Items.Add(new Choice(number.ToString(CultureInfo.InvariantCulture), OptionText(key, number)));
                     }
-                    // v0.6.16-beta.4 (f): a number typed in beside the presets - shown as it is where it is one - and
-                    // Custom... last, which opens the box it is typed in (AdvancedUsage.cs).
+                    // v0.6.16-beta.4 (f): a number of one's own beside the presets - shown as it is where it is one - and
+                    // Custom... last, which opens the Settings page's dialog for one (v0.6.16 final, AdvancedUsage.cs).
                     if (CustomRange(option) != null)
                     {
                         if (index < 0 && value > 0)
@@ -1093,10 +1117,49 @@ namespace CodexAutoResume
                 combo.SelectionChangeCommitted += delegate { SetAdvancedOption(id, key, chosen); };
                 card.Controls.Add(NewRow(label, combo));
                 advancedChoices.Add(combo);
-                BuildCustomEntry(id, key, label, CustomRange(option), card);
+                WatchCustom(id, key, label, CustomRange(option), Items(option, "choices"), combo);
             }
+            // v0.6.16 final: a capability with both its windows switched off says it acts on neither (AdvancedUsage.cs).
+            BuildNoWindowNote(options, card);
             // v0.6.16-beta.4: the wrap-up's Custom wording, under its drop-downs (AdvancedUsage.cs).
             BuildWordings(id, options, card);
+        }
+
+        // A switch's two values (registry SWITCH: 1 on, 2 off).
+        private const int SwitchOn = 1, SwitchOff = 2;
+
+        /// Whether a choice is on or off (registry SWITCH): Include the reset time, Continue after the reset, and each window
+        /// acted on or not.
+        private static bool IsSwitchChoice(string key)
+        {
+            return key == "wrap_reset_time" || key == "wrap_after_reset" || key.StartsWith("window_", StringComparison.Ordinal);
+        }
+
+        /// An on/off choice as the Dashboard's own switch (NewCheck, as Settings draws its switches), in the row a drop-down
+        /// stood in - its label at the left, the switch where the drop-down's right edge was. It moves only once the change
+        /// is taken: a press sends the other value, and the page, read again, draws what holds (AutoCheck off, as the power
+        /// action's switch is). A CheckButton, so the keyboard's Space and UI Automation's Toggle press it too.
+        private void BuildAdvancedSwitch(string id, string key, bool on, TableLayoutPanel card)
+        {
+            string label = Word("page.option." + key, key);
+            var toggle = (SoftCheck)NewCheck("", on, false);
+            toggle.AutoCheck = false;
+            toggle.AutoSize = false;
+            toggle.Size = new Size(Px(Brand.SwitchWidth), toggle.GetPreferredSize(Size.Empty).Height);
+            toggle.AccessibleName = label;
+            toggle.Tag = key;
+            SoftCheck pressed = toggle;
+            toggle.Click += delegate { SwitchAdvancedOption(id, key, pressed); };
+            card.Controls.Add(NewRow(label, toggle));
+            advancedSwitches.Add(toggle);
+        }
+
+        /// A switch pressed: the other value sent, as a drop-down's choice is (SetAdvancedOptionValue).
+        private void SwitchAdvancedOption(string id, string key, CheckBox toggle)
+        {
+            if (choiceFilling || advancedListing == null || busy > 0) return;
+            int other = toggle.Checked ? SwitchOff : SwitchOn;
+            SetAdvancedOptionValue(id, key, other.ToString(CultureInfo.InvariantCulture));
         }
 
         /// One value of a choice as the drop-down shows it: hours with their unit, a count as a number.
@@ -1105,9 +1168,6 @@ namespace CodexAutoResume
             if (key == "ceiling_hours") return Word("page.option.hours", "{n} h", "n", value);
             // v0.6.16-beta.3 (issue #29): the meter's spacing, a stage's percentage, the wrap-up's wording.
             if (key == "poll_minutes") return Word("page.option.minutes", "{n} min", "n", value);
-            // v0.6.16-beta.4: a switch's two values (1 on, 2 off).
-            if (key == "wrap_reset_time" || key == "wrap_after_reset" || key.StartsWith("window_", StringComparison.Ordinal))
-                return value == 1 ? Word("page.option.on", "On") : Word("page.option.off", "Off");
             if (key == "wrap_style")
                 return Word("page.option.style." + value.ToString(CultureInfo.InvariantCulture),
                             value == 1 ? "Short" : value == 3 ? "Detailed" : value == 4 ? "With the numbers" :
@@ -1124,14 +1184,14 @@ namespace CodexAutoResume
             if (choiceFilling || choice == null) return;
             if (choice.Value == CustomChoice)
             {
-                OpenCustomEntry(key);                            // (f): the number is typed in, and set with Set
+                OpenCustom(key, combo);                          // (f): the number is asked for in its dialog
                 return;
             }
             if (advancedListing == null || busy > 0) return;
             SetAdvancedOptionValue(id, key, choice.Value);
         }
 
-        /// One choice sent as `value` - a preset, or (v0.6.16-beta.4) a number typed in - against the generation the page
+        /// One choice sent as `value` - a preset, or (v0.6.16-beta.4) a number of one's own - against the generation the page
         /// read; the drop-down then shows what holds.
         private void SetAdvancedOptionValue(string id, string key, string value)
         {
@@ -1476,6 +1536,7 @@ namespace CodexAutoResume
             if (advancedHourly != null) advancedHourly.Enabled = idle && advancedListing != null;
             bool listed = idle && advancedListing != null;
             foreach (SoftCombo combo in advancedChoices) combo.Enabled = listed;
+            foreach (SoftCheck toggle in advancedSwitches) toggle.Enabled = listed;
             foreach (Button remove in ruleRemoves) remove.Enabled = listed;
             if (ruleAdd != null) ruleAdd.Enabled = listed;
             UpdateKeptButtons(idle);

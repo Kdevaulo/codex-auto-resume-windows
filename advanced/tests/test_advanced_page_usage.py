@@ -1,5 +1,6 @@
 """The Dashboard's Advanced features page in the window itself: the near-the-limit choices (v0.6.16-beta.4, the owner's
-additions to issue #29) - the wrap-up's Custom wording for each window.
+additions to issue #29) - the wrap-up's Custom wording for each window, and (v0.6.16 final) each number's Custom...,
+which opens the Settings page's dialog for a number of one's own.
 
 The window is compiled once for this module and every scenario_* below runs in one window process
 (pagecase.PageCase); each makes its replies with this edition's real bridge in a home of its own, so nothing
@@ -19,6 +20,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from pagecase import CSC, POWERSHELL, Bridge, PageCase, sent, snapshot  # noqa: E402
+from codex_auto_resume import l10n  # noqa: E402
 
 WRAP = "usage_wrap_up"
 FIVE, WEEKLY = "wrap_custom_five_hour", "wrap_custom_weekly"
@@ -71,20 +73,31 @@ class PageTests(PageCase):
 
     @classmethod
     def scenario_custom_numbers(cls, bridge):
-        """(f): the five-hour wrap-up percentage typed in as 93 through the real bridge - shown as itself, Custom... last;
-        then the weekly one typed in as 88 and set; then letters typed in, refused before anything is sent."""
+        """(f), v0.6.16 final: Custom... opens the Settings page's dialog for a number of one's own. The five-hour
+        wrap-up percentage set to 93 through the real bridge first - shown as itself, one item before Custom.... Then on
+        the weekly one: Cancel; 150, refused in the dialog; 97, taken there and refused by the real bridge (above the
+        words' stop); and 88, taken and set, the page then reading the list the real bridge answers after it."""
         generation = bridge("advanced-list", {})["result"]["generation"]
         done = bridge("advanced-option", {"capability": WRAP, "key": "wrap_five_hour", "value": 93, "generation": generation})
         assert done["result"]["done"], done
         script = cls.opening(bridge, "en")
         script["advanced-wordings"] = [bridge("advanced-wordings", {"capability": WRAP})]
+        read = script["advanced-list"][0]["result"]["generation"]
+        refused = bridge("advanced-option", {"capability": WRAP, "key": "wrap_weekly", "value": 97, "generation": read})
+        taken = bridge("advanced-option", {"capability": WRAP, "key": "wrap_weekly", "value": 88, "generation": read})
+        assert taken["result"]["done"], taken
+        after = bridge("advanced-list", {})
+        weekly = {"do": "custom_option", "key": "wrap_weekly"}
         steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": WRAP}, {"do": "look"},
-                 {"do": "reply", "key": "advanced-option", "with": [{"ok": True, "result": {"done": True}}]},
-                 {"do": "custom_option", "key": "wrap_weekly", "text": "88"},
-                 {"do": "custom_option", "key": "wrap_weekly", "text": "eighty"}, {"do": "look"}]
+                 dict(weekly, cancel=True), {"do": "look"},
+                 dict(weekly, value=150), {"do": "look"},
+                 {"do": "reply", "key": "advanced-option", "with": [refused]}, dict(weekly, value=97), {"do": "look"},
+                 {"do": "reply", "key": "advanced-option", "with": [taken]},
+                 {"do": "reply", "key": "advanced-list", "with": [after]}, dict(weekly, value=88), {"do": "look"}]
         return "en", {"script": script, "steps": steps}, {
-            "generation": script["advanced-list"][0]["result"]["generation"],
-            "words": script["advanced-words"][0]["result"]["words"]}
+            "generation": read, "refused": refused["result"], "words": script["advanced-words"][0]["result"]["words"],
+            "presets": [option for item in script["advanced-list"][0]["result"]["capabilities"] if item["id"] == WRAP
+                        for option in item["options"] if option["key"] == "wrap_weekly"][0]["choices"]}
 
     @classmethod
     def scenario_order(cls, bridge):
@@ -104,6 +117,78 @@ class PageTests(PageCase):
         return "en", {"script": script, "steps": steps}, {
             "taken": taken["result"], "refused": refused["result"], "words": script["advanced-words"][0]["result"]["words"]}
 
+    @classmethod
+    def scenario_switches(cls, bridge):
+        """v0.6.16 final: the on/off choices drawn as switches - the meter's two windows, the wrap-up's Include the reset
+        time and Continue after the reset. The five-hour one pressed as UI Automation presses it, the weekly one by Space;
+        each sends Off with the generation the page read, and the page is drawn again from the list it reads - here the
+        same list, so both switches still show On: a switch moves only once the change is taken. Asked for the value it
+        already shows, nothing is sent."""
+        script = cls.opening(bridge, "en")
+        script["advanced-wordings"] = [bridge("advanced-wordings", {"capability": WRAP})]
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "usage_meter"},
+                 {"do": "look"},
+                 {"do": "reply", "key": "advanced-option", "with": [{"ok": True, "result": {"done": True}}]},
+                 {"do": "set_option", "key": "window_five_hour", "value": 2},
+                 {"do": "set_option", "key": "window_weekly", "value": 2, "by": "keyboard"},
+                 {"do": "set_option", "key": "window_weekly", "value": 1}, {"do": "look"},
+                 {"do": "choose", "id": WRAP}, {"do": "look"}]
+        return "en", {"script": script, "steps": steps}, {
+            "generation": script["advanced-list"][0]["result"]["generation"],
+            "words": script["advanced-words"][0]["result"]["words"]}
+
+    def test_on_off_choices_are_switches_that_move_only_once_the_change_is_taken(self):
+        result, expected = self.of("scenario_switches")
+        words = expected["words"]
+        first, after, wrap = result["looks"]
+        self.assertEqual(first["switches"], [
+            {"key": key, "on": True, "enabled": True, "name": words["page.option." + key], "role": "CheckButton"}
+            for key in ("window_five_hour", "window_weekly")])
+        self.assertEqual([choice["key"] for choice in first["choices"]], ["poll_minutes", "warn_five_hour", "warn_weekly"],
+                         "no on/off choice is a drop-down")
+        self.assertEqual(sent(result, "advanced-option"), [
+            {"capability": "usage_meter", "key": key, "value": 2, "generation": expected["generation"]}
+            for key in ("window_five_hour", "window_weekly")])
+        self.assertEqual([each["on"] for each in after["switches"]], [True, True], "drawn from what the list says")
+        self.assertEqual(result["disabled"], [])
+        # v0.6.16 final: the wrap-up's own pair of window switches, after its other two.
+        self.assertEqual([each["key"] for each in wrap["switches"]],
+                         ["wrap_reset_time", "wrap_after_reset", "window_five_hour", "window_weekly"])
+        self.assertEqual([each["name"] for each in wrap["switches"]][2:],
+                         [words["page.option.window_five_hour"], words["page.option.window_weekly"]])
+        self.assertFalse({each["key"] for each in wrap["switches"]} & {choice["key"] for choice in wrap["choices"]})
+        self.assertEqual({each["role"] for each in wrap["switches"]}, {"CheckButton"})
+        for look in (first, wrap):
+            self.assertNotIn(words["page.option.no_window"], next(card for card in look["cards"]
+                                                                   if card[0] == words["page.options"]))
+
+    @classmethod
+    def scenario_no_window(cls, bridge):
+        """v0.6.16 final: Stop near a limit with both its windows switched off through the real bridge, and the meter
+        with its weekly one alone off."""
+        generation = bridge("advanced-list", {})["result"]["generation"]
+        for capability, key in (("usage_pause", "window_five_hour"), ("usage_pause", "window_weekly"),
+                                ("usage_meter", "window_weekly")):
+            done = bridge("advanced-option", {"capability": capability, "key": key, "value": 2, "generation": generation})
+            assert done["result"]["done"], done
+            generation = done["result"]["generation"]
+        script = cls.opening(bridge, "en")
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "usage_pause"},
+                 {"do": "look"}, {"do": "choose", "id": "usage_meter"}, {"do": "look"}]
+        return "en", {"script": script, "steps": steps}, {"words": script["advanced-words"][0]["result"]["words"]}
+
+    def test_a_capability_with_both_windows_off_says_it_acts_on_neither(self):
+        result, expected = self.of("scenario_no_window")
+        words = expected["words"]
+        stop, meter = result["looks"]
+        self.assertEqual([(each["key"], each["on"]) for each in stop["switches"]],
+                         [("window_five_hour", False), ("window_weekly", False)])
+        self.assertIn(words["page.option.no_window"], next(card for card in stop["cards"] if card[0] == words["page.options"]))
+        self.assertEqual([(each["key"], each["on"]) for each in meter["switches"]],
+                         [("window_five_hour", True), ("window_weekly", False)])
+        self.assertNotIn(words["page.option.no_window"],
+                         next(card for card in meter["cards"] if card[0] == words["page.options"]), "one window is on")
+
     def test_out_of_order_is_told_and_a_forced_stop_below_the_words_is_said(self):
         result, expected = self.of("scenario_order")
         words = expected["words"]
@@ -113,19 +198,64 @@ class PageTests(PageCase):
         self.assertEqual(look["note"], words["page.warn.stop_before_words"])
         self.assertEqual(result["told"], [words["page.refused.option_order"]])
 
-    def test_a_number_can_be_typed_in_beside_the_presets_and_is_checked_before_it_is_sent(self):
+    def custom_numbers(self):
+        """The scenario's result, its looks, its weekly wrap-up drop-down in each look, and the window's own words."""
         result, expected = self.of("scenario_custom_numbers")
+        looks = result["looks"]
+        weekly = [next(choice for choice in look["choices"] if choice["key"] == "wrap_weekly") for look in looks]
+        return result, expected, looks, weekly, l10n.catalog("en")
+
+    def test_a_number_taken_in_the_custom_dialog_is_what_is_set_and_shows_as_its_own_item_before_custom(self):
+        """(a): fails with Custom... opening anything but the Settings page's dialog, or with the number it takes not
+        sent as the choice - and a stored number of one's own (93) shows as itself, one item before Custom...."""
+        result, expected, looks, weekly, own = self.custom_numbers()
         words = expected["words"]
-        first, after = result["looks"]
-        five = next(choice for choice in first["choices"] if choice["key"] == "wrap_five_hour")
+        five = next(choice for choice in looks[0]["choices"] if choice["key"] == "wrap_five_hour")
         self.assertEqual((five["value"], five["items"][-2:]), ("93%", ["93%", words["page.option.custom"]]))
-        style = next(choice for choice in first["choices"] if choice["key"] == "wrap_style")
+        style = next(choice for choice in looks[0]["choices"] if choice["key"] == "wrap_style")
         self.assertNotIn(words["page.option.custom"], style["items"], "a wording is no number")
-        self.assertEqual(first["custom"]["wrap_weekly"], False, "the box shows only once Custom... is chosen")
-        self.assertTrue(after["custom"]["wrap_weekly"])
         self.assertEqual(sent(result, "advanced-option"), [
-            {"capability": WRAP, "key": "wrap_weekly", "value": 88, "generation": expected["generation"]}])
-        self.assertEqual(result["told"], [words["page.refused.option_range"].replace("{low}", "1").replace("{high}", "100")])
+            {"capability": WRAP, "key": "wrap_weekly", "value": value, "generation": expected["generation"]}
+            for value in (97, 88)])
+        self.assertEqual((weekly[-1]["value"], weekly[-1]["items"][-2:]), ("88%", ["88%", words["page.option.custom"]]))
+        self.assertEqual(len(weekly[-1]["items"]), len(expected["presets"]) + 2, "one item of its own, and Custom...")
+        dialogs = result["dialogs"]
+        self.assertEqual([dialog["key"] for dialog in dialogs], ["wrap_weekly"] * 4)
+        hint = own["own.range"].replace("{low}", "1%").replace("{high}", "100%")
+        for dialog in dialogs:
+            # The Settings page's dialog, in its words: titled with the choice, the range above the number, in percent.
+            self.assertEqual(dialog["title"], words["page.option.wrap_weekly"])
+            self.assertEqual(dialog["hint"], hint)
+            self.assertEqual(dialog["buttons"], [own["own.use"], own["action.cancel"]])
+            self.assertEqual(dialog["findings"], [], "nothing in it cut off, every control named")
+        self.assertEqual(dialogs[0]["opened"], 90, "the number it opens with is the one the drop-down held")
+        self.assertIsNone(dialogs[3]["after"], "taken: the dialog closed")
+
+    def test_cancel_in_the_custom_dialog_changes_nothing_and_puts_back_the_item_held(self):
+        """(b): fails with the drop-down left on Custom... after Cancel, or with anything sent."""
+        result, _expected, looks, weekly, _own = self.custom_numbers()
+        self.assertEqual(weekly[1], weekly[0])
+        self.assertEqual(weekly[1]["value"], "90%")
+        self.assertEqual(looks[1]["requests"], looks[0]["requests"], "nothing sent")
+        self.assertEqual(result["disabled"], [])
+
+    def test_a_number_outside_the_range_is_refused_in_the_custom_dialog_and_nothing_is_sent(self):
+        """(c): fails with the range not checked in the dialog - 150 would be sent - or the refusal not said there."""
+        result, _expected, looks, weekly, own = self.custom_numbers()
+        hint = own["own.range"].replace("{low}", "1%").replace("{high}", "100%")
+        self.assertEqual(result["dialogs"][1]["after"], own["own.refused"].replace("{hint}", hint))
+        self.assertEqual(weekly[2], weekly[0], "the drop-down back on the item it held")
+        self.assertEqual(looks[2]["requests"], looks[1]["requests"], "nothing sent")
+        self.assertNotIn(150, [each["value"] for each in sent(result, "advanced-option")])
+
+    def test_a_number_the_bridge_refuses_is_told_and_the_drop_down_shows_what_holds(self):
+        """A number in the range the bridge refuses - the wrap-up above the words' stop - is told as the page tells any
+        refusal, and the drop-down shows what holds."""
+        result, expected, _looks, weekly, _own = self.custom_numbers()
+        self.assertEqual(expected["refused"]["refusal"], "option_order")
+        self.assertIsNone(result["dialogs"][2]["after"], "taken in the dialog, which checks only the range")
+        self.assertEqual(result["told"], [expected["words"]["page.refused.option_order"]])
+        self.assertEqual(weekly[3]["value"], "90%")
 
     def test_custom_wording_has_a_box_for_each_window_with_the_persons_words(self):
         result, expected = self.of("scenario_wordings")

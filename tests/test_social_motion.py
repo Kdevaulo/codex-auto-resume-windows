@@ -1,8 +1,8 @@
 """The social preview's motion: one cycle of the watching icon's motion on the card, as an APNG, under 1 MB.
 
 build/make_social.py writes docs/images/social-preview-motion.png: an animated PNG whose default image is the
-still card's PNG itself, and whose later frames are only the head's changed rectangle, at the icon's own timing
-(make_screenshots.icon_timeline). These tests read what it wrote with a reader of their own, written from the PNG
+still card's PNG itself, and whose later frames are only the head's changed rectangle, the icon's own curve
+sampled every 25 ms (ui.tray.icon_turn and the monitoring breath, as build/motion_logo.py samples it). These tests read what it wrote with a reader of their own, written from the PNG
 and APNG specifications and sharing no code with the writer - chunks, CRCs, sequence numbers, inflate, the five
 row filters, dispose - and hold it to what the owner asked: the mark moving as the real icon moves, looping
 forever, every pixel kept (no palette and no dither, which a GIF had needed), frame 1 the card exactly.
@@ -10,7 +10,7 @@ forever, every pixel kept (no palette and no dither, which a GIF had needed), fr
 The reader is pure Python, so its work is kept to what changes: the still card is decoded once for the module,
 the motion's default image is not decoded again when its IDAT chunks are the still's byte for byte, and the frames
 are composited on a canvas the size of the mark's box only. CAR_SOCIAL_MOTION points the committed-motion tests
-at another file (a mutated copy, to prove they fail).
+at another file (a mutated copy, to prove they fail) and CAR_SOCIAL_STILL the still card (a scratch render's).
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from codex_auto_resume import brand     # noqa: E402
 from codex_auto_resume.ui import tray   # noqa: E402
 
 MOTION = Path(os.environ.get("CAR_SOCIAL_MOTION") or ROOT / "docs" / "images" / "social-preview-motion.png")
-STILL = ROOT / "docs" / "images" / "social-preview.png"
+STILL = Path(os.environ.get("CAR_SOCIAL_STILL") or ROOT / "docs" / "images" / "social-preview.png")
 CARD = {}
 
 
@@ -107,9 +107,13 @@ def read_apng(raw: bytes, known=None) -> dict:
     width, height, depth, colour, _c, _f, interlace = struct.unpack(">IIBBBBB", dict(parts)[b"IHDR"])
     if (depth, colour, interlace) != (8, 2, 0):
         raise ValueError("not 8-bit RGB without interlace")
-    frames, current, sequence, idat, plays, count = [], None, 0, bytearray(), None, None
+    frames, current, sequence, idat, plays, count, key = [], None, 0, bytearray(), None, None, None
     for kind, data in parts:
-        if kind == b"acTL":
+        if kind == b"tRNS":
+            if idat:
+                raise ValueError("tRNS after IDAT")
+            key = bytes(value & 0xFF for value in struct.unpack(">HHH", data))
+        elif kind == b"acTL":
             count, plays = struct.unpack(">II", data)
         elif kind == b"fcTL":
             number, w, h, x, y, num, den, dispose, blend = struct.unpack(">IIIIIHHBB", data)
@@ -144,12 +148,13 @@ def read_apng(raw: bytes, known=None) -> dict:
     if count is not None and count != len(frames):
         raise ValueError("acTL says %d frames, %d are there" % (count, len(frames)))
     return {"width": width, "height": height, "plays": plays, "default": default, "frames": frames,
-            "idat": idats}
+            "idat": idats, "key": key}
 
 
 def composite(apng: dict, box=None):
     """Each frame's picture, RGB, as a viewer shows it: dispose 0 keeps the frame, 1 clears its rectangle,
-    2 restores what was before it; an opaque frame's blend 'over' is its 'source'.
+    2 restores what was before it; blend 'over' leaves what is under a pixel of the tRNS colour (transparent), and is
+    'source' for every other pixel, which is opaque.
 
     With `box` (left, top, width, height) only that crop of each picture is made: frame 1 may cover more than the
     box (its part inside is drawn), but every later frame must lie inside it, or this raises - so outside the box
@@ -164,9 +169,16 @@ def composite(apng: dict, box=None):
             raise ValueError("frame %d's rectangle %r is outside the box %r" % (index + 1, frame["box"], box))
         x0, y0, x1, y1 = max(x, left), max(y, top), min(x + w, left + wide), min(y + h, top + tall)
         before = bytes(canvas)
+        keyed = apng.get("key") if frame["blend"] == 1 else None
         for row in range(y0, y1):
             at, source = ((row - top) * wide + x0 - left) * 3, ((row - y) * w + x0 - x) * 3
-            canvas[at:at + (x1 - x0) * 3] = frame["pixels"][source:source + (x1 - x0) * 3]
+            line = frame["pixels"][source:source + (x1 - x0) * 3]
+            if keyed is None or keyed not in line:
+                canvas[at:at + (x1 - x0) * 3] = line
+                continue
+            for i in range(0, len(line), 3):
+                if line[i:i + 3] != keyed:
+                    canvas[at + i:at + i + 3] = line[i:i + 3]
         yield bytes(canvas)
         if frame["dispose"] == 1:
             for row in range(y0, y1):
@@ -244,9 +256,63 @@ class TheReaderReadsTheWriter(unittest.TestCase):
         same(self, list(composite(apng)), [picture for _, picture in pictures], "the pictures")
         self.assertEqual(apng["frames"][1]["box"], (40, 30, 20, 1), "a later frame is more than what changed")
 
+    @mock.patch.object(make_social, "HEIGHT", 8)
+    @mock.patch.object(make_social, "WIDTH", 8)
+    def test_a_frames_unchanged_pixels_are_transparent_and_the_picture_exact(self):
+        """Inside a later frame's rectangle, the pixels it does not change are the tRNS colour - one no picture has -
+        so they compress to nothing and leave the frame before showing; every picture is still exact."""
+        first = bytes(range(8 * 8 * 3))
+        second = bytearray(first)
+        second[(2 * 8 + 1) * 3:(2 * 8 + 1) * 3 + 3] = bytes((250, 251, 252))
+        second[(5 * 8 + 6) * 3:(5 * 8 + 6) * 3 + 3] = bytes((253, 254, 255))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "keyed.png"
+            make_social.write_motion(path, still_png(8, 8, first), iter([(100, first), (25, bytes(second))]))
+            raw = path.read_bytes()
+            apng = read_apng(raw)
+        kinds = [kind for kind, _ in chunks(raw)]
+        self.assertLess(kinds.index(b"tRNS"), kinds.index(b"IDAT"))
+        key = apng["key"]
+        self.assertNotIn(key, {first[at:at + 3] for at in range(0, len(first), 3)} | {bytes(second[at:at + 3])
+                                                                                     for at in range(0, 192, 3)})
+        frame = apng["frames"][1]
+        self.assertEqual(frame["box"], (1, 2, 6, 4))
+        pixels = frame["pixels"]
+        keyed = sum(1 for at in range(0, len(pixels), 3) if pixels[at:at + 3] == key)
+        self.assertEqual(keyed, 6 * 4 - 2, "the unchanged pixels of the rectangle are written again")
+        same(self, list(composite(apng)), [first, bytes(second)], "the pictures")
+
+    @mock.patch.object(make_social, "HEIGHT", 8)
+    @mock.patch.object(make_social, "WIDTH", 8)
+    def test_whole_ms_delays_are_written_exactly(self):
+        """motion_pictures' delays are whole ms: 25 ms is 25/1000 s, not rounded to hundredths."""
+        first = bytes(range(8 * 8 * 3))
+        second = bytes(255 - value for value in first)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "ms.png"
+            make_social.write_motion(path, still_png(8, 8, first), iter([(100, first), (25, second), (1525, first)]))
+            apng = read_apng(path.read_bytes())
+        self.assertEqual([frame["delay"] for frame in apng["frames"]],
+                         [Fraction(100, 1000), Fraction(25, 1000), Fraction(1525, 1000)])
+
+
+def icon_head(at_ms):
+    """(angle, colour) of watching's head `at_ms` into its cycle, from the tray's own code and written here: the
+    sweep (icon_turn) at full colour, or the head in its place tinted by the monitoring breath toward the badge's
+    blue - icon_level_colour's arithmetic on the breath itself, before _breath_level rounds it to a level."""
+    import math
+    colour = tray.icon_head_colour("watching")
+    turn = tray.icon_turn("watching", at_ms)
+    if turn is not None:
+        return round(brand.ICON_SHAPE["arc_end"] - turn, 6), tuple(colour)
+    amount = tray.ICON_MOTION["dim"] * brand._breath(at_ms, brand.GLOW["monitoring_ms"])
+    target = brand.rgb(tray.ICON_DIM_TOWARD)
+    return (round(brand.ICON_SHAPE["arc_end"], 6),
+            tuple(int(math.floor(one + (other - one) * amount + 0.5)) for one, other in zip(colour, target)))
+
 
 class TheScheduleIsTheIcons(unittest.TestCase):
-    """The frames, their moments and their heads come from the tray icon's own code."""
+    """The frames, their moments and their heads are the tray icon's own curve, sampled every 25 ms."""
 
     def setUp(self):
         self.plan = make_social.schedule()
@@ -256,41 +322,93 @@ class TheScheduleIsTheIcons(unittest.TestCase):
         for at in (0.0, 1234.0, 15000.0, 17777.0):
             self.assertEqual(tray.icon_frame("watching", at), tray.icon_frame("watching", at + loop),
                              "watching_loop_ms is not watching's cycle")
-        self.assertEqual(sum(delay for delay, _, _ in self.plan) * 10, int(round(loop)))
+        self.assertEqual(sum(delay for delay, _, _ in self.plan), int(round(loop)))
 
     def test_frame_one_is_the_mark_at_rest_at_full_brightness(self):
-        self.assertEqual(self.plan[0][1:], (0, tray.ICON_MOTION["levels"] - 1))
-        self.assertEqual(self.plan[0][1:], tray.icon_frame("watching", 0.0))
+        self.assertEqual(self.plan[0][1:], (round(brand.ICON_SHAPE["arc_end"], 6), tuple(brand.rgb(brand.ICON_ACCENT))))
+        self.assertEqual(self.plan[0][1:], make_social.rest_head())
+        self.assertEqual(self.plan[-1][1:], make_social.rest_head(), "the loop's seam is not the mark at rest")
 
-    def test_every_frame_is_the_one_the_icons_timer_shows_then(self):
-        """Stepped here as the icon's timer steps - icon_frame_ms from the moment watching is entered - and each
-        frame is the icon's frame on show when it starts, on the hundredth it starts."""
-        loop, ticks, at = make_social.watching_loop_ms(), [], 0.0
-        while at < loop:
-            ticks.append((int(round(at / 10.0)), tray.icon_frame("watching", at, at)))
-            at += tray.icon_frame_ms("watching", at, at)
+    def test_the_curve_is_sampled_every_25_ms_and_each_frame_is_its_sample(self):
+        """Every 25 ms of the cycle is a sample of the icon's own curve, and the frame on show then is that sample's
+        head: a frame lasts while the samples give the same head, and the next frame is the next head."""
+        self.assertEqual(make_social.STEP_MS, 25)
         start = 0
-        for delay, position, level in self.plan:
-            shown = [frame for hundredth, frame in ticks if hundredth <= start][-1]
-            self.assertEqual((position, level), shown, "the frame at %d0 ms is not the icon's" % start)
-            self.assertGreaterEqual(delay, make_social.SHORTEST)
+        for index, (delay, angle, colour) in enumerate(self.plan):
+            self.assertEqual(delay % 25, 0, "frame %d lasts %d ms, not whole steps" % (index + 1, delay))
+            for at in range(start, start + delay, 25):
+                self.assertEqual((angle, colour), icon_head(at), "the frame at %d ms is not the icon's" % at)
+            if index:
+                self.assertNotEqual(self.plan[index - 1][1:], (angle, colour), "two frames running are one head")
             start += delay
 
+    def test_the_sweep_is_drawn_at_every_step(self):
+        """Where the head travels, every 25 ms is a frame of its own - not the tray timer's 62 ms, nor its 156 - and
+        only the far end, where the curve holds the head still, lasts longer."""
+        sweep = [(delay, angle) for delay, angle, _ in self.plan if angle != make_social.rest_head()[0]]
+        self.assertTrue(sweep, "the head never leaves its place")
+        far = round(brand.ICON_SHAPE["arc_end"] - tray.ICON_SWEEP, 6)
+        self.assertEqual({delay for delay, angle in sweep if angle != far}, {25})
+        travels = sum(1 for at in range(0, int(round(make_social.watching_loop_ms())), 25)
+                      if (tray.icon_turn("watching", at) or 0) > 0)
+        self.assertEqual(sum(delay for delay, _ in sweep), travels * 25)
+        self.assertGreater(len(sweep), travels * 0.9, "the sweep is thinned")
+
     def test_it_breathes_three_times_then_sweeps_out_and_back_without_breathing(self):
-        top = tray.ICON_MOTION["levels"] - 1
-        moving = [(position, level) for _, position, level in self.plan if position]
-        self.assertTrue(moving, "the head never leaves its place")
-        self.assertEqual({level for _, level in moving}, {top}, "the head breathes while it travels")
-        far = max(position for position, _ in moving)
-        self.assertEqual(far, int(round(tray.ICON_SWEEP / (360.0 / tray.ICON_MOTION["positions"]))))
-        before = [level for _, position, level in self.plan[:[p for _, p, _ in self.plan].index(1)]]
-        dips = sum(1 for one, other in zip(before, before[1:]) if one == top and other < top)
+        rest_angle, accent = make_social.rest_head()
+        moving = [(angle, colour) for _, angle, colour in self.plan if angle != rest_angle]
+        self.assertEqual({colour for _, colour in moving}, {accent}, "the head breathes while it travels")
+        far = min(angle for angle, _ in moving)
+        self.assertAlmostEqual(rest_angle - far, tray.ICON_SWEEP, places=6)
+        first = [index for index, (_, angle, _) in enumerate(self.plan) if angle != rest_angle][0]
+        before = [colour for _, _, colour in self.plan[:first]]
+        dips = sum(1 for one, other in zip(before, before[1:]) if one == accent and other != accent)
         self.assertEqual(dips, tray.ICON_MOTION["breaths"])
+        self.assertGreater(len(set(before)), tray.ICON_MOTION["levels"], "the breath is stepped into the tray's levels")
 
     def test_the_svg_head_at_rest_is_the_marks_own(self):
         svg = (ROOT / "assets" / "brand" / "icon.svg").read_text(encoding="utf-8")
-        self.assertEqual(make_social.mark_svg(svg, 0, tray.ICON_MOTION["levels"] - 1), svg)
+        self.assertEqual(make_social.mark_svg(svg, *make_social.rest_head()), svg)
+        self.assertNotEqual(make_social.mark_svg(svg, 30.0, make_social.rest_head()[1]), svg)
         self.assertIn("width:%dpx;height:%dpx" % (make_social.MARK_PX, make_social.MARK_PX), make_social.TEMPLATE)
+
+    def test_every_sprite_sheet_draws_the_mark_at_rest_first(self):
+        heads = sorted({head[1:] for head in self.plan})
+        batches = make_social.sprite_batches(heads)
+        self.assertGreater(len(batches), 1)
+        for batch in batches:
+            self.assertEqual(batch[0], make_social.rest_head())
+            self.assertLessEqual(len(batch), make_social.SPRITE_BATCH)
+        self.assertEqual(sorted({head for batch in batches for head in batch}), heads)
+
+    def test_the_heads_mask_is_every_pixel_within_reach(self):
+        """head_mask only looks near the heads; it takes what a look at every pixel of the cell takes."""
+        head, left, top = (300.5, 200.5), 160, 64
+        cell, scale = make_social.cell_size(), make_social.MARK_PX / 2.0
+        reach = brand.ICON_SHAPE["head_radius"] * scale + make_social.MASK_REACH
+        rest = brand.icon_head_centre()
+        for angle in (brand.ICON_SHAPE["arc_end"], 0.0, -40.0):
+            there = brand.icon_head_centre(angle)
+            centres = [(head[0] - left, head[1] - top), (head[0] - left + (there[0] - rest[0]) * scale,
+                                                         head[1] - top - (there[1] - rest[1]) * scale)]
+            every = [y * cell + x for y in range(cell) for x in range(cell)
+                     if any((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= reach * reach for cx, cy in centres)]
+            self.assertEqual(make_social.head_mask(head, angle, left, top), every)
+
+    def test_the_pictures_keep_the_schedules_ms(self):
+        """motion_pictures hands write_motion each frame's delay as the schedule has it, in whole ms."""
+        rest = make_social.rest_head()
+        card = bytes(make_social.WIDTH * make_social.HEIGHT * 3)
+        delays = [delay for delay, _ in make_social.motion_pictures(card, {}, [(25,) + rest, (1525,) + rest],
+                                                                    (0, 0, (0.0, 0.0)))]
+        self.assertEqual(delays, [25, 1525])
+
+    def test_its_bounds(self):
+        """GitHub's social preview takes a PNG of less than a megabyte, and the moving card is the one uploaded: its
+        ceiling leaves room under that, and the still card is under it too."""
+        self.assertEqual(make_social.UPLOAD_LIMIT, 1000000)
+        self.assertLessEqual(make_social.MOTION_LIMIT, 950000)
+        self.assertLess(STILL.stat().st_size, make_social.UPLOAD_LIMIT)
 
 
 class TheCommittedMotion(unittest.TestCase):
@@ -327,8 +445,19 @@ class TheCommittedMotion(unittest.TestCase):
         """So outside the box every picture is frame 1, and comparing the box's crops compares the pictures."""
         self.assertIsNone(self.outside)
 
-    def test_it_is_under_githubs_megabyte(self):
+    def test_it_is_an_upload_github_takes(self):
+        """Under GitHub's megabyte with room to spare: the moving card is what Settings -> Social preview gets."""
+        self.assertLess(len(self.raw), 950000)
         self.assertLess(len(self.raw), make_social.MOTION_LIMIT)
+
+    def test_frame_one_has_no_transparent_pixel(self):
+        """The colour the later frames mark unchanged pixels with is in no pixel of the card, so the default image is
+        the card wholly opaque - and a later frame never marks a pixel it changes."""
+        key = self.apng["key"]
+        self.assertIsNotNone(key, "no tRNS: every later frame writes its unchanged ground again")
+        card = self.card
+        self.assertFalse(any(card[at:at + 3] == key for at in range(0, len(card), 3)), "the card has the key colour")
+        self.assertTrue(all(frame["blend"] == 1 for frame in self.apng["frames"]))
 
     def test_it_is_the_cards_size_and_loops_forever(self):
         self.assertEqual((self.apng["width"], self.apng["height"]), (make_social.WIDTH, make_social.HEIGHT))
@@ -347,7 +476,7 @@ class TheCommittedMotion(unittest.TestCase):
     def test_its_frames_and_delays_are_the_schedules(self):
         self.assertEqual(len(self.apng["frames"]), len(self.plan))
         self.assertEqual([frame["delay"] for frame in self.apng["frames"]],
-                         [Fraction(delay, 100) for delay, _, _ in self.plan])
+                         [Fraction(delay, 1000) for delay, _, _ in self.plan])
         self.assertEqual(sum(frame["delay"] for frame in self.apng["frames"]),
                          Fraction(int(round(make_social.watching_loop_ms())), 1000))
 
@@ -368,20 +497,18 @@ class TheCommittedMotion(unittest.TestCase):
 
     def test_the_head_is_where_and_what_the_icons_is_in_every_frame(self):
         """The head's centre in each frame is the icon's head for that frame - the accent where it travels, the
-        breath's tint where it breathes in its place - and home is not lit while the head is away."""
+        breath's tint where it breathes in its place - and home is not lit while the head is far away."""
         rest = brand.icon_head_centre()
         scale = make_social.MARK_PX / 2.0
         accent = tuple(brand.rgb(brand.ICON_ACCENT))
         self.assertIsNone(self.outside)
         self.assertEqual(len(self.pictures), len(self.plan))
-        for (_, position, level), picture in zip(self.plan, self.pictures):
-            there = brand.icon_head_centre(brand.ICON_SHAPE["arc_end"]
-                                           - 360.0 * position / tray.ICON_MOTION["positions"])
+        for (_, angle, colour), picture in zip(self.plan, self.pictures):
+            there = brand.icon_head_centre(angle)
             x = self.head[0] + (there[0] - rest[0]) * scale
             y = self.head[1] - (there[1] - rest[1]) * scale
-            want = tuple(tray.icon_level_colour(tray.icon_head_colour("watching"), level))
-            self.assertEqual(self.pixel(picture, x, y), want, "the head at %d, level %d" % (position, level))
-            if position >= 4:
+            self.assertEqual(self.pixel(picture, x, y), colour, "the head at %.3f degrees" % angle)
+            if brand.ICON_SHAPE["arc_end"] - angle >= 60:
                 self.assertNotEqual(self.pixel(picture, *self.head), accent, "home is lit while the head is away")
 
 

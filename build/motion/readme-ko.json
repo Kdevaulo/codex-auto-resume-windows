@@ -1,0 +1,60 @@
+{
+  "format": "car-motion/1",
+  "name": "readme-ko",
+  "output": "docs/images/readme-motion-ko.png",
+  "locale": "ko",
+  "scenes_from": "readme-scenes.json",
+  "values": {
+    "first": "ko",
+    "second": "en",
+    "rows": [
+      "system",
+      "en"
+    ],
+    "scroll_over": {
+      "by": [
+        420,
+        380
+      ]
+    }
+  },
+  "forms": {
+    "ko": {},
+    "en": {
+      "interface_language": "en"
+    }
+  },
+  "canvas": {
+    "size": [
+      1500,
+      1041
+    ],
+    "transparent": true,
+    "shadow": false,
+    "theme": "light",
+    "design": "soft"
+  },
+  "window": {
+    "at": [
+      0,
+      0
+    ],
+    "still": "assets/screenshot-dashboard.png"
+  },
+  "pointer": {
+    "rest": [
+      1154,
+      543
+    ],
+    "scale": 1.5
+  },
+  "ripple_step": 16,
+  "length": [
+    25000,
+    35000
+  ],
+  "budget": {
+    "cap": 9000000
+  },
+  "light_step_ms": 33
+}

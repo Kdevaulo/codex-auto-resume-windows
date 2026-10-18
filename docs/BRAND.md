@@ -301,7 +301,11 @@ the frames are the mark itself, drawn from `ICON_SHAPE` by the same rasteriser a
 the head moved - 24 positions round the ring, fifteen degrees apart, of which the 20 from its own
 place clockwise to the stroke's far end are the ones a sweep uses - and recoloured - 24 levels of
 brightness, a tint of the head and never a stored frame - and at rest the icon is exactly the icon
-it has always been. Of `GLOW` the icon reads two rhythms and nothing else: the monitoring breath,
+it has always been. Since v0.6.16 the notification-area icon steps between those positions four times
+as finely - 96 positions, 3.75 degrees apart, every fourth one of them one of the 24 pixel for pixel -
+and draws watching's sweep at 31 ms a frame, two of Windows' timer ticks, where it moved a pixel at a
+time about eight times a second; recovering's and a failure's sweeps keep 62 ms, and the taskbar button,
+which Windows redraws no more than about eight times a second, keeps the 24. Of `GLOW` the icon reads two rhythms and nothing else: the monitoring breath,
 which is every slot of its loop and of recovering's and a failure's sweeps, and attention's slow
 breath. Since v0.6.8 nothing is drawn on top of the mark - no status badge in its corner - so the
 notification-area icon and the window's taskbar button are one picture. Its own few

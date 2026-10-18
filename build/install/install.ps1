@@ -20,6 +20,7 @@ param(
     [switch]$Uninstall,          # remove the program, keeping settings and pending state
     [switch]$Purge,              # with -Uninstall: also delete settings, state and logs
     [switch]$AllowEditionChange, # replace the installed edition with this archive's other one
+    [switch]$Silent,             # for Install.cmd and Uninstall.cmd, which ask nothing and wait for no key with it
     [string]$PluginName      = 'codex-auto-resume',
     [string]$MarketplaceName = 'codex-auto-resume-windows'
 )
@@ -270,6 +271,39 @@ function Get-OwnedMcpProcess {
     return ,$found
 }
 
+function Get-OwnedDashboardProcess {
+    <#
+        This installation's Dashboard windows that are open, found as the MCP launchers are: by their
+        executable's path inside the installation, never by name alone. The one that started this update
+        (CODEX_AUTO_RESUME_UPDATING_DASHBOARD, its process id) is not among them: it waits for this, and
+        opens the new version itself once it is done.
+    #>
+    $found = @()
+    $starter = 0
+    [void][int]::TryParse([string]$env:CODEX_AUTO_RESUME_UPDATING_DASHBOARD, [ref]$starter)
+    $all = @(Get-CimInstance Win32_Process -Filter "Name='CodexAutoResumeSettings.exe'" -ErrorAction SilentlyContinue)
+    foreach ($process in $all) {
+        $exe = $process.ExecutablePath
+        if ([string]::IsNullOrWhiteSpace($exe) -or $process.ProcessId -eq $starter) { continue }
+        if (Test-PathInside $exe $OwnedHome) { $found += $process }
+    }
+    return ,$found
+}
+
+function Get-UpdateEventName {
+    <#
+        The event an update sets to ask this installation's Dashboard windows to close themselves - the
+        window's own close, never anything ended from outside (gui/WindowReopen.cs, WatchForUpdate). Named
+        after the installation's folder, so another installation's windows never hear it: the first sixteen
+        hex digits of the SHA-256 of its full path in lower case, as UTF-8.
+    #>
+    param([string]$Root)
+    $full = [IO.Path]::GetFullPath($Root).TrimEnd('\').ToLowerInvariant()
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $hash = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($full)) } finally { $sha.Dispose() }
+    return 'Local\CodexAutoResume.CloseForUpdate.' + (-join ($hash[0..7] | ForEach-Object { $_.ToString('x2') }))
+}
+
 function Get-OwnedWatcherProcess {
     <#
         The watcher belonging to this installation, if one is running.
@@ -299,6 +333,218 @@ function Get-OwnedWatcherProcess {
     # the first version of the upgrade handover waited sixty seconds for a watcher
     # that had exited in under one.
     return ,$found
+}
+
+function Get-DashboardPage {
+    <#
+        The page an older Dashboard window was opened on, read from its command line: the one thing a window that does
+        not answer an update's request says about where it is. Only the words its own reopen takes for a page
+        (`--page=<name>`, and `--settings`, the older spelling); '' where it says none, and it opens on the Overview.
+    #>
+    param([string]$CommandLine)
+    $page = ''
+    foreach ($word in @([regex]::Matches([string]$CommandLine, '"([^"]*)"|(\S+)') |
+                        ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } })) {
+        if ($word -cmatch '^--page=(overview|pending|history|statistics|diagnostics|settings)$') { $page = $Matches[1] }
+        elseif ($word -ceq '--settings') { $page = 'settings' }
+    }
+    return $page
+}
+
+function Test-DashboardAnswered {
+    <#
+        Whether a Dashboard window answered an update's request: it wrote where it was and is closing itself
+        (reopen-after-update-<its process id>.txt), or it wrote that it keeps unsaved Settings changes and stays open
+        (update-unsaved-<its process id>.txt, gui/WindowReopen.cs). A window from before v0.6.16 never writes either.
+    #>
+    param([int]$ProcessId)
+    $config = Join-Path $InstallHome 'config'
+    foreach ($name in @('reopen-after-update-', 'update-unsaved-')) {
+        if (Test-Path -LiteralPath (Join-Path $config ($name + $ProcessId + '.txt')) -PathType Leaf) { return $true }
+    }
+    return $false
+}
+
+function Test-DashboardUnsaved {
+    param([int]$ProcessId)
+    return (Test-Path -LiteralPath (Join-Path (Join-Path $InstallHome 'config') ('update-unsaved-' + $ProcessId + '.txt')) -PathType Leaf)
+}
+
+function Close-DashboardWindow {
+    <#
+        The fallback for a window that did not answer: its own close, as a person closes it - WM_CLOSE to its main
+        window (Process.CloseMainWindow), which every Dashboard before v0.6.16 answers by closing. Never ended from
+        outside. False where it has no window to be asked.
+    #>
+    param([int]$ProcessId)
+    try {
+        $process = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+        try { return [bool]$process.CloseMainWindow() } finally { $process.Dispose() }
+    } catch { return $false }
+}
+
+function Close-OwnedDashboard {
+    <#
+        Asks this installation's open Dashboard windows to close, and says how it went: before an update or a repair
+        replaces the files they run, and before an uninstall removes them.
+
+        Each window is asked through its own close (gui/WindowReopen.cs): the event named after the installation
+        (Get-UpdateEventName). A window of this version answers at once - it writes where it was and closes, or writes
+        that it keeps unsaved Settings changes and stays open. A window of an earlier version does not listen for the
+        event and answers nothing: most updates come from v0.6.15, and such a window kept the update waiting a minute
+        and was then said to have unsaved changes it never had (v0.6.16 acceptance). So a window that has not answered
+        in $AnswerSeconds is closed as a person closes it (Close-DashboardWindow), and opens again on the new version
+        (Open-ClosedDashboard) on the page its command line names, else the Overview.
+
+        Nothing is ended by force. Returns Unsaved - the windows that answered that they keep unsaved changes - and
+        Stuck - the windows still open that did not say so, which could not be asked or did not close - and
+        Fallback, the page of each window closed by the fallback ('' for the Overview), which is also kept for
+        Open-ClosedDashboard. Sets $script:DashboardsAskedAt, so the windows open again on every way out.
+    #>
+    param([int]$AnswerSeconds = 10, [int]$CloseSeconds = 20)
+    $result = @{ Unsaved = 0; Stuck = 0; Fallback = @() }
+    if ((Get-OwnedDashboardProcess).Count -eq 0) { return $result }
+    $config = Join-Path $InstallHome 'config'
+    # An answer an earlier run left is no answer to this one.
+    foreach ($stale in @(Get-ChildItem -LiteralPath $config -File -Filter 'update-unsaved-*.txt' -ErrorAction SilentlyContinue)) {
+        $null = Remove-OwnedItem $stale.FullName
+    }
+    $script:DashboardsAskedAt = [DateTime]::UtcNow
+    $closeEvents = @()
+    foreach ($root in @($InstallHome, $OwnedHome) | Select-Object -Unique) {
+        try {
+            $closeEvent = New-Object System.Threading.EventWaitHandle($false,
+                [System.Threading.EventResetMode]::ManualReset, (Get-UpdateEventName $root))
+            [void]$closeEvent.Set()
+            $closeEvents += $closeEvent
+        } catch { }
+    }
+    $fallback = @()
+    # Each list is taken whole before it is read: Get-OwnedDashboardProcess hands back one array (its leading comma),
+    # which a pipeline or @() would take as a single item.
+    try {
+        # The answers: every window closed, or said why it stays.
+        $deadline = (Get-Date).AddSeconds($AnswerSeconds)
+        while ((Get-Date) -lt $deadline) {
+            $windows = Get-OwnedDashboardProcess
+            $silent = @($windows | Where-Object { -not (Test-DashboardAnswered $_.ProcessId) })
+            if ($silent.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+        }
+        # The fallback, for each window that said nothing.
+        $windows = Get-OwnedDashboardProcess
+        foreach ($process in $windows) {
+            if (Test-DashboardAnswered $process.ProcessId) { continue }
+            if (Close-DashboardWindow $process.ProcessId) {
+                $fallback += @{ Id = [int]$process.ProcessId; Page = (Get-DashboardPage $process.CommandLine) }
+            }
+        }
+        # Every window but one that keeps unsaved changes closes now, and its bridge with it.
+        $deadline = (Get-Date).AddSeconds($CloseSeconds)
+        while ((Get-Date) -lt $deadline) {
+            $windows = Get-OwnedDashboardProcess
+            $open = @($windows | Where-Object { -not (Test-DashboardUnsaved $_.ProcessId) })
+            if ($open.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+        }
+    } finally {
+        foreach ($closeEvent in $closeEvents) { [void]$closeEvent.Reset(); $closeEvent.Dispose() }
+    }
+    $still = Get-OwnedDashboardProcess
+    $stillIds = @($still | ForEach-Object { [int]$_.ProcessId })
+    $result.Unsaved = @($still | Where-Object { Test-DashboardUnsaved $_.ProcessId }).Count
+    $result.Stuck = $still.Count - $result.Unsaved
+    $result.Fallback = @($fallback | Where-Object { $stillIds -notcontains $_.Id } | ForEach-Object { [string]$_.Page })
+    $script:DashboardsFallback = $result.Fallback
+    foreach ($answer in @(Get-ChildItem -LiteralPath $config -File -Filter 'update-unsaved-*.txt' -ErrorAction SilentlyContinue)) {
+        $null = Remove-OwnedItem $answer.FullName
+    }
+    return $result
+}
+
+function Get-InstallationHolder {
+    <#
+        What of this installation still runs that an uninstall does not stop itself, and so would hold its files: each
+        process whose program is inside the installation - a Dashboard that stayed open, the runtime python.exe one
+        started, a command run by hand - but the watcher, which the uninstall's own first step stops, and this
+        installation's tool launchers, which it ends before the files go, with whatever each of them started. Waits up
+        to $Seconds for what is closing to have closed. Changes nothing.
+    #>
+    param([int]$Seconds = 10)
+    $roots = @($OwnedHome, $InstallHome) | Where-Object { $_ } | Select-Object -Unique
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    while ($true) {
+        $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+        # Each list taken whole first: the two hand back one array (their leading comma).
+        $watchers = Get-OwnedWatcherProcess
+        $launchers = Get-OwnedMcpProcess -Roots @($OwnedHome, $PluginCacheRoot)
+        $spared = @($watchers | ForEach-Object { [int]$_.ProcessId }) + @($launchers | ForEach-Object { [int]$_.ProcessId })
+        # And what each of those started, however deep.
+        $grew = $true
+        while ($grew) {
+            $grew = $false
+            foreach ($process in $all) {
+                $id = [int]$process.ProcessId
+                if ($spared -notcontains $id -and $spared -contains [int]$process.ParentProcessId) { $spared += $id; $grew = $true }
+            }
+        }
+        $held = @()
+        foreach ($process in $all) {
+            $exe = [string]$process.ExecutablePath
+            if (-not $exe -or [int]$process.ProcessId -eq $PID -or $spared -contains [int]$process.ProcessId) { continue }
+            $near = $false
+            foreach ($root in $roots) { if ($exe.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { $near = $true } }
+            if ($near -and (Test-PathInside $exe $OwnedHome)) { $held += $process }
+        }
+        if ($held.Count -eq 0 -or (Get-Date) -ge $deadline) { return ,$held }
+        Start-Sleep -Milliseconds 500
+    }
+}
+
+function Test-FileFree {
+    # Whether nothing holds a file open: it opens for writing with no sharing, and is closed at once, unchanged. A
+    # running program's own file never opens so. A file that may not be written to at all is not held by anything.
+    param([string]$Path)
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $stream.Dispose()
+        return $true
+    } catch [System.UnauthorizedAccessException] {
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Get-UninstallBlocker {
+    <#
+        What would stop an uninstall part way, found before anything is removed. The v0.6.16 acceptance's uninstall
+        ran with the Dashboard open: the watcher, the sign-in start, the Start menu entry and the plugin went, and
+        then the program files could not - the Dashboard and the runtime python.exe it started held them - and it
+        stopped with half a product left. So the Dashboard is asked to close first, as an update asks it
+        (Close-OwnedDashboard), and then what still runs here (Get-InstallationHolder) and each program file at the
+        root that something holds are named. An empty list: nothing holds the files. Changes nothing but the windows
+        asked to close.
+    #>
+    $blockers = @()
+    if ((Get-OwnedDashboardProcess).Count -gt 0) {
+        Step 'Closing the Dashboard so its files can be removed'
+        $closed = Close-OwnedDashboard
+        if ($closed.Unsaved -gt 0) { $blockers += 'A Dashboard window has unsaved Settings changes: save or undo them, then close it.' }
+        if ($closed.Stuck -gt 0) { $blockers += 'A Dashboard window could not be closed: close it.' }
+        if ($blockers.Count -eq 0) { Ok 'The Dashboard closed' }
+    }
+    if ($blockers.Count -eq 0) {
+        $holders = Get-InstallationHolder
+        foreach ($process in $holders) {
+            $blockers += ([string]$process.Name + ' (process ' + $process.ProcessId + ') is running ' + $process.ExecutablePath)
+        }
+    }
+    foreach ($file in @('CodexAutoResumeSettings.exe', 'codex-auto-resume.ico')) {
+        $path = Join-Path $OwnedHome $file
+        if ((Test-Path -LiteralPath $path -PathType Leaf) -and -not (Test-FileFree $path)) { $blockers += ($path + ' is in use.') }
+    }
+    return ,$blockers
 }
 
 function Invoke-Codex {
@@ -410,6 +656,109 @@ function Invoke-Setup {
     $setup = Join-Path $AppDir 'scripts\plugin_setup.py'
     & $Python $setup @Arguments | ForEach-Object { Write-Host ('    ' + $_) }
     return $LASTEXITCODE
+}
+
+function Install-KeptUninstaller {
+    <#
+        Keep a copy of this script in the installation, for the entry in Add or remove programs.
+
+        The archive's own Uninstall.cmd is gone once a setup program has run: it unpacks the
+        archive into a temporary folder and removes it. Windows' list of installed programs, and
+        `winget uninstall` with it, runs a command line, so there has to be a file for that command
+        to name. This script is that file - uninstalling is its -Uninstall branch, which asks the
+        installed engine about the installation and needs nothing else from the archive.
+
+        One file, in a folder of the installation's own, written beside its name and moved into
+        place so a copy cut short is never the one that runs. A link or a junction where the
+        folder should be is not followed and not replaced: the path is refused unless it resolves
+        inside the verified root, the confinement every other write in this file keeps.
+
+        Returns $true when the copy is there afterwards.
+    #>
+    param([string]$Source)
+    $folder = Join-Path $OwnedHome 'uninstall'
+    $target = Join-Path $folder 'install.ps1'
+    if (-not (Test-PathInside $target $OwnedHome)) {
+        Warn ('Not keeping an uninstaller: ' + $folder + ' is outside the verified installation.')
+        return $false
+    }
+    $existing = Get-Item -LiteralPath $folder -Force -ErrorAction SilentlyContinue
+    if ($existing -and (-not $existing.PSIsContainer -or $existing.LinkType)) {
+        Warn ('Not keeping an uninstaller: ' + $folder + ' is not an ordinary folder.')
+        return $false
+    }
+    if ((Resolve-Canonical $Source) -eq (Resolve-Canonical $target)) { return $true }
+    $temp = $target + '.writing'
+    try {
+        if (-not $existing) { New-Item -ItemType Directory -Path $folder -ErrorAction Stop | Out-Null }
+        Copy-Item -LiteralPath $Source -Destination $temp -Force -ErrorAction Stop
+        Move-Item -LiteralPath $temp -Destination $target -Force -ErrorAction Stop
+    } catch {
+        Warn ('Could not keep an uninstaller: ' + $_.Exception.Message)
+        $null = Remove-OwnedItem $temp
+        return $false
+    }
+    return $true
+}
+
+function Read-UninstallEntry {
+    # The two values that say whose an entry in Add or remove programs is, or $null when there is none. The only
+    # read of the registry in this file, and one of the two calls into it (Remove-UninstallEntry is the other);
+    # tests stand in for both, so none of them reaches the real one.
+    param([string]$Name)
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\' + $Name)
+    if ($null -eq $key) { return $null }
+    try {
+        return @{ InstallLocation = [string]$key.GetValue('InstallLocation'); UninstallString = [string]$key.GetValue('UninstallString') }
+    } finally { $key.Close() }
+}
+
+function Remove-UninstallEntry {
+    param([string]$Name)
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\' + $Name, $false)
+}
+
+function Remove-OwnUninstallEntry {
+    <#
+        Take this installation's entry in Add or remove programs away, and nobody else's.
+
+        Called once, after every removal has succeeded: until then a failed uninstall stays listed, and the
+        entry's own command is what runs it again. The engine writes the entry (src/codex_auto_resume/
+        addremove.py) and would remove it too, early, in its own uninstall step; it is told not to
+        (CODEX_AUTO_RESUME_KEEP_ENTRY) so that this is the only place it goes.
+
+        An entry is this installation's when it is installed at this root and its command runs this root's
+        kept uninstaller - the engine's own rule, in the same two conditions (addremove.owned): one of the
+        command's arguments after the program it starts is the kept script. Both forms the engine writes are
+        that: PowerShell's `-File "<root>\uninstall\install.ps1"`, and since v0.6.16 the installation's own
+        program, `"<root>\CodexAutoResumeSettings.exe" "--uninstall" "<root>\uninstall\install.ps1"`, which
+        the first version of this read only as the first and so left behind after every uninstall. One of the
+        two fixed names, which differ by edition and never exist together; an entry that says anything else is
+        left as it is.
+    #>
+    param([string]$Root)
+    $kept = Resolve-Canonical (Join-Path (Join-Path $Root 'uninstall') 'install.ps1')
+    foreach ($name in @('CodexAutoResume', 'CodexAutoResumeAdvanced')) {
+        try {
+            $entry = Read-UninstallEntry $name
+            if ($null -eq $entry) { continue }
+            $here = (Resolve-Canonical $entry.InstallLocation) -eq (Resolve-Canonical $Root)
+            $runs = $false
+            # The command's words as Windows reads them: a quoted one whole, any other up to a space. The first is
+            # the program it starts, and is never the script.
+            $words = @([regex]::Matches([string]$entry.UninstallString, '"([^"]*)"|(\S+)') |
+                       ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } })
+            foreach ($word in @($words | Select-Object -Skip 1)) {
+                if ($kept -and (Resolve-Canonical $word) -eq $kept) { $runs = $true }
+            }
+            if ($here -and $runs) {
+                Step 'Removing the entry in Add or remove programs'
+                Remove-UninstallEntry $name
+            }
+        } catch {
+            Warn ('Could not remove the entry in Add or remove programs: ' + $_.Exception.Message)
+        }
+    }
 }
 
 function Write-CopyJournal {
@@ -562,6 +911,15 @@ if ($Uninstall) {
         Fail 'The installation root could not be resolved; nothing was removed.'
         exit 1
     }
+    # Before the first removal: the Dashboard asked to close, and nothing else of this installation's left holding
+    # its files (Get-UninstallBlocker). An uninstall that stops here has changed nothing, and says what holds them.
+    $blockers = Get-UninstallBlocker
+    if ($blockers.Count -gt 0) {
+        Fail 'Codex Auto Resume is still in use here, so nothing was removed:'
+        foreach ($line in $blockers) { Write-Host ('       ' + $line) }
+        Write-Host '       Close it, and run this uninstaller again.'
+        exit 1
+    }
     if (Test-Path $Python) {
         Step 'Removing the watcher, autostart, notification identity and Start Menu entry'
         # Without -Purge this keeps settings and pending recoveries, which is what the
@@ -573,7 +931,9 @@ if ($Uninstall) {
         # running or its state cannot be verified, and throwing the code away meant
         # deleting the engine and the interpreter out from under a live watcher and
         # then printing "Removed." over the top of its refusal.
-        $code = Invoke-Setup $setupArgs
+        # The engine is asked to leave the entry in Add or remove programs for the end of this branch.
+        $env:CODEX_AUTO_RESUME_KEEP_ENTRY = '1'
+        try { $code = Invoke-Setup $setupArgs } finally { $env:CODEX_AUTO_RESUME_KEEP_ENTRY = $null }
         if ($code -ne 0) {
             Fail 'The watcher could not be stopped, so nothing was removed.'
             Write-Host '       Close the ChatGPT/Codex app, wait a moment, and run this again.'
@@ -685,6 +1045,12 @@ if ($Uninstall) {
     # So the check comes first, and the proof only goes when there is nothing left to do.
     # The copy journal is ours too, and an installation being removed has nothing left to
     # put back, so it goes with the rest rather than outliving the thing it described.
+    # Every removal that can fail has succeeded: only now does the program leave the list of installed programs.
+    Remove-OwnUninstallEntry $OwnedHome
+    # This script may be the copy being removed: PowerShell has read all of it, and nothing holds the file.
+    $kept = Join-Path $OwnedHome 'uninstall'
+    $keptItem = Get-Item -LiteralPath $kept -Force -ErrorAction SilentlyContinue
+    if ($keptItem -and $keptItem.PSIsContainer -and -not $keptItem.LinkType) { $null = Remove-OwnedItem $kept }
     foreach ($file in @('CodexAutoResumeSettings.exe', 'codex-auto-resume.ico', 'watcher-launcher.py',
                         'runtime.json', '.owned-by-codex-auto-resume',
                         '.codex-auto-resume-install-journal.json')) {
@@ -776,294 +1142,423 @@ if (-not $OwnedHome -or -not (Test-PathInside $AppDir $OwnedHome)) {
 # the two steps in that order used to answer "not installed" and then delete the proof.
 $claimedAside = Restore-InterruptedCopy -Path $Journal -Root $OwnedHome
 
-$upgrade = Test-Path $AppDir
-
-# Which edition is installed, read while the old program files are still where they were.
-# The move-aside below takes the whole app tree away, which is why no advanced package can
-# outlive a move to the standard edition - and why this is the last moment to read it.
-#
-# Moving between editions is a reinstall, never an update, so it happens only when asked for.
-# Refused before the sweep, the handover and the move: a run that stops here has changed
-# nothing, and says what going ahead would keep and change. Install.cmd reads the code as its
-# cue to ask y/N and run this again with -AllowEditionChange; the bootstrap passes that only
-# after -Edition and -Force.
-$EDITION_CHANGE_REFUSED = 14
-$previousEdition = $null
-if ($upgrade) { $previousEdition = Get-Edition -Src (Join-Path $AppDir 'src') }
-$editionChange = $upgrade -and ($previousEdition -ne $edition)
-if ($editionChange) {
-    Write-Host ''
-    Write-Host (Get-EditionStatement -From $previousEdition -To $edition)
-    if (-not $AllowEditionChange) {
-        Fail ('This archive is the ' + $edition + ' edition, and the ' + $previousEdition + ' edition is installed here.')
-        Write-Host '       An edition is changed only when that is asked for, so nothing was changed.'
-        Write-Host '       Install.cmd asks before it changes it; run by hand, add -AllowEditionChange.'
-        exit $EDITION_CHANGE_REFUSED
+function Open-ClosedDashboard {
+    <#
+        Opens again each Dashboard window this update asked to close (the close step below), where it was: the
+        arguments it wrote are its own reopen's (WindowReopen.ReopenArguments), taken only in that form, and it
+        checks each again. On every way out once the windows were asked - an update that finished, and one that
+        stopped or was put back (the `finally` at the end) - so an update that fails never leaves the person's
+        Dashboard closed. Each window writes a record of its own, reopen-after-update-<its process id>.txt, so two
+        windows open again as two. Only a record written after this run asked is opened, and every record is removed
+        once read: none is left behind for a later update to open. Nothing is opened that was not open before. Once.
+    #>
+    param([switch]$Updated)
+    if ($null -eq $script:DashboardsAskedAt -or $script:DashboardsReopened) { return }
+    $script:DashboardsReopened = $true
+    $dashboard = Join-Path $InstallHome 'CodexAutoResumeSettings.exe'
+    # Only the words the window's own ParseArguments takes (gui/WindowReopen.cs): its pages, sections, themes and
+    # designs by name, the bounds and the frame as numbers, a generation from 1 to 9 and a place for the keyboard it
+    # gives - nothing else, such as the window's --uninstall. The numbers' ranges are the window's to check again.
+    $pages = 'overview|pending|history|statistics|diagnostics|settings'
+    $sections = 'general|recovery|continuation|appearance|advanced'
+    $word = '--settings|--maximized|--page=(' + $pages + ')|--section=(' + $sections + ')' +
+            '|--theme=(system|light|dark)|--design=(soft|classic|plain)' +
+            '|--bounds=(-[0-9]{1,5}|[0-9]{1,6}),(-[0-9]{1,5}|[0-9]{1,6}),[0-9]{1,6},[0-9]{1,6}' +
+            '|--frame=[0-9]{1,2},[0-9]{1,2},[0-9]{1,2},[0-9]{1,2}|--reopened=[1-9]' +
+            '|--focus=(save|restore|close|start|page\.(' + $pages + ')|section\.(' + $sections + ')|setting\.[a-z0-9_]{1,64})'
+    $rule = '^(' + $word + ')( (' + $word + '))*$'
+    $records = @(Get-ChildItem -LiteralPath (Join-Path $InstallHome 'config') -File -Filter 'reopen-after-update*.txt' `
+                               -ErrorAction SilentlyContinue)
+    foreach ($record in $records) {
+        $fresh = $record.LastWriteTimeUtc -ge $script:DashboardsAskedAt
+        $line = ([string](Get-Content -LiteralPath $record.FullName -Raw -ErrorAction SilentlyContinue)).Trim()
+        $null = Remove-OwnedItem $record.FullName
+        if ($record.Name -cnotmatch '^reopen-after-update-[0-9]{1,10}\.txt$') { continue }
+        if (-not $fresh -or -not (Test-Path -LiteralPath $dashboard -PathType Leaf)) { continue }
+        if ($line -cnotmatch $rule) { continue }
+        try {
+            # Through the shell, never -NoNewWindow: that hands the window this script's own output and error handles,
+            # so whoever reads them - the Dashboard that started an update, `$o = & Setup.exe -Silent` - waited for
+            # this Dashboard to close before it saw the end. The Dashboard is a Windows program, built
+            # /target:winexe, so the shell opens no console for it.
+            Start-Process -FilePath $dashboard -ArgumentList $line -WorkingDirectory $InstallHome
+            if ($Updated) { Ok 'The Dashboard was opened again on the new version' }
+            else { Ok 'The Dashboard was opened again' }
+        } catch {
+            Warn 'The Dashboard could not be opened again; open it from the Start menu.'
+        }
     }
-    Ok ('Replacing the ' + $previousEdition + ' edition with the ' + $edition + ' edition, as asked')
-}
-
-if ($upgrade) { Step 'Updating program files' } else { Step 'Installing program files' }
-
-# Sweep up copies moved aside by an earlier upgrade. They are only removable once
-# whatever was using them has exited, which is normally by now - except the ones the
-# journal still accounts for, which are either the tree just put back or the one an
-# interrupted run was replacing and could not.
-foreach ($stale in (Get-ChildItem -Path $OwnedHome -Directory -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
-    $canonical = Resolve-Canonical $stale.FullName
-    if ($canonical -and ($claimedAside -contains $canonical)) {
-        Step ('Keeping ' + $stale.Name + ' until this installation is complete')
-        continue
-    }
-    $null = Remove-OwnedItem $stale.FullName
-}
-
-# Hand over from a running watcher before its files are replaced.
-#
-# Renaming app\ and runtime\ under a live watcher succeeds - Windows allows it - and the
-# old process carries on running the old code from the renamed copy, while setup below
-# sees the watcher mutex held, reports it already running and starts nothing. For an
-# ordinary upgrade that only delays the new version until the next sign-in. For a
-# security fix it means the fix is installed and not in effect. So the running watcher
-# is asked to stop through its own stop event - the same request "stop" and uninstall
-# make - and waited for.
-#
-# It is asked, never killed. A watcher stopped mid-submission would leave that recovery
-# unable to prove whether it was sent, and the product then refuses to send it again.
-# If it does not finish within the wait, the upgrade still completes and says plainly
-# that the old version is still running and how to replace it.
-$previousWatcherStillRunning = $false
-if ((Get-OwnedWatcherProcess).Count -gt 0) {
-    Step 'Stopping the running watcher so the new version takes over'
-    if ((Test-Path $Python) -and (Test-Path (Join-Path $AppDir 'scripts\plugin_setup.py'))) {
-        $null = Invoke-Setup @('stop')
-    }
-    $deadline = (Get-Date).AddSeconds(60)
-    while ((Get-Date) -lt $deadline -and (Get-OwnedWatcherProcess).Count -gt 0) {
-        Start-Sleep -Milliseconds 500
-    }
-    if ((Get-OwnedWatcherProcess).Count -gt 0) {
-        $previousWatcherStillRunning = $true
-        Warn 'The previous watcher is still finishing and was left running.'
-    } else {
-        Ok 'The previous watcher stopped'
+    # A window of an earlier version, closed by the fallback (Close-OwnedDashboard), wrote no record: it opens on the
+    # page its command line named, else the Overview - one for each window closed so.
+    foreach ($page in @($script:DashboardsFallback)) {
+        if (-not (Test-Path -LiteralPath $dashboard -PathType Leaf)) { break }
+        try {
+            if ($page -cmatch ('^(' + $pages + ')$')) {
+                Start-Process -FilePath $dashboard -ArgumentList ('--page=' + $page) -WorkingDirectory $InstallHome
+            } else {
+                Start-Process -FilePath $dashboard -WorkingDirectory $InstallHome
+            }
+            if ($Updated) { Ok 'The Dashboard was opened again on the new version' }
+            else { Ok 'The Dashboard was opened again' }
+        } catch {
+            Warn 'The Dashboard could not be opened again; open it from the Start menu.'
+        }
     }
 }
 
-# Replace only the program directories. Settings, state and logs sit beside them and are
-# deliberately not in this list, so an upgrade cannot lose a pending recovery.
-#
-# Moved aside, never deleted in place. Codex keeps this plugin's MCP server running, and
-# that holds the bundled interpreter's DLLs open; a loaded DLL cannot be deleted, so
-# `Remove-Item` failed part-way through and left the installation half-replaced. Windows
-# does allow renaming the directory that contains an open file - the running process
-# keeps working - so the old copy is moved out of the way and swept up next time.
-$pairs = @(@{ src = 'app'; dst = $AppDir }, @{ src = 'runtime'; dst = $RunDir })
-# The files the payload carries at its root, by name - the settings window and its icon,
-# which is exactly what build/make_release.py puts there. Named rather than enumerated:
-# copying whatever happened to be at the payload root wrote every stray file into the
-# installation home, including names this product reads as proof that the home is ours
-# (`runtime.json`, `.owned-by-codex-auto-resume`) or as state. An installer authors
-# neither. Checked here, before anything is moved, so a payload missing one of them
-# fails while putting it back is still free.
-$rootFiles = @('CodexAutoResumeSettings.exe', 'codex-auto-resume.ico')
-foreach ($pair in $pairs) {
-    if (-not (Test-Path (Join-Path $Payload $pair.src))) { Fail ('Payload is incomplete: ' + $pair.src); exit 1 }
-}
-foreach ($name in $rootFiles) {
-    if (-not (Test-Path (Join-Path $Payload $name))) { Fail ('Payload is incomplete: ' + $name); exit 1 }
-}
-
-# Move everything aside first, copy second, and undo the whole thing on any failure -
-# including a failure during the copy. An upgrade that stops half way is worse than one
-# that does not happen: the first attempt at this rolled back a failed move but not a
-# failed copy, and left the application present and the interpreter missing.
-#
-# The names every tree will be moved to are decided before the first move and written to
-# the journal, because the undo below cannot run at all if the power goes. One stamp for
-# the whole run: the two trees have different base names, so they cannot collide.
-$stamp = Get-Date -Format 'yyyyMMddHHmmss'
-$plan = @()
-foreach ($pair in $pairs) {
-    if (-not (Test-Path $pair.dst)) { continue }
-    $aside = $pair.dst + '.old-' + $stamp
-    $plan += @{ src = $pair.src; dst = $pair.dst; aside = $aside }
-}
-$moved = @()
+# From here on, the Dashboard windows an update asks to close (below) open again on every way out, through the
+# `finally` at the end - an update that finishes, and one that stops, is refused or is put back alike.
+$script:DashboardsAskedAt = $null
+$script:DashboardsReopened = $false
+$script:DashboardsFallback = @()
 try {
-    if ($plan.Count -gt 0) { Write-CopyJournal -Path $Journal -Root $OwnedHome -Entries $plan }
-    foreach ($pair in $plan) {
-        $aside = $pair.aside
-        Move-Item -Path $pair.dst -Destination $aside -ErrorAction Stop
-        $moved += @{ from = $aside; to = $pair.dst }
+    $upgrade = Test-Path $AppDir
+
+    # Which edition is installed, read while the old program files are still where they were.
+    # The move-aside below takes the whole app tree away, which is why no advanced package can
+    # outlive a move to the standard edition - and why this is the last moment to read it.
+    #
+    # Moving between editions is a reinstall, never an update, so it happens only when asked for.
+    # Refused before the sweep, the handover and the move: a run that stops here has changed
+    # nothing, and says what going ahead would keep and change. Install.cmd reads the code as its
+    # cue to ask y/N and run this again with -AllowEditionChange; the bootstrap passes that only
+    # after -Edition and -Force.
+    $EDITION_CHANGE_REFUSED = 14
+    $previousEdition = $null
+    if ($upgrade) { $previousEdition = Get-Edition -Src (Join-Path $AppDir 'src') }
+    $editionChange = $upgrade -and ($previousEdition -ne $edition)
+    if ($editionChange) {
+        Write-Host ''
+        Write-Host (Get-EditionStatement -From $previousEdition -To $edition)
+        if (-not $AllowEditionChange) {
+            Fail ('This archive is the ' + $edition + ' edition, and the ' + $previousEdition + ' edition is installed here.')
+            Write-Host '       An edition is changed only when that is asked for, so nothing was changed.'
+            Write-Host '       Install.cmd asks before it changes it; run by hand, add -AllowEditionChange.'
+            exit $EDITION_CHANGE_REFUSED
+        }
+        Ok ('Replacing the ' + $previousEdition + ' edition with the ' + $edition + ' edition, as asked')
     }
+
+    if ($upgrade) { Step 'Updating program files' } else { Step 'Installing program files' }
+
+    # Sweep up copies moved aside by an earlier upgrade. They are only removable once
+    # whatever was using them has exited, which is normally by now - except the ones the
+    # journal still accounts for, which are either the tree just put back or the one an
+    # interrupted run was replacing and could not.
+    foreach ($stale in (Get-ChildItem -Path $OwnedHome -Directory -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
+        $canonical = Resolve-Canonical $stale.FullName
+        if ($canonical -and ($claimedAside -contains $canonical)) {
+            Step ('Keeping ' + $stale.Name + ' until this installation is complete')
+            continue
+        }
+        $null = Remove-OwnedItem $stale.FullName
+    }
+
+    # Hand over from a running watcher before its files are replaced.
+    #
+    # Renaming app\ and runtime\ under a live watcher succeeds - Windows allows it - and the
+    # old process carries on running the old code from the renamed copy, while setup below
+    # sees the watcher mutex held, reports it already running and starts nothing. For an
+    # ordinary upgrade that only delays the new version until the next sign-in. For a
+    # security fix it means the fix is installed and not in effect. So the running watcher
+    # is asked to stop through its own stop event - the same request "stop" and uninstall
+    # make - and waited for.
+    #
+    # It is asked, never killed. A watcher stopped mid-submission would leave that recovery
+    # unable to prove whether it was sent, and the product then refuses to send it again.
+    # If it does not finish within the wait, the upgrade still completes and says plainly
+    # that the old version is still running and how to replace it.
+    $previousWatcherStillRunning = $false
+    # Whether a watcher of this installation ran before the update: the setup below starts the new version's again only
+    # then, or where it runs at sign-in anyway - never one the person had stopped (--watcher-was-stopped, v0.6.16).
+    $watcherWasRunning = (Get-OwnedWatcherProcess).Count -gt 0
+    if ($watcherWasRunning) {
+        Step 'Stopping the running watcher so the new version takes over'
+        if ((Test-Path $Python) -and (Test-Path (Join-Path $AppDir 'scripts\plugin_setup.py'))) {
+            $null = Invoke-Setup @('stop')
+        }
+        $deadline = (Get-Date).AddSeconds(60)
+        while ((Get-Date) -lt $deadline -and (Get-OwnedWatcherProcess).Count -gt 0) {
+            Start-Sleep -Milliseconds 500
+        }
+        if ((Get-OwnedWatcherProcess).Count -gt 0) {
+            $previousWatcherStillRunning = $true
+            Warn 'The previous watcher is still finishing and was left running.'
+        } else {
+            Ok 'The previous watcher stopped'
+        }
+    }
+
+    # The Dashboard, as the watcher (v0.6.16, the owner: after an update everything runs on the new version). An
+    # open window of this installation is asked to close itself (Close-OwnedDashboard): a window of this version
+    # writes where it was (config\reopen-after-update-<its process id>.txt) and closes - unless it has unsaved
+    # Settings changes, which it keeps, and says so, and stays open; a window of an earlier version, which does not
+    # listen, is closed as a person closes it. A window that stayed runs the previous version until it is opened
+    # again, and is said as what it is. Nothing is ended by force. Each window opens again where it was once setup
+    # has run (below) - and on every other way out from here, through the `finally` at the end, so an update that
+    # stops or is put back leaves it open as it was. A record an earlier update left, one that stopped before it
+    # read it, is never opened: removed before asking.
+    if ($upgrade) {
+        foreach ($stale in @(Get-ChildItem -LiteralPath (Join-Path $InstallHome 'config') -File `
+                                           -Filter 'reopen-after-update*.txt' -ErrorAction SilentlyContinue)) {
+            $null = Remove-OwnedItem $stale.FullName
+        }
+    }
+    $dashboardsOpen = $upgrade -and (Get-OwnedDashboardProcess).Count -gt 0
+    if ($dashboardsOpen) {
+        Step 'Closing the Dashboard so it opens again on the new version'
+        $closed = Close-OwnedDashboard
+        if ($closed.Fallback.Count -gt 0) {
+            Ok 'A Dashboard of an earlier version, which cannot be asked, was closed as a window is closed'
+        }
+        if ($closed.Unsaved -gt 0) {
+            Warn 'A Dashboard window with unsaved changes stayed open; it runs the previous version until it is opened again.'
+        }
+        if ($closed.Stuck -gt 0) {
+            Warn 'A Dashboard window could not be closed; it runs the previous version until it is opened again.'
+        }
+        if ($closed.Unsaved -eq 0 -and $closed.Stuck -eq 0) { Ok 'The Dashboard closed' }
+    }
+
+    # Replace only the program directories. Settings, state and logs sit beside them and are
+    # deliberately not in this list, so an upgrade cannot lose a pending recovery.
+    #
+    # Moved aside, never deleted in place. Codex keeps this plugin's MCP server running, and
+    # that holds the bundled interpreter's DLLs open; a loaded DLL cannot be deleted, so
+    # `Remove-Item` failed part-way through and left the installation half-replaced. Windows
+    # does allow renaming the directory that contains an open file - the running process
+    # keeps working - so the old copy is moved out of the way and swept up next time.
+    $pairs = @(@{ src = 'app'; dst = $AppDir }, @{ src = 'runtime'; dst = $RunDir })
+    # The files the payload carries at its root, by name - the settings window and its icon,
+    # which is exactly what build/make_release.py puts there. Named rather than enumerated:
+    # copying whatever happened to be at the payload root wrote every stray file into the
+    # installation home, including names this product reads as proof that the home is ours
+    # (`runtime.json`, `.owned-by-codex-auto-resume`) or as state. An installer authors
+    # neither. Checked here, before anything is moved, so a payload missing one of them
+    # fails while putting it back is still free.
+    $rootFiles = @('CodexAutoResumeSettings.exe', 'codex-auto-resume.ico')
     foreach ($pair in $pairs) {
-        New-Item -ItemType Directory -Force -Path $pair.dst | Out-Null
-        # Join-Path takes two paths in Windows PowerShell; a third argument is a
-        # parameter-binding error, not a longer path.
-        Copy-Item -Path (Join-Path (Join-Path $Payload $pair.src) '*') `
-                  -Destination $pair.dst -Recurse -Force -ErrorAction Stop
+        if (-not (Test-Path (Join-Path $Payload $pair.src))) { Fail ('Payload is incomplete: ' + $pair.src); exit 1 }
     }
-} catch {
-    Warn ('Could not replace the installation: ' + $_.Exception.Message)
-    foreach ($undo in $moved) {
-        if (Test-Path $undo.to) { $null = Remove-OwnedItem $undo.to }
-        Move-Item -Path $undo.from -Destination $undo.to -Force -ErrorAction SilentlyContinue
+    foreach ($name in $rootFiles) {
+        if (-not (Test-Path (Join-Path $Payload $name))) { Fail ('Payload is incomplete: ' + $name); exit 1 }
     }
-    # The journal is deliberately left where it is. The undo above is best-effort, and if
-    # any part of it did not take, that file is the only record of where the tree went.
-    Fail 'The existing installation was put back; nothing was changed.'
-    Write-Host '       Close the ChatGPT/Codex app and run this installer again.'
-    exit 1
-}
-# Both trees are in place, so nothing is waiting to be put back and the copies moved
-# aside are leftovers again rather than the last good ones.
-if (Test-Path -LiteralPath $Journal) { $null = Remove-OwnedItem $Journal }
-foreach ($old in $moved) { $null = Remove-OwnedItem $old.from }
 
-# The settings window and the icon live at the payload root because the window
-# resolves runtime\python.exe and app\src relative to its own directory. The window may
-# be open right now, so the same move-aside rule applies to it. By name, from the list
-# checked above - never everything the payload root happens to hold.
-foreach ($name in $rootFiles) {
-    $source = Join-Path $Payload $name
-    $target = Join-Path $InstallHome $name
+    # Move everything aside first, copy second, and undo the whole thing on any failure -
+    # including a failure during the copy. An upgrade that stops half way is worse than one
+    # that does not happen: the first attempt at this rolled back a failed move but not a
+    # failed copy, and left the application present and the interpreter missing.
+    #
+    # The names every tree will be moved to are decided before the first move and written to
+    # the journal, because the undo below cannot run at all if the power goes. One stamp for
+    # the whole run: the two trees have different base names, so they cannot collide.
+    $stamp = Get-Date -Format 'yyyyMMddHHmmss'
+    $plan = @()
+    foreach ($pair in $pairs) {
+        if (-not (Test-Path $pair.dst)) { continue }
+        $aside = $pair.dst + '.old-' + $stamp
+        $plan += @{ src = $pair.src; dst = $pair.dst; aside = $aside }
+    }
+    $moved = @()
+    # Its own line, so the installer window's step follows the copy rather than staying on what came before it.
+    Step 'Copying the program files into place'
     try {
-        Copy-Item -Path $source -Destination $target -Force -ErrorAction Stop
+        if ($plan.Count -gt 0) { Write-CopyJournal -Path $Journal -Root $OwnedHome -Entries $plan }
+        foreach ($pair in $plan) {
+            $aside = $pair.aside
+            Move-Item -Path $pair.dst -Destination $aside -ErrorAction Stop
+            $moved += @{ from = $aside; to = $pair.dst }
+        }
+        foreach ($pair in $pairs) {
+            New-Item -ItemType Directory -Force -Path $pair.dst | Out-Null
+            # Join-Path takes two paths in Windows PowerShell; a third argument is a
+            # parameter-binding error, not a longer path.
+            Copy-Item -Path (Join-Path (Join-Path $Payload $pair.src) '*') `
+                      -Destination $pair.dst -Recurse -Force -ErrorAction Stop
+        }
     } catch {
-        $aside = $target + '.old-' + (Get-Date -Format 'yyyyMMddHHmmss')
-        Move-Item -Path $target -Destination $aside -Force -ErrorAction SilentlyContinue
-        Copy-Item -Path $source -Destination $target -Force
+        Warn ('Could not replace the installation: ' + $_.Exception.Message)
+        foreach ($undo in $moved) {
+            if (Test-Path $undo.to) { $null = Remove-OwnedItem $undo.to }
+            Move-Item -Path $undo.from -Destination $undo.to -Force -ErrorAction SilentlyContinue
+        }
+        # The journal is deliberately left where it is. The undo above is best-effort, and if
+        # any part of it did not take, that file is the only record of where the tree went.
+        Fail 'The existing installation was put back; nothing was changed.'
+        Write-Host '       Close the ChatGPT/Codex app and run this installer again.'
+        exit 1
     }
-}
-foreach ($stale in (Get-ChildItem -Path $OwnedHome -File -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
-    $null = Remove-OwnedItem $stale.FullName
-}
-if (-not (Test-Path $Python)) { Fail 'The bundled Python runtime is missing from the payload.'; exit 1 }
-$runtimeVersion = & $Python -c 'import sys;print(str(sys.version_info[0])+chr(46)+str(sys.version_info[1]))'
-Ok ('Bundled Python ' + $runtimeVersion + ' (no system Python needed)')
+    # Both trees are in place, so nothing is waiting to be put back and the copies moved
+    # aside are leftovers again rather than the last good ones.
+    if (Test-Path -LiteralPath $Journal) { $null = Remove-OwnedItem $Journal }
+    foreach ($old in $moved) { $null = Remove-OwnedItem $old.from }
 
-# The payload is itself a valid local marketplace, so the plugin installs from the bytes
-# already on disk rather than from GitHub, with no network access. Nothing *here*
-# verifies those bytes: on the plugin route the bootstrap checked the archive before
-# unpacking it, and a hand-extracted download carries only the assurance whoever
-# downloaded it obtained for themselves.
-Step 'Registering the Codex plugin'
-$added = Invoke-Codex $codex @('plugin', 'marketplace', 'add', $AppDir)
-if ($added.Code -ne 0) {
-    # A previous install may have registered the same marketplace name from GitHub.
-    # Repointing it at the payload is the upgrade path, so replace rather than fail.
-    if (($added.Err + $added.Out) -match 'already added from a different source') {
-        Step 'Repointing the existing marketplace at this installation'
-        $null = Invoke-Codex $codex @('plugin', 'marketplace', 'remove', $MarketplaceName)
-        $added = Invoke-Codex $codex @('plugin', 'marketplace', 'add', $AppDir)
+    # The settings window and the icon live at the payload root because the window
+    # resolves runtime\python.exe and app\src relative to its own directory. The window may
+    # be open right now, so the same move-aside rule applies to it. By name, from the list
+    # checked above - never everything the payload root happens to hold.
+    foreach ($name in $rootFiles) {
+        $source = Join-Path $Payload $name
+        $target = Join-Path $InstallHome $name
+        try {
+            Copy-Item -Path $source -Destination $target -Force -ErrorAction Stop
+        } catch {
+            $aside = $target + '.old-' + (Get-Date -Format 'yyyyMMddHHmmss')
+            Move-Item -Path $target -Destination $aside -Force -ErrorAction SilentlyContinue
+            Copy-Item -Path $source -Destination $target -Force
+        }
     }
-}
-if ($added.Code -ne 0) { Warn 'Could not register the local marketplace; the Codex skill may be unavailable.' }
-# Ours, by name - never the no-name form. Without a name, Codex refreshes every Git
-# marketplace the user has configured and reinstalls those vendors' plugins: an action on
-# other people's software that nobody asked this installer to take, and a network fetch on
-# the route that promises none. Measured in an isolated CODEX_HOME: for the local
-# marketplace registered above, the named form is a no-op ("not configured as a Git
-# marketplace"); it only does anything when a GitHub registration survived the repoint.
-$null = Invoke-Codex $codex @('plugin', 'marketplace', 'upgrade', $MarketplaceName)
-$installed = Invoke-Codex $codex @('plugin', 'add', ($PluginName + '@' + $MarketplaceName))
-if ($installed.Code -ne 0 -and (($installed.Err + $installed.Out) -match 'os error 5|back up plugin cache')) {
-    # Codex replaces the plugin by backing up its cache directory, and it cannot while
-    # a file inside that directory is open. The open file is ours: Codex starts this
-    # plugin's MCP launcher, which lives in the plugin, so the plugin cannot be updated
-    # while Codex is using it. Stopping only our own launchers is enough - Codex starts
-    # a fresh one the next time it needs the server.
-    $ours = Get-OwnedMcpProcess -Roots @($InstallHome, $PluginCacheRoot)
-    if ($ours.Count -gt 0) {
-        Step 'Releasing the plugin files this installation is holding open'
-        foreach ($process in $ours) {
+    foreach ($stale in (Get-ChildItem -Path $OwnedHome -File -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
+        $null = Remove-OwnedItem $stale.FullName
+    }
+    if (-not (Test-Path $Python)) { Fail 'The bundled Python runtime is missing from the payload.'; exit 1 }
+    $runtimeVersion = & $Python -c 'import sys;print(str(sys.version_info[0])+chr(46)+str(sys.version_info[1]))'
+    Ok ('Bundled Python ' + $runtimeVersion + ' (no system Python needed)')
+
+    # The payload is itself a valid local marketplace, so the plugin installs from the bytes
+    # already on disk rather than from GitHub, with no network access. Nothing *here*
+    # verifies those bytes: on the plugin route the bootstrap checked the archive before
+    # unpacking it, and a hand-extracted download carries only the assurance whoever
+    # downloaded it obtained for themselves.
+    Step 'Registering the Codex plugin'
+    $added = Invoke-Codex $codex @('plugin', 'marketplace', 'add', $AppDir)
+    if ($added.Code -ne 0) {
+        # A previous install may have registered the same marketplace name from GitHub.
+        # Repointing it at the payload is the upgrade path, so replace rather than fail.
+        if (($added.Err + $added.Out) -match 'already added from a different source') {
+            Step 'Repointing the existing marketplace at this installation'
+            $null = Invoke-Codex $codex @('plugin', 'marketplace', 'remove', $MarketplaceName)
+            $added = Invoke-Codex $codex @('plugin', 'marketplace', 'add', $AppDir)
+        }
+    }
+    if ($added.Code -ne 0) { Warn 'Could not register the local marketplace; the Codex skill may be unavailable.' }
+    # Ours, by name - never the no-name form. Without a name, Codex refreshes every Git
+    # marketplace the user has configured and reinstalls those vendors' plugins: an action on
+    # other people's software that nobody asked this installer to take, and a network fetch on
+    # the route that promises none. Measured in an isolated CODEX_HOME: for the local
+    # marketplace registered above, the named form is a no-op ("not configured as a Git
+    # marketplace"); it only does anything when a GitHub registration survived the repoint.
+    $null = Invoke-Codex $codex @('plugin', 'marketplace', 'upgrade', $MarketplaceName)
+    $installed = Invoke-Codex $codex @('plugin', 'add', ($PluginName + '@' + $MarketplaceName))
+    if ($installed.Code -ne 0 -and (($installed.Err + $installed.Out) -match 'os error 5|back up plugin cache')) {
+        # Codex replaces the plugin by backing up its cache directory, and it cannot while
+        # a file inside that directory is open. The open file is ours: Codex starts this
+        # plugin's MCP launcher, which lives in the plugin, so the plugin cannot be updated
+        # while Codex is using it. Stopping only our own launchers is enough - Codex starts
+        # a fresh one the next time it needs the server.
+        $ours = Get-OwnedMcpProcess -Roots @($InstallHome, $PluginCacheRoot)
+        if ($ours.Count -gt 0) {
+            Step 'Releasing the plugin files this installation is holding open'
+            foreach ($process in $ours) {
+                Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+            Start-Sleep -Milliseconds 800
+            $installed = Invoke-Codex $codex @('plugin', 'add', ($PluginName + '@' + $MarketplaceName))
+        }
+    }
+    if ($installed.Code -ne 0) {
+        # After an edition change, what is and is not the new edition yet (Write-PluginNotUpdated).
+        if ($editionChange) { Write-PluginNotUpdated -From $previousEdition -To $edition }
+        else { Write-PluginNotUpdated }
+    } else { Ok 'Codex plugin installed' }
+
+    # Every run, not only when a locked file forced it: a tool server Codex started before the
+    # files were replaced is still running the previous version's code, and that code may not
+    # read the state the new version writes. It holds no state of its own, so ending it only
+    # costs a restart - Codex starts a fresh one, from the new files, when it next needs the
+    # tools. Only this installation's own launchers are touched, found by path, never by name.
+    $stale = Get-OwnedMcpProcess -Roots @($InstallHome, $PluginCacheRoot)
+    if ($stale.Count -gt 0) {
+        Step 'Restarting the plugin tools on the new version'
+        foreach ($process in $stale) {
             Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
         }
-        Start-Sleep -Milliseconds 800
-        $installed = Invoke-Codex $codex @('plugin', 'add', ($PluginName + '@' + $MarketplaceName))
     }
-}
-if ($installed.Code -ne 0) {
-    # After an edition change, what is and is not the new edition yet (Write-PluginNotUpdated).
-    if ($editionChange) { Write-PluginNotUpdated -From $previousEdition -To $edition }
-    else { Write-PluginNotUpdated }
-} else { Ok 'Codex plugin installed' }
 
-# Every run, not only when a locked file forced it: a tool server Codex started before the
-# files were replaced is still running the previous version's code, and that code may not
-# read the state the new version writes. It holds no state of its own, so ending it only
-# costs a restart - Codex starts a fresh one, from the new files, when it next needs the
-# tools. Only this installation's own launchers are touched, found by path, never by name.
-$stale = Get-OwnedMcpProcess -Roots @($InstallHome, $PluginCacheRoot)
-if ($stale.Count -gt 0) {
-    Step 'Restarting the plugin tools on the new version'
-    foreach ($process in $stale) {
-        Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+    # The entry in Add or remove programs is written by the engine's setup below, and only where this has
+    # left an uninstaller for it to name. Only for the ordinary home: an installation somewhere the person
+    # chose through CODEX_AUTO_RESUME_PLUGIN_HOME would need the uninstaller told where it is, and gets none.
+    if ([string]::IsNullOrWhiteSpace($env:CODEX_AUTO_RESUME_PLUGIN_HOME)) {
+        $null = Install-KeptUninstaller -Source $PSCommandPath
     }
-}
 
-Step 'Setting up the watcher'
-$setupArgs = @('setup')
-# An upgrade repairs an installation; it does not get to decide anything for its owner.
-# Plain `setup` runs the engine's `enable` and registers the sign-in entry, so upgrading
-# over an installation whose owner had paused recovery switched it back on, and put back
-# a sign-in entry they had removed - silently, under the name of an update. `--keep-state`
-# leaves the pause switch alone and only re-registers an autostart that is already ours,
-# which still repairs a stale path after the runtime moves.
-#
-# Only on the upgrade branch. A first install has no decision to preserve, and has to end
-# up enabled and registered or nothing is being watched.
-if ($upgrade) { $setupArgs += '--keep-state' }
-# An edition change is the new edition's to act on, and only it knows what that means for it:
-# entering the advanced edition starts every advanced feature off, whatever an earlier advanced
-# installation left on. Setup carries the edition it replaced across to `install --edition-from`.
-#
-# A home with no program in it but advanced state in config\advanced is the other way in. An
-# uninstall keeps config\ unless it purges, so the state of an advanced installation that was
-# armed, moved to the standard edition and then uninstalled is still there, and nothing says
-# which edition ran here last. The advanced archive installed over it enters from standard as
-# far as setup is told, so every advanced feature starts off rather than coming back on.
-$advancedLeft = Test-Path -LiteralPath (Join-Path (Join-Path $InstallHome 'config') 'advanced')
-if ($editionChange) { $setupArgs += @('--edition-from', $previousEdition) }
-elseif (-not $upgrade -and $edition -eq 'advanced' -and $advancedLeft) {
-    $setupArgs += @('--edition-from', 'standard')
-}
-if ($SkipStartup) { $setupArgs += '--no-startup' }
-# 2 means everything was done but the watcher was not seen running - a real outcome that
-# is neither success nor failure. Treating it as failure would roll back a good install;
-# treating it as success is how this script came to end with "Installed and running."
-# about a watcher nobody had looked at.
-$SETUP_UNCONFIRMED = 2
-$code = Invoke-Setup $setupArgs
-$watcherUnconfirmed = $code -eq $SETUP_UNCONFIRMED
-if ($code -ne 0 -and -not $watcherUnconfirmed) {
-    Fail 'Setup did not complete. Nothing was removed; read the message above.'
-    exit 1
-}
+    Step 'Setting up the watcher'
+    $setupArgs = @('setup')
+    # An upgrade repairs an installation; it does not get to decide anything for its owner.
+    # Plain `setup` runs the engine's `enable` and registers the sign-in entry, so upgrading
+    # over an installation whose owner had paused recovery switched it back on, and put back
+    # a sign-in entry they had removed - silently, under the name of an update. `--keep-state`
+    # leaves the pause switch alone and only re-registers an autostart that is already ours,
+    # which still repairs a stale path after the runtime moves.
+    #
+    # Only on the upgrade branch. A first install has no decision to preserve, and has to end
+    # up enabled and registered or nothing is being watched.
+    if ($upgrade) { $setupArgs += '--keep-state' }
+    # An edition change is the new edition's to act on, and only it knows what that means for it:
+    # entering the advanced edition starts every advanced feature off, whatever an earlier advanced
+    # installation left on. Setup carries the edition it replaced across to `install --edition-from`.
+    #
+    # A home with no program in it but advanced state in config\advanced is the other way in. An
+    # uninstall keeps config\ unless it purges, so the state of an advanced installation that was
+    # armed, moved to the standard edition and then uninstalled is still there, and nothing says
+    # which edition ran here last. The advanced archive installed over it enters from standard as
+    # far as setup is told, so every advanced feature starts off rather than coming back on.
+    # Unless the uninstall said it took the advanced edition away (config\edition-left.txt, v0.6.16): then this is the
+    # same edition coming back, and its choices stay as an update keeps them (K2, amended by the owner on 2026-10-18).
+    $advancedLeft = Test-Path -LiteralPath (Join-Path (Join-Path $InstallHome 'config') 'advanced')
+    $leftFile = Join-Path (Join-Path $InstallHome 'config') 'edition-left.txt'
+    $leftBy = $null
+    $leftItem = Get-Item -LiteralPath $leftFile -Force -ErrorAction SilentlyContinue
+    if ($leftItem -and -not $leftItem.PSIsContainer -and -not ($leftItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        try { $leftBy = ([IO.File]::ReadAllText($leftItem.FullName)).Trim() } catch { $leftBy = $null }
+    }
+    if ($editionChange) { $setupArgs += @('--edition-from', $previousEdition) }
+    elseif (-not $upgrade -and $edition -eq 'advanced' -and $advancedLeft -and $leftBy -cne 'advanced') {
+        $setupArgs += @('--edition-from', 'standard')
+    }
+    if ($SkipStartup) { $setupArgs += '--no-startup' }
+    if ($upgrade -and -not $watcherWasRunning) { $setupArgs += '--watcher-was-stopped' }
+    # 2 means everything was done but the watcher was not seen running - a real outcome that
+    # is neither success nor failure. Treating it as failure would roll back a good install;
+    # treating it as success is how this script came to end with "Installed and running."
+    # about a watcher nobody had looked at.
+    $SETUP_UNCONFIRMED = 2
+    $code = Invoke-Setup $setupArgs
+    $watcherUnconfirmed = $code -eq $SETUP_UNCONFIRMED
+    if ($code -ne 0 -and -not $watcherUnconfirmed) {
+        Fail 'Setup did not complete. Nothing was removed; read the message above.'
+        exit 1
+    }
 
-Step 'Checking the installation'
-$null = Invoke-Setup @('doctor')
-if ($LASTEXITCODE -ne 0) { Warn 'The health check reported a problem. Recovery is installed but may not be ready.' }
+    Step 'Checking the installation'
+    $null = Invoke-Setup @('doctor')
+    if ($LASTEXITCODE -ne 0) { Warn 'The health check reported a problem. Recovery is installed but may not be ready.' }
 
-Write-Host ''
-if ($script:Failed) { Write-Host 'Finished with problems. See the messages above.'; exit 1 }
-if ($watcherUnconfirmed) {
-    if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
-    else { Write-Host 'Installed.' }
-    Write-Host 'The watcher could not be confirmed running, so nothing is being watched yet.'
-    Write-Host 'Open Start Menu > Codex Auto Resume and use Start watcher, or run this again.'
-} elseif ($previousWatcherStillRunning) {
-    Write-Host 'Updated. Your settings and pending recoveries were kept.'
-    Write-Host 'The previous version of the watcher was asked to stop and is still finishing'
-    Write-Host 'what it was doing; nothing was ended by force. Once it has stopped, open'
-    Write-Host 'Start Menu > Codex Auto Resume and use Start watcher - or sign out and back in.'
-} else {
-    if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
-    else { Write-Host 'Installed and running.' }
-    Write-Host 'Recommended settings are already on. Nothing else to do.'
+    # The Dashboard that closed for this update opens again on the new version, where it was (Open-ClosedDashboard).
+    Open-ClosedDashboard -Updated
+
+    Write-Host ''
+    if ($script:Failed) { Write-Host 'Finished with problems. See the messages above.'; exit 1 }
+    if ($watcherUnconfirmed) {
+        if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
+        else { Write-Host 'Installed.' }
+        Write-Host 'The watcher could not be confirmed running, so nothing is being watched yet.'
+        Write-Host 'Open Start Menu > Codex Auto Resume and use Start watcher, or run this again.'
+    } elseif ($previousWatcherStillRunning) {
+        Write-Host 'Updated. Your settings and pending recoveries were kept.'
+        Write-Host 'The previous version of the watcher was asked to stop and is still finishing'
+        Write-Host 'what it was doing; nothing was ended by force. Once it has stopped, open'
+        Write-Host 'Start Menu > Codex Auto Resume and use Start watcher - or sign out and back in.'
+    } else {
+        if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
+        else { Write-Host 'Installed and running.' }
+        Write-Host 'Recommended settings are already on. Nothing else to do.'
+    }
+    Write-Host ''
+    Write-Host 'To change anything: open Codex and ask "open auto resume settings",'
+    Write-Host 'or use Start Menu > Codex Auto Resume.'
+    exit 0
+} finally {
+    # Every way out once the Dashboard was asked to close - a stop, a put-back installation, an error - opens it again.
+    try { Open-ClosedDashboard } catch { }
 }
-Write-Host ''
-Write-Host 'To change anything: open Codex and ask "open auto resume settings",'
-Write-Host 'or use Start Menu > Codex Auto Resume.'
-exit 0

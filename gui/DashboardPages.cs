@@ -387,7 +387,11 @@ namespace CodexAutoResume
                                       delegate { ToggleThread(pendingList); });
             // Only cancelling is offered for everything at once: it can only reduce what runs.
             cancelAllButton = MakeButton(S("action.cancel_all", "Cancel all"), false, delegate { CancelAll(); });
-            foreach (Button button in new[] { retryButton, cancelButton, timelineButton, threadButton, cancelAllButton })
+            // v0.6.16 (issue #39): and every waiting recovery looked at again - one retired only on proof of newer
+            // work, every other one left to wait as it was. It sends nothing and brings nothing forward.
+            rescanButton = MakeButton(S("action.rescan", "Rescan and reconcile"), false, delegate { Rescan(); });
+            foreach (Button button in new[] { retryButton, cancelButton, timelineButton, threadButton, cancelAllButton,
+                                              rescanButton })
             {
                 button.Margin = Pad(0, 0, 6, 0);
                 row.Controls.Add(button);

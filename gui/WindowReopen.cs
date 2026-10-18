@@ -508,7 +508,7 @@ namespace CodexAutoResume
         /// this one stays as it is: the old words and colours are better than no window.
         private void Reopen(bool firstRead)
         {
-            if (reopening || auditing) return;
+            if (reopening || auditing || rendering) return;
             bool normal = WindowState == FormWindowState.Normal;
             Rectangle bounds = normal ? Bounds : RestoreBounds;
             // The invisible border as it is now; maximized, as it was last measured on screen, or as the window this
@@ -693,6 +693,136 @@ namespace CodexAutoResume
         {
             if (ticks % 2 == 0) WatchSettings();
             if (recheck) CheckReopen(false);
+            if (updateRearm) ListenForUpdateAgain();
+        }
+
+        // ------------------------------------------------------------------ an update from elsewhere (v0.6.16)
+        // A setup program, or an update with -Silent, that replaces this installation asks its open windows to close
+        // (install.ps1, Get-UpdateEventName): through the window's own close, as a person closes it. The window writes
+        // where it is - its own reopen's arguments - for the installer to open the new version with, once it has run.
+        // With unsaved Settings changes it keeps them and stays open, and says so (UpdateUnsavedFile): the installer
+        // goes on, says that a window with unsaved changes stayed open - only then - and this window runs the previous
+        // version until it is opened again; an uninstall stops before it removes anything. A window that answers
+        // nothing - one of an earlier version, which does not listen - is closed by the installer as a person closes
+        // it (install.ps1, Close-OwnedDashboard). The update this window started itself (InstallUpdate, InstallPick:
+        // updatingHere) is never one it closes for: it opens the new version itself.
+
+        /// What an update writes beside the settings, read by the installer once (install.ps1, Open-ClosedDashboard):
+        /// one record for each window, named by its process, so two windows open again as two and neither's place is
+        /// written over by the other's.
+        internal static string UpdateReopenFile(int process)
+        {
+            return "reopen-after-update-" + process.ToString(CultureInfo.InvariantCulture) + ".txt";
+        }
+
+        /// The answer of a window that keeps unsaved Settings changes and stays open (install.ps1,
+        /// Test-DashboardUnsaved), named by its process as its reopen record is.
+        internal static string UpdateUnsavedFile(int process)
+        {
+            return "update-unsaved-" + process.ToString(CultureInfo.InvariantCulture) + ".txt";
+        }
+
+        /// Says, for the installer, that this window stays open for its unsaved changes: the one answer the installer
+        /// reads as unsaved changes, so it never says so of a window that did not.
+        private void AnswerUnsaved()
+        {
+            try
+            {
+                string config = Path.Combine(installRoot, "config");
+                if (Directory.Exists(config))
+                    File.WriteAllText(Path.Combine(config, UpdateUnsavedFile(Process.GetCurrentProcess().Id)), "unsaved",
+                                      new UTF8Encoding(false));
+            }
+            catch (Exception) { /* unanswered: the installer treats it as a window that cannot be asked */ }
+        }
+
+        private System.Threading.EventWaitHandle updateClose;
+        private System.Threading.RegisteredWaitHandle updateWait;
+        /// While this window's own update runs: the close an installer asks for is not this window's to answer.
+        private bool updatingHere;
+        /// A request this window did not answer (CloseForUpdate returned early): it listens again once the installer has
+        /// let the event go, so the next update finds it listening (ListenForUpdateAgain).
+        private bool updateRearm;
+
+        /// The event an update sets for the installation at `root`: the first sixteen hex digits of the SHA-256 of its
+        /// full path in lower case, as UTF-8 - install.ps1's Get-UpdateEventName, the same. Pure.
+        internal static string UpdateEventName(string root)
+        {
+            string full = Path.GetFullPath(root).TrimEnd('\\').ToLowerInvariant();
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(new UTF8Encoding(false).GetBytes(full));
+                var hex = new StringBuilder("Local\\CodexAutoResume.CloseForUpdate.");
+                for (int i = 0; i < 8; i++) hex.Append(hash[i].ToString("x2", CultureInfo.InvariantCulture));
+                return hex.ToString();
+            }
+        }
+
+        /// Listens for an update's request, once the window is on screen.
+        private void WatchForUpdate()
+        {
+            if (auditing || installRoot == null) return;
+            try
+            {
+                updateClose = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.ManualReset,
+                                                                    UpdateEventName(installRoot));
+                updateWait = System.Threading.ThreadPool.RegisterWaitForSingleObject(updateClose, UpdateHeard, null, -1, true);
+                FormClosed += delegate
+                {
+                    try { updateWait.Unregister(null); updateClose.Dispose(); }
+                    catch (Exception) { }
+                };
+            }
+            catch (Exception) { /* no event to listen on: an update leaves this window as it always did */ }
+        }
+
+        /// The event was set: heard once (the wait is registered to run once), and answered on the window's own thread.
+        private void UpdateHeard(object state, bool timedOut)
+        {
+            try { if (IsHandleCreated && !IsDisposed) BeginInvoke(new MethodInvoker(CloseForUpdate)); }
+            catch (Exception) { }
+        }
+
+        /// Listens for the next update's request once this one's is over: the installer resets the event when it stops
+        /// waiting (install.ps1), and a wait registered again while it is still set would hear the same request again
+        /// at once. Looked at by the clock (TickReopen) while a request went unanswered.
+        private void ListenForUpdateAgain()
+        {
+            try
+            {
+                if (updateClose == null || IsDisposed || updateClose.WaitOne(0)) return;
+                updateRearm = false;
+                if (updateWait != null) updateWait.Unregister(null);
+                updateWait = System.Threading.ThreadPool.RegisterWaitForSingleObject(updateClose, UpdateHeard, null, -1, true);
+            }
+            catch (Exception) { /* not listening: an update leaves this window as it always did */ }
+        }
+
+        /// The update's request: where this window is, written for the installer, and the window's own close - unless
+        /// it is this window's own update, or there are unsaved edits, which are never thrown away for an update. A
+        /// request it does not answer leaves it listening for the next one (updateRearm).
+        private void CloseForUpdate()
+        {
+            if (updatingHere || reopening || auditing || Dirty())
+            {
+                // Unsaved changes are the one reason it says: the others are moments, not answers.
+                if (!updatingHere && !reopening && !auditing) AnswerUnsaved();
+                updateRearm = true;
+                return;
+            }
+            bool normal = WindowState == FormWindowState.Normal;
+            string arguments = ReopenArguments(currentPage ?? firstPage, currentSection, normal ? Bounds : RestoreBounds,
+                                               WindowState == FormWindowState.Maximized, storedTheme, storedDesign,
+                                               NextGeneration(false, request.Generation), invisibleFrame, FocusName());
+            try
+            {
+                string config = Path.Combine(installRoot, "config");
+                if (Directory.Exists(config))
+                    File.WriteAllText(Path.Combine(config, UpdateReopenFile(Process.GetCurrentProcess().Id)), arguments,
+                                      new UTF8Encoding(false));
+            }
+            catch (Exception) { /* it closes all the same; the installer opens nothing it was not told of */ }
+            Close();
         }
     }
 }

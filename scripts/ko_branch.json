@@ -42,6 +42,7 @@
   "intentionally_english": {
     "LICENSE": "The authoritative licence text. A translation would be a second licence.",
     "skills/codex-auto-resume/SKILL.md": "Instructions Codex reads to operate the plugin, not prose a person reads. Translating it would make the two branches behave differently, which is exactly what generating ko from main exists to prevent.",
+    "docs/WINGET.md": "A maintainer's note on submitting the winget manifests, read by the one person who submits them, who reads English; the files it describes are English.",
     ".github/GENERATED-BRANCH.md": "Written by the generator, for maintainers, and only exists on ko."
   },
   "_reviewed_comment": [
@@ -58,23 +59,23 @@
     "CI does not translate anything. A person decides what the Korean should say."
   ],
   "reviewed": {
-    "docs/CHANGELOG.md": "47caf252aa605724b9920974b640cf8ad407b1aa1c71f020e0df093588f9f156",
+    "docs/CHANGELOG.md": "13fd40d378d1a05e3ac9e98e895a3b969363c041a22019a310c3a67520bbd789",
     "docs/CONTRIBUTING.md": "3207eb4667a5a226d17ee186857d87cbf0f9aa4e5d1c36cd7b7793a5ad427202",
-    "docs/CONTRIBUTORS.md": "29a99a735aec90caf76898eadc6cbbd3e8250a39aa832996d6ab9dfe63638c7f",
-    "docs/PRIVACY.md": "ec6a472d7f2e54a01b7781f65387b51f4d30ee59c3496117586689660f010cac",
-    "README.md": "ff2ffa7703eedf11bf02ec9884ab4d4a6466881d48c2cbee9557e701b5f05580",
-    "docs/SECURITY.md": "8e8c094aee929bb250c88737f1893adcd89c55436049fcbaca4f4c2fbaf8b64c",
+    "docs/CONTRIBUTORS.md": "e51f2d18c238d90babab0f6d3a83af7c7152183f1cad2a10ab9fda735a7527bd",
+    "docs/PRIVACY.md": "1fccd810d866411ebe0078bbd244692153d86372075559757bb3fd32e7fcd997",
+    "README.md": "2d112c5bcf5d8dd494ab9f88a330b851a6c2a219971c4d2718d419b810c55624",
+    "docs/SECURITY.md": "d7cfa1cb0caa9e6772553926182200a63de9f17970597935d7b61df573c454ae",
     "docs/SUPPORT.md": "7833488b0467b1afa997380e3cc9c0f6a3b1cfa25d488db50f9ec0774c4c08e4",
-    "docs/BRAND.md": "42a8ce1d0639dbed62fc7bab91d1f663d5a0775e4f666f8bb13aabd4c085ef6c",
+    "docs/BRAND.md": "87e979826c947d29e3ba3e7e59777b75ea7ce3b2b7f66738927796e98a49efa9",
     "docs/COMPARISON.md": "9a6707df274814dc62788462c9f245aea787bf9515a3f6391dfb7893f158b706",
     "docs/DEVELOPMENT.md": "e62cfbe43c855d5c87bfce8e0d69eba649f625f3f1d508818d8126de723b73de",
     "docs/PLUGIN.md": "e61e04ca4f08f01dc2e1ab89d8f443a2f6915b8ff38bbddce63900ddde42c945",
     "docs/VERIFY.md": "64c0d82d1101d02429707828e326dc29caed063d041b500ae5c88bbb9a0bc2e7",
-    "docs/FEATURE_MATRIX.md": "ad18ecaeae7e3f2300940df903fe8fb51d98d85d33a0fe39f8f8457bd1db6122",
+    "docs/FEATURE_MATRIX.md": "43593d4800cd9043d2b2879597aa404e342db81efae81163311f3158cccbae49",
     "docs/LIVE_ACCEPTANCE.md": "0c7c71b31d40ac1a4af254808730f3dfe17d30713373fb84c8c97e237808e11f",
-    "docs/ROADMAP.md": "22994c5fd1a8fac3b15f35cb4c4ff87055e22454869886b5135ea80eca234767",
-    "docs/GUIDE.md": "5bf776b12ff82ecaef6162c2a0202d08df265530b3e07e687ef940de6920cbda",
-    "docs/STANDARDS.md": "497908cb6975a1f5c444d1569059cbcb20e7277b6c4071f09e08d9fa3501bd75",
-    "docs/EDITIONS.md": "bda522b134c433a5ed623d93a82daa685165704188541598bdae0fe39a19a066"
+    "docs/ROADMAP.md": "f60bdfbc33356e84dbb913617b765dce221526479e3217c7ab2907e1d07058fc",
+    "docs/GUIDE.md": "658f50fdef00cc15e09cfb9068f97920ad81f5b1f691806864d5417845936c7c",
+    "docs/STANDARDS.md": "abea7ad04038a6c1fd4282b7da71497afa8a2ebbd8edfca805d69317250483c2",
+    "docs/EDITIONS.md": "ca6a19ae4a893bffded6275633f6c4004d4867276825f65efdf73d165926e622"
   }
 }

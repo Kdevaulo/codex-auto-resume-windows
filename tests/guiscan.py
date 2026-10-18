@@ -38,6 +38,8 @@ SEPARATE = ("gui/McpLauncher.cs",)
 #   settings    the process, the bridge, the frame and the Settings page - what
 #               `SettingsApp.cs` was
 #   dashboard   the navigation and its five pages - what `Dashboard.cs` was
+#   installer   the installer's window (v0.6.16): the setup programs' wizard, the Dashboard's update and the
+#               uninstall - built into the setup programs as well (build/make_setup.py)
 #   controls    the soft controls both halves are drawn with - what `Controls.cs` was
 #   generated   written by `build/make_brand.py` from the Python palette
 #
@@ -46,7 +48,7 @@ SEPARATE = ("gui/McpLauncher.cs",)
 # is a rule about the first three; `generated` is where the palette's values legitimately are.
 # Before v0.6.10-alpha each of those rules named the file it meant, so the split had to move
 # them all at once; a group is what they name now.
-GROUPS = ("settings", "dashboard", "controls", "generated")
+GROUPS = ("settings", "dashboard", "installer", "controls", "generated")
 HALVES = ("settings", "dashboard")
 
 
@@ -156,8 +158,9 @@ def window_sources() -> tuple[str, ...]:
 
 
 def handwritten() -> tuple[str, ...]:
-    """Every compiled source a person writes, in compile order: the window, then its controls."""
-    return window_sources() + group("controls")
+    """Every compiled source a person writes, in compile order: the window, the installer's window, then the
+    controls."""
+    return window_sources() + group("installer") + group("controls")
 
 
 def controls() -> str:

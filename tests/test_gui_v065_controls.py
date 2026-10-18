@@ -704,10 +704,13 @@ $t = @{}
 foreach ($n in 'Palette','Soft','SoftCombo','SoftDropList') { $t[$n] = $assembly.GetType('CodexAutoResume.' + $n, $true) }
 function P($target, [string]$name) { return $target.GetType().GetProperty($name, $instance).GetValue($target, $null) }
 function Pump([int]$ms) { $sw = [Diagnostics.Stopwatch]::StartNew(); do { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 3 } while ($sw.ElapsedMilliseconds -lt $ms) }
-# Events arrive on UI Automation's own threads: waited for, up to three seconds.
+# Events arrive on UI Automation's own threads, and on a busy runner late: main's CI on 2026-10-16 heard the open's
+# item only after the three seconds it was given, first of all the events it then listed. So each is waited for up to
+# $hearWithin and answered the moment it is there - a deadline, never a fixed wait.
+$hearWithin = 30000
 function Heard([string]$line) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    do { if (@([Uia]::Seen()) -contains $line) { return $true }; Pump 20 } while ($sw.ElapsedMilliseconds -lt 3000)
+    do { if (@([Uia]::Seen()) -contains $line) { return $true }; Pump 20 } while ($sw.ElapsedMilliseconds -lt $hearWithin)
     return $false
 }
 $null = $t.Palette.GetMethod('Adopt', $static).Invoke($null, [object[]]@('light'))

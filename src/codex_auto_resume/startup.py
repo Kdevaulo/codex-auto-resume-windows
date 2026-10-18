@@ -2,8 +2,9 @@
 
 Both are optional, both are HKCU only, and both need no administrator rights. The only
 things ever written are the single ``CodexAutoResume`` value under the current user's Run
-key and the ``codex-auto-resume:`` protocol keys under the user's own class registrations.
-Nothing system-wide, no services, no scheduled tasks.
+key and the ``codex-auto-resume:`` protocol keys under the user's own class registrations -
+and, through read_key/write_key/delete_key at the foot of this module, the one key of
+addremove.py under the user's Uninstall key. Nothing system-wide, no services, no scheduled tasks.
 """
 from __future__ import annotations
 
@@ -349,4 +350,50 @@ def uninstall() -> bool:
         return False
     except OSError as exc:
         raise StartupError("Cannot remove the current user's Run value") from exc
+    return True
+
+
+# ---------------------------------------------------------------------------------------- a key's own values
+# addremove.py decides what its key says and whose it is; startup.py stays the one module that touches the
+# registry, so these are the whole of what it is asked for. They carry no rule of their own.
+
+def read_key(path: str, names) -> dict | None:
+    """The values of `names` under the HKCU key `path` that exist, or None when the key does not."""
+    winreg = _winreg()
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_READ) as key:
+            found = {}
+            for name in names:
+                try:
+                    found[name] = winreg.QueryValueEx(key, name)[0]
+                except FileNotFoundError:
+                    continue
+            return found
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise StartupError("Cannot read the current user's registry key") from exc
+
+
+def write_key(path: str, values: dict) -> None:
+    """Create the HKCU key `path` and set each value: a string as REG_SZ, an integer as REG_DWORD."""
+    winreg = _winreg()
+    try:
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_SET_VALUE) as key:
+            for name, value in values.items():
+                kind = winreg.REG_DWORD if isinstance(value, int) else winreg.REG_SZ
+                winreg.SetValueEx(key, name, 0, kind, value)
+    except OSError as exc:
+        raise StartupError("Cannot write the current user's registry key") from exc
+
+
+def delete_key(path: str) -> bool:
+    """Idempotent: True when the HKCU key `path` was removed. A key with subkeys is refused by Windows, as it should be."""
+    winreg = _winreg()
+    try:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, path)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise StartupError("Cannot remove the current user's registry key") from exc
     return True

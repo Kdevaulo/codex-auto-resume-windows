@@ -138,6 +138,9 @@ _RECEIVERS = {
         "limitSchema": [("bridge:describe", "schema{name}")],
         # v0.6.11: what a drop-down takes of a person's own (Custom...), and the sets of days a choice names.
         "custom": [("bridge:describe", "schema[].custom")],
+        # v0.6.16: the kinds of notice that may stay on screen: core's catalog keys, and an edition's words.
+        "keys": [("bridge:describe", "schema[].keys")],
+        "labels": [("bridge:describe", "schema[].labels")],
         "named": [("bridge:describe", "schema[].custom.named")],
         # The Save request, built by setting name: each must be a setting the bridge stores.
         "jsonValues": SETTINGS,
@@ -180,6 +183,11 @@ _LOCAL = {
     "gui/SoftTheme.cs": {"MOTION"},
     # v0.6.15-beta: the homes the card writes back - their folders and aliases - and the request it writes them in.
     "gui/SettingsHomes.cs": {"entry", "changes"},
+    # v0.6.16: the installer window reads a plugin.json's version, never a reply.
+    "gui/InstallerFlow.cs": {"manifest"},
+    # v0.6.16: the render mode's job (build/motion_window.py writes it, not the bridge): the job, its forms and
+    # frames, and a frame's own parts - never a reply's.
+    "gui/WindowRender.cs": {"job", "forms", "frame", "answer", "combo", "listed", "scroll", "Map(forms, locale)"},
 }
 
 # The window was two files until v0.6.10-alpha, when each became several. The three tables above
@@ -215,6 +223,7 @@ LOCAL = _spread(_LOCAL)
 
 # Reads by a name computed from nothing literal, which no golden can check, each with its reason.
 UNCHECKED = {
+    ("gui/WindowRender.cs", "forms", "locale"): "the render job's replies for each language its frames are in",
     ("gui/DashboardData.cs", "map", "key"): "the accessor helpers themselves (Number, Str, Items, Map)",
     ("gui/DashboardCompat.cs", "capabilities", "name"): "each capability the report carries, in the "
                                                    "order the window lists them",
@@ -225,6 +234,8 @@ UNCHECKED = {
                                                "every_day, weekdays or weekends, as the schema carries them",
     ("gui/DashboardTools.cs", "held", "thread"): "one conversation's own message, by that conversation's id "
                                                  "(v0.6.11); the map is empty in every golden",
+    ("gui/SettingsPage.cs", "keys", "id"): "each kind of notice the schema lists, by its id (v0.6.16, notice_kinds)",
+    ("gui/SettingsPage.cs", "labels", "id"): "each kind an edition registered, by its id (v0.6.16, notice_kinds)",
 }
 
 # Dictionaries the window writes a request into, by setting name: a name written there is one the

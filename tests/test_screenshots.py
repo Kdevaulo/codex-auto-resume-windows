@@ -147,6 +147,22 @@ class ManifestTests(unittest.TestCase):
         from codex_auto_resume import config
         self.assertEqual(self.manifest["version"], config.version(), REGENERATE)
 
+    def test_the_envelope_is_the_standard_editions_whatever_this_process_registered(self):
+        """An edition's kinds of notice stay registered for the life of a process (notice_kinds), so an advanced test
+        run before this one put them in the standard edition's `describe` answer, and the pictures' inputs read as
+        moved in the advanced lanes only (the v0.6.16 final's dev CI). The generator reads the standard edition's
+        answers with core's kinds alone, and puts back whatever was registered."""
+        from codex_auto_resume import l10n, notice_kinds
+        shots = generator()
+        before = shots.bridge_envelope("en")
+        made = notice_kinds.register("picture_probe", ("picture_probe",), {locale: "Probe" for locale in l10n.LOCALES})
+        try:
+            self.assertEqual(shots.bridge_envelope("en"), before)
+            self.assertIn(made, notice_kinds.kinds(), "what was registered is put back")
+        finally:
+            with notice_kinds._lock:
+                notice_kinds._registered.pop("picture_probe", None)
+
     def generator(self):
         import sys
         sys.path.insert(0, str(ROOT / "build"))
@@ -156,13 +172,28 @@ class ManifestTests(unittest.TestCase):
         finally:
             sys.path.pop(0)
 
+    def inputs_of_a_fresh_process(self) -> dict:
+        """render_inputs() asked in a process of its own, of the standard edition, as the generator is run. In the
+        advanced lanes an earlier test in this process can leave the advanced edition's state behind - its kinds of
+        notice, a loaded edition - and the panel's markup then read as moved there and nowhere else (the v0.6.16
+        final's dev CI, advanced lane part 4)."""
+        import subprocess
+        environment = {key: value for key, value in os.environ.items() if key != "CODEX_AR_EDITION"}
+        environment["PYTHONPATH"] = os.pathsep.join((str(ROOT / "src"), str(ROOT / "tests")))
+        code = ("import json, sys; sys.path.insert(0, %r); import make_screenshots as m; "
+                "inputs = m.render_inputs(); print(); print(json.dumps(inputs))" % str(ROOT / "build"))
+        done = subprocess.run([sys.executable, "-X", "utf8", "-c", code], capture_output=True, cwd=str(ROOT),
+                              env=environment, timeout=1800, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(done.returncode, 0, done.stderr.decode("utf-8", "replace")[-3000:])
+        return json.loads(done.stdout.decode("utf-8").strip().splitlines()[-1])
+
     def test_every_render_input_is_unchanged_since_the_images_were_made(self):
         """Asked of the generator, so the two can never disagree about what an input is.
 
         The panel's input is the markup it renders rather than the files that produce it,
         so this recomputes it rather than hashing a path.
         """
-        current = self.generator().render_inputs()
+        current = self.inputs_of_a_fresh_process()
         stale = []
         for name, recorded in self.manifest["inputs"].items():
             if name not in current:
@@ -1714,10 +1745,13 @@ class CardPictureTests(unittest.TestCase):
             made = {asset.relative_to(ROOT).as_posix(): copy.relative_to(ROOT).as_posix()
                     for asset, copy in self.generator.card_paths(locale).values()}
             self.assertEqual(made, pairs)
-        # No picture of a notification is left outside the manifest, as notification.png was.
+        # No picture of a notification is left outside the manifest, as notification.png was. The card's motion
+        # pictures (v0.6.16) are pinned by their own manifest, assets/motion.json, and held there by test_motion_fidelity.
+        motion_path = ROOT / "assets" / "motion.json"
+        moving = set(json.loads(motion_path.read_text(encoding="utf-8"))["images"]) if motion_path.is_file() else set()
         pictured = {path.relative_to(ROOT).as_posix() for folder in ("assets", "docs/images")
                     for path in (ROOT / folder).glob("*notification*.png")}
-        self.assertEqual(pictured, expected)
+        self.assertEqual(pictured - moving, expected)
 
     def test_the_card_says_what_the_watcher_would_say(self):
         """The watcher's builder, the catalogs' words, the sample's conversation - never a real one."""
@@ -2345,8 +2379,15 @@ class FasterRunTests(unittest.TestCase):
         # in one place; nothing the product runs names it.
         named = {path.name for path in guiscan.sources() if "CODEX_AR_STILL_READY" in path.read_text(encoding="utf-8")}
         self.assertEqual(named, {"SoftTheme.cs"})
-        setting = {path.name for path in guiscan.sources() if "EventWaitHandle" in path.read_text(encoding="utf-8")}
+        texts = {path.name: path.read_text(encoding="utf-8") for path in guiscan.sources()}
+        setting = {name for name, text in texts.items() if "EventWaitHandle.OpenExisting(Soft.StillReady)" in text}
         self.assertEqual(setting, {"DashboardData.cs"})
+        # One other file names a wait handle (v0.6.16): the update's close request, which the window only waits on.
+        # It is never set by the window, and it is never the capture's.
+        handles = {name for name, text in texts.items() if "EventWaitHandle" in text}
+        self.assertEqual(handles, {"DashboardData.cs", "WindowReopen.cs"})
+        self.assertNotIn("StillReady", texts["WindowReopen.cs"])
+        self.assertNotIn(".Set()", texts["WindowReopen.cs"])
         self.assertEqual([path for path in srcscan.package_files()
                           if "CODEX_AR_STILL_READY" in srcscan.read(path)], [])
 

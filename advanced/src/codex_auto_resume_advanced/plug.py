@@ -129,6 +129,28 @@ class AdvancedPlug(Plug):
         return None
 
 
+# v0.6.16: this edition's kinds of notice a person can keep on screen until clicked, as core's registry takes an
+# edition's (codex_auto_resume.notice_kinds.register): an id, the notifier kinds it covers, and its words in every
+# language. Every notice this edition raises is one: the usage meter's warning (issue #29), and the forced stop's three
+# (v0.6.16-beta.4) - a turn it could not stop, a queue to Resume in Codex, a conversation it could not continue after
+# the reset. Each is named by its notice's own title. Its other capabilities raise no notice of their own: a turn run
+# here, a compaction or another model ends as core's own notices say (resumed, failed, stopped).
+NOTICE_KINDS = (("near_limit", ("near_limit",), "msg.toast_near_limit"),
+                ("near_limit_not_stopped", ("near_limit_not_stopped",), "msg.toast_near_limit_not_stopped"),
+                ("near_limit_press_resume", ("near_limit_press_resume",), "msg.toast_near_limit_press_resume"),
+                ("near_limit_not_continued", ("near_limit_not_continued",), "msg.toast_near_limit_not_continued"))
+
+
+def register_notice_kinds():
+    """Register NOTICE_KINDS with core, which then lists them in Settings and keeps their notices on screen when a
+    person chose to. Registering again replaces, so a second plug in one process changes nothing."""
+    from codex_auto_resume import l10n, notice_kinds
+    for kind_id, notices, key in NOTICE_KINDS:
+        notice_kinds.register(kind_id, notices, {locale: l10n.text(key, locale) for locale in l10n.LOCALES})
+
+
 def create(paths) -> AdvancedPlug:
-    """The plug for the installation whose home is `paths`."""
+    """The plug for the installation whose home is `paths` - and this edition's kinds of notice, registered with core
+    as the plug is made (register_notice_kinds)."""
+    register_notice_kinds()
     return AdvancedPlug(paths)

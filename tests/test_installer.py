@@ -124,9 +124,16 @@ class SafetyTests(unittest.TestCase):
         self.assertIn("src = 'runtime'", install_section)
         # Settings, state and logs are only ever removed under an explicit -Purge.
         purge = self.text.index("if ($Purge)")
-        for state in ("'config'", "'logs'"):
-            first = self.text.index(state)
-            self.assertGreater(first, purge, "%s must only be removed under -Purge" % state)
+        first = self.text.index("'logs'")
+        self.assertGreater(first, purge, "'logs' must only be removed under -Purge")
+        # Before the purge, config is named only as the folder where an open Dashboard leaves its answer to an update
+        # (Test-DashboardAnswered, Close-OwnedDashboard: reopen-after-update-*.txt, update-unsaved-*.txt), and is
+        # never the thing removed.
+        for found in re.finditer(re.escape("'config'"), self.text[:purge]):
+            line = self.text[self.text.rindex("\n", 0, found.start()) + 1:self.text.index("\n", found.start())]
+            with self.subTest(line=line.strip()):
+                self.assertRegex(line, r"Join-Path \(?\$InstallHome 'config'\)?")
+                self.assertNotIn("Remove-", line)
 
     def test_purge_is_opt_in(self):
         self.assertIn("[switch]$Purge", self.text)
@@ -815,6 +822,11 @@ class UninstallRegistrationFailureTests(unittest.TestCase):
         source = VOICE + block(text, "function Quote-Argument", "function Invoke-Setup")
         source += ("\nfunction Fail { param([string]$m) "
                    "$script:Failed = $true; Write-Host $m }\n")
+        # The branch ends by removing the entry in Add or remove programs; here there is none, and the two
+        # calls into the registry are stood in for, so the real one is never asked.
+        source += block(text, "function Remove-OwnUninstallEntry", "function Write-CopyJournal")
+        source += ("\nfunction Read-UninstallEntry { param([string]$Name) return $null }\n"
+                   "function Remove-UninstallEntry { param([string]$Name) throw 'the registry was asked' }\n")
         script = ("$OwnedHome = %s\n$InstallHome = $OwnedHome\n"
                   "$AppDir = Join-Path $OwnedHome app\n$RunDir = Join-Path $OwnedHome runtime\n"
                   "$PluginCacheRoot = Join-Path $OwnedHome cache\n"

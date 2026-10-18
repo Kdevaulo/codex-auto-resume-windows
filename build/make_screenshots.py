@@ -2809,6 +2809,18 @@ def owner_only(folder: Path) -> None:
                    check=True, capture_output=True, creationflags=NO_WINDOW)
 
 
+def capture_moment(clock=time.time) -> float:
+    """The moment a capture's records are seeded at and the window is told it is (Soft.StillNow): now, in whole
+    seconds.
+
+    The window prints a time of day as the seeded moment's distance from StillNow laid on WINDOW_CLOCK, and a
+    reading's resets are whole seconds after the seed (sample_usage: int(now) + ...). Seeded at a fractional now,
+    every reset came out that fraction of a second early on the window's clock - the weekly reset, which falls on a
+    whole minute, read 12:59 where the envelope's (seeded at the whole ENVELOPE_NOW) and the README motion's read
+    13:00, depending only on the instant the capture began. Whole, the two are the same to the second."""
+    return float(int(clock()))
+
+
 def render_window(targets: dict, theme: str | None = None, design: str | None = None,
                   captured=None) -> dict:
     """Capture each page of the window, with the watcher's mutex held but no watcher running.
@@ -2832,9 +2844,13 @@ def render_window(targets: dict, theme: str | None = None, design: str | None = 
         workspace = Path(name)
         home = scratch_installation(workspace, theme, design)
         codex, local = workspace / "codex", workspace / "LocalAppData"
-        now = time.time()
+        now = capture_moment()
         seed_window_state(home, codex, now)
         word = seed_compatibility(home, codex, local, now)
+        # The heartbeat the envelope's installation has, with its usage reading (sample_usage): the capture's
+        # mutex holder beats every second with no reading, which leaves this one as it is. Until v0.6.16 only the
+        # envelope had it, so the window was photographed with no "Codex usage, read ..." line the envelope said.
+        write_heartbeat(config.Paths(home), now, word)
         owner_only(config.Paths(home).state_dir)
         # The window reads conversation names from Codex's own state, found through
         # CODEX_HOME - pointed here at the synthetic one, so a capture can never show,
@@ -3356,6 +3372,28 @@ def pinned_installation(workspace: Path, *, watching: bool = True, engine: bool 
             l10n.set_preference(previous)
 
 
+@contextmanager
+def edition_notice_kinds(edition: str = "standard"):
+    """For the block, this process's kinds of notice are exactly `edition`'s: core's alone for the standard edition,
+    core's and the advanced plug's for the advanced one; whatever was registered before is put back after.
+    codex_auto_resume.notice_kinds keeps an edition's kinds for the life of a process, so an advanced test run earlier in
+    the same process left them in the standard edition's `describe` answer, and the pictures' inputs depended on what
+    had run before them (the v0.6.16 final's dev CI, advanced lanes)."""
+    from codex_auto_resume import notice_kinds
+    with notice_kinds._lock:
+        held = dict(notice_kinds._registered)
+        notice_kinds._registered.clear()
+    try:
+        if edition == "advanced":
+            from codex_auto_resume_advanced import plug
+            plug.register_notice_kinds()
+        yield
+    finally:
+        with notice_kinds._lock:
+            notice_kinds._registered.clear()
+            notice_kinds._registered.update(held)
+
+
 def window_envelopes(locales, design: str | None = None) -> dict:
     """Locale -> the canonical text of what the bridge tells the window, one line per read, with the
     installation's Design stored as `design` (Soft when none is given).
@@ -3365,7 +3403,7 @@ def window_envelopes(locales, design: str | None = None) -> dict:
     Statistics page's kinds of interruption), with only the pinned values above rewritten.
     """
     envelopes = {}
-    with tempfile.TemporaryDirectory() as name:
+    with tempfile.TemporaryDirectory() as name, edition_notice_kinds("standard"):
         workspace = Path(name)
         with pinned_installation(workspace, design=design) as surface:
             spellings = workspace_spellings(workspace)

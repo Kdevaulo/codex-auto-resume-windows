@@ -76,7 +76,9 @@ LISTS = {
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
     # same, and a person's own postponement taken away.
-    "machine.EVENT_CODES": ("set", 28, "338d004c0e77ba46"),
+    # v0.6.16 (issue #39): rescan_retired, rescan_rechecked, rescan_unresolved and rescan_changed - what a
+    # person's Rescan and reconcile found of each waiting record, one journal word for each outcome.
+    "machine.EVENT_CODES": ("set", 32, "405d5c00a0cd7440"),
     "machine.WAITING_CODES": ("set", 5, "aef153e5808afe46"),
     "machine.PUBLIC_CODES": ("set", 22, "33761768f9d99cd0"),
     "machine.PAGES": ("tuple", 6, "ffad1c9f0521398d"),
@@ -192,12 +194,13 @@ LISTS = {
     "ui.popup.ATTENTION_OVERLAYS": ("set", 4, "a707a2b300127033"),
     # v0.6.11: and the needs-you notice's light, attention; and a long sleep's, paused (power.py).
     # and Show me what happens' card, waiting.
-    "notifier.NOTICE_STATUS": ("dict", 13, "0119f51b8b7710c8"),   # v0.6.16-beta.3: near_limit
+    # v0.6.16-beta.3: near_limit; v0.6.16: the forced stop's three notices near a limit, each a kind of its own.
+    "notifier.NOTICE_STATUS": ("dict", 16, "3005b73bf99e26b3"),
     # v0.6.12: the power action's five notices follow them, in a table of their own (PowerNotice), and the
     # whole table is both.
     "notifier.POWER_STATUS": ("dict", 5, "d403490eeafa7732"),
     "notifier.POWER_EVENTS": ("tuple", 5, "e5a05bae37eb8e45"),
-    "notifier.STATUS": ("dict", 18, "a034163f3da8091a"),
+    "notifier.STATUS": ("dict", 21, "493cb07dc5d9ca80"),
     "mcpserver.Server.START_WORDING": ("dict", 4, "f15e04a780f57870"),
     # v0.6.11: the two editions, and the plug that is the whole difference between them.
     "edition.EDITIONS": ("tuple", 2, "49cc206af3867704"),

@@ -14,9 +14,16 @@
 // are the person's own and are never written anywhere but the advanced state.
 //
 // Every number with Custom... (item (f), "이런 수치들은 직접 입력도 가능해야 한다니까"): a choice the bridge says takes a number
-// typed in (its `custom` range) has Custom... last in its drop-down, and a number already typed in shown there as itself.
-// Custom... opens a box under the drop-down with Set beside it; the number is checked before anything is sent - a whole
-// number in the range - and the reason said where it is not, as the bridge's refusal is said where it refuses one.
+// of one's own (its `custom` range) has Custom... last in its drop-down, and a number already taken shown there as itself,
+// one item before Custom.... Custom... opens the small dialog the Settings page's Custom... has opened since v0.6.11
+// (SettingsOwn.cs OwnDialog; v0.6.16 final, the owner's "예전에 직접입력 누를 시 하던 방식대로"): the range said above a
+// number, in the unit the choices are said in, Use this value and Cancel. A number outside the range is refused in the
+// dialog, with the range, and nothing is sent; Cancel puts the drop-down back on the item it held; a number taken shows
+// in the drop-down - as one item before Custom..., or as the preset it is - and is sent as a choice is, the bridge's
+// refusal said as the page says any.
+//
+// Both windows off (v0.6.16 final): a capability with a pair of window switches - the meter, the wrap-up, the stop - and
+// both of them off says, under them, that it acts on neither.
 //
 // Nothing here draws anything the page does not draw already: the captions, help lines, boxes and buttons are the
 // Settings page's.
@@ -25,6 +32,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Windows.Forms;
 
 namespace CodexAutoResume
@@ -46,20 +54,24 @@ namespace CodexAutoResume
         private static readonly string[] PreviewWindows = { "300", "10080" };
         private readonly List<Label> previewLines = new List<Label>();
 
-        // (f): the drop-downs' last item, Custom..., and each customizable choice's box and Set, by its key.
+        // (f): the drop-downs' last item, Custom..., and each customizable drop-down by its key: its capability, its label,
+        // its range, its presets, the item it held before Custom... was chosen, and whether its dialog is open.
         private const string CustomChoice = "custom";
-        private readonly Dictionary<string, SoftTextArea> customBoxes = new Dictionary<string, SoftTextArea>();
-        private readonly Dictionary<string, Button> customSets = new Dictionary<string, Button>();
-        private readonly Dictionary<string, Control> customRows = new Dictionary<string, Control>();
-        // The keys whose box Custom... opened (a hidden window's controls all read as not Visible, so this says it).
-        private readonly HashSet<string> customOpen = new HashSet<string>();
+        private sealed class CustomPick
+        {
+            internal string Id, Key, Label;
+            internal int[] Range;
+            internal readonly HashSet<string> Presets = new HashSet<string>();
+            internal int Last = -1;
+            internal bool Asking;
+        }
+        private readonly Dictionary<string, CustomPick> customPicks = new Dictionary<string, CustomPick>();
+        // Null in every window a person opens. In a window AdvancedPageRun drives: what answers the dialog, never shown.
+        private Action<Form> customAnswer;
 
         private void ForgetCustomEntries()
         {
-            customBoxes.Clear();
-            customSets.Clear();
-            customRows.Clear();
-            customOpen.Clear();
+            customPicks.Clear();
         }
 
         /// A choice's custom range, [lowest, highest], or null where it takes only its presets.
@@ -70,56 +82,137 @@ namespace CodexAutoResume
             return new[] { Whole(range[0]), Whole(range[1]) };
         }
 
-        /// Under a customizable choice, the box a number is typed in and Set beside it - hidden until Custom... is chosen.
-        private void BuildCustomEntry(string id, string key, string label, int[] range, TableLayoutPanel card)
+        /// A customizable choice's drop-down kept with its range, and the item it holds followed, so that Custom... can
+        /// put it back.
+        private void WatchCustom(string id, string key, string label, int[] range, List<object> presets, SoftCombo combo)
         {
             if (range == null) return;
-            SoftTextArea box = OneLine(label + " - " + Word("page.option.custom", "Custom..."), 80, 4);
-            Button set = MakeButton(Word("page.option.set", "Set"), false, delegate { SetCustomValue(id, key, range); });
-            set.AccessibleName = Word("page.option.set", "Set") + " " + label;
-            var pair = new FlowLayoutPanel();
-            pair.AutoSize = true;
-            pair.WrapContents = false;
-            pair.Margin = new Padding(0);
-            pair.Controls.Add(box);
-            set.Margin = Pad(6, 0, 0, 0);
-            pair.Controls.Add(set);
-            Control row = NewRow(Word("page.option.range", "{low} to {high}").Replace("{low}", range[0].ToString(System.Globalization.CultureInfo.CurrentCulture))
-                                    .Replace("{high}", range[1].ToString(System.Globalization.CultureInfo.CurrentCulture)), pair);
-            row.Visible = false;
-            card.Controls.Add(row);
-            customBoxes[key] = box;
-            customSets[key] = set;
-            customRows[key] = row;
-        }
-
-        /// Custom... chosen: its box shown, the keyboard in it.
-        private void OpenCustomEntry(string key)
-        {
-            Control row;
-            SoftTextArea box;
-            if (!customRows.TryGetValue(key, out row) || !customBoxes.TryGetValue(key, out box)) return;
-            row.Visible = true;
-            customOpen.Add(key);
-            box.Box.Focus();
-        }
-
-        /// The number typed in, checked before anything is sent - a whole number from the range's lowest to its highest -
-        /// then set as a choice is; where it is not one, the reason is said and nothing is sent.
-        private void SetCustomValue(string id, string key, int[] range)
-        {
-            SoftTextArea box;
-            if (busy > 0 || advancedListing == null || !customBoxes.TryGetValue(key, out box)) return;
-            int typed;
-            if (!int.TryParse((box.Box.Text ?? "").Trim(), System.Globalization.NumberStyles.None,
-                              System.Globalization.CultureInfo.InvariantCulture, out typed) || typed < range[0] || typed > range[1])
+            var pick = new CustomPick();
+            pick.Id = id;
+            pick.Key = key;
+            pick.Label = label;
+            pick.Range = range;
+            foreach (object preset in presets ?? new List<object>())
+                pick.Presets.Add(Whole(preset).ToString(CultureInfo.InvariantCulture));
+            pick.Last = combo.SelectedIndex;
+            combo.SelectedIndexChanged += delegate
             {
-                TellAdvanced(Word("page.refused.option_range", "Type a whole number from {low} to {high}. Nothing was changed.")
-                    .Replace("{low}", range[0].ToString(System.Globalization.CultureInfo.CurrentCulture))
-                    .Replace("{high}", range[1].ToString(System.Globalization.CultureInfo.CurrentCulture)));
-                return;
+                var chosen = combo.SelectedItem as Choice;
+                if (chosen != null && chosen.Value != CustomChoice) pick.Last = combo.SelectedIndex;
+            };
+            customPicks[key] = pick;
+        }
+
+        /// Custom... chosen: its dialog, once the drop-down has finished taking the item - never inside its own event.
+        private void OpenCustom(string key, SoftCombo combo)
+        {
+            CustomPick pick;
+            if (!customPicks.TryGetValue(key, out pick) || pick.Asking) return;
+            pick.Asking = true;
+            if (advancedScript != null) AskCustom(combo, pick);
+            else if (auditing || !IsHandleCreated) HoldCustom(combo, pick);
+            else BeginInvoke((MethodInvoker)delegate { AskCustom(combo, pick); });
+        }
+
+        /// The dialog for a number of one's own, as the Settings page's Custom... asks for one: Cancel - or a number
+        /// refused, then the dialog closed - puts back the item the drop-down held; a number taken is shown and sent.
+        private void AskCustom(SoftCombo combo, CustomPick pick)
+        {
+            string taken = null;
+            try
+            {
+                if (combo.IsDisposed || busy > 0 || advancedListing == null) return;
+                var held = pick.Last >= 0 && pick.Last < combo.Items.Count ? combo.Items[pick.Last] as Choice : null;
+                using (Form dialog = BuildCustomValue(pick, held == null ? null : held.Value, delegate(string value) { taken = value; }))
+                {
+                    if (customAnswer != null) customAnswer(dialog);
+                    else dialog.ShowDialog(this);
+                }
             }
-            SetAdvancedOptionValue(id, key, typed.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            finally
+            {
+                if (taken == null) HoldCustom(combo, pick);
+                pick.Asking = false;
+            }
+            if (taken == null) return;
+            if (!combo.IsDisposed) TakeCustom(combo, pick, taken);
+            SetAdvancedOptionValue(pick.Id, pick.Key, taken);
+            if (!combo.IsDisposed && combo.CanFocus) combo.Focus();
+        }
+
+        /// The drop-down back on the item it held before Custom... was chosen.
+        private void HoldCustom(SoftCombo combo, CustomPick pick)
+        {
+            pick.Asking = false;
+            if (!combo.IsDisposed && pick.Last >= 0 && pick.Last < combo.Items.Count) combo.SelectedIndex = pick.Last;
+        }
+
+        /// The Settings page's dialog for a value of one's own (OwnDialog), for a whole number in the choice's range: titled
+        /// with the choice's label, the range said in the unit its choices are said in; a number outside it is refused
+        /// there, before anything is sent.
+        private Form BuildCustomValue(CustomPick pick, string current, Action<string> taken)
+        {
+            int[] range = pick.Range;
+            var custom = new Dictionary<string, object>();
+            custom["kind"] = "number";
+            custom["min"] = (double)range[0];
+            custom["max"] = (double)range[1];
+            return OwnDialog(pick.Label, custom, CustomHint(pick), current, delegate(string value, Action<string> answer)
+            {
+                int typed;
+                answer(int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out typed) &&
+                       typed >= range[0] && typed <= range[1] ? typed.ToString(CultureInfo.InvariantCulture) : null);
+            }, taken);
+        }
+
+        /// What the dialog says above its number: the Settings page's own range words, with the ends said as the choices
+        /// say theirs ("1 min", "100%").
+        private string CustomHint(CustomPick pick)
+        {
+            return S("own.range", "From {low} to {high}.").Replace("{low}", OptionText(pick.Key, pick.Range[0]))
+                                                        .Replace("{high}", OptionText(pick.Key, pick.Range[1]));
+        }
+
+        /// Shows `value` in `combo`: the preset it is, or the one item of one's own before Custom..., in place of the one
+        /// there was.
+        private void TakeCustom(SoftCombo combo, CustomPick pick, string value)
+        {
+            int at = -1, own = -1;
+            for (int i = 0; i < combo.Items.Count; i++)
+            {
+                var item = combo.Items[i] as Choice;
+                if (item == null || item.Value == CustomChoice) continue;
+                if (item.Value == value) at = i;
+                else if (!pick.Presets.Contains(item.Value)) own = i;
+            }
+            if (at < 0)
+            {
+                var item = new Choice(value, OptionText(pick.Key, int.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture)));
+                if (own >= 0)
+                {
+                    combo.Items[own] = item;
+                    at = own;
+                }
+                else
+                {
+                    at = Math.Max(0, combo.Items.Count - 1);
+                    combo.Items.Insert(at, item);
+                }
+            }
+            combo.SelectedIndex = at;
+        }
+
+        /// Each customizable choice's dialog on the open capability, built and never shown, held to the Settings page's
+        /// checks of its own (AuditOwnDialog): nothing cut off, the refusal given room, every control named - once for
+        /// each range and unit `seen` has not met.
+        private void AuditCustomValues(string where, HashSet<string> seen, List<string> findings)
+        {
+            foreach (CustomPick pick in customPicks.Values)
+            {
+                if (!seen.Add(CustomHint(pick))) continue;
+                using (Form dialog = BuildCustomValue(pick, null, delegate(string value) { }))
+                    AuditOwnDialog(dialog, where + "/custom value " + pick.Key, CustomHint(pick), findings);
+            }
         }
 
         /// The wrap-up's wordings read, then `after`.
@@ -191,6 +284,15 @@ namespace CodexAutoResume
             }
         }
 
+        /// Under the switches of a capability that has a pair for the windows (v0.6.16 final: the usage meter, Wrap up near
+        /// a limit and Stop near a limit, each its own), where both are off: a line saying it acts on neither - on, and
+        /// doing nothing for either window.
+        private void BuildNoWindowNote(List<object> options, TableLayoutPanel card)
+        {
+            if (OptionValue(options, "window_five_hour") != SwitchOff || OptionValue(options, "window_weekly") != SwitchOff) return;
+            card.Controls.Add(HelpText(Word("page.option.no_window", "Both windows are switched off, so this feature acts on neither of them.")));
+        }
+
         /// A choice's value as the list says it is now, or 0.
         private static int OptionValue(List<object> options, string key)
         {
@@ -240,7 +342,6 @@ namespace CodexAutoResume
         private void UpdateWordingButtons(bool idle)
         {
             foreach (Button save in wordingSaves.Values) save.Enabled = idle && advancedListing != null;
-            foreach (Button set in customSets.Values) set.Enabled = idle && advancedListing != null;
         }
     }
 }

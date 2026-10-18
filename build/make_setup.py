@@ -11,6 +11,12 @@ what the ZIP installs, asking what the ZIP's Install.cmd asks, and ends with its
 builds it right after the archive, from the very file it wrote, and writes a .sha256 beside it as it does for
 the archive.
 
+Double-clicked, it is a window (v0.6.16): the product's installer window, gui/InstallerWindow.cs and
+gui/InstallerFlow.cs, drawn with the settings window's own controls in its palette - the [installer], [controls] and
+[generated] groups of gui/window.sources, and gui/WindowJson.cs for the catalogs it reads - beside
+build/setup/SetupWindow.cs, which gives the window what a setup program has. So it is a Windows program, not a
+console one: with -Silent it shows nothing and asks nothing, as before.
+
 It is compiled the way build/make_gui.ps1 compiles the settings window: by the in-box C# compiler of .NET
 Framework 4.8, which every supported Windows has, for x64, with the product's icon and a version resource made
 from .codex-plugin/plugin.json, and then build/normalize_pe.py fixes the two fields the compiler stamps anew
@@ -43,11 +49,16 @@ import legacy_bootstraps  # noqa: E402  (the version rule, `order`)
 import normalize_pe  # noqa: E402
 
 SOURCE = "build/setup/Setup.cs"
+WINDOW = "build/setup/SetupWindow.cs"
+# What the setup program takes of the settings window's sources: the groups of gui/window.sources it is drawn with,
+# and the one file of another group whose JSON reader the catalogs need.
+GROUPS = ("installer", "controls", "generated")
+JSON = "gui/WindowJson.cs"
 MANIFEST = "build/setup/setup.manifest"
 ICON = "assets/codex-auto-resume.ico"
 # The name of the one managed resource, the carried archive, as Setup.cs asks for it (Embedded.Resource).
 RESOURCE = "archive.zip"
-REFERENCES = ("System.dll", "System.IO.Compression.dll")
+REFERENCES = ("System.dll", "System.IO.Compression.dll", "System.Drawing.dll", "System.Windows.Forms.dll")
 EDITIONS = ("standard", "advanced")
 # Each edition's file name, beside its archive's (scripts/release.json holds those). The release workflow
 # spells both in its publish job, and tests/test_setup.py holds it to these.
@@ -55,6 +66,25 @@ NAMES = {"standard": "CodexAutoResume-Setup-v{version}.exe",
          "advanced": "CodexAutoResume-Advanced-Setup-v{version}.exe"}
 WORDS = {"standard": "Standard", "advanced": "Advanced"}
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def window_sources(root: Path = ROOT) -> list:
+    """The settings window's sources the setup program is compiled with, in gui/window.sources' order: its GROUPS,
+    then JSON. The list is read the way tests/guiscan.py reads it, so a file added to a group joins both."""
+    found, group = {}, None
+    for line in (root / "gui" / "window.sources").read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            group = line[1:-1]
+            found.setdefault(group, [])
+        elif group is not None:
+            found[group].append(line)
+    missing = [name for name in GROUPS if not found.get(name)]
+    if missing:
+        raise SystemExit("gui/window.sources has no %s" % ", ".join("[%s]" % name for name in missing))
+    return [name for name in GROUPS for name in found[name]] + [JSON]
 
 
 def setup_name(edition: str, version: str) -> str:
@@ -153,11 +183,16 @@ def build(archive: Path, out: Path, edition: str, version: str, root: Path = ROO
         carried_copy.write_bytes(data)
         if "," in str(carried_copy):
             raise SystemExit("the temporary folder's path holds a comma, which csc would misread: %s" % carried_copy)
-        arguments = [str(csc), "/nologo", "/utf8output", "/target:exe", "/platform:x64", "/optimize+",
+        arguments = [str(csc), "/nologo", "/utf8output", "/target:winexe", "/platform:x64", "/optimize+",
                      "/warn:4", "/warnaserror+", "/out:" + str(exe), "/win32manifest:" + str(manifest),
                      "/win32icon:" + str(root / ICON), "/resource:%s,%s" % (carried_copy, RESOURCE)]
+        # CS0649, a field never assigned, alone: the controls have fields the window's two halves assign (Soft's
+        # stored Reduce motion, a transition's moving area), which the setup program leaves at their defaults.
+        arguments += ["/nowarn:0649"]
         arguments += ["/reference:" + reference for reference in REFERENCES]
-        arguments += [str(root / SOURCE), str(info), str(embedded)]
+        arguments += [str(root / SOURCE), str(root / WINDOW)]
+        arguments += [str(root / name) for name in window_sources(root)]
+        arguments += [str(info), str(embedded)]
         done = subprocess.run(arguments, capture_output=True, stdin=subprocess.DEVNULL, timeout=600,
                               creationflags=NO_WINDOW)
     if done.returncode:

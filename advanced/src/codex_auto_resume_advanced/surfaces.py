@@ -216,11 +216,12 @@ def meter_view(runtime) -> dict:
     if not rows:
         return {}
     shown, notices = [], []
-    on = usage.acting(options[usage.METER])
+    # v0.6.16 final: each stage by the windows its own switches leave on.
+    on = {capability: usage.acting(values) for capability, values in options.items()}
     for (bucket, minutes), row in sorted(rows.items()):
         band = "none"
         for capability, word in ((usage.PAUSE, "pause"), (usage.WRAP_UP, "wrap_up"), (usage.METER, "warn")):
-            if (minutes in on and states.get(capability) == ArmingState.ARMED
+            if (minutes in on[capability] and states.get(capability) == ArmingState.ARMED
                     and usage.reached(row, usage.percent(options[capability], capability, minutes), now)):
                 band = word
                 break

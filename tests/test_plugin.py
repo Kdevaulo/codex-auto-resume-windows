@@ -534,6 +534,39 @@ class BridgeTests(unittest.TestCase):
         install.assert_called_once_with(self.bridge.watcher_command(self.home))
         self.assertIn(l10n.message("setup_autostart"), text)
 
+    def started_after_update(self, argv, current):
+        """Run an update's setup against an installation whose Run value is `current`; its code, whether it started
+        the watcher, and what it said."""
+        self.pretend_installed()
+        args = self.bridge.build_parser().parse_args(argv)
+        output = io.StringIO()
+        with patch.object(self.bridge, "runtime_home", return_value=self.home),              patch.object(startup, "current_value", return_value=current),              patch.object(startup, "install"),              patch.object(self.bridge, "start_watcher", return_value="running") as start,              contextlib.redirect_stdout(output):
+            code = self.bridge.cmd_setup(args)
+        return code, start.called, output.getvalue()
+
+    def test_an_update_leaves_a_watcher_the_person_had_stopped_stopped(self):
+        """v0.6.16 (the owner: an update runs again by itself what ran before): install.ps1 says
+        --watcher-was-stopped when no watcher ran before it, and with no sign-in start either, nothing is started
+        - and that is a finished setup, not a watcher it could not confirm."""
+        code, started, text = self.started_after_update(["setup", "--keep-state", "--watcher-was-stopped"], None)
+        self.assertEqual(code, self.bridge.EXIT_OK)
+        self.assertFalse(started, "the person had stopped it")
+        self.assertIn(l10n.message("setup_left_stopped"), text)
+        self.assertNotIn(l10n.message("setup_unconfirmed"), text)
+
+    def test_an_update_starts_the_watcher_again_where_it_ran_or_runs_at_sign_in(self):
+        ours = startup.command_line(self.home / self.bridge.LAUNCHER_NAME, None,
+                                    launcher=Path(r"C:\Python313\pythonw.exe"))
+        for argv, current in ((["setup", "--keep-state"], None),
+                              (["setup", "--keep-state", "--watcher-was-stopped"], ours),
+                              (["setup"], None),
+                              (["setup", "--watcher-was-stopped"], None)):
+            with self.subTest(argv=argv, sign_in=current is not None):
+                code, started, text = self.started_after_update(argv, current)
+                self.assertEqual(code, self.bridge.EXIT_OK)
+                self.assertTrue(started)
+                self.assertNotIn(l10n.message("setup_left_stopped"), text)
+
     def test_an_update_never_takes_a_sign_in_entry_away_whatever_it_finds(self):
         """v0.6.16-beta.3, issue #31 item 3: an update (install.ps1's upgrade branch, the bootstrap's repair
         and a pick's restart all run `setup --keep-state`) keeps the person's choice both ways - one they
