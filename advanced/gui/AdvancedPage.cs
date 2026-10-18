@@ -1093,8 +1093,8 @@ namespace CodexAutoResume
                         if (number == value) index = combo.Items.Count;
                         combo.Items.Add(new Choice(number.ToString(CultureInfo.InvariantCulture), OptionText(key, number)));
                     }
-                    // v0.6.16-beta.4 (f): a number typed in beside the presets - shown as it is where it is one - and
-                    // Custom... last, which opens the box it is typed in (AdvancedUsage.cs).
+                    // v0.6.16-beta.4 (f): a number of one's own beside the presets - shown as it is where it is one - and
+                    // Custom... last, which opens the Settings page's dialog for one (v0.6.16 final, AdvancedUsage.cs).
                     if (CustomRange(option) != null)
                     {
                         if (index < 0 && value > 0)
@@ -1117,7 +1117,7 @@ namespace CodexAutoResume
                 combo.SelectionChangeCommitted += delegate { SetAdvancedOption(id, key, chosen); };
                 card.Controls.Add(NewRow(label, combo));
                 advancedChoices.Add(combo);
-                BuildCustomEntry(id, key, label, CustomRange(option), card);
+                WatchCustom(id, key, label, CustomRange(option), Items(option, "choices"), combo);
             }
             // v0.6.16 final: a capability with both its windows switched off says it acts on neither (AdvancedUsage.cs).
             BuildNoWindowNote(options, card);
@@ -1184,14 +1184,14 @@ namespace CodexAutoResume
             if (choiceFilling || choice == null) return;
             if (choice.Value == CustomChoice)
             {
-                OpenCustomEntry(key);                            // (f): the number is typed in, and set with Set
+                OpenCustom(key, combo);                          // (f): the number is asked for in its dialog
                 return;
             }
             if (advancedListing == null || busy > 0) return;
             SetAdvancedOptionValue(id, key, choice.Value);
         }
 
-        /// One choice sent as `value` - a preset, or (v0.6.16-beta.4) a number typed in - against the generation the page
+        /// One choice sent as `value` - a preset, or (v0.6.16-beta.4) a number of one's own - against the generation the page
         /// read; the drop-down then shows what holds.
         private void SetAdvancedOptionValue(string id, string key, string value)
         {
