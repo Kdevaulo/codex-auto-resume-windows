@@ -133,14 +133,17 @@ class Flow:
     """One installation's report jobs, for the life of this process."""
 
     def __init__(self, paths, *, runner=github.run_process, find_gh=None, mutex=ReportMutex, sleep=time.sleep,
-                 clock=time.time, product_version=None, windows=None, codex_home=None, view=None):
+                 clock=None, product_version=None, windows=None, codex_home=None, view=None):
         self.paths = paths
         self.runner = runner
         self._find = find_gh
         self._make_mutex = mutex
         self._mutex = None
         self.sleep = sleep
-        self.clock = clock
+        # The process's clock as it is when asked, not as it was when this module was imported: a default of
+        # time.time is bound once, at import, so a process whose clock is set later (the pictures' pinned one,
+        # build/advanced_shots.py) would stamp its reports with whichever clock imported this module first.
+        self.clock = clock if clock is not None else (lambda: time.time())
         self.product_version = product_version
         self.windows = windows
         self._codex_home = codex_home

@@ -1,0 +1,35 @@
+{
+  "format": "car-motion/1",
+  "name": "card-en",
+  "output": "docs/images/notification-card-motion.png",
+  "locale": "en",
+  "scenes_from": "card-scenes.json",
+  "values": {},
+  "canvas": {
+    "size": [
+      776,
+      600
+    ],
+    "ground": "canvas",
+    "theme": "light",
+    "design": "soft"
+  },
+  "card": {
+    "scale": 2.0,
+    "locale": "en",
+    "at": [
+      52,
+      52
+    ]
+  },
+  "pointer": null,
+  "ripple_step": 16,
+  "length": [
+    4000,
+    12000
+  ],
+  "budget": {
+    "cap": 4000000
+  },
+  "light_step_ms": 33
+}

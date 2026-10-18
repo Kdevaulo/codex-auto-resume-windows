@@ -1,0 +1,65 @@
+{
+  "command": "rescan",
+  "cases": [
+    {
+      "case": "every waiting recovery looked at again",
+      "argument": null,
+      "reply": {
+        "ok": true,
+        "result": {
+          "scanned": 2,
+          "not_waiting": 0,
+          "retired": 0,
+          "rechecked": 0,
+          "unresolved": 2,
+          "changed": 0,
+          "records": [
+            {
+              "interruption_id": "7777777777777777777777777777777777777777777777777777777777777777",
+              "thread_id": "11111111-1111-7111-8111-111111111111",
+              "outcome": "unresolved",
+              "reason": "latest_turn_changed"
+            },
+            {
+              "interruption_id": "8888888888888888888888888888888888888888888888888888888888888888",
+              "thread_id": "22222222-2222-7222-8222-222222222222",
+              "outcome": "unresolved",
+              "reason": "latest_turn_changed"
+            }
+          ],
+          "woke": false
+        }
+      }
+    },
+    {
+      "case": "and again",
+      "argument": null,
+      "reply": {
+        "ok": true,
+        "result": {
+          "scanned": 2,
+          "not_waiting": 0,
+          "retired": 0,
+          "rechecked": 0,
+          "unresolved": 2,
+          "changed": 0,
+          "records": [
+            {
+              "interruption_id": "7777777777777777777777777777777777777777777777777777777777777777",
+              "thread_id": "11111111-1111-7111-8111-111111111111",
+              "outcome": "unresolved",
+              "reason": "latest_turn_changed"
+            },
+            {
+              "interruption_id": "8888888888888888888888888888888888888888888888888888888888888888",
+              "thread_id": "22222222-2222-7222-8222-222222222222",
+              "outcome": "unresolved",
+              "reason": "latest_turn_changed"
+            }
+          ],
+          "woke": false
+        }
+      }
+    }
+  ]
+}

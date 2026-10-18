@@ -101,12 +101,40 @@ The setup program is the release archive of [From the release archive](#from-the
 in one file. It carries that archive byte for byte, with the archive's SHA-256 beside it. When you
 start it, it checks the archive against that digest and stops if they differ, unpacks it into a new
 folder of its own in your temporary folder, runs the archive's own `Install.cmd` there - the same
-installer, asking the same questions in the same console window, and ending the same way - and then
-removes that folder. It downloads nothing, needs no administrator rights and brings no Python of its
+installer - and then removes that folder. From v0.6.16 it does this in a window of its own, in the
+Dashboard's look and in your Windows language (you can pick another): it says what it installs, which
+edition and version, and where; asks only what the installer has a choice about - whether to run at
+Windows sign-in on a first installation, and whether to change the edition when the other one is
+installed - shows how far the installer is and which step it is on, and ends by saying whether it
+finished, with the installer's exit code and its log, and offers to open the Dashboard. Run where its own
+version is installed already, it first offers Repair, which installs it again in place and keeps your settings,
+everything waiting and the sign-in choice, or Remove, the uninstall with its question about the settings and the
+recovery history; a newer version updates as before, and `-Silent` asks neither. No console window
+opens. When it updates an installation whose Dashboard is open, it asks that Dashboard to close and opens it again
+on the new version where it was, as it starts the watcher again; a Dashboard with unsaved Settings changes keeps
+them and stays open, on the previous version until you open it again. With `-Silent` it does the same. It downloads nothing, needs no administrator rights and brings no Python of its
 own: the installation runs on the Python inside the archive. It loads DLLs from Windows' System32
 folder only, so a DLL lying beside it in Downloads is never loaded, and it stops if a `.config` file
 is beside it. Started from a command line, it passes switches such as `-SkipStartup` on to
 `Install.cmd`, and refuses anything but switches and plain words.
+
+From v0.6.16, `-Silent` installs without a question and without waiting for a key:
+`CodexAutoResume-Setup-vX.Y.Z.exe -Silent`, which is how `winget` runs it. Nothing else changes: it prints what
+it prints and ends with the exit code it ends with otherwise (0 done, 1 stopped, 14 when the other edition is
+installed, in which case nothing is changed, since nobody can be asked). It is a Windows program rather than a
+console one, so that no console window opens when it is double-clicked, and PowerShell does not wait for a Windows
+program it only starts: there, in the folder it is in, run `cmd /c .\CodexAutoResume-Setup-vX.Y.Z.exe -Silent`,
+which waits, shows its lines and leaves its exit code in `$LASTEXITCODE`. `winget`, a `.cmd` script and `cmd /c` wait for it as they are. The
+same switch works on the archive's `Install.cmd` and `Uninstall.cmd`, and the setup program does not wait for Enter
+when it stops.
+
+From v0.6.16 an installation also appears in Windows' Settings > Apps and in `winget list`, as *Codex Auto Resume*
+(*Codex Auto Resume Advanced* for the advanced edition), for your Windows user only. Its Uninstall button runs the
+uninstaller the installer keeps in `%USERPROFILE%\.codex-auto-resume\uninstall\`, the same one as `Uninstall.cmd`, in
+the same installer window: it asks whether to delete the settings and the recovery history too, and shows the
+removal as it goes. `winget uninstall` runs the same uninstaller with `-Silent`, with no window.
+A change of edition replaces the entry with the other edition's, and an update rewrites it. An installation placed
+elsewhere with `CODEX_AUTO_RESUME_PLUGIN_HOME` gets neither the kept uninstaller nor an entry.
 
 It is not code-signed (see the end of [From the release archive](#from-the-release-archive)), so
 SmartScreen may show *Windows protected your PC* when you start it. Choose **More info**, then
@@ -206,7 +234,13 @@ and the Dashboard's Diagnostics says so too until the copy is replaced. `Uninsta
 Codex to remove it, removes it; see [Uninstall](#uninstall) for what each route leaves behind.
 
 **Check for updates**, on the Dashboard's Diagnostics page, asks GitHub whether a newer release has
-been published and offers to install it. From v0.6.11 it also looks for a newer *pre-release*: an
+been published and offers to install it. From v0.6.16 the install runs in the setup program's window: once the
+download is checked it shows the version it goes from and to and what is new in it, read from that download, and
+installs only when you press **Update** (**Not now** installs nothing); then it shows how far it is and its log, and
+"Updated to" with the first lines of what is new. Everything that ran before then runs again on the new version by
+itself: the watcher - unless you had stopped it and it does not run at sign-in - with its notification-area icon,
+and this Dashboard, which opens again in the new version. An update with `-Silent` starts the watcher again the same
+way, and opens no window. From v0.6.11 it also looks for a newer *pre-release*: an
 `-alpha` or `-beta` build published before its release is finished, and tested less than a release.
 When there is one newer than both the version you have and the newest release, and no release to
 offer first, it asks whether to install it - and **Not now** is the button Enter presses. Saying yes
@@ -265,7 +299,8 @@ deliver is switched off, and Observe only, if it is on, becomes a pause. A watch
 within the minute gets nothing installed and its state left as it was, but it was asked to stop and may
 still do so afterwards, and nothing starts it again then: if the header says it is not running, press
 **Start watcher**. A conversion that fails starts the watcher again and installs nothing. Then the version's own installer runs, keeping every record, your pause and the
-sign-in choice. While all this runs, every action button on the page is greyed, **Start watcher**
+sign-in choice. A version older than v0.6.16 knows neither the entry in Settings > Apps nor the uninstaller kept
+for it, so picking one over an installation that has them first removes both. While all this runs, every action button on the page is greyed, **Start watcher**
 included.
 
 Afterwards the window says whether the watcher now runs the version installed, and, where the state was
@@ -374,7 +409,18 @@ already be in Codex is marked and taken back if it is still queued, and a finish
 marked too, so no later failure of that task can start a new chain from it. A turn already
 running in Codex is not stopped, and the confirmation says so. **Cancel all** does the same to
 every waiting recovery, one exact record at a time; there is deliberately no way to retry them
-all at once. **Turn off for this conversation** cancels its waiting recoveries and keeps
+all at once. From v0.6.16 **Rescan and reconcile**, after Cancel all, looks at every waiting recovery
+again by the watcher's own rules, once you confirm. One is retired - stopped as replaced by your own
+work - only on proof: its exact failed turn in Codex's history followed by a turn you started (a
+continuation of this tool's never counts), or, while that history has not caught up with the
+conversation's file, the same in the file itself, where nothing after a rollback counts. One that is still its conversation's latest failure
+is left waiting exactly as it was, under every check - the reset's grace, a postponement, a hold, the
+switches and the budgets - and the watcher is woken to look at whatever is due. Anything it cannot
+decide stays as it is and is counted as unresolved, and a recovery that changed while it looked is
+skipped. It sends nothing, writes nothing to Codex, gives no attempts back and brings nothing forward,
+and it leaves cancelled, finished and in-flight recoveries and History as they are; the note beside the
+buttons says how many were retired, rechecked, unresolved and changed meanwhile, and each one's
+Timeline says which. **Turn off for this conversation** cancels its waiting recoveries and keeps
 automatic recovery off for that conversation until you turn it back on — the Pending and History
 pages then offer **Turn on for this conversation**. From v0.6.11 each row also has a menu of its own,
 on a right click, Shift+F10 or the menu key: **Postpone** holds that task back 30 minutes, an hour,
@@ -886,6 +932,22 @@ Those names are for display only. Recovery never resolves a thread by title, pro
 Doing nothing resumes — that is the default. **Don't resume** / **Don't retry** cancels the
 auto-resume for that one interruption and whatever continues it, and nothing else. **Open
 Dashboard** opens the Dashboard on its Pending page and does nothing more.
+
+From v0.6.16 a click on the notification itself - the card's face, or the body of Windows' own
+notification - opens the Dashboard on the page the notification is about: the page its **Open
+Dashboard** button opens, or, for a notification without that button, Pending while a continuation is
+being sent, History once it has ended, Settings for the power action's, and otherwise the Overview. The card then goes, as a click always made it go; a right
+click only puts it away, and the buttons do what they always did.
+
+A notification goes away by itself after a while. **Keep on screen until clicked**, under Settings >
+General > Notifications, lists each kind of notification - an interruption detected, a recovery
+starting, resumed, could not resume, stopped trying, cancelled, a conversation that needs you, tasks
+waiting after a long sleep, the watcher's memory, and the power action after usage-limit recoveries;
+the advanced edition adds its usage meter's warning and each of its three notices about a stop near a
+limit - and a kind ticked there stays on screen until
+you click it or a newer notification needs its place (at most three cards stack, and the oldest is pushed
+out): the card stays beside the notification area, and Windows' own notification stays as a
+reminder until you close it, with a button to close it where it has none. None is ticked at first.
 
 From v0.6.11 a conversation can ask more of you first (see
 [Quiet hours and how a conversation resumes](#quiet-hours-and-how-a-conversation-resumes)), and the
@@ -1500,7 +1562,10 @@ error logs; `logs\launcher.log` and `logs\codex-start.log` stay), so reinstallin
 removes its Windows registrations and the plugin, and keeps your settings and pending
 recoveries unless you ask it to delete them too; it leaves the installation folder, which still
 holds the program files, for you to delete. `Uninstall.cmd` also removes this product's
-marketplace from Codex while it still points at this installation.
+marketplace from Codex while it still points at this installation. From v0.6.16 it, and Settings > Apps and
+`winget uninstall` with it (`-Silent` for no questions), also remove the installation's entry in Add or remove
+programs and the uninstaller kept for it - each only while it names this installation; an entry of that name that
+names another is left as it is.
 
 From a source checkout, the same command-line tool also deletes this tool's own state and logs
 (`--keep-logs` keeps the logs; `--keep-state` keeps settings and pending recoveries):
@@ -1517,8 +1582,8 @@ Uninstall is deliberately conservative:
 
 - It asks the watcher to stop first. If a watcher is still running, **or if it cannot verify
   whether one is running**, it aborts before removing anything.
-- It removes the sign-in autostart value and the notification identity only while they belong
-  to **this** installation. A value that starts a different copy of the tool is reported and
+- It removes the sign-in autostart value, the notification identity and the Add or remove programs
+  entry only while they belong to **this** installation. A value that starts a different copy of the tool is reported and
   kept, never silently removed. The Start Menu entry is kept while the notification identity
   belongs to a different installation; if no notification identity is registered at all, the
   entry at its fixed location is removed without an ownership check.
@@ -1553,7 +1618,11 @@ plugin and its local marketplace, and a marketplace already registered under thi
 name (`codex-auto-resume-windows`) is repointed at this installation. Installing also asks
 Codex to refresh marketplaces. The v0.5.7 installer refreshes every Git marketplace you have
 configured. Refreshing only `codex-auto-resume-windows` is new in v0.6.0. `Uninstall.cmd` asks
-the `codex` CLI to unregister the plugin and its marketplace, only while they still point here.
+the `codex` CLI to unregister the plugin and its marketplace, only while they still point here. From v0.6.16
+installing also writes the entry in Add or remove programs - one per-user key under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall`, `CodexAutoResume`, to which the other edition's adds its
+word - and keeps a copy of the installer's own uninstall in the installation (`uninstall\install.ps1`) for the
+entry to name; uninstalling removes the entry, only while it names this installation.
 
 Design rules enforced in code:
 

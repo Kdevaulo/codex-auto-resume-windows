@@ -182,7 +182,7 @@ class Scoped:
             "now": lambda: state.clock(),
             "options": lambda: state.options(capability),
             # v0.6.16-beta.4: its own wordings (the wrap-up's Custom text), and another capability's choices read -
-            # the usage meter's windows on or off, which the wrap-up and the stop follow.
+            # the wrap-up's Continue after the reset, which the stop follows.
             "wordings": lambda: state.wordings(capability),
             "options_of": lambda other: state.options(other),
             "rules": lambda: state.rules() if rules_editor else [],

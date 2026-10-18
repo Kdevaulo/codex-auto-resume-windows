@@ -217,7 +217,9 @@ class GateVectorTests(unittest.TestCase):
 
 # ------------------------------------------------------------------------ settings file
 # v0.6.10 writes no recover_ or custom_message_ key for auth_service_transient, which nothing
-# produces (failures.RESERVED); a file that still has them reads as it did (test_settings).
+# produces (failures.RESERVED); a file that still has them reads as it did (test_settings). v0.6.16 adds two
+# settings, and nothing else moved: notice_click (what a click on a notice opens) and notices_stay (the kinds of
+# notice that stay until clicked, none by default).
 DEFAULT_FILE = """{
   "ask_after_sleep_minutes": "off",
   "chain_time_ceiling": "off",
@@ -249,6 +251,8 @@ DEFAULT_FILE = """{
   "memory_guard_limit": "mb1024",
   "needs_you_sound": false,
   "new_conversation_policy": "resume",
+  "notice_click": "page",
+  "notices_stay": [],
   "notification_card": true,
   "notifications": true,
   "notify_interruption": true,

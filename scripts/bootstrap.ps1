@@ -162,6 +162,9 @@
          Add -CheckOnly to ask whether a newer release exists and install nothing.
          Add -Update to install one if there is.
          Add -Version <pre-release> to install the pre-release -CheckOnly offered.
+         Add -AskFirst, with -Update or -Version, to stop once the download is verified: the folder of
+         its changelog on a `notes:` line, then `ask: install v<version>`, and a line on the input -
+         `install` to go on, anything else to install nothing (the Dashboard's update, v0.6.16).
          Add -Compatibility to refresh the Codex compatibility data and nothing else.
          Add -Versions to list the versions the Dashboard may install instead, and install nothing.
          Add -Pick <version> -Edition <edition> to install one of them (with -Force when it is older
@@ -191,7 +194,10 @@ param(
     # The version a person picked there and confirmed, with -Edition the edition of its row and -Force
     # exactly when that row is older or of the other edition. Never spliced as typed: Get-ChosenVersion
     # rebuilds it from its integers, and it is installed only if the list still offers it.
-    [string]$Pick
+    [string]$Pick,
+    # The Dashboard's update (v0.6.16): it shows what is new in the verified download before anything is installed,
+    # and the person says whether to go on. Only a line on the input that is exactly `install` goes on.
+    [switch]$AskFirst
 )
 
 # Started before anything else runs, so an update check can tell how much of its caller's
@@ -275,6 +281,11 @@ $ExitOtherEdition = 14
 # (src/codex_auto_resume/managed.py, VALUES): a value that guards a feature no older version has
 # is not among them, since no older version could do what it holds back.
 $PickFloor = '0.6.2'
+# The first version that lists the installation in Add or remove programs and keeps an uninstaller for that entry
+# (src/codex_auto_resume/addremove.py, FIRST_VERSION). A pick of anything older removes both first, since that
+# version's own installer and uninstaller know neither and would leave an entry that says the wrong version and
+# points at an uninstaller nothing removes.
+$EntryFrom = '0.6.16'
 $EditionsSince = '0.6.11-alpha'
 $PolicySince = '0.6.11-beta'
 $PolicyKeys = @('HKEY_LOCAL_MACHINE', 'HKEY_CURRENT_USER')
@@ -309,6 +320,9 @@ $PickOlderPrereleases = $true
 # except for `state`, which started the watcher again. Its own code: no answer to the update
 # question, and not the other edition's refusal either.
 $ExitPickRefused = 15
+# -AskFirst, answered with anything but `install`: the download was verified and nothing was installed, said on an
+# `update: later <installed> <version>` line. Its own code, apart from every answer of the update check.
+$ExitLater = 16
 
 function Step { param([string]$Text) Write-Host ('  ' + $Text) }
 function Ok   { param([string]$Text) Write-Host ('  [ok] ' + $Text) }
@@ -1216,6 +1230,31 @@ function Convert-StateForOlder {
     return 'failed'
 }
 
+function Remove-EntryBeforeOlder {
+    <#
+        Before the installer of a version that does not know the entry in Add or remove programs runs over one
+        that does: the installed version's own `remove-entry`, which takes the entry and the uninstaller kept
+        for it away. 'removed' (or nothing there to remove), 'kept' when the target keeps the entry itself,
+        'none' when the installed version has no such command, 'failed' when it could not. A pre-release of the
+        entry's own release may or may not have the command yet, so it is tried, and an engine that does not
+        know it (argparse's 2) answers 'none'.
+    #>
+    param([string]$Home_, [string]$Installed, [string]$Target)
+    try {
+        $has = @(Get-VersionParts $Installed)
+        $first = @(Get-VersionParts $EntryFrom)
+        for ($i = 0; $i -lt 3; $i++) {
+            if ($has[$i] -lt $first[$i]) { return 'none' }
+            if ($has[$i] -gt $first[$i]) { break }
+        }
+        if ((Compare-ProductVersion -Left $Target -Right $EntryFrom) -ge 0) { return 'kept' }
+    } catch { return 'none' }
+    $done = Invoke-InstalledSetup -Home_ $Home_ -Arguments @('remove-entry')
+    if ($done.Code -eq 0) { return 'removed' }
+    if ($done.Code -eq 2) { return 'none' }
+    return 'failed'
+}
+
 function Start-CurrentWatcher {
     # The installed version's watcher started again, after a conversion that failed: `setup
     # --keep-state`, the repair branch's own run, which changes no decision a person made.
@@ -1711,6 +1750,19 @@ try {
     $unpacked = Join-Path $work 'unpacked'
     [IO.Compression.ZipFile]::ExtractToDirectory((Resolve-Path $zip), $unpacked)
 
+    # What is new, from the archive just verified, and the person's word before anything is installed. The folder is
+    # this run's own and goes with it; the caller reads the changelog there while this waits.
+    if ($AskFirst -and -not $Pick) {
+        Write-Host ('notes: ' + (Join-Path $unpacked 'payload\app\docs'))
+        Write-Host ('ask: install v' + $target)
+        $answer = [Console]::In.ReadLine()
+        if ($answer -cne 'install') {
+            Write-Host ('update: later ' + $installed + ' ' + $target)
+            Step 'Nothing was installed.'
+            exit $ExitLater
+        }
+    }
+
     if ($Pick) {
         # The install lock, from before the state is converted until this process ends: the
         # installer below runs on this thread and takes it again, which a Mutex allows its owner. A
@@ -1744,6 +1796,12 @@ try {
             }
             if ($converted -clike 'converted *') { Write-Host ('pick: state ' + $converted) }
         }
+    }
+
+    if ($Pick) {
+        $entry = Remove-EntryBeforeOlder -Home_ $installHome -Installed ([string]$installed) -Target $target
+        if ($entry -ceq 'removed') { Step 'The entry in Add or remove programs and its uninstaller were removed; that version has neither.' }
+        elseif ($entry -ceq 'failed') { Fail 'The entry in Add or remove programs could not be removed first; it may name a version that is no longer installed.' }
     }
 
     Step 'Installing'

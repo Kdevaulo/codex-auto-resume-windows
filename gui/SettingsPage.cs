@@ -482,6 +482,13 @@ namespace CodexAutoResume
                 if (host == null) continue;
                 // v0.6.11: what the retry preview and the high-limit notice read of the limits' schema.
                 if (group == "limits") limitSchema[name] = field;
+                // v0.6.16: which kinds of notice stay on screen until clicked (notice_kinds.py) - in the Notifications
+                // card whatever its schema group, which keeps it out of the panel and MCP (the owner's choice).
+                if (name == StayField)
+                {
+                    BuildStay(notifications, field, current);
+                    continue;
+                }
 
                 string type = Str(field, "type");
                 if (type == "boolean")
@@ -971,6 +978,60 @@ namespace CodexAutoResume
             if (!Equals(Get(field, "managed"), true)) return;
             editor.Enabled = false;
             host.Controls.Add(HelpText(S("settings.managed", "Set by your administrator.")));
+        }
+
+        // ------------------------------------------------------------------ v0.6.16: notices that stay until clicked
+        /// The setting that keeps notices of the kinds chosen on screen until clicked (notice_kinds.FIELD).
+        internal const string StayField = "notices_stay";
+
+        // Each kind's box, by id, in the order the schema lists them.
+        private readonly List<KeyValuePair<string, CheckBox>> stayBoxes = new List<KeyValuePair<string, CheckBox>>();
+
+        /// A heading, one box per kind the schema lists (its `kinds`) - each named by the catalog key the schema
+        /// gives it (`keys`), or by the words an edition registered it with (`labels`) - and what it does, under
+        /// them. Saved as the ids of the boxes ticked, in the schema's order.
+        private void BuildStay(TableLayoutPanel host, Dictionary<string, object> field, Dictionary<string, object> current)
+        {
+            stayBoxes.Clear();
+            var heading = new WrapLabel();
+            heading.AutoSize = true;
+            heading.Font = Soft.RoleFont("label");
+            heading.Text = S("field.notices_stay", "Keep on screen until clicked");
+            heading.Margin = Pad(0, 10, 0, 2);
+            host.Controls.Add(heading);
+            var chosen = new HashSet<string>();
+            foreach (object id in Items(current, "notices_stay") ?? new List<object>())
+                chosen.Add(Convert.ToString(id, CultureInfo.InvariantCulture));
+            var keys = Map(field, "keys");
+            var labels = Map(field, "labels");
+            foreach (object choice in Items(field, "kinds") ?? new List<object>())
+            {
+                string id = Convert.ToString(choice, CultureInfo.InvariantCulture);
+                string label = Str(labels, id) ?? S(Str(keys, id) ?? id, id);
+                CheckBox box = NewCheck(label, chosen.Contains(id), true);
+                box.Margin = Pad(21, 2, 0, 2);
+                host.Controls.Add(box);
+                stayBoxes.Add(new KeyValuePair<string, CheckBox>(id, box));
+            }
+            Managed(field, heading, host);
+            if (Equals(Get(field, "managed"), true))
+                foreach (KeyValuePair<string, CheckBox> pair in stayBoxes) pair.Value.Enabled = false;
+            host.Controls.Add(HelpText(S("help.notices_stay",
+                "A notification of a kind chosen here stays on screen until you click it, instead of going away by itself after a while: the card beside the notification area, or Windows' own notification, which then has a button to close it.")));
+            jsonValues["notices_stay"] = StayJson;
+        }
+
+        /// The ids of the kinds ticked, as a JSON array in the order they are listed.
+        private string StayJson()
+        {
+            var json = new StringBuilder("[");
+            foreach (KeyValuePair<string, CheckBox> pair in stayBoxes)
+            {
+                if (!pair.Value.Checked) continue;
+                if (json.Length > 1) json.Append(',');
+                json.Append(Json.Escape(pair.Key));
+            }
+            return json.Append(']').ToString();
         }
 
         private SoftCombo ChoiceCombo(Dictionary<string, object> field, Dictionary<string, object> current, string prefix)

@@ -21,8 +21,8 @@ from pathlib import Path
 import sys
 import tempfile
 
-from . import (continuation, failures, guards, homes, l10n, ladder, memguard, needsyou, ownvalues, power,
-               projects, quiet, reasons, settings_schema, statusfile)
+from . import (continuation, failures, guards, homes, l10n, ladder, memguard, needsyou, notice_kinds, ownvalues,
+               power, projects, quiet, reasons, settings_schema, statusfile)
 from .domain.vocabulary import (Design, ImportanceTier, NewConversationPolicy, NotifyEvent,
                                 ProjectPolicy, Theme)
 
@@ -286,6 +286,14 @@ FIELDS[statusfile.FIELD] = (False, _boolean)
 # v0.6.15-beta: the Codex homes watched beside the default one (homes.py) - none by default, the default
 # home alone, as before. Written in the Dashboard alone (DASHBOARD_ONLY), where each is checked (homes.strict).
 FIELDS[homes.FIELD] = ([], homes.coerce)
+# v0.6.16: where a click on a notice's face or body goes (notifier.click_uri) - its Dashboard page, the conversation's
+# chat here, or Codex at that conversation. Offered and read only while the in-app chat is on (notifier.chat_on), so
+# until v0.6.16-beta.4's chat is merged it waits in NOT_YET_OFFERED and every click opens the page.
+NOTICE_CLICKS = ("page", "chat", "codex")
+FIELDS["notice_click"] = ("page", lambda v, d: _choice(v, d, NOTICE_CLICKS))
+# v0.6.16: the kinds of notice that stay on screen until clicked (notice_kinds.py) - none by default, each going away
+# by itself after a while as before. Offered in the Dashboard's Notifications card alone (settings_schema).
+FIELDS[notice_kinds.FIELD] = ([], notice_kinds.coerce)
 
 
 def is_custom_text(name) -> bool:
@@ -624,7 +632,10 @@ def update(path: Path, changes: dict) -> dict:
 # it; `Control.start_for_codex` refuses for the same reason and writes what the job said to
 # logs/codex-start.log, which is how the next Codex gets measured. The advanced edition builds it
 # properly in v0.6.11, where starting a process outside the host's job is a thing a person may turn on.
-NOT_YET_OFFERED = frozenset({"start_with_codex"})
+#
+# `notice_click` (v0.6.16) is here because what it chooses between needs the in-app chat, which is not merged yet: its
+# control is shown only while the chat is on, and until then notifier.click_destination reads it as the page.
+NOT_YET_OFFERED = frozenset({"start_with_codex", "notice_click"})
 
 # Fields a task's row writes and no settings editor offers (v0.6.11): the projects set to Always and to
 # Never, each a list of keys a person has no way to read (projects.py), and the messages for one

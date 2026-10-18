@@ -561,8 +561,9 @@ namespace CodexAutoResume
         /// brightnesses and every screenshot in the repository changed for a reason that was not
         /// the source. CODEX_AR_STILL_LIGHT=&lt;ms&gt; holds the breath still at that moment;
         /// build/capture_window.ps1 sets it to 0, where the breath is brightest. Read once, at
-        /// start, and never set by the product itself.
-        internal static readonly double StillLightMs = ReadStillLight();
+        /// start, and never set by the product itself - only by the render mode, which draws each
+        /// frame of a motion picture at its own moment (WindowRender.cs).
+        internal static double StillLightMs = ReadStillLight();
 
         /// The moment the window is to believe it is, in seconds since 1970, or -1 for the real
         /// clock - which is what anybody running the product gets.
@@ -1028,12 +1029,14 @@ namespace CodexAutoResume
         }
 
         /// The edition after the version, quiet secondary text (VersionLabel; the owner's decision of 2026-10-02):
-        /// AsideShare of the version's size - 10 px beside a 16 px version in the mock he approved, after asking
-        /// twice for it smaller - but never under AsideLeast, those same 10 px at 96 DPI: at the window's usual 9 pt
-        /// the share alone would be 5.6 pt, too small to read, and from Windows' text size 135% up the share is what
-        /// sets it. Never larger than the version. The panel's heading takes the same two numbers (panel.css, .edition).
-        internal const float AsideShare = 0.62f;
-        internal const float AsideLeast = 7.5f;
+        /// AsideShare of the version's size, but never under AsideLeast. The mock he approved then, after asking twice
+        /// for it smaller, set 10 px beside a 16 px version; on 2026-10-15 he asked for it smaller again ("글씨 크기 더
+        /// 줄였음 좋겠어"), so it is one pixel down: 9 px beside 16, and never under those 9 px at 96 DPI (6.75 pt) - at
+        /// the window's usual 9 pt the share alone would be 5 pt, too small to read, and from Windows' text size 150%
+        /// up the share is what sets it. Never larger than the version. The panel's heading takes the same two numbers
+        /// (panel.css, .edition).
+        internal const float AsideShare = 0.5625f;
+        internal const float AsideLeast = 6.75f;
 
         internal static float AsidePoints(float version)
         {

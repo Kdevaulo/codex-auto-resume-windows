@@ -48,14 +48,17 @@ class Workers(Plug):
 
 
 class Waiting(SimBackend):
-    """Each send, entered through its launch guard, waits until `go` is set (or three seconds) before it answers - and
-    counts how many are waiting at once."""
+    """Each send, entered through its launch guard, waits until `go` is set (or `patience`, three seconds) before it
+    answers - and counts how many are waiting at once. With `release_at`, the send that makes that many wait at once
+    sets `go` itself: the overlap is seen the moment it happens, however slowly a busy machine starts the second."""
 
     def __init__(self, home):
         super().__init__(home)
         self.go = threading.Event()
         self.lock = threading.Lock()
         self.waiting = self.most = 0
+        self.patience = 3.0
+        self.release_at = None
         self.before_guard = None
         self.raising = set()
 
@@ -72,7 +75,9 @@ class Waiting(SimBackend):
         with self.lock:
             self.waiting += 1
             self.most = max(self.most, self.waiting)
-        self.go.wait(timeout=3.0)
+            if self.release_at is not None and self.waiting >= self.release_at:
+                self.go.set()
+        self.go.wait(timeout=self.patience)
         with self.lock:
             self.waiting -= 1
         queue_id = self.home.enqueue(thread_id, prompt, client_id="0a1b2c3d-0009-7000-8000-%012d" % len(self.send_calls))
@@ -119,6 +124,10 @@ class Case(unittest.TestCase):
 
 class PoolTests(Case):
     def test_two_conversations_receipts_are_waited_for_at_once(self):
+        """The first send waits - up to 30 s, not the three a busy CI runner once spent starting the second worker
+        (dev CI 2026-10-16: "1 != 2") - until the second is waiting beside it, and both then answer. Sends that took
+        turns would leave the first alone for all of that, and fail."""
+        self.backend.patience, self.backend.release_at = 30.0, 2
         self.due(THREADS[:2])
         self.engine.tick()
         self.assertEqual(self.backend.most, 2, "the second send waited for the first's receipt")

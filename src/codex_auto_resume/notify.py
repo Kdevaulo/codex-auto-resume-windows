@@ -18,6 +18,8 @@ Windows keeps it in its notification center for history, without a banner or a s
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
 import subprocess
 import time
 
@@ -115,6 +117,47 @@ def parse_open_uri(uri: str) -> str | None:
     return page if page in machine.PAGES else None
 
 
+# v0.6.16: the Codex app's own link to one conversation. Measured on 2026-10-16 (Codex app 26.1007): opened through
+# Windows' URL handler, it brings a running or minimized app to the front at that conversation, and starts a closed
+# one there. Codex's link, not this product's: it can only show a conversation, never change one.
+CODEX_THREAD_LINK = "codex://threads/"
+
+
+def codex_thread_uri(thread_id) -> str | None:
+    """The Codex app's link to one conversation, or None unless `thread_id` is a UUID in its canonical text - the
+    only thing ever put in the link (ids.is_uuid)."""
+    return CODEX_THREAD_LINK + thread_id if ids.is_uuid(thread_id) else None
+
+
+def parse_codex_thread_uri(uri) -> str | None:
+    """The conversation a Codex link names, or None when `uri` is anything but exactly CODEX_THREAD_LINK and a UUID
+    in its canonical text: no query, no fragment, no second segment."""
+    text = uri if isinstance(uri, str) else ""
+    if not text.startswith(CODEX_THREAD_LINK):
+        return None
+    thread_id = text[len(CODEX_THREAD_LINK):]
+    return thread_id if ids.is_uuid(thread_id) else None
+
+
+def open_in_codex(link) -> bool:
+    """Show one conversation in the Codex app, where a click on a notice may go: the app's own link to it, handed to
+    Windows' URL handler - explorer.exe, given the link as its one argument, opens it with whatever Windows has
+    registered for `codex:`, the Codex app, as a click on such a link would. No shell and no command string: the link
+    is read again here, and only exactly a Codex conversation link - CODEX_THREAD_LINK and a UUID's canonical text -
+    is ever put in the argument list. False when there is no explorer.exe."""
+    thread_id = parse_codex_thread_uri(link)
+    if thread_id is None:
+        raise ValueError("not a Codex conversation link")
+    explorer = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "explorer.exe"
+    if not explorer.is_file():
+        return False
+    # explorer.exe is a GUI program, so no console is made for it; the flag is the rule every start obeys
+    # (tests/test_no_console_windows.py).
+    subprocess.Popen([str(explorer), codex_thread_uri(thread_id)], close_fds=True,
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    return True
+
+
 def power_stop_uri(nonce: str) -> str:
     """Capability URI that stops the power action for one batch (v0.6.12, the A28 amendment).
 
@@ -154,6 +197,8 @@ MAX_TOAST_ACTIONS = 5
 # by the toast's own audio element - so it is Windows that plays it, and Windows' Do not disturb and
 # Focus that hold it back with the toast. Otherwise a needs-you toast is silent; no other toast changes.
 NEEDS_YOU_SOUND = "ms-winsoundevent:Notification.Reminder"
+# v0.6.16: the sound every other toast has always had, named only where a reminder would otherwise change it.
+DEFAULT_SOUND = "ms-winsoundevent:Notification.Default"
 
 
 def _audio(silent, sound) -> str:
@@ -164,7 +209,8 @@ def _audio(silent, sound) -> str:
     return '<audio src="%s"/>' % NEEDS_YOU_SOUND if sound is True else ""
 
 
-def _toast_xml(title, body, button=None, uri=None, extra=(), more=(), silent=False, sound=None) -> str:
+def _toast_xml(title, body, button=None, uri=None, extra=(), more=(), silent=False, sound=None,
+               launch=None, stays=False) -> str:
     # Imported when a toast is built, not when this module is: `xml.sax` brings about
     # ninety modules with it, `urllib.request`, `http.client`, `email` and `ssl` among
     # them, and every process that imports the watcher paid for them whether or not it
@@ -179,6 +225,10 @@ def _toast_xml(title, body, button=None, uri=None, extra=(), more=(), silent=Fal
             '<action content=%s activationType="protocol" arguments=%s/>' % (
                 quoteattr(label), quoteattr(target))
             for label, target in pairs[:MAX_TOAST_ACTIONS])
+    elif stays:
+        # A toast that stays needs a button to go (Windows keeps a reminder only while it has one): Windows' own
+        # Dismiss, in Windows' own words - no word of ours.
+        actions = '<actions><action activationType="system" arguments="dismiss" content=""/></actions>'
     # Trimmed here rather than at the call sites, so no future caller can silently
     # lose a line to the platform limit.
     lines = [line for line in ([title] + list(extra) + [body]) if line][:MAX_TOAST_LINES]
@@ -186,12 +236,23 @@ def _toast_xml(title, body, button=None, uri=None, extra=(), more=(), silent=Fal
     # The history copy (`silent`) makes no sound. Without it the document is byte for byte
     # what it was before v0.6.5; tests/test_notice_card.py holds every toast to a golden.
     audio = _audio(silent, sound)
-    return ('<toast duration="long"><visual><binding template="ToastGeneric">'
-            '%s</binding></visual>%s%s</toast>' % (text, audio, actions))
+    if stays and not audio:
+        # A reminder would ring Windows' reminder sound; one that stays rings what it always rang.
+        audio = '<audio src="%s"/>' % DEFAULT_SOUND
+    # v0.6.16: a click on the toast's body (`launch`, a protocol activation, as its buttons are) goes where a click on
+    # the card's goes - notifier.click_uri decides it. Without one the element is what it always was.
+    opens = ' launch=%s activationType="protocol"' % quoteattr(launch) if launch else ""
+    # v0.6.16: a notice of a kind a person keeps on screen until clicked (notice_kinds) is Windows' reminder, which
+    # stays until it is clicked or dismissed. Without it the element is what it always was.
+    if stays:
+        opens += ' scenario="reminder"'
+    return ('<toast duration="long"%s><visual><binding template="ToastGeneric">'
+            '%s</binding></visual>%s%s</toast>' % (opens, text, audio, actions))
 
 
 def show(title: str, body: str, *, button: str | None = None, uri: str | None = None,
-         extra=(), more=(), silent: bool = False, sound: bool | None = None) -> bool:
+         extra=(), more=(), silent: bool = False, sound: bool | None = None, launch: str | None = None,
+         stays: bool = False) -> bool:
     """Best effort. Returns True only when PowerShell reported success.
 
     The toast document travels as an environment variable into a constant script, never
@@ -202,12 +263,14 @@ def show(title: str, body: str, *, button: str | None = None, uri: str | None = 
     Windows files it straight into its notification center (`SuppressPopup`) and it plays
     no sound (`<audio silent="true"/>`). Checked on Windows 11 build 26200: a toast with
     SuppressPopup set is in `ToastNotificationManager.History` a moment after `Show`. The
-    default is exactly the toast this function always raised.
+    default is exactly the toast this function always raised. `launch` (v0.6.16) is where a click on its
+    body goes, which only a notifier's notice gives.
     """
     if pwsh.executable() is None:
         return False
     values = {"XML": _toast_xml(title, body, button, uri, extra, more, silent=silent is True,
-                                sound=sound if isinstance(sound, bool) else None),
+                                sound=sound if isinstance(sound, bool) else None,
+                                launch=launch if isinstance(launch, str) else None, stays=stays is True),
               "AUMID": aumid()}
     if silent is True:
         values["SILENT"] = "1"
@@ -289,7 +352,8 @@ def _content(title, body, *, button=None, uri=None, extra=(), more=(), sound=Non
 
 def show_content(content: dict, *, silent: bool = False) -> bool:
     """Raise the toast one of the `*_content` functions describes."""
-    options = {name: content[name] for name in ("button", "uri", "extra", "more", "sound") if name in content}
+    options = {name: content[name] for name in ("button", "uri", "extra", "more", "sound", "launch", "stays")
+               if name in content}
     if silent is True:
         options["silent"] = True
     return show(content["title"], content["body"], **options)

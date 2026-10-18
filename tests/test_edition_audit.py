@@ -555,7 +555,12 @@ class SetupProgramTests(unittest.TestCase):
 
     def test_h_a_name_or_a_literal_of_the_advanced_edition_outside_the_archive(self):
         image = self.standard.read_bytes()
-        for added, finding in ((PACKAGE.encode("utf-8"), "(h) the standard setup program holds %s" % PACKAGE),
+        # The package's name is the edition machinery's (audit.SETUP_ALLOWED, the installer window); the skill's is
+        # the strong name nothing of the standard edition holds.
+        self.assertEqual(audit.SETUP_ALLOWED, {PACKAGE: audit.INSTALLER_WINDOW})
+        self.assertEqual(audit.EXECUTABLE_ALLOWED, {(audit.WINDOW, PACKAGE): audit.INSTALLER_WINDOW})
+        self.assertTrue(audit.INSTALLER_WINDOW.strip())
+        for added, finding in ((SKILL.encode("utf-8"), "(h) the standard setup program holds %s" % SKILL),
                                ("ArmingPage".encode("utf-16-le"), "(h) the standard setup program holds ArmingPage"),
                                ("Watch first, then turn on".encode("utf-16-le"),
                                 "(h) the standard setup program holds the literal 'Watch first, then turn on'")):

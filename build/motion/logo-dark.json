@@ -1,0 +1,13 @@
+{
+  "format": "car-motion/1",
+  "kind": "logo",
+  "name": "logo-dark",
+  "output": "assets/logo-motion-dark.png",
+  "size": 192,
+  "dark": true,
+  "state": "watching",
+  "budget": {
+    "cap": 2000000
+  },
+  "step_ms": 25
+}

@@ -26,7 +26,10 @@ class Card:
         # v0.6.10: the design (win32.look), which chooses paint only. What moves - the light's breath, and
         # the card's own entrance, exit and slide - is held by `reduced` alone, the same in every design.
         self.design = popup.design_choice(drawn.get("design"))
-        self.motion = notice_card.CardMotion(now_ms, hold_ms=stack.hold(), reduced=bool(drawn["reduced"]))
+        # v0.6.16: a notice of a kind a person keeps on screen (notice_kinds) holds until it is clicked, or until a
+        # newer card needs its place; every other goes after its hold, as it always did.
+        hold = notice_card.UNTIL_CLICKED if getattr(notice, "stays", False) is True else stack.hold()
+        self.motion = notice_card.CardMotion(now_ms, hold_ms=hold, reduced=bool(drawn["reduced"]))
         self.hover = self.pressed = None
         self.tracking = False
         self.pushed_out = False

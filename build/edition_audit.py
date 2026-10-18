@@ -97,6 +97,12 @@ ALLOWED = {
     ("install/install.ps1", PACKAGE):
         "tells which edition the payload it installs is, the same way",
 }
+# The same for our executables (d) and the setup programs (h), outside the archive they carry: the installer window
+# (gui/InstallerFlow.cs, v0.6.16) is in both, and tells which edition is installed - and in a setup program which one
+# the archive is - by install.ps1's own rule, the package's folder (InstallerFlow.EditionOfSource).
+INSTALLER_WINDOW = "the installer window tells which edition is installed by the package's folder (gui/InstallerFlow.cs)"
+EXECUTABLE_ALLOWED = {(WINDOW, PACKAGE): INSTALLER_WINDOW}
+SETUP_ALLOWED = {PACKAGE: INSTALLER_WINDOW}
 # Shorter names and plain words - `create`, `Registry`, `VALUES` - are English (or SQL) as often
 # as they are code, and would be found in any text; the checks look for the ones that can only be
 # ours (`distinctive`) everywhere, and a capitalised word only among code's identifiers
@@ -421,6 +427,8 @@ def check_executables(standard: dict, advanced: Inventory) -> list:
             found.append("(d) the standard archive has no %s to read" % entry)
             continue
         for name in sorted(advanced.window):
+            if (entry, name) in EXECUTABLE_ALLOWED:
+                continue
             if _holds(data, name, word=name not in (PACKAGE, SKILL, SENTINEL)):
                 found.append("(d) %s holds %s" % (entry, name))
         for literal in sorted(advanced.literals):
@@ -574,6 +582,8 @@ def check_setups(standard_zip: bytes, advanced_zip: bytes, standard_setup: bytes
             continue
         outside = image[:start] + image[end:]
         for name in sorted(advanced.window | {PACKAGE, SKILL, SENTINEL}):
+            if name in SETUP_ALLOWED:
+                continue
             if _holds(outside, name, word=name not in (PACKAGE, SKILL, SENTINEL)):
                 found.append("(h) the standard setup program holds %s" % name)
         for literal in sorted(advanced.literals):

@@ -102,6 +102,9 @@ namespace CodexAutoResume
             }
         }
 
+        /// The render mode's answers (WindowRender.cs), in place of any process: null for every window a person opens.
+        internal static Func<string, string, Dictionary<string, object>> Answers;
+
         internal Dictionary<string, object> Call(string command, string argument)
         {
             System.Threading.Interlocked.Increment(ref calls);
@@ -112,6 +115,7 @@ namespace CodexAutoResume
         private Dictionary<string, object> CallCounted(string command, string argument)
         {
             if (closed) throw new ObjectDisposedException("the window is closing");
+            if (Answers != null) return Answers(command, argument);
             lock (gate)
             {
                 if (closed) throw new ObjectDisposedException("the window is closing");
@@ -143,6 +147,7 @@ namespace CodexAutoResume
         internal Dictionary<string, object> CallOnce(string command, string argument)
         {
             if (closed) throw new ObjectDisposedException("the window is closing");
+            if (Answers != null) return Answers(command, argument);
             System.Threading.Interlocked.Increment(ref calls);
             try { return once.Call(command, argument); }
             finally { System.Threading.Interlocked.Decrement(ref calls); }
@@ -730,6 +735,8 @@ namespace CodexAutoResume
         private ListView pendingList, historyList;
         private Label pendingEmpty, historyEmpty;
         private Button retryButton, cancelButton, timelineButton, threadButton, cancelAllButton;
+        // v0.6.16 (issue #39): every waiting recovery looked at again, after the person says yes.
+        private Button rescanButton;
         // Why the selected task is waiting.
         private GateList explainList;
         private Label explainAsOf;
@@ -812,6 +819,10 @@ namespace CodexAutoResume
         // The arguments a window that reopens itself passes on have been written (ReopenArguments),
         // with only the standard window's pages and places among them.
         static partial void ReopenArgumentsWritten(string page, string focus, List<string> arguments);
+        // The render mode (gui/WindowRender.cs) has put the window in a frame's state as far as the
+        // standard window goes: a page of the advanced edition's, and what the frame asks of it, is
+        // put in place here, `moved` set when anything changed.
+        partial void RenderStateNamed(Dictionary<string, object> frame, RenderWriter writer, ref bool moved);
 
         // ----------------------------------------------------------------- chrome
         private void BuildDashboard()

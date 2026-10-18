@@ -1073,6 +1073,7 @@ namespace CodexAutoResume
                                         : S("action.thread_on", "Turn on for this conversation");
             if (threadButton.Text != text) threadButton.Text = text;
             if (cancelAllButton != null) cancelAllButton.Enabled = idle && pendingList.Items.Count > (demoPending == null ? 0 : 1);
+            if (rescanButton != null) rescanButton.Enabled = idle && pendingList.Items.Count > (demoPending == null ? 0 : 1);
         }
 
         private void UpdateHistoryButtons()

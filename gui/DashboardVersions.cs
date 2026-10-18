@@ -449,6 +449,9 @@ namespace CodexAutoResume
             string before = WatcherIdentity();
             string shown = diagUpdate.Text;
             SetBusy(true);
+            // The installer's request to close (WatchForUpdate) is not this window's to answer while it runs its own: it
+            // would close mid-pick, its result never said.
+            updatingHere = true;
             diagUpdate.Text = S("diag.update_installing", "installing...");
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
@@ -467,6 +470,7 @@ namespace CodexAutoResume
                 string detail = Tail(printed + "\n" + errors);
                 MethodInvoker finish = delegate
                 {
+                    updatingHere = false;
                     SetBusy(false);
                     if (outcome == "installed") AfterPick(before, version, converted);
                     else

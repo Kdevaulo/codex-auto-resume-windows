@@ -547,7 +547,8 @@ Write-PluginNotUpdated
 
     def test_the_installer_says_it_where_the_edition_changed(self):
         text = (ROOT / "build" / "install" / "install.ps1").read_text(encoding="utf-8")
-        failed = text[text.index("if ($installed.Code -ne 0) {\n    # After an edition change"):]
+        # Found whatever the block it stands in indents it by.
+        failed = text[re.search(r"if \(\$installed\.Code -ne 0\) \{\n[ ]*# After an edition change", text).start():]
         self.assertIn("if ($editionChange) { Write-PluginNotUpdated -From $previousEdition -To $edition }",
                       failed[:400])
 

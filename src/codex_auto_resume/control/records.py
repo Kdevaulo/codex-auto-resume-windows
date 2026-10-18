@@ -16,7 +16,9 @@ from .errors import ControlError, _identifier
 # The journal entries that change a schedule or a flag and never the record's stored
 # reason. Every other same-state event really did change the reason - `Store.update`
 # writes one whenever `last_error` changed - and so really did change the public code.
-_REASON_UNCHANGED = frozenset({"retry_now", "cancel_requested", "would_send"})
+# v0.6.16 (issue #39): and what Rescan and reconcile left as it was - rechecked, unresolved, changed meanwhile.
+_REASON_UNCHANGED = frozenset({"retry_now", "cancel_requested", "would_send",
+                               "rescan_rechecked", "rescan_unresolved", "rescan_changed"})
 
 
 def receipts(rows) -> list:

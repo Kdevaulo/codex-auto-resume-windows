@@ -51,7 +51,8 @@ AFTER = {"test_ladder_and_guards": "v0.6.11's Custom waits, time ceiling and gua
          "test_skip_reasons": "v0.6.16-beta.3's log lines for a failed turn passed over, which v0.6.10 never wrote",
          "test_continuation_split": "v0.6.16-beta.3's conversations Codex records under another id (issue #30)",
          "test_checkup": "v0.6.16-beta.3's Diagnostics check, which v0.6.10 did not have",
-         "test_once_words_engine": "v0.6.16-beta.3's words for this time, which v0.6.10 did not have"}
+         "test_once_words_engine": "v0.6.16-beta.3's words for this time, which v0.6.10 did not have",
+         "test_rescan": "v0.6.16's Rescan and reconcile on the Pending page (issue #39), which v0.6.10 did not have"}
 MARKER = re.compile(r"\[codex-auto-resume:([0-9a-f]{64}|[0-9a-f]{16})\]")
 
 

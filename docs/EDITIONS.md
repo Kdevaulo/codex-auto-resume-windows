@@ -797,8 +797,10 @@ It rests on no measurement.
 **What it does.** While the Codex app runs, reads your Codex usage on its own every 5 to 60 minutes, as you
 choose or type in - 15 by default - and shows it in the icon's tooltip and the popup. When a window reaches
 the percentage you set for a warning (85% by default, each window its own), it shows a notice, once for that
-window. Each window - the five-hour and the weekly - can be switched off on its own: it is still read and
-shown, and nothing warns, wraps up or stops for it. Every number on the page has *Custom...* beside its
+window. Each window - the five-hour and the weekly - can be switched off on its own (*Act on the five-hour
+window*, *Act on the weekly window*): it is still read and shown, and no warning is shown for it. These two
+switches decide only the warnings: Wrap up near a limit and Stop near a limit each have a pair of their own.
+Every on/off choice on the page is a switch; every number on the page has *Custom...* beside its
 choices, checked before it is saved - a whole percentage from 1 to 100, a spacing from 5 to 60 minutes - and
 for each window the warning stays at or below the wrap-up, and the wrap-up below the stop its words ask for.
 The reading is only shown: whether a recovery may go is still decided by the reading the program makes when
@@ -817,8 +819,10 @@ reading that cannot be read is shown as nothing and warns of nothing.
 
 ### Wrap up near a limit
 
-**What it does.** Needs the usage meter, which turns on with it. When a window it may act on reaches the
-percentage you set (90% by default, each window its own), each conversation that is switched on and has a
+**What it does.** Needs the usage meter, which turns on with it. Its own switches, *Act on the five-hour
+window* and *Act on the weekly window* (both on by default), say which windows it acts on - apart from the
+meter's, which decide only the warnings; with both off it acts on neither, and the page says so. When a window
+it may act on reaches the percentage you set (90% by default, each window its own), each conversation that is switched on and has a
 turn running is sent one message, once for that window, in the wording you pick: the standard "Please finish
 the current step, then stop.", the short "Please stop now.", the detailed "Commit what is pending, write down
 where you are and what is left, then stop.", one with the numbers - "You have used 90% of the five-hour limit.
@@ -846,7 +850,11 @@ MT: not made yet.**
 ### Stop near a limit
 
 **What it does.** Needs the usage meter, which turns on with it. (Pause near a limit until v0.6.16-beta.4.)
-When a window it may act on reaches the stop percentage you set (97% by default, each window its own), each
+Its own switches, *Act on the five-hour window* and *Act on the weekly window* (both on by default), say which
+windows it acts on, as the wrap-up's do; with both off it acts on neither, and the page says so. A window
+switched off in the meter's choices before this version is switched off here and in Wrap up near a limit too,
+once, when the program first opens its state after the update - so nothing starts acting on a window you had
+off. When a window it may act on reaches the stop percentage you set (97% by default, each window its own), each
 conversation that is switched on and has a turn running is stopped, as the Stop button in the Codex app
 stops one - through the app's own internal channel, the `\\.\pipe\codex-ipc` pipe, once for that window -
 and the program sends no further continuation until that window resets: recoveries wait, and the advanced
@@ -857,7 +865,9 @@ pauses a stopped conversation's queue, and that survives the app's restart, unti
 reset lets it go; with Continue after the reset off, a notice asks you to press Resume in Codex. When the window resets, a conversation it stopped is continued once (*Continue after the reset*, a
 choice of Wrap up near a limit, on by default) by a turn started through the same channel - past the paused
 queue - only if nothing newer happened there and the app has it open; otherwise it waits, and a notice says
-to open it in Codex. Messages you queued yourself, and anything you type in Codex, are not touched.
+to open it in Codex. Messages you queued yourself, and anything you type in Codex, are not touched. Each of
+these three notices, and the meter's warning, is a kind of its own under *Keep on screen until clicked*
+(Settings > General > Notifications), and a click on one opens the Dashboard.
 
 **When it helps.** When you would rather a turn stopped before the limit than ran into it.
 
@@ -946,8 +956,10 @@ Two editions installed side by side are not supported: one installation is one e
 
 Changing edition is a reinstall, never an update. Run the other edition's setup program, or its
 archive's `Install.cmd`: the installer says which edition is installed, what the change keeps and
-what it changes, and asks before it replaces anything (`Change the edition? [y/N]`; anything but yes
-changes nothing). From a command line, `scripts/bootstrap.ps1 -Edition Standard` or `-Edition
+what it changes, and asks before it replaces anything: the setup program in its window, where *Change the
+edition* has to be chosen before it will start, and `Install.cmd` with `Change the edition? [y/N]`, where
+anything but yes changes nothing. With `-Silent` nobody can be asked, so nothing is changed and it ends with
+exit code 14. From a command line, `scripts/bootstrap.ps1 -Edition Standard` or `-Edition
 Advanced` chooses the edition, and over the other edition it needs `-Force` as well. The change keeps
 your settings, your pause, everything waiting to resume and the sign-in choice, and every advanced
 capability starts off (K2). Codex's own copy of the plugin can stay the old edition's until Codex
@@ -993,32 +1005,35 @@ limit to reset has ended. It keeps every standard (H14 and F15 in [STANDARDS.md]
 A28 amended by the owner for its stop button), so it is in the standard edition, off until a person
 turns it on in the Dashboard.
 
-Then, after v0.6.13's fix of how Codex's engine is found, v0.6.14 brings the first part of the rest
+Then, after v0.6.13's fix of how Codex's engine is found, v0.6.14 brought the first part of the rest
 of the advanced edition: the six capabilities [above](#todays-capabilities) that follow the goal
 continuation, and with them Once more when unsure, Send now, Keep it on, the compatibility report
-and the three for a usage reset you pick. It was to be the first of several pre-releases and is
-published as a final instead (owner, 2026-10-10). The rest moves to v0.6.15, each part published as
-a pre-release as it is finished. Each new capability is the advanced edition's alone, off until you
+and the three for a usage reset you pick. It was to be the first of several pre-releases and was
+published as a final instead (owner, 2026-10-10). v0.6.15 was a fix alone (owner, 2026-10-13), so the
+rest went to v0.6.16, which came in four pre-releases and is out: its first, v0.6.16-beta, built the
+six capabilities of stage 3c, and the next three a route of its own, other kinds of session and the
+usage capabilities. What is left - stage 5 and the chat inside the Dashboard - is v0.6.17, which begins
+with a pre-release, v0.6.17-alpha, and publishes each part as a pre-release as it is finished. Each new capability is the advanced edition's alone, off until you
 turn it on, with a statement that names the standards it departs from. This is a direction, not a
 promise; [ROADMAP.md](ROADMAP.md) has the whole list: the two additions in its v0.6.12 section, what
-is built in its v0.6.14 section, and the rest in its v0.6.15 section, under the same four headings
-as below.
+is built in its v0.6.14 and v0.6.16 sections, and the rest in its v0.6.17 section, under the same
+four headings as below.
 
 - **Recovery through the channels already in use** - several conversations at once,
   empty-response recovery, an unloaded conversation through a queue that waits for it, a subagent
   through its parent, keep going after a normal completion, and a prompt queue and recurring
-  wakes - all six built in its first pre-release, v0.6.15-beta, and described
+  wakes - all six built in v0.6.16's first pre-release, v0.6.16-beta (published first as v0.6.15-beta), and described
   [above](#todays-capabilities).
 - **A route of its own, and other kinds of session** - a conversation nothing holds, run through
   Codex's app server; CLI, TUI and IDE sessions; a full context compacted, then continued; another
   model at capacity; a continuation with no words - all built in v0.6.16-beta.4, described
   [above](#todays-capabilities); and a continuation inside the turn through a Codex Stop hook, planned for
   v0.6.17. (Codex's own retry settings are offered only once a measurement passes.)
-- **Around recovery** - a live usage meter, a wrap-up nudge near a limit and usage analytics; a
-  provider status feed and push notifications through one courier process, the advanced edition's only
+- **Around recovery** - usage analytics (the live usage meter and the wrap-up near a limit are built,
+  described [above](#todays-capabilities)); a provider status feed and push notifications through one courier process, the advanced edition's only
   outbound network code; a local API and web view, remote control over Telegram and a read-only view
   of other PCs; switching the Codex account on your command; a weekly update check while idle; crash
   supervision, a wake timer for a reset and *Open Codex* on the card.
 - **Also moved here** - watching several Codex homes, which the standard edition gains and
-  v0.6.15-beta built; Arabic and
+  v0.6.16-beta built; Arabic and
   Hebrew; winget manifests for both editions.

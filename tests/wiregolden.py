@@ -527,6 +527,8 @@ BRIDGE_CASES = {
         Case("every failure so far marked as seen"),
         Case("again, with nothing new to see")],
     "cancel-all": [Case("every pending recovery cancelled"), Case("nothing left to cancel")],
+    # v0.6.16: Rescan and reconcile (issue #39), twice - the second finds what the first left as it was.
+    "rescan": [Case("every waiting recovery looked at again"), Case("and again")],
     # v0.6.11: Diagnostics - who Windows lets open the state folder, read only; and Show me what happens,
     # whose rows are made up and whose card is asked of a watcher that is not there to draw it.
     "state-access": [

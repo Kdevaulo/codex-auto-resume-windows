@@ -18,6 +18,9 @@
 // Custom... opens a box under the drop-down with Set beside it; the number is checked before anything is sent - a whole
 // number in the range - and the reason said where it is not, as the bridge's refusal is said where it refuses one.
 //
+// Both windows off (v0.6.16 final): a capability with a pair of window switches - the meter, the wrap-up, the stop - and
+// both of them off says, under them, that it acts on neither.
+//
 // Nothing here draws anything the page does not draw already: the captions, help lines, boxes and buttons are the
 // Settings page's.
 //
@@ -189,6 +192,15 @@ namespace CodexAutoResume
                 wordingBoxes[key] = box;
                 wordingSaves[key] = save;
             }
+        }
+
+        /// Under the switches of a capability that has a pair for the windows (v0.6.16 final: the usage meter, Wrap up near
+        /// a limit and Stop near a limit, each its own), where both are off: a line saying it acts on neither - on, and
+        /// doing nothing for either window.
+        private void BuildNoWindowNote(List<object> options, TableLayoutPanel card)
+        {
+            if (OptionValue(options, "window_five_hour") != SwitchOff || OptionValue(options, "window_weekly") != SwitchOff) return;
+            card.Controls.Add(HelpText(Word("page.option.no_window", "Both windows are switched off, so this feature acts on neither of them.")));
         }
 
         /// A choice's value as the list says it is now, or 0.

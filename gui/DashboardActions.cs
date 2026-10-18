@@ -513,6 +513,45 @@ namespace CodexAutoResume
             });
         }
 
+        /// Rescan and reconcile (v0.6.16, issue #39): every waiting recovery looked at again by the watcher's own
+        /// rules, once the person says yes. One is retired only where Codex's history proves a person's newer work
+        /// came after it; every other one waits as it did, under every check. The note says how many were retired,
+        /// rechecked, left unresolved and changed meanwhile - the bridge's `rescan`, which sends nothing.
+        private void Rescan()
+        {
+            if (busy > 0 || pendingList.Items.Count == 0) return;
+            if (!Confirm(S("confirm.rescan",
+                           "Look at every waiting recovery again? One is retired only where Codex's history proves newer work of yours came after it; every other one keeps waiting, with every check, and nothing is sent."),
+                         S("action.rescan", "Rescan and reconcile")))
+                return;
+            CallAsync("rescan", null, delegate(Dictionary<string, object> reply)
+            {
+                if (!Ok(reply))
+                {
+                    Report(reply);
+                    RefreshAfterChange();
+                    return;
+                }
+                var result = Map(reply, "result");
+                pendingNoteFor = BulkNote;
+                pendingNoteText = RescanNote(S("result.rescan",
+                    "Retired: {retired} \u00B7 Rechecked: {rechecked} \u00B7 Unresolved: {unresolved} \u00B7 Changed meanwhile: {changed}"),
+                    result);
+                ShowPendingNote();
+                RefreshAfterChange();
+            });
+        }
+
+        /// The rescan's result line: each of its four counts in its place, each read by its own name and written as Count writes it (DashboardCompat.cs). Pure.
+        internal static string RescanNote(string template, Dictionary<string, object> result)
+        {
+            return template
+                .Replace("{retired}", Count(Number(result, "retired")))
+                .Replace("{rechecked}", Count(Number(result, "rechecked")))
+                .Replace("{unresolved}", Count(Number(result, "unresolved")))
+                .Replace("{changed}", Count(Number(result, "changed")));
+        }
+
         /// What the watcher is doing, as the header's status light shows it: the light of the header's word
         /// (ActivityWord), and a light that is off - grey, as it was until v0.6.3 - for a watcher that is not
         /// running or not known to be, beside the word that asks for attention (HeaderLight).
