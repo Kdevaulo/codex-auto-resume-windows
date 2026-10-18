@@ -137,13 +137,24 @@ class StopTests(StopCase):
         self.assertEqual(len(self.starts), 1)
 
     def test_a_window_switched_off_is_never_stopped(self):
+        """Switched off in its own choices (v0.6.16 final)."""
+        plug, _turn = self.running()
+        assert plug.runtime.arming.set_option("usage_pause", OptionKey.WINDOW_FIVE_HOUR, 2,
+                                              generation=plug.runtime.state.meta()["generation"],
+                                              actor=Actor.DASHBOARD)["done"]
+        for _ in range(3):
+            self.h.tick(advance=61)
+        self.assertEqual(self.stops, [])
+
+    def test_the_meters_window_switch_leaves_the_stop_alone(self):
+        """v0.6.16 final: the meter's five-hour switch off stops only its warnings - the turn is stopped all the same."""
         plug, _turn = self.running()
         assert plug.runtime.arming.set_option("usage_meter", OptionKey.WINDOW_FIVE_HOUR, 2,
                                               generation=plug.runtime.state.meta()["generation"],
                                               actor=Actor.DASHBOARD)["done"]
         for _ in range(3):
             self.h.tick(advance=61)
-        self.assertEqual(self.stops, [])
+        self.assertEqual(len(self.stops), 1)
 
 
 class OncePerResetTests(StopCase):
@@ -155,7 +166,7 @@ class OncePerResetTests(StopCase):
         self.h.home.set_turn(T1, turn, status="interrupted", completed_at=int(self.h.now))
         self.h.home.add_turn(T1, status="inProgress", progress=False)        # the person pressed Resume
         for value in (2, 1):
-            assert plug.runtime.arming.set_option("usage_meter", OptionKey.WINDOW_FIVE_HOUR, value,
+            assert plug.runtime.arming.set_option("usage_pause", OptionKey.WINDOW_FIVE_HOUR, value,
                                                   generation=plug.runtime.state.meta()["generation"],
                                                   actor=Actor.DASHBOARD)["done"]
             self.h.tick(advance=61)

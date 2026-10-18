@@ -119,6 +119,8 @@ namespace CodexAutoResume
         private Dictionary<string, object> advancedRules, advancedSamples;
         // The open capability's choices, its rules' Remove buttons and the editor of a new rule, as its cards were built.
         private readonly List<SoftCombo> advancedChoices = new List<SoftCombo>();
+        // Its on/off choices (v0.6.16 final), each the Dashboard's own switch, as they were built.
+        private readonly List<SoftCheck> advancedSwitches = new List<SoftCheck>();
         private readonly List<Button> ruleRemoves = new List<Button>();
         private SoftTextArea ruleTag, ruleFrom, ruleTo;
         private SoftCombo ruleKind, ruleSampled;
@@ -892,6 +894,7 @@ namespace CodexAutoResume
             advancedStack.RowStyles.Clear();
             advancedHourly = null;
             advancedChoices.Clear();
+            advancedSwitches.Clear();
             ForgetCustomEntries();
             ruleRemoves.Clear();
             ruleTag = ruleFrom = ruleTo = null;
@@ -1061,8 +1064,9 @@ namespace CodexAutoResume
         }
 
         // ---------------------------------------------------------------- choices, rules and samples
-        /// A capability's own choices (registry.Option), one drop-down each at what the list says it is now; a choice made
-        /// is sent at once (advanced-option), with the generation the page read.
+        /// A capability's own choices (registry.Option), one drop-down each at what the list says it is now - or, for an
+        /// on/off choice, the switch every on-or-off setting of the window is; a choice made is sent at once
+        /// (advanced-option), with the generation the page read.
         private void BuildAdvancedChoices(string id, List<object> options)
         {
             TableLayoutPanel card = NewGroup(Word("page.options", "Choices"), advancedStack);
@@ -1071,6 +1075,11 @@ namespace CodexAutoResume
                 var option = entry as Dictionary<string, object>;
                 string key = Str(option, "key");
                 if (key == null) continue;
+                if (IsSwitchChoice(key))
+                {
+                    BuildAdvancedSwitch(id, key, Whole(Get(option, "value")) == SwitchOn, card);
+                    continue;
+                }
                 var combo = new SoftCombo();
                 combo.Width = Px(160);
                 IgnoreWheel(combo);
@@ -1110,8 +1119,47 @@ namespace CodexAutoResume
                 advancedChoices.Add(combo);
                 BuildCustomEntry(id, key, label, CustomRange(option), card);
             }
+            // v0.6.16 final: a capability with both its windows switched off says it acts on neither (AdvancedUsage.cs).
+            BuildNoWindowNote(options, card);
             // v0.6.16-beta.4: the wrap-up's Custom wording, under its drop-downs (AdvancedUsage.cs).
             BuildWordings(id, options, card);
+        }
+
+        // A switch's two values (registry SWITCH: 1 on, 2 off).
+        private const int SwitchOn = 1, SwitchOff = 2;
+
+        /// Whether a choice is on or off (registry SWITCH): Include the reset time, Continue after the reset, and each window
+        /// acted on or not.
+        private static bool IsSwitchChoice(string key)
+        {
+            return key == "wrap_reset_time" || key == "wrap_after_reset" || key.StartsWith("window_", StringComparison.Ordinal);
+        }
+
+        /// An on/off choice as the Dashboard's own switch (NewCheck, as Settings draws its switches), in the row a drop-down
+        /// stood in - its label at the left, the switch where the drop-down's right edge was. It moves only once the change
+        /// is taken: a press sends the other value, and the page, read again, draws what holds (AutoCheck off, as the power
+        /// action's switch is). A CheckButton, so the keyboard's Space and UI Automation's Toggle press it too.
+        private void BuildAdvancedSwitch(string id, string key, bool on, TableLayoutPanel card)
+        {
+            string label = Word("page.option." + key, key);
+            var toggle = (SoftCheck)NewCheck("", on, false);
+            toggle.AutoCheck = false;
+            toggle.AutoSize = false;
+            toggle.Size = new Size(Px(Brand.SwitchWidth), toggle.GetPreferredSize(Size.Empty).Height);
+            toggle.AccessibleName = label;
+            toggle.Tag = key;
+            SoftCheck pressed = toggle;
+            toggle.Click += delegate { SwitchAdvancedOption(id, key, pressed); };
+            card.Controls.Add(NewRow(label, toggle));
+            advancedSwitches.Add(toggle);
+        }
+
+        /// A switch pressed: the other value sent, as a drop-down's choice is (SetAdvancedOptionValue).
+        private void SwitchAdvancedOption(string id, string key, CheckBox toggle)
+        {
+            if (choiceFilling || advancedListing == null || busy > 0) return;
+            int other = toggle.Checked ? SwitchOff : SwitchOn;
+            SetAdvancedOptionValue(id, key, other.ToString(CultureInfo.InvariantCulture));
         }
 
         /// One value of a choice as the drop-down shows it: hours with their unit, a count as a number.
@@ -1120,9 +1168,6 @@ namespace CodexAutoResume
             if (key == "ceiling_hours") return Word("page.option.hours", "{n} h", "n", value);
             // v0.6.16-beta.3 (issue #29): the meter's spacing, a stage's percentage, the wrap-up's wording.
             if (key == "poll_minutes") return Word("page.option.minutes", "{n} min", "n", value);
-            // v0.6.16-beta.4: a switch's two values (1 on, 2 off).
-            if (key == "wrap_reset_time" || key == "wrap_after_reset" || key.StartsWith("window_", StringComparison.Ordinal))
-                return value == 1 ? Word("page.option.on", "On") : Word("page.option.off", "Off");
             if (key == "wrap_style")
                 return Word("page.option.style." + value.ToString(CultureInfo.InvariantCulture),
                             value == 1 ? "Short" : value == 3 ? "Detailed" : value == 4 ? "With the numbers" :
@@ -1491,6 +1536,7 @@ namespace CodexAutoResume
             if (advancedHourly != null) advancedHourly.Enabled = idle && advancedListing != null;
             bool listed = idle && advancedListing != null;
             foreach (SoftCombo combo in advancedChoices) combo.Enabled = listed;
+            foreach (SoftCheck toggle in advancedSwitches) toggle.Enabled = listed;
             foreach (Button remove in ruleRemoves) remove.Enabled = listed;
             if (ruleAdd != null) ruleAdd.Enabled = listed;
             UpdateKeptButtons(idle);

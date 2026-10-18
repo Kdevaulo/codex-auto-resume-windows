@@ -89,6 +89,15 @@ from ..vocabulary import (ArmingState, ChatReason, ChatState, ContinuationKind, 
                           PromptState, PromptTrigger, RecordState, RuleReason, RuleState, RunEnd, SpendOutcome,
                           WordingKey)
 
+# The window switches (v0.6.16 final, the owner's request of 2026-10-18): Wrap up near a limit and Stop near a limit
+# offer a pair of their own, rows of `options` whose CHECK has admitted these words since version 6 - no new version.
+# Until then the usage meter's pair decided for all three, so a window switched off there is carried over to the other
+# two once (session.SessionMixin._carry_windows). An older build skips a choice its capability does not offer.
+WINDOW_CHOICES = ("window_five_hour", "window_weekly")
+WINDOW_LEADER = "usage_meter"
+WINDOW_FOLLOWERS = ("usage_wrap_up", "usage_pause")
+WINDOW_ON, WINDOW_OFF = 1, 2
+
 # Stage 4's version (v0.6.16-beta.4): the one place it is numbered - a literal, which the setup's version picker reads
 # (tests/test_version_picker.py) - the step after the version before it (6, the usage additions' own).
 SCHEMA_VERSION = 7
