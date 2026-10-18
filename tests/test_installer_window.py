@@ -299,6 +299,12 @@ foreach ($case in @(@('plain'), @('uninstall', '-Uninstall'), @('purge', '-unins
                              ((Switches $flow $given) -join ' '))
 }
 
+# The look it opens in: the installation's stored theme, design and motion, else the Dashboard's defaults.
+$out.look = @{}
+foreach ($case in $input_.looks.PSObject.Properties) {
+    $out.look[$case.Name] = @($SetupType.GetMethod('LookAt', $any).Invoke($null, [object[]]@([string]$case.Value)))
+}
+
 # Over its own version, installed already: Repair or Remove first (the owner, 2026-10-17); a newer one updates.
 function SetupFlow($given, $installed, $from) {
     $SetupType.GetMethod('FlowFor', $any).Invoke($null, [object[]]@([string[]]@($given), 'C:\Users\ExampleUser\.codex-auto-resume',
@@ -401,9 +407,19 @@ class FlowTests(unittest.TestCase):
         docs.mkdir()
         for name in ("CHANGELOG.md", "CHANGELOG.ko.md"):
             (docs / name).write_text("# Changelog\n", encoding="utf-8")
+        # Scratch homes whose settings say how the Dashboard looks (never the real one).
+        looks = {}
+        for name, settings in (("light", {"theme": "light", "design": "classic"}), ("dark", {"theme": "dark"}),
+                               ("still", {"design": "still"}), ("none", None)):
+            look_home = cls.work / "looks" / name
+            (look_home / "config").mkdir(parents=True)
+            if settings is not None:
+                (look_home / "config" / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+            looks[name] = str(look_home)
         source = cls.work / "input.json"
         source.write_text(json.dumps({"lines": {"install": INSTALLING, "update": UPDATING, "uninstall": REMOVING},
-                                      "tags": cls.TAGS, "trees": trees, "homes": homes, "sample": NOTES_SAMPLE}),
+                                      "tags": cls.TAGS, "trees": trees, "homes": homes, "sample": NOTES_SAMPLE,
+                                      "looks": looks}),
                           encoding="utf-8")
         cls.result = _powershell(PROBE, cls.work, 600, CAR_EXE=str(exe), CAR_INPUT=str(source),
                                  CAR_CHANGELOG=str(ROOT / "docs" / "CHANGELOG.md"), CAR_DOCS=str(docs))
@@ -541,6 +557,19 @@ class FlowTests(unittest.TestCase):
         self.assertNotIn("*Check", real)
         self.assertEqual(real.count("\n"), real.count("\r\n"), "every line ends in CR LF")
         self.assertIn("Check for updates offers it", real.replace("\r\n", "\n"))
+
+    def test_the_setup_window_opens_in_the_installations_own_look(self):
+        """The acceptance's setup window was dark - Windows' app mode - while the Dashboard and the uninstall window
+        of the installation it updated were light, as that installation's settings say. It opens in the theme,
+        design and motion the installation stores, as those two do, and in the Dashboard's defaults where nothing is
+        stored; the stored preference still goes through Theme.Current, so High Contrast wins as it does there."""
+        self.assertEqual(self.answer["look"], {"light": ["light", "classic", ""], "dark": ["dark", "soft", ""],
+                                               "still": ["system", "soft", "reduce"], "none": ["system", "soft", ""]})
+        run = SETUP_WINDOW[SETUP_WINDOW.index("internal static int Run("):SETUP_WINDOW.index("internal static InstallerFlow FlowFor(")]
+        self.assertIn("string[] look = LookAt(home);", run)
+        self.assertIn("Palette.Adopt(Theme.Current(look[0]));", run)
+        self.assertNotIn("Theme.Current(Theme.System)", run)
+        self.assertLess(run.index("Palette.Adopt("), run.index("new InstallerWindow("))
 
     def test_the_finish_page_and_the_log_say_the_exit_code(self):
         """The changelog promises "whether it finished, with the exit code and the log", and the acceptance's
