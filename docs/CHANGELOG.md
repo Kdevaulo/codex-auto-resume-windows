@@ -26,12 +26,12 @@ down first, which *Install another version...* does for you.
 
 - **Rescan and reconcile on the Pending page** (the standard edition's improvement). After *Cancel all*, a button
   that reads every waiting recovery again, once you confirm. It retires a wait only on positive proof that newer
-  work in that conversation superseded it - the failed turn found exactly, a later message of the person's,
-  nothing claimed - rechecks the valid ones under every normal gate, leaves the uncertain ones as they are, and
+  work of yours superseded it - its exact failed turn in Codex's history followed by a turn you started (a
+  continuation of this tool's never counts; after a rollback, nothing does) - rechecks the valid ones under every normal gate, leaves the uncertain ones as they are, and
   re-reads each one before applying and skips any that changed. It sends nothing, writes nothing to Codex's files
   and resets no budget; the note beside the buttons says how many were retired, rechecked, left unresolved and
   changed meanwhile (reported by [@weng-wen-jun](https://github.com/weng-wen-jun),
-  [#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)). <!-- confirm after merge -->
+  [#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)).
 - **The setup program is an installer.** Double-clicked, it opens a window of its own in the Dashboard's design and
   the product's eighteen languages: what it installs, which edition and version, and where; the few choices the
   installer has; how far it is and which step it is on; and whether it finished, with the exit code and the log,
@@ -55,7 +55,7 @@ down first, which *Install another version...* does for you.
 - **The README is the short one**: the setup program first, the Dashboard shown in motion, and one table of what to
   read next.
 - **Compatibility data 11** names codex-cli 0.163.0-alpha.10.2 as verified in eight capabilities, after a real
-  recovery on it. <!-- confirm after merge -->
+  recovery on it.
 - **The compatibility report stamps a report with the process's clock**, not the clock its module was imported
   under.
 
