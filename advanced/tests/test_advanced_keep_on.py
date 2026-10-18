@@ -472,6 +472,60 @@ class SendAgainSettingTests(KeepOnCase):
                 self.assertEqual((self.row()["keep_on"], self.row()["send_again"]), (False, False))
 
 
+class ReinstallTests(KeepOnCase):
+    """v0.6.16 (K2, as the owner amended it on 2026-10-18): an uninstall that kept the data, and the same edition
+    installed again, is like an update - what is on, what is kept on and every choice stay. Only an entry into the
+    edition (`install --edition-from standard`, which the installer passes unless the uninstall noted the advanced
+    edition, tests/test_edition_installer.py) turns every capability off."""
+
+    def setUp(self):
+        super().setUp()
+        from codex_auto_resume_advanced.registry import Option
+        from codex_auto_resume_advanced.vocabulary import OptionKey
+        self.key = OptionKey.ATTEMPTS
+        self.definition = ac.definition(options=(Option(self.key, (1, 2, 3), 1),))
+        self.rt = self.runtime(self.definition)
+        from codex_auto_resume import shortcut, startup
+        from test_cli import FakeWinreg
+        for guard in (patch.object(startup, "_winreg", return_value=FakeWinreg()),
+                      patch.object(shortcut, "install", return_value=True),
+                      patch.object(shortcut, "uninstall", return_value=False),
+                      patch.dict("os.environ", {"LOCALAPPDATA": str(self.home.parent / "no-codex"),
+                                                "CODEX_HOME": str(self.home.parent / "codex")})):
+            guard.start()
+            self.addCleanup(guard.stop)
+        from test_cli import _reset_logging
+        self.addCleanup(_reset_logging)
+
+    def cli(self, *argv):
+        import contextlib
+        import io
+        from codex_auto_resume import cli
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return cli.main(["--quiet", "--home", str(self.home), *argv])
+
+    def chosen(self):
+        row = self.row()
+        return row["state"], row["keep_on"], self.rt.state.options("test_wake")
+
+    def test_the_same_edition_installed_again_keeps_every_choice_and_an_entry_turns_them_off(self):
+        from codex_auto_resume import edition
+        self.armed()
+        self.rt.state.set_option("test_wake", self.key, 3, generation=self.generation(), actor=Actor.DASHBOARD)
+        before = self.chosen()
+        self.assertEqual(before, (ArmingState.ARMED, True, {self.key: 3}))
+        self.assertEqual(self.cli("uninstall", "--keep-state"), 0)
+        with patch.object(edition, "plug", return_value=self.plug(self.definition)):
+            self.assertEqual(self.cli("install"), 0)
+        self.assertEqual(self.chosen(), before, "a reinstall of the same edition changed its choices")
+        self.assertNotIn(JournalCode.RESET, [line["code"] for line in self.rt.state.journal()])
+        with patch.object(edition, "plug", return_value=self.plug(self.definition)):
+            self.assertEqual(self.cli("install", "--edition-from", "standard"), 0)
+        state, kept, _options = self.chosen()
+        self.assertEqual((state, kept), (ArmingState.OFF, False))
+        self.assertEqual(self.row()["reason"], OffReason.EDITION_ENTERED)
+
+
 class SendAgainTests(PluggedCase):
     """With Send again, the kept-on capability that paid for a continuation gone uncertain sends it once
     more under the once-more rules, and pays; without it, it is held as core holds one."""

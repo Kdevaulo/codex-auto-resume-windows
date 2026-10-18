@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 _HERE = str(Path(__file__).resolve().parent)
 if _HERE not in sys.path:
@@ -218,6 +219,43 @@ class EditionChangeTests(unittest.TestCase):
                 code, output, setup = self.run_region()
                 self.assertEqual(code, 0, output[-1500:])
                 self.assertEqual(setup, expected)
+
+
+    def test_the_same_edition_reinstalled_over_its_kept_state_keeps_its_choices(self):
+        """v0.6.16 (K2, as the owner amended it on 2026-10-18): an uninstall that kept the state notes which edition it
+        took away (commands/install.py). The advanced edition coming back over its own state is like an update, and
+        setup is told of no change, so every choice stays; a note of the standard edition, or no note - an uninstall
+        by an older version - is an entry, and every advanced feature starts off. The note is the one core writes."""
+        from codex_auto_resume import config, edition
+        from codex_auto_resume.commands import install
+        from codex_auto_resume.domain.plug import Edition
+        for left_by, expected in ((Edition.ADVANCED, ["setup"]),
+                                  (Edition.STANDARD, ["setup", "--edition-from", "standard"]),
+                                  (None, ["setup", "--edition-from", "standard"])):
+            with self.subTest(left_by=left_by):
+                shutil.rmtree(self.home, ignore_errors=True)
+                shutil.rmtree(self.payload, ignore_errors=True)
+                self.given(None, "advanced")
+                paths = config.Paths(self.home)
+                paths.ensure()
+                (self.home / "config" / "advanced").mkdir()
+                (self.home / "config" / "advanced" / "advanced.sqlite").write_bytes(b"armed")
+                if left_by is not None:
+                    with patch.object(edition, "name", return_value=left_by), \
+                            patch.object(install, "_print", lambda *_: None):
+                        install._note_edition_left(paths)
+                    self.assertTrue(paths.edition_left_file.is_file())
+                code, output, setup = self.run_region()
+                self.assertEqual(code, 0, output[-1500:])
+                self.assertEqual(setup, expected)
+        # Only the advanced archive is told anything, and an upgrade reads the installed tree instead.
+        shutil.rmtree(self.home, ignore_errors=True)
+        shutil.rmtree(self.payload, ignore_errors=True)
+        self.given("standard", "advanced")
+        (self.home / "config" / "edition-left.txt").write_text("advanced\n", encoding="ascii")
+        code, output, setup = self.run_region(allow=True)
+        self.assertEqual(code, 0, output[-1500:])
+        self.assertEqual(setup, ["setup", "--keep-state", "--edition-from", "standard", STOPPED])
 
 
 class EditionChangeTextTests(unittest.TestCase):

@@ -195,6 +195,46 @@ class ShrinkTests(KindsCase):
         self.assertNotEqual(self.h.record(T2)["state"], "cancelled")
 
 
+class RestartTests(KindsCase):
+    """v0.6.16 (live acceptance item 8 e): a watcher that starts does not know what the one before it watched. A kind
+    no longer named by then - turned off with the watcher stopped, the advanced edition entered again, the standard
+    edition installed - ends the waiting records of its conversations as it would have in the running watcher:
+    cancelled, session_kind_off. It used to leave them to the next check, which could no longer read the conversation
+    and retired the record as superseded, latest_turn_changed - untrue of a conversation with one turn."""
+
+    def waiting_cli(self):
+        self.watching({"cli"})
+        self.h.home.fail_usage(T1)       # the app's own, beside it
+        add_thread(self.h.home, T2, **CLI)
+        self.ready_after_reset(self.h, thread_id=T2, loaded=False)
+        self.h.tick()
+        self.assertEqual(self.h.record(T2)["state"], "waiting_for_loaded_thread")
+
+    def restarted(self, plug):
+        """A new watcher: a new reader, which watches the app's alone until its plug is asked, and a new engine."""
+        self.h.source.session_kinds = frozenset()
+        self.plugged(plug)
+
+    def test_a_kind_no_longer_named_when_the_watcher_starts_is_cancelled_as_off(self):
+        """Fails with the fix reverted: superseded, latest_turn_changed."""
+        for plug in (KindsAsked(sessions=frozenset()), KindsAsked(sessions=frozenset({"ide"})), None):
+            with self.subTest(plug=plug and sorted(plug.answers["sessions"])):
+                self.setUp()
+                self.waiting_cli()
+                self.restarted(plug)
+                self.h.tick(advance=60)    # the next check, past its poll
+                row = self.h.record(T2)
+                self.assertEqual((row["state"], row["last_error"]), ("cancelled", "session_kind_off"))
+                self.assertNotEqual(self.h.record(T1)["state"], "cancelled", "the app's own record was ended")
+                self.assertEqual(self.h.backend.send_calls, [])
+
+    def test_a_kind_still_named_when_the_watcher_starts_keeps_waiting(self):
+        self.waiting_cli()
+        self.restarted(KindsAsked(sessions=frozenset({"cli"})))
+        self.h.tick(advance=60)    # the next check, past its poll
+        self.assertEqual(self.h.record(T2)["state"], "waiting_for_loaded_thread")
+
+
 class AnswerTests(unittest.TestCase):
     def test_only_the_closed_words_are_taken(self):
         self.assertEqual(kinds_of(frozenset({"cli"})), frozenset({SessionKind.CLI}))
