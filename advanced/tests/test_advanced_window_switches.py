@@ -46,6 +46,10 @@ class WindowSwitchCase(ac.AdvancedCase):
         options = state.options(capability)
         return options[FIVE], options[WEEKLY]
 
+    def reopened(self, state):
+        state.close()
+        return self.state()
+
     def as_beta4_left_it(self, state):
         """The file as beta.4 left it: the follower capabilities' window rows - which beta.4 never wrote - gone."""
         state.close()
@@ -80,10 +84,6 @@ class CarryOverTests(WindowSwitchCase):
                 self.assertEqual(self.windows(opened, METER), (ON, OFF))
                 self.assertEqual(self.windows(opened, WRAP), (OFF, ON))
                 self.assertEqual(self.windows(opened, PAUSE), (OFF, ON))
-
-    def reopened(self, state):
-        state.close()
-        return self.state()
 
     def test_a_new_file_has_every_switch_on_and_the_meters_off_later_moves_nothing(self):
         state = self.state()
