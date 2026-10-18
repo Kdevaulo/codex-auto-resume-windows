@@ -26,8 +26,8 @@
   },
   "canvas": {
     "size": [
-      1592,
-      1133
+      1570,
+      1111
     ],
     "transparent": true,
     "theme": "light",
@@ -35,15 +35,15 @@
   },
   "window": {
     "at": [
-      46,
-      37
+      35,
+      26
     ],
     "still": "assets/screenshot-dashboard.png"
   },
   "pointer": {
     "rest": [
-      1200,
-      580
+      1189,
+      569
     ],
     "scale": 1.5
   },

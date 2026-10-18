@@ -203,6 +203,13 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
                                              at=tuple(plan["window"]["at"]), ground=ground,
                                              scale=float(result.get("dpi_scale") or 1.5))
         origin = chrome.client_origin()
+        # A clear canvas is exactly the union of the window and its shadow: an empty border would only push the
+        # picture's caption away on the page (the owner, 2026-10-19). The pointer stays on the window.
+        border = chrome.empty_border()
+        if clear and any(border):
+            raise SystemExit("the canvas %dx%d has an empty border (left, top, right, bottom) of %s: make it "
+                             "smaller by that and move the window and the pointer's rest by the left and top"
+                             % (width, height, border))
     else:
         pictures, chrome, origin = None, None, (0, 0)
         plain = bytes(width * height * 4) if clear else bytes(ground) * (width * height)

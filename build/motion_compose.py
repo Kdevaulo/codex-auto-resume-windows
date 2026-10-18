@@ -202,6 +202,19 @@ class WindowChrome:
                 level = int(round(255 * SHADOW_ALPHA * row * across[x]))
                 _blend(base, canvas_w, canvas_h, x, y, (0, 0, 0), level)
 
+    def empty_border(self) -> tuple:
+        """(left, top, right, bottom): how many columns and rows at each edge of a clear canvas hold nothing at all -
+        no window, no shadow, every pixel wholly transparent. A picture drawn as it should be has none of them."""
+        if self.bpp != 4:
+            return 0, 0, 0, 0
+        width, height = self.size
+        alpha = self.base[3::4]
+        rows = [any(alpha[y * width:(y + 1) * width]) for y in range(height)]
+        if not any(rows):
+            return width, height, width, height
+        columns = [x for y in range(height) if rows[y] for x in range(width) if alpha[y * width + x]]
+        return (min(columns), rows.index(True), width - 1 - max(columns), rows[::-1].index(True))
+
     def client_origin(self) -> tuple:
         """Where the client area's top-left is on the canvas."""
         return self.at[0], self.at[1] + self.caption
