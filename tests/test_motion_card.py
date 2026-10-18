@@ -183,9 +183,13 @@ class CardMarginsTests(unittest.TestCase):
         for name, locale in (("card-en", "en"), ("card-ko", "ko")):
             with self.subTest(name):
                 plan = motion_plan.load(make_motion.plan_path(name))
+                # The committed still, not one drawn here: a card drawn on another machine takes that machine's
+                # fonts, and the CI runner drew the English card 30 px shorter than the picture beside it.
+                asset, _copy = make_screenshots.card_paths(locale)["light"]
+                width, height = (int(part) for part in make_screenshots.dimensions(asset).split("x"))
+                self.assertEqual(plan["canvas"]["size"], [width, height])
                 still = make_screenshots._SettledCard(locale, "light", "soft", 2.0, None)
                 try:
-                    self.assertEqual(plan["canvas"]["size"], [still.width, still.height])
                     self.assertEqual(plan["card"]["at"], [still.pad, still.pad])
                 finally:
                     still.close()
