@@ -147,6 +147,22 @@ class ManifestTests(unittest.TestCase):
         from codex_auto_resume import config
         self.assertEqual(self.manifest["version"], config.version(), REGENERATE)
 
+    def test_the_envelope_is_the_standard_editions_whatever_this_process_registered(self):
+        """An edition's kinds of notice stay registered for the life of a process (notice_kinds), so an advanced test
+        run before this one put them in the standard edition's `describe` answer, and the pictures' inputs read as
+        moved in the advanced lanes only (the v0.6.16 final's dev CI). The generator reads the standard edition's
+        answers with core's kinds alone, and puts back whatever was registered."""
+        from codex_auto_resume import l10n, notice_kinds
+        shots = generator()
+        before = shots.bridge_envelope("en")
+        made = notice_kinds.register("picture_probe", ("picture_probe",), {locale: "Probe" for locale in l10n.LOCALES})
+        try:
+            self.assertEqual(shots.bridge_envelope("en"), before)
+            self.assertIn(made, notice_kinds.kinds(), "what was registered is put back")
+        finally:
+            with notice_kinds._lock:
+                notice_kinds._registered.pop("picture_probe", None)
+
     def generator(self):
         import sys
         sys.path.insert(0, str(ROOT / "build"))

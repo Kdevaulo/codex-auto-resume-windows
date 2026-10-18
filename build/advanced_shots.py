@@ -411,6 +411,8 @@ def read_answers(edition: str, variant: str, locale: str, report: bool = False) 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as name:
         workspace = Path(name)
         with ExitStack() as stack:
+            # The edition's own kinds of notice, whatever an earlier picture or test registered in this process.
+            stack.enter_context(shots.edition_notice_kinds(edition))
             if edition == "advanced":
                 surface = stack.enter_context(advanced_installation(workspace, variant))
             else:
