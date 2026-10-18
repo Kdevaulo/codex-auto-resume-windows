@@ -756,12 +756,13 @@ a word and never recovered. The owner had it published as this final so that eve
 offered it. What this roadmap planned as v0.6.15 is v0.6.16 from here, and every release after it
 moved one on; the published v0.6.15-beta is published again as v0.6.16-beta.
 
-## v0.6.16 — Most of the advanced edition
+## v0.6.16 — Most of the advanced edition ✅
 
-**In development: v0.6.16-beta.4 ✅ is out: a route of its own, other kinds of session, and the usage
-capabilities finished. Before it came v0.6.16-beta.3, words for this time in the standard edition with the other
-work that landed there; v0.6.16-beta.2, v0.6.15's fix on the beta line; and v0.6.16-beta (published first as
-v0.6.15-beta), the first pre-release: stage 3c and watching several Codex homes. Next, the final v0.6.16.**
+**Released, after four pre-releases: v0.6.16-beta (published first as v0.6.15-beta), the first, with stage 3c and
+watching several Codex homes; v0.6.16-beta.2, v0.6.15's fix on the beta line; v0.6.16-beta.3, words for this time
+in the standard edition with the other work that landed there; and v0.6.16-beta.4, a route of its own, other kinds
+of session, and the usage capabilities finished.** The final adds the work below, under *The final*. What it
+carries for a person coming from v0.6.15 is its entry in [CHANGELOG.md](CHANGELOG.md).
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
@@ -834,7 +835,7 @@ What the owner added on 2026-10-16 to the usage meter, the wrap-up and the pause
 - a continuation after the reset for a conversation that was wrapped up or stopped,
 - *Keep it on* turns a capability on.
 
-### The final's small requests
+### v0.6.16 — The final
 
 Three things the owner asked for on 2026-10-16, for the v0.6.16 final:
 
@@ -842,14 +843,28 @@ Three things the owner asked for on 2026-10-16, for the v0.6.16 final:
 - a smaller edition label,
 - a click on a popup's body opens its page.
 
-Also for the v0.6.16 final, and what the owner asked for as the beta line went on:
+Also in the final, and what the owner asked for as the beta line went on:
 
 - **Notices that stay on screen until clicked**, chosen for each kind of notice - the advanced edition's
-  kinds too, on the Dashboard alone,
-- **an update that explains itself**: the setup wizard, a notes page before the update and an "updated" page
-  after it, the watcher and any open Dashboard restarted on the new version, and *Repair* and *Remove* offered
-  when the same version is already installed,
-- **release pages that start with direct download links**, the setup program recommended first.
+  kinds too (the usage meter's warning and each of its three notices about a stop near a limit), set in the
+  Dashboard alone,
+- **an installer wizard**: the setup program is a window of its own in the Dashboard's design and the
+  product's eighteen languages, with *Repair* and *Remove* offered when the same version is already
+  installed, no console window, and `-Silent` as before; the installation is listed in Settings > Apps, and
+  its Uninstall button shows the same window,
+- **an update that explains itself**: a notes page before the update, from what version to what and what is
+  new, and an "updated" page after it; the watcher restarted on the new version where one ran, and any open
+  Dashboard closed and opened again where it was,
+- **release pages that start with direct download links**, the setup program recommended first - in the
+  README too, which is short now and shows the Dashboard in motion,
+- **Rescan and reconcile** on the Pending page, in both editions, reported by
+  [@weng-wen-jun](https://github.com/weng-wen-jun) in
+  [#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39): it reads every waiting
+  recovery again and retires a wait only on positive proof that newer work in that conversation superseded
+  it; it sends nothing, writes nothing to Codex's files and resets no budget,
+- **switches on the Advanced features page** for every on/off choice, with Wrap up near a limit and Stop
+  near a limit each given their own five-hour and weekly switches,
+- **compatibility data 11**: codex-cli 0.163.0-alpha.10.2, verified in eight capabilities.
 
 ### Also moved here
 
@@ -868,6 +883,16 @@ of its own, and the owner moved the in-app chat here the same day. As in v0.6.16
 on, with a statement that names the standards it departs from; some rest on a measurement of the real Codex,
 and one that fails narrows the route, or becomes a warning the person confirms, and does not drop the
 capability.
+
+### v0.6.17-alpha — The ground the last stage stands on (a pre-release)
+
+Two changes to how the advanced edition stores its choices and how state files are read, made first, in
+one migration, so that every stage after them adds an option or a stored field without a rebuild:
+
+- the advanced options table loses its CHECK constraint on the option's name - names are validated in code
+  only, so a new option needs no table rebuild,
+- state files carry a "readable from" marker, so that an older version reads a compatible newer file
+  instead of refusing it.
 
 ### Around recovery
 
@@ -1172,15 +1197,17 @@ Conversations ChatGPT hands over, and the ones Codex labels not at all, recovere
 
         ↓
 
-v0.6.16-beta → v0.6.16-beta.2 → v0.6.16-beta.3 → v0.6.16-beta.4 → v0.6.16
-Most of the advanced edition, in as many pre-releases as it needs
+v0.6.16-beta → v0.6.16-beta.2 → v0.6.16-beta.3 → v0.6.16-beta.4 → v0.6.16  ✅ Released
+Most of the advanced edition, in as many pre-releases as it needed
 + several Codex homes, words for this time, the usage meter, a route of its own and other kinds of session
-+ three small requests of the owner, in the final
++ Rescan and reconcile, the setup program as an installer, notices that stay until clicked and switches for
+  every advanced choice, in the final
 
         ↓
 
-v0.6.17
-The advanced edition's last stage: analytics, the courier, the loopback API and remote control,
+v0.6.17-alpha → v0.6.17
+The options table without its CHECK constraint and a "readable from" marker on state files, in a pre-release
++ the advanced edition's last stage: analytics, the courier, the loopback API and remote control,
 account switching, crash supervision, the chat inside the Dashboard, the Stop hook continuation,
 Arabic and Hebrew
 
@@ -1207,10 +1234,11 @@ Final Rust audit and stabilization: the Rust bug hunt
 Maintenance
 ```
 
-This document records the current direction; v0.6.15 is out, a fix alone: the conversations ChatGPT hands
-over, and the ones Codex labels not at all, are recovered. Before it, v0.6.14 brought eight more ways to
-recover, Keep it on, the watch log, the reset actions and a compatibility report sent from the app, and the
-panel beside the chat, in the advanced edition; and a window that no longer hangs while a recovery waits, in
-both. The rest of the advanced edition, v0.6.16, is being built: its pre-releases, up to v0.6.16-beta.3, are
-out, with stage 3c, watching several Codex homes, words for this time and the first of the usage
-capabilities. The owner moved stage 5 to v0.6.17 on 2026-10-16, so that the v0.6.16 final comes sooner.
+This document records the current direction; v0.6.16 is out: most of the advanced edition, and for both
+editions Rescan and reconcile, a setup program that is an installer, notices that stay until clicked, words
+for one recovery's next send and up to three more Codex homes. Before it, v0.6.15 was a fix alone (the
+conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered), and v0.6.14 brought
+eight more ways to recover, Keep it on, the watch log, the reset actions and a compatibility report sent from
+the app, and the panel beside the chat, in the advanced edition; and a window that no longer hangs while a
+recovery waits, in both. v0.6.17 is next, starting with its pre-release, v0.6.17-alpha. The owner moved
+stage 5 there on 2026-10-16, so that the v0.6.16 final came sooner.
