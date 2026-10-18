@@ -260,6 +260,8 @@ function BoxOf($window, $name) {
     $area.GetType().GetField('Box', $any).GetValue($area)
 }
 $out.readable.box = [string](BoxOf $showing 'notesArea').Text
+$log = BoxOf $showing 'logArea'
+$out.log_box = @([bool]$log.WordWrap, [string]$log.ScrollBars)
 $docs = [string]$env:CAR_DOCS
 $out.file = @(($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ko'))),
               ($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ja'))),
@@ -521,6 +523,14 @@ class FlowTests(unittest.TestCase):
         self.assertNotIn("*Check", real)
         self.assertEqual(real.count("\n"), real.count("\r\n"), "every line ends in CR LF")
         self.assertIn("Check for updates offers it", real.replace("\r\n", "\n"))
+
+    def test_the_log_wraps_and_has_only_the_wells_own_scroll_bar(self):
+        """The log box had Windows' own horizontal scroll bar, white on the dark setup window (the owner: "not our
+        design"). It wraps its lines, and the one bar it has is the well's own (SoftTextArea draws it; Windows'
+        vertical bar is kept outside the well's clip, where it is never seen)."""
+        self.assertEqual(self.answer["log_box"], [True, "Vertical"])
+        self.assertNotIn("ScrollBars.Both", WINDOW)
+        self.assertNotIn("ScrollBars.Horizontal", WINDOW)
 
     def test_the_notes_pages_wait_is_not_the_installers_time(self):
         """Staying on the Notes page past the update's limit (20 minutes) reported "still running" with nothing

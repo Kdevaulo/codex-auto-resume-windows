@@ -155,9 +155,9 @@ namespace CodexAutoResume
             }
             AcceptButton = forward;
 
+            // Word-wrapped, with the well's own scroll bar (SoftTextArea) and no other: a horizontal bar is Windows'
+            // own, white on a dark window, never the product's (v0.6.16 acceptance, the owner: "not our design").
             logArea.Box.ReadOnly = true;
-            logArea.Box.WordWrap = false;
-            logArea.Box.ScrollBars = ScrollBars.Both;
             notesArea.Box.ReadOnly = true;
             notesArea.Box.WordWrap = true;
 
