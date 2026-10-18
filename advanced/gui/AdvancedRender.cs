@@ -7,9 +7,10 @@
 // scroll, a face - and hands the frame here (RenderStateNamed, a point gui/Dashboard.cs declares). A frame on this page
 // shows it once this edition has answered with its words; opens the capability it names, waiting until its statement
 // and what it keeps have been read and shown; for the compatibility report, writes the report and checks what sending
-// would write, each from the job's replies, as a person's clicks would; chooses Custom... on a choice the frame names and
-// types its number in, as a person would, sending nothing (v0.6.16: the usage numbers' picture); and scrolls the open
-// capability's column, to a part the frame names or by turns of the wheel. Each
+// would write, each from the job's replies, as a person's clicks would; shows a number of one's own the frame names in
+// its choice's drop-down, as one item before Custom..., as the drop-down shows a number its dialog took - sending
+// nothing (v0.6.16: the usage numbers' picture); and scrolls the open capability's column, to a part the frame names or
+// by turns of the wheel. Each
 // is waited for until it is drawn. A capability this tree does not have, a statement that was not read, or a report
 // that was not written stops the job: a picture is never of something else.
 //
@@ -62,7 +63,7 @@ namespace CodexAutoResume
             var custom = Map(frame, "custom");
             if (custom != null)
             {
-                RenderCustom(Str(custom, "key"), Str(custom, "text"));
+                RenderCustom(Str(custom, "key"), Str(custom, "value"));
                 moved = true;
             }
             string show = Str(frame, "show");
@@ -101,19 +102,20 @@ namespace CodexAutoResume
             }
         }
 
-        /// Custom... chosen on the open capability's choice `key`, as a choice from its list is taken - which opens the box a
-        /// number is typed in (AdvancedUsage.cs) and sends nothing - and `text` typed there, not yet Set. A choice the
-        /// open capability does not have, or one that takes no number typed in, stops the job.
-        private void RenderCustom(string key, string text)
+        /// The open capability's choice `key` showing `value`, a number of one's own, as its drop-down shows one its Custom...
+        /// dialog took (AdvancedUsage.cs TakeCustom): one item before Custom..., chosen - and nothing sent. A choice the
+        /// open capability does not have, one that takes no number of its own, or a number outside its range stops the job.
+        private void RenderCustom(string key, string value)
         {
             SoftCombo combo = advancedChoices.Find(delegate(SoftCombo each) { return Equals(each.Tag, key); });
-            SoftTextArea box;
-            if (combo == null || !customBoxes.TryGetValue(key ?? "", out box))
-                throw new InvalidDataException("no choice called " + key + " takes a number typed in on " + advancedOpen);
-            Choose(combo, CustomChoice);
-            Committed.Invoke(combo, new object[] { EventArgs.Empty });
-            if (!customOpen.Contains(key)) throw new InvalidDataException("Custom... did not open on " + key);
-            box.Box.Text = text ?? "";
+            CustomPick pick;
+            if (combo == null || !customPicks.TryGetValue(key ?? "", out pick))
+                throw new InvalidDataException("no choice called " + key + " takes a number of its own on " + advancedOpen);
+            int number;
+            if (!int.TryParse(value ?? "", NumberStyles.None, CultureInfo.InvariantCulture, out number) ||
+                number < pick.Range[0] || number > pick.Range[1])
+                throw new InvalidDataException(key + " takes no number " + value);
+            TakeCustom(combo, pick, number.ToString(CultureInfo.InvariantCulture));
         }
 
         // How far above the part a frame shows the column stops, in logical pixels: the caption or line over it shows too.

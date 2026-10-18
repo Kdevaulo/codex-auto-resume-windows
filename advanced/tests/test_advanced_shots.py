@@ -189,14 +189,15 @@ class JobTests(unittest.TestCase):
         self.assertEqual(data["frames"][2]["show"], "report.file")
         self.assertEqual((data["theme"], data["design"], data["targets"]), ("light", "soft", []))
 
-    def test_p8_is_the_meter_s_choices_card_with_custom_open_on_the_five_hour_warning(self):
-        """The P8 decision (STOP-NOTES): the meter on, its column scrolled to the Choices card, Custom... chosen on the
-        five-hour warning with a number typed in - a number the card would take (its custom range), not a preset."""
+    def test_p8_is_the_meter_s_choices_card_with_a_number_of_its_own_on_the_five_hour_warning(self):
+        """The P8 decision (STOP-NOTES): the meter on, its column scrolled to the Choices card, the five-hour warning
+        holding a number of its own as its Custom... dialog leaves one (v0.6.16 final) - a number the card would take
+        (its custom range), not a preset."""
         each = shots_made.shot("P8")
         data, _order = shots_made.job([each], ("en",), {"en": {}}, ROOT / "nowhere")
         self.assertEqual(data["frames"][0], {"index": 0, "locale": "en", "page": "advanced", "light": 0,
                                              "capability": "usage_meter", "show": "choices",
-                                             "custom": {"key": "warn_five_hour", "text": "88"}})
+                                             "custom": {"key": "warn_five_hour", "value": "88"}})
         self.assertIn(("usage_meter", "armed"), shots_made.VARIANTS[each.variant]["turned"])
         read, _envelope = shots_made.read_answers("advanced", each.variant, "en")
         listing = [reply["result"] for command, _argument, reply in read if command == "advanced-list"][0]

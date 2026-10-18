@@ -117,7 +117,8 @@ namespace CodexAutoResume
         /// states ([{"state", "built", "checked", "last", "told", "job", "login", "word"}], AdoptReportState), then with a
         /// list that could not be read. At each: the standard audit's Walk (anything cut off, a page that would scroll sideways, a field
         /// that is not a field high), a control with no name a screen reader can say, a pinned control out of its
-        /// corner, and the list's columns wider than it is. Last, the narrowest window there is, held to its tabs and its
+        /// corner, and the list's columns wider than it is - and (v0.6.16 final) each Custom... dialog its choices open, as
+        /// the Settings page's are audited (AuditOwnDialog). Last, the narrowest window there is, held to its tabs and its
         /// list (AuditNarrowest), on two screens that do not depend on this machine's: one as wide as anything needs,
         /// where the window is 800 wide less a sizable frame's 8 px each side, as the standard audit's narrowest
         /// (AuditReopenNote), or as wide as the tabs, this page's among them, where they need more (HoldTabs); and the
@@ -153,11 +154,14 @@ namespace CodexAutoResume
                 }
                 // What each would have done while watched, at its fullest: one line for every answer the log names.
                 foreach (string id in ids) form.advancedWatchLog[id] = Map(kept, "advanced-watch-log");
+                // v0.6.16 final: and each customizable choice's Custom... dialog, once for each range and unit.
+                var dialogsSeen = new HashSet<string>();
                 foreach (string id in ids)
                 {
                     form.OpenAdvanced(id);
                     form.FillAdvancedList();
                     form.AuditAdvanced("advanced/" + id, findings);
+                    form.AuditCustomValues("advanced/" + id, dialogsSeen, findings);
                 }
                 var reports = Json.Parse(reportsJson) as List<object> ?? new List<object>();
                 foreach (string id in ids)
@@ -292,7 +296,9 @@ namespace CodexAutoResume
         ///    "from": ..., "to": ..., "kind": ...}             samples' drop-down - and Add rule pressed, if it can be
         ///   {"do": "remove", "rule": n}                       that rule's Remove pressed, if it can be
         ///   {"do": "wording", "key": ..., "text": ...}         a wrap-up wording box filled and its Save words pressed
-        ///   {"do": "custom_option", "key": ..., "text": ...}   Custom... chosen in that choice's drop-down, typed, Set pressed
+        ///   {"do": "custom_option", "key": ...,               Custom... chosen in that choice's drop-down, and its dialog -
+        ///    "value": n | "cancel": true}                     built, never shown - given n and Use this value pressed, or
+        ///                                                     Cancel pressed; what it said into "dialogs"
         ///   {"do": "send_now", "id": ...}                     that waiting recovery's Send now pressed, if it can be
         ///   {"do": "reset_add", "family": "bucket minutes",   a reset form filled - its window chosen first, then which
         ///    "ordinal": ..., "repeat": once|every,            one, how often and whether it asks, or the conversation and
@@ -310,8 +316,10 @@ namespace CodexAutoResume
         ///                                                     BuildDashboard read them, and its first page shown as Load
         ///                                                     shows it
         /// What it returns is the page as it was left (Look), with every look taken, every request sent ("<command>
-        /// <argument>"), every question asked, every notice told, and each press of a button that could not be
-        /// pressed.
+        /// <argument>"), every question asked, every notice told, each press of a button that could not be
+        /// pressed, and each Custom... dialog opened (v0.6.16 final): its title, what it said above its number on
+        /// opening and after Use this value, the number it opened with, its buttons, and what the Settings page's audit
+        /// of its dialogs finds in it.
         internal static string AdvancedPageRun(string stringsJson, string scenarioJson)
         {
             var result = new Dictionary<string, object>();
@@ -325,6 +333,7 @@ namespace CodexAutoResume
                 var looks = new List<object>();
                 var disabled = new List<object>();
                 var reopened = new List<object>();
+                var dialogs = new List<object>();
                 foreach (object entry in Items(scenario, "steps") ?? new List<object>())
                 {
                     var step = entry as Dictionary<string, object>;
@@ -408,18 +417,28 @@ namespace CodexAutoResume
                     }
                     else if (what == "custom_option")
                     {
-                        SoftCombo combo = form.advancedChoices.Find(delegate(SoftCombo each) { return Equals(each.Tag, Str(step, "key")); });
-                        SoftTextArea box;
-                        Button set;
-                        if (combo == null || !combo.Enabled || !form.customBoxes.TryGetValue(Str(step, "key") ?? "", out box) ||
-                            !form.customSets.TryGetValue(Str(step, "key") ?? "", out set))
-                            disabled.Add("custom_option");
+                        string key = Str(step, "key") ?? "";
+                        SoftCombo combo = form.advancedChoices.Find(delegate(SoftCombo each) { return Equals(each.Tag, key); });
+                        if (combo == null || !combo.Enabled || !form.customPicks.ContainsKey(key)) disabled.Add("custom_option");
                         else
                         {
-                            Choose(combo, CustomChoice);
-                            Committed.Invoke(combo, new object[] { EventArgs.Empty });
-                            box.Box.Text = Str(step, "text") ?? "";
-                            Pressed.Invoke(set, new object[] { EventArgs.Empty });
+                            var record = new Dictionary<string, object>();
+                            record["key"] = key;
+                            var found = new List<string>();
+                            form.AuditCustomValues("custom_option", new HashSet<string>(), found);
+                            record["findings"] = new List<object>(found.ToArray());
+                            Dictionary<string, object> answer = step;
+                            form.customAnswer = delegate(Form dialog) { form.AnswerCustom(dialog, answer, record); };
+                            try
+                            {
+                                Choose(combo, CustomChoice);
+                                Committed.Invoke(combo, new object[] { EventArgs.Empty });
+                            }
+                            finally
+                            {
+                                form.customAnswer = null;
+                            }
+                            dialogs.Add(record);
                         }
                     }
                     else if (what == "wording")
@@ -529,8 +548,31 @@ namespace CodexAutoResume
                 result["told"] = new List<object>(form.advancedTold.ToArray());
                 result["disabled"] = disabled;
                 result["reopened"] = reopened;
+                result["dialogs"] = dialogs;
             });
             return Json.Write(result);
+        }
+
+        /// A Custom... dialog (AdvancedUsage.cs AskCustom), built and never shown, answered as `step` says - its number set
+        /// and Use this value pressed, or Cancel pressed - and what it said written into `record`.
+        private void AnswerCustom(Form dialog, Dictionary<string, object> step, Dictionary<string, object> record)
+        {
+            NumericUpDown spin = ((SoftNumber)((SoftFlow)ownEditor).Controls[0]).Spin;
+            var use = (Button)dialog.AcceptButton;
+            var cancel = (Button)dialog.CancelButton;
+            record["title"] = dialog.Text;
+            record["hint"] = ownHint.Text;
+            record["opened"] = (double)spin.Value;
+            record["buttons"] = new List<object> { use.Text, cancel.Text };
+            if (Equals(Get(step, "cancel"), true))
+            {
+                Pressed.Invoke(cancel, new object[] { EventArgs.Empty });
+                return;
+            }
+            spin.Value = Whole(Get(step, "value"));
+            Pressed.Invoke(use, new object[] { EventArgs.Empty });
+            // Still open where the number was refused: what it says then, above the number.
+            record["after"] = dialog.IsDisposed ? null : ownHint.Text;
         }
 
         // Control.OnClick, which raises Click as a press of the button does.
@@ -685,10 +727,6 @@ namespace CodexAutoResume
             var previewed = new List<object>();
             foreach (Label line in previewLines) previewed.Add(line.Text);
             look["previews"] = previewed;
-            // (f): each customizable choice's box, by key, and whether it shows.
-            var entries = new Dictionary<string, object>();
-            foreach (string key in customRows.Keys) entries[key] = customOpen.Contains(key);
-            look["custom"] = entries;
             var waiting = new List<object>();
             foreach (Button send in sendNowButtons) waiting.Add(send.Tag);
             look["send_now"] = waiting;

@@ -35,9 +35,10 @@ The two pictures of v0.6.16-beta.4's usage numbers, settled at the final's merge
   and when it resets - because beta.4 holds core's records at their gate as any gate holds them (they keep waiting) and
   draws no words of its own on the Overview: a picture never shows what the product does not draw.
 * P8, the usage meter's Choices card - both windows' warnings and each window's switch - scrolled to the top of the
-  column (`show` "choices": the statement above it scrolled away), with Custom... chosen on the five-hour warning and
-  a number typed in its box, not yet Set (`custom`): the one picture of "a Custom entry beside the presets". The meter
-  is on, as in P7 (the near_limit seed), so the card is of a capability in use.
+  column (`show` "choices": the statement above it scrolled away), with the five-hour warning's drop-down holding 88%,
+  a number of one's own, as one item before Custom... - as it shows a number its Custom... dialog took (`custom`, v0.6.16
+  final): the one picture of "a Custom entry beside the presets". The meter is on, as in P7 (the near_limit seed), so
+  the card is of a capability in use.
 
 Into docs/images, the run first holds the window drawn offscreen to today's captured stills (motion_fidelity) and
 records the result, each picture's digest and what it was made from in assets/advanced-shots.json; a page that fails
@@ -483,7 +484,7 @@ def frame(each: Shot, locale: str, index: int) -> dict:
     if each.show is not None:
         state["show"] = each.show
     if each.custom is not None:
-        state["custom"] = {"key": each.custom[0], "text": each.custom[1]}
+        state["custom"] = {"key": each.custom[0], "value": each.custom[1]}
     return state
 
 

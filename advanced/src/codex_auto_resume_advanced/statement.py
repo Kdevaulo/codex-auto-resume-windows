@@ -195,8 +195,9 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     # (e) each window acted on or not - and (v0.6.16 final) a capability with both its windows off says it acts on
     # neither.
     "option.window_five_hour", "option.window_weekly", "option.no_window",
-    # (f) a number typed in beside the presets.
-    "option.custom", "option.set", "option.range", "refused.option_range",
+    # (f) a number of one's own beside the presets: Custom..., which opens the Settings page's dialog for one, in that
+    # page's words (v0.6.16 final).
+    "option.custom",
     # (j) the percentages of a window in order, and the forced stop below the words' stop only said.
     "refused.option_order", "warn.stop_before_words"))
 # The edition's own continuations' words (v0.6.15-beta): what empty_response, subagent_parent and keep_going send -
