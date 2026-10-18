@@ -39,8 +39,8 @@
   그 대화의 로컬 기록·대기열로 확인한 것이고,
   [`docs/evidence/unloaded-thread-observation.json`](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/docs/evidence/unloaded-thread-observation.json)에
   `visual_ui_scraping_used: false`로 적혀 있습니다. 프로토콜 관측이지, 누가 지켜본 것이 아닙니다.
-- **이번 릴리스는 지금 내는 중이고, 가장 새로 공개된 릴리스는 v0.6.15입니다.** 아래에서 PUBLISHED라고 적힌 항목들이 뜻하는 것은
-  공개된 릴리스, 곧 v0.6.0부터 v0.6.15까지입니다. 열여섯 개 모두 압축 파일이 발행되었고 해시가 `main`에
+- **이번 릴리스는 공개되었고 가장 새 릴리스입니다.** 아래에서 PUBLISHED라고 적힌 항목들이 뜻하는 것은
+  공개된 릴리스, 곧 v0.6.0부터 이번 릴리스까지입니다. 열일곱 개 모두 압축 파일이 발행되었고 해시가 `main`에
   고정되어 있습니다. 프리 릴리스는 고정하지 않습니다. 항목이 PUBLISHED라고 말하는 것은
   발행된 바이트로 다시 확인한 경우뿐이므로, v0.6.6, v0.6.7, v0.6.8, v0.6.9, v0.6.10, v0.6.11, v0.6.12, v0.6.13, v0.6.14, v0.6.15와 이번 릴리스가
   더한 것들은 그 확인을 마친 뒤에야 그렇게 말합니다. v0.6.3은 화면 언어 아홉 개, 이어가기 메시지 설정, 알림
