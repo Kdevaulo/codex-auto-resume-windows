@@ -50,7 +50,8 @@ Everyone below is a person outside the project who helped it, in the order they 
 - [@barkshah2002-pixel](https://github.com/barkshah2002-pixel) reported a usage-limit interruption that was not
   detected ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)) and suggested logging every failed turn the watcher does not take up, with why.
 - [@ZionZhang42](https://github.com/ZionZhang42) proved the cause of that missed detection ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
-- [@aca22jy](https://github.com/aca22jy) reported a conversation whose turns Codex records under another id ([#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)).
+- [@aca22jy](https://github.com/aca22jy) reported a missed detection on a desktop conversation ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)) and then a conversation whose turns Codex
+  records under another id ([#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)).
 - [@Hunweibyn](https://github.com/Hunweibyn) suggested watching the usage limit ahead of time, with a safe pause
   and resume ([#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
 - [@Zephreo](https://github.com/Zephreo) suggested resuming a goal that was running ([#36](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/36)).
