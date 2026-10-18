@@ -338,6 +338,33 @@ class InstallerFlowTests(unittest.TestCase):
             self.assertIn("Removing the entry in Add or remove programs", done.stdout)
             self.assertFalse((home / "app").exists())
 
+    def test_the_entry_the_installer_window_runs_goes_too(self):
+        """v0.6.16 writes the entry as the installation's own program with --uninstall and the kept script
+        (addremove.uninstall_command), and the installer matched only PowerShell's `-File "<script>"`: every
+        successful uninstall from Settings > Apps left its entry behind, pointing at a program that was gone. Both
+        forms are this installation's; the window form naming another home's script is still not."""
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            log = Path(name) / "removed.txt"
+            command = " ".join(startup.quote_argument(argument) for argument in
+                               (str(home / addremove.WINDOW), addremove.WINDOW_SWITCH, str(addremove.kept_script(home))))
+            self.assertTrue(addremove.owned({"InstallLocation": str(home), "UninstallString": command}, home),
+                            "the engine's own rule reads it as this installation's")
+            done = self.uninstall_tail(home, {"CodexAutoResumeAdvanced": (str(home), command)}, log)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertTrue(log.exists(), "the entry was left behind: " + done.stdout)
+            self.assertEqual(log.read_text(encoding="utf-8").split(), ["CodexAutoResumeAdvanced"])
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            other = Path(name) / "other-home"
+            log = Path(name) / "removed.txt"
+            command = " ".join(startup.quote_argument(argument) for argument in
+                               (str(home / addremove.WINDOW), addremove.WINDOW_SWITCH,
+                                str(other / "uninstall" / "install.ps1")))
+            done = self.uninstall_tail(home, {"CodexAutoResumeAdvanced": (str(home), command)}, log)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertFalse(log.exists(), "an entry that runs another home's script was removed")
+
     def test_a_failed_uninstall_stays_listed_and_can_be_run_again(self):
         """A program file held open: the uninstall stops with 1 and the entry, the kept uninstaller and the
         program are all still there, so Settings > Apps offers the same uninstall again."""

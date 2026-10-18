@@ -516,18 +516,29 @@ function Remove-OwnUninstallEntry {
         (CODEX_AUTO_RESUME_KEEP_ENTRY) so that this is the only place it goes.
 
         An entry is this installation's when it is installed at this root and its command runs this root's
-        kept uninstaller - the engine's own rule, in the same two conditions. One of the two fixed names, which
-        differ by edition and never exist together; an entry that says anything else is left as it is.
+        kept uninstaller - the engine's own rule, in the same two conditions (addremove.owned): one of the
+        command's arguments after the program it starts is the kept script. Both forms the engine writes are
+        that: PowerShell's `-File "<root>\uninstall\install.ps1"`, and since v0.6.16 the installation's own
+        program, `"<root>\CodexAutoResumeSettings.exe" "--uninstall" "<root>\uninstall\install.ps1"`, which
+        the first version of this read only as the first and so left behind after every uninstall. One of the
+        two fixed names, which differ by edition and never exist together; an entry that says anything else is
+        left as it is.
     #>
     param([string]$Root)
-    $kept = Join-Path (Join-Path $Root 'uninstall') 'install.ps1'
+    $kept = Resolve-Canonical (Join-Path (Join-Path $Root 'uninstall') 'install.ps1')
     foreach ($name in @('CodexAutoResume', 'CodexAutoResumeAdvanced')) {
         try {
             $entry = Read-UninstallEntry $name
             if ($null -eq $entry) { continue }
             $here = (Resolve-Canonical $entry.InstallLocation) -eq (Resolve-Canonical $Root)
             $runs = $false
-            if ($entry.UninstallString -cmatch '-File "([^"]+)"') { $runs = (Resolve-Canonical $Matches[1]) -eq (Resolve-Canonical $kept) }
+            # The command's words as Windows reads them: a quoted one whole, any other up to a space. The first is
+            # the program it starts, and is never the script.
+            $words = @([regex]::Matches([string]$entry.UninstallString, '"([^"]*)"|(\S+)') |
+                       ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } })
+            foreach ($word in @($words | Select-Object -Skip 1)) {
+                if ($kept -and (Resolve-Canonical $word) -eq $kept) { $runs = $true }
+            }
             if ($here -and $runs) {
                 Step 'Removing the entry in Add or remove programs'
                 Remove-UninstallEntry $name
