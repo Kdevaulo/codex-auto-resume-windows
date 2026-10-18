@@ -9,6 +9,9 @@
 // before Custom..., or as the choice it turned out to be. So the rule is one - ownvalues.py - and this file
 // holds no bound of its own: it reads the range from the schema to say it, and a value past it comes back
 // refused, in the dialog, before anything is saved.
+//
+// v0.6.16: the advanced edition's Advanced features page opens the same dialog for its own numbers (OwnDialog, a
+// whole `number` beside its choices), with the range its listing gives and its own check of it.
 
 using System;
 using System.Collections.Generic;
@@ -47,7 +50,7 @@ namespace CodexAutoResume
         internal static double OwnAmount(Dictionary<string, object> custom, string value)
         {
             string kind = Str(custom, "kind");
-            if (string.IsNullOrEmpty(value) || (kind != "duration" && kind != "count")) return -1;
+            if (string.IsNullOrEmpty(value) || (kind != "duration" && kind != "count" && kind != "number")) return -1;
             string digits = value, unit = "";
             if (kind == "duration")
             {
@@ -223,8 +226,23 @@ namespace CodexAutoResume
         {
             string name = Str(field, "name");
             var custom = Map(field, "custom");
+            return OwnDialog(Humanise(name ?? ""), custom, OwnHint(custom), current, delegate(string value, Action<string> answer)
+            {
+                string argument = "{\"name\":" + Json.Escape(name) + ",\"value\":" + Json.Escape(value) + "}";
+                CallAsync("check-setting", argument, delegate(Dictionary<string, object> reply)
+                {
+                    answer(Ok(reply) ? Str(Map(reply, "result"), "value") : null);
+                });
+            }, taken);
+        }
+
+        /// The dialog itself, titled `title`, for a value `custom` describes, `hintText` above its editor: Use this value
+        /// hands what the editor composes to `judge`, which answers with the value as it will be kept - or null, and the
+        /// refusal is said above the editor, with the range, and nothing changes.
+        private Form OwnDialog(string title, Dictionary<string, object> custom, string hintText, string current,
+                               Action<string, Action<string>> judge, Action<string> taken)
+        {
             string kind = Str(custom, "kind");
-            string title = Humanise(name ?? "");
             var dialog = new Form();
             dialog.Text = title;
             dialog.Font = Font;
@@ -246,7 +264,6 @@ namespace CodexAutoResume
             body.GrowStyle = TableLayoutPanelGrowStyle.AddRows;
             body.Padding = Pad(16, 16, 16, 0);
             body.BackColor = Canvas;
-            string hintText = OwnHint(custom);
             var hint = Value(hintText);
             hint.ForeColor = Secondary;
             hint.MaximumSize = new Size(width - Px(32), 0);
@@ -407,20 +424,18 @@ namespace CodexAutoResume
             use = MakeButton(S("own.use", "Use this value"), true, delegate
             {
                 string value = compose();
-                string argument = "{\"name\":" + Json.Escape(name) + ",\"value\":" + Json.Escape(value) + "}";
                 use.Enabled = false;
-                CallAsync("check-setting", argument, delegate(Dictionary<string, object> reply)
+                judge(value, delegate(string stored)
                 {
                     if (dialog.IsDisposed) return;
                     use.Enabled = true;
-                    string stored = Ok(reply) ? Str(Map(reply, "result"), "value") : null;
                     if (stored != null)
                     {
                         taken(stored);
                         dialog.Close();
                         return;
                     }
-                    // Refused by the settings' own rule: said with the range, in the dialog, and nothing changes.
+                    // Refused by the value's own rule: said with the range, in the dialog, and nothing changes.
                     hint.Text = S("own.refused", "This value can't be used. {hint}", "hint", hintText);
                     hint.ForeColor = Palette.Danger;
                 });
@@ -459,38 +474,43 @@ namespace CodexAutoResume
                 var choices = Items(field, "choices");
                 string current = choices != null && choices.Count > 0 ? Convert.ToString(choices[choices.Count - 1], CultureInfo.InvariantCulture) : null;
                 using (Form dialog = BuildOwnValue(field, current, delegate(string value) { }))
-                {
-                    dialog.TopLevel = false;
-                    string where = "custom value " + Str(field, "name");
-                    // Unless the screen this runs on is smaller than the dialog: no form is ever larger than the largest
-                    // window the screen allows (SystemInformation.MaxWindowTrackSize), so Windows has made it smaller than
-                    // what it holds was laid out for - 1980 wide at 200% and the largest text size, on a screen 1024 wide.
-                    // The window opens only at a text size whose dialogs its screen holds (TextScale.Fitting).
-                    Size most = SystemInformation.MaxWindowTrackSize;
-                    bool whole = dialog.Width < most.Width && dialog.Height < most.Height;
-                    Materialise(dialog);
-                    dialog.PerformLayout();
-                    if (whole)
-                    {
-                        Walk(dialog, where, findings);
-                        // And with the refusal said above it, the longest the line gets.
-                        ownHint.Text = S("own.refused", "This value can't be used. {hint}", "hint", OwnHint(custom));
-                        dialog.PerformLayout();
-                        int needs = dialog.Controls[0].GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height;
-                        int room = dialog.ClientSize.Height - dialog.Controls[1].Height;
-                        if (needs > room) findings.Add(where + " :: the refusal needs " + needs + " high, the dialog gives " + room);
-                    }
-                    // Every name is asked either way; a whole line in each box only where the dialog is whole, as its layout is.
-                    AuditLines = whole;
-                    try
-                    {
-                        AuditSpoken(where, dialog, findings);
-                    }
-                    finally
-                    {
-                        AuditLines = true;
-                    }
-                }
+                    AuditOwnDialog(dialog, "custom value " + Str(field, "name"), OwnHint(custom), findings);
+            }
+        }
+
+        /// One dialog for a value of the person's own, built and never shown, held to the audit's checks at its opening
+        /// size - and with the refusal said above its editor, `hintText` in it, the longest that line gets - and every
+        /// control in it asked its name. The Settings page's (AuditOwnValues) and, v0.6.16, the Advanced features page's.
+        private void AuditOwnDialog(Form dialog, string where, string hintText, List<string> findings)
+        {
+            dialog.TopLevel = false;
+            // Unless the screen this runs on is smaller than the dialog: no form is ever larger than the largest
+            // window the screen allows (SystemInformation.MaxWindowTrackSize), so Windows has made it smaller than
+            // what it holds was laid out for - 1980 wide at 200% and the largest text size, on a screen 1024 wide.
+            // The window opens only at a text size whose dialogs its screen holds (TextScale.Fitting).
+            Size most = SystemInformation.MaxWindowTrackSize;
+            bool whole = dialog.Width < most.Width && dialog.Height < most.Height;
+            Materialise(dialog);
+            dialog.PerformLayout();
+            if (whole)
+            {
+                Walk(dialog, where, findings);
+                // And with the refusal said above it, the longest the line gets.
+                ownHint.Text = S("own.refused", "This value can't be used. {hint}", "hint", hintText);
+                dialog.PerformLayout();
+                int needs = dialog.Controls[0].GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height;
+                int room = dialog.ClientSize.Height - dialog.Controls[1].Height;
+                if (needs > room) findings.Add(where + " :: the refusal needs " + needs + " high, the dialog gives " + room);
+            }
+            // Every name is asked either way; a whole line in each box only where the dialog is whole, as its layout is.
+            AuditLines = whole;
+            try
+            {
+                AuditSpoken(where, dialog, findings);
+            }
+            finally
+            {
+                AuditLines = true;
             }
         }
     }
