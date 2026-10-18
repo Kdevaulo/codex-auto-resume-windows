@@ -555,6 +555,7 @@ namespace CodexAutoResume
         // install.ps1 -Uninstall.
         private static readonly Milestone[] Removing =
         {
+            new Milestone("Closing the Dashboard", 0.05, "dashboard"),
             new Milestone("Removing the watcher, autostart", 0.15, "unregister"),
             new Milestone("Removing the Codex plugin", 0.40, "remove_plugin"),
             new Milestone("The Codex plugin is not installed", 0.40, "remove_plugin"),

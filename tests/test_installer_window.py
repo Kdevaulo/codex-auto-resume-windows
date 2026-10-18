@@ -82,7 +82,8 @@ UPDATING = ["Codex Auto Resume - setting up", "edition: standard",
             "  Closing the Dashboard so it opens again on the new version", "  Copying the program files into place",
             "  [ok] Bundled Python 3.13 (no system Python needed)", "  Registering the Codex plugin",
             "  Setting up the watcher", "  Checking the installation", "Updated. Your settings and pending recoveries were kept."]
-REMOVING = ["Codex Auto Resume", "  Removing the watcher, autostart, notification identity and Start Menu entry",
+REMOVING = ["Codex Auto Resume", "  Closing the Dashboard so its files can be removed", "  [ok] The Dashboard closed",
+            "  Removing the watcher, autostart, notification identity and Start Menu entry",
             "  Removing the Codex plugin", "  Removing the marketplace this installation registered",
             "  Removing program files", "Removed. Settings and pending recoveries were kept."]
 
@@ -491,6 +492,7 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(steps["Closing the Dashboard so it opens again on the new version"], "dashboard")
         self.assertEqual(steps["Copying the program files into place"], "files")
         self.assertEqual(self.answer["bar"]["uninstall"][-1][2], "finishing")
+        self.assertEqual(self.answer["bar"]["uninstall"][1][2], "dashboard", "the uninstall closes the Dashboard first")
         self.assertEqual(self.answer["unpacked"], [0.0, 0.125, 0.25, 0.0])
 
     def test_the_languages_are_l10ns(self):

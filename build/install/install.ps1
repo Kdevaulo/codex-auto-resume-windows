@@ -462,6 +462,91 @@ function Close-OwnedDashboard {
     return $result
 }
 
+function Get-InstallationHolder {
+    <#
+        What of this installation still runs that an uninstall does not stop itself, and so would hold its files: each
+        process whose program is inside the installation - a Dashboard that stayed open, the runtime python.exe one
+        started, a command run by hand - but the watcher, which the uninstall's own first step stops, and this
+        installation's tool launchers, which it ends before the files go, with whatever each of them started. Waits up
+        to $Seconds for what is closing to have closed. Changes nothing.
+    #>
+    param([int]$Seconds = 10)
+    $roots = @($OwnedHome, $InstallHome) | Where-Object { $_ } | Select-Object -Unique
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    while ($true) {
+        $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+        # Each list taken whole first: the two hand back one array (their leading comma).
+        $watchers = Get-OwnedWatcherProcess
+        $launchers = Get-OwnedMcpProcess -Roots @($OwnedHome, $PluginCacheRoot)
+        $spared = @($watchers | ForEach-Object { [int]$_.ProcessId }) + @($launchers | ForEach-Object { [int]$_.ProcessId })
+        # And what each of those started, however deep.
+        $grew = $true
+        while ($grew) {
+            $grew = $false
+            foreach ($process in $all) {
+                $id = [int]$process.ProcessId
+                if ($spared -notcontains $id -and $spared -contains [int]$process.ParentProcessId) { $spared += $id; $grew = $true }
+            }
+        }
+        $held = @()
+        foreach ($process in $all) {
+            $exe = [string]$process.ExecutablePath
+            if (-not $exe -or [int]$process.ProcessId -eq $PID -or $spared -contains [int]$process.ProcessId) { continue }
+            $near = $false
+            foreach ($root in $roots) { if ($exe.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { $near = $true } }
+            if ($near -and (Test-PathInside $exe $OwnedHome)) { $held += $process }
+        }
+        if ($held.Count -eq 0 -or (Get-Date) -ge $deadline) { return ,$held }
+        Start-Sleep -Milliseconds 500
+    }
+}
+
+function Test-FileFree {
+    # Whether nothing holds a file open: it opens for writing with no sharing, and is closed at once, unchanged. A
+    # running program's own file never opens so. A file that may not be written to at all is not held by anything.
+    param([string]$Path)
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $stream.Dispose()
+        return $true
+    } catch [System.UnauthorizedAccessException] {
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Get-UninstallBlocker {
+    <#
+        What would stop an uninstall part way, found before anything is removed. The v0.6.16 acceptance's uninstall
+        ran with the Dashboard open: the watcher, the sign-in start, the Start menu entry and the plugin went, and
+        then the program files could not - the Dashboard and the runtime python.exe it started held them - and it
+        stopped with half a product left. So the Dashboard is asked to close first, as an update asks it
+        (Close-OwnedDashboard), and then what still runs here (Get-InstallationHolder) and each program file at the
+        root that something holds are named. An empty list: nothing holds the files. Changes nothing but the windows
+        asked to close.
+    #>
+    $blockers = @()
+    if ((Get-OwnedDashboardProcess).Count -gt 0) {
+        Step 'Closing the Dashboard so its files can be removed'
+        $closed = Close-OwnedDashboard
+        if ($closed.Unsaved -gt 0) { $blockers += 'A Dashboard window has unsaved Settings changes: save or undo them, then close it.' }
+        if ($closed.Stuck -gt 0) { $blockers += 'A Dashboard window could not be closed: close it.' }
+        if ($blockers.Count -eq 0) { Ok 'The Dashboard closed' }
+    }
+    if ($blockers.Count -eq 0) {
+        $holders = Get-InstallationHolder
+        foreach ($process in $holders) {
+            $blockers += ([string]$process.Name + ' (process ' + $process.ProcessId + ') is running ' + $process.ExecutablePath)
+        }
+    }
+    foreach ($file in @('CodexAutoResumeSettings.exe', 'codex-auto-resume.ico')) {
+        $path = Join-Path $OwnedHome $file
+        if ((Test-Path -LiteralPath $path -PathType Leaf) -and -not (Test-FileFree $path)) { $blockers += ($path + ' is in use.') }
+    }
+    return ,$blockers
+}
+
 function Invoke-Codex {
     # Native stderr must not become a terminating error: PowerShell 5.1 wraps it in an
     # ErrorRecord, and `codex` writes ordinary progress there. Capture to files instead
@@ -824,6 +909,15 @@ if ($Uninstall) {
     $OwnedHome = Resolve-Canonical (@($verify)[-1])
     if (-not $OwnedHome -or -not (Test-PathInside $AppDir $OwnedHome)) {
         Fail 'The installation root could not be resolved; nothing was removed.'
+        exit 1
+    }
+    # Before the first removal: the Dashboard asked to close, and nothing else of this installation's left holding
+    # its files (Get-UninstallBlocker). An uninstall that stops here has changed nothing, and says what holds them.
+    $blockers = Get-UninstallBlocker
+    if ($blockers.Count -gt 0) {
+        Fail 'Codex Auto Resume is still in use here, so nothing was removed:'
+        foreach ($line in $blockers) { Write-Host ('       ' + $line) }
+        Write-Host '       Close it, and run this uninstaller again.'
         exit 1
     }
     if (Test-Path $Python) {

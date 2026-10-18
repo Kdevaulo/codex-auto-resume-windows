@@ -410,6 +410,178 @@ class InstallerFlowTests(unittest.TestCase):
         self.assertEqual(self.text.count("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\"), 2)
 
 
+class UninstallWithTheDashboardOpenTests(unittest.TestCase):
+    """The v0.6.16 acceptance's uninstall ran with the Dashboard open. It removed the watcher, the sign-in start,
+    the Start menu entry and the plugin, then could not remove the program files - the Dashboard and the runtime
+    python.exe it started held them - and stopped with exit 1 and half a product left. The uninstall now asks the
+    Dashboard to close first, as an update does (the event, then WM_CLOSE for a window that does not answer), and
+    before its first removal names whatever still holds the files and stops there, having changed nothing."""
+
+    def setUp(self):
+        self.text = PS1.read_text(encoding="utf-8")
+
+    def run_uninstall(self, home: Path, windows=(), holders=(), entries=None):
+        """The uninstall branch from its check on, in a scratch installation: `windows` are stand-in Dashboard
+        windows (process id, command line, kind - as test_upgrade_handover's run_close), `holders` stand-in
+        processes still running there; the engine's step, Codex and the registry are stubs."""
+        text = self.text
+        log = home.parent / "steps.txt"
+        source = installer.VOICE + installer.block(text, "function Quote-Argument", "function Invoke-Setup")
+        source += "\nfunction Fail { param([string]$m) $script:Failed = $true; Write-Host $m }\n"
+        source += installer.block(text, "function Remove-OwnUninstallEntry", "function Write-CopyJournal")
+        stub = ["$global:Entries = @{}"]
+        for name, (location, command) in (entries or {}).items():
+            stub.append("$global:Entries[%s] = @{ InstallLocation = %s; UninstallString = %s }"
+                        % (installer.ps_literal(name), installer.ps_literal(location), installer.ps_literal(command)))
+        fakes = ", ".join("@{ ProcessId = %d; CommandLine = %s; Kind = %s; Alive = $true }"
+                          % (pid, installer.ps_literal(line), installer.ps_literal(kind)) for pid, line, kind in windows)
+        held = ", ".join("[pscustomobject]@{ Name = %s; ProcessId = %d; ExecutablePath = %s }"
+                         % (installer.ps_literal(name), pid, installer.ps_literal(path)) for name, pid, path in holders)
+        stub += [
+            "function Read-UninstallEntry { param([string]$Name) if ($global:Entries.ContainsKey($Name)) { "
+            "return $global:Entries[$Name] } return $null }",
+            "function Remove-UninstallEntry { param([string]$Name) Add-Content -LiteralPath %s -Value ('entry ' + $Name); "
+            "$global:Entries.Remove($Name) }" % installer.ps_literal(log),
+            "$global:Fakes = @(%s)" % fakes,
+            "function Get-OwnedDashboardProcess {",
+            "    foreach ($f in $global:Fakes) {",
+            "        if (-not $f.Alive -or $null -eq $script:DashboardsAskedAt) { continue }",
+            "        if ($f.Kind -eq 'unsaved') { Set-Content -LiteralPath (Join-Path (Join-Path $InstallHome 'config') "
+            "('update-unsaved-' + $f.ProcessId + '.txt')) -Value 'unsaved' }",
+            "    }",
+            "    return ,@($global:Fakes | Where-Object { $_.Alive } | ForEach-Object { [pscustomobject]@{ "
+            "ProcessId = $_.ProcessId; CommandLine = $_.CommandLine } })",
+            "}",
+            "function Close-DashboardWindow { param([int]$ProcessId) Add-Content -LiteralPath %s -Value ('closed ' + $ProcessId); "
+            "$f = @($global:Fakes | Where-Object { $_.ProcessId -eq $ProcessId })[0]; if ($f.Kind -eq 'old') { $f.Alive = $false }; "
+            "return $true }" % installer.ps_literal(log),
+            "function Get-InstallationHolder { return ,@(%s) }" % held,
+            "function Invoke-Setup { param([string[]]$Arguments) Add-Content -LiteralPath %s -Value ('setup ' + ($Arguments -join ' ')); "
+            "return 0 }" % installer.ps_literal(log),
+            "function Get-CodexCli { return $null }",
+            "function Get-OwnedMcpProcess { return ,@() }",
+            "$PSDefaultParameterValues['Close-OwnedDashboard:AnswerSeconds'] = 1",
+            "$PSDefaultParameterValues['Close-OwnedDashboard:CloseSeconds'] = 1",
+        ]
+        script = ("$OwnedHome = %s\n$InstallHome = $OwnedHome\n$AppDir = Join-Path $OwnedHome app\n"
+                  "$RunDir = Join-Path $OwnedHome runtime\n$Python = Join-Path $RunDir python.exe\n"
+                  "$PluginCacheRoot = Join-Path $OwnedHome cache\n$PluginName = 'fixture-plugin'\n"
+                  "$MarketplaceName = 'fixture-market'\n$script:Failed = $false\n$Purge = $false\n"
+                  "$script:DashboardsAskedAt = $null\n$script:DashboardsFallback = @()\n" % installer.ps_literal(home))
+        script += "\n".join(stub) + "\n"
+        branch = installer.block(text, "# ----------------------------------------------------------------------- uninstall",
+                                 "# -------------------------------------------------------------------------- install")
+        script += "if ($true) {\n" + branch[branch.index("    # Before the first removal:"):]
+        done = installer.run_probe(source, script)
+        steps = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+        return done, steps
+
+    def installation(self, root: Path) -> Path:
+        home = InstallerFlowTests.installation(self, root)
+        (home / addremove.WINDOW).write_text("fixture", encoding="utf-8")
+        return home
+
+    def entry(self, home: Path) -> dict:
+        command = " ".join(startup.quote_argument(argument) for argument in
+                           (str(home / addremove.WINDOW), addremove.WINDOW_SWITCH, str(addremove.kept_script(home))))
+        return {"CodexAutoResumeAdvanced": (str(home), command)}
+
+    def assert_nothing_removed(self, home: Path, done, steps):
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("nothing was removed", done.stdout)
+        self.assertFalse([step for step in steps if step.startswith(("setup", "entry"))],
+                         "something was removed before the check: %s" % steps)
+        for kept in ("app", "runtime/python.exe", "uninstall/install.ps1", addremove.WINDOW, "config/settings.json"):
+            self.assertTrue((home / kept).exists(), kept)
+
+    def test_a_dashboard_with_unsaved_changes_stops_it_before_anything_is_removed(self):
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            done, steps = self.run_uninstall(home, windows=[(401, "x", "unsaved")], entries=self.entry(home))
+            self.assert_nothing_removed(home, done, steps)
+            self.assertIn("unsaved Settings changes", done.stdout)
+            self.assertNotIn("closed 401", steps, "a window keeping unsaved changes is never sent WM_CLOSE")
+
+    def test_what_still_runs_there_stops_it_and_is_named(self):
+        """The runtime python.exe the Dashboard started, or any program of the installation's still running that
+        the uninstall does not stop itself, is named, and nothing is removed."""
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            done, steps = self.run_uninstall(home, holders=[("python.exe", 4242, str(home / "runtime" / "python.exe"))],
+                                             entries=self.entry(home))
+            self.assert_nothing_removed(home, done, steps)
+            self.assertIn("python.exe (process 4242) is running", done.stdout)
+
+    def test_a_program_file_held_open_stops_it_before_anything_is_removed(self):
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            with (home / addremove.WINDOW).open("rb"):
+                done, steps = self.run_uninstall(home, entries=self.entry(home))
+            self.assert_nothing_removed(home, done, steps)
+            self.assertIn("is in use", done.stdout)
+
+    def test_an_older_dashboard_is_closed_first_and_the_uninstall_goes_on_to_the_end(self):
+        """A Dashboard of an earlier version, which does not answer the event, is sent WM_CLOSE and closes; then the
+        uninstall runs whole, and its Apps entry goes with it."""
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            done, steps = self.run_uninstall(home, windows=[(501, "x --page=pending", "old")], entries=self.entry(home))
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertEqual(steps[0], "closed 501", steps)
+            self.assertIn("setup uninstall", steps)
+            self.assertIn("entry CodexAutoResumeAdvanced", steps)
+            self.assertIn("Closing the Dashboard so its files can be removed", done.stdout)
+            self.assertFalse((home / "app").exists())
+            self.assertTrue((home / "config" / "settings.json").is_file())
+
+    def test_with_nothing_open_it_runs_as_before(self):
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            done, steps = self.run_uninstall(home, entries=self.entry(home))
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertEqual(steps, ["setup uninstall", "entry CodexAutoResumeAdvanced"])
+            self.assertNotIn("Closing the Dashboard", done.stdout)
+
+    def test_the_check_comes_before_the_first_removal(self):
+        branch = installer.block(self.text, "if ($Uninstall)", "# -------------------------------------------------------------------------- install")
+        self.assertLess(branch.index("$blockers = Get-UninstallBlocker"), branch.index("$code = Invoke-Setup $setupArgs"))
+        self.assertGreater(branch.index("$blockers = Get-UninstallBlocker"), branch.index("$OwnedHome = Resolve-Canonical"))
+
+    @unittest.skipUnless(WINDOWS, "Windows processes")
+    def test_a_program_running_from_the_installation_holds_it_but_the_watcher_and_its_children_do_not(self):
+        """Get-InstallationHolder against real processes, read-only: a program started from a scratch installation's
+        runtime folder holds it; spared as the watcher - or as what a spared process started - it does not."""
+        ping = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "PING.EXE"
+        if not ping.is_file():
+            self.skipTest("no ping.exe to stand in for a program")
+        with tempfile.TemporaryDirectory() as name:
+            home = InstallerFlowTests.installation(self, Path(name))
+            program = home / "runtime" / "stand-in.exe"
+            shutil.copyfile(ping, program)
+            child = subprocess.Popen([str(program), "-n", "60", "127.0.0.1"], stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
+            try:
+                source = installer.VOICE + installer.block(self.text, "function Quote-Argument", "function Invoke-Setup")
+                results = {}
+                for case, watcher in (("held", "@()"), ("watcher", "@([pscustomobject]@{ ProcessId = %d })" % child.pid),
+                                      ("parent", "@([pscustomobject]@{ ProcessId = %d })" % os.getpid())):
+                    script = ("$OwnedHome = %s\n$InstallHome = $OwnedHome\n$PluginCacheRoot = Join-Path $OwnedHome cache\n"
+                              "function Get-OwnedWatcherProcess { return ,%s }\n"
+                              "function Get-OwnedMcpProcess { return ,@() }\n"
+                              "$found = Get-InstallationHolder -Seconds 0\n"
+                              "Write-Output ('FOUND ' + (@($found | ForEach-Object { $_.ProcessId }) -join ','))\n"
+                              % (installer.ps_literal(home), watcher))
+                    done = installer.run_probe(source, script)
+                    line = next((l for l in done.stdout.splitlines() if l.startswith("FOUND")), done.stdout + done.stderr)
+                    results[case] = line
+                self.assertEqual(results["held"], "FOUND %d" % child.pid)
+                self.assertEqual(results["watcher"], "FOUND ", "the watcher is the uninstall's own to stop")
+                self.assertEqual(results["parent"], "FOUND ", "what a spared process started is spared with it")
+            finally:
+                child.kill()
+                child.wait(30)
+
+
 # ---------------------------------------------------------------------------------------------------- the key
 
 class FakeWinreg:
