@@ -77,21 +77,25 @@ class ReadmePlanTests(unittest.TestCase):
                 self.assertEqual(pages[0], "overview")
                 self.assertEqual(next(page for page in pages if page != "overview"), "pending")
 
-    def test_the_readme_pictures_have_no_empty_border(self):
-        """The owner, 2026-10-19: the caption stood too far from the picture because the clear canvas kept an empty
-        margin round the window. The canvas is exactly the window and its shadow, and the pointer rests on it."""
+    def test_the_readme_pictures_are_exactly_the_bare_window(self):
+        """The owner, 2026-10-19: the caption stood too far from the picture, first for an empty margin round the
+        window, then for its drop shadow, which a dark page does not show. The canvas is the window itself, 1500x1041
+        like the still window pictures, with no shadow, and the pointer rests on it."""
         import make_screenshots as shots
         still = shots.read_png(ROOT / "assets" / "screenshot-dashboard.png")
         for name in make_motion.PLAN_NAMES:
             with self.subTest(name):
                 plan = motion_plan.load(make_motion.plan_path(name))
                 width, height = plan["canvas"]["size"]
+                self.assertEqual((width, height), (still[0], still[1]))
+                self.assertEqual(plan["window"]["at"], [0, 0])
+                self.assertIs(plan["canvas"].get("shadow"), False)
                 chrome = motion_compose.WindowChrome(still, (still[0], still[1] - 1), size=(width, height),
-                                                     at=tuple(plan["window"]["at"]), ground=None, scale=1.5)
+                                                     at=tuple(plan["window"]["at"]), ground=None, scale=1.5,
+                                                     shadow=False)
                 self.assertEqual(chrome.empty_border(), (0, 0, 0, 0))
                 x, y = plan["pointer"]["rest"]
                 self.assertTrue(0 <= x < width and 0 <= y < height)
-
 
 class CardPlanTests(unittest.TestCase):
     def test_the_card_on_its_own_is_planned_in_both_languages_and_drawn_only_when_named(self):

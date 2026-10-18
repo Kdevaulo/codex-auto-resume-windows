@@ -20,7 +20,7 @@
 <p align="center"><sub>🇺🇸 <a href="README.md">English README</a> · 프로그램은 열여섯 개 언어로 표시됩니다: English · 한국어 · 日本語 · 简体中文 · 繁體中文 · Español · Deutsch · Français · Português (Brasil) · Русский · Italiano · Türkçe · Polski · Українська · Tiếng Việt · Bahasa Indonesia</sub></p>
 
 <p align="center">
-<img src="docs/images/readme-motion-ko.png" alt="합성한 예시 데이터로 제품 자신의 그리기 코드가 그린 Codex Auto Resume 대시보드의 동작. 복구 2건이 대기 중인 개요, 포인터가 대기 중을 열고 기록·통계·진단을 차례로 누른 뒤 설정을 열어 스크롤, 화면 언어를 English로 바꿔 저장하자 창이 영어로 다시 열림" width="785"><br>
+<img src="docs/images/readme-motion-ko.png" alt="합성한 예시 데이터로 제품 자신의 그리기 코드가 그린 Codex Auto Resume 대시보드의 동작. 복구 2건이 대기 중인 개요, 포인터가 대기 중을 열고 기록·통계·진단을 차례로 누른 뒤 설정을 열어 스크롤, 화면 언어를 English로 바꿔 저장하자 창이 영어로 다시 열림" width="750"><br>
 <sub>UUID로 찾는 바로 그 대화 · Codex가 알려 주는 초기화 시각 · 확실하지 않으면 기다림 · 텔레메트리 없음 · 표준판과 고급판</sub>
 </p>
 
