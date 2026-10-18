@@ -568,6 +568,23 @@ class CatalogTests(unittest.TestCase):
             with self.subTest(locale=locale):
                 self.assertEqual(sorted(key for key in said if key not in own), [])
 
+    def test_no_sentence_gives_a_word_both_of_its_endings(self):
+        """The Repair page read "버전 0.6.16이(가) 이미 설치되어 있습니다" on the owner's PC: a Korean particle written
+        both ways, because what comes before it is a value. A sentence is worded so its particle follows a word of
+        its own ("0.6.16 버전이"), in every catalog - the advanced edition's too - and in the form a message takes."""
+        both = re.compile(r"이\(가\)|가\(이\)|을\(를\)|를\(을\)|은\(는\)|는\(은\)|\(으\)로|와\(과\)|과\(와\)|\(이\)라|\(이\)나")
+        folders = [l10n.DIRECTORY]
+        advanced = ROOT / "advanced" / "src" / "codex_auto_resume_advanced" / "locales"
+        if advanced.is_dir():
+            folders.append(advanced)
+        found = []
+        for folder in folders:
+            for catalog in sorted(folder.glob("*.json")):
+                for key, text in json.loads(catalog.read_text(encoding="utf-8")).items():
+                    if isinstance(text, str) and both.search(text):
+                        found.append("%s/%s %s: %s" % (folder.parent.name, catalog.name, key, text[:80]))
+        self.assertEqual(found, [])
+
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class LayoutAuditTests(unittest.TestCase):
