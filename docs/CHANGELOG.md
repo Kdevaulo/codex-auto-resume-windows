@@ -38,14 +38,18 @@ down first, which *Install another version...* does for you.
   and a button that opens the Dashboard. Run where its own version is installed already, it offers **Repair** and
   **Remove**. No console window opens, and `-Silent` asks nothing and shows nothing, with the same exit codes.
 - **An installation is listed in Windows' Settings > Apps** and in `winget list`, for your Windows user only. Its
-  Uninstall button shows the same window and asks whether to delete the settings and the history too; a failed
-  uninstall stays listed, and installing an older version leaves no entry naming a version that is not installed.
+  Uninstall button shows the same window and asks whether to delete the settings and the history too. The uninstall
+  closes an open Dashboard first and removes nothing while anything still holds the program's files, saying what;
+  a failed uninstall stays listed, a finished one takes its entry with it, and installing an older version leaves no
+  entry naming a version that is not installed.
   The winget manifests of both editions are made from a release's pinned archives ([WINGET.md](WINGET.md)).
 - **An update shows itself.** Before it installs, a notes page says from what version to what and what is new in
   it, read from the verified download; afterwards an "Updated to" page says it is done. The watcher is started
   again on the new version where one ran before or where it runs at sign-in, and one you had stopped stays
-  stopped. An open Dashboard is asked to close and opens again on the new version where it was; one with unsaved
-  Settings changes keeps them and stays open.
+  stopped. An open Dashboard is asked to close and opens again on the new version where it was - one from before
+  v0.6.16, which cannot be asked, is closed as any window is and opened again - and one with unsaved Settings
+  changes keeps them and stays open. The notes are shown as plain text, and the window follows the installation's
+  own look.
 - **Notices that stay until clicked, chosen for each kind.** *Settings > General > Notifications* lists each kind
   of notice with a box, and a kind ticked there stays on screen until you click it. None is ticked at first.
 - **A click on a notice itself opens its page** - the card's face, or the body of Windows' own notification - the
