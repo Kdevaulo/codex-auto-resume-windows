@@ -39,6 +39,7 @@ if _BUILD not in sys.path:
     sys.path.insert(0, _BUILD)
 
 import guiscan  # noqa: E402
+import languages  # noqa: E402
 import make_setup  # noqa: E402
 
 from codex_auto_resume import l10n  # noqa: E402
@@ -558,7 +559,10 @@ class FlowTests(unittest.TestCase):
             self.assertNotIn(mark, real)
         self.assertNotIn("*Check", real)
         self.assertEqual(real.count("\n"), real.count("\r\n"), "every line ends in CR LF")
-        self.assertIn("Check for updates offers it", real.replace("\r\n", "\n"))
+        # The words of one English sentence the old reading ran together; the generated ko branch's changelog is the
+        # Korean one, which says it in its own words.
+        if not languages.generated_ko_branch():
+            self.assertIn("Check for updates offers it", real.replace("\r\n", "\n"))
 
     def test_the_setup_window_opens_in_the_installations_own_look(self):
         """The acceptance's setup window was dark - Windows' app mode - while the Dashboard and the uninstall window
