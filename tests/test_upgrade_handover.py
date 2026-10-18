@@ -158,13 +158,20 @@ class DashboardAfterUpdateTests(unittest.TestCase):
         self.assertIn('info.EnvironmentVariables["CODEX_AUTO_RESUME_UPDATING_DASHBOARD"] =', self.update)
 
     def test_the_dashboard_is_asked_before_the_files_move_and_never_ended(self):
+        """Asked through its own close - the event, and for a window that does not answer it, WM_CLOSE - and never
+        ended from outside; no minute's idle wait any more (Close-OwnedDashboard)."""
         asked = self.block("$dashboardsOpen = $upgrade -and (Get-OwnedDashboardProcess).Count -gt 0",
                            "$pairs = @(@{ src = 'app'")
-        self.assertIn("[void]$closeEvent.Set()", asked)
-        self.assertIn("$deadline = (Get-Date).AddSeconds(60)", asked)
-        self.assertIn("[void]$closeEvent.Reset(); $closeEvent.Dispose()", asked)
-        for kill in ("Stop-Process", "Kill(", "taskkill", "CloseMainWindow"):
-            self.assertNotIn(kill, asked)
+        self.assertIn("$closed = Close-OwnedDashboard", asked)
+        close = self.block("function Close-OwnedDashboard {", "function Invoke-Codex {")
+        self.assertIn("[void]$closeEvent.Set()", close)
+        self.assertIn("[void]$closeEvent.Reset(); $closeEvent.Dispose()", close)
+        self.assertIn("param([int]$AnswerSeconds = 10, [int]$CloseSeconds = 20)", close)
+        self.assertNotIn("AddSeconds(60)", asked + close)
+        fallback = self.block("function Close-DashboardWindow {", "function Close-OwnedDashboard {")
+        self.assertIn("$process.CloseMainWindow()", fallback)
+        for kill in ("Stop-Process", "Kill(", "taskkill", ".Kill"):
+            self.assertNotIn(kill, asked + close + fallback)
 
     def test_it_opens_again_after_setup_in_the_form_its_own_reopen_wrote(self):
         reopen = self.block("function Open-ClosedDashboard {", "# From here on, the Dashboard windows")
@@ -238,7 +245,7 @@ class DashboardAfterUpdateTests(unittest.TestCase):
         self.assertEqual(left, [], "every record is removed, opened or not")
 
     # ------------------------------------------------------------------ every way out (v0.6.16 review)
-    def run_reopen(self, records, asked=True, calls=("-Updated",), dashboard=None):
+    def run_reopen(self, records, asked=True, calls=("-Updated",), dashboard=None, fallback=()):
         """Open-ClosedDashboard, lifted from install.ps1 with the helpers it calls, in a scratch home whose config
         folder holds `records` - (name, line, seconds the record was written before the request, or None for
         after it). Start-Process is a stub that writes down what it was asked to start - unless `dashboard` is a
@@ -263,13 +270,15 @@ class DashboardAfterUpdateTests(unittest.TestCase):
             source += block(self.text, "function Open-ClosedDashboard {", "# From here on, the Dashboard windows")
             if not dashboard:
                 source += ("function Start-Process { param($FilePath, $ArgumentList, $WorkingDirectory, "
-                           "[switch]$NoNewWindow) Add-Content -LiteralPath %s -Value ([string]$ArgumentList) }\n"
+                           "[switch]$NoNewWindow) $said = [string]$ArgumentList; if (-not $said) { $said = '(none)' }; "
+                           "Add-Content -LiteralPath %s -Value $said }\n"
                            % ps_literal(started))
             script = ["$ErrorActionPreference = 'Stop'",
                       "$OwnedHome = %s" % ps_literal(home), "$InstallHome = $OwnedHome",
                       "$script:DashboardsReopened = $false",
                       "$now = [DateTime]::UtcNow",
-                      "$script:DashboardsAskedAt = %s" % ("$now" if asked else "$null")]
+                      "$script:DashboardsAskedAt = %s" % ("$now" if asked else "$null"),
+                      "$script:DashboardsFallback = @(%s)" % ", ".join(ps_literal(page) for page in fallback)]
             for name, line, before in records:
                 path = ps_literal(home / "config" / name)
                 script.append("[IO.File]::WriteAllText(%s, %s)" % (path, ps_literal(line)))
@@ -402,6 +411,174 @@ class DashboardAfterUpdateTests(unittest.TestCase):
         stale = next(number for number, line in enumerate(lines, 1)
                      if number > start and "-Filter 'reopen-after-update*.txt'" in line)
         self.assertLess(stale, asked, "a record an earlier update left is removed before the windows are asked")
+
+    # ------------------------------------------------------------------ a Dashboard that does not answer (acceptance)
+    def run_close(self, windows, answer_seconds=1, close_seconds=1):
+        """Close-OwnedDashboard, lifted from install.ps1 with the helpers it calls, over stand-in windows: `windows`
+        is a list of (process id, command line, kind). A "new" window answers the event by writing its reopen record
+        and closing; an "unsaved" one writes that it keeps unsaved changes and stays; an "old" one (before v0.6.16)
+        answers nothing and closes on WM_CLOSE; a "stuck" one is sent WM_CLOSE and stays (a dialog in front); a
+        "hidden" one has no window to send it to. Returns (result, the ids sent WM_CLOSE, the answers left in
+        config, what was printed)."""
+        import json
+        import subprocess
+        import tempfile
+        from test_installer import VOICE, block, ps_literal
+        if not POWERSHELL.is_file():
+            self.skipTest("Windows PowerShell")
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            home = Path(folder) / "home"
+            (home / "config").mkdir(parents=True)
+            closed = Path(folder) / "closed.txt"
+            source = VOICE
+            source += block(self.text, "function Resolve-Canonical {", "function Get-Edition {")
+            source += block(self.text, "function Get-UpdateEventName {", "function Get-OwnedWatcherProcess {")
+            source += block(self.text, "function Remove-OwnedItem {", "function Invoke-Setup {")
+            source += block(self.text, "function Get-DashboardPage {", "function Invoke-Codex {")
+            fakes = ", ".join("@{ ProcessId = %d; CommandLine = %s; Kind = %s; Alive = $true }"
+                              % (pid, ps_literal(line), ps_literal(kind)) for pid, line, kind in windows)
+            script = [
+                "$ErrorActionPreference = 'Stop'",
+                "$OwnedHome = %s" % ps_literal(home), "$InstallHome = $OwnedHome",
+                "$script:DashboardsAskedAt = $null", "$script:DashboardsFallback = @()",
+                "$global:Fakes = @(%s)" % fakes,
+                "function Get-OwnedDashboardProcess {",
+                "    foreach ($f in $global:Fakes) {",
+                "        if (-not $f.Alive -or $null -eq $script:DashboardsAskedAt) { continue }",
+                "        $config = Join-Path $InstallHome 'config'",
+                "        if ($f.Kind -eq 'new') { Set-Content -LiteralPath (Join-Path $config ('reopen-after-update-' + $f.ProcessId + '.txt')) -Value '--page=history'; $f.Alive = $false }",
+                "        if ($f.Kind -eq 'unsaved') { Set-Content -LiteralPath (Join-Path $config ('update-unsaved-' + $f.ProcessId + '.txt')) -Value 'unsaved' }",
+                "    }",
+                "    return ,@($global:Fakes | Where-Object { $_.Alive } | ForEach-Object { [pscustomobject]@{ ProcessId = $_.ProcessId; CommandLine = $_.CommandLine } })",
+                "}",
+                "function Close-DashboardWindow {",
+                "    param([int]$ProcessId)",
+                "    Add-Content -LiteralPath %s -Value $ProcessId" % ps_literal(closed),
+                "    $f = @($global:Fakes | Where-Object { $_.ProcessId -eq $ProcessId })[0]",
+                "    if ($f.Kind -eq 'hidden') { return $false }",
+                "    if ($f.Kind -ne 'stuck') { $f.Alive = $false }",
+                "    return $true",
+                "}",
+                "$r = Close-OwnedDashboard -AnswerSeconds %d -CloseSeconds %d" % (answer_seconds, close_seconds),
+                "Write-Output ('RESULT ' + (@{ unsaved = $r.Unsaved; stuck = $r.Stuck; fallback = @($r.Fallback); "
+                "kept = @($script:DashboardsFallback); asked = ($null -ne $script:DashboardsAskedAt) } | ConvertTo-Json -Compress))",
+            ]
+            probe = Path(folder) / "probe.ps1"
+            probe.write_text(source + "\n" + "\n".join(script) + "\n", encoding="utf-8-sig")
+            done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe)], capture_output=True, text=True, encoding="utf-8",
+                                  errors="replace", timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            line = next(line for line in done.stdout.splitlines() if line.startswith("RESULT "))
+            sent = [int(pid) for pid in closed.read_text(encoding="utf-8").split()] if closed.exists() else []
+            left = sorted(name for name in os.listdir(home / "config") if name.startswith("update-unsaved-"))
+            return json.loads(line[len("RESULT "):]), sent, left, done.stdout
+
+    def test_a_dashboard_of_an_earlier_version_is_closed_as_a_window_is_and_opens_again(self):
+        """The acceptance: the beta.4 Dashboard did not listen for the event, stayed open, the update waited a minute
+        and then said it had unsaved changes it never had, and nothing opened again. Most updates come from v0.6.15,
+        whose window does not listen either. A window that answers nothing is sent WM_CLOSE - its own close, which
+        such a window answers by closing - and kept to be opened again on the page its command line named, else the
+        Overview; one that answers is never sent it."""
+        result, sent, left, _ = self.run_close([
+            (101, '"C:\\Users\\ExampleUser\\.codex-auto-resume\\CodexAutoResumeSettings.exe" --page=pending', "old"),
+            (102, '"C:\\Users\\ExampleUser\\.codex-auto-resume\\CodexAutoResumeSettings.exe"', "old"),
+            (103, '"C:\\Users\\ExampleUser\\.codex-auto-resume\\CodexAutoResumeSettings.exe" --page=history', "new")])
+        self.assertEqual(sent, [101, 102], "only the windows that said nothing are sent WM_CLOSE")
+        self.assertEqual((result["unsaved"], result["stuck"]), (0, 0))
+        self.assertEqual(result["fallback"], ["pending", ""])
+        self.assertEqual(result["kept"], ["pending", ""], "kept for Open-ClosedDashboard")
+        self.assertTrue(result["asked"], "the windows open again on every way out")
+        self.assertEqual(left, [])
+
+    def test_unsaved_changes_are_said_only_of_a_window_that_said_so(self):
+        """A window of this version with unsaved Settings changes says so and stays, and is never sent WM_CLOSE; a
+        window that could not be closed is counted apart, so it is never called unsaved."""
+        result, sent, left, _ = self.run_close([(201, "x", "unsaved"), (202, "x", "stuck"), (203, "x", "hidden")])
+        self.assertEqual(sorted(sent), [202, 203])
+        self.assertEqual((result["unsaved"], result["stuck"]), (1, 2))
+        self.assertEqual(result["fallback"], [], "a window still open is not one to open again")
+        self.assertEqual(left, [], "the answers are removed once read")
+        result, sent, _, _ = self.run_close([])
+        self.assertEqual((result["unsaved"], result["stuck"], result["fallback"], sent), (0, 0, [], []))
+        self.assertFalse(result["asked"], "nothing open, nothing asked")
+
+    def test_the_update_says_what_happened_to_each_window_truthfully(self):
+        """The update's own lines for what Close-OwnedDashboard found: "unsaved changes" only for a window that said
+        it has them, its own words for one that could not be closed, and for an earlier version's window, closed."""
+        import subprocess
+        import tempfile
+        from test_installer import VOICE, ps_literal
+        if not POWERSHELL.is_file():
+            self.skipTest("Windows PowerShell")
+        said = {}
+        for name, unsaved, stuck, fallback in (("fallback", 0, 0, ["pending"]), ("unsaved", 1, 0, []),
+                                               ("stuck", 0, 1, []), ("answered", 0, 0, [])):
+            step = self.block("    $dashboardsOpen = $upgrade -and (Get-OwnedDashboardProcess).Count -gt 0",
+                              "    # Replace only the program directories.")
+            script = (VOICE + "$upgrade = $true\nfunction Get-OwnedDashboardProcess { return ,@(1) }\n"
+                      "function Close-OwnedDashboard { return @{ Unsaved = %d; Stuck = %d; Fallback = @(%s) } }\n"
+                      % (unsaved, stuck, ", ".join(ps_literal(page) for page in fallback)) + step)
+            with tempfile.TemporaryDirectory() as folder:
+                probe = Path(folder) / "said.ps1"
+                probe.write_text(script, encoding="utf-8-sig")
+                done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                       "-File", str(probe)], capture_output=True, text=True, encoding="utf-8",
+                                      errors="replace", timeout=120,
+                                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            said[name] = done.stdout
+        self.assertIn("earlier version", said["fallback"])
+        self.assertIn("[ok] The Dashboard closed", said["fallback"])
+        self.assertIn("unsaved changes stayed open", said["unsaved"])
+        self.assertIn("could not be closed", said["stuck"])
+        self.assertNotIn("unsaved", said["stuck"])
+        for name in ("fallback", "answered"):
+            self.assertNotIn("unsaved", said[name])
+            self.assertNotIn("[!]", said[name])
+
+    def test_a_window_closed_by_the_fallback_opens_again_on_its_page_or_the_overview(self):
+        said, started, left = self.run_reopen([("reopen-after-update-301.txt", "--page=settings --reopened=1", None)],
+                                              fallback=["pending", "", "nowhere"])
+        self.assertEqual(sorted(started), sorted(["--page=settings", "--reopened=1", "--page=pending", "(none)", "(none)"]),
+                         "its own record's words, the page its command line named, else nothing - the Overview")
+        self.assertEqual(said.count("[ok] The Dashboard was opened again on the new version"), 4)
+        self.assertEqual(left, [])
+        said, started, _ = self.run_reopen([], asked=False, fallback=["pending"])
+        self.assertEqual(started, [], "nothing was asked to close, so nothing opens")
+
+    def test_the_page_is_read_only_from_the_words_the_windows_reopen_takes(self):
+        import subprocess
+        import tempfile
+        from test_installer import ps_literal
+        if not POWERSHELL.is_file():
+            self.skipTest("Windows PowerShell")
+        lines = ['"C:\\x\\CodexAutoResumeSettings.exe" --page=pending', '"C:\\x\\CodexAutoResumeSettings.exe" --settings',
+                 '"C:\\x\\CodexAutoResumeSettings.exe"', '"C:\\x\\CodexAutoResumeSettings.exe" --page=Pending',
+                 '"C:\\x\\CodexAutoResumeSettings.exe" --page=pending;calc', '"C:\\x\\--page=history\\a.exe"',
+                 '"C:\\x\\CodexAutoResumeSettings.exe" --page=history --reopened=2', ""]
+        script = self.block("function Get-DashboardPage {", "function Test-DashboardAnswered {")
+        script += "\n".join("'[' + (Get-DashboardPage %s) + ']'" % ps_literal(line) for line in lines) + "\n"
+        with tempfile.TemporaryDirectory() as folder:
+            probe = Path(folder) / "page.ps1"
+            probe.write_text(script, encoding="utf-8-sig")
+            done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe)], capture_output=True, text=True, timeout=120,
+                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(done.stdout.split(), ["[pending]", "[settings]", "[]", "[]", "[]", "[]", "[history]", "[]"],
+                         done.stderr)
+
+    def test_the_window_answers_when_it_keeps_unsaved_changes(self):
+        """The installer says "unsaved changes" only of a window that said so: CloseForUpdate writes its answer
+        (update-unsaved-<its process id>.txt) when it stays for unsaved changes, and only then."""
+        import guiscan
+        close = guiscan.member_body("SettingsForm", "CloseForUpdate")
+        early = close[close.index("if (updatingHere || reopening || auditing || Dirty())"):close.index("bool normal")]
+        self.assertIn("if (!updatingHere && !reopening && !auditing) AnswerUnsaved();", early)
+        self.assertIn('"update-unsaved-" + process.ToString(CultureInfo.InvariantCulture) + ".txt"',
+                      guiscan.member_body("SettingsForm", "UpdateUnsavedFile"))
+        self.assertIn("UpdateUnsavedFile(Process.GetCurrentProcess().Id)", guiscan.member_body("SettingsForm", "AnswerUnsaved"))
+        self.assertIn("'update-unsaved-'", self.block("function Test-DashboardUnsaved {", "function Close-DashboardWindow {"))
 
     def test_the_window_closes_through_its_own_close_and_keeps_unsaved_changes(self):
         import guiscan

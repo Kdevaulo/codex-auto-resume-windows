@@ -335,6 +335,133 @@ function Get-OwnedWatcherProcess {
     return ,$found
 }
 
+function Get-DashboardPage {
+    <#
+        The page an older Dashboard window was opened on, read from its command line: the one thing a window that does
+        not answer an update's request says about where it is. Only the words its own reopen takes for a page
+        (`--page=<name>`, and `--settings`, the older spelling); '' where it says none, and it opens on the Overview.
+    #>
+    param([string]$CommandLine)
+    $page = ''
+    foreach ($word in @([regex]::Matches([string]$CommandLine, '"([^"]*)"|(\S+)') |
+                        ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } })) {
+        if ($word -cmatch '^--page=(overview|pending|history|statistics|diagnostics|settings)$') { $page = $Matches[1] }
+        elseif ($word -ceq '--settings') { $page = 'settings' }
+    }
+    return $page
+}
+
+function Test-DashboardAnswered {
+    <#
+        Whether a Dashboard window answered an update's request: it wrote where it was and is closing itself
+        (reopen-after-update-<its process id>.txt), or it wrote that it keeps unsaved Settings changes and stays open
+        (update-unsaved-<its process id>.txt, gui/WindowReopen.cs). A window from before v0.6.16 never writes either.
+    #>
+    param([int]$ProcessId)
+    $config = Join-Path $InstallHome 'config'
+    foreach ($name in @('reopen-after-update-', 'update-unsaved-')) {
+        if (Test-Path -LiteralPath (Join-Path $config ($name + $ProcessId + '.txt')) -PathType Leaf) { return $true }
+    }
+    return $false
+}
+
+function Test-DashboardUnsaved {
+    param([int]$ProcessId)
+    return (Test-Path -LiteralPath (Join-Path (Join-Path $InstallHome 'config') ('update-unsaved-' + $ProcessId + '.txt')) -PathType Leaf)
+}
+
+function Close-DashboardWindow {
+    <#
+        The fallback for a window that did not answer: its own close, as a person closes it - WM_CLOSE to its main
+        window (Process.CloseMainWindow), which every Dashboard before v0.6.16 answers by closing. Never ended from
+        outside. False where it has no window to be asked.
+    #>
+    param([int]$ProcessId)
+    try {
+        $process = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+        try { return [bool]$process.CloseMainWindow() } finally { $process.Dispose() }
+    } catch { return $false }
+}
+
+function Close-OwnedDashboard {
+    <#
+        Asks this installation's open Dashboard windows to close, and says how it went: before an update or a repair
+        replaces the files they run, and before an uninstall removes them.
+
+        Each window is asked through its own close (gui/WindowReopen.cs): the event named after the installation
+        (Get-UpdateEventName). A window of this version answers at once - it writes where it was and closes, or writes
+        that it keeps unsaved Settings changes and stays open. A window of an earlier version does not listen for the
+        event and answers nothing: most updates come from v0.6.15, and such a window kept the update waiting a minute
+        and was then said to have unsaved changes it never had (v0.6.16 acceptance). So a window that has not answered
+        in $AnswerSeconds is closed as a person closes it (Close-DashboardWindow), and opens again on the new version
+        (Open-ClosedDashboard) on the page its command line names, else the Overview.
+
+        Nothing is ended by force. Returns Unsaved - the windows that answered that they keep unsaved changes - and
+        Stuck - the windows still open that did not say so, which could not be asked or did not close - and
+        Fallback, the page of each window closed by the fallback ('' for the Overview), which is also kept for
+        Open-ClosedDashboard. Sets $script:DashboardsAskedAt, so the windows open again on every way out.
+    #>
+    param([int]$AnswerSeconds = 10, [int]$CloseSeconds = 20)
+    $result = @{ Unsaved = 0; Stuck = 0; Fallback = @() }
+    if ((Get-OwnedDashboardProcess).Count -eq 0) { return $result }
+    $config = Join-Path $InstallHome 'config'
+    # An answer an earlier run left is no answer to this one.
+    foreach ($stale in @(Get-ChildItem -LiteralPath $config -File -Filter 'update-unsaved-*.txt' -ErrorAction SilentlyContinue)) {
+        $null = Remove-OwnedItem $stale.FullName
+    }
+    $script:DashboardsAskedAt = [DateTime]::UtcNow
+    $closeEvents = @()
+    foreach ($root in @($InstallHome, $OwnedHome) | Select-Object -Unique) {
+        try {
+            $closeEvent = New-Object System.Threading.EventWaitHandle($false,
+                [System.Threading.EventResetMode]::ManualReset, (Get-UpdateEventName $root))
+            [void]$closeEvent.Set()
+            $closeEvents += $closeEvent
+        } catch { }
+    }
+    $fallback = @()
+    # Each list is taken whole before it is read: Get-OwnedDashboardProcess hands back one array (its leading comma),
+    # which a pipeline or @() would take as a single item.
+    try {
+        # The answers: every window closed, or said why it stays.
+        $deadline = (Get-Date).AddSeconds($AnswerSeconds)
+        while ((Get-Date) -lt $deadline) {
+            $windows = Get-OwnedDashboardProcess
+            $silent = @($windows | Where-Object { -not (Test-DashboardAnswered $_.ProcessId) })
+            if ($silent.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+        }
+        # The fallback, for each window that said nothing.
+        $windows = Get-OwnedDashboardProcess
+        foreach ($process in $windows) {
+            if (Test-DashboardAnswered $process.ProcessId) { continue }
+            if (Close-DashboardWindow $process.ProcessId) {
+                $fallback += @{ Id = [int]$process.ProcessId; Page = (Get-DashboardPage $process.CommandLine) }
+            }
+        }
+        # Every window but one that keeps unsaved changes closes now, and its bridge with it.
+        $deadline = (Get-Date).AddSeconds($CloseSeconds)
+        while ((Get-Date) -lt $deadline) {
+            $windows = Get-OwnedDashboardProcess
+            $open = @($windows | Where-Object { -not (Test-DashboardUnsaved $_.ProcessId) })
+            if ($open.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+        }
+    } finally {
+        foreach ($closeEvent in $closeEvents) { [void]$closeEvent.Reset(); $closeEvent.Dispose() }
+    }
+    $still = Get-OwnedDashboardProcess
+    $stillIds = @($still | ForEach-Object { [int]$_.ProcessId })
+    $result.Unsaved = @($still | Where-Object { Test-DashboardUnsaved $_.ProcessId }).Count
+    $result.Stuck = $still.Count - $result.Unsaved
+    $result.Fallback = @($fallback | Where-Object { $stillIds -notcontains $_.Id } | ForEach-Object { [string]$_.Page })
+    $script:DashboardsFallback = $result.Fallback
+    foreach ($answer in @(Get-ChildItem -LiteralPath $config -File -Filter 'update-unsaved-*.txt' -ErrorAction SilentlyContinue)) {
+        $null = Remove-OwnedItem $answer.FullName
+    }
+    return $result
+}
+
 function Invoke-Codex {
     # Native stderr must not become a terminating error: PowerShell 5.1 wraps it in an
     # ErrorRecord, and `codex` writes ordinary progress there. Capture to files instead
@@ -967,12 +1094,29 @@ function Open-ClosedDashboard {
             Warn 'The Dashboard could not be opened again; open it from the Start menu.'
         }
     }
+    # A window of an earlier version, closed by the fallback (Close-OwnedDashboard), wrote no record: it opens on the
+    # page its command line named, else the Overview - one for each window closed so.
+    foreach ($page in @($script:DashboardsFallback)) {
+        if (-not (Test-Path -LiteralPath $dashboard -PathType Leaf)) { break }
+        try {
+            if ($page -cmatch ('^(' + $pages + ')$')) {
+                Start-Process -FilePath $dashboard -ArgumentList ('--page=' + $page) -WorkingDirectory $InstallHome
+            } else {
+                Start-Process -FilePath $dashboard -WorkingDirectory $InstallHome
+            }
+            if ($Updated) { Ok 'The Dashboard was opened again on the new version' }
+            else { Ok 'The Dashboard was opened again' }
+        } catch {
+            Warn 'The Dashboard could not be opened again; open it from the Start menu.'
+        }
+    }
 }
 
 # From here on, the Dashboard windows an update asks to close (below) open again on every way out, through the
 # `finally` at the end - an update that finishes, and one that stops, is refused or is put back alike.
 $script:DashboardsAskedAt = $null
 $script:DashboardsReopened = $false
+$script:DashboardsFallback = @()
 try {
     $upgrade = Test-Path $AppDir
 
@@ -1052,13 +1196,14 @@ try {
     }
 
     # The Dashboard, as the watcher (v0.6.16, the owner: after an update everything runs on the new version). An
-    # open window of this installation is asked to close itself, through its own close: it writes where it was
-    # (config\reopen-after-update-<its process id>.txt) and closes - unless it has unsaved Settings changes, which it keeps, and then
-    # it stays open. This waits a minute for them, as the watcher above is waited for, and goes on either way: a
-    # window that stayed runs the previous version until it is opened again, and says nothing is lost. Nothing is
-    # ended by force. The window opens again where it was once setup has run (below) - and on every other way out
-    # from here, through the `finally` at the end, so an update that stops or is put back leaves it open as it was.
-    # A record an earlier update left, one that stopped before it read it, is never opened: removed before asking.
+    # open window of this installation is asked to close itself (Close-OwnedDashboard): a window of this version
+    # writes where it was (config\reopen-after-update-<its process id>.txt) and closes - unless it has unsaved
+    # Settings changes, which it keeps, and says so, and stays open; a window of an earlier version, which does not
+    # listen, is closed as a person closes it. A window that stayed runs the previous version until it is opened
+    # again, and is said as what it is. Nothing is ended by force. Each window opens again where it was once setup
+    # has run (below) - and on every other way out from here, through the `finally` at the end, so an update that
+    # stops or is put back leaves it open as it was. A record an earlier update left, one that stopped before it
+    # read it, is never opened: removed before asking.
     if ($upgrade) {
         foreach ($stale in @(Get-ChildItem -LiteralPath (Join-Path $InstallHome 'config') -File `
                                            -Filter 'reopen-after-update*.txt' -ErrorAction SilentlyContinue)) {
@@ -1068,26 +1213,17 @@ try {
     $dashboardsOpen = $upgrade -and (Get-OwnedDashboardProcess).Count -gt 0
     if ($dashboardsOpen) {
         Step 'Closing the Dashboard so it opens again on the new version'
-        $script:DashboardsAskedAt = [DateTime]::UtcNow
-        $closeEvents = @()
-        foreach ($root in @($InstallHome, $OwnedHome) | Select-Object -Unique) {
-            try {
-                $closeEvent = New-Object System.Threading.EventWaitHandle($false,
-                    [System.Threading.EventResetMode]::ManualReset, (Get-UpdateEventName $root))
-                [void]$closeEvent.Set()
-                $closeEvents += $closeEvent
-            } catch { }
+        $closed = Close-OwnedDashboard
+        if ($closed.Fallback.Count -gt 0) {
+            Ok 'A Dashboard of an earlier version, which cannot be asked, was closed as a window is closed'
         }
-        $deadline = (Get-Date).AddSeconds(60)
-        while ((Get-Date) -lt $deadline -and (Get-OwnedDashboardProcess).Count -gt 0) {
-            Start-Sleep -Milliseconds 500
-        }
-        foreach ($closeEvent in $closeEvents) { [void]$closeEvent.Reset(); $closeEvent.Dispose() }
-        if ((Get-OwnedDashboardProcess).Count -gt 0) {
+        if ($closed.Unsaved -gt 0) {
             Warn 'A Dashboard window with unsaved changes stayed open; it runs the previous version until it is opened again.'
-        } else {
-            Ok 'The Dashboard closed'
         }
+        if ($closed.Stuck -gt 0) {
+            Warn 'A Dashboard window could not be closed; it runs the previous version until it is opened again.'
+        }
+        if ($closed.Unsaved -eq 0 -and $closed.Stuck -eq 0) { Ok 'The Dashboard closed' }
     }
 
     # Replace only the program directories. Settings, state and logs sit beside them and are
