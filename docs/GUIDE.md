@@ -237,7 +237,8 @@ and the Dashboard's Diagnostics says so too until the copy is replaced. `Uninsta
 Codex to remove it, removes it; see [Uninstall](#uninstall) for what each route leaves behind.
 
 **Check for updates**, on the Dashboard's Diagnostics page, asks GitHub whether a newer release has
-been published and offers to install it. From v0.6.16 the install runs in the setup program's window: once the
+been published and offers to install it. From v0.6.16 - when the installation that checks is v0.6.16 or later; an
+earlier version installs its update the way it always did - the install runs in the setup program's window: once the
 download is checked it shows the version it goes from and to and what is new in it, read from that download, and
 installs only when you press **Update** (**Not now** installs nothing); then it shows how far it is and its log, and
 "Updated to" with the first lines of what is new. Everything that ran before then runs again on the new version by

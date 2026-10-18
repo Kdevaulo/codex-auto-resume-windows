@@ -43,8 +43,9 @@ down first, which *Install another version...* does for you.
   a failed uninstall stays listed, a finished one takes its entry with it, and installing an older version leaves no
   entry naming a version that is not installed.
   The winget manifests of both editions are made from a release's pinned archives ([WINGET.md](WINGET.md)).
-- **An update shows itself.** Before it installs, a notes page says from what version to what and what is new in
-  it, read from the verified download; afterwards an "Updated to" page says it is done. The watcher is started
+- **An update shows itself** - from this version's own *Check for updates* on, and the setup program run by hand; the
+  update to v0.6.16 from an earlier version runs as that version always did. Before it installs, a notes page says
+  from what version to what and what is new in it, read from the verified download; afterwards an "Updated to" page says it is done. The watcher is started
   again on the new version where one ran before or where it runs at sign-in, and one you had stopped stays
   stopped. An open Dashboard is asked to close and opens again on the new version where it was - one from before
   v0.6.16, which cannot be asked, is closed as any window is and opened again - and one with unsaved Settings
