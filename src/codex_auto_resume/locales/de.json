@@ -665,6 +665,7 @@
   "installer.step.verify": "Download wird überprüft",
   "installer.step.verify_setup": "Setup-Programm wird geprüft",
   "installer.step.watcher": "Der laufende Watcher wird beendet",
+  "installer.step.dashboard": "Dashboard wird geschlossen",
   "installer.uninstall.heading": "Codex Auto Resume entfernen",
   "installer.uninstall.purge": "Auch die Einstellungen und den Wiederherstellungsverlauf löschen",
   "installer.uninstall.what": "Der Watcher, sein Start bei der Anmeldung, sein Eintrag im Startmenü und das Plugin in Codex werden entfernt. Deine Codex-Unterhaltungen bleiben unberührt.",

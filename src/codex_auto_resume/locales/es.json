@@ -665,6 +665,7 @@
   "installer.step.verify": "Verificando la descarga",
   "installer.step.verify_setup": "Comprobando el programa de instalación",
   "installer.step.watcher": "Deteniendo el monitor en ejecución",
+  "installer.step.dashboard": "Cerrando el Panel",
   "installer.uninstall.heading": "Eliminar Codex Auto Resume",
   "installer.uninstall.purge": "Eliminar también los ajustes y el historial de recuperaciones",
   "installer.uninstall.what": "Se eliminan el monitor, su inicio al iniciar sesión, su entrada del menú Inicio y el plugin de Codex. Tus conversaciones de Codex no se tocan.",

@@ -67,7 +67,10 @@ TEST_ENTRIES = {"Install.cmd": b"@echo off\r\nexit /b 0\r\n",
 
 # install.ps1's lines in the order a first installation prints them, the bootstrap's -Update before its own, and the
 # uninstall's: what the bar is read from (FlowTests), each one checked against the scripts (ScriptTests).
-INSTALLING = ["", "Codex Auto Resume", "edition: standard", "  [ok] Found Codex", "  Installing program files",
+INSTALLING = ["", "Codex Auto Resume", "edition: standard", "  [ok] Found Codex", "  Updating program files",
+              "  Stopping the running watcher so the new version takes over", "  [ok] The previous watcher stopped",
+              "  Closing the Dashboard so it opens again on the new version", "  [ok] The Dashboard closed",
+              "  Copying the program files into place",
               "  [ok] Bundled Python 3.13 (no system Python needed)", "  Registering the Codex plugin",
               "  [ok] Codex plugin installed", "  Setting up the watcher", "    (the setup step's words, in any language)",
               "  Checking the installation", "Installed and running."]
@@ -76,6 +79,7 @@ UPDATING = ["Codex Auto Resume - setting up", "edition: standard",
             "  Downloading v9.9.9 from github.com over HTTPS.", "  [ok] SHA-256 matches the digest pinned in this plugin",
             "  [ok] Archive contents verified as Codex Auto Resume v9.9.9", "  Installing", "edition: standard",
             "  [ok] Found Codex", "  Updating program files", "  Stopping the running watcher so the new version takes over",
+            "  Closing the Dashboard so it opens again on the new version", "  Copying the program files into place",
             "  [ok] Bundled Python 3.13 (no system Python needed)", "  Registering the Codex plugin",
             "  Setting up the watcher", "  Checking the installation", "Updated. Your settings and pending recoveries were kept."]
 REMOVING = ["Codex Auto Resume", "  Removing the watcher, autostart, notification identity and Start Menu entry",
@@ -459,9 +463,17 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(install["Registering the Codex plugin"], (True, "plugin"))
         self.assertEqual(install["Setting up the watcher"], (True, "setup"))
         self.assertFalse(install["(the setup step's words, in any language)"][0], "the localized lines move nothing")
+        # The acceptance's step stayed on the watcher while the Dashboard closed and the files were copied: each
+        # has its own step now.
+        self.assertEqual(install["Stopping the running watcher so the new version takes over"], (True, "watcher"))
+        self.assertEqual(install["Closing the Dashboard so it opens again on the new version"], (True, "dashboard"))
+        self.assertEqual(install["Copying the program files into place"], (True, "files"))
         update = self.answer["bar"]["update"]
         self.assertFalse(update[1][0], "the bootstrap's own edition line, before it downloads, is no step")
         self.assertEqual(update[3][2], "download")
+        steps = {line.strip(): step for line, (_, _, step) in zip(UPDATING, update)}
+        self.assertEqual(steps["Closing the Dashboard so it opens again on the new version"], "dashboard")
+        self.assertEqual(steps["Copying the program files into place"], "files")
         self.assertEqual(self.answer["bar"]["uninstall"][-1][2], "finishing")
         self.assertEqual(self.answer["unpacked"], [0.0, 0.125, 0.25, 0.0])
 

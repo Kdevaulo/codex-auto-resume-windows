@@ -519,6 +519,10 @@ namespace CodexAutoResume
             new Milestone("Installing program files", 0.33, "files"),
             new Milestone("Updating program files", 0.33, "files"),
             new Milestone("Stopping the running watcher", 0.40, "watcher"),
+            // The Dashboard's close and the copy itself have their own lines (v0.6.16 acceptance: the step stayed on
+            // the watcher through both, while the log went on).
+            new Milestone("Closing the Dashboard", 0.45, "dashboard"),
+            new Milestone("Copying the program files into place", 0.50, "files"),
             new Milestone("[ok] Bundled Python", 0.60, "plugin"),
             new Milestone("Registering the Codex plugin", 0.62, "plugin"),
             new Milestone("Setting up the watcher", 0.78, "setup"),
@@ -540,6 +544,8 @@ namespace CodexAutoResume
             new Milestone("Updating program files", 0.45, "files"),
             new Milestone("Installing program files", 0.45, "files"),
             new Milestone("Stopping the running watcher", 0.50, "watcher"),
+            new Milestone("Closing the Dashboard", 0.53, "dashboard"),
+            new Milestone("Copying the program files into place", 0.57, "files"),
             new Milestone("[ok] Bundled Python", 0.65, "plugin"),
             new Milestone("Registering the Codex plugin", 0.68, "plugin"),
             new Milestone("Setting up the watcher", 0.80, "setup"),
@@ -630,6 +636,7 @@ namespace CodexAutoResume
             "codex", "Looking for Codex",
             "files", "Copying the program files",
             "watcher", "Stopping the watcher that is running",
+            "dashboard", "Closing the Dashboard",
             "plugin", "Adding the plugin to Codex",
             "setup", "Setting up the watcher",
             "check", "Checking the installation",

@@ -665,6 +665,7 @@
   "installer.step.verify": "Перевірка завантаження",
   "installer.step.verify_setup": "Перевірка програми встановлення",
   "installer.step.watcher": "Зупинка запущеного монітора",
+  "installer.step.dashboard": "Закриття Dashboard",
   "installer.uninstall.heading": "Видалити Codex Auto Resume",
   "installer.uninstall.purge": "Також видалити параметри та історію відновлень",
   "installer.uninstall.what": "Буде видалено монітор, його запуск під час входу, пункт меню «Пуск» і плагін у Codex. Ваші розмови в Codex не зачіпаються.",

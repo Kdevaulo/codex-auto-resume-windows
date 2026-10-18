@@ -665,6 +665,7 @@
   "installer.step.verify": "Memverifikasi unduhan",
   "installer.step.verify_setup": "Memeriksa program penyiapan",
   "installer.step.watcher": "Menghentikan pemantau yang sedang berjalan",
+  "installer.step.dashboard": "Menutup Dasbor",
   "installer.uninstall.heading": "Hapus Codex Auto Resume",
   "installer.uninstall.purge": "Hapus juga pengaturan dan riwayat pemulihan",
   "installer.uninstall.what": "Pemantau, jalannya saat masuk, entri menu Start, dan plugin di Codex akan dihapus. Percakapan Codex Anda tidak disentuh.",

@@ -665,6 +665,7 @@
   "installer.step.verify": "다운로드 확인 중",
   "installer.step.verify_setup": "설치 프로그램 확인 중",
   "installer.step.watcher": "실행 중인 워처 중지 중",
+  "installer.step.dashboard": "대시보드 닫는 중",
   "installer.uninstall.heading": "Codex Auto Resume 제거",
   "installer.uninstall.purge": "설정과 복구 기록도 함께 삭제",
   "installer.uninstall.what": "워처, 로그인 시 실행, 시작 메뉴 항목, Codex의 플러그인이 제거됩니다. Codex 대화는 건드리지 않습니다.",

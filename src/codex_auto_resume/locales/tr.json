@@ -665,6 +665,7 @@
   "installer.step.verify": "İndirme doğrulanıyor",
   "installer.step.verify_setup": "Kurulum programı denetleniyor",
   "installer.step.watcher": "Çalışan izleyici durduruluyor",
+  "installer.step.dashboard": "Gösterge Paneli kapatılıyor",
   "installer.uninstall.heading": "Codex Auto Resume'u kaldır",
   "installer.uninstall.purge": "Ayarları ve kurtarma geçmişini de sil",
   "installer.uninstall.what": "İzleyici, oturum açılınca çalışması, Başlat menüsü girdisi ve Codex'teki eklenti kaldırılır. Codex sohbetlerinize dokunulmaz.",

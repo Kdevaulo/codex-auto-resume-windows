@@ -665,6 +665,7 @@
   "installer.step.verify": "Weryfikowanie pobranych plików",
   "installer.step.verify_setup": "Sprawdzanie programu instalacyjnego",
   "installer.step.watcher": "Zatrzymywanie działającego monitora",
+  "installer.step.dashboard": "Zamykanie Dashboardu",
   "installer.uninstall.heading": "Usuń Codex Auto Resume",
   "installer.uninstall.purge": "Usuń także ustawienia i historię odzyskiwania",
   "installer.uninstall.what": "Monitor, jego uruchamianie przy logowaniu, wpis w menu Start i wtyczka w Codex zostaną usunięte. Twoje rozmowy w Codex pozostają nietknięte.",

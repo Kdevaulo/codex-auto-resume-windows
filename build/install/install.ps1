@@ -1130,6 +1130,8 @@ try {
         $plan += @{ src = $pair.src; dst = $pair.dst; aside = $aside }
     }
     $moved = @()
+    # Its own line, so the installer window's step follows the copy rather than staying on what came before it.
+    Step 'Copying the program files into place'
     try {
         if ($plan.Count -gt 0) { Write-CopyJournal -Path $Journal -Root $OwnedHome -Entries $plan }
         foreach ($pair in $plan) {
