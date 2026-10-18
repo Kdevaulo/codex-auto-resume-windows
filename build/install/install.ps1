@@ -1260,9 +1260,17 @@ try {
     # armed, moved to the standard edition and then uninstalled is still there, and nothing says
     # which edition ran here last. The advanced archive installed over it enters from standard as
     # far as setup is told, so every advanced feature starts off rather than coming back on.
+    # Unless the uninstall said it took the advanced edition away (config\edition-left.txt, v0.6.16): then this is the
+    # same edition coming back, and its choices stay as an update keeps them (K2, amended by the owner on 2026-10-18).
     $advancedLeft = Test-Path -LiteralPath (Join-Path (Join-Path $InstallHome 'config') 'advanced')
+    $leftFile = Join-Path (Join-Path $InstallHome 'config') 'edition-left.txt'
+    $leftBy = $null
+    $leftItem = Get-Item -LiteralPath $leftFile -Force -ErrorAction SilentlyContinue
+    if ($leftItem -and -not $leftItem.PSIsContainer -and -not ($leftItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        try { $leftBy = ([IO.File]::ReadAllText($leftItem.FullName)).Trim() } catch { $leftBy = $null }
+    }
     if ($editionChange) { $setupArgs += @('--edition-from', $previousEdition) }
-    elseif (-not $upgrade -and $edition -eq 'advanced' -and $advancedLeft) {
+    elseif (-not $upgrade -and $edition -eq 'advanced' -and $advancedLeft -and $leftBy -cne 'advanced') {
         $setupArgs += @('--edition-from', 'standard')
     }
     if ($SkipStartup) { $setupArgs += '--no-startup' }

@@ -567,6 +567,30 @@ class UninstallSafetyTests(unittest.TestCase):
                 self.assertEqual(paths.power_action_file.exists(), kept)
                 self.assertEqual(left.exists(), kept)
 
+    def test_an_uninstall_that_keeps_the_state_says_which_edition_it_took_away(self):
+        """v0.6.16 (K2, as the owner amended it on 2026-10-18): the program goes and config/ stays, so the uninstall
+        notes which edition it removed, for the installer to tell the same edition coming back from an entry into the
+        advanced edition. A purge leaves no note, and the next install takes the note away once it is read."""
+        from codex_auto_resume import edition
+        from codex_auto_resume.domain.plug import Edition
+        paths = config.Paths(self.home)
+        for which in Edition:
+            with self.subTest(which):
+                shutil.rmtree(self.home, ignore_errors=True)
+                self.cli("install")
+                with patch.object(edition, "name", return_value=which):
+                    code, _, _ = self.cli("uninstall", "--keep-state")
+                self.assertEqual(code, 0)
+                self.assertEqual(paths.edition_left_file.read_text(encoding="ascii"), which.value + "\n")
+                self.assertEqual(list(paths.state_dir.glob("edition-left.*.tmp")), [])
+                self.cli("install")
+                self.assertFalse(paths.edition_left_file.exists(), "a later install took an old note for the last word")
+        self.cli("uninstall", "--keep-state")
+        self.assertTrue(paths.edition_left_file.exists())
+        code, _, _ = self.cli("uninstall")
+        self.assertEqual(code, 0)
+        self.assertFalse(paths.edition_left_file.exists(), "a purge left the note behind")
+
     def test_uninstall_aborts_when_watcher_state_is_unknown(self):
         self.cli("install")
         app = App(config.Paths(self.home), console=False, enable_logging=False)
