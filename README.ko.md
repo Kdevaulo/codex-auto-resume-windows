@@ -135,16 +135,10 @@ codex plugin add codex-auto-resume@codex-auto-resume-windows
 그렇고, 아래 그림들도 함께 숨 쉽니다.
 
 <p align="center">
-<img src="docs/images/notification-card-motion-ko.png" alt="제품이 보여 주는 그대로의 알림 카드. 제품의 코드가 예시 데이터로 그렸습니다: example-project, Codex 사용 한도 도달, 이 작업은 08:42에 다시 이어집니다. 카드가 사라졌다가 알림 영역 옆에 다시 떠오릅니다" width="388">
+<img src="docs/images/notification-card-motion-ko.png" alt="제품이 보여 주는 그대로의 알림 카드. 제품의 코드가 예시 데이터로 그렸습니다: example-project, Codex 사용 한도 도달, 이 작업은 08:42에 다시 이어집니다. 카드가 사라졌다가 알림 영역 옆에 다시 떠오릅니다" width="388" align="top">
+<img src="docs/images/tray-popup-ko.png" alt="알림 영역 팝업. 대기 중 상태, 약 1분 30초 뒤 다음 확인, 대기 중인 작업 세 개가 각각 중단 종류, 다음 확인 시각, 자동 이어 가기 스위치와 함께 보이고, 자동 복구 일시 정지와 대시보드 열기 버튼" width="360" align="top"><br>
+<sub>왼쪽: 제품이 그리는 알림 카드 · 오른쪽: 알림 영역 아이콘을 누르면 열리는 창</sub>
 </p>
-
-<p align="center"><sub>제품이 그리는 알림 카드</sub></p>
-
-<p align="center">
-<img src="docs/images/tray-popup-ko.png" alt="알림 영역 팝업. 대기 중 상태, 약 1분 30초 뒤 다음 확인, 대기 중인 작업 세 개가 각각 중단 종류, 다음 확인 시각, 자동 이어 가기 스위치와 함께 보이고, 자동 복구 일시 정지와 대시보드 열기 버튼" width="360">
-</p>
-
-<p align="center"><sub>알림 영역 아이콘을 누르면 열리는 창</sub></p>
 
 <details>
 <summary><b>대시보드와 아이콘, 정지 그림</b></summary>
