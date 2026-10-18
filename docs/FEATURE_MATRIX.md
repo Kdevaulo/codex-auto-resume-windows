@@ -40,12 +40,12 @@ real Codex recovery. Read each citation and its limits separately.
   `visual_ui_scraping_used: false` recorded in
   [`docs/evidence/unloaded-thread-observation.json`](evidence/unloaded-thread-observation.json).
   That is a protocol observation, not somebody watching.
-- **This version, v0.6.14, is released and is the newest.** The rows below that say PUBLISHED
-  mean a published version - v0.6.0 through v0.6.14, all fifteen of whose archives are published
-  and whose digests are pinned on `main`; a pre-release such as v0.6.13-beta is never pinned. A
+- **This version, v0.6.16, is being published; v0.6.15 is released and is the newest.** The rows below that
+  say PUBLISHED mean a published version - v0.6.0 through v0.6.15, all sixteen of whose archives are published
+  and whose digests are pinned on `main`; a pre-release such as v0.6.16-beta.4 is never pinned. A
   row says PUBLISHED only where the published bytes were driven again, so v0.6.6's, v0.6.7's,
-  v0.6.8's, v0.6.9's, v0.6.10's, v0.6.11's, v0.6.12's, v0.6.13's and v0.6.14's own rows will not say it until
-  that has been done. v0.6.3 added nine
+  v0.6.8's, v0.6.9's, v0.6.10's, v0.6.11's, v0.6.12's, v0.6.13's, v0.6.14's, v0.6.15's and v0.6.16's own rows
+  will not say it until that has been done. v0.6.3 added nine
   interface languages, settings for the continuation message, a popup on the
   notification-area icon, an Open Dashboard button on notifications and a redesigned window
   and panel, and fixed one defect present in the three versions before it: a recoverable
