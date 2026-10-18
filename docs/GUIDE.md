@@ -102,7 +102,8 @@ in one file. It carries that archive byte for byte, with the archive's SHA-256 b
 start it, it checks the archive against that digest and stops if they differ, unpacks it into a new
 folder of its own in your temporary folder, runs the archive's own `Install.cmd` there - the same
 installer - and then removes that folder. From v0.6.16 it does this in a window of its own, in the
-Dashboard's look and in your Windows language (you can pick another): it says what it installs, which
+Dashboard's look - the theme your installation is set to, where there is one - and in your Windows language (you
+can pick another): it says what it installs, which
 edition and version, and where; asks only what the installer has a choice about - whether to run at
 Windows sign-in on a first installation, and whether to change the edition when the other one is
 installed - shows how far the installer is and which step it is on, and ends by saying whether it
@@ -111,8 +112,10 @@ version is installed already, it first offers Repair, which installs it again in
 everything waiting and the sign-in choice, or Remove, the uninstall with its question about the settings and the
 recovery history; a newer version updates as before, and `-Silent` asks neither. No console window
 opens. When it updates an installation whose Dashboard is open, it asks that Dashboard to close and opens it again
-on the new version where it was, as it starts the watcher again; a Dashboard with unsaved Settings changes keeps
-them and stays open, on the previous version until you open it again. With `-Silent` it does the same. It downloads nothing, needs no administrator rights and brings no Python of its
+on the new version where it was, as it starts the watcher again. A Dashboard of a version before v0.6.16 cannot be
+asked: it is closed as you would close it, and opens again on the new version on the page it was opened on, or the
+Overview. A Dashboard with unsaved Settings changes keeps them and stays open, on the previous version until you open
+it again, and the installer says so only of such a window. With `-Silent` it does the same. It downloads nothing, needs no administrator rights and brings no Python of its
 own: the installation runs on the Python inside the archive. It loads DLLs from Windows' System32
 folder only, so a DLL lying beside it in Downloads is never loaded, and it stops if a `.config` file
 is beside it. Started from a command line, it passes switches such as `-SkipStartup` on to
@@ -1582,6 +1585,10 @@ Uninstall is deliberately conservative:
 
 - It asks the watcher to stop first. If a watcher is still running, **or if it cannot verify
   whether one is running**, it aborts before removing anything.
+- From v0.6.16 `Uninstall.cmd`, Settings > Apps and the setup program's Remove ask an open Dashboard to close
+  first, as an update does, and before removing anything check that nothing of this installation still holds its
+  files. If something does - a Dashboard with unsaved Settings changes, one that would not close, or a program
+  still running from the installation - they stop with nothing removed and say what to close.
 - It removes the sign-in autostart value, the notification identity and the Add or remove programs
   entry only while they belong to **this** installation. A value that starts a different copy of the tool is reported and
   kept, never silently removed. The Start Menu entry is kept while the notification identity

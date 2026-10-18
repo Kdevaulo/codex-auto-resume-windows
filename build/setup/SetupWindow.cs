@@ -42,15 +42,19 @@ namespace CodexAutoResumeSetup
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Palette.AdoptDesign(Brand.DesignDefault);
-            Palette.Adopt(Theme.Current(Theme.System));
+            string home = InstallerFlow.HomeFrom(Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_PLUGIN_HOME"),
+                                                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+            // The Dashboard's look: the theme, design and motion the installation here stores, as the Dashboard and the
+            // uninstall window open in them - and where there is none, what the Dashboard does by default.
+            string[] look = LookAt(home);
+            Soft.ReduceMotionSetting = look[2] == "reduce";
+            Palette.AdoptDesign(look[1]);
+            Palette.Adopt(Theme.Current(look[0]));
             double read = TextScale.Read();
             SettingsForm.AdoptTextSize(TextScale.Fitting(read, Screen.PrimaryScreen.WorkingArea.Size, SettingsForm.SystemScale));
             Font font = TextScale.Apply(SystemFonts.MessageBoxFont, read, SettingsForm.TextSize);
 
             Archive carried = new Archive(archive);
-            string home = InstallerFlow.HomeFrom(Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_PLUGIN_HOME"),
-                                                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
             string installed = InstallerFlow.InstalledAt(home);
             string from = installed == null ? "" : InstallerFlow.VersionOf(
                 Read(Path.Combine(Path.Combine(Path.Combine(home, "app"), ".codex-plugin"), "plugin.json")));
@@ -86,6 +90,18 @@ namespace CodexAutoResumeSetup
             flow.Maintaining = mode == InstallerFlow.Install && flow.Upgrade && !flow.EditionChange &&
                                flow.From.Length > 0 && flow.From == flow.Version;
             return flow;
+        }
+
+        /// The look the window opens in over the installation at `home`: its stored Theme preference, design and "reduce"
+        /// or "" for its motion (Theme.Stored, as the Dashboard and the uninstall window read them) - or, with nothing
+        /// stored, the Dashboard's own defaults, "system" and Soft. The acceptance's setup window opened dark, Windows'
+        /// app mode, while the installation it updated was set to light. Pure but for the one file it reads.
+        internal static string[] LookAt(string home)
+        {
+            string theme, design;
+            bool reduce;
+            Theme.Stored(home, out theme, out design, out reduce);
+            return new[] { theme, design, reduce ? "reduce" : "" };
         }
 
         private static string Read(string path)

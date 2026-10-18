@@ -44,9 +44,12 @@ KEPT_SCRIPT = "install.ps1"
 # The installation's Dashboard program, which shows the uninstall in the installer window (gui/SettingsRemove.cs).
 WINDOW = "CodexAutoResumeSettings.exe"
 WINDOW_SWITCH = "--uninstall"
+# The program's icon, which the installer puts beside the Dashboard program (build/make_release.py): the one Settings >
+# Apps shows beside the entry (DisplayIcon). The Dashboard program carries the same icon, for a home without the file.
+ICON = "codex-auto-resume.ico"
 EDITIONS = ("standard", "advanced")
 VALUE_NAMES = ("DisplayName", "DisplayVersion", "Publisher", "InstallLocation", "UninstallString",
-               "QuietUninstallString", "NoModify", "NoRepair")
+               "QuietUninstallString", "NoModify", "NoRepair", "DisplayIcon")
 
 
 def key_name(edition: str) -> str:
@@ -122,9 +125,19 @@ def display_name(manifest_path) -> str:
     return text or DEFAULT_DISPLAY_NAME
 
 
+def display_icon(home) -> str | None:
+    """The installed program's icon, for Settings > Apps: the icon file the installer puts in the home, else the
+    Dashboard program's own (its first icon, `,0`); None where neither is there. The entry had none, and Settings
+    showed a blank square beside it (v0.6.16 acceptance)."""
+    for name, suffix in ((ICON, ""), (WINDOW, ",0")):
+        if _plain(Path(home) / name, False):
+            return str(Path(home) / name) + suffix
+    return None
+
+
 def entry_values(home, name: str, version: str) -> dict:
     """The values of one key: name -> (value, REG_SZ or REG_DWORD, by Python type)."""
-    return {
+    values = {
         "DisplayName": name,
         "DisplayVersion": version,
         "Publisher": PUBLISHER,
@@ -134,6 +147,10 @@ def entry_values(home, name: str, version: str) -> dict:
         "NoModify": 1,
         "NoRepair": 1,
     }
+    icon = display_icon(home)
+    if icon:
+        values["DisplayIcon"] = icon
+    return values
 
 
 def read(edition: str) -> dict | None:

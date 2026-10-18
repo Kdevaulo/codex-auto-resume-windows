@@ -285,41 +285,154 @@ namespace CodexAutoResume
             return found.Length > 0 ? found.ToString().Trim() : null;
         }
 
-        /// The first `count` lines of a section worth reading on their own: no link lines, no Markdown marks.
+        /// The kinds of block a section is read into (Blocks).
+        private const char Heading = 'h', Item = 'i', Paragraph = 'p';
+
+        /// A section as plain text to read (v0.6.16 acceptance: the notes page showed the changelog's Markdown as it is
+        /// written, and ran the words of two wrapped lines together, "*Check for updates*offers", for a text box breaks
+        /// a line only at CR LF). Each heading is a line of its own words; each paragraph and each list item is one
+        /// line, its wrapped lines joined with a space, an item set off by a bullet; a blank line before a heading
+        /// and between paragraphs; a link is its text, and no **, * or ` is left - but what is between backticks is
+        /// kept as it is written. Lines end in CR LF. Pure.
+        internal static string Readable(string section)
+        {
+            if (string.IsNullOrEmpty(section)) return "";
+            var text = new StringBuilder();
+            char last = ' ';
+            foreach (KeyValuePair<char, string> block in Blocks(section))
+            {
+                if (text.Length > 0)
+                {
+                    text.Append("\r\n");
+                    // Items in a list follow one another; anything else is set off by a blank line.
+                    if (!(block.Key == Item && last == Item)) text.Append("\r\n");
+                }
+                text.Append(block.Key == Item ? "• " + block.Value : block.Value);
+                last = block.Key;
+            }
+            return text.ToString();
+        }
+
+        /// The first `count` blocks of a section worth reading on their own, for the Finish page: its title, then its
+        /// paragraphs and items - no other heading, nothing that was only a link - each cut at a word near `Room`
+        /// letters, one to a line.
         internal static string Brief(string section, int count)
         {
             if (string.IsNullOrEmpty(section)) return "";
             var kept = new List<string>();
-            foreach (string raw in section.Split('\n'))
+            foreach (KeyValuePair<char, string> block in Blocks(section))
             {
-                string line = Plain(raw.Trim());
-                if (line.Length == 0) continue;
-                kept.Add(line);
+                if (block.Key == Heading && kept.Count > 0) continue;
+                kept.Add(Cut(block.Value, Room));
                 if (kept.Count >= count) break;
             }
             return string.Join(Environment.NewLine, kept.ToArray());
         }
 
-        /// A line as it reads: [text](link) as its text, ** and ` taken out; a line that was only a link is nothing.
+        /// How many letters a line of the Finish page's brief keeps.
+        internal const int Room = 160;
+
+        private static string Cut(string line, int room)
+        {
+            if (line.Length <= room) return line;
+            int space = line.LastIndexOf(' ', room);
+            return line.Substring(0, space > room / 2 ? space : room).TrimEnd(',', ';', ':', ' ') + "…";
+        }
+
+        /// The section's blocks in order - a heading, a list item or a paragraph, each with its words read as plain
+        /// text (Plain) and its wrapped lines joined - leaving out each line that was only a link.
+        private static List<KeyValuePair<char, string>> Blocks(string section)
+        {
+            var blocks = new List<KeyValuePair<char, string>>();
+            char kind = ' ';
+            var words = new StringBuilder();
+            Action close = delegate
+            {
+                string said = Plain(words.ToString().Trim());
+                if (said.Length > 0) blocks.Add(new KeyValuePair<char, string>(kind, said));
+                words.Length = 0;
+                kind = ' ';
+            };
+            foreach (string raw in section.Replace("\r\n", "\n").Split('\n'))
+            {
+                string line = raw.Trim();
+                int indent = raw.Length - raw.TrimStart().Length;
+                if (line.Length == 0) { close(); continue; }
+                int marks = 0;
+                while (marks < line.Length && line[marks] == '#') marks++;
+                if (marks > 0 && marks < line.Length && line[marks] == ' ')
+                {
+                    close();
+                    kind = Heading;
+                    words.Append(line.TrimStart('#').Trim());
+                    close();
+                    continue;
+                }
+                string item = indent <= 3 ? ItemText(line) : null;
+                if (item != null)
+                {
+                    close();
+                    kind = Item;
+                    words.Append(item);
+                    continue;
+                }
+                if (IsOnlyALink(line) && words.Length == 0) continue;
+                if (kind == ' ') kind = Paragraph;
+                if (words.Length > 0) words.Append(' ');
+                words.Append(line);
+            }
+            close();
+            return blocks;
+        }
+
+        // Where the section is a list item: its words after the mark ("- ", "* ", "+ " or "1. "), else null.
+        private static string ItemText(string line)
+        {
+            if (line.Length > 2 && (line[0] == '-' || line[0] == '*' || line[0] == '+') && line[1] == ' ')
+                return line.Substring(2).Trim();
+            int digits = 0;
+            while (digits < line.Length && char.IsDigit(line[digits])) digits++;
+            if (digits > 0 && digits + 1 < line.Length && line[digits] == '.' && line[digits + 1] == ' ')
+                return line.Substring(digits + 2).Trim();
+            return null;
+        }
+
+        /// Words as they read: [text](link) as its text, and the marks of ** and * and ` taken out - but what is
+        /// between backticks is kept as written, *.old-* and all. A line that was only a link is nothing.
         internal static string Plain(string line)
         {
+            if (IsOnlyALink(line)) return "";
             var text = new StringBuilder();
             int i = 0;
             while (i < line.Length)
             {
-                int close = line[i] == '[' ? line.IndexOf("](", i, StringComparison.Ordinal) : -1;
+                char c = line[i];
+                if (c == '`')
+                {
+                    int shut = line.IndexOf('`', i + 1);
+                    if (shut > i)
+                    {
+                        text.Append(line, i + 1, shut - i - 1);
+                        i = shut + 1;
+                        continue;
+                    }
+                    i++;
+                    continue;
+                }
+                int close = c == '[' ? line.IndexOf("](", i, StringComparison.Ordinal) : -1;
                 int end = close > 0 ? line.IndexOf(')', close) : -1;
                 if (close > 0 && end > 0)
                 {
-                    text.Append(line, i + 1, close - i - 1);
+                    // The link's text, read again: it may hold emphasis or code of its own.
+                    text.Append(Plain(line.Substring(i + 1, close - i - 1)));
                     i = end + 1;
                     continue;
                 }
-                text.Append(line[i]);
+                if (c == '*') { i++; continue; }
+                text.Append(c);
                 i++;
             }
-            string plain = text.ToString().Replace("**", "").Replace("`", "").Trim();
-            return IsOnlyALink(line) ? "" : plain;
+            return text.ToString().Trim();
         }
 
         private static bool IsOnlyALink(string line)
@@ -406,6 +519,10 @@ namespace CodexAutoResume
             new Milestone("Installing program files", 0.33, "files"),
             new Milestone("Updating program files", 0.33, "files"),
             new Milestone("Stopping the running watcher", 0.40, "watcher"),
+            // The Dashboard's close and the copy itself have their own lines (v0.6.16 acceptance: the step stayed on
+            // the watcher through both, while the log went on).
+            new Milestone("Closing the Dashboard", 0.45, "dashboard"),
+            new Milestone("Copying the program files into place", 0.50, "files"),
             new Milestone("[ok] Bundled Python", 0.60, "plugin"),
             new Milestone("Registering the Codex plugin", 0.62, "plugin"),
             new Milestone("Setting up the watcher", 0.78, "setup"),
@@ -427,6 +544,8 @@ namespace CodexAutoResume
             new Milestone("Updating program files", 0.45, "files"),
             new Milestone("Installing program files", 0.45, "files"),
             new Milestone("Stopping the running watcher", 0.50, "watcher"),
+            new Milestone("Closing the Dashboard", 0.53, "dashboard"),
+            new Milestone("Copying the program files into place", 0.57, "files"),
             new Milestone("[ok] Bundled Python", 0.65, "plugin"),
             new Milestone("Registering the Codex plugin", 0.68, "plugin"),
             new Milestone("Setting up the watcher", 0.80, "setup"),
@@ -436,6 +555,7 @@ namespace CodexAutoResume
         // install.ps1 -Uninstall.
         private static readonly Milestone[] Removing =
         {
+            new Milestone("Closing the Dashboard", 0.05, "dashboard"),
             new Milestone("Removing the watcher, autostart", 0.15, "unregister"),
             new Milestone("Removing the Codex plugin", 0.40, "remove_plugin"),
             new Milestone("The Codex plugin is not installed", 0.40, "remove_plugin"),
@@ -517,6 +637,7 @@ namespace CodexAutoResume
             "codex", "Looking for Codex",
             "files", "Copying the program files",
             "watcher", "Stopping the watcher that is running",
+            "dashboard", "Closing the Dashboard",
             "plugin", "Adding the plugin to Codex",
             "setup", "Setting up the watcher",
             "check", "Checking the installation",

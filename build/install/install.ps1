@@ -335,6 +335,218 @@ function Get-OwnedWatcherProcess {
     return ,$found
 }
 
+function Get-DashboardPage {
+    <#
+        The page an older Dashboard window was opened on, read from its command line: the one thing a window that does
+        not answer an update's request says about where it is. Only the words its own reopen takes for a page
+        (`--page=<name>`, and `--settings`, the older spelling); '' where it says none, and it opens on the Overview.
+    #>
+    param([string]$CommandLine)
+    $page = ''
+    foreach ($word in @([regex]::Matches([string]$CommandLine, '"([^"]*)"|(\S+)') |
+                        ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } })) {
+        if ($word -cmatch '^--page=(overview|pending|history|statistics|diagnostics|settings)$') { $page = $Matches[1] }
+        elseif ($word -ceq '--settings') { $page = 'settings' }
+    }
+    return $page
+}
+
+function Test-DashboardAnswered {
+    <#
+        Whether a Dashboard window answered an update's request: it wrote where it was and is closing itself
+        (reopen-after-update-<its process id>.txt), or it wrote that it keeps unsaved Settings changes and stays open
+        (update-unsaved-<its process id>.txt, gui/WindowReopen.cs). A window from before v0.6.16 never writes either.
+    #>
+    param([int]$ProcessId)
+    $config = Join-Path $InstallHome 'config'
+    foreach ($name in @('reopen-after-update-', 'update-unsaved-')) {
+        if (Test-Path -LiteralPath (Join-Path $config ($name + $ProcessId + '.txt')) -PathType Leaf) { return $true }
+    }
+    return $false
+}
+
+function Test-DashboardUnsaved {
+    param([int]$ProcessId)
+    return (Test-Path -LiteralPath (Join-Path (Join-Path $InstallHome 'config') ('update-unsaved-' + $ProcessId + '.txt')) -PathType Leaf)
+}
+
+function Close-DashboardWindow {
+    <#
+        The fallback for a window that did not answer: its own close, as a person closes it - WM_CLOSE to its main
+        window (Process.CloseMainWindow), which every Dashboard before v0.6.16 answers by closing. Never ended from
+        outside. False where it has no window to be asked.
+    #>
+    param([int]$ProcessId)
+    try {
+        $process = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+        try { return [bool]$process.CloseMainWindow() } finally { $process.Dispose() }
+    } catch { return $false }
+}
+
+function Close-OwnedDashboard {
+    <#
+        Asks this installation's open Dashboard windows to close, and says how it went: before an update or a repair
+        replaces the files they run, and before an uninstall removes them.
+
+        Each window is asked through its own close (gui/WindowReopen.cs): the event named after the installation
+        (Get-UpdateEventName). A window of this version answers at once - it writes where it was and closes, or writes
+        that it keeps unsaved Settings changes and stays open. A window of an earlier version does not listen for the
+        event and answers nothing: most updates come from v0.6.15, and such a window kept the update waiting a minute
+        and was then said to have unsaved changes it never had (v0.6.16 acceptance). So a window that has not answered
+        in $AnswerSeconds is closed as a person closes it (Close-DashboardWindow), and opens again on the new version
+        (Open-ClosedDashboard) on the page its command line names, else the Overview.
+
+        Nothing is ended by force. Returns Unsaved - the windows that answered that they keep unsaved changes - and
+        Stuck - the windows still open that did not say so, which could not be asked or did not close - and
+        Fallback, the page of each window closed by the fallback ('' for the Overview), which is also kept for
+        Open-ClosedDashboard. Sets $script:DashboardsAskedAt, so the windows open again on every way out.
+    #>
+    param([int]$AnswerSeconds = 10, [int]$CloseSeconds = 20)
+    $result = @{ Unsaved = 0; Stuck = 0; Fallback = @() }
+    if ((Get-OwnedDashboardProcess).Count -eq 0) { return $result }
+    $config = Join-Path $InstallHome 'config'
+    # An answer an earlier run left is no answer to this one.
+    foreach ($stale in @(Get-ChildItem -LiteralPath $config -File -Filter 'update-unsaved-*.txt' -ErrorAction SilentlyContinue)) {
+        $null = Remove-OwnedItem $stale.FullName
+    }
+    $script:DashboardsAskedAt = [DateTime]::UtcNow
+    $closeEvents = @()
+    foreach ($root in @($InstallHome, $OwnedHome) | Select-Object -Unique) {
+        try {
+            $closeEvent = New-Object System.Threading.EventWaitHandle($false,
+                [System.Threading.EventResetMode]::ManualReset, (Get-UpdateEventName $root))
+            [void]$closeEvent.Set()
+            $closeEvents += $closeEvent
+        } catch { }
+    }
+    $fallback = @()
+    # Each list is taken whole before it is read: Get-OwnedDashboardProcess hands back one array (its leading comma),
+    # which a pipeline or @() would take as a single item.
+    try {
+        # The answers: every window closed, or said why it stays.
+        $deadline = (Get-Date).AddSeconds($AnswerSeconds)
+        while ((Get-Date) -lt $deadline) {
+            $windows = Get-OwnedDashboardProcess
+            $silent = @($windows | Where-Object { -not (Test-DashboardAnswered $_.ProcessId) })
+            if ($silent.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+        }
+        # The fallback, for each window that said nothing.
+        $windows = Get-OwnedDashboardProcess
+        foreach ($process in $windows) {
+            if (Test-DashboardAnswered $process.ProcessId) { continue }
+            if (Close-DashboardWindow $process.ProcessId) {
+                $fallback += @{ Id = [int]$process.ProcessId; Page = (Get-DashboardPage $process.CommandLine) }
+            }
+        }
+        # Every window but one that keeps unsaved changes closes now, and its bridge with it.
+        $deadline = (Get-Date).AddSeconds($CloseSeconds)
+        while ((Get-Date) -lt $deadline) {
+            $windows = Get-OwnedDashboardProcess
+            $open = @($windows | Where-Object { -not (Test-DashboardUnsaved $_.ProcessId) })
+            if ($open.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+        }
+    } finally {
+        foreach ($closeEvent in $closeEvents) { [void]$closeEvent.Reset(); $closeEvent.Dispose() }
+    }
+    $still = Get-OwnedDashboardProcess
+    $stillIds = @($still | ForEach-Object { [int]$_.ProcessId })
+    $result.Unsaved = @($still | Where-Object { Test-DashboardUnsaved $_.ProcessId }).Count
+    $result.Stuck = $still.Count - $result.Unsaved
+    $result.Fallback = @($fallback | Where-Object { $stillIds -notcontains $_.Id } | ForEach-Object { [string]$_.Page })
+    $script:DashboardsFallback = $result.Fallback
+    foreach ($answer in @(Get-ChildItem -LiteralPath $config -File -Filter 'update-unsaved-*.txt' -ErrorAction SilentlyContinue)) {
+        $null = Remove-OwnedItem $answer.FullName
+    }
+    return $result
+}
+
+function Get-InstallationHolder {
+    <#
+        What of this installation still runs that an uninstall does not stop itself, and so would hold its files: each
+        process whose program is inside the installation - a Dashboard that stayed open, the runtime python.exe one
+        started, a command run by hand - but the watcher, which the uninstall's own first step stops, and this
+        installation's tool launchers, which it ends before the files go, with whatever each of them started. Waits up
+        to $Seconds for what is closing to have closed. Changes nothing.
+    #>
+    param([int]$Seconds = 10)
+    $roots = @($OwnedHome, $InstallHome) | Where-Object { $_ } | Select-Object -Unique
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    while ($true) {
+        $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+        # Each list taken whole first: the two hand back one array (their leading comma).
+        $watchers = Get-OwnedWatcherProcess
+        $launchers = Get-OwnedMcpProcess -Roots @($OwnedHome, $PluginCacheRoot)
+        $spared = @($watchers | ForEach-Object { [int]$_.ProcessId }) + @($launchers | ForEach-Object { [int]$_.ProcessId })
+        # And what each of those started, however deep.
+        $grew = $true
+        while ($grew) {
+            $grew = $false
+            foreach ($process in $all) {
+                $id = [int]$process.ProcessId
+                if ($spared -notcontains $id -and $spared -contains [int]$process.ParentProcessId) { $spared += $id; $grew = $true }
+            }
+        }
+        $held = @()
+        foreach ($process in $all) {
+            $exe = [string]$process.ExecutablePath
+            if (-not $exe -or [int]$process.ProcessId -eq $PID -or $spared -contains [int]$process.ProcessId) { continue }
+            $near = $false
+            foreach ($root in $roots) { if ($exe.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { $near = $true } }
+            if ($near -and (Test-PathInside $exe $OwnedHome)) { $held += $process }
+        }
+        if ($held.Count -eq 0 -or (Get-Date) -ge $deadline) { return ,$held }
+        Start-Sleep -Milliseconds 500
+    }
+}
+
+function Test-FileFree {
+    # Whether nothing holds a file open: it opens for writing with no sharing, and is closed at once, unchanged. A
+    # running program's own file never opens so. A file that may not be written to at all is not held by anything.
+    param([string]$Path)
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $stream.Dispose()
+        return $true
+    } catch [System.UnauthorizedAccessException] {
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Get-UninstallBlocker {
+    <#
+        What would stop an uninstall part way, found before anything is removed. The v0.6.16 acceptance's uninstall
+        ran with the Dashboard open: the watcher, the sign-in start, the Start menu entry and the plugin went, and
+        then the program files could not - the Dashboard and the runtime python.exe it started held them - and it
+        stopped with half a product left. So the Dashboard is asked to close first, as an update asks it
+        (Close-OwnedDashboard), and then what still runs here (Get-InstallationHolder) and each program file at the
+        root that something holds are named. An empty list: nothing holds the files. Changes nothing but the windows
+        asked to close.
+    #>
+    $blockers = @()
+    if ((Get-OwnedDashboardProcess).Count -gt 0) {
+        Step 'Closing the Dashboard so its files can be removed'
+        $closed = Close-OwnedDashboard
+        if ($closed.Unsaved -gt 0) { $blockers += 'A Dashboard window has unsaved Settings changes: save or undo them, then close it.' }
+        if ($closed.Stuck -gt 0) { $blockers += 'A Dashboard window could not be closed: close it.' }
+        if ($blockers.Count -eq 0) { Ok 'The Dashboard closed' }
+    }
+    if ($blockers.Count -eq 0) {
+        $holders = Get-InstallationHolder
+        foreach ($process in $holders) {
+            $blockers += ([string]$process.Name + ' (process ' + $process.ProcessId + ') is running ' + $process.ExecutablePath)
+        }
+    }
+    foreach ($file in @('CodexAutoResumeSettings.exe', 'codex-auto-resume.ico')) {
+        $path = Join-Path $OwnedHome $file
+        if ((Test-Path -LiteralPath $path -PathType Leaf) -and -not (Test-FileFree $path)) { $blockers += ($path + ' is in use.') }
+    }
+    return ,$blockers
+}
+
 function Invoke-Codex {
     # Native stderr must not become a terminating error: PowerShell 5.1 wraps it in an
     # ErrorRecord, and `codex` writes ordinary progress there. Capture to files instead
@@ -516,18 +728,29 @@ function Remove-OwnUninstallEntry {
         (CODEX_AUTO_RESUME_KEEP_ENTRY) so that this is the only place it goes.
 
         An entry is this installation's when it is installed at this root and its command runs this root's
-        kept uninstaller - the engine's own rule, in the same two conditions. One of the two fixed names, which
-        differ by edition and never exist together; an entry that says anything else is left as it is.
+        kept uninstaller - the engine's own rule, in the same two conditions (addremove.owned): one of the
+        command's arguments after the program it starts is the kept script. Both forms the engine writes are
+        that: PowerShell's `-File "<root>\uninstall\install.ps1"`, and since v0.6.16 the installation's own
+        program, `"<root>\CodexAutoResumeSettings.exe" "--uninstall" "<root>\uninstall\install.ps1"`, which
+        the first version of this read only as the first and so left behind after every uninstall. One of the
+        two fixed names, which differ by edition and never exist together; an entry that says anything else is
+        left as it is.
     #>
     param([string]$Root)
-    $kept = Join-Path (Join-Path $Root 'uninstall') 'install.ps1'
+    $kept = Resolve-Canonical (Join-Path (Join-Path $Root 'uninstall') 'install.ps1')
     foreach ($name in @('CodexAutoResume', 'CodexAutoResumeAdvanced')) {
         try {
             $entry = Read-UninstallEntry $name
             if ($null -eq $entry) { continue }
             $here = (Resolve-Canonical $entry.InstallLocation) -eq (Resolve-Canonical $Root)
             $runs = $false
-            if ($entry.UninstallString -cmatch '-File "([^"]+)"') { $runs = (Resolve-Canonical $Matches[1]) -eq (Resolve-Canonical $kept) }
+            # The command's words as Windows reads them: a quoted one whole, any other up to a space. The first is
+            # the program it starts, and is never the script.
+            $words = @([regex]::Matches([string]$entry.UninstallString, '"([^"]*)"|(\S+)') |
+                       ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } })
+            foreach ($word in @($words | Select-Object -Skip 1)) {
+                if ($kept -and (Resolve-Canonical $word) -eq $kept) { $runs = $true }
+            }
             if ($here -and $runs) {
                 Step 'Removing the entry in Add or remove programs'
                 Remove-UninstallEntry $name
@@ -686,6 +909,15 @@ if ($Uninstall) {
     $OwnedHome = Resolve-Canonical (@($verify)[-1])
     if (-not $OwnedHome -or -not (Test-PathInside $AppDir $OwnedHome)) {
         Fail 'The installation root could not be resolved; nothing was removed.'
+        exit 1
+    }
+    # Before the first removal: the Dashboard asked to close, and nothing else of this installation's left holding
+    # its files (Get-UninstallBlocker). An uninstall that stops here has changed nothing, and says what holds them.
+    $blockers = Get-UninstallBlocker
+    if ($blockers.Count -gt 0) {
+        Fail 'Codex Auto Resume is still in use here, so nothing was removed:'
+        foreach ($line in $blockers) { Write-Host ('       ' + $line) }
+        Write-Host '       Close it, and run this uninstaller again.'
         exit 1
     }
     if (Test-Path $Python) {
@@ -956,12 +1188,29 @@ function Open-ClosedDashboard {
             Warn 'The Dashboard could not be opened again; open it from the Start menu.'
         }
     }
+    # A window of an earlier version, closed by the fallback (Close-OwnedDashboard), wrote no record: it opens on the
+    # page its command line named, else the Overview - one for each window closed so.
+    foreach ($page in @($script:DashboardsFallback)) {
+        if (-not (Test-Path -LiteralPath $dashboard -PathType Leaf)) { break }
+        try {
+            if ($page -cmatch ('^(' + $pages + ')$')) {
+                Start-Process -FilePath $dashboard -ArgumentList ('--page=' + $page) -WorkingDirectory $InstallHome
+            } else {
+                Start-Process -FilePath $dashboard -WorkingDirectory $InstallHome
+            }
+            if ($Updated) { Ok 'The Dashboard was opened again on the new version' }
+            else { Ok 'The Dashboard was opened again' }
+        } catch {
+            Warn 'The Dashboard could not be opened again; open it from the Start menu.'
+        }
+    }
 }
 
 # From here on, the Dashboard windows an update asks to close (below) open again on every way out, through the
 # `finally` at the end - an update that finishes, and one that stops, is refused or is put back alike.
 $script:DashboardsAskedAt = $null
 $script:DashboardsReopened = $false
+$script:DashboardsFallback = @()
 try {
     $upgrade = Test-Path $AppDir
 
@@ -1041,13 +1290,14 @@ try {
     }
 
     # The Dashboard, as the watcher (v0.6.16, the owner: after an update everything runs on the new version). An
-    # open window of this installation is asked to close itself, through its own close: it writes where it was
-    # (config\reopen-after-update-<its process id>.txt) and closes - unless it has unsaved Settings changes, which it keeps, and then
-    # it stays open. This waits a minute for them, as the watcher above is waited for, and goes on either way: a
-    # window that stayed runs the previous version until it is opened again, and says nothing is lost. Nothing is
-    # ended by force. The window opens again where it was once setup has run (below) - and on every other way out
-    # from here, through the `finally` at the end, so an update that stops or is put back leaves it open as it was.
-    # A record an earlier update left, one that stopped before it read it, is never opened: removed before asking.
+    # open window of this installation is asked to close itself (Close-OwnedDashboard): a window of this version
+    # writes where it was (config\reopen-after-update-<its process id>.txt) and closes - unless it has unsaved
+    # Settings changes, which it keeps, and says so, and stays open; a window of an earlier version, which does not
+    # listen, is closed as a person closes it. A window that stayed runs the previous version until it is opened
+    # again, and is said as what it is. Nothing is ended by force. Each window opens again where it was once setup
+    # has run (below) - and on every other way out from here, through the `finally` at the end, so an update that
+    # stops or is put back leaves it open as it was. A record an earlier update left, one that stopped before it
+    # read it, is never opened: removed before asking.
     if ($upgrade) {
         foreach ($stale in @(Get-ChildItem -LiteralPath (Join-Path $InstallHome 'config') -File `
                                            -Filter 'reopen-after-update*.txt' -ErrorAction SilentlyContinue)) {
@@ -1057,26 +1307,17 @@ try {
     $dashboardsOpen = $upgrade -and (Get-OwnedDashboardProcess).Count -gt 0
     if ($dashboardsOpen) {
         Step 'Closing the Dashboard so it opens again on the new version'
-        $script:DashboardsAskedAt = [DateTime]::UtcNow
-        $closeEvents = @()
-        foreach ($root in @($InstallHome, $OwnedHome) | Select-Object -Unique) {
-            try {
-                $closeEvent = New-Object System.Threading.EventWaitHandle($false,
-                    [System.Threading.EventResetMode]::ManualReset, (Get-UpdateEventName $root))
-                [void]$closeEvent.Set()
-                $closeEvents += $closeEvent
-            } catch { }
+        $closed = Close-OwnedDashboard
+        if ($closed.Fallback.Count -gt 0) {
+            Ok 'A Dashboard of an earlier version, which cannot be asked, was closed as a window is closed'
         }
-        $deadline = (Get-Date).AddSeconds(60)
-        while ((Get-Date) -lt $deadline -and (Get-OwnedDashboardProcess).Count -gt 0) {
-            Start-Sleep -Milliseconds 500
-        }
-        foreach ($closeEvent in $closeEvents) { [void]$closeEvent.Reset(); $closeEvent.Dispose() }
-        if ((Get-OwnedDashboardProcess).Count -gt 0) {
+        if ($closed.Unsaved -gt 0) {
             Warn 'A Dashboard window with unsaved changes stayed open; it runs the previous version until it is opened again.'
-        } else {
-            Ok 'The Dashboard closed'
         }
+        if ($closed.Stuck -gt 0) {
+            Warn 'A Dashboard window could not be closed; it runs the previous version until it is opened again.'
+        }
+        if ($closed.Unsaved -eq 0 -and $closed.Stuck -eq 0) { Ok 'The Dashboard closed' }
     }
 
     # Replace only the program directories. Settings, state and logs sit beside them and are
@@ -1119,6 +1360,8 @@ try {
         $plan += @{ src = $pair.src; dst = $pair.dst; aside = $aside }
     }
     $moved = @()
+    # Its own line, so the installer window's step follows the copy rather than staying on what came before it.
+    Step 'Copying the program files into place'
     try {
         if ($plan.Count -gt 0) { Write-CopyJournal -Path $Journal -Root $OwnedHome -Entries $plan }
         foreach ($pair in $plan) {
