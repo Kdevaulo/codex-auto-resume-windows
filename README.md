@@ -20,10 +20,9 @@
 <p align="center"><sub>🇰🇷 <a href="https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/ko/README.md">한국어 README</a> · The app speaks sixteen languages: English · 한국어 · 日本語 · 简体中文 · 繁體中文 · Español · Deutsch · Français · Português (Brasil) · Русский · Italiano · Türkçe · Polski · Українська · Tiếng Việt · Bahasa Indonesia</sub></p>
 
 <p align="center">
-<img src="docs/images/readme-motion.png" alt="The Codex Auto Resume Dashboard at work, drawn by the product's own code from synthetic sample data: the Overview with two recoveries waiting; the pointer opens Pending, then History, Statistics and Diagnostics, opens Settings and scrolls; it changes the interface language to Korean, saves, and the window opens again in Korean" width="796">
+<img src="docs/images/readme-motion.png" alt="The Codex Auto Resume Dashboard at work, drawn by the product's own code from synthetic sample data: the Overview with two recoveries waiting; the pointer opens Pending, then History, Statistics and Diagnostics, opens Settings and scrolls; it changes the interface language to Korean, saves, and the window opens again in Korean" width="750"><br>
+<sub>The exact conversation, by UUID · the reset time Codex reports · fails closed · no telemetry · standard and advanced editions</sub>
 </p>
-
-<p align="center"><sub>The exact conversation, by UUID · the reset time Codex reports · fails closed · no telemetry · standard and advanced editions</sub></p>
 
 Codex stops mid-task and tells you to try again at 6:34 AM. You are asleep at 6:34 AM, and in
 the morning the task is exactly where it stopped.
@@ -140,16 +139,10 @@ The status light breathes wherever it is shown - on the card, in the Dashboard, 
 Codex and on the notification-area icon - and the pictures below breathe with it.
 
 <p align="center">
-<img src="docs/images/notification-card-motion.png" alt="The notification card as the product shows it, drawn by its own code from sample data: example-project, Codex usage limit reached, this task will resume at 08:42; the card fades out and rises in again beside the notification area" width="388">
+<img src="docs/images/notification-card-motion.png" alt="The notification card as the product shows it, drawn by its own code from sample data: example-project, Codex usage limit reached, this task will resume at 08:42; the card fades out and rises in again beside the notification area" width="388" align="top">
+<img src="docs/images/tray-popup.png" alt="The notification-area popup: waiting, with the next check in a minute and a half and three waiting tasks, each with its kind of interruption, when it is next checked and its Auto-resume switch, and Pause recovery and Open Dashboard buttons" width="360" align="top"><br>
+<sub>Left: the notification card, as the product draws it · right: what opens when you click the notification-area icon</sub>
 </p>
-
-<p align="center"><sub>The notification card, as the product draws it</sub></p>
-
-<p align="center">
-<img src="docs/images/tray-popup.png" alt="The notification-area popup: waiting, with the next check in a minute and a half and three waiting tasks, each with its kind of interruption, when it is next checked and its Auto-resume switch, and Pause recovery and Open Dashboard buttons" width="360">
-</p>
-
-<p align="center"><sub>What opens when you click the notification-area icon</sub></p>
 
 <details>
 <summary><b>The Dashboard and the icon, still</b></summary>
@@ -240,7 +233,8 @@ its provenance marker), and Windows registrations that belong to this installati
 
 Built by **songyb111-gachon** with the assistance of two AI development tools, OpenAI Codex and
 Anthropic Claude Code; [CONTRIBUTORS.md](docs/CONTRIBUTORS.md) has the full breakdown. Thanks to everyone who
-reported a problem, suggested a feature or tested a fix - [@cervinho](https://github.com/cervinho), [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [@ZionZhang42](https://github.com/ZionZhang42), [@aca22jy](https://github.com/aca22jy) and [@Hunweibyn](https://github.com/Hunweibyn) among them;
-each is named in the [changelog](docs/CHANGELOG.md) beside what they helped with.
+reported a problem, suggested a feature or tested a fix - [@cervinho](https://github.com/cervinho), [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [@ZionZhang42](https://github.com/ZionZhang42), [@aca22jy](https://github.com/aca22jy), [@Hunweibyn](https://github.com/Hunweibyn), [@Zephreo](https://github.com/Zephreo), [@Kdevaulo](https://github.com/Kdevaulo) and [@weng-wen-jun](https://github.com/weng-wen-jun) among them;
+[CONTRIBUTORS.md](docs/CONTRIBUTORS.md) says what each of them helped with, and the [changelog](docs/CHANGELOG.md)
+names them beside the changes it led to.
 
 MIT. See [LICENSE](LICENSE).

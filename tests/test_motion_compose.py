@@ -120,6 +120,27 @@ class WindowTests(unittest.TestCase):
                       if at(x, y)[3] and not (10 <= x < 78 and 0 <= y < 76))
         self.assertEqual(outside, 0, "nothing beyond the shadow's reach")
 
+    def test_a_clear_canvas_reports_how_much_of_each_edge_is_empty(self):
+        """The README's picture is cut to the union of the window and its shadow: this is what tells it is not."""
+        chrome = compose.WindowChrome(self.still(), (8, 4), size=(100, 100), at=(40, 30), ground=None, scale=1.0)
+        left, top, right, bottom = chrome.empty_border()
+        self.assertGreater(min(left, top, right, bottom), 0, "the shadow does not reach this canvas's edges")
+        tight = compose.WindowChrome(self.still(), (8, 4), size=(100 - left - right, 100 - top - bottom),
+                                     at=(40 - left, 30 - top), ground=None, scale=1.0)
+        self.assertEqual(tight.empty_border(), (0, 0, 0, 0), "cut by that much, nothing is lost and nothing is left")
+        solid = compose.WindowChrome(self.still(), (8, 4), size=(100, 100), at=(40, 30), ground=GROUND, scale=1.0)
+        self.assertEqual(solid.empty_border(), (0, 0, 0, 0), "a canvas with a ground has no clear border")
+
+    def test_a_window_without_a_shadow_is_the_bare_window_on_a_clear_canvas(self):
+        shadowed = compose.WindowChrome(self.still(), (8, 4), size=(100, 100), at=(40, 30), ground=None, scale=1.0)
+        bare = compose.WindowChrome(self.still(), (8, 4), size=(100, 100), at=(40, 30), ground=None, scale=1.0,
+                                    shadow=False)
+        self.assertEqual(bare.empty_border(), (40, 30, 52, 64), "nothing but the 8x6 window's own pixels")
+        self.assertLess(sum(1 for value in bare.base[3::4] if value), sum(1 for value in shadowed.base[3::4] if value))
+        fitted = compose.WindowChrome(self.still(), (8, 4), size=(8, 6), at=(0, 0), ground=None, scale=1.0,
+                                      shadow=False)
+        self.assertEqual(fitted.empty_border(), (0, 0, 0, 0))
+
     def test_the_pointer_on_a_clear_canvas_keeps_its_own_colour_and_coverage(self):
         picture = bytearray(60 * 60 * 4)
         compose.draw_pointer(picture, 60, 60, 20, 10)

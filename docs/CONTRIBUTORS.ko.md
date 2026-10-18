@@ -40,6 +40,24 @@
 - 보안 검토 및 적대적 감사 (3회, 그리고 뮤테이션 테스트, crash-window 매트릭스, 교차 프로세스 경쟁 시험)
 - 공개 배포 준비
 
+## 문제를 알리고, 제안하고, 시험해 주신 분들
+
+아래는 모두 프로젝트 밖에서 도와 주신 분들이며, 처음 도와 주신 순서입니다.
+
+- [@cervinho](https://github.com/cervinho) 님은 모든 복구가 끝나면 컴퓨터를 종료하거나 절전 상태로 두는 기능을
+  요청했습니다([토론 #22](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/22)).
+- [@barkshah2002-pixel](https://github.com/barkshah2002-pixel) 님은 감지되지 않은 사용량 한도 중단을
+  알렸고([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)), 감시자가 다루지 않은 실패한 턴을 이유와 함께 기록하자고 제안했습니다.
+- [@ZionZhang42](https://github.com/ZionZhang42) 님은 그 감지 누락의 원인을 증명했습니다([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+- [@aca22jy](https://github.com/aca22jy) 님은 Codex가 턴을 다른 ID로 기록하는 대화를 알렸고, 그에 앞서 데스크톱 대화에서 감지가 빠진 경우도 알렸습니다([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27), [#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)).
+- [@Hunweibyn](https://github.com/Hunweibyn) 님은 사용량 한도를 미리 지켜보고 안전하게 멈췄다가 다시
+  시작하자고 제안했습니다([#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
+- [@Zephreo](https://github.com/Zephreo) 님은 실행 중이던 목표를 이어서 하자고 제안했습니다([#36](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/36)).
+- [@Kdevaulo](https://github.com/Kdevaulo) 님은 Codex Desktop에서 이어 간 터미널 대화가 복구에서 빠지는 문제([#37](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/37))와
+  GitHub에 닿지 못할 때 잘못 알려 주는 업데이트 상태([#41](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/41))를 알렸습니다.
+- [@weng-wen-jun](https://github.com/weng-wen-jun) 님은 오래된 대기 중 복구를 맞춰 주는 수동 다시 검사를
+  요청했습니다([#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)).
+
 ## AI 기여자에 대한 참고
 
 **OpenAI Codex와 Anthropic Claude Code는 AI 개발 도구이지 인간 기여자나 GitHub 계정이 아닙니다.**

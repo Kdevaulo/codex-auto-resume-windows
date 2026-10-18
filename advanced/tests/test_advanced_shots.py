@@ -315,9 +315,14 @@ class MadeTests(unittest.TestCase):
                                      "the picture is not the one made: run build/advanced_shots.py")
                     _read, envelope = shots_made.read_answers(each.edition, each.variant, locale,
                                                               shots_made.reads_report(each.edition, each.variant))
+                    recorded_parts = manifest.get("parts", {}).get(shots_made.manifest_key(each, locale), {})
+                    parts = shots_made.envelope_parts(envelope)
+                    moved = sorted(name for name in set(parts) | set(recorded_parts)
+                                   if parts.get(name) != recorded_parts.get(name))
                     self.assertEqual(manifest["inputs"].get(shots_made.manifest_key(each, locale)),
                                      shots_made.render_input(each, envelope),
-                                     "what %s is made from moved: run build/advanced_shots.py" % key)
+                                     "what %s is made from moved: run build/advanced_shots.py (reads that moved: %s)"
+                                     % (key, ", ".join(moved) or "none - a file it is made from"))
                     self.assertTrue(manifest["fidelity"] and all(result["passed"] for name, result in
                                                                  manifest["fidelity"].items() if name != "window"))
 

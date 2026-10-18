@@ -8,8 +8,8 @@
     python -X utf8 build/make_motion.py logo-light logo-dark   # the README's logo, moving (build/motion_logo.py)
     python -X utf8 build/make_motion.py --all           # all six: the final's picture pass
 
-The README's two show the Dashboard alone, everything outside the window transparent (RGBA); the card's two the
-card appearing as the product shows it, on the canvas colour; the logos the icon's own watching motion.
+The README's two show the Dashboard alone, the window bare, with no shadow (RGBA, its rounded corners clear);
+the card's two the card appearing as the product shows it, on the canvas colour; the logos the icon's own watching motion.
 
 A plan (build/motion_plan.py, build/motion/*.json) says what a person does, scene by scene, on one clock. Each frame
 is then drawn:
@@ -201,8 +201,16 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
         still = shots.read_png(ROOT / plan["window"]["still"])
         chrome = motion_compose.WindowChrome(still, tuple(result["client"]), size=(width, height),
                                              at=tuple(plan["window"]["at"]), ground=ground,
+                                             shadow=bool(canvas.get("shadow", True)),
                                              scale=float(result.get("dpi_scale") or 1.5))
         origin = chrome.client_origin()
+        # A clear canvas is exactly the union of the window and its shadow, if it has one: an empty border would
+        # only push the picture's caption away on the page (the owner, 2026-10-19). The pointer stays on the window.
+        border = chrome.empty_border()
+        if clear and any(border):
+            raise SystemExit("the canvas %dx%d has an empty border (left, top, right, bottom) of %s: make it "
+                             "smaller by that and move the window and the pointer's rest by the left and top"
+                             % (width, height, border))
     else:
         pictures, chrome, origin = None, None, (0, 0)
         plain = bytes(width * height * 4) if clear else bytes(ground) * (width * height)

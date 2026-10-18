@@ -41,6 +41,25 @@ Project creator and maintainer. Copyright holder.
   a cross-process race test)
 - Public release preparation
 
+## People who reported, suggested and tested
+
+Everyone below is a person outside the project who helped it, in the order they first did.
+
+- [@cervinho](https://github.com/cervinho) asked for the computer to shut down or sleep once every recovery has
+  finished ([discussion #22](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/22)).
+- [@barkshah2002-pixel](https://github.com/barkshah2002-pixel) reported a usage-limit interruption that was not
+  detected ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)) and suggested logging every failed turn the watcher does not take up, with why.
+- [@ZionZhang42](https://github.com/ZionZhang42) proved the cause of that missed detection ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+- [@aca22jy](https://github.com/aca22jy) reported a missed detection on a desktop conversation ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)) and then a conversation whose turns Codex
+  records under another id ([#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)).
+- [@Hunweibyn](https://github.com/Hunweibyn) suggested watching the usage limit ahead of time, with a safe pause
+  and resume ([#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
+- [@Zephreo](https://github.com/Zephreo) suggested resuming a goal that was running ([#36](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/36)).
+- [@Kdevaulo](https://github.com/Kdevaulo) reported a terminal conversation continued in the Codex Desktop that
+  was left out of recovery ([#37](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/37)) and an update status that misled when GitHub could not be reached ([#41](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/41)).
+- [@weng-wen-jun](https://github.com/weng-wen-jun) asked for a manual rescan that reconciles obsolete
+  pending recoveries ([#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)).
+
 ## A note on the AI contributors
 
 **OpenAI Codex and Anthropic Claude Code are AI development tools, not human contributors or GitHub

@@ -26,24 +26,25 @@
   },
   "canvas": {
     "size": [
-      1592,
-      1133
+      1500,
+      1041
     ],
     "transparent": true,
+    "shadow": false,
     "theme": "light",
     "design": "soft"
   },
   "window": {
     "at": [
-      46,
-      37
+      0,
+      0
     ],
     "still": "assets/screenshot-dashboard.png"
   },
   "pointer": {
     "rest": [
-      1200,
-      580
+      1154,
+      543
     ],
     "scale": 1.5
   },

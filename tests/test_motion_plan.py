@@ -18,6 +18,7 @@ for _path in (str(ROOT / "src"), str(ROOT / "build")):
         sys.path.insert(0, _path)
 
 import make_motion  # noqa: E402
+import motion_compose  # noqa: E402
 import motion_plan  # noqa: E402
 from motion_plan import PlanError  # noqa: E402
 
@@ -76,6 +77,25 @@ class ReadmePlanTests(unittest.TestCase):
                 self.assertEqual(pages[0], "overview")
                 self.assertEqual(next(page for page in pages if page != "overview"), "pending")
 
+    def test_the_readme_pictures_are_exactly_the_bare_window(self):
+        """The owner, 2026-10-19: the caption stood too far from the picture, first for an empty margin round the
+        window, then for its drop shadow, which a dark page does not show. The canvas is the window itself, 1500x1041
+        like the still window pictures, with no shadow, and the pointer rests on it."""
+        import make_screenshots as shots
+        still = shots.read_png(ROOT / "assets" / "screenshot-dashboard.png")
+        for name in make_motion.PLAN_NAMES:
+            with self.subTest(name):
+                plan = motion_plan.load(make_motion.plan_path(name))
+                width, height = plan["canvas"]["size"]
+                self.assertEqual((width, height), (still[0], still[1]))
+                self.assertEqual(plan["window"]["at"], [0, 0])
+                self.assertIs(plan["canvas"].get("shadow"), False)
+                chrome = motion_compose.WindowChrome(still, (still[0], still[1] - 1), size=(width, height),
+                                                     at=tuple(plan["window"]["at"]), ground=None, scale=1.5,
+                                                     shadow=False)
+                self.assertEqual(chrome.empty_border(), (0, 0, 0, 0))
+                x, y = plan["pointer"]["rest"]
+                self.assertTrue(0 <= x < width and 0 <= y < height)
 
 class CardPlanTests(unittest.TestCase):
     def test_the_card_on_its_own_is_planned_in_both_languages_and_drawn_only_when_named(self):
@@ -89,7 +109,8 @@ class CardPlanTests(unittest.TestCase):
                 self.assertEqual(plan["output"], output)
                 self.assertNotIn("window", plan)
                 self.assertNotIn("taskbar", plan)
-                self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]), ([776, 600], 2.0))
+                self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]),
+                                 ([776, {"card-en": 540, "card-ko": 524}[name]], 2.0))
                 self.assertLessEqual(plan["budget"]["cap"], 4000000)
                 frames = motion_plan.expand(plan)
                 from codex_auto_resume import notice_card

@@ -20,10 +20,9 @@
 <p align="center"><sub>🇺🇸 <a href="README.md">English README</a> · 프로그램은 열여섯 개 언어로 표시됩니다: English · 한국어 · 日本語 · 简体中文 · 繁體中文 · Español · Deutsch · Français · Português (Brasil) · Русский · Italiano · Türkçe · Polski · Українська · Tiếng Việt · Bahasa Indonesia</sub></p>
 
 <p align="center">
-<img src="docs/images/readme-motion-ko.png" alt="합성한 예시 데이터로 제품 자신의 그리기 코드가 그린 Codex Auto Resume 대시보드의 동작. 복구 2건이 대기 중인 개요, 포인터가 대기 중을 열고 기록·통계·진단을 차례로 누른 뒤 설정을 열어 스크롤, 화면 언어를 English로 바꿔 저장하자 창이 영어로 다시 열림" width="796">
+<img src="docs/images/readme-motion-ko.png" alt="합성한 예시 데이터로 제품 자신의 그리기 코드가 그린 Codex Auto Resume 대시보드의 동작. 복구 2건이 대기 중인 개요, 포인터가 대기 중을 열고 기록·통계·진단을 차례로 누른 뒤 설정을 열어 스크롤, 화면 언어를 English로 바꿔 저장하자 창이 영어로 다시 열림" width="750"><br>
+<sub>UUID로 찾는 바로 그 대화 · Codex가 알려 주는 초기화 시각 · 확실하지 않으면 기다림 · 텔레메트리 없음 · 표준판과 고급판</sub>
 </p>
-
-<p align="center"><sub>UUID로 찾는 바로 그 대화 · Codex가 알려 주는 초기화 시각 · 확실하지 않으면 기다림 · 텔레메트리 없음 · 표준판과 고급판</sub></p>
 
 Codex가 작업 도중에 멈추고 오전 6시 34분에 다시 해 보라고 말합니다. 오전 6시 34분에 사용자는
 자고 있고, 아침에 보면 작업은 멈춘 그 자리 그대로입니다.
@@ -136,16 +135,10 @@ codex plugin add codex-auto-resume@codex-auto-resume-windows
 그렇고, 아래 그림들도 함께 숨 쉽니다.
 
 <p align="center">
-<img src="docs/images/notification-card-motion-ko.png" alt="제품이 보여 주는 그대로의 알림 카드. 제품의 코드가 예시 데이터로 그렸습니다: example-project, Codex 사용 한도 도달, 이 작업은 08:42에 다시 이어집니다. 카드가 사라졌다가 알림 영역 옆에 다시 떠오릅니다" width="388">
+<img src="docs/images/notification-card-motion-ko.png" alt="제품이 보여 주는 그대로의 알림 카드. 제품의 코드가 예시 데이터로 그렸습니다: example-project, Codex 사용 한도 도달, 이 작업은 08:42에 다시 이어집니다. 카드가 사라졌다가 알림 영역 옆에 다시 떠오릅니다" width="388" align="top">
+<img src="docs/images/tray-popup-ko.png" alt="알림 영역 팝업. 대기 중 상태, 약 1분 30초 뒤 다음 확인, 대기 중인 작업 세 개가 각각 중단 종류, 다음 확인 시각, 자동 이어 가기 스위치와 함께 보이고, 자동 복구 일시 정지와 대시보드 열기 버튼" width="360" align="top"><br>
+<sub>왼쪽: 제품이 그리는 알림 카드 · 오른쪽: 알림 영역 아이콘을 누르면 열리는 창</sub>
 </p>
-
-<p align="center"><sub>제품이 그리는 알림 카드</sub></p>
-
-<p align="center">
-<img src="docs/images/tray-popup-ko.png" alt="알림 영역 팝업. 대기 중 상태, 약 1분 30초 뒤 다음 확인, 대기 중인 작업 세 개가 각각 중단 종류, 다음 확인 시각, 자동 이어 가기 스위치와 함께 보이고, 자동 복구 일시 정지와 대시보드 열기 버튼" width="360">
-</p>
-
-<p align="center"><sub>알림 영역 아이콘을 누르면 열리는 창</sub></p>
 
 <details>
 <summary><b>대시보드와 아이콘, 정지 그림</b></summary>
@@ -234,7 +227,7 @@ Windows **설정 > 앱**에서 제거하거나, 설치 프로그램을 다시 �
 
 **songyb111-gachon**이 두 AI 개발 도구, OpenAI Codex와 Anthropic Claude Code의 도움을 받아 만들었습니다. 자세한 내용은
 [CONTRIBUTORS.ko.md](docs/CONTRIBUTORS.ko.md)에 있습니다. 문제를 알려 주시고, 기능을 제안하고, 고친 버전을 시험해 주신
-모든 분께 감사드립니다([@cervinho](https://github.com/cervinho), [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [@ZionZhang42](https://github.com/ZionZhang42), [@aca22jy](https://github.com/aca22jy), [@Hunweibyn](https://github.com/Hunweibyn) 님 등). 도와주신 분의 이름은 [변경 기록](docs/CHANGELOG.ko.md)에서
-그 항목 옆에 적어 두었습니다.
+모든 분께 감사드립니다([@cervinho](https://github.com/cervinho), [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [@ZionZhang42](https://github.com/ZionZhang42), [@aca22jy](https://github.com/aca22jy), [@Hunweibyn](https://github.com/Hunweibyn), [@Zephreo](https://github.com/Zephreo), [@Kdevaulo](https://github.com/Kdevaulo), [@weng-wen-jun](https://github.com/weng-wen-jun) 님 등). 각자 무엇을 도와주셨는지는 [CONTRIBUTORS.ko.md](docs/CONTRIBUTORS.ko.md)에 적었고,
+그로 인해 바뀐 것은 [변경 기록](docs/CHANGELOG.ko.md)의 그 항목 옆에 이름과 함께 적어 두었습니다.
 
 MIT. [LICENSE](LICENSE)를 참고하세요.

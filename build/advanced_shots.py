@@ -419,6 +419,10 @@ def read_answers(edition: str, variant: str, locale: str, report: bool = False) 
             # the pictures are drawn on answers: no sleep state, hibernation and shutting down offered.
             from unittest import mock
             from codex_auto_resume.win import powerdown
+            # Who may open the state folder (win/acl) is read from the folder's real access list, which a CI runner's
+            # accounts answer differently: pinned as an installation answers it, owner only.
+            from codex_auto_resume.win import acl
+            stack.enter_context(mock.patch.object(acl, "state_access", return_value="owner_only"))
             stack.enter_context(mock.patch.object(powerdown, "available", side_effect=lambda action: {
                 powerdown.SLEEP: (False, powerdown.NO_SLEEP_STATE), powerdown.HIBERNATE: (True, None),
                 powerdown.SHUT_DOWN: (True, None)}.get(action, (False, None))))
@@ -562,6 +566,17 @@ def render_input(each: Shot, envelope: str) -> str:
     return hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
 
 
+def envelope_parts(envelope: str) -> dict:
+    """{"NN command": digest} for each read of an envelope, in order: recorded beside a picture's input so that when the
+    input reads as moved, the test can name the reads that moved instead of a bare digest (a CI runner answered some of
+    them differently from the PC the pictures were drawn on)."""
+    parts = {}
+    for index, line in enumerate(envelope.splitlines()):
+        command = json.loads(line).get("command", "?") if line.strip() else "?"
+        parts["%02d %s" % (index, command)] = hashlib.sha256(line.encode("utf-8")).hexdigest()[:16]
+    return parts
+
+
 def manifest_key(each: Shot, locale: str) -> str:
     return "<advanced shot:%s:%s>" % (each.name, locale)
 
@@ -612,7 +627,7 @@ def make(shots_wanted: list, locales, out: Path, work: Path) -> dict:
             path = target(each, locale, out)
             path.parent.mkdir(parents=True, exist_ok=True)
             shots.write_file(path, png(width, height, rgb, alpha))
-            made[(each.name, locale)] = (path, render_input(each, envelopes[locale]))
+            made[(each.name, locale)] = (path, render_input(each, envelopes[locale]), envelope_parts(envelopes[locale]))
             print("%-10s %-3s %s" % (each.name, locale, path))
     return made
 
@@ -667,9 +682,10 @@ def main(argv=None) -> int:
                 raise SystemExit("the window drawn offscreen is not the captured one on %s" % ", ".join(failed))
         made = make(wanted, locales, out or OUT, work)
         if real:
-            for (shot_name, locale), (path, inputs) in sorted(made.items()):
+            for (shot_name, locale), (path, inputs, parts) in sorted(made.items()):
                 key = str(path.relative_to(ROOT)).replace("\\", "/")
                 manifest["inputs"][manifest_key(shot(shot_name), locale)] = inputs
+                manifest.setdefault("parts", {})[manifest_key(shot(shot_name), locale)] = parts
                 manifest["images"][key] = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                                            "size": shots.dimensions(path)}
             write_manifest(manifest)

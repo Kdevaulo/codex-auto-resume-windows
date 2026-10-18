@@ -151,9 +151,11 @@ class WindowChrome:
     kept, the frame cut away, the corners Windows rounds left clear); `client` the client area's size the render
     mode drew. The window's top-left goes at `at` on a canvas `size` in `ground`'s colour - or, with `ground` None,
     on a clear canvas: RGBA, every pixel outside the window and its shadow wholly transparent, the shadow and the
-    corners Windows rounds laid with their alpha, so the picture sits on any page."""
+    corners Windows rounds laid with their alpha, so the picture sits on any page. With `shadow` false there is none
+    (the README's: on a dark page a shadow only reads as empty space), and the canvas is the bare window."""
 
-    def __init__(self, still: tuple, client: tuple, *, size: tuple, at: tuple, ground, scale: float = 1.5):
+    def __init__(self, still: tuple, client: tuple, *, size: tuple, at: tuple, ground, scale: float = 1.5,
+                 shadow: bool = True):
         width, height, rgb, alpha = still
         client_w, client_h = client
         if width != client_w or height < client_h:
@@ -166,7 +168,8 @@ class WindowChrome:
         self.bpp = 3 if ground is not None else 4
         base = bytearray(bytes(ground) * (canvas_w * canvas_h)) if ground is not None else bytearray(
             canvas_w * canvas_h * 4)
-        self._shadow(base, scale)
+        if shadow:
+            self._shadow(base, scale)
         left, top = at
         for y in range(height):
             for x in range(width):
@@ -201,6 +204,27 @@ class WindowChrome:
             for x in xs:
                 level = int(round(255 * SHADOW_ALPHA * row * across[x]))
                 _blend(base, canvas_w, canvas_h, x, y, (0, 0, 0), level)
+
+    def empty_border(self) -> tuple:
+        """(left, top, right, bottom): how many columns and rows at each edge of a clear canvas hold nothing at all -
+        no window, no shadow, every pixel wholly transparent. A picture drawn as it should be has none of them. The
+        client area is every frame's own, so it counts here as the window's pixels the corners leave covered."""
+        if self.bpp != 4:
+            return 0, 0, 0, 0
+        width, height = self.size
+        covered = bytearray(1 if value else 0 for value in self.base[3::4])
+        left, top = self.at
+        for y in range(self.height):
+            if not 0 <= top + y < height:
+                continue
+            for x in range(self.width):
+                if 0 <= left + x < width and (self.alpha is None or self.alpha[y * self.width + x]):
+                    covered[(top + y) * width + left + x] = 1
+        rows = [i for i in range(height) if any(covered[i * width:(i + 1) * width])]
+        if not rows:
+            return width, height, width, height
+        columns = [x for y in rows for x in range(width) if covered[y * width + x]]
+        return min(columns), rows[0], width - 1 - max(columns), height - 1 - rows[-1]
 
     def client_origin(self) -> tuple:
         """Where the client area's top-left is on the canvas."""
