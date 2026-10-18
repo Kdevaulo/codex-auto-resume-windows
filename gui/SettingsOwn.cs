@@ -231,7 +231,9 @@ namespace CodexAutoResume
                 string argument = "{\"name\":" + Json.Escape(name) + ",\"value\":" + Json.Escape(value) + "}";
                 CallAsync("check-setting", argument, delegate(Dictionary<string, object> reply)
                 {
-                    answer(Ok(reply) ? Str(Map(reply, "result"), "value") : null);
+                    // The value as the bridge will store it, or null where the settings' own rule refused it.
+                    string stored = Ok(reply) ? Str(Map(reply, "result"), "value") : null;
+                    answer(stored);
                 });
             }, taken);
         }
