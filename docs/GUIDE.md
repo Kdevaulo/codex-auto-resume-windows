@@ -299,7 +299,8 @@ deliver is switched off, and Observe only, if it is on, becomes a pause. A watch
 within the minute gets nothing installed and its state left as it was, but it was asked to stop and may
 still do so afterwards, and nothing starts it again then: if the header says it is not running, press
 **Start watcher**. A conversion that fails starts the watcher again and installs nothing. Then the version's own installer runs, keeping every record, your pause and the
-sign-in choice. While all this runs, every action button on the page is greyed, **Start watcher**
+sign-in choice. A version older than v0.6.16 knows neither the entry in Settings > Apps nor the uninstaller kept
+for it, so picking one over an installation that has them first removes both. While all this runs, every action button on the page is greyed, **Start watcher**
 included.
 
 Afterwards the window says whether the watcher now runs the version installed, and, where the state was
@@ -935,7 +936,7 @@ Dashboard** opens the Dashboard on its Pending page and does nothing more.
 From v0.6.16 a click on the notification itself - the card's face, or the body of Windows' own
 notification - opens the Dashboard on the page the notification is about: the page its **Open
 Dashboard** button opens, or, for a notification without that button, Pending while a continuation is
-being sent and History once it has ended. The card then goes, as a click always made it go; a right
+being sent, History once it has ended, Settings for the power action's, and otherwise the Overview. The card then goes, as a click always made it go; a right
 click only puts it away, and the buttons do what they always did.
 
 A notification goes away by itself after a while. **Keep on screen until clicked**, under Settings >
@@ -944,7 +945,8 @@ starting, resumed, could not resume, stopped trying, cancelled, a conversation t
 waiting after a long sleep, the watcher's memory, and the power action after usage-limit recoveries;
 the advanced edition adds its usage meter's warning and each of its three notices about a stop near a
 limit - and a kind ticked there stays on screen until
-you click it: the card stays beside the notification area, and Windows' own notification stays as a
+you click it or a newer notification needs its place (at most three cards stack, and the oldest is pushed
+out): the card stays beside the notification area, and Windows' own notification stays as a
 reminder until you close it, with a button to close it where it has none. None is ticked at first.
 
 From v0.6.11 a conversation can ask more of you first (see
@@ -1580,8 +1582,8 @@ Uninstall is deliberately conservative:
 
 - It asks the watcher to stop first. If a watcher is still running, **or if it cannot verify
   whether one is running**, it aborts before removing anything.
-- It removes the sign-in autostart value and the notification identity only while they belong
-  to **this** installation. A value that starts a different copy of the tool is reported and
+- It removes the sign-in autostart value, the notification identity and the Add or remove programs
+  entry only while they belong to **this** installation. A value that starts a different copy of the tool is reported and
   kept, never silently removed. The Start Menu entry is kept while the notification identity
   belongs to a different installation; if no notification identity is registered at all, the
   entry at its fixed location is removed without an ownership check.
@@ -1616,7 +1618,11 @@ plugin and its local marketplace, and a marketplace already registered under thi
 name (`codex-auto-resume-windows`) is repointed at this installation. Installing also asks
 Codex to refresh marketplaces. The v0.5.7 installer refreshes every Git marketplace you have
 configured. Refreshing only `codex-auto-resume-windows` is new in v0.6.0. `Uninstall.cmd` asks
-the `codex` CLI to unregister the plugin and its marketplace, only while they still point here.
+the `codex` CLI to unregister the plugin and its marketplace, only while they still point here. From v0.6.16
+installing also writes the entry in Add or remove programs - one per-user key under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall`, `CodexAutoResume`, to which the other edition's adds its
+word - and keeps a copy of the installer's own uninstall in the installation (`uninstall\install.ps1`) for the
+entry to name; uninstalling removes the entry, only while it names this installation.
 
 Design rules enforced in code:
 
