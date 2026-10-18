@@ -35,7 +35,7 @@ From v0.6.16 both Setup programs meet what the community repository asks of an i
   installation: HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\CodexAutoResume (the advanced edition:
   CodexAutoResumeAdvanced), with `DisplayName` "Codex Auto Resume" ("Codex Auto Resume Advanced"), `DisplayVersion`,
   `Publisher` "songyb111-gachon", `InstallLocation`, `UninstallString`, `QuietUninstallString` (with `-Silent`),
-  `NoModify` and `NoRepair`. The manifest's `AppsAndFeaturesEntries` repeats the name, publisher and version, which is
+  `NoModify`, `NoRepair` and `DisplayIcon` (the installed program's icon). The manifest's `AppsAndFeaturesEntries` repeats the name, publisher and version, which is
   how winget matches them. Both uninstall commands run the installer's kept copy of itself in
   `%USERPROFILE%\.codex-auto-resume\uninstall\`: the quiet one directly, with `-Silent` and no window, and the other
   through the installation's Dashboard program (`CodexAutoResumeSettings.exe --uninstall <that script>`), which shows

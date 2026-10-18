@@ -496,6 +496,24 @@ class KeyTests(Entry):
         self.assertEqual(sorted(values), sorted(["DisplayName", "DisplayVersion", "Publisher", "InstallLocation",
                                                  "UninstallString", "QuietUninstallString", "NoModify", "NoRepair"]))
 
+    def test_the_entry_shows_the_installed_programs_icon(self):
+        """The v0.6.16 acceptance found DisplayIcon empty, so Settings > Apps showed the entry with no icon. It
+        names the icon file the installer puts in the home, else the Dashboard program's own first icon; a home
+        with neither gets no DisplayIcon rather than one naming nothing, and an update adds it to an entry written
+        without it."""
+        addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
+        self.assertNotIn("DisplayIcon", self.values(), "nothing there to name")
+        (self.home / addremove.WINDOW).write_bytes(b"MZ not a program")
+        self.assertEqual(addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume"),
+                         ["wrote CodexAutoResume"], "the icon is added to an entry that had none")
+        self.assertEqual(self.values()["DisplayIcon"], str(self.home / "CodexAutoResumeSettings.exe") + ",0")
+        (self.home / "codex-auto-resume.ico").write_bytes(b"\x00\x00\x01\x00")
+        addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
+        self.assertEqual(self.values()["DisplayIcon"], str(self.home / "codex-auto-resume.ico"))
+        self.assertEqual(addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume"), [],
+                         "a repeat writes nothing: the icon is read back with the rest")
+        self.assertEqual(addremove.ICON, config.Paths(self.home).icon_file.name)
+
     def test_the_commands_run_the_kept_installer_by_full_paths_and_the_quiet_one_adds_the_switch(self):
         addremove.register(self.home, "standard", "1.2.3", "Codex Auto Resume")
         values = self.values()
