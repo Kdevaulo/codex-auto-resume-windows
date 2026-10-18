@@ -748,6 +748,58 @@ class LayoutAuditTests(unittest.TestCase):
         self.assertIn("/pages/options :: SoftCheck", report, "the options page was laid out and looked at")
 
 
+PRESENT = r"""
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+$assembly = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
+$present = $assembly.GetType('CodexAutoResume.SettingsRemove', $true).GetMethod('Present', [Reflection.BindingFlags]'Static,NonPublic')
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'installer-window-present-probe'
+$form.StartPosition = 'Manual'
+$form.Location = New-Object System.Drawing.Point(-2000, -2000)
+$form.Size = New-Object System.Drawing.Size(200, 120)
+# As Windows handed the uninstall window out on the acceptance's PC: iconic from the start.
+$form.WindowState = 'Minimized'
+$null = $present.Invoke($null, [object[]]@($form.PSObject.BaseObject))
+$script:shown = $false
+$form.add_Shown({ $script:shown = $true })
+$form.Show()
+$deadline = (Get-Date).AddSeconds(10)
+while (-not $script:shown -and (Get-Date) -lt $deadline) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 }
+[System.Windows.Forms.Application]::DoEvents()
+$state = [string]$form.WindowState
+$form.Close(); $form.Dispose()
+@{ shown = $script:shown; state = $state } | ConvertTo-Json -Compress
+"""
+
+
+@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
+class UninstallWindowTests(unittest.TestCase):
+    """The uninstall window came up iconic - only on the taskbar - whether it was started from Settings > Apps or
+    run directly (v0.6.16 acceptance): the copy that shows it is started by the program in the installation, which
+    ends first. SettingsRemove.Present opens it normal and in front; here a window handed out minimized, as that one
+    was, is shown through it, off screen, and comes up normal."""
+
+    def test_the_uninstall_window_opens_normal_and_in_front(self):
+        removing = guiscan.member_body("SettingsRemove", "Removing")
+        self.assertLess(removing.index("Present(window);"), removing.index("Application.Run(window);"))
+        refuse = guiscan.member_body("SettingsRemove", "Refuse")
+        self.assertLess(refuse.index("Present(window);"), refuse.index("Application.Run(window);"))
+        self.assertIn("AllowSetForegroundWindow(copied.Id);", guiscan.member_body("SettingsRemove", "CopyAndStart"))
+        work = Path(tempfile.mkdtemp(prefix="installer-present-"))
+        try:
+            exe = work / "CodexAutoResumeSettings.exe"
+            subprocess.run([str(CSC), "/nologo", "/target:winexe", "/platform:x64", "/out:" + str(exe),
+                            "/reference:System.dll", "/reference:System.Drawing.dll",
+                            "/reference:System.Windows.Forms.dll", *[str(path) for path in guiscan.sources()]],
+                           check=True, capture_output=True, timeout=300, creationflags=NO_WINDOW)
+            done = _powershell(PRESENT, work, 120, CAR_EXE=str(exe))
+            self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+            self.assertEqual(json.loads(done.stdout.strip().splitlines()[-1]), {"shown": True, "state": "Normal"})
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+
 class SourceTests(unittest.TestCase):
     def test_it_is_built_into_the_window_and_the_setup_programs_from_one_list(self):
         self.assertEqual(guiscan.group("installer"), ("gui/InstallerFlow.cs", "gui/InstallerWindow.cs"))
