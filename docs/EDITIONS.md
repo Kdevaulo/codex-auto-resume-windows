@@ -800,9 +800,10 @@ the percentage you set for a warning (85% by default, each window its own), it s
 window. Each window - the five-hour and the weekly - can be switched off on its own (*Act on the five-hour
 window*, *Act on the weekly window*): it is still read and shown, and no warning is shown for it. These two
 switches decide only the warnings: Wrap up near a limit and Stop near a limit each have a pair of their own.
-Every on/off choice on the page is a switch; every number on the page has *Custom...* beside its
-choices, checked before it is saved - a whole percentage from 1 to 100, a spacing from 5 to 60 minutes - and
-for each window the warning stays at or below the wrap-up, and the wrap-up below the stop its words ask for.
+Every on/off choice on the page is a switch; every number on the page has *Custom...* beside its choices,
+which opens a small dialog for a number of your own, as on the Settings page, checked before it is saved - a
+whole percentage from 1 to 100, a spacing from 5 to 60 minutes - and for each window the warning stays at or
+below the wrap-up, and the wrap-up below the stop its words ask for.
 The reading is only shown: whether a recovery may go is still decided by the reading the program makes when
 a recovery is due.
 
