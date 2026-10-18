@@ -313,7 +313,8 @@ class MadeTests(unittest.TestCase):
                     self.assertIsNotNone(recorded, "%s is not in assets/advanced-shots.json" % key)
                     self.assertEqual(recorded["sha256"], hashlib.sha256(path.read_bytes()).hexdigest(),
                                      "the picture is not the one made: run build/advanced_shots.py")
-                    _read, envelope = shots_made.read_answers(each.edition, each.variant, locale, each.report)
+                    _read, envelope = shots_made.read_answers(each.edition, each.variant, locale,
+                                                              shots_made.reads_report(each.edition, each.variant))
                     self.assertEqual(manifest["inputs"].get(shots_made.manifest_key(each, locale)),
                                      shots_made.render_input(each, envelope),
                                      "what %s is made from moved: run build/advanced_shots.py" % key)

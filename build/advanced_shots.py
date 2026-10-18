@@ -569,6 +569,13 @@ def write_manifest(manifest: dict) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------- making them
+def reads_report(edition: str, variant: str) -> bool:
+    """Whether the answers of `edition`'s pictures of `variant` include the report's: every picture of the pair is drawn
+    from one reading, so as soon as one of them shows the report, all of them are read - and recorded - with it, whichever
+    of them a run draws (P1-after's and P4-after's inputs once missed what P5 put into their shared answers)."""
+    return any(shot.report for shot in SHOTS if (shot.edition, shot.variant) == (edition, variant))
+
+
 def make(shots_wanted: list, locales, out: Path, work: Path) -> dict:
     """Draws `shots_wanted` in `locales` into `out`; {(name, locale): (path, render input)}."""
     import make_screenshots as shots
@@ -582,7 +589,7 @@ def make(shots_wanted: list, locales, out: Path, work: Path) -> dict:
     for (edition, variant), group in sorted(groups.items()):
         if edition not in exes:
             exes[edition] = compile_window(work / ("window-" + edition), edition)
-        report = any(each.report for each in group)
+        report = reads_report(edition, variant)
         forms, envelopes = {}, {}
         for locale in locales:
             read, envelopes[locale] = read_answers(edition, variant, locale, report)
