@@ -67,7 +67,10 @@ TEST_ENTRIES = {"Install.cmd": b"@echo off\r\nexit /b 0\r\n",
 
 # install.ps1's lines in the order a first installation prints them, the bootstrap's -Update before its own, and the
 # uninstall's: what the bar is read from (FlowTests), each one checked against the scripts (ScriptTests).
-INSTALLING = ["", "Codex Auto Resume", "edition: standard", "  [ok] Found Codex", "  Installing program files",
+INSTALLING = ["", "Codex Auto Resume", "edition: standard", "  [ok] Found Codex", "  Updating program files",
+              "  Stopping the running watcher so the new version takes over", "  [ok] The previous watcher stopped",
+              "  Closing the Dashboard so it opens again on the new version", "  [ok] The Dashboard closed",
+              "  Copying the program files into place",
               "  [ok] Bundled Python 3.13 (no system Python needed)", "  Registering the Codex plugin",
               "  [ok] Codex plugin installed", "  Setting up the watcher", "    (the setup step's words, in any language)",
               "  Checking the installation", "Installed and running."]
@@ -76,11 +79,36 @@ UPDATING = ["Codex Auto Resume - setting up", "edition: standard",
             "  Downloading v9.9.9 from github.com over HTTPS.", "  [ok] SHA-256 matches the digest pinned in this plugin",
             "  [ok] Archive contents verified as Codex Auto Resume v9.9.9", "  Installing", "edition: standard",
             "  [ok] Found Codex", "  Updating program files", "  Stopping the running watcher so the new version takes over",
+            "  Closing the Dashboard so it opens again on the new version", "  Copying the program files into place",
             "  [ok] Bundled Python 3.13 (no system Python needed)", "  Registering the Codex plugin",
             "  Setting up the watcher", "  Checking the installation", "Updated. Your settings and pending recoveries were kept."]
-REMOVING = ["Codex Auto Resume", "  Removing the watcher, autostart, notification identity and Start Menu entry",
+REMOVING = ["Codex Auto Resume", "  Closing the Dashboard so its files can be removed", "  [ok] The Dashboard closed",
+            "  Removing the watcher, autostart, notification identity and Start Menu entry",
             "  Removing the Codex plugin", "  Removing the marketplace this installation registered",
             "  Removing program files", "Removed. Settings and pending recoveries were kept."]
+
+# A changelog section as the release's are written: a title, a link line, wrapped paragraphs with emphasis, links
+# and code, headings and a list whose items wrap (the acceptance's notes page, 2026-10-18).
+NOTES_SAMPLE = ("v9.9.9 — A title\n\n"
+                "[The commits in this release](https://example.com/compare/v9.9.8...v9.9.9)\n\n"
+                "**From v9.9.8, an ordinary update.** v9.9.8's *Check for updates*\n"
+                "offers it, the final of a line that went out\n"
+                "in four pre-releases ([beta](#v999-beta) and [beta.2](#v999-beta2)).\n\n"
+                "### Both editions\n\n"
+                "#### New\n\n"
+                "- **Rescan** on the Pending page. It reads `reopen-after-update*.txt` and\n"
+                "  `*.old-*` folders, once you confirm.\n"
+                "- A *second* item.\n"
+                "1. A numbered one\n")
+NOTES_READABLE = ("v9.9.9 — A title\r\n\r\n"
+                  "From v9.9.8, an ordinary update. v9.9.8's Check for updates offers it, the final of a line that "
+                  "went out in four pre-releases (beta and beta.2).\r\n\r\n"
+                  "Both editions\r\n\r\n"
+                  "New\r\n\r\n"
+                  "• Rescan on the Pending page. It reads reopen-after-update*.txt and *.old-* folders, once you "
+                  "confirm.\r\n"
+                  "• A second item.\r\n"
+                  "• A numbered one")
 
 PROBE = r"""
 $ErrorActionPreference = 'Stop'
@@ -215,6 +243,12 @@ $out.updated_switches = @(@(CallOn $updating 'ShownRows' @()) | Where-Object { $
 $later = $WindowType.GetConstructors($any)[0].Invoke([object[]]@((NewFlow 'update' 'standard' 'standard'), $english, $null, $null, $null, $font))
 $null = CallOn $later 'Finished' @(-3, "update: later 9.9.8 9.9.9")
 $out.later = @((Of $later 'Code'), (Of $later 'OpenDashboard'), $later.IsDisposed)
+# The exit code on the Finish page and at the end of the log - only where the installer ended with one.
+$unstarted = $WindowType.GetConstructors($any)[0].Invoke([object[]]@((NewFlow 'install' 'standard' $null), $english, $null, $null, $null, $font))
+$null = CallOn $unstarted 'Finished' @(-1, "could not start")
+$out.exit_code = @((@(@(CallOn $done 'ShownRows' @()) | ForEach-Object { [string]$_.Text }) -contains 'Exit code: 0'),
+                   (Of $done 'Log').TrimEnd().EndsWith('Exit code: 0'), (Of $built 'Log').TrimEnd().EndsWith('Exit code: 14'),
+                   (Of $later 'Log').Contains('Exit code'), (Of $unstarted 'Log').Contains('Exit code'))
 
 # What is new: a version's section of a changelog, its brief, and which file is read.
 $notes = T 'InstallerNotes'
@@ -224,6 +258,21 @@ foreach ($version in @('0.6.16-beta.3', '0.6.16-beta', '0.6.16', '9.9.9')) {
     $out.notes[$version] = $notes.GetMethod('Section', $any).Invoke($null, [object[]]@($changelog, $version))
 }
 $out.brief = $notes.GetMethod('Brief', $any).Invoke($null, [object[]]@([string]$out.notes['0.6.16-beta.3'], 3))
+# The notes as the Notes page shows them: plain text, never the changelog's Markdown (v0.6.16 acceptance).
+$readable = $notes.GetMethod('Readable', $any)
+$out.readable = @{ sample = $readable.Invoke($null, [object[]]@([string]$input_.sample))
+                   real = $readable.Invoke($null, [object[]]@([string]$out.notes['0.6.16'])) }
+$shown = NewFlow 'update' 'standard' 'standard'
+$FlowType.GetField('NotesText', $any).SetValue($shown, [string]$input_.sample)
+$showing = $WindowType.GetConstructors($any)[0].Invoke([object[]]@($shown, $english, $null, $null, $null, $font))
+$null = CallOn $showing 'ShowPage' @('notes')
+function BoxOf($window, $name) {
+    $area = $WindowType.GetField($name, $any).GetValue($window)
+    $area.GetType().GetField('Box', $any).GetValue($area)
+}
+$out.readable.box = [string](BoxOf $showing 'notesArea').Text
+$log = BoxOf $showing 'logArea'
+$out.log_box = @([bool]$log.WordWrap, [string]$log.ScrollBars)
 $docs = [string]$env:CAR_DOCS
 $out.file = @(($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ko'))),
               ($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ja'))),
@@ -249,6 +298,12 @@ foreach ($case in @(@('plain'), @('uninstall', '-Uninstall'), @('purge', '-unins
                                                                             'standard', 'standard', '9.9.9', '9.9.8'))
     $out.setup[$case[0]] = @([string]$FlowType.GetField('Mode', $any).GetValue($flow), (CallOn $flow 'Pages' @())[0],
                              ((Switches $flow $given) -join ' '))
+}
+
+# The look it opens in: the installation's stored theme, design and motion, else the Dashboard's defaults.
+$out.look = @{}
+foreach ($case in $input_.looks.PSObject.Properties) {
+    $out.look[$case.Name] = @($SetupType.GetMethod('LookAt', $any).Invoke($null, [object[]]@([string]$case.Value)))
 }
 
 # Over its own version, installed already: Repair or Remove first (the owner, 2026-10-17); a newer one updates.
@@ -353,9 +408,20 @@ class FlowTests(unittest.TestCase):
         docs.mkdir()
         for name in ("CHANGELOG.md", "CHANGELOG.ko.md"):
             (docs / name).write_text("# Changelog\n", encoding="utf-8")
+        # Scratch homes whose settings say how the Dashboard looks (never the real one).
+        looks = {}
+        for name, settings in (("light", {"theme": "light", "design": "classic"}), ("dark", {"theme": "dark"}),
+                               ("still", {"design": "still"}), ("none", None)):
+            look_home = cls.work / "looks" / name
+            (look_home / "config").mkdir(parents=True)
+            if settings is not None:
+                (look_home / "config" / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+            looks[name] = str(look_home)
         source = cls.work / "input.json"
         source.write_text(json.dumps({"lines": {"install": INSTALLING, "update": UPDATING, "uninstall": REMOVING},
-                                      "tags": cls.TAGS, "trees": trees, "homes": homes}), encoding="utf-8")
+                                      "tags": cls.TAGS, "trees": trees, "homes": homes, "sample": NOTES_SAMPLE,
+                                      "looks": looks}),
+                          encoding="utf-8")
         cls.result = _powershell(PROBE, cls.work, 600, CAR_EXE=str(exe), CAR_INPUT=str(source),
                                  CAR_CHANGELOG=str(ROOT / "docs" / "CHANGELOG.md"), CAR_DOCS=str(docs))
         cls.docs = docs
@@ -414,10 +480,19 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(install["Registering the Codex plugin"], (True, "plugin"))
         self.assertEqual(install["Setting up the watcher"], (True, "setup"))
         self.assertFalse(install["(the setup step's words, in any language)"][0], "the localized lines move nothing")
+        # The acceptance's step stayed on the watcher while the Dashboard closed and the files were copied: each
+        # has its own step now.
+        self.assertEqual(install["Stopping the running watcher so the new version takes over"], (True, "watcher"))
+        self.assertEqual(install["Closing the Dashboard so it opens again on the new version"], (True, "dashboard"))
+        self.assertEqual(install["Copying the program files into place"], (True, "files"))
         update = self.answer["bar"]["update"]
         self.assertFalse(update[1][0], "the bootstrap's own edition line, before it downloads, is no step")
         self.assertEqual(update[3][2], "download")
+        steps = {line.strip(): step for line, (_, _, step) in zip(UPDATING, update)}
+        self.assertEqual(steps["Closing the Dashboard so it opens again on the new version"], "dashboard")
+        self.assertEqual(steps["Copying the program files into place"], "files")
         self.assertEqual(self.answer["bar"]["uninstall"][-1][2], "finishing")
+        self.assertEqual(self.answer["bar"]["uninstall"][1][2], "dashboard", "the uninstall closes the Dashboard first")
         self.assertEqual(self.answer["unpacked"], [0.0, 0.125, 0.25, 0.0])
 
     def test_the_languages_are_l10ns(self):
@@ -456,7 +531,11 @@ class FlowTests(unittest.TestCase):
 
     def test_what_is_new_is_the_versions_own_section_of_the_changelog(self):
         notes = self.answer["notes"]
-        self.assertTrue(notes["0.6.16-beta.3"].startswith("v0.6.16-beta.3 \u2014 Words for this time"), notes["0.6.16-beta.3"][:80])
+        # The section's own heading, as the changelog read here spells it: English on dev and main, Korean on the
+        # generated ko branch, whose docs/CHANGELOG.md is the Korean one.
+        heading = next(line[3:] for line in (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+                       if line.startswith("## v0.6.16-beta.3 "))
+        self.assertTrue(notes["0.6.16-beta.3"].startswith(heading), notes["0.6.16-beta.3"][:80])
         self.assertNotIn("## v0.6.16-beta.2", notes["0.6.16-beta.3"], "it ends where the next version begins")
         self.assertTrue(notes["0.6.16-beta"].startswith("v0.6.16-beta \u2014 "), "not v0.6.16-beta.3's, whose name begins alike")
         self.assertIsNone(notes["9.9.9"])
@@ -465,6 +544,49 @@ class FlowTests(unittest.TestCase):
         self.assertFalse(any("](" in line or "**" in line for line in brief), brief)
         self.assertEqual(self.answer["file"], [str(self.docs / "CHANGELOG.ko.md"), str(self.docs / "CHANGELOG.md"),
                                                str(self.docs / "CHANGELOG.md")])
+
+    def test_the_notes_page_shows_plain_text_not_markdown(self):
+        """The acceptance's notes page showed the changelog's Markdown as written - [text](link), **, * - and ran the
+        words of wrapped lines together ("*Check for updates*offers", "outin four"): a text box breaks a line only
+        at CR LF. It is plain text now: a link as its text, no marks, headings as lines, a paragraph's or an item's
+        wrapped lines joined with a space, each item a line of its own; code kept as written."""
+        readable = self.answer["readable"]
+        self.assertEqual(readable["sample"], NOTES_READABLE)
+        self.assertEqual(readable["box"], NOTES_READABLE, "the Notes page shows it so")
+        real = readable["real"]
+        for mark in ("](", "**", "`", "## ", "\n- "):
+            self.assertNotIn(mark, real)
+        self.assertNotIn("*Check", real)
+        self.assertEqual(real.count("\n"), real.count("\r\n"), "every line ends in CR LF")
+        self.assertIn("Check for updates offers it", real.replace("\r\n", "\n"))
+
+    def test_the_setup_window_opens_in_the_installations_own_look(self):
+        """The acceptance's setup window was dark - Windows' app mode - while the Dashboard and the uninstall window
+        of the installation it updated were light, as that installation's settings say. It opens in the theme,
+        design and motion the installation stores, as those two do, and in the Dashboard's defaults where nothing is
+        stored; the stored preference still goes through Theme.Current, so High Contrast wins as it does there."""
+        self.assertEqual(self.answer["look"], {"light": ["light", "classic", ""], "dark": ["dark", "soft", ""],
+                                               "still": ["system", "soft", "reduce"], "none": ["system", "soft", ""]})
+        run = SETUP_WINDOW[SETUP_WINDOW.index("internal static int Run("):SETUP_WINDOW.index("internal static InstallerFlow FlowFor(")]
+        self.assertIn("string[] look = LookAt(home);", run)
+        self.assertIn("Palette.Adopt(Theme.Current(look[0]));", run)
+        self.assertNotIn("Theme.Current(Theme.System)", run)
+        self.assertLess(run.index("Palette.Adopt("), run.index("new InstallerWindow("))
+
+    def test_the_finish_page_and_the_log_say_the_exit_code(self):
+        """The changelog promises "whether it finished, with the exit code and the log", and the acceptance's
+        Finish page said "installed" with no code, nor did the log. A success says its code on a line of its own (a
+        failure's headline already says it), and the log ends with the code - but never one of the window's own,
+        such as an installer that could not be started or an update put off."""
+        self.assertEqual(self.answer["exit_code"], [True, True, True, False, False])
+
+    def test_the_log_wraps_and_has_only_the_wells_own_scroll_bar(self):
+        """The log box had Windows' own horizontal scroll bar, white on the dark setup window (the owner: "not our
+        design"). It wraps its lines, and the one bar it has is the well's own (SoftTextArea draws it; Windows'
+        vertical bar is kept outside the well's clip, where it is never seen)."""
+        self.assertEqual(self.answer["log_box"], [True, "Vertical"])
+        self.assertNotIn("ScrollBars.Both", WINDOW)
+        self.assertNotIn("ScrollBars.Horizontal", WINDOW)
 
     def test_the_notes_pages_wait_is_not_the_installers_time(self):
         """Staying on the Notes page past the update's limit (20 minutes) reported "still running" with nothing
@@ -564,6 +686,23 @@ class CatalogTests(unittest.TestCase):
             with self.subTest(locale=locale):
                 self.assertEqual(sorted(key for key in said if key not in own), [])
 
+    def test_no_sentence_gives_a_word_both_of_its_endings(self):
+        """The Repair page read "버전 0.6.16이(가) 이미 설치되어 있습니다" on the owner's PC: a Korean particle written
+        both ways, because what comes before it is a value. A sentence is worded so its particle follows a word of
+        its own ("0.6.16 버전이"), in every catalog - the advanced edition's too - and in the form a message takes."""
+        both = re.compile(r"이\(가\)|가\(이\)|을\(를\)|를\(을\)|은\(는\)|는\(은\)|\(으\)로|와\(과\)|과\(와\)|\(이\)라|\(이\)나")
+        folders = [l10n.DIRECTORY]
+        advanced = ROOT / "advanced" / "src" / "codex_auto_resume_advanced" / "locales"
+        if advanced.is_dir():
+            folders.append(advanced)
+        found = []
+        for folder in folders:
+            for catalog in sorted(folder.glob("*.json")):
+                for key, text in json.loads(catalog.read_text(encoding="utf-8")).items():
+                    if isinstance(text, str) and both.search(text):
+                        found.append("%s/%s %s: %s" % (folder.parent.name, catalog.name, key, text[:80]))
+        self.assertEqual(found, [])
+
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class LayoutAuditTests(unittest.TestCase):
@@ -609,6 +748,58 @@ class LayoutAuditTests(unittest.TestCase):
         self.assertIn("SoftCheck'SSSS", report, "a 300-letter word went unreported, so a quiet report proves nothing")
         self.assertIn("button 'NNNN", report, "a button wider than the window went unreported")
         self.assertIn("/pages/options :: SoftCheck", report, "the options page was laid out and looked at")
+
+
+PRESENT = r"""
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+$assembly = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
+$present = $assembly.GetType('CodexAutoResume.SettingsRemove', $true).GetMethod('Present', [Reflection.BindingFlags]'Static,NonPublic')
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'installer-window-present-probe'
+$form.StartPosition = 'Manual'
+$form.Location = New-Object System.Drawing.Point(-2000, -2000)
+$form.Size = New-Object System.Drawing.Size(200, 120)
+# As Windows handed the uninstall window out on the acceptance's PC: iconic from the start.
+$form.WindowState = 'Minimized'
+$null = $present.Invoke($null, [object[]]@($form.PSObject.BaseObject))
+$script:shown = $false
+$form.add_Shown({ $script:shown = $true })
+$form.Show()
+$deadline = (Get-Date).AddSeconds(10)
+while (-not $script:shown -and (Get-Date) -lt $deadline) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 }
+[System.Windows.Forms.Application]::DoEvents()
+$state = [string]$form.WindowState
+$form.Close(); $form.Dispose()
+@{ shown = $script:shown; state = $state } | ConvertTo-Json -Compress
+"""
+
+
+@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
+class UninstallWindowTests(unittest.TestCase):
+    """The uninstall window came up iconic - only on the taskbar - whether it was started from Settings > Apps or
+    run directly (v0.6.16 acceptance): the copy that shows it is started by the program in the installation, which
+    ends first. SettingsRemove.Present opens it normal and in front; here a window handed out minimized, as that one
+    was, is shown through it, off screen, and comes up normal."""
+
+    def test_the_uninstall_window_opens_normal_and_in_front(self):
+        removing = guiscan.member_body("SettingsRemove", "Removing")
+        self.assertLess(removing.index("Present(window);"), removing.index("Application.Run(window);"))
+        refuse = guiscan.member_body("SettingsRemove", "Refuse")
+        self.assertLess(refuse.index("Present(window);"), refuse.index("Application.Run(window);"))
+        self.assertIn("AllowSetForegroundWindow(copied.Id);", guiscan.member_body("SettingsRemove", "CopyAndStart"))
+        work = Path(tempfile.mkdtemp(prefix="installer-present-"))
+        try:
+            exe = work / "CodexAutoResumeSettings.exe"
+            subprocess.run([str(CSC), "/nologo", "/target:winexe", "/platform:x64", "/out:" + str(exe),
+                            "/reference:System.dll", "/reference:System.Drawing.dll",
+                            "/reference:System.Windows.Forms.dll", *[str(path) for path in guiscan.sources()]],
+                           check=True, capture_output=True, timeout=300, creationflags=NO_WINDOW)
+            done = _powershell(PRESENT, work, 120, CAR_EXE=str(exe))
+            self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+            self.assertEqual(json.loads(done.stdout.strip().splitlines()[-1]), {"shown": True, "state": "Normal"})
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
 
 
 class SourceTests(unittest.TestCase):

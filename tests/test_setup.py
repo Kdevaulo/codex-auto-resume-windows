@@ -438,7 +438,8 @@ class SilentTests(unittest.TestCase):
         says a line and ends with 7 - and the bare form beside it, which does not wait."""
         exe = self.exe
         powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
-        documents = {"docs/GUIDE.md": not languages.generated_ko_branch(), "docs/GUIDE.ko.md": True}
+        # The generated ko branch keeps the Korean guide as docs/GUIDE.md, with the same command in it.
+        documents = {"docs/GUIDE.md": True, "docs/GUIDE.ko.md": True}
         forms = {}
         for name, present in documents.items():
             if present and (ROOT / name).is_file():

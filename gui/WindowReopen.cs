@@ -700,9 +700,12 @@ namespace CodexAutoResume
         // A setup program, or an update with -Silent, that replaces this installation asks its open windows to close
         // (install.ps1, Get-UpdateEventName): through the window's own close, as a person closes it. The window writes
         // where it is - its own reopen's arguments - for the installer to open the new version with, once it has run.
-        // With unsaved Settings changes it keeps them and stays open: the installer waits a minute and goes on, and
-        // this window runs the previous version until it is opened again. The update this window started itself
-        // (InstallUpdate, InstallPick: updatingHere) is never one it closes for: it opens the new version itself.
+        // With unsaved Settings changes it keeps them and stays open, and says so (UpdateUnsavedFile): the installer
+        // goes on, says that a window with unsaved changes stayed open - only then - and this window runs the previous
+        // version until it is opened again; an uninstall stops before it removes anything. A window that answers
+        // nothing - one of an earlier version, which does not listen - is closed by the installer as a person closes
+        // it (install.ps1, Close-OwnedDashboard). The update this window started itself (InstallUpdate, InstallPick:
+        // updatingHere) is never one it closes for: it opens the new version itself.
 
         /// What an update writes beside the settings, read by the installer once (install.ps1, Open-ClosedDashboard):
         /// one record for each window, named by its process, so two windows open again as two and neither's place is
@@ -710,6 +713,27 @@ namespace CodexAutoResume
         internal static string UpdateReopenFile(int process)
         {
             return "reopen-after-update-" + process.ToString(CultureInfo.InvariantCulture) + ".txt";
+        }
+
+        /// The answer of a window that keeps unsaved Settings changes and stays open (install.ps1,
+        /// Test-DashboardUnsaved), named by its process as its reopen record is.
+        internal static string UpdateUnsavedFile(int process)
+        {
+            return "update-unsaved-" + process.ToString(CultureInfo.InvariantCulture) + ".txt";
+        }
+
+        /// Says, for the installer, that this window stays open for its unsaved changes: the one answer the installer
+        /// reads as unsaved changes, so it never says so of a window that did not.
+        private void AnswerUnsaved()
+        {
+            try
+            {
+                string config = Path.Combine(installRoot, "config");
+                if (Directory.Exists(config))
+                    File.WriteAllText(Path.Combine(config, UpdateUnsavedFile(Process.GetCurrentProcess().Id)), "unsaved",
+                                      new UTF8Encoding(false));
+            }
+            catch (Exception) { /* unanswered: the installer treats it as a window that cannot be asked */ }
         }
 
         private System.Threading.EventWaitHandle updateClose;
@@ -781,6 +805,8 @@ namespace CodexAutoResume
         {
             if (updatingHere || reopening || auditing || Dirty())
             {
+                // Unsaved changes are the one reason it says: the others are moments, not answers.
+                if (!updatingHere && !reopening && !auditing) AnswerUnsaved();
                 updateRearm = true;
                 return;
             }

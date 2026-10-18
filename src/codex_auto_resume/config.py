@@ -104,6 +104,9 @@ class Paths:
         self.power_action_file = self.state_dir / "power-action.json"
         # v0.6.16-beta.3: the words for this time a person added for one waiting recovery (oncewords.py).
         self.once_words_file = self.state_dir / "once-words.json"
+        # v0.6.16: which edition an uninstall that kept the state took away (commands/install.py), so the installer
+        # can tell a reinstall of that same edition from an entry into the advanced edition; the next install removes it.
+        self.edition_left_file = self.state_dir / "edition-left.txt"
         # v0.6.11: the advanced edition's own state, in one directory of its own under config/,
         # carrying the same marker config/ does. Core never writes there and the standard edition
         # never creates it; it is named here only so a purge can take it (owned_state_files).
@@ -225,10 +228,11 @@ class Paths:
             return []
         names = ["state.sqlite", "state.sqlite-journal", "state.sqlite-wal", "state.sqlite-shm", "settings.json",
                  "compatibility.json", "compat-cache.json", "failure-seen.json", "status.json",
-                 "power-action.json", "split-chains.json", "once-words.json"]
+                 "power-action.json", "split-chains.json", "once-words.json", "edition-left.txt"]
         files = [self.state_dir / name for name in names]
         for pattern in ("settings.*.tmp", "compatibility.*.tmp", "compat-cache.*.tmp", "failure-seen.*.tmp",
-                        "status.*.tmp", "power-action.*.tmp", "split-chains.*.tmp", "once-words.*.tmp"):
+                        "status.*.tmp", "power-action.*.tmp", "split-chains.*.tmp", "once-words.*.tmp",
+                        "edition-left.*.tmp"):
             files += [p for p in sorted(self.state_dir.glob(pattern))
                       if not is_link(p) and self.confined(p)]
         return files + self.owned_advanced_files() + [self.state_dir / OWNER_MARKER]

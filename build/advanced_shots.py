@@ -35,9 +35,10 @@ The two pictures of v0.6.16-beta.4's usage numbers, settled at the final's merge
   and when it resets - because beta.4 holds core's records at their gate as any gate holds them (they keep waiting) and
   draws no words of its own on the Overview: a picture never shows what the product does not draw.
 * P8, the usage meter's Choices card - both windows' warnings and each window's switch - scrolled to the top of the
-  column (`show` "choices": the statement above it scrolled away), with Custom... chosen on the five-hour warning and
-  a number typed in its box, not yet Set (`custom`): the one picture of "a Custom entry beside the presets". The meter
-  is on, as in P7 (the near_limit seed), so the card is of a capability in use.
+  column (`show` "choices": the statement above it scrolled away), with the five-hour warning's drop-down holding 88%,
+  a number of one's own, as one item before Custom... - as it shows a number its Custom... dialog took (`custom`, v0.6.16
+  final): the one picture of "a Custom entry beside the presets". The meter is on, as in P7 (the near_limit seed), so
+  the card is of a capability in use.
 
 Into docs/images, the run first holds the window drawn offscreen to today's captured stills (motion_fidelity) and
 records the result, each picture's digest and what it was made from in assets/advanced-shots.json; a page that fails
@@ -411,6 +412,8 @@ def read_answers(edition: str, variant: str, locale: str, report: bool = False) 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as name:
         workspace = Path(name)
         with ExitStack() as stack:
+            # The edition's own kinds of notice, whatever an earlier picture or test registered in this process.
+            stack.enter_context(shots.edition_notice_kinds(edition))
             if edition == "advanced":
                 surface = stack.enter_context(advanced_installation(workspace, variant))
             else:
@@ -481,7 +484,7 @@ def frame(each: Shot, locale: str, index: int) -> dict:
     if each.show is not None:
         state["show"] = each.show
     if each.custom is not None:
-        state["custom"] = {"key": each.custom[0], "text": each.custom[1]}
+        state["custom"] = {"key": each.custom[0], "value": each.custom[1]}
     return state
 
 
@@ -566,6 +569,13 @@ def write_manifest(manifest: dict) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------- making them
+def reads_report(edition: str, variant: str) -> bool:
+    """Whether the answers of `edition`'s pictures of `variant` include the report's: every picture of the pair is drawn
+    from one reading, so as soon as one of them shows the report, all of them are read - and recorded - with it, whichever
+    of them a run draws (P1-after's and P4-after's inputs once missed what P5 put into their shared answers)."""
+    return any(shot.report for shot in SHOTS if (shot.edition, shot.variant) == (edition, variant))
+
+
 def make(shots_wanted: list, locales, out: Path, work: Path) -> dict:
     """Draws `shots_wanted` in `locales` into `out`; {(name, locale): (path, render input)}."""
     import make_screenshots as shots
@@ -579,7 +589,7 @@ def make(shots_wanted: list, locales, out: Path, work: Path) -> dict:
     for (edition, variant), group in sorted(groups.items()):
         if edition not in exes:
             exes[edition] = compile_window(work / ("window-" + edition), edition)
-        report = any(each.report for each in group)
+        report = reads_report(edition, variant)
         forms, envelopes = {}, {}
         for locale in locales:
             read, envelopes[locale] = read_answers(edition, variant, locale, report)

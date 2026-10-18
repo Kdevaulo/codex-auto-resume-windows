@@ -36,7 +36,8 @@ belong in the standard edition instead. Until you turn one on or have one watche
 edition does what the standard edition does; the plugin's name in Codex carries the word *Advanced*.
 
 **Everything is off until you turn it on, one at a time, in the Dashboard.** Every capability
-starts off, and installing the edition, or switching to it, turns every one off. The Dashboard has
+starts off, and installing the edition, or switching to it, turns every one off - except installing it
+again over what its own uninstall kept, which, like an update, keeps every choice (K2). The Dashboard has
 one more page in this edition, **Advanced features**, the last tab after Settings. Choose a
 capability there and read its statement: what it does, what the standard edition does instead,
 which standards it departs from, what can go wrong and how to stop it, and any warnings it carries
@@ -800,9 +801,10 @@ the percentage you set for a warning (85% by default, each window its own), it s
 window. Each window - the five-hour and the weekly - can be switched off on its own (*Act on the five-hour
 window*, *Act on the weekly window*): it is still read and shown, and no warning is shown for it. These two
 switches decide only the warnings: Wrap up near a limit and Stop near a limit each have a pair of their own.
-Every on/off choice on the page is a switch; every number on the page has *Custom...* beside its
-choices, checked before it is saved - a whole percentage from 1 to 100, a spacing from 5 to 60 minutes - and
-for each window the warning stays at or below the wrap-up, and the wrap-up below the stop its words ask for.
+Every on/off choice on the page is a switch; every number on the page has *Custom...* beside its choices,
+which opens a small dialog for a number of your own, as on the Settings page, checked before it is saved - a
+whole percentage from 1 to 100, a spacing from 5 to 60 minutes - and for each window the warning stays at or
+below the wrap-up, and the wrap-up below the stop its words ask for.
 The reading is only shown: whether a recovery may go is still decided by the reading the program makes when
 a recovery is due.
 
@@ -962,7 +964,10 @@ anything but yes changes nothing. With `-Silent` nobody can be asked, so nothing
 exit code 14. From a command line, `scripts/bootstrap.ps1 -Edition Standard` or `-Edition
 Advanced` chooses the edition, and over the other edition it needs `-Force` as well. The change keeps
 your settings, your pause, everything waiting to resume and the sign-in choice, and every advanced
-capability starts off (K2). Codex's own copy of the plugin can stay the old edition's until Codex
+capability starts off (K2). An uninstall that keeps your data notes which edition it removed: the same
+edition installed again afterwards is no change, and like an update it keeps what you turned on, what you
+kept on and every choice; the advanced edition installed after the standard one was removed is a change,
+and every advanced capability starts off. Codex's own copy of the plugin can stay the old edition's until Codex
 lets it be replaced; the installer and the Dashboard's Diagnostics page say so while it is.
 
 The Dashboard has a way too: **Install another version...** on the Diagnostics page lists every

@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 
@@ -62,6 +63,7 @@ namespace CodexAutoResume
                 var flow = new InstallerFlow(InstallerFlow.Uninstall, home, InstallerFlow.InstalledAt(home), null, VersionAt(home));
                 var window = new InstallerWindow(flow, Words(home), null, null, null, font);
                 window.Finished(InstallerFlow.NotStarted, NotItsOwn + (where.Length > 0 ? "\n" + where : ""));
+                Present(window);
                 Application.Run(window);
             }
             catch (Exception) { /* nothing to draw it with: the code is all that is left to say it */ }
@@ -127,7 +129,14 @@ namespace CodexAutoResume
                                   Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
                 start.UseShellExecute = false;
                 start.WorkingDirectory = folder;
-                Process.Start(start).Dispose();
+                using (Process copied = Process.Start(start))
+                {
+                    // This program was started by a person - Settings > Apps, or the command itself - and may bring a
+                    // window to the front; the copy, started by it and opening its window once this has ended, may
+                    // not unless it is let (Present).
+                    try { AllowSetForegroundWindow(copied.Id); }
+                    catch (Exception) { /* the copy's window comes up behind, never minimized (Present) */ }
+                }
                 return 0;
             }
             catch (Exception error)
@@ -158,9 +167,47 @@ namespace CodexAutoResume
                 {
                     return Uninstall(home, kept, answered.Switches(null), heard);
                 }, null, font);
+            Present(window);
             Application.Run(window);
             Tidy(folder);
             return window.Code == int.MinValue ? 0 : window.Code;
+        }
+
+        private const int SW_RESTORE = 9;
+
+        [DllImport("user32.dll")]
+        private static extern bool AllowSetForegroundWindow(int process);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr window);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr window, int command);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr window);
+
+        /// The uninstall window, shown as a window a person opened: normal and in front. The copy that shows it was
+        /// started by another program, which ends first, and its window came up iconic - only on the taskbar - both
+        /// from Settings > Apps and run directly (v0.6.16 acceptance). It opens normal, is restored should Windows
+        /// still hand it out minimized, and is brought to the front, which the program that started it allowed.
+        internal static void Present(Form window)
+        {
+            window.WindowState = FormWindowState.Normal;
+            window.Shown += delegate
+            {
+                try
+                {
+                    if (IsIconic(window.Handle) || window.WindowState == FormWindowState.Minimized)
+                    {
+                        ShowWindow(window.Handle, SW_RESTORE);
+                        window.WindowState = FormWindowState.Normal;
+                    }
+                    window.Activate();
+                    SetForegroundWindow(window.Handle);
+                }
+                catch (Exception) { /* it is open, wherever Windows put it */ }
+            };
         }
 
         private static string Read(string path)

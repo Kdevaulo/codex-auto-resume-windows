@@ -6,9 +6,16 @@ paused (K5), and set on the engine's reader, so every eligibility check of this 
 record is checked against, a usage limit's reset time, a stalled turn - reads them (codex/eligibility.py). A kind that
 leaves ends, cancelled, the waiting records of its conversations (session_kind_off): what the plug no longer watches is
 never sent to, and what is in flight is followed to its end. The cancel is core's, final, as any cancel is.
+
+v0.6.16: a watcher that starts does not know what the one before it watched, so at its first ask every kind may
+have been, and one its plug does not name then leaves as in a running watcher - after a restart with a capability
+turned off, an entry into the advanced edition, a move to the standard edition. Left to the next check, which can no
+longer read the conversation, such a record was retired as superseded, latest_turn_changed: untrue (live acceptance
+item 8 e).
 """
 from __future__ import annotations
 
+from ..domain.plughands import SESSION_KINDS
 from ..machine import WAITING
 
 # The reason a kind no longer watched cancels its waiting records with.
@@ -32,14 +39,16 @@ class KindsMixin:
 
     def session_kinds(self):
         kinds = self.plug.sessions()
-        before = self.__dict__.get("_session_kinds", frozenset())
+        # The first ask of this watcher: what the one before it watched is unknown, so every kind may have been.
+        before = self.__dict__.get("_session_kinds", frozenset(SESSION_KINDS))
+        self.source.session_kinds = self._session_kinds = kinds
         if kinds == before:
             return
-        self.source.session_kinds = self._session_kinds = kinds
         gone, left = before - kinds, []
         for row in self._records(WAITING) if gone else ():
             try:
-                if self.source.taken(row["thread_id"], before) and not self.source.taken(row["thread_id"], kinds):
+                # Taken now first: the app's own conversation, and every one still watched, costs one read.
+                if not self.source.taken(row["thread_id"], kinds) and self.source.taken(row["thread_id"], before):
                     left.append(row)
             except Exception:
                 pass                    # one that cannot be read is left as it is: never cancelled on a guess

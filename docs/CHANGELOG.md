@@ -38,14 +38,18 @@ down first, which *Install another version...* does for you.
   and a button that opens the Dashboard. Run where its own version is installed already, it offers **Repair** and
   **Remove**. No console window opens, and `-Silent` asks nothing and shows nothing, with the same exit codes.
 - **An installation is listed in Windows' Settings > Apps** and in `winget list`, for your Windows user only. Its
-  Uninstall button shows the same window and asks whether to delete the settings and the history too; a failed
-  uninstall stays listed, and installing an older version leaves no entry naming a version that is not installed.
+  Uninstall button shows the same window and asks whether to delete the settings and the history too. The uninstall
+  closes an open Dashboard first and removes nothing while anything still holds the program's files, saying what;
+  a failed uninstall stays listed, a finished one takes its entry with it, and installing an older version leaves no
+  entry naming a version that is not installed.
   The winget manifests of both editions are made from a release's pinned archives ([WINGET.md](WINGET.md)).
 - **An update shows itself.** Before it installs, a notes page says from what version to what and what is new in
   it, read from the verified download; afterwards an "Updated to" page says it is done. The watcher is started
   again on the new version where one ran before or where it runs at sign-in, and one you had stopped stays
-  stopped. An open Dashboard is asked to close and opens again on the new version where it was; one with unsaved
-  Settings changes keeps them and stays open.
+  stopped. An open Dashboard is asked to close and opens again on the new version where it was - one from before
+  v0.6.16, which cannot be asked, is closed as any window is and opened again - and one with unsaved Settings
+  changes keeps them and stays open. The notes are shown as plain text, and the window follows the installation's
+  own look.
 - **Notices that stay until clicked, chosen for each kind.** *Settings > General > Notifications* lists each kind
   of notice with a box, and a kind ticked there stays on screen until you click it. None is ticked at first.
 - **A click on a notice itself opens its page** - the card's face, or the body of Windows' own notification - the
@@ -90,6 +94,14 @@ down first, which *Install another version...* does for you.
   limit** and **Stop near a limit** each have their own five-hour and weekly switches, and the usage meter's pair
   now decides only its warnings. An update keeps what a beta.4 meter's window switch meant: a window switched off
   there stays off for the wrap-up and the stop (the owner's request).
+- **Custom... opens the Settings page's small dialog** for a number of your own - the range above it, the number,
+  *Use this value* and *Cancel* - instead of a row of its own under the drop-down; a value taken shows as its own item
+  before *Custom...*, and Cancel leaves the drop-down as it was (the owner's request).
+- **Reinstalling the same edition after an uninstall that kept your data works like an update**: the advanced
+  features you turned on, kept on and set up stay as they were. Installing the advanced edition after the standard
+  one still starts every advanced feature off (standard K2, as the owner amended it on 2026-10-18).
+- **A recovery waiting in a terminal or VS Code conversation ends as cancelled because that kind is off** when the
+  watcher starts with *Recover CLI, TUI and VS Code conversations* off, instead of being reported as superseded.
 - **The notices near a limit are each a kind to keep on screen** - the usage meter's warning, a turn the forced
   stop could not stop, a queue to resume in Codex, and a conversation that could not be continued after the
   reset - each ticked or not on its own in the Notifications list.

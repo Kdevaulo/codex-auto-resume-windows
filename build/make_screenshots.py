@@ -3372,6 +3372,28 @@ def pinned_installation(workspace: Path, *, watching: bool = True, engine: bool 
             l10n.set_preference(previous)
 
 
+@contextmanager
+def edition_notice_kinds(edition: str = "standard"):
+    """For the block, this process's kinds of notice are exactly `edition`'s: core's alone for the standard edition,
+    core's and the advanced plug's for the advanced one; whatever was registered before is put back after.
+    codex_auto_resume.notice_kinds keeps an edition's kinds for the life of a process, so an advanced test run earlier in
+    the same process left them in the standard edition's `describe` answer, and the pictures' inputs depended on what
+    had run before them (the v0.6.16 final's dev CI, advanced lanes)."""
+    from codex_auto_resume import notice_kinds
+    with notice_kinds._lock:
+        held = dict(notice_kinds._registered)
+        notice_kinds._registered.clear()
+    try:
+        if edition == "advanced":
+            from codex_auto_resume_advanced import plug
+            plug.register_notice_kinds()
+        yield
+    finally:
+        with notice_kinds._lock:
+            notice_kinds._registered.clear()
+            notice_kinds._registered.update(held)
+
+
 def window_envelopes(locales, design: str | None = None) -> dict:
     """Locale -> the canonical text of what the bridge tells the window, one line per read, with the
     installation's Design stored as `design` (Soft when none is given).
@@ -3381,7 +3403,7 @@ def window_envelopes(locales, design: str | None = None) -> dict:
     Statistics page's kinds of interruption), with only the pinned values above rewritten.
     """
     envelopes = {}
-    with tempfile.TemporaryDirectory() as name:
+    with tempfile.TemporaryDirectory() as name, edition_notice_kinds("standard"):
         workspace = Path(name)
         with pinned_installation(workspace, design=design) as surface:
             spellings = workspace_spellings(workspace)
