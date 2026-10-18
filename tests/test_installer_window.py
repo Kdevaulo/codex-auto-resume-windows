@@ -82,6 +82,29 @@ REMOVING = ["Codex Auto Resume", "  Removing the watcher, autostart, notificatio
             "  Removing the Codex plugin", "  Removing the marketplace this installation registered",
             "  Removing program files", "Removed. Settings and pending recoveries were kept."]
 
+# A changelog section as the release's are written: a title, a link line, wrapped paragraphs with emphasis, links
+# and code, headings and a list whose items wrap (the acceptance's notes page, 2026-10-18).
+NOTES_SAMPLE = ("v9.9.9 — A title\n\n"
+                "[The commits in this release](https://example.com/compare/v9.9.8...v9.9.9)\n\n"
+                "**From v9.9.8, an ordinary update.** v9.9.8's *Check for updates*\n"
+                "offers it, the final of a line that went out\n"
+                "in four pre-releases ([beta](#v999-beta) and [beta.2](#v999-beta2)).\n\n"
+                "### Both editions\n\n"
+                "#### New\n\n"
+                "- **Rescan** on the Pending page. It reads `reopen-after-update*.txt` and\n"
+                "  `*.old-*` folders, once you confirm.\n"
+                "- A *second* item.\n"
+                "1. A numbered one\n")
+NOTES_READABLE = ("v9.9.9 — A title\r\n\r\n"
+                  "From v9.9.8, an ordinary update. v9.9.8's Check for updates offers it, the final of a line that "
+                  "went out in four pre-releases (beta and beta.2).\r\n\r\n"
+                  "Both editions\r\n\r\n"
+                  "New\r\n\r\n"
+                  "• Rescan on the Pending page. It reads reopen-after-update*.txt and *.old-* folders, once you "
+                  "confirm.\r\n"
+                  "• A second item.\r\n"
+                  "• A numbered one")
+
 PROBE = r"""
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
@@ -224,6 +247,19 @@ foreach ($version in @('0.6.16-beta.3', '0.6.16-beta', '0.6.16', '9.9.9')) {
     $out.notes[$version] = $notes.GetMethod('Section', $any).Invoke($null, [object[]]@($changelog, $version))
 }
 $out.brief = $notes.GetMethod('Brief', $any).Invoke($null, [object[]]@([string]$out.notes['0.6.16-beta.3'], 3))
+# The notes as the Notes page shows them: plain text, never the changelog's Markdown (v0.6.16 acceptance).
+$readable = $notes.GetMethod('Readable', $any)
+$out.readable = @{ sample = $readable.Invoke($null, [object[]]@([string]$input_.sample))
+                   real = $readable.Invoke($null, [object[]]@([string]$out.notes['0.6.16'])) }
+$shown = NewFlow 'update' 'standard' 'standard'
+$FlowType.GetField('NotesText', $any).SetValue($shown, [string]$input_.sample)
+$showing = $WindowType.GetConstructors($any)[0].Invoke([object[]]@($shown, $english, $null, $null, $null, $font))
+$null = CallOn $showing 'ShowPage' @('notes')
+function BoxOf($window, $name) {
+    $area = $WindowType.GetField($name, $any).GetValue($window)
+    $area.GetType().GetField('Box', $any).GetValue($area)
+}
+$out.readable.box = [string](BoxOf $showing 'notesArea').Text
 $docs = [string]$env:CAR_DOCS
 $out.file = @(($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ko'))),
               ($notes.GetMethod('FileFor', $any).Invoke($null, [object[]]@($docs, 'ja'))),
@@ -355,7 +391,8 @@ class FlowTests(unittest.TestCase):
             (docs / name).write_text("# Changelog\n", encoding="utf-8")
         source = cls.work / "input.json"
         source.write_text(json.dumps({"lines": {"install": INSTALLING, "update": UPDATING, "uninstall": REMOVING},
-                                      "tags": cls.TAGS, "trees": trees, "homes": homes}), encoding="utf-8")
+                                      "tags": cls.TAGS, "trees": trees, "homes": homes, "sample": NOTES_SAMPLE}),
+                          encoding="utf-8")
         cls.result = _powershell(PROBE, cls.work, 600, CAR_EXE=str(exe), CAR_INPUT=str(source),
                                  CAR_CHANGELOG=str(ROOT / "docs" / "CHANGELOG.md"), CAR_DOCS=str(docs))
         cls.docs = docs
@@ -469,6 +506,21 @@ class FlowTests(unittest.TestCase):
         self.assertFalse(any("](" in line or "**" in line for line in brief), brief)
         self.assertEqual(self.answer["file"], [str(self.docs / "CHANGELOG.ko.md"), str(self.docs / "CHANGELOG.md"),
                                                str(self.docs / "CHANGELOG.md")])
+
+    def test_the_notes_page_shows_plain_text_not_markdown(self):
+        """The acceptance's notes page showed the changelog's Markdown as written - [text](link), **, * - and ran the
+        words of wrapped lines together ("*Check for updates*offers", "outin four"): a text box breaks a line only
+        at CR LF. It is plain text now: a link as its text, no marks, headings as lines, a paragraph's or an item's
+        wrapped lines joined with a space, each item a line of its own; code kept as written."""
+        readable = self.answer["readable"]
+        self.assertEqual(readable["sample"], NOTES_READABLE)
+        self.assertEqual(readable["box"], NOTES_READABLE, "the Notes page shows it so")
+        real = readable["real"]
+        for mark in ("](", "**", "`", "## ", "\n- "):
+            self.assertNotIn(mark, real)
+        self.assertNotIn("*Check", real)
+        self.assertEqual(real.count("\n"), real.count("\r\n"), "every line ends in CR LF")
+        self.assertIn("Check for updates offers it", real.replace("\r\n", "\n"))
 
     def test_the_notes_pages_wait_is_not_the_installers_time(self):
         """Staying on the Notes page past the update's limit (20 minutes) reported "still running" with nothing

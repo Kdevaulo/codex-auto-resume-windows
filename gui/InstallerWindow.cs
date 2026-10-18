@@ -530,7 +530,8 @@ namespace CodexAutoResume
         {
             if (page != InstallerFlow.Notes) Row(Words(Versions(), "label", Palette.Ink), gap);
             Row(Words(words.Say("installer.update.whats_new", "What's new"), "label", Palette.Secondary), page == InstallerFlow.Notes ? gap : 6);
-            notesArea.Box.Text = flow.NotesText ?? words.Say("installer.update.no_notes", "What is new in this version could not be read from the download.");
+            // As plain text to read, never the changelog's Markdown (InstallerNotes.Readable).
+            notesArea.Box.Text = flow.NotesText != null ? InstallerNotes.Readable(flow.NotesText) : words.Say("installer.update.no_notes", "What is new in this version could not be read from the download.");
             Row(notesArea, 6);
         }
 
