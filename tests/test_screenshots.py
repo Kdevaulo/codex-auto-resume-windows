@@ -1714,10 +1714,13 @@ class CardPictureTests(unittest.TestCase):
             made = {asset.relative_to(ROOT).as_posix(): copy.relative_to(ROOT).as_posix()
                     for asset, copy in self.generator.card_paths(locale).values()}
             self.assertEqual(made, pairs)
-        # No picture of a notification is left outside the manifest, as notification.png was.
+        # No picture of a notification is left outside the manifest, as notification.png was. The card's motion
+        # pictures (v0.6.16) are pinned by their own manifest, assets/motion.json, and held there by test_motion_fidelity.
+        motion_path = ROOT / "assets" / "motion.json"
+        moving = set(json.loads(motion_path.read_text(encoding="utf-8"))["images"]) if motion_path.is_file() else set()
         pictured = {path.relative_to(ROOT).as_posix() for folder in ("assets", "docs/images")
                     for path in (ROOT / folder).glob("*notification*.png")}
-        self.assertEqual(pictured, expected)
+        self.assertEqual(pictured - moving, expected)
 
     def test_the_card_says_what_the_watcher_would_say(self):
         """The watcher's builder, the catalogs' words, the sample's conversation - never a real one."""
