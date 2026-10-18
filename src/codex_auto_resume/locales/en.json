@@ -1108,6 +1108,7 @@
   "installer.back": "Back",
   "installer.done.edition_kept": "The other edition is installed here, and it was not changed.",
   "installer.done.failed": "It did not finish (exit code {code}).",
+  "installer.done.exit_code": "Exit code: {code}",
   "installer.done.installed": "Codex Auto Resume is installed.",
   "installer.done.not_started": "The installer could not be started.",
   "installer.done.open": "Open the Dashboard",

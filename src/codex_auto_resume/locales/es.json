@@ -612,6 +612,7 @@
   "installer.back": "Atrás",
   "installer.done.edition_kept": "La otra edición está instalada aquí y no se ha modificado.",
   "installer.done.failed": "No terminó (código de salida {code}).",
+  "installer.done.exit_code": "Código de salida: {code}",
   "installer.done.installed": "Codex Auto Resume está instalado.",
   "installer.done.not_started": "No se pudo iniciar el instalador.",
   "installer.done.open": "Abrir el Panel",

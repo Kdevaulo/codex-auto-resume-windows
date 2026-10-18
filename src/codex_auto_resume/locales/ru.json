@@ -612,6 +612,7 @@
   "installer.back": "Назад",
   "installer.done.edition_kept": "Другая редакция установлена здесь и не изменилась.",
   "installer.done.failed": "Операция не завершилась (код выхода {code}).",
+  "installer.done.exit_code": "Код выхода: {code}",
   "installer.done.installed": "Codex Auto Resume установлен.",
   "installer.done.not_started": "Не удалось запустить установщик.",
   "installer.done.open": "Открыть Дашборд",

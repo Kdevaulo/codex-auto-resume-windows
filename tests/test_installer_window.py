@@ -238,6 +238,12 @@ $out.updated_switches = @(@(CallOn $updating 'ShownRows' @()) | Where-Object { $
 $later = $WindowType.GetConstructors($any)[0].Invoke([object[]]@((NewFlow 'update' 'standard' 'standard'), $english, $null, $null, $null, $font))
 $null = CallOn $later 'Finished' @(-3, "update: later 9.9.8 9.9.9")
 $out.later = @((Of $later 'Code'), (Of $later 'OpenDashboard'), $later.IsDisposed)
+# The exit code on the Finish page and at the end of the log - only where the installer ended with one.
+$unstarted = $WindowType.GetConstructors($any)[0].Invoke([object[]]@((NewFlow 'install' 'standard' $null), $english, $null, $null, $null, $font))
+$null = CallOn $unstarted 'Finished' @(-1, "could not start")
+$out.exit_code = @((@(@(CallOn $done 'ShownRows' @()) | ForEach-Object { [string]$_.Text }) -contains 'Exit code: 0'),
+                   (Of $done 'Log').TrimEnd().EndsWith('Exit code: 0'), (Of $built 'Log').TrimEnd().EndsWith('Exit code: 14'),
+                   (Of $later 'Log').Contains('Exit code'), (Of $unstarted 'Log').Contains('Exit code'))
 
 # What is new: a version's section of a changelog, its brief, and which file is read.
 $notes = T 'InstallerNotes'
@@ -523,6 +529,13 @@ class FlowTests(unittest.TestCase):
         self.assertNotIn("*Check", real)
         self.assertEqual(real.count("\n"), real.count("\r\n"), "every line ends in CR LF")
         self.assertIn("Check for updates offers it", real.replace("\r\n", "\n"))
+
+    def test_the_finish_page_and_the_log_say_the_exit_code(self):
+        """The changelog promises "whether it finished, with the exit code and the log", and the acceptance's
+        Finish page said "installed" with no code, nor did the log. A success says its code on a line of its own (a
+        failure's headline already says it), and the log ends with the code - but never one of the window's own,
+        such as an installer that could not be started or an update put off."""
+        self.assertEqual(self.answer["exit_code"], [True, True, True, False, False])
 
     def test_the_log_wraps_and_has_only_the_wells_own_scroll_bar(self):
         """The log box had Windows' own horizontal scroll bar, white on the dark setup window (the owner: "not our

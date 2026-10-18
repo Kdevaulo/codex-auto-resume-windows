@@ -612,6 +612,7 @@
   "installer.back": "Kembali",
   "installer.done.edition_kept": "Edisi lainnya terpasang di sini dan tidak diubah.",
   "installer.done.failed": "Tidak selesai (kode keluar {code}).",
+  "installer.done.exit_code": "Kode keluar: {code}",
   "installer.done.installed": "Codex Auto Resume sudah terpasang.",
   "installer.done.not_started": "Penginstal tidak dapat dimulai.",
   "installer.done.open": "Buka Dasbor",

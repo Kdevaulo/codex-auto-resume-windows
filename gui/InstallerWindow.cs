@@ -564,6 +564,9 @@ namespace CodexAutoResume
                       ? words.Say("installer.done.updated_to", "Updated to v{version}", "version", flow.Version)
                       : flow.Repair && code == 0 ? words.Say("installer.done.repaired", "Codex Auto Resume is repaired.")
                       : words.Outcome(flow.Mode, code), "title", Palette.Ink), 0);
+            // The exit code, as the changelog promises it: a failure's headline says it already (Outcome), so it is a
+            // line of its own after a success. The window's own codes - not started, still running - are none.
+            if (code == 0) Row(Words(ExitCode(), null, Palette.Secondary), 8);
             if (flow.Mode == InstallerFlow.Update && code == 0 && !string.IsNullOrEmpty(flow.NotesText))
                 Row(Words(InstallerNotes.Brief(flow.NotesText, 4), null, Palette.Secondary), 8);
             string more = code == 0 ? null : words.Explain(code);
@@ -708,6 +711,12 @@ namespace CodexAutoResume
             }
             running = false;
             code = ended;
+            // The log ends with the code the installer ended with, where it ended with one of its own.
+            if (HasExitCode(ended))
+            {
+                log.AppendLine(ExitCode());
+                logArea.Box.AppendText(ExitCode() + Environment.NewLine);
+            }
             at = ended == 0 ? 1.0 : at;
             bar.Value = at;
             logShown = ended != 0;
@@ -715,6 +724,20 @@ namespace CodexAutoResume
             // failure's own lines - so the window is as tall as it now needs.
             page = InstallerFlow.Finish;
             Fit();
+        }
+
+        /// Whether `ended` is a code the installer ended with, rather than one of the window's own (not started, still
+        /// running, put off).
+        private static bool HasExitCode(int ended)
+        {
+            return ended != InstallerFlow.NotStarted && ended != InstallerFlow.StillRunning &&
+                   ended != InstallerFlow.Later && ended != int.MinValue;
+        }
+
+        private string ExitCode()
+        {
+            return words.Say("installer.done.exit_code", "Exit code: {code}", "code",
+                             code.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

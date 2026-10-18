@@ -612,6 +612,7 @@
   "installer.back": "Назад",
   "installer.done.edition_kept": "Інша редакція встановлена тут і не змінилася.",
   "installer.done.failed": "Не завершилося (код виходу {code}).",
+  "installer.done.exit_code": "Код виходу: {code}",
   "installer.done.installed": "Codex Auto Resume встановлено.",
   "installer.done.not_started": "Не вдалося запустити інсталятор.",
   "installer.done.open": "Відкрити Dashboard",

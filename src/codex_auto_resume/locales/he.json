@@ -612,6 +612,7 @@
   "installer.back": "חזרה",
   "installer.done.edition_kept": "המהדורה האחרת מותקנת כאן ולא שונתה.",
   "installer.done.failed": "הפעולה לא הסתיימה (קוד יציאה {code}).",
+  "installer.done.exit_code": "קוד יציאה: {code}",
   "installer.done.installed": "Codex Auto Resume הותקן.",
   "installer.done.not_started": "לא ניתן היה להפעיל את תוכנית ההתקנה.",
   "installer.done.open": "פתיחת לוח המחוונים",

@@ -612,6 +612,7 @@
   "installer.back": "上一步",
   "installer.done.edition_kept": "另一個版本已安裝在此處，且未被變更。",
   "installer.done.failed": "未能完成（結束代碼 {code}）。",
+  "installer.done.exit_code": "結束代碼：{code}",
   "installer.done.installed": "Codex Auto Resume 已安裝。",
   "installer.done.not_started": "無法啟動安裝程式。",
   "installer.done.open": "開啟儀表板",

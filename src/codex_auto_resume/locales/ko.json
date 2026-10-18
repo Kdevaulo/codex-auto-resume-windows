@@ -612,6 +612,7 @@
   "installer.back": "이전",
   "installer.done.edition_kept": "다른 에디션이 여기에 설치되어 있으며, 변경되지 않았습니다.",
   "installer.done.failed": "완료되지 않았습니다(종료 코드 {code}).",
+  "installer.done.exit_code": "종료 코드: {code}",
   "installer.done.installed": "Codex Auto Resume가 설치되었습니다.",
   "installer.done.not_started": "설치 프로그램을 시작할 수 없습니다.",
   "installer.done.open": "대시보드 열기",

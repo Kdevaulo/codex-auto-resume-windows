@@ -612,6 +612,7 @@
   "installer.back": "Wstecz",
   "installer.done.edition_kept": "Druga edycja jest tu zainstalowana i nie została zmieniona.",
   "installer.done.failed": "Nie zakończono (kod wyjścia {code}).",
+  "installer.done.exit_code": "Kod wyjścia: {code}",
   "installer.done.installed": "Codex Auto Resume jest zainstalowany.",
   "installer.done.not_started": "Nie udało się uruchomić instalatora.",
   "installer.done.open": "Otwórz Dashboard",

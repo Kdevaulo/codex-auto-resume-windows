@@ -612,6 +612,7 @@
   "installer.back": "رجوع",
   "installer.done.edition_kept": "الإصدار الآخر مثبّت هنا ولم يتغيّر.",
   "installer.done.failed": "لم يكتمل (رمز الخروج {code}).",
+  "installer.done.exit_code": "رمز الخروج: {code}",
   "installer.done.installed": "تم تثبيت Codex Auto Resume.",
   "installer.done.not_started": "تعذّر تشغيل برنامج التثبيت.",
   "installer.done.open": "فتح لوحة المعلومات",

@@ -612,6 +612,7 @@
   "installer.back": "Geri",
   "installer.done.edition_kept": "Diğer sürüm burada kurulu ve değiştirilmedi.",
   "installer.done.failed": "Tamamlanamadı (çıkış kodu {code}).",
+  "installer.done.exit_code": "Çıkış kodu: {code}",
   "installer.done.installed": "Codex Auto Resume kuruldu.",
   "installer.done.not_started": "Yükleyici başlatılamadı.",
   "installer.done.open": "Gösterge Paneli'ni aç",

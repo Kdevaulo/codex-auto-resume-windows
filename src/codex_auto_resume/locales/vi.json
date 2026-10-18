@@ -612,6 +612,7 @@
   "installer.back": "Quay lại",
   "installer.done.edition_kept": "Phiên bản kia đã được cài ở đây và không bị thay đổi.",
   "installer.done.failed": "Chưa hoàn tất (mã thoát {code}).",
+  "installer.done.exit_code": "Mã thoát: {code}",
   "installer.done.installed": "Codex Auto Resume đã được cài đặt.",
   "installer.done.not_started": "Không thể khởi động trình cài đặt.",
   "installer.done.open": "Mở Bảng điều khiển",
