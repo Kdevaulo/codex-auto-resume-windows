@@ -1,5 +1,47 @@
 {
   "fidelity": {
+    "en/diagnostics": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/history": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/overview": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/pending": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/settings": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/statistics": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
     "ko/diagnostics": {
       "exact": 1.0,
       "light": 388,
@@ -42,7 +84,7 @@
       "passed": true,
       "worst": 0
     },
-    "window": "7cfb0b7225e1d2205ef5d6ea4f4ffccb13bdd558a3ba5014ab4ebe8d89ecdc9b"
+    "window": "e0fb1a862763bae07cf4537f648e4c66a5fc4aee1bce2e4b89c8f0d281809e47"
   },
   "images": {
     "docs/images/advanced-page-after-ko.png": {
@@ -111,22 +153,22 @@
     }
   },
   "inputs": {
-    "<advanced shot:P1-after:en>": "36033675230850aa073074c47e0b0b3604b98b1482ec9a57877df937692c646e",
-    "<advanced shot:P1-after:ko>": "ae7e9246e0bd8fa58474727b3a6a2db7d0075f250fc1a69b550b194b42d13be3",
-    "<advanced shot:P1-before:en>": "1a9441997afaeccb30be661f15cc709b50939f5e1c4254b91a760d16b0eb5636",
-    "<advanced shot:P1-before:ko>": "5b2adb148b104f6bb62122db8b00a571d69680b92b1924885e02a1033e86288d",
-    "<advanced shot:P4-after:en>": "fc2188c24934e97d9ff909ed3687be61ce44c23637262582c8db73ec1596d9b7",
-    "<advanced shot:P4-after:ko>": "8c3d1150f2e132decfccd0d5be5fc39c085e054576dcd0b336591c55f0d08f3e",
-    "<advanced shot:P4-before:en>": "f7eeefdccc13149de4edcb7318dc72bca99a568a228d65744833bc51a249f88a",
-    "<advanced shot:P4-before:ko>": "8270479c96c010a52450e4fed2593b336b5df25ca9d20a37c8731801919aaacd",
-    "<advanced shot:P5:en>": "f34cd263bc769760530fb4a2efabc1a078f9e3cc4611e8f08381ace3d23759ef",
-    "<advanced shot:P5:ko>": "eefa814e330c7fa9a288783c37af8902d05b1d10e30f5db7090a10dc6f566a36",
-    "<advanced shot:P7-after:en>": "7b287c10cd120e7416bbd9ec2f898563eb1a57b7039b2bfdac848b9e4a6c11e4",
-    "<advanced shot:P7-after:ko>": "8ea764fa94261355c82f1f040da1f9fb874b5c7d4e2cbe53b1cdee507959fa41",
-    "<advanced shot:P7-before:en>": "11e6205a919ed0986f37fe1cf4669a208eeefff84bfd7e1144f2b7129b5c6e11",
-    "<advanced shot:P7-before:ko>": "cc9a7463f880fe80b2b024231eb9eb543cd182c786e31ba5b491f762d639ce33",
-    "<advanced shot:P8:en>": "7d18c6c15f985a38ecec292ee1f19d0a52ec59b0040d4d556d701f7f235a05b4",
-    "<advanced shot:P8:ko>": "62c74a346221b76688994e807af665096c5798bbd52408b052a1c5bafcf8a0ae"
+    "<advanced shot:P1-after:en>": "1e663c96269dfdf264eee2d98b0759aafcb2af70e00589a0fe9744e3a58583c9",
+    "<advanced shot:P1-after:ko>": "33add1b50c6ea12321ff7a4000ac76c41fb4c11268dfbe6fc02343fc589d3bae",
+    "<advanced shot:P1-before:en>": "850844c1c2906ee526f95106840fa9d52ab7555e733e005d71991db13d81ed3f",
+    "<advanced shot:P1-before:ko>": "b1aea5d14de9f4446980d662e016100810916b34d7cb57ae1300509c3bdbf353",
+    "<advanced shot:P4-after:en>": "20b2d1dd2ac40a5bfe299d5a51ea9d36a3fb35f5b9b45b0c7a8f08c2fc127ecc",
+    "<advanced shot:P4-after:ko>": "c8302036a8693c8b05c5d34cb4df47214c3be2da9b2ea5325c9122c0b21a28b2",
+    "<advanced shot:P4-before:en>": "262f3a81567d94fee394c72f381f8ddf5af0ef6b3b324fb49fe8813cc737bd1f",
+    "<advanced shot:P4-before:ko>": "72327e5bfebe246b2f538d580e24ef58bd4a72ce7457d13df3317eec435fd07a",
+    "<advanced shot:P5:en>": "4e73f47c323479776db46b2c57a1d8f8089142b6173d546e89adeae0797764d9",
+    "<advanced shot:P5:ko>": "f75a8c3516759684b970cec12c0b75578041c72305f915b5072d10b7f525b031",
+    "<advanced shot:P7-after:en>": "6386de7da1ce7751188183ece51b2a4e614b5d17f98693fe139d36f87a9822c8",
+    "<advanced shot:P7-after:ko>": "8aa33c68b87cc65f747292dbefb35cff36b8d2d1e562cbf62b857026a7d54c31",
+    "<advanced shot:P7-before:en>": "680a260dea994504d78a91810c753186b6af5c766e69789332ce72e36264d039",
+    "<advanced shot:P7-before:ko>": "d246bf37ef18842340930957040a1077a2d979d24d03197945b1dca9885947cb",
+    "<advanced shot:P8:en>": "6c1b3d2e140b3fd46edb3d5993ab4fae1de4c1e4b6b8f7004cb6a1cd1b290733",
+    "<advanced shot:P8:ko>": "54032c7dc3244357b952c5a3a2328ffbeea1c9efe18b576ccf9c9efde522c724"
   },
   "parts": {
     "<advanced shot:P1-after:en>": {
@@ -212,7 +254,7 @@
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P1-after:ko>": {
-      "00 strings": "0f2991d34c905b83",
+      "00 strings": "814d1fbcec313e12",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
       "03 status": "fe6a5aeed1e9d3d9",
@@ -307,7 +349,7 @@
       "10 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P1-before:ko>": {
-      "00 strings": "0f2991d34c905b83",
+      "00 strings": "814d1fbcec313e12",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
       "03 status": "4bf8f9fca41d7293",
@@ -402,7 +444,7 @@
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P4-after:ko>": {
-      "00 strings": "0f2991d34c905b83",
+      "00 strings": "814d1fbcec313e12",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
       "03 status": "fe6a5aeed1e9d3d9",
@@ -497,7 +539,7 @@
       "10 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P4-before:ko>": {
-      "00 strings": "0f2991d34c905b83",
+      "00 strings": "814d1fbcec313e12",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
       "03 status": "4bf8f9fca41d7293",
@@ -592,7 +634,7 @@
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P5:ko>": {
-      "00 strings": "0f2991d34c905b83",
+      "00 strings": "814d1fbcec313e12",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
       "03 status": "fe6a5aeed1e9d3d9",
@@ -752,7 +794,7 @@
       "75 advanced-watch-log": "b8352ae5ec19bb8c"
     },
     "<advanced shot:P7-after:ko>": {
-      "00 strings": "0f2991d34c905b83",
+      "00 strings": "814d1fbcec313e12",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
       "03 status": "ec2612e542394790",
@@ -843,7 +885,7 @@
       "10 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P7-before:ko>": {
-      "00 strings": "0f2991d34c905b83",
+      "00 strings": "814d1fbcec313e12",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
       "03 status": "4bf8f9fca41d7293",
@@ -934,7 +976,7 @@
       "75 advanced-watch-log": "b8352ae5ec19bb8c"
     },
     "<advanced shot:P8:ko>": {
-      "00 strings": "0f2991d34c905b83",
+      "00 strings": "814d1fbcec313e12",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
       "03 status": "ec2612e542394790",
