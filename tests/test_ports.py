@@ -116,7 +116,11 @@ ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "holder", "loaded", "send",
                      "session_holder",
                      # v0.6.16-beta.4: the engine's own `codex --version`, which the version skew guard holds a terminal's
                      # or VS Code's conversation to (engine/kinds.py) - read only while the plug names such a kind.
-                     "engine_version"}
+                     "engine_version",
+                     # v0.6.17 (#47, P-7): whether a channel the plug named may wait for its receipt on a pool worker
+                     # beside others (domain/plughands.Channel) - read off the sender, never set; core's own backend has
+                     # none, so the engine reads it with a default and pools its own sends as before.
+                     "concurrent"}
 BACKEND_NAMES = ("backend", "sender")
 # What it reads out of Codex's own files, through the source: the turns, the markers that say a
 # continuation of ours is in the queue, what a recovered turn produced, and the projection's age.
