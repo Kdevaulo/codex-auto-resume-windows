@@ -382,6 +382,34 @@ class OneNameTests(unittest.TestCase):
                               ("python", "menu.open")}, found)
 
 
+class EditionWordOnceTests(unittest.TestCase):
+    """The edition-switch page's sentence names the editions by the catalog's own words (edition.advanced and
+    edition.standard, InstallerWords.EditionWord), and those already say "edition" in Korean (고급판, 표준판) and in
+    Chinese (高级版, 進階版): the v0.6.17 acceptance read "여기에는 고급판 에디션이 설치되어 있고, 이것은 표준판
+    에디션입니다", the word twice. Where a language's edition word carries its "edition", the sentence does not add
+    another."""
+
+    KEY = "installer.options.edition_change"
+    # Each language whose edition words carry the word "edition", and that word.
+    CARRIED = {"ko": ("판", "에디션"), "zh-CN": ("版", "版"), "zh-TW": ("版", "版")}
+
+    def said(self, locale):
+        table = l10n.catalog(locale)
+        return table[self.KEY].replace("{from}", table["edition.advanced"]).replace("{to}", table["edition.standard"])
+
+    def test_the_edition_is_said_once(self):
+        for locale, (ending, word) in self.CARRIED.items():
+            with self.subTest(locale):
+                table = l10n.catalog(locale)
+                for edition in ("edition.advanced", "edition.standard"):
+                    self.assertTrue(table[edition].endswith(ending), "%s %s carries the word" % (locale, edition))
+                    self.assertNotIn(table[edition] + " " + word, self.said(locale))
+                    self.assertNotIn(table[edition] + word, self.said(locale))
+
+    def test_the_korean_sentence_keeps_its_meaning(self):
+        self.assertEqual(self.said("ko"), "여기에는 고급판이 설치되어 있고, 이것은 표준판입니다.")
+
+
 class LoaderTests(unittest.TestCase):
     def setUp(self):
         self.saved_cache = dict(l10n._CACHE)

@@ -642,7 +642,7 @@
   "installer.maintain.repair": "修复",
   "installer.maintain.repair_help": "在原位置重新安装此版本。你的设置、所有等待中的内容和登录时运行的选择都会保留。",
   "installer.next": "下一步",
-  "installer.options.edition_change": "此处已安装 {from} 版，而当前是 {to} 版。",
+  "installer.options.edition_change": "此处已安装{from}，而当前是{to}。",
   "installer.options.edition_confirm": "更改版本",
   "installer.options.heading": "安装之前",
   "installer.options.kept": "这将更新此处的现有安装。你的设置、所有待处理项以及登录时运行的选择都会保留。",
