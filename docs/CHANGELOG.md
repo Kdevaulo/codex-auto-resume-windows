@@ -22,12 +22,13 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
   management service (WMI) wrote where Windows reads. Run from inside such an app, an install here would leave the
   entry in Settings > Apps, the start at sign-in, the notifications' name, the link handler and the Start menu
   entry out of Windows' sight. The Dashboard and the setup program now open again outside by themselves, and
-  `Install.cmd` and the installer script it runs - which an update and Repair go through - run again outside the
-  same way, passing on what they print and their exit code. Where one cannot get out, the Dashboard refuses
-  Repair, installing an update and *Install another version...* and says why, and the setup program says what
-  would stay inside the app before it installs or removes anything. The Dashboard decides from what its own
-  process descends from, so its refusal can be a false alarm; [the guide's troubleshooting entry](GUIDE.md) says
-  what to do either way.
+  `Install.cmd`, the installer script it runs - which an update and Repair go through - and the update script's own
+  repair, downgrade and watcher-start steps run again outside the same way, passing on what they print and their
+  exit code. Where one cannot get out, the Dashboard refuses Repair, installing an update, *Install another
+  version...* and a change to *Run at Windows sign-in*, and says why, and the setup program says what would stay
+  inside the app before it installs or removes anything. Each decides from what its own process descends from, so
+  the warning says it *may* be inside such an app - a tab of Windows Terminal, which is packaged too, can raise it;
+  [the guide's troubleshooting entry](GUIDE.md) says what to do either way.
 - **An update made in the Dashboard keeps the uninstaller again**, so the installation gets its Settings > Apps and
   winget entry back ([#43](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/43)). Every update the Dashboard started had left it out; the update to v0.6.17 itself
   repairs an install that lost it, and **Repair** now says when it cannot write the entry.

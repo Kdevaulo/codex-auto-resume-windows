@@ -266,10 +266,11 @@ Afterwards, change anything from **Start Menu → Codex Auto Resume**, or by ask
 a private view of the registry and of `%APPDATA%`, which Windows itself never reads. An installation or an update run
 from inside one of them - the setup program or `Install.cmd` run by an agent, or the Dashboard opened from the icon of
 a watcher that Codex started - could leave the entry in Settings > Apps, the sign-in start, the notifications' name,
-the link handler and the Start menu entry where Windows does not look. From v0.6.17 the setup programs, `Install.cmd`
-and the Dashboard notice it and run again outside that app by themselves, and a Dashboard that cannot get out refuses
-Repair, installing an update and **Install another version...** and says why. That answer rests on what the window was
-started from, so it can be wrong; open the Dashboard from the Start menu and do it there. If it happened anyway, open the Dashboard from the Start menu - or, where the Start
+the link handler and the Start menu entry where Windows does not look. From v0.6.17 the setup programs, `Install.cmd`,
+the update script's own repair steps and the Dashboard notice it and run again outside that app by themselves, and a
+Dashboard that cannot get out refuses Repair, installing an update, **Install another version...** and a change to
+**Run at Windows sign-in**, and says why. That answer rests on what the window was started from, so it can be wrong - a
+tab of Windows Terminal, which is packaged too, can raise it; open the Dashboard from the Start menu and do it there. If it happened anyway, open the Dashboard from the Start menu - or, where the Start
 menu has no entry, `CodexAutoResumeSettings.exe` in `%USERPROFILE%\.codex-auto-resume` from File Explorer - and choose
 **Repair installation** on its Diagnostics page.
 
