@@ -129,7 +129,6 @@
   "page.kept.not_delivered_on_open": "Pozostała włączona, chociaż Codex nie wykonał wiadomości z kolejki po otwarciu jej rozmowy.",
   "page.kept.not_dispatched_by_session": "Pozostała włączona, chociaż sesja w terminalu lub VS Code nie odebrała na czas wiadomości dodanej dla niej do kolejki.",
   "page.kept.refused_by_codex": "Pozostała włączona, chociaż Codex odmówił rozpoczęcia tury bez słów.",
-  "page.voided": "Nie mogła nic zrobić przy przywracaniu, które przejęła: funkcja „{name}” odpowiedziała dla tego samego przywracania tak, że nie zostało jej nic do zrobienia.",
   "page.kept.requirement_off": "Funkcja pozostała włączona, choć funkcja, której wymaga, nie jest już włączona.",
   "page.kept.statement_changed": "Funkcja pozostała włączona, choć zmieniło się to, co robi. Przeczytaj opis ponownie i włącz ją, aby potwierdzić.",
   "page.kept.submission_unknown": "Funkcja pozostała włączona, choć nie mogła dowieść, że wysłana przez nią kontynuacja dotarła.",

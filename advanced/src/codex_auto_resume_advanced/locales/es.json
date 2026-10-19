@@ -129,7 +129,6 @@
   "page.kept.not_delivered_on_open": "Siguió activada aunque Codex no ejecutó un mensaje en cola al abrirse su conversación.",
   "page.kept.not_dispatched_by_session": "Siguió activada aunque una sesión del terminal o de VS Code no tomó a tiempo un mensaje puesto en cola para ella.",
   "page.kept.refused_by_codex": "Siguió activada aunque Codex se negó a iniciar un turno sin palabras.",
-  "page.voided": "No pudo actuar en una recuperación que había asumido: «{name}» respondió por la misma recuperación de un modo que no le dejó nada que hacer.",
   "page.kept.requirement_off": "Siguió activada aunque una función que necesita ya no está activada.",
   "page.kept.statement_changed": "Siguió activada aunque cambió lo que hace. Vuelve a leerlo y actívala para confirmarlo.",
   "page.kept.submission_unknown": "Siguió activada aunque no pudo demostrar que llegó una continuación que envió.",

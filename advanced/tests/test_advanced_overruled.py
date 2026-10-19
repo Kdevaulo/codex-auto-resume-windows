@@ -6,8 +6,8 @@ continuation answers P5 and P15 for every send, and taken there for a continuati
 record waiting with notLoaded and nothing sent, while the journal said queue_for_open had acted. Now marker-free stands
 aside for that send - core's backend sends it with its marker, into Codex's queue - and says so: an `overruled` journal
 line that names the capability it stood aside for. That is a split - each goes on serving its own cases - so the
-Dashboard shows nothing for it; the word there is for a capability whose answer another one voided (VoidTests). A
-conversation the app holds it still serves through its own channel.
+Dashboard shows nothing for it, and a split is the only way two such answers are settled (RuleTests). A conversation
+the app holds it still serves through its own channel.
 
 Held against the shipped definitions and statements and against core's own engine, store and simulated Codex home
 (takingcase.py); marker-free's channel speaks to the fake app server of test_advanced_marker_free.
@@ -111,8 +111,9 @@ class ForOpenTests(BothArmedCase):
         self.assertNotIn(JournalCode.ACTED, [code for code, _point, _answer in lines], "not a silent 'acted'")
         self.assertIn((JournalCode.ACTED, Point.UNLOADED, Alternative.QUEUE_FOR_OPEN), self.journal(plug))
         # A split: each serves its own cases, so neither shows a word on the Dashboard.
-        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["voided_by"])
-        self.assertIsNone(self.listed(plug, self.cap)["voided_by"])
+        for capability in (MARKER_FREE_ID, self.cap):
+            listed = self.listed(plug, capability)
+            self.assertEqual((listed["state"], listed["notice"], listed["reason"]), ("armed", None, None))
 
 
 class MeasuredTests(BothArmedCase):
@@ -208,36 +209,35 @@ class ToSessionTests(SessionsCase):
         self.assertNotIn(JournalCode.ACTED, [line[0] for line in lines])
 
 
-class VoidTests(BothArmedCase):
-    """The general mechanism's other settlement (runtime.CONFLICTS' VOID), held on the same pair configured so: the
-    later answer is taken, the earlier one is not paid for, and its capability - which could not act at all on a
-    record it took up - is journalled as voided by the other and shown so on the Dashboard."""
+class RuleTests(BothArmedCase):
+    """A split is the only settlement (runtime._conflicts): P16's answer is core's before P5 and P15 are asked, so a
+    later answer cannot void it - core would carry it unpaid, the watch take it back, and it go again."""
 
-    def setUp(self):
-        super().setUp()
-        voiding = tuple(line[:4] + (runtime.VOID,) for line in runtime.CONFLICTS)
-        patcher = patch.object(runtime, "CONFLICTS", voiding)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+    def test_a_line_that_would_void_an_earlier_answer_is_refused_where_conflicts_is_made(self):
+        """Fails with the refusal reverted: a VOID line was taken."""
+        line = runtime.CONFLICTS[0]
+        with self.assertRaises(ValueError):
+            runtime._conflicts((line[:4] + ("void",),))
+        with self.assertRaises(ValueError):
+            runtime._conflicts(((Point.SENDER, line[1], frozenset({Point.SENDER}), line[3], runtime.SPLIT),))
+        self.assertEqual(runtime._conflicts((line,)), (line,))
 
-    def test_a_voided_answer_is_journalled_naming_the_other_and_the_dashboard_says_which(self):
-        """Fails with the mechanism reverted: nothing journals queue_for_open's answer as voided, nor lists it."""
-        plug = self.armed()
-        self.due()
-        self.h.tick()
-        journal = self.journal(plug)
-        self.assertIn((JournalCode.VOIDED, Point.UNLOADED, MARKER_FREE_ID), journal)
-        self.assertIn((JournalCode.ACTED, Point.SENDER, Point.SENDER), self.marker_free_journal(plug))
-        self.assertEqual(self.listed(plug, self.cap)["voided_by"], MARKER_FREE_ID)
-        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["voided_by"])
-        self.assertNotIn(self.cap, self.spent_by(plug), "a voided answer is not paid for")
-        # Turned off it shows none; turned on again it is let go of - the word is about since it stood where it stands.
-        self.h.now += 5
-        self.assertTrue(plug.runtime.arming.disarm(self.cap, actor=Actor.DASHBOARD)["done"])
-        self.assertIsNone(self.listed(plug, self.cap)["voided_by"])
-        self.h.now += 5
-        self.arm(plug)
-        self.assertIsNone(self.listed(plug, self.cap)["voided_by"])
+    def test_a_void_put_there_afterwards_is_settled_as_a_split_and_nothing_goes_unpaid(self):
+        """The reviewer's configuration: CONFLICTS patched to VOID. Fails with VOID honoured again: marker-free's
+        channel was taken, core carried the 'voided' QUEUE_FOR_OPEN unpaid, the watch took it back and it went again."""
+        voiding = tuple(line[:4] + ("void",) for line in runtime.CONFLICTS)
+        with patch.object(runtime, "CONFLICTS", voiding):
+            plug = self.armed()
+            self.due()
+            self.h.tick()
+            for _ in range(120):
+                self.h.tick(advance=60)
+        row = self.h.record()
+        self.assertEqual(row["state"], "queued", row["last_error"])
+        self.assertEqual(len(self.h.backend.send_calls), 1, "core's backend, once, with its marker")
+        self.assertEqual(self.fake.adds(), [], "marker-free sent nothing")
+        self.assertEqual(self.spent_by(plug), [self.cap], "queue for opening paid for what it queued")
+        self.assertIn((JournalCode.OVERRULED, Point.SENDER, self.cap), self.marker_free_journal(plug))
 
 
 class LoadedTests(BothArmedCase):
@@ -257,7 +257,6 @@ class LoadedTests(BothArmedCase):
         lines = self.marker_free_journal(plug)
         self.assertIn((JournalCode.ACTED, Point.SENDER, Point.SENDER), lines)
         self.assertNotIn(JournalCode.OVERRULED, [code for code, _point, _answer in lines])
-        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["voided_by"])
         self.assertEqual(self.spent_by(plug), [MARKER_FREE_ID])
 
 

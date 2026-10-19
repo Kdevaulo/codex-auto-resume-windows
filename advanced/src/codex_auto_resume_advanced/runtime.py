@@ -35,18 +35,20 @@ With no capability at a point, nothing is read and nothing is written: the answe
 
 Two capabilities' answers for one record that cannot both be carried (v0.6.17, issue #42). CONFLICTS lists each such
 pair of answers: one taken at an earlier point for a record this tick, and one at a later point for the same record
-that core could not carry with it - and how the two are settled, which every pair names:
+that core could not carry with it. There is one way to settle them, SPLIT: the later answer is not taken. Its
+capability stands aside for that record, and the journal says so - an `overruled` line on it whose answer names the
+capability it stood aside for, and whose reason says why, where its code said (`carries`). Each goes on serving its
+own cases; nothing is shown on the Dashboard for a split. Only an armed answer is overruled: a watched capability's
+answer is a would-have, as always.
 
-* SPLIT: the later answer is not taken. Its capability stands aside for that record, and the journal says so - an
-  `overruled` line on it whose answer names the capability it stood aside for, and whose reason says why, where its
-  code said (`carries`). Each goes on serving its own cases; nothing is shown on the Dashboard for a split.
+The earlier answer is never the one dropped: core has already taken it when the later point is asked (P16's route is
+handed to the dispatch that then asks P5 and P15), so dropping it here would leave core carrying an answer nobody pays
+for. A line that settles any other way is refused where CONFLICTS is made (`_conflicts`), and is settled as a split
+if one is ever put there afterwards.
 
 A capability whose code has `carries(word)` is asked first whether it can carry its answer together with the earlier
-one, the word that was: True, and there is no conflict - both are taken and paid for; anything else, and the pair is
-settled as CONFLICTS says, with that answer as the reason where it is one of the statement's warning words.
-* VOID: the later answer is taken, and the earlier one can no longer be carried: it is not paid for at the claim, and
-  its capability, which could not act at all on a record it took up, gets a `voided` line naming the capability whose
-  answer voided it - which the Dashboard shows under where it stands (arming.listing's `voided_by`).
+one, the word that was: True, and there is no conflict - both are taken and paid for; anything else, and it stands
+aside, with that answer as the reason where it is one of the statement's warning words.
 
 Core carries P16's TO_SESSION only through its own backend, with its marker, and QUEUE_FOR_OPEN that way or through
 a channel the plug named under a client id it named (core's engine/foropen._not_for_open): anything else for that
@@ -120,8 +122,8 @@ KEEP_GOING = "keep_going"
 # The reasons a start route was not named that nothing else in the journal says (v0.6.16-beta.3): a
 # turn off has its own line, a watched answer its would-have; held back by Codex or a policy has none.
 HELD_WORDS = frozenset({"compat_unknown", "engine_unknown", "policy", "refused", "off"})
-# How two answers of CONFLICTS are settled (v0.6.17): the later stands aside, or the earlier is voided.
-SPLIT, VOID = "split", "void"
+# How two answers of CONFLICTS are settled (v0.6.17): the later stands aside - the one way there is.
+SPLIT = "split"
 
 
 def _taken(point, answer) -> bool:
@@ -191,17 +193,33 @@ def _not_ordinary(point, answer) -> bool:
         return False
 
 
+def _conflicts(lines) -> tuple:
+    """`lines` as CONFLICTS holds them, each checked: an earlier point, the words its answer may be, the later points -
+    every one asked after it - which of their answers core could not carry with it, and SPLIT. Anything else is
+    refused (ValueError): an earlier answer core has already taken cannot be voided by a later one."""
+    checked = []
+    for line in lines:
+        first, words, later, refuses, settled = line
+        if settled != SPLIT:
+            raise ValueError("a later answer cannot void one core has already taken: settle the pair as SPLIT")
+        if first in later or not callable(refuses) or not words:
+            raise ValueError("not a pair of an earlier and a later answer")
+        checked.append((first, frozenset(words), frozenset(later), refuses, SPLIT))
+    return tuple(checked)
+
+
 # v0.6.17 (issue #42): the answers that cannot both be carried for one record - (the point an earlier answer was taken
-# at, the words it may be, the later points, which of their answers core could not carry with it, how the two are
-# settled). P16's QUEUE_FOR_OPEN and TO_SESSION go only core's ordinary way (core's engine/foropen._not_for_open).
-CONFLICTS = ((Point.UNLOADED, QUEUED, frozenset({Point.SENDER, Point.DELIVERY}), _not_ordinary, SPLIT),)
+# at, the words it may be, the later points, which of their answers core could not carry with it, SPLIT). P16's
+# QUEUE_FOR_OPEN and TO_SESSION go only core's ordinary way (core's engine/foropen._not_for_open); P16 is asked before
+# the dispatch asks P5 and P15.
+CONFLICTS = _conflicts(((Point.UNLOADED, QUEUED, frozenset({Point.SENDER, Point.DELIVERY}), _not_ordinary, SPLIT),))
 
 
 def _conflict(earlier, point, answer, carries=None):
-    """The first of `earlier` (Runtime._earlier) that `answer` at `point` cannot be carried with - (entry, how the two
-    are settled, why: one of the statement's warning words or None) - or None. `carries` is the capability's own
-    `carries(word)`, where its code has one: True, and that earlier answer is no conflict."""
-    for entry, (_first, _words, _later, refuses, settled) in earlier:
+    """The first of `earlier` (Runtime._earlier) that `answer` at `point` cannot be carried with - (entry, why: one of
+    the statement's warning words or None) - or None. `carries` is the capability's own `carries(word)`, where its code
+    has one: True, and that earlier answer is no conflict. Every conflict is settled as a split, whatever a line says."""
+    for entry, (_first, _words, _later, refuses, _settled) in earlier:
         if not refuses(point, answer):
             continue
         why = None
@@ -212,7 +230,7 @@ def _conflict(earlier, point, answer, carries=None):
                 why = None
             if why is True:
                 continue
-        return entry, settled, (why if isinstance(why, str) and why in tuple(ArmingWarning) else None)
+        return entry, (why if isinstance(why, str) and why in tuple(ArmingWarning) else None)
     return None
 
 
@@ -398,7 +416,7 @@ class Runtime:
         kept = point == Point.UNLOADED and foropen.watching(record)
         # v0.6.17 (issue #42): what was taken earlier for this record that an answer here may not be carried with.
         earlier = self._earlier(key, point)
-        chosen = chooser = voids = None
+        chosen = chooser = None
         for definition in definitions:
             state = states.get(definition.id, ArmingState.OFF)
             if state == ArmingState.OFF or (definition.id, key) in self._skipped:
@@ -413,9 +431,9 @@ class Runtime:
                 continue
             conflict = _conflict(earlier, point, answer,
                                  _own(self._code_of(definition), "carries") if earlier else None)
-            if conflict is not None and conflict[1] == SPLIT:
+            if conflict is not None:
                 # Taken, core could carry neither: it stands aside for this record, and says for whom and why.
-                self._paired(JournalCode.OVERRULED, definition, point, conflict[0][1], record, reason=conflict[2])
+                self._paired(JournalCode.OVERRULED, definition, point, conflict[0][1], record, reason=conflict[1])
                 continue
             if state == ArmingState.SHADOW:
                 self._once(JournalCode.WOULD_HAVE, definition, point, answer, record)
@@ -431,7 +449,7 @@ class Runtime:
                     if relaxing and answer in HELD_AT_CEILING:
                         return Alternative.HOLD          # it waits for a unit, and does not end
                     continue
-            chosen, chooser, voids = answer, definition, conflict
+            chosen, chooser = answer, definition
         if chooser is None:
             if relaxing and self._unsure(record, admission):
                 return Alternative.HOLD
@@ -445,8 +463,6 @@ class Runtime:
         if point in SENDING and not kept:
             self._acted.setdefault(record.get("interruption_id"), set()).add(
                 (point, chooser.id, _word(chosen, point)))
-        if voids is not None:
-            self._void(voids[0], chooser, key, record)
         self._once(JournalCode.ACTED, chooser, point, chosen, record)
         return chosen
 
@@ -467,18 +483,9 @@ class Runtime:
                     continue
         return tuple(found)
 
-    def _void(self, entry, chooser, key, record) -> None:
-        """The earlier answer `entry` can no longer be carried now that `chooser`'s is taken (VOID): it is not paid for
-        at the claim, and its capability is journalled as voided by `chooser`'s."""
-        self._acted.get(key, set()).discard(entry)
-        definition = self.registry.get(entry[1])
-        if definition is not None:
-            self._paired(JournalCode.VOIDED, definition, entry[0], chooser.id, record)
-
     def _paired(self, code, definition, point, other, record, reason=None) -> None:
         """One journal line, once per record in a process, about `definition` and the capability `other`, which its
-        answer names: `overruled` - it stood aside for that one, for `reason` where one is known - or `voided` - that
-        one's answer voided its own."""
+        answer names: `overruled` - it stood aside for that one, for `reason` where one is known."""
         key = (code, definition.id, point, other, record.get("interruption_id") if isinstance(record, dict) else None)
         if key in self._noted:
             return

@@ -52,7 +52,7 @@ def _answer(value):
 class JournalMixin:
     def _answer(self, value):
         """`_answer`'s word, or (v0.6.17) the id of a capability the registry holds - the other capability an
-        `overruled` or `voided` line names. Still never a value a capability gave."""
+        `overruled` line names. Still never a value a capability gave."""
         if isinstance(value, str) and self.registry.get(value) is not None:
             return value
         return _answer(value)
@@ -109,20 +109,6 @@ class JournalMixin:
                  "point": _closed(row["point"], Point),
                  "answer": self._answer(row["answer"])}
                 for row in rows]
-
-    def newest(self, code) -> dict:
-        """{capability: {"at", "point", "answer"}}: each capability's newest journal line with `code` (v0.6.17), for a
-        surface to show - never read to decide anything, as no journal line is."""
-        with self._read() as connection:
-            if connection is None:
-                return {}
-            rows = connection.execute(
-                "SELECT capability, at, point, answer FROM journal WHERE event_id IN "
-                "(SELECT MAX(event_id) FROM journal WHERE code=? AND capability IS NOT NULL GROUP BY capability)",
-                (str(code),)).fetchall()
-        return {row["capability"]: {"at": row["at"], "point": _closed(row["point"], Point),
-                                    "answer": self._answer(row["answer"])}
-                for row in rows if self.registry.get(row["capability"]) is not None}
 
     # ------------------------------------------------------------------ sampler
     def sample(self, capability, code, at=None) -> bool:

@@ -129,7 +129,6 @@
   "page.kept.not_delivered_on_open": "對話開啟時 Codex 沒有執行為它排入佇列的訊息，但仍保持開啟。",
   "page.kept.not_dispatched_by_session": "雖然終端機或 VS Code 的工作階段沒有及時取走為它排入佇列的訊息，它仍保持開啟。",
   "page.kept.refused_by_codex": "雖然 Codex 拒絕開始一個沒有文字的回合，它仍保持開啟。",
-  "page.voided": "無法處理它接手的一次復原：「{name}」對同一次復原的回應讓它無事可做。",
   "page.kept.requirement_off": "它仍維持開啟，儘管它所需要的功能已不再開啟。",
   "page.kept.statement_changed": "它的作用已經變更，但它維持開啟。請重新閱讀，並開啟它以確認。",
   "page.kept.submission_unknown": "它無法證明自己傳送的接續訊息已送達，但它維持開啟。",

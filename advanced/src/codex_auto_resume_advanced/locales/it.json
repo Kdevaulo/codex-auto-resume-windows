@@ -129,7 +129,6 @@
   "page.kept.not_delivered_on_open": "È rimasta accesa anche se Codex non ha eseguito un messaggio in coda all'apertura della sua conversazione.",
   "page.kept.not_dispatched_by_session": "È rimasta attiva anche se una sessione del terminale o di VS Code non ha preso in tempo un messaggio messo in coda per lei.",
   "page.kept.refused_by_codex": "È rimasta attiva anche se Codex ha rifiutato di avviare un turno senza parole.",
-  "page.voided": "Non ha potuto agire su un recupero che aveva preso in carico: «{name}» ha risposto per lo stesso recupero in un modo che non le ha lasciato nulla da fare.",
   "page.kept.requirement_off": "È rimasta attiva anche se una funzione che richiede non è più attiva.",
   "page.kept.statement_changed": "È rimasta attiva anche se ciò che fa è cambiato. Rileggilo e attivala per confermare.",
   "page.kept.submission_unknown": "È rimasta attiva anche se non ha potuto provare che una continuazione che ha inviato sia arrivata.",

@@ -605,7 +605,6 @@
   "statement.silent_continuation.stop": "Turn it off here or turn every advanced feature off; continuations then carry their words and marker again.",
   "page.tripped.refused_by_codex": "Turned off: Codex refused to start a turn with no words.",
   "page.kept.refused_by_codex": "It stayed on although Codex refused to start a turn with no words.",
-  "page.voided": "It could not act on a recovery it took up: {name} answered for the same recovery in a way that left it nothing to do.",
   "page.runs.title": "Turns run here now",
   "page.runs.none": "No turn is running here.",
   "page.runs.until": "until {time} at most",

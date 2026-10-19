@@ -129,7 +129,6 @@
   "page.kept.not_delivered_on_open": "Vẫn bật dù Codex không chạy một tin nhắn trong hàng đợi khi cuộc trò chuyện của nó được mở.",
   "page.kept.not_dispatched_by_session": "Vẫn bật dù một phiên trong terminal hoặc VS Code không nhận kịp một tin nhắn được xếp hàng cho nó.",
   "page.kept.refused_by_codex": "Vẫn bật dù Codex từ chối bắt đầu một lượt không có lời nào.",
-  "page.voided": "Không thể làm gì với một lần khôi phục mà nó đã nhận: “{name}” đã trả lời cho cùng lần khôi phục đó theo cách không để lại việc gì cho nó.",
   "page.kept.requirement_off": "Nó vẫn bật dù một tính năng mà nó cần không còn bật.",
   "page.kept.statement_changed": "Nó vẫn bật dù những gì nó làm đã thay đổi. Hãy đọc lại và bật nó để xác nhận.",
   "page.kept.submission_unknown": "Nó vẫn bật dù không chứng minh được tin nhắn tiếp tục nó gửi đã đến.",

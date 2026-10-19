@@ -129,7 +129,6 @@
   "page.kept.not_delivered_on_open": "对话打开时 Codex 没有运行为它排队的消息，但仍保持开启。",
   "page.kept.not_dispatched_by_session": "虽然终端或 VS Code 的会话没有及时取走为它排队的消息，它仍保持开启。",
   "page.kept.refused_by_codex": "虽然 Codex 拒绝开始一个没有文字的回合，它仍保持开启。",
-  "page.voided": "无法处理它接手的一次恢复：“{name}”对同一次恢复的回应让它无事可做。",
   "page.kept.requirement_off": "它仍保持开启，尽管它所需要的功能已不再开启。",
   "page.kept.statement_changed": "它的作用已经改变，但它保持开启。请重新阅读，并开启它以确认。",
   "page.kept.submission_unknown": "它无法证明自己发送的续接消息已送达，但它保持开启。",

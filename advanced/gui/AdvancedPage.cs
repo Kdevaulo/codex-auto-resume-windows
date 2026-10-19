@@ -953,16 +953,6 @@ namespace CodexAutoResume
                 line.Margin = Pad(0, Brand.SpaceS, 0, 0);
                 head.Controls.Add(line);
             }
-            // v0.6.17: that it could not act on a recovery it took up because another feature's answer voided its own, in
-            // the accent beside it, naming that feature. Two features that each serve their own cases show nothing.
-            string voided = VoidedText(item);
-            if (voided != null)
-            {
-                Label line = HelpText(voided);
-                line.ForeColor = Accent;
-                line.Margin = Pad(0, Brand.SpaceS, 0, 0);
-                head.Controls.Add(line);
-            }
             // What an administrator's policy refuses, in the accent, as Diagnostics says what needs noticing under its facts
             // (diagUpgrade, diagPlugin). Lines rather than callouts: a callout holds each of its words whole, and this
             // column is narrower than the compatibility card's, where a sentence of Japanese - one word to it - fits.
@@ -1518,15 +1508,6 @@ namespace CodexAutoResume
             else if (reason == "refused_by_codex")
                 said = Word("page.tripped.refused_by_codex", "Turned off: Codex refused to start a turn with no words.");
             return said ?? Word("page.tripped", "It turned itself off.");
-        }
-
-        /// That another feature's answer voided one `item` gave for a recovery it took up, since it stood where it stands
-        /// (the list's voided_by, v0.6.17), in words naming that feature, or null where none did.
-        private string VoidedText(Dictionary<string, object> item)
-        {
-            string by = Str(item, "voided_by");
-            if (string.IsNullOrEmpty(by)) return null;
-            return Word("page.voided", "It could not act on a recovery it took up: {name} answered for the same recovery in a way that left it nothing to do.", "name", AdvancedName(by));
         }
 
         private bool PolicyAdmits(string id)

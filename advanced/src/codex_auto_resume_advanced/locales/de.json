@@ -129,7 +129,6 @@
   "page.kept.not_delivered_on_open": "Sie blieb an, obwohl Codex eine eingereihte Nachricht beim Öffnen der Unterhaltung nicht ausgeführt hat.",
   "page.kept.not_dispatched_by_session": "Sie blieb an, obwohl eine Sitzung im Terminal oder in VS Code eine für sie eingereihte Nachricht nicht rechtzeitig übernommen hat.",
   "page.kept.refused_by_codex": "Sie blieb an, obwohl Codex sich geweigert hat, einen Durchgang ohne Worte zu starten.",
-  "page.voided": "Sie konnte bei einer Wiederherstellung, die sie übernommen hatte, nichts tun: „{name}“ hat für dieselbe Wiederherstellung so geantwortet, dass ihr nichts zu tun blieb.",
   "page.kept.requirement_off": "Die Funktion blieb eingeschaltet, obwohl eine benötigte Funktion nicht mehr eingeschaltet ist.",
   "page.kept.statement_changed": "Die Funktion blieb eingeschaltet, obwohl sich geändert hat, was sie tut. Lesen Sie es erneut und schalten Sie sie zur Bestätigung ein.",
   "page.kept.submission_unknown": "Die Funktion blieb eingeschaltet, obwohl sie nicht belegen konnte, dass eine von ihr gesendete Fortsetzung angekommen ist.",

@@ -129,7 +129,6 @@
   "page.kept.not_delivered_on_open": "Konuşması açıldığında Codex kuyruktaki bir iletiyi çalıştırmadığı hâlde açık kaldı.",
   "page.kept.not_dispatched_by_session": "Bir terminal ya da VS Code oturumu, onun için sıraya konan bir iletiyi zamanında almasa da açık kaldı.",
   "page.kept.refused_by_codex": "Codex sözcüksüz bir tur başlatmayı reddetse de açık kaldı.",
-  "page.voided": "Üstlendiği bir kurtarmada hiçbir şey yapamadı: “{name}” aynı kurtarma için ona yapacak bir şey bırakmayan bir yanıt verdi.",
   "page.kept.requirement_off": "Gerektirdiği bir özellik artık açık olmadığı hâlde açık kaldı.",
   "page.kept.statement_changed": "Yaptığı şey değiştiği hâlde açık kaldı. Yeniden okuyun ve onaylamak için açın.",
   "page.kept.submission_unknown": "Gönderdiği bir devam mesajının ulaştığını kanıtlayamadığı hâlde açık kaldı.",

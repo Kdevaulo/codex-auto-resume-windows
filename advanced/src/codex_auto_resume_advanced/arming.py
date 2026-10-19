@@ -78,8 +78,8 @@ from .state.choices import DAY, RECENT_DAYS, RULES_LIMIT, aggregated, tag_proble
 from .statement import CATALOGS
 from .vocabulary import ContinuationReason, PromptReason  # noqa: E402  (v0.6.15-beta)
 from .vocabulary import (KEPT_NOTICES, TRIPWIRES, Actor, ArmingState, ArmingWarning, CapabilityKind,
-                         JournalCode, KeepOn, Measurement, OffReason, OverrideKind, RecordState, Refusal,
-                         RuleReason, RuleState, Verdict)
+                         KeepOn, Measurement, OffReason, OverrideKind, RecordState, Refusal, RuleReason,
+                         RuleState, Verdict)
 from .state.resets import CREDIT
 
 # The actors a person turns a capability off through.
@@ -204,19 +204,6 @@ def departs(definition, row) -> list:
     if (row or {}).get("send_again"):
         found += [standard for standard in ONCE_MORE.departs_from if standard not in found]
     return found
-
-
-def _voided_by(line, row, registry):
-    """The capability whose answer voided one a capability gave for a record it took up (v0.6.17, runtime.CONFLICTS'
-    VOID) - its newest `voided` line's answer, a capability the registry holds - where that line is from since it stood
-    where it stands now; None otherwise. Turning it on again is how it is let go of. A split (`overruled`) is never
-    shown: each of the two goes on serving its own cases."""
-    if not isinstance(line, dict):
-        return None
-    since, at, other = row.get("since"), line.get("at"), line.get("answer")
-    if not isinstance(at, (int, float)) or (isinstance(since, (int, float)) and at < since):
-        return None
-    return other if isinstance(other, str) and registry.get(other) is not None else None
 
 
 def kept_words(keep_on, send_again) -> list:
@@ -1146,10 +1133,6 @@ class Arming:
             rows, meta = self.state.arming(), self.state.meta()
         except StateError:
             rows, meta = {}, {"generation": 0, "global_hourly": GLOBAL_HOURLY}
-        try:
-            voided = self.state.newest(JournalCode.VOIDED)
-        except StateError:
-            voided = {}
         shown = []
         # In the order a person reads them (registry.SHOWN_ORDER), not the order they answer in.
         for definition in _shown(self.registry):
@@ -1164,9 +1147,6 @@ class Arming:
                 # so is never given Send again.
                 "keep_on": bool(row.get("keep_on")), "send_again": bool(row.get("send_again")),
                 "notice": None if off else row.get("reason"), "resends": definition.resends,
-                # v0.6.17: the capability whose answer last voided one it gave for a record it took up, since it
-                # stood where it stands (runtime.CONFLICTS), or None - never shown for one that is off.
-                "voided_by": None if off else _voided_by(voided.get(definition.id), row, self.registry),
                 # v0.6.16-beta.4: whether Keep on is offered at all (registry.keepable).
                 "keepable": definition.keepable,
                 "revision": definition.revision, "read_revision": row.get("statement_revision"),
