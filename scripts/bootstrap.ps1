@@ -559,10 +559,11 @@ function Resolve-OutsideRun {
     if ($null -ne $code) { return $code }
     $name = $app
     if ($app.LastIndexOf('_') -gt 0) { $name = $app.Substring(0, $app.LastIndexOf('_')) }
-    Warn ('This runs inside ' + $name + ', and Windows keeps what is registered from there inside that app: the ' +
-          'entry in Settings > Apps, the start at sign-in, the notifications'' name, the link handler and the Start ' +
-          'menu entry. Run Install.cmd from File Explorer, or afterwards open the Dashboard from the Start menu and ' +
-          'choose Repair installation.')
+    Warn ('This may be running inside ' + $name + '. A program started from the Codex app, Claude or another app ' +
+          'installed as a package can be, and Windows then keeps what it registers inside that app: the entry in ' +
+          'Settings > Apps, the start at sign-in, the notifications'' name, the link handler and the Start menu ' +
+          'entry. If Settings > Apps lacks the entry or it does not start at sign-in, open the Dashboard from the ' +
+          'Start menu and choose Repair installation.')
     return $null
 }
 # <<< the outside gate

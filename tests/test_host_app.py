@@ -302,9 +302,22 @@ class InstallerGateTests(unittest.TestCase):
         self.assertEqual(self.lines(done, "CODE "), ["none"])
         warnings = [line for line in done.stdout.splitlines() if line.startswith("  [!]")]
         self.assertEqual(len(warnings), 1, done.stdout)
-        self.assertIn("inside OpenAI.Codex,", warnings[0])
+        self.assertIn("may be running inside OpenAI.Codex.", warnings[0])
         for named in ("Settings > Apps", "sign-in", "Start menu", "Repair installation"):
             self.assertIn(named, warnings[0])
+
+    def test_every_word_of_it_allows_for_an_ancestor_that_keeps_no_private_view(self):
+        """A packaged ancestor is not always an app with a private view - Windows Terminal is packaged, and a shell in
+        one of its tabs counts as inside it. The relaunch is kept (it costs nothing there); what is said where it fails
+        says what may be so: the scripts' warning, and the window's English, which is the catalog's."""
+        catalog = json.loads((LOCALES / "en.json").read_text(encoding="utf-8"))
+        self.assertTrue(catalog["diag.inside_app"].startswith("This Dashboard may have been opened from inside {app}."))
+        self.assertTrue(catalog["installer.inside_app"].startswith("This may have been started from inside {app}."))
+        self.assertIn('"%s"' % catalog["diag.inside_app"], guiscan.member_body("SettingsForm", "RefusedInside"))
+        self.assertIn('"%s"' % catalog["installer.inside_app"], guiscan.member_body("InstallerWindow", "InsideNote"))
+        for script in (INSTALL, BOOTSTRAP_TEXT):
+            self.assertIn("Warn ('This may be running inside ' + $name", outside_gate(script))
+            self.assertNotIn("This runs inside", script)
 
     def test_the_gate_runs_before_anything_else_the_script_does(self):
         gate = INSTALL.index("$outsideCode = Resolve-OutsideRun -Script $PSCommandPath")
