@@ -20,6 +20,7 @@ It holds no memory of its own: what it reads is the state's, through its view (s
 """
 from __future__ import annotations
 
+from codex_auto_resume import failures
 from codex_auto_resume.domain.plug import DEFER, Alternative
 
 from ..vocabulary import OptionKey, OverrideKind
@@ -59,6 +60,11 @@ class QueueForOpen:
         # v0.6.16-beta.4: queued only for a conversation the running app does not hold - never one asked with the
         # app closed or held by another session; the watch, which hands neither, asks only whether to keep it.
         if not watching(record) and record.get("holder") != APP_FREE:
+            return DEFER
+        # v0.6.17 (#47, P-5): usage-limited records only, as its definition and statement say. Core never asks P3 for
+        # a record queued for opening, so a full context window queued here would skip compact_continue's hold until
+        # /compact and run on a full window on open; a network or server failure is not what it was turned on for.
+        if not watching(record) and record.get("category") != failures.USAGE_LIMIT:
             return DEFER
         try:
             override = scoped.request(key)

@@ -28,7 +28,7 @@ from codex_auto_resume_advanced.codex.turns import Turns  # noqa: E402
 from codex_auto_resume_advanced.registry import (COMPACT_CONTINUE, GOAL_CONTINUATION, MARKER_FREE,  # noqa: E402
                                                  QUEUE_FOR_OPEN, RESET_CREDIT, SILENT_CONTINUATION, USAGE_METER,
                                                  USAGE_PAUSE)
-from codex_auto_resume_advanced.vocabulary import Actor, SpendOutcome  # noqa: E402
+from codex_auto_resume_advanced.vocabulary import Actor, JournalCode, SpendOutcome  # noqa: E402
 from test_engine import T1  # noqa: E402
 
 CONTEXT_FULL = json.dumps({"codexErrorInfo": "contextWindowExceeded"})
@@ -52,9 +52,9 @@ class CompactBesideQueueForOpenTests(TakingCase):
         plug.runtime._code_of(self.DEFINITION)._turns = Turns((h or self.h).home.root)
         return plug
 
-    @unittest.expectedFailure
+    # Fixed in v0.6.17 (#47): queue_for_open takes up usage-limited records only, so compact's hold is asked again.
     def test_a_full_context_window_is_not_queued_for_open_uncompacted(self):
-        self.armed()
+        plug = self.armed()
         self.failing(CONTEXT_FULL)
         self.h.tick()
         (row,) = self.h.records()
@@ -64,6 +64,23 @@ class CompactBesideQueueForOpenTests(TakingCase):
         for _ in range(30):
             self.h.tick(advance=60)
         self.assertEqual(self.h.backend.send_calls, [], "held until a compaction turn is the latest")
+        self.assertEqual(self.h.record()["last_error"], "notLoaded", "it waits for the app, as A11 says")
+        self.assertIsNone(plug.runtime.state.override(row["interruption_id"], QUEUE_FOR_OPEN.id), "never queued")
+        self.h.backend.loaded_map[T1] = "loaded"             # opened: compact_continue's hold is asked, and holds
+        for _ in range(5):
+            self.h.tick(advance=60)
+        self.assertEqual(self.h.backend.send_calls, [], "held in the app until the person compacts")
+        self.assertIn((JournalCode.ACTED, Point.GATES, Alternative.HOLD), self.journal(plug))
+
+    def test_a_usage_limited_conversation_is_still_queued_for_open_beside_it(self):
+        plug = self.armed()
+        self.ready_after_reset(loaded=False)
+        self.h.backend.loaded_map[T1] = "notLoaded"
+        self.h.backend.after_accept = "queue"
+        self.h.tick()
+        self.assertEqual(self.h.record()["state"], "queued", self.h.record()["last_error"])
+        self.assertEqual(len(self.h.backend.send_calls), 1)
+        self.assertEqual([spend[0] for spend in self.spends(plug)], [QUEUE_FOR_OPEN.id])
 
 
 class GoalBesideQueueForOpenTests(GoalCase):
