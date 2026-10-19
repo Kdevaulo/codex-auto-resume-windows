@@ -100,7 +100,7 @@ namespace HostAppProbe
             Case("own package", 100, 100, 90, 50L, "Claude_pzs8sxrjxfjjc", 90, 4, 40L, null);
             Case("no package", 100, 100, 90, 50L, null, 90, 80, 40L, null, 80, 4, 30L, null);
             Case("parent created after its child", 100, 100, 90, 50L, null, 90, 80, 60L, "OpenAI.Codex_2p2nqsd0c76g0");
-            Case("parent cannot be opened", 100, 100, 90, 50L, null, 90, 80, 0L, null, 80, 4, 30L, "OpenAI.Codex_2p2nqsd0c76g0");
+            Case("parent cannot be opened", 100, 100, 90, 50L, null, 90, 80, 0L, null, 80, 4, 0L, "OpenAI.Codex_2p2nqsd0c76g0");
             Case("cycle", 100, 100, 90, 10L, null, 90, 80, 10L, null, 80, 90, 10L, null);
             Case("self as its own parent", 100, 100, 100, 10L, null);
             var deep = new List<object>();
@@ -161,6 +161,7 @@ class DecisionTests(unittest.TestCase):
         self.assertIsNone(self.answer("parent created after its child")["found"])
 
     def test_a_parent_that_cannot_be_opened_ends_the_walk_outside(self):
+        """Whatever lies beyond it: past one that could not be opened, nothing is known to be an ancestor."""
         self.assertIsNone(self.answer("parent cannot be opened")["found"])
 
     def test_a_cycle_stops_at_once(self):
@@ -222,7 +223,7 @@ $cases = [ordered]@{
     'own package' = @(@(100, 90, 50, 'Claude_pzs8sxrjxfjjc'), @(90, 4, 40, $null))
     'no package' = @(@(100, 90, 50, $null), @(90, 80, 40, $null), @(80, 4, 30, $null))
     'parent created after its child' = @(@(100, 90, 50, $null), @(90, 80, 60, 'OpenAI.Codex_2p2nqsd0c76g0'))
-    'parent cannot be opened' = @(@(100, 90, 50, $null), @(90, 80, 0, $null), @(80, 4, 30, 'OpenAI.Codex_2p2nqsd0c76g0'))
+    'parent cannot be opened' = @(@(100, 90, 50, $null), @(90, 80, 0, $null), @(80, 4, 0, 'OpenAI.Codex_2p2nqsd0c76g0'))
     'cycle' = @(@(100, 90, 10, $null), @(90, 80, 10, $null), @(80, 90, 10, $null))
 }
 $answers = [ordered]@{}
