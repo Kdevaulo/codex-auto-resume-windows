@@ -140,9 +140,10 @@ class TableTests(unittest.TestCase):
         2026-10-20, on the same engine, the measurement session in one sitting with the Desktop holding none of the
         throwaway conversations (v0.6.17, issues #42 and #47): MQO passed (a continuation queued for opening with no
         marker ran once on open, as the person's own, and core's read found it by its client id) and MQP passed (two
-        added at once, each in a session of its own, each queued, run and found only in its own conversation). MQG
-        failed, inconclusive: two turns ran on open (the goal's, then the queued message's), but the goal ended inside
-        its own turn before the message ran, so whether a goal carries on beside it is not settled."""
+        added at once, each in a session of its own, each queued, run and found only in its own conversation). MQG first
+        failed, inconclusive - its goal ended inside its own turn - and was made again that night with a goal that takes
+        many turns: on open the queued message ran first and once, then the goal carried on, a turn at a time, to its
+        own end (nine turns), so it passed."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
@@ -150,17 +151,17 @@ class TableTests(unittest.TestCase):
                                   Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR,
                                   Measurement.MN, Measurement.MU, Measurement.MIPC, Measurement.MC1,
                                   Measurement.MXA, Measurement.MX, Measurement.MF, Measurement.MO,
-                                  Measurement.M3B, Measurement.M6B, Measurement.MQO, Measurement.MQP})
+                                  Measurement.M3B, Measurement.M6B, Measurement.MQO, Measurement.MQP,
+                                  Measurement.MQG})
         self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4, Measurement.MAWS,
-                                  Measurement.MCLOUD, Measurement.MB, Measurement.MC2, Measurement.MQG})
+                                  Measurement.MCLOUD, Measurement.MB, Measurement.MC2})
         new = "codex-cli 0.163.0-alpha.10.2"
         again = {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5, Measurement.M6,
                  Measurement.M7, Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MIPC,
                  Measurement.MO, Measurement.M6B, Measurement.MX, Measurement.MF, Measurement.M3B}
         v0617 = {Measurement.MQO, Measurement.MQP, Measurement.MQG}
         self.assertEqual({m for m, (_v, version) in measured.MEASURED.items() if version == new}, again | v0617)
-        self.assertTrue(all(measured.MEASURED[m][0] == Verdict.PASS for m in again))
-        self.assertEqual(measured.MEASURED[Measurement.MQG][0], Verdict.FAIL)
+        self.assertTrue(all(measured.MEASURED[m][0] == Verdict.PASS for m in again | v0617))
         self.assertEqual(set(Measurement) - passed - failed,
                          # v0.6.15-beta's own, for several conversations at once: not made yet.
                          {Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK, Measurement.MT})
