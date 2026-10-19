@@ -1,4 +1,4 @@
-# Codex Auto Resume roadmap: v0.6.7 → v0.6.20
+# Codex Auto Resume roadmap: v0.6.7 → v0.6.21
 
 This is the current development direction for Codex Auto Resume after v0.6.6.
 
@@ -12,7 +12,7 @@ advanced features, more than any program like this, in two editions → stabiliz
 core with Rust and make it Rust-native → stabilize Rust**
 
 The default recovery behavior stays as conservative as it has always been, through every release
-here: what v0.6.11, v0.6.12, v0.6.14, v0.6.15, v0.6.16 and v0.6.17 add to it is there for a person to turn on, never
+here: what v0.6.11, v0.6.12, v0.6.14, v0.6.15, v0.6.16 and v0.6.18 add to it is there for a person to turn on, never
 on by itself.
 
 ---
@@ -327,7 +327,7 @@ The repository's landing page on GitHub is tidied in the same stage, while paths
 anyway, so that fewer files sit at its root.
 
 Bugs discovered during this refactor will be fixed with regression tests, but the alpha is
-**not intended to be the full repository-wide bug hunt**; v0.6.18 is. It is the modularization and
+**not intended to be the full repository-wide bug hunt**; v0.6.19 is. It is the modularization and
 nothing else: no feature, and no change anybody could see.
 
 What it carries: the modules that were over their ceiling are packages in the plan's layout -
@@ -569,7 +569,7 @@ and released at the same time, with the same version:
 
 Each has its own archive and pinned digest, and one build attestation names both. An installation
 updates within its edition only; moving between them is a deliberate reinstall, never an update.
-The Rust core carries both (v0.6.19).
+The Rust core carries both (v0.6.20).
 
 ---
 
@@ -766,7 +766,8 @@ carries for a person coming from v0.6.15 is its entry in [CHANGELOG.md](CHANGELO
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
-v0.6.14's. The owner moved stage 5 to v0.6.17 on 2026-10-16 so that the v0.6.16 final comes sooner. v0.6.16
+v0.6.14's. The owner moved stage 5 out of v0.6.16 on 2026-10-16 so that the v0.6.16 final comes sooner; it is v0.6.18 from
+here (see v0.6.17). v0.6.16
 comes in as many pre-releases as it needs, from **v0.6.16-beta** on: each finished
 stage is published as a numbered beta while the next is built, and the final v0.6.16 follows the
 last. Every advanced capability here is the advanced edition's alone, off until a person turns it on, with a
@@ -819,7 +820,7 @@ finish its step, and a pause that holds our continuations until the reset
 
 Codex's own retry settings are not offered until Codex allows changing its built-in provider's retry settings
 (measured on 2026-10-16, MB). A continuation inside the turn, through a Codex Stop hook, and chatting with a
-Codex conversation inside the Dashboard were on this list; both are v0.6.17's.
+Codex conversation inside the Dashboard were on this list; both are v0.6.18's.
 
 #### The usage capabilities, finished
 
@@ -876,7 +877,38 @@ Also in the final, and what the owner asked for as the beta line went on:
 
 ---
 
-## v0.6.17 — The advanced edition's last stage
+## v0.6.17 — A quick final: installs from inside another app, and the update that keeps its uninstaller
+
+A hotfix final, on v0.6.16 (the owner's decision of 2026-10-19), with no pre-release of its own. What this
+roadmap planned as v0.6.17 - stage 5 and the chat inside the Dashboard, begun with a pre-release - is v0.6.18 from
+here, and every release after it moved one on.
+
+In both editions:
+
+- **An install, update or repair started from inside another app's container** - the Codex app, Claude desktop:
+  Windows' MSIX apps - is moved outside it, so that the Apps entry, the sign-in start, the notification
+  identity, the link handler and the Start-menu entry land where Windows reads them.
+- **An update made inside the Dashboard keeps the uninstaller again**, so the install gets its Settings > Apps and
+  winget entry back, and the next update repairs an install that lost it
+  ([#43](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/43)).
+- **Check for updates and Install another version say when pre-releases could not be checked**, and name a
+  GitHub rate limit with its reset time, reported by [@Kdevaulo](https://github.com/Kdevaulo) in
+  [#41](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/41).
+
+In the advanced edition:
+
+- the queue for a conversation you open works again while the continuation with no marker is on, and the
+  Dashboard says when one capability is held back by another
+  ([#42](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/42)),
+- groundwork moved here from the pre-release that was to begin the last stage: the options table checks names in
+  code only, and the stored state says the oldest version that reads it safely.
+
+Small fixes: the Dashboard opens in front after a fresh install; the motion-picture build reads the compiler's
+messages in any Windows language; and a timing test measures the icon's own work, not a busy runner.
+
+---
+
+## v0.6.18 — The advanced edition's last stage
 
 Stage 5, moved out of v0.6.16 by the owner on 2026-10-16 so that the v0.6.16 final comes sooner, is a release
 of its own, and the owner moved the in-app chat here the same day. As in v0.6.16, every capability here is the advanced edition's alone, off until a person turns it
@@ -884,15 +916,12 @@ on, with a statement that names the standards it departs from; some rest on a me
 and one that fails narrows the route, or becomes a warning the person confirms, and does not drop the
 capability.
 
-### v0.6.17-alpha — The ground the last stage stands on (a pre-release)
+### v0.6.18-alpha — The last stage's first pre-release (a pre-release)
 
-Two changes to how the advanced edition stores its choices and how state files are read, made first, in
-one migration, so that every stage after them adds an option or a stored field without a rebuild:
-
-- the advanced options table loses its CHECK constraint on the option's name - names are validated in code
-  only, so a new option needs no table rebuild,
-- state files carry a "readable from" marker, so that an older version reads a compatible newer file
-  instead of refusing it.
+The two changes to how the advanced edition stores its choices and how state files are read, which this alpha
+was to make first, are v0.6.17's now (the options table checks names in code only, and state files carry a
+"readable from" marker), so every capability below adds an option or a stored field without a rebuild. The
+alpha is the first of the last stage's capabilities, published as a pre-release while the rest is built.
 
 ### Around recovery
 
@@ -932,14 +961,14 @@ one migration, so that every stage after them adds an option or a stored field w
 
 ---
 
-## v0.6.18 — The final Python audit, both editions
+## v0.6.19 — The final Python audit, both editions
 
-v0.6.18 is the last Python release: the whole repository, both editions, through its bug hunt, and
-the Python reference implementation the Rust migration reproduces. It comes after v0.6.16 and v0.6.17 so that
+v0.6.19 is the last Python release: the whole repository, both editions, through its bug hunt, and
+the Python reference implementation the Rust migration reproduces. It comes after v0.6.16 and v0.6.18 so that
 the last features written in Python - the rest of the advanced edition - are audited with the rest,
 and the reference the Rust core reproduces holds them.
 
-v0.6.18 is planned as the final comprehensive audit of the Python implementation, in both editions.
+v0.6.19 is planned as the final comprehensive audit of the Python implementation, in both editions.
 
 Unlike v0.6.10-alpha's refactoring, it is intentionally a broad bug hunt.
 
@@ -957,7 +986,7 @@ Expected areas include:
 - malformed, stale, or corrupted state,
 - fault injection,
 - real Codex integration,
-- Advanced / Experimental recovery paths: every capability of v0.6.11, v0.6.14, v0.6.16 and v0.6.17, each with its
+- Advanced / Experimental recovery paths: every capability of v0.6.11, v0.6.14, v0.6.16 and v0.6.18, each with its
   warnings, tripwires and ceilings,
 - responsiveness, in every language: whatever lag v0.6.9 left,
 - both editions, and that the standard one still holds none of the advanced code,
@@ -974,14 +1003,14 @@ for the Rust migration.
 
 ---
 
-## v0.6.19 — Rust: the core replaced as it is, then made Rust-native
+## v0.6.20 — Rust: the core replaced as it is, then made Rust-native
 
-v0.6.19 arrives in two stages too: **v0.6.19-alpha**, a pre-release, replaces the production Python
-core with Rust as it is; the final **v0.6.19** is that core made naturally Rust-oriented. The alpha is
+v0.6.20 arrives in two stages too: **v0.6.20-alpha**, a pre-release, replaces the production Python
+core with Rust as it is; the final **v0.6.20** is that core made naturally Rust-oriented. The alpha is
 a pre-release because the core swapped as it is is a stage on the way to the Rust-native one, not a
 release worth having on its own.
 
-### v0.6.19-alpha — Complete Rust core replacement (a pre-release)
+### v0.6.20-alpha — Complete Rust core replacement (a pre-release)
 
 The alpha is planned to replace the production Python core with Rust, as it is.
 
@@ -992,7 +1021,7 @@ The rule is:
 
 > **Replace the implementation, not the behavior.**
 
-The Rust implementation should reproduce the final v0.6.18 as closely as practical.
+The Rust implementation should reproduce the final v0.6.19 as closely as practical.
 
 Goals include:
 
@@ -1034,13 +1063,13 @@ Rust
 PowerShell may remain as a thin layer for bootstrap, installation, updating, or similar Windows
 deployment work.
 
-### v0.6.19 — Rust-native restructuring and optimization
+### v0.6.20 — Rust-native restructuring and optimization
 
 The alpha prioritizes behavioral parity.
 
 That may leave some Python-shaped architecture inside the first Rust implementation.
 
-The final v0.6.19 is planned to make the codebase more naturally Rust-oriented.
+The final v0.6.20 is planned to make the codebase more naturally Rust-oriented.
 
 Potential work includes:
 
@@ -1060,9 +1089,9 @@ This is not intended to be the final full-system bug hunt.
 
 ---
 
-## v0.6.20 — Final Rust audit and stabilization: the Rust bug hunt
+## v0.6.21 — Final Rust audit and stabilization: the Rust bug hunt
 
-v0.6.20 is planned as the final comprehensive stabilization pass.
+v0.6.21 is planned as the final comprehensive stabilization pass.
 
 Expected focus includes:
 
@@ -1078,7 +1107,7 @@ Expected focus includes:
 - installer / update / repair / uninstall,
 - malformed or corrupted state,
 - Compatibility Registry cache/offline/failure behavior,
-- Advanced / Experimental capabilities: every capability of v0.6.11, v0.6.14, v0.6.16 and v0.6.17,
+- Advanced / Experimental capabilities: every capability of v0.6.11, v0.6.14, v0.6.16 and v0.6.18,
 - real Codex recovery,
 - fuzz or property testing where useful.
 
@@ -1100,7 +1129,7 @@ The intended final stack is:
 
 There is currently **no planned v0.7.0 feature cycle**.
 
-After v0.6.20, the project is expected to move primarily into maintenance:
+After v0.6.21, the project is expected to move primarily into maintenance:
 
 - Codex compatibility updates,
 - Compatibility Registry updates,
@@ -1205,27 +1234,32 @@ Most of the advanced edition, in as many pre-releases as it needed
 
         ↓
 
-v0.6.17-alpha → v0.6.17
-The options table without its CHECK constraint and a "readable from" marker on state files, in a pre-release
-+ the advanced edition's last stage: analytics, the courier, the loopback API and remote control,
+v0.6.17
+A quick final: installs started from inside another app moved outside it, the update that keeps its
+uninstaller, a queue that works with marker-free continuation, update checks that say what they could not check
+
+        ↓
+
+v0.6.18-alpha → v0.6.18
+The advanced edition's last stage, begun in a pre-release: analytics, the courier, the loopback API and remote control,
 account switching, crash supervision, the chat inside the Dashboard, the Stop hook continuation,
 Arabic and Hebrew
 
         ↓
 
-v0.6.18
+v0.6.19
 The final Python audit, both editions
 → freeze Python reference behavior
 
         ↓
 
-v0.6.19-alpha → v0.6.19
+v0.6.20-alpha → v0.6.20
 Complete Rust core replacement, in a pre-release
 + Rust-native restructuring and optimization, in the final
 
         ↓
 
-v0.6.20
+v0.6.21
 Final Rust audit and stabilization: the Rust bug hunt
 → final stable Rust baseline
 
@@ -1240,5 +1274,6 @@ for one recovery's next send and up to three more Codex homes. Before it, v0.6.1
 conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered), and v0.6.14 brought
 eight more ways to recover, Keep it on, the watch log, the reset actions and a compatibility report sent from
 the app, and the panel beside the chat, in the advanced edition; and a window that no longer hangs while a
-recovery waits, in both. v0.6.17 is next, starting with its pre-release, v0.6.17-alpha. The owner moved
-stage 5 there on 2026-10-16, so that the v0.6.16 final came sooner.
+recovery waits, in both. v0.6.17 is next, a quick final, and v0.6.18 follows it, starting with its pre-release,
+v0.6.18-alpha: the owner moved stage 5 out of v0.6.16 on 2026-10-16, so that the v0.6.16 final came sooner, and
+made v0.6.17 a hotfix on 2026-10-19.

@@ -42,7 +42,7 @@ changed).
 **0.6** The deciding line: keep the engine small, local, conservative and fail-closed; spend complexity on install and control.  
 *docs*
 
-**0.7** The Rust core (v0.6.19) replaces the implementation, not the behaviour: exact-thread, fail-closed, the registry's semantics and both editions are kept.  
+**0.7** The Rust core (v0.6.20) replaces the implementation, not the behaviour: exact-thread, fail-closed, the registry's semantics and both editions are kept (amended by the owner on 2026-10-19).  
 *planned*
 
 ## A. What it may send to Codex, and when
