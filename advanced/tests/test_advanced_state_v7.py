@@ -51,8 +51,9 @@ class UpgradeTests(StateCase):
         self.assertEqual(opened.runs(live=False), [])
         opened.close()
         with contextlib.closing(sqlite3.connect(path)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.STAGE4_VERSION)
-            self.assertEqual((schema_module.STAGE4_VERSION, schema_module.SCHEMA_VERSION), (7, 7))
+            # On through version 8's step (test_advanced_state_v8) in the same opening.
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.SCHEMA_VERSION)
+            self.assertEqual((schema_module.STAGE4_VERSION, schema_module.SCHEMA_VERSION), (7, 8))
             self.assertEqual(connection.execute("SELECT count(*) FROM spend").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT count(*) FROM wordings").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT count(*) FROM keep_going").fetchone()[0], 1)
@@ -70,7 +71,9 @@ class UpgradeTests(StateCase):
         made.run_started(KEY, "headless_run", ac.THREAD, started_at=self.now, ends_by=self.now)
         made.close()
         with contextlib.closing(sqlite3.connect(made.path)) as connection:
-            connection.execute("PRAGMA user_version=%d" % (schema_module.STAGE4_VERSION + 1))
+            # A newer version with no readable-from mark (v0.6.17): readable from itself alone.
+            connection.execute("PRAGMA application_id=0")
+            connection.execute("PRAGMA user_version=%d" % (schema_module.SCHEMA_VERSION + 1))
             connection.commit()
         with self.assertRaises(StateError):
             self.state().arming()

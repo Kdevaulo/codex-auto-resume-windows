@@ -133,7 +133,9 @@ class FileTests(StateCase):
 
     def test_a_file_that_is_not_exactly_this_schema_is_refused_not_repaired(self):
         for damage in ("CREATE TABLE extra (x)", "ALTER TABLE journal ADD COLUMN words TEXT",
-                       "PRAGMA user_version=%d" % (SCHEMA_VERSION + 1), "PRAGMA user_version=2", "PRAGMA user_version=1",
+                       # A newer version with no readable-from mark (schema.READABLE_FROM): readable from itself alone.
+                       "PRAGMA application_id=0; PRAGMA user_version=%d" % (SCHEMA_VERSION + 1),
+                       "PRAGMA user_version=2", "PRAGMA user_version=1",
                        "DELETE FROM meta", "DROP TABLE samples", "ALTER TABLE samples ADD COLUMN words TEXT"):
             with self.subTest(damage):
                 self.home = self.home.parent / ("home-%d" % abs(hash(damage)))
@@ -142,7 +144,7 @@ class FileTests(StateCase):
                 state.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
                 state.close()
                 with contextlib.closing(sqlite3.connect(state.path)) as connection:
-                    connection.execute(damage)
+                    connection.executescript(damage)
                     connection.commit()
                 with self.assertRaises(StateError):
                     self.state().arming()
@@ -532,7 +534,8 @@ class RuleTests(ChoicesCase):
                           "INSERT INTO samples (at, form, has_words, items_agent) VALUES (1, 'tagged', 1, -1)",
                           "INSERT INTO admissions VALUES ('%s', 'test_wake', 'hold', NULL, NULL, NULL, NULL, "
                           "NULL, 0, 1)" % ac.KEY,
-                          "INSERT INTO options VALUES ('test_wake', 'tries', 2)",
+                          # A name the vocabulary does not hold is the code's to refuse since version 8
+                          # (test_advanced_state_v8); a value below 1 is still the file's too.
                           "INSERT INTO options VALUES ('test_wake', 'attempts', 0)"):
             with self.subTest(statement):
                 with self.assertRaises(sqlite3.IntegrityError):

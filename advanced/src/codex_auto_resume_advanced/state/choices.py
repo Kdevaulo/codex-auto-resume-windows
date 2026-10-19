@@ -28,10 +28,12 @@ import time
 from codex_auto_resume import failures
 from codex_auto_resume.domain.plug import TAKE_UP, Alternative, FailureForm
 
-from ..vocabulary import Actor, JournalCode, Refusal
+from ..vocabulary import Actor, JournalCode, OptionKey, Refusal
 from .journal import prune_every
 from .session import StaleGeneration, StateError, _key, _word
 
+# The names a person's choice may be stored under: the vocabulary's, checked here and nowhere in the file (version 8).
+OPTION_WORDS = frozenset(str(word) for word in OptionKey)
 RULES_LIMIT = 10
 STATUS_RANGE = (100, 599)
 # How far back the Dashboard counts a rule's hits and shows samples.
@@ -247,10 +249,12 @@ class ChoicesMixin:
     def set_option(self, capability, key, value, *, generation, actor, at=None) -> int:
         """One choice set, against the generation the Dashboard read. The generation after.
         Refused (OPTION_INVALID) for a choice the capability does not offer or a value it does not
-        offer for it; StaleGeneration where anything moved since."""
+        offer for it; StaleGeneration where anything moved since. The name is the vocabulary's too
+        (OptionKey): since version 8 no CHECK of the file's names it (schema.READABLE_FROM), so the code
+        is what keeps a word it does not know out."""
         definition = self.registry.get(capability)
         option = definition.option(key) if definition is not None else None
-        if option is None or not option.takes(value):
+        if option is None or not option.takes(value) or str(option.key) not in OPTION_WORDS:
             raise Refused(Refusal.OPTION_INVALID)
         actor = _word(actor, Actor, "actor")
         now = self._now(at)
