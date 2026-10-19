@@ -1817,6 +1817,11 @@ try {
     Step 'Checking the installation'
     $null = Invoke-Setup @('doctor')
     if ($LASTEXITCODE -ne 0) { Warn 'The health check reported a problem. Recovery is installed but may not be ready.' }
+    # Setup waits for the watcher it started for a few seconds and no longer. On a busy PC, right after every file
+    # was written fresh, a watcher can take longer than that to take its mutex (v0.6.17 live acceptance: 6 to 9
+    # seconds), and this run then ended "could not be confirmed" under a health check that had just seen the mutex
+    # held. So it is looked at once more, now, before the last word: a watcher running now is a watcher running.
+    if ($watcherUnconfirmed -and (Invoke-Setup @('watcher-running')) -eq 0) { $watcherUnconfirmed = $false }
 
     # The Dashboard that closed for this update opens again on the new version, where it was (Open-ClosedDashboard).
     Open-ClosedDashboard -Updated

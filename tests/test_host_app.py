@@ -446,7 +446,11 @@ static class FakePython
                                  System.Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_OUTSIDE"));
         string ran = System.Environment.GetEnvironmentVariable("CAR_RAN");
         if (!string.IsNullOrEmpty(ran)) System.IO.File.AppendAllText(ran, string.Join(" ", args) + "\n");
-        return 5;
+        // 5 unless a case says otherwise: CAR_PROBE_CODE for `watcher-running`, CAR_SETUP_CODE for anything else.
+        string said = System.Environment.GetEnvironmentVariable(
+            args.Length > 1 && args[1] == "watcher-running" ? "CAR_PROBE_CODE" : "CAR_SETUP_CODE");
+        int code;
+        return int.TryParse(said, out code) ? code : 5;
     }
 }
 """
@@ -466,6 +470,7 @@ function global:Fake-Outside {
     param([string]$Source, [string]$Log, [string]$CodeFile)
     Write-Host ('SOURCE ' + ($Source -replace "`r`n", ' | '))
     if ($env:CAR_LAUNCH -eq 'fail') { return $null }
+    if ($env:CAR_OUTSIDE_CODE) { return [int]$env:CAR_OUTSIDE_CODE }
     return 7
 }
 Set-Alias -Scope Global Get-ProcessTable Fake-ProcessTable
@@ -523,7 +528,8 @@ class BootstrapRepairTests(unittest.TestCase):
                       TMP=str(self.temp), CAR_SCRIPT=str(self.script), CAR_ARGUMENTS="{}",
                       CAR_REQUESTS=str(self.work / "requests.txt"), CAR_INSTALLED=str(self.work / "installed.json"),
                       CAR_LATEST="")
-        for name in ("CAR_PACKAGE", "CAR_LAUNCH", "CODEX_AUTO_RESUME_OUTSIDE"):
+        for name in ("CAR_PACKAGE", "CAR_LAUNCH", "CODEX_AUTO_RESUME_OUTSIDE", "CAR_SETUP_CODE", "CAR_PROBE_CODE",
+                     "CAR_OUTSIDE_CODE"):
             values.pop(name, None)
         values.update(environment)
         done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
@@ -547,6 +553,25 @@ class BootstrapRepairTests(unittest.TestCase):
         self.assertEqual(code, 5, output[-2000:])
         self.assertIn("FAKE-PYTHON args=", output)
         self.assertEqual(len([line for line in output.splitlines() if line.startswith("  [!]")]), 1, output[-2000:])
+
+    def test_a_watcher_that_started_after_the_setup_s_wait_ends_the_check_over_with_0(self):
+        """v0.6.17 live acceptance: setup's 2 - it could not confirm the watcher within its wait - is looked at once
+        more (plugin_setup.py watcher-running), here and after a run outside alike, and a watcher holding its mutex
+        by then is running: 0. One still not running stays 2."""
+        setup = self.home / "app" / "scripts" / "plugin_setup.py"
+        for environment, expected in (({"CAR_SETUP_CODE": "2", "CAR_PROBE_CODE": "0"}, 0),
+                                      ({"CAR_SETUP_CODE": "2", "CAR_PROBE_CODE": "2"}, 2),
+                                      ({"CAR_PACKAGE": CODEX, "CAR_OUTSIDE_CODE": "2", "CAR_PROBE_CODE": "0"}, 0),
+                                      ({"CAR_PACKAGE": CODEX, "CAR_OUTSIDE_CODE": "2", "CAR_PROBE_CODE": "2"}, 2)):
+            with self.subTest(environment):
+                code, output = self.run_it(**environment)
+                self.assertEqual(code, expected, output[-2000:])
+                self.assertIn("FAKE-PYTHON args=%s watcher-running" % setup, output)
+
+    def test_only_a_2_is_looked_at_again(self):
+        code, output = self.run_it(CAR_SETUP_CODE="1", CAR_PROBE_CODE="0")
+        self.assertEqual(code, 1, output[-2000:])
+        self.assertNotIn("watcher-running", output)
 
     def test_the_mark_and_a_run_outside_any_app_run_it_here(self):
         for environment in ({"CAR_PACKAGE": CODEX, "CODEX_AUTO_RESUME_OUTSIDE": "1"}, {}):
