@@ -13,11 +13,13 @@ agree before either is believed.
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 import guiscan
 
@@ -57,7 +59,18 @@ CASES = {
     "with_prerelease":    ("prerelease: v0.6.1-beta\nupdate: current 0.6.0", 0, "current"),
     "prerelease_and_newer_local": ("prerelease: v0.7.1-alpha.2\nupdate: newer-local 0.7.0 0.6.0", 11, "newer-local"),
     "prerelease_alone":   ("prerelease: v0.6.1-beta", 0, "failed"),
+    # v0.6.17 (GitHub #41): where the list could not be read, a `releases:` line says so and why, and changes no answer.
+    "rate_limited":       ("releases: rate-limited 1760000000\nupdate: newer-local 0.7.0 0.6.0", 11, "newer-local"),
+    "rate_limited_unknown": ("releases: rate-limited unknown\nupdate: current 0.6.0", 0, "current"),
+    "list_unread":        ("releases: unread\nupdate: current 0.6.0", 0, "current"),
+    "releases_malformed": ("releases: rate-limited soon\nupdate: current 0.6.0", 0, "current"),
+    "releases_too_long":  ("releases: rate-limited 176000000000000\nupdate: current 0.6.0", 0, "current"),
+    "releases_last_wins": ("releases: unread\nreleases: rate-limited 1760000000\nupdate: current 0.6.0", 0, "current"),
 }
+
+# What the window reads from each case's `releases:` line (ReleasesLine): its words, or null.
+RELEASES = {"rate_limited": "rate-limited 1760000000", "rate_limited_unknown": "rate-limited unknown",
+            "list_unread": "unread", "releases_last_wins": "rate-limited 1760000000"}
 
 # What the window reads from each case's `compatibility:` line (CompatibilityLine): the words, or null.
 COMPATIBILITY = {"with_refresh": "refreshed 12", "with_refusal": "refused from_the_future",
@@ -112,7 +125,7 @@ foreach ($case in (ConvertFrom-Json $env:CAR_CASES).PSObject.Properties) {
     $body += ('exit ' + $case.Value[1])
     [IO.File]::WriteAllText($script, ($body -join "`r`n"), (New-Object Text.UTF8Encoding $false))
     # out parameters come back through the array .NET was handed.
-    $arguments = [object[]]@($work, $script, '-CheckOnly', 60000, $null, $null, $null, $null, $null, $null)
+    $arguments = [object[]]@($work, $script, '-CheckOnly', 60000, $null, $null, $null, $null, $null, $null, $null)
     $null = $run.Invoke($null, $arguments)
     $out[$case.Name] = @{
         answer  = $arguments[4]
@@ -120,6 +133,7 @@ foreach ($case in (ConvertFrom-Json $env:CAR_CASES).PSObject.Properties) {
         latest  = $arguments[6]
         compatibility = $arguments[8]
         prerelease = $arguments[9]
+        releases = $arguments[10]
     }
 }
 
@@ -134,15 +148,38 @@ foreach ($text in (ConvertFrom-Json $env:CAR_LINES)) {
 # A child that does not finish is not killed: it may be part way through an installation.
 $slow = [string](Join-Path $work 'slow.ps1')
 [IO.File]::WriteAllText($slow, "Start-Sleep -Seconds 30`r`nexit 0", (New-Object Text.UTF8Encoding $false))
-$arguments = [object[]]@($work, $slow, '-CheckOnly', 1500, $null, $null, $null, $null, $null, $null)
+$arguments = [object[]]@($work, $slow, '-CheckOnly', 1500, $null, $null, $null, $null, $null, $null, $null)
 $null = $run.Invoke($null, $arguments)
 $out['slow'] = @{ answer = $arguments[4]; current = $arguments[5]; latest = $arguments[6] }
 
 # A script that is not there at all.
 $arguments = [object[]]@($work, [string](Join-Path $work 'absent.ps1'), '-CheckOnly',
-                         60000, $null, $null, $null, $null, $null, $null)
+                         60000, $null, $null, $null, $null, $null, $null, $null)
 $null = $run.Invoke($null, $arguments)
 $out['absent'] = @{ answer = $arguments[4]; current = $arguments[5]; latest = $arguments[6] }
+
+# GitHub #41: what the window says, in English (a form whose constructor never ran, with no catalog), for an answer and
+# the check's `releases:` line, and for Install another version...'s listing and pick where GitHub could not be asked.
+$instance = [Reflection.BindingFlags]'Instance,NonPublic,Public'
+$updateWords = $form.GetMethod('UpdateWords', $instance)
+$listWords = $form.GetMethod('ListUnavailableWords', $instance)
+$pickWords = $form.GetMethod('PickUnavailableWords', $instance)
+$out['words'] = $null
+if ($updateWords -and $listWords -and $pickWords) {
+    $blank = [Runtime.Serialization.FormatterServices]::GetUninitializedObject($form)
+    $form.GetField('strings', $instance).SetValue($blank, (New-Object 'System.Collections.Generic.Dictionary[string,object]'))
+    $out['words'] = @{}
+    foreach ($case in (ConvertFrom-Json $env:CAR_WORDS).PSObject.Properties) {
+        $v = @($case.Value)
+        $releases = $null
+        if ($null -ne $v[4]) { $releases = [string]$v[4] }
+        if ($v[0] -eq 'update') {
+            $said = $updateWords.Invoke($blank, [object[]]@([string]$v[1], [string]$v[2], [string]$v[3], '', $releases))
+        } elseif ($v[0] -eq 'list') { $said = $listWords.Invoke($blank, [object[]]@($releases)) }
+        else { $said = $pickWords.Invoke($blank, [object[]]@($releases)) }
+        $out['words'][$case.Name] = [string]$said
+    }
+}
 
 # GitHub #43: whether a finished Repair has to say that it wrote no entry in Settings > Apps.
 $entry = $form.GetMethod('EntryCannotBeWritten', [Reflection.BindingFlags]'Static,NonPublic,Public')
@@ -156,6 +193,48 @@ if ($entry) {
 
 $out | ConvertTo-Json -Depth 5 -Compress
 """
+
+
+SOON = int(time.time()) + 1800
+
+
+def clock(seconds: int) -> str:
+    """A moment as the window's ClockTime writes it: this PC's time, the hour alone today and the date too otherwise."""
+    moment = datetime.datetime.fromtimestamp(seconds)
+    return moment.strftime("%H:%M" if moment.date() == datetime.date.today() else "%Y-%m-%d %H:%M")
+
+
+LIMIT = ("GitHub refused because this network has used up its limit of requests to GitHub for now (a VPN or a shared "
+         "connection often does). ")
+NEWER_UNCHECKED = ("This build is newer than the latest release, v0.6.0, but pre-releases could not be checked, so a "
+                   "newer pre-release may have been published.")
+CURRENT_UNCHECKED = ("Version 0.6.0 is the newest published release, but pre-releases could not be checked, so a newer "
+                     "pre-release may have been published.")
+COULD_NOT_LIST = "GitHub could not be asked for the list of releases just now. Nothing was changed."
+COULD_NOT_ASK = "GitHub could not be asked just now, so nothing was installed and nothing was changed."
+# name -> ((what is asked: update, list or pick; answer; current; latest; the `releases:` words), what the window says)
+WORDS = {
+    "ahead_and_limited": (("update", "newer-local", "0.7.0", "0.6.0", "rate-limited 1760000000"),
+                          NEWER_UNCHECKED + "\n\n" + LIMIT + "The limit resets at %s; try again after that." % clock(1760000000)),
+    "ahead_and_limited_today": (("update", "newer-local", "0.7.0", "0.6.0", "rate-limited %d" % SOON),
+                                NEWER_UNCHECKED + "\n\n" + LIMIT + "The limit resets at %s; try again after that." % clock(SOON)),
+    "ahead_and_limited_unknown": (("update", "newer-local", "0.7.0", "0.6.0", "rate-limited unknown"),
+                                  NEWER_UNCHECKED + "\n\n" + LIMIT + "The limit resets within an hour; try again after that."),
+    "ahead_and_unread": (("update", "newer-local", "0.7.0", "0.6.0", "unread"), NEWER_UNCHECKED + "\n\nTry again later."),
+    "current_and_unread": (("update", "current", "0.6.0", "0.6.0", "unread"), CURRENT_UNCHECKED + "\n\nTry again later."),
+    # A list that was read leaves the words as they were.
+    "ahead_and_read": (("update", "newer-local", "0.7.0", "0.6.0", None),
+                       "This build is ahead of the newest published release, so there is nothing to install."),
+    "current_and_read": (("update", "current", "0.6.0", "0.6.0", None), "Version 0.6.0 is the newest published release."),
+    "available_and_unread": (("update", "available", "0.5.0", "0.6.0", "unread"), "Version 0.6.0 has been published."),
+    "list_limited": (("list", None, None, None, "rate-limited 1760000000"),
+                     COULD_NOT_LIST + "\n" + LIMIT + "The limit resets at %s; try again after that." % clock(1760000000)),
+    "list_unread": (("list", None, None, None, "unread"), COULD_NOT_LIST + "\nTry again later."),
+    "list_as_before": (("list", None, None, None, None), COULD_NOT_LIST),
+    "pick_limited": (("pick", None, None, None, "rate-limited unknown"),
+                     COULD_NOT_ASK + "\n\n" + LIMIT + "The limit resets within an hour; try again after that."),
+    "pick_as_before": (("pick", None, None, None, None), COULD_NOT_ASK),
+}
 
 
 def entry_cases(work: Path) -> dict:
@@ -224,7 +303,8 @@ class BootstrapReadingTests(unittest.TestCase):
                      CAR_CASES=json.dumps({name: [printed, code]
                                            for name, (printed, code, _) in CASES.items()}),
                      CAR_LINES=json.dumps(list(prerelease_lines())),
-                     CAR_ENTRY=json.dumps({name: list(pair) for name, (pair, _) in cls.entry.items()})))
+                     CAR_ENTRY=json.dumps({name: list(pair) for name, (pair, _) in cls.entry.items()}),
+                     CAR_WORDS=json.dumps({name: list(asked) for name, (asked, _) in WORDS.items()})))
         cls.result = result
         cls.answer = json.loads(result.stdout) if result.returncode == 0 and result.stdout.strip() else {}
 
@@ -265,6 +345,24 @@ class BootstrapReadingTests(unittest.TestCase):
         for text, version in sorted(expected.items()):
             with self.subTest(ascii(text)):
                 self.assertEqual(read[text], version)
+
+    def test_the_releases_line_is_read_beside_the_update_line(self):
+        """GitHub #41: where GitHub's list could not be read the bootstrap says so on a `releases:` line, and why; the
+        window reads its words without letting them change the answer, and nothing malformed is read."""
+        for name in CASES:
+            with self.subTest(name):
+                self.assertEqual(self.answer[name].get("releases"), RELEASES.get(name))
+
+    def test_a_check_that_could_not_read_the_list_says_pre_releases_were_not_checked(self):
+        """GitHub #41: "ahead of the newest published release" was all a VPN's spent rate limit was told. Where the list
+        was not read the answer says the pre-releases were not checked, names the rate limit with when it resets in this
+        PC's time, or says to try again later; a list that was read, or a release to offer, leaves the words as they
+        were. Install another version... says the same after its own sentence."""
+        self.assertIsNotNone(self.answer["words"],
+                             "SettingsForm has no UpdateWords, ListUnavailableWords or PickUnavailableWords")
+        for name, (_, expected) in sorted(WORDS.items()):
+            with self.subTest(name):
+                self.assertEqual(self.answer["words"][name].replace("\r\n", "\n"), expected)
 
     def test_the_versions_come_out_of_the_line(self):
         self.assertEqual(self.answer["available"]["current"], "0.5.7")

@@ -376,6 +376,157 @@ class DeadlineTests(unittest.TestCase):
         self.assertLess(answer["seconds"], 12, answer)
 
 
+class RefusingServer:
+    """HTTP on 127.0.0.1 alone, answering each path with the status and headers it names: GitHub's refusals for its
+    rate limit, as api.github.com sends them, and a refusal that is not one (GitHub #41)."""
+
+    ANSWERS = {
+        "/limit/repos/o/r/releases": (403, {"X-RateLimit-Limit": "60", "X-RateLimit-Remaining": "0",
+                                            "X-RateLimit-Reset": "1760000000"}),
+        "/secondary/repos/o/r/releases": (403, {"Retry-After": "120"}),
+        "/too-many/repos/o/r/releases": (429, {}),
+        "/forbidden/repos/o/r/releases": (403, {"X-RateLimit-Remaining": "42", "X-RateLimit-Reset": "1760000000"}),
+        "/missing/repos/o/r/releases": (404, {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1760000000"}),
+    }
+
+    def __init__(self):
+        import http.server
+        answers = self.ANSWERS
+        self.asked = []
+        asked = self.asked
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(handler):
+                asked.append(handler.path)
+                status, headers = answers.get(handler.path, (500, {}))
+                body = b'{"message":"API rate limit exceeded"}'
+                handler.send_response(status)
+                for name, value in headers.items():
+                    handler.send_header(name, value)
+                handler.send_header("Content-Type", "application/json")
+                handler.send_header("Content-Length", str(len(body)))
+                handler.end_headers()
+                handler.wfile.write(body)
+
+            def log_message(handler, *arguments):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def url(self, path: str) -> str:
+        return "http://127.0.0.1:%d%s" % (self.port, path)
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+REFUSED = r"""
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version 2.0
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($env:CAR_BOOTSTRAP, [ref]$null, [ref]$errors)
+if ($errors -and $errors.Count) { throw 'bootstrap.ps1 does not parse' }
+$wanted = @('Get-FinalUri', 'Assert-TrustedHost', 'Get-RateLimitReset', 'Write-ReleasesUnread', 'Invoke-BoundedWebRequest',
+            'Get-VersionParts', 'Compare-ProductVersion', 'Format-UnreadVersion', 'Get-PrereleaseVersion',
+            'Read-ReleasesPage', 'Get-PublishedPrereleases', 'Get-NewerPrerelease')
+foreach ($node in $ast.FindAll({ param($n)
+        $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
+    if ($wanted -contains $node.Name) { Invoke-Expression $node.Extent.Text }
+}
+$missing = @($wanted | Where-Object { -not (Get-Command $_ -CommandType Function -ErrorAction SilentlyContinue) })
+foreach ($name in @('$ReleasesHosts', '$ReleasesMaxChars', '$RateLimitReset')) {
+    $found = $ast.FindAll({ param($n)
+        $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq $name }, $true)
+    if ($found) { Invoke-Expression $found[0].Extent.Text }
+}
+function Step { param([string]$m) Write-Host ('  ' + $m) }
+# The real cmdlet, and addresses on this machine alone.
+if ((Get-Command Invoke-WebRequest).CommandType -ne 'Cmdlet') { throw 'Invoke-WebRequest is not the cmdlet here' }
+$out = @{ missing = $missing; cases = @{} }
+foreach ($case in (ConvertFrom-Json $env:CAR_CASES).PSObject.Properties) {
+    $script:RateLimitReset = $null
+    $Release = [pscustomobject]@{ owner = 'o'; repo = 'r'; releases = [string]$case.Value }
+    $answer = 'NOTHING'
+    try { $found = Get-NewerPrerelease -Release $Release -Installed '1.2.3' -Stable '1.2.3' -TimeoutSec 10; $answer = [string]$found }
+    catch { $answer = 'THROWS' }
+    $said = ''
+    if ($missing.Count -eq 0) { $said = (Write-ReleasesUnread 6>&1 | ForEach-Object { [string]$_ }) -join "`n" }
+    $out.cases[$case.Name] = @{ answer = $answer; reset = [string]$script:RateLimitReset; said = $said }
+}
+$out | ConvertTo-Json -Depth 5 -Compress
+"""
+
+
+@unittest.skipUnless(POWERSHELL.is_file(), "the bootstrap is PowerShell on Windows")
+class RateLimitTests(unittest.TestCase):
+    """GitHub #41: api.github.com refusing the list for its rate limit - 60 unauthenticated requests an hour for a
+    network, which a VPN spends for everyone behind it - is told from any other failure, with when the limit resets.
+    The real cmdlet against a server on 127.0.0.1 that refuses as GitHub does."""
+
+    @classmethod
+    def setUpClass(cls):
+        server = RefusingServer()
+        try:
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                nowhere = "http://127.0.0.1:%d/repos/o/r/releases" % probe.getsockname()[1]
+            cases = {"limit": server.url("/limit/repos/o/r/releases"),
+                     "secondary": server.url("/secondary/repos/o/r/releases"),
+                     "too_many": server.url("/too-many/repos/o/r/releases"),
+                     "forbidden": server.url("/forbidden/repos/o/r/releases"),
+                     "missing": server.url("/missing/repos/o/r/releases"),
+                     "no_network": nowhere}
+            started = time.time()
+            done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-Command", REFUSED],
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
+                                  env=dict(os.environ, CAR_BOOTSTRAP=str(BOOTSTRAP), CAR_CASES=json.dumps(cases)))
+            cls.started, cls.ended = started, time.time()
+        finally:
+            server.close()
+        cls.done = done
+        lines = done.stdout.strip().splitlines()
+        cls.answer = json.loads(lines[-1]) if done.returncode == 0 and lines else None
+
+    def setUp(self):
+        if self.answer is None:
+            self.fail("the probe did not run: " + (self.done.stderr or self.done.stdout)[-2000:])
+        missing = self.answer["missing"]
+        self.assertFalse(missing, "bootstrap.ps1 has no %s" % missing)
+
+    def case(self, name):
+        found = self.answer["cases"][name]
+        self.assertEqual(found["answer"], "THROWS", "a refused list is never an answer")
+        return found
+
+    def test_a_spent_limit_is_named_with_the_reset_github_sent(self):
+        found = self.case("limit")
+        self.assertEqual(found["reset"], "1760000000")
+        self.assertIn("releases: rate-limited 1760000000", found["said"])
+        self.assertIn("the limit on requests from this network was reached", found["said"])
+
+    def test_the_secondary_limit_says_when_to_retry(self):
+        found = self.case("secondary")
+        self.assertRegex(found["reset"], r"^\d{10}$")
+        self.assertLessEqual(int(self.started) + 120, int(found["reset"]))
+        self.assertLessEqual(int(found["reset"]), int(self.ended) + 121)
+        self.assertIn("releases: rate-limited " + found["reset"], found["said"])
+
+    def test_a_429_without_a_time_is_a_limit_whose_reset_is_unknown(self):
+        found = self.case("too_many")
+        self.assertEqual(found["reset"], "unknown")
+        self.assertIn("releases: rate-limited unknown", found["said"])
+
+    def test_any_other_refusal_or_no_network_is_a_list_not_read(self):
+        for name in ("forbidden", "missing", "no_network"):
+            with self.subTest(name):
+                found = self.case(name)
+                self.assertEqual(found["reset"], "")
+                self.assertEqual(found["said"].strip(), "releases: unread")
+
+
 # ------------------------------------------------------------------------------ the whole script
 RUN = r"""
 # Where the network was: every request is written down, and none leaves this process. HEAD - the
@@ -385,6 +536,14 @@ function global:Invoke-WebRequest {
     param([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing, [switch]$PassThru,
           [int]$MaximumRedirection, [int]$TimeoutSec, [string]$Method)
     Add-Content -LiteralPath $env:CAR_REQUESTS -Value (([string]$Method) + ' ' + $Uri) -Encoding UTF8
+    # The list from a server on 127.0.0.1 through the real cmdlet, where a case names one: GitHub's refusals as sent.
+    if ($Method -eq 'Get' -and -not $OutFile -and $env:CAR_LIST_SERVER) {
+        # A cmdlet's error ends only its own statement here, so it is thrown on, as the cmdlet's own call would end.
+        $real = $ExecutionContext.InvokeCommand.GetCmdlet('Invoke-WebRequest')
+        try { return (& $real -Uri $env:CAR_LIST_SERVER -UseBasicParsing -Method Get -MaximumRedirection 0 -TimeoutSec 10 `
+                              -ErrorAction Stop) }
+        catch { throw $_.Exception }
+    }
     $base = New-Object psobject
     $response = New-Object psobject
     if ($Method -eq 'Head' -and $env:CAR_LATEST) {
@@ -459,7 +618,7 @@ class ScriptRun(unittest.TestCase):
         found += sorted(self.temp.glob("codex-auto-resume-*"))
         return sorted(str(path.relative_to(self.root)) for path in found)
 
-    def run_it(self, latest=None, listed=None, list_seconds=0, **arguments):
+    def run_it(self, latest=None, listed=None, list_seconds=0, list_server=None, **arguments):
         self.requests.unlink(missing_ok=True)
         environment = dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(self.home),
                            TEMP=str(self.temp), TMP=str(self.temp),
@@ -467,7 +626,7 @@ class ScriptRun(unittest.TestCase):
                            CAR_ARGUMENTS=json.dumps(arguments), CAR_REQUESTS=str(self.requests),
                            CAR_INSTALLED=str(self.installed), CAR_LATEST=TAG + latest if latest else "",
                            CAR_LIST="", CAR_LIST_FINAL=LIST + "?per_page=10", CAR_LIST_SECONDS=str(list_seconds or ""),
-                           CAR_ZIP=str(self.zip or ""), CAR_SUM=str(self.sum or ""))
+                           CAR_ZIP=str(self.zip or ""), CAR_SUM=str(self.sum or ""), CAR_LIST_SERVER=list_server or "")
         if listed is not None:
             self.listed.write_text(json.dumps(listed), encoding="utf-8")
             environment["CAR_LIST"] = str(self.listed)
@@ -519,6 +678,7 @@ class CheckOnlyTests(ScriptRun):
         output = self.check("v1.2.4", [entry("v1.2.4", prerelease=False), entry("v1.2.4-beta")], 0,
                             "update: current 1.2.4")
         self.assertNotIn("prerelease:", output)
+        self.assertNotIn("releases:", output, "a list that was read is not said to be unread (GitHub #41)")
 
     def test_a_release_newer_than_the_pre_release_offers_none(self):
         self.installation("1.2.3")
@@ -535,6 +695,7 @@ class CheckOnlyTests(ScriptRun):
                 self.assertIn("update: current 1.2.4", output)
                 self.assertNotIn("prerelease:", output)
                 self.assertIn("The list of releases could not be read", output)
+                self.assertIn("releases: unread", output, "GitHub #41: said, beside an answer it does not change")
                 self.assertEqual([request[0] for request in asked], ["Head", "Get"])
 
     def test_a_list_that_arrives_too_slowly_offers_nothing_and_the_answer_comes_in_time(self):
@@ -567,6 +728,55 @@ class CheckOnlyTests(ScriptRun):
         self.assertNotIn("prerelease:", output)
         self.assertEqual(asked, [["Head", NOWHERE + "/latest"],
                                  ["", NOWHERE + "/download/v1.2.4/CodexAutoResume-v1.2.4-win-x64.zip"]])
+
+
+@unittest.skipUnless(POWERSHELL.is_file(), "the bootstrap is PowerShell on Windows")
+class RefusedListScriptTests(ScriptRun):
+    """GitHub #41, the whole script: where api.github.com refuses the list for its rate limit, -CheckOnly's answer and
+    code are still github.com's, and a `releases:` line before it says the pre-releases were not checked and when the
+    limit resets; -Versions and -Pick say the same before their `unavailable`. The list's request goes, through the real
+    cmdlet, to a server on 127.0.0.1 that refuses as GitHub does."""
+
+    def setUp(self):
+        super().setUp()
+        self.server = RefusingServer()
+        self.addCleanup(self.server.close)
+
+    def test_ahead_of_the_release_with_the_list_refused_says_so_with_the_reset(self):
+        self.installation("1.2.5-alpha")
+        code, output, asked = self.run_it(latest="v1.2.4", list_server=self.server.url("/limit/repos/o/r/releases"),
+                                          CheckOnly=True)
+        self.assertEqual(code, 11, output[-1500:])
+        self.assertIn("update: newer-local 1.2.5-alpha 1.2.4", output)
+        self.assertIn("releases: rate-limited 1760000000", output)
+        self.assertLess(output.index("releases: "), output.index("update: "))
+        self.assertNotIn("prerelease:", output)
+        self.assertEqual(self.server.asked, ["/limit/repos/o/r/releases"])
+
+    def test_a_list_refused_for_another_reason_is_unread(self):
+        self.installation("1.2.4")
+        code, output, _ = self.run_it(latest="v1.2.4", list_server=self.server.url("/forbidden/repos/o/r/releases"),
+                                      CheckOnly=True)
+        self.assertEqual(code, 0, output[-1500:])
+        self.assertIn("update: current 1.2.4", output)
+        self.assertIn("releases: unread", output)
+        self.assertNotIn("rate-limited", output)
+
+    def test_the_picker_says_it_before_it_lists_nothing(self):
+        self.installation("1.2.5-alpha")
+        code, output, _ = self.run_it(list_server=self.server.url("/limit/repos/o/r/releases"), Versions=True)
+        self.assertEqual(code, 12, output[-1500:])
+        self.assertIn("releases: rate-limited 1760000000", output)
+        self.assertIn("versions: unavailable", output)
+        self.assertLess(output.index("releases: "), output.index("versions: unavailable"))
+
+    def test_a_pick_says_it_before_it_installs_nothing(self):
+        self.installation("1.2.5-alpha")
+        code, output, _ = self.run_it(list_server=self.server.url("/too-many/repos/o/r/releases"),
+                                      Pick="1.2.4", Edition="Standard", Force=True)
+        self.assertEqual(code, 12, output[-1500:])
+        self.assertIn("releases: rate-limited unknown", output)
+        self.assertIn("pick: unavailable", output)
 
 
 @unittest.skipUnless(POWERSHELL.is_file(), "the bootstrap is PowerShell on Windows")
