@@ -85,7 +85,7 @@ namespace CodexAutoResume
         {
             if (HostApp.StuckInside == null) return false;
             Tell(S("diag.inside_app",
-                   "This Dashboard was opened from inside {app}, and Windows would keep what this sets up inside that app: the entry in Settings > Apps, the start at sign-in, the notifications' name, the link handler and the Start menu entry. Open the Dashboard from the Start menu and do this there.",
+                   "This Dashboard may have been opened from inside {app}. If so, Windows would keep what this sets up inside that app: the entry in Settings > Apps, the start at sign-in, the notifications' name, the link handler and the Start menu entry. Open the Dashboard from the Start menu and do this there.",
                    "app", HostApp.Name(HostApp.StuckInside)));
             return true;
         }

@@ -302,9 +302,22 @@ class InstallerGateTests(unittest.TestCase):
         self.assertEqual(self.lines(done, "CODE "), ["none"])
         warnings = [line for line in done.stdout.splitlines() if line.startswith("  [!]")]
         self.assertEqual(len(warnings), 1, done.stdout)
-        self.assertIn("inside OpenAI.Codex,", warnings[0])
+        self.assertIn("may be running inside OpenAI.Codex.", warnings[0])
         for named in ("Settings > Apps", "sign-in", "Start menu", "Repair installation"):
             self.assertIn(named, warnings[0])
+
+    def test_every_word_of_it_allows_for_an_ancestor_that_keeps_no_private_view(self):
+        """A packaged ancestor is not always an app with a private view - Windows Terminal is packaged, and a shell in
+        one of its tabs counts as inside it. The relaunch is kept (it costs nothing there); what is said where it fails
+        says what may be so: the scripts' warning, and the window's English, which is the catalog's."""
+        catalog = json.loads((LOCALES / "en.json").read_text(encoding="utf-8"))
+        self.assertTrue(catalog["diag.inside_app"].startswith("This Dashboard may have been opened from inside {app}."))
+        self.assertTrue(catalog["installer.inside_app"].startswith("This may have been started from inside {app}."))
+        self.assertIn('"%s"' % catalog["diag.inside_app"], guiscan.member_body("SettingsForm", "RefusedInside"))
+        self.assertIn('"%s"' % catalog["installer.inside_app"], guiscan.member_body("InstallerWindow", "InsideNote"))
+        for script in (INSTALL, BOOTSTRAP_TEXT):
+            self.assertIn("Warn ('This may be running inside ' + $name", outside_gate(script))
+            self.assertNotIn("This runs inside", script)
 
     def test_the_gate_runs_before_anything_else_the_script_does(self):
         gate = INSTALL.index("$outsideCode = Resolve-OutsideRun -Script $PSCommandPath")
@@ -318,6 +331,314 @@ class InstallerGateTests(unittest.TestCase):
         self.assertIn("ShowWindow = [uint16]0", launch, "no console window shows")
         self.assertIn("'CODEX_AUTO_RESUME_OUTSIDE=1'", launch)
         self.assertIn("[Environment]::GetEnvironmentVariables()", launch, "the run outside gets this run's environment")
+
+
+# The run outside, for real but not through WMI: Win32_ProcessStartup and Win32_Process.Create stand in as functions,
+# which are found before cmdlets. The startup object is written down; Create starts the very command line it is given
+# as an ordinary hidden child of the probe, so the relay, the exit code and the source the run outside executes are the
+# script's own. The stand-in for the work prints two lines, one of them Korean, adds a last line with no line end to
+# the log by itself, and ends with 7.
+RELAY = r"""
+$script:startupSeen = $null
+function New-CimInstance {
+    [CmdletBinding()]
+    param([string]$ClassName, [switch]$ClientOnly, [hashtable]$Property)
+    $script:startupSeen = $Property
+    return $Property
+}
+function Invoke-CimMethod {
+    [CmdletBinding()]
+    param([string]$ClassName, [string]$MethodName, [hashtable]$Arguments)
+    $line = [string]$Arguments.CommandLine
+    $close = $line.IndexOf('"', 1)
+    $info = New-Object System.Diagnostics.ProcessStartInfo($line.Substring(1, $close - 1), $line.Substring($close + 2))
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    $process = [System.Diagnostics.Process]::Start($info)
+    return [pscustomobject]@{ ReturnValue = 0; ProcessId = $process.Id }
+}
+$folder = $env:CAR_FOLDER
+$log = Join-Path $folder 'output.txt'
+$codeFile = Join-Path $folder 'code.txt'
+$env:CAR_LOG = $log
+$env:CAR_PROBE_VAR = 'present'
+$source = Get-OutsideSource -Script $env:CAR_STAND_IN -Switches @('Silent') -Log $log -CodeFile $codeFile
+$code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
+'CODE ' + $code
+'ENV ' + (@($script:startupSeen.EnvironmentVariables) -join '|')
+'SHOW ' + $script:startupSeen.ShowWindow
+"""
+
+STAND_IN = """param([switch]$Silent)
+Write-Host ('first line, silent ' + $Silent)
+Write-Host 'Korean: 한국어'
+[IO.File]::AppendAllText($env:CAR_LOG, 'last line without an end', (New-Object System.Text.UTF8Encoding $false))
+exit 7
+"""
+
+
+@unittest.skipUnless(POWERSHELL.is_file(), "the installer is PowerShell on Windows")
+class RelayTests(unittest.TestCase):
+    """install.ps1's relay, exit code and environment, run for real against a stand-in for the process outside."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.work = Path(tempfile.mkdtemp(prefix="host-app-relay-"))
+        stand_in = cls.work / "stand-in.ps1"
+        stand_in.write_text(STAND_IN, encoding="utf-8-sig")
+        folder = cls.work / "outside"
+        folder.mkdir()
+        saved = {name: os.environ.get(name) for name in ("CAR_FOLDER", "CAR_STAND_IN")}
+        os.environ.update(CAR_FOLDER=str(folder), CAR_STAND_IN=str(stand_in))
+        try:
+            cls.done = run_probe(VOICE + GATE, RELAY)
+        finally:
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.work, ignore_errors=True)
+
+    def lines(self, prefix):
+        return [line[len(prefix):] for line in self.done.stdout.splitlines() if line.startswith(prefix)]
+
+    def test_what_the_run_outside_prints_is_passed_on_line_by_line_with_the_last_unended_line(self):
+        printed = self.done.stdout.splitlines()
+        self.assertEqual(self.done.returncode, 0, self.done.stdout + self.done.stderr)
+        for line in ("first line, silent True", "Korean: 한국어", "last line without an end"):
+            with self.subTest(line):
+                self.assertIn(line, printed)
+        self.assertLess(printed.index("first line, silent True"), printed.index("last line without an end"))
+
+    def test_its_exit_code_is_the_run_s(self):
+        self.assertEqual(self.lines("CODE "), ["7"], self.done.stdout + self.done.stderr)
+
+    def test_the_run_outside_gets_this_run_s_environment_and_the_mark_with_no_window(self):
+        environment = self.lines("ENV ")[0].split("|")
+        self.assertIn("CAR_PROBE_VAR=present", environment)
+        self.assertIn("CODEX_AUTO_RESUME_OUTSIDE=1", environment)
+        self.assertEqual([entry for entry in environment if entry.startswith("CODEX_AUTO_RESUME_OUTSIDE=")],
+                         ["CODEX_AUTO_RESUME_OUTSIDE=1"])
+        self.assertEqual(self.lines("SHOW "), ["0"])
+
+
+# ----------------------------------------------------------------------- bootstrap.ps1's repair branch
+BOOTSTRAP_TEXT = (ROOT / "scripts" / "bootstrap.ps1").read_text(encoding="utf-8")
+
+
+def outside_gate(text: str) -> str:
+    """The outside gate as a script carries it: from its first line to its end marker."""
+    start = text.index("# Opens a process for limited query")
+    return text[start:text.index("# <<< the outside gate", start)]
+
+
+# The installation's runtime\python.exe, standing in: it says how it was run, and ends with 5.
+FAKE_PYTHON = r"""
+static class FakePython
+{
+    static int Main(string[] args)
+    {
+        System.Console.WriteLine("FAKE-PYTHON args=" + string.Join(" ", args) + " marker=" +
+                                 System.Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_OUTSIDE"));
+        string ran = System.Environment.GetEnvironmentVariable("CAR_RAN");
+        if (!string.IsNullOrEmpty(ran)) System.IO.File.AppendAllText(ran, string.Join(" ", args) + "\n");
+        return 5;
+    }
+}
+"""
+
+# Aliases are found before functions, so these stand in for the script's own Get-ProcessTable and Invoke-Outside
+# while the whole script runs: a process table with or without a packaged parent, and a launcher that writes down
+# what it would run outside and answers 7, or fails.
+ALIASED = r"""
+function global:Fake-ProcessTable {
+    param([int]$Self)
+    $table = @{}
+    $table[$Self] = @{ Parent = 41; Created = 50; Package = $null }
+    $table[41] = @{ Parent = 4; Created = 40; Package = $env:CAR_PACKAGE }
+    return $table
+}
+function global:Fake-Outside {
+    param([string]$Source, [string]$Log, [string]$CodeFile)
+    Write-Host ('SOURCE ' + ($Source -replace "`r`n", ' | '))
+    if ($env:CAR_LAUNCH -eq 'fail') { return $null }
+    return 7
+}
+Set-Alias -Scope Global Get-ProcessTable Fake-ProcessTable
+Set-Alias -Scope Global Invoke-Outside Fake-Outside
+"""
+
+
+@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
+class BootstrapRepairTests(unittest.TestCase):
+    """bootstrap.ps1 at the version already installed checks the installation over with its own setup, never
+    through install.ps1: inside another app's view that setup runs outside, as install.ps1 does (v0.6.17). The whole
+    script runs over a scratch plugin and a scratch home at the same version, with the network stubbed as
+    tests/test_edition_bootstrap.py stubs it and the installation's python a stand-in."""
+
+    @classmethod
+    def setUpClass(cls):
+        from test_edition_bootstrap import NOWHERE, RELEASE, RUN
+        cls.run_script = ALIASED + RUN
+        cls.work = Path(tempfile.mkdtemp(prefix="host-app-bootstrap-"))
+        plugin = cls.work / "plugin"
+        (plugin / "scripts").mkdir(parents=True)
+        (plugin / ".codex-plugin").mkdir()
+        shutil.copyfile(ROOT / "scripts" / "bootstrap.ps1", plugin / "scripts" / "bootstrap.ps1")
+        manifest = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        (plugin / ".codex-plugin" / "plugin.json").write_text(json.dumps(dict(manifest, version="9.9.9")),
+                                                               encoding="utf-8")
+        release = dict(RELEASE, download=NOWHERE + "/download/v{version}/", latest=NOWHERE + "/latest")
+        (plugin / "scripts" / "release.json").write_text(json.dumps(release), encoding="utf-8")
+        cls.script = plugin / "scripts" / "bootstrap.ps1"
+        cls.home = cls.work / "home"
+        (cls.home / "runtime").mkdir(parents=True)
+        (cls.home / "app" / ".codex-plugin").mkdir(parents=True)
+        (cls.home / "app" / ".codex-plugin" / "plugin.json").write_text(
+            json.dumps({"name": "codex-auto-resume", "version": "9.9.9"}), encoding="utf-8")
+        (cls.home / "app" / "scripts").mkdir()
+        (cls.home / "app" / "src" / "codex_auto_resume").mkdir(parents=True)
+        source = cls.work / "fake.cs"
+        source.write_text(FAKE_PYTHON, encoding="utf-8")
+        cls.python = cls.home / "runtime" / "python.exe"
+        built = subprocess.run([str(CSC), "/nologo", "/target:exe", "/out:" + str(cls.python), str(source)],
+                               capture_output=True, text=True, encoding="mbcs", errors="replace", timeout=300,
+                               creationflags=NO_WINDOW)
+        cls.built = built.returncode == 0
+        cls.temp = cls.work / "temp"
+        cls.temp.mkdir()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.work, ignore_errors=True)
+
+    def run_it(self, **environment):
+        if not self.built:
+            self.fail("the stand-in python did not build")
+        values = dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(self.home), TEMP=str(self.temp),
+                      TMP=str(self.temp), CAR_SCRIPT=str(self.script), CAR_ARGUMENTS="{}",
+                      CAR_REQUESTS=str(self.work / "requests.txt"), CAR_INSTALLED=str(self.work / "installed.json"),
+                      CAR_LATEST="")
+        for name in ("CAR_PACKAGE", "CAR_LAUNCH", "CODEX_AUTO_RESUME_OUTSIDE"):
+            values.pop(name, None)
+        values.update(environment)
+        done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                               "-Command", self.run_script], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              text=True, encoding="utf-8", errors="replace", timeout=300, env=values,
+                              creationflags=NO_WINDOW)
+        self.assertIn("already installed", done.stdout, done.stdout[-2000:])
+        return done.returncode, done.stdout
+
+    def test_inside_the_check_over_runs_outside_and_ends_with_its_code(self):
+        code, output = self.run_it(CAR_PACKAGE=CODEX)
+        self.assertEqual(code, 7, output[-2000:])
+        sources = [line for line in output.splitlines() if line.startswith("SOURCE ")]
+        self.assertEqual(len(sources), 1, output[-2000:])
+        setup = self.home / "app" / "scripts" / "plugin_setup.py"
+        self.assertIn("& '%s' '%s' 'setup' '--keep-state'" % (self.python, setup), sources[0])
+        self.assertNotIn("FAKE-PYTHON", output, "the setup ran here as well")
+
+    def test_a_relaunch_that_fails_runs_it_here_and_says_so_once(self):
+        code, output = self.run_it(CAR_PACKAGE=CODEX, CAR_LAUNCH="fail")
+        self.assertEqual(code, 5, output[-2000:])
+        self.assertIn("FAKE-PYTHON args=", output)
+        self.assertEqual(len([line for line in output.splitlines() if line.startswith("  [!]")]), 1, output[-2000:])
+
+    def test_the_mark_and_a_run_outside_any_app_run_it_here(self):
+        for environment in ({"CAR_PACKAGE": CODEX, "CODEX_AUTO_RESUME_OUTSIDE": "1"}, {}):
+            with self.subTest(environment):
+                code, output = self.run_it(**environment)
+                self.assertEqual(code, 5, output[-2000:])
+                self.assertIn("FAKE-PYTHON args=", output)
+                self.assertIn("setup --keep-state", output)
+                self.assertNotIn("SOURCE ", output)
+                self.assertNotIn("  [!]", output)
+
+    # ------------------------------------------------------------------ the other two runs of the installed setup
+    # The downgrade path's `remove-entry` (Remove-EntryBeforeOlder) and a failed conversion's `setup --keep-state`
+    # (Start-CurrentWatcher) write the registry too, so they go through the gate as the repair branch does. Each is
+    # lifted out of the script with the gate and run alone, with the process table and launcher stubbed and the
+    # stand-in python writing down that it ran here.
+    LIFTED = ("Find-PackagedAncestor", "Get-OutsideSource", "Resolve-OutsideRun", "Invoke-InstalledSetup",
+              "Remove-EntryBeforeOlder", "Start-CurrentWatcher", "Get-VersionParts", "Compare-ProductVersion")
+    CALLS = r"""
+$EntryFrom = '0.6.16'
+$script:sources = @()
+$script:warned = @()
+function Get-ProcessTable {
+    param([int]$Self)
+    $table = @{}
+    $table[$Self] = @{ Parent = 41; Created = 50; Package = $null }
+    $table[41] = @{ Parent = 4; Created = 40; Package = $env:CAR_PACKAGE }
+    return $table
+}
+function Invoke-Outside {
+    param([string]$Source, [string]$Log, [string]$CodeFile)
+    $script:sources += ,($Source -replace "`r`n", ' | ')
+    if ($env:CAR_LAUNCH -eq 'fail') { return $null }
+    return 0
+}
+function Warn { param([string]$m) $script:warned += ,$m }
+$answer = $null
+if ($env:CAR_WHICH -eq 'entry') { $answer = Remove-EntryBeforeOlder -Home_ $env:CAR_HOME -Installed '0.6.16' -Target '0.6.15' }
+else { Start-CurrentWatcher -Home_ $env:CAR_HOME }
+@{ answer = $answer; sources = @($script:sources); warned = @($script:warned) } | ConvertTo-Json -Compress
+"""
+
+    def call(self, which, **environment):
+        from test_edition_bootstrap import LIFT
+        ran = self.work / "ran.txt"
+        if ran.exists():
+            ran.unlink()
+        values = dict(os.environ, CAR_SCRIPT=str(ROOT / "scripts" / "bootstrap.ps1"), CAR_FUNCTIONS=",".join(self.LIFTED),
+                      CAR_CASES="[]", CAR_HOME=str(self.home), CAR_WHICH=which, CAR_RAN=str(ran))
+        for name in ("CAR_PACKAGE", "CAR_LAUNCH", "CODEX_AUTO_RESUME_OUTSIDE"):
+            values.pop(name, None)
+        values.update(environment)
+        done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                               "-Command", LIFT + self.CALLS], capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=300, env=values, creationflags=NO_WINDOW)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        answer = json.loads(done.stdout.strip().splitlines()[-1])
+        here = ran.read_text(encoding="utf-8").splitlines() if ran.exists() else []
+        return answer, here
+
+    def check_gated(self, which, command):
+        answer, here = self.call(which, CAR_PACKAGE=CODEX)
+        self.assertEqual(len(answer["sources"]), 1, answer)
+        self.assertIn("'%s'" % (self.home / "app" / "scripts" / "plugin_setup.py"), answer["sources"][0])
+        self.assertIn(command, answer["sources"][0])
+        self.assertEqual(here, [], "it ran here as well")
+        self.assertEqual(answer["warned"], [])
+        if which == "entry":
+            self.assertEqual(answer["answer"], "removed", "the code of the run outside decides")
+        answer, here = self.call(which, CAR_PACKAGE=CODEX, CAR_LAUNCH="fail")
+        self.assertEqual(len(answer["warned"]), 1, answer)
+        self.assertEqual(len(here), 1, "a relaunch that fails runs it here")
+        for environment in ({"CAR_PACKAGE": CODEX, "CODEX_AUTO_RESUME_OUTSIDE": "1"}, {}):
+            with self.subTest(environment):
+                answer, here = self.call(which, **environment)
+                self.assertEqual(answer["sources"], [])
+                self.assertEqual(len(here), 1)
+
+    def test_the_downgrade_s_remove_entry_runs_outside_as_the_repair_does(self):
+        self.check_gated("entry", "'remove-entry'")
+
+    def test_a_failed_conversion_s_watcher_start_runs_outside_as_the_repair_does(self):
+        self.check_gated("watcher", "'setup' '--keep-state'")
+
+    def test_the_two_scripts_carry_one_gate(self):
+        """Both scripts ship in every archive, but neither finds the other from everywhere it runs (the kept
+        uninstaller, Codex's copy of the plugin), so each carries the gate; this holds the copies equal."""
+        self.assertEqual(outside_gate(BOOTSTRAP_TEXT), outside_gate(INSTALL))
+        branch = BOOTSTRAP_TEXT[BOOTSTRAP_TEXT.index("Step 'Checking it over'"):]
+        gate = branch.index("$outsideCode = Resolve-OutsideRun -Script $python -Arguments $arguments")
+        self.assertLess(branch.index("$held = $lock.WaitOne(0)"), gate, "the lock is held while it runs outside")
+        self.assertLess(gate, branch.index("& $python @arguments"))
 
 
 # ----------------------------------------------------------------------- the wiring
@@ -368,6 +689,16 @@ class WiringTests(unittest.TestCase):
         not try again in the middle of a reopen."""
         self.assertIn("if (HostApp.StuckInside != null) arguments.Add(HostApp.Outside);",
                       guiscan.member_body("SettingsForm", "ReopenArguments"))
+
+    def test_a_moved_sign_in_switch_is_not_saved_while_stuck_inside(self):
+        """The Settings page's Save writes the sign-in entry through the bridge's `startup` (HKCU Run): the only other
+        HKCU write the window reaches. Stuck inside, it is refused as Repair is, and the switch goes back."""
+        save = guiscan.member_body("SettingsForm", "Save")
+        call = save.index('CallAsync("startup"')
+        refused = save.rindex("if (RefusedInside())", 0, call)
+        self.assertIn("startup.Checked = startupBaseline;", save[refused:call])
+        self.assertIn("return;", save[refused:call])
+        self.assertLess(save.index("startAtSignIn != startupBaseline"), refused)
 
     def test_the_three_maintenance_actions_refuse_while_stuck_inside(self):
         refused = guiscan.member_body("SettingsForm", "RefusedInside")

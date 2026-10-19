@@ -134,13 +134,23 @@ class RefreshRouteTests(unittest.TestCase):
                         "let go before the refresh, so an installation that starts meanwhile is not turned away")
 
     def test_an_update_checks_compatibility_line_reaches_the_card(self):
-        for caller in ("private void CheckForUpdates()", "private void InstallUpdate("):
+        """Both callers take the line out of RunBootstrap and hand that very variable to the card. The call is found
+        by its own parentheses, not by the text after it: v0.6.17 gave it one more `out` (#41), and a test anchored on
+        the old end of the list failed although the line still reached the card."""
+        for caller in ("CheckForUpdates", "InstallUpdate"):
             with self.subTest(caller):
-                body = method(self.dashboard, caller)
-                self.assertIn("out compatibility, out prerelease);", body)
-                self.assertIn("ReportCompatibilityLine(compatibility, live);", body)
-        run = self.dashboard[self.dashboard.index("private static void RunBootstrap"):]
-        run = run[:run.index("\n        /// The one-line fact")]
+                body = guiscan.member_body("SettingsForm", caller)
+                start = body.index("RunBootstrap(")
+                depth, end = 0, start + len("RunBootstrap")
+                for end in range(end, len(body)):
+                    depth += {"(": 1, ")": -1}.get(body[end], 0)
+                    if depth == 0:
+                        break
+                listed = " ".join(body[start + len("RunBootstrap("):end].split())
+                self.assertIn("out compatibility", [part.strip() for part in listed.split(",")])
+                self.assertIn("ReportCompatibilityLine(compatibility, live);", body[end:])
+        run = guiscan.member_body("SettingsForm", "RunBootstrap")
+        self.assertIn("out string compatibility", " ".join(run[:run.index("{")].split()))
         self.assertIn("compatibility = CompatibilityLine(printed);", run)
         self.assertRegex(self.dashboard, r"CheckMilliseconds\s*=\s*(\d+)\s*;")
         self.assertGreaterEqual(int(re.search(r"CheckMilliseconds\s*=\s*(\d+)\s*;", self.dashboard).group(1)), 100000,

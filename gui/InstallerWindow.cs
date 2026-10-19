@@ -455,7 +455,7 @@ namespace CodexAutoResume
         {
             if (HostApp.StuckInside == null) return;
             Row(new SoftCallout(words.Say("installer.inside_app",
-                "This was started from inside {app}, and Windows would keep what it sets up or removes inside that app: the entry in Settings > Apps, the start at sign-in, the notifications' name, the link handler and the Start menu entry. Run the setup program from File Explorer instead, or afterwards open the Dashboard from the Start menu and choose Repair.",
+                "This may have been started from inside {app}. If so, Windows would keep what it sets up or removes inside that app: the entry in Settings > Apps, the start at sign-in, the notifications' name, the link handler and the Start menu entry. If Settings > Apps lacks the entry afterwards, open the Dashboard from the Start menu and choose Repair installation.",
                 "app", HostApp.Name(HostApp.StuckInside))), gap);
         }
 
