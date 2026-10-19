@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -26,6 +27,7 @@ from codex_auto_resume.domain.plug import Alternative, Point  # noqa: E402
 from codex_auto_resume import machine  # noqa: E402
 from codex_auto_resume_advanced import runtime, statement  # noqa: E402
 from codex_auto_resume_advanced.codex.turns import Turns  # noqa: E402
+from codex_auto_resume_advanced.engine import foropen  # noqa: E402
 from codex_auto_resume_advanced.registry import (COMPACT_CONTINUE, GOAL_CONTINUATION, MARKER_FREE,  # noqa: E402
                                                  OTHER_SESSIONS, QUEUE_FOR_OPEN, RESET_CREDIT, SILENT_CONTINUATION, USAGE_METER,
                                                  USAGE_PAUSE)
@@ -92,20 +94,66 @@ class GoalBesideQueueForOpenTests(GoalCase):
     next armed answer - queue_for_open's - is taken, and core never asks P3 thread_available for a P16 answer: the
     standard continuation is queued for open beside the goal Codex carries on when the app opens the conversation."""
     registry = (GOAL_CONTINUATION, QUEUE_FOR_OPEN)
+    # A measurement neither capability rests on, standing in for MQG where the vocabulary does not have it yet.
+    STAND_IN = Measurement.MN
 
-    @unittest.expectedFailure
-    def test_a_goal_set_active_is_not_also_queued_for_open(self):
+    def both(self):
         plug, fake = self.armed()
         definition = plug.runtime.registry.get(QUEUE_FOR_OPEN.id)
         self.arm(plug, capability=QUEUE_FOR_OPEN.id,
                  warnings=[str(word) for word in plug.runtime.arming.warnings(definition)])
+        plug.runtime._code_of(QUEUE_FOR_OPEN)._home = self.h.home.root      # the harness's goals, never this PC's
         self.h.backend.after_accept = "queue"
         self.h.tick()
         self.assertEqual(len(fake.sets()), 1, "the goal set active")
         for _ in range(25):
             self.h.tick(advance=61)
         self.assertEqual(self.status(), "active")
+        return plug, fake
+
+    def qfo_journal(self, plug):
+        return [line["code"] for line in plug.runtime.state.journal(capability=QUEUE_FOR_OPEN.id)]
+
+    def assert_one_continuation(self, plug, code):
         self.assertEqual(self.h.backend.send_calls, [], "the standard continuation is not queued beside the goal")
+        self.assertEqual([spend[0] for spend in self.spends(plug)], [GOAL_CONTINUATION.id], "the goal carried it")
+        self.assertEqual(self.qfo_journal(plug).count(code), 1, "why it stood aside, once")
+
+    def assert_both(self, plug):
+        self.assertEqual(len(self.h.backend.send_calls), 1, "queued for opening beside the goal: MQG ran it once")
+        self.assertEqual(self.h.record()["state"], "queued")
+        self.assertEqual(sorted(spend[0] for spend in self.spends(plug)), [GOAL_CONTINUATION.id, QUEUE_FOR_OPEN.id])
+        self.assertNotIn("qfo.goal_unmeasured", self.qfo_journal(plug))
+
+    # Fixed in v0.6.17 (#47): while MQG has no pass on this Codex, queue_for_open leaves an active goal to carry it.
+    def test_a_goal_set_active_is_not_also_queued_for_open(self):
+        plug, _fake = self.both()
+        self.assert_one_continuation(plug, "qfo.goal_unmeasured")
+
+    def test_measured_as_two_turns_it_still_stands_aside_and_says_so(self):
+        self.measured[self.STAND_IN] = (Verdict.FAIL, ENGINE)
+        with patch.object(foropen, "MQG", self.STAND_IN):
+            plug, _fake = self.both()
+        self.assert_one_continuation(plug, "qfo.goal_two_turns")
+
+    def test_measured_as_one_turn_both_apply(self):
+        self.measured[self.STAND_IN] = (Verdict.PASS, ENGINE)
+        with patch.object(foropen, "MQG", self.STAND_IN):
+            plug, _fake = self.both()
+        self.assert_both(plug)
+
+    def test_one_turn_on_another_codex_is_not_measured_here(self):
+        self.measured[self.STAND_IN] = (Verdict.PASS, "codex-cli 0.1.0")
+        with patch.object(foropen, "MQG", self.STAND_IN):
+            plug, _fake = self.both()
+        self.assert_one_continuation(plug, "qfo.goal_unmeasured")
+
+    @unittest.skipUnless(hasattr(Measurement, "MQG"), "Measurement.MQG arrives with v0617-queue")
+    def test_mqg_passed_by_its_own_id_and_both_apply(self):
+        self.assertIs(foropen.MQG, Measurement.MQG)
+        self.measured[Measurement.MQG] = (Verdict.PASS, ENGINE)
+        plug, _fake = self.both()
+        self.assert_both(plug)
 
 
 class GoalBesideOtherSessionsTests(GoalCase):
