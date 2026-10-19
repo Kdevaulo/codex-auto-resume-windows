@@ -258,6 +258,16 @@ a command line, `-CheckOnly` prints the pre-release it found on a line of its ow
 Afterwards, change anything from **Start Menu → Codex Auto Resume**, or by asking Codex to
 *open auto resume settings*.
 
+**Not in Settings > Apps, or not starting at sign-in?** The Codex app and Claude desktop give every program they start
+a private view of the registry and of `%APPDATA%`, which Windows itself never reads. An installation or an update run
+from inside one of them - the setup program or `Install.cmd` run by an agent, or the Dashboard opened from the icon of
+a watcher that Codex started - could leave the entry in Settings > Apps, the sign-in start, the notifications' name,
+the link handler and the Start menu entry where Windows does not look. From v0.6.17 the setup programs, `Install.cmd`
+and the Dashboard notice it and run again outside that app by themselves, and a Dashboard that cannot get out refuses
+Repair and updates and says why. If it happened anyway, open the Dashboard from the Start menu - or, where the Start
+menu has no entry, `CodexAutoResumeSettings.exe` in `%USERPROFILE%\.codex-auto-resume` from File Explorer - and choose
+**Repair installation** on its Diagnostics page.
+
 ### Installing another version
 
 **Install another version...**, last in the Tools card of the Dashboard's Diagnostics page, installs a

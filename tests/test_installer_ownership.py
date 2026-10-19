@@ -621,13 +621,16 @@ class InstallerDeletionRoutingTests(unittest.TestCase):
     def source(self) -> str:
         return INSTALLER.read_text(encoding="utf-8")
 
-    def test_only_two_deletions_bypass_the_ownership_gate(self):
+    def test_only_three_deletions_bypass_the_ownership_gate(self):
         lines = [(number, line.strip())
                  for number, line in enumerate(self.source().splitlines(), 1)
                  if "Remove-Item" in line and not line.strip().startswith("#")]
         # One is inside `Remove-OwnedItem` itself; one removes the two temporary files
-        # `Invoke-Codex` created moments earlier under $env:TEMP.
+        # `Invoke-Codex` created moments earlier under $env:TEMP; and one (v0.6.17) the folder
+        # `Resolve-OutsideRun` made moments earlier under the temporary folder, for the output and
+        # the exit code of the run outside another app's view.
         self.assertEqual([line for _, line in lines], [
+            "Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue",
             "Remove-Item -Force -ErrorAction SilentlyContinue $out, $err",
             "Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue",
         ], "a deletion in install.ps1 does not go through Remove-OwnedItem")

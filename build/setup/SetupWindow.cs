@@ -68,6 +68,9 @@ namespace CodexAutoResumeSetup
                 {
                     return install(answered.Switches(arguments), heard, unpacked);
                 }, arguments, font);
+            // In front when it opens: a window this program relaunched outside another app's view is created by the
+            // shell or the WMI service, which do not give it the foreground (HostApp.Relaunch).
+            HostApp.BringToFront(window);
             Application.Run(window);
             if (window.OpenDashboard) OpenDashboard(flow.Home);
             return window.Code == int.MinValue ? Codes.Cancelled : window.Code;
@@ -111,19 +114,14 @@ namespace CodexAutoResumeSetup
         }
 
         // The Dashboard of the installation just made: its own program, by its full path, which is a window and
-        // has no console.
+        // has no console - in front (v0.6.17): this program's window has just closed on Finish, and the Dashboard it
+        // started opened behind the windows already there until this program let it come forward (HostApp). Where it
+        // cannot be started, it is installed all the same, and the Start menu opens it.
         private static void OpenDashboard(string home)
         {
             string exe = Path.Combine(home, Dashboard);
             if (!File.Exists(exe)) return;
-            try
-            {
-                var start = new ProcessStartInfo(exe);
-                start.UseShellExecute = false;
-                start.WorkingDirectory = home;
-                Process.Start(start).Dispose();
-            }
-            catch (Exception) { /* it is installed; the Start menu opens it */ }
+            HostApp.StartInFront(exe, null, home);
         }
 
         /// What the window reads from the archive it carries: its entries' names, its version and the catalogs.

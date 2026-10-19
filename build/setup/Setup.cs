@@ -102,15 +102,20 @@ namespace CodexAutoResumeSetup
         }
 
         // A test's hook, which never waits for Enter: every one begins with two hyphens, and nothing Install.cmd
-        // is given does.
+        // is given does. The one other word with two, HostApp.Outside, is a relaunched window's (Started).
         static bool Hook(string[] arguments)
         {
-            return arguments.Length > 0 && arguments[0].StartsWith("--", StringComparison.Ordinal);
+            return arguments.Length > 0 && arguments[0].StartsWith("--", StringComparison.Ordinal) &&
+                   arguments[0] != CodexAutoResume.HostApp.Outside;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static int Started(string[] arguments, bool hook)
         {
+            // A window this program relaunched outside another app's view (below) is told so by one more word, which
+            // nothing else is given and Install.cmd never sees.
+            bool relaunched = CodexAutoResume.HostApp.Relaunched(arguments);
+            arguments = CodexAutoResume.HostApp.Without(arguments);
             bool wait = !hook && !Passed.Silent(arguments);
             bool modules = arguments.Length == 1 && arguments[0] == "--loaded-modules";
             string into = arguments.Length == 2 && arguments[0] == "--unpack-into" ? arguments[1] : null;
@@ -120,6 +125,20 @@ namespace CodexAutoResumeSetup
             }
             if (wait)
             {
+                // v0.6.17: double-clicked inside another app's private view of Windows - started by an agent in the Codex
+                // app or Claude - the installation would be registered where Windows never looks (HostApp). The window
+                // opens outside instead, once, and this program ends; where it cannot, the window says so before it
+                // installs (InstallerWindow.InsideNote). With -Silent there is no window to move, and install.ps1, which
+                // Install.cmd runs, gets out by itself and passes its output and exit code back through here.
+                string inside = CodexAutoResume.HostApp.Inside();
+                if (inside != null && !relaunched &&
+                    CodexAutoResume.HostApp.Relaunch(typeof(Program).Assembly.Location,
+                                                     CodexAutoResume.HostApp.Arguments(arguments),
+                                                     Environment.CurrentDirectory))
+                {
+                    return 0;
+                }
+                CodexAutoResume.HostApp.StuckInside = inside;
                 return Windowed(arguments);
             }
             byte[] archive = Carried.Read();
