@@ -111,6 +111,45 @@ NOTES_READABLE = ("v9.9.9 — A title\r\n\r\n"
                   "• A second item.\r\n"
                   "• A numbered one")
 
+# Every phase the installer window shows, as (name, mode, page, code, watcher unconfirmed, previous watcher running)
+# for InstallerFlow.Light, and the light that is true there (the owner, 2026-10-20). A code of None is a page before
+# the run, which is asked twice - with no code yet and with 0 - for the page decides there, whatever the code.
+NO_CODE = -2147483648
+PHASES = [
+    ("welcome", "install", "welcome", None, False, False, "idle"),
+    ("options", "install", "options", None, False, False, "idle"),
+    ("edition_switch", "install", "options", None, False, False, "idle"),
+    ("maintain", "install", "maintain", None, False, False, "idle"),
+    ("uninstall_confirm", "uninstall", "confirm", None, False, False, "idle"),
+    ("update_notes", "update", "notes", None, False, False, "idle"),
+    ("installing", "install", "progress", None, False, False, "checking"),
+    ("updating", "update", "progress", None, False, False, "checking"),
+    ("uninstalling", "uninstall", "progress", None, False, False, "checking"),
+    ("installed_running", "install", "finish", 0, False, False, "monitoring"),
+    ("updated_running", "update", "finish", 0, False, False, "monitoring"),
+    ("installed_unconfirmed", "install", "finish", 0, True, False, "idle"),
+    ("updated_unconfirmed", "update", "finish", 0, True, False, "idle"),
+    ("updated_previous_still_running", "update", "finish", 0, False, True, "attention"),
+    ("install_failed", "install", "finish", 1, False, False, "idle"),
+    ("edition_refused", "install", "finish", 14, False, False, "idle"),
+    ("not_started", "install", "finish", -1, False, False, "idle"),
+    ("still_working", "update", "finish", -2, False, False, "checking"),
+    ("uninstalled", "uninstall", "finish", 0, False, False, "idle"),
+    ("uninstall_failed", "uninstall", "finish", 1, False, False, "idle"),
+]
+
+
+def _phase_cases():
+    cases = []
+    for name, mode, page, code, unconfirmed, previous, _ in PHASES:
+        if code is None:
+            cases.append([name, mode, page, NO_CODE, unconfirmed, previous])
+            cases.append([name + "@0", mode, page, 0, unconfirmed, previous])
+        else:
+            cases.append([name, mode, page, code, unconfirmed, previous])
+    return cases
+
+
 PROBE = r"""
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
@@ -338,6 +377,22 @@ $ways[0].Checked = $true
 $out.maintain.window_repair = @([string]$FlowType.GetField('Mode', $any).GetValue((Of $maintaining 'Flow')), [string]$button.Text)
 $null = CallOn $maintaining 'Finished' @(0, "  Checking the installation")
 $out.maintain.finished = [string](@(CallOn $maintaining 'ShownRows' @())[0].Text)
+
+# The status light, phase by phase (InstallerFlow.Light, the one place it is decided), and the windows above showing it.
+$out.light = @{}
+foreach ($case in $input_.phases) {
+    $out.light[[string]$case[0]] = [string](Call 'InstallerFlow' 'Light' @([string]$case[1], [string]$case[2], [int]$case[3],
+                                                                          [bool]$case[4], [bool]$case[5]))
+}
+function LightOf($window) {
+    $dot = $WindowType.GetField('light', $any).GetValue($window)
+    [string]$dot.GetType().GetProperty('State', $any).GetValue($dot, $null)
+}
+$gone = $WindowType.GetConstructors($any)[0].Invoke([object[]]@((NewFlow 'uninstall' 'advanced' 'advanced'), $english, $null, $null, $null, $font))
+$asking = LightOf $gone
+$null = CallOn $gone 'Finished' @(0, "Removed. Settings and pending recoveries were kept.")
+$out.window_light = @{ removed = (LightOf $gone); confirm = $asking; unconfirmed = (LightOf $done); updated = (LightOf $updating)
+                       refused = (LightOf $built); unstarted = (LightOf $unstarted); repaired = (LightOf $maintaining) }
 $out | ConvertTo-Json -Depth 6 -Compress
 """
 
@@ -421,7 +476,7 @@ class FlowTests(unittest.TestCase):
         source = cls.work / "input.json"
         source.write_text(json.dumps({"lines": {"install": INSTALLING, "update": UPDATING, "uninstall": REMOVING},
                                       "tags": cls.TAGS, "trees": trees, "homes": homes, "sample": NOTES_SAMPLE,
-                                      "looks": looks}),
+                                      "looks": looks, "phases": _phase_cases()}),
                           encoding="utf-8")
         cls.result = _powershell(PROBE, cls.work, 600, CAR_EXE=str(exe), CAR_INPUT=str(source),
                                  CAR_CHANGELOG=str(ROOT / "docs" / "CHANGELOG.md"), CAR_DOCS=str(docs))
@@ -467,6 +522,25 @@ class FlowTests(unittest.TestCase):
     def test_a_finished_run_says_its_code_and_offers_the_dashboard_only_after_a_success(self):
         self.assertEqual(self.answer["window"]["after"], ["finish", 14, False, True])
         self.assertEqual(self.answer["window"]["done"], ["finish", 0, True])
+
+    def assert_phase_light(self, name, expected):
+        """One phase's light (PHASES), as InstallerFlow.Light decides it: a page before the run asked with no code
+        yet and with 0."""
+        asked = [key for key in self.answer["light"] if key == name or key == name + "@0"]
+        self.assertTrue(asked, "the phase %s was asked" % name)
+        for key in asked:
+            self.assertEqual(self.answer["light"][key], expected, key)
+
+    def test_the_window_shows_the_phase_light_it_is_in(self):
+        """The window's own light is the one InstallerFlow.Light gives: the acceptance's uninstall finished with it
+        lit (cyan) on "Codex Auto Resume is removed." (the owner, 2026-10-20) - off now, as after a failure, a
+        watcher not confirmed running and an installer that could not start; lit only where the watcher was."""
+        self.assertEqual(self.answer["window_light"], {
+            "confirm": "idle", "removed": "idle", "unconfirmed": "idle", "refused": "idle", "unstarted": "idle",
+            "updated": "monitoring", "repaired": "monitoring"})
+        shown = guiscan.member_body("InstallerWindow", "ShowPage")
+        self.assertIn("light.State = InstallerFlow.Light(flow.Mode, name, code, unconfirmed, previousRunning);", shown)
+        self.assertEqual(len(re.findall(r"\blight\.State\s*=", WINDOW)), 1, "the light is set in one place")
 
     def test_the_bar_follows_the_scripts_lines_forward_only(self):
         for mode, lines in (("install", INSTALLING), ("update", UPDATING), ("uninstall", REMOVING)):
@@ -642,6 +716,17 @@ class FlowTests(unittest.TestCase):
         self.assertIn("setup program stopped", outcome["43"][1])
         self.assertIn("still working", outcome["-2"][0])
         self.assertEqual(self.answer["removed"], "Codex Auto Resume is removed.")
+
+
+def _phase_light_test(name, expected):
+    def test(self):
+        self.assert_phase_light(name, expected)
+    test.__doc__ = "The status light of the phase %s is %s (InstallerFlow.Light)." % (name, expected)
+    return test
+
+
+for _phase in PHASES:
+    setattr(FlowTests, "test_the_light_of_phase_" + _phase[0], _phase_light_test(_phase[0], _phase[6]))
 
 
 class ScriptTests(unittest.TestCase):
