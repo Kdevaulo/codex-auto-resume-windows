@@ -509,6 +509,16 @@ class WiringTests(unittest.TestCase):
         self.assertIn("if (HostApp.StuckInside != null) arguments.Add(HostApp.Outside);",
                       guiscan.member_body("SettingsForm", "ReopenArguments"))
 
+    def test_a_moved_sign_in_switch_is_not_saved_while_stuck_inside(self):
+        """The Settings page's Save writes the sign-in entry through the bridge's `startup` (HKCU Run): the only other
+        HKCU write the window reaches. Stuck inside, it is refused as Repair is, and the switch goes back."""
+        save = guiscan.member_body("SettingsForm", "Save")
+        call = save.index('CallAsync("startup"')
+        refused = save.rindex("if (RefusedInside())", 0, call)
+        self.assertIn("startup.Checked = startupBaseline;", save[refused:call])
+        self.assertIn("return;", save[refused:call])
+        self.assertLess(save.index("startAtSignIn != startupBaseline"), refused)
+
     def test_the_three_maintenance_actions_refuse_while_stuck_inside(self):
         refused = guiscan.member_body("SettingsForm", "RefusedInside")
         self.assertIn("if (HostApp.StuckInside == null) return false;", refused)
