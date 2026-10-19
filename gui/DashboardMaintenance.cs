@@ -90,10 +90,12 @@ namespace CodexAutoResume
             {
                 string outcome, detail;
                 RunRepair(root, python, setup, out outcome, out detail);
+                bool noEntry = outcome == "done" &&
+                               EntryCannotBeWritten(root, Environment.GetEnvironmentVariable("USERPROFILE"));
                 MethodInvoker finish = delegate
                 {
                     SetBusy(false);
-                    ReportRepair(outcome, detail);
+                    ReportRepair(outcome, detail, noEntry);
                     RefreshAfterChange();
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(finish); }
@@ -641,7 +643,30 @@ namespace CodexAutoResume
                 @"^(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})-(alpha|beta)(\.([2-9]|[1-9][0-9]{1,2}))?\z",
                 System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
-        private void ReportRepair(string outcome, string detail)
+        /// GitHub #43: true when `root` is the ordinary home (.codex-auto-resume in the profile, install.ps1's
+        /// Test-DefaultHome) and the uninstaller kept in it for the entry in Settings > Apps is missing - so setup wrote no
+        /// entry (addremove.register writes one only where it is), and Repair cannot make one: the installation holds no
+        /// other copy of install.ps1 (the archive's install\ folder is removed once it has run, and payload\app carries
+        /// none). An update before v0.6.17 started from the Dashboard kept none, and a pick of a version before v0.6.16
+        /// removes it. A home placed elsewhere never has one, as documented, and gets no sentence for it. A folder or
+        /// file that is a link or a junction counts as missing, as addremove.kept_uninstaller_present reads it.
+        internal static bool EntryCannotBeWritten(string root, string profile)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(profile)) return false;
+            try
+            {
+                string ordinary = Path.GetFullPath(InstallerFlow.HomeFrom(null, profile)).TrimEnd('\\');
+                string here = Path.GetFullPath(root).TrimEnd('\\');
+                if (!string.Equals(ordinary, here, StringComparison.OrdinalIgnoreCase)) return false;
+                string folder = Path.Combine(here, "uninstall");
+                string script = Path.Combine(folder, "install.ps1");
+                if (!Directory.Exists(folder) || !File.Exists(script)) return true;
+                return ((File.GetAttributes(folder) | File.GetAttributes(script)) & FileAttributes.ReparsePoint) != 0;
+            }
+            catch (Exception) { return false; }
+        }
+
+        private void ReportRepair(string outcome, string detail, bool noEntry)
         {
             string text = outcome == "done" ? S("diag.repair_done", "Setup finished.")
                         : outcome == "running" ? S("diag.repair_running", "Setup is taking longer than usual and is still working. It carries on in the background; look at this page again in a minute.")
@@ -652,6 +677,10 @@ namespace CodexAutoResume
             // would be noise beside a sentence that already says what to do.
             if (outcome == "failed" && !string.IsNullOrEmpty(detail))
                 text += Environment.NewLine + Environment.NewLine + detail;
+            // Said rather than left out (GitHub #43): a repair that wrote everything else wrote no entry here.
+            if (noEntry)
+                text += Environment.NewLine + Environment.NewLine +
+                        S("diag.repair_no_entry", "Settings > Apps still has no entry for this installation: the copy of the installer its Uninstall button runs is missing, and Repair has no copy to put back. Run this version's Setup program and choose Repair, or install the next update: either one puts the copy and the entry back.");
             Tell(text);
         }
     }

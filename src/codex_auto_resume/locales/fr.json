@@ -340,6 +340,7 @@
   "diag.repair_done": "Installation terminée.",
   "diag.repair_failed": "L'installation n'a pas abouti.",
   "diag.repair_incomplete": "Des fichiers qui composent cette installation sont manquants : l'installation n'a donc pas pu s'exécuter. Réinstallez à partir de l'archive de la version.",
+  "diag.repair_no_entry": "Paramètres > Applications n'a toujours aucune entrée pour cette installation : la copie de l'installateur que lance son bouton Désinstaller est absente, et la réparation n'a aucune copie à remettre. Lancez le programme d'installation de cette version et choisissez Réparer, ou installez la prochaine mise à jour : l'un comme l'autre remet la copie et l'entrée.",
   "diag.repair_running": "L'installation prend plus de temps que d'habitude et est toujours en cours. Elle se poursuit en arrière-plan ; revenez sur cette page dans une minute.",
   "diag.running": "en cours d'exécution",
   "diag.startup": "Démarre à la connexion",

@@ -340,6 +340,7 @@
   "diag.repair_done": "Kurulum tamamlandı.",
   "diag.repair_failed": "Kurulum tamamlanmadı.",
   "diag.repair_incomplete": "Bu yüklemeyi oluşturan dosyalar eksik, bu nedenle kurulum çalıştırılamadı. Sürüm arşivinden yeniden yükleyin.",
+  "diag.repair_no_entry": "Ayarlar > Uygulamalar'da bu yükleme için hâlâ bir girdi yok: Kaldır düğmesinin çalıştırdığı yükleyici kopyası eksik ve onarımın geri koyabileceği bir kopya yok. Bu sürümün kurulum programını çalıştırıp Onar'ı seçin ya da bir sonraki güncellemeyi yükleyin: ikisi de kopyayı ve girdiyi geri getirir.",
   "diag.repair_running": "Kurulum her zamankinden uzun sürüyor ve hâlâ çalışıyor. Arka planda devam ediyor; bir dakika sonra bu sayfaya yeniden bakın.",
   "diag.running": "çalışıyor",
   "diag.startup": "Oturum açılınca başlar",

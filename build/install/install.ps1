@@ -701,6 +701,31 @@ function Install-KeptUninstaller {
     return $true
 }
 
+function Test-DefaultHome {
+    <#
+        True when the installation root $Root is the ordinary one, `.codex-auto-resume` in the profile $Profile.
+
+        The kept uninstaller (Install-KeptUninstaller), and with it the entry in Add or remove programs, is for the
+        ordinary home. Whether CODEX_AUTO_RESUME_PLUGIN_HOME is set does not say which home this is: the Dashboard sets
+        it to its own root for every update it starts (gui/DashboardMaintenance.cs, StartBootstrap), and that root is
+        the ordinary home nearly always. Read as "set means moved", every update from the Dashboard kept no uninstaller,
+        so no entry was ever written after one, and Repair could not add it (GitHub #43). So the root this run really
+        installed is compared with the ordinary one.
+
+        Both go through Resolve-Canonical, so one place has one spelling: a different case (the compare ignores it), a
+        trailing separator, `.` and `..`, forward slashes, a `\\?\` prefix, an 8.3 short name (Windows PowerShell's
+        GetFullPath gives the long name of a path that exists, and both exist here) and a junction are all the same
+        folder. Environment variables are not expanded, on purpose: $InstallHome takes the variable as it is written, so
+        a `%USERPROFILE%` in it names another folder, and $Root is the folder the files went to - which is what decides.
+    #>
+    param([string]$Root, [string]$Profile)
+    if ([string]::IsNullOrWhiteSpace($Root) -or [string]::IsNullOrWhiteSpace($Profile)) { return $false }
+    $ordinary = Resolve-Canonical (Join-Path $Profile '.codex-auto-resume')
+    $here = Resolve-Canonical $Root
+    if (-not $ordinary -or -not $here) { return $false }
+    return [string]::Equals($ordinary, $here, [StringComparison]::OrdinalIgnoreCase)
+}
+
 function Read-UninstallEntry {
     # The two values that say whose an entry in Add or remove programs is, or $null when there is none. The only
     # read of the registry in this file, and one of the two calls into it (Remove-UninstallEntry is the other);
@@ -1478,7 +1503,10 @@ try {
     # The entry in Add or remove programs is written by the engine's setup below, and only where this has
     # left an uninstaller for it to name. Only for the ordinary home: an installation somewhere the person
     # chose through CODEX_AUTO_RESUME_PLUGIN_HOME would need the uninstaller told where it is, and gets none.
-    if ([string]::IsNullOrWhiteSpace($env:CODEX_AUTO_RESUME_PLUGIN_HOME)) {
+    # The ordinary home named by that variable is still the ordinary home (Test-DefaultHome): every update the
+    # Dashboard starts names it so, and kept nothing until v0.6.17 - which this puts back, update by update.
+    if ([string]::IsNullOrWhiteSpace($env:CODEX_AUTO_RESUME_PLUGIN_HOME) -or
+        (Test-DefaultHome -Root $OwnedHome -Profile $env:USERPROFILE)) {
         $null = Install-KeptUninstaller -Source $PSCommandPath
     }
 

@@ -144,8 +144,40 @@ $arguments = [object[]]@($work, [string](Join-Path $work 'absent.ps1'), '-CheckO
 $null = $run.Invoke($null, $arguments)
 $out['absent'] = @{ answer = $arguments[4]; current = $arguments[5]; latest = $arguments[6] }
 
+# GitHub #43: whether a finished Repair has to say that it wrote no entry in Settings > Apps.
+$entry = $form.GetMethod('EntryCannotBeWritten', [Reflection.BindingFlags]'Static,NonPublic,Public')
+$out['entry'] = $null
+if ($entry) {
+    $out['entry'] = @{}
+    foreach ($case in (ConvertFrom-Json $env:CAR_ENTRY).PSObject.Properties) {
+        $out['entry'][$case.Name] = $entry.Invoke($null, [object[]]@([string]$case.Value[0], [string]$case.Value[1]))
+    }
+}
+
 $out | ConvertTo-Json -Depth 5 -Compress
 """
+
+
+def entry_cases(work: Path) -> dict:
+    """name -> ((root, profile), whether Repair must say it wrote no entry): scratch homes in `work`, made here."""
+    profile = work / "Profile Of ExampleUser"
+    ordinary = profile / ".codex-auto-resume"
+    elsewhere = work / "Elsewhere" / ".codex-auto-resume"
+    for folder in (ordinary / "app", elsewhere / "app"):
+        folder.mkdir(parents=True, exist_ok=True)
+    kept_home = work / "Kept Profile"
+    (kept_home / ".codex-auto-resume" / "uninstall").mkdir(parents=True)
+    (kept_home / ".codex-auto-resume" / "uninstall" / "install.ps1").write_text("# kept", encoding="utf-8")
+    folder_only = work / "Folder Only"
+    (folder_only / ".codex-auto-resume" / "uninstall").mkdir(parents=True)
+    return {
+        "ordinary_without_it": ((str(ordinary), str(profile)), True),
+        "ordinary_spelled_otherwise": ((str(ordinary).upper() + "\\", str(profile)), True),
+        "ordinary_with_an_empty_folder": ((str(folder_only / ".codex-auto-resume"), str(folder_only)), True),
+        "ordinary_with_it": ((str(kept_home / ".codex-auto-resume"), str(kept_home)), False),
+        "placed_elsewhere": ((str(elsewhere), str(profile)), False),
+        "no_profile": ((str(ordinary), ""), False),
+    }
 
 
 def prerelease_lines() -> dict:
@@ -183,6 +215,7 @@ class BootstrapReadingTests(unittest.TestCase):
         # from CreateProcess, which reads like a permissions problem and is not one.
         probe = work / "probe.ps1"
         probe.write_text(PROBE, encoding="utf-8")
+        cls.entry = entry_cases(work / "homes")
         result = subprocess.run(
             [str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
              "-File", str(probe)],
@@ -190,7 +223,8 @@ class BootstrapReadingTests(unittest.TestCase):
             env=dict(os.environ, CAR_EXE=str(exe), CAR_WORK=str(work),
                      CAR_CASES=json.dumps({name: [printed, code]
                                            for name, (printed, code, _) in CASES.items()}),
-                     CAR_LINES=json.dumps(list(prerelease_lines()))))
+                     CAR_LINES=json.dumps(list(prerelease_lines())),
+                     CAR_ENTRY=json.dumps({name: list(pair) for name, (pair, _) in cls.entry.items()})))
         cls.result = result
         cls.answer = json.loads(result.stdout) if result.returncode == 0 and result.stdout.strip() else {}
 
@@ -245,6 +279,31 @@ class BootstrapReadingTests(unittest.TestCase):
     def test_a_missing_script_is_not_a_failed_check(self):
         """Nothing to run is a broken installation, not an answer about updates."""
         self.assertEqual(self.answer["absent"]["answer"], "failed")
+
+    def test_a_repair_says_when_it_could_write_no_entry_in_settings_apps(self):
+        """GitHub #43: the ordinary home without its kept uninstaller gets no entry in Settings > Apps from setup, and the
+        installation holds no other copy of install.ps1 to put back, so Repair says so instead of saying only "Setup
+        finished". A home with it, a home placed elsewhere (which never has one, as documented) and a profile that
+        cannot be read say nothing more."""
+        self.assertIsNotNone(self.answer["entry"], "SettingsForm has no EntryCannotBeWritten")
+        for name, (_, expected) in sorted(self.entry.items()):
+            with self.subTest(name):
+                self.assertIs(self.answer["entry"][name], expected)
+
+
+class RepairEntryTests(unittest.TestCase):
+    """GitHub #43: Repair asks EntryCannotBeWritten only once setup has finished, and then says the sentence."""
+
+    def test_a_finished_repair_says_it_wrote_no_entry(self):
+        repair = guiscan.member_body("SettingsForm", "Repair")
+        self.assertIn('bool noEntry = outcome == "done" &&\n'
+                      '                               EntryCannotBeWritten(root, Environment.GetEnvironmentVariable("USERPROFILE"));',
+                      repair)
+        self.assertIn("ReportRepair(outcome, detail, noEntry);", repair)
+        report = guiscan.member_body("SettingsForm", "ReportRepair")
+        self.assertIn('if (noEntry)', report)
+        self.assertIn('S("diag.repair_no_entry", ', report)
+        self.assertLess(report.index('if (noEntry)'), report.index("Tell(text);"))
 
 
 class ButtonTests(unittest.TestCase):

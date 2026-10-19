@@ -340,6 +340,7 @@
   "diag.repair_done": "f91e80afacae6b67",
   "diag.repair_failed": "60f422e2cc15ec58",
   "diag.repair_incomplete": "1b07f7bf49468ce3",
+  "diag.repair_no_entry": "291c9590fd54030b",
   "diag.repair_running": "32750baec4027d7e",
   "diag.running": "c071cf5f5ed6f884",
   "diag.startup": "540a25e84f20b133",

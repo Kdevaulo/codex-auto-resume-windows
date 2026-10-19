@@ -340,6 +340,7 @@
   "diag.repair_done": "Penyiapan selesai.",
   "diag.repair_failed": "Penyiapan tidak selesai.",
   "diag.repair_incomplete": "Sebagian file penyusun instalasi ini hilang, sehingga penyiapan tidak dapat berjalan. Instal lagi dari arsip rilis.",
+  "diag.repair_no_entry": "Pengaturan > Aplikasi masih belum memiliki entri untuk instalasi ini: salinan penginstal yang dijalankan tombol Copot pemasangan hilang, dan perbaikan tidak punya salinan untuk dikembalikan. Jalankan program penyiapan versi ini dan pilih Perbaiki, atau instal pembaruan berikutnya: keduanya mengembalikan salinan dan entrinya.",
   "diag.repair_running": "Penyiapan memakan waktu lebih lama dari biasanya dan masih berjalan. Prosesnya berlanjut di latar belakang; lihat halaman ini lagi dalam satu menit.",
   "diag.running": "berjalan",
   "diag.startup": "Mulai saat masuk",

@@ -340,6 +340,7 @@
   "diag.repair_done": "Installazione completata.",
   "diag.repair_failed": "L'installazione non è stata completata.",
   "diag.repair_incomplete": "Mancano file che compongono questa installazione, quindi non è stato possibile eseguire l'installazione. Reinstallala dall'archivio della release.",
+  "diag.repair_no_entry": "In Impostazioni > App non c'è ancora una voce per questa installazione: manca la copia del programma di installazione che il pulsante Disinstalla esegue, e la riparazione non ha una copia da rimettere. Esegui il programma di installazione di questa versione e scegli Ripara, oppure installa il prossimo aggiornamento: in entrambi i casi tornano la copia e la voce.",
   "diag.repair_running": "L'installazione richiede più tempo del solito ed è ancora in corso. Prosegue in background; torna su questa pagina tra un minuto.",
   "diag.running": "attivo",
   "diag.startup": "Avvio all'accesso",

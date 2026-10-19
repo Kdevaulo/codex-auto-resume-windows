@@ -340,6 +340,7 @@
   "diag.repair_done": "Einrichtung abgeschlossen.",
   "diag.repair_failed": "Die Einrichtung wurde nicht abgeschlossen.",
   "diag.repair_incomplete": "Dateien dieser Installation fehlen, daher konnte die Einrichtung nicht ausgeführt werden. Installieren Sie sie erneut aus dem Release-Archiv.",
+  "diag.repair_no_entry": "In Einstellungen > Apps gibt es für diese Installation weiterhin keinen Eintrag: Die Kopie des Installationsprogramms, die die Schaltfläche „Deinstallieren“ ausführt, fehlt, und die Reparatur hat keine Kopie, die sie zurücklegen könnte. Führen Sie das Setup-Programm dieser Version aus und wählen Sie „Reparieren“, oder installieren Sie das nächste Update: Beides bringt die Kopie und den Eintrag zurück.",
   "diag.repair_running": "Die Einrichtung dauert länger als üblich und läuft im Hintergrund weiter; sehen Sie in einer Minute wieder auf dieser Seite nach.",
   "diag.running": "läuft",
   "diag.startup": "Start bei Anmeldung",

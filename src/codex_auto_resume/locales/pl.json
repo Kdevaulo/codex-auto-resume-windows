@@ -340,6 +340,7 @@
   "diag.repair_done": "Konfiguracja zakończona.",
   "diag.repair_failed": "Konfiguracja nie została ukończona.",
   "diag.repair_incomplete": "Brakuje plików tej instalacji, więc nie można było uruchomić konfiguracji. Zainstaluj ją ponownie z archiwum wydania.",
+  "diag.repair_no_entry": "W Ustawienia > Aplikacje nadal nie ma wpisu tej instalacji: brakuje kopii instalatora, którą uruchamia przycisk Odinstaluj, a naprawa nie ma kopii, którą mogłaby przywrócić. Uruchom program instalacyjny tej wersji i wybierz Napraw albo zainstaluj następną aktualizację: każde z nich przywróci kopię i wpis.",
   "diag.repair_running": "Konfiguracja trwa dłużej niż zwykle i nadal działa. Będzie kontynuowana w tle; zajrzyj na tę stronę ponownie za minutę.",
   "diag.running": "działa",
   "diag.startup": "Start przy logowaniu",

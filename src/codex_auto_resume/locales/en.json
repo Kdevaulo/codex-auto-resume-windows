@@ -195,6 +195,7 @@
   "diag.repair_done": "Setup finished.",
   "diag.repair_failed": "Setup did not finish.",
   "diag.repair_incomplete": "Files this installation is made of are missing, so setup could not run. Install it again from the release archive.",
+  "diag.repair_no_entry": "Settings > Apps still has no entry for this installation: the copy of the installer its Uninstall button runs is missing, and Repair has no copy to put back. Run this version's Setup program and choose Repair, or install the next update: either one puts the copy and the entry back.",
   "diag.repair_running": "Setup is taking longer than usual and is still working. It carries on in the background; look at this page again in a minute.",
   "diag.running": "running",
   "diag.startup": "Starts at sign-in",

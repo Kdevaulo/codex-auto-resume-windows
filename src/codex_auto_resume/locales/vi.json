@@ -340,6 +340,7 @@
   "diag.repair_done": "Thiết lập đã hoàn tất.",
   "diag.repair_failed": "Thiết lập chưa hoàn tất.",
   "diag.repair_incomplete": "Thiếu các tệp tạo nên bản cài đặt này, nên không thể chạy thiết lập. Hãy cài đặt lại từ tệp nén của bản phát hành.",
+  "diag.repair_no_entry": "Cài đặt > Ứng dụng vẫn chưa có mục cho bản cài đặt này: bản sao trình cài đặt mà nút Gỡ cài đặt chạy đã mất, và việc sửa không có bản sao nào để đặt lại. Hãy chạy chương trình thiết lập của phiên bản này và chọn Sửa, hoặc cài bản cập nhật tiếp theo: cách nào cũng đưa cả bản sao lẫn mục trở lại.",
   "diag.repair_running": "Thiết lập mất nhiều thời gian hơn thường lệ và vẫn đang chạy. Nó tiếp tục chạy ở chế độ nền; hãy xem lại trang này sau một phút.",
   "diag.running": "đang chạy",
   "diag.startup": "Khởi động khi đăng nhập",

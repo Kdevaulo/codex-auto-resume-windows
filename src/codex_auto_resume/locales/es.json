@@ -340,6 +340,7 @@
   "diag.repair_done": "El programa de instalación terminó.",
   "diag.repair_failed": "El programa de instalación no terminó.",
   "diag.repair_incomplete": "Faltan archivos que forman esta instalación, así que no se pudo ejecutar el programa de instalación. Vuelve a instalarla desde el archivo comprimido de la versión.",
+  "diag.repair_no_entry": "Configuración > Aplicaciones sigue sin una entrada para esta instalación: falta la copia del instalador que ejecuta su botón Desinstalar, y la reparación no tiene ninguna copia que reponer. Ejecute el programa de instalación de esta versión y elija Reparar, o instale la próxima actualización: cualquiera de las dos repone la copia y la entrada.",
   "diag.repair_running": "El programa de instalación está tardando más de lo habitual y sigue trabajando. Continúa en segundo plano; vuelve a mirar esta página en un minuto.",
   "diag.running": "en ejecución",
   "diag.startup": "Se ejecuta al iniciar sesión",
