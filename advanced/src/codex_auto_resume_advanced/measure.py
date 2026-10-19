@@ -1333,7 +1333,17 @@ def _mqp(ctx):
         for index, thread in enumerate(threads):
             left = max(0.0, _MQO_OPEN_SECONDS - (time.monotonic() - began))
             taken += _await_taken(session, thread, ids[index], left)
-    found_own = sum(_recorded_in(ctx, thread, ids[index]) for index, thread in enumerate(threads)) if taken else 0
+    # As MQO: the history is read again until each conversation's own message is found there, _MQO_FIND_SECONDS at
+    # most - a message taken a moment ago may not be written yet (the owner's run of 2026-10-20 read 1 of 2 at once).
+    found = set()
+    deadline = time.monotonic() + _MQO_FIND_SECONDS
+    while taken:
+        found |= {index for index, thread in enumerate(threads)
+                  if index not in found and _recorded_in(ctx, thread, ids[index])}
+        if len(found) == len(threads) or time.monotonic() >= deadline:
+            break
+        time.sleep(_M2B_POLL_SECONDS)
+    found_own = len(found)
     found_elsewhere = sum(_recorded_in(ctx, thread, other) for thread in threads for other in ids
                           if other != ids[threads.index(thread)]) if taken else 0
     observed = {"conversations": len(threads), "held_before": 0, "accepted": sum(accepted),

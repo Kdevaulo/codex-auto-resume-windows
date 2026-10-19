@@ -133,7 +133,7 @@ THREADS = ("0a1b2c3d-0001-7000-8000-0000000000a1", "0a1b2c3d-0001-7000-8000-0000
 class MqpTests(MqoCase):
     """MQP (v0.6.17): two to four conversations sent to at once, each under its own client id."""
 
-    def run_mqp(self, *, threads=THREADS, held=(), crossed=False):
+    def run_mqp(self, *, threads=THREADS, held=(), crossed=False, late=()):
         seen = {}
 
         def queue_list(params):
@@ -152,8 +152,12 @@ class MqpTests(MqoCase):
             self.sessions.append(FakeSession(measurement, replies))
             return self.sessions[-1]
 
+        reads = {}
+
         def history(ctx, thread, client_id):
-            return client_id == measure._SAMPLE_MQP_CLIENT_IDS[list(threads).index(thread)]
+            own = client_id == measure._SAMPLE_MQP_CLIENT_IDS[list(threads).index(thread)]
+            reads[thread] = reads.get(thread, 0) + 1
+            return own and not (thread in late and reads[thread] == 1)     # `late`: written only by the second read
         with patch.object(measure, "_recorded_in", history):
             summary = measure.run(Measurement.MQP, session_factory=factory, backend=Backend(), versions=VERSIONS,
                                   thread=",".join(threads), clock=lambda: 1_800_000_000.0, directory=self.dir)
@@ -184,6 +188,10 @@ class MqpTests(MqoCase):
         text = json.dumps(record)
         for secret in THREADS + measure._SAMPLE_MQP_CLIENT_IDS:
             self.assertNotIn(secret, text)
+
+    def test_a_message_the_history_has_only_at_the_second_read_is_found(self):
+        """Fails with the one read the owner's run of 2026-10-20 made: found_in_own was 1 of 2."""
+        self.assertEqual(self.run_mqp(late=(THREADS[1],))["observed"]["found_in_own"], 3)
 
     def test_an_item_in_another_conversations_queue_is_counted(self):
         self.assertEqual(self.run_mqp(crossed=True)["observed"]["queued_elsewhere"], 3)
