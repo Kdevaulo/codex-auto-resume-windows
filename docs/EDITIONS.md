@@ -75,12 +75,17 @@ record that it was claimed and the last look before it stay the standard edition
 
 **Ceilings.** Each capability may send only so many times a day, in all and in any one
 conversation, counted when the send is claimed. Over them stands one ceiling for all capabilities
-together, 12 sends an hour, which you can lower on the page, as far as one an hour, and never raise
-past 12. The page shows a capability's own ceilings beside its statement. Every send also counts
+together, 12 sends an hour - a send counts once, however many capabilities answered for it - which you can
+lower on the page, as far as one an hour, and never raise past 12. The page shows a capability's own ceilings beside its statement. Every send also counts
 against the standard edition's own limits for the conversation: five in any 24 hours, at least 15
 minutes apart (A20) - except where a capability says it departs from A20: a send of the short retries
 when Codex is at capacity counts against the program's own capacity limits instead, 48 a day, a minute
 apart, and Send now skips the 15 minutes for the one recovery you choose, still within the five a day.
+
+**Two capabilities, one send.** Two capabilities may answer for the same send in ways Codex cannot carry together.
+Then the one asked later stands aside for that send - never the one already taken - and the journal says so, on a line
+that names the capability it stood aside for and why, instead of recording the send as acted. Each goes on serving
+its own cases; where a capability's section below says two apply together, both do.
 
 **Warnings, not refusals.** A measurement a capability rests on that failed, or was never made for
 your version of Codex, a compatibility grade of Failed here, Incompatible or Unknown, or a Codex
@@ -144,7 +149,9 @@ no words - and four more (the reset credit, the reset message, the usage meter a
 measurements made on `codex-cli 0.162.0-alpha.17.2` and, for the forced stop, again on the newer one. Six rest on
 measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
 owner's machine, first on `codex-cli 0.158.0-alpha.2.1`, again on `codex-cli 0.162.0-alpha.17.2` and, for those this release's
-capabilities rest on, once more on `codex-cli 0.163.0-alpha.10.2` (2026-10-17);
+capabilities rest on, once more on `codex-cli 0.163.0-alpha.10.2` (2026-10-17) - and MQO, MQP and MQG, which decide how
+the continuation with no marker, several conversations at once and the goal continuation sit beside the queue for
+when a conversation is opened, on the same version on 2026-10-20;
 its record is in [`docs/evidence/live/`](evidence/live/). On any other version of Codex, and for a
 measurement not made yet, a capability's statement carries the warning that it was not measured there.
 
@@ -181,6 +188,13 @@ message is added to the conversation's queue through Codex's own app server (`th
 under an id made from the interruption, and that id, which Codex keeps on the message, is what proves
 it arrived. Past its ceilings, a continuation goes with the marker, as in the standard edition.
 
+It serves every send that carries words. A continuation queued for when a conversation is opened it
+carries with no marker too, under its id, where measurement MQO passed on your Codex: the message is found in the
+conversation's history by that id when you open it. Where MQO did not pass, and for a continuation sent to another
+Codex session, it stands aside and the ordinary send goes with its marker. The sends of Several conversations at once
+wait for their receipts together where MQP passed, and one at a time elsewhere. Beside Continue with no words, which
+serves the routes that go without words, it serves the sends that carry words.
+
 **When it helps.** When you would rather the continuation read as plain words in the conversation,
 without `[codex-auto-resume:…]` at the end.
 
@@ -200,7 +214,11 @@ only for usage and to withdraw a queued message).
 conversation.
 
 **Measurement M7: passed.** The app server accepted a message added with such an id, and delivered
-the words `/compact` as plain text rather than running them as a command.
+the words `/compact` as plain text rather than running them as a command. **MQO: passed** on
+`codex-cli 0.163.0-alpha.10.2`: such a message, queued for opening while nothing held the conversation, ran once
+when it was opened, as your own message, and was found by its id. **MQP: passed** there too: two added at once, each
+in a session of its own, each landed only in its own conversation. On any other version the queue carries its
+message with its marker and the sends go one at a time.
 
 ### Goal continuation
 
@@ -212,7 +230,8 @@ the goal says. While the app has the conversation open, the continuation goes th
 as in the standard edition, except where measurement M2b passed for your version of Codex - so far
 `codex-cli 0.163.0-alpha.10.2`: there it sets the paused goal active first and then adds the
 continuation to the conversation's queue, as M2b did. While a goal it set active carries the
-conversation on, the standard continuation waits, for up to ten minutes, so the two do not both run.
+conversation on, the standard continuation waits, for up to ten minutes, so the two do not both run. A conversation
+another Codex session holds is not its to wake: that continuation goes to that session, as without it.
 
 **When it helps.** When a usage limit stopped work under a goal and you do not keep that
 conversation open: in the standard edition the goal stays paused until you resume it yourself.
@@ -457,7 +476,9 @@ twice) and [H2](STANDARDS.md#h-user-control) (nothing can resend an uncertain su
 For the one you choose, the watcher sends its continuation at its next look instead of when its
 schedule says: it passes the wait before the next try, a postponement, the minutes before a first
 send, the 15 minutes between two continuations in one conversation and an attempt budget you set that
-is used up - never one your administrator set. Every other check still runs. A request not used within
+is used up - never one your administrator set. Where an early look - the look a reset credit allows before the reset
+time - could answer for the same recovery, your request wins where Send now can send; before a usage reset, which
+Send now never passes, the early look sends it. Every other check still runs. A request not used within
 15 minutes lapses, and turning it off, or setting it to watch, voids one not yet used.
 
 **When it helps.** When the cause of a failure is gone and you do not want to wait for the schedule.
@@ -605,16 +626,25 @@ A continuation whose arrival cannot be proven is never sent again, and this turn
 [A19](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (continuations are dispatched in sequence, under
 one lock). It keeps A19's one continuation in flight per conversation.
 
-**Ceilings.** 48 a day, and core's 5 in any one conversation. **Measurement MQ: not made yet.**
+The sends of the continuation with no marker are pooled with the rest where MQP passed on your Codex; where it
+has not, they go one at a time, and the journal says so.
+
+**Ceilings.** 48 a day, and core's 5 in any one conversation. **Measurement MQ: not made yet;
+MQP: passed** on `codex-cli 0.163.0-alpha.10.2`.
 
 ### Queue for when a conversation is opened
 
 **What it does.** When a usage limit has reset in a conversation the Codex app does not have open, it sends
-the ordinary continuation anyway - the program's own words and marker, through every check - and leaves it
+the ordinary continuation anyway - the program's own words and marker, through every check; with the
+continuation with no marker on, and MQO passed on your Codex, with no marker, under its id - and leaves it
 in Codex's queue, so Codex runs it when you open the conversation. It stays there for the days you choose (3
 by default, 7 at most); the program takes it back at seven days and an hour whatever it is told, and at once
 when this is turned off. An interruption is queued this way once; taken back, it waits for the app as usual.
-Where the goal continuation applies, its route goes first.
+It takes up conversations a usage limit stopped, and no others: a full context window waits for its compaction,
+and a network or server failure waits for the app. Beside the goal continuation: where MQG passed on your Codex - a
+queued message runs once when the conversation is opened, and the goal carries on after it - both apply; where it
+has not, a conversation whose goal is active is left to the goal continuation alone, one continuation, and the
+journal says why.
 
 **When it helps.** When you will come back to a conversation later and want it to go on the moment you open
 it.
@@ -627,7 +657,8 @@ is taken back, sent the ordinary way, and this turns itself off.
 chance that a conversation will be opened). It keeps A17, H4 and H6: every withdrawal still happens at once.
 
 **Ceilings.** 12 a day, and 3 in any one conversation. **Measurement M1: made** on `codex-cli
-0.163.0-alpha.10.2`; on any other version, a warning.
+0.163.0-alpha.10.2`; on any other version, a warning. **MQO and MQG: passed** there too (MQO is described
+under Marker-free continuation).
 
 ### Run a conversation here while Codex is closed
 
@@ -860,7 +891,9 @@ off. When a window it may act on reaches the stop percentage you set (97% by def
 conversation that is switched on and has a turn running is stopped, as the Stop button in the Codex app
 stops one - through the app's own internal channel, the `\\.\pipe\codex-ipc` pipe, once for that window -
 and the program sends no further continuation until that window resets: recoveries wait, and the advanced
-edition's own continuations are held. It works only for a conversation the Codex app has open; where it
+edition's own continuations are held. A reset credit spent for that window - yours, or a rule's - lets the hold go,
+since the credit empties the window; one Codex has not answered yet, one that reset nothing, and a credit for the
+other window leave it. It works only for a conversation the Codex app has open; where it
 cannot stop a turn - the app does not have the conversation open, is not running, or its build no longer
 answers this request as measured - it only holds, and a notice says the turn could not be stopped. Codex
 pauses a stopped conversation's queue, and that survives the app's restart, until the turn started after the
@@ -893,7 +926,10 @@ names its turn - f16c9ca2 on measure-20261017); **MU: passed** (codex-cli 0.162.
 words at all, so nothing extra appears in the conversation; the id it was started under proves its arrival.
 It continues nothing by itself: it changes only how Run a conversation here while Codex is closed, or a
 compacted conversation's continuation, starts its turn. Where Codex refuses a turn with no words, that turn
-is started with the usual words instead, and this turns itself off.
+is started with the usual words instead, and this turns itself off. It yields where a continuation carries words
+beyond the program's own template - another capability's words, or the message you wrote for this time: that
+continuation goes with its marker, and your words are never taken or lost for it. Beside the continuation with no
+marker, this serves the routes and that one the sends that carry words.
 
 **When it helps.** When you would rather the program's sentence did not appear in a conversation.
 
