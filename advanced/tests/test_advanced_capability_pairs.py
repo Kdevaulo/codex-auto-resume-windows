@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
+import threading
 import unittest
 from unittest.mock import patch
 import uuid
@@ -28,13 +29,21 @@ from codex_auto_resume import machine  # noqa: E402
 from codex_auto_resume_advanced import runtime, statement  # noqa: E402
 from codex_auto_resume_advanced.codex.turns import Turns  # noqa: E402
 from codex_auto_resume_advanced.engine import foropen  # noqa: E402
-from codex_auto_resume_advanced.registry import (COMPACT_CONTINUE, GOAL_CONTINUATION, MARKER_FREE,  # noqa: E402
-                                                 OTHER_SESSIONS, QUEUE_FOR_OPEN, RESET_CREDIT, SILENT_CONTINUATION, USAGE_METER,
-                                                 USAGE_PAUSE)
-from codex_auto_resume_advanced.vocabulary import Actor, JournalCode, Measurement, SpendOutcome, Verdict  # noqa: E402
+from codex_auto_resume_advanced.registry import (COMPACT_CONTINUE, GOAL_CONTINUATION, HEADLESS_RUN,  # noqa: E402
+                                                 MARKER_FREE, OTHER_SESSIONS, PARALLEL_DISPATCH, QUEUE_FOR_OPEN,
+                                                 RESET_CREDIT, SILENT_CONTINUATION, USAGE_METER, USAGE_PAUSE)
+from codex_auto_resume_advanced.vocabulary import (Actor, ArmingWarning, JournalCode, Measurement,  # noqa: E402
+                                                   SpendOutcome, Verdict)
+from codex_auto_resume.domain import ids  # noqa: E402
+from codex_auto_resume.domain.plug import DEFER  # noqa: E402
+from codex_auto_resume_advanced.codex import headless  # noqa: E402
+from codex_auto_resume_advanced.engine.markerfree import MarkerFreeContinuation  # noqa: E402
 from advancedcase import ENGINE  # noqa: E402
 from sessionsim import holding_sessions  # noqa: E402
+from test_advanced_parallel import T1 as P1, T2 as P2, ParallelCase  # noqa: E402
 from test_engine import T1  # noqa: E402
+from test_route_unheld import UnheldCase  # noqa: E402
+from test_silent_core import Silent  # noqa: E402
 
 CONTEXT_FULL = json.dumps({"codexErrorInfo": "contextWindowExceeded"})
 
@@ -208,8 +217,7 @@ class SilentBesideMarkerFreeTests(ac.AdvancedCase):
     the registry's order, and the first armed answer wins - so a headless route's P15 (core's engine/routes._silent),
     which takes SILENT alone, never gets it: Continue with no words never acts while the marker-free one is on."""
 
-    @unittest.expectedFailure
-    def test_a_route_is_answered_silent_with_marker_free_on(self):
+    def both(self):
         self.compat = ac.view(capability="recovery_turn_tracking")
         runtime = self.runtime(MARKER_FREE, SILENT_CONTINUATION)
         runtime.arming.catalogs = statement.CATALOGS
@@ -220,8 +228,197 @@ class SilentBesideMarkerFreeTests(ac.AdvancedCase):
                                         actor=Actor.DASHBOARD)
             self.assertTrue(result["done"], result)
         runtime.states(fresh=True)
-        record = {"interruption_id": ac.KEY, "thread_id": ac.THREAD, "category": "usage_limit"}
+        return runtime
+
+    def marker_free_lines(self, runtime):
+        return [(line["code"], line["point"]) for line in runtime.state.journal(capability=MARKER_FREE.id)]
+
+    # Fixed in v0.6.17 (#47): a route's P15 says `route` (core's routes._silent), where only SILENT is taken.
+    def test_a_route_is_answered_silent_with_marker_free_on(self):
+        runtime = self.both()
+        record = {"interruption_id": ac.KEY, "thread_id": ac.THREAD, "category": "usage_limit", "route": True}
         self.assertIs(runtime.ask(Point.DELIVERY, record), Alternative.SILENT)
+        self.assertNotIn((JournalCode.ACTED, Point.DELIVERY), self.marker_free_lines(runtime),
+                         "marker-free never said it acted on a route it cannot serve")
+
+    def test_a_channel_send_that_carries_words_still_goes_marker_free(self):
+        runtime = self.both()
+        record = {"interruption_id": ac.KEY, "thread_id": ac.THREAD, "category": "usage_limit"}
+        self.assertIs(runtime.ask(Point.DELIVERY, record), Alternative.CLIENT_ID)
+        self.assertIn((JournalCode.ACTED, Point.DELIVERY), self.marker_free_lines(runtime))
+
+
+class _RouteOnly:
+    """headless_run's code in a test: P16 names the test's route where the app is closed, and no errand."""
+
+    def __init__(self, route):
+        self.route = route
+
+    def unloaded(self, record):
+        return self.route if record.get("app") is False else DEFER
+
+    def tick(self, view):
+        return DEFER
+
+
+class _Adds:
+    """marker-free continuation's app-server session in a test: thread/queue/add puts the item into the harness's
+    Codex queue under the client id it came with, as Codex's own does, and says which thread it was made on."""
+
+    def __init__(self, case):
+        self.case = case
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *unused):
+        return False
+
+    def call(self, method, params):
+        self.case.adds.append((params["threadId"], params.get("clientUserMessageId"), params["input"][0]["text"],
+                               threading.current_thread() is threading.main_thread()))
+        return {"queuedSubmissionId": self.case.h.home.enqueue(params["threadId"], params["input"][0]["text"],
+                                                               client_id=params.get("clientUserMessageId"))}
+
+
+def _compat(*capabilities):
+    return {"status": "ok", "engine": {"found": True, "version": ENGINE},
+            "capabilities": {name: {"state": "COMPATIBLE", "reason": "local_checks_passed"} for name in capabilities}}
+
+
+class SilentRouteBesideMarkerFreeTests(TakingCase, UnheldCase):
+    """P-6 against core's own engine: a route that takes words (headless_run's), with silent_continuation and
+    marker_free_continuation both on - the route is handed no words and no marker, the turn proven by the client id
+    core derives; and a conversation the app holds still goes marker-free through the channel, with its words."""
+    DEFINITION = SILENT_CONTINUATION
+    BESIDE = (HEADLESS_RUN, MARKER_FREE)
+
+    def setUp(self):
+        super().setUp()
+        self.compat = _compat(*{definition.compat for definition in (*self.BESIDE, self.DEFINITION)})
+        self.addCleanup(setattr, headless, "EMPTY_REFUSED", headless.EMPTY_REFUSED)
+        headless.EMPTY_REFUSED = False
+        self.adds = []
+        patcher = patch.object(MarkerFreeContinuation, "_session", lambda _self: _Adds(self))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def arm(self, plug, state="armed", capability=None, **changes):
+        definition = plug.runtime.registry.get(capability or self.cap)
+        changes.setdefault("warnings", [str(word) for word in plug.runtime.arming.warnings(definition)])
+        return super().arm(plug, state=state, capability=capability, **changes)
+
+    def all_on(self):
+        plug = self.armed()
+        route = Silent(self.h)
+        plug.runtime._code[HEADLESS_RUN.id] = _RouteOnly(route)
+        return plug, route
+
+    def lines(self, plug, capability):
+        return [(line["code"], line["point"], line["answer"]) for line in plug.runtime.state.journal(capability=capability)]
+
+    def test_a_silent_route_goes_with_no_words_and_no_marker(self):
+        """Fails with the fix reverted: marker-free's CLIENT_ID wins the route's P15, and the route is handed the
+        words and the marker."""
+        plug, route = self.all_on()
+        self.closed()
+        self.h.tick()
+        (call,) = route.calls
+        row = self.h.record()
+        derived = ids.continuation_client_id(row["interruption_id"])
+        self.assertEqual(call["words"], "", "no words, so no marker and no id carried as words")
+        self.assertEqual(call["client_id"], derived)
+        self.assertEqual(row["recovery_client_id"], derived)
+        self.assertEqual(row["state"], "turn_started", "proven by the turn the route returned")
+        self.assertEqual(self.adds, [], "nothing went through marker-free's channel")
+        self.assertIn((JournalCode.ACTED, Point.DELIVERY, Alternative.SILENT), self.lines(plug, self.cap))
+        self.assertNotIn(JournalCode.ACTED, [line[0] for line in self.lines(plug, MARKER_FREE.id)])
+        self.assertEqual(sorted(spend[0] for spend in self.spends(plug)), [HEADLESS_RUN.id, self.cap])
+
+    def test_a_conversation_the_app_holds_still_goes_marker_free_with_its_words(self):
+        plug, route = self.all_on()
+        self.ready_after_reset()
+        self.h.tick()
+        self.assertEqual(route.calls, [])
+        self.assert_no_send()
+        ((thread, client, words, _main),) = self.adds
+        row = self.h.record()
+        self.assertEqual((thread, client), (T1, ids.continuation_client_id(row["interruption_id"])))
+        self.assertTrue(words.strip())
+        self.assertNotIn(ids.MARKER_PREFIX, words)
+        self.assertIn((JournalCode.ACTED, Point.DELIVERY, Alternative.CLIENT_ID), self.lines(plug, MARKER_FREE.id))
+        self.assertNotIn(JournalCode.ACTED, [line[0] for line in self.lines(plug, self.cap)])
+
+
+class ParallelBesideMarkerFreeTests(ParallelCase):
+    """Finding P-7: core pooled only its own backend's sends, carrying the marker (engine/delivery._pooled), and
+    marker_free_continuation makes every send a channel send - so parallel_dispatch never pooled one while it was on,
+    and the journal still said it acted. MQP (2026-10-19, codex-cli 0.163.0-alpha.10.2) measured several
+    thread/queue/add calls at once, each in a session of its own under its own client id: each accepted, each only in
+    its own conversation. Where it passed the channel's sends are pooled and paid as core's own; elsewhere they go one
+    at a time and the journal says why."""
+    DEFINITION = PARALLEL_DISPATCH
+    BESIDE = (MARKER_FREE,)
+
+    def setUp(self):
+        super().setUp()
+        self.compat = _compat(PARALLEL_DISPATCH.compat, MARKER_FREE.compat)
+        self.measured = {Measurement.M7: (Verdict.PASS, ENGINE)}
+        self.adds = []
+        patcher = patch.object(MarkerFreeContinuation, "_session", lambda _self: _Adds(self))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def both(self, mqp=None):
+        if mqp is not None:
+            self.measured[Measurement.MQP] = (mqp, ENGINE)
+        plug = self.armed()
+        self.due()
+        self.h.tick()
+        return plug
+
+    def parallel_lines(self, plug):
+        return [(line["code"], line["point"], line["answer"], line["reason"])
+                for line in plug.runtime.state.journal(capability=self.cap)]
+
+    def paid(self, plug, capability):
+        return sorted(thread for cap, thread, _key in self.spends(plug) if cap == capability)
+
+    def test_mqp_passed_two_conversations_channel_sends_are_pooled_and_each_paid_once(self):
+        """Fails with the fix reverted: both adds made one after another on the tick thread, parallel paid nothing."""
+        plug = self.both(Verdict.PASS)
+        self.assert_no_send()
+        self.assertEqual(sorted(thread for thread, _client, _words, _main in self.adds), [P1, P2], "each sent once")
+        self.assertFalse(any(main for _thread, _client, _words, main in self.adds), "each waited on a worker")
+        self.assertEqual(len({client for _thread, client, _words, _main in self.adds}), 2, "each under its own id")
+        self.assertEqual(self.paid(plug, self.cap), [P1, P2], "parallel paid once for each pooled claim")
+        self.assertEqual(self.paid(plug, MARKER_FREE.id), [P1, P2])
+        lines = self.parallel_lines(plug)
+        self.assertEqual([line[:3] for line in lines].count((JournalCode.ACTED, Point.CONCURRENCY, Point.CONCURRENCY)),
+                         2, "acted, once for each record it pooled")
+        self.assertNotIn(JournalCode.OVERRULED, [line[0] for line in lines])
+        self.assertEqual({row["state"] for row in self.h.store.records_in({"queued"})}, {"queued"})
+        self.assertEqual(len(self.h.store.records_in({"queued"})), 2)
+
+    def assert_one_at_a_time(self, plug, reason):
+        self.assert_no_send()
+        self.assertEqual(sorted(thread for thread, _client, _words, _main in self.adds), [P1, P2])
+        self.assertTrue(all(main for _thread, _client, _words, main in self.adds), "inline, one at a time")
+        self.assertEqual(self.paid(plug, self.cap), [], "nothing pooled, nothing paid")
+        lines = self.parallel_lines(plug)
+        self.assertNotIn(JournalCode.ACTED, [line[0] for line in lines], "never 'acted' for a tick it pooled nothing")
+        self.assertIn((JournalCode.OVERRULED, Point.CONCURRENCY, MARKER_FREE.id, reason), lines)
+
+    def test_mqp_unmeasured_one_at_a_time_and_the_journal_says_why(self):
+        """Fails with the fix reverted: the journal said parallel acted, and nothing said why it pooled nothing."""
+        self.assert_one_at_a_time(self.both(), ArmingWarning.UNMEASURED)
+
+    def test_mqp_failed_one_at_a_time_and_the_journal_says_why(self):
+        self.assert_one_at_a_time(self.both(Verdict.FAIL), ArmingWarning.MEASUREMENT_FAILED)
+
+    def test_mqp_passed_on_another_codex_is_not_measured_here(self):
+        self.measured[Measurement.MQP] = (Verdict.PASS, "another Codex")
+        self.assert_one_at_a_time(self.both(), ArmingWarning.UNMEASURED)
 
 
 class PauseBesideResetCreditTests(UsageCase):

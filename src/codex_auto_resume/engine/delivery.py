@@ -214,10 +214,13 @@ class DeliveryMixin:
             self._held_slot = self._pool.take()
 
     def _pooled(self, sender, client) -> frozenset:
-        """Whether this send goes to the worker taken for it - only core's own backend, carrying its marker - as the
-        claim is told: CONCURRENCY among what it carries, so the plug's ledger pays for it (and its tripwire on a
-        send whose fate is unknown covers it, K7)."""
-        self._pooling = self._held_slot is not None and sender is self.backend and client is None
+        """Whether this send goes to the worker taken for it - core's own backend, carrying its marker, or (v0.6.17)
+        a channel the plug said may wait beside others (plughands.Channel's `concurrent`) - as the claim is told:
+        CONCURRENCY among what it carries, so the plug's ledger pays for it (and its tripwire on a send whose fate is
+        unknown covers it, K7). Any other channel is sent inline, one at a time, as before."""
+        self._pooling = self._held_slot is not None and (
+            (sender is self.backend and client is None)
+            or (sender is not self.backend and getattr(sender, "concurrent", False) is True))
         return frozenset({Point.CONCURRENCY}) if self._pooling else frozenset()
 
     def _launched(self, current, call, thread, words, key, carrying) -> bool:

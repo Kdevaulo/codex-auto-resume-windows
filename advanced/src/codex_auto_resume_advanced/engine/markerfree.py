@@ -31,6 +31,15 @@ a continuation sent to another Codex session (TO_SESSION), which MQO does not co
 core's backend carries it with its marker, and the runtime journals it as overruled, naming queue_for_open or
 other_sessions and why (runtime.CONFLICTS). Every other send - a conversation the app holds - it serves as before.
 
+Beside Continue with no words (v0.6.17, #47 P-6) it serves the sends that carry words, and that capability the routes:
+core asks a route's P15 with the record saying `route`, where only SILENT is taken (runtime._takes), so this answer is
+passed over there - a turn with no words carries no marker either.
+
+Beside Several conversations at once (v0.6.17, #47 P-7) its sends may wait for their receipts on workers, each add in a
+session of its own under its own client id (`pools`), where MQP passed on the Codex in force: that several such adds at
+once are each accepted and each lands only in its own conversation. Unmeasured or failed, its sends go one at a time,
+as before, and the runtime journals parallel_dispatch as overruled for them and why.
+
 No test opens a real Codex: the tests give the channel a session over a fake app server, and the
 live session is opened only by a watcher that has this capability armed.
 """
@@ -107,6 +116,22 @@ class MarkerFreeContinuation:
     def sender(self, record, backend):
         """P5: this object is the channel. `backend` is core's stand-in, never core's backend."""
         return self
+
+    def pools(self):
+        """Whether its send may wait for its receipt on a worker beside others (core's plughands.Channel, P12;
+        v0.6.17): True where MQP passed on the Codex in force - each send opens a session of its own (`_session`),
+        as MQP's adds did; otherwise why not, as the statement's warning words say it - MQP failed, or not
+        measured."""
+        scoped = self._scoped
+        if scoped is not None:
+            try:
+                if scoped.passed(Measurement.MQP):
+                    return True
+                if scoped.failed(Measurement.MQP):
+                    return ArmingWarning.MEASUREMENT_FAILED
+            except Exception:
+                pass
+        return ArmingWarning.UNMEASURED
 
     def delivery(self, record):
         """P15: no marker; core derives the client id and proves delivery by it."""

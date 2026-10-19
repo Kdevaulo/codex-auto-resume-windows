@@ -195,9 +195,13 @@ class RoutesMixin:
 
         With `yields` (v0.6.17) P15 is not asked at all and this continuation is not silent: it carries words a
         turn with none would throw away (`_resume_unloaded`), so it goes by its marker, and an id an earlier
-        silent look wrote into the record is taken away again, exactly as a look that was answered otherwise."""
+        silent look wrote into the record is taken away again, exactly as a look that was answered otherwise.
+
+        Asked with `route` (v0.6.17, #47): the plug is told this P15 is a route's, which takes SILENT alone - so an
+        answer only a channel's send can carry (CLIENT_ID) is not the one it takes here, and a capability that
+        serves channel sends does not stand in the way of one that serves routes."""
         derived = ids.continuation_client_id(row["interruption_id"])
-        silent = not yields and self.plug.delivery(row) is Alternative.SILENT
+        silent = not yields and self.plug.delivery(dict(row, route=True)) is Alternative.SILENT
         if silent and row.get("recovery_client_id") != derived:
             self.store.update(row["interruption_id"], at=self.clock(), recovery_client_id=derived)
         elif not silent and row.get("recovery_client_id") == derived:
