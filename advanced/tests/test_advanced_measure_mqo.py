@@ -70,7 +70,7 @@ class ShapeTests(MqoCase):
         self.assertEqual(protocol.MEASUREMENT_METHODS[MQO], ("thread/loaded/list", "thread/queue/add",
                                                              "thread/queue/list"))
         self.assertIs(measure.PROBES[MQO], measure._mqo)
-        self.assertNotIn(MQO, measured.MEASURED, "unmeasured until the owner's run")
+        self.assertEqual(measured.MEASURED[MQO][0], Verdict.PASS, "the run of 2026-10-20 passed")
 
     def test_queued_then_taken_on_open_and_found_by_its_client_id_in_the_history(self):
         summary, record = self.run_one()
@@ -163,7 +163,7 @@ class MqpTests(MqoCase):
         self.assertEqual(protocol.MEASUREMENT_METHODS[Measurement.MQP],
                          ("thread/loaded/list", "thread/queue/add", "thread/queue/list"))
         self.assertIs(measure.PROBES[Measurement.MQP], measure._mqp)
-        self.assertNotIn(Measurement.MQP, measured.MEASURED)
+        self.assertEqual(measured.MEASURED[Measurement.MQP][0], Verdict.PASS, "the run of 2026-10-20 passed")
 
     def test_each_add_in_its_own_session_each_lands_in_its_own_conversation_only(self):
         record = self.run_mqp()
@@ -235,7 +235,7 @@ class MqgTests(MqoCase):
                          ("thread/loaded/list", "thread/goal/get", "thread/goal/set", "thread/queue/add",
                           "thread/queue/list"))
         self.assertIs(measure.PROBES[Measurement.MQG], measure._mqg)
-        self.assertNotIn(Measurement.MQG, measured.MEASURED)
+        self.assertEqual(measured.MEASURED[Measurement.MQG][0], Verdict.FAIL, "2026-10-20: inconclusive, not a pass")
 
     def test_goal_set_active_message_queued_taken_and_the_turns_after_counted(self):
         record = self.run_mqg()
