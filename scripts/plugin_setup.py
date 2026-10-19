@@ -442,7 +442,10 @@ def cmd_uninstall(args) -> int:
     # Keeping settings and pending recoveries is the default here: the installer offers a
     # separate purge for the other case, and losing a queued recovery to an ordinary
     # uninstall is not something a user would expect or forgive.
-    flags = [] if getattr(args, "purge", False) else ["--keep-state"]
+    # The watcher's log too ("Keep settings and history"): the core uninstall deletes auto-resume.log and errors.log
+    # unless --keep-logs, so the v0.6.17 acceptance's keep-data uninstall and reinstall left auto-resume.log starting
+    # at the reinstall while launcher.log and codex-start.log, which it never names, kept their lines.
+    flags = [] if getattr(args, "purge", False) else ["--keep-state", "--keep-logs"]
     code = _cli(home, ["--quiet", "uninstall"] + flags)
     if code != EXIT_OK:
         return code
