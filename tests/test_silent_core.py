@@ -171,19 +171,29 @@ class YieldsToOtherWordsTests(UnheldCase):
                         self.assertIsNone(kept, "spent with it, as a send's are")
 
     def test_the_standard_edition_is_asked_nothing_and_its_words_go_as_before(self):
-        """Its plug names no route and answers DEFER everywhere, so none of this runs for it."""
-        route = Silent(self.h)
-        self.armed(route)                               # P15 unanswered, as the standard edition's plug leaves it
+        """The standard edition's plug is NULL: it names no route and answers no P15, so none of this runs for it.
+        With the app closed the record waits for the app with its words kept, and nobody is asked who holds the
+        conversation; once the app holds it, the words go through `codex queue` before the marker, as ever. It
+        holds by design with or without the v0.6.17 changes: the standard edition is not one of them."""
+        app = self.h.backend.app
+        self.plugged(None)
+        self.assertTrue(self.h.engine.plug.null)
         self.closed()
         key = self.h.record()["interruption_id"]
         self.words_file().put(key, WORDS, now=BASE)
         self.h.tick()
-        (call,) = route.calls
+        self.assertEqual(self.h.backend.send_calls, [])
+        self.assertEqual(self.h.record()["state"], "waiting_for_app")
+        self.assertEqual(self.h.backend.holder_calls, [], "no route, so no one is asked who holds it")
+        self.assertEqual(self.words_file().words(key), WORDS)
+        self.h.backend.app = app
+        self.h.backend.loaded_map[T1] = "loaded"
+        self.h.tick(advance=self.h.options["state_poll_seconds"] + 1)      # its next look, waiting for the app
+        (sent,) = self.h.backend.send_calls
         row = self.h.record()
-        self.assertIn("\n\n" + WORDS + "\n\n", call["words"])
-        self.assertTrue(call["words"].endswith("\n\n" + row["marker"]), call["words"])
+        self.assertIn("\n\n" + WORDS + "\n\n" + row["marker"], sent[1])
         self.assertIsNone(row["recovery_client_id"])
-        self.assertIsNone(self.words_file().words(key))
+        self.assertIsNone(self.words_file().words(key), "spent with the send that carried them")
 
 
 if __name__ == "__main__":
