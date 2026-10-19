@@ -88,8 +88,8 @@ from .engine import foropen, sessions, silent
 from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
-from .vocabulary import (TRIPWIRES, ArmingState, ArmingWarning, CapabilityKind, ContinuationReason, JournalCode, KeepReason,
-                         OffReason, OverrideKind, PromptReason)
+from .vocabulary import (TRIPWIRES, ArmingState, ArmingWarning, CapabilityKind, ContinuationReason, JournalCode,
+                         KeepReason, OffReason, OverrideKind, PromptReason)
 
 # How long what every capability stands at is taken as read, between ticks. A tick reads it
 # again; a process that has no ticks - the bridge, the MCP server - reads it at most this often.
@@ -218,7 +218,8 @@ CONFLICTS = _conflicts(((Point.UNLOADED, QUEUED, frozenset({Point.SENDER, Point.
 def _conflict(earlier, point, answer, carries=None):
     """The first of `earlier` (Runtime._earlier) that `answer` at `point` cannot be carried with - (entry, why: one of
     the statement's warning words or None) - or None. `carries` is the capability's own `carries(word)`, where its code
-    has one: True, and that earlier answer is no conflict. Every conflict is settled as a split, whatever a line says."""
+    has one: True, and that earlier answer is no conflict. Every conflict is settled as a split, whatever a line
+    says."""
     for entry, (_first, _words, _later, refuses, _settled) in earlier:
         if not refuses(point, answer):
             continue
