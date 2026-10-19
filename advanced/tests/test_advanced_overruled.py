@@ -5,7 +5,8 @@ Core carries P16's QUEUE_FOR_OPEN only through its own backend, with its marker 
 continuation answers P5 and P15 for every send, and taken there for a continuation queued for opening it left the
 record waiting with notLoaded and nothing sent, while the journal said queue_for_open had acted. Now marker-free stands
 aside for that send - core's backend sends it with its marker, into Codex's queue - and says so: an `overruled` journal
-line that names the route it stood aside for, and the Dashboard's list carries which capability that was. A
+line that names the capability it stood aside for. That is a split - each goes on serving its own cases - so the
+Dashboard shows nothing for it; the word there is for a capability whose answer another one voided (VoidTests). A
 conversation the app holds it still serves through its own channel.
 
 Held against the shipped definitions and statements and against core's own engine, store and simulated Codex home
@@ -27,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import advancedcase as ac  # noqa: E402
 from codex_auto_resume.domain import ids  # noqa: E402
 from codex_auto_resume.domain.plug import Alternative, Point  # noqa: E402
+from codex_auto_resume_advanced import runtime  # noqa: E402
 from codex_auto_resume_advanced.codex import protocol  # noqa: E402
 from codex_auto_resume_advanced.engine.markerfree import MarkerFreeContinuation  # noqa: E402
 from codex_auto_resume_advanced.registry import MARKER_FREE  # noqa: E402
@@ -90,26 +92,52 @@ class ForOpenTests(BothArmedCase):
         self.assertEqual(len(self.h.backend.send_calls), 1, "never sent twice")
         self.assertEqual(self.fake.adds(), [], "never a marker-free copy of the same continuation")
 
-    def test_the_overrule_is_journalled_naming_both_and_the_dashboard_list_names_the_capability(self):
-        """Fails with the fix reverted: marker-free was journalled as having acted, and the list said nothing."""
+    def test_the_overrule_is_journalled_naming_both_and_the_dashboard_shows_nothing_for_a_split(self):
+        """Fails with the fix reverted: marker-free was journalled as having acted, and nothing named the other."""
         plug = self.armed()
-        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["overruled_by"])
         self.due()
         self.h.tick()
         lines = self.marker_free_journal(plug)
-        self.assertIn((JournalCode.OVERRULED, Point.SENDER, Alternative.QUEUE_FOR_OPEN), lines)
-        self.assertIn((JournalCode.OVERRULED, Point.DELIVERY, Alternative.QUEUE_FOR_OPEN), lines)
+        self.assertIn((JournalCode.OVERRULED, Point.SENDER, self.cap), lines, "names queue_for_open")
+        self.assertIn((JournalCode.OVERRULED, Point.DELIVERY, self.cap), lines)
         self.assertNotIn(JournalCode.ACTED, [code for code, _point, _answer in lines], "not a silent 'acted'")
         self.assertIn((JournalCode.ACTED, Point.UNLOADED, Alternative.QUEUE_FOR_OPEN), self.journal(plug))
-        self.assertEqual(self.listed(plug, MARKER_FREE_ID)["overruled_by"], self.cap)
-        self.assertIsNone(self.listed(plug, self.cap)["overruled_by"])
+        # A split: each serves its own cases, so neither shows a word on the Dashboard.
+        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["voided_by"])
+        self.assertIsNone(self.listed(plug, self.cap)["voided_by"])
+
+
+class VoidTests(BothArmedCase):
+    """The general mechanism's other settlement (runtime.CONFLICTS' VOID), held on the same pair configured so: the
+    later answer is taken, the earlier one is not paid for, and its capability - which could not act at all on a
+    record it took up - is journalled as voided by the other and shown so on the Dashboard."""
+
+    def setUp(self):
+        super().setUp()
+        voiding = tuple(line[:4] + (runtime.VOID,) for line in runtime.CONFLICTS)
+        patcher = patch.object(runtime, "CONFLICTS", voiding)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_a_voided_answer_is_journalled_naming_the_other_and_the_dashboard_says_which(self):
+        """Fails with the mechanism reverted: nothing journals queue_for_open's answer as voided, nor lists it."""
+        plug = self.armed()
+        self.due()
+        self.h.tick()
+        self.assertEqual(self.h.record()["last_error"], "notLoaded", "core cannot carry the two: it waits")
+        journal = self.journal(plug)
+        self.assertIn((JournalCode.VOIDED, Point.UNLOADED, MARKER_FREE_ID), journal)
+        self.assertIn((JournalCode.ACTED, Point.SENDER, Point.SENDER), self.marker_free_journal(plug))
+        self.assertEqual(self.listed(plug, self.cap)["voided_by"], MARKER_FREE_ID)
+        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["voided_by"])
+        self.assertEqual(self.spent_by(plug), [])
         # Turned off it shows none; turned on again it is let go of - the word is about since it stood where it stands.
         self.h.now += 5
-        self.assertTrue(plug.runtime.arming.disarm(MARKER_FREE_ID, actor=Actor.DASHBOARD)["done"])
-        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["overruled_by"])
+        self.assertTrue(plug.runtime.arming.disarm(self.cap, actor=Actor.DASHBOARD)["done"])
+        self.assertIsNone(self.listed(plug, self.cap)["voided_by"])
         self.h.now += 5
-        self.arm(plug, capability=MARKER_FREE_ID)
-        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["overruled_by"])
+        self.arm(plug)
+        self.assertIsNone(self.listed(plug, self.cap)["voided_by"])
 
 
 class LoadedTests(BothArmedCase):
@@ -126,7 +154,7 @@ class LoadedTests(BothArmedCase):
         lines = self.marker_free_journal(plug)
         self.assertIn((JournalCode.ACTED, Point.SENDER, Point.SENDER), lines)
         self.assertNotIn(JournalCode.OVERRULED, [code for code, _point, _answer in lines])
-        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["overruled_by"])
+        self.assertIsNone(self.listed(plug, MARKER_FREE_ID)["voided_by"])
         self.assertEqual(self.spent_by(plug), [MARKER_FREE_ID])
 
 

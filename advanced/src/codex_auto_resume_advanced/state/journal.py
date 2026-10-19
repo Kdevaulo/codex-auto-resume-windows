@@ -44,6 +44,13 @@ def _answer(value):
 
 
 class JournalMixin:
+    def _answer(self, value):
+        """`_answer`'s word, or (v0.6.17) the id of a capability the registry holds - the other capability an
+        `overruled` or `voided` line names. Still never a value a capability gave."""
+        if isinstance(value, str) and self.registry.get(value) is not None:
+            return value
+        return _answer(value)
+
     def _code(self, code, capability) -> str:
         """`code` if it is one of the journal's own or one of `capability`'s, else "other"."""
         if code in tuple(JournalCode):
@@ -64,7 +71,7 @@ class JournalMixin:
             "VALUES (?,?,?,?,?,?,?)",
             (at, capability, self._code(code, capability), _closed(reason, OffReason),
              _closed(actor, Actor), _closed(point, Point),
-             _answer(answer)))
+             self._answer(answer)))
         if prune_every(connection.execute("SELECT last_insert_rowid()").fetchone()[0]):
             self._prune(connection, at)
 
@@ -94,7 +101,7 @@ class JournalMixin:
                  "code": self._code(row["code"], row["capability"]),
                  "reason": _closed(row["reason"], OffReason), "actor": _closed(row["actor"], Actor),
                  "point": _closed(row["point"], Point),
-                 "answer": _answer(row["answer"])}
+                 "answer": self._answer(row["answer"])}
                 for row in rows]
 
     def newest(self, code) -> dict:
@@ -108,7 +115,7 @@ class JournalMixin:
                 "(SELECT MAX(event_id) FROM journal WHERE code=? AND capability IS NOT NULL GROUP BY capability)",
                 (str(code),)).fetchall()
         return {row["capability"]: {"at": row["at"], "point": _closed(row["point"], Point),
-                                    "answer": _answer(row["answer"])}
+                                    "answer": self._answer(row["answer"])}
                 for row in rows if self.registry.get(row["capability"]) is not None}
 
     # ------------------------------------------------------------------ sampler

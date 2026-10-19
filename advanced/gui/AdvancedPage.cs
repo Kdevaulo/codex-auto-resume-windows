@@ -953,12 +953,12 @@ namespace CodexAutoResume
                 line.Margin = Pad(0, Brand.SpaceS, 0, 0);
                 head.Controls.Add(line);
             }
-            // v0.6.17 (issue #42): that it stood aside for another feature's continuation, which only the ordinary way
-            // carries, in the accent beside it: on, it did not send that one, and the person is told which did.
-            string overruled = OverruledText(item);
-            if (overruled != null)
+            // v0.6.17: that it could not act on a recovery it took up because another feature's answer voided its own, in
+            // the accent beside it, naming that feature. Two features that each serve their own cases show nothing.
+            string voided = VoidedText(item);
+            if (voided != null)
             {
-                Label line = HelpText(overruled);
+                Label line = HelpText(voided);
                 line.ForeColor = Accent;
                 line.Margin = Pad(0, Brand.SpaceS, 0, 0);
                 head.Controls.Add(line);
@@ -1520,16 +1520,13 @@ namespace CodexAutoResume
             return said ?? Word("page.tripped", "It turned itself off.");
         }
 
-        /// That `item` stood aside for another feature's continuation since it stood where it stands (the list's
-        /// overruled_by, v0.6.17), in words, or null where it did not.
-        private string OverruledText(Dictionary<string, object> item)
+        /// That another feature's answer voided one `item` gave for a recovery it took up, since it stood where it stands
+        /// (the list's voided_by, v0.6.17), in words naming that feature, or null where none did.
+        private string VoidedText(Dictionary<string, object> item)
         {
-            string by = Str(item, "overruled_by");
-            if (by == "queue_for_open")
-                return Word("page.overruled.queue_for_open", "Stood aside for another feature: Queue for when a conversation is opened sent a continuation the ordinary way, with the marker.");
-            if (by == "other_sessions")
-                return Word("page.overruled.other_sessions", "Stood aside for another feature: Recover CLI, TUI and VS Code conversations sent a continuation the ordinary way, with the marker.");
-            return null;
+            string by = Str(item, "voided_by");
+            if (string.IsNullOrEmpty(by)) return null;
+            return Word("page.voided", "It could not act on a recovery it took up: {name} answered for the same recovery in a way that left it nothing to do.", "name", AdvancedName(by));
         }
 
         private bool PolicyAdmits(string id)

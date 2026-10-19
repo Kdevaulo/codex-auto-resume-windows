@@ -206,16 +206,17 @@ def departs(definition, row) -> list:
     return found
 
 
-def _overruled_by(line, row, overrulers):
-    """The capability whose route a capability stood aside for (v0.6.17, issue #42) - its newest `overruled` line's
-    answer, through runtime.OVERRULERS - where that line is from since it stood where it stands now; None otherwise.
-    Turning it on again is how it is let go of."""
+def _voided_by(line, row, registry):
+    """The capability whose answer voided one a capability gave for a record it took up (v0.6.17, runtime.CONFLICTS'
+    VOID) - its newest `voided` line's answer, a capability the registry holds - where that line is from since it stood
+    where it stands now; None otherwise. Turning it on again is how it is let go of. A split (`overruled`) is never
+    shown: each of the two goes on serving its own cases."""
     if not isinstance(line, dict):
         return None
-    since, at = row.get("since"), line.get("at")
+    since, at, other = row.get("since"), line.get("at"), line.get("answer")
     if not isinstance(at, (int, float)) or (isinstance(since, (int, float)) and at < since):
         return None
-    return overrulers.get(line.get("answer"))
+    return other if isinstance(other, str) and registry.get(other) is not None else None
 
 
 def kept_words(keep_on, send_again) -> list:
@@ -1137,7 +1138,7 @@ class Arming:
         """Every capability as a surface shows it, in registry.SHOWN_ORDER: where it is stored, what it is now, since
         when and by whom, what a person would be agreeing to, what its statement warns of now
         and what they confirmed when they last turned it on or watched it."""
-        from .runtime import OVERRULERS, SENDING  # lazily: runtime imports this module
+        from .runtime import SENDING              # lazily: runtime imports this module
         SENDING_POINTS = frozenset(SENDING)
         view, policy = self.view(), self.policy()
         states = self.current(view=view, policy=policy)
@@ -1146,9 +1147,9 @@ class Arming:
         except StateError:
             rows, meta = {}, {"generation": 0, "global_hourly": GLOBAL_HOURLY}
         try:
-            overruled = self.state.newest(JournalCode.OVERRULED)
+            voided = self.state.newest(JournalCode.VOIDED)
         except StateError:
-            overruled = {}
+            voided = {}
         shown = []
         # In the order a person reads them (registry.SHOWN_ORDER), not the order they answer in.
         for definition in _shown(self.registry):
@@ -1163,9 +1164,9 @@ class Arming:
                 # so is never given Send again.
                 "keep_on": bool(row.get("keep_on")), "send_again": bool(row.get("send_again")),
                 "notice": None if off else row.get("reason"), "resends": definition.resends,
-                # v0.6.17 (issue #42): the capability whose route it last stood aside for since it stood where it
-                # stands (runtime.OVERRULERS), or None - never shown for one that is off.
-                "overruled_by": None if off else _overruled_by(overruled.get(definition.id), row, OVERRULERS),
+                # v0.6.17: the capability whose answer last voided one it gave for a record it took up, since it
+                # stood where it stands (runtime.CONFLICTS), or None - never shown for one that is off.
+                "voided_by": None if off else _voided_by(voided.get(definition.id), row, self.registry),
                 # v0.6.16-beta.4: whether Keep on is offered at all (registry.keepable).
                 "keepable": definition.keepable,
                 "revision": definition.revision, "read_revision": row.get("statement_revision"),

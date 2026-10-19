@@ -33,13 +33,22 @@ until the claim, so the ledger pays for a resend, or a person's Send now, only w
 
 With no capability at a point, nothing is read and nothing is written: the answer is NULL's.
 
-One answer overruled by another (v0.6.17, issue #42). Core carries P16's QUEUE_FOR_OPEN and TO_SESSION out only
-through its own backend, with its marker (core's engine/foropen._not_for_open): a channel named at P5, or a client id
-at P15, for that same send leaves the record waiting - notLoaded, held_by_other_session - with nothing sent. Where one
-of those two was taken for a record this tick, such an answer at P5 or P15 for it is not taken, and is journalled as
-`overruled`, its answer the word that overruled it (OVERRULERS names the capability behind each); the Dashboard shows
-the newest such line under where the capability stands (arming.listing's `overruled_by`). Marker-free continuation and
-the goal continuation's channel stand aside so; every send of a conversation the app holds they serve as before.
+Two capabilities' answers for one record that cannot both be carried (v0.6.17, issue #42). CONFLICTS lists each such
+pair of answers: one taken at an earlier point for a record this tick, and one at a later point for the same record
+that core could not carry with it - and how the two are settled, which every pair names:
+
+* SPLIT: the later answer is not taken. Its capability stands aside for that record, and the journal says so - an
+  `overruled` line on it whose answer names the capability it stood aside for. Each goes on serving its own cases;
+  nothing is shown on the Dashboard for a split.
+* VOID: the later answer is taken, and the earlier one can no longer be carried: it is not paid for at the claim, and
+  its capability, which could not act at all on a record it took up, gets a `voided` line naming the capability whose
+  answer voided it - which the Dashboard shows under where it stands (arming.listing's `voided_by`).
+
+Core carries P16's QUEUE_FOR_OPEN and TO_SESSION only through its own backend, with its marker (core's
+engine/foropen._not_for_open): a channel named at P5, or a client id at P15, for that same send left the record
+waiting - notLoaded, held_by_other_session - with nothing sent and the P16 answer journalled as acted. That pair is a
+split: marker-free continuation, and the goal continuation's channel, stand aside for such a send, and serve every
+send of a conversation the app holds as before.
 
 Taking failures up (v0.6.14, stage 3b). At P17 an answer is taken only if core offered it - one of
 the `takes` core hands over (failures.takes) - and only for a failure that completed after the
@@ -62,8 +71,8 @@ from inspect import getattr_static
 import time
 
 from codex_auto_resume import continuation, failures, machine
-from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, RECORD_MOVES, RESTRICTIONS,
-                                           TAKE_UP, Alternative, Point, RecordMove)
+from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, QUEUED, RECORD_MOVES,
+                                           RESTRICTIONS, TAKE_UP, Alternative, Point, RecordMove)
 from codex_auto_resume.domain.plughands import RECORDS_LIMIT, kinds_of, widening_of, workers
 
 from .arming import Arming
@@ -106,9 +115,8 @@ KEEP_GOING = "keep_going"
 # The reasons a start route was not named that nothing else in the journal says (v0.6.16-beta.3): a
 # turn off has its own line, a watched answer its would-have; held back by Codex or a policy has none.
 HELD_WORDS = frozenset({"compat_unknown", "engine_unknown", "policy", "refused", "off"})
-# v0.6.17 (issue #42): the P16 answers core carries out only through its own backend, with its marker (core's
-# engine/foropen._not_for_open), each with the one capability that gives it - what an `overruled` line's answer names.
-OVERRULERS = {Alternative.QUEUE_FOR_OPEN: foropen.CAPABILITY, Alternative.TO_SESSION: sessions.CAPABILITY}
+# How two answers of CONFLICTS are settled (v0.6.17): the later stands aside, or the earlier is voided.
+SPLIT, VOID = "split", "void"
 
 
 def _taken(point, answer) -> bool:
@@ -166,16 +174,31 @@ def _relaxes(answer) -> bool:
         return False
 
 
-def _starves(point, answer) -> bool:
-    """Whether `answer` at `point` is one core cannot carry with a route of OVERRULERS: any channel at P5 - core's own
-    backend is never taken as an answer - and a client id at P15. Words for no marker through core's backend (P15's
-    SILENT) core already sends with its marker, and are left as they are."""
+def _not_ordinary(point, answer) -> bool:
+    """Whether `answer` at `point` keeps a send from going core's ordinary way - its own backend, its marker: any
+    channel at P5 (core's own backend is never taken as an answer) and a client id at P15. Words for no marker through
+    core's backend (P15's SILENT) core already sends with its marker, and are left as they are."""
     if point == Point.SENDER:
         return True
     try:
         return point == Point.DELIVERY and answer == Alternative.CLIENT_ID
     except Exception:
         return False
+
+
+# v0.6.17 (issue #42): the answers that cannot both be carried for one record - (the point an earlier answer was taken
+# at, the words it may be, the later points, which of their answers core could not carry with it, how the two are
+# settled). P16's QUEUE_FOR_OPEN and TO_SESSION go only core's ordinary way (core's engine/foropen._not_for_open).
+CONFLICTS = ((Point.UNLOADED, QUEUED, frozenset({Point.SENDER, Point.DELIVERY}), _not_ordinary, SPLIT),)
+
+
+def _conflict(earlier, point, answer):
+    """The first of `earlier` (Runtime._earlier) that `answer` at `point` cannot be carried with - (entry, how the two
+    are settled) - or None."""
+    for entry, (_first, _words, _later, refuses, settled) in earlier:
+        if refuses(point, answer):
+            return entry, settled
+    return None
 
 
 def _restricts(answer) -> bool:
@@ -358,9 +381,9 @@ class Runtime:
         # P16 in the watch (v0.6.15-beta): whether a continuation queued for opening stays queued. It was paid for at
         # its claim; nothing is spent or carried again, so neither a ceiling nor the claim is asked.
         kept = point == Point.UNLOADED and foropen.watching(record)
-        # v0.6.17 (issue #42): the route taken at P16 for this record that only core's own send carries, if any.
-        routed = self._routed(key) if point in (Point.SENDER, Point.DELIVERY) else None
-        chosen = chooser = None
+        # v0.6.17 (issue #42): what was taken earlier for this record that an answer here may not be carried with.
+        earlier = self._earlier(key, point)
+        chosen = chooser = voids = None
         for definition in definitions:
             state = states.get(definition.id, ArmingState.OFF)
             if state == ArmingState.OFF or (definition.id, key) in self._skipped:
@@ -373,9 +396,10 @@ class Runtime:
             if (answer is DEFER or (point == Point.SENDER and answer is arguments[-1])
                     or not self._takes(definition, point, answer, arguments, admission)):
                 continue
-            if routed is not None and _starves(point, answer):
-                # Taken, core would wait for the app with nothing sent: it stands aside, and says so.
-                self._once(JournalCode.OVERRULED, definition, point, routed, record)
+            conflict = _conflict(earlier, point, answer)
+            if conflict is not None and conflict[1] == SPLIT:
+                # Taken, core could carry neither: it stands aside for this record, and says for whom.
+                self._paired(JournalCode.OVERRULED, definition, point, conflict[0][1], record)
                 continue
             if state == ArmingState.SHADOW:
                 self._once(JournalCode.WOULD_HAVE, definition, point, answer, record)
@@ -391,7 +415,7 @@ class Runtime:
                     if relaxing and answer in HELD_AT_CEILING:
                         return Alternative.HOLD          # it waits for a unit, and does not end
                     continue
-            chosen, chooser = answer, definition
+            chosen, chooser, voids = answer, definition, conflict
         if chooser is None:
             if relaxing and self._unsure(record, admission):
                 return Alternative.HOLD
@@ -405,16 +429,49 @@ class Runtime:
         if point in SENDING and not kept:
             self._acted.setdefault(record.get("interruption_id"), set()).add(
                 (point, chooser.id, _word(chosen, point)))
+        if voids is not None:
+            self._void(voids[0], chooser, key, record)
         self._once(JournalCode.ACTED, chooser, point, chosen, record)
         return chosen
 
-    def _routed(self, key):
-        """The P16 answer taken this tick for the record `key` that core carries out only through its own backend
-        (OVERRULERS), or None. The tick forgets every answer taken (`tick`), and the claim pays for it (`claim`)."""
-        for point, _capability, word in self._acted.get(key, ()):
-            if point == Point.UNLOADED and word in OVERRULERS:
-                return Alternative(word)
-        return None
+    def _earlier(self, key, point) -> tuple:
+        """((entry, line), ...): each answer taken this tick for the record `key` - an `_acted` entry, (point,
+        capability, word) - that a line of CONFLICTS says an answer at `point` may not be carried with. The tick
+        forgets every answer taken (`tick`), and the claim pays for what is left (`claim`)."""
+        found = []
+        for line in CONFLICTS:
+            first, words, later = line[:3]
+            if point not in later:
+                continue
+            for entry in self._acted.get(key, ()):
+                try:
+                    if entry[0] == first and entry[2] in words:
+                        found.append((entry, line))
+                except TypeError:
+                    continue
+        return tuple(found)
+
+    def _void(self, entry, chooser, key, record) -> None:
+        """The earlier answer `entry` can no longer be carried now that `chooser`'s is taken (VOID): it is not paid for
+        at the claim, and its capability is journalled as voided by `chooser`'s."""
+        self._acted.get(key, set()).discard(entry)
+        definition = self.registry.get(entry[1])
+        if definition is not None:
+            self._paired(JournalCode.VOIDED, definition, entry[0], chooser.id, record)
+
+    def _paired(self, code, definition, point, other, record) -> None:
+        """One journal line, once per record in a process, about `definition` and the capability `other`, which its
+        answer names: `overruled` - it stood aside for that one - or `voided` - that one's answer voided its own."""
+        key = (code, definition.id, point, other, record.get("interruption_id") if isinstance(record, dict) else None)
+        if key in self._noted:
+            return
+        if len(self._noted) >= NOTED_LIMIT:
+            self._noted.clear()
+        self._noted.add(key)
+        try:
+            self.state.note(code, capability=definition.id, point=point, answer=other, at=self.clock())
+        except StateError:
+            pass
 
     def _not_taken(self, definitions, chooser, record, states) -> None:
         """At P7, every capability on that has a `not_taken` and whose answer was not the one taken is told so

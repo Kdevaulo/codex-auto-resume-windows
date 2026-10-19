@@ -192,19 +192,19 @@ class PageTests(PageCase):
         return "en", {"script": script, "steps": steps}, {"words": script["advanced-words"][0]["result"]["words"]}
 
     @classmethod
-    def scenario_overruled(cls, bridge):
-        """v0.6.17 (issue #42): marker-free continuation on, and journalled as standing aside for a continuation queued
-        for opening: the list names queue_for_open, and the page says so in the accent under where it stands."""
-        cls.watched(bridge, "marker_free_continuation", "armed")
-        bridge.plug.runtime.state.note(JournalCode.OVERRULED, capability="marker_free_continuation",
-                                       point=Point.SENDER, answer=Alternative.QUEUE_FOR_OPEN, at=ac.NOW)
+    def scenario_voided(cls, bridge):
+        """v0.6.17: queue for opening on, and journalled as voided by marker-free continuation's answer for a recovery
+        it took up: the list names marker_free_continuation, and the page says so, by name, in the accent."""
+        cls.watched(bridge, "queue_for_open", "armed")
+        bridge.plug.runtime.state.note(JournalCode.VOIDED, capability="queue_for_open", point=Point.UNLOADED,
+                                       answer="marker_free_continuation", at=ac.NOW)
         script = cls.opening(bridge, "en")
-        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"},
-                 {"do": "choose", "id": "marker_free_continuation"}, {"do": "look"}]
+        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "queue_for_open"},
+                 {"do": "look"}]
         listed = next(item for item in script["advanced-list"][0]["result"]["capabilities"]
-                      if item["id"] == "marker_free_continuation")
+                      if item["id"] == "queue_for_open")
         return "en", {"script": script, "steps": steps}, {"words": script["advanced-words"][0]["result"]["words"],
-                                                          "overruled_by": listed["overruled_by"]}
+                                                          "voided_by": listed["voided_by"]}
 
     @classmethod
     def scenario_action_kept(cls, bridge):
@@ -353,12 +353,14 @@ class PageTests(PageCase):
         self.assertIn(words["page.tripped.duplicate_seen"], tripped["cards"][0])
         self.assertNotIn(words["page.keep_on"], [card[0] for card in tripped["cards"]], "off: nothing to keep on")
 
-    def test_a_capability_that_stood_aside_for_another_says_which_in_the_accent(self):
-        """Fails with the fix reverted: nothing on the page said marker-free stood aside for queue for opening."""
-        result, expected = self.of("scenario_overruled")
-        self.assertEqual(expected["overruled_by"], "queue_for_open")
+    def test_a_capability_whose_answer_another_voided_says_which_in_the_accent(self):
+        """Fails with VoidedText reverted: nothing on the page said another feature left it nothing to do."""
+        result, expected = self.of("scenario_voided")
+        words = expected["words"]
+        self.assertEqual(expected["voided_by"], "marker_free_continuation")
         look, = result["looks"]
-        self.assertIn(expected["words"]["page.overruled.queue_for_open"], look["cards"][0])
+        said = words["page.voided"].replace("{name}", words["name.marker_free_continuation"])
+        self.assertIn(said, look["cards"][0])
 
     def test_an_action_kept_on_is_never_offered_send_again(self):
         result, expected = self.of("scenario_action_kept")

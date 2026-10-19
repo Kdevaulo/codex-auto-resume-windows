@@ -169,6 +169,8 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "tripped.not_dispatched_by_session", "kept.not_dispatched_by_session", "tripped.refused_by_codex",
     "kept.refused_by_codex",
+    # v0.6.17: that its answer for a recovery it took up was voided by another capability's (runtime.CONFLICTS).
+    "voided",
     # The turns run here, each with its Stop (advanced/gui/AdvancedRuns.cs), and a capability never kept on.
     "runs.title", "runs.none", "runs.until", "runs.stopping", "runs.stop", "runs.conversation", "confirm.run_stop",
     "done.run_stop", "keep_on.never",
