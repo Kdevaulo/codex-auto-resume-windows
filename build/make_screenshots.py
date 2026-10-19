@@ -2350,6 +2350,12 @@ def _icon_sweep_closes(state: str, length: int, loop: int) -> bool:
     return True
 
 
+def _icon_fine() -> int:
+    """The fine steps the notification-area icon moves in (ui/tray/animation.py TRAY_FINE)."""
+    from codex_auto_resume.ui.tray import motion
+    return int(motion.ICON_MOTION["tray_fine"])
+
+
 def icon_timeline(state: str, start: float, end: float) -> list:
     """(ms from `start`, position, level) for each frame the icon's own timer shows in [start, end): stepped from the
     motion clock's zero, where the state is entered, by the interval each frame asks for (tray.icon_frame_ms). The
@@ -2357,12 +2363,14 @@ def icon_timeline(state: str, start: float, end: float) -> list:
     from codex_auto_resume.ui import tray
     shown, at = [], 0.0
     while at < end:
-        position, level = tray.icon_frame(state, at, at)
+        # In the notification area's fine steps, as the icon there moves (tray TRAY_FINE, v0.6.16): the picture drew
+        # the old coarse steps while the icon itself glided, and read as stuttering beside it.
+        position, level = tray.icon_frame(state, at, at, fine=_icon_fine())
         if at <= start:
             shown = [(0.0, position, level)]
         else:
             shown.append((at - start, position, level))
-        step = tray.icon_frame_ms(state, at, at)
+        step = tray.icon_frame_ms(state, at, at, fine=_icon_fine())
         if step is None:
             break
         at += step
@@ -2458,7 +2466,7 @@ def icon_motion_frames() -> dict:
                  for (state, _), timeline in zip(ICON_MOTION_LIGHTS, timelines)}
         following = ticks[index + 1][0] if index + 1 < len(ticks) else total
         shown.append((following - hundredth, frame))
-    frames = tray.IconFrames(ICON_MOTION_SIZE)
+    frames = tray.IconFrames(ICON_MOTION_SIZE, _icon_fine())
     cells, counted = {}, {}
     for _delay, frame in shown:
         for state, _ in ICON_MOTION_LIGHTS:

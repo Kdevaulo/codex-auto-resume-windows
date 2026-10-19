@@ -34,7 +34,7 @@
     "assets/codex-auto-resume.ico": "45c3f3a0d02d78f9be0b80532eedc2f524cd7ebe1056007dacdb286ca743bd52",
     "build/capture_window.ps1": "15b5897082d9d6a24056ff5780d8b24909a1b48738730dfa3387c59e7abd382c",
     "build/make_gui.ps1": "12fc4fc4d2633e3b52e5b318eeb850e561fe9887a42eb4d4cc0b4926224ac21e",
-    "build/make_screenshots.py": "a4eb1013c313f0fdb605eabd8f049ebb73622629f56bd7555e2791c194affdf0",
+    "build/make_screenshots.py": "6cd3defbef02b9ea26b97b2eec7d4cc056a3706a62c728576ce7d0f95376270c",
     "<bridge envelope:en>": "7766776aa895be81b18078187a1de74141090ae9b34fe269502ea66f5b970cf7",
     "<panel render:en>": "4c2fde503aee9ee71f0749848bdd9a484e62065b97f38f7d816e7cb4c9019f35",
     "<popup render:en>": "ef59a4405af9c5d3bee9c6ea0a9af2ed11f7547b41763d39a13058bb454272b9",
@@ -308,7 +308,7 @@
       "size": "776x540"
     },
     "docs/images/icon-motion.png": {
-      "sha256": "affd6dcd418504867f85ba6f85703ef3e1fa9ba0d0254775a8785581de3e46e6",
+      "sha256": "384e14c9a4032fd56df3369850437099917fe0da7941b1b1f2488ef2b8494b32",
       "size": "360x72"
     },
     "docs/images/status-light.png": {
