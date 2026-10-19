@@ -16,15 +16,39 @@ waiting and sends it the ordinary way to the now loaded conversation - and this 
 NOT_DELIVERED_ON_OPEN (runtime.moved). Where the goal continuation's route applies it answers first, before this in
 the registry, and its route is carried out.
 
+Beside the goal continuation (v0.6.17, #47 P-4). Once that route has set a conversation's goal active, its P16 answers
+nothing more, and core asks no P3 for a record queued for opening - so the goal continuation's hold, "the goal and the
+standard continuation never both run", would never be asked, and opening the conversation could run two turns: the
+goal carried on (M2) and the queued continuation (M1). Measurement MQG asks Codex exactly that. Where it passed on the
+Codex in force - one turn: the queued message ran and the goal carried on after it - both apply and nothing is held.
+Anywhere else - not measured on this Codex, or measured as two turns - this answers nothing for a conversation whose
+goal is active while the goal continuation is on: the goal carries the conversation, one continuation, and the record
+waits for the app as A11 says. Its journal says so once a record, `qfo.goal_unmeasured` or `qfo.goal_two_turns`. The
+goal is read as the goal continuation reads it (codex/goals.py: its status, never its words); one that cannot be read
+is no goal, as there. An active goal also stands for the goal continuation's claim: its route is accepted only once the
+goal reads back active.
+
 It holds no memory of its own: what it reads is the state's, through its view (state.Scoped).
 """
 from __future__ import annotations
 
+from codex_auto_resume import failures
 from codex_auto_resume.domain.plug import DEFER, Alternative
 
-from ..vocabulary import OptionKey, OverrideKind
+from ..codex import inuse
+from ..codex.goals import Goals
+from ..vocabulary import GoalStatus, Measurement, OptionKey, OverrideKind
 
 CAPABILITY = "queue_for_open"
+GOAL = "goal_continuation"
+# MQG (v0.6.17): a goal set active and a continuation queued for opening, opened - one turn (a pass) or two. Read by its
+# id; on a build whose vocabulary does not have it yet, it is not measured.
+MQG = getattr(Measurement, "MQG", None)
+# Why it answered nothing beside an active goal, as its journal says it (registry.QUEUE_FOR_OPEN.codes).
+GOAL_UNMEASURED, GOAL_TWO_TURNS = "goal_unmeasured", "goal_two_turns"
+CODES = (GOAL_UNMEASURED, GOAL_TWO_TURNS)
+# Records it said that for, forgotten all at once past this many: one journal line a record.
+NOTED_LIMIT = 4096
 DAYS = (3, 4, 5, 6, 7)
 DEFAULT_DAYS = 3
 DAY = 86400
@@ -39,12 +63,15 @@ def watching(record) -> bool:
 
 
 class QueueForOpen:
-    """The capability's code: its hook at P16. `bind` gives it its view of the state (state.Scoped)."""
-    __slots__ = ("paths", "_scoped")
+    """The capability's code: its hook at P16. `bind` gives it its view of the state (state.Scoped). `home` is the
+    Codex home whose goals are read (None: the watcher's, codex/inuse.py) - the tests' seam."""
+    __slots__ = ("paths", "_scoped", "_home", "_noted")
 
-    def __init__(self, paths):
+    def __init__(self, paths, *, home=None):
         self.paths = paths
         self._scoped = None
+        self._home = home
+        self._noted = set()
 
     def bind(self, scoped):
         self._scoped = scoped
@@ -60,6 +87,13 @@ class QueueForOpen:
         # app closed or held by another session; the watch, which hands neither, asks only whether to keep it.
         if not watching(record) and record.get("holder") != APP_FREE:
             return DEFER
+        # v0.6.17 (#47, P-5): usage-limited records only, as its definition and statement say. Core never asks P3 for
+        # a record queued for opening, so a full context window queued here would skip compact_continue's hold until
+        # /compact and run on a full window on open; a network or server failure is not what it was turned on for.
+        if not watching(record) and record.get("category") != failures.USAGE_LIMIT:
+            return DEFER
+        if not watching(record) and self._for_goal(scoped, record, key):
+            return DEFER
         try:
             override = scoped.request(key)
             if not watching(record):
@@ -72,6 +106,43 @@ class QueueForOpen:
             return DEFER
         days = days if days in DAYS else DEFAULT_DAYS
         return Alternative.QUEUE_FOR_OPEN if now - override["created_at"] < days * DAY else DEFER
+
+
+    def _for_goal(self, scoped, record, key) -> bool:
+        """Whether the conversation's active goal carries it: the goal continuation on, MQG not passed on the Codex
+        in force, and the goal active. Said once a record in its journal, with why."""
+        try:
+            if not scoped.armed(GOAL):
+                return False
+            if MQG is not None and scoped.passed(MQG):
+                return False
+        except Exception:
+            pass                                  # no verdict read is no pass: the side with one continuation
+        if not self._active(record.get("thread_id")):
+            return False
+        try:
+            failed = MQG is not None and scoped.failed(MQG) is True
+        except Exception:
+            failed = False
+        if key not in self._noted:
+            if len(self._noted) >= NOTED_LIMIT:
+                self._noted.clear()
+            self._noted.add(key)
+            try:
+                scoped.count(GOAL_TWO_TURNS if failed else GOAL_UNMEASURED)
+            except Exception:
+                pass
+        return True
+
+    def _active(self, thread_id) -> bool:
+        """Whether `thread_id`'s goal is active; a goal that cannot be read is none."""
+        if not isinstance(thread_id, str):
+            return False
+        try:
+            goal = Goals(self._home if self._home is not None else inuse.home(self.paths)).read(thread_id)
+        except Exception:
+            return False
+        return goal is not None and goal.status == GoalStatus.ACTIVE
 
 
 def make(paths) -> QueueForOpen:
