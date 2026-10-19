@@ -116,6 +116,24 @@ class ForOpenTests(BothArmedCase):
             self.assertEqual((listed["state"], listed["notice"], listed["reason"]), ("armed", None, None))
 
 
+class WatchedTests(BothArmedCase):
+    def test_a_watched_marker_free_journals_what_it_would_have_done_never_an_overrule(self):
+        """Fails with the conflict checked before the watched one: its journal read watched, overruled, overruled."""
+        plug = self.advanced()
+        self.arm(plug)                                              # queue for opening on
+        self.arm(plug, capability=MARKER_FREE_ID, state="shadow")  # marker-free watched
+        self.plugged(plug)
+        self.due()
+        self.h.tick()
+        lines = self.marker_free_journal(plug)
+        self.assertNotIn(JournalCode.OVERRULED, [line[0] for line in lines])
+        self.assertIn((JournalCode.WOULD_HAVE, Point.SENDER, Point.SENDER), lines)
+        row = self.h.record()
+        self.assertEqual(row["state"], "queued", row["last_error"])
+        self.assertTrue(self.prompt().endswith(row["marker"]), "core's backend, with its marker")
+        self.assertEqual(self.fake.adds(), [])
+
+
 class MeasuredTests(BothArmedCase):
     """Route b (v0.6.17): with MQO passed for the Codex in force, both apply to the same record - queued for opening,
     with no marker, under its client id, and proven by it when the person opens the conversation."""

@@ -429,14 +429,15 @@ class Runtime:
             if (answer is DEFER or (point == Point.SENDER and answer is arguments[-1])
                     or not self._takes(definition, point, answer, arguments, admission)):
                 continue
+            if state == ArmingState.SHADOW:
+                self._once(JournalCode.WOULD_HAVE, definition, point, answer, record)
+                continue
             conflict = _conflict(earlier, point, answer,
                                  _own(self._code_of(definition), "carries") if earlier else None)
             if conflict is not None:
-                # Taken, core could carry neither: it stands aside for this record, and says for whom and why.
+                # Taken, core could carry neither: it stands aside for this record, and says for whom and why. Armed
+                # answers only - a watched one is a would-have above, as always.
                 self._paired(JournalCode.OVERRULED, definition, point, conflict[0][1], record, reason=conflict[1])
-                continue
-            if state == ArmingState.SHADOW:
-                self._once(JournalCode.WOULD_HAVE, definition, point, answer, record)
                 continue
             if _restricts(answer):
                 self._once(JournalCode.ACTED, definition, point, answer, record)
