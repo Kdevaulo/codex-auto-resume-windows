@@ -1561,7 +1561,18 @@ namespace CodexAutoResume
                 Action decide = delegate
                 {
                     if (startup != null && startupKnown && startAtSignIn != startupBaseline)
+                    {
+                        // v0.6.17: a window that stayed inside another app's private view would write or remove the
+                        // sign-in entry where Windows never reads it (HostApp.StuckInside), as Repair would. It says
+                        // so as Repair does, and the switch goes back to what Windows holds.
+                        if (RefusedInside())
+                        {
+                            startup.Checked = startupBaseline;
+                            registeredThen(null);
+                            return;
+                        }
                         CallAsync("startup", "{\"enabled\":" + (startAtSignIn ? "true" : "false") + "}", registeredThen);
+                    }
                     else registeredThen(null);
                 };
                 if (startup == null || startupKnown || startAtSignIn == startupBaseline) { decide(); return; }

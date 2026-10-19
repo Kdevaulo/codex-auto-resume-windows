@@ -141,11 +141,15 @@ class Channel:
     send started, as it finds one of the backend's after its launch.
 
     `client_id` is handed on only when core gives one - a continuation it sends with no marker
-    (P15) - so a channel that was never asked for that is called exactly as before."""
-    __slots__ = ("_send",)
+    (P15) - so a channel that was never asked for that is called exactly as before.
 
-    def __init__(self, send):
-        self._send = send
+    `concurrent` (v0.6.17): whether this send may wait for its receipt on a worker beside others (P12,
+    engine/delivery.py) - what the plug's object said when it was named (its `pools()`), held to True itself;
+    a channel that says nothing is sent inline, one at a time, as every channel was before."""
+    __slots__ = ("_send", "concurrent")
+
+    def __init__(self, send, concurrent=False):
+        self._send, self.concurrent = send, concurrent is True
 
     def send(self, thread_id, prompt, *, launch_guard=None, client_id=None):
         with launch_guard if launch_guard is not None else nullcontext(True) as permitted:

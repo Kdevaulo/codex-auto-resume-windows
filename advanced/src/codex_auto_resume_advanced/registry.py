@@ -85,7 +85,7 @@ from .engine.everyconversation import make as make_every_conversation
 from .engine.subagent import make as make_subagent_parent
 from .engine.keepgoing import make as make_keep_going
 from .engine.promptqueue import make as make_prompt_queue
-from .engine.foropen import DAYS, DEFAULT_DAYS, make as make_queue_for_open
+from .engine.foropen import CODES as FOROPEN_CODES, DAYS, DEFAULT_DAYS, make as make_queue_for_open
 from .engine.fallback import (ATTEMPTS as FALLBACK_ATTEMPTS, DEFAULT_ATTEMPTS as FALLBACK_DEFAULT_ATTEMPTS,
                               NOT_RESTORED, make as make_model_fallback)
 from .engine.goal import make as make_goal_continuation
@@ -461,7 +461,8 @@ GOAL_CONTINUATION = CapabilityDef(
 # and keeps A17, H4 and H6 - every withdrawal still fires at once - and stands on loaded_state_detection, what decides
 # that a conversation is not held. Its route rests on M1, passed on codex-cli 0.158 and a warning on any other.
 # Ceilings: three a conversation a day, a dozen a day in all. After the goal continuation, whose route comes first
-# where both are on and a goal applies.
+# where both are on and a goal applies - and (v0.6.17, #47) which, while MQG has no pass on the Codex in force, it leaves
+# a conversation whose goal is active to: one continuation, its codes saying why (engine/foropen.py).
 QUEUE_FOR_OPEN = CapabilityDef(
     id="queue_for_open",
     points=frozenset({Point.UNLOADED}),
@@ -471,6 +472,7 @@ QUEUE_FOR_OPEN = CapabilityDef(
     ceilings=Ceilings(per_day=12, per_conversation=3),
     journal_prefix="qfo",
     make=make_queue_for_open,
+    codes=FOROPEN_CODES,
     options=(Option(OptionKey.DAYS, DAYS, DEFAULT_DAYS),),
     measurements=(Measurement.M1,),
 )

@@ -129,7 +129,8 @@ class Plug:
 
     def sender(self, record, backend):                # P5
         """What the one send is handed to: core's own backend, unless a channel says otherwise.
-        `backend` is BACKEND, which stands for core's backend and is not it."""
+        `backend` is BACKEND, which stands for core's backend and is not it. A channel whose `pools()`
+        answers True (v0.6.17) may have its send wait on a worker beside others (P12)."""
         return backend
 
     def outcome(self, record, outcome):               # P6
@@ -193,7 +194,9 @@ class Plug:
         record's marker at the end of the words, found in Codex's history. CLIENT_ID is no
         marker: core queues the words through the channel the plug named at P5, under the client
         id it derives from the interruption, and proves delivery by that id alone - so without a
-        channel, core's own backend being unable to name one, it is DEFER."""
+        channel, core's own backend being unable to name one, it is DEFER. Asked for a route that takes
+        words (P16, engine/routes.py), the record says `route` True (v0.6.17): there SILENT is the one answer
+        core takes."""
         return DEFER
 
     def unloaded(self, record):                       # P16
@@ -441,7 +444,11 @@ class Guarded:
 
         The plug is asked with BACKEND in the backend's place, and that answer or DEFER is the
         backend. Anything else with a `send` is a channel, core's own backend included, should
-        a plug have found it some other way: held to the guard, and paid for as the plug's."""
+        a plug have found it some other way: held to the guard, and paid for as the plug's.
+
+        A channel whose object has `pools()` answering True itself (v0.6.17) may wait for its receipt on a worker
+        beside other sends (P12, engine/delivery.py); asked once, here, as the channel is named for this send - and
+        a `pools` that raises, or answers anything else, sends it inline, as every channel was sent before."""
         answer = self._ask(Point.SENDER, record, BACKEND)
         if answer is BACKEND or answer is DEFER:
             return backend
@@ -449,7 +456,14 @@ class Guarded:
             send = getattr(answer, "send", None)
         except Exception:                              # a `send` that raises when it is looked up
             return backend
-        return Channel(send) if callable(send) else backend
+        if not callable(send):
+            return backend
+        try:
+            pools = getattr(answer, "pools", None)
+            concurrent = callable(pools) and pools() is True
+        except Exception:                              # a `pools` that raises: one at a time
+            concurrent = False
+        return Channel(send, concurrent=concurrent)
 
     def outcome(self, record, outcome):
         return self._ask(Point.OUTCOME, record, outcome)

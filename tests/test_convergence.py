@@ -519,8 +519,12 @@ class BootstrapTests(unittest.TestCase):
         self.assertNotIn("$ArchivePath", fetch[:fetch.index("Get-Remote")])
         self.assertNotIn("$Edition", fetch[:fetch.index("Get-Remote")])
         self.assertNotRegex(fetch[:fetch.index("Get-Remote")], r"(?i)\$version\b")
-        named = self.text[self.text.index("    $name = "):]
-        named = named[:named.index("\n")]
+        # The archive's name, found as the one `$name =` line that names an archive - not the first `$name =` in the
+        # script: v0.6.17's outside gate, carried in this script too, has a `$name = $app` of its own, and a slice by
+        # the first match would quietly read that one.
+        named = [line for line in self.text.splitlines() if line.startswith("    $name = ") and ".archive" in line]
+        self.assertEqual(len(named), 1, named)
+        named = named[0]
         self.assertNotIn("$Edition", named, "the typed word, rather than the settled one")
         self.assertIn(".archive.Replace('{version}', $target)", named)
 

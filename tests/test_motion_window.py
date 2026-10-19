@@ -15,6 +15,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 ROOT = Path(__file__).resolve().parents[1]
 for _path in (str(ROOT / "src"), str(ROOT / "build"), str(ROOT / "tests")):
@@ -122,6 +123,50 @@ class JobTests(unittest.TestCase):
         self.assertEqual(drawn[1][1], bytes(range(9)) + b"\xff\xfe\xfd")
         self.assertEqual(drawn[2][1], drawn[1][1])
         self.assertEqual(drawn[0][2], {"save": [0, 0, 1, 1]})
+
+
+@unittest.skipUnless(os.name == "nt", "the stand-in compiler is a .cmd file")
+class CompileTests(unittest.TestCase):
+    """compile_window with a compiler stand-in of our own (never the real compile of the window): what csc says is
+    read as bytes, in the console's code page, so a Korean Windows' cp949 message is shown and not a decode error, and
+    the folder it builds into is made when a fresh checkout has none."""
+
+    # What csc writes on a Korean Windows: cp949 text, then a lead byte and a blank that no code page reads, so that a
+    # strict decode raises in whichever code page the default encoding is.
+    SAID = "error CS0103: 컬파일 오류".encode("cp949") + b"\x81\x20 end"
+
+    def stand_in(self, root: Path, *, writes: bool) -> Path:
+        script = root / "fake_csc.py"
+        lines = ["import sys",
+                 "out = [a[5:] for a in sys.argv if a.startswith('/out:')][0]",
+                 "sys.stderr.buffer.write(%r)" % self.SAID]
+        lines += ["open(out, 'wb').write(b'MZ')", "sys.exit(0)"] if writes else ["sys.exit(1)"]
+        script.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        command = root / "fake_csc.cmd"
+        command.write_text('@"%s" "%s" %%*\r\n' % (sys.executable, script), encoding="ascii")
+        return command
+
+    def compile_with(self, root: Path, folder: Path, *, writes: bool):
+        with unittest.mock.patch.object(motion_window, "CSC", self.stand_in(root, writes=writes)):
+            return motion_window.compile_window(folder)
+
+    def test_a_compile_error_in_the_consoles_code_page_is_shown_not_a_decode_error(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            with self.assertRaises(RuntimeError) as raised:
+                self.compile_with(root, root / "out", writes=False)
+        message = str(raised.exception)
+        self.assertIn("the window did not compile", message)
+        self.assertIn("error CS0103", message)
+        self.assertIn(self.SAID.decode("mbcs", errors="replace"), message)
+
+    def test_the_output_folder_is_made_when_it_is_not_there(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            folder = root / "fresh" / "checkout" / "out"
+            exe = self.compile_with(root, folder, writes=True)
+            self.assertEqual(exe, folder / "CodexAutoResumeSettings.exe")
+            self.assertTrue(exe.is_file())
 
 
 @unittest.skipUnless(os.name == "nt" and motion_window.CSC.is_file(), "the window is built with Windows' C# compiler")

@@ -1236,10 +1236,14 @@ class SourceRuleTests(unittest.TestCase):
         """tests/test_repo_hygiene.py holds every tracked file to made-up GUIDs, and a new file only once it is committed:
         the IID of IAccessible, written as a string in the window's controls and in this file's probe, turned the whole suite red.
         Windows' constants are built from their fields instead. Checked here for every window source and every window
-        test, tracked or not."""
+        test, tracked or not. The one exception is hygiene's own list: a file that must hand Windows a COM interface
+        id as an attribute string (`[ComImport, Guid("...")]` takes nothing else - gui/HostApp.cs's shell interfaces)
+        is allowed in both tests by the same entry, so the two can never disagree."""
         import test_repo_hygiene as hygiene
         found = []
         for path in sorted((ROOT / "gui").glob("*.cs")) + sorted((ROOT / "tests").glob("test_gui*.py")):
+            if path.relative_to(ROOT).as_posix() in hygiene.GUID_ALLOWLIST:
+                continue
             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                 for value in hygiene.UUID.findall(line):
                     if not hygiene.SYNTHETIC_UUID.match(value):

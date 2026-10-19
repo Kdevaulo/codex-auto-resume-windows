@@ -84,7 +84,7 @@
       "passed": true,
       "worst": 0
     },
-    "window": "47ec009f870e6e44ae46071cdfa7b91791f215d73c5dc4ade564a35ade559141"
+    "window": "7cfb0b7225e1d2205ef5d6ea4f4ffccb13bdd558a3ba5014ab4ebe8d89ecdc9b"
   },
   "images": {
     "assets/logo-motion-dark.png": {
@@ -138,60 +138,60 @@
       "size": "776x540"
     },
     "docs/images/readme-motion-ko.png": {
-      "bytes": 6239090,
+      "bytes": 6239085,
       "frames": 1010,
       "ms": 26772,
       "scenes": {
         "S0": 108020,
         "S1": 288328,
         "S10": 264639,
-        "S11": 680408,
+        "S11": 680440,
         "S12": 40990,
-        "S12b": 1471185,
+        "S12b": 1471154,
         "S13": 62900,
         "S14": 12019,
-        "S15": 421322,
+        "S15": 421318,
         "S16": 67990,
         "S5": 216566,
         "S6": 250696,
-        "S7": 289243,
-        "S8": 251466,
+        "S7": 289245,
+        "S8": 251462,
         "S9": 1813215
       },
-      "sha256": "4379a080287b62d147c4bd897148cb12a1778f1066886edd482e2e94ff2e98df",
+      "sha256": "789d9bb4d92f8a7ef5546c722b387300a11f3b001470c5a93d6f5b882f59c743",
       "size": "1500x1041"
     },
     "docs/images/readme-motion.png": {
-      "bytes": 6904283,
+      "bytes": 6904170,
       "frames": 1012,
       "ms": 26852,
       "scenes": {
-        "S0": 113660,
+        "S0": 113661,
         "S1": 336310,
         "S10": 315411,
-        "S11": 743112,
+        "S11": 743134,
         "S12": 46504,
-        "S12b": 1671170,
+        "S12b": 1671037,
         "S13": 64640,
         "S14": 11908,
-        "S15": 378085,
+        "S15": 378086,
         "S16": 67247,
         "S5": 257811,
         "S6": 299133,
-        "S7": 348174,
-        "S8": 302887,
+        "S7": 348179,
+        "S8": 302878,
         "S9": 1948128
       },
-      "sha256": "86c1fa8702727f03d47bbe9f3021eaad17f8b485072c2037b7057a013d0b1d00",
+      "sha256": "c924fa748dca4cc1d150ddba90739ca4cfd83c68631385d2568cd22ec6491780",
       "size": "1500x1041"
     }
   },
   "inputs": {
-    "<motion:card-en>": "fde674d74cf71f6b3580de4af57b63e2ae577af00e54a8f105b971154df78cfd",
-    "<motion:card-ko>": "6f78d637dee10a0ea3c91aa14d98e3ab3342a4ad17b3d72d0594be9b33242f4b",
+    "<motion:card-en>": "32effa2f420b9a9a8f9c27707ef5dd497695a11350ae37476aed24c8ca38e90e",
+    "<motion:card-ko>": "bf041f5ae0e07454ad4aeac6f6ea6b55995f76d8c039fb645fc706259d0601a7",
     "<motion:logo-dark>": "4dfe3238f39ea88c7af2d9415561f25a758b58ac419575cbaa549f3bd811d159",
     "<motion:logo-light>": "e30f23a553b3ff5cc333efa162e11d280073213b463e80e2da1ce125326216f9",
-    "<motion:readme-en>": "f53e0d847494944f66150ce098647869933ad02558e9c5e6ffe89ed442e550d1",
-    "<motion:readme-ko>": "e488eb3720d10e87778951d02811327d4648d5ba9de69973f9b7228108c24a54"
+    "<motion:readme-en>": "8d99877ad9fb43b438da8fae817c8a287b07994d02e6ed5d6f0585883b5a1ec0",
+    "<motion:readme-ko>": "4afbdb2a94a01637f83c9e17fb050a1a7e69635ecdce2c07bb2b1ba5648b2743"
   }
 }

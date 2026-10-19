@@ -253,10 +253,26 @@ against the checksum published beside it, and keeps your settings, your pause, e
 and the sign-in choice. Nothing else installs a pre-release: not the watcher, not the panel inside
 Codex and not Codex's tools, and `scripts/bootstrap.ps1 -Update` still installs releases only. From
 a command line, `-CheckOnly` prints the pre-release it found on a line of its own
-(`prerelease: v<version>`), and `-Version <version>` installs it.
+(`prerelease: v<version>`), and `-Version <version>` installs it. Where GitHub's list cannot be read, the
+answer says that pre-releases could not be checked, beside an answer about releases that does not depend on them;
+where GitHub refused because the requests it allows a network (60 an hour, which a VPN or a shared connection uses up
+for everyone on it) have run out, it says so and when the limit resets, and **Install another version...** says the
+same. The command line prints `releases: rate-limited <reset>` or `releases: unread`.
 
 Afterwards, change anything from **Start Menu → Codex Auto Resume**, or by asking Codex to
 *open auto resume settings*.
+
+**Not in Settings > Apps, or not starting at sign-in?** The Codex app and Claude desktop give every program they start
+a private view of the registry and of `%APPDATA%`, which Windows itself never reads. An installation or an update run
+from inside one of them - the setup program or `Install.cmd` run by an agent, or the Dashboard opened from the icon of
+a watcher that Codex started - could leave the entry in Settings > Apps, the sign-in start, the notifications' name,
+the link handler and the Start menu entry where Windows does not look. From v0.6.17 the setup programs, `Install.cmd`,
+the update script's own repair steps and the Dashboard notice it and run again outside that app by themselves, and a
+Dashboard that cannot get out refuses Repair, installing an update, **Install another version...** and a change to
+**Run at Windows sign-in**, and says why. That answer rests on what the window was started from, so it can be wrong - a
+tab of Windows Terminal, which is packaged too, can raise it; open the Dashboard from the Start menu and do it there. If it happened anyway, open the Dashboard from the Start menu - or, where the Start
+menu has no entry, `CodexAutoResumeSettings.exe` in `%USERPROFILE%\.codex-auto-resume` from File Explorer - and choose
+**Repair installation** on its Diagnostics page.
 
 ### Installing another version
 

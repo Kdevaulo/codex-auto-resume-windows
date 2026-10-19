@@ -33,6 +33,43 @@ until the claim, so the ledger pays for a resend, or a person's Send now, only w
 
 With no capability at a point, nothing is read and nothing is written: the answer is NULL's.
 
+Two capabilities' answers for one record that cannot both be carried (v0.6.17, issue #42). CONFLICTS lists each such
+pair of answers: one taken at an earlier point for a record this tick, and one at a later point for the same record
+that core could not carry with it. There is one way to settle them, SPLIT: the later answer is not taken. Its
+capability stands aside for that record, and the journal says so - an `overruled` line on it whose answer names the
+capability it stood aside for, and whose reason says why, where its code said (`carries`). Each goes on serving its
+own cases; nothing is shown on the Dashboard for a split. Only an armed answer is overruled: a watched capability's
+answer is a would-have, as always.
+
+The earlier answer is never the one dropped: core has already taken it when the later point is asked (P16's route is
+handed to the dispatch that then asks P5 and P15), so dropping it here would leave core carrying an answer nobody pays
+for. A line that settles any other way is refused where CONFLICTS is made (`_conflicts`), and is settled as a split
+if one is ever put there afterwards.
+
+A capability whose code has `carries(word)` is asked first whether it can carry its answer together with the earlier
+one, the word that was: True, and there is no conflict - both are taken and paid for; anything else, and it stands
+aside, with that answer as the reason where it is one of the statement's warning words.
+
+Core carries P16's TO_SESSION only through its own backend, with its marker, and QUEUE_FOR_OPEN that way or through
+a channel the plug named under a client id it named (core's engine/foropen._not_for_open): anything else for that
+same send left the record waiting - notLoaded, held_by_other_session - with nothing sent and the P16 answer journalled
+as acted. That pair is a split: the goal continuation's channel stands aside for such a send, and so does marker-free
+continuation - except for QUEUE_FOR_OPEN where MQO passed, which it carries with no marker (engine/markerfree.carries);
+both serve every send of a conversation the app holds as before.
+
+Two answers at one point that serve different sends (v0.6.17, #47 P-6). Core asks P15 for a route that takes words
+with the record saying `route` (core's engine/routes._silent), and takes only SILENT there; so here too only SILENT is
+an answer at such an ask (`_takes`), and marker-free continuation's CLIENT_ID - an answer only a channel's send carries
+- is passed over there as DEFER would be: never journalled as acted, never paid. Continue with no words serves the
+routes, marker-free continuation every channel send that carries words; a silent turn carries no words, so no marker.
+
+Several conversations at once beside a channel (v0.6.17, #47 P-7). Core pools a channel's send only where the channel
+says it may wait beside others (its `pools()`, core's domain/plug.Guarded.sender): marker-free continuation says so
+where MQP passed on the Codex in force. Where a channel cannot, its send goes inline, one at a time, and
+parallel_dispatch is journalled as overruled for that record, naming the channel's capability and why (`_alone`).
+parallel_dispatch is journalled as acted for a record only once a claim that pooled it committed (`moved`), never for
+a tick that pooled nothing.
+
 Taking failures up (v0.6.14, stage 3b). At P17 an answer is taken only if core offered it - one of
 the `takes` core hands over (failures.takes) - and only for a failure that completed after the
 capability was last turned on or watched: arming never reaches back. A capability that takes one up
@@ -54,8 +91,8 @@ from inspect import getattr_static
 import time
 
 from codex_auto_resume import continuation, failures, machine
-from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, RECORD_MOVES, RESTRICTIONS,
-                                           TAKE_UP, Alternative, Point, RecordMove)
+from codex_auto_resume.domain.plug import (ALTERNATIVES, ANSWERS, DEFER, HOOKS, NULL, QUEUED, RECORD_MOVES,
+                                           RESTRICTIONS, TAKE_UP, Alternative, Point, RecordMove)
 from codex_auto_resume.domain.plughands import RECORDS_LIMIT, kinds_of, widening_of, workers
 
 from .arming import Arming
@@ -64,8 +101,8 @@ from .engine import foropen, sessions, silent
 from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
-from .vocabulary import (TRIPWIRES, ArmingState, CapabilityKind, ContinuationReason, JournalCode, KeepReason,
-                         OffReason, OverrideKind, PromptReason)
+from .vocabulary import (TRIPWIRES, ArmingState, ArmingWarning, CapabilityKind, ContinuationReason, JournalCode,
+                         KeepReason, OffReason, OverrideKind, PromptReason)
 
 # How long what every capability stands at is taken as read, between ticks. A tick reads it
 # again; a process that has no ticks - the bridge, the MCP server - reads it at most this often.
@@ -98,6 +135,16 @@ KEEP_GOING = "keep_going"
 # The reasons a start route was not named that nothing else in the journal says (v0.6.16-beta.3): a
 # turn off has its own line, a watched answer its would-have; held back by Codex or a policy has none.
 HELD_WORDS = frozenset({"compat_unknown", "engine_unknown", "policy", "refused", "off"})
+# How two answers of CONFLICTS are settled (v0.6.17): the later stands aside - the one way there is.
+SPLIT = "split"
+# The state a claimed record moves to first (core's machine), where a pooled claim is known to have committed.
+SUBMITTING = "submitting"
+
+
+def _route_ask(record) -> bool:
+    """Whether P15 is asked for a route that takes words (core's engine/routes._silent, v0.6.17): the record says
+    `route`, True itself. There core takes SILENT alone."""
+    return isinstance(record, dict) and record.get("route") is True
 
 
 def _taken(point, answer) -> bool:
@@ -155,11 +202,79 @@ def _relaxes(answer) -> bool:
         return False
 
 
+def _not_ordinary(point, answer) -> bool:
+    """Whether `answer` at `point` keeps a send from going core's ordinary way - its own backend, its marker: any
+    channel at P5 (core's own backend is never taken as an answer) and a client id at P15. Words for no marker through
+    core's backend (P15's SILENT) core already sends with its marker, and are left as they are."""
+    if point == Point.SENDER:
+        return True
+    try:
+        return point == Point.DELIVERY and answer == Alternative.CLIENT_ID
+    except Exception:
+        return False
+
+
+def _conflicts(lines) -> tuple:
+    """`lines` as CONFLICTS holds them, each checked: an earlier point, the words its answer may be, the later points -
+    every one asked after it - which of their answers core could not carry with it, and SPLIT. Anything else is
+    refused (ValueError): an earlier answer core has already taken cannot be voided by a later one."""
+    checked = []
+    for line in lines:
+        first, words, later, refuses, settled = line
+        if settled != SPLIT:
+            raise ValueError("a later answer cannot void one core has already taken: settle the pair as SPLIT")
+        if first in later or not callable(refuses) or not words:
+            raise ValueError("not a pair of an earlier and a later answer")
+        checked.append((first, frozenset(words), frozenset(later), refuses, SPLIT))
+    return tuple(checked)
+
+
+# v0.6.17 (issue #42): the answers that cannot both be carried for one record - (the point an earlier answer was taken
+# at, the words it may be, the later points, which of their answers core could not carry with it, SPLIT). P16's
+# QUEUE_FOR_OPEN and TO_SESSION go only core's ordinary way (core's engine/foropen._not_for_open); P16 is asked before
+# the dispatch asks P5 and P15.
+CONFLICTS = _conflicts(((Point.UNLOADED, QUEUED, frozenset({Point.SENDER, Point.DELIVERY}), _not_ordinary, SPLIT),))
+
+
+def _conflict(earlier, point, answer, carries=None):
+    """The first of `earlier` (Runtime._earlier) that `answer` at `point` cannot be carried with - (entry, why: one of
+    the statement's warning words or None) - or None. `carries` is the capability's own `carries(word)`, where its code
+    has one: True, and that earlier answer is no conflict. Every conflict is settled as a split, whatever a line
+    says."""
+    for entry, (_first, _words, _later, refuses, _settled) in earlier:
+        if not refuses(point, answer):
+            continue
+        why = None
+        if carries is not None:
+            try:
+                why = carries(entry[2])
+            except Exception:
+                why = None
+            if why is True:
+                continue
+        return entry, (why if isinstance(why, str) and why in tuple(ArmingWarning) else None)
+    return None
+
+
 def _restricts(answer) -> bool:
     try:
         return answer in RESTRICTIONS
     except TypeError:
         return False
+
+
+def _preferred(point, chosen, answer, record, now) -> bool:
+    """Whether `answer` is taken at `point` although an earlier capability's `chosen` was taken first (v0.6.17).
+
+    A point is first wins, and this is its one exception: at P7, a person's Send now over an early look - where
+    core would carry the Send now out, and only there. The person asked for the record to go as soon as it can.
+    Core makes no early look at a postponement, which only Send now passes, so there EARLY taken first would
+    send nobody and the request would stand unanswered until it lapsed. But core never carries a Send now out
+    before a usage reset (domain/gates.py, gate_schedule), the very wait an early look exists for: there EARLY
+    is what sends it soonest, and SEND_NOW taken in its place would hold it for the whole early window. So the
+    record is put to core's own schedule gate for a Send now (quiet hours aside, which hold an early look too)."""
+    return (point == Point.SCHEDULE and chosen is Alternative.EARLY and answer is Alternative.SEND_NOW
+            and isinstance(record, dict) and machine.gate_schedule(record, now, forced=True)[0] == machine.PASS)
 
 
 def _word(answer, point):
@@ -193,6 +308,9 @@ class Runtime:
         # {record: {(point, capability, word)}}: the answers taken this tick that lead to a send, with
         # the word each was where it was one (an Alternative), for the claim to pay (`claim`).
         self._acted = {}
+        # {record: (capability, ...)}: the capabilities at P12 a claim that pooled the record paid, journalled as
+        # acted once that claim is known to have committed (`moved`, v0.6.17).
+        self._pooled = {}
         self._noted = set()
         # (capability, record) a kept-on capability's hook raised for: passed over for it (K8).
         self._skipped = set()
@@ -319,7 +437,10 @@ class Runtime:
 
     def ask(self, point, *arguments):
         """The answer at `point`: an armed capability's, or NULL's. A record of this edition's own (P2) is asked
-        nothing at P4, P5, P15 or P16: its words are the person's, and core sends it as it is (v0.6.14)."""
+        nothing at P4, P5, P15 or P16: its words are the person's, and core sends it as it is (v0.6.14).
+
+        The first capability to answer is the one taken, in registry order, with one exception (`_preferred`):
+        a person's Send now is preferred to an early look at P7 where core would carry it out (v0.6.17)."""
         definitions = self.registry.at(point)
         if not definitions or (point in OWN_RECORD_POINTS and _own_record(arguments[0])):
             return getattr(NULL, HOOKS[point])(*arguments)
@@ -335,6 +456,8 @@ class Runtime:
         # P16 in the watch (v0.6.15-beta): whether a continuation queued for opening stays queued. It was paid for at
         # its claim; nothing is spent or carried again, so neither a ceiling nor the claim is asked.
         kept = point == Point.UNLOADED and foropen.watching(record)
+        # v0.6.17 (issue #42): what was taken earlier for this record that an answer here may not be carried with.
+        earlier = self._earlier(key, point)
         chosen = chooser = None
         for definition in definitions:
             state = states.get(definition.id, ArmingState.OFF)
@@ -351,10 +474,17 @@ class Runtime:
             if state == ArmingState.SHADOW:
                 self._once(JournalCode.WOULD_HAVE, definition, point, answer, record)
                 continue
+            conflict = _conflict(earlier, point, answer,
+                                 _own(self._code_of(definition), "carries") if earlier else None)
+            if conflict is not None:
+                # Taken, core could carry neither: it stands aside for this record, and says for whom and why. Armed
+                # answers only - a watched one is a would-have above, as always.
+                self._paired(JournalCode.OVERRULED, definition, point, conflict[0][1], record, reason=conflict[1])
+                continue
             if _restricts(answer):
                 self._once(JournalCode.ACTED, definition, point, answer, record)
                 return answer
-            if chooser is not None:
+            if chooser is not None and not _preferred(point, chosen, answer, record, self.clock()):
                 continue
             if point in SENDING and not kept:
                 if not isinstance(record, dict) or self._ceiling(definition, record) is not None:
@@ -376,8 +506,65 @@ class Runtime:
         if point in SENDING and not kept:
             self._acted.setdefault(record.get("interruption_id"), set()).add(
                 (point, chooser.id, _word(chosen, point)))
+        if point == Point.SENDER:
+            self._alone(chooser, chosen, record)
         self._once(JournalCode.ACTED, chooser, point, chosen, record)
         return chosen
+
+    def _alone(self, chooser, channel, record) -> None:
+        """v0.6.17 (#47 P-7): where P12 answered for `record` this tick and the channel `chooser` named for its send
+        cannot wait beside others - its `pools()` answers anything but True, or it has none - core sends it inline,
+        one at a time: the capability that answered P12 stood aside for this record, and the journal says for whom
+        and why (an `overruled` line, the channel's warning word as the reason; no `pools` at all: no measurement
+        covers its send at once, UNMEASURED). A resend is never pooled, so nothing is said of one."""
+        entries = self._acted.get(record.get("interruption_id"), ())
+        pooled = [capability for point, capability, _w in entries if point == Point.CONCURRENCY]
+        if not pooled or any(point == Point.SCHEDULE and word == Alternative.RESEND for point, _c, word in entries):
+            return
+        try:
+            pools = getattr(channel, "pools", None)
+            why = pools() if callable(pools) else ArmingWarning.UNMEASURED
+        except Exception:
+            why = None
+        if why is True:
+            return
+        reason = why if isinstance(why, str) and why in tuple(ArmingWarning) else None
+        for capability in pooled:
+            definition = self.registry.get(capability)
+            if definition is not None:
+                self._paired(JournalCode.OVERRULED, definition, Point.CONCURRENCY, chooser.id, record, reason=reason)
+
+    def _earlier(self, key, point) -> tuple:
+        """((entry, line), ...): each answer taken this tick for the record `key` - an `_acted` entry, (point,
+        capability, word) - that a line of CONFLICTS says an answer at `point` may not be carried with. The tick
+        forgets every answer taken (`tick`), and the claim pays for what is left (`claim`)."""
+        found = []
+        for line in CONFLICTS:
+            first, words, later = line[:3]
+            if point not in later:
+                continue
+            for entry in self._acted.get(key, ()):
+                try:
+                    if entry[0] == first and entry[2] in words:
+                        found.append((entry, line))
+                except TypeError:
+                    continue
+        return tuple(found)
+
+    def _paired(self, code, definition, point, other, record, reason=None) -> None:
+        """One journal line, once per record in a process, about `definition` and the capability `other`, which its
+        answer names: `overruled` - it stood aside for that one, for `reason` where one is known."""
+        key = (code, definition.id, point, other, record.get("interruption_id") if isinstance(record, dict) else None)
+        if key in self._noted:
+            return
+        if len(self._noted) >= NOTED_LIMIT:
+            self._noted.clear()
+        self._noted.add(key)
+        try:
+            self.state.note(code, capability=definition.id, point=point, answer=other, reason=reason,
+                            at=self.clock())
+        except StateError:
+            pass
 
     def _not_taken(self, definitions, chooser, record, states) -> None:
         """At P7, every capability on that has a `not_taken` and whose answer was not the one taken is told so
@@ -426,6 +613,9 @@ class Runtime:
         that took the record up with that very word."""
         if not _taken(point, answer):
             return False
+        if point == Point.DELIVERY and _route_ask(arguments[0]):
+            # v0.6.17 (#47 P-6): a route's P15 takes SILENT alone; anything else is not an answer there.
+            return answer is Alternative.SILENT
         if point == Point.ADMISSION:
             facts = arguments[0]
             try:
@@ -556,6 +746,7 @@ class Runtime:
         its own, joined in the registry's order into the one errand core runs last in the tick
         (`_Errands`, v0.6.14); a watched one's is only journalled, never run."""
         self._acted.clear()
+        self._pooled.clear()
         if not len(self.registry):
             return DEFER
         self.arming.sweep(view)
@@ -744,12 +935,22 @@ class Runtime:
             return DEFER
         if _own_record(record) and state in RECORD_MOVES:
             return self._record_moved(record, RecordMove(state))
+        if state == SUBMITTING and isinstance(record, dict):
+            self._pooled_acted(record)
         if (self._not_delivered_on_open(record, state) or self._not_dispatched_by_session(record, state)
                 or self._refused_by_codex()):
             self.states(fresh=True)
         if self.arming.moved(record, state):
             self.states(fresh=True)
         return DEFER
+
+    def _pooled_acted(self, record) -> None:
+        """v0.6.17 (#47 P-7): a claim that pooled `record` committed - core moved it to submitting - so the
+        capability at P12 that it paid acted for it, and the journal says so: once per record, never for a tick."""
+        for capability in self._pooled.pop(record.get("interruption_id"), ()):
+            definition = self.registry.get(capability)
+            if definition is not None:
+                self._once(JournalCode.ACTED, definition, Point.CONCURRENCY, None, record)
 
     def _not_delivered_on_open(self, record, state) -> bool:
         """The tripwire NOT_DELIVERED_ON_OPEN (v0.6.15-beta): core took back a continuation queued for opening because
@@ -834,7 +1035,9 @@ class Runtime:
     def partition(self, records):
         """P12 (v0.6.15-beta): how many sends may wait for their receipts at once - an armed capability's whole
         number, which core holds to 2 to 4 (domain/plughands.workers), or NULL's. Each due record its ceilings leave a
-        unit for is remembered as acted at CONCURRENCY, so the claim of a pooled send pays exactly one (`claim`)."""
+        unit for is remembered as acted at CONCURRENCY, so the claim of a pooled send pays exactly one (`claim`).
+        The journal says it acted only for a record whose pooled claim committed (`moved`, v0.6.17): an answer here
+        pools nothing by itself."""
         definitions = self.registry.at(Point.CONCURRENCY)
         if not definitions or not isinstance(records, list):
             return DEFER
@@ -862,7 +1065,6 @@ class Runtime:
             for record in paid:
                 self._acted.setdefault(record.get("interruption_id"), set()).add(
                     (Point.CONCURRENCY, definition.id, None))
-            self._once(JournalCode.ACTED, definition, Point.CONCURRENCY, answer, None)
             return answer
         return DEFER
 
@@ -895,11 +1097,15 @@ class Runtime:
                 if word in ANSWERS:
                     words.add(Alternative(word))
         try:
-            return self.ledger.claim(connection, record, now, acted)
+            answer = self.ledger.claim(connection, record, now, acted)
         except Exception:
             if acted:
                 return Alternative.HOLD
             raise
+        if Point.CONCURRENCY in carried and answer is not Alternative.HOLD:
+            # Journalled once the claim committed (`moved`): this runs inside its transaction.
+            self._pooled[key] = tuple(capability for point, capability, _w in entries if point == Point.CONCURRENCY)
+        return answer
 
     # ------------------------------------------------------------------ the measurement harness
     def run_measurement(self, measurement, thread=None, may_spend=False):

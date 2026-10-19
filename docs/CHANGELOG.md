@@ -1,5 +1,78 @@
 # Changelog
 
+## v0.6.17 — Installs from inside another app, the update that keeps its uninstaller, and the capability pairs that kept each other from working
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16...v0.6.17)
+
+**From v0.6.16, an ordinary update.** It is the latest release, for both editions, so v0.6.16's *Check for updates*
+offers it in the edition you have, and the plugin in Codex installs it too. It has no pre-release of its own: it is
+v0.6.16 with the fixes below. Both editions change in the first group; the second is the advanced edition's alone,
+and what it changes is off until you turn it on.
+
+**Going back.** The watcher's state stays schema 5 and the advanced edition's own file stays version 7, as in
+v0.6.16. The file now says the oldest version that reads it safely, and that is v0.6.16, so *Install another
+version...* back to v0.6.16 keeps every advanced feature on there, as it was.
+
+### Both editions
+
+- **Installs, updates and repairs started from inside another app are moved outside it.** The Codex app and Claude
+  desktop are Windows MSIX apps: a program they start, and everything that program starts, writes the registry and
+  `%APPDATA%` into a private view that Windows itself never reads. Measured on this PC first: a process that came
+  from either app wrote where only that app could see it, while one started by the desktop shell or by Windows' own
+  management service (WMI) wrote where Windows reads. Run from inside such an app, an install here would leave the
+  entry in Settings > Apps, the start at sign-in, the notifications' name, the link handler and the Start menu
+  entry out of Windows' sight. The Dashboard and the setup program now open again outside by themselves, and
+  `Install.cmd`, the installer script it runs - which an update and Repair go through - and the update script's own
+  repair, downgrade and watcher-start steps run again outside the same way, passing on what they print and their
+  exit code. Where one cannot get out, the Dashboard refuses Repair, installing an update, *Install another
+  version...* and a change to *Run at Windows sign-in*, and says why, and the setup program says what would stay
+  inside the app before it installs or removes anything. Each decides from what its own process descends from, so
+  the warning says it *may* be inside such an app - a tab of Windows Terminal, which is packaged too, can raise it;
+  [the guide's troubleshooting entry](GUIDE.md) says what to do either way.
+- **An update made in the Dashboard keeps the uninstaller again**, so the installation gets its Settings > Apps and
+  winget entry back ([#43](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/43)). Every update the Dashboard started had left it out; the update to v0.6.17 itself
+  repairs an install that lost it, and **Repair** now says when it cannot write the entry.
+- **Check for updates and Install another version say when pre-releases could not be checked**, and name a GitHub
+  rate limit with the time it resets, where GitHub's list was refused because a network - a VPN, a shared
+  connection - had used up its requests. Before, the Dashboard said the build was the newest published release,
+  and nothing more (reported by [@Kdevaulo](https://github.com/Kdevaulo), [#41](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/41)).
+- **The Dashboard opens in front** after a fresh install's *Finish*, and after an update's *Open the Dashboard*.
+- **The motion-picture build reads the compiler's messages in any Windows language**, and a timing test measures
+  the tray icon's own CPU work rather than a busy runner.
+
+### Advanced edition
+
+- **The queue for a conversation you open and the continuation with no marker now apply to the same message**
+  ([#42](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/42)). The message is queued for opening with no marker and proven by its message id, which Codex keeps. This was
+  measured on codex-cli 0.163.0-alpha.10.2: it runs once when the conversation is opened, as your own message, and is
+  found by its id. Before, nothing was queued while the continuation with no marker was on. On any other Codex
+  the queue carries the message with its marker, as it always did. A continuation for a conversation another
+  Codex session holds (a terminal's Codex, VS Code) goes to that session again, with its marker ([#42](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/42), [#47](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/47)).
+- **A reset credit spent for the window the usage pause holds lifts the pause** ([#44](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/44)). The pause waited out the
+  reset the credit had just made unnecessary; it now goes by when Codex answered the credit, and a credit that is
+  unanswered or reset nothing leaves the pause standing, as does another window's.
+- **"Sends an hour, all advanced features together" counts sends, not features** ([#45](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/45)). With two or three
+  features on one send, the real limit was four to six: a person who set a number now gets that many sends.
+- **Continue with no words never takes or loses the message you wrote for this time** ([#46](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/46)). It yields to a
+  continuation that carries words beyond the program's own template, and a route that never started puts the words
+  back.
+- **The other pairs that kept each other from working** ([#47](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/47)):
+  the goal continuation beside other sessions (a conversation a session holds goes to that session);
+  the goal continuation beside the queue for open (measured on the same Codex: the queued message runs once and the
+  goal carries on afterwards, so both apply there; on another Codex the goal carries the conversation alone and the
+  journal says so);
+  the queue for open takes up usage-limited conversations only, so a full context window waits for its compaction
+  and a network or server failure is not queued;
+  Continue with no words beside the continuation with no marker (the routes go without words, the continuation with
+  no marker serves the sends that carry words);
+  several conversations at once now pool the continuation with no marker's sends where that was measured on this
+  Codex, and send them one at a time where not;
+  and a person's *Send now* wins where it can send, while an early look sends it where *Send now* cannot before a reset.
+  When one feature stands aside for another, the journal says so and names it, in place of a silent "acted".
+- **Groundwork.** The options table checks names in code only, and the stored state says the oldest version that
+  reads it safely - kept at its version, so v0.6.16 still reads it with every feature on after *Install another
+  version...*.
+
 ## v0.6.16 — Rescan and reconcile, a setup program that is an installer, notices that stay until clicked, and most of the advanced edition
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15...v0.6.16)

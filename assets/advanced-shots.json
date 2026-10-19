@@ -1,47 +1,5 @@
 {
   "fidelity": {
-    "en/diagnostics": {
-      "exact": 1.0,
-      "light": 388,
-      "outside": 0,
-      "passed": true,
-      "worst": 0
-    },
-    "en/history": {
-      "exact": 1.0,
-      "light": 388,
-      "outside": 0,
-      "passed": true,
-      "worst": 0
-    },
-    "en/overview": {
-      "exact": 1.0,
-      "light": 388,
-      "outside": 0,
-      "passed": true,
-      "worst": 0
-    },
-    "en/pending": {
-      "exact": 1.0,
-      "light": 388,
-      "outside": 0,
-      "passed": true,
-      "worst": 0
-    },
-    "en/settings": {
-      "exact": 1.0,
-      "light": 388,
-      "outside": 0,
-      "passed": true,
-      "worst": 0
-    },
-    "en/statistics": {
-      "exact": 1.0,
-      "light": 388,
-      "outside": 0,
-      "passed": true,
-      "worst": 0
-    },
     "ko/diagnostics": {
       "exact": 1.0,
       "light": 388,
@@ -84,99 +42,99 @@
       "passed": true,
       "worst": 0
     },
-    "window": "47ec009f870e6e44ae46071cdfa7b91791f215d73c5dc4ade564a35ade559141"
+    "window": "7cfb0b7225e1d2205ef5d6ea4f4ffccb13bdd558a3ba5014ab4ebe8d89ecdc9b"
   },
   "images": {
     "docs/images/advanced-page-after-ko.png": {
-      "sha256": "9ce66edeb8e9db975f83d54e3e18d80fe5a03d4038903c74de9097199759c1c6",
+      "sha256": "20feaf77f04b9995a866a804527c2595c3e8c773bcd867f554840ab48d381c49",
       "size": "1500x1041"
     },
     "docs/images/advanced-page-after.png": {
-      "sha256": "de8835cdb70aba96122fb019361a8665bc38bf64f91f34825149d447f3dc2340",
+      "sha256": "04db912b0c64269392aea85d1cea456154dab0941c76e52c6019ef6917c33f14",
       "size": "1500x1041"
     },
     "docs/images/advanced-page-before-ko.png": {
-      "sha256": "09c6be090cd80405cf4d2dddb9b8d9e17790737e0cc71194358ec26e6a20c4b9",
+      "sha256": "d599d186b881a977ebfeea0e955cf3e742a35b833bc5d3bca9558e0faed4b7b1",
       "size": "1500x1041"
     },
     "docs/images/advanced-page-before.png": {
-      "sha256": "ea44c7fe245a1311d3d7493f866964b794328a2a35344e1a0b028b46b013a627",
+      "sha256": "0b8c2eadc316cc48a2731229e42abaf6040201d3d701346782bf7eabb25cf1b3",
       "size": "1500x1041"
     },
     "docs/images/advanced-pause-after-ko.png": {
-      "sha256": "1093e683e999f473d06fe82c05fed48090bd57759642cbe2d6085657a7eafa5a",
+      "sha256": "7e3e75c66260bf8df32bf449724070e5a03dda025215ca7ec913613010fa9776",
       "size": "1500x1041"
     },
     "docs/images/advanced-pause-after.png": {
-      "sha256": "e1e6befbd206b0d42faa65af4ab7e3b7652c6bc361e6af97d1c0c34a92baace5",
+      "sha256": "1672a5c7f4bb8f6a912eacfe5ba5030f16ed351bae779ed0b23a43024341e1dc",
       "size": "1500x1041"
     },
     "docs/images/advanced-pause-before-ko.png": {
-      "sha256": "09c6be090cd80405cf4d2dddb9b8d9e17790737e0cc71194358ec26e6a20c4b9",
+      "sha256": "d599d186b881a977ebfeea0e955cf3e742a35b833bc5d3bca9558e0faed4b7b1",
       "size": "1500x1041"
     },
     "docs/images/advanced-pause-before.png": {
-      "sha256": "ea44c7fe245a1311d3d7493f866964b794328a2a35344e1a0b028b46b013a627",
+      "sha256": "0b8c2eadc316cc48a2731229e42abaf6040201d3d701346782bf7eabb25cf1b3",
       "size": "1500x1041"
     },
     "docs/images/advanced-report-ko.png": {
-      "sha256": "7e65bae7250faf1485c06c3cb569943367a45450448ba1682e7741333cca4511",
+      "sha256": "c351e341520ea1c6f0682aa123afb5a46b7a0c410241d9c789a761f38ff5866b",
       "size": "1500x1041"
     },
     "docs/images/advanced-report.png": {
-      "sha256": "be86e11d1c2cad16d67a5ced8e3e6d5dfa3a93c2cb9cb783e5f1d96d82b38cda",
+      "sha256": "ea80c3337489e85166cb6cfcf5bc349c4fdaf98f95ebb676176085d20f2264f5",
       "size": "1500x1041"
     },
     "docs/images/advanced-scheduled-after-ko.png": {
-      "sha256": "5303e76795f73c72406d96deee4f6b9f678683f09c933693866e6fd9defb180e",
+      "sha256": "c38cdbe810efb1083315604c3c225fa842a9b8d9d71e24d18bc6fc8c43953a2c",
       "size": "1500x1041"
     },
     "docs/images/advanced-scheduled-after.png": {
-      "sha256": "d7976f447bb1cdbed20230d22c2633a88d635862769c2fd5288abeb190a751c1",
+      "sha256": "6d0deabfa79ce6821e4e6dd094bd17d16c7dd3b3c45cc16f459656b597d35286",
       "size": "1500x1041"
     },
     "docs/images/advanced-scheduled-before-ko.png": {
-      "sha256": "4000f21cbefefa24bd9b9012ec76824dafca7bc87eebfea93eb6faee1b4ac48b",
+      "sha256": "4d92ce401b7ab482ba2cbda3d3f8e11a40fd2ae0080949b180b65310120023c8",
       "size": "1500x1041"
     },
     "docs/images/advanced-scheduled-before.png": {
-      "sha256": "0c355f37d64b0d2977065e5eb88aa7ad049aed4d21f4970a492be60397c25383",
+      "sha256": "4807d937a43d8c1010a3aac007eacd3a04bf8c6dade42189028d9dcec4789c88",
       "size": "1500x1041"
     },
     "docs/images/advanced-usage-numbers-ko.png": {
-      "sha256": "5df63db194bc82608f86315e0400ac2428594dcf0672b89014fe252c770fc5ce",
+      "sha256": "5584da8df1abf14ffccb2743b24d02a4ea262aae04075d1ae42eb0f8c6122c93",
       "size": "1500x1041"
     },
     "docs/images/advanced-usage-numbers.png": {
-      "sha256": "b0c19ca1bb2b98bfad26bdb6afc63581f8bbf51ecb16643dc4ba73871c75779b",
+      "sha256": "26ee84241ee4834b897cdbc4f2c821763e38423a63615fa335f57e28161bec33",
       "size": "1500x1041"
     }
   },
   "inputs": {
-    "<advanced shot:P1-after:en>": "46c8b550caabc9d333d1962c7cd30c116b501d8a149fe883493146b0bfb446a1",
-    "<advanced shot:P1-after:ko>": "783a994eac566cdce3be974363aae89e498849e7651e8f76b2d876db1284cdbb",
-    "<advanced shot:P1-before:en>": "39f9c280277ce0dda690cace4503039dd9dcfef95609a4a49993c850f5672b0c",
-    "<advanced shot:P1-before:ko>": "c9a742941a64baaa743d491e1164cd465f52b48c1c643ac9cde3ffd6c4a22ec9",
-    "<advanced shot:P4-after:en>": "c765e3960e338aed2782b1821c547e9fdf539d68bf9b1026cecce258a3d5f909",
-    "<advanced shot:P4-after:ko>": "d92231b808e48d9b3b67ae6f768d486aa315b3bdb90caa3ab4ff3dcd1299b28c",
-    "<advanced shot:P4-before:en>": "00e10d0c43ccb98312ff769fc884b74acfe8cb78a11a70c5a4d8b520ebe31483",
-    "<advanced shot:P4-before:ko>": "67d3d9d4a1f7b39f6c968512a89e69473b29b8252812db54f9b4615011b7e64c",
-    "<advanced shot:P5:en>": "34377f7262d19cdeec7b2031eb96f4aa4f4107d81681ae412bae32a728a6c05a",
-    "<advanced shot:P5:ko>": "5deb054ae06a8fc4d2c76eb71b19efb0512ec1a9950dc3b6ca65e57351f5e2b1",
-    "<advanced shot:P7-after:en>": "181a9e6b87a7b17b04d248a5ee8a1357dd9a68405c88eb9321e23d8551f6fbf3",
-    "<advanced shot:P7-after:ko>": "1569d218efaf9f8b1c09ad2b26b9fcf1175a316ed38eb1a87cef722b3ac2d491",
-    "<advanced shot:P7-before:en>": "7ef9392cb2ea0359f9e9a63bb0ee74b4f5de2424b0e44e8beb5f96625b18ece7",
-    "<advanced shot:P7-before:ko>": "788fde223cc45484f4c684c489a4d0c1263f7d6e2ea15ef749e34463a63fdc2e",
-    "<advanced shot:P8:en>": "f236929d4c89bb848a2c6956d5ee418532562d8840219cdd629df4e34c734cc7",
-    "<advanced shot:P8:ko>": "e5aa126ad4aedffacab431a2a8eb1c9a411cb5094c8af44f4a13fa8e375ce8b4"
+    "<advanced shot:P1-after:en>": "36033675230850aa073074c47e0b0b3604b98b1482ec9a57877df937692c646e",
+    "<advanced shot:P1-after:ko>": "ae7e9246e0bd8fa58474727b3a6a2db7d0075f250fc1a69b550b194b42d13be3",
+    "<advanced shot:P1-before:en>": "1a9441997afaeccb30be661f15cc709b50939f5e1c4254b91a760d16b0eb5636",
+    "<advanced shot:P1-before:ko>": "5b2adb148b104f6bb62122db8b00a571d69680b92b1924885e02a1033e86288d",
+    "<advanced shot:P4-after:en>": "fc2188c24934e97d9ff909ed3687be61ce44c23637262582c8db73ec1596d9b7",
+    "<advanced shot:P4-after:ko>": "8c3d1150f2e132decfccd0d5be5fc39c085e054576dcd0b336591c55f0d08f3e",
+    "<advanced shot:P4-before:en>": "f7eeefdccc13149de4edcb7318dc72bca99a568a228d65744833bc51a249f88a",
+    "<advanced shot:P4-before:ko>": "8270479c96c010a52450e4fed2593b336b5df25ca9d20a37c8731801919aaacd",
+    "<advanced shot:P5:en>": "f34cd263bc769760530fb4a2efabc1a078f9e3cc4611e8f08381ace3d23759ef",
+    "<advanced shot:P5:ko>": "eefa814e330c7fa9a288783c37af8902d05b1d10e30f5db7090a10dc6f566a36",
+    "<advanced shot:P7-after:en>": "7b287c10cd120e7416bbd9ec2f898563eb1a57b7039b2bfdac848b9e4a6c11e4",
+    "<advanced shot:P7-after:ko>": "8ea764fa94261355c82f1f040da1f9fb874b5c7d4e2cbe53b1cdee507959fa41",
+    "<advanced shot:P7-before:en>": "11e6205a919ed0986f37fe1cf4669a208eeefff84bfd7e1144f2b7129b5c6e11",
+    "<advanced shot:P7-before:ko>": "cc9a7463f880fe80b2b024231eb9eb543cd182c786e31ba5b491f762d639ce33",
+    "<advanced shot:P8:en>": "7d18c6c15f985a38ecec292ee1f19d0a52ec59b0040d4d556d701f7f235a05b4",
+    "<advanced shot:P8:ko>": "62c74a346221b76688994e807af665096c5798bbd52408b052a1c5bafcf8a0ae"
   },
   "parts": {
     "<advanced shot:P1-after:en>": {
-      "00 strings": "d6d6b280b5398539",
+      "00 strings": "52895e1b5b78b757",
       "01 describe": "a76ff611d9a7e3b4",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "8e05d5545c302b63",
-      "04 dashboard": "304e8587210a99db",
+      "03 status": "fe6a5aeed1e9d3d9",
+      "04 dashboard": "39800415d87837bb",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -249,16 +207,16 @@
       "74 advanced-statement": "b7fc649bd13b797a",
       "75 advanced-watch-log": "b8352ae5ec19bb8c",
       "76 advanced-report-build": "27836c45f1f1f648",
-      "77 advanced-report-job": "4d2448b955848c5b",
-      "78 advanced-report-check": "56ace7a838515d67",
+      "77 advanced-report-job": "24e9fd75ffd262da",
+      "78 advanced-report-check": "c60fa4a648b76908",
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P1-after:ko>": {
-      "00 strings": "92500f15c8edac32",
+      "00 strings": "0f2991d34c905b83",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "8e05d5545c302b63",
-      "04 dashboard": "304e8587210a99db",
+      "03 status": "fe6a5aeed1e9d3d9",
+      "04 dashboard": "39800415d87837bb",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -331,16 +289,16 @@
       "74 advanced-statement": "8cfea00ee3e8f001",
       "75 advanced-watch-log": "b8352ae5ec19bb8c",
       "76 advanced-report-build": "27836c45f1f1f648",
-      "77 advanced-report-job": "4d2448b955848c5b",
-      "78 advanced-report-check": "56ace7a838515d67",
+      "77 advanced-report-job": "24e9fd75ffd262da",
+      "78 advanced-report-check": "c60fa4a648b76908",
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P1-before:en>": {
-      "00 strings": "d6d6b280b5398539",
+      "00 strings": "52895e1b5b78b757",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "055f6c359618d970",
-      "04 dashboard": "87daf3fd6ff79b7d",
+      "03 status": "4bf8f9fca41d7293",
+      "04 dashboard": "535b7740e5bb9351",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -349,11 +307,11 @@
       "10 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P1-before:ko>": {
-      "00 strings": "92500f15c8edac32",
+      "00 strings": "0f2991d34c905b83",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "055f6c359618d970",
-      "04 dashboard": "87daf3fd6ff79b7d",
+      "03 status": "4bf8f9fca41d7293",
+      "04 dashboard": "535b7740e5bb9351",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -362,11 +320,11 @@
       "10 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P4-after:en>": {
-      "00 strings": "d6d6b280b5398539",
+      "00 strings": "52895e1b5b78b757",
       "01 describe": "a76ff611d9a7e3b4",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "8e05d5545c302b63",
-      "04 dashboard": "304e8587210a99db",
+      "03 status": "fe6a5aeed1e9d3d9",
+      "04 dashboard": "39800415d87837bb",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -439,16 +397,16 @@
       "74 advanced-statement": "b7fc649bd13b797a",
       "75 advanced-watch-log": "b8352ae5ec19bb8c",
       "76 advanced-report-build": "27836c45f1f1f648",
-      "77 advanced-report-job": "4d2448b955848c5b",
-      "78 advanced-report-check": "56ace7a838515d67",
+      "77 advanced-report-job": "24e9fd75ffd262da",
+      "78 advanced-report-check": "c60fa4a648b76908",
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P4-after:ko>": {
-      "00 strings": "92500f15c8edac32",
+      "00 strings": "0f2991d34c905b83",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "8e05d5545c302b63",
-      "04 dashboard": "304e8587210a99db",
+      "03 status": "fe6a5aeed1e9d3d9",
+      "04 dashboard": "39800415d87837bb",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -521,16 +479,16 @@
       "74 advanced-statement": "8cfea00ee3e8f001",
       "75 advanced-watch-log": "b8352ae5ec19bb8c",
       "76 advanced-report-build": "27836c45f1f1f648",
-      "77 advanced-report-job": "4d2448b955848c5b",
-      "78 advanced-report-check": "56ace7a838515d67",
+      "77 advanced-report-job": "24e9fd75ffd262da",
+      "78 advanced-report-check": "c60fa4a648b76908",
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P4-before:en>": {
-      "00 strings": "d6d6b280b5398539",
+      "00 strings": "52895e1b5b78b757",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "055f6c359618d970",
-      "04 dashboard": "87daf3fd6ff79b7d",
+      "03 status": "4bf8f9fca41d7293",
+      "04 dashboard": "535b7740e5bb9351",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -539,11 +497,11 @@
       "10 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P4-before:ko>": {
-      "00 strings": "92500f15c8edac32",
+      "00 strings": "0f2991d34c905b83",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "055f6c359618d970",
-      "04 dashboard": "87daf3fd6ff79b7d",
+      "03 status": "4bf8f9fca41d7293",
+      "04 dashboard": "535b7740e5bb9351",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -552,11 +510,11 @@
       "10 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P5:en>": {
-      "00 strings": "d6d6b280b5398539",
+      "00 strings": "52895e1b5b78b757",
       "01 describe": "a76ff611d9a7e3b4",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "8e05d5545c302b63",
-      "04 dashboard": "304e8587210a99db",
+      "03 status": "fe6a5aeed1e9d3d9",
+      "04 dashboard": "39800415d87837bb",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -629,16 +587,16 @@
       "74 advanced-statement": "b7fc649bd13b797a",
       "75 advanced-watch-log": "b8352ae5ec19bb8c",
       "76 advanced-report-build": "27836c45f1f1f648",
-      "77 advanced-report-job": "4d2448b955848c5b",
-      "78 advanced-report-check": "56ace7a838515d67",
+      "77 advanced-report-job": "24e9fd75ffd262da",
+      "78 advanced-report-check": "c60fa4a648b76908",
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P5:ko>": {
-      "00 strings": "92500f15c8edac32",
+      "00 strings": "0f2991d34c905b83",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "8e05d5545c302b63",
-      "04 dashboard": "304e8587210a99db",
+      "03 status": "fe6a5aeed1e9d3d9",
+      "04 dashboard": "39800415d87837bb",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -711,16 +669,16 @@
       "74 advanced-statement": "8cfea00ee3e8f001",
       "75 advanced-watch-log": "b8352ae5ec19bb8c",
       "76 advanced-report-build": "27836c45f1f1f648",
-      "77 advanced-report-job": "4d2448b955848c5b",
-      "78 advanced-report-check": "56ace7a838515d67",
+      "77 advanced-report-job": "24e9fd75ffd262da",
+      "78 advanced-report-check": "c60fa4a648b76908",
       "79 advanced-report-job": "86c6ba3742dfe498"
     },
     "<advanced shot:P7-after:en>": {
-      "00 strings": "d6d6b280b5398539",
+      "00 strings": "52895e1b5b78b757",
       "01 describe": "a76ff611d9a7e3b4",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "ab1e705db7185ddb",
-      "04 dashboard": "4ce9536f17041ad0",
+      "03 status": "ec2612e542394790",
+      "04 dashboard": "975fdcad785bd1ec",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -794,11 +752,11 @@
       "75 advanced-watch-log": "b8352ae5ec19bb8c"
     },
     "<advanced shot:P7-after:ko>": {
-      "00 strings": "92500f15c8edac32",
+      "00 strings": "0f2991d34c905b83",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "ab1e705db7185ddb",
-      "04 dashboard": "4ce9536f17041ad0",
+      "03 status": "ec2612e542394790",
+      "04 dashboard": "975fdcad785bd1ec",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -872,11 +830,11 @@
       "75 advanced-watch-log": "b8352ae5ec19bb8c"
     },
     "<advanced shot:P7-before:en>": {
-      "00 strings": "d6d6b280b5398539",
+      "00 strings": "52895e1b5b78b757",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "055f6c359618d970",
-      "04 dashboard": "87daf3fd6ff79b7d",
+      "03 status": "4bf8f9fca41d7293",
+      "04 dashboard": "535b7740e5bb9351",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -885,11 +843,11 @@
       "10 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P7-before:ko>": {
-      "00 strings": "92500f15c8edac32",
+      "00 strings": "0f2991d34c905b83",
       "01 describe": "d64c333e8c56671b",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "055f6c359618d970",
-      "04 dashboard": "87daf3fd6ff79b7d",
+      "03 status": "4bf8f9fca41d7293",
+      "04 dashboard": "535b7740e5bb9351",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -898,11 +856,11 @@
       "10 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P8:en>": {
-      "00 strings": "d6d6b280b5398539",
+      "00 strings": "52895e1b5b78b757",
       "01 describe": "a76ff611d9a7e3b4",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "ab1e705db7185ddb",
-      "04 dashboard": "4ce9536f17041ad0",
+      "03 status": "ec2612e542394790",
+      "04 dashboard": "975fdcad785bd1ec",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",
@@ -976,11 +934,11 @@
       "75 advanced-watch-log": "b8352ae5ec19bb8c"
     },
     "<advanced shot:P8:ko>": {
-      "00 strings": "92500f15c8edac32",
+      "00 strings": "0f2991d34c905b83",
       "01 describe": "0ca9fc8c6c788aa5",
       "02 settings": "bc037398c6cc03db",
-      "03 status": "ab1e705db7185ddb",
-      "04 dashboard": "4ce9536f17041ad0",
+      "03 status": "ec2612e542394790",
+      "04 dashboard": "975fdcad785bd1ec",
       "05 statistics": "c3baf451f59e1e6b",
       "06 compatibility": "a237154eec268de7",
       "07 power-action": "82c84584a922e276",

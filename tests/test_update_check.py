@@ -26,6 +26,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
+# Every whole run here carries CODEX_AUTO_RESUME_OUTSIDE=1: a run inside the Codex app or Claude would otherwise take the
+# repair branch outside through WMI (scripts/bootstrap.ps1, the outside gate; v0.6.17), out of the test's reach.
 POWERSHELL = (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
               / "WindowsPowerShell" / "v1.0" / "powershell.exe")
 
@@ -371,7 +373,7 @@ class EndToEndTests(unittest.TestCase):
             # default reader raises inside its thread and hands back no output at all -
             # which reads as a product bug and is not one.
             text=True, encoding="utf-8", errors="replace",
-            env=dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(self.home)))
+            env=dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(self.home), CODEX_AUTO_RESUME_OUTSIDE="1"))
 
     def test_a_machine_that_cannot_ask_is_told_so(self):
         result = self.run_it("-CheckOnly")
@@ -462,7 +464,7 @@ class NeverGoesBackwardsTests(unittest.TestCase):
              "-File", str(self.script), *arguments],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=300,
             text=True, encoding="utf-8", errors="replace",
-            env=dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(home)))
+            env=dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(home), CODEX_AUTO_RESUME_OUTSIDE="1"))
 
     def test_a_newer_installation_is_not_replaced_by_an_older_plugin(self):
         self.plugin_at("0.5.7")
@@ -577,7 +579,7 @@ class UnknownInstalledVersionTests(unittest.TestCase):
 
     def run_it(self, home, *switches):
         self.requests.unlink(missing_ok=True)
-        environment = dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(home),
+        environment = dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(home), CODEX_AUTO_RESUME_OUTSIDE="1",
                            TEMP=str(self.temp), TMP=str(self.temp), CAR_SCRIPT=str(self.script),
                            CAR_SWITCHES=json.dumps(list(switches)), CAR_REQUESTS=str(self.requests),
                            CAR_LATEST=TAG + "v1.2.5")

@@ -67,4 +67,11 @@ MEASURED = {
     Measurement.MO: (Verdict.PASS, CLI_0163_ALPHA_10_2),
     Measurement.M3B: (Verdict.PASS, CLI_0163_ALPHA_10_2),
     Measurement.M6B: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    # 2026-10-20 (v0.6.17, issues #42 and #47), the Desktop not holding the conversations: a continuation queued for
+    # opening with no marker ran once on open and was found by its client id; two at once each ran once in its own
+    # conversation. MQG, made again the same night with a goal that takes many turns: on open the queued message ran
+    # first and once, then the goal carried on, a turn at a time, until it reached its own end.
+    Measurement.MQO: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.MQP: (Verdict.PASS, CLI_0163_ALPHA_10_2),
+    Measurement.MQG: (Verdict.PASS, CLI_0163_ALPHA_10_2),
 }
