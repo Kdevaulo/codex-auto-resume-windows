@@ -5,7 +5,7 @@ Eleven tables and nothing else - the state is refused at open if it holds any ot
 other column, exactly as core refuses its own (store/session.py). Every word a decision reads is
 checked twice: by the code that writes it (state/session.py) and by a CHECK here, built from the
 same closed vocabulary, so not even a hand-edited row can put a word in that the code does not
-know.
+know - but for the names of `options`, which since v0.6.17 the code alone checks (below).
 
     meta       one row: the arming generation, and the global ceiling a person may lower
     arming     one row per capability that has ever been moved: off, shadow or armed, and for
@@ -77,15 +77,41 @@ earlier steps first:
     chat_messages  the Dashboard's chat messages: their words only until sent (state/chat.py)
 
 The way down is the same: an older build refuses the file as newer, every capability off.
+
+v0.6.17 (the owner's decision of 2026-10-18) makes `options` again without the CHECK on its names, every row kept, and
+marks the file with the oldest version that can read it (READABLE_FROM) - and keeps version 7. Whenever the table's
+stored CREATE still names its words (names_checked), the opening makes it again (FREE_OPTIONS), after any earlier step,
+in the opening's one transaction: a run cut short leaves the old table whole, and a table already free is left alone.
+The tables and their columns are version 7's, which is all v0.6.16 compares, so it goes on reading the file with every
+feature on, and its own writes stay checked by its code.
+
+    options        a choice's name is checked by the code that writes it - the capability must offer it
+                   (registry.Option) and the vocabulary must hold it (OptionKey) - and a name a reader does not know
+                   is passed over, as every reader of the table always did (choices.options, arming, ledger); a new
+                   choice no longer needs the table made again, nor a new version
+
+    readable from  PRAGMA application_id holds MARK with, in its low 16 bits, the oldest version whose reader may use
+                   the file. A version that adds only what an older reader passes over (a table, a column at the end
+                   with a default, a word of a list only the code checks) keeps the older number there, and that
+                   reader uses the file instead of refusing it - every table it knows holding at least its columns,
+                   first - upgrading nothing and leaving the version and the mark as they are. A file marked newer than
+                   the reader is still refused, and a file without the mark is readable from its own version alone,
+                   as every file v0.6.16 and earlier wrote is.
+
+The first marked file did not bump the version: v0.6.16 reads no mark, so a version 8 - however readable - would be
+refused there as newer, every feature off after a pick of v0.6.16 in Install another version. Kept at 7, it is read
+there as its own; the mark serves every version from v0.6.17 on, the first time a later version (v0.6.18's) moves it.
 """
 from __future__ import annotations
+
+import re
 
 from codex_auto_resume import failures
 from codex_auto_resume.domain.plug import TAKE_UP, FailureForm
 
 from ..registry import GLOBAL_HOURLY
 from ..vocabulary import (ArmingState, ChatReason, ChatState, ContinuationKind, ContinuationReason,
-                          KeepOn, KeepReason, KeepState, OptionKey, OverrideKind, PromptEvery, PromptReason,
+                          KeepReason, KeepState, OverrideKind, PromptEvery, PromptReason,
                           PromptState, PromptTrigger, RecordState, RuleReason, RuleState, RunEnd, SpendOutcome,
                           WordingKey)
 
@@ -99,9 +125,17 @@ WINDOW_FOLLOWERS = ("usage_wrap_up", "usage_pause")
 WINDOW_ON, WINDOW_OFF = 1, 2
 
 # Stage 4's version (v0.6.16-beta.4): the one place it is numbered - a literal, which the setup's version picker reads
-# (tests/test_version_picker.py) - the step after the version before it (6, the usage additions' own).
+# (tests/test_version_picker.py) - the step after the version before it (6, the usage additions' own). v0.6.17 keeps it
+# (above): `options` free of its CHECK and the mark change no table and no column.
 SCHEMA_VERSION = 7
 STAGE4_VERSION = SCHEMA_VERSION
+# The oldest version whose reader may use a file this version writes (above): 7, this version itself - the first file
+# with a mark keeps the version v0.6.16 reads. A later version raises it only where a version-7 reader cannot use its
+# file.
+READABLE_FROM = 7
+# "CA" in the high half of SQLite's application id: the mark that the low half is a readable-from version.
+MARK = 0x43410000
+_MARK_HALF = 0xFFFF0000
 FILE_NAME = "advanced.sqlite"
 # The name the file is attached under on core's connection, inside the one claim (ledger.py).
 ATTACHED = "advanced"
@@ -183,6 +217,33 @@ TABLES_V2 = dict({name: TABLES[name] for name in ("meta", "arming", "spend", "ov
 
 def _one_of(column, words) -> str:
     return "CHECK (%s IN (%s))" % (column, ", ".join("'%s'" % word for word in words))
+
+
+def readable_from(connection, version) -> int:
+    """The oldest version whose reader may use the file `connection` holds, at user_version `version`: the mark's
+    (READABLE_FROM), or `version` itself where the file has none - every file v0.6.16 and earlier wrote."""
+    found = connection.execute("PRAGMA application_id").fetchone()[0]
+    return found & ~_MARK_HALF if found & _MARK_HALF == MARK else version
+
+
+def holds(tables, known) -> bool:
+    """Whether `tables` (name: columns, as found) holds every table of `known` with at least its columns, first: what a
+    newer file marked readable from this version must, for this version to use it."""
+    return all(tables.get(name, ())[:len(columns)] == columns for name, columns in known.items())
+
+
+def names_checked(connection) -> bool:
+    """Whether `options` as stored still has the CHECK on its names that v0.6.16 and earlier made it with."""
+    stored = connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='options'").fetchone()
+    return stored is not None and re.search(r"CHECK\s*\(\s*choice\s+IN\b", stored[0], re.I) is not None
+
+
+# The names `options` admitted while a CHECK named them (versions 3 to 7), frozen as v0.6.16 left them: what its file
+# refuses, and what a test builds an older file from. OptionKey may grow; this does not.
+V7_OPTION_WORDS = ("attempts", "ceiling_hours", "workers", "days", "poll_minutes", "warn_five_hour", "warn_weekly",
+                   "wrap_five_hour", "wrap_weekly", "wrap_style", "pause_five_hour", "pause_weekly", "window_five_hour",
+                   "window_weekly", "stop_words_five_hour", "stop_words_weekly", "wrap_reset_time", "wrap_after_reset",
+                   "keep_on", "send_again")
 
 
 # The warnings a person confirmed: ArmingWarning's words, joined by commas. The file keeps out
@@ -284,7 +345,7 @@ _STATEMENTS_V3 = (
         choice TEXT NOT NULL %s,
         value INTEGER NOT NULL CHECK (typeof(value) = 'integer' AND value >= 1),
         PRIMARY KEY (capability, choice)
-    )""" % _one_of("choice", (*OptionKey, *KeepOn)),
+    )""" % _one_of("choice", V7_OPTION_WORDS),
     """CREATE TABLE rules (
         rule_id INTEGER PRIMARY KEY AUTOINCREMENT,
         tag TEXT NOT NULL %s,
@@ -564,8 +625,19 @@ _STATEMENTS_STAGE4 = (
             "CHECK (length(record_id) = 64 AND record_id NOT GLOB '*[^0-9a-f]*')", ChatState.WAITING),
     "CREATE INDEX chat_messages_thread ON chat_messages(thread_id, chat_id)",
 )
-STATEMENTS = (_STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + _STATEMENTS_V5 + _STATEMENTS_V6 + _STATEMENTS_STAGE4
-              + ("PRAGMA user_version=%d" % SCHEMA_VERSION,))
+# `options` as v0.6.17 makes it: its names the code's to check, its values still the file's too.
+_OPTIONS_FREE = """CREATE TABLE options (
+        capability TEXT NOT NULL,
+        choice TEXT NOT NULL,
+        value INTEGER NOT NULL CHECK (typeof(value) = 'integer' AND value >= 1),
+        PRIMARY KEY (capability, choice)
+    )"""
+_STATEMENTS_V7 = _STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + _STATEMENTS_V5 + _STATEMENTS_V6 + _STATEMENTS_STAGE4
+MARKED = "PRAGMA application_id=%d" % (MARK | READABLE_FROM)
+STATEMENTS = (tuple(_OPTIONS_FREE if statement is _STATEMENTS_V3[0] else statement for statement in _STATEMENTS_V7)
+              + (MARKED, "PRAGMA user_version=%d" % SCHEMA_VERSION))
+# The file exactly as v0.6.16 made it - its `options` CHECK on names, no mark: what a test builds the file before from.
+STATEMENTS_V7 = _STATEMENTS_V7 + ("PRAGMA user_version=%d" % SCHEMA_VERSION,)
 # Version 2's file exactly as v0.6.11 and v0.6.12 made it: what a test builds an older file from.
 STATEMENTS_V2 = _STATEMENTS_V2 + ("PRAGMA user_version=2",)
 
@@ -641,3 +713,7 @@ TABLES_BEFORE_STAGE4 = {name: columns for name, columns in TABLES.items() if nam
 UPGRADE_TO_STAGE4 = _STATEMENTS_STAGE4 + ("PRAGMA user_version=%d" % STAGE4_VERSION,)
 STATEMENTS_BEFORE_STAGE4 = (_STATEMENTS_V2 + _STATEMENTS_V3 + _STATEMENTS_V4 + _STATEMENTS_V5 + _STATEMENTS_V6
                             + ("PRAGMA user_version=%d" % (STAGE4_VERSION - 1),))
+# v0.6.17: `options` made again without the CHECK on its names, every row kept, and the file marked readable from
+# READABLE_FROM - its version left at 7. Taken while names_checked, in the opening's one transaction, so a run cut short
+# leaves the old table whole, to be made again at the next opening.
+FREE_OPTIONS = _remade(_OPTIONS_FREE, "options", TABLES["options"], suffix="free") + (MARKED,)

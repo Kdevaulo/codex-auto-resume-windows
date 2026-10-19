@@ -189,7 +189,7 @@ def ledger(paths, now):
     unit at}, and reach the earliest claim the ledger can still tell, or None when it tells every
     one. (None, {}, None) where there is no ledger - every installation nothing was ever armed on."""
     from ..state.journal import EVENT_LIMIT, EVENT_MAX_AGE
-    from ..state.schema import FILE_NAME, SCHEMA_VERSION
+    from ..state.schema import FILE_NAME, SCHEMA_VERSION, readable_from
     path = paths.advanced_dir / FILE_NAME
     if not _present(paths, path, ReadRefusal.LEDGER_UNREADABLE):
         return None, {}, None
@@ -197,7 +197,9 @@ def ledger(paths, now):
     try:
         with readonly(path) as db:
             found = db.execute("PRAGMA user_version").fetchone()[0]
-            if found > SCHEMA_VERSION:
+            # A newer ledger is read where it is marked readable from this version (v0.6.17): its spend columns are
+            # checked below either way.
+            if found > SCHEMA_VERSION and readable_from(db, found) > SCHEMA_VERSION:
                 raise ReadRefused(ReadRefusal.LEDGER_NEWER)
             if found < 1:
                 raise ReadRefused(ReadRefusal.LEDGER_UNREADABLE)

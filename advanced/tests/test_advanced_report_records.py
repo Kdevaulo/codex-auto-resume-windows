@@ -251,6 +251,17 @@ class RefusalTests(Case):
         db.close()
         self.refused(ReadRefusal.LEDGER_UNREADABLE, bare)
 
+    def test_a_newer_ledger_marked_readable_from_this_version_is_read(self):
+        """v0.6.17's readable-from mark (schema.READABLE_FROM): a later version's ledger that says this version may read
+        it is read as this version's own; one marked newer than this version is refused as before. Fails with the
+        mark not honoured: the first is refused as newer."""
+        newer = ledger_schema.SCHEMA_VERSION + 1
+        for readable in (ledger_schema.SCHEMA_VERSION, ledger_schema.READABLE_FROM):
+            with self.subTest(readable=readable):
+                found = read(self.home(fixtures.BASE, ledger=newer, ledger_readable=readable))
+                self.assertEqual(found["read"]["ledger_schema"], newer)
+        self.refused(ReadRefusal.LEDGER_NEWER, self.home(fixtures.BASE, ledger=newer, ledger_readable=newer))
+
     def test_with_no_records_the_ledger_is_not_read_as_1_5_0_does_not_read_it(self):
         """1.5.0's by_route asks the ledger only when there are records to tell apart: with none, a ledger
         it does not know, or one that is not a database, still gives the report a home without one gives."""
