@@ -769,11 +769,13 @@ SPREAD = 1.2
 
 def uneven_lanes(counts, path: Path | None = None) -> list[str]:
     """A sentence for each lane and count in `counts` whose parts, dealt by the table at `path`, break
-    SPREAD, naming the file that takes most of its longest part. None when every lane is even."""
+    SPREAD, naming the file that takes most of its longest part. None when every lane is even. `counts` is
+    the counts to try every lane at, or a dict of the counts to try each lane at (a lane it lacks is not
+    tried): a workflow that deals one lane into 3 parts and another into 4 asks for exactly those."""
     found = []
     for lane in LANES:
         seconds = load_durations(lane, path)
-        for count in counts:
+        for count in (counts.get(lane, ()) if isinstance(counts, dict) else counts):
             dealt = deal(lane_files(lane), count, seconds)
             totals = [sum(seconds.get(name, 0.0) for name in part) for part in dealt]
             if max(totals) > SPREAD * min(totals):
@@ -791,31 +793,56 @@ def worth_refreshing(before: float, after: float) -> bool:
     return shrink >= REFRESH_FRACTION * before and shrink >= REFRESH_SECONDS
 
 
-def gains(medians: dict, count: int, path: Path | None = None) -> dict:
+def lane_counts(count) -> dict[str, int]:
+    """Each lane's part count from `count`: a number for every lane, or a dict naming each lane's own."""
+    if isinstance(count, dict):
+        missing = sorted(set(LANES) - set(count))
+        if missing:
+            raise Refused("no part count for the %s lane" % ", ".join(missing))
+        return {lane: int(count[lane]) for lane in LANES}
+    return {lane: int(count) for lane in LANES}
+
+
+def parse_parts(text: str) -> int | dict[str, int]:
+    """--parts: `4`, or each lane's own, `standard=3,advanced=4,release=4`."""
+    if "=" not in text:
+        return int(text)
+    named = dict(item.split("=", 1) for item in text.split(",") if item.strip())
+    unknown = sorted(set(named) - set(LANES))
+    if unknown:
+        raise Refused("--parts names no lane called %s" % ", ".join(unknown))
+    return lane_counts({lane: int(value) for lane, value in named.items()})
+
+
+def gains(medians: dict, count, path: Path | None = None) -> dict:
     """For each lane `medians` times, (its longest part under the current table, under the refreshed one),
-    both predicted by the fresh seconds (lane_gain), the lanes in LANES' order."""
+    both predicted by the fresh seconds (lane_gain), the lanes in LANES' order. `count` is the part count of
+    every lane, or each lane's own (lane_counts)."""
+    counts = lane_counts(count)
     every, lanes = read_durations(path)
     answer = {}
     for lane in LANES:
         if lane in medians:
             current = dict(every)
             current.update(lanes.get(lane, {}))
-            answer[lane] = lane_gain(lane_files(lane), count, current, medians[lane])
+            answer[lane] = lane_gain(lane_files(lane), counts[lane], current, medians[lane])
     return answer
 
 
-def refresh_seconds(paths, count: int, path: Path | None = None) -> tuple[bool, list[str]]:
+def refresh_seconds(paths, count, path: Path | None = None) -> tuple[bool, list[str]]:
     """merge_seconds, only when some lane's longest part shrinks enough (worth_refreshing) and the table it
     would write keeps every lane within SPREAD (uneven_lanes); a table the suite would reject is never
     written. Returns whether the durations were written, and a line for each lane saying what its longest
-    part would be, then a `refused:` line for each lane the fresh table leaves uneven."""
+    part would be, then a `refused:` line for each lane the fresh table leaves uneven. `count` is every
+    lane's part count, or each lane's own: test.yml deals the standard lane into 3 and the others into 4."""
+    counts = lane_counts(count)
     medians, files, runs = read_seconds(paths)
     lines, worth = [], False
-    for lane, (before, after) in gains(medians, count, path).items():
+    for lane, (before, after) in gains(medians, counts, path).items():
         enough = worth_refreshing(before, after)
         worth = worth or enough
         lines.append("lane %s: longest of %d parts %.1f min under the current table, %.1f min under the "
-                     "fresh one%s" % (lane, count, before / 60, after / 60, " - enough" if enough else ""))
+                     "fresh one%s" % (lane, counts[lane], before / 60, after / 60, " - enough" if enough else ""))
     if not worth:
         return False, lines
     path = path or DURATIONS
@@ -824,7 +851,7 @@ def refresh_seconds(paths, count: int, path: Path | None = None) -> tuple[bool, 
         if path.is_file():
             shutil.copyfile(path, fresh)
         write_medians(medians, files, runs, fresh)
-        refused = uneven_lanes([count], fresh)
+        refused = uneven_lanes({lane: [number] for lane, number in counts.items()}, fresh)
         if refused:
             return False, lines + ["refused: %s" % sentence for sentence in refused]
         os.replace(fresh, path)
@@ -867,7 +894,9 @@ def main(argv=None) -> int:
                             "and 3 minutes (.github/workflows/durations.yml)")
     which.add_argument("--worker", metavar="SUITE", help=argparse.SUPPRESS)
     which.add_argument("--check-suite", metavar="SUITE", help=argparse.SUPPRESS)
-    parser.add_argument("--parts", type=int, default=4, help="with --list or --refresh-seconds: how many parts")
+    parser.add_argument("--parts", type=parse_parts, default=4,
+                        help="with --list or --refresh-seconds: how many parts - a number, or with "
+                             "--refresh-seconds each lane's own: standard=3,advanced=4,release=4")
     parser.add_argument("--counts", default="1,2,3,4,5,6,7,8",
                         help="with --check: the part counts to prove, comma separated")
     parser.add_argument("--outcomes", metavar="FILE", help="write every test id's outcome as JSON")
@@ -913,10 +942,11 @@ def main(argv=None) -> int:
         return 0 if ok else 1
     if options.list:
         seconds = load_durations(lane)
-        for index, part in enumerate(deal(lane_files(lane), options.parts, seconds), 1):
+        count = lane_counts(options.parts)[lane]
+        for index, part in enumerate(deal(lane_files(lane), count, seconds), 1):
             known = sum(seconds.get(name, 0.0) for name in part)
             say("part %d of %d, lane %s: %d files, %.0f s measured, %d not measured" % (
-                index, options.parts, lane, len(part), known, sum(name not in seconds for name in part)))
+                index, count, lane, len(part), known, sum(name not in seconds for name in part)))
             for name in part:
                 say("  %s%s" % (name, "  %.1f s" % seconds[name] if name in seconds else ""))
         return 0
