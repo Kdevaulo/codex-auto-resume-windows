@@ -444,6 +444,8 @@ static class FakePython
     {
         System.Console.WriteLine("FAKE-PYTHON args=" + string.Join(" ", args) + " marker=" +
                                  System.Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_OUTSIDE"));
+        string ran = System.Environment.GetEnvironmentVariable("CAR_RAN");
+        if (!string.IsNullOrEmpty(ran)) System.IO.File.AppendAllText(ran, string.Join(" ", args) + "\n");
         return 5;
     }
 }
@@ -555,6 +557,79 @@ class BootstrapRepairTests(unittest.TestCase):
                 self.assertIn("setup --keep-state", output)
                 self.assertNotIn("SOURCE ", output)
                 self.assertNotIn("  [!]", output)
+
+    # ------------------------------------------------------------------ the other two runs of the installed setup
+    # The downgrade path's `remove-entry` (Remove-EntryBeforeOlder) and a failed conversion's `setup --keep-state`
+    # (Start-CurrentWatcher) write the registry too, so they go through the gate as the repair branch does. Each is
+    # lifted out of the script with the gate and run alone, with the process table and launcher stubbed and the
+    # stand-in python writing down that it ran here.
+    LIFTED = ("Find-PackagedAncestor", "Get-OutsideSource", "Resolve-OutsideRun", "Invoke-InstalledSetup",
+              "Remove-EntryBeforeOlder", "Start-CurrentWatcher", "Get-VersionParts", "Compare-ProductVersion")
+    CALLS = r"""
+$EntryFrom = '0.6.16'
+$script:sources = @()
+$script:warned = @()
+function Get-ProcessTable {
+    param([int]$Self)
+    $table = @{}
+    $table[$Self] = @{ Parent = 41; Created = 50; Package = $null }
+    $table[41] = @{ Parent = 4; Created = 40; Package = $env:CAR_PACKAGE }
+    return $table
+}
+function Invoke-Outside {
+    param([string]$Source, [string]$Log, [string]$CodeFile)
+    $script:sources += ,($Source -replace "`r`n", ' | ')
+    if ($env:CAR_LAUNCH -eq 'fail') { return $null }
+    return 0
+}
+function Warn { param([string]$m) $script:warned += ,$m }
+$answer = $null
+if ($env:CAR_WHICH -eq 'entry') { $answer = Remove-EntryBeforeOlder -Home_ $env:CAR_HOME -Installed '0.6.16' -Target '0.6.15' }
+else { Start-CurrentWatcher -Home_ $env:CAR_HOME }
+@{ answer = $answer; sources = @($script:sources); warned = @($script:warned) } | ConvertTo-Json -Compress
+"""
+
+    def call(self, which, **environment):
+        from test_edition_bootstrap import LIFT
+        ran = self.work / "ran.txt"
+        if ran.exists():
+            ran.unlink()
+        values = dict(os.environ, CAR_SCRIPT=str(ROOT / "scripts" / "bootstrap.ps1"), CAR_FUNCTIONS=",".join(self.LIFTED),
+                      CAR_CASES="[]", CAR_HOME=str(self.home), CAR_WHICH=which, CAR_RAN=str(ran))
+        for name in ("CAR_PACKAGE", "CAR_LAUNCH", "CODEX_AUTO_RESUME_OUTSIDE"):
+            values.pop(name, None)
+        values.update(environment)
+        done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                               "-Command", LIFT + self.CALLS], capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=300, env=values, creationflags=NO_WINDOW)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        answer = json.loads(done.stdout.strip().splitlines()[-1])
+        here = ran.read_text(encoding="utf-8").splitlines() if ran.exists() else []
+        return answer, here
+
+    def check_gated(self, which, command):
+        answer, here = self.call(which, CAR_PACKAGE=CODEX)
+        self.assertEqual(len(answer["sources"]), 1, answer)
+        self.assertIn("'%s'" % (self.home / "app" / "scripts" / "plugin_setup.py"), answer["sources"][0])
+        self.assertIn(command, answer["sources"][0])
+        self.assertEqual(here, [], "it ran here as well")
+        self.assertEqual(answer["warned"], [])
+        if which == "entry":
+            self.assertEqual(answer["answer"], "removed", "the code of the run outside decides")
+        answer, here = self.call(which, CAR_PACKAGE=CODEX, CAR_LAUNCH="fail")
+        self.assertEqual(len(answer["warned"]), 1, answer)
+        self.assertEqual(len(here), 1, "a relaunch that fails runs it here")
+        for environment in ({"CAR_PACKAGE": CODEX, "CODEX_AUTO_RESUME_OUTSIDE": "1"}, {}):
+            with self.subTest(environment):
+                answer, here = self.call(which, **environment)
+                self.assertEqual(answer["sources"], [])
+                self.assertEqual(len(here), 1)
+
+    def test_the_downgrade_s_remove_entry_runs_outside_as_the_repair_does(self):
+        self.check_gated("entry", "'remove-entry'")
+
+    def test_a_failed_conversion_s_watcher_start_runs_outside_as_the_repair_does(self):
+        self.check_gated("watcher", "'setup' '--keep-state'")
 
     def test_the_two_scripts_carry_one_gate(self):
         """Both scripts ship in every archive, but neither finds the other from everywhere it runs (the kept

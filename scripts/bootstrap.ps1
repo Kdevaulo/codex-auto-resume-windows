@@ -1516,10 +1516,18 @@ function Invoke-InstalledSetup {
         The installation's own plugin_setup.py with $Arguments, run by its own runtime\python.exe:
         the version that is installed now, whatever this run is about to install. Returns what it
         printed and its exit code. A console program, by the call operator, in this console.
+
+        -Outside (v0.6.17), for a run that writes the registrations: inside another app's private view it runs
+        outside instead, through the outside gate above - what it prints passed on, not returned (Printed is
+        empty), and its exit code the run's - or here, after the gate's one warning, where it cannot get out.
     #>
-    param([string]$Home_, [string[]]$Arguments)
+    param([string]$Home_, [string[]]$Arguments, [switch]$Outside)
     $python = Join-Path $Home_ 'runtime\python.exe'
     $setup = Join-Path $Home_ 'app\scripts\plugin_setup.py'
+    if ($Outside) {
+        $outsideCode = Resolve-OutsideRun -Script $python -Arguments (@($setup) + @($Arguments))
+        if ($null -ne $outsideCode) { return [pscustomobject]@{ Printed = @(); Code = $outsideCode } }
+    }
     $ErrorActionPreference = 'Continue'
     $printed = @(& $python $setup @Arguments)
     $code = $LASTEXITCODE
@@ -1570,7 +1578,8 @@ function Remove-EntryBeforeOlder {
         }
         if ((Compare-ProductVersion -Left $Target -Right $EntryFrom) -ge 0) { return 'kept' }
     } catch { return 'none' }
-    $done = Invoke-InstalledSetup -Home_ $Home_ -Arguments @('remove-entry')
+    # It removes the entry from the registry: outside another app's view, or it removes nothing Windows reads.
+    $done = Invoke-InstalledSetup -Home_ $Home_ -Arguments @('remove-entry') -Outside
     if ($done.Code -eq 0) { return 'removed' }
     if ($done.Code -eq 2) { return 'none' }
     return 'failed'
@@ -1582,7 +1591,8 @@ function Start-CurrentWatcher {
     param([string]$Home_, [switch]$NoStartup)
     $arguments = @('setup', '--keep-state')
     if ($NoStartup) { $arguments += '--no-startup' }
-    $null = Invoke-InstalledSetup -Home_ $Home_ -Arguments $arguments
+    # It writes the registrations the repair branch writes, so outside another app's view as that branch does.
+    $null = Invoke-InstalledSetup -Home_ $Home_ -Arguments $arguments -Outside
 }
 
 # ---------------------------------------------------------------------------- run
