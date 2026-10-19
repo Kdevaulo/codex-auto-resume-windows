@@ -84,7 +84,9 @@ class VersionFiveTests(StateCase):
         before = path.read_bytes()
         from unittest.mock import patch
         from codex_auto_resume_advanced.state import session
-        with patch.object(session, "SCHEMA_VERSION", schema_module.SCHEMA_VERSION - 1):
+        # Version 4 itself: the version before this one (7) reads the readable-from mark since v0.6.17, and this
+        # file says it may (test_advanced_state_v8).
+        with patch.object(session, "SCHEMA_VERSION", 4):
             older = AdvancedState(self.paths, registry=ac.Registry((ac.definition(),)), clock=lambda: self.now)
             self.addCleanup(older.close)
             with self.assertRaises(StateError):
