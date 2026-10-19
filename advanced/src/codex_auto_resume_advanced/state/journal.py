@@ -97,6 +97,20 @@ class JournalMixin:
                  "answer": _answer(row["answer"])}
                 for row in rows]
 
+    def newest(self, code) -> dict:
+        """{capability: {"at", "point", "answer"}}: each capability's newest journal line with `code` (v0.6.17), for a
+        surface to show - never read to decide anything, as no journal line is."""
+        with self._read() as connection:
+            if connection is None:
+                return {}
+            rows = connection.execute(
+                "SELECT capability, at, point, answer FROM journal WHERE event_id IN "
+                "(SELECT MAX(event_id) FROM journal WHERE code=? AND capability IS NOT NULL GROUP BY capability)",
+                (str(code),)).fetchall()
+        return {row["capability"]: {"at": row["at"], "point": _closed(row["point"], Point),
+                                    "answer": _answer(row["answer"])}
+                for row in rows if self.registry.get(row["capability"]) is not None}
+
     # ------------------------------------------------------------------ sampler
     def sample(self, capability, code, at=None) -> bool:
         """Count one occurrence of one of `capability`'s own codes, today. False, and nothing

@@ -23,6 +23,12 @@ holds one of `codex queue`'s; the tripwire for a paid send that went unknown tur
 off (arming.py). Only a failure before anything was asked of Codex - no app server could be
 started, or the words are not ones core would send - is "not started", which core may retry.
 
+It answers for every send, and the runtime stands it aside for one it cannot carry (v0.6.17, issue #42): a
+continuation queued for when its conversation is opened, or sent to another Codex session (P16's QUEUE_FOR_OPEN and
+TO_SESSION), goes only through core's backend with its marker, so for that send its answers at P5 and P15 are not
+taken and are journalled as overruled (runtime.OVERRULERS). Every other send - a conversation the app holds - it
+serves as before.
+
 No test opens a real Codex: the tests give the channel a session over a fake app server, and the
 live session is opened only by a watcher that has this capability armed.
 """

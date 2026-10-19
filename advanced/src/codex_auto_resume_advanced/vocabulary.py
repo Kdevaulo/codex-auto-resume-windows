@@ -180,6 +180,9 @@ class JournalCode(StrEnum):
     WOULD_HAVE = "would_have"                # a watched capability's answer, not taken
     ACTED = "acted"                          # an armed capability's answer, taken
     CEILING = "ceiling"                      # an armed capability's answer, not taken: no unit left
+    # v0.6.17 (issue #42): an answer not taken because another capability's answer for the same send needs core's
+    # own way - the capability is this line's, the other is named by its answer's word (runtime.OVERRULERS).
+    OVERRULED = "overruled"
     CEILING_CHANGED = "ceiling_changed"
     OPTION_CHANGED = "option_changed"        # a capability's own choice, set in the Dashboard
     RULE_ADDED = "rule_added"

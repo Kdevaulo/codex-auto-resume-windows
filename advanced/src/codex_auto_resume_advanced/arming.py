@@ -78,8 +78,8 @@ from .state.choices import DAY, RECENT_DAYS, RULES_LIMIT, aggregated, tag_proble
 from .statement import CATALOGS
 from .vocabulary import ContinuationReason, PromptReason  # noqa: E402  (v0.6.15-beta)
 from .vocabulary import (KEPT_NOTICES, TRIPWIRES, Actor, ArmingState, ArmingWarning, CapabilityKind,
-                         KeepOn, Measurement, OffReason, OverrideKind, RecordState, Refusal, RuleReason,
-                         RuleState, Verdict)
+                         JournalCode, KeepOn, Measurement, OffReason, OverrideKind, RecordState, Refusal,
+                         RuleReason, RuleState, Verdict)
 from .state.resets import CREDIT
 
 # The actors a person turns a capability off through.
@@ -204,6 +204,18 @@ def departs(definition, row) -> list:
     if (row or {}).get("send_again"):
         found += [standard for standard in ONCE_MORE.departs_from if standard not in found]
     return found
+
+
+def _overruled_by(line, row, overrulers):
+    """The capability whose route a capability stood aside for (v0.6.17, issue #42) - its newest `overruled` line's
+    answer, through runtime.OVERRULERS - where that line is from since it stood where it stands now; None otherwise.
+    Turning it on again is how it is let go of."""
+    if not isinstance(line, dict):
+        return None
+    since, at = row.get("since"), line.get("at")
+    if not isinstance(at, (int, float)) or (isinstance(since, (int, float)) and at < since):
+        return None
+    return overrulers.get(line.get("answer"))
 
 
 def kept_words(keep_on, send_again) -> list:
@@ -1125,7 +1137,7 @@ class Arming:
         """Every capability as a surface shows it, in registry.SHOWN_ORDER: where it is stored, what it is now, since
         when and by whom, what a person would be agreeing to, what its statement warns of now
         and what they confirmed when they last turned it on or watched it."""
-        from .runtime import SENDING              # lazily: runtime imports this module
+        from .runtime import OVERRULERS, SENDING  # lazily: runtime imports this module
         SENDING_POINTS = frozenset(SENDING)
         view, policy = self.view(), self.policy()
         states = self.current(view=view, policy=policy)
@@ -1133,6 +1145,10 @@ class Arming:
             rows, meta = self.state.arming(), self.state.meta()
         except StateError:
             rows, meta = {}, {"generation": 0, "global_hourly": GLOBAL_HOURLY}
+        try:
+            overruled = self.state.newest(JournalCode.OVERRULED)
+        except StateError:
+            overruled = {}
         shown = []
         # In the order a person reads them (registry.SHOWN_ORDER), not the order they answer in.
         for definition in _shown(self.registry):
@@ -1147,6 +1163,9 @@ class Arming:
                 # so is never given Send again.
                 "keep_on": bool(row.get("keep_on")), "send_again": bool(row.get("send_again")),
                 "notice": None if off else row.get("reason"), "resends": definition.resends,
+                # v0.6.17 (issue #42): the capability whose route it last stood aside for since it stood where it
+                # stands (runtime.OVERRULERS), or None - never shown for one that is off.
+                "overruled_by": None if off else _overruled_by(overruled.get(definition.id), row, OVERRULERS),
                 # v0.6.16-beta.4: whether Keep on is offered at all (registry.keepable).
                 "keepable": definition.keepable,
                 "revision": definition.revision, "read_revision": row.get("statement_revision"),

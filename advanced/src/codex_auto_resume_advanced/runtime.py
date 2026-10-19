@@ -33,6 +33,14 @@ until the claim, so the ledger pays for a resend, or a person's Send now, only w
 
 With no capability at a point, nothing is read and nothing is written: the answer is NULL's.
 
+One answer overruled by another (v0.6.17, issue #42). Core carries P16's QUEUE_FOR_OPEN and TO_SESSION out only
+through its own backend, with its marker (core's engine/foropen._not_for_open): a channel named at P5, or a client id
+at P15, for that same send leaves the record waiting - notLoaded, held_by_other_session - with nothing sent. Where one
+of those two was taken for a record this tick, such an answer at P5 or P15 for it is not taken, and is journalled as
+`overruled`, its answer the word that overruled it (OVERRULERS names the capability behind each); the Dashboard shows
+the newest such line under where the capability stands (arming.listing's `overruled_by`). Marker-free continuation and
+the goal continuation's channel stand aside so; every send of a conversation the app holds they serve as before.
+
 Taking failures up (v0.6.14, stage 3b). At P17 an answer is taken only if core offered it - one of
 the `takes` core hands over (failures.takes) - and only for a failure that completed after the
 capability was last turned on or watched: arming never reaches back. A capability that takes one up
@@ -98,6 +106,9 @@ KEEP_GOING = "keep_going"
 # The reasons a start route was not named that nothing else in the journal says (v0.6.16-beta.3): a
 # turn off has its own line, a watched answer its would-have; held back by Codex or a policy has none.
 HELD_WORDS = frozenset({"compat_unknown", "engine_unknown", "policy", "refused", "off"})
+# v0.6.17 (issue #42): the P16 answers core carries out only through its own backend, with its marker (core's
+# engine/foropen._not_for_open), each with the one capability that gives it - what an `overruled` line's answer names.
+OVERRULERS = {Alternative.QUEUE_FOR_OPEN: foropen.CAPABILITY, Alternative.TO_SESSION: sessions.CAPABILITY}
 
 
 def _taken(point, answer) -> bool:
@@ -152,6 +163,18 @@ def _relaxes(answer) -> bool:
     try:
         return answer in RELAXING
     except TypeError:
+        return False
+
+
+def _starves(point, answer) -> bool:
+    """Whether `answer` at `point` is one core cannot carry with a route of OVERRULERS: any channel at P5 - core's own
+    backend is never taken as an answer - and a client id at P15. Words for no marker through core's backend (P15's
+    SILENT) core already sends with its marker, and are left as they are."""
+    if point == Point.SENDER:
+        return True
+    try:
+        return point == Point.DELIVERY and answer == Alternative.CLIENT_ID
+    except Exception:
         return False
 
 
@@ -335,6 +358,8 @@ class Runtime:
         # P16 in the watch (v0.6.15-beta): whether a continuation queued for opening stays queued. It was paid for at
         # its claim; nothing is spent or carried again, so neither a ceiling nor the claim is asked.
         kept = point == Point.UNLOADED and foropen.watching(record)
+        # v0.6.17 (issue #42): the route taken at P16 for this record that only core's own send carries, if any.
+        routed = self._routed(key) if point in (Point.SENDER, Point.DELIVERY) else None
         chosen = chooser = None
         for definition in definitions:
             state = states.get(definition.id, ArmingState.OFF)
@@ -347,6 +372,10 @@ class Runtime:
                 continue
             if (answer is DEFER or (point == Point.SENDER and answer is arguments[-1])
                     or not self._takes(definition, point, answer, arguments, admission)):
+                continue
+            if routed is not None and _starves(point, answer):
+                # Taken, core would wait for the app with nothing sent: it stands aside, and says so.
+                self._once(JournalCode.OVERRULED, definition, point, routed, record)
                 continue
             if state == ArmingState.SHADOW:
                 self._once(JournalCode.WOULD_HAVE, definition, point, answer, record)
@@ -378,6 +407,14 @@ class Runtime:
                 (point, chooser.id, _word(chosen, point)))
         self._once(JournalCode.ACTED, chooser, point, chosen, record)
         return chosen
+
+    def _routed(self, key):
+        """The P16 answer taken this tick for the record `key` that core carries out only through its own backend
+        (OVERRULERS), or None. The tick forgets every answer taken (`tick`), and the claim pays for it (`claim`)."""
+        for point, _capability, word in self._acted.get(key, ()):
+            if point == Point.UNLOADED and word in OVERRULERS:
+                return Alternative(word)
+        return None
 
     def _not_taken(self, definitions, chooser, record, states) -> None:
         """At P7, every capability on that has a `not_taken` and whose answer was not the one taken is told so
