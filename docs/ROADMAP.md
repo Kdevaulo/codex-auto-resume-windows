@@ -877,19 +877,22 @@ Also in the final, and what the owner asked for as the beta line went on:
 
 ---
 
-## v0.6.17 — A quick final: installs from inside another app, and the update that keeps its uninstaller
+## v0.6.17 — A final on v0.6.16: installs from inside another app, the update that keeps its uninstaller, and the capability pairs that kept each other from working 🚧
 
-A hotfix final, on v0.6.16 (the owner's decision of 2026-10-19), with no pre-release of its own. What this
-roadmap planned as v0.6.17 - stage 5 and the chat inside the Dashboard, begun with a pre-release - is v0.6.18 from
-here, and every release after it moved one on.
+A final on v0.6.16, with no pre-release of its own. It began on the owner's decision of 2026-10-19 as a quick hotfix, and
+the owner then put all ten findings of the capability-pair audit
+([#42](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/42) to [#47](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/47)) into it. What this roadmap planned as v0.6.17 -
+stage 5 and the chat inside the Dashboard, begun with a pre-release - is v0.6.18 from here, and every release after
+it moved one on.
 
 In both editions:
 
 - **An install, update or repair started from inside another app's container** - the Codex app, Claude desktop:
   Windows' MSIX apps - is moved outside it, so that the Apps entry, the sign-in start, the notification
-  identity, the link handler and the Start-menu entry land where Windows reads them.
+  identity, the link handler and the Start-menu entry land where Windows reads them; where that cannot be done,
+  the Dashboard refuses Repair, updates and Install another version and says why.
 - **An update made inside the Dashboard keeps the uninstaller again**, so the install gets its Settings > Apps and
-  winget entry back, and the next update repairs an install that lost it
+  winget entry back, and the update to v0.6.17 itself repairs an install that lost it
   ([#43](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/43)).
 - **Check for updates and Install another version say when pre-releases could not be checked**, and name a
   GitHub rate limit with its reset time, reported by [@Kdevaulo](https://github.com/Kdevaulo) in
@@ -897,9 +900,19 @@ In both editions:
 
 In the advanced edition:
 
-- the queue for a conversation you open works again while the continuation with no marker is on, and the
-  Dashboard says when one capability is held back by another
+- the queue for a conversation you open and the continuation with no marker apply to the same message, and a
+  continuation for a conversation another Codex session holds goes to that session
   ([#42](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/42)),
+- a reset credit spent for the window the usage pause holds lifts the pause
+  ([#44](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/44)), and the hourly number counts sends, not features
+  ([#45](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/45)),
+- Continue with no words never takes or loses the message you wrote for this time
+  ([#46](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/46)),
+- the other pairs that kept each other from working - the goal continuation beside other sessions and beside the
+  queue for open, usage-limited conversations only for the queue for open, Continue with no words beside the
+  continuation with no marker, several conversations at once beside it, and a person's Send now beside an early
+  look - each settled, with the journal naming the capability one stood aside for
+  ([#47](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/47)),
 - groundwork moved here from the pre-release that was to begin the last stage: the options table checks names in
   code only, and the stored state says the oldest version that reads it safely.
 
@@ -1234,9 +1247,10 @@ Most of the advanced edition, in as many pre-releases as it needed
 
         ↓
 
-v0.6.17
-A quick final: installs started from inside another app moved outside it, the update that keeps its
-uninstaller, a queue that works with marker-free continuation, update checks that say what they could not check
+v0.6.17  🚧 In development
+A final on v0.6.16: installs started from inside another app moved outside it, the update that keeps its
+uninstaller, update checks that say what they could not check, and the capability pairs that kept each other
+from working
 
         ↓
 
@@ -1274,6 +1288,6 @@ for one recovery's next send and up to three more Codex homes. Before it, v0.6.1
 conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered), and v0.6.14 brought
 eight more ways to recover, Keep it on, the watch log, the reset actions and a compatibility report sent from
 the app, and the panel beside the chat, in the advanced edition; and a window that no longer hangs while a
-recovery waits, in both. v0.6.17 is next, a quick final, and v0.6.18 follows it, starting with its pre-release,
-v0.6.18-alpha: the owner moved stage 5 out of v0.6.16 on 2026-10-16, so that the v0.6.16 final came sooner, and
-made v0.6.17 a hotfix on 2026-10-19.
+recovery waits, in both. v0.6.17 is in development, a final on v0.6.16 with no pre-release of its own, and v0.6.18 follows it, starting with its
+pre-release, v0.6.18-alpha: the owner moved stage 5 out of v0.6.16 on 2026-10-16, so that the v0.6.16 final came
+sooner, and made v0.6.17 a final on v0.6.16 on 2026-10-19.
