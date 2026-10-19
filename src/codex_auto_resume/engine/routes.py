@@ -225,10 +225,20 @@ class RoutesMixin:
         when the app opens it, so the record waits again - the claim still counted against the
         cooldown, the day's claims and the chain, never given back. Not started: the claim is given
         back, as for a send that never started, its time kept for the caps. Anything else may have
-        changed Codex and nothing proves how: an uncertain submission, never tried again (A6)."""
+        changed Codex and nothing proves how: an uncertain submission, never tried again (A6).
+
+        The person's words for this time, taken off the file as the route was handed them, are put back for the
+        next continuation where it never started (v0.6.17), exactly as `_after_send` puts back a send's: the
+        route takes and hands them inside one call, so core cannot wait for it to start before taking them."""
         key = row["interruption_id"]
-        reserved = self.store.get(key)
         outcome = response.get("outcome")
+        words = self._once_sent.pop(key, None)
+        if words is not None and outcome == "not_started":     # never handed to Codex: they wait for the next one
+            try:
+                self.once_words.restore(key, words)
+            except Exception:
+                pass
+        reserved = self.store.get(key)
         poll = self.options["state_poll_seconds"]
         if outcome == "accepted":
             self.transition(reserved, "waiting_retry", "notLoaded", delay=poll, submitted_at=None)

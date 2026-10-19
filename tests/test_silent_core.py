@@ -22,7 +22,7 @@ from codexsim import BASE  # noqa: E402
 from test_engine import T1  # noqa: E402
 from test_plug_points import Asked  # noqa: E402
 from test_route_unheld import Headless, UnheldCase  # noqa: E402
-from codex_auto_resume import oncewords  # noqa: E402
+from codex_auto_resume import machine, oncewords  # noqa: E402
 from codex_auto_resume.domain import ids  # noqa: E402
 from codex_auto_resume.domain.plug import ALTERNATIVES, DEFER, Alternative, Point  # noqa: E402
 
@@ -147,20 +147,28 @@ class YieldsToOtherWordsTests(UnheldCase):
         self.assertIsNone(self.words_file().words(key), "spent, because they went with this continuation")
 
     def test_words_waiting_are_never_both_unsent_and_spent(self):
-        """The invariant P-10 broke, whichever way P15 is answered: what leaves the file is what was handed over."""
-        for silent in (True, False):
-            with self.subTest(silent=silent):
-                h = self.fresh()
-                route = Silent(h)
-                self.armed(route, h, **({"delivery": Alternative.SILENT} if silent else {}))
-                self.closed(h)
-                key = h.record()["interruption_id"]
-                self.words_file(h).put(key, WORDS, now=BASE)
-                h.tick()
-                (call,) = route.calls
-                kept = self.words_file(h).words(key)
-                self.assertTrue((WORDS in (call["words"] or "")) or kept == WORDS,
-                                "sent, or still there for the next continuation")
+        """The invariant P-10 broke, whichever way P15 is answered and whatever the route answers: words a route
+        never started with are still there for the next continuation; words it may have sent went with it, and
+        are spent as a send's are. Fails with either fix reverted: silent with ran or unknown (the route handed
+        ""), and the put-back with not_started (the words spent off the file by a route that never started)."""
+        for outcome in ("ran", "not_started", "unknown"):
+            for silent in (True, False):
+                with self.subTest(outcome=outcome, silent=silent):
+                    h = self.fresh()
+                    route = Headless(h, outcome)
+                    self.armed(route, h, **({"delivery": Alternative.SILENT} if silent else {}))
+                    self.closed(h)
+                    key = h.record()["interruption_id"]
+                    self.words_file(h).put(key, WORDS, now=BASE)
+                    h.tick()
+                    (call,) = route.calls
+                    kept = self.words_file(h).words(key)
+                    if outcome == "not_started":
+                        self.assertEqual(kept, WORDS, "never handed to Codex: kept for the next continuation")
+                        self.assertIn(h.record()["state"], machine.WAITING, "and the record waits for it")
+                    else:
+                        self.assertIn("\n\n" + WORDS + "\n\n", call["words"] or "", "handed with the continuation")
+                        self.assertIsNone(kept, "spent with it, as a send's are")
 
     def test_the_standard_edition_is_asked_nothing_and_its_words_go_as_before(self):
         """Its plug names no route and answers DEFER everywhere, so none of this runs for it."""
