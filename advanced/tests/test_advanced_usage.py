@@ -423,14 +423,17 @@ class PauseBesideResetCreditTests(UsageCase):
         super().setUp()
         self.occasion = 0
 
-    def credit(self, minutes=300, *, outcome=SpendOutcome.RESET, bucket="codex"):
-        """One reset credit of this edition's spent on a window and answered, as engine/credits.py
-        writes it (state/resets: the spend first, its outcome when Codex answers)."""
+    def credit(self, minutes=300, *, outcome=SpendOutcome.RESET, bucket="codex", written=None):
+        """One reset credit of this edition's spent on a window, as engine/credits.py writes it
+        (state/resets: the spend first, at `written` or now, its outcome when Codex answers; `outcome`
+        None leaves it unanswered)."""
         self.occasion += 1
         state = self.rt.state
-        spend = state.add_credit_spend(1, bucket, minutes, self.occasion, str(uuid.uuid4()), at=self.now)
+        spend = state.add_credit_spend(1, bucket, minutes, self.occasion, str(uuid.uuid4()),
+                                       at=self.now if written is None else written)
         self.assertIsNotNone(spend)
-        self.assertTrue(state.finish_credit_spend(spend, outcome, at=self.now))
+        if outcome is not None:
+            self.assertTrue(state.finish_credit_spend(spend, outcome, at=self.now))
         return spend
 
     def held(self, five=98, week=20.0):
@@ -453,7 +456,33 @@ class PauseBesideResetCreditTests(UsageCase):
         self.assertIsNone(self.rt.state.meter()[("codex", 300)]["paused_reset_at"], "the mark is let go")
         self.assertIn("pause.resumed", [line["code"] for line in self.rt.state.journal()])
 
+    def test_a_credit_written_long_before_the_reading_and_answered_after_it_lets_the_window_go(self):
+        """A spend is written before Codex is asked and answered whenever Codex answers - late, or on the
+        second ask ten minutes on. What settles the reading is when it was ANSWERED, not when it was
+        written: a credit written well before the reading still empties the window after it."""
+        self.on("usage_pause")
+        spend = self.credit(outcome=None)                  # written, asked, no answer yet
+        self.now += 4200
+        self.answer = reply(five=98, five_reset=int(self.now) + 3600)
+        self.look()
+        self.look()
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
+        self.app = False
+        self.now += 60
+        self.assertTrue(self.rt.state.finish_credit_spend(spend, SpendOutcome.RESET, at=self.now))
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), DEFER)
+
+    def test_a_credit_that_reset_nothing_leaves_the_pause_standing(self):
+        self.held()
+        for outcome in (None, SpendOutcome.NOTHING_TO_RESET, SpendOutcome.NO_CREDIT, SpendOutcome.UNKNOWN):
+            with self.subTest(outcome):
+                self.credit(outcome=outcome)
+                self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
+        self.look()
+        self.assertIsNotNone(self.rt.state.meter()[("codex", 300)]["paused_reset_at"])
+
     def test_the_pause_still_holds_where_no_credit_was_spent(self):
+        # A guard for behaviour this change leaves alone, not a proof of it: it passes with the fix reverted.
         self.held()
         self.now += 600
         self.look()
@@ -473,8 +502,9 @@ class PauseBesideResetCreditTests(UsageCase):
         self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
 
     def test_a_credit_spent_before_the_reading_the_pause_rests_on_holds_nothing_back(self):
-        """A credit of an earlier filling of the window: the meter read the window full after it, so the
-        reading stands and the pause with it."""
+        """A guard for behaviour this change leaves alone, not a proof: it passes with the fix reverted.
+        A credit of an earlier filling of the window - the meter read the window full after it was answered,
+        so the reading stands and the pause with it."""
         self.on("usage_pause")
         self.credit()
         self.now += 60

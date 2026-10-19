@@ -85,10 +85,9 @@ NOTICE_FOR = 900
 # The wrap-up looks at most once a minute.
 LOOK_EVERY = 60
 # The outcomes of a reset credit that reset the window it was spent on - the two engine/credits.py counts as a
-# reset of its own (`own_reset`) - and how long before a reading a credit may have been written and still have
-# taken effect after it: it is asked, answered and settled well inside the hour.
+# reset of its own (`own_reset`). An outcome not yet known, and the three that reset nothing, leave a pause
+# standing.
 CREDIT_RESET = (SpendOutcome.RESET, SpendOutcome.ALREADY_REDEEMED)
-CREDIT_SETTLES = 3600
 
 
 def percent(options, capability, minutes) -> int | None:
@@ -110,14 +109,19 @@ def windows(rows):
 
 
 def credit_resets(scoped, rows) -> dict:
-    """{(bucket, minutes): when the newest reset credit of that window took effect} for the windows of
+    """{(bucket, minutes): when the newest reset credit of that window was answered} for the windows of
     `rows`, from the spends this edition wrote (engine/credits.py, state/resets.credit_spends). Empty
-    where none can be read: a pause is never let go on something unreadable."""
-    oldest = min([row["read_at"] or 0 for row in rows], default=None)
-    if oldest is None:
+    where none can be read: a pause is never let go on something unreadable.
+
+    Every spend is read, not those written since some time: what settles a reading is when Codex
+    ANSWERED the credit (`finished_at`), and a credit written long before a reading can be answered
+    after it - asked once more with its own key ten minutes on, or answered late. Reading by when it
+    was written would miss exactly the case the pause is here for. The table holds one spend for each
+    filling of a window, two a day and seven a week at most, and is read only where a window is held."""
+    if not rows:
         return {}
     try:
-        spends = scoped.resets.credit_spends(since=oldest - CREDIT_SETTLES)
+        spends = scoped.resets.credit_spends()
     except Exception:
         return {}
     found = {}
@@ -132,8 +136,8 @@ def credit_resets(scoped, rows) -> dict:
 
 
 def stale(row, resets) -> bool:
-    """Whether `row` was read before a reset credit reset that very window (v0.6.17, P-8): what it says
-    of the window is from before the credit, so the window is not full any more, whatever it says."""
+    """Whether `row` was read before a reset credit of that very window was answered (v0.6.17, P-8):
+    what it says of the window is from before the credit, so it is not full any more, whatever it says."""
     at = resets.get((row["bucket"], row["minutes"]))
     return at is not None and at >= (row["read_at"] or 0)
 
