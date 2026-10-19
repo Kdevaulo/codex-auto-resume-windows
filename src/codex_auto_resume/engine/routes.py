@@ -121,7 +121,13 @@ class RoutesMixin:
         key = current["interruption_id"]
         at = self.clock()
         message, worded, once, plain = words if words is not None else (None, False, None, None)
-        silent = message is not None and self._silent(current)
+        # v0.6.17: SILENT is a turn with no words at all, so it yields to any words the continuation carries that
+        # are not core's own template - another capability's at P4, or the person's words for this time. A silent
+        # turn would throw them away, and the person's would be spent as they went (`_spend_once_words` below),
+        # lost for good: not sent, not kept. Where it yields the continuation goes by its marker, as one whose
+        # P15 was never asked, and P4's words are carried and paid for as any send's are.
+        carries_words = worded or once is not None
+        silent = message is not None and self._silent(current, yields=carries_words)
         claimed, gate, reason = self.store.reserve_detailed(
             key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector, ledger=self.plug,
             carried=frozenset({Point.UNLOADED}) | ({Point.TEXT} if worded and not silent else frozenset())
@@ -182,12 +188,16 @@ class RoutesMixin:
         except Exception:
             self.log(current["thread_id"], "post_send_bookkeeping_failed", None)
 
-    def _silent(self, row) -> bool:
+    def _silent(self, row, yields=False) -> bool:
         """P15 for a route that takes words (v0.6.16-beta.4): SILENT is no words at all, the turn proven by the client
         id core derives - written into the record before the claim (its `recovery_client_id`, engine/delivery.proof),
-        and taken away again where it is not SILENT this time, so the record goes by its marker."""
+        and taken away again where it is not SILENT this time, so the record goes by its marker.
+
+        With `yields` (v0.6.17) P15 is not asked at all and this continuation is not silent: it carries words a
+        turn with none would throw away (`_resume_unloaded`), so it goes by its marker, and an id an earlier
+        silent look wrote into the record is taken away again, exactly as a look that was answered otherwise."""
         derived = ids.continuation_client_id(row["interruption_id"])
-        silent = self.plug.delivery(row) is Alternative.SILENT
+        silent = not yields and self.plug.delivery(row) is Alternative.SILENT
         if silent and row.get("recovery_client_id") != derived:
             self.store.update(row["interruption_id"], at=self.clock(), recovery_client_id=derived)
         elif not silent and row.get("recovery_client_id") == derived:

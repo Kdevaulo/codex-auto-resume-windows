@@ -2,6 +2,10 @@
 takes words - calling it with none, under the client id it derives, and proving the turn by that id - and ignores
 everywhere else: through `codex queue` the words go with their marker, as ever.
 
+And (v0.6.17) what it never silences: words that are not core's own template. Where the continuation carries another
+capability's words (P4) or the person's words for this time, a turn with no words would throw them away - and the
+person's would be spent as they went, lost for good - so P15 is not asked at all and the words go with the marker.
+
 The plug is a test's own (test_plug_points.Asked); the route is test_route_unheld's, which runs the turn in codexsim.
 """
 from __future__ import annotations
@@ -14,9 +18,11 @@ _HERE = str(Path(__file__).resolve().parent)
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
+from codexsim import BASE  # noqa: E402
 from test_engine import T1  # noqa: E402
 from test_plug_points import Asked  # noqa: E402
 from test_route_unheld import Headless, UnheldCase  # noqa: E402
+from codex_auto_resume import oncewords  # noqa: E402
 from codex_auto_resume.domain import ids  # noqa: E402
 from codex_auto_resume.domain.plug import ALTERNATIVES, DEFER, Alternative, Point  # noqa: E402
 
@@ -81,10 +87,95 @@ class SilentTests(UnheldCase):
         self.assertIn(row["marker"], sent[1])
         self.assertIsNone(row["recovery_client_id"])
 
+    def test_the_plain_continuation_with_no_other_words_is_silent_as_before(self):
+        """The template alone is core's own: nothing of anyone else's is thrown away, so SILENT stands."""
+        route = Silent(self.h)
+        self.armed(route, delivery=Alternative.SILENT)
+        self.closed()
+        self.h.tick()
+        (call,) = route.calls
+        self.assertEqual(call["words"], "")
+        self.assertEqual(self.h.record()["recovery_client_id"],
+                         ids.continuation_client_id(self.h.record()["interruption_id"]))
+
     def test_it_is_one_of_p15s_answers_and_null_never_gives_it(self):
         self.assertEqual(ALTERNATIVES[Point.DELIVERY], {Alternative.CLIENT_ID, Alternative.SILENT})
         from codex_auto_resume.domain.plug import NULL
         self.assertIs(NULL.delivery({}), DEFER)
+
+
+WORDS = "Then run the tests, please."
+
+
+class YieldsToOtherWordsTests(UnheldCase):
+    """v0.6.17: what SILENT never silences. A turn with no words carries nothing of anyone's, so where the
+    continuation holds words that are not core's own template, P15 is not asked and the words go with the marker."""
+
+    def words_file(self, h=None):
+        """The real side file the person's words for this time are kept in, on the engine `armed` just built."""
+        h = h or self.h
+        if h.engine.once_words is None:
+            h.engine.once_words = oncewords.OnceWords(h.root / oncewords.FILE_NAME)
+        return h.engine.once_words
+
+    def test_another_capabilitys_words_are_sent_and_silent_yields(self):
+        """Fails with the yield reverted: the route is handed "", and the words P4 gave are gone."""
+        route = Silent(self.h)
+        self.armed(route, delivery=Alternative.SILENT, text="Please go on with the {category} task.")
+        self.closed()
+        self.h.tick()
+        (call,) = route.calls
+        row = self.h.record()
+        self.assertEqual(call["words"], "Please go on with the usage_limit task.\n\n" + row["marker"])
+        self.assertIsNone(row["recovery_client_id"], "it goes by its marker, as one P15 never answered")
+        self.assertEqual(row["state"], "queued")
+
+    def test_the_persons_words_for_this_time_are_neither_thrown_away_nor_spent_unsent(self):
+        """Fails with the yield reverted: the route is handed "", and the words are removed from the file
+        all the same - the person's message for this time lost, neither sent nor kept."""
+        route = Silent(self.h)
+        self.armed(route, delivery=Alternative.SILENT)
+        self.closed()
+        key = self.h.record()["interruption_id"]
+        self.words_file().put(key, WORDS, now=BASE)
+        self.h.tick()
+        (call,) = route.calls
+        row = self.h.record()
+        self.assertIn("\n\n" + WORDS + "\n\n", call["words"])
+        self.assertTrue(call["words"].endswith("\n\n" + row["marker"]), call["words"])
+        self.assertIsNone(row["recovery_client_id"])
+        self.assertIsNone(self.words_file().words(key), "spent, because they went with this continuation")
+
+    def test_words_waiting_are_never_both_unsent_and_spent(self):
+        """The invariant P-10 broke, whichever way P15 is answered: what leaves the file is what was handed over."""
+        for silent in (True, False):
+            with self.subTest(silent=silent):
+                h = self.fresh()
+                route = Silent(h)
+                self.armed(route, h, **({"delivery": Alternative.SILENT} if silent else {}))
+                self.closed(h)
+                key = h.record()["interruption_id"]
+                self.words_file(h).put(key, WORDS, now=BASE)
+                h.tick()
+                (call,) = route.calls
+                kept = self.words_file(h).words(key)
+                self.assertTrue((WORDS in (call["words"] or "")) or kept == WORDS,
+                                "sent, or still there for the next continuation")
+
+    def test_the_standard_edition_is_asked_nothing_and_its_words_go_as_before(self):
+        """Its plug names no route and answers DEFER everywhere, so none of this runs for it."""
+        route = Silent(self.h)
+        self.armed(route)                               # P15 unanswered, as the standard edition's plug leaves it
+        self.closed()
+        key = self.h.record()["interruption_id"]
+        self.words_file().put(key, WORDS, now=BASE)
+        self.h.tick()
+        (call,) = route.calls
+        row = self.h.record()
+        self.assertIn("\n\n" + WORDS + "\n\n", call["words"])
+        self.assertTrue(call["words"].endswith("\n\n" + row["marker"]), call["words"])
+        self.assertIsNone(row["recovery_client_id"])
+        self.assertIsNone(self.words_file().words(key))
 
 
 if __name__ == "__main__":
