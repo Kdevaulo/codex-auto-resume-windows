@@ -22,7 +22,10 @@ fails at it. Three capabilities, each off until a person turns it on:
   the edition's own continuations are not handed to core (`holds`, runtime.records). A person's own messages - a
   queued prompt, a message at a reset - and anything they type in Codex are not touched, nor is a wrap-up. The pause
   is marked on the window's row, so a restart keeps it, and it lets go when the window resets - its reset time
-  passed, or a reading shows the window reset early and below the percentage.
+  passed, a reading shows the window reset early and below the percentage, or (v0.6.17) a reset credit of that
+  very window was spent since the reading the pause rests on: the credit empties the window there and then, and
+  the meter may be hours from reading it again, or never while the Codex app is closed, so holding on would
+  spend the credit for nothing (`credit_resets`, `stale`).
 
 The five-hour window is any bucket's 300-minute window, the weekly one any bucket's 10080-minute window; each stage
 reads each window on its own percentage.
@@ -38,7 +41,8 @@ from .. import statement
 
 from ..codex import credits, inuse
 from ..codex.turns import Turns
-from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState, WordingKey
+from ..vocabulary import (ContinuationKind, ContinuationReason, OptionKey, RecordState, SpendOutcome,
+                          WordingKey)
 from .continued import answer_key, handed
 from .wrapwords import ON, SWITCH, DEFAULT_STYLE, STYLE_KEYS, STYLES, render  # noqa: F401 - the registry's, the tests'
 
@@ -80,6 +84,10 @@ CLOSE_AFTER = 60
 NOTICE_FOR = 900
 # The wrap-up looks at most once a minute.
 LOOK_EVERY = 60
+# The outcomes of a reset credit that reset the window it was spent on - the two engine/credits.py counts as a
+# reset of its own (`own_reset`). An outcome not yet known, and the three that reset nothing, leave a pause
+# standing.
+CREDIT_RESET = (SpendOutcome.RESET, SpendOutcome.ALREADY_REDEEMED)
 
 
 def percent(options, capability, minutes) -> int | None:
@@ -98,6 +106,40 @@ def reached(row, threshold, now) -> bool:
 def windows(rows):
     """The rows of the five-hour and the weekly windows, any bucket's."""
     return [row for row in rows.values() if row["minutes"] in WINDOWS]
+
+
+def credit_resets(scoped, rows) -> dict:
+    """{(bucket, minutes): when the newest reset credit of that window was answered} for the windows of
+    `rows`, from the spends this edition wrote (engine/credits.py, state/resets.credit_spends). Empty
+    where none can be read: a pause is never let go on something unreadable.
+
+    Every spend is read, not those written since some time: what settles a reading is when Codex
+    ANSWERED the credit (`finished_at`), and a credit written long before a reading can be answered
+    after it - asked once more with its own key ten minutes on, or answered late. Reading by when it
+    was written would miss exactly the case the pause is here for. The table holds one spend for each
+    filling of a window, two a day and seven a week at most, and is read only where a window is held."""
+    if not rows:
+        return {}
+    try:
+        spends = scoped.resets.credit_spends()
+    except Exception:
+        return {}
+    found = {}
+    for spend in spends:
+        at = spend.get("finished_at")
+        if spend.get("outcome") not in CREDIT_RESET or not isinstance(at, (int, float)):
+            continue
+        family = (spend.get("bucket"), spend.get("minutes"))
+        if at > found.get(family, 0):
+            found[family] = at
+    return found
+
+
+def stale(row, resets) -> bool:
+    """Whether `row` was read before a reset credit of that very window was answered (v0.6.17, P-8):
+    what it says of the window is from before the credit, so it is not full any more, whatever it says."""
+    at = resets.get((row["bucket"], row["minutes"]))
+    return at is not None and at >= (row["read_at"] or 0)
 
 
 def _reset_since(rows, minutes, created_at, now) -> bool:
@@ -476,16 +518,21 @@ class UsagePause:
             now = scoped.now()
             options = scoped.options()
             on = _acting(scoped)
-            for row in windows(handle.rows()):
+            rows = windows(handle.rows())
+            resets = credit_resets(scoped, rows)
+            for row in rows:
                 # (e) a window switched off is never held, and one held lets go when it is switched off.
                 acted = row["minutes"] in on
-                over = acted and reached(row, percent(options, PAUSE, row["minutes"]), now)
+                # (v0.6.17, P-8) a reading from before a reset credit of this window says nothing of it now:
+                # the window was emptied after it, so nothing is held on it and nothing newly held by it.
+                fresh = not stale(row, resets)
+                over = acted and fresh and reached(row, percent(options, PAUSE, row["minutes"]), now)
                 held = row["paused_reset_at"]
                 if over and held != row["reset_at"]:
                     if handle.mark(row["bucket"], row["minutes"], paused_reset_at=row["reset_at"]):
                         self._count("paused")
                         newly.append(row)
-                elif held is not None and not over and (not acted or held != row["reset_at"]
+                elif held is not None and not over and (not acted or not fresh or held != row["reset_at"]
                                                          or now >= held + CLOSE_AFTER):
                     if handle.mark(row["bucket"], row["minutes"], clear_pause=True):
                         self._count("resumed")
@@ -494,13 +541,24 @@ class UsagePause:
         return newly
 
     def holding(self) -> bool:
-        """Whether a window the pause marked has not reset yet - its reset time not yet passed."""
+        """Whether a window the pause marked has not reset yet - its reset time not yet passed, and no reset
+        credit of that window spent since it was read (v0.6.17, P-8).
+
+        The mark is let go at P8, but only the meter's own reading moves it, and the meter reads while the
+        Codex app runs and no oftener than the person's spacing. A credit spent in between resets the window
+        at once and buys the whole early window (engine/credits.py, P7 EARLY), so the hold is asked here too
+        - or the pause would hold every record through the fifteen minutes the credit paid for, and on to the
+        reset it was spent to avoid."""
         scoped = self._scoped
         if scoped is None:
             return False
         now = scoped.now()
-        return any(row["paused_reset_at"] is not None and now < row["paused_reset_at"] + CLOSE_AFTER
-                   for row in windows(scoped.meter.rows()))
+        held = [row for row in windows(scoped.meter.rows())
+                if row["paused_reset_at"] is not None and now < row["paused_reset_at"] + CLOSE_AFTER]
+        if not held:
+            return False
+        resets = credit_resets(scoped, held)
+        return any(not stale(row, resets) for row in held)
 
     def gate(self, name, record, facts):
         """P3: HOLD a record of core's while a window holds; nothing for anything else."""
