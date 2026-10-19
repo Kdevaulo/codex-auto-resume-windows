@@ -44,6 +44,9 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
   reinstall after it started `auto-resume.log` afresh. An uninstall with the Dashboard open also no longer leaves a
   note behind asking a later update to open that Dashboard again.
 - **The edition-change sentence says "edition" once** in Korean and Chinese.
+- **A finished install or update says the watcher runs when it does.** On a busy PC the watcher can take longer to
+  start than the setup waits for it. The last word and the finished page then said it could not be confirmed, right
+  under a health check that had just seen it running. The setup now looks once more before its last word.
 - **The motion-picture build reads the compiler's messages in any Windows language**, and a timing test measures
   the tray icon's own CPU work rather than a busy runner.
 
