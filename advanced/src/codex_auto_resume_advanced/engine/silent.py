@@ -9,6 +9,8 @@ machinery: nothing new is stored). Through `codex queue`, or any channel, core i
 the marker: M3 found Codex refuses an empty queue item, so that route is not offered.
 
 It continues nothing by itself: it changes only how headless_run's turn, or compact_continue's continuation, starts.
+It never silences words that are not core's own template: where the continuation carries another capability's words
+(P4) or the person's words for this time, core does not ask P15 at all and those words go with the marker (v0.6.17).
 Until M3B - a turn started with no input, proven by its id - passes for the Codex in force, its statement carries the
 UNMEASURED warning. Where Codex refuses a turn with no input, the route answers "not started" with Codex's refusal,
 and from then on this answers DEFER for that Codex in this process - so the next attempt carries words (the review's
