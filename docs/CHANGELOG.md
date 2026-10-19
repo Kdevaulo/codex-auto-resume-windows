@@ -37,6 +37,13 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
   connection - had used up its requests. Before, the Dashboard said the build was the newest published release,
   and nothing more (reported by [@Kdevaulo](https://github.com/Kdevaulo), [#41](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/41)).
 - **The Dashboard opens in front** after a fresh install's *Finish*, and after an update's *Open the Dashboard*.
+- **The setup window's light says what is true at each step.** It shows the working light while the product is being
+  changed, is lit only once the watcher was confirmed running, and turns grey when an uninstall has finished, when a
+  run failed and when the watcher was not confirmed. Before, it stayed lit on the *Uninstalled* page.
+- **An uninstall that keeps your settings and history keeps the watcher's log and its error log too.** Before, the
+  reinstall after it started `auto-resume.log` afresh. An uninstall with the Dashboard open also no longer leaves a
+  note behind asking a later update to open that Dashboard again.
+- **The edition-change sentence says "edition" once** in Korean and Chinese.
 - **The motion-picture build reads the compiler's messages in any Windows language**, and a timing test measures
   the tray icon's own CPU work rather than a busy runner.
 
