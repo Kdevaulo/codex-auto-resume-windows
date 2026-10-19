@@ -320,6 +320,99 @@ class InstallerGateTests(unittest.TestCase):
         self.assertIn("[Environment]::GetEnvironmentVariables()", launch, "the run outside gets this run's environment")
 
 
+# The run outside, for real but not through WMI: Win32_ProcessStartup and Win32_Process.Create stand in as functions,
+# which are found before cmdlets. The startup object is written down; Create starts the very command line it is given
+# as an ordinary hidden child of the probe, so the relay, the exit code and the source the run outside executes are the
+# script's own. The stand-in for the work prints two lines, one of them Korean, adds a last line with no line end to
+# the log by itself, and ends with 7.
+RELAY = r"""
+$script:startupSeen = $null
+function New-CimInstance {
+    [CmdletBinding()]
+    param([string]$ClassName, [switch]$ClientOnly, [hashtable]$Property)
+    $script:startupSeen = $Property
+    return $Property
+}
+function Invoke-CimMethod {
+    [CmdletBinding()]
+    param([string]$ClassName, [string]$MethodName, [hashtable]$Arguments)
+    $line = [string]$Arguments.CommandLine
+    $close = $line.IndexOf('"', 1)
+    $info = New-Object System.Diagnostics.ProcessStartInfo($line.Substring(1, $close - 1), $line.Substring($close + 2))
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    $process = [System.Diagnostics.Process]::Start($info)
+    return [pscustomobject]@{ ReturnValue = 0; ProcessId = $process.Id }
+}
+$folder = $env:CAR_FOLDER
+$log = Join-Path $folder 'output.txt'
+$codeFile = Join-Path $folder 'code.txt'
+$env:CAR_LOG = $log
+$env:CAR_PROBE_VAR = 'present'
+$source = Get-OutsideSource -Script $env:CAR_STAND_IN -Switches @('Silent') -Log $log -CodeFile $codeFile
+$code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
+'CODE ' + $code
+'ENV ' + (@($script:startupSeen.EnvironmentVariables) -join '|')
+'SHOW ' + $script:startupSeen.ShowWindow
+"""
+
+STAND_IN = """param([switch]$Silent)
+Write-Host ('first line, silent ' + $Silent)
+Write-Host 'Korean: 한국어'
+[IO.File]::AppendAllText($env:CAR_LOG, 'last line without an end', (New-Object System.Text.UTF8Encoding $false))
+exit 7
+"""
+
+
+@unittest.skipUnless(POWERSHELL.is_file(), "the installer is PowerShell on Windows")
+class RelayTests(unittest.TestCase):
+    """install.ps1's relay, exit code and environment, run for real against a stand-in for the process outside."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.work = Path(tempfile.mkdtemp(prefix="host-app-relay-"))
+        stand_in = cls.work / "stand-in.ps1"
+        stand_in.write_text(STAND_IN, encoding="utf-8-sig")
+        folder = cls.work / "outside"
+        folder.mkdir()
+        saved = {name: os.environ.get(name) for name in ("CAR_FOLDER", "CAR_STAND_IN")}
+        os.environ.update(CAR_FOLDER=str(folder), CAR_STAND_IN=str(stand_in))
+        try:
+            cls.done = run_probe(VOICE + GATE, RELAY)
+        finally:
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.work, ignore_errors=True)
+
+    def lines(self, prefix):
+        return [line[len(prefix):] for line in self.done.stdout.splitlines() if line.startswith(prefix)]
+
+    def test_what_the_run_outside_prints_is_passed_on_line_by_line_with_the_last_unended_line(self):
+        printed = self.done.stdout.splitlines()
+        self.assertEqual(self.done.returncode, 0, self.done.stdout + self.done.stderr)
+        for line in ("first line, silent True", "Korean: 한국어", "last line without an end"):
+            with self.subTest(line):
+                self.assertIn(line, printed)
+        self.assertLess(printed.index("first line, silent True"), printed.index("last line without an end"))
+
+    def test_its_exit_code_is_the_run_s(self):
+        self.assertEqual(self.lines("CODE "), ["7"], self.done.stdout + self.done.stderr)
+
+    def test_the_run_outside_gets_this_run_s_environment_and_the_mark_with_no_window(self):
+        environment = self.lines("ENV ")[0].split("|")
+        self.assertIn("CAR_PROBE_VAR=present", environment)
+        self.assertIn("CODEX_AUTO_RESUME_OUTSIDE=1", environment)
+        self.assertEqual([entry for entry in environment if entry.startswith("CODEX_AUTO_RESUME_OUTSIDE=")],
+                         ["CODEX_AUTO_RESUME_OUTSIDE=1"])
+        self.assertEqual(self.lines("SHOW "), ["0"])
+
+
 # ----------------------------------------------------------------------- bootstrap.ps1's repair branch
 BOOTSTRAP_TEXT = (ROOT / "scripts" / "bootstrap.ps1").read_text(encoding="utf-8")
 
