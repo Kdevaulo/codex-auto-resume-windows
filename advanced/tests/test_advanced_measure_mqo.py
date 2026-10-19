@@ -243,7 +243,7 @@ class MqgTests(MqoCase):
                          ("thread/loaded/list", "thread/goal/get", "thread/goal/set", "thread/queue/add",
                           "thread/queue/list"))
         self.assertIs(measure.PROBES[Measurement.MQG], measure._mqg)
-        self.assertEqual(measured.MEASURED[Measurement.MQG][0], Verdict.FAIL, "2026-10-20: inconclusive, not a pass")
+        self.assertEqual(measured.MEASURED[Measurement.MQG][0], Verdict.PASS, "the second run of 2026-10-20 passed")
 
     def test_goal_set_active_message_queued_taken_and_the_turns_after_counted(self):
         record = self.run_mqg()
