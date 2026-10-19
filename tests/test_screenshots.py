@@ -1997,8 +1997,11 @@ class IconMotionPictureTests(unittest.TestCase):
                         self.assertEqual(frame[0], 0, "no sweep while it breathes")
                     if state == "attention":
                         self.assertEqual(frame[0], 0, "attention breathes at home and never sweeps")
-        # The stroke's own positions: its place and every fifteen degrees clockwise of it, to the far end.
-        stroke = set(range(round(tray.ICON_SWEEP / (360.0 / motion["positions"])) + 1))
+        # The stroke's own positions in the notification area's fine steps (tray_fine times the window's, every
+        # 3.75 degrees rather than fifteen): its place and each step clockwise of it, to the far end. The picture
+        # drew the window's coarse steps until 2026-10-19, which stepped where the tray glides.
+        positions = motion["positions"] * motion["tray_fine"]
+        stroke = set(range(round(tray.ICON_SWEEP / (360.0 / positions)) + 1))
         self.assertEqual({position for position, _ in seen["watching"]}, stroke, "watching sweeps the whole stroke")
         self.assertIn((0, 0), seen["watching"], "and breathes to its low")
         self.assertEqual({position for position, _ in seen["recovering"]}, stroke)
