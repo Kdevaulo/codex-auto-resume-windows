@@ -333,6 +333,240 @@ function Step { param([string]$Text) Write-Host ('  ' + $Text) }
 function Ok   { param([string]$Text) Write-Host ('  [ok] ' + $Text) }
 function Fail { param([string]$Text) Write-Host ('  [!] ' + $Text) -ForegroundColor Red }
 
+function Warn { param([string]$m) Write-Host ('  [!]  ' + $m) -ForegroundColor Yellow }
+
+# ----------------------------------------------------------------------- inside another app (v0.6.17)
+# A process descended from an MSIX app - the Codex app, Claude desktop - writes HKCU and %APPDATA% into that app's
+# private view, which Windows itself never reads. The repair branch below runs the installation's setup itself,
+# never through install.ps1, so it asks what install.ps1 asks before it does: run by an agent inside one of those
+# apps, the setup runs again outside through WMI instead, with this run's environment and CODEX_AUTO_RESUME_OUTSIDE=1,
+# what it prints passed on as it prints it, and its exit code this run's (Resolve-OutsideRun). Where it cannot get
+# out, it carries on and says once what may stay inside the app.
+# >>> the outside gate: the same text as build/install/install.ps1's, which tests/test_host_app.py holds equal.
+# Opens a process for limited query: its creation time (FILETIME; 0 where it cannot be opened) and its package
+# family name (null without package identity).
+$script:HostAppSource = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+namespace CodexAutoResumeInstall
+{
+    public static class HostApp
+    {
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        static extern IntPtr OpenProcess(uint access, bool inherit, int process);
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool GetProcessTimes(IntPtr process, out long created, out long exited, out long kernel, out long user);
+        [DllImport("kernel32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        static extern int GetPackageFamilyName(IntPtr process, ref uint length, StringBuilder name);
+        [DllImport("kernel32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        static extern int GetCurrentPackageFamilyName(ref uint length, StringBuilder name);
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool CloseHandle(IntPtr handle);
+
+        public static long Open(int id, bool self, out string package)
+        {
+            package = null;
+            IntPtr handle = OpenProcess(0x1000, false, id);
+            if (handle == IntPtr.Zero) return 0;
+            try
+            {
+                long created, exited, kernel, user;
+                if (!GetProcessTimes(handle, out created, out exited, out kernel, out user)) return 0;
+                var name = new StringBuilder(256);
+                uint length = (uint)name.Capacity;
+                int answer = self ? GetCurrentPackageFamilyName(ref length, name) : GetPackageFamilyName(handle, ref length, name);
+                if (answer == 0 && name.Length > 0) package = name.ToString();
+                return created;
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
+        }
+    }
+}
+'@
+
+function Find-PackagedAncestor {
+    <#
+        The package family name of this process, or of its nearest live ancestor that has one, or $null: the
+        decision over a process table, `$Table[pid] = @{ Parent; Created; Package }`. The walk stops - outside -
+        where a parent is not in the table or could not be opened (Created 0), where a parent was created after its
+        child (its id was reused), on a cycle, and after 32 steps. Pure, so a test can feed it a table of its own.
+    #>
+    param([hashtable]$Table, [int]$Self)
+    $row = $Table[$Self]
+    if ($null -eq $row) { return $null }
+    if ($row.Package) { return [string]$row.Package }
+    $seen = @{ $Self = $true }
+    for ($step = 0; $step -lt 32; $step++) {
+        $id = [int]$row.Parent
+        $parent = $Table[$id]
+        if ($null -eq $parent -or -not $parent.Created) { return $null }
+        if ($seen.ContainsKey($id)) { return $null }
+        $seen[$id] = $true
+        if ([long]$parent.Created -gt [long]$row.Created) { return $null }
+        if ($parent.Package) { return [string]$parent.Package }
+        $row = $parent
+    }
+    return $null
+}
+
+function Get-ProcessTable {
+    # This process and its ancestors as far as the walk can go, for Find-PackagedAncestor.
+    param([int]$Self)
+    Add-Type -TypeDefinition $script:HostAppSource -ErrorAction Stop
+    $parents = @{}
+    foreach ($process in @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId -ErrorAction Stop)) {
+        $parents[[int]$process.ProcessId] = [int]$process.ParentProcessId
+    }
+    $table = @{}
+    $id = $Self
+    for ($step = 0; $step -le 33 -and $parents.ContainsKey($id) -and -not $table.ContainsKey($id); $step++) {
+        $package = $null
+        $created = [CodexAutoResumeInstall.HostApp]::Open($id, ($id -eq $Self), [ref]$package)
+        $table[$id] = @{ Parent = $parents[$id]; Created = $created; Package = $package }
+        if (-not $created) { break }
+        $id = $parents[$id]
+    }
+    return $table
+}
+
+function Get-OutsideSource {
+    <#
+        What the run outside executes: $Script - a script or a program - by its full path with this run's switches
+        and values, then $Arguments as they are, everything it prints appended line by line to $Log as it prints it,
+        and its exit code written to $CodeFile last.
+    #>
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile)
+    $literal = { param($text) "'" + ([string]$text).Replace("'", "''") + "'" }
+    $call = '& ' + (& $literal $Script)
+    foreach ($name in $Switches) { $call += ' -' + $name }
+    if ($Values) { foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) } }
+    foreach ($argument in $Arguments) { $call += ' ' + (& $literal $argument) }
+    return @(
+        '$ErrorActionPreference = ''Continue'''
+        '$log = ' + (& $literal $Log)
+        '$utf8 = New-Object System.Text.UTF8Encoding $false'
+        '$code = 1'
+        'try {'
+        '    ' + $call + ' *>&1 | ForEach-Object { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
+        '    $code = $LASTEXITCODE'
+        '    if ($null -eq $code) { $code = 0 }'
+        '} catch { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
+        '[IO.File]::WriteAllText(' + (& $literal $CodeFile) + ', [string]$code)'
+        'exit $code'
+    ) -join "`r`n"
+}
+
+function Send-OutsideLines {
+    # The whole lines the run outside has added to $Log since byte $From, printed here; where it has got to. -All
+    # prints a last line that has no line end too.
+    param([string]$Log, [long]$From, [switch]$All)
+    if (-not (Test-Path -LiteralPath $Log)) { return $From }
+    $stream = $null
+    $bytes = $null
+    $read = 0
+    try {
+        $stream = New-Object System.IO.FileStream($Log, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read,
+                                                  ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
+        if ($stream.Length -le $From) { return $From }
+        $null = $stream.Seek($From, [System.IO.SeekOrigin]::Begin)
+        $bytes = New-Object byte[] ([int]($stream.Length - $From))
+        $read = $stream.Read($bytes, 0, $bytes.Length)
+    } catch {
+        return $From
+    } finally {
+        if ($stream) { $stream.Dispose() }
+    }
+    $end = $read
+    if (-not $All) { $end = [Array]::LastIndexOf($bytes, [byte]10, [Math]::Max(0, $read - 1)) + 1 }
+    if ($end -le 0) { return $From }
+    $lines = @([System.Text.Encoding]::UTF8.GetString($bytes, 0, $end) -split "`r`n|`n")
+    if ($lines.Count -gt 0 -and $lines[$lines.Count - 1] -eq '') { $lines = @($lines | Select-Object -First ($lines.Count - 1)) }
+    foreach ($line in $lines) { Write-Host $line }
+    return $From + $end
+}
+
+function Invoke-Outside {
+    <#
+        Runs $Source in Windows PowerShell outside every app's private view: created by WMI's Win32_Process.Create,
+        with this run's environment and CODEX_AUTO_RESUME_OUTSIDE=1, its console hidden (SW_HIDE: WMI refuses
+        CREATE_NO_WINDOW), in this run's folder. Passes on what it writes to $Log as it writes it, and returns its
+        exit code once it has ended - or $null where it could not be started.
+    #>
+    param([string]$Source, [string]$Log, [string]$CodeFile)
+    $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($Source))
+    $line = '"' + $powershell + '" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + $encoded
+    $environment = @(foreach ($variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
+        if ([string]$variable.Key -ne 'CODEX_AUTO_RESUME_OUTSIDE') { [string]$variable.Key + '=' + [string]$variable.Value }
+    }) + 'CODEX_AUTO_RESUME_OUTSIDE=1'
+    $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{
+        ShowWindow = [uint16]0; EnvironmentVariables = [string[]]$environment }
+    $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -ErrorAction Stop -Arguments @{
+        CommandLine = $line; CurrentDirectory = [Environment]::CurrentDirectory; ProcessStartupInformation = $startup }
+    if ($created.ReturnValue -ne 0 -or -not $created.ProcessId) { return $null }
+    $id = [int]$created.ProcessId
+    $process = $null
+    try { $process = [System.Diagnostics.Process]::GetProcessById($id); $null = $process.Handle } catch { $process = $null }
+    $position = [long]0
+    while ($true) {
+        if ($process) { $ended = $process.HasExited }
+        else { $ended = (Test-Path -LiteralPath $CodeFile) -or -not (Get-Process -Id $id -ErrorAction SilentlyContinue) }
+        $position = Send-OutsideLines -Log $Log -From $position
+        if ($ended) { break }
+        Start-Sleep -Milliseconds 200
+    }
+    $null = Send-OutsideLines -Log $Log -From $position -All
+    $said = $null
+    try { $said = [System.IO.File]::ReadAllText($CodeFile).Trim() } catch { $said = $null }
+    $code = 0
+    if ([int]::TryParse([string]$said, [ref]$code)) { return $code }
+    return 1
+}
+
+function Resolve-OutsideRun {
+    <#
+        Whether this run goes on here: $null, or the exit code of the run outside that did its work instead. A run
+        CODEX_AUTO_RESUME_OUTSIDE=1 marks is one: it never relaunches, and the mark goes no further than it.
+    #>
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments)
+    if ($env:CODEX_AUTO_RESUME_OUTSIDE -eq '1') {
+        $env:CODEX_AUTO_RESUME_OUTSIDE = $null
+        return $null
+    }
+    $app = $null
+    try { $app = Find-PackagedAncestor -Table (Get-ProcessTable -Self $PID) -Self $PID } catch { $app = $null }
+    if (-not $app) { return $null }
+    $folder = Join-Path ([System.IO.Path]::GetTempPath()) ('CodexAutoResume-Outside-' + [guid]::NewGuid().ToString('N').Substring(0, 16))
+    $code = $null
+    try {
+        $null = New-Item -ItemType Directory -Path $folder -ErrorAction Stop
+        $log = Join-Path $folder 'output.txt'
+        $codeFile = Join-Path $folder 'code.txt'
+        $source = Get-OutsideSource -Script $Script -Switches $Switches -Values $Values -Arguments $Arguments `
+                                    -Log $log -CodeFile $codeFile
+        $code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
+    } catch {
+        $code = $null
+    } finally {
+        Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $code) { return $code }
+    $name = $app
+    if ($app.LastIndexOf('_') -gt 0) { $name = $app.Substring(0, $app.LastIndexOf('_')) }
+    Warn ('This runs inside ' + $name + ', and Windows keeps what is registered from there inside that app: the ' +
+          'entry in Settings > Apps, the start at sign-in, the notifications'' name, the link handler and the Start ' +
+          'menu entry. Run Install.cmd from File Explorer, or afterwards open the Dashboard from the Start menu and ' +
+          'choose Repair installation.')
+    return $null
+}
+# <<< the outside gate
+
 function Get-Sha256 {
     <#
         The digest of a downloaded archive, computed with .NET rather than `Get-FileHash`.
@@ -1773,6 +2007,10 @@ if ($null -ne $standing -and $standing -ge 0 -and -not $Force) {
     # removed - a decision, taken while claiming to check the installation over.
     $arguments = @($setup, 'setup', '--keep-state')
     if ($NoStartup) { $arguments += '--no-startup' }
+    # Inside another app's private view, the setup runs outside it instead, with this lock still held here, and its
+    # code is this run's (the outside gate above).
+    $outsideCode = Resolve-OutsideRun -Script $python -Arguments $arguments
+    if ($null -ne $outsideCode) { exit $outsideCode }
     & $python @arguments
     $code = $LASTEXITCODE
     if ($null -eq $code) { $code = 0 }

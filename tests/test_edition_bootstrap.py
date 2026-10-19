@@ -379,7 +379,8 @@ class WholeScriptTests(unittest.TestCase):
         return sorted(self.temp.glob("codex-auto-resume-*"))
 
     def run_it(self, latest=None, **arguments):
-        environment = dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(self.home),
+        # CODEX_AUTO_RESUME_OUTSIDE=1: never the repair branch outside through WMI (bootstrap.ps1, the outside gate).
+        environment = dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(self.home), CODEX_AUTO_RESUME_OUTSIDE="1",
                            TEMP=str(self.temp), TMP=str(self.temp),
                            CAR_SCRIPT=str(self.plugin / "scripts" / "bootstrap.ps1"),
                            CAR_ARGUMENTS=json.dumps(arguments), CAR_REQUESTS=str(self.requests),

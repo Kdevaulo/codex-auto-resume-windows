@@ -320,6 +320,146 @@ class InstallerGateTests(unittest.TestCase):
         self.assertIn("[Environment]::GetEnvironmentVariables()", launch, "the run outside gets this run's environment")
 
 
+# ----------------------------------------------------------------------- bootstrap.ps1's repair branch
+BOOTSTRAP_TEXT = (ROOT / "scripts" / "bootstrap.ps1").read_text(encoding="utf-8")
+
+
+def outside_gate(text: str) -> str:
+    """The outside gate as a script carries it: from its first line to its end marker."""
+    start = text.index("# Opens a process for limited query")
+    return text[start:text.index("# <<< the outside gate", start)]
+
+
+# The installation's runtime\python.exe, standing in: it says how it was run, and ends with 5.
+FAKE_PYTHON = r"""
+static class FakePython
+{
+    static int Main(string[] args)
+    {
+        System.Console.WriteLine("FAKE-PYTHON args=" + string.Join(" ", args) + " marker=" +
+                                 System.Environment.GetEnvironmentVariable("CODEX_AUTO_RESUME_OUTSIDE"));
+        return 5;
+    }
+}
+"""
+
+# Aliases are found before functions, so these stand in for the script's own Get-ProcessTable and Invoke-Outside
+# while the whole script runs: a process table with or without a packaged parent, and a launcher that writes down
+# what it would run outside and answers 7, or fails.
+ALIASED = r"""
+function global:Fake-ProcessTable {
+    param([int]$Self)
+    $table = @{}
+    $table[$Self] = @{ Parent = 41; Created = 50; Package = $null }
+    $table[41] = @{ Parent = 4; Created = 40; Package = $env:CAR_PACKAGE }
+    return $table
+}
+function global:Fake-Outside {
+    param([string]$Source, [string]$Log, [string]$CodeFile)
+    Write-Host ('SOURCE ' + ($Source -replace "`r`n", ' | '))
+    if ($env:CAR_LAUNCH -eq 'fail') { return $null }
+    return 7
+}
+Set-Alias -Scope Global Get-ProcessTable Fake-ProcessTable
+Set-Alias -Scope Global Invoke-Outside Fake-Outside
+"""
+
+
+@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
+class BootstrapRepairTests(unittest.TestCase):
+    """bootstrap.ps1 at the version already installed checks the installation over with its own setup, never
+    through install.ps1: inside another app's view that setup runs outside, as install.ps1 does (v0.6.17). The whole
+    script runs over a scratch plugin and a scratch home at the same version, with the network stubbed as
+    tests/test_edition_bootstrap.py stubs it and the installation's python a stand-in."""
+
+    @classmethod
+    def setUpClass(cls):
+        from test_edition_bootstrap import NOWHERE, RELEASE, RUN
+        cls.run_script = ALIASED + RUN
+        cls.work = Path(tempfile.mkdtemp(prefix="host-app-bootstrap-"))
+        plugin = cls.work / "plugin"
+        (plugin / "scripts").mkdir(parents=True)
+        (plugin / ".codex-plugin").mkdir()
+        shutil.copyfile(ROOT / "scripts" / "bootstrap.ps1", plugin / "scripts" / "bootstrap.ps1")
+        manifest = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        (plugin / ".codex-plugin" / "plugin.json").write_text(json.dumps(dict(manifest, version="9.9.9")),
+                                                               encoding="utf-8")
+        release = dict(RELEASE, download=NOWHERE + "/download/v{version}/", latest=NOWHERE + "/latest")
+        (plugin / "scripts" / "release.json").write_text(json.dumps(release), encoding="utf-8")
+        cls.script = plugin / "scripts" / "bootstrap.ps1"
+        cls.home = cls.work / "home"
+        (cls.home / "runtime").mkdir(parents=True)
+        (cls.home / "app" / ".codex-plugin").mkdir(parents=True)
+        (cls.home / "app" / ".codex-plugin" / "plugin.json").write_text(
+            json.dumps({"name": "codex-auto-resume", "version": "9.9.9"}), encoding="utf-8")
+        (cls.home / "app" / "scripts").mkdir()
+        (cls.home / "app" / "src" / "codex_auto_resume").mkdir(parents=True)
+        source = cls.work / "fake.cs"
+        source.write_text(FAKE_PYTHON, encoding="utf-8")
+        cls.python = cls.home / "runtime" / "python.exe"
+        built = subprocess.run([str(CSC), "/nologo", "/target:exe", "/out:" + str(cls.python), str(source)],
+                               capture_output=True, text=True, encoding="mbcs", errors="replace", timeout=300,
+                               creationflags=NO_WINDOW)
+        cls.built = built.returncode == 0
+        cls.temp = cls.work / "temp"
+        cls.temp.mkdir()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.work, ignore_errors=True)
+
+    def run_it(self, **environment):
+        if not self.built:
+            self.fail("the stand-in python did not build")
+        values = dict(os.environ, CODEX_AUTO_RESUME_PLUGIN_HOME=str(self.home), TEMP=str(self.temp),
+                      TMP=str(self.temp), CAR_SCRIPT=str(self.script), CAR_ARGUMENTS="{}",
+                      CAR_REQUESTS=str(self.work / "requests.txt"), CAR_INSTALLED=str(self.work / "installed.json"),
+                      CAR_LATEST="")
+        for name in ("CAR_PACKAGE", "CAR_LAUNCH", "CODEX_AUTO_RESUME_OUTSIDE"):
+            values.pop(name, None)
+        values.update(environment)
+        done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                               "-Command", self.run_script], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              text=True, encoding="utf-8", errors="replace", timeout=300, env=values,
+                              creationflags=NO_WINDOW)
+        self.assertIn("already installed", done.stdout, done.stdout[-2000:])
+        return done.returncode, done.stdout
+
+    def test_inside_the_check_over_runs_outside_and_ends_with_its_code(self):
+        code, output = self.run_it(CAR_PACKAGE=CODEX)
+        self.assertEqual(code, 7, output[-2000:])
+        sources = [line for line in output.splitlines() if line.startswith("SOURCE ")]
+        self.assertEqual(len(sources), 1, output[-2000:])
+        setup = self.home / "app" / "scripts" / "plugin_setup.py"
+        self.assertIn("& '%s' '%s' 'setup' '--keep-state'" % (self.python, setup), sources[0])
+        self.assertNotIn("FAKE-PYTHON", output, "the setup ran here as well")
+
+    def test_a_relaunch_that_fails_runs_it_here_and_says_so_once(self):
+        code, output = self.run_it(CAR_PACKAGE=CODEX, CAR_LAUNCH="fail")
+        self.assertEqual(code, 5, output[-2000:])
+        self.assertIn("FAKE-PYTHON args=", output)
+        self.assertEqual(len([line for line in output.splitlines() if line.startswith("  [!]")]), 1, output[-2000:])
+
+    def test_the_mark_and_a_run_outside_any_app_run_it_here(self):
+        for environment in ({"CAR_PACKAGE": CODEX, "CODEX_AUTO_RESUME_OUTSIDE": "1"}, {}):
+            with self.subTest(environment):
+                code, output = self.run_it(**environment)
+                self.assertEqual(code, 5, output[-2000:])
+                self.assertIn("FAKE-PYTHON args=", output)
+                self.assertIn("setup --keep-state", output)
+                self.assertNotIn("SOURCE ", output)
+                self.assertNotIn("  [!]", output)
+
+    def test_the_two_scripts_carry_one_gate(self):
+        """Both scripts ship in every archive, but neither finds the other from everywhere it runs (the kept
+        uninstaller, Codex's copy of the plugin), so each carries the gate; this holds the copies equal."""
+        self.assertEqual(outside_gate(BOOTSTRAP_TEXT), outside_gate(INSTALL))
+        branch = BOOTSTRAP_TEXT[BOOTSTRAP_TEXT.index("Step 'Checking it over'"):]
+        gate = branch.index("$outsideCode = Resolve-OutsideRun -Script $python -Arguments $arguments")
+        self.assertLess(branch.index("$held = $lock.WaitOne(0)"), gate, "the lock is held while it runs outside")
+        self.assertLess(gate, branch.index("& $python @arguments"))
+
+
 # ----------------------------------------------------------------------- the wiring
 def setup_method(name: str) -> str:
     found = re.search(r"\n[ \t]+(?:internal |private |public )?static \w+ %s\(" % re.escape(name), SETUP)

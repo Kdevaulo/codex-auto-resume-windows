@@ -63,6 +63,9 @@ function Fail { param([string]$m) Write-Host ('  [x]  ' + $m) -ForegroundColor R
 # second relaunch - passes on what that run prints as it prints it, and ends with its exit code. Where it cannot
 # get out, it carries on and says once what will stay inside the app.
 
+# >>> the outside gate: the same text in scripts/bootstrap.ps1, which runs the installation's setup itself in its
+# repair branch. Both scripts ship in every archive but neither can find the other from every place it runs (the kept
+# uninstaller, Codex's plugin copy), so each carries it, and tests/test_host_app.py holds the two copies equal.
 # Opens a process for limited query: its creation time (FILETIME; 0 where it cannot be opened) and its package
 # family name (null without package identity).
 $script:HostAppSource = @'
@@ -157,14 +160,16 @@ function Get-ProcessTable {
 
 function Get-OutsideSource {
     <#
-        What the run outside executes: this script by its full path with this run's switches and values, everything
-        it prints appended line by line to $Log as it prints it, and its exit code written to $CodeFile last.
+        What the run outside executes: $Script - a script or a program - by its full path with this run's switches
+        and values, then $Arguments as they are, everything it prints appended line by line to $Log as it prints it,
+        and its exit code written to $CodeFile last.
     #>
-    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string]$Log, [string]$CodeFile)
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile)
     $literal = { param($text) "'" + ([string]$text).Replace("'", "''") + "'" }
     $call = '& ' + (& $literal $Script)
     foreach ($name in $Switches) { $call += ' -' + $name }
-    foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) }
+    if ($Values) { foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) } }
+    foreach ($argument in $Arguments) { $call += ' ' + (& $literal $argument) }
     return @(
         '$ErrorActionPreference = ''Continue'''
         '$log = ' + (& $literal $Log)
@@ -252,7 +257,7 @@ function Resolve-OutsideRun {
         Whether this run goes on here: $null, or the exit code of the run outside that did its work instead. A run
         CODEX_AUTO_RESUME_OUTSIDE=1 marks is one: it never relaunches, and the mark goes no further than it.
     #>
-    param([string]$Script, [string[]]$Switches, [hashtable]$Values)
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments)
     if ($env:CODEX_AUTO_RESUME_OUTSIDE -eq '1') {
         $env:CODEX_AUTO_RESUME_OUTSIDE = $null
         return $null
@@ -266,7 +271,8 @@ function Resolve-OutsideRun {
         $null = New-Item -ItemType Directory -Path $folder -ErrorAction Stop
         $log = Join-Path $folder 'output.txt'
         $codeFile = Join-Path $folder 'code.txt'
-        $source = Get-OutsideSource -Script $Script -Switches $Switches -Values $Values -Log $log -CodeFile $codeFile
+        $source = Get-OutsideSource -Script $Script -Switches $Switches -Values $Values -Arguments $Arguments `
+                                    -Log $log -CodeFile $codeFile
         $code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
     } catch {
         $code = $null
@@ -282,6 +288,7 @@ function Resolve-OutsideRun {
           'choose Repair installation.')
     return $null
 }
+# <<< the outside gate
 
 $outsideSwitches = @(foreach ($name in 'SkipStartup', 'Uninstall', 'Purge', 'AllowEditionChange', 'Silent') {
     if (Get-Variable -Name $name -ValueOnly) { $name }
