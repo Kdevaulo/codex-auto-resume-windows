@@ -23,12 +23,15 @@ from takingcase import TakingCase  # noqa: E402
 from test_advanced_goal import GoalCase  # noqa: E402
 from test_advanced_usage import Session, UsageCase, reply  # noqa: E402
 from codex_auto_resume.domain.plug import Alternative, Point  # noqa: E402
-from codex_auto_resume_advanced import statement  # noqa: E402
+from codex_auto_resume import machine  # noqa: E402
+from codex_auto_resume_advanced import runtime, statement  # noqa: E402
 from codex_auto_resume_advanced.codex.turns import Turns  # noqa: E402
 from codex_auto_resume_advanced.registry import (COMPACT_CONTINUE, GOAL_CONTINUATION, MARKER_FREE,  # noqa: E402
-                                                 QUEUE_FOR_OPEN, RESET_CREDIT, SILENT_CONTINUATION, USAGE_METER,
+                                                 OTHER_SESSIONS, QUEUE_FOR_OPEN, RESET_CREDIT, SILENT_CONTINUATION, USAGE_METER,
                                                  USAGE_PAUSE)
-from codex_auto_resume_advanced.vocabulary import Actor, JournalCode, SpendOutcome  # noqa: E402
+from codex_auto_resume_advanced.vocabulary import Actor, JournalCode, Measurement, SpendOutcome, Verdict  # noqa: E402
+from advancedcase import ENGINE  # noqa: E402
+from sessionsim import holding_sessions  # noqa: E402
 from test_engine import T1  # noqa: E402
 
 CONTEXT_FULL = json.dumps({"codexErrorInfo": "contextWindowExceeded"})
@@ -103,6 +106,53 @@ class GoalBesideQueueForOpenTests(GoalCase):
             self.h.tick(advance=61)
         self.assertEqual(self.status(), "active")
         self.assertEqual(self.h.backend.send_calls, [], "the standard continuation is not queued beside the goal")
+
+
+class GoalBesideOtherSessionsTests(GoalCase):
+    """Finding P-3: goal_continuation's channel at P5 (M2b passed, the goal paused by the usage limit) is a send of a
+    conversation the app holds; for one another Codex session holds, other_sessions' TO_SESSION goes only core's
+    ordinary way (core's engine/foropen._not_for_open), so a channel named there left the record waiting "held by
+    another session" for ever. Settled by the runtime's rule for answers core cannot carry together (runtime.CONFLICTS,
+    v0.6.17 #42, branch v0617-queue): the goal's channel stands aside for that send, `overruled` in its journal - goal.py
+    is unchanged. Until that rule is merged the session test is skipped; it fails on a runtime without it."""
+    registry = (GOAL_CONTINUATION, OTHER_SESSIONS)
+
+    def fresh(self, **kwargs):
+        # Who holds a conversation "elsewhere", as the real Backend keeps it (tests/sessionsim.py).
+        made = super().fresh(**kwargs)
+        holding_sessions(made.backend)
+        return made
+
+    def both(self, loaded):
+        self.measured[Measurement.M2B] = (Verdict.PASS, ENGINE)
+        plug, fake = self.armed(loaded=loaded)
+        definition = plug.runtime.registry.get(OTHER_SESSIONS.id)
+        self.arm(plug, capability=OTHER_SESSIONS.id,
+                 warnings=[str(word) for word in plug.runtime.arming.warnings(definition)])
+        return plug, fake
+
+    @unittest.skipUnless(hasattr(runtime, "CONFLICTS"), "runtime.CONFLICTS (v0617-queue, #42) settles P-3: not merged")
+    def test_a_conversation_another_session_holds_is_sent_for_it_to_take(self):
+        plug, fake = self.both(loaded=False)
+        self.h.backend.loaded_map[T1] = "elsewhere"          # a terminal's or VS Code's session holds it
+        self.h.backend.after_accept = "queue"
+        self.h.tick()
+        row = self.h.record()
+        self.assertEqual(row["state"], "queued", row["last_error"])
+        self.assertEqual(len(self.h.backend.send_calls), 1, "core's own send, for that session to take")
+        self.assertEqual(machine.decode_gates(row["gate_eval"])["thread_available"], (machine.PASS, machine.SESSION))
+        self.assertEqual(fake.sets(), [], "the goal is not set for a conversation the app does not hold")
+        self.assertEqual(fake.adds(), [])
+        self.assertEqual(self.status(), "usage_limited")
+        self.assertEqual([spend[0] for spend in self.spends(plug)], [OTHER_SESSIONS.id])
+        self.assertIn((JournalCode.OVERRULED, Point.SENDER, OTHER_SESSIONS.id), self.journal(plug))
+
+    def test_a_conversation_the_app_holds_still_gets_the_goal_s_channel(self):
+        plug, fake = self.both(loaded=True)
+        self.h.tick()
+        self.assert_no_send()
+        self.assertEqual(fake.methods(), ["thread/goal/set", "thread/queue/add"])
+        self.assertEqual(self.status(), "active")
 
 
 class SilentBesideMarkerFreeTests(ac.AdvancedCase):
