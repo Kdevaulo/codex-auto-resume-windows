@@ -12,10 +12,12 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
-from codex_auto_resume import l10n, shortcut, startup
+from codex_auto_resume import config, l10n, shortcut, startup
+from codex_auto_resume.windows import Mutex
 
 _HERE = str(Path(__file__).resolve().parent)
 if _HERE not in sys.path:
@@ -30,6 +32,30 @@ SKILL = ROOT / "skills" / "codex-auto-resume" / "SKILL.md"
 MCP_COMPANION = ROOT / "build" / "plugin-mcp.json"
 PLUGIN_NAME = "codex-auto-resume"
 OURS = "codex-auto-resume-windows"   # the marketplace this product ships under
+
+
+class MutexHolder:
+    """A stand-in watcher on a thread of its own: once told (`take`), it holds the real single-instance mutex of a
+    scratch home's state - a name of its own, derived from that path, never the real watcher's - until `stop`. Another
+    thread, because a mutex its owner asks about again is granted to it again rather than found busy."""
+
+    def __init__(self, home):
+        self.state = config.Paths(home).state_dir
+        self.take, self.taken, self.done = threading.Event(), threading.Event(), threading.Event()
+        self.thread = threading.Thread(target=self._hold, daemon=True)
+        self.thread.start()
+
+    def _hold(self):
+        if not self.take.wait(10) or self.done.is_set():
+            return
+        with Mutex(str(self.state), timeout=0.0):
+            self.taken.set()
+            self.done.wait(10)
+
+    def stop(self):
+        self.done.set()
+        self.take.set()
+        self.thread.join(10)
 
 
 def _load(name: str, path: Path):
@@ -464,6 +490,78 @@ class BridgeTests(unittest.TestCase):
                                 ("exited", self.bridge.EXIT_UNCONFIRMED)):
             with self.subTest(state),                  patch.object(self.bridge, "runtime_home", return_value=self.home),                  patch.object(startup, "current_value", return_value=None),                  patch.object(startup, "install"),                  patch.object(self.bridge, "start_watcher", return_value=state):
                 self.assertEqual(self.bridge.cmd_setup(args), expected)
+
+    def first_wait(self, holder=None, seen=None):
+        """A `start_watcher` whose own wait, with the real probe of the scratch home's mutex, ends before the watcher
+        takes that mutex - which `holder`, a stand-in watcher on another thread, then does at once, if given."""
+        def start(home):
+            app = self.bridge.App(config.Paths(home), console=False, enable_logging=False)
+            state = self.bridge.control.await_watcher(app.watcher_running, None, timeout=0.05, interval=0.01)["state"]
+            if seen is not None:
+                seen.append(state)
+            if holder is not None:
+                holder.take.set()
+                self.assertTrue(holder.taken.wait(10), "the stand-in watcher took its mutex")
+            return state
+        return start
+
+    def setup_after_wait(self, start):
+        self.pretend_installed()
+        args = self.bridge.build_parser().parse_args(["setup", "--no-startup"])
+        output = io.StringIO()
+        with patch.object(self.bridge, "runtime_home", return_value=self.home), \
+             patch.object(startup, "current_value", return_value=None), \
+             patch.object(startup, "install"), \
+             patch.object(self.bridge, "start_watcher", side_effect=start), \
+             contextlib.redirect_stdout(output):
+            code = self.bridge.cmd_setup(args)
+        return code, output.getvalue()
+
+    def test_a_watcher_that_takes_its_mutex_just_after_the_wait_is_reported_running(self):
+        """v0.6.17 live acceptance: the setup's wait ended a moment before a slow-starting watcher took its mutex,
+        and every update said "could not be confirmed" under a health check that had just seen the mutex held.
+        Looked at once more before the last word, it is running: no unconfirmed line, and 0."""
+        holder = MutexHolder(self.home)
+        self.addCleanup(holder.stop)
+        seen = []
+        code, text = self.setup_after_wait(self.first_wait(holder, seen))
+        self.assertEqual(seen, ["unconfirmed"], "the first wait did end before the mutex was taken")
+        self.assertEqual(code, self.bridge.EXIT_OK)
+        self.assertIn(l10n.message("setup_done"), text)
+        self.assertNotIn(l10n.message("setup_unconfirmed"), text)
+
+    def test_a_watcher_that_never_starts_is_still_unconfirmed(self):
+        code, text = self.setup_after_wait(self.first_wait())
+        self.assertEqual(code, self.bridge.EXIT_UNCONFIRMED)
+        self.assertIn(l10n.message("setup_unconfirmed"), text)
+        self.assertNotIn(l10n.message("setup_done"), text)
+
+    def test_only_a_watcher_still_starting_is_looked_at_again(self):
+        """A launched process that exited, or a probe that could not tell, is never rounded up to running."""
+        for started, seen, expected in (("unconfirmed", True, "running"), ("unconfirmed", False, "unconfirmed"),
+                                        ("unconfirmed", None, "unconfirmed"), ("exited", True, "exited"),
+                                        ("not-started", True, "not-started"), ("running", False, "running")):
+            with self.subTest(started=started, seen=seen), \
+                 patch.object(self.bridge, "watcher_seen", return_value=seen):
+                self.assertEqual(self.bridge.looked_again(self.home, started), expected)
+
+    def test_watcher_running_answers_by_the_mutex_now(self):
+        """What install.ps1 and the bootstrap's check-over ask after setup could not confirm the watcher: 0 only
+        while the watcher holds its mutex, else 2 - with the words `status` says first."""
+        self.pretend_installed()
+        args = self.bridge.build_parser().parse_args(["watcher-running"])
+        self.assertIs(self.bridge.COMMANDS["watcher-running"], self.bridge.cmd_watcher_running)
+
+        def ask():
+            output = io.StringIO()
+            with patch.object(self.bridge, "runtime_home", return_value=self.home), contextlib.redirect_stdout(output):
+                return self.bridge.COMMANDS[args.command](args), output.getvalue().strip()
+        self.assertEqual(ask(), (self.bridge.EXIT_UNCONFIRMED, l10n.message("watcher_stopped")))
+        holder = MutexHolder(self.home)
+        self.addCleanup(holder.stop)
+        holder.take.set()
+        self.assertTrue(holder.taken.wait(10))
+        self.assertEqual(ask(), (self.bridge.EXIT_OK, l10n.message("watcher_running")))
 
     def test_setup_is_idempotent_and_keeps_existing_state(self):
         self.pretend_installed()

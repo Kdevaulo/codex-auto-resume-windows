@@ -205,6 +205,26 @@ def start_watcher(home: Path) -> str:
     return control.await_watcher(app.watcher_running, process)["state"]
 
 
+def watcher_seen(home: Path):
+    """The watcher's single-instance mutex, looked at once, now: True / False / None (the probe could not tell)."""
+    return App(config.Paths(home), console=False, enable_logging=False).watcher_running()
+
+
+def looked_again(home: Path, started: str) -> str:
+    """What `start_watcher` answered, with one more look where it could not confirm a watcher that is still starting.
+
+    `start_watcher` waits WATCHER_START_TIMEOUT and no longer, which is a promise to the person waiting. A watcher
+    whose interpreter is still importing when that wait ends - on a busy PC, right after an update has written
+    every file fresh, it can take longer (the v0.6.17 live acceptance: 6 to 9 seconds from its launcher's start)
+    - was reported as not confirmed, and the installer then said nothing was being watched while its own health
+    check had just seen the mutex held. So the answer is looked at once more, without waiting again, before any
+    word about the watcher is said: only "unconfirmed", the launched process still alive and not yet seen. One
+    that exited stays exited, and a probe that cannot tell stays unconfirmed - never rounded up to running."""
+    if started == "unconfirmed" and watcher_seen(home) is True:
+        return "running"
+    return started
+
+
 def conflicting_autostart(home: Path) -> str | None:
     """A different installation registered for autostart, if any.
 
@@ -297,6 +317,7 @@ def cmd_setup(args) -> int:
     for key in ("ready_b1", "ready_b2", "ready_b3", "ready_b4"):
         print("  " + bullet() + " " + l10n.message(key))
     print()
+    started = looked_again(home, started)
     confirmed = started in ("running", "already-running")
     if incomplete:
         say("setup_incomplete")
@@ -317,7 +338,7 @@ def cmd_enable(args) -> int:
     # `start_watcher` blocks for up to six seconds to learn the answer; throwing it away
     # and then printing "Auto resume is on." says the thing is on when nothing is
     # watching. `_cli_silent` also swallows the engine's own warning about this.
-    started = start_watcher(home)
+    started = looked_again(home, start_watcher(home))
     say("enabled")
     if started not in ("running", "already-running"):
         say("setup_unconfirmed")
@@ -349,6 +370,18 @@ def cmd_status(args) -> int:
         print("  %s" % conflict)
     print()
     return _cli(home, ["--quiet", "status"])
+
+
+def cmd_watcher_running(args) -> int:
+    """Whether this installation's watcher runs now, by its mutex, for the installer's last word: 0 when it does,
+    EXIT_UNCONFIRMED when it does not or the probe cannot tell. One line, the words `status` says first.
+
+    The installer asks it after its health check, where setup could not confirm the watcher it started
+    (build/install/install.ps1, scripts/bootstrap.ps1): a watcher that took the mutex after setup's wait ended is
+    running, and the last word says so rather than contradicting the health check printed above it."""
+    running = watcher_seen(runtime_home())
+    say({True: "watcher_running", False: "watcher_stopped", None: "watcher_unknown"}[running])
+    return EXIT_OK if running is True else EXIT_UNCONFIRMED
 
 
 def cmd_pending(args) -> int:
@@ -516,6 +549,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("thread_id")
     sub.add_parser("stop")
     sub.add_parser("doctor")
+    sub.add_parser("watcher-running", help="exit 0 only if this installation's watcher holds its mutex now")
     sub.add_parser("verify-home", help="exit 0 only if the install root is provably ours")
     sub.add_parser("claim-home",
                    help="exit 0 only if the install root is ours or holds nothing of ours")
@@ -537,7 +571,7 @@ def build_parser() -> argparse.ArgumentParser:
 COMMANDS = {
     "setup": cmd_setup, "status": cmd_status, "pending": cmd_pending, "enable": cmd_enable,
     "disable": cmd_disable, "cancel": cmd_cancel, "uninstall": cmd_uninstall,
-    "verify-home": cmd_verify_home,
+    "verify-home": cmd_verify_home, "watcher-running": cmd_watcher_running,
     "claim-home": cmd_claim_home, "downgrade-state": cmd_downgrade_state, "remove-entry": cmd_remove_entry,
     "stop": passthrough("stop"), "doctor": passthrough("doctor"), "logs": passthrough("logs"),
 }

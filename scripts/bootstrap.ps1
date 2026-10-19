@@ -2021,10 +2021,19 @@ if ($null -ne $standing -and $standing -ge 0 -and -not $Force) {
     # Inside another app's private view, the setup runs outside it instead, with this lock still held here, and its
     # code is this run's (the outside gate above).
     $outsideCode = Resolve-OutsideRun -Script $python -Arguments $arguments
-    if ($null -ne $outsideCode) { exit $outsideCode }
-    & $python @arguments
-    $code = $LASTEXITCODE
-    if ($null -eq $code) { $code = 0 }
+    if ($null -ne $outsideCode) { $code = $outsideCode }
+    else {
+        & $python @arguments
+        $code = $LASTEXITCODE
+        if ($null -eq $code) { $code = 0 }
+    }
+    # 2 is a setup that did everything but could not confirm the watcher within its wait. A watcher that took its
+    # mutex since - on a busy PC it can take longer than that wait (v0.6.17 live acceptance) - is running, and this
+    # run's code says so: the watcher is looked at once more, here (a look writes nothing, so it need not go outside).
+    if ($code -eq 2) {
+        & $python $setup 'watcher-running'
+        if ($LASTEXITCODE -eq 0) { $code = 0 }
+    }
     exit $code
 }
 

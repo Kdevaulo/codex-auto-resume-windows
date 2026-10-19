@@ -640,5 +640,60 @@ class DashboardAfterUpdateTests(unittest.TestCase):
                       'hash[i].ToString("x2", CultureInfo.InvariantCulture)'):
             self.assertIn(piece, name)
 
+
+class WatcherLookedAtAgainTests(unittest.TestCase):
+    """v0.6.17 live acceptance: setup waits for the watcher it started a few seconds and no longer, and a watcher that
+    took its mutex just after that wait ended left the installer's last word "could not be confirmed" - which the
+    setup window shows as its finished page - right under a health check that had just seen the mutex held. The last
+    word is now decided after one more look (plugin_setup.py watcher-running). Lifted verbatim from the health check
+    to the last word and run with setup stubbed: the look's answer is the only thing the cases change."""
+
+    START, END = "    Step 'Checking the installation'", "    Write-Host 'To change anything"
+
+    def finish(self, probe_code, previous_running=False):
+        import subprocess
+        import tempfile
+        from test_installer import VOICE, block
+        if not POWERSHELL.is_file():
+            self.skipTest("Windows PowerShell")
+        text = INSTALL.read_text(encoding="utf-8")
+        stubs = ("function Invoke-Setup { param([string[]]$Arguments)\n"
+                 "    $script:asked += ,($Arguments -join ' ')\n"
+                 "    if ($Arguments[0] -eq 'doctor') {\n"
+                 "        Write-Host '    watcher mutex : held by a running watcher'; $global:LASTEXITCODE = 0; return 0 }\n"
+                 "    if ($Arguments[0] -eq 'watcher-running') { $global:LASTEXITCODE = %d; return %d }\n"
+                 "    $global:LASTEXITCODE = 9; return 9 }\n"
+                 "function Open-ClosedDashboard { param([switch]$Updated) }\n" % (probe_code, probe_code))
+        script = ("$script:asked = @()\n$script:Failed = $false\n$upgrade = $true\n$watcherUnconfirmed = $true\n"
+                  "$previousWatcherStillRunning = $%s\n" % ("true" if previous_running else "false")
+                  + block(text, self.START, self.END)
+                  + "Write-Host ('ASKED ' + ($script:asked -join ','))\n")
+        with tempfile.TemporaryDirectory() as folder:
+            probe = Path(folder) / "probe.ps1"
+            probe.write_text(VOICE + stubs + script, encoding="utf-8-sig")
+            done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe)], capture_output=True, text=True, encoding="utf-8",
+                                  errors="replace", timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        return done.stdout
+
+    def test_a_watcher_running_by_the_last_word_is_said_to_run(self):
+        said = self.finish(0)
+        self.assertNotIn("could not be confirmed", said)
+        self.assertIn("Updated. Your settings and pending recoveries were kept.", said)
+        self.assertIn("Recommended settings are already on. Nothing else to do.", said)
+        self.assertIn("ASKED doctor,watcher-running", said, "looked at after the health check")
+
+    def test_a_watcher_still_not_running_is_still_unconfirmed(self):
+        said = self.finish(2)
+        self.assertIn("The watcher could not be confirmed running, so nothing is being watched yet.", said)
+        self.assertNotIn("Nothing else to do.", said)
+
+    def test_an_old_watcher_still_finishing_is_said_to_be_finishing(self):
+        """The mutex a look finds held may be the previous version's, still finishing: that branch's words, then."""
+        said = self.finish(0, previous_running=True)
+        self.assertNotIn("could not be confirmed", said)
+        self.assertIn("The previous version of the watcher was asked to stop and is still finishing", said)
+
 if __name__ == "__main__":
     unittest.main()
