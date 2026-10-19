@@ -953,6 +953,16 @@ namespace CodexAutoResume
                 line.Margin = Pad(0, Brand.SpaceS, 0, 0);
                 head.Controls.Add(line);
             }
+            // v0.6.17 (issue #42): that it stood aside for another feature's continuation, which only the ordinary way
+            // carries, in the accent beside it: on, it did not send that one, and the person is told which did.
+            string overruled = OverruledText(item);
+            if (overruled != null)
+            {
+                Label line = HelpText(overruled);
+                line.ForeColor = Accent;
+                line.Margin = Pad(0, Brand.SpaceS, 0, 0);
+                head.Controls.Add(line);
+            }
             // What an administrator's policy refuses, in the accent, as Diagnostics says what needs noticing under its facts
             // (diagUpgrade, diagPlugin). Lines rather than callouts: a callout holds each of its words whole, and this
             // column is narrower than the compatibility card's, where a sentence of Japanese - one word to it - fits.
@@ -1508,6 +1518,18 @@ namespace CodexAutoResume
             else if (reason == "refused_by_codex")
                 said = Word("page.tripped.refused_by_codex", "Turned off: Codex refused to start a turn with no words.");
             return said ?? Word("page.tripped", "It turned itself off.");
+        }
+
+        /// That `item` stood aside for another feature's continuation since it stood where it stands (the list's
+        /// overruled_by, v0.6.17), in words, or null where it did not.
+        private string OverruledText(Dictionary<string, object> item)
+        {
+            string by = Str(item, "overruled_by");
+            if (by == "queue_for_open")
+                return Word("page.overruled.queue_for_open", "Stood aside for another feature: Queue for when a conversation is opened sent a continuation the ordinary way, with the marker.");
+            if (by == "other_sessions")
+                return Word("page.overruled.other_sessions", "Stood aside for another feature: Recover CLI, TUI and VS Code conversations sent a continuation the ordinary way, with the marker.");
+            return null;
         }
 
         private bool PolicyAdmits(string id)

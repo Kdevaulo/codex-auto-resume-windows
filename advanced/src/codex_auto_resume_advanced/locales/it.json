@@ -129,6 +129,8 @@
   "page.kept.not_delivered_on_open": "È rimasta accesa anche se Codex non ha eseguito un messaggio in coda all'apertura della sua conversazione.",
   "page.kept.not_dispatched_by_session": "È rimasta attiva anche se una sessione del terminale o di VS Code non ha preso in tempo un messaggio messo in coda per lei.",
   "page.kept.refused_by_codex": "È rimasta attiva anche se Codex ha rifiutato di avviare un turno senza parole.",
+  "page.overruled.queue_for_open": "Ha lasciato il passo a un'altra funzione: «Metti in coda per quando si apre una conversazione» ha inviato una continuazione nel modo consueto, con il marcatore.",
+  "page.overruled.other_sessions": "Ha lasciato il passo a un'altra funzione: «Recupera le conversazioni di CLI, TUI e VS Code» ha inviato una continuazione nel modo consueto, con il marcatore.",
   "page.kept.requirement_off": "È rimasta attiva anche se una funzione che richiede non è più attiva.",
   "page.kept.statement_changed": "È rimasta attiva anche se ciò che fa è cambiato. Rileggilo e attivala per confermare.",
   "page.kept.submission_unknown": "È rimasta attiva anche se non ha potuto provare che una continuazione che ha inviato sia arrivata.",

@@ -129,6 +129,8 @@
   "page.kept.not_delivered_on_open": "Continuou ligado, embora o Codex não tenha executado uma mensagem na fila quando a conversa foi aberta.",
   "page.kept.not_dispatched_by_session": "Continuou ativada, embora uma sessão do terminal ou do VS Code não tenha pegado a tempo uma mensagem colocada na fila para ela.",
   "page.kept.refused_by_codex": "Continuou ativada, embora o Codex tenha se recusado a iniciar um turno sem palavras.",
+  "page.overruled.queue_for_open": "Cedeu a vez a outro recurso: o recurso “Colocar na fila para quando uma conversa for aberta” enviou uma continuação pelo caminho habitual, com a marca.",
+  "page.overruled.other_sessions": "Cedeu a vez a outro recurso: o recurso “Recuperar conversas de CLI, TUI e VS Code” enviou uma continuação pelo caminho habitual, com a marca.",
   "page.kept.requirement_off": "Ele continuou ligado embora um recurso de que precisa não esteja mais ligado.",
   "page.kept.statement_changed": "Ele continuou ligado embora o que ele faz tenha mudado. Leia de novo e ligue-o para confirmar.",
   "page.kept.submission_unknown": "Ele continuou ligado embora não tenha conseguido provar que uma continuação que enviou chegou.",

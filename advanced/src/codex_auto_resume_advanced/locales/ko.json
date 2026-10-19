@@ -129,6 +129,8 @@
   "page.kept.not_delivered_on_open": "대화를 열었을 때 Codex가 넣어 둔 메시지를 실행하지 않았지만 켜진 채로 두었습니다.",
   "page.kept.not_dispatched_by_session": "터미널이나 VS Code 세션이 대기열에 넣은 메시지를 제때 가져가지 않았지만 켜진 채로 두었습니다.",
   "page.kept.refused_by_codex": "Codex가 말 없이 턴을 시작하기를 거부했지만 켜진 채로 두었습니다.",
+  "page.overruled.queue_for_open": "다른 기능에 양보했습니다. '대화를 열 때 실행되도록 대기열에 넣기' 기능이 이어서 하기 메시지를 평소 방식대로 마커를 달아 보냈습니다.",
+  "page.overruled.other_sessions": "다른 기능에 양보했습니다. 'CLI, TUI, VS Code 대화 복구하기' 기능이 이어서 하기 메시지를 평소 방식대로 마커를 달아 보냈습니다.",
   "page.kept.requirement_off": "필요한 기능이 더는 켜져 있지 않지만 켜진 채로 남았습니다.",
   "page.kept.statement_changed": "하는 일이 바뀌었지만 켜진 채로 남았습니다. 다시 읽고 켜서 확인하세요.",
   "page.kept.submission_unknown": "보낸 이어서 하기 메시지가 도착했는지 증명하지 못했지만 켜진 채로 남았습니다.",

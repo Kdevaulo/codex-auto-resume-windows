@@ -129,6 +129,8 @@
   "page.kept.not_delivered_on_open": "Pozostała włączona, chociaż Codex nie wykonał wiadomości z kolejki po otwarciu jej rozmowy.",
   "page.kept.not_dispatched_by_session": "Pozostała włączona, chociaż sesja w terminalu lub VS Code nie odebrała na czas wiadomości dodanej dla niej do kolejki.",
   "page.kept.refused_by_codex": "Pozostała włączona, chociaż Codex odmówił rozpoczęcia tury bez słów.",
+  "page.overruled.queue_for_open": "Ustąpiła innej funkcji: funkcja „Kolejkuj do otwarcia rozmowy” wysłała kontynuację zwykłą drogą, ze znacznikiem.",
+  "page.overruled.other_sessions": "Ustąpiła innej funkcji: funkcja „Przywracaj rozmowy z CLI, TUI i VS Code” wysłała kontynuację zwykłą drogą, ze znacznikiem.",
   "page.kept.requirement_off": "Funkcja pozostała włączona, choć funkcja, której wymaga, nie jest już włączona.",
   "page.kept.statement_changed": "Funkcja pozostała włączona, choć zmieniło się to, co robi. Przeczytaj opis ponownie i włącz ją, aby potwierdzić.",
   "page.kept.submission_unknown": "Funkcja pozostała włączona, choć nie mogła dowieść, że wysłana przez nią kontynuacja dotarła.",

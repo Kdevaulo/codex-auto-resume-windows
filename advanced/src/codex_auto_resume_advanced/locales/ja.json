@@ -129,6 +129,8 @@
   "page.kept.not_delivered_on_open": "会話を開いたときに Codex がキューのメッセージを実行しませんでしたが、オンのままにしました。",
   "page.kept.not_dispatched_by_session": "ターミナルまたは VS Code のセッションがキューに入れたメッセージを時間内に受け取りませんでしたが、オンのままです。",
   "page.kept.refused_by_codex": "Codex が言葉のないターンの開始を拒否しましたが、オンのままです。",
+  "page.overruled.queue_for_open": "別の機能に譲りました: 「会話を開いたときのためにキューに入れる」が継続メッセージを通常の方法でマーカー付きで送りました。",
+  "page.overruled.other_sessions": "別の機能に譲りました: 「CLI、TUI、VS Code の会話を復旧する」が継続メッセージを通常の方法でマーカー付きで送りました。",
   "page.kept.requirement_off": "必要な機能がオンではなくなりましたが、オンのまま残りました。",
   "page.kept.statement_changed": "内容が変わりましたが、オンのまま残りました。もう一度読んで、オンにして確認してください。",
   "page.kept.submission_unknown": "送った継続メッセージが届いたことを証明できませんでしたが、オンのまま残りました。",

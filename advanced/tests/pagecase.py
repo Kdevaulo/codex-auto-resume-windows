@@ -345,10 +345,12 @@ def audit_data(locale: str, bridge: Bridge) -> dict:  # noqa: C901 - one layout'
     # Each capability on (v0.6.14), so its Keep it on card shows: by turns not kept on, kept on with its longest notice,
     # and kept on sending again with a resend found twice; Send now on, with the waiting recoveries of the fullest snapshot.
     # An action is never given Send again, and an error of its own is the one notice it can have.
+    # v0.6.17: and each stood aside for another feature's continuation, by turns for each of the two that overrule.
     for index, item in enumerate(listing["capabilities"]):
         action = item["kind"] == "action"
         item.update(stored="armed", state="armed", keep_on=index % 3 != 0, send_again=index % 3 == 2 and not action,
-                    notice="hook_exception" if action else (None, "local_check_failed", "duplicate_seen")[index % 3])
+                    notice="hook_exception" if action else (None, "local_check_failed", "duplicate_seen")[index % 3],
+                    overruled_by=("queue_for_open", "other_sessions")[index % 2])
     # What each would have done while watched, at its fullest: every answer the log names and one it does not, each
     # counted more often than anyone would see, watched, and cut by the bound.
     first = watchlog.minute(ac.NOW - 29 * 86400)

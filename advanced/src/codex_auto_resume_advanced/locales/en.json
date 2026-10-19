@@ -605,6 +605,8 @@
   "statement.silent_continuation.stop": "Turn it off here or turn every advanced feature off; continuations then carry their words and marker again.",
   "page.tripped.refused_by_codex": "Turned off: Codex refused to start a turn with no words.",
   "page.kept.refused_by_codex": "It stayed on although Codex refused to start a turn with no words.",
+  "page.overruled.queue_for_open": "Stood aside for another feature: Queue for when a conversation is opened sent a continuation the ordinary way, with the marker.",
+  "page.overruled.other_sessions": "Stood aside for another feature: Recover CLI, TUI and VS Code conversations sent a continuation the ordinary way, with the marker.",
   "page.runs.title": "Turns run here now",
   "page.runs.none": "No turn is running here.",
   "page.runs.until": "until {time} at most",
