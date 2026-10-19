@@ -104,15 +104,16 @@ class ClaimLedger:
         if not acted:
             return DEFER
         global_hourly = connection.execute("SELECT global_hourly FROM %s.meta" % ATTACHED).fetchone()[0]
+        paid = []                                 # the units this claim has written, by their spend ids
         for capability in sorted(acted):
             definition = self.registry.get(capability)
             row = connection.execute("SELECT state, since FROM %s.arming WHERE capability=?" % ATTACHED,
                                      (capability,)).fetchone()
             if definition is None or row is None or row[0] != ArmingState.ARMED:
                 return Alternative.HOLD
-            # The hour is the one this claim found, for every capability of it: the units paid here are
-            # this send's own, and this send is one send (v0.6.17).
-            counts = self.state.counts(connection, ATTACHED, capability, thread_id, now, claim=(key, now))
+            # The hour is the one this claim found, for every capability of it: the units already paid
+            # here are this send's own, named by their spend ids, and this send is one send (v0.6.17).
+            counts = self.state.counts(connection, ATTACHED, capability, thread_id, now, paid=paid)
             if ceiling_reached(counts, definition, global_hourly) is not None:
                 return Alternative.HOLD
             if Alternative.RESEND in acted[capability] and not self._resend(connection, definition, key, now):
@@ -121,7 +122,7 @@ class ClaimLedger:
                 return Alternative.HOLD
             if Alternative.QUEUE_FOR_OPEN in acted[capability] and not self._for_open(connection, definition, key, now):
                 return Alternative.HOLD
-            self.state.record_spend(connection, ATTACHED, capability, thread_id, key, now)
+            paid.append(self.state.record_spend(connection, ATTACHED, capability, thread_id, key, now))
         return DEFER
 
     @staticmethod
@@ -193,7 +194,7 @@ class ClaimLedger:
             if found[0] != RecordState.WAITING:
                 return Alternative.HOLD
             global_hourly = connection.execute("SELECT global_hourly FROM %s.meta" % ATTACHED).fetchone()[0]
-            counts = self.state.counts(connection, ATTACHED, capability, found[2], now, claim=(None, now))
+            counts = self.state.counts(connection, ATTACHED, capability, found[2], now)
             if ceiling_reached(counts, definition, global_hourly) is not None:
                 return Alternative.HOLD
             if not self.state.claim_record(connection, key, now):

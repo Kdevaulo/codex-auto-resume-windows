@@ -450,12 +450,42 @@ class GlobalHourTests(LedgerCase):
         self.assertEqual(len(self.spends(plug)), 4)
 
     def test_a_send_one_capability_rides_counts_as_it_did(self):
+        # A guard for behaviour this change leaves alone, not a proof of it: it passes with the fix reverted.
         plug = self.two_on()
         base = self.h.now
         for number in range(12):
             self.assertIs(self.send(plug, number, base + number, "test_wake"), DEFER)
         self.assertIs(self.send(plug, 12, base + 12, "test_wake"), Alternative.HOLD)
         self.assertEqual(len(self.spends(plug)), 12)
+
+    def test_one_record_claimed_twice_at_one_reading_of_the_clock_is_two_sends(self):
+        """Two claims of the one record at the identical time are two sends, though their units bear the
+        one record and the one time: what a claim leaves out of its hour is the units it wrote itself."""
+        plug = self.two_on()
+        base = self.h.now
+        for number in range(11):
+            self.assertIs(self.send(plug, number, base + number), DEFER)
+        self.assertIs(self.send(plug, 99, base + 11), DEFER, "the twelfth send")
+        self.assertIs(self.send(plug, 99, base + 11), Alternative.HOLD, "the thirteenth, at the same time")
+
+    def test_the_units_of_this_editions_own_records_at_one_reading_are_the_sends_they_are(self):
+        """A record of this edition's own bears no standard record and is paid for by its one capability,
+        so each of its units is a send of its own, however many fall at one reading of the clock."""
+        plug = self.two_on()
+        state = plug.runtime.state
+        with state._transaction() as connection:
+            for _ in range(3):
+                state.record_spend(connection, "main", "test_wake", ac.THREAD, None, self.h.now)
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 3)
+
+    def test_the_thirteenth_send_goes_once_the_first_is_an_hour_old(self):
+        # A guard for the hour's edge, which this change leaves alone: it passes with the fix reverted.
+        plug = self.two_on()
+        base = self.h.now
+        for number in range(12):
+            self.assertIs(self.send(plug, number, base + number), DEFER)
+        self.assertIs(self.send(plug, 12, base + 12), Alternative.HOLD)
+        self.assertIs(self.send(plug, 12, base + 3600), DEFER, "the first send is an hour old")
 
 
 class ChannelTests(LedgerCase):

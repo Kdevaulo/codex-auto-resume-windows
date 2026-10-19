@@ -32,10 +32,16 @@ CHANNELS = frozenset({Point.SENDER, Point.UNLOADED})
 # How far apart a unit's time and a claim's may be and still be the one claim: a unit is spent at the
 # very time the claim writes, so they are equal, and this only absorbs a float's round trip.
 SAME_CLAIM = 0.001
-# Which claim a unit paid for: every unit of one claim bears that claim's standard record and its very
-# time (ledger.py), so this is the same text for all of them and a different one for any other claim.
-# `count(DISTINCT ...)` of it is how many sends an hour the global ceiling has seen.
-CLAIM_OF = "(ifnull(interruption_id, '-') || '@' || at)"
+# How the units of one claim are told from another claim's, for the hourly ceiling, which counts sends:
+# a claim writes its units together, under its one standard record and at its one time, so they group by
+# (record, time) - on the stored numbers themselves, never on text of them, which would make two claims a
+# ten-millionth of a second apart one. A unit with no standard record is a record of this edition's own,
+# which one capability alone pays for, so there each unit stands for its own claim (its spend id groups
+# it alone). And the claim asking tells `counts` the units it has written itself, by their spend ids: its
+# own units are the send it is paying for, not a send before it, and that is exact where a time and a
+# record cannot be - two claims of the one record at the one reading of the clock are two sends.
+CLAIM_GROUPS = ("SELECT count(*) FROM (SELECT 1 FROM %s.spend WHERE at>?%s GROUP BY interruption_id, at, "
+                "CASE WHEN interruption_id IS NULL THEN spend_id END)")
 
 
 def _schema(name) -> str:
@@ -44,26 +50,35 @@ def _schema(name) -> str:
     return name
 
 
+def claims_since(connection, schema, since, paid=()) -> int:
+    """How many sends the units written after `since` paid for - one for each claim. `paid` is the spend
+    ids the claim asking has written already, left out: they are its own."""
+    paid = tuple(int(one) for one in paid)
+    left = (" AND spend_id NOT IN (%s)" % ", ".join("?" for _ in paid)) if paid else ""
+    return int(connection.execute(CLAIM_GROUPS % (_schema(schema), left),
+                                  (since, *paid)).fetchone()[0])
+
+
 class SpendMixin:
     @staticmethod
-    def counts(connection, schema, capability, thread_id, now, claim=None) -> dict:
+    def counts(connection, schema, capability, thread_id, now, paid=()) -> dict:
         """What this capability has spent in the last day, overall and in this conversation - one for
         each unit - and how many sends every capability together has paid for in the last hour.
 
-        `claim` is the claim being paid for now, as (its standard record, its time), whose own units
-        are left out of that hour: the capabilities that ride one send pay a unit each, inside the one
-        claim, and each must see the same hour as the first of them did, or the send that reaches the
-        ceiling with the next unit is the one held (v0.6.17)."""
+        `paid` is the spend ids the claim asking has written already (ledger.py). They are left out of
+        that hour: the capabilities that ride one send pay a unit each, inside the one claim, and each
+        must see the hour the first of them saw, or the send that reaches the ceiling with the next
+        unit is the one held (v0.6.17)."""
         schema = _schema(schema)
         day, hour = now - DAY, now - HOUR
-        key, at = (None, None) if claim is None else claim
         row = connection.execute(
             ("SELECT coalesce(sum(capability=? AND at>?), 0) AS capability_day, "
-             "coalesce(sum(capability=? AND thread_id=? AND at>?), 0) AS conversation_day, "
-             "count(DISTINCT CASE WHEN at>? AND NOT coalesce(at=? AND interruption_id IS ?, 0) "
-             "THEN " + CLAIM_OF + " END) AS global_hour FROM %s.spend WHERE at>?") % schema,
-            (capability, day, capability, thread_id, day, hour, at, key, min(day, hour))).fetchone()
-        return {name: int(row[name]) for name in ("capability_day", "conversation_day", "global_hour")}
+             "coalesce(sum(capability=? AND thread_id=? AND at>?), 0) AS conversation_day "
+             "FROM %s.spend WHERE at>?") % schema,
+            (capability, day, capability, thread_id, day, min(day, hour))).fetchone()
+        found = {name: int(row[name]) for name in ("capability_day", "conversation_day")}
+        found["global_hour"] = claims_since(connection, schema, hour, paid)
+        return found
 
     def spent(self, capability, thread_id, now=None) -> dict:
         """`counts` on this file's own connection, for a look before the claim. No file, no spend."""
@@ -73,8 +88,9 @@ class SpendMixin:
                 return {"capability_day": 0, "conversation_day": 0, "global_hour": 0}
             return self.counts(connection, "main", capability, thread_id, now)
 
-    def record_spend(self, connection, schema, capability, thread_id, interruption_id, now) -> None:
-        """One unit, inside the caller's transaction. Pruned now and then, never inside a day."""
+    def record_spend(self, connection, schema, capability, thread_id, interruption_id, now) -> int:
+        """One unit, inside the caller's transaction. Pruned now and then, never inside a day. Its spend
+        id, which the claim that wrote it hands back to `counts` as one of its own."""
         schema = _schema(schema)
         if self.registry.get(capability) is None:
             raise StateError("unknown capability")
@@ -84,8 +100,10 @@ class SpendMixin:
         now = _timestamp(now, "time")
         connection.execute("INSERT INTO %s.spend (at, capability, thread_id, interruption_id) "
                            "VALUES (?,?,?,?)" % schema, (now, capability, thread_id, interruption_id))
-        if prune_every(connection.execute("SELECT last_insert_rowid()").fetchone()[0]):
+        spend_id = int(connection.execute("SELECT last_insert_rowid()").fetchone()[0])
+        if prune_every(spend_id):
             self._prune_spend(connection, schema, now)
+        return spend_id
 
     def spends_since(self, capability, since) -> dict:
         """{interruption id: the times of the units a capability spent on it} since `since`, from
