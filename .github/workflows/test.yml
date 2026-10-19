@@ -52,18 +52,29 @@ jobs:
     # 61 - 24 jobs, and the last 4 wait for a whole part; 4 parts, 48 (57); 5 parts, 43 alone but 64
     # once a release's or the ko sync's four jobs hold slots too. And tests/test_gui_layout.py, one
     # file of one probe, is a floor of about 20 minutes on a runner that no count goes below.
+    #
+    # Three parts for the standard lane, four for the advanced (2026-10-20), from tests/data/durations.json
+    # and the runs since. The standard lane is 5794 s in all: 4 parts are 1448 s each (24 minutes), 3 parts
+    # 1931 s each (32 minutes). The advanced lane is 10607 s: 4 parts are 2652 s each (44 minutes), and its
+    # floor is one file, advanced/tests/test_advanced_page_layout_3.py at 2566 s, so the advanced parts bound
+    # a run and three standard parts do not lengthen it. What a run waits for is runners: dev run 39198984813
+    # ran alone, all 36 jobs started at once, and took 61 minutes; run 39191648359 overlapped main's run
+    # 39191641442, its jobs waited for runners, and it took 92 minutes. Three standard parts take 4 jobs
+    # from every run. The main-tree job and release.yml stay at four.
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13", "3.14"]
         experimental: [false]
         edition: [standard, advanced]
-        # PARTS below is the length of this list; tests/test_split_runs.py holds the two together,
-        # so no part of a lane can be dropped by changing one of them.
+        # The longest lane's parts; PARTS below is this list for the advanced lane and one fewer for the
+        # standard, whose part 4 is excluded. tests/test_split_runs.py holds each lane's list (this one
+        # without what is excluded) to 1..its PARTS, so no part of a lane can be dropped by changing one of them.
         part: [1, 2, 3, 4]
-        # A quick run (workflow_dispatch input `quick`) keeps 3.13 alone: the others and the pre-release lane are
-        # excluded. Without the input the expression is an empty list and the matrix is whole.
-        exclude: '${{ fromJSON(inputs.quick && ''[{"python-version":"3.12"},{"python-version":"3.14"},{"python-version":"3.15"}]'' || ''[]'') }}'
+        # The standard lane has no part 4 (see its three parts above). A quick run (workflow_dispatch input
+        # `quick`) keeps 3.13 alone: the others and the pre-release lane are excluded as well. Without the input
+        # only the standard part 4 is.
+        exclude: '${{ fromJSON(inputs.quick && ''[{"python-version":"3.12"},{"python-version":"3.14"},{"python-version":"3.15"},{"edition":"standard","part":4}]'' || ''[{"edition":"standard","part":4}]'') }}'
         include:
           # The next Python, while it is still a release candidate. It is not decoration:
           # it compiles the sources and runs the same suite, and a failure is annotated
@@ -77,7 +88,6 @@ jobs:
           - {python-version: "3.15", experimental: true, edition: standard, part: 1}
           - {python-version: "3.15", experimental: true, edition: standard, part: 2}
           - {python-version: "3.15", experimental: true, edition: standard, part: 3}
-          - {python-version: "3.15", experimental: true, edition: standard, part: 4}
           - {python-version: "3.15", experimental: true, edition: advanced, part: 1}
           - {python-version: "3.15", experimental: true, edition: advanced, part: 2}
           - {python-version: "3.15", experimental: true, edition: advanced, part: 3}
@@ -166,7 +176,8 @@ jobs:
           # RefusalTests.test_the_refusals_match_a_generated_schema).
           CODEX_AR_SCHEMA_DIR: ${{ matrix.edition == 'advanced' && format('{0}/advanced/tests/data/app-server-schema', github.workspace) || '' }}
           PART: ${{ matrix.part }}
-          PARTS: "4"
+          # The standard lane's three parts and the advanced lane's four (the matrix's `exclude`).
+          PARTS: ${{ matrix.edition == 'standard' && '3' || '4' }}
         run: python scripts/test_parts.py --lane $env:CODEX_AR_EDITION --part "$env:PART/$env:PARTS" -v --annotate --seconds "$env:RUNNER_TEMP\seconds.json"
 
       - name: Keep this part's seconds per file
