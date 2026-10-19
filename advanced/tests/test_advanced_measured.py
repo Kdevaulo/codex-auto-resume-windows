@@ -157,7 +157,9 @@ class TableTests(unittest.TestCase):
                          # v0.6.15-beta's own, for several conversations at once: not made yet.
                          {Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK, Measurement.MT,
                           # v0.6.17 (issue #42): a continuation queued for opening with no marker - the owner's run.
-                          Measurement.MQO})
+                          Measurement.MQO,
+                          # and the two measured in the same sitting: several at once (MQP), a goal beside it (MQG).
+                          Measurement.MQP, Measurement.MQG})
 
 
 if __name__ == "__main__":

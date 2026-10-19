@@ -125,5 +125,148 @@ class ShapeTests(MqoCase):
         self.assertIn("self.source.marker_rows(thread, marker)", reconcile)
 
 
+
+THREADS = ("0a1b2c3d-0001-7000-8000-0000000000a1", "0a1b2c3d-0001-7000-8000-0000000000a2",
+           "0a1b2c3d-0001-7000-8000-0000000000a3")
+
+
+class MqpTests(MqoCase):
+    """MQP (v0.6.17): two to four conversations sent to at once, each under its own client id."""
+
+    def run_mqp(self, *, threads=THREADS, held=(), crossed=False):
+        seen = {}
+
+        def queue_list(params):
+            thread = params["threadId"]
+            index = list(threads).index(thread)
+            looks = seen[thread] = seen.get(thread, 0) + 1
+            if looks > 1:
+                return {"data": []}                      # taken: the person opened it
+            mine = measure._SAMPLE_MQP_CLIENT_IDS[index]
+            other = measure._SAMPLE_MQP_CLIENT_IDS[(index + 1) % len(threads)]
+            return {"data": [{"clientUserMessageId": mine}] + ([{"clientUserMessageId": other}] if crossed else [])}
+        replies = {"thread/loaded/list": {"data": list(held)}, "thread/queue/add": {"queuedSubmissionId": "q"},
+                   "thread/queue/list": queue_list}
+
+        def factory(measurement):
+            self.sessions.append(FakeSession(measurement, replies))
+            return self.sessions[-1]
+
+        def history(ctx, thread, client_id):
+            return client_id == measure._SAMPLE_MQP_CLIENT_IDS[list(threads).index(thread)]
+        with patch.object(measure, "_recorded_in", history):
+            summary = measure.run(Measurement.MQP, session_factory=factory, backend=Backend(), versions=VERSIONS,
+                                  thread=",".join(threads), clock=lambda: 1_800_000_000.0, directory=self.dir)
+        return json.loads(Path(summary["recorded"]).read_text(encoding="utf-8"))
+
+    def test_it_declares_its_methods_and_has_a_probe(self):
+        self.assertEqual(protocol.MEASUREMENT_METHODS[Measurement.MQP],
+                         ("thread/loaded/list", "thread/queue/add", "thread/queue/list"))
+        self.assertIs(measure.PROBES[Measurement.MQP], measure._mqp)
+        self.assertNotIn(Measurement.MQP, measured.MEASURED)
+
+    def test_each_add_in_its_own_session_each_lands_in_its_own_conversation_only(self):
+        record = self.run_mqp()
+        self.assertEqual(record["verdict"], Verdict.BLOCKED)
+        observed = record["observed"]
+        self.assertEqual({key: observed[key] for key in ("conversations", "accepted", "queued_in_own",
+                                                          "queued_elsewhere", "taken", "found_in_own",
+                                                          "found_elsewhere")},
+                         {"conversations": 3, "accepted": 3, "queued_in_own": 3, "queued_elsewhere": 0, "taken": 3,
+                          "found_in_own": 3, "found_elsewhere": 0})
+        adds = [params for session in self.sessions for method, params in session.calls
+                if method == "thread/queue/add"]
+        self.assertEqual(sorted((add["threadId"], add["clientUserMessageId"]) for add in adds),
+                         sorted(zip(THREADS, measure._SAMPLE_MQP_CLIENT_IDS)))
+        adders = [session for session in self.sessions
+                  if [method for method, _params in session.calls] == ["thread/queue/add"]]
+        self.assertEqual(len(adders), 3, "each add in a session of its own")
+        text = json.dumps(record)
+        for secret in THREADS + measure._SAMPLE_MQP_CLIENT_IDS:
+            self.assertNotIn(secret, text)
+
+    def test_an_item_in_another_conversations_queue_is_counted(self):
+        self.assertEqual(self.run_mqp(crossed=True)["observed"]["queued_elsewhere"], 3)
+
+    def test_one_conversation_the_app_holds_and_nothing_is_added(self):
+        record = self.run_mqp(held=(THREADS[1],))
+        self.assertEqual(record["observed"]["held_before"], 1)
+        self.assertNotIn("thread/queue/add", [method for s in self.sessions for method, _p in s.calls])
+
+    def test_it_takes_two_to_four_different_conversations_and_no_other_measurement_takes_a_list(self):
+        for named in (THREADS[:1], THREADS + THREADS[:2], (THREADS[0], THREADS[0])):
+            with self.subTest(named), self.assertRaises(measure.EvidenceUnavailable):
+                measure.run(Measurement.MQP, session_factory=lambda m: None, backend=Backend(), versions=VERSIONS,
+                            thread=",".join(named), directory=self.dir)
+        with self.assertRaises(measure.EvidenceUnavailable):
+            measure.run(MQO, session_factory=lambda m: None, backend=Backend(), versions=VERSIONS,
+                        thread=",".join(THREADS[:2]), directory=self.dir)
+
+
+class MqgTests(MqoCase):
+    """MQG (v0.6.17): a goal set active and a continuation queued for opening, in one conversation opened."""
+
+    def run_mqg(self, *, goal="paused", held=(), ran=2):
+        statuses = [goal, "active", "active"]
+
+        def goal_get(_params):
+            status = statuses.pop(0) if len(statuses) > 1 else statuses[0]
+            return {"goal": None} if goal is None else {"goal": {"status": status, "objective": "secret words"}}
+        looks = []
+
+        def queue_list(_params):
+            looks.append(1)
+            return {"data": [{"clientUserMessageId": measure._SAMPLE_MQG_CLIENT_ID}] if len(looks) == 1 else []}
+        replies = {"thread/loaded/list": {"data": list(held)}, "thread/goal/get": goal_get, "thread/goal/set": {},
+                   "thread/queue/add": {"queuedSubmissionId": "q"}, "thread/queue/list": queue_list}
+
+        def factory(measurement):
+            self.sessions.append(FakeSession(measurement, replies))
+            return self.sessions[-1]
+        with patch.object(measure, "_turns_after", lambda home, thread, first: ran), \
+                patch.object(measure, "_client_recorded", lambda ctx, client_id: True), \
+                patch.object(measure, "_MQG_SETTLE_SECONDS", 0.05):
+            summary = measure.run(Measurement.MQG, session_factory=factory, backend=Backend(), versions=VERSIONS,
+                                  thread=THREAD, clock=lambda: 1_800_000_000.0, directory=self.dir)
+        return json.loads(Path(summary["recorded"]).read_text(encoding="utf-8"))
+
+    def test_it_declares_its_methods_and_has_a_probe(self):
+        self.assertEqual(protocol.MEASUREMENT_METHODS[Measurement.MQG],
+                         ("thread/loaded/list", "thread/goal/get", "thread/goal/set", "thread/queue/add",
+                          "thread/queue/list"))
+        self.assertIs(measure.PROBES[Measurement.MQG], measure._mqg)
+        self.assertNotIn(Measurement.MQG, measured.MEASURED)
+
+    def test_goal_set_active_message_queued_taken_and_the_turns_after_counted(self):
+        record = self.run_mqg()
+        self.assertEqual(record["verdict"], Verdict.BLOCKED)
+        observed = record["observed"]
+        self.assertEqual({key: observed[key] for key in ("goal_found", "goal_set_active", "add_accepted",
+                                                          "queued_while_not_held", "taken", "turns_after_open",
+                                                          "client_id_on_user_item", "goal_active_after")},
+                         {"goal_found": True, "goal_set_active": True, "add_accepted": True,
+                          "queued_while_not_held": True, "taken": True, "turns_after_open": 2,
+                          "client_id_on_user_item": True, "goal_active_after": True})
+        calls = [method for session in self.sessions for method, _params in session.calls]
+        self.assertLess(calls.index("thread/goal/set"), calls.index("thread/queue/add"), "the goal first")
+        (goal_set,) = [params for s in self.sessions for method, params in s.calls if method == "thread/goal/set"]
+        self.assertEqual(goal_set, {"threadId": THREAD, "status": "active"}, "never an objective: never creating one")
+        self.assertNotIn("secret words", json.dumps(record))
+        self.assertIn("two turns ran", record["note"])
+
+    def test_no_goal_and_nothing_is_set_or_added(self):
+        record = self.run_mqg(goal=None)
+        self.assertEqual(record["observed"]["goal_found"], False)
+        calls = [method for session in self.sessions for method, _params in session.calls]
+        self.assertNotIn("thread/goal/set", calls)
+        self.assertNotIn("thread/queue/add", calls)
+
+    def test_held_and_nothing_is_read_set_or_added(self):
+        record = self.run_mqg(held=(THREAD,))
+        self.assertEqual(record["observed"]["held_before"], True)
+        self.assertEqual([method for session in self.sessions for method, _params in session.calls],
+                         ["thread/loaded/list"])
+
+
 if __name__ == "__main__":
     unittest.main()
