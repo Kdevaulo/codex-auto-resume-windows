@@ -313,8 +313,7 @@ namespace CodexAutoResume
                                                             ? words.Say("installer.update", "Update")
                                                             : words.Say("action.install", "Install"))
                          : words.Say("installer.next", "Next");
-            light.State = name == InstallerFlow.Progress ? "checking"
-                        : name == InstallerFlow.Finish ? (code == 0 ? "monitoring" : "failed") : "idle";
+            light.State = InstallerFlow.Light(flow.Mode, name, code, unconfirmed, previousRunning);
             PerformLayout();
             if (forwardShown && forward.Enabled) ActiveControl = forward;
         }

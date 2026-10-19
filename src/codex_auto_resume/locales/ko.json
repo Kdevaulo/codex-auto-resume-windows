@@ -642,7 +642,7 @@
   "installer.maintain.repair": "복구",
   "installer.maintain.repair_help": "이 버전을 그 자리에 다시 설치합니다. 설정, 기다리는 모든 작업, 로그인 시 실행 선택은 그대로 유지됩니다.",
   "installer.next": "다음",
-  "installer.options.edition_change": "여기에는 {from} 에디션이 설치되어 있고, 이것은 {to} 에디션입니다.",
+  "installer.options.edition_change": "여기에는 {from}이 설치되어 있고, 이것은 {to}입니다.",
   "installer.options.edition_confirm": "에디션 변경",
   "installer.options.heading": "설치하기 전에",
   "installer.options.kept": "이 작업은 여기에 설치된 항목을 업데이트합니다. 설정, 대기 중인 항목, 로그인 시 실행 선택은 그대로 유지됩니다.",

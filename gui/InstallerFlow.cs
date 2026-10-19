@@ -117,6 +117,32 @@ namespace CodexAutoResume
         /// Whether this run repairs the installation: the Maintain page's Repair.
         internal bool Repair { get { return Maintaining && Mode == Install; } }
 
+        /// The status light for each phase the window shows, in one place (the owner, 2026-10-20: the light is the state
+        /// that is true there, in every phase). Only the Dashboard's own states, by its rule (DashboardActions.HeaderLight):
+        /// grey "idle" for a watcher not known to be running, a lit state only for one that is.
+        ///   - the pages before the run (Welcome, Options with the edition change, Maintain, Confirm, Notes): the window
+        ///     has not looked at the watcher, so it is not known to be running - idle;
+        ///   - the run, and a run still working in the background (StillRunning): the product is being changed - the
+        ///     working light, "checking";
+        ///   - an uninstall that finished: the product is gone and nothing watches - idle;
+        ///   - a run that failed or could not start: what runs now is not known - idle, as the Dashboard has it;
+        ///   - an install, update or repair whose watcher was not confirmed running - idle;
+        ///   - an update whose previous watcher is still finishing and the new one waits to be started: a watcher runs
+        ///     and wants the person - "attention";
+        ///   - an install, update or repair whose watcher was confirmed running - "monitoring".
+        /// Comparisons, not a switch (build/normalize_pe.py).
+        internal static string Light(string mode, string page, int code, bool unconfirmed, bool previousRunning)
+        {
+            if (page == Progress) return "checking";
+            if (page != Finish) return "idle";
+            if (code == StillRunning) return "checking";
+            if (code != 0) return "idle";
+            if (mode == Uninstall) return "idle";
+            if (unconfirmed) return "idle";
+            if (previousRunning) return "attention";
+            return "monitoring";
+        }
+
         /// Whether the page that starts the run may start it: an edition change only once it is asked for.
         internal bool CanStart()
         {

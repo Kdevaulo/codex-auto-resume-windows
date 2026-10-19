@@ -572,6 +572,8 @@ class UninstallWithTheDashboardOpenTests(unittest.TestCase):
             "        if (-not $f.Alive -or $null -eq $script:DashboardsAskedAt) { continue }",
             "        if ($f.Kind -eq 'unsaved') { Set-Content -LiteralPath (Join-Path (Join-Path $InstallHome 'config') "
             "('update-unsaved-' + $f.ProcessId + '.txt')) -Value 'unsaved' }",
+            "        if ($f.Kind -eq 'new') { Set-Content -LiteralPath (Join-Path (Join-Path $InstallHome 'config') "
+            "('reopen-after-update-' + $f.ProcessId + '.txt')) -Value '--page=pending --reopened=1'; $f.Alive = $false }",
             "    }",
             "    return ,@($global:Fakes | Where-Object { $_.Alive } | ForEach-Object { [pscustomobject]@{ "
             "ProcessId = $_.ProcessId; CommandLine = $_.CommandLine } })",
@@ -657,6 +659,26 @@ class UninstallWithTheDashboardOpenTests(unittest.TestCase):
             self.assertIn("Closing the Dashboard so its files can be removed", done.stdout)
             self.assertFalse((home / "app").exists())
             self.assertTrue((home / "config" / "settings.json").is_file())
+
+    def test_a_dashboard_of_this_version_closes_and_leaves_no_record_to_open_again(self):
+        """The v0.6.17 acceptance: the uninstall closed the open Dashboard, which wrote where it was
+        (config/reopen-after-update-<pid>.txt) as it does for an update; config/ is kept by a keep-data uninstall, and
+        the reinstall after it, no update, never swept the record. An uninstall opens nothing again: it removes them."""
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            done, steps = self.run_uninstall(home, windows=[(601, "x --page=pending", "new")], entries=self.entry(home))
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertIn("The Dashboard closed", done.stdout)
+            self.assertEqual(sorted(p.name for p in (home / "config").glob("reopen-after-update*")), [],
+                             "the record the closed window wrote is gone")
+            self.assertTrue((home / "config" / "settings.json").is_file(), "the settings are kept")
+        with tempfile.TemporaryDirectory() as name:
+            home = self.installation(Path(name))
+            done, steps = self.run_uninstall(home, windows=[(602, "x", "new"), (603, "x", "unsaved")],
+                                             entries=self.entry(home))
+            self.assert_nothing_removed(home, done, steps)
+            self.assertEqual(sorted(p.name for p in (home / "config").glob("reopen-after-update*")), [],
+                             "nor when the uninstall stops for a window that keeps unsaved changes")
 
     def test_with_nothing_open_it_runs_as_before(self):
         with tempfile.TemporaryDirectory() as name:
