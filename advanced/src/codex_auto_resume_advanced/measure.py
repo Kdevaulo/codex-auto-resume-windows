@@ -1217,6 +1217,47 @@ def _mc1(ctx):
                     "turn ran as one you typed, then set the verdict", **observed)
 
 
+def _mqo(ctx):
+    """A continuation queued for opening, with no marker (v0.6.17, issue #42): the owner names a throwaway conversation
+    the Desktop does not hold. The harness lists what the app holds - and stops there if it holds this one - then adds
+    one short message to its queue under a client id of no one's, with no marker (thread/queue/add, M7's call, as
+    marker-free continuation sends), looks that it stays queued, and follows the queue for up to _MQO_OPEN_SECONDS
+    while the person opens the conversation in the Desktop. Taken, it reads Codex's history for that client id on a
+    person's message the way core proves a marker-free continuation delivered (LocalSource.marker_rows: the history
+    database's userMessage items, placed by the rollout - engine/reconcile.py reads exactly this). That the message
+    ran there once, as the person's own, is what the person watching confirms."""
+    with ctx.open() as session:
+        loaded = session.call("thread/loaded/list")
+        held = loaded.get("data") if isinstance(loaded, dict) else None
+        if not isinstance(held, list):
+            return _blocked("the conversations the app holds could not be listed", loaded_listed=False)
+        if ctx.probe_thread in held:
+            return _blocked("the app holds the throwaway conversation: quit and reopen the Codex app without opening "
+                            "it, then run mqo again", loaded_listed=True, held_before=True)
+        added = session.call("thread/queue/add", {"threadId": ctx.probe_thread,
+                                                  "clientUserMessageId": _SAMPLE_MQO_CLIENT_ID,
+                                                  "input": [{"type": "text", "text": _M2B_PROMPT}]})
+        listed = session.call("thread/queue/list", {"threadId": ctx.probe_thread})
+        items = listed.get("data") if isinstance(listed, dict) else None
+        waiting = isinstance(items, list) and any(
+            isinstance(item, dict) and item.get("clientUserMessageId") == _SAMPLE_MQO_CLIENT_ID for item in items)
+        began = time.monotonic()
+        taken = waiting and _await_taken(session, ctx.probe_thread, _SAMPLE_MQO_CLIENT_ID, _MQO_OPEN_SECONDS)
+    waited = time.monotonic() - began
+    found = False
+    deadline = time.monotonic() + _MQO_FIND_SECONDS
+    while taken:
+        found = _client_recorded(ctx, _SAMPLE_MQO_CLIENT_ID)
+        if found or time.monotonic() >= deadline:
+            break
+        time.sleep(_M2B_POLL_SECONDS)
+    observed = {"loaded_listed": True, "held_before": False, "add_accepted": isinstance(added, dict),
+                "queued_while_not_held": waiting, "taken": taken, "taken_seconds": _seconds(waited),
+                "client_id_on_user_item": found}
+    return _blocked("open the throwaway conversation in the Desktop within five minutes of starting this; confirm the "
+                    "message ran there once, as your own, with no marker, then set the verdict", **observed)
+
+
 class _Watch:
     """What MC2 sees of one conversation, look after look: when the history first said a new latest turn was in
     progress and when it ended, when the rollout's newest event first said a task started and ended, whether the
@@ -1320,6 +1361,9 @@ _MB_VALUE = 8                    # the value MB writes: the retry settings' defa
 _MC1_QUEUE_SECONDS = 60.0        # how long MC1 follows the queue for the app to take its item
 _MC1_START_SECONDS = 10.0        # and then the history for the turn it starts
 _MC2_SECONDS = 300.0
+_SAMPLE_MQO_CLIENT_ID = "00000000-0000-7000-8000-000000000005"
+_MQO_OPEN_SECONDS = 300.0        # how long MQO follows the queue for the person to open the conversation
+_MQO_FIND_SECONDS = 30.0         # and then the history for the message under its client id
 _MC2_POLL_SECONDS = 0.25
 
 
@@ -1334,6 +1378,7 @@ PROBES = {
     Measurement.MIPC: _mipc, Measurement.MAWS: _maws, Measurement.MCLOUD: _mcloud,
     Measurement.M6B: _m6b, Measurement.MO: _mo, Measurement.MX: _mx, Measurement.MXA: _mxa, Measurement.MF: _mf,
     Measurement.M3B: _m3b, Measurement.MB: _mb, Measurement.MC1: _mc1, Measurement.MC2: _mc2,
+    Measurement.MQO: _mqo,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe

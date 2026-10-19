@@ -95,6 +95,9 @@ MEASUREMENT_METHODS = {
     Measurement.MB: ("config/read", "config/value/write"),
     Measurement.MC1: ("thread/queue/add", "thread/queue/list"),
     Measurement.MC2: (),
+    # v0.6.17: MQO lists what the app holds, adds one item with no marker to a conversation it does not hold - M7's
+    # call - and follows that conversation's queue until the person opens it; the history is read from its database.
+    Measurement.MQO: ("thread/loaded/list", "thread/queue/add", "thread/queue/list"),
 }
 
 # The methods a capability's own route may call, beyond `initialize` - each one a measurement

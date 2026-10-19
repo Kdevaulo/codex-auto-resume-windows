@@ -435,6 +435,11 @@ class Measurement(StrEnum):
     MB = "mb"
     MC1 = "mc1"
     MC2 = "mc2"
+    # v0.6.17 (issue #42): one message added with no marker, under a client id, to a throwaway conversation the
+    # Desktop does not hold, stays queued, is taken when the person opens it there, and its delivered message is found
+    # in Codex's history by that client id - the proof marker-free continuation uses on a loaded conversation. What
+    # marker-free continuation needs to carry a continuation queued for opening (engine/markerfree.carries).
+    MQO = "mqo"
 
 
 class ObservedWord(StrEnum):
