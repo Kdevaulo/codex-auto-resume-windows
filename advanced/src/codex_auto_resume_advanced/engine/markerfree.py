@@ -23,6 +23,14 @@ holds one of `codex queue`'s; the tripwire for a paid send that went unknown tur
 off (arming.py). Only a failure before anything was asked of Codex - no app server could be
 started, or the words are not ones core would send - is "not started", which core may retry.
 
+It answers for every send (v0.6.17, issue #42). A continuation queued for when its conversation is opened (P16's
+QUEUE_FOR_OPEN) it carries too - with no marker, under its client id, left in the queue for the person to open - only
+where MQO passed for the Codex in force: that such an item, taken when the conversation is opened, is found in
+Codex's history by its client id, which is how core proves this delivery (`carries`). Unmeasured or failed, and for
+a continuation sent to another Codex session (TO_SESSION), which MQO does not cover, it stands aside for that send:
+core's backend carries it with its marker, and the runtime journals it as overruled, naming queue_for_open or
+other_sessions and why (runtime.CONFLICTS). Every other send - a conversation the app holds - it serves as before.
+
 No test opens a real Codex: the tests give the channel a session over a fake app server, and the
 live session is opened only by a watcher that has this capability armed.
 """
@@ -35,6 +43,7 @@ from codex_auto_resume.domain.plug import Alternative
 
 from ..codex import inuse
 from ..codex.protocol import Session, SessionRefused
+from ..vocabulary import ArmingWarning, Measurement
 
 CAPABILITY = "marker_free_continuation"
 METHOD = "thread/queue/add"
@@ -68,11 +77,32 @@ class MarkerFreeContinuation:
     `session` is a factory for the app-server session the one call is made in; None opens a live
     one against the Codex the watcher drives (codex/inuse.py), restricted to this capability's one
     method (codex/protocol.CAPABILITY_METHODS)."""
-    __slots__ = ("paths", "_open")
+    __slots__ = ("paths", "_open", "_scoped")
 
     def __init__(self, paths, *, session=None):
         self.paths = paths
         self._open = session
+        self._scoped = None
+
+    def bind(self, scoped):
+        """Its view of the state (state.Scoped): here, only whether a measurement passed or failed on the Codex in
+        force."""
+        self._scoped = scoped
+
+    def carries(self, word):
+        """Whether it can carry its send together with the P16 answer `word` taken for the same record (v0.6.17,
+        runtime.CONFLICTS): True for QUEUE_FOR_OPEN where MQO passed on the Codex in force; otherwise why not, as the
+        statement's warning words say it - MQO failed, or not measured (TO_SESSION: no measurement covers it)."""
+        scoped = self._scoped
+        if word == Alternative.QUEUE_FOR_OPEN and scoped is not None:
+            try:
+                if scoped.passed(Measurement.MQO):
+                    return True
+                if scoped.failed(Measurement.MQO):
+                    return ArmingWarning.MEASUREMENT_FAILED
+            except Exception:
+                pass
+        return ArmingWarning.UNMEASURED
 
     def sender(self, record, backend):
         """P5: this object is the channel. `backend` is core's stand-in, never core's backend."""

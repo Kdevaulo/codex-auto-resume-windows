@@ -180,6 +180,9 @@ class JournalCode(StrEnum):
     WOULD_HAVE = "would_have"                # a watched capability's answer, not taken
     ACTED = "acted"                          # an armed capability's answer, taken
     CEILING = "ceiling"                      # an armed capability's answer, not taken: no unit left
+    # v0.6.17 (issue #42): two capabilities' answers for one record that cannot both be carried (runtime.CONFLICTS):
+    # this one stood aside for the other, which the line's answer names - a split; each serves its own cases.
+    OVERRULED = "overruled"
     CEILING_CHANGED = "ceiling_changed"
     OPTION_CHANGED = "option_changed"        # a capability's own choice, set in the Dashboard
     RULE_ADDED = "rule_added"
@@ -430,6 +433,19 @@ class Measurement(StrEnum):
     MB = "mb"
     MC1 = "mc1"
     MC2 = "mc2"
+    # v0.6.17 (issue #42): one message added with no marker, under a client id, to a throwaway conversation the
+    # Desktop does not hold, stays queued, is taken when the person opens it there, and its delivered message is found
+    # in Codex's history by that client id - the proof marker-free continuation uses on a loaded conversation. What
+    # marker-free continuation needs to carry a continuation queued for opening (engine/markerfree.carries).
+    MQO = "mqo"
+    # v0.6.17: two to four messages added at once, each under its own client id, to as many throwaway conversations
+    # the Desktop does not hold - whether every add is accepted and each lands in its own conversation only (what
+    # pooling several sends through one channel rests on, parallel_dispatch).
+    MQP = "mqp"
+    # v0.6.17: a throwaway conversation the Desktop does not hold, with its goal set active and a continuation queued
+    # for opening, opened by the person - whether two turns then run (the goal's and the queued one) or one (M1 and
+    # M2 together, which no measurement made; goal_continuation beside queue_for_open rests on it).
+    MQG = "mqg"
 
 
 class ObservedWord(StrEnum):
