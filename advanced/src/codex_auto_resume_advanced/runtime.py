@@ -162,15 +162,18 @@ def _restricts(answer) -> bool:
         return False
 
 
-def _preferred(point, chosen, answer) -> bool:
+def _preferred(point, chosen, answer, record, now) -> bool:
     """Whether `answer` is taken at `point` although an earlier capability's `chosen` was taken first (v0.6.17).
 
-    A point is first wins, and this is its one exception: at P7, a person's Send now over an early look. The
-    request is the person's own, for that one record; an early look is core's own way of looking at a record
-    sooner, and core makes none at a wait an early look does not pass - a postponement, which only Send now
-    passes (core's engine/relaxed.py). Taken first, EARLY would send nobody there and the person's request
-    would stand unanswered until it lapsed."""
-    return point == Point.SCHEDULE and chosen is Alternative.EARLY and answer is Alternative.SEND_NOW
+    A point is first wins, and this is its one exception: at P7, a person's Send now over an early look - where
+    core would carry the Send now out, and only there. The person asked for the record to go as soon as it can.
+    Core makes no early look at a postponement, which only Send now passes, so there EARLY taken first would
+    send nobody and the request would stand unanswered until it lapsed. But core never carries a Send now out
+    before a usage reset (domain/gates.py, gate_schedule), the very wait an early look exists for: there EARLY
+    is what sends it soonest, and SEND_NOW taken in its place would hold it for the whole early window. So the
+    record is put to core's own schedule gate for a Send now (quiet hours aside, which hold an early look too)."""
+    return (point == Point.SCHEDULE and chosen is Alternative.EARLY and answer is Alternative.SEND_NOW
+            and isinstance(record, dict) and machine.gate_schedule(record, now, forced=True)[0] == machine.PASS)
 
 
 def _word(answer, point):
@@ -333,7 +336,7 @@ class Runtime:
         nothing at P4, P5, P15 or P16: its words are the person's, and core sends it as it is (v0.6.14).
 
         The first capability to answer is the one taken, in registry order, with one exception (`_preferred`):
-        a person's Send now is preferred to an early look at P7 (v0.6.17)."""
+        a person's Send now is preferred to an early look at P7 where core would carry it out (v0.6.17)."""
         definitions = self.registry.at(point)
         if not definitions or (point in OWN_RECORD_POINTS and _own_record(arguments[0])):
             return getattr(NULL, HOOKS[point])(*arguments)
@@ -368,7 +371,7 @@ class Runtime:
             if _restricts(answer):
                 self._once(JournalCode.ACTED, definition, point, answer, record)
                 return answer
-            if chooser is not None and not _preferred(point, chosen, answer):
+            if chooser is not None and not _preferred(point, chosen, answer, record, self.clock()):
                 continue
             if point in SENDING and not kept:
                 if not isinstance(record, dict) or self._ceiling(definition, record) is not None:

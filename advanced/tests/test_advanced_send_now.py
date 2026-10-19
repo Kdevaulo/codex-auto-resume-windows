@@ -282,6 +282,29 @@ class BesideAnEarlyLookTests(SendNowCase):
         self.assertEqual(len(self.h.backend.send_calls), 1, "looked at early, before its next look was due")
         self.assertEqual([spent[0] for spent in self.spends(plug)], [RESET_CREDIT.id], "the early look paid")
 
+    def reset_ahead(self, h=None):
+        """A usage-limited recovery waiting for its reset, registered before either capability stood on: the wait
+        an early look exists for, and one core never carries a Send now out before."""
+        h = h or self.h
+        h.home.fail_usage(T1, TURN_A)
+        h.backend.loaded_map[T1] = "loaded"
+        h.tick()
+        row = h.record()
+        self.assertEqual(row["state"], "waiting_reset")
+        self.assertGreater(row["reset_at"], h.now + 60)
+        return row
+
+    def test_waiting_for_a_reset_the_early_look_carries_the_persons_request(self):
+        """Fails with the gate check in `_preferred` reverted: SEND_NOW is taken in EARLY's place, core never
+        carries a Send now out before a reset, and the record waits out the early window a credit bought."""
+        row = self.reset_ahead()
+        plug = self.armed()
+        self.assertTrue(self.ask(plug, row["interruption_id"])["done"])
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.h.backend.send_calls), 1, "sent at once by the early look")
+        self.assertLess(self.h.now, row["reset_at"], "before its reset")
+        self.assertEqual([spent[0] for spent in self.spends(plug)], [RESET_CREDIT.id], "the early look paid")
+
 
 class CodeTests(unittest.TestCase):
     class Scoped:
