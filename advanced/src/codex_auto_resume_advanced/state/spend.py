@@ -9,6 +9,12 @@ even when the claim is, since nothing can prove the send it paid for never reach
 The same statements serve both connections: this file's own, where its tables are `main`, and
 core's, where it is attached as `advanced`. The schema name is one of those two constants and is
 never taken from anything else.
+
+A capability's own ceilings count its rows, one for each unit it spent. The global hourly ceiling
+counts claims, not rows (v0.6.17): every capability whose answer one send carries pays its own unit
+there, and the person is told that ceiling in sends - "Sends an hour, all advanced features
+together" - so two capabilities riding one send are one send against it, and the next send the
+hour's twelfth, not its sixth.
 """
 from __future__ import annotations
 
@@ -26,6 +32,10 @@ CHANNELS = frozenset({Point.SENDER, Point.UNLOADED})
 # How far apart a unit's time and a claim's may be and still be the one claim: a unit is spent at the
 # very time the claim writes, so they are equal, and this only absorbs a float's round trip.
 SAME_CLAIM = 0.001
+# Which claim a unit paid for: every unit of one claim bears that claim's standard record and its very
+# time (ledger.py), so this is the same text for all of them and a different one for any other claim.
+# `count(DISTINCT ...)` of it is how many sends an hour the global ceiling has seen.
+CLAIM_OF = "(ifnull(interruption_id, '-') || '@' || at)"
 
 
 def _schema(name) -> str:
@@ -36,16 +46,23 @@ def _schema(name) -> str:
 
 class SpendMixin:
     @staticmethod
-    def counts(connection, schema, capability, thread_id, now) -> dict:
-        """What this capability has spent in the last day, overall and in this conversation, and
-        what every capability together has spent in the last hour."""
+    def counts(connection, schema, capability, thread_id, now, claim=None) -> dict:
+        """What this capability has spent in the last day, overall and in this conversation - one for
+        each unit - and how many sends every capability together has paid for in the last hour.
+
+        `claim` is the claim being paid for now, as (its standard record, its time), whose own units
+        are left out of that hour: the capabilities that ride one send pay a unit each, inside the one
+        claim, and each must see the same hour as the first of them did, or the send that reaches the
+        ceiling with the next unit is the one held (v0.6.17)."""
         schema = _schema(schema)
         day, hour = now - DAY, now - HOUR
+        key, at = (None, None) if claim is None else claim
         row = connection.execute(
-            "SELECT coalesce(sum(capability=? AND at>?), 0) AS capability_day, "
-            "coalesce(sum(capability=? AND thread_id=? AND at>?), 0) AS conversation_day, "
-            "coalesce(sum(at>?), 0) AS global_hour FROM %s.spend WHERE at>?" % schema,
-            (capability, day, capability, thread_id, day, hour, min(day, hour))).fetchone()
+            ("SELECT coalesce(sum(capability=? AND at>?), 0) AS capability_day, "
+             "coalesce(sum(capability=? AND thread_id=? AND at>?), 0) AS conversation_day, "
+             "count(DISTINCT CASE WHEN at>? AND NOT coalesce(at=? AND interruption_id IS ?, 0) "
+             "THEN " + CLAIM_OF + " END) AS global_hour FROM %s.spend WHERE at>?") % schema,
+            (capability, day, capability, thread_id, day, hour, at, key, min(day, hour))).fetchone()
         return {name: int(row[name]) for name in ("capability_day", "conversation_day", "global_hour")}
 
     def spent(self, capability, thread_id, now=None) -> dict:

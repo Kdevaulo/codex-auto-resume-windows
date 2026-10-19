@@ -19,6 +19,9 @@ Two things are decided:
   channel - pays one unit here, in the spend ledger, before the claim that leads to the send is
   granted. No unit left under its own ceilings or the global one, or a capability turned off
   since it answered, and the claim is held: a disarm always wins, and a ceiling is never passed.
+  A capability's own day and conversation ceilings count its units; the global hourly one counts
+  claims (v0.6.17), so the two or three capabilities one send carries cost it one of the twelve
+  sends an hour a person is told of, not two or three (state/spend.py, `counts`).
 
 * A person's Send now (v0.6.14), SEND_NOW at P7: only with that capability's request of this very
   record, unused, under fifteen minutes old and made since the capability last stood where it stands
@@ -107,7 +110,9 @@ class ClaimLedger:
                                      (capability,)).fetchone()
             if definition is None or row is None or row[0] != ArmingState.ARMED:
                 return Alternative.HOLD
-            counts = self.state.counts(connection, ATTACHED, capability, thread_id, now)
+            # The hour is the one this claim found, for every capability of it: the units paid here are
+            # this send's own, and this send is one send (v0.6.17).
+            counts = self.state.counts(connection, ATTACHED, capability, thread_id, now, claim=(key, now))
             if ceiling_reached(counts, definition, global_hourly) is not None:
                 return Alternative.HOLD
             if Alternative.RESEND in acted[capability] and not self._resend(connection, definition, key, now):
@@ -188,7 +193,7 @@ class ClaimLedger:
             if found[0] != RecordState.WAITING:
                 return Alternative.HOLD
             global_hourly = connection.execute("SELECT global_hourly FROM %s.meta" % ATTACHED).fetchone()[0]
-            counts = self.state.counts(connection, ATTACHED, capability, found[2], now)
+            counts = self.state.counts(connection, ATTACHED, capability, found[2], now, claim=(None, now))
             if ceiling_reached(counts, definition, global_hourly) is not None:
                 return Alternative.HOLD
             if not self.state.claim_record(connection, key, now):
