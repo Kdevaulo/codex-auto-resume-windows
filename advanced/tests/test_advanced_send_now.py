@@ -21,14 +21,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import advancedcase as ac  # noqa: E402
 from takingcase import TakingCase  # noqa: E402
+from codex_auto_resume import failures, ladder  # noqa: E402
 from codex_auto_resume.domain.plug import DEFER, Alternative, Point  # noqa: E402
 from codex_auto_resume_advanced import policy, surfaces  # noqa: E402
 from codex_auto_resume_advanced.control import sendnow  # noqa: E402
 from codex_auto_resume_advanced.control.sendnow import LIFETIME, SendNow  # noqa: E402
-from codex_auto_resume_advanced.registry import SEND_NOW  # noqa: E402
+from codex_auto_resume_advanced.engine import credits  # noqa: E402
+from codex_auto_resume_advanced.registry import RESET_CREDIT, SEND_NOW  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import (Actor, ArmingState, JournalCode, McpTool,  # noqa: E402
-                                                   OffReason, OverrideKind, Refusal)
-from test_engine import T1  # noqa: E402
+                                                   Measurement, OffReason, OverrideKind, Refusal,
+                                                   Verdict)
+from test_engine import T1, TURN_A  # noqa: E402
 from test_plug_points import OVERLOADED  # noqa: E402
 
 CAP = "send_now"
@@ -194,6 +197,90 @@ class ArmedTests(SendNowCase):
         self.assertEqual(self.h.record()["state"], "submission_unknown")
         stored = plug.runtime.state.arming()[CAP]
         self.assertEqual((stored["state"], stored["reason"]), (ArmingState.OFF, OffReason.SUBMISSION_UNKNOWN))
+
+
+class BesideAnEarlyLookTests(SendNowCase):
+    """P7 is a first-wins point and reset_credit is asked before Send now: for fifteen minutes after one of its
+    credits reset a window it answers EARLY for every usage-limited recovery that waits. A person's explicit
+    request is the answer taken all the same (v0.6.17) - an early look is core's own optimisation, and core makes
+    none at a wait an early look does not pass, so there EARLY sent nobody and the request went nowhere.
+
+    reset_credit's own conditions are the shipped ones; only the credit spend behind them is stubbed out.
+    """
+    BESIDE = (RESET_CREDIT,)
+
+    def setUp(self):
+        super().setUp()
+        self.compat = {"status": "ok", "engine": {"found": True, "version": ac.ENGINE},
+                       "capabilities": {name: {"state": "COMPATIBLE", "reason": "local_checks_passed"}
+                                        for name in (SEND_NOW.compat, RESET_CREDIT.compat)}}
+        self.measured = {name: (Verdict.PASS, ac.ENGINE)
+                         for name in (Measurement.MU, Measurement.MN, Measurement.MR)}
+        looking = patch.object(credits.ResetCredit, "schedule", self.early)
+        looking.start()
+        self.addCleanup(looking.stop)
+
+    def early(self, record, due):
+        """reset_credit's P7 while a credit of its own has just reset a window (engine/credits.py): its shipped
+        conditions, with the spend that opens the fifteen minutes stubbed out."""
+        if (not isinstance(record, dict) or record.get("category") != failures.USAGE_LIMIT
+                or record.get("state") not in ladder.EARLY_STATES or not isinstance(due, (int, float))
+                or due <= self.h.now):
+            return DEFER
+        return Alternative.EARLY
+
+    def armed(self, h=None, state="armed"):
+        """Both capabilities on, each with the warnings its own statement carries."""
+        h = h or self.h
+        plug = self.advanced(h)
+        for definition in (*self.BESIDE, self.DEFINITION):
+            found = plug.runtime.registry.get(definition.id)
+            self.arm(plug, state=state if definition is self.DEFINITION else "armed", capability=definition.id,
+                     warnings=list(plug.runtime.arming.warnings(found)))
+        self.plugged(plug, h)
+        return plug
+
+    def limited(self, h=None):
+        """A usage-limited recovery with no reset time, registered before either capability stood on, so no
+        early look reaches it while it is being set up: its record, waiting_poll and not yet due."""
+        h = h or self.h
+        h.home.fail_usage(T1, TURN_A, reset=None)
+        h.backend.loaded_map[T1] = "loaded"
+        h.tick()
+        row = h.record()
+        self.assertEqual(row["state"], "waiting_poll")
+        return row
+
+    def postponed(self, h=None):
+        """That recovery, past its next look, postponed by the person: a wait Send now passes and an early
+        look does not, so only Send now can send it."""
+        h = h or self.h
+        row = self.limited(h)
+        h.now = row["next_retry_at"] + 1
+        accepted, _detail = h.store.postpone(row["interruption_id"], T1, h.now + 1800, h.now)
+        self.assertTrue(accepted)
+        return h.record()
+
+    def test_the_persons_request_is_taken_though_the_early_look_is_offered_first(self):
+        """Fails with the preference reverted: EARLY is P7's answer, Send now is never seen, and the postponed
+        recovery the person asked for goes nowhere - EARLY passes no postponement, so it sends nobody either."""
+        key = self.postponed()["interruption_id"]
+        plug = self.armed()
+        self.h.tick(advance=1)
+        self.assert_no_send()
+        self.assertTrue(self.ask(plug, key)["done"])
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.h.backend.send_calls), 1)
+        self.assertEqual(self.spends(plug), [(CAP, T1, key)], "paid by Send now, which carried it")
+        self.assertIn((JournalCode.ACTED, Point.SCHEDULE, Alternative.SEND_NOW), self.journal(plug))
+
+    def test_an_early_look_is_still_the_answer_where_nobody_asked(self):
+        """The preference is for a person's own request alone: with none, EARLY wins P7 as it always did."""
+        self.limited()
+        plug = self.armed()
+        self.h.tick(advance=1)
+        self.assertEqual(len(self.h.backend.send_calls), 1, "looked at early, before its next look was due")
+        self.assertEqual([spent[0] for spent in self.spends(plug)], [RESET_CREDIT.id], "the early look paid")
 
 
 class CodeTests(unittest.TestCase):
