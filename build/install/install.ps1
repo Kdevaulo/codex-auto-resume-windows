@@ -771,12 +771,21 @@ function Get-UninstallBlocker {
         stopped with half a product left. So the Dashboard is asked to close first, as an update asks it
         (Close-OwnedDashboard), and then what still runs here (Get-InstallationHolder) and each program file at the
         root that something holds are named. An empty list: nothing holds the files. Changes nothing but the windows
-        asked to close.
+        asked to close, and the records they wrote.
+
+        A window asked so writes where it was for the installer to open it again (reopen-after-update-<its process
+        id>.txt) - as it does for an update, for it cannot tell the two apart. An uninstall opens nothing again, so
+        each record is removed here, once the windows have answered: the v0.6.17 acceptance's keep-data uninstall left
+        one in config\, which the uninstall keeps, and the reinstall after it, which is no update, never swept it.
     #>
     $blockers = @()
     if ((Get-OwnedDashboardProcess).Count -gt 0) {
         Step 'Closing the Dashboard so its files can be removed'
         $closed = Close-OwnedDashboard
+        foreach ($record in @(Get-ChildItem -LiteralPath (Join-Path $InstallHome 'config') -File `
+                                            -Filter 'reopen-after-update*.txt' -ErrorAction SilentlyContinue)) {
+            $null = Remove-OwnedItem $record.FullName
+        }
         if ($closed.Unsaved -gt 0) { $blockers += 'A Dashboard window has unsaved Settings changes: save or undo them, then close it.' }
         if ($closed.Stuck -gt 0) { $blockers += 'A Dashboard window could not be closed: close it.' }
         if ($blockers.Count -eq 0) { Ok 'The Dashboard closed' }
