@@ -354,9 +354,15 @@ namespace CodexAutoResume
         private const int SwcDesktop = 8;
         private const int SwfoNeedDispatch = 1;
         private const uint SvgioBackground = 0;
-        private static readonly Guid ShellWindowsClass = new Guid("9BA05972-F6A8-11CF-A442-00A0C90A8F39");
-        private static readonly Guid TopLevelBrowser = new Guid("4C96BE40-915C-11CF-99D3-00AA004AE837");
-        private static readonly Guid DispatchId = new Guid("00020400-0000-0000-C000-000000000046");
+        // Windows' constants are built from their fields, as everywhere in the window (test_gui_v065_controls). Only
+        // the four interface ids below stay strings: `[ComImport, Guid(...)]` takes nothing else, and this file is on
+        // tests/test_repo_hygiene.py's GUID_ALLOWLIST for them.
+        private static readonly Guid ShellWindowsClass =                 // CLSID_ShellWindows
+            new Guid(0x9BA05972, 0xF6A8, 0x11CF, 0xA4, 0x42, 0x00, 0xA0, 0xC9, 0x0A, 0x8F, 0x39);
+        private static readonly Guid TopLevelBrowser =                   // SID_STopLevelBrowser
+            new Guid(0x4C96BE40, 0x915C, 0x11CF, 0x99, 0xD3, 0x00, 0xAA, 0x00, 0x4A, 0xE8, 0x37);
+        private static readonly Guid DispatchId =                        // IID_IDispatch
+            new Guid(0x00020400, 0x0000, 0x0000, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46);
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         private struct ProcessEntry
