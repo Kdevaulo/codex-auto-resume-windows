@@ -136,7 +136,13 @@ class TableTests(unittest.TestCase):
         2026-10-17, on codex-cli 0.163.0-alpha.10.2 (app 26.1013.3656.0) the main session measured again MW, M1, M2b,
         M5, M6, M7, MP1-MP3, MIPC and stage 4's MO, M6B, MX, MF and M3B, and every one passed - MO, M6B and M3B,
         which had failed on 0.162, among them. The others stay as they were made, so on 0.163 they read as
-        unmeasured; MAWS, MCLOUD and MB are as before."""
+        unmeasured; MAWS, MCLOUD and MB are as before.
+        2026-10-20, on the same engine, the measurement session in one sitting with the Desktop holding none of the
+        throwaway conversations (v0.6.17, issues #42 and #47): MQO passed (a continuation queued for opening with no
+        marker ran once on open, as the person's own, and core's read found it by its client id) and MQP passed (two
+        added at once, each in a session of its own, each queued, run and found only in its own conversation). MQG
+        failed, inconclusive: two turns ran on open (the goal's, then the queued message's), but the goal ended inside
+        its own turn before the message ran, so whether a goal carries on beside it is not settled."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
@@ -144,22 +150,20 @@ class TableTests(unittest.TestCase):
                                   Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MR,
                                   Measurement.MN, Measurement.MU, Measurement.MIPC, Measurement.MC1,
                                   Measurement.MXA, Measurement.MX, Measurement.MF, Measurement.MO,
-                                  Measurement.M3B, Measurement.M6B})
+                                  Measurement.M3B, Measurement.M6B, Measurement.MQO, Measurement.MQP})
         self.assertEqual(failed, {Measurement.M2, Measurement.M3, Measurement.M4, Measurement.MAWS,
-                                  Measurement.MCLOUD, Measurement.MB, Measurement.MC2})
+                                  Measurement.MCLOUD, Measurement.MB, Measurement.MC2, Measurement.MQG})
         new = "codex-cli 0.163.0-alpha.10.2"
         again = {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5, Measurement.M6,
                  Measurement.M7, Measurement.MP1, Measurement.MP2, Measurement.MP3, Measurement.MIPC,
                  Measurement.MO, Measurement.M6B, Measurement.MX, Measurement.MF, Measurement.M3B}
-        self.assertEqual({m for m, (_v, version) in measured.MEASURED.items() if version == new}, again)
+        v0617 = {Measurement.MQO, Measurement.MQP, Measurement.MQG}
+        self.assertEqual({m for m, (_v, version) in measured.MEASURED.items() if version == new}, again | v0617)
         self.assertTrue(all(measured.MEASURED[m][0] == Verdict.PASS for m in again))
+        self.assertEqual(measured.MEASURED[Measurement.MQG][0], Verdict.FAIL)
         self.assertEqual(set(Measurement) - passed - failed,
                          # v0.6.15-beta's own, for several conversations at once: not made yet.
-                         {Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK, Measurement.MT,
-                          # v0.6.17 (issue #42): a continuation queued for opening with no marker - the owner's run.
-                          Measurement.MQO,
-                          # and the two measured in the same sitting: several at once (MQP), a goal beside it (MQG).
-                          Measurement.MQP, Measurement.MQG})
+                         {Measurement.MQ, Measurement.ME, Measurement.MS, Measurement.MK, Measurement.MT})
 
 
 if __name__ == "__main__":
