@@ -253,7 +253,11 @@ against the checksum published beside it, and keeps your settings, your pause, e
 and the sign-in choice. Nothing else installs a pre-release: not the watcher, not the panel inside
 Codex and not Codex's tools, and `scripts/bootstrap.ps1 -Update` still installs releases only. From
 a command line, `-CheckOnly` prints the pre-release it found on a line of its own
-(`prerelease: v<version>`), and `-Version <version>` installs it.
+(`prerelease: v<version>`), and `-Version <version>` installs it. Where GitHub's list cannot be read, the
+answer says that pre-releases could not be checked, beside an answer about releases that does not depend on them;
+where GitHub refused because the requests it allows a network (60 an hour, which a VPN or a shared connection uses up
+for everyone on it) have run out, it says so and when the limit resets, and **Install another version...** says the
+same. The command line prints `releases: rate-limited <reset>` or `releases: unread`.
 
 Afterwards, change anything from **Start Menu → Codex Auto Resume**, or by asking Codex to
 *open auto resume settings*.

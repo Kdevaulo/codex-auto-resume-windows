@@ -178,6 +178,8 @@ namespace CodexAutoResume
                 string printed, errors;
                 int code;
                 string ran = StartBootstrap(root, script, "-Versions", ListMilliseconds, out printed, out errors, out code);
+                // Why GitHub's list could not be read, where the bootstrap said (GitHub #41: a rate limit, named as one).
+                string releases = ran == "done" ? ReleasesLine(printed) : null;
                 List<string[]> rows = new List<string[]>();
                 string[] listed = null;
                 // Still asking after three minutes is an answer that did not come; nothing the bootstrap did not print
@@ -188,7 +190,7 @@ namespace CodexAutoResume
                 {
                     SetBusy(false);
                     if (mine != versionsToken || dialog.IsDisposed) return;
-                    ShowVersionRows(state, rows, listed);
+                    ShowVersionRows(state, rows, listed, releases);
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(apply); }
                 catch (Exception) { }
@@ -196,8 +198,9 @@ namespace CodexAutoResume
         }
 
         /// One answer of the listing in the dialog BuildVersions made: `state` as VersionsLines read it, its rows and
-        /// its `versions: listed` line. The audit fills the dialog through here too (AuditVersions).
-        private void ShowVersionRows(string state, List<string[]> rows, string[] listed)
+        /// its `versions: listed` line, and the listing's `releases:` line where it printed one (ReleasesLine). The audit
+        /// fills the dialog through here too (AuditVersions).
+        private void ShowVersionRows(string state, List<string[]> rows, string[] listed, string releases = null)
         {
             if (versionsList == null || versionsList.IsDisposed) return;
             Form dialog = versionsList.FindForm();
@@ -227,9 +230,24 @@ namespace CodexAutoResume
                 : "";
             ShowVersionChoice();
             if (state == "unavailable")
-                versionsSaid.Text = S("pick.could_not_list", "GitHub could not be asked for the list of releases just now. Nothing was changed.");
+                versionsSaid.Text = ListUnavailableWords(releases);
             else if (!shown)
                 versionsSaid.Text = S("pick.list_failed", "The list of releases could not be read. Nothing was changed.");
+        }
+
+        /// The listing's words where GitHub could not be asked: the sentence it always said, and since v0.6.17 why, where
+        /// the bootstrap said (ReleasesWords) - a spent rate limit by name, with when it resets (GitHub #41).
+        internal string ListUnavailableWords(string releases)
+        {
+            string text = S("pick.could_not_list", "GitHub could not be asked for the list of releases just now. Nothing was changed.");
+            return releases == null ? text : text + Environment.NewLine + ReleasesWords(releases);
+        }
+
+        /// A pick's words where GitHub could not be asked, as ListUnavailableWords says the listing's.
+        internal string PickUnavailableWords(string releases)
+        {
+            string text = S("pick.could_not_ask", "GitHub could not be asked just now, so nothing was installed and nothing was changed.");
+            return releases == null ? text : text + Environment.NewLine + Environment.NewLine + ReleasesWords(releases);
         }
 
         // While HoldVersionColumns sets the columns: the list's own horizontal bar going as they narrow asks again.
@@ -461,6 +479,7 @@ namespace CodexAutoResume
                 int code;
                 int[] converted = null;
                 string ran = StartBootstrap(root, script, flag, UpdateMilliseconds, out printed, out errors, out code);
+                string releases = ran == "done" ? ReleasesLine(printed) : null;
                 string outcome = ran;
                 reason = null;
                 installed = null;
@@ -478,7 +497,7 @@ namespace CodexAutoResume
                     else
                     {
                         diagUpdate.Text = shown;
-                        ReportPick(outcome, reason, converted, detail);
+                        ReportPick(outcome, reason, converted, detail, releases);
                     }
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(finish); }
@@ -526,7 +545,7 @@ namespace CodexAutoResume
         }
 
         /// Every answer of a pick but installed, in words that say what was and was not changed.
-        private void ReportPick(string outcome, string reason, int[] converted, string detail)
+        private void ReportPick(string outcome, string reason, int[] converted, string detail, string releases)
         {
             if (outcome == "refused")
             {
@@ -542,7 +561,7 @@ namespace CodexAutoResume
                     Tell(S("pick.refused.changed", "The list of releases changed after it was shown, so nothing was installed and nothing was changed. Open Install another version... again."));
             }
             else if (outcome == "unavailable")
-                Tell(S("pick.could_not_ask", "GitHub could not be asked just now, so nothing was installed and nothing was changed."));
+                Tell(PickUnavailableWords(releases));
             else if (outcome == "running")
                 Tell(S("diag.update_running", "It is taking longer than usual and is still working. It carries on in the background; look at this page again in a few minutes."));
             else if (outcome == "incomplete")

@@ -103,10 +103,12 @@ namespace CodexAutoResume
             {
                 string outcome, detail;
                 RunRepair(root, python, setup, out outcome, out detail);
+                bool noEntry = outcome == "done" &&
+                               EntryCannotBeWritten(root, Environment.GetEnvironmentVariable("USERPROFILE"));
                 MethodInvoker finish = delegate
                 {
                     SetBusy(false);
-                    ReportRepair(outcome, detail);
+                    ReportRepair(outcome, detail, noEntry);
                     RefreshAfterChange();
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(finish); }
@@ -237,16 +239,17 @@ namespace CodexAutoResume
             if (!File.Exists(script))
             {
                 diagUpdate.Text = S("diag.update_unavailable", "could not be checked");
-                ReportUpdate("incomplete", null, null, null);
+                ReportUpdate("incomplete", null, null, null, null);
                 return;
             }
             SetBusy(true);
             diagUpdate.Text = S("diag.update_asking", "asking...");
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
-                string answer, current, latest, detail, compatibility, prerelease;
+                string answer, current, latest, detail, compatibility, prerelease, releases;
                 RunBootstrap(root, script, "-CheckOnly", CheckMilliseconds,
-                             out answer, out current, out latest, out detail, out compatibility, out prerelease);
+                             out answer, out current, out latest, out detail, out compatibility, out prerelease,
+                             out releases);
                 Dictionary<string, object> live = CheckAfterRefresh(bridge, compatibility);
                 MethodInvoker finish = delegate
                 {
@@ -260,7 +263,7 @@ namespace CodexAutoResume
                     // installed only on a yes. Not now leaves the answer on the card as it stands.
                     else if ((answer == "current" || answer == "newer-local") && prerelease != null)
                         OfferPrerelease(root, script, prerelease);
-                    else ReportUpdate(answer, current, latest, detail);
+                    else ReportUpdate(answer, current, latest, detail, releases);
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(finish); }
                 catch (Exception) { }
@@ -274,7 +277,7 @@ namespace CodexAutoResume
                            "latest", latest).Replace("{current}", current ?? ""),
                          S("action.install", "Install")))
             {
-                ReportUpdate("available", current, latest, null);
+                ReportUpdate("available", current, latest, null, null);
                 return;
             }
             InstallUpdate(root, script, "-Update", latest);
@@ -311,7 +314,8 @@ namespace CodexAutoResume
             // The installer's request to close (WatchForUpdate) is not this window's to answer while it runs its own.
             updatingHere = true;
             diagUpdate.Text = S("diag.update_installing", "installing...");
-            string answer = "failed", from = null, to = null, detail = "", compatibility = null, prerelease = null;
+            string answer = "failed", from = null, to = null, detail = "", compatibility = null, prerelease = null,
+                   releases = null;
             string app = Path.Combine(root, "app");
             string edition = InstallerFlow.EditionOfSource(Path.Combine(app, "src"));
             var flow = new InstallerFlow(InstallerFlow.Update, root, edition, edition, version);
@@ -332,7 +336,8 @@ namespace CodexAutoResume
                     try
                     {
                         RunBootstrap(root, script, flag + " -AskFirst", UpdateMilliseconds,
-                                     out answer, out from, out to, out detail, out compatibility, out prerelease);
+                                     out answer, out from, out to, out detail, out compatibility, out prerelease,
+                                     out releases);
                     }
                     finally { Heard = null; Asked = null; }
                     return answer == "installed" ? 0 : answer == "later" ? InstallerFlow.Later
@@ -543,10 +548,13 @@ namespace CodexAutoResume
         /// caller - and, since v0.6.5, the `compatibility:` line before it, the answer to the
         /// check's second request (CompatibilityLine; null when it made none), and since v0.6.11
         /// the `prerelease:` line of its question about pre-releases (PrereleaseLine; null when
-        /// there is none). The lines are the contract; the rest of the output is for a person.
+        /// there is none), and since v0.6.17 the `releases:` line it prints where that question
+        /// could not be answered (ReleasesLine; null when it was, or was not asked). The lines are
+        /// the contract; the rest of the output is for a person.
         private static void RunBootstrap(string root, string script, string flag, int milliseconds,
                                          out string answer, out string current, out string latest,
-                                         out string detail, out string compatibility, out string prerelease)
+                                         out string detail, out string compatibility, out string prerelease,
+                                         out string releases)
         {
             answer = "failed";
             current = null;
@@ -554,6 +562,7 @@ namespace CodexAutoResume
             detail = "";
             compatibility = null;
             prerelease = null;
+            releases = null;
             string printed, errors;
             int code;
             string ran = StartBootstrap(root, script, flag, milliseconds, out printed, out errors, out code);
@@ -562,6 +571,7 @@ namespace CodexAutoResume
             detail = Tail(printed + "\n" + errors);
             compatibility = CompatibilityLine(printed);
             prerelease = PrereleaseLine(printed);
+            releases = ReleasesLine(printed);
             string line = null;
             foreach (string raw in (printed ?? "").Replace("\r", "").Split('\n'))
             {
@@ -599,13 +609,28 @@ namespace CodexAutoResume
             return S("diag.update_unavailable", "could not be checked");
         }
 
-        private void ReportUpdate(string answer, string current, string latest, string detail)
+        private void ReportUpdate(string answer, string current, string latest, string detail, string releases)
         {
+            Tell(UpdateWords(answer, current, latest, detail, releases));
+        }
+
+        /// What ReportUpdate says. `releases` is the check's `releases:` line (ReleasesLine): where GitHub's list was
+        /// asked for and not read, "up to date" and "ahead" are only the answer about releases, so each says that
+        /// pre-releases could not be checked, and why where GitHub said (ReleasesWords) - GitHub #41, where a VPN's
+        /// spent rate limit was read as "ahead of the newest published release" and nothing more. A list that was read
+        /// leaves the words as they were.
+        internal string UpdateWords(string answer, string current, string latest, string detail, string releases)
+        {
+            bool unchecked_ = releases != null && (answer == "current" || answer == "newer-local");
             string text =
-                answer == "current"
+                answer == "current" && unchecked_
+                    ? S("diag.update_is_current_unchecked", "Version {version} is the newest published release, but pre-releases could not be checked, so a newer pre-release may have been published.", "version", current)
+              : answer == "current"
                     ? S("diag.update_is_current", "Version {version} is the newest published release.", "version", current)
               : answer == "available"
                     ? S("diag.update_is_available", "Version {version} has been published.", "version", latest)
+              : answer == "newer-local" && unchecked_
+                    ? S("diag.update_is_newer_local_unchecked", "This build is newer than the latest release, v{version}, but pre-releases could not be checked, so a newer pre-release may have been published.", "version", latest)
               : answer == "newer-local"
                     // A development build, or a release that was withdrawn. Either way there
                     // is nothing to install, and installing would go backwards.
@@ -619,7 +644,49 @@ namespace CodexAutoResume
                     : S("diag.update_failed", "The update check did not finish.");
             if ((answer == "failed" || answer == "unavailable") && !string.IsNullOrEmpty(detail))
                 text += Environment.NewLine + Environment.NewLine + detail;
-            Tell(text);
+            if (unchecked_) text += Environment.NewLine + Environment.NewLine + ReleasesWords(releases);
+            return text;
+        }
+
+        /// The words on the `releases:` line the bootstrap prints where GitHub's list of this repository's releases was
+        /// asked for and not read (scripts/bootstrap.ps1, Write-ReleasesUnread), without its name: "unread", or
+        /// "rate-limited " and when GitHub's rate limit resets - Unix seconds, or "unknown". Null when there is no such
+        /// line or it says anything else. The last one counts, as the `update:` line's does.
+        internal static string ReleasesLine(string printed)
+        {
+            string line = null;
+            foreach (string raw in (printed ?? "").Replace("\r", "").Split('\n'))
+            {
+                string trimmed = raw.Trim();
+                if (trimmed.StartsWith("releases: ", StringComparison.Ordinal)) line = trimmed.Substring("releases: ".Length);
+            }
+            if (line == "unread" || line == "rate-limited unknown") return line;
+            if (line != null && line.StartsWith("rate-limited ", StringComparison.Ordinal))
+            {
+                string seconds = line.Substring("rate-limited ".Length);
+                long value;
+                if (seconds.Length >= 9 && seconds.Length <= 11 &&
+                    long.TryParse(seconds, NumberStyles.None, CultureInfo.InvariantCulture, out value))
+                    return line;
+            }
+            return null;
+        }
+
+        /// Why GitHub's list could not be read, said after the sentence it belongs to (GitHub #41): its rate limit by name,
+        /// with when it resets in this PC's time where GitHub said, for "rate-limited"; "try again later" otherwise. Shared
+        /// by Check for updates and Install another version..., which ask the same list.
+        internal string ReleasesWords(string releases)
+        {
+            if (releases != null && releases.StartsWith("rate-limited ", StringComparison.Ordinal))
+            {
+                long seconds;
+                if (long.TryParse(releases.Substring("rate-limited ".Length), NumberStyles.None, CultureInfo.InvariantCulture,
+                                  out seconds))
+                    return S("diag.github_rate_limited", "GitHub refused because this network has used up its limit of requests to GitHub for now (a VPN or a shared connection often does). The limit resets at {time}; try again after that.",
+                             "time", ClockTime(seconds));
+                return S("diag.github_rate_limited_unknown", "GitHub refused because this network has used up its limit of requests to GitHub for now (a VPN or a shared connection often does). The limit resets within an hour; try again after that.");
+            }
+            return S("diag.github_try_later", "Try again later.");
         }
 
         /// The version on the `prerelease:` line an update check prints when GitHub's list of this repository's
@@ -646,7 +713,30 @@ namespace CodexAutoResume
                 @"^(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})-(alpha|beta)(\.([2-9]|[1-9][0-9]{1,2}))?\z",
                 System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
-        private void ReportRepair(string outcome, string detail)
+        /// GitHub #43: true when `root` is the ordinary home (.codex-auto-resume in the profile, install.ps1's
+        /// Test-DefaultHome) and the uninstaller kept in it for the entry in Settings > Apps is missing - so setup wrote no
+        /// entry (addremove.register writes one only where it is), and Repair cannot make one: the installation holds no
+        /// other copy of install.ps1 (the archive's install\ folder is removed once it has run, and payload\app carries
+        /// none). An update before v0.6.17 started from the Dashboard kept none, and a pick of a version before v0.6.16
+        /// removes it. A home placed elsewhere never has one, as documented, and gets no sentence for it. A folder or
+        /// file that is a link or a junction counts as missing, as addremove.kept_uninstaller_present reads it.
+        internal static bool EntryCannotBeWritten(string root, string profile)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(profile)) return false;
+            try
+            {
+                string ordinary = Path.GetFullPath(InstallerFlow.HomeFrom(null, profile)).TrimEnd('\\');
+                string here = Path.GetFullPath(root).TrimEnd('\\');
+                if (!string.Equals(ordinary, here, StringComparison.OrdinalIgnoreCase)) return false;
+                string folder = Path.Combine(here, "uninstall");
+                string script = Path.Combine(folder, "install.ps1");
+                if (!Directory.Exists(folder) || !File.Exists(script)) return true;
+                return ((File.GetAttributes(folder) | File.GetAttributes(script)) & FileAttributes.ReparsePoint) != 0;
+            }
+            catch (Exception) { return false; }
+        }
+
+        private void ReportRepair(string outcome, string detail, bool noEntry)
         {
             string text = outcome == "done" ? S("diag.repair_done", "Setup finished.")
                         : outcome == "running" ? S("diag.repair_running", "Setup is taking longer than usual and is still working. It carries on in the background; look at this page again in a minute.")
@@ -657,6 +747,10 @@ namespace CodexAutoResume
             // would be noise beside a sentence that already says what to do.
             if (outcome == "failed" && !string.IsNullOrEmpty(detail))
                 text += Environment.NewLine + Environment.NewLine + detail;
+            // Said rather than left out (GitHub #43): a repair that wrote everything else wrote no entry here.
+            if (noEntry)
+                text += Environment.NewLine + Environment.NewLine +
+                        S("diag.repair_no_entry", "Settings > Apps still has no entry for this installation: the copy of the installer its Uninstall button runs is missing, and Repair has no copy to put back. Run this version's Setup program and choose Repair, or install the next update: either one puts the copy and the entry back.");
             Tell(text);
         }
     }

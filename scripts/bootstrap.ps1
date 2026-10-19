@@ -251,6 +251,11 @@ $ReleasesMaxChars = 2097152
 $ReleasesTimeoutMax = 15
 $ReleasesTimeoutMin = 5
 $ReleasesVersionTimeout = 60
+# GitHub #41: when api.github.com refused the list because this network's share of its unauthenticated requests ran out
+# (60 an hour, which a VPN or a shared connection spends for everyone behind it), when that share comes back - the
+# X-RateLimit-Reset it sent, in Unix seconds, or 'unknown' - so the `releases:` line can name the limit rather than a
+# list that "could not be read" (Write-ReleasesUnread). $null for every other failure. Set by Invoke-BoundedWebRequest.
+$RateLimitReset = $null
 
 # What -CheckOnly and -Update answer with. Four codes, because there are four answers and
 # a caller that has to tell them apart should not have to read prose to do it. "Could not
@@ -444,6 +449,85 @@ function Assert-TrustedHost {
     }
 }
 
+function Get-RateLimitReset {
+    <#
+        Where $Failure - an exception a request threw, with what it wraps - is GitHub refusing for its rate limit, when
+        the limit resets: the X-RateLimit-Reset it sent, in Unix seconds, or 'unknown' where it sent none that reads;
+        $null for any other failure. A refusal for the limit is a 403 or 429 that says the requests left are 0
+        (X-RateLimit-Remaining, the primary limit) or when to retry (Retry-After, the secondary one), or any 429.
+
+        The response is found on whichever exception in the chain carries one (WebException under Windows PowerShell,
+        HttpResponseException under PowerShell 7), and its headers are read the way each keeps them. Only digits are
+        taken for a time, and only a plausible one; nothing else of the response is read.
+    #>
+    param($Failure)
+    $seen = 0
+    $current = $Failure
+    while ($null -ne $current -and $seen -lt 8) {
+        $seen++
+        $response = $null
+        if ($current.PSObject.Properties.Match('Response').Count) { $response = $current.Response }
+        if ($null -ne $response) {
+            $status = 0
+            try { $status = [int]$response.StatusCode } catch { $status = 0 }
+            if ($status -ne 403 -and $status -ne 429) { return $null }
+            $headers = @{}
+            foreach ($name in @('X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After')) {
+                $value = $null
+                try {
+                    if ($response.Headers -is [Net.WebHeaderCollection]) { $value = $response.Headers[$name] }
+                    else {
+                        $values = $null
+                        if ($response.Headers.TryGetValues($name, [ref]$values)) { $value = @($values)[0] }
+                    }
+                } catch { $value = $null }
+                if ($null -ne $value) { $headers[$name] = ([string]$value).Trim() }
+            }
+            $limited = ($status -eq 429) -or ($headers['X-RateLimit-Remaining'] -eq '0') -or $headers.ContainsKey('Retry-After')
+            if (-not $limited) { return $null }
+            $reset = $headers['X-RateLimit-Reset']
+            if ($reset -match '^[0-9]{9,11}$') { return $reset }
+            $after = $headers['Retry-After']
+            if ($after -match '^[0-9]{1,6}$') {
+                return [string]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + [int64]$after)
+            }
+            return 'unknown'
+        }
+        # What it wraps: under Windows PowerShell the runspace's EndInvoke throws a MethodInvocationException around
+        # a CmdletInvocationException around the WebException. An error record's own exception is looked at only
+        # where nothing is wrapped.
+        $next = $current.InnerException
+        if ($null -eq $next -and $current.PSObject.Properties.Match('ErrorRecord').Count -and
+            $null -ne $current.ErrorRecord -and -not [object]::ReferenceEquals($current.ErrorRecord.Exception, $current)) {
+            $next = $current.ErrorRecord.Exception
+        }
+        $current = $next
+    }
+    return $null
+}
+
+function Write-ReleasesUnread {
+    <#
+        The `releases:` line, said where GitHub's list of this repository's releases was asked for and not read (GitHub
+        #41): `releases: rate-limited <reset>` where GitHub refused for its rate limit ($RateLimitReset: Unix seconds,
+        or `unknown`), `releases: unread` for anything else - so the window can say that pre-releases were not checked,
+        and why, beside an answer that does not depend on them. Its own line, before the answer's; it changes no answer
+        and no exit code. With the reset in this machine's time for whoever reads the output.
+    #>
+    if ($script:RateLimitReset) {
+        Write-Host ('releases: rate-limited ' + $script:RateLimitReset)
+        if ($script:RateLimitReset -ne 'unknown') {
+            $local = [DateTimeOffset]::FromUnixTimeSeconds([int64]$script:RateLimitReset).ToLocalTime()
+            Step ('GitHub refused: the limit on requests from this network was reached. It resets at ' +
+                  $local.ToString('yyyy-MM-dd HH:mm', [Globalization.CultureInfo]::InvariantCulture) + '.')
+        } else {
+            Step 'GitHub refused: the limit on requests from this network was reached.'
+        }
+    } else {
+        Write-Host 'releases: unread'
+    }
+}
+
 function Invoke-BoundedWebRequest {
     <#
         Invoke-WebRequest with $Parameters, answered within $Seconds of being asked - lookup,
@@ -492,6 +576,8 @@ function Invoke-BoundedWebRequest {
         $finished = $true
         try { $answer = @($shell.EndInvoke($pending)) }
         catch {
+            $limit = Get-RateLimitReset $_.Exception
+            if ($limit) { $script:RateLimitReset = $limit }
             $inner = $_.Exception
             while ($null -ne $inner.InnerException) { $inner = $inner.InnerException }
             throw ($What + ' could not be fetched: ' + $inner.Message)
@@ -1306,6 +1392,7 @@ if ($Versions) {
     try { $listed = Get-ReleasePages -Release $release }
     catch {
         Fail ('The list of releases could not be read (' + $_.Exception.Message + ').')
+        Write-ReleasesUnread
         Write-Host 'versions: unavailable'
         Step 'Nothing was changed.'
         exit $ExitUnavailable
@@ -1384,6 +1471,7 @@ if ($Pick) {
     try { $listed = Get-ReleasePages -Release $release }
     catch {
         Fail ('The list of releases could not be read (' + $_.Exception.Message + ').')
+        Write-ReleasesUnread
         Write-Host 'pick: unavailable'
         Step 'Nothing was downloaded, and nothing was changed.'
         exit $ExitUnavailable
@@ -1575,12 +1663,14 @@ if ($CheckOnly -or $Update) {
         $prerelease = $null
         if ($listTimeout -le 0) {
             Step 'Too little of the update check''s time is left to look for a pre-release; none is offered.'
+            Write-ReleasesUnread
         } else {
             Step 'Asking api.github.com for this repository''s list of releases, for a newer pre-release.'
             try {
                 $prerelease = Get-NewerPrerelease -Release $release -Installed $current -Stable $newest -TimeoutSec $listTimeout
             } catch {
                 Step 'The list of releases could not be read, so no pre-release is offered. The answer below does not depend on it.'
+                Write-ReleasesUnread
             }
         }
         if ($prerelease) {

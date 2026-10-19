@@ -412,6 +412,128 @@ class InstallerFlowTests(unittest.TestCase):
         self.assertEqual(self.text.count("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\"), 2)
 
 
+def short_name(path: Path) -> str:
+    """The 8.3 short name Windows gives `path`, or the path itself where the volume makes none."""
+    import ctypes
+    size = ctypes.windll.kernel32.GetShortPathNameW(str(path), None, 0)
+    if not size:
+        return str(path)
+    buffer = ctypes.create_unicode_buffer(size)
+    ctypes.windll.kernel32.GetShortPathNameW(str(path), buffer, size)
+    return buffer.value
+
+
+@unittest.skipUnless(WINDOWS and installer.POWERSHELL, "the installer is PowerShell on Windows")
+class UpdateFromTheDashboardTests(unittest.TestCase):
+    """GitHub #43. The Dashboard starts every update, and Repair, with CODEX_AUTO_RESUME_PLUGIN_HOME set to its own root
+    (gui/DashboardMaintenance.cs, StartBootstrap and RunRepair), and install.ps1 kept the uninstaller only where that
+    variable was empty - so an update from the Dashboard kept none, and the engine's setup, which writes the entry in
+    Settings > Apps only where the kept uninstaller is (addremove.register), wrote none. The variable naming the ordinary
+    home, in any spelling of it, keeps it now; a home really placed elsewhere still gets neither.
+
+    The install path's own lines run, lifted out of install.ps1 from the comment above the call to the step after it,
+    in a scratch profile with the variable set as the Dashboard sets it; the engine's half is addremove.register over
+    a fake registry (startup._winreg), for the home plugin_setup.runtime_home() reads from the same variable."""
+
+    def setUp(self):
+        self.temp = Path(tempfile.mkdtemp(prefix="dashboard-update-"))
+        self.addCleanup(shutil.rmtree, self.temp, True)
+        self.profile = self.temp / "Profile Of ExampleUser"
+        self.home = self.profile / ".codex-auto-resume"
+        (self.home / "app").mkdir(parents=True)
+        self.text = PS1.read_text(encoding="utf-8")
+
+    def update(self, variable: str | None) -> subprocess.CompletedProcess:
+        """install.ps1's lines from the entry's comment to "Setting up the watcher", as the in-app update runs them: the
+        variable as given, $OwnedHome the folder it resolves to (install.ps1 takes it from claim-home and
+        Resolve-Canonical), the kept uninstaller's source this probe itself."""
+        text = self.text
+        helpers = installer.block(text, "function Resolve-Canonical", "function Get-Edition")
+        helpers += installer.block(text, "function Remove-OwnedItem", "function Invoke-Setup")
+        helpers += installer.block(text, KEPT, JOURNAL_FUNCTION)
+        call = installer.block(text, "    # The entry in Add or remove programs is written", "    Step 'Setting up the watcher'")
+        script = "# the installer that ran\n$env:USERPROFILE = %s\n" % installer.ps_literal(self.profile)
+        if variable is None:
+            script += "$env:CODEX_AUTO_RESUME_PLUGIN_HOME = $null\n$OwnedHome = Resolve-Canonical %s\n" % (
+                installer.ps_literal(self.home))
+        else:
+            script += ("$env:CODEX_AUTO_RESUME_PLUGIN_HOME = %s\n"
+                       "$OwnedHome = Resolve-Canonical $env:CODEX_AUTO_RESUME_PLUGIN_HOME\n" % installer.ps_literal(variable))
+        script += "if ($true) {\n" + call + "}\n'kept: ' + (Test-Path -LiteralPath (Join-Path $OwnedHome 'uninstall\\install.ps1'))\n"
+        return installer.run_probe(installer.VOICE + helpers, script)
+
+    def entry_written(self, variable: str | None) -> list:
+        """What the engine's setup does about the entry afterwards, for the home it reads from the same variable."""
+        import plugin_setup
+        environment = {"USERPROFILE": str(self.profile)}
+        if variable is not None:
+            environment[plugin_setup.ENV_RUNTIME_HOME] = variable
+        registry = FakeWinreg()
+        with patch.dict(os.environ, environment), patch.object(startup, "_winreg", return_value=registry):
+            if variable is None:
+                os.environ.pop(plugin_setup.ENV_RUNTIME_HOME, None)
+            return addremove.register(plugin_setup.runtime_home(), "standard", "0.6.17", "Codex Auto Resume")
+
+    def spellings(self) -> dict:
+        home = str(self.home)
+        found = {
+            "as the Dashboard passes it": home,
+            "another case": home.upper(),
+            "a trailing separator": home + "\\",
+            "two trailing separators": home + "\\\\",
+            "dot and dot-dot": str(self.profile) + "\\.\\app-elsewhere\\..\\.codex-auto-resume",
+            "forward slashes": home.replace("\\", "/"),
+            "extended-length prefix": "\\\\?\\" + home,
+        }
+        short = short_name(self.home)
+        if short.lower() != home.lower():
+            found["an 8.3 short name"] = short
+        return found
+
+    def test_the_ordinary_home_named_by_the_variable_keeps_the_uninstaller_and_gets_the_entry(self):
+        for name, variable in sorted(self.spellings().items()):
+            with self.subTest(name, variable=variable):
+                shutil.rmtree(self.home / "uninstall", ignore_errors=True)
+                done = self.update(variable)
+                self.assertIn("kept: True", done.stdout, done.stdout + done.stderr)
+                kept = self.home / "uninstall" / "install.ps1"
+                self.assertIn("# the installer that ran", kept.read_text(encoding="utf-8-sig"))
+                self.assertEqual(self.entry_written(variable), ["wrote CodexAutoResume"],
+                                 "the engine wrote no entry in Settings > Apps")
+        if "an 8.3 short name" not in self.spellings():
+            self.skipTest("this volume gives no 8.3 short names; every other spelling passed")
+
+    def test_with_no_variable_it_is_kept_as_before(self):
+        done = self.update(None)
+        self.assertIn("kept: True", done.stdout, done.stdout + done.stderr)
+        self.assertEqual(self.entry_written(None), ["wrote CodexAutoResume"])
+
+    def test_a_home_placed_elsewhere_still_gets_neither(self):
+        for elsewhere in (self.temp / "Elsewhere" / ".codex-auto-resume",       # the same name in another folder
+                          self.profile / ".codex-auto-resume-2",              # a name beside it
+                          self.profile / ".codex-auto-resume" / "inner",      # inside it
+                          self.profile):                                       # the profile itself
+            with self.subTest(elsewhere=str(elsewhere)):
+                (elsewhere / "app").mkdir(parents=True, exist_ok=True)
+                done = self.update(str(elsewhere))
+                self.assertIn("kept: False", done.stdout, done.stdout + done.stderr)
+                self.assertFalse((elsewhere / "uninstall").exists())
+                self.assertEqual(self.entry_written(str(elsewhere)), [])
+
+    def test_a_variable_naming_the_home_through_an_environment_variable_is_another_folder(self):
+        """$InstallHome takes the variable as written, so `%USERPROFILE%` in it is a folder of that name and not the
+        profile: the files go there, and the comparison is about where they went."""
+        literal = self.temp / "%USERPROFILE%" / ".codex-auto-resume"
+        (literal / "app").mkdir(parents=True)
+        done = self.update(str(literal))
+        self.assertIn("kept: False", done.stdout, done.stdout + done.stderr)
+
+    def test_the_call_asks_about_the_root_this_run_installed(self):
+        call = installer.block(self.text, "# The entry in Add or remove programs is written", "Step 'Setting up the watcher'")
+        self.assertIn("Test-DefaultHome -Root $OwnedHome -Profile $env:USERPROFILE", call)
+        self.assertEqual(self.text.count("function Test-DefaultHome"), 1)
+
+
 class UninstallWithTheDashboardOpenTests(unittest.TestCase):
     """The v0.6.16 acceptance's uninstall ran with the Dashboard open. It removed the watcher, the sign-in start,
     the Start menu entry and the plugin, then could not remove the program files - the Dashboard and the runtime
