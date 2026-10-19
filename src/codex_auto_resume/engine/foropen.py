@@ -1,7 +1,8 @@
 """A continuation queued for when its conversation is opened (v0.6.15-beta, P16's QUEUE_FOR_OPEN).
 
 A conversation the Codex app does not hold may be sent the ordinary continuation - core's backend, its marker, its
-claim - and left in Codex's queue for when a person opens it, where the plug answers QUEUE_FOR_OPEN at P16
+claim; or (v0.6.17) the plug's channel under the plug's client id, with no marker - and left in Codex's queue for when
+a person opens it, where the plug answers QUEUE_FOR_OPEN at P16
 (domain/plug.py). Core keeps it there only while the plug still says so, and seven days and an hour at most
 (DEFERRED_LONGEST); opened, it has the delivery window like any queued item, and then is taken back as not
 delivered on open. Each of these withdrawals is given back to waiting once nothing ran (domain/public.py
@@ -19,10 +20,15 @@ DEFERRED_LONGEST = 7 * 86400 + 3600
 
 class ForOpenMixin:
     def _not_for_open(self, current, route, sender, client, vector) -> bool:
-        """P16's QUEUE_FOR_OPEN (v0.6.15-beta) goes the ordinary way - core's backend, its marker - or not at all: a
-        channel or a client id the plug named waits for the conversation to be opened, as A11 says. True if it waits."""
+        """P16's QUEUE_FOR_OPEN (v0.6.15-beta) goes the ordinary way - core's backend, its marker - or (v0.6.17) through
+        a channel the plug named under a client id it named, which proves it by that id as any marker-free send is
+        proven (engine/delivery.py); a channel with the marker, or a client id through core's backend, waits for the
+        conversation to be opened, as A11 says. TO_SESSION goes the ordinary way alone. True if it waits. Only a plug
+        names a channel or a client id: the standard edition's sends are core's backend and its marker, always."""
         if route not in (Alternative.QUEUE_FOR_OPEN, Alternative.TO_SESSION) or (
                 sender is self.backend and client is None):
+            return False
+        if route is Alternative.QUEUE_FOR_OPEN and sender is not self.backend and client is not None:
             return False
         # v0.6.16-beta.4: TO_SESSION goes the ordinary way too, or waits with its own reason.
         reason = "notLoaded" if route is Alternative.QUEUE_FOR_OPEN else "held_by_other_session"

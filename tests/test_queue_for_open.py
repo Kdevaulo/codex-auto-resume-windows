@@ -17,6 +17,7 @@ if _HERE not in sys.path:
 from test_engine import T1  # noqa: E402
 from test_plug_points import Asked, Channel, PluggedCase  # noqa: E402
 from codex_auto_resume import machine  # noqa: E402
+from codex_auto_resume.domain import ids  # noqa: E402
 from codex_auto_resume.domain.plug import DEFER, Alternative, BACKEND  # noqa: E402
 from codex_auto_resume.engine.foropen import DEFERRED_LONGEST  # noqa: E402
 
@@ -61,19 +62,38 @@ class QueueTests(ForOpen):
         self.assertEqual(self.h.backend.send_calls, [])
         self.assertEqual(self.h.record()["last_error"], "loaded_state_unknown")
 
-    def test_a_channel_or_a_client_id_waits_as_a11_says(self):
-        for name in ("sender", "delivery"):
-            with self.subTest(name):
-                h = self.fresh()
-                answers = {"sender": lambda record, backend, _h=h: Channel(_h)}
-                if name == "delivery":
-                    answers["delivery"] = Alternative.CLIENT_ID
-                self.ready_after_reset(h, loaded=False)
-                h.backend.loaded_map[T1] = "notLoaded"
-                self.plugged(Asked(unloaded=Alternative.QUEUE_FOR_OPEN, **answers), h)
-                h.tick()
-                self.assertEqual(h.backend.send_calls, [])
-                self.assertEqual(h.record()["last_error"], "notLoaded")
+    def test_a_channel_with_the_marker_waits_as_a11_says(self):
+        h = self.fresh()
+        self.ready_after_reset(h, loaded=False)
+        h.backend.loaded_map[T1] = "notLoaded"
+        channel = Channel(h)
+        self.plugged(Asked(unloaded=Alternative.QUEUE_FOR_OPEN, sender=lambda record, backend: channel), h)
+        h.tick()
+        self.assertEqual((h.backend.send_calls, channel.calls), ([], []))
+        self.assertEqual(h.record()["last_error"], "notLoaded")
+
+    def test_a_channel_under_a_client_id_the_plug_named_carries_it_with_no_marker(self):
+        """v0.6.17 (issue #42): the door only a plug opens - its channel, under the client id core derives, proven by
+        that id. Fails with the door reverted: it waited notLoaded and nothing was sent."""
+        h = self.fresh()
+        self.ready_after_reset(h, loaded=False)
+        h.backend.loaded_map[T1] = "notLoaded"
+        sent = []
+
+        class ClientChannel:
+            def send(self, thread_id, prompt, *, launch_guard=None, client_id=None):
+                with launch_guard as permitted:
+                    sent.append((thread_id, prompt, permitted, client_id))
+                return {"outcome": "unknown"}
+        self.plugged(Asked(unloaded=Alternative.QUEUE_FOR_OPEN, sender=lambda record, backend: ClientChannel(),
+                           delivery=Alternative.CLIENT_ID), h)
+        h.tick()
+        self.assertEqual(h.backend.send_calls, [], "not core's backend")
+        ((thread, prompt, permitted, client),) = sent
+        row = h.record()
+        self.assertEqual((thread, permitted, client), (T1, True, ids.continuation_client_id(row["interruption_id"])))
+        self.assertNotIn(row["marker"], prompt)
+        self.assertEqual(row["recovery_client_id"], client)
 
     def test_the_plug_no_longer_keeping_it_takes_it_back_and_gives_it_back(self):
         plug, row = self.queued_for_open()

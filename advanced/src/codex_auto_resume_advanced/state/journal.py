@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from codex_auto_resume.domain.plug import Alternative, Point
 
-from ..vocabulary import Actor, JournalCode, OffReason, RecordState
+from ..vocabulary import Actor, ArmingWarning, JournalCode, OffReason, RecordState
 
 EVENT_LIMIT = 5000
 WATCH_LIMIT = 150                 # would_have lines kept a capability, its newest (250; 200; 180 until v0.6.16-beta.4: 30 fit)
@@ -34,6 +34,12 @@ def prune_every(row_id) -> bool:
 
 def _closed(value, words):
     return value if value in tuple(words) else None
+
+
+def _reason(value):
+    """A reason as the journal keeps it: why a capability is off, or (v0.6.17) one of the statement's warning words -
+    why a capability stood aside for another (runtime.CONFLICTS)."""
+    return _closed(value, OffReason) or _closed(value, ArmingWarning)
 
 
 def _answer(value):
@@ -69,7 +75,7 @@ class JournalMixin:
         connection.execute(
             "INSERT INTO journal (at, capability, code, reason, actor, point, answer) "
             "VALUES (?,?,?,?,?,?,?)",
-            (at, capability, self._code(code, capability), _closed(reason, OffReason),
+            (at, capability, self._code(code, capability), _reason(reason),
              _closed(actor, Actor), _closed(point, Point),
              self._answer(answer)))
         if prune_every(connection.execute("SELECT last_insert_rowid()").fetchone()[0]):
@@ -99,7 +105,7 @@ class JournalMixin:
         return [{"at": row["at"],
                  "capability": row["capability"] if self.registry.get(row["capability"]) else None,
                  "code": self._code(row["code"], row["capability"]),
-                 "reason": _closed(row["reason"], OffReason), "actor": _closed(row["actor"], Actor),
+                 "reason": _reason(row["reason"]), "actor": _closed(row["actor"], Actor),
                  "point": _closed(row["point"], Point),
                  "answer": self._answer(row["answer"])}
                 for row in rows]
