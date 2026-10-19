@@ -173,41 +173,17 @@ namespace CodexAutoResume
             return window.Code == int.MinValue ? 0 : window.Code;
         }
 
-        private const int SW_RESTORE = 9;
-
         [DllImport("user32.dll")]
         private static extern bool AllowSetForegroundWindow(int process);
-
-        [DllImport("user32.dll")]
-        private static extern bool IsIconic(IntPtr window);
-
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr window, int command);
-
-        [DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr window);
 
         /// The uninstall window, shown as a window a person opened: normal and in front. The copy that shows it was
         /// started by another program, which ends first, and its window came up iconic - only on the taskbar - both
         /// from Settings > Apps and run directly (v0.6.16 acceptance). It opens normal, is restored should Windows
-        /// still hand it out minimized, and is brought to the front, which the program that started it allowed.
+        /// still hand it out minimized, and is brought to the front, which the program that started it allowed. The
+        /// routine is HostApp's since v0.6.17, where the Dashboard after Finish is brought to the front the same way.
         internal static void Present(Form window)
         {
-            window.WindowState = FormWindowState.Normal;
-            window.Shown += delegate
-            {
-                try
-                {
-                    if (IsIconic(window.Handle) || window.WindowState == FormWindowState.Minimized)
-                    {
-                        ShowWindow(window.Handle, SW_RESTORE);
-                        window.WindowState = FormWindowState.Normal;
-                    }
-                    window.Activate();
-                    SetForegroundWindow(window.Handle);
-                }
-                catch (Exception) { /* it is open, wherever Windows put it */ }
-            };
+            HostApp.Present(window);
         }
 
         private static string Read(string path)

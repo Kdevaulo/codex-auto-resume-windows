@@ -57,6 +57,8 @@ namespace CodexAutoResume
             // An administrator's DisableUpdateCheck greys this button as it greys Check for updates, and nothing is
             // asked however this is reached.
             if (updatesManaged) return;
+            // v0.6.17: opened inside another app's view of Windows, the version it installs would stay inside it.
+            if (RefusedInside()) return;
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
             string script = Path.Combine(root, "app", "scripts", "bootstrap.ps1");
             if (!File.Exists(script))

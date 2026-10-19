@@ -1076,6 +1076,16 @@ namespace CodexAutoResume
             if (renderJob != null) return SettingsForm.RenderFrames(renderJob);
 
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+            // v0.6.17: opened inside another app's private view of Windows - from the tray of a watcher the Codex app
+            // started - Repair, an update and another version would register this installation where Windows never
+            // looks (HostApp). The window opens again outside, once (HostApp.Outside), and this one ends; where it
+            // cannot, it stays and refuses those three (HostApp.StuckInside). A capture's window stays where it was
+            // started.
+            string inside = Soft.StillReady == null ? HostApp.Inside() : null;
+            if (inside != null && !HostApp.Relaunched(argv) &&
+                HostApp.Relaunch(Application.ExecutablePath, HostApp.Arguments(argv), root))
+                return 0;
+            HostApp.StuckInside = inside;
             var bridge = new Bridge(root);
             if (!bridge.Available)
             {
@@ -1105,7 +1115,11 @@ namespace CodexAutoResume
             double text = TextScale.Read();
             SettingsForm.AdoptTextSize(text, TextScale.Fitting(text, Screen.FromPoint(Cursor.Position).WorkingArea.Size,
                                                                SettingsForm.DpiScale));
-            Application.Run(new SettingsForm(new PersistentBridge(root, bridge)));
+            var window = new SettingsForm(new PersistentBridge(root, bridge));
+            // A window a person opened comes to the front - after Finish, and opened again outside (v0.6.17); a window
+            // that reopens itself, and a capture's, keep their place.
+            if (request.Generation == 0 && Soft.StillReady == null) HostApp.BringToFront(window);
+            Application.Run(window);
             return 0;
         }
     }

@@ -78,8 +78,21 @@ namespace CodexAutoResume
         // enough that the window says something before a person gives up on it.
         private const int RepairMilliseconds = 120000;
 
+        /// v0.6.17: this window stayed inside another app's private view of Windows (HostApp.StuckInside), where
+        /// Repair, an update and another version would register the installation out of Windows' sight. Says so, and
+        /// true: the action does not start.
+        private bool RefusedInside()
+        {
+            if (HostApp.StuckInside == null) return false;
+            Tell(S("diag.inside_app",
+                   "This Dashboard was opened from inside {app}, and Windows would keep what this sets up inside that app: the entry in Settings > Apps, the start at sign-in, the notifications' name, the link handler and the Start menu entry. Open the Dashboard from the Start menu and do this there.",
+                   "app", HostApp.Name(HostApp.StuckInside)));
+            return true;
+        }
+
         private void Repair()
         {
+            if (RefusedInside()) return;
             if (!Confirm(S("confirm.repair", "Run setup again to repair the Windows registrations?"),
                          S("action.repair", "Repair installation"))) return;
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
@@ -288,6 +301,8 @@ namespace CodexAutoResume
         /// and, where it did, "Open the Dashboard", which opens this installation's new Dashboard in place of this one.
         private void InstallUpdate(string root, string script, string flag, string version)
         {
+            // The check has said what it found, on the card; the install is what would stay inside another app.
+            if (RefusedInside()) return;
             // Who is running now. `code_version` is no use for this: an old watcher reads the
             // version out of the files under it and starts reporting the new one the moment
             // they are replaced, so only a start time that moved says a watcher restarted.
@@ -371,23 +386,13 @@ namespace CodexAutoResume
         }
         [ThreadStatic] private static int HeardCode;
 
-        /// This installation's Dashboard, the new version the update has just put in place, started by its full path.
+        /// This installation's Dashboard, the new version the update has just put in place, started by its full path -
+        /// in front, which this window, where Open the Dashboard was just pressed, lets it be (v0.6.17).
         private static bool OpenNewDashboard(string root)
         {
             string exe = Path.Combine(root, "CodexAutoResumeSettings.exe");
             if (!File.Exists(exe)) return false;
-            try
-            {
-                var start = new ProcessStartInfo(exe);
-                start.UseShellExecute = false;
-                start.WorkingDirectory = root;
-                Process.Start(start).Dispose();
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
+            return HostApp.StartInFront(exe, null, root);
         }
 
         /// The identity of the process holding the watcher's heartbeat, or null where there
