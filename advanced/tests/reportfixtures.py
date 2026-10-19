@@ -260,7 +260,7 @@ class Home:
                            (len(pruned),))
             db.execute("PRAGMA user_version = %d" % version)
             if version != ledger_schema.SCHEMA_VERSION:
-                # A ledger of another version carries that version's readable-from mark: none before version 8, and a
+                # A ledger of another version carries that version's readable-from mark: none for an older one, and a
                 # later one's own number unless `readable` names an older one (schema.READABLE_FROM).
                 db.execute("PRAGMA application_id = %d" % (0 if version < ledger_schema.SCHEMA_VERSION
                                                            else ledger_schema.MARK | (readable or version)))

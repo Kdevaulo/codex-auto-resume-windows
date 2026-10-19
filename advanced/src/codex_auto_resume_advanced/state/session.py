@@ -35,10 +35,11 @@ from codex_auto_resume import config, machine
 from codex_auto_resume.domain import ids
 
 from .schema import (ADD_RESETS, ATTACHED, FILE_NAME, SCHEMA_VERSION, STATEMENTS, TABLES, TABLES_V1,
-                     TABLES_V2, TABLES_V3, TABLES_V3_BEFORE_RESETS, TABLES_V4, TABLES_V5, TABLES_V7, UPGRADE_FROM_1,
-                     UPGRADE_FROM_2, UPGRADE_FROM_3, UPGRADE_FROM_4, UPGRADE_FROM_5, UPGRADE_FROM_7, STAGE4_VERSION,
+                     TABLES_V2, TABLES_V3, TABLES_V3_BEFORE_RESETS, TABLES_V4, TABLES_V5, UPGRADE_FROM_1,
+                     UPGRADE_FROM_2, UPGRADE_FROM_3, UPGRADE_FROM_4, UPGRADE_FROM_5, STAGE4_VERSION,
                      TABLES_BEFORE_STAGE4, UPGRADE_TO_STAGE4, WINDOW_CHOICES, WINDOW_FOLLOWERS, WINDOW_LEADER,
-                     WINDOW_OFF, WINDOW_ON, holds, readable_from)
+                     WINDOW_OFF, WINDOW_ON, FREE_OPTIONS, MARKED, READABLE_FROM, holds, names_checked,
+                     readable_from)
 
 
 class StateError(RuntimeError):
@@ -190,7 +191,7 @@ class SessionMixin:
             tables = self._tables(connection)
             version = SCHEMA_VERSION
         if version > SCHEMA_VERSION:
-            # A newer version's file (v0.6.17): used where it is marked readable from this version - every table this
+            # A later version's file (v0.6.17): used where it is marked readable from this version - every table this
             # version knows holding its columns, first - with nothing upgraded and its version and mark left as they
             # are; refused as newer otherwise, every capability off and nothing written (schema.READABLE_FROM).
             if readable_from(connection, version) > SCHEMA_VERSION:
@@ -201,8 +202,7 @@ class SessionMixin:
             for old, shape, steps in ((1, TABLES_V1, UPGRADE_FROM_1), (2, TABLES_V2, UPGRADE_FROM_2),
                                       (3, TABLES_V3_BEFORE_RESETS, ADD_RESETS), (3, TABLES_V3, UPGRADE_FROM_3),
                                       (4, TABLES_V4, UPGRADE_FROM_4), (5, TABLES_V5, UPGRADE_FROM_5),
-                                      (STAGE4_VERSION - 1, TABLES_BEFORE_STAGE4, UPGRADE_TO_STAGE4),
-                                      (STAGE4_VERSION, TABLES_V7, UPGRADE_FROM_7)):
+                                      (STAGE4_VERSION - 1, TABLES_BEFORE_STAGE4, UPGRADE_TO_STAGE4)):
                 if version == old and tables == shape:
                     for statement in steps:
                         connection.execute(statement)
@@ -210,6 +210,13 @@ class SessionMixin:
                     version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version != SCHEMA_VERSION or tables != TABLES:
                 raise StateError("unsupported or malformed advanced state")
+            # v0.6.17: `options` freed of the CHECK on its names, and the file marked, its version kept - so v0.6.16,
+            # which compares columns alone, reads it as before. Each only while it is still to do.
+            if names_checked(connection):
+                for statement in FREE_OPTIONS:
+                    connection.execute(statement)
+            elif readable_from(connection, version) != READABLE_FROM:
+                connection.execute(MARKED)
         if connection.execute("SELECT count(*) FROM meta").fetchone()[0] != 1:
             raise StateError("malformed advanced state")
         self._carry_windows(connection)

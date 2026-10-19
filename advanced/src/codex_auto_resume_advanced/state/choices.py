@@ -32,7 +32,7 @@ from ..vocabulary import Actor, JournalCode, OptionKey, Refusal
 from .journal import prune_every
 from .session import StaleGeneration, StateError, _key, _word
 
-# The names a person's choice may be stored under: the vocabulary's, checked here and nowhere in the file (version 8).
+# The names a person's choice may be stored under: the vocabulary's, checked here and nowhere in the file (v0.6.17).
 OPTION_WORDS = frozenset(str(word) for word in OptionKey)
 RULES_LIMIT = 10
 STATUS_RANGE = (100, 599)
@@ -250,7 +250,7 @@ class ChoicesMixin:
         """One choice set, against the generation the Dashboard read. The generation after.
         Refused (OPTION_INVALID) for a choice the capability does not offer or a value it does not
         offer for it; StaleGeneration where anything moved since. The name is the vocabulary's too
-        (OptionKey): since version 8 no CHECK of the file's names it (schema.READABLE_FROM), so the code
+        (OptionKey): since v0.6.17 no CHECK of the file's names it (schema.FREE_OPTIONS), so the code
         is what keeps a word it does not know out."""
         definition = self.registry.get(capability)
         option = definition.option(key) if definition is not None else None

@@ -534,8 +534,8 @@ class RuleTests(ChoicesCase):
                           "INSERT INTO samples (at, form, has_words, items_agent) VALUES (1, 'tagged', 1, -1)",
                           "INSERT INTO admissions VALUES ('%s', 'test_wake', 'hold', NULL, NULL, NULL, NULL, "
                           "NULL, 0, 1)" % ac.KEY,
-                          # A name the vocabulary does not hold is the code's to refuse since version 8
-                          # (test_advanced_state_v8); a value below 1 is still the file's too.
+                          # A name the vocabulary does not hold is the code's to refuse since v0.6.17
+                          # (test_advanced_state_options); a value below 1 is still the file's too.
                           "INSERT INTO options VALUES ('test_wake', 'attempts', 0)"):
             with self.subTest(statement):
                 with self.assertRaises(sqlite3.IntegrityError):

@@ -1,9 +1,9 @@
-"""The advanced state's version 8 (v0.6.17, the owner's decision of 2026-10-18): `options` without the CHECK on its names
-- the code alone keeps a name it does not know out, and passes one over that a later version wrote - and the
-readable-from mark (schema.READABLE_FROM), by which a reader uses a later version's file that says it may, and still
-refuses one marked newer than itself. A version-7 file - v0.6.16's - is brought to it with every row kept, once, and a
-run cut short leaves version 7 as it was. The way down: v0.6.16 predates the mark, refuses the file as newer and writes
-nothing to it.
+"""The advanced state as v0.6.17 keeps it (the owner's decision of 2026-10-18), its version still 7: `options` without
+the CHECK on its names - the code alone keeps a name it does not know out, and passes one over that a later version
+wrote - and the readable-from mark (schema.READABLE_FROM), by which a reader uses a later version's file that says it
+may, and still refuses one marked newer than itself. v0.6.16's file is freed of the CHECK with every row kept, once, and
+a run cut short leaves the old table whole. The way down: v0.6.16 compares columns alone, reads the file with every
+feature on, and its own code still refuses a name it does not know.
 
     PYTHONPATH=src python -m unittest discover -s advanced/tests
 """
@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import tarfile
@@ -22,8 +24,6 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import sqlite3  # noqa: E402
 
 import advancedcase as ac  # noqa: E402
 from codex_auto_resume import config  # noqa: E402
@@ -48,27 +48,27 @@ def dump(path) -> dict:
 
 
 def header(path) -> tuple:
+    """(user_version, application_id, whether `options` still has its CHECK on names)."""
     with contextlib.closing(sqlite3.connect(path)) as connection:
         return (connection.execute("PRAGMA user_version").fetchone()[0],
-                connection.execute("PRAGMA application_id").fetchone()[0],
-                connection.execute("SELECT sql FROM sqlite_master WHERE name='options'").fetchone()[0])
+                connection.execute("PRAGMA application_id").fetchone()[0], schema_module.names_checked(connection))
 
 
-class V8Case(StateCase):
+class OptionsCase(StateCase):
     def definition(self, **changes):
         fields = dict(options=(Option(OptionKey.ATTEMPTS, (1, 2, 3), 1),))
         fields.update(changes)
         return ac.definition(**fields)
 
     def opened(self):
-        """The file opened once - a read - and closed: what brings it to this version."""
+        """The file opened once - a read - and closed: what frees `options` and marks the file."""
         state = self.state(self.definition())
         state.arming()
         state.close()
 
-    def version_seven(self):
+    def as_v0616_made_it(self, *rows):
         """A file exactly as v0.6.16 made it - version 7, no mark, `options` with its CHECK on names - holding a row in
-        `arming`, `options` (a choice and Keep it on), `spend`, `journal`, `wordings` and `chat_messages`."""
+        `arming`, `options` (a choice and Keep it on), `spend`, `journal`, `wordings` and `chat_messages`, and `rows`."""
         self.paths.advanced_dir.mkdir(parents=True)
         (self.paths.advanced_dir / config.OWNER_MARKER).write_text(config.OWNER_TEXT, encoding="utf-8")
         path = self.paths.advanced_dir / schema_module.FILE_NAME
@@ -85,27 +85,27 @@ class V8Case(StateCase):
             connection.execute("INSERT INTO wordings VALUES ('usage_wrap_up', 'wrap_custom_weekly', 'Stop soon.', 1.0)")
             connection.execute("INSERT INTO chat_messages (thread_id, words, state, record_id, created_at) "
                                "VALUES (?, 'mine', 'waiting', ?, 1.0)", (ac.THREAD, "%064x" % 5))
+            for statement in rows:
+                connection.execute(statement)
             connection.commit()
-            with self.assertRaises(sqlite3.IntegrityError, msg="version 7's CHECK on names"):
+            with self.assertRaises(sqlite3.IntegrityError, msg="v0.6.16's CHECK on names"):
                 connection.execute("INSERT INTO options VALUES ('test_wake', ?, 1)", (UNKNOWN,))
-        self.assertEqual(header(path)[:2], (7, 0))
+        self.assertEqual(header(path), (7, 0, True))
         return path
 
 
-class UpgradeTests(V8Case):
-    def test_a_version_seven_file_is_brought_to_eight_and_keeps_every_row(self):
-        """Fails with the step reverted: the file is refused, every capability off."""
-        path = self.version_seven()
+class FreeingTests(OptionsCase):
+    def test_v0616s_file_is_freed_of_the_check_and_keeps_every_row_and_its_version(self):
+        """Fails with the freeing reverted: the CHECK stays and the file has no mark."""
+        path = self.as_v0616_made_it()
         before = dump(path)
         state = self.state(self.definition())
         self.assertEqual(state.arming()["test_wake"]["state"], ArmingState.ARMED)
         self.assertTrue(state.arming()["test_wake"]["keep_on"])
         self.assertEqual(state.options("test_wake"), {OptionKey.ATTEMPTS: 3})
         state.close()
-        version, mark, options = header(path)
-        self.assertEqual((version, mark), (schema_module.SCHEMA_VERSION, MARKED_7))
-        self.assertEqual(schema_module.SCHEMA_VERSION, 8)
-        self.assertNotIn("choice IN", options)
+        self.assertEqual(header(path), (7, MARKED_7, False))
+        self.assertEqual(schema_module.SCHEMA_VERSION, 7, "no new version: v0.6.16 reads the file as its own")
         self.assertEqual(dump(path), before, "every row of every table kept, and no table more or less")
         with contextlib.closing(sqlite3.connect(path)) as connection:
             self.assertEqual(AdvancedState._tables(connection), schema_module.TABLES)
@@ -113,48 +113,49 @@ class UpgradeTests(V8Case):
             with self.assertRaises(sqlite3.IntegrityError, msg="the value's CHECK stays"):
                 connection.execute("INSERT INTO options VALUES ('test_wake', 'workers', 0)")
 
-    def test_a_new_file_is_version_eight_marked_and_without_the_check(self):
+    def test_a_new_file_is_made_free_and_marked(self):
         state = self.state(self.definition())
         state.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
         state.close()
-        version, mark, options = header(state.path)
-        self.assertEqual((version, mark), (schema_module.SCHEMA_VERSION, MARKED_7))
-        self.assertNotIn("choice IN", options)
+        self.assertEqual(header(state.path), (7, MARKED_7, False))
 
-    def test_the_step_runs_once(self):
-        """Opened again, the file is left as the first opening made it: no step is taken twice."""
-        path = self.version_seven()
+    def test_it_is_done_once_and_never_on_a_free_table(self):
+        """Opened again, a freed file - or a new one, free from the start - is left as it is: the step is not taken."""
+        path = self.as_v0616_made_it()
         self.opened()
         after = (dump(path), header(path))
-        with patch.object(session, "UPGRADE_FROM_7", ("SELECT no_such_column FROM options",)):
+        with patch.object(session, "FREE_OPTIONS", ("SELECT no_such_column FROM options",)), \
+                patch.object(session, "MARKED", "SELECT no_such_column FROM options"):
             again = self.state(self.definition())
             self.assertEqual(again.options("test_wake"), {OptionKey.ATTEMPTS: 3})
             again.close()
+            self.home = self.home.parent / "home-new"
+            self.paths = config.Paths(self.home)
+            new = self.state(self.definition())
+            new.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
+            new.close()
+            self.assertEqual(self.state(self.definition()).arming()["test_wake"]["state"], ArmingState.SHADOW)
         self.assertEqual((dump(path), header(path)), after)
 
-    def test_a_run_cut_short_leaves_version_seven_and_is_taken_again(self):
-        """The step is taken in the opening's one transaction: cut short after `options` was dropped, the file is version
-        7 as v0.6.16 left it, every row there; the next opening takes the step whole."""
-        path = self.version_seven()
+    def test_a_run_cut_short_leaves_the_old_table_whole_and_is_done_at_the_next_opening(self):
+        """Done in the opening's one transaction: cut short after `options` was dropped, the file is as v0.6.16 left it,
+        every row there; the next opening does it whole."""
+        path = self.as_v0616_made_it()
         before = dump(path)
-        steps = schema_module.UPGRADE_FROM_7
-        cut = steps[:3] + ("INSERT INTO no_such_table VALUES (1)",) + steps[3:]       # after the DROP TABLE options
+        steps = schema_module.FREE_OPTIONS
         self.assertTrue(steps[2].startswith("DROP TABLE options"))
-        with patch.object(session, "UPGRADE_FROM_7", cut):
+        cut = steps[:3] + ("INSERT INTO no_such_table VALUES (1)",) + steps[3:]
+        with patch.object(session, "FREE_OPTIONS", cut):
             with self.assertRaises(StateError):
                 self.state(self.definition()).arming()
-        version, mark, options = header(path)
-        self.assertEqual((version, mark), (7, 0))
-        self.assertIn("choice IN", options)
+        self.assertEqual(header(path), (7, 0, True))
         self.assertEqual(dump(path), before)
-        state = self.state(self.definition())
-        self.assertEqual(state.options("test_wake"), {OptionKey.ATTEMPTS: 3})
-        state.close()
-        self.assertEqual(header(path)[:2], (schema_module.SCHEMA_VERSION, MARKED_7))
+        self.opened()
+        self.assertEqual(header(path), (7, MARKED_7, False))
         self.assertEqual(dump(path), before)
 
 
-class NameTests(V8Case):
+class NameTests(OptionsCase):
     def test_a_name_the_vocabulary_does_not_hold_is_refused_by_the_code(self):
         """With no CHECK on names, the code is what refuses one, twice: the registry takes no capability offering a
         choice the vocabulary does not hold (registry._option_problem), and were one let through, set_option still
@@ -177,9 +178,9 @@ class NameTests(V8Case):
 
     def test_a_name_a_later_version_wrote_is_passed_over(self):
         """A row under a name this version does not know - a later version's choice - is read past: the choices are
-        the defaults and the stored ones offered, Keep it on reads from its own words only. Fails with version 8's step
+        the defaults and the stored ones offered, Keep it on reads from its own words only. Fails with the freeing
         reverted: the file refuses the row."""
-        path = self.version_seven()
+        path = self.as_v0616_made_it()
         self.opened()
         with contextlib.closing(sqlite3.connect(path)) as connection:
             connection.execute("INSERT INTO options VALUES ('test_wake', ?, 2)", (UNKNOWN,))
@@ -196,14 +197,14 @@ class NameTests(V8Case):
         self.assertEqual(kept, {"attempts", UNKNOWN, "a_later_choice"}, "a later version's rows are left as they are")
         self.assertNotIn(str(KeepOn.KEEP_ON), kept)
 
-    def test_the_frozen_names_are_the_vocabularys_at_version_seven(self):
+    def test_the_frozen_names_are_still_the_vocabularys(self):
         """V7_OPTION_WORDS is what v0.6.16's CHECK named: every word of it is still the vocabulary's."""
         self.assertEqual(set(schema_module.V7_OPTION_WORDS) - {str(word) for word in (*OptionKey, *KeepOn)}, set())
 
 
-class MarkTests(V8Case):
+class MarkTests(OptionsCase):
     def later(self, readable, *, extra=True):
-        """This version's file as a later version (9) would leave it, marked readable from `readable`: with a table of
+        """This version's file as a later version (8) would leave it, marked readable from `readable`: with a table of
         its own and a column at the end of `journal`, each holding a row."""
         state = self.state(self.definition())
         state.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
@@ -237,17 +238,21 @@ class MarkTests(V8Case):
             self.assertIn("later", AdvancedState._tables(connection)["journal"])
 
     def test_an_older_reader_honours_the_mark(self):
-        """A version-7 reader that reads the mark uses this version's file (marked readable from 7) and refuses one
-        marked readable from 8 only - as each later reader will judge a file newer than itself."""
+        """A version-6 reader that reads the mark uses a version-7 file marked readable from 6, and refuses this
+        version's own (marked 7) - as each later reader will judge a file newer than itself. Fails with the mark not
+        honoured: the first is refused too."""
         state = self.state(self.definition())
         state.move("test_wake", ArmingState.SHADOW, actor=Actor.DASHBOARD, revision=1)
         state.close()
-        with patch.object(session, "SCHEMA_VERSION", 7):
+        with contextlib.closing(sqlite3.connect(state.path)) as connection:
+            connection.execute("PRAGMA application_id=%d" % (schema_module.MARK | 6))
+            connection.commit()
+        with patch.object(session, "SCHEMA_VERSION", 6):
             older = self.state(self.definition())
             self.assertEqual(older.arming()["test_wake"]["state"], ArmingState.SHADOW)
             older.close()
             with contextlib.closing(sqlite3.connect(state.path)) as connection:
-                connection.execute("PRAGMA application_id=%d" % (schema_module.MARK | 8))
+                connection.execute("PRAGMA application_id=%d" % MARKED_7)
                 connection.commit()
             before = state.path.read_bytes()
             with self.assertRaises(StateError):
@@ -280,62 +285,83 @@ class MarkTests(V8Case):
             self.assertEqual(schema_module.readable_from(connection, 9), 7)
 
 
-class DowngradeTests(V8Case):
-    """v0.6.16 (version 7) reads no mark: `version > SCHEMA_VERSION` is refused as newer (its state/session.py:190).
-    Every capability reads off there, nothing is written, and every row waits for this version."""
+# Run with v0.6.16's own sources: its shipped registry, reading the file this version freed and marked. One of its
+# capabilities is armed there with a choice of its own; it reads both, refuses a name it does not know, and sets its
+# own choice into the free table.
+V0616 = """
+import json, sys
+sys.path[:0] = sys.argv[2:]
+from pathlib import Path
+from codex_auto_resume import config
+from codex_auto_resume_advanced.registry import REGISTRY
+from codex_auto_resume_advanced.state import AdvancedState, Refused, StateError
+state = AdvancedState(config.Paths(Path(sys.argv[1])), registry=REGISTRY, clock=lambda: 1.8e9)
+out = {}
+try:
+    out["arming"] = {key: row["state"] for key, row in state.arming().items()}
+    out["options"] = {str(key): value for key, value in state.options("queue_for_open").items()}
+    try:
+        state.set_option("queue_for_open", "tries", 2, generation=state.meta()["generation"], actor="dashboard")
+        out["unknown"] = "written"
+    except Refused as exc:
+        out["unknown"] = str(exc.refusal)
+    days = REGISTRY.get("queue_for_open").option("days").choices[-1]
+    state.set_option("queue_for_open", "days", days, generation=state.meta()["generation"], actor="dashboard")
+    out["set"] = days
+except StateError as exc:
+    out["refused"] = str(exc)
+state.close()
+print(json.dumps(out))
+"""
+
+
+class DowngradeTests(OptionsCase):
+    """Install another version back to v0.6.16 (version 7, which reads no mark and compares column names only)."""
 
     def migrated(self):
-        path = self.version_seven()
+        path = self.as_v0616_made_it(
+            "INSERT INTO arming VALUES ('queue_for_open','armed',%r,'dashboard',NULL,1,NULL,NULL)" % self.now,
+            "INSERT INTO options VALUES ('queue_for_open', 'days', 5)")
         self.opened()
+        self.assertEqual(header(path), (7, MARKED_7, False))
         return path
 
-    def test_v0_6_16s_gate_refuses_the_migrated_file_and_writes_nothing(self):
-        """Its gate, as it is: version 7 and no mark read. Fails with the file kept at version 7 (the proposal): it is
-        read."""
-        path = self.migrated()
-        before = path.read_bytes()
-        with patch.object(session, "SCHEMA_VERSION", 7), \
-                patch.object(session, "readable_from", lambda connection, version: version):
-            older = self.state(self.definition())
-            for attempt in (lambda: older.arming(), lambda: older.meta(),
-                            lambda: older.move("test_wake", ArmingState.ARMED, actor=Actor.DASHBOARD, revision=1),
-                            lambda: older.all_off(actor=Actor.DASHBOARD, reason="all_off")):
-                with self.assertRaises(StateError):
-                    attempt()
-            older.close()
-        self.assertEqual(path.read_bytes(), before)
-        back = self.state(self.definition())
-        self.assertEqual(back.options("test_wake"), {OptionKey.ATTEMPTS: 3})
-        self.assertTrue(back.arming()["test_wake"]["keep_on"])
-
-    def test_v0_6_16s_own_code_refuses_it_and_writes_nothing(self):
-        """The same with v0.6.16's own sources, from its tag, in a process of their own: skipped where the tag is not
-        in the checkout."""
-        path = self.migrated()
-        before = path.read_bytes()
+    def v0616(self):
+        """v0.6.16's own sources, from its tag; skipped where the tag is not in the checkout."""
         archive = subprocess.run(["git", "-C", str(ROOT), "archive", "--format=tar", "v0.6.16", "--",
                                   "src/codex_auto_resume", "advanced/src/codex_auto_resume_advanced"],
                                  capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         if archive.returncode != 0:
             self.skipTest("the v0.6.16 tag is not in this checkout")
-        with tempfile.TemporaryDirectory() as tree:
-            with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
-                tar.extractall(tree, filter="data")
-            script = ("import sys\nsys.path[:0] = sys.argv[2:]\nfrom pathlib import Path\n"
-                      "from codex_auto_resume import config\n"
-                      "from codex_auto_resume_advanced.registry import Registry\n"
-                      "from codex_auto_resume_advanced.state import AdvancedState, StateError\n"
-                      "state = AdvancedState(config.Paths(Path(sys.argv[1])), registry=Registry(()), "
-                      "clock=lambda: 1.8e9)\n"
-                      "try:\n    state.arming()\n    print('read')\n"
-                      "except StateError as exc:\n    print('refused: %s' % exc)\n")
-            environment = dict(os.environ, CODEX_AR_EDITION="advanced")
-            ran = subprocess.run([sys.executable, "-I", "-c", script, str(self.home), str(Path(tree) / "src"),
-                                  str(Path(tree) / "advanced" / "src")], capture_output=True,
-                                 text=True, env=environment, cwd=tree, timeout=120,
-                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        self.assertEqual(ran.stdout.strip(), "refused: the advanced state was written by a newer version", ran.stderr)
-        self.assertEqual(path.read_bytes(), before)
+        tree = tempfile.TemporaryDirectory()
+        self.addCleanup(tree.cleanup)
+        with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
+            tar.extractall(tree.name, filter="data")
+        return Path(tree.name)
+
+    def test_v0616s_own_code_reads_the_freed_file_with_its_features_on(self):
+        """Its features as they stood, its own choice read and set, a name it does not know refused by its code, and the
+        file still version 7, marked, every other row as it was. Fails with the version moved to 8: v0.6.16 refuses
+        the file as newer."""
+        path = self.migrated()
+        tree = self.v0616()
+        ran = subprocess.run([sys.executable, "-I", "-c", V0616, str(self.home), str(tree / "src"),
+                              str(tree / "advanced" / "src")], capture_output=True, text=True, timeout=120,
+                             env=dict(os.environ, CODEX_AR_EDITION="advanced"), cwd=tree,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(ran.returncode, 0, ran.stderr)
+        found = json.loads(ran.stdout)
+        self.assertNotIn("refused", found)
+        self.assertEqual(found["arming"], {"queue_for_open": "armed"})
+        self.assertEqual(found["options"], {"days": 5})
+        self.assertEqual(found["unknown"], "option_invalid")
+        self.assertEqual(header(path), (7, MARKED_7, False))
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            # Less the window switches v0.6.16 carries over for its own wrap-up and stop on opening (session._carry_windows).
+            stored = {(row[0], row[1]): row[2] for row in connection.execute("SELECT * FROM options")
+                      if row[1] not in schema_module.WINDOW_CHOICES}
+        self.assertEqual(stored, {("test_wake", "attempts"): 3, ("test_wake", "keep_on"): 1,
+                                  ("queue_for_open", "days"): found["set"]})
 
 
 if __name__ == "__main__":

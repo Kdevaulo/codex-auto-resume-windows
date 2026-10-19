@@ -63,7 +63,7 @@ class VersionSixTests(StateCase):
         state.close()
         with contextlib.closing(sqlite3.connect(path)) as connection:
             self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], schema_module.SCHEMA_VERSION)
-            self.assertEqual(schema_module.SCHEMA_VERSION, 8, "and on through version 8's step (test_advanced_state_v8)")
+            self.assertEqual(schema_module.SCHEMA_VERSION, 7)
             self.assertEqual(AdvancedState._tables(connection), schema_module.TABLES)
             for name in schema_module.STAGE4_TABLES:
                 self.assertEqual(connection.execute("SELECT count(*) FROM %s" % name).fetchone()[0], 0)
