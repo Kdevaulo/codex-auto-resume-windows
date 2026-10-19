@@ -127,7 +127,7 @@ class PauseBesideResetCreditTests(UsageCase):
         code._session = lambda: Session(self.answer, self.calls)
         code._app_running = lambda: self.app
 
-    @unittest.expectedFailure
+    # Fixed in v0.6.17 (#44): a reset spend of the held window lets the pause go (engine/usage.py).
     def test_a_credit_spent_is_not_held_for_its_whole_early_window(self):
         self.on("usage_pause")
         self.on("reset_credit")
