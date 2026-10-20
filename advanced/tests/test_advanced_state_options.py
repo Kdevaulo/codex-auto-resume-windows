@@ -202,6 +202,87 @@ class NameTests(OptionsCase):
         self.assertEqual(set(schema_module.V7_OPTION_WORDS) - {str(word) for word in (*OptionKey, *KeepOn)}, set())
 
 
+class DefaultTests(OptionsCase):
+    """Choosing a choice's default stores nothing (v0.6.17): on the owner's PC the queue's days set back to 3 left an
+    explicit `days=3` where there had been none, so a later release that changed the default would not have reached
+    that person. The row is taken away instead; reading an absent row gives the default."""
+
+    def set(self, state, key, value):
+        return state.set_option("test_wake", key, value, generation=state.meta()["generation"], actor=Actor.DASHBOARD)
+
+    def stored(self, state) -> dict:
+        with contextlib.closing(sqlite3.connect(state.path)) as connection:
+            return {row[0]: row[1] for row in connection.execute(
+                "SELECT choice, value FROM options WHERE capability='test_wake'")}
+
+    def test_the_default_chosen_stores_nothing_and_reads_as_the_default(self):
+        state = self.state(self.definition())
+        self.set(state, OptionKey.ATTEMPTS, 1)
+        self.assertEqual(self.stored(state), {})
+        self.assertEqual(state.options("test_wake"), {OptionKey.ATTEMPTS: 1})
+
+    def test_another_value_is_stored_and_the_default_chosen_again_takes_its_row_away(self):
+        """Fails with the fix reverted: the default is written as `attempts=1`."""
+        state = self.state(self.definition())
+        before = state.meta()["generation"]
+        self.set(state, OptionKey.ATTEMPTS, 3)
+        self.assertEqual(self.stored(state), {"attempts": 3})
+        self.assertEqual(state.options("test_wake"), {OptionKey.ATTEMPTS: 3})
+        after = self.set(state, OptionKey.ATTEMPTS, 1)
+        self.assertEqual(self.stored(state), {}, "the default chosen again: no row")
+        self.assertEqual(state.options("test_wake"), {OptionKey.ATTEMPTS: 1})
+        self.assertEqual(after, before + 2, "each choice moves the generation as any choice does")
+
+    def test_a_default_stored_before_is_left_as_it_is(self):
+        # A guard for rows this change never touches, not a proof of it: it passes with the fix reverted. No migration.
+        path = self.as_v0616_made_it("UPDATE options SET value=1 WHERE capability='test_wake' AND choice='attempts'")
+        state = self.state(self.definition())
+        self.assertEqual(state.options("test_wake"), {OptionKey.ATTEMPTS: 1})
+        state.close()
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            self.assertEqual(connection.execute("SELECT value FROM options WHERE capability='test_wake' "
+                                                "AND choice='attempts'").fetchone(), (1,))
+
+    def test_every_choice_of_every_shipped_capability_stores_nothing_at_its_default(self):
+        """Not only the queue's days: each choice the shipped registry offers, set to another value and back to its
+        default, leaves no row - but the wrap-up's and the stop's window switches, whose missing row an opening fills
+        from the meter's (session._carry_windows), so their default is written as any value is."""
+        from codex_auto_resume_advanced.registry import REGISTRY
+        from codex_auto_resume_advanced.state.choices import CARRIED
+        state = AdvancedState(self.paths, registry=REGISTRY, clock=lambda: self.now)
+        self.addCleanup(state.close)
+        checked = 0
+        for definition in REGISTRY:
+            for option in definition.options:
+                other = next(value for value in option.choices if value != option.default)
+                for value in (other, option.default):
+                    state.set_option(definition.id, option.key, value, generation=state.meta()["generation"],
+                                     actor=Actor.DASHBOARD)
+                with contextlib.closing(sqlite3.connect(state.path)) as connection:
+                    row = connection.execute("SELECT value FROM options WHERE capability=? AND choice=?",
+                                             (definition.id, str(option.key))).fetchone()
+                with self.subTest(capability=definition.id, choice=str(option.key)):
+                    self.assertEqual(row, (option.default,) if (definition.id, str(option.key)) in CARRIED else None)
+                    self.assertEqual(state.options(definition.id)[option.key], option.default)
+                checked += 1
+        self.assertGreater(checked, 10)
+
+    def test_a_carried_window_switch_chosen_on_stays_on_after_the_next_opening(self):
+        """The wrap-up's five-hour switch turned off and back on, with the meter's off: were its row taken away, the
+        next opening would carry the meter's off over to it."""
+        from codex_auto_resume_advanced.registry import USAGE_METER, USAGE_PAUSE, USAGE_WRAP_UP
+        registry = Registry((USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE))
+        state = AdvancedState(self.paths, registry=registry, clock=lambda: self.now)
+        for capability, value in (("usage_meter", 2), ("usage_wrap_up", 2), ("usage_wrap_up", 1)):
+            state.set_option(capability, OptionKey.WINDOW_FIVE_HOUR, value, generation=state.meta()["generation"],
+                             actor=Actor.DASHBOARD)
+        state.close()
+        state = AdvancedState(self.paths, registry=registry, clock=lambda: self.now)
+        self.addCleanup(state.close)
+        self.assertEqual(state.options("usage_wrap_up")[OptionKey.WINDOW_FIVE_HOUR], 1)
+        self.assertEqual(state.options("usage_meter")[OptionKey.WINDOW_FIVE_HOUR], 2)
+
+
 class MarkTests(OptionsCase):
     def later(self, readable, *, extra=True):
         """This version's file as a later version (8) would leave it, marked readable from `readable`: with a table of
@@ -314,6 +395,30 @@ state.close()
 print(json.dumps(out))
 """
 
+# v0.6.16's own sources again, reading the units this version wrote for two claims of one record at one reading of the
+# clock - the second at the next float above the first (state/spend.claim_time) - and paying a unit of its own.
+V0616_SPEND = """
+import json, sys
+sys.path[:0] = sys.argv[3:]
+from pathlib import Path
+from codex_auto_resume import config
+from codex_auto_resume_advanced.registry import REGISTRY
+from codex_auto_resume_advanced.state import AdvancedState, StateError
+asked = json.loads(sys.argv[2])
+state = AdvancedState(config.Paths(Path(sys.argv[1])), registry=REGISTRY, clock=lambda: asked["now"])
+out = {}
+try:
+    out["spent"] = state.spent("queue_for_open", asked["thread"], asked["now"])
+    out["payers"] = {key: list(times) for key, times in state.payers(asked["key"], asked["at"]).items()}
+    with state._transaction() as connection:
+        state.record_spend(connection, "main", "queue_for_open", asked["thread"], asked["key"], asked["now"])
+    out["after"] = state.spent("queue_for_open", asked["thread"], asked["now"])["capability_day"]
+except StateError as exc:
+    out["refused"] = str(exc)
+state.close()
+print(json.dumps(out))
+"""
+
 
 class DowngradeTests(OptionsCase):
     """Install another version back to v0.6.16 (version 7, which reads no mark and compares column names only)."""
@@ -338,6 +443,64 @@ class DowngradeTests(OptionsCase):
         with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
             tar.extractall(tree.name, filter="data")
         return Path(tree.name)
+
+    def run_v0616(self, script, *arguments) -> dict:
+        """`script` run by v0.6.16's own sources against this home, `arguments` after it: what it printed."""
+        tree = self.v0616()
+        ran = subprocess.run([sys.executable, "-I", "-c", script, str(self.home), *arguments, str(tree / "src"),
+                              str(tree / "advanced" / "src")], capture_output=True, text=True, timeout=120,
+                             env=dict(os.environ, CODEX_AR_EDITION="advanced"), cwd=tree,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(ran.returncode, 0, ran.stderr)
+        return json.loads(ran.stdout)
+
+    def test_v0616s_own_code_reads_the_units_of_two_claims_at_one_reading(self):
+        """The second of two claims of one record at one reading of the clock writes its units at the next float
+        above the first's - no column for it, so v0.6.16 still reads the file as its own: it counts both units, finds
+        both paid for that send of the record (within its SAME_CLAIM), and pays a unit of its own beside them."""
+        from codex_auto_resume_advanced.registry import REGISTRY
+        path = self.migrated()
+        key = "%064x" % 7
+        state = AdvancedState(config.Paths(self.home), registry=REGISTRY, clock=lambda: self.now)
+        self.addCleanup(state.close)
+        for _ in range(2):
+            with state._transaction() as connection:
+                at = state.claim_time(connection, "main", key, self.now)
+                state.record_spend(connection, "main", "queue_for_open", ac.THREAD, key, at)
+        state.close()
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            times = [row[0] for row in connection.execute(
+                "SELECT at FROM spend WHERE interruption_id=? ORDER BY spend_id", (key,))]
+        self.assertEqual(len(times), 2)
+        self.assertLess(times[0], times[1], "the second claim's units stand apart from the first's")
+        found = self.run_v0616(V0616_SPEND, json.dumps({"now": self.now, "thread": ac.THREAD, "key": key,
+                                                        "at": self.now}))
+        self.assertNotIn("refused", found)
+        self.assertEqual(found["spent"]["capability_day"], 2)
+        self.assertEqual(found["spent"]["global_hour"], 3, "v0.6.16 counts units: these two and test_wake's")
+        self.assertEqual(found["payers"], {"queue_for_open": [times[1], times[0]]})
+        self.assertEqual(found["after"], 3)
+        self.assertEqual(header(path), (7, MARKED_7, False))
+
+    def test_v0616s_own_code_reads_a_choice_set_back_to_its_default_as_the_default(self):
+        """This version takes the queue's `days=5` away when a person sets it back to its default; v0.6.16's own code
+        reads the default where there is no row, and the file is still version 7, marked."""
+        from codex_auto_resume_advanced.registry import REGISTRY
+        path = self.migrated()
+        default = REGISTRY.get("queue_for_open").option("days").default
+        state = AdvancedState(config.Paths(self.home), registry=REGISTRY, clock=lambda: self.now)
+        self.addCleanup(state.close)
+        state.set_option("queue_for_open", "days", default, generation=state.meta()["generation"],
+                         actor=Actor.DASHBOARD)
+        state.close()
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            self.assertIsNone(connection.execute("SELECT 1 FROM options WHERE capability='queue_for_open' "
+                                                 "AND choice='days'").fetchone())
+        found = self.run_v0616(V0616)
+        self.assertNotIn("refused", found)
+        self.assertEqual(found["options"], {"days": default})
+        self.assertEqual(found["unknown"], "option_invalid")
+        self.assertEqual(header(path), (7, MARKED_7, False))
 
     def test_v0616s_own_code_reads_the_freed_file_with_its_features_on(self):
         """Its features as they stood, its own choice read and set, a name it does not know refused by its code, and the

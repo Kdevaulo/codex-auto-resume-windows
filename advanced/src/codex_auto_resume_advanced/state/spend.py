@@ -18,6 +18,8 @@ hour's twelfth, not its sixth.
 """
 from __future__ import annotations
 
+import math
+
 from codex_auto_resume.domain.plug import Point
 
 from .journal import prune_every
@@ -40,6 +42,9 @@ SAME_CLAIM = 0.001
 # it alone). And the claim asking tells `counts` the units it has written itself, by their spend ids: its
 # own units are the send it is paying for, not a send before it, and that is exact where a time and a
 # record cannot be - two claims of the one record at the one reading of the clock are two sends.
+# Nor do two claims ever share a group (v0.6.17): a claim whose record already has units at its reading of the
+# clock writes its own at the next float above it that none has (`claim_time`), so the hour counts each claim
+# once without a column of its own - a file v0.6.16 reads as its own. Units v0.6.16 wrote are grouped as they were.
 CLAIM_GROUPS = ("SELECT count(*) FROM (SELECT 1 FROM %s.spend WHERE at>?%s GROUP BY interruption_id, at, "
                 "CASE WHEN interruption_id IS NULL THEN spend_id END)")
 
@@ -87,6 +92,22 @@ class SpendMixin:
             if connection is None:
                 return {"capability_day": 0, "conversation_day": 0, "global_hour": 0}
             return self.counts(connection, "main", capability, thread_id, now)
+
+    @staticmethod
+    def claim_time(connection, schema, interruption_id, now) -> float:
+        """The time one claim writes its units at, inside the caller's transaction: `now`, or - where units of
+        standard record `interruption_id` already stand at it, another claim's at the same reading of the clock -
+        the next float above it that none of the record's units has. Each claim is a group of its own for the hour
+        (`CLAIM_GROUPS`), and a step of a float's last bit is far inside `SAME_CLAIM`, so the units still name the
+        claim they paid for. A unit with no standard record groups by its spend id already."""
+        schema = _schema(schema)
+        at = _timestamp(now, "time")
+        if interruption_id is None:
+            return at
+        while connection.execute("SELECT 1 FROM %s.spend WHERE interruption_id=? AND at=?" % schema,
+                                 (interruption_id, at)).fetchone() is not None:
+            at = math.nextafter(at, math.inf)
+        return at
 
     def record_spend(self, connection, schema, capability, thread_id, interruption_id, now) -> int:
         """One unit, inside the caller's transaction. Pruned now and then, never inside a day. Its spend
