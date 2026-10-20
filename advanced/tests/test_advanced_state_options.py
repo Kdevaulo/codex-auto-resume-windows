@@ -314,6 +314,30 @@ state.close()
 print(json.dumps(out))
 """
 
+# v0.6.16's own sources again, reading the units this version wrote for two claims of one record at one reading of the
+# clock - the second at the next float above the first (state/spend.claim_time) - and paying a unit of its own.
+V0616_SPEND = """
+import json, sys
+sys.path[:0] = sys.argv[3:]
+from pathlib import Path
+from codex_auto_resume import config
+from codex_auto_resume_advanced.registry import REGISTRY
+from codex_auto_resume_advanced.state import AdvancedState, StateError
+asked = json.loads(sys.argv[2])
+state = AdvancedState(config.Paths(Path(sys.argv[1])), registry=REGISTRY, clock=lambda: asked["now"])
+out = {}
+try:
+    out["spent"] = state.spent("queue_for_open", asked["thread"], asked["now"])
+    out["payers"] = {key: list(times) for key, times in state.payers(asked["key"], asked["at"]).items()}
+    with state._transaction() as connection:
+        state.record_spend(connection, "main", "queue_for_open", asked["thread"], asked["key"], asked["now"])
+    out["after"] = state.spent("queue_for_open", asked["thread"], asked["now"])["capability_day"]
+except StateError as exc:
+    out["refused"] = str(exc)
+state.close()
+print(json.dumps(out))
+"""
+
 
 class DowngradeTests(OptionsCase):
     """Install another version back to v0.6.16 (version 7, which reads no mark and compares column names only)."""
@@ -338,6 +362,44 @@ class DowngradeTests(OptionsCase):
         with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
             tar.extractall(tree.name, filter="data")
         return Path(tree.name)
+
+    def run_v0616(self, script, *arguments) -> dict:
+        """`script` run by v0.6.16's own sources against this home, `arguments` after it: what it printed."""
+        tree = self.v0616()
+        ran = subprocess.run([sys.executable, "-I", "-c", script, str(self.home), *arguments, str(tree / "src"),
+                              str(tree / "advanced" / "src")], capture_output=True, text=True, timeout=120,
+                             env=dict(os.environ, CODEX_AR_EDITION="advanced"), cwd=tree,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertEqual(ran.returncode, 0, ran.stderr)
+        return json.loads(ran.stdout)
+
+    def test_v0616s_own_code_reads_the_units_of_two_claims_at_one_reading(self):
+        """The second of two claims of one record at one reading of the clock writes its units at the next float
+        above the first's - no column for it, so v0.6.16 still reads the file as its own: it counts both units, finds
+        both paid for that send of the record (within its SAME_CLAIM), and pays a unit of its own beside them."""
+        from codex_auto_resume_advanced.registry import REGISTRY
+        path = self.migrated()
+        key = "%064x" % 7
+        state = AdvancedState(config.Paths(self.home), registry=REGISTRY, clock=lambda: self.now)
+        self.addCleanup(state.close)
+        for _ in range(2):
+            with state._transaction() as connection:
+                at = state.claim_time(connection, "main", key, self.now)
+                state.record_spend(connection, "main", "queue_for_open", ac.THREAD, key, at)
+        state.close()
+        with contextlib.closing(sqlite3.connect(path)) as connection:
+            times = [row[0] for row in connection.execute(
+                "SELECT at FROM spend WHERE interruption_id=? ORDER BY spend_id", (key,))]
+        self.assertEqual(len(times), 2)
+        self.assertLess(times[0], times[1], "the second claim's units stand apart from the first's")
+        found = self.run_v0616(V0616_SPEND, json.dumps({"now": self.now, "thread": ac.THREAD, "key": key,
+                                                        "at": self.now}))
+        self.assertNotIn("refused", found)
+        self.assertEqual(found["spent"]["capability_day"], 2)
+        self.assertEqual(found["spent"]["global_hour"], 3, "v0.6.16 counts units: these two and test_wake's")
+        self.assertEqual(found["payers"], {"queue_for_open": [times[1], times[0]]})
+        self.assertEqual(found["after"], 3)
+        self.assertEqual(header(path), (7, MARKED_7, False))
 
     def test_v0616s_own_code_reads_the_freed_file_with_its_features_on(self):
         """Its features as they stood, its own choice read and set, a name it does not know refused by its code, and the

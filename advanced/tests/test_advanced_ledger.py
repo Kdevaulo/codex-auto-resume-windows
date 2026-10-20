@@ -27,6 +27,7 @@ from codex_auto_resume_advanced import arming  # noqa: E402
 from codex_auto_resume_advanced import ledger as ledger_module  # noqa: E402
 from codex_auto_resume_advanced.registry import Ceilings  # noqa: E402
 from codex_auto_resume_advanced.state import ATTACHED, StateError  # noqa: E402
+from codex_auto_resume_advanced.state.spend import SAME_CLAIM  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import Actor, ArmingState, RecordState  # noqa: E402
 from test_engine import T1, TURN_A  # noqa: E402
 from test_plug_points import POLL, PluggedCase  # noqa: E402
@@ -467,6 +468,47 @@ class GlobalHourTests(LedgerCase):
             self.assertIs(self.send(plug, number, base + number), DEFER)
         self.assertIs(self.send(plug, 99, base + 11), DEFER, "the twelfth send")
         self.assertIs(self.send(plug, 99, base + 11), Alternative.HOLD, "the thirteenth, at the same time")
+
+    def test_two_claims_of_one_record_at_one_reading_both_granted_are_two_sends_in_the_hour(self):
+        """Two claims of the one record at a bit-identical time, both below the ceiling, used to write their units
+        under the one (record, time) and so count one send in the hour: the twelfth claim after them saw eleven and
+        one more send went than a person allowed. The second claim writes its units at the next float above the
+        first's (state/spend.claim_time), so each counts and the ceiling holds."""
+        plug = self.two_on()
+        state = plug.runtime.state
+        base = self.h.now
+        self.assertIs(self.send(plug, 99, base), DEFER, "the first claim")
+        self.assertIs(self.send(plug, 99, base), DEFER, "the second claim, at the same reading of the clock")
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 2, "two sends, though one time")
+        with contextlib.closing(sqlite3.connect(state.path)) as connection:
+            times = [row[0] for row in connection.execute("SELECT at FROM spend ORDER BY spend_id")]
+        self.assertEqual(len(times), 4, "two capabilities paid for each claim")
+        self.assertEqual(times[0], times[1], "the units of one claim stand at its one time")
+        self.assertEqual(times[2], times[3])
+        self.assertGreater(times[2], times[0], "the second claim's time is apart from the first's")
+        self.assertLessEqual(times[2] - times[0], SAME_CLAIM, "and still names the claim it paid for")
+        for number in range(10):
+            self.assertIs(self.send(plug, number, base + 1 + number), DEFER, "send %d" % (number + 3))
+        self.assertIs(self.send(plug, 50, base + 20), Alternative.HOLD, "the thirteenth send")
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 12)
+
+    def test_a_spend_table_v0616_wrote_counts_as_it_did(self):
+        # A guard for rows this change never writes, not a proof of it: it passes with the fix reverted. v0.6.16
+        # wrote every claim's units at its own time, so two claims of one record at one reading share a group.
+        plug = self.two_on()
+        state = plug.runtime.state
+        now = self.h.now
+        first, second = self.key(1), self.key(2)
+        with state._transaction() as connection:
+            for capability, key, at in (("test_wake", first, now), ("test_nap", first, now),
+                                        ("test_wake", first, now), ("test_wake", second, now + 1),
+                                        ("test_wake", None, now + 2), ("test_wake", None, now + 2)):
+                connection.execute("INSERT INTO spend (at, capability, thread_id, interruption_id) VALUES (?,?,?,?)",
+                                   (at, capability, ac.THREAD, key))
+        counts = state.spent("test_wake", ac.THREAD, now + 3)
+        self.assertEqual(counts["global_hour"], 4, "one for the first record's time, one for the second's, and one "
+                                                   "for each unit of this edition's own records")
+        self.assertEqual(counts["capability_day"], 5)
 
     def test_the_units_of_this_editions_own_records_at_one_reading_are_the_sends_they_are(self):
         """A record of this edition's own bears no standard record and is paid for by its one capability,

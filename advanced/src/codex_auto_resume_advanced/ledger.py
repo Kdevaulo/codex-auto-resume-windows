@@ -105,6 +105,7 @@ class ClaimLedger:
             return DEFER
         global_hourly = connection.execute("SELECT global_hourly FROM %s.meta" % ATTACHED).fetchone()[0]
         paid = []                                 # the units this claim has written, by their spend ids
+        at = None                                 # the one time they are written at (state/spend.claim_time)
         for capability in sorted(acted):
             definition = self.registry.get(capability)
             row = connection.execute("SELECT state, since FROM %s.arming WHERE capability=?" % ATTACHED,
@@ -122,7 +123,9 @@ class ClaimLedger:
                 return Alternative.HOLD
             if Alternative.QUEUE_FOR_OPEN in acted[capability] and not self._for_open(connection, definition, key, now):
                 return Alternative.HOLD
-            paid.append(self.state.record_spend(connection, ATTACHED, capability, thread_id, key, now))
+            if at is None:
+                at = self.state.claim_time(connection, ATTACHED, key, now)
+            paid.append(self.state.record_spend(connection, ATTACHED, capability, thread_id, key, at))
         return DEFER
 
     @staticmethod
