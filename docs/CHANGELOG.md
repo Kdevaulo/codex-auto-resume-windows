@@ -1218,6 +1218,7 @@ The final v0.6.13 follows it, improved further (owner, 2026-10-07).
 
 ## v0.6.12 — Another version from the Dashboard, a power action after usage limits, and recovery beside the Codex app's cloud-environment server
 
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.11...v0.6.12)
 
 **What changed since v0.6.11, in one place.** For a person, two additions and two fixes. In the
@@ -1228,12 +1229,7 @@ turn it on ([below](#the-power-action-after-usage-limit-recoveries)) - asked for
 Both are in the standard edition, and in both editions' windows. The fixes: recovery beside the
 Codex app's cloud-environment server, without which no recovery was sent with the Codex app from
 26.930 on, and a setup program that removes its folder when its console window is closed
-([Fixes](#fixes)). Two pre-releases for the people who build the project came first, each with an
-entry of its own below that has the detail and how it was checked: the test suite in parts and
-pictures taken when the window is ready ([v0.6.12-alpha](CHANGELOG.md#the-suite-in-parts)), and
-every lane's test parts even ([v0.6.12-alpha.2](CHANGELOG.md#every-lanes-parts-even)). Nothing in
-them changes anything for a person. The additions and the fixes were not published as a pre-release
-first: their detail is this entry's.
+([Fixes](#fixes)). Two pre-releases for the people who build the project came first, v0.6.12-alpha (the test suite in parts and pictures taken when the window is ready) and v0.6.12-alpha.2 (every lane's test parts even); nothing in them changes anything for a person, and everything they announced is under *For developers* below. The additions and the fixes were not published as a pre-release first.
 
 **From v0.6.11, it is an ordinary update.** It is the latest release, so v0.6.11's *Check for
 updates* offers it in the edition you have, and so does a v0.6.12 pre-release's; the plugin in
@@ -1256,8 +1252,8 @@ watcher once it passes the checks every recovery passes.
 
 **Every plugin copy from v0.6.0's on reads this version.** `0.6.12` has no word after its three
 numbers, and every bootstrap published from v0.6.0 on compares those, so none of them takes this
-installation for none. Only a pre-release's word needs a later copy: the entries of v0.6.12's
-pre-releases, below, say which.
+installation for none. Only a pre-release's word needs a later copy: v0.6.12-alpha's needs v0.6.9-alpha's or later, and v0.6.12-alpha.2's needs v0.6.11-beta.2's or later; if yours is older, set up and repair with the installation's own copy, `%USERPROFILE%\.codex-auto-resume\app\scripts\bootstrap.ps1`.
+
 
 ### Install another version...
 
@@ -1396,6 +1392,8 @@ standard edition: it keeps every standard, with A28 amended by the owner for its
 
 ### For developers
 
+#### The version picker, the pairing fix and the power action
+
 - `scripts/bootstrap.ps1` gains `-Versions` (lists, exit 0, or `versions: unavailable`, exit 12) and
   `-Pick <version> -Edition <edition> [-Force]` (installs one offered row; refusals exit 15).
   `scripts/release.json` gains `release_pages`. `downgrade-state` gains `--stop-watcher`, with its
@@ -1417,6 +1415,92 @@ standard edition: it keeps every standard, with A28 amended by the owner for its
   additions in `test_cli`, `test_notify`, `test_notice_card`, `test_source`, `test_tray`, `test_mcp`
   and `test_managed`. The product refuses the real power calls while `unittest` is loaded.
 
+#### The suite in parts
+
+- **One place splits the suite, by measured time.** `scripts/test_parts.py` deals the test files
+  into parts balanced by how long each took on that lane when it was last measured (`tests/data/durations.json`, a table for each lane),
+  and runs each part as `unittest discover` runs the suite: the same files, loaded by discover
+  itself, in the same order, with a fresh Python for each suite. Every CI lane, the suite the release
+  runs before it builds, and the ko sync now run it in four parts, a job each; a lane took 78 to 103
+  minutes as one job. `tests/test_split_runs.py` proves that the parts together are exactly the
+  tests discover finds, each once.
+- **Proven to give a whole run's results.** On the owner's PC each lane was run whole - `unittest
+  discover` itself - and in four parts, and the two were compared test by test. Of the tests that
+  ran both ways, 4,268 of the standard lane's 4,274 and 4,595 of the advanced lane's 4,596 came out
+  the same. All but five of the differences were a probe that ran out of time or a check sensitive
+  to timing, under the load of four parts and other work on one PC, and each passes alone, both
+  ways. The five were a real leak, now fixed: `tests/test_gui_own_values.py` set the process's
+  interface language to English and never gave it back, and `tests/test_locale.py` passed in a whole
+  run only because `tests/test_l10n.py` ran between them and reset it. Dealt into different parts,
+  five of its tests - 30 checks - failed. The window tests give the language back when they end now,
+  and that part, run again, came out as the whole run did in every test.
+- **Parts run at once on one PC are not a whole run.** They contend for one desktop and one
+  processor, which CI's parts - a runner each - never do. `--compare` names the part each differing
+  test ran in, prints the command that runs that part alone, and holds it to the whole run; the
+  contributing guide says what it means when they then agree, and when they still differ
+  ([In parts](CONTRIBUTING.md#in-parts)). On that PC, under its load, four parts at once took about
+  half the time: the standard lane 60 minutes against 123.
+- **A CI lane sees the tree as `main` does.** On `dev` and pull requests into it, the `main-tree`
+  job takes every Korean document off the tree, as a promotion to `main` does, and runs the
+  release's suite on what is left. A test that reads a Korean page without asking whether the
+  checkout holds one now fails on `dev`, before it reaches `main`.
+
+#### Every lane's parts even
+
+- **Each lane is dealt by its own times.** v0.6.12-alpha dealt every CI lane's test files into its
+  four parts by one table: each file's median over all the lanes of one CI run. A file does not take
+  every lane as long - `tests/test_neutral_plug.py` took 1,305 s in the advanced lane, where the
+  advanced package sits beside core, and 841 s in the standard one - so on a later CI run of `dev` the
+  standard lane's parts took 19 to 29 minutes, the `main-tree` job's (the release's lane on `main`'s
+  tree) 22 to 28, and the advanced lane's 21 to 41, its first part the heavy one.
+  `tests/data/durations.json` now holds a table for each lane: each file's median over that lane's
+  jobs in two of `dev`'s CI runs on GitHub's runners, read from the job logs. `scripts/test_parts.py`
+  deals a lane by its own table, a file that table lacks by the figure for every lane, which stays,
+  and a file measured nowhere round-robin after the rest, as before. Every workflow already names its
+  lane, so none of them changed.
+- **Before and after, by those tables.** Dealt by the one table, the four parts of each lane come to
+  20 to 24 minutes in the standard lane, 24 to 30 in the advanced and 22 to 32 in the release lane, up
+  to 1.45 times apart, by the lane's own table; measured, the release lane's parts were closer than
+  that table says: 22 to 28 minutes on `dev` and 21 to 23 in v0.6.12-alpha's release run. Dealt by
+  its own table, each lane's parts are within a second of each other, at 21.4, 26.8 and 24.9 minutes.
+  `tests/test_split_runs.py` now holds every lane's parts, by its own table, within 1.2 times of each
+  other at the count the workflows use, which the one table's deal fails in all three lanes; the parts
+  together are still exactly the tests `unittest discover` finds, each once, in every lane and every
+  count from one to eight.
+- **`--record-durations` writes the lane it ran.** It keeps that table's other files and the other
+  lanes' tables, and gives the figure for every lane to a file that had none, so the other lanes deal
+  it by a measurement too. `--list --parts 4 --lane advanced` shows a lane's deal.
+
+#### Faster pictures
+
+- **A window is photographed when it says it may be.** The picture generator photographed each
+  window a fixed fifteen seconds after it started, whatever it was doing by then. Now the window
+  sets an event once the page it opened on is drawn from every answer it asked for and holds still -
+  nothing on its way from the bridge, nothing gliding, and a tick of its clock since - and
+  `build/capture_window.ps1` waits for that, with the fifteen seconds as its limit. None of these
+  windows takes the foreground, and a picture whose caption still comes out active is taken again.
+- **Only stale pictures are drawn.** A run draws only the pictures whose inputs moved, whose files
+  are not the bytes the manifest records, or that were captured at another display scaling, each
+  job in a process of its own, side by side; `--all` draws every one. Measured on the owner's PC
+  while other work ran, a full run took 1,144 s and `--breathe` 126 s before, and 479 s and 30 s
+  after, with two windows at a time; with nothing stale, 7 s.
+- **One window at a time, unless `--windows N` asks for more.** A session once crashed while
+  several windows were being captured at once, so more than one is a trial a person asks for.
+- **A window being photographed answers no pointer.** Windows hands a window that appears under a
+  pointer standing still a mouse move of its own, so a control under a mouse somebody had left there
+  was drawn hovered: v0.6.11-beta.3's Settings pictures show the Custom message card hovered, and
+  pictures made twice differed by where the mouse had been. A window the generator starts now drops
+  the mouse's moves, presses, wheel turns, hover and leave before any control sees them; a person's
+  window answers the mouse as always.
+- **History's clock is pinned.** The window's pictures print every date and time as one moment, the
+  popup's and the panel's, in UTC. History is drawn again byte for byte on another day and in
+  another time zone, where it printed the day the pictures were made.
+
+How it was checked: in a scratch copy, against the generator before it, 63 of 67 pictures came out
+byte for byte the same, and the other four differed only in History's times of day, which two runs
+of the old generator also differ in. A second comparison found seven pictures that differed where
+nothing should have, and in each the old generator's window had had the pointer over it - the case
+the change above closes.
 
 ## v0.6.12-alpha.2 — Every lane's test parts even, each dealt by its own times
 
