@@ -293,7 +293,8 @@ class OneNameTests(unittest.TestCase):
               "msg.setup_unconfirmed", "panel.compat_acting_differs", "panel.compat_refresh",
               "panel.compat_reported", "panel.readonly")
     # The window's own words, where "this window" is the window reading them.
-    WINDOW_ONLY = ("diag.update_reopen", "pick.reopen")
+    # v0.6.17: and the Diagnostics row that says this window runs inside another app.
+    WINDOW_ONLY = ("diag.update_reopen", "pick.reopen", "diag.host_app.window", "diag.host_app.both")
     THIS_WINDOW = {"en": "this window", "ko": "이 창"}
 
     def test_every_language_has_its_word(self):

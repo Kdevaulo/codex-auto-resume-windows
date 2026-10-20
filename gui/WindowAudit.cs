@@ -142,6 +142,9 @@ namespace CodexAutoResume
                         // v0.6.11: the State folder's longest answer and the sentence under it, as the bridge would give
                         // them (LoadStateAccess asks nothing while auditing).
                         if (page == "diagnostics") form.ApplyStateAccess("shared");
+                        // v0.6.17: and whether the watcher and this window run inside another app at its longest - both
+                        // inside, in two apps - with the sentence under the facts (LoadHostApp asks nothing either).
+                        if (page == "diagnostics") form.ApplyHostApp(AuditHostApp());
                         if (page != "settings")
                         {
                             Geometry(page, form, geometry);
@@ -796,6 +799,22 @@ namespace CodexAutoResume
         /// Every pinned control on screen that is not in its corner or covers text (AuditPin), and every button an
         /// Overview card leads to that is not in its card's bottom-left corner, covers text or crowds it (AuditLead), each
         /// where it first shows.
+        /// A `host-app` answer at its longest (v0.6.17): the watcher and this window inside two apps, each line said apart,
+        /// and the sentence under the facts.
+        private static Dictionary<string, object> AuditHostApp()
+        {
+            var watcher = new Dictionary<string, object>();
+            watcher["state"] = "inside";
+            watcher["app"] = "OpenAI.Codex";
+            var window = new Dictionary<string, object>();
+            window["state"] = "inside";
+            window["app"] = "Claude";
+            var answer = new Dictionary<string, object>();
+            answer["watcher"] = watcher;
+            answer["bridge"] = window;
+            return answer;
+        }
+
         private void AuditPins(string where, List<string> findings)
         {
             foreach (KeyValuePair<Control, Control> pair in pinned)

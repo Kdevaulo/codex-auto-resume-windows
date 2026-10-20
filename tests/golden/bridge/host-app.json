@@ -1,0 +1,43 @@
+{
+  "command": "host-app",
+  "cases": [
+    {
+      "case": "the watcher and the bridge outside every app",
+      "argument": null,
+      "reply": {
+        "ok": true,
+        "result": {
+          "watcher": {
+            "state": "outside",
+            "family": null,
+            "app": null
+          },
+          "bridge": {
+            "state": "outside",
+            "family": null,
+            "app": null
+          }
+        }
+      }
+    },
+    {
+      "case": "the watcher inside the Codex app, the bridge outside",
+      "argument": null,
+      "reply": {
+        "ok": true,
+        "result": {
+          "watcher": {
+            "state": "inside",
+            "family": "OpenAI.Codex_2p2nqsd0c76g0",
+            "app": "OpenAI.Codex"
+          },
+          "bridge": {
+            "state": "outside",
+            "family": null,
+            "app": null
+          }
+        }
+      }
+    }
+  ]
+}

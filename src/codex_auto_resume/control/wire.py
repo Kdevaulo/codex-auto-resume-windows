@@ -116,6 +116,20 @@ class StateAccessReply(TypedDict):
     access: str
 
 
+class HostAppPart(TypedDict):
+    """v0.6.17 (`host-app`): one process's answer - inside another app's private view, outside, unknown, or (the
+    watcher's) not running - with the app's package family name and its name for a person while inside, else None."""
+    state: str
+    family: str | None
+    app: str | None
+
+
+class HostAppReply(TypedDict):
+    """`host-app`: whether the watcher and the Dashboard's bridge run inside another app (v0.6.17)."""
+    watcher: HostAppPart
+    bridge: HostAppPart
+
+
 class CheckConversation(TypedDict):
     """v0.6.16-beta.3 (`detection-check`, checkup.py): one recent conversation's latest turn - how Codex
     recorded it, whether the failure scan brings it and why not, and what else holds one it brings."""
@@ -487,6 +501,6 @@ class SchemaField(TypedDict):
 CONTRACTS = (RecordView, PendingRow, TimelineEvent, Receipt, UsageWindow, UsageReading, WatcherView,
              StatusSnapshot, Outcomes, Statistics, CompatEngine, CompatData, CompatCapability,
              CompatReported, CompatView, SchemaField, OwnValue, DemoRow, DemoReply, LogLine, LogSearch,
-             StateAccessReply, PowerArmed, PowerShown, PowerLast, PowerView, PowerChoice, PowerOptions,
+             StateAccessReply, HostAppPart, HostAppReply, PowerArmed, PowerShown, PowerLast, PowerView, PowerChoice, PowerOptions,
              PowerDisarmed, CheckConversation, CheckHome, CheckUsage, CheckNotices, CheckCodex, CheckLeftOut,
              DetectionCheck)
