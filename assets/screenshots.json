@@ -29,7 +29,7 @@
   "system_dpi": 144,
   "inputs": {
     ".codex-plugin/plugin.json": "9cfe92ce548b2f737202b6c180ae6706c1ec5f1b979ce7d60025fab42ffad57c",
-    "<window sources>": "bd0880e6d54c3638f2a1e6d217409cc74e3edeb8a433f6d0424fdcb5666a688b",
+    "<window sources>": "b726c10a8bf5028b50c1e5dd55853b3b7e830681500d086498b67aedfcff1db5",
     "gui/app.manifest": "db5f16dcf2448fdd7e3812dfdaa6d2da893b92c27a982721d3f04cdc05559870",
     "assets/codex-auto-resume.ico": "45c3f3a0d02d78f9be0b80532eedc2f524cd7ebe1056007dacdb286ca743bd52",
     "build/capture_window.ps1": "15b5897082d9d6a24056ff5780d8b24909a1b48738730dfa3387c59e7abd382c",
