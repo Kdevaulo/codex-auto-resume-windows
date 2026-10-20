@@ -8,8 +8,8 @@
 // the window drawn is the setup program's window, byte for byte the same code.
 //
 // It drives that window as a person and a run would, through the window's own doors: the window is made as
-// SetupWindow.Run makes it - a first installation, or an update over an older version with what is new in it -
-// (FlowFor, the catalog's words, the display's scale and text size), its primary button is
+// SetupWindow.Run makes it for a first installation (FlowFor, the catalog's words, the display's scale and text
+// size), its primary button is
 // clicked (Form.AcceptButton), the run is the window's own Start on its own worker, told each line the installer would
 // print and how far the archive is unpacked - the lines install.ps1 really prints, from the plan - and the run ends
 // with the code a run that succeeded ends with. Nothing is installed, unpacked, started or written anywhere but the
@@ -43,6 +43,18 @@ namespace CodexAutoResume
         private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 
         private const int WM_UPDATEUISTATE = 0x0128;
+        // WM_PRINT of one control alone - its frame, its background and its face, never its children: the frame is
+        // put together child by child, each clipped to its parent, as Windows shows a window (Compose).
+        private const int WM_PRINT = 0x0317;
+        private static readonly IntPtr PrintOwn = (IntPtr)(0x02 | 0x04 | 0x08);   // PRF_NONCLIENT | PRF_CLIENT | PRF_ERASEBKGND
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr window, out Rect rect);
+
+        [DllImport("user32.dll")]
+        private static extern bool ClientToScreen(IntPtr window, ref Point point);
+
+        private struct Rect { internal int Left, Top, Right, Bottom; }
         // UIS_SET with UISF_HIDEFOCUS | UISF_HIDEACCEL: the window as a person using the mouse sees it.
         private static readonly IntPtr HideCues = (IntPtr)0x00030001;
         // The pages of a first installation, in the order the window goes through them (InstallerFlow.Pages).
@@ -133,15 +145,9 @@ namespace CodexAutoResume
                     spoken[other] = found;
                     return found;
                 };
-                // The flow the setup program makes for its archive's edition and version over what is installed: nothing
-                // (a first installation), or an older version of an edition (an update), with what is new in the version
-                // it carries read as SetupWindow.Run reads it (Archive.Notes).
-                string installed = Str(job, "installed"), version = Str(job, "version");
+                // A first installation of the archive's edition and version: the flow the setup program makes for it.
                 var flow = CodexAutoResumeSetup.SetupWindow.FlowFor(new string[0], Str(job, "home"), Str(job, "edition"),
-                                                                    installed, version,
-                                                                    installed == null ? "" : Str(job, "from") ?? "");
-                if (flow.Upgrade && flow.Mode == InstallerFlow.Install && !flow.Maintaining)
-                    flow.NotesText = Notes(Str(job, "docs"), language, version);
+                                                                    null, Str(job, "version"), "");
                 window = new InstallerWindow(flow, speaker(language), speaker, Run, new string[0], font);
                 Size client = window.ClientSize;
                 window.TopLevel = false;
@@ -283,12 +289,54 @@ namespace CodexAutoResume
                 writer.Note("the " + window.Page + " page did not hold still");
             }
 
+            /// The window as Windows shows it. Not DrawToBitmap: that prints every child window whole, past the parent
+            /// that clips it on the screen - a text area's box is wider than its clip by Windows' own scroll bar, which
+            /// the real window never shows (SoftTextArea, ListClip), and DrawToBitmap drew that bar beside the soft one.
             internal Bitmap Picture()
             {
                 var picture = new Bitmap(window.ClientSize.Width, window.ClientSize.Height, PixelFormat.Format32bppArgb);
                 window.Invalidate(true);
-                window.DrawToBitmap(picture, new Rectangle(Point.Empty, window.ClientSize));
+                using (Graphics g = Graphics.FromImage(picture))
+                    Compose(g, window, Point.Empty, new Rectangle(Point.Empty, window.ClientSize));
                 return picture;
+            }
+
+            /// `control` printed alone at `at`, inside `clip`, then each of its children over it, bottom of the z-order
+            /// first, each inside its parent's client area as well: a child window shows only within its parent.
+            private static void Compose(Graphics g, Control control, Point at, Rectangle clip)
+            {
+                Rectangle shown = Rectangle.Intersect(new Rectangle(at, control.Size), clip);
+                if (shown.Width <= 0 || shown.Height <= 0 || !control.IsHandleCreated) return;
+                using (var own = new Bitmap(control.Width, control.Height, PixelFormat.Format32bppRgb))
+                {
+                    using (Graphics paper = Graphics.FromImage(own))
+                    {
+                        IntPtr dc = paper.GetHdc();
+                        try { SendMessage(control.Handle, WM_PRINT, dc, PrintOwn); }
+                        finally { paper.ReleaseHdc(dc); }
+                    }
+                    g.SetClip(shown);
+                    g.DrawImageUnscaled(own, at.X, at.Y);
+                    g.ResetClip();
+                }
+                Point inside = ClientOffset(control);
+                Rectangle client = Rectangle.Intersect(shown, new Rectangle(at.X + inside.X, at.Y + inside.Y,
+                                                                            control.ClientSize.Width, control.ClientSize.Height));
+                for (int i = control.Controls.Count - 1; i >= 0; i--)
+                {
+                    Control child = control.Controls[i];
+                    if (!child.Visible) continue;
+                    Compose(g, child, new Point(at.X + inside.X + child.Left, at.Y + inside.Y + child.Top), client);
+                }
+            }
+
+            /// Where a control's client area starts inside its window rectangle: past its border, if it has one.
+            private static Point ClientOffset(Control control)
+            {
+                Rect outer;
+                var origin = new Point(0, 0);
+                if (!GetWindowRect(control.Handle, out outer) || !ClientToScreen(control.Handle, ref origin)) return Point.Empty;
+                return new Point(origin.X - outer.Left, origin.Y - outer.Top);
             }
 
             /// The bounds, in client coordinates, of every target the job names that shows now.
@@ -304,7 +352,28 @@ namespace CodexAutoResume
                     for (Control c = control; c != null && c != window; c = c.Parent) { x += c.Left; y += c.Top; }
                     found[name] = new List<object> { (double)x, (double)y, (double)control.Width, (double)control.Height };
                 }
+                // Each text area shown, and where its box keeps Windows' own scroll bar - outside the clip, never seen:
+                // what tests/test_install_motion_window.py holds a frame to.
+                int number = 0;
+                foreach (SoftTextArea area in All<SoftTextArea>(window))
+                {
+                    if (!area.Visible) continue;
+                    Point where = InWindow(area), box = InWindow(area.Box);
+                    int native = SystemInformation.VerticalScrollBarWidth;
+                    found["area." + number] = new List<object> { (double)where.X, (double)where.Y, (double)area.Width, (double)area.Height };
+                    found["native." + number] = new List<object> { (double)(box.X + area.Box.Width - native), (double)box.Y,
+                                                                   (double)native, (double)area.Box.Height };
+                    number++;
+                }
                 return found;
+            }
+
+            /// Where `control` stands in the window's client area.
+            private Point InWindow(Control control)
+            {
+                int x = 0, y = 0;
+                for (Control c = control; c != null && c != window; c = c.Parent) { x += c.Left; y += c.Top; }
+                return new Point(x, y);
             }
 
             public void Dispose()
@@ -315,18 +384,15 @@ namespace CodexAutoResume
             }
         }
 
-        /// What is new in `version`: its section of the changelog, the language's own where there is one - as the setup
-        /// program reads it from the archive it carries (SetupWindow.Archive.Notes), here from the docs folder the
-        /// archive is made from.
-        private static string Notes(string docs, string language, string version)
+        private static List<T> All<T>(Control root) where T : Control
         {
-            string own = language == "en" ? null : Text(Path.Combine(docs ?? "", "CHANGELOG." + language + ".md"));
-            return InstallerNotes.Section(own ?? Text(Path.Combine(docs ?? "", "CHANGELOG.md")), version);
-        }
-
-        private static string Text(string path)
-        {
-            return File.Exists(path) ? File.ReadAllText(path, new UTF8Encoding(false)).TrimStart('\uFEFF') : null;
+            var found = new List<T>();
+            foreach (Control child in root.Controls)
+            {
+                if (child is T) found.Add((T)child);
+                found.AddRange(All<T>(child));
+            }
+            return found;
         }
 
         private static T Find<T>(Control root) where T : Control
