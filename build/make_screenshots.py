@@ -2873,8 +2873,13 @@ def render_window(targets: dict, theme: str | None = None, design: str | None = 
         # not something to add for a picture - so the window is told too which moment to print
         # that one as (Soft.StillClock, WINDOW_CLOCK): History's dates and times were the run's,
         # and the only thing that moved between two runs.
+        # And the window's bridge answers where the watcher and it run (control/tools.py host_app) as the envelope's
+        # pinned installation does, outside every app: the pictures are made from inside Claude desktop, whose
+        # descendants a live walk finds inside it, and the capture's mutex holder is no watcher the walk can place
+        # (CODEX_AR_STILL_HOST, read by that one answer alone).
         environment = dict(os.environ, CODEX_HOME=str(codex), LOCALAPPDATA=str(local.resolve()),
-                           CODEX_AR_STILL_NOW=repr(now), CODEX_AR_STILL_CLOCK=repr(WINDOW_CLOCK))
+                           CODEX_AR_STILL_NOW=repr(now), CODEX_AR_STILL_CLOCK=repr(WINDOW_CLOCK),
+                           CODEX_AR_STILL_HOST="outside")
         for override in (config.ENV_HOME, config.ENV_CODEX_EXE):
             environment.pop(override, None)
         holder = subprocess.Popen(
