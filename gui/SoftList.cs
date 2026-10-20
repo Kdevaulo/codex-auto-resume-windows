@@ -47,7 +47,7 @@ namespace CodexAutoResume
 
         public override Size GetPreferredSize(Size proposedSize)
         {
-            if (!Soft.SplitsWords(Text)) return base.GetPreferredSize(proposedSize);
+            if (!Soft.SplitsWords(Text)) return Remembered(proposedSize);
             // As Label answers - a width of 0 or 1 is none - measured in the lines it is drawn in.
             int width = proposedSize.Width > 1 ? proposedSize.Width : int.MaxValue;
             if (MaximumSize.Width > 0) width = Math.Min(width, MaximumSize.Width);
@@ -57,6 +57,119 @@ namespace CodexAutoResume
             if (MaximumSize.Width > 0) size.Width = Math.Min(size.Width, MaximumSize.Width);
             if (MaximumSize.Height > 0) size.Height = Math.Min(size.Height, MaximumSize.Height);
             return new Size(Math.Max(size.Width, MinimumSize.Width), Math.Max(size.Height, MinimumSize.Height));
+        }
+
+        // ---------------------------------------------------------------- Label's own answer, remembered
+        // v0.6.17: Label's measurement of text without Korean, remembered for the whole process. Label keeps what it
+        // measured only for itself and forgets it when its text or font changes, and the Advanced page builds its
+        // cards anew each time a capability is opened or a read comes back - so the same help line was measured at the
+        // same width again and again, about 235,000 times in one layout audit for some 3,000 different answers. In
+        // Chinese and Japanese each of those is a wrapped GDI measurement that borrows glyphs from a linked face, 10 to
+        // 45 ms where English takes 1.5, and one click on the page waited about 2 s for it. What is drawn is unchanged:
+        // the answer is Label's own, given again only for a label that would ask exactly the same question.
+
+        /// How many times Label itself was asked (base.GetPreferredSize) for text without Korean: the misses of the
+        /// remembered answers. Read by tests/test_wrap_measure_cache.py.
+        internal static long LabelMeasures;
+
+        /// The remembered answers, at most RememberedMost of them: past that they are all let go, as Soft.Measure's are.
+        private static readonly Dictionary<MeasureKey, Size> remembered = new Dictionary<MeasureKey, Size>();
+        internal const int RememberedMost = 8192;
+
+        internal static int RememberedCount
+        {
+            get { return remembered.Count; }
+        }
+
+        /// Label's answer for this label at `proposedSize`, from an earlier label that asked the same question where there
+        /// was one. A label being disposed, or one with an image, is asked itself every time.
+        private Size Remembered(Size proposedSize)
+        {
+            if (IsDisposed || Disposing || Image != null)
+            {
+                LabelMeasures++;
+                return base.GetPreferredSize(proposedSize);
+            }
+            var key = new MeasureKey(this, proposedSize);
+            Size found;
+            if (remembered.TryGetValue(key, out found)) return found;
+            LabelMeasures++;
+            found = base.GetPreferredSize(proposedSize);
+            if (remembered.Count >= RememberedMost) remembered.Clear();
+            remembered[key] = found;
+            return found;
+        }
+
+        /// Everything Label.GetPreferredSize reads: the label's kind (a subclass may change its frame), its text and
+        /// font, the size asked and its minimum and maximum, its padding and border, how its text is laid out (Format:
+        /// alignment, ellipsis, mnemonic, keyboard cues), whether it sizes itself, its flat style, its reading order and
+        /// whether it measures with GDI+ - and nothing else, so two labels with one key are answered alike.
+        private struct MeasureKey : IEquatable<MeasureKey>
+        {
+            private readonly Type kind;
+            private readonly string text, face;
+            private readonly float points;
+            private readonly int style, unit, charSet;
+            private readonly bool vertical, autoSize, compatible;
+            private readonly Size proposed, least, most;
+            private readonly Padding padding;
+            private readonly int format, border, flat, reading;
+            private readonly int hash;
+
+            internal MeasureKey(WrapLabel label, Size proposedSize)
+            {
+                Font font = label.Font;
+                kind = label.GetType();
+                text = label.Text ?? "";
+                face = font.Name;
+                points = font.SizeInPoints;
+                style = (int)font.Style;
+                unit = (int)font.Unit;
+                charSet = font.GdiCharSet;
+                vertical = font.GdiVerticalFont;
+                autoSize = label.AutoSize;
+                compatible = label.UseCompatibleTextRendering;
+                proposed = proposedSize;
+                least = label.MinimumSize;
+                most = label.MaximumSize;
+                padding = label.Padding;
+                format = (int)label.Format;
+                border = (int)label.BorderStyle;
+                flat = (int)label.FlatStyle;
+                reading = (int)label.RightToLeft;
+                unchecked
+                {
+                    int h = text.GetHashCode();
+                    h = h * 31 + face.GetHashCode();
+                    h = h * 31 + points.GetHashCode();
+                    h = h * 31 + proposed.GetHashCode();
+                    h = h * 31 + most.GetHashCode();
+                    h = h * 31 + padding.GetHashCode();
+                    h = h * 31 + format;
+                    hash = h;
+                }
+            }
+
+            public bool Equals(MeasureKey other)
+            {
+                return hash == other.hash && kind == other.kind && points == other.points && style == other.style &&
+                       unit == other.unit && charSet == other.charSet && vertical == other.vertical &&
+                       autoSize == other.autoSize && compatible == other.compatible && proposed == other.proposed &&
+                       least == other.least && most == other.most && padding == other.padding && format == other.format &&
+                       border == other.border && flat == other.flat && reading == other.reading &&
+                       string.Equals(face, other.face, StringComparison.Ordinal) &&
+                       string.Equals(text, other.text, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object other)
+            {
+                return other is MeasureKey && Equals((MeasureKey)other);
+            }
+
+            public override int GetHashCode()
+            {
+                return hash;
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)
