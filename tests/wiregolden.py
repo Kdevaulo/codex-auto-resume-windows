@@ -555,7 +555,9 @@ BRIDGE_CASES = {
     # whose rows are made up and whose card is asked of a watcher that is not there to draw it.
     "state-access": [
         Case("only this account and Windows", using=_state_access("owner_only")),
-        Case("other accounts too", using=_state_access("shared"))],
+        Case("other accounts too", using=_state_access("shared")),
+        # v0.6.17: Codex's Windows sandbox's group reading the folder, said apart from other accounts.
+        Case("Codex's sandbox group reads it", using=_state_access("codex_sandbox"))],
     # v0.6.17: Diagnostics - whether the watcher and the bridge run inside another app, read only.
     "host-app": [
         Case("the watcher and the bridge outside every app", using=_host_app(False)),

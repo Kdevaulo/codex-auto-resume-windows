@@ -755,22 +755,35 @@ namespace CodexAutoResume
         }
 
         /// The bridge's word for the state folder under Health, and - only while other accounts can open it - what that
-        /// means, under the facts. LayoutAudit hands it the longest, "shared".
+        /// means, under the facts. LayoutAudit hands it the longest, "shared". Codex's sandbox group reading the folder
+        /// (v0.6.17, win/acl.py) is said on the line itself, naming the group, and is no warning.
         private void ApplyStateAccess(string word)
         {
             if (diagStateAccess == null) return;
-            string access = StateAccessWord(word);
-            diagStateAccess.Text = access == "owner_only" ? S("diag.state_access.owner_only", "only your account can open it")
-                                 : access == "shared" ? S("diag.state_access.shared", "other accounts on this PC can open it")
-                                 : S("diag.state_access.unknown", "not checked");
-            diagStateNote.Text = access != "shared" ? ""
-                : S("diag.state_shared_note", "Other accounts on this PC can open the folder that holds this product's settings, pending tasks and logs. They hold no prompts or replies, but they do hold your conversations' ids. To keep them to yourself, install it where the installer puts it: .codex-auto-resume in your user folder.");
+            string[] said = StateAccessSaid(word, S("diag.state_access.owner_only", "only your account can open it"),
+                S("diag.state_access.shared", "other accounts on this PC can open it"),
+                S("diag.state_access.codex_sandbox", "your account; Codex's sandbox (CodexSandboxUsers) can read it - Codex added that"),
+                S("diag.state_access.unknown", "not checked"),
+                S("diag.state_shared_note", "Other accounts on this PC can open the folder that holds this product's settings, pending tasks and logs. They hold no prompts or replies, but they do hold your conversations' ids. To keep them to yourself, remove the other accounts' access in the folder's Properties > Security > Advanced."));
+            diagStateAccess.Text = said[0];
+            diagStateNote.Text = said[1];
         }
 
-        /// The bridge's word for the state folder, read as one of the three there are: anything else is unknown.
+        /// The line under Health and the sentence under the facts for the bridge's word: the sentence only for "shared".
+        /// Pure, for the tests.
+        internal static string[] StateAccessSaid(string word, string ownerOnly, string shared, string codexSandbox,
+                                                 string unknown, string sharedNote)
+        {
+            string access = StateAccessWord(word);
+            string line = access == "owner_only" ? ownerOnly : access == "shared" ? shared
+                        : access == "codex_sandbox" ? codexSandbox : unknown;
+            return new[] { line, access == "shared" ? sharedNote : "" };
+        }
+
+        /// The bridge's word for the state folder, read as one of the four there are: anything else is unknown.
         internal static string StateAccessWord(string access)
         {
-            return access == "owner_only" || access == "shared" ? access : "unknown";
+            return access == "owner_only" || access == "shared" || access == "codex_sandbox" ? access : "unknown";
         }
 
         // --------------------------------------------------------- inside another app

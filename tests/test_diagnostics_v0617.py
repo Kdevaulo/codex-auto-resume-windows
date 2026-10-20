@@ -6,6 +6,11 @@
   and held to the time it says it started, and of its own; `host-app` gives both back, a package family name at
   most. Here the control method and the bridge, with the walk stood in for: no live process is asked, so the answer
   is the same inside Claude on this laptop and inside nothing on CI.
+* The state folder and Codex's sandbox: Codex's Windows sandbox adds an explicit `(OI)(CI)(RX)` entry for its local
+  group CodexSandboxUsers to a user's folders. win/acl.py says that apart - CODEX_SANDBOX, a line naming the group -
+  while every entry for the group only reads; another account beside it, or the group with any right to write,
+  keeps the other-accounts warning. Held over security descriptors written as SDDL and read in this process
+  (acl.described_entries), with the account lookup stood in for: no folder's access list is read or changed.
 """
 from __future__ import annotations
 
@@ -66,6 +71,89 @@ class HostAppControlTests(ControlTestCase):
             reply = controlcli.dispatch(self.control, "host-app", {})
         self.assertEqual(reply, {"ok": True, "result": {
             "watcher": {"state": "not_running", "family": None, "app": None}, "bridge": OUTSIDE}})
+
+
+# ----------------------------------------------------------------------- the state folder and Codex's sandbox
+OWN = "S-1-5-21-1-2-3-1001"
+GROUP = "S-1-5-21-1-2-3-1011"
+OTHER = "S-1-5-21-1-2-3-1002"
+COMPUTER = "EXAMPLE-PC"
+# A folder as the installer leaves it: Windows, the administrators and this account, nothing inherited.
+BASE = "D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;%s)" % OWN
+# The entry Codex's Windows sandbox adds, as icacls shows it: CodexSandboxUsers:(OI)(CI)(RX).
+SANDBOX_READ = "(A;OICI;0x1200a9;;;%s)" % GROUP
+
+
+def accounts(group=("CodexSandboxUsers", COMPUTER, 4)):
+    """Windows' answer for each identifier, stood in for: the sandbox group (or what `group` makes it), another
+    person's account, and nothing for anything else."""
+    table = {GROUP: group, OTHER: ("ExampleUser2", COMPUTER, 1)}
+    return table.get
+
+
+class SandboxReadTests(unittest.TestCase):
+    def setUp(self):
+        from codex_auto_resume.win import acl
+        self.acl = acl
+
+    def word(self, sddl, group=("CodexSandboxUsers", COMPUTER, 4), computer=COMPUTER):
+        entries = self.acl.described_entries(sddl)
+        self.assertIsNotNone(entries, sddl)
+        return self.acl.verdict(entries, OWN, self.acl.sandbox_sids(entries, accounts(group), computer))
+
+    def test_the_entry_is_read_with_its_rights(self):
+        self.assertEqual(self.acl.described_entries(BASE + SANDBOX_READ)[-1], (GROUP, 0x1200A9))
+
+    def test_the_sandbox_groups_read_entry_alone_is_said_as_what_it_is(self):
+        self.assertEqual(self.word(BASE + SANDBOX_READ), "codex_sandbox")
+        self.assertEqual(self.word(BASE + "(A;OICI;GRGX;;;%s)" % GROUP), "codex_sandbox", "generic read and execute")
+        self.assertEqual(self.word(BASE), "owner_only", "without it, as before")
+
+    def test_another_account_beside_it_keeps_the_warning(self):
+        self.assertEqual(self.word(BASE + SANDBOX_READ + "(A;OICI;0x1200a9;;;%s)" % OTHER), "shared")
+        self.assertEqual(self.word(BASE + SANDBOX_READ + "(A;OICI;GR;;;BU)"), "shared", "Users")
+
+    def test_the_group_with_any_right_to_write_keeps_the_warning(self):
+        for rights in ("0x1301bf", "FA", "GA", "GW", "WD", "SD"):
+            with self.subTest(rights):
+                self.assertEqual(self.word(BASE + "(A;OICI;%s;;;%s)" % (rights, GROUP)), "shared")
+        self.assertEqual(self.word(BASE + SANDBOX_READ + "(A;;FW;;;%s)" % GROUP), "shared",
+                         "a second entry for the group that writes")
+
+    def test_a_refusal_for_the_group_lets_nobody_in(self):
+        self.assertEqual(self.word(BASE + "(D;OICI;FA;;;%s)" % GROUP), "owner_only")
+
+    def test_the_group_is_this_computers_local_group_by_name_whatever_the_computer_is_called(self):
+        self.assertEqual(self.word(BASE + SANDBOX_READ, group=("codexsandboxusers", "other-pc", 4),
+                                   computer="OTHER-PC"), "codex_sandbox")
+        for group in (("CodexSandboxUsers", "CORP", 4), ("CodexSandboxUsers", COMPUTER, 1),
+                      ("CodexSandboxUsersX", COMPUTER, 4)):
+            with self.subTest(group):
+                self.assertEqual(self.word(BASE + SANDBOX_READ, group=group), "shared")
+        self.assertEqual(self.word(BASE + SANDBOX_READ, computer=""), "shared", "no computer name, no match")
+
+    def test_the_folder_is_asked_and_the_group_looked_up_as_the_bridge_does(self):
+        entries = self.acl.described_entries(BASE + SANDBOX_READ)
+        with patch.object(self.acl, "allowed_entries", return_value=entries), \
+                patch.object(self.acl, "_own_sid", return_value=OWN), \
+                patch.object(self.acl, "_account", side_effect=accounts()), \
+                patch.object(self.acl, "_computer", return_value=COMPUTER), \
+                patch.object(self.acl.os, "name", "nt"):
+            self.assertEqual(self.acl.state_access("C:\\not-read"), "codex_sandbox")
+        with patch.object(self.acl, "allowed_entries", return_value=entries), \
+                patch.object(self.acl, "_own_sid", return_value=OWN), \
+                patch.object(self.acl, "_account", return_value=None), \
+                patch.object(self.acl, "_computer", return_value=COMPUTER), \
+                patch.object(self.acl.os, "name", "nt"):
+            self.assertEqual(self.acl.state_access("C:\\not-read"), "shared", "a group Windows does not name")
+
+
+class StateAccessBridgeTests(ControlTestCase):
+    def test_the_bridge_says_the_word(self):
+        from codex_auto_resume.win import acl
+        with patch.object(acl, "state_access", return_value="codex_sandbox"):
+            reply = controlcli.dispatch(self.control, "state-access", {})
+        self.assertEqual(reply, {"ok": True, "result": {"access": "codex_sandbox"}})
 
 
 if __name__ == "__main__":

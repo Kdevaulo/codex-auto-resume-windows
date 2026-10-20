@@ -42,7 +42,12 @@ function To-Value {
     return [double]$value
 }
 
-$out = @{ host = @{} }
+$out = @{ host = @{}; access = @{} }
+$state = Method 'StateAccessSaid'
+foreach ($word in @('owner_only', 'shared', 'codex_sandbox', 'unknown', 'other')) {
+    $said = $state.Invoke($null, [object[]]@($word, 'OWNER', 'SHARED', 'SANDBOX', 'UNKNOWN', 'NOTE'))
+    $out.access[$word] = @($said[0], $said[1])
+}
 $lines = Method 'HostAppLines'
 foreach ($case in (ConvertFrom-Json $env:CAR_HOST).PSObject.Properties) {
     $answer = [Collections.Generic.Dictionary[string,object]](To-Value $case.Value)
@@ -115,6 +120,14 @@ class HostAppLinesTests(unittest.TestCase):
         self.assertEqual(self.answer["host"]["both inside one app"], ["B:OpenAI.Codex", "NOTE:OpenAI.Codex"])
         self.assertEqual(self.answer["host"]["both inside, apart"],
                          ["W:OpenAI.Codex\r\nD:Claude", "NOTE:OpenAI.Codex"])
+
+
+    def test_codexs_sandbox_reading_is_said_on_the_line_and_only_other_accounts_get_the_advice(self):
+        """v0.6.17: CodexSandboxUsers reading the folder is a line naming the group, not the warning; the advice -
+        take the other accounts' access away - is under the facts only while other accounts can open it."""
+        self.assertEqual(self.answer["access"], {"owner_only": ["OWNER", ""], "shared": ["SHARED", "NOTE"],
+                                                 "codex_sandbox": ["SANDBOX", ""], "unknown": ["UNKNOWN", ""],
+                                                 "other": ["UNKNOWN", ""]})
 
 
 class HostAppPlacementTests(unittest.TestCase):
