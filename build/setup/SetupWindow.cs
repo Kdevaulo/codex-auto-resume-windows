@@ -69,8 +69,10 @@ namespace CodexAutoResumeSetup
                     return install(answered.Switches(arguments), heard, unpacked);
                 }, arguments, font);
             // In front when it opens: a window this program relaunched outside another app's view is created by the
-            // shell or the WMI service, which do not give it the foreground (HostApp.Relaunch).
-            HostApp.BringToFront(window);
+            // shell or the WMI service, which do not give it the foreground (HostApp.Relaunch). Not a window
+            // build/capture_window.ps1 started, which stays where it opened - the capture refuses a picture whose caption
+            // is active (2026-10-20, the install motion's still) - as the Dashboard's reopen does (SettingsApp).
+            if (Soft.StillReady == null) HostApp.BringToFront(window);
             Application.Run(window);
             if (window.OpenDashboard) OpenDashboard(flow.Home);
             return window.Code == int.MinValue ? Codes.Cancelled : window.Code;

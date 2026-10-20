@@ -18,12 +18,14 @@ import guiscan  # noqa: E402
 
 class CaptureTests(unittest.TestCase):
     def test_a_capture_is_never_brought_to_the_front(self):
+        """The setup program brings its window forward only when no capture started it, as the Dashboard's reopen does;
+        HostApp itself names no capture (it is compiled without the theme in the walk's harness, and only SoftTheme.cs
+        reads the capture's variable - test_screenshots.FasterRunTests)."""
+        setup = (Path(__file__).resolve().parents[1] / "build" / "setup" / "SetupWindow.cs").read_text(encoding="utf-8")
+        self.assertIn("if (Soft.StillReady == null) HostApp.BringToFront(window);", setup)
+        self.assertEqual(setup.count("HostApp.BringToFront(window);"), 1, "one call, the guarded one")
         body = guiscan.member_body("HostApp", "BringToFront")
-        guard = body.find('Environment.GetEnvironmentVariable("CODEX_AR_STILL_READY"))) return')
-        self.assertGreater(guard, -1, "BringToFront brings a capture's window forward")
-        self.assertLess(guard, body.find("Activate()"), "the guard comes after the window is activated")
-        code = " ".join(line.split("//")[0] for line in body.splitlines())
-        self.assertNotIn("Soft.", code, "HostApp.cs is compiled without the theme in the walk's test harness")
+        self.assertNotIn("CODEX_AR_STILL_READY", body)
 
     def test_the_setup_window_opens_without_taking_the_foreground_under_a_capture(self):
         window = guiscan.type_body("InstallerWindow")

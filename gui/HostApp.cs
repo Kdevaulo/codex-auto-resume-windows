@@ -187,12 +187,6 @@ namespace CodexAutoResume
         /// which the program that started it allowed (StartInFront, Relaunch). Its size and place are its own.
         internal static void BringToFront(Form window)
         {
-            // A window build/capture_window.ps1 started stays where it opened: the capture refuses a picture whose
-            // caption is active, and the setup program's window, brought forward here, could not be photographed for
-            // the install motion's still (2026-10-20). A person's window is never given a capture's event. Read here
-            // and not through Soft.StillReady: this file is compiled without the window's theme too (the walk's
-            // test harness, tests/test_host_app.py).
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CODEX_AR_STILL_READY"))) return;
             window.Shown += delegate
             {
                 try
