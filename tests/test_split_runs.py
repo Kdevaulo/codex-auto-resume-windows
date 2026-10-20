@@ -756,7 +756,9 @@ class WorkflowPartsTests(unittest.TestCase):
 
     def test_every_lane_runs_in_parts_and_each_part_names_its_lane(self):
         counts = edition_parts(self.tests)
-        self.assertEqual(counts, {"standard": 3, "advanced": 4}, "the lanes' own counts (2026-10-20)")
+        self.assertEqual(counts, {"standard": 3, "advanced": 5}, "the lanes' own counts (2026-10-20)")
+        self.assertEqual(declared_parts(job(workflow("test.yml"), "main-tree")), 4, "the release lane's count")
+        self.assertEqual(declared_parts(job(workflow("release.yml"), "test")), 4, "the same one in the release")
         self.assertGreater(min(counts.values()), 1)
         run = step(self.tests, "Run the automated test suite")
         self.assertIn('run: python scripts/test_parts.py --lane $env:CODEX_AR_EDITION --part "$env:PART/$env:PARTS"'
