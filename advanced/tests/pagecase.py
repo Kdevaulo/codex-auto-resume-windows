@@ -4,8 +4,8 @@ The page's tests are split by what they drive, so that no one file bounds a CI p
 suite by file): test_advanced_page_arming (the list, Turn on, Watch, Turn off, the hourly limit, the policy, the
 keys and the reopen), test_advanced_page_options (a capability's choices, the rules, the samples, the watch log,
 Keep it on and Send now), test_advanced_page_resets (the reset actions and Pending's scheduled group),
-test_advanced_page_report (the compatibility report's card), test_advanced_page_layout_1 to _5 (the audit at every
-scaling, each module in its share of the languages, every language in one of them) and test_advanced_page_standard
+test_advanced_page_report (the compatibility report's card), test_advanced_page_layout_1 to _5 (the audit of every
+language at every scaling, each module its share dealt by cost, every audit in one of them) and test_advanced_page_standard
 (the standard window holds nothing of the page).
 
 Here: the advanced window compiled from the standard window's sources and the overlay's (compile_window), the probe
@@ -13,7 +13,7 @@ that loads it in an STA PowerShell and drives the page through the window's own 
 AdvancedLayoutAudit in advanced/gui/AdvancedPageAudit.cs) the way tests/test_gui_layout.py drives the standard pages
 through LayoutAudit, this edition's real bridge in a temporary home (Bridge), the report card's job replies,
 PageCase - each module's PageTests, which runs every scenario_* of its own in one window process - and LayoutCase,
-each layout module's LayoutTests, which audits its languages (layout_languages) in four window processes. The window
+each layout module's LayoutTests, which runs its audits (layout_jobs) in four window processes. The window
 is never shown, and its bridge is rooted where nothing is: every reply it reads is one a test hands it, made by this
 edition's real bridge (controlcli, surfaces, arming) in a temporary home with a policy, a compatibility view and
 measurements of the test's own - so nothing here reads the real installation, the real Software\\Policies keys or a
@@ -23,6 +23,7 @@ Not a test module (no `test_` prefix), so discovery does not collect it.
 """
 from __future__ import annotations
 
+import functools
 import io
 import json
 import os
@@ -134,13 +135,29 @@ foreach ($job in $jobs) {
 """
 
 
+def deal_out(costs: list, workers: int) -> list:
+    """The indexes of `costs` in `workers` shares: longest first, each to the share with the least so far (the
+    lowest-numbered on a tie), so one long audit is not left behind several others in one process (v0.6.17: the
+    Japanese audits took 20 minutes each on GitHub's runners and two of them shared a process). Equal costs deal
+    round, the first to the first share. Deterministic."""
+    count = max(1, workers)
+    loads = [0.0] * count
+    shares = [[] for _ in range(count)]
+    for index in sorted(range(len(costs)), key=lambda each: (-costs[each], each)):
+        least = min(range(count), key=lambda share: (loads[share], share))
+        loads[least] += costs[index]
+        shares[least].append(index)
+    return [sorted(share) for share in shares]
+
+
 def probe(work: Path, exe: Path, jobs: list, timeout: int, workers: int = 1) -> tuple:
     """Runs `jobs` in the window, in `workers` processes side by side, each an STA PowerShell that loads the window
     once: (the processes, what each job answered). The jobs are independent, so the answers are the same however
-    they are shared out; only the time differs."""
+    they are shared out; only the time differs - so they are shared out longest first (deal_out, by each job's
+    "cost", 1 where it has none: then job i goes to process i % workers, as before v0.6.17)."""
     script = work / "probe.ps1"
     script.write_text(PROBE, encoding="utf-8")
-    shares = [jobs[index::workers] for index in range(max(1, workers))]
+    shares = [[jobs[index] for index in share] for share in deal_out([job.get("cost", 1) for job in jobs], workers)]
     running = []
     for index, share in enumerate(share for share in shares if share):
         listed, result = work / ("jobs-%d.json" % index), work / ("result-%d.json" % index)
@@ -377,10 +394,12 @@ def audited_views() -> int:
     return len(IDS) + 3 + len(report_states()) + 1
 
 
-def audit_timeout(jobs: int, workers: int) -> int:
-    """The time the slowest of `workers` processes sharing `jobs` audits is allowed: its share of them, each
-    audited_views() views."""
-    return AUDIT_SECONDS * audited_views() * -(-jobs // workers)
+def audit_timeout(costs: list, workers: int) -> int:
+    """The time the slowest of `workers` processes sharing audits of these costs (deal_out) is allowed: for each audit
+    in its share, audited_views() views of AUDIT_SECONDS - or, for an audit measured slower than that on GitHub's
+    runners (audit_cost), three times what it took there."""
+    each = AUDIT_SECONDS * audited_views()
+    return int(max(sum(max(each, 3 * costs[index]) for index in share) for share in deal_out(costs, workers)))
 
 
 def fullest_resets(shot, generation) -> dict:
@@ -413,25 +432,73 @@ def fullest_resets(shot, generation) -> dict:
             "limits": {"messages": 10, "credit_rules": 4, "words": 2000, "ordinals": 9, "use_now_minutes": 15}}
 
 
-# The modules the layout audit is dealt over (test_advanced_page_layout_1 to _5), and the languages each audits:
-# l10n.LOCALES dealt round, the first to the first module, the second to the second and so on - the first languages
-# audited the slowest (en, ko, ja and zh-CN took about three times another four, 2026-10-11), so each module has one.
-# Every language is in exactly one module, however many there are; the last also audits the canary.
+# The modules the layout audit is dealt over (test_advanced_page_layout_1 to _5), each running its audits in
+# LAYOUT_WORKERS processes side by side; the last also audits the canary. Each audit is one language at one scaling.
 LAYOUT_MODULES = 5
+LAYOUT_WORKERS = 4
+CANARY_MODULE = LAYOUT_MODULES
+
+# What one audit of a language took on GitHub's runners, in seconds - read off the layout modules' times in
+# tests/data/durations.json and dev run 39198984813 (2026-10-19, before v0.6.17 remembered WrapLabel's measurements):
+# Japanese, Chinese and, less, Korean are measured in glyphs the window's face borrows from a linked one, and every
+# other language took about ten. What the deal weighs audits by; only their order matters, and that held after
+# v0.6.17 too (the remembered answers cut every language's measuring, CJK's most).
+AUDIT_COST = {"ja": 1270, "zh-TW": 420, "zh-CN": 320, "ko": 50}
+OTHER_AUDIT_COST = 10
 
 
-def layout_languages(module: int) -> tuple:
-    """The languages test_advanced_page_layout_<module> audits (1-based)."""
-    return tuple(l10n.LOCALES[module - 1::LAYOUT_MODULES])
+def audit_cost(locale: str) -> float:
+    """What one audit of `locale` took on GitHub's runners (AUDIT_COST), in seconds."""
+    return AUDIT_COST.get(str(locale), OTHER_AUDIT_COST)
+
+
+@functools.lru_cache(maxsize=None)
+def layout_deal() -> tuple:
+    """Every language at every scaling, dealt over the LAYOUT_MODULES modules by what each audit costs (v0.6.17;
+    until then the languages were dealt round, and the module with Japanese took 43 minutes while another took one).
+
+    A module takes as long as the slowest of its LAYOUT_WORKERS processes, and that is at least its longest audit; so
+    module by module, the longest audit left sets the module's time and the module is filled - longest first, each to
+    its least loaded process - with every audit that fits in that time, keeping one for each module still to come.
+    The last module takes what is left, beside the canary. Each (language, scaling) is in exactly one module.
+    Deterministic: a tuple per module of (locale, scale), in l10n.LOCALES and SCALES order."""
+    locales = [str(locale) for locale in l10n.LOCALES]
+    left = sorted(((locale, scale) for locale in locales for scale in SCALES),
+                  key=lambda job: (-audit_cost(job[0]), locales.index(job[0]), SCALES.index(job[1])))
+    modules = []
+    for module in range(1, LAYOUT_MODULES + 1):
+        loads = [0.0] * LAYOUT_WORKERS
+        if module == CANARY_MODULE:
+            loads[-1] += OTHER_AUDIT_COST
+        last = module == LAYOUT_MODULES
+        later = LAYOUT_MODULES - module
+        wall = max([audit_cost(left[0][0])] + loads) if left else max(loads)
+        taken = []
+        for job in list(left):
+            if len(left) <= later:
+                break
+            least = min(range(LAYOUT_WORKERS), key=lambda share: (loads[share], share))
+            if last or loads[least] + audit_cost(job[0]) <= wall:
+                loads[least] += audit_cost(job[0])
+                taken.append(job)
+                left.remove(job)
+        modules.append(tuple(sorted(taken, key=lambda job: (locales.index(job[0]), SCALES.index(job[1])))))
+    return tuple(modules)
+
+
+def layout_jobs(module: int) -> tuple:
+    """The (locale, scale) audits test_advanced_page_layout_<module> runs (1-based)."""
+    return layout_deal()[module - 1]
 
 
 class LayoutCase(unittest.TestCase):
-    """The page in the subclass's LANGUAGES at five scalings, each capability open with every warning there is, then
-    unread, then in the narrowest window - and, where CANARY, a canary that shows the audit finds what does not fit.
-    The audits are dealt over LAYOUT_MODULES modules by language (layout_languages), so that no one file bounds a CI part;
-    the modules together audit every language. Not collected itself: a module imports it as pagecase.LayoutCase."""
+    """The page in the subclass's JOBS - (locale, scale) audits - each capability open with every warning there is,
+    then unread, then in the narrowest window - and, where CANARY, a canary that shows the audit finds what does not
+    fit. The audits are dealt over LAYOUT_MODULES modules by what each costs (layout_deal), so that no one file bounds a
+    CI part; the modules together audit every language at every scaling. Not collected itself: a module imports it as
+    pagecase.LayoutCase."""
 
-    LANGUAGES: tuple = ()
+    JOBS: tuple = ()
     CANARY = False
 
     @classmethod
@@ -442,21 +509,26 @@ class LayoutCase(unittest.TestCase):
         bridge = Bridge(work / "home")
         jobs = []
         try:
-            for locale in cls.LANGUAGES:
+            locales = []
+            for locale, _ in cls.JOBS:
+                if locale not in locales:
+                    locales.append(locale)
+            for locale in locales:
                 data = audit_data(locale, bridge)
                 for part in ("words", "listing", "statements", "kept", "reports"):
                     (work / ("%s-%s.json" % (part, locale))).write_text(json.dumps(data[part], ensure_ascii=False),
                                                                          encoding="utf-8")
                 (work / ("strings-%s.json" % locale)).write_text(json.dumps(strings(locale), ensure_ascii=False),
                                                                   encoding="utf-8")
-                for scale in SCALES:
-                    jobs.append({"kind": "audit", "name": "%s %.2f" % (locale, scale), "scale": scale,
-                                 "strings": "strings-%s.json" % locale, "words": "words-%s.json" % locale,
-                                 "listing": "listing-%s.json" % locale, "statements": "statements-%s.json" % locale,
-                                 "kept": "kept-%s.json" % locale,
-                                 "reports": "reports-%s.json" % locale})
+            for locale, scale in cls.JOBS:
+                jobs.append({"kind": "audit", "name": "%s %.2f" % (locale, scale), "scale": scale,
+                             "cost": audit_cost(locale),
+                             "strings": "strings-%s.json" % locale, "words": "words-%s.json" % locale,
+                             "listing": "listing-%s.json" % locale, "statements": "statements-%s.json" % locale,
+                             "kept": "kept-%s.json" % locale,
+                             "reports": "reports-%s.json" % locale})
             if cls.CANARY:
-                if "en" not in cls.LANGUAGES:
+                if "en" not in locales:
                     (work / "strings-en.json").write_text(json.dumps(strings("en"), ensure_ascii=False),
                                                           encoding="utf-8")
                 canary = audit_data("en", bridge)
@@ -466,16 +538,20 @@ class LayoutCase(unittest.TestCase):
                 canary["words"]["page.nav"] = "T" * 400
                 for part in ("words", "listing", "statements", "kept", "reports"):
                     (work / ("%s-canary.json" % part)).write_text(json.dumps(canary[part]), encoding="utf-8")
-                jobs.append({"kind": "audit", "name": "canary", "scale": 1.0, "strings": "strings-en.json",
+                jobs.append({"kind": "audit", "name": "canary", "scale": 1.0, "cost": OTHER_AUDIT_COST,
+                             "strings": "strings-en.json",
                              "words": "words-canary.json", "listing": "listing-canary.json",
                              "statements": "statements-canary.json", "kept": "kept-canary.json",
                              "reports": "reports-canary.json"})
         finally:
             bridge.close()
-        # Four processes side by side: the audits are independent, and one process took 17 minutes for them all.
-        # The time allowed grows with the views each audit lays out (AUDIT_SECONDS a view): a capability, a card or a
-        # list more is more to lay out, and a fixed allowance ran out when the reset actions added four (v0.6.14).
-        cls.run_, cls.answer = probe(work, cls.exe, jobs, timeout=audit_timeout(len(jobs), workers=4), workers=4)
+        # LAYOUT_WORKERS processes side by side, the longest audits first (deal_out): the audits are independent, and
+        # one process took 17 minutes for them all. The time allowed grows with the views each audit lays out
+        # (AUDIT_SECONDS a view) - a fixed allowance ran out when the reset actions added four (v0.6.14) - and with
+        # what an audit took on GitHub's runners where that was more (audit_timeout).
+        costs = [job["cost"] for job in jobs]
+        cls.run_, cls.answer = probe(work, cls.exe, jobs, timeout=audit_timeout(costs, workers=LAYOUT_WORKERS),
+                                     workers=LAYOUT_WORKERS)
 
     @classmethod
     def tearDownClass(cls):
@@ -486,16 +562,16 @@ class LayoutCase(unittest.TestCase):
             self.fail("the probe did not run: " + (self.run_.stderr or self.run_.stdout)[-3000:])
 
     def test_nothing_is_cut_off_in_any_language_at_any_scaling(self):
-        for locale in self.LANGUAGES:
-            for scale in SCALES:
-                found = self.answer["%s %.2f" % (locale, scale)]
-                with self.subTest(locale=locale, scale=scale):
-                    self.assertEqual(found["report"], "", "\n" + "\n".join(found["report"].splitlines()[:40]))
-                    # Each capability open, the list unread, and the narrowest window - on a screen that holds the
-                    # tabs on one row, and on the narrowest screen the window opens on at this scaling, where they take
-                    # two rather than be cut off. Both held from a window wider than Windows allows (AuditNarrowestOn),
-                    # so a frame measured from its held Width shows here on any machine, not only on a screen smaller
-                    # than the window at 200% (v0.6.11-beta.3: eight languages cut off on a screen 1440 wide).
-                    # And the action's card in every state a report can be in (report_states).
-                    # And Pending, with the reset rules scheduled under its list (fullest_resets).
-                    self.assertEqual(found["audited"], audited_views())
+        self.assertTrue(self.JOBS, "this module audits nothing")
+        for locale, scale in self.JOBS:
+            found = self.answer["%s %.2f" % (locale, scale)]
+            with self.subTest(locale=locale, scale=scale):
+                self.assertEqual(found["report"], "", "\n" + "\n".join(found["report"].splitlines()[:40]))
+                # Each capability open, the list unread, and the narrowest window - on a screen that holds the
+                # tabs on one row, and on the narrowest screen the window opens on at this scaling, where they take
+                # two rather than be cut off. Both held from a window wider than Windows allows (AuditNarrowestOn),
+                # so a frame measured from its held Width shows here on any machine, not only on a screen smaller
+                # than the window at 200% (v0.6.11-beta.3: eight languages cut off on a screen 1440 wide).
+                # And the action's card in every state a report can be in (report_states).
+                # And Pending, with the reset rules scheduled under its list (fullest_resets).
+                self.assertEqual(found["audited"], audited_views())
