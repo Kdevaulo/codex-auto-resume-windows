@@ -1106,7 +1106,7 @@ now...*. [EDITIONS.md](EDITIONS.md#use-a-reset-credit-at-the-limit-you-pick) des
 **What changed since v0.6.12, in one place.** For a person, one fix, in both editions: the watcher
 finds Codex's engine again after a Codex update moves it, where v0.6.12 went on looking at the old
 path and every recovery waited until the watcher restarted. The pre-release v0.6.13-beta carried it
-first, and its own entry, below, has the detail and how it was checked. The final adds the two cases
+first, and everything it announced is below. The final adds the two cases
 the beta left open - the ChatGPT app running its Codex server from another build while the old one
 stays on disk, and two builds that both pass the engine checks ([Fixes](#fixes)) - and, besides,
 only compatibility data 6 to 8.
@@ -1132,10 +1132,15 @@ installation for none.
 
 ### Fixes
 
-- **An update that moves Codex's engine no longer stops recovery.** This is v0.6.13-beta's fix, as
-  its entry below says: before each check the watcher sees whether the `codex.exe` it found is still
-  there and unchanged (its size and write time), and when it is gone or another file stands in its
-  place, it looks for the engine again and runs every engine check again, as at the start.
+- **An update that moves Codex's engine no longer stops recovery.** The watcher found `codex.exe`
+  once, when it started, and never looked again. On 2026-10-07 the Codex app (26.930) updated, put its
+  engine in a new folder under `%LOCALAPPDATA%\OpenAI\Codex\bin` and emptied the old one; from then
+  on the watcher looked for the app's server at the old path, found none, and every recovery waited,
+  saying the ChatGPT app or its Codex server was not running, until the watcher was restarted - at the
+  next sign-in, for most people. Now, before each check, the watcher sees whether the file it found
+  is still there and unchanged (its size and write time); when it is gone or another file stands in
+  its place, it looks for the engine again and runs every engine check again, as at the start.
+  Nothing was sent twice or to another conversation; recoveries waited.
 - **Nor does an update that runs the app's server from another build.** An update can start the
   ChatGPT app's Codex server from a build in another `bin\<hash>` folder and leave the old build on
   disk, unchanged. The beta then kept the old file, looked for the app's server there, found none, and
@@ -1164,6 +1169,13 @@ installation for none.
 
 ### For developers
 
+- `tests/test_engine_moved.py`: the same file is not looked for again; an engine moved to another
+  folder is found there; another file at the same path is checked again; none left is refused, never
+  kept; the loop asks before every tick but its first. All five fail with the fix reverted. They have
+  a module of their own because `tests/test_compat_characterization.py` must stay v0.6.10's file for
+  `test_released_calls`.
+- Two tests no longer use a real Codex version as one no data names (`codex-cli 99.0.0`, `99.1.0`), so a
+  new compatibility document cannot break them, as data 7 did.
 - `config.discover_codex_exe` takes `running`, asked only where more than one official build passes:
   the image paths the one ChatGPT app main runs as its `codex.exe` children (`pairing.app_engines`),
   matched case-insensitively. `compat/probes.discover` passes it as the watcher does.
@@ -1177,7 +1189,6 @@ installation for none.
   reverted, every one of them fails: each guard's test ends on the case that does look again or
   choose, so none passes only because nothing ever looks. Each guard was also reverted alone, and
   each made its test fail.
-
 
 ## v0.6.13-beta — The watcher finds Codex's engine again after an update moves it
 
