@@ -30,10 +30,14 @@ from codex_auto_resume.domain.plug import TAKE_UP, Alternative, FailureForm
 
 from ..vocabulary import Actor, JournalCode, OptionKey, Refusal
 from .journal import prune_every
+from .schema import WINDOW_CHOICES, WINDOW_FOLLOWERS
 from .session import StaleGeneration, StateError, _key, _word
 
 # The names a person's choice may be stored under: the vocabulary's, checked here and nowhere in the file (v0.6.17).
 OPTION_WORDS = frozenset(str(word) for word in OptionKey)
+# The choices whose missing row is not their default, so a choice of the default is still written for them: the wrap-up's
+# and the stop's window switches, which an opening writes from the usage meter's where it finds none (session._carry_windows).
+CARRIED = frozenset((capability, choice) for capability in WINDOW_FOLLOWERS for choice in WINDOW_CHOICES)
 RULES_LIMIT = 10
 STATUS_RANGE = (100, 599)
 # How far back the Dashboard counts a rule's hits and shows samples.
@@ -251,7 +255,12 @@ class ChoicesMixin:
         Refused (OPTION_INVALID) for a choice the capability does not offer or a value it does not
         offer for it; StaleGeneration where anything moved since. The name is the vocabulary's too
         (OptionKey): since v0.6.17 no CHECK of the file's names it (schema.FREE_OPTIONS), so the code
-        is what keeps a word it does not know out."""
+        is what keeps a word it does not know out.
+
+        A choice of the default stores nothing (v0.6.17): its row is taken away, and `options` reads the
+        default where there is none - so a later release that changes the default reaches this person too.
+        A row stored before, of any value, stays until the choice is set again; and a choice whose missing
+        row is not its default (CARRIED) is written as any other value is."""
         definition = self.registry.get(capability)
         option = definition.option(key) if definition is not None else None
         if option is None or not option.takes(value) or str(option.key) not in OPTION_WORDS:
@@ -260,9 +269,13 @@ class ChoicesMixin:
         now = self._now(at)
         with self._transaction() as connection:
             current = self._current_generation(connection, generation)
-            connection.execute("INSERT INTO options (capability, choice, value) VALUES (?,?,?) "
-                               "ON CONFLICT (capability, choice) DO UPDATE SET value=excluded.value",
-                               (capability, str(option.key), value))
+            if value == option.default and (capability, str(option.key)) not in CARRIED:
+                connection.execute("DELETE FROM options WHERE capability=? AND choice=?",
+                                   (capability, str(option.key)))
+            else:
+                connection.execute("INSERT INTO options (capability, choice, value) VALUES (?,?,?) "
+                                   "ON CONFLICT (capability, choice) DO UPDATE SET value=excluded.value",
+                                   (capability, str(option.key), value))
             connection.execute("UPDATE meta SET generation = generation + 1")
             self._note(connection, now, JournalCode.OPTION_CHANGED, capability=capability, actor=actor)
             return current + 1
