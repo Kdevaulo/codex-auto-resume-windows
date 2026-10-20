@@ -2018,6 +2018,9 @@ if ($null -ne $standing -and $standing -ge 0 -and -not $Force) {
     # removed - a decision, taken while claiming to check the installation over.
     $arguments = @($setup, 'setup', '--keep-state')
     if ($NoStartup) { $arguments += '--no-startup' }
+    # This branch looks at the watcher again below (watcher-running) and says the last word, so a watcher setup could
+    # not confirm within its wait is "not confirmed yet" in setup's own line (v0.6.17).
+    $arguments += '--will-look-again'
     # Inside another app's private view, the setup runs outside it instead, with this lock still held here, and its
     # code is this run's (the outside gate above).
     $outsideCode = Resolve-OutsideRun -Script $python -Arguments $arguments

@@ -406,6 +406,7 @@
           "msg.setup_done": "Auto resume is set up and the watcher is running.",
           "msg.setup_incomplete": "Setup did not finish: preparing the recovery state or switching recovery on failed. Run `doctor` to see why.",
           "msg.setup_unconfirmed": "Auto resume is set up, but the watcher could not be confirmed running. Open the Dashboard, or run `doctor`, to check.",
+          "msg.setup_unconfirmed_yet": "Auto resume is set up. The watcher is not confirmed running yet; it is looked at again at the end.",
           "msg.toast_button_cancel": "Don't resume",
           "msg.toast_button_no_retry": "Don't retry",
           "msg.toast_button_open": "Open Dashboard",

@@ -1802,6 +1802,10 @@ try {
     }
     if ($SkipStartup) { $setupArgs += '--no-startup' }
     if ($upgrade -and -not $watcherWasRunning) { $setupArgs += '--watcher-was-stopped' }
+    # This run looks at the watcher again after the health check (watcher-running, below) and says the last word, so a
+    # watcher setup could not confirm within its wait is "not confirmed yet" in setup's own line, not a verdict
+    # the last word then contradicts (v0.6.17, the live acceptance's second round).
+    $setupArgs += '--will-look-again'
     # 2 means everything was done but the watcher was not seen running - a real outcome that
     # is neither success nor failure. Treating it as failure would roll back a good install;
     # treating it as success is how this script came to end with "Installed and running."

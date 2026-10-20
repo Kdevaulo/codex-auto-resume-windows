@@ -739,6 +739,7 @@
   "msg.setup_incomplete": "El programa de instalación no terminó: falló la preparación del estado de recuperación o la activación de la recuperación. Ejecuta `doctor` para ver por qué.",
   "msg.setup_left_stopped": "La reanudación automática se ha actualizado. El monitor no se estaba ejecutando antes de la actualización, así que sigue detenido: inícialo desde el Panel cuando lo quieras.",
   "msg.setup_unconfirmed": "La reanudación automática está configurada, pero no se pudo confirmar que el monitor se esté ejecutando. Abre el Panel o ejecuta `doctor` para comprobarlo.",
+  "msg.setup_unconfirmed_yet": "La reanudación automática está configurada. Aún no se ha confirmado que el monitor se esté ejecutando; se vuelve a comprobar al final.",
   "msg.toast_after_sleep": "Este PC estuvo en suspensión {time}",
   "msg.toast_after_sleep_count": "Tareas que vencieron durante la suspensión te esperan: {n}",
   "msg.toast_after_sleep_next": "Deja continuar cada una desde Pendientes, o cancélala. No se envía nada hasta que lo hagas.",

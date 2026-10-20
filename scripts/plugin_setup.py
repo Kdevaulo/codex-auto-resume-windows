@@ -319,10 +319,14 @@ def cmd_setup(args) -> int:
     print()
     started = looked_again(home, started)
     confirmed = started in ("running", "already-running")
+    # A caller that looks at the watcher again after this (the installer, after its health check) has not heard a
+    # verdict yet: "not confirmed yet" is the true word mid-log, and its own last word is the verdict (v0.6.17, the
+    # live acceptance's second round). A setup run alone, from Codex, has no later look, so its word stays final.
+    unconfirmed_word = "setup_unconfirmed_yet" if getattr(args, "will_look_again", False) else "setup_unconfirmed"
     if incomplete:
         say("setup_incomplete")
     else:
-        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else "setup_unconfirmed")
+        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else unconfirmed_word)
     if register_startup:
         say("setup_autostart")
     print()
@@ -544,6 +548,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--watcher-was-stopped", action="store_true",
                    help="with --keep-state: no watcher ran before the update, so it is started only where it "
                         "runs at sign-in")
+    p.add_argument("--will-look-again", action="store_true",
+                   help="the caller looks at the watcher again after this (watcher-running) and says the last word: "
+                        "a watcher not confirmed here is then said not to be confirmed yet, not to be unconfirmed")
     sub.add_parser("status")
     sub.add_parser("pending")
     sub.add_parser("enable")
