@@ -3987,6 +3987,37 @@ renaming a tag does not rename what is already attached to a release - the same 
 bytes. The digest pinned in `scripts/release.json` is this release's, and it is the one to check
 against.
 
+#### v0.6.6-beta
+
+**A pre-release, kept on [its own page](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/tag/v0.6.6-beta).** Built from `b17076d`, published and
+announced as `v0.6.6` on 2026-09-20 and renamed `v0.6.6-beta` on 2026-09-21. It went out without the panel's own
+theme, which was asked for the same day, so v0.6.6 was cut a third time. Its notes are v0.6.6's
+above less *The panel in Codex has a theme of its own*: the ordinary breath, the taskbar button that
+moves where it is installed, the product's own scroll bars and dialog, and the pictures cut to the
+window. Its evidence was measured on its own tree: 2,572 tests, and a window built twice to
+`c572844e…`, 387,072 bytes.
+
+- It was announced, so it is said plainly: **the tag `v0.6.6` has named three archives**, and this
+  was the first announced under it. Its digest is
+  `e620280bd5b40ad354d767fe22dd65ec8ed3eefe6b2f0af20d20759fca7e81a3`; `scripts/release.json` pins v0.6.6's, so a copy taken from the beta's page fails the
+  comparison, which is the comparison doing its job.
+- Nothing is served it: the update check reads the tag out of the URL `releases/latest` ends at and
+  accepts `vMAJOR.MINOR.PATCH` alone. A machine running it keeps it and is not moved back to v0.6.5.
+  Because the number is the same, the update check does not offer it v0.6.6 either: the v0.6.6
+  archive's `Install.cmd` installs over it, and so does the setup script given `-Force`.
+
+#### v0.6.6-alpha
+
+**A pre-release, kept on [its own page](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/tag/v0.6.6-alpha).** Built from `f63d904`, tagged
+`v0.6.6` and published on 2026-09-20, then stopped before it was announced: its gentler light - a
+smaller swing - was too faint to see, and the scroll bars, the dialog and the pictures' edges had not
+been made the product's own yet. It carried two things: a slower, shallower status light (a 4.4 s
+cycle, the dot dimming 38% of the way rather than 60%, the glow peaking at 0.30), and the taskbar
+button that moves where it is installed, which v0.6.6 carries too.
+
+- Its archive is called `CodexAutoResume-v0.6.6-win-x64.zip` as well, and its digest is
+  `3b99217b084148111d07cfc51c9ad8f5bddb6fd50029979ed1b1b6796be0b956`. Nothing is served it, for the same reason as the beta.
+
 ### Evidence
 
 Everything below was run on one Windows 11 machine (Home, build 26200, 3840 x 2160 at 150%, Korean
