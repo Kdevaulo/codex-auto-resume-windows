@@ -8,7 +8,8 @@
 // the window drawn is the setup program's window, byte for byte the same code.
 //
 // It drives that window as a person and a run would, through the window's own doors: the window is made as
-// SetupWindow.Run makes it (FlowFor, the catalog's words, the display's scale and text size), its primary button is
+// SetupWindow.Run makes it - a first installation, or an update over an older version with what is new in it -
+// (FlowFor, the catalog's words, the display's scale and text size), its primary button is
 // clicked (Form.AcceptButton), the run is the window's own Start on its own worker, told each line the installer would
 // print and how far the archive is unpacked - the lines install.ps1 really prints, from the plan - and the run ends
 // with the code a run that succeeded ends with. Nothing is installed, unpacked, started or written anywhere but the
@@ -126,15 +127,21 @@ namespace CodexAutoResume
                     if (spoken.TryGetValue(other, out found)) return found;
                     string path = Path.Combine(locales ?? "", other + ".json");
                     var catalog = File.Exists(path)
-                        ? InstallerFlow.ParseObject(File.ReadAllText(path, new UTF8Encoding(false)).TrimStart('﻿'))
+                        ? InstallerFlow.ParseObject(File.ReadAllText(path, new UTF8Encoding(false)).TrimStart('\uFEFF'))
                         : null;
                     found = new InstallerWords(catalog, other);
                     spoken[other] = found;
                     return found;
                 };
-                // A first installation of the archive's edition and version: the flow the setup program makes for it.
+                // The flow the setup program makes for its archive's edition and version over what is installed: nothing
+                // (a first installation), or an older version of an edition (an update), with what is new in the version
+                // it carries read as SetupWindow.Run reads it (Archive.Notes).
+                string installed = Str(job, "installed"), version = Str(job, "version");
                 var flow = CodexAutoResumeSetup.SetupWindow.FlowFor(new string[0], Str(job, "home"), Str(job, "edition"),
-                                                                    null, Str(job, "version"), "");
+                                                                    installed, version,
+                                                                    installed == null ? "" : Str(job, "from") ?? "");
+                if (flow.Upgrade && flow.Mode == InstallerFlow.Install && !flow.Maintaining)
+                    flow.NotesText = Notes(Str(job, "docs"), language, version);
                 window = new InstallerWindow(flow, speaker(language), speaker, Run, new string[0], font);
                 Size client = window.ClientSize;
                 window.TopLevel = false;
@@ -306,6 +313,20 @@ namespace CodexAutoResume
                 Tell(InstallerFlow.NotStarted);
                 window.Dispose();
             }
+        }
+
+        /// What is new in `version`: its section of the changelog, the language's own where there is one - as the setup
+        /// program reads it from the archive it carries (SetupWindow.Archive.Notes), here from the docs folder the
+        /// archive is made from.
+        private static string Notes(string docs, string language, string version)
+        {
+            string own = language == "en" ? null : Text(Path.Combine(docs ?? "", "CHANGELOG." + language + ".md"));
+            return InstallerNotes.Section(own ?? Text(Path.Combine(docs ?? "", "CHANGELOG.md")), version);
+        }
+
+        private static string Text(string path)
+        {
+            return File.Exists(path) ? File.ReadAllText(path, new UTF8Encoding(false)).TrimStart('\uFEFF') : null;
         }
 
         private static T Find<T>(Control root) where T : Control

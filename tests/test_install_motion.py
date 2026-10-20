@@ -38,6 +38,11 @@ def plans() -> dict:
     return {name: motion.load(name) for name in motion.PLAN_NAMES}
 
 
+def update(plan: dict) -> bool:
+    """Whether the plan is the update: the setup program over an older version."""
+    return "installed" in plan
+
+
 def milestones(table: str = "Installing") -> list:
     """(starts, place, step) of the window's table for a first installation (InstallerProgress)."""
     body = FLOW[FLOW.index("Milestone[] %s =" % table):]
@@ -78,17 +83,39 @@ def labels(plan: dict) -> list:
 
 
 class PlanTests(unittest.TestCase):
-    def test_the_two_plans_are_one_story_in_english_and_korean(self):
+    def test_each_story_is_one_plan_in_english_and_one_in_korean(self):
         loaded = plans()
-        self.assertEqual(set(loaded), {"install-en", "install-ko"})
-        self.assertEqual(loaded["install-en"]["output"], "docs/images/install-motion.png")
-        self.assertEqual(loaded["install-ko"]["output"], "docs/images/install-motion-ko.png")
-        self.assertEqual((loaded["install-en"]["locale"], loaded["install-ko"]["locale"]), ("en", "ko"))
-        same = {key: value for key, value in loaded["install-en"].items() if key not in ("name", "output", "locale")}
-        other = {key: value for key, value in loaded["install-ko"].items() if key not in ("name", "output", "locale")}
-        self.assertEqual(same, other)
+        self.assertEqual(set(loaded), {"install-en", "install-ko", "install-update-en", "install-update-ko"})
+        for story, picture in (("install", "install-motion"), ("install-update", "install-update-motion")):
+            english, korean = loaded[story + "-en"], loaded[story + "-ko"]
+            with self.subTest(story):
+                self.assertEqual(english["output"], "docs/images/%s.png" % picture)
+                self.assertEqual(korean["output"], "docs/images/%s-ko.png" % picture)
+                self.assertEqual((english["locale"], korean["locale"]), ("en", "ko"))
+                same = {key: value for key, value in english.items() if key not in ("name", "output", "locale")}
+                other = {key: value for key, value in korean.items() if key not in ("name", "output", "locale")}
+                self.assertEqual(same, other)
 
-    def test_it_is_a_first_installation_of_the_standard_edition_framed_bare(self):
+    def test_the_update_is_the_setup_program_over_the_previous_final_with_what_is_new_in_this_one(self):
+        loaded = plans()
+        self.assertFalse(update(loaded["install-en"]))
+        current = motion.version()
+        for name in ("install-update-en", "install-update-ko"):
+            plan = loaded[name]
+            with self.subTest(name):
+                self.assertEqual(plan["installed"], plan["edition"])
+                self.assertEqual(plan["from"], motion.previous_final(current))
+                self.assertLess(tuple(map(int, plan["from"].split("."))), tuple(map(int, current.split("-")[0].split("."))))
+                # What the Options page shows as new: the version's section of the changelog the archive carries
+                # (InstallerNotes.Section), the language's own where there is one.
+                heading = re.compile(r"^## v%s( |$)" % re.escape(current), re.M)
+                own = ROOT / "docs" / ("CHANGELOG.md" if plan["locale"] == "en" else "CHANGELOG.%s.md" % plan["locale"])
+                changelog = own if own.is_file() else ROOT / "docs" / "CHANGELOG.md"
+                self.assertRegex(changelog.read_text(encoding="utf-8"), heading)
+        self.assertEqual(motion.previous_final("0.6.17"), "0.6.16")
+        self.assertEqual(motion.previous_final("0.6.17-beta"), "0.6.16")
+
+    def test_it_is_the_standard_edition_framed_bare(self):
         for name, plan in plans().items():
             with self.subTest(name):
                 self.assertEqual(plan["edition"], "standard")
@@ -110,10 +137,11 @@ class PlanTests(unittest.TestCase):
                 self.assertEqual(tuple(motion.walk_pages(frames, len(plan["events"]))), motion.PAGES)
                 self.assertEqual(dict(frames[-1].window)["page"], "finish")
 
-    def test_it_lasts_fifteen_to_twenty_seconds(self):
+    def test_it_lasts_fifteen_to_twenty_seconds_and_the_update_with_its_notes_a_little_longer(self):
         for name, plan in plans().items():
             with self.subTest(name):
-                self.assertTrue(15000 <= motion_plan.plan_end(plan) <= 20000, motion_plan.plan_end(plan))
+                self.assertTrue(15000 <= motion_plan.plan_end(plan) <= (23000 if update(plan) else 20000),
+                                motion_plan.plan_end(plan))
 
     def test_every_click_has_the_readme_motions_rhythm(self):
         """Hover 10 and press 8 frames of 16 ms, the pointer travelling 25 - as the README motion clicks."""
@@ -132,9 +160,11 @@ class PlanTests(unittest.TestCase):
 
     def test_every_page_holds_long_enough_to_be_read(self):
         """The owner found a hurried scene too fast (2026-10-20): each page stands at least 900 ms between what moves
-        it, the Welcome and Options pages, which have text to read, at least 2.5 s, and the Finish page at least 3."""
-        least = {"welcome": 2500, "options": 2500, "progress": 900, "finish": 3000}
+        it, the Welcome and Options pages, which have text to read, at least 2.5 s - the update's Options page, with what
+        is new, 3.5 s; its Welcome page is the one the first installation showed, 2 s - and the Finish page at least 3."""
         for name, plan in plans().items():
+            least = ({"welcome": 2000, "options": 3500, "progress": 900, "finish": 3000} if update(plan) else
+                     {"welcome": 2500, "options": 2500, "progress": 900, "finish": 3000})
             frames = motion_plan.expand(plan)
             end = motion_plan.plan_end(plan)
             spans = {}
@@ -156,7 +186,8 @@ class PlanTests(unittest.TestCase):
                 if shown[0][0] == "starting":
                     shown = shown[1:]
                 self.assertEqual([step for step, _ms in shown],
-                                 ["unpack", "codex", "files", "plugin", "setup", "check"])
+                                 ["unpack", "codex", "files", "watcher", "files", "plugin", "setup", "check"]
+                                 if update(plan) else ["unpack", "codex", "files", "plugin", "setup", "check"])
                 for step, ms in shown:
                     self.assertGreaterEqual(ms, 900, step)
 
