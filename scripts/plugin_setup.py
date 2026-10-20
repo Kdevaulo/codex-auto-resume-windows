@@ -46,6 +46,11 @@ EXIT_UNCONFIRMED = 2
 sys.path.insert(0, str(PLUGIN_ROOT / "src"))
 from codex_auto_resume import addremove, config, control, edition, l10n, startup # noqa: E402
 from codex_auto_resume.app import App                        # noqa: E402
+from codex_auto_resume.commands.base import PROGRESS_LINES, progress  # noqa: E402
+
+# Setup's own steps, counted for the setup window's bar while the installer runs it (progress): the launcher, the
+# state, recovery switched on, the sign-in start, the link handler, the entry in Add or remove programs, the watcher.
+SETUP_STEPS = 7
 
 
 def say(key: str) -> None:
@@ -205,8 +210,10 @@ def start_watcher(home: Path) -> str:
     if os.name == "nt":
         # Safe only because the interpreter is pythonw.exe, a GUI program: see python_for_watcher.
         flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    # Never the setup window's request for progress lines: the watcher lives on long after the window has gone.
+    environment = {name: value for name, value in os.environ.items() if name != PROGRESS_LINES}
     process = subprocess.Popen([str(interpreter), str(home / LAUNCHER_NAME), "run"],
-                               cwd=str(home), close_fds=True, creationflags=flags,
+                               cwd=str(home), close_fds=True, creationflags=flags, env=environment,
                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return control.await_watcher(app.watcher_running, process)["state"]
 
@@ -279,6 +286,7 @@ def cmd_setup(args) -> int:
         print("  %s" % conflict)
         return EXIT_ERROR
     install_launcher(home, "plugin" if installed_as_plugin() else "local")
+    progress("setup", 1, SETUP_STEPS)
     # Both are reported when they fail. Ignoring them is how a setup that never prepared
     # the state, or never switched recovery on, used to end with "set up and running".
     # An edition change is the installer's to report and the new edition's to act on
@@ -287,6 +295,7 @@ def cmd_setup(args) -> int:
     if getattr(args, "edition_from", None):
         prepare += ["--edition-from", args.edition_from]
     incomplete = (_cli_silent(home, prepare) != EXIT_OK)
+    progress("setup", 2, SETUP_STEPS)
     # A repair must not undo a decision the user made. Turning recovery back on, or
     # adding a sign-in entry they removed, would do exactly that under the name of fixing
     # something - so --keep-state leaves the pause switch alone and only re-registers an
@@ -294,29 +303,34 @@ def cmd_setup(args) -> int:
     keep_state = getattr(args, "keep_state", False)
     if not keep_state:
         incomplete |= (_cli_silent(home, ["--quiet", "enable"]) != EXIT_OK)
+    progress("setup", 3, SETUP_STEPS)
     # The same ownership check the settings window uses, so "ours" means one thing.
     register_startup = (not args.no_startup
                         and (not keep_state or control.Control(config.Paths(home)).startup_enabled()))
     if register_startup:
         startup.install(watcher_command(home))
+    progress("setup", 4, SETUP_STEPS)
     # `install` above registered the protocol against the plugin's own versioned path;
     # replace it with the stable launcher so an update cannot orphan the button.
     try:
         startup.install_protocol(notification_command(home))
     except startup.StartupError:
         pass
+    progress("setup", 5, SETUP_STEPS)
     # The entry in Add or remove programs, where the installer has kept an uninstaller for it to name.
     try:
         addremove.register(home, edition.name().value, config.version(),
                            addremove.display_name(config.PROJECT_ROOT / config.PLUGIN_MANIFEST))
     except startup.StartupError:
         pass
+    progress("setup", 6, SETUP_STEPS)
     # v0.6.16: an update starts again what it stopped, and nothing the person had turned off. The installer says
     # --watcher-was-stopped when no watcher of this installation ran before it; the watcher is then started only
     # where it would run at the next sign-in anyway. A first installation, and every other repair, starts it as before.
     left_stopped = (keep_state and getattr(args, "watcher_was_stopped", False)
                     and not control.Control(config.Paths(home)).startup_enabled())
     started = "left-stopped" if left_stopped else start_watcher(home)
+    progress("setup", 7, SETUP_STEPS)
     say("ready_title")
     print()
     say("ready_defaults")

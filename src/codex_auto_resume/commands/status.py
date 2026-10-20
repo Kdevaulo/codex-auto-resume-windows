@@ -15,7 +15,7 @@ from ..domain.plug import Surface
 from ..logbook import format_local
 from ..store import StoreError
 from ..windows import AdapterError, WakeEvent, resource_users
-from .base import _app, _now, _print
+from .base import _app, _now, _print, progress
 from .records import _record_view
 
 
@@ -75,6 +75,10 @@ def cmd_status(args) -> int:
     return EXIT_OK
 
 
+# The health check's checks, counted for the setup window's bar while install.ps1 runs it (progress).
+DOCTOR_CHECKS = 8
+
+
 def cmd_doctor(args) -> int:
     app = _app(args)
     ok = True
@@ -85,6 +89,7 @@ def cmd_doctor(args) -> int:
     except (config.ConfigError, AdapterError) as exc:
         _print("codex.exe        : FAIL (%s)" % exc)
         return EXIT_ERROR
+    progress("check", 1, DOCTOR_CHECKS)
     # Checked now, against the backend just probed; never written - the report on disk is
     # the watcher's alone. Read-only against Codex's state, like everything here.
     try:
@@ -99,10 +104,12 @@ def cmd_doctor(args) -> int:
             _print(line)
         if live["overall"] in ("incompatible", "failed_here"):
             ok = False
+    progress("check", 2, DOCTOR_CHECKS)
     report = compatio.reader_view(app.paths, settings=app.settings)
     _print("watcher's report : %s (%s)" % (report["overall"], _view_status(report)))
     # Beside the version, and never a verdict: `ok` is not touched by it.
     _print("reported         : %s" % _reported_words(live if live is not None else report))
+    progress("check", 3, DOCTOR_CHECKS)
     _print("codex home       : %s" % app.codex_home)
     identity = backend.app_identity()
     if identity:
@@ -110,8 +117,10 @@ def cmd_doctor(args) -> int:
     else:
         ok = False
         _print("ChatGPT app      : not running or not paired with the configured engine")
+    progress("check", 4, DOCTOR_CHECKS)
     running = app.watcher_running()
     _print("watcher mutex    : %s" % {True: "held by a running watcher", False: "free", None: "unavailable"}[running])
+    progress("check", 5, DOCTOR_CHECKS)
     try:
         lock_dir = app.codex_home / "thread-writer-locks"
         probe = lock_dir / ".coordination.lock"
@@ -123,12 +132,14 @@ def cmd_doctor(args) -> int:
     except AdapterError as exc:
         ok = False
         _print("restart manager  : FAIL (%s)" % exc)
+    progress("check", 6, DOCTOR_CHECKS)
     try:
         app.source().latest_failures(_now() - 60)
         _print("local history    : readable")
     except Exception as exc:
         ok = False
         _print("local history    : FAIL (%s)" % type(exc).__name__)
+    progress("check", 7, DOCTOR_CHECKS)
     # The notification's button goes through a registered URL protocol. If its target has
     # gone - an installation moved, or a temporary home that no longer exists - the button
     # silently does nothing, and nothing else in the product would ever mention it.
@@ -147,6 +158,7 @@ def cmd_doctor(args) -> int:
                 _print("notification action: registered")
     except startup.StartupError as exc:
         _print("notification action: unavailable (%s)" % exc)
+    progress("check", 8, DOCTOR_CHECKS)
     return EXIT_OK if ok else EXIT_ERROR
 
 

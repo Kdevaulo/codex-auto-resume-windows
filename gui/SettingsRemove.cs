@@ -227,6 +227,8 @@ namespace CodexAutoResume
             start.StandardOutputEncoding = Encoding.UTF8;
             start.StandardErrorEncoding = Encoding.UTF8;
             start.EnvironmentVariables["CODEX_AUTO_RESUME_PLUGIN_HOME"] = home;
+            // How much of each step is done, for the installer window's bar (InstallerProgress.Variable).
+            start.EnvironmentVariables[InstallerProgress.Variable] = "1";
             start.WorkingDirectory = Path.GetTempPath();
             using (Process run = Process.Start(start))
             {

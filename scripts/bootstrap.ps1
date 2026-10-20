@@ -1602,6 +1602,13 @@ function Start-CurrentWatcher {
 
 # ---------------------------------------------------------------------------- run
 
+# The setup window's progress lines (CODEX_AUTO_RESUME_PROGRESS_LINES=1, gui/InstallerFlow.cs InstallerProgress): this
+# script counts nothing itself - Invoke-WebRequest writes the download to its file and says nothing until it has the
+# whole of it, so the download stays one step - and passes the request on to the installer it runs, and to nothing
+# else it starts (the installed setup, a watcher started again).
+$progressLines = $env:CODEX_AUTO_RESUME_PROGRESS_LINES -ceq '1'
+$env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null
+
 Write-Host ''
 Write-Host 'Codex Auto Resume - setting up'
 Write-Host ''
@@ -2180,6 +2187,7 @@ try {
     # been touched. It reports and rolls back its own work; this script must not claim
     # otherwise on its way out.
     $started = $true
+    if ($progressLines) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = '1' }
     & $installer @arguments
     $code = $LASTEXITCODE
     if ($null -eq $code) { $code = 0 }

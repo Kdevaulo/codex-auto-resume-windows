@@ -281,7 +281,7 @@ class InPlaceUpgradeTests(unittest.TestCase):
         # left the application present with the interpreter missing - which is how the
         # bug it fixes was reproduced in the first place.
         move = self.text.index("Move-Item -Path $pair.dst -Destination $aside")
-        copy = self.text.index("Copy-Item -Path (Join-Path (Join-Path $Payload $pair.src)")
+        copy = self.text.index("[IO.File]::Copy($item.From, $item.To, $true)")
         rollback = self.text.index("foreach ($undo in $moved)")
         self.assertLess(move, copy, "moves must all happen before any copy")
         self.assertLess(copy, rollback, "the rollback must cover the copy as well")
@@ -666,7 +666,7 @@ class CrashDuringTheCopyTests(unittest.TestCase):
 
     def test_the_journal_goes_when_the_copy_is_complete(self):
         removal = self.text.index("$null = Remove-OwnedItem $Journal")
-        self.assertLess(self.text.index("Copy-Item -Path (Join-Path (Join-Path $Payload $pair.src)"),
+        self.assertLess(self.text.index("[IO.File]::Copy($item.From, $item.To, $true)"),
                         removal, "it may only go once both trees are in place")
         self.assertLess(removal, self.text.index("Step 'Setting up the watcher'"))
 
