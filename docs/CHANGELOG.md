@@ -43,7 +43,8 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
 - **An uninstall that keeps your settings and history keeps the watcher's log and its error log too.** Before, the
   reinstall after it started `auto-resume.log` afresh. An uninstall with the Dashboard open also no longer leaves a
   note behind asking a later update to open that Dashboard again.
-- **The edition-change sentence says "edition" once** in Korean and Chinese.
+- **The edition-change sentence says "edition" once** in Korean and Chinese, and Korean calls an edition 판 on
+  that page's box and its finished page too.
 - **A finished install or update says the watcher runs when it does.** On a busy PC the watcher can take longer to
   start than the setup waits for it. The last word and the finished page then said it could not be confirmed, right
   under a health check that had just seen it running. The setup now looks once more before its last word.

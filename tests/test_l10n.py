@@ -409,6 +409,12 @@ class EditionWordOnceTests(unittest.TestCase):
     def test_the_korean_sentence_keeps_its_meaning(self):
         self.assertEqual(self.said("ko"), "여기에는 고급판이 설치되어 있고, 이것은 표준판입니다.")
 
+    def test_korean_calls_an_edition_pan_everywhere(self):
+        """Korean names an edition 판 (고급판, 표준판, the picker's 판 column) and nowhere 에디션: the v0.6.17 re-check
+        still read "에디션 변경" on the edition-switch box beside a sentence that says 판."""
+        table = l10n.catalog("ko")
+        self.assertEqual(sorted(key for key, value in table.items() if "에디션" in value), [])
+
 
 class LoaderTests(unittest.TestCase):
     def setUp(self):
