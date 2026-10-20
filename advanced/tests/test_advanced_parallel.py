@@ -105,6 +105,17 @@ class PaidTests(ParallelCase):
         self.assertEqual(sorted(thread for _cap, thread, _key in paid), [T1, T2])
         self.assertEqual(sorted(call[0] for call in self.h.backend.send_calls), [T1, T2], "each sent once")
 
+    def test_acted_is_journalled_for_each_pooled_claim_never_for_the_answer_alone(self):
+        """v0.6.17 (#47 P-7). Fails with the line written at P12 again: it said acted on a tick that pooled nothing."""
+        plug = self.armed()
+        self.due()
+        self.assertEqual(self.workers(plug), 2)
+        acted = (JournalCode.ACTED, Point.CONCURRENCY, Point.CONCURRENCY)
+        self.assertNotIn(acted, self.journal(plug), "an answer pools nothing by itself")
+        self.h.tick()
+        self.assertEqual(self.journal(plug).count(acted), 2, "once for each record a committed claim pooled")
+        self.assertEqual(sorted(call[0] for call in self.h.backend.send_calls), [T1, T2], "pooled as before")
+
     def test_a_pooled_send_whose_fate_is_unknown_turns_it_off(self):
         """Fails with CONCURRENCY not carried by the claim: nothing pays for a pooled send, and nothing trips."""
         plug = self.armed()

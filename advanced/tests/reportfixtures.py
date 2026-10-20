@@ -182,7 +182,7 @@ class Home:
     """A product home (`paths`) and a Codex home (`codex`), on disk, in one temporary folder."""
 
     def __init__(self, rows=(), *, state=4, ledger=None, spends=(), pruned=(), watcher_report=None,
-                 log_files=None, enabled=True, history=True, columns=None):
+                 log_files=None, enabled=True, history=True, columns=None, ledger_readable=None):
         self.temporary = tempfile.TemporaryDirectory(prefix="report-records-")
         self.root = Path(self.temporary.name)
         self.paths = config.Paths(self.root / "product")
@@ -196,7 +196,7 @@ class Home:
         if state is not None:
             self.write_state(rows, state, enabled=enabled, columns=columns)
         if ledger is not None:
-            self.write_ledger(ledger, spends, pruned)
+            self.write_ledger(ledger, spends, pruned, readable=ledger_readable)
         for name, lines in (logs() if log_files is None else log_files).items():
             (self.paths.logs_dir / name).write_text("\n".join(lines) + "\n", encoding="utf-8")
         if watcher_report is not None:
@@ -240,7 +240,7 @@ class Home:
         finally:
             db.close()
 
-    def write_ledger(self, version, spends=(), pruned=()):
+    def write_ledger(self, version, spends=(), pruned=(), readable=None):
         """The spend ledger, made by the edition's own statements (version 1: without the column
         version 2 added), holding `spends` - (interruption id, time) - after the `pruned` ones,
         which it was given first and has pruned since, as the product prunes its oldest."""
@@ -259,6 +259,11 @@ class Home:
                 db.execute("DELETE FROM spend WHERE spend_id IN (SELECT spend_id FROM spend ORDER BY spend_id LIMIT ?)",
                            (len(pruned),))
             db.execute("PRAGMA user_version = %d" % version)
+            if version != ledger_schema.SCHEMA_VERSION:
+                # A ledger of another version carries that version's readable-from mark: none for an older one, and a
+                # later one's own number unless `readable` names an older one (schema.READABLE_FROM).
+                db.execute("PRAGMA application_id = %d" % (0 if version < ledger_schema.SCHEMA_VERSION
+                                                           else ledger_schema.MARK | (readable or version)))
             db.commit()
         finally:
             db.close()

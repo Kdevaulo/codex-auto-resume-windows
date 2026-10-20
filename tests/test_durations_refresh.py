@@ -25,6 +25,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
 
+from test_split_runs import declared_parts, edition_parts  # noqa: E402
 from test_workflow_privilege import job, steps  # noqa: E402
 
 WORKFLOWS = ROOT / ".github" / "workflows"
@@ -93,7 +94,7 @@ class DealComparisonTests(unittest.TestCase):
                                    "seconds": seconds}), encoding="utf-8")
         return folder / "downloaded"
 
-    def refresh(self, fresh: dict):
+    def refresh(self, fresh: dict, count: str = "2"):
         folder = self.folder = Path(tempfile.mkdtemp())
         self.addCleanup(__import__("shutil").rmtree, folder, True)
         table = folder / "durations.json"
@@ -102,7 +103,7 @@ class DealComparisonTests(unittest.TestCase):
         said = []
         with mock.patch.object(parts, "lane_files", lambda lane: list(self.FILES)), \
                 mock.patch.object(parts, "DURATIONS", table), mock.patch.object(parts, "say", said.append):
-            code = parts.main(["--refresh-seconds", str(self.seconds_folder(folder, "standard", fresh)), "--parts", "2"])
+            code = parts.main(["--refresh-seconds", str(self.seconds_folder(folder, "standard", fresh)), "--parts", count])
         self.assertEqual(code, 0)
         return json.loads(table.read_text(encoding="utf-8")), before, said
 
@@ -133,6 +134,37 @@ class DealComparisonTests(unittest.TestCase):
         self.refresh({"tests/test_a.py": 2000.0, "tests/test_c.py": 2000.0, "tests/test_b.py": 1500.0,
                       "tests/test_d.py": 10.0})
         self.assertEqual(sorted(path.name for path in self.folder.iterdir()), ["downloaded", "durations.json"])
+
+    def test_each_lane_is_dealt_into_its_own_count_where_a_workflow_gives_one(self):
+        """test.yml deals the standard lane into 3 parts and the advanced into 4 (2026-10-20): the refresh
+        weighs each lane at its own count, and holds its fresh table to the spread at that count only."""
+        self.assertEqual(parts.parse_parts("4"), 4)
+        self.assertEqual(parts.parse_parts("standard=3,advanced=4,release=4"),
+                         {"standard": 3, "advanced": 4, "release": 4})
+        for text in ("standard=3,advanced=4", "standard=3,advanced=4,release=4,rust=2"):
+            with self.subTest(text), self.assertRaises(SystemExit):
+                parts.parse_parts(text)
+        after, before, said = self.refresh({"tests/test_a.py": 600.0, "tests/test_c.py": 600.0},
+                                           "standard=2,advanced=4,release=4")
+        self.assertEqual(after["lanes"]["standard"]["tests/test_a.py"], 600.0)
+        self.assertTrue(said[0].startswith("lane standard: longest of 2 parts "), said)
+        after, before, said = self.refresh({"tests/test_a.py": 600.0, "tests/test_c.py": 600.0},
+                                           "standard=4,advanced=2,release=2")
+        self.assertTrue(said[0].startswith("lane standard: longest of 4 parts "), said)
+
+    def test_the_spread_is_asked_of_each_lane_at_its_own_count_only(self):
+        # Four files of 1 s: even in 2 parts and in 4, uneven in 3 (2 s against 1 s).
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder, True)
+        table = folder / "durations.json"
+        table.write_text(json.dumps({"seconds": {name: 1.0 for name in DealComparisonTests.FILES}}), encoding="utf-8")
+        with mock.patch.object(parts, "lane_files", lambda lane: list(DealComparisonTests.FILES)):
+            self.assertEqual(parts.uneven_lanes({"standard": [2], "advanced": [4], "release": [4]}, table), [])
+            self.assertEqual([line.split(" lane")[0] for line in parts.uneven_lanes([3], table)],
+                             ["the standard", "the advanced", "the release"], "a list is every lane's counts")
+            found = parts.uneven_lanes({"standard": [3], "advanced": [4], "release": [2]}, table)
+            self.assertEqual(len(found), 1, found)
+            self.assertIn("the standard lane's 3 parts", found[0])
 
     def test_the_tracked_table_and_a_refresh_share_one_spread_check(self):
         source = (ROOT / "tests" / "test_split_runs.py").read_text(encoding="utf-8")
@@ -230,9 +262,16 @@ class WorkflowShapeTests(unittest.TestCase):
     def test_it_deals_as_many_parts_as_test_yml_runs_and_runs_no_test(self):
         weigh = self.measure_steps["Weigh a new deal"]
         call = re.findall(r"python scripts/test_parts\.py (.*)", weigh)
-        self.assertEqual(call, ['--refresh-seconds "$RUNNER_TEMP/seconds" --parts 4 > "$out/report.txt"'])
+        self.assertEqual(call, ['--refresh-seconds "$RUNNER_TEMP/seconds" --parts standard=3,advanced=5,release=4 '
+                                '> "$out/report.txt"'])
+        # Each lane's own count: test.yml's test job gives each edition one, and its main-tree job and
+        # release.yml deal the release lane into theirs.
         tests = (WORKFLOWS / "test.yml").read_text(encoding="utf-8")
-        self.assertEqual(set(re.findall(r'PARTS: "(\d+)"', tests)), {"4"})
+        counts = edition_parts(job(tests, "test"))
+        counts["release"] = declared_parts(job(tests, "main-tree"))
+        self.assertEqual(declared_parts(job((WORKFLOWS / "release.yml").read_text(encoding="utf-8"), "test")),
+                         counts["release"])
+        self.assertEqual(parts.parse_parts(call[0].split("--parts ")[1].split(" ")[0]), counts)
 
     def test_what_it_greps_for_is_what_the_script_prints(self):
         pattern = re.search(r"grep -E '([^']+)'", self.commit).group(1)

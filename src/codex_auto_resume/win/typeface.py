@@ -14,6 +14,13 @@ UI (`face_for`) - as it is on every Windows set to that language - on the Dashbo
 Typeface, the same rule), the popup, the card and the panel alike. Every language the UI font has
 whole is set in it, exactly as before; on an English Windows that is every language.
 
+And since v0.6.17 (#48) a language with a script face of its own - Korean, Japanese, Chinese - is set
+in the face Windows itself sets it in on a Windows set to that language (`SCRIPT_FACES`, `language_face`):
+Malgun Gothic, Yu Gothic UI, Microsoft YaHei UI, Microsoft JhengHei UI - whatever Windows' UI font is,
+where that face is installed, and as before where it is not. Until then Japanese on an English Windows
+was set in Segoe UI with every kana and kanji borrowed through a font link, as the window measured and
+drew it, and a click on the Advanced page in Japanese waited seconds for those measurements.
+
 GDI is asked which glyphs a face has (GetGlyphIndicesW) once per face and text, and the answer is
 remembered. Read, never written; nothing here draws, and nothing here raises: what cannot be asked
 is taken as whole, which keeps the face v0.6.10 used.
@@ -30,6 +37,10 @@ from .dll import library
 
 # The face every Windows has, with every letter of every language not set in a script face of its own.
 SEGOE = "Segoe UI"
+# The face Windows sets each language with a script face of its own in, on a Windows set to that language (v0.6.17,
+# #48): the window (gui/SoftTheme.cs, Typeface.ScriptFaces), the popup and the card (ui/popup/fonts.py) and the panel
+# (mcp/assets/panel.css, a rule on the page's language) all set these languages in them.
+SCRIPT_FACES = {"ko": "Malgun Gothic", "ja": "Yu Gothic UI", "zh-CN": "Microsoft YaHei UI", "zh-TW": "Microsoft JhengHei UI"}
 SPI_GETNONCLIENTMETRICS = 0x0029
 GGI_MARK_NONEXISTING_GLYPHS = 0x1
 _NO_GLYPH = 0xFFFF
@@ -74,6 +85,61 @@ def face_for(face, text, lacks) -> str:
     return SEGOE if lacks(face, text) and not lacks(SEGOE, text) else face
 
 
+def language_face(locale, face, text, lacks, installed) -> str:
+    """The face the words of `locale`, whose letters are `text`, are set in when Windows' UI font is `face`: the
+    language's own script face (SCRIPT_FACES) where `installed` says Windows has it, and otherwise what `face_for`
+    chooses, as before v0.6.17. `lacks` and `installed` answer for GDI. Pure, given them."""
+    own = SCRIPT_FACES.get(str(locale)) if locale is not None else None
+    if own and installed(own):
+        return own
+    return face_for(face, text, lacks)
+
+
+_INSTALLED = {}                                 # face -> whether GDI has it itself
+_NO_SUCH_FACE = "CodexAutoResume No Such Face"
+
+
+def _realized(gdi32, dc, face) -> str:
+    font = gdi32.CreateFontW(-12, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, face)
+    if not font:
+        return ""
+    previous = gdi32.SelectObject(dc, font)
+    try:
+        buffer = C.create_unicode_buffer(64)
+        gdi32.GetTextFaceW(dc, 64, buffer)
+        return buffer.value
+    finally:
+        gdi32.SelectObject(dc, previous)
+        gdi32.DeleteObject(font)
+
+
+def installed(face) -> bool:
+    """Whether GDI has the face `face` itself rather than a stand-in for it: the face it realizes for the name is the
+    name, or - a face Windows reports by its localized name, Malgun Gothic's Korean one on a Korean Windows - anything
+    but what a face that does not exist is realized as. False when Windows cannot be asked. Asked once per face."""
+    if os.name != "nt" or not isinstance(face, str) or not face.strip():
+        return False
+    with _LOCK:
+        if face in _INSTALLED:
+            return _INSTALLED[face]
+        found = False
+        try:
+            gdi32 = _dll("gdi32")
+            _declare(gdi32, _dll("user32"))
+            dc = gdi32.CreateCompatibleDC(None)
+            if dc:
+                try:
+                    stand_in = _realized(gdi32, dc, _NO_SUCH_FACE)
+                    realized = _realized(gdi32, dc, face)
+                    found = bool(realized) and (realized.lower() == face.lower() or realized != stand_in)
+                finally:
+                    gdi32.DeleteDC(dc)
+        except Exception:
+            found = False
+        _INSTALLED[face] = found
+        return found
+
+
 def _declare(gdi32, user32):
     global _declared
     if _declared:
@@ -86,6 +152,8 @@ def _declare(gdi32, user32):
     gdi32.DeleteObject.restype, gdi32.DeleteObject.argtypes = W.BOOL, [C.c_void_p]
     gdi32.GetGlyphIndicesW.restype = W.DWORD
     gdi32.GetGlyphIndicesW.argtypes = [C.c_void_p, W.LPCWSTR, C.c_int, C.POINTER(W.WORD), W.DWORD]
+    gdi32.GetTextFaceW.restype = C.c_int
+    gdi32.GetTextFaceW.argtypes = [C.c_void_p, C.c_int, W.LPWSTR]
     user32.SystemParametersInfoW.restype = W.BOOL
     user32.SystemParametersInfoW.argtypes = [W.UINT, W.UINT, C.c_void_p, W.UINT]
     _declared = True

@@ -521,7 +521,9 @@ class SourceTests(unittest.TestCase):
         self.assertIn('start.Arguments = "/d /s /c \\"\\"" + script + "\\""', install)
         self.assertIn("start.WorkingDirectory = folder;", install)
         self.assertIn('string script = Path.Combine(folder, "Install.cmd");', install)
-        self.assertEqual(WINDOW.count("Process.Start("), 1)
+        # The Dashboard is started in front by HostApp.StartInFront (v0.6.17, gui/HostApp.cs), with no shell.
+        self.assertEqual(WINDOW.count("Process.Start("), 0)
+        self.assertIn("HostApp.StartInFront(exe, null, home);", WINDOW)
         self.assertIn("string exe = Path.Combine(home, Dashboard);", WINDOW)
         self.assertIn('internal const string Dashboard = "CodexAutoResumeSettings.exe";', WINDOW)
 

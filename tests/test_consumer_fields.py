@@ -118,6 +118,10 @@ _RECEIVERS = {
         "line": [("bridge:logs", "result.lines[]")],
         "held": [("bridge:status", "status.settings.custom_message_by_thread"),
                  ("bridge:dashboard", "status.settings.custom_message_by_thread")],
+        # v0.6.17: where the watcher and this window's bridge run - each part of the answer, and either.
+        "watcherPart": [("bridge:host-app", "result.watcher")],
+        "windowPart": [("bridge:host-app", "result.bridge")],
+        "hostPart": [("bridge:host-app", "result.watcher"), ("bridge:host-app", "result.bridge")],
     },
     "gui/SettingsApp.cs": {
         "reply": [("@", ""), REFUSAL],

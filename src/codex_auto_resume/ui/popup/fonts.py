@@ -11,8 +11,8 @@ from ...win import typeface
 from .win32 import _dll
 
 
-_SCRIPT_FACES = {"ko": "Malgun Gothic", "ja": "Yu Gothic UI", "zh-CN": "Microsoft YaHei UI",
-                 "zh-TW": "Microsoft JhengHei UI"}
+# The face Windows sets each script language in (win/typeface.py, SCRIPT_FACES): one table for every surface (v0.6.17).
+_SCRIPT_FACES = typeface.SCRIPT_FACES
 
 
 _ON_EVERY_WINDOWS = "Segoe UI"

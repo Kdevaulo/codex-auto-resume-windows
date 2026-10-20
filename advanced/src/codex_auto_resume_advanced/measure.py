@@ -77,7 +77,9 @@ class Context:
         # into the record: the record holds only that one was given (`thread_given`), because a
         # conversation id is exactly the kind of content this whole edition keeps out of state.
         self.thread_given = bool(thread)
-        self.probe_thread = thread if thread else _SAMPLE_THREAD
+        # v0.6.17: MQP's two to four throwaway conversations, named comma-separated; every other measurement one.
+        self.probe_threads = tuple(thread.split(",")) if thread else (_SAMPLE_THREAD,)
+        self.probe_thread = self.probe_threads[0]
 
     def open(self):
         """The one-turn session for this measurement, restricted to the methods it declared. A
@@ -1217,6 +1219,205 @@ def _mc1(ctx):
                     "turn ran as one you typed, then set the verdict", **observed)
 
 
+def _mqo(ctx):
+    """A continuation queued for opening, with no marker (v0.6.17, issue #42): the owner names a throwaway conversation
+    the Desktop does not hold. The harness lists what the app holds - and stops there if it holds this one - then adds
+    one short message to its queue under a client id of no one's, with no marker (thread/queue/add, M7's call, as
+    marker-free continuation sends), looks that it stays queued, and follows the queue for up to _MQO_OPEN_SECONDS
+    while the person opens the conversation in the Desktop. Taken, it reads Codex's history for that client id on a
+    person's message the way core proves a marker-free continuation delivered (LocalSource.marker_rows: the history
+    database's userMessage items, placed by the rollout - engine/reconcile.py reads exactly this). That the message
+    ran there once, as the person's own, is what the person watching confirms."""
+    with ctx.open() as session:
+        loaded = session.call("thread/loaded/list")
+        held = loaded.get("data") if isinstance(loaded, dict) else None
+        if not isinstance(held, list):
+            return _blocked("the conversations the app holds could not be listed", loaded_listed=False)
+        if ctx.probe_thread in held:
+            return _blocked("the app holds the throwaway conversation: quit and reopen the Codex app without opening "
+                            "it, then run mqo again", loaded_listed=True, held_before=True)
+        added = session.call("thread/queue/add", {"threadId": ctx.probe_thread,
+                                                  "clientUserMessageId": _SAMPLE_MQO_CLIENT_ID,
+                                                  "input": [{"type": "text", "text": _M2B_PROMPT}]})
+        listed = session.call("thread/queue/list", {"threadId": ctx.probe_thread})
+        items = listed.get("data") if isinstance(listed, dict) else None
+        waiting = isinstance(items, list) and any(
+            isinstance(item, dict) and item.get("clientUserMessageId") == _SAMPLE_MQO_CLIENT_ID for item in items)
+        began = time.monotonic()
+        taken = waiting and _await_taken(session, ctx.probe_thread, _SAMPLE_MQO_CLIENT_ID, _MQO_OPEN_SECONDS)
+    waited = time.monotonic() - began
+    found = False
+    deadline = time.monotonic() + _MQO_FIND_SECONDS
+    while taken:
+        found = _client_recorded(ctx, _SAMPLE_MQO_CLIENT_ID)
+        if found or time.monotonic() >= deadline:
+            break
+        time.sleep(_M2B_POLL_SECONDS)
+    observed = {"loaded_listed": True, "held_before": False, "add_accepted": isinstance(added, dict),
+                "queued_while_not_held": waiting, "taken": taken, "taken_seconds": _seconds(waited),
+                "client_id_on_user_item": found}
+    return _blocked("open the throwaway conversation in the Desktop within five minutes of starting this; confirm the "
+                    "message ran there once, as your own, with no marker, then set the verdict", **observed)
+
+
+def _held(session, threads):
+    """Which of `threads` the app holds now (thread/loaded/list), or None where that could not be listed."""
+    loaded = session.call("thread/loaded/list")
+    held = loaded.get("data") if isinstance(loaded, dict) else None
+    return None if not isinstance(held, list) else [thread for thread in threads if thread in held]
+
+
+def _queued_ids(session, thread):
+    """The client ids of the items in `thread`'s queue now, or None where it could not be listed."""
+    listed = session.call("thread/queue/list", {"threadId": thread})
+    items = listed.get("data") if isinstance(listed, dict) else None
+    if not isinstance(items, list):
+        return None
+    return [item.get("clientUserMessageId") for item in items if isinstance(item, dict)]
+
+
+def _recorded_in(ctx, thread, client_id) -> bool:
+    """Whether Codex's history keeps `client_id` on a person's message of `thread` - core's own read, as
+    _client_recorded makes it for the measurement's one conversation."""
+    from codex_auto_resume.codex import LocalSource
+    home = getattr(ctx.backend, "codex_home", None)
+    try:
+        return home is not None and bool(LocalSource(home).marker_rows(thread, client_id))
+    except Exception:
+        return False
+
+
+def _mqp(ctx):
+    """Several sends at once (v0.6.17): the owner names two to four throwaway conversations the Desktop does not hold,
+    comma-separated. The harness stops if the app holds any of them; otherwise it adds one short message with no marker
+    to each at once - each add in a session of its own, on a thread of its own, under a client id of its own - then
+    lists each queue: every add accepted, and each conversation's queue holding its own item and none of the others'.
+    It follows the queues for up to _MQO_OPEN_SECONDS while the person opens each conversation in the Desktop, and
+    reads Codex's history for each client id in its own conversation and in the others (core's read, as MQO's). That
+    each message ran once, in its own conversation only, is what the person watching confirms."""
+    import threading
+    threads = ctx.probe_threads
+    if len(threads) < 2:
+        return _blocked("name two to four throwaway conversations the Desktop does not hold, comma-separated, then run "
+                        "mqp again", conversations=len(threads))
+    ids = _SAMPLE_MQP_CLIENT_IDS[:len(threads)]
+    with ctx.open() as session:
+        held = _held(session, threads)
+    if held is None:
+        return _blocked("the conversations the app holds could not be listed", loaded_listed=False)
+    if held:
+        return _blocked("the app holds one of the throwaway conversations: quit and reopen the Codex app without "
+                        "opening them, then run mqp again", loaded_listed=True, held_before=len(held))
+    accepted = [False] * len(threads)
+
+    def add(index):
+        try:
+            with ctx.open() as own:
+                answer = own.call("thread/queue/add", {"threadId": threads[index], "clientUserMessageId": ids[index],
+                                                       "input": [{"type": "text", "text": _M2B_PROMPT}]})
+            accepted[index] = isinstance(answer, dict)
+        except Exception:
+            accepted[index] = False
+    workers = [threading.Thread(target=add, args=(index,), daemon=True) for index in range(len(threads))]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join(_MQP_ADD_SECONDS)
+    own_queued = misplaced = taken = 0
+    with ctx.open() as session:
+        for index, thread in enumerate(threads):
+            found = _queued_ids(session, thread) or []
+            own_queued += ids[index] in found
+            misplaced += sum(1 for other in ids if other != ids[index] and other in found)
+        began = time.monotonic()
+        for index, thread in enumerate(threads):
+            left = max(0.0, _MQO_OPEN_SECONDS - (time.monotonic() - began))
+            taken += _await_taken(session, thread, ids[index], left)
+    # As MQO: the history is read again until each conversation's own message is found there, _MQO_FIND_SECONDS at
+    # most - a message taken a moment ago may not be written yet (the owner's run of 2026-10-20 read 1 of 2 at once).
+    found = set()
+    deadline = time.monotonic() + _MQO_FIND_SECONDS
+    while taken:
+        found |= {index for index, thread in enumerate(threads)
+                  if index not in found and _recorded_in(ctx, thread, ids[index])}
+        if len(found) == len(threads) or time.monotonic() >= deadline:
+            break
+        time.sleep(_M2B_POLL_SECONDS)
+    found_own = len(found)
+    found_elsewhere = sum(_recorded_in(ctx, thread, other) for thread in threads for other in ids
+                          if other != ids[threads.index(thread)]) if taken else 0
+    observed = {"conversations": len(threads), "held_before": 0, "accepted": sum(accepted),
+                "queued_in_own": own_queued, "queued_elsewhere": misplaced, "taken": taken,
+                "found_in_own": found_own, "found_elsewhere": found_elsewhere}
+    return _blocked("open each of the throwaway conversations in the Desktop within five minutes of starting this; "
+                    "confirm each message ran once, in its own conversation only, then set the verdict", **observed)
+
+
+def _mqg(ctx):
+    """A goal and a continuation queued for opening, together (v0.6.17): the owner names a throwaway conversation the
+    Desktop does not hold, with a goal it paused. The harness stops if the app holds it or it has no goal; otherwise it
+    sets that existing goal active (M2's call - never creating one) and adds one short message with no marker to its
+    queue under a client id of its own (MQO's), notes the conversation's latest turn, and follows the queue for up to
+    _MQO_OPEN_SECONDS while the person opens it in the Desktop; taken, it watches the history for _MQG_SETTLE_SECONDS
+    and counts the turns that ran after the one it noted - two where the goal and the queued message each ran one, one
+    where they ran as one - and reads the goal's status again. What ran is what the person watching confirms."""
+    from .codex import turns
+    home = getattr(ctx.backend, "codex_home", None)
+    with ctx.open() as session:
+        held = _held(session, (ctx.probe_thread,))
+        if held is None:
+            return _blocked("the conversations the app holds could not be listed", loaded_listed=False)
+        if held:
+            return _blocked("the app holds the throwaway conversation: quit and reopen the Codex app without opening "
+                            "it, then run mqg again", loaded_listed=True, held_before=True)
+        before = _goal_status(session.call("thread/goal/get", {"threadId": ctx.probe_thread}))
+        if before is None:
+            return _blocked("give the throwaway conversation a goal and pause it, close the conversation, then run mqg "
+                            "again", loaded_listed=True, held_before=False, goal_found=False)
+        session.call("thread/goal/set", {"threadId": ctx.probe_thread, "status": "active"})
+        set_active = _goal_status(session.call("thread/goal/get", {"threadId": ctx.probe_thread}))
+        try:
+            first = turns.Turns(home).latest(ctx.probe_thread) if home is not None else None
+        except Exception:
+            first = None
+        added = session.call("thread/queue/add", {"threadId": ctx.probe_thread,
+                                                  "clientUserMessageId": _SAMPLE_MQG_CLIENT_ID,
+                                                  "input": [{"type": "text", "text": _M2B_PROMPT}]})
+        waiting = _SAMPLE_MQG_CLIENT_ID in (_queued_ids(session, ctx.probe_thread) or [])
+        taken = waiting and _await_taken(session, ctx.probe_thread, _SAMPLE_MQG_CLIENT_ID, _MQO_OPEN_SECONDS)
+        ran = 0
+        deadline = time.monotonic() + _MQG_SETTLE_SECONDS
+        while taken:
+            ran = _turns_after(home, ctx.probe_thread, first)
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(_M2B_POLL_SECONDS)
+        after = _goal_status(session.call("thread/goal/get", {"threadId": ctx.probe_thread}))
+    observed = {"loaded_listed": True, "held_before": False, "goal_found": True,
+                "goal_set_active": set_active == "active", "add_accepted": isinstance(added, dict),
+                "queued_while_not_held": waiting, "taken": taken, "turns_after_open": ran,
+                "client_id_on_user_item": taken and _client_recorded(ctx, _SAMPLE_MQG_CLIENT_ID),
+                "goal_active_after": after == "active"}
+    return _blocked("open the throwaway conversation in the Desktop within five minutes of starting this and watch it "
+                    "for two more; say whether two turns ran (the goal's and the queued message) or one, then set the "
+                    "verdict", **observed)
+
+
+def _turns_after(home, thread, first) -> int:
+    """How many turns of `thread` ran after the turn `first` (codex/turns.py), 0 where none or it cannot be read."""
+    from .codex import turns
+    try:
+        reader = turns.Turns(home)
+        latest = reader.latest(thread)
+        if latest is None or (first is not None and latest.turn_id == first.turn_id):
+            return 0
+        if first is None:
+            return 1
+        return reader.between(thread, first.ordinal, latest.ordinal) + 1
+    except Exception:
+        return 0
+
+
 class _Watch:
     """What MC2 sees of one conversation, look after look: when the history first said a new latest turn was in
     progress and when it ended, when the rollout's newest event first said a task started and ended, whether the
@@ -1320,6 +1521,15 @@ _MB_VALUE = 8                    # the value MB writes: the retry settings' defa
 _MC1_QUEUE_SECONDS = 60.0        # how long MC1 follows the queue for the app to take its item
 _MC1_START_SECONDS = 10.0        # and then the history for the turn it starts
 _MC2_SECONDS = 300.0
+_SAMPLE_MQO_CLIENT_ID = "00000000-0000-7000-8000-000000000005"
+_SAMPLE_MQP_CLIENT_IDS = ("00000000-0000-7000-8000-000000000006", "00000000-0000-7000-8000-000000000007",
+                          "00000000-0000-7000-8000-000000000008", "00000000-0000-7000-8000-000000000009")
+_SAMPLE_MQG_CLIENT_ID = "00000000-0000-7000-8000-00000000000a"
+_MQP_MOST = 4                    # the most conversations MQP sends to at once
+_MQP_ADD_SECONDS = 60.0          # how long MQP waits for each add it started
+_MQG_SETTLE_SECONDS = 120.0      # how long MQG watches the history for turns once the queued message is taken
+_MQO_OPEN_SECONDS = 300.0        # how long MQO follows the queue for the person to open the conversation
+_MQO_FIND_SECONDS = 30.0         # and then the history for the message under its client id
 _MC2_POLL_SECONDS = 0.25
 
 
@@ -1334,6 +1544,7 @@ PROBES = {
     Measurement.MIPC: _mipc, Measurement.MAWS: _maws, Measurement.MCLOUD: _mcloud,
     Measurement.M6B: _m6b, Measurement.MO: _mo, Measurement.MX: _mx, Measurement.MXA: _mxa, Measurement.MF: _mf,
     Measurement.M3B: _m3b, Measurement.MB: _mb, Measurement.MC1: _mc1, Measurement.MC2: _mc2,
+    Measurement.MQO: _mqo, Measurement.MQP: _mqp, Measurement.MQG: _mqg,
 }
 
 # A conversation and a message id of no one's: the shape a call takes, never a real id. A probe
@@ -1401,7 +1612,7 @@ def run(measurement, *, session_factory=None, launcher=None, backend=None, versi
     warnings read it (arming.warnings_for) - and "unknown" would speak for every version at once.
     """
     measurement = Measurement(measurement)
-    if thread is not None and not is_uuid(thread):
+    if thread is not None and not _threads_valid(measurement, thread):
         raise EvidenceUnavailable("the conversation id is not a Codex thread id")
     versions = dict(versions or _versions(backend))
     if versions.get("codex_version") in (None, "", "unknown"):
@@ -1417,6 +1628,17 @@ def run(measurement, *, session_factory=None, launcher=None, backend=None, versi
     written = evidence.write(record, directory=directory)
     return {"measurement": str(measurement), "verdict": str(verdict),
             "recorded": str(written), "observed": dict(observed)}
+
+
+def _threads_valid(measurement, thread) -> bool:
+    """Whether `thread` names what `measurement` takes: one Codex thread id - or, for MQP (v0.6.17), two to four
+    different ones, comma-separated."""
+    if not isinstance(thread, str):
+        return False
+    if measurement != Measurement.MQP:
+        return is_uuid(thread)
+    parts = thread.split(",")
+    return 2 <= len(parts) <= _MQP_MOST and len(set(parts)) == len(parts) and all(is_uuid(part) for part in parts)
 
 
 def _versions(backend) -> dict:

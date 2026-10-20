@@ -25,7 +25,7 @@ from codex_auto_resume_advanced import registry, statement, surfaces  # noqa: E4
 from codex_auto_resume_advanced.engine import usage, wrapwords  # noqa: E402
 from codex_auto_resume_advanced.registry import USAGE_METER, USAGE_PAUSE, USAGE_WRAP_UP, Registry  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import (Actor, ArmingState, ContinuationKind, OptionKey, OffReason,  # noqa: E402
-                                                   Refusal)
+                                                   Refusal, SpendOutcome)
 from test_engine import T1  # noqa: E402
 
 ENGINE = ac.ENGINE
@@ -405,6 +405,115 @@ class PauseTests(UsageCase):
         self.look()
         self.look()
         self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), DEFER)
+
+
+class PauseBesideResetCreditTests(UsageCase):
+    """The pause and a reset credit, v0.6.17's P-8.
+
+    A credit resets the window there and then and buys fifteen minutes in which every waiting recovery
+    is looked at early (engine/credits.py, P7 EARLY). The pause's own mark moves only on a reading of
+    the meter's, and the meter reads while the Codex app runs, every Poll minutes - so with the app
+    closed the pause held every record through the whole early window and on to the reset the credit
+    was spent to avoid: the credit bought nothing. Each test here drives the broken case, the meter not
+    reading."""
+
+    CORE = {"interruption_id": ac.KEY, "thread_id": ac.THREAD}
+
+    def setUp(self):
+        super().setUp()
+        self.occasion = 0
+
+    def credit(self, minutes=300, *, outcome=SpendOutcome.RESET, bucket="codex", written=None):
+        """One reset credit of this edition's spent on a window, as engine/credits.py writes it
+        (state/resets: the spend first, at `written` or now, its outcome when Codex answers; `outcome`
+        None leaves it unanswered)."""
+        self.occasion += 1
+        state = self.rt.state
+        spend = state.add_credit_spend(1, bucket, minutes, self.occasion, str(uuid.uuid4()),
+                                       at=self.now if written is None else written)
+        self.assertIsNotNone(spend)
+        if outcome is not None:
+            self.assertTrue(state.finish_credit_spend(spend, outcome, at=self.now))
+        return spend
+
+    def held(self, five=98, week=20.0):
+        """The pause holding, and then the Codex app closed: the meter reads nothing more."""
+        self.on("usage_pause")
+        self.answer = reply(five=five, week=week)
+        self.look()
+        self.look()
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
+        self.app = False
+        self.now += 60
+
+    def test_a_reset_credit_of_the_held_window_lets_the_early_window_be_used(self):
+        self.held()
+        self.credit()
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), DEFER,
+                      "the credit reset the window: nothing waits for the reset it paid to avoid")
+        self.assertFalse(self.rt._code_of(USAGE_PAUSE).holds({"state": "waiting", "purpose": "continuation"}))
+        self.look()
+        self.assertIsNone(self.rt.state.meter()[("codex", 300)]["paused_reset_at"], "the mark is let go")
+        self.assertIn("pause.resumed", [line["code"] for line in self.rt.state.journal()])
+
+    def test_a_credit_written_long_before_the_reading_and_answered_after_it_lets_the_window_go(self):
+        """A spend is written before Codex is asked and answered whenever Codex answers - late, or on the
+        second ask ten minutes on. What settles the reading is when it was ANSWERED, not when it was
+        written: a credit written well before the reading still empties the window after it."""
+        self.on("usage_pause")
+        spend = self.credit(outcome=None)                  # written, asked, no answer yet
+        self.now += 4200
+        self.answer = reply(five=98, five_reset=int(self.now) + 3600)
+        self.look()
+        self.look()
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
+        self.app = False
+        self.now += 60
+        self.assertTrue(self.rt.state.finish_credit_spend(spend, SpendOutcome.RESET, at=self.now))
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), DEFER)
+
+    def test_a_credit_that_reset_nothing_leaves_the_pause_standing(self):
+        self.held()
+        for outcome in (None, SpendOutcome.NOTHING_TO_RESET, SpendOutcome.NO_CREDIT, SpendOutcome.UNKNOWN):
+            with self.subTest(outcome):
+                self.credit(outcome=outcome)
+                self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
+        self.look()
+        self.assertIsNotNone(self.rt.state.meter()[("codex", 300)]["paused_reset_at"])
+
+    def test_the_pause_still_holds_where_no_credit_was_spent(self):
+        # A guard for behaviour this change leaves alone, not a proof of it: it passes with the fix reverted.
+        self.held()
+        self.now += 600
+        self.look()
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
+        self.assertTrue(self.rt._code_of(USAGE_PAUSE).holds({"state": "waiting", "purpose": "continuation"}))
+        self.assertIsNotNone(self.rt.state.meter()[("codex", 300)]["paused_reset_at"])
+
+    def test_a_credit_for_another_window_leaves_this_ones_pause_standing(self):
+        self.held(five=98, week=98)
+        self.credit(minutes=usage.WEEKLY)
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD,
+                      "the five-hour window was not the one the credit reset")
+        self.look()
+        rows = self.rt.state.meter()
+        self.assertIsNone(rows[("codex", usage.WEEKLY)]["paused_reset_at"])
+        self.assertIsNotNone(rows[("codex", 300)]["paused_reset_at"])
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
+
+    def test_a_credit_spent_before_the_reading_the_pause_rests_on_holds_nothing_back(self):
+        """A guard for behaviour this change leaves alone, not a proof: it passes with the fix reverted.
+        A credit of an earlier filling of the window - the meter read the window full after it was answered,
+        so the reading stands and the pause with it."""
+        self.on("usage_pause")
+        self.credit()
+        self.now += 60
+        self.answer = reply(five=98)
+        self.look()
+        self.look()
+        self.app = False
+        self.now += 600
+        self.assertIs(self.rt.ask(Point.GATES, "usage", self.CORE, {}), Alternative.HOLD)
 
 
 class WrapUpTests(TakingCase):

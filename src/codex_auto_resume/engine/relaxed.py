@@ -13,8 +13,11 @@ v0.6.14 so may one a usage read found waiting for usage (waiting_for_usage), as 
 And P7 (SEND_NOW): a waiting record a person asked to send now passes its retry's wait, a postponement,
 the spacing between two continuations, the objection window and an attempt budget of the person's own -
 never a reset ahead, quiet hours or an administrator's MaxRecoveryAttempts - and every other gate holds,
-in the engine and again in the claim. The standard edition's plug is asked nothing here: a record taken
-up under another edition ends unsent at its next look, and that is all.
+in the engine and again in the claim. The two are one answer at P7, and core looks early only at a record
+waiting for its next look or its reset, so an edition that would answer both must answer SEND_NOW there, or
+the person's request is never seen and EARLY sends nobody either (the advanced edition's runtime.py, v0.6.17).
+The standard edition's plug is asked nothing here: a record taken up under another edition ends unsent at its
+next look, and that is all.
 """
 from __future__ import annotations
 

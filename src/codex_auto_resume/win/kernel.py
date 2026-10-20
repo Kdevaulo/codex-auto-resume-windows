@@ -10,6 +10,7 @@ from __future__ import annotations
 import ctypes as C
 from ctypes import wintypes as W
 import os
+import re
 
 from ..domain.errors import AdapterError
 
@@ -124,6 +125,159 @@ def process_context() -> dict:
     except AttributeError:
         pass
     return facts
+
+
+
+# ------------------------------------------------------------------ inside another app (v0.6.17)
+# gui/HostApp.cs's walk, asked of a process by Diagnostics: whether it descends from a live MSIX app - the Codex app
+# (OpenAI.Codex), Claude desktop - whose private view of Windows takes what it registers (HKCU, %APPDATA%), and whose
+# closing may end it. The same guards as HostApp.Decide, held to the same answers by the tests: each parent from one
+# Toolhelp snapshot; a parent created after its child is not its parent (its id was reused); a parent that cannot be
+# opened, a cycle and HOST_MAX_STEPS end the walk, outside. Only the package family name leaves: never a path.
+HOST_MAX_STEPS = 32
+TH32CS_SNAPPROCESS = 0x2
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+# A package family name as Windows writes one: the package's name, "_", and the publisher's 13-letter id.
+_FAMILY = re.compile(r"[A-Za-z0-9.\-]{1,64}_[a-z0-9]{13}\Z")
+# Where the answer is the start process's own: inside an app (its family), outside every one, or not to be had.
+INSIDE, OUTSIDE, UNKNOWN = "inside", "outside", "unknown"
+# 100-ns intervals between 1601-01-01 (FILETIME) and 1970-01-01 (the epoch).
+_EPOCH_AS_FILETIME = 116444736000000000
+
+
+class _ProcessEntry(C.Structure):
+    _fields_ = [("size", W.DWORD), ("usage", W.DWORD), ("pid", W.DWORD), ("heap", C.c_size_t),
+                ("module", W.DWORD), ("threads", W.DWORD), ("parent", W.DWORD), ("priority", C.c_long),
+                ("flags", W.DWORD), ("exe", W.WCHAR * 260)]
+
+
+def decide_host(start, table):
+    """The package family name of `start`, or of its nearest live ancestor that has one, or None.
+
+    `table` maps a process id to (parent id, creation FILETIME - 0 where it could not be opened - and package family
+    name or None). HostApp.Decide, line for line: pure, so a test feeds it a table of its own."""
+    row = (table or {}).get(start)
+    if row is None:
+        return None
+    if row[2] is not None:
+        return row[2]
+    seen = {start}
+    for _step in range(HOST_MAX_STEPS):
+        parent = table.get(row[0])
+        if parent is None or parent[1] == 0:
+            return None
+        if row[0] in seen:
+            return None
+        seen.add(row[0])
+        if parent[1] > row[1]:
+            return None
+        if parent[2] is not None:
+            return parent[2]
+        row = parent
+    return None
+
+
+def app_name(family) -> str:
+    """The app's name for a person: the family name without its publisher id ("OpenAI.Codex"). HostApp.Name."""
+    if not family:
+        return ""
+    cut = family.rfind("_")
+    return family[:cut] if cut > 0 else family
+
+
+def _toolhelp_parents(k) -> dict:
+    """Every process's parent id, from one Toolhelp snapshot."""
+    k.CreateToolhelp32Snapshot.argtypes = [W.DWORD, W.DWORD]
+    k.CreateToolhelp32Snapshot.restype = W.HANDLE
+    k.Process32FirstW.argtypes = k.Process32NextW.argtypes = [W.HANDLE, C.POINTER(_ProcessEntry)]
+    k.Process32FirstW.restype = k.Process32NextW.restype = W.BOOL
+    snapshot = k.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if not snapshot or snapshot == W.HANDLE(-1).value:
+        return {}
+    parents = {}
+    try:
+        entry = _ProcessEntry()
+        entry.size = C.sizeof(_ProcessEntry)
+        more = k.Process32FirstW(snapshot, C.byref(entry))
+        while more:
+            parents[int(entry.pid)] = int(entry.parent)
+            more = k.Process32NextW(snapshot, C.byref(entry))
+    finally:
+        k.CloseHandle(snapshot)
+    return parents
+
+
+def _opened(k, pid, own) -> tuple:
+    """(creation FILETIME, package family name or None) of one process: (0, None) where it cannot be opened."""
+    handle = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return 0, None
+    try:
+        times = [W.FILETIME() for _ in range(4)]
+        created = ((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+                   if k.GetProcessTimes(handle, *(C.byref(t) for t in times)) else 0)
+        family = None
+        try:
+            name, length = C.create_unicode_buffer(256), W.UINT(256)
+            if own:
+                k.GetCurrentPackageFamilyName.argtypes = [C.POINTER(W.UINT), W.LPWSTR]
+                k.GetCurrentPackageFamilyName.restype = C.c_long
+                answer = k.GetCurrentPackageFamilyName(C.byref(length), name)
+            else:
+                k.GetPackageFamilyName.argtypes = [W.HANDLE, C.POINTER(W.UINT), W.LPWSTR]
+                k.GetPackageFamilyName.restype = C.c_long
+                answer = k.GetPackageFamilyName(handle, C.byref(length), name)
+            if answer == 0 and name.value:
+                family = name.value
+        except AttributeError:
+            pass                                    # a Windows with no packages at all
+        return created, family
+    finally:
+        k.CloseHandle(handle)
+
+
+def _host_table(k, start) -> dict:
+    """`start` and its ancestors as the walk sees them, as HostApp.LiveTable gathers them."""
+    parents = _toolhelp_parents(k)
+    own = os.getpid()
+    table, pid = {}, start
+    for _step in range(HOST_MAX_STEPS + 2):
+        if pid in table or pid not in parents:
+            break
+        created, family = _opened(k, pid, pid == own)
+        table[pid] = (parents[pid], created, family)
+        if created == 0:
+            break
+        pid = parents[pid]
+    return table
+
+
+def host_verdict(start, table, started_by=None) -> dict:
+    """{"state", "family", "app"} for the process `start` over `table`: INSIDE with the app's family name and name,
+    OUTSIDE, or UNKNOWN where `start` itself is not in the table or could not be opened - or, given `started_by` (the
+    epoch second the process says it started, the watcher's heartbeat), was created after it: its id now belongs to
+    another process. A family name that is not one is said as no name. Pure."""
+    row = (table or {}).get(start)
+    if row is None or row[1] == 0:
+        return {"state": UNKNOWN, "family": None, "app": None}
+    if started_by is not None and (row[1] - _EPOCH_AS_FILETIME) / 1e7 > started_by + 2:
+        return {"state": UNKNOWN, "family": None, "app": None}
+    family = decide_host(start, table)
+    if family is None:
+        return {"state": OUTSIDE, "family": None, "app": None}
+    family = family if _FAMILY.match(family) else None
+    return {"state": INSIDE, "family": family, "app": app_name(family) or None}
+
+
+def host_app(pid=None, started_by=None) -> dict:
+    """Whether the process `pid` - this one when None - runs inside another app's private view, and which:
+    host_verdict over the live process table. Never raises: UNKNOWN where Windows would not say."""
+    start = os.getpid() if pid is None else pid
+    try:
+        k = _kernel()
+        return host_verdict(start, _host_table(k, start), started_by)
+    except Exception:
+        return {"state": UNKNOWN, "family": None, "app": None}
 
 
 ERROR_ALREADY_EXISTS = 183

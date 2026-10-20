@@ -293,6 +293,28 @@ def _state_access(word):
     return using
 
 
+def _host_app(watcher_inside):
+    """Where the watcher and the bridge run, for this one case (v0.6.17, win/kernel.py host_app): a stand-in for the
+    one function that walks the live process table, so the answer is the same on every machine - outside, or, with
+    `watcher_inside`, a running watcher's process inside the Codex app's private view."""
+    @contextmanager
+    def using(_workspace):
+        from codex_auto_resume import control
+        from codex_auto_resume.win import kernel
+
+        outside = {"state": "outside", "family": None, "app": None}
+        inside = {"state": "inside", "family": "OpenAI.Codex_2p2nqsd0c76g0", "app": "OpenAI.Codex"}
+        with patch.object(kernel, "host_app", side_effect=lambda pid=None, started_by=None:
+                          dict(inside if watcher_inside and pid == 4242 else outside)):
+            if not watcher_inside:
+                yield
+                return
+            with patch.object(control.Control, "_watcher",
+                              lambda self, store: {"running": True, "pid": 4242, "started_at": 1.0e9}):
+                yield
+    return using
+
+
 def _postponed(key, thread):
     """A task a person postponed by an hour (v0.6.11), so Don't postpone has something to take away.
     Through the product's own store, and left as it is for the cases after it."""
@@ -533,7 +555,13 @@ BRIDGE_CASES = {
     # whose rows are made up and whose card is asked of a watcher that is not there to draw it.
     "state-access": [
         Case("only this account and Windows", using=_state_access("owner_only")),
-        Case("other accounts too", using=_state_access("shared"))],
+        Case("other accounts too", using=_state_access("shared")),
+        # v0.6.17: Codex's Windows sandbox's group reading the folder, said apart from other accounts.
+        Case("Codex's sandbox group reads it", using=_state_access("codex_sandbox"))],
+    # v0.6.17: Diagnostics - whether the watcher and the bridge run inside another app, read only.
+    "host-app": [
+        Case("the watcher and the bridge outside every app", using=_host_app(False)),
+        Case("the watcher inside the Codex app, the bridge outside", using=_host_app(True))],
     "demo": [Case("the made-up rows, and no watcher's icon to ask for the card")],
     # v0.6.16-beta.3: Diagnostics' check of why a failure was not taken up, read only (checkup.py).
     "detection-check": [Case("the recent conversations, the homes, usage, notices and Codex", using=_check_pinned)],

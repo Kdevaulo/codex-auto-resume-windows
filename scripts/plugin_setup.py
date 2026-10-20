@@ -23,6 +23,12 @@ LAUNCHER_NAME = "watcher-launcher.py"
 RUNTIME_CONFIG = "runtime.json"
 ICON_NAME = "codex-auto-resume.ico"
 ENV_RUNTIME_HOME = "CODEX_AUTO_RESUME_PLUGIN_HOME"
+# What the installer tells setup about the call it is making, as environment variables set for that one call and
+# never as arguments: the installer may be a newer version than the setup it runs (the bootstrap's check-over runs
+# the INSTALLED plugin_setup.py), and an older one rejects an argument it does not know - so `setup` would not run
+# at all - while it ignores a variable it does not read.
+ENV_WILL_LOOK_AGAIN = "CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN"   # "1": the caller looks at the watcher again after setup
+ENV_ENGLISH = "CODEX_AUTO_RESUME_SETUP_ENGLISH"                   # "1": the caller's log is English: say watcher-running so
 RUNTIME_DIR_NAME = ".codex-auto-resume"
 # The directory names the installer creates under the root - and therefore the ones
 # it would destroy if it ever ran against a directory that merely contained them.
@@ -205,6 +211,26 @@ def start_watcher(home: Path) -> str:
     return control.await_watcher(app.watcher_running, process)["state"]
 
 
+def watcher_seen(home: Path):
+    """The watcher's single-instance mutex, looked at once, now: True / False / None (the probe could not tell)."""
+    return App(config.Paths(home), console=False, enable_logging=False).watcher_running()
+
+
+def looked_again(home: Path, started: str) -> str:
+    """What `start_watcher` answered, with one more look where it could not confirm a watcher that is still starting.
+
+    `start_watcher` waits WATCHER_START_TIMEOUT and no longer, which is a promise to the person waiting. A watcher
+    whose interpreter is still importing when that wait ends - on a busy PC, right after an update has written
+    every file fresh, it can take longer (the v0.6.17 live acceptance: 6 to 9 seconds from its launcher's start)
+    - was reported as not confirmed, and the installer then said nothing was being watched while its own health
+    check had just seen the mutex held. So the answer is looked at once more, without waiting again, before any
+    word about the watcher is said: only "unconfirmed", the launched process still alive and not yet seen. One
+    that exited stays exited, and a probe that cannot tell stays unconfirmed - never rounded up to running."""
+    if started == "unconfirmed" and watcher_seen(home) is True:
+        return "running"
+    return started
+
+
 def conflicting_autostart(home: Path) -> str | None:
     """A different installation registered for autostart, if any.
 
@@ -297,11 +323,16 @@ def cmd_setup(args) -> int:
     for key in ("ready_b1", "ready_b2", "ready_b3", "ready_b4"):
         print("  " + bullet() + " " + l10n.message(key))
     print()
+    started = looked_again(home, started)
     confirmed = started in ("running", "already-running")
+    # A caller that looks at the watcher again after this (the installer, after its health check) has not heard a
+    # verdict yet: "not confirmed yet" is the true word mid-log, and its own last word is the verdict (v0.6.17, the
+    # live acceptance's second round). A setup run alone, from Codex, has no later look, so its word stays final.
+    unconfirmed_word = "setup_unconfirmed_yet" if os.environ.get(ENV_WILL_LOOK_AGAIN) == "1" else "setup_unconfirmed"
     if incomplete:
         say("setup_incomplete")
     else:
-        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else "setup_unconfirmed")
+        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else unconfirmed_word)
     if register_startup:
         say("setup_autostart")
     print()
@@ -317,7 +348,7 @@ def cmd_enable(args) -> int:
     # `start_watcher` blocks for up to six seconds to learn the answer; throwing it away
     # and then printing "Auto resume is on." says the thing is on when nothing is
     # watching. `_cli_silent` also swallows the engine's own warning about this.
-    started = start_watcher(home)
+    started = looked_again(home, start_watcher(home))
     say("enabled")
     if started not in ("running", "already-running"):
         say("setup_unconfirmed")
@@ -349,6 +380,25 @@ def cmd_status(args) -> int:
         print("  %s" % conflict)
     print()
     return _cli(home, ["--quiet", "status"])
+
+
+def cmd_watcher_running(args) -> int:
+    """Whether this installation's watcher runs now, by its mutex, for the installer's last word: 0 when it does,
+    EXIT_UNCONFIRMED when it does not or the probe cannot tell. One line, the words `status` says first.
+
+    The installer asks it after its health check, where setup could not confirm the watcher it started
+    (build/install/install.ps1, scripts/bootstrap.ps1): a watcher that took the mutex after setup's wait ended is
+    running, and the last word says so rather than contradicting the health check printed above it."""
+    running = watcher_seen(runtime_home())
+    if os.environ.get(ENV_ENGLISH) == "1":
+        # The installer's log is English, and this line is the one place a localized sentence landed in it (v0.6.17,
+        # the live acceptance: "워처: 실행 중" on a Korean PC). `watcher_seen` has just built the App, which adopted the
+        # Interface language the person stored - and an explicit choice outranks the environment's override
+        # (l10n.resolve), so the line is asked for in English by name, for this one process. What the Dashboard's
+        # Diagnostics shows is another process, and is untouched.
+        l10n.set_preference("en")
+    say({True: "watcher_running", False: "watcher_stopped", None: "watcher_unknown"}[running])
+    return EXIT_OK if running is True else EXIT_UNCONFIRMED
 
 
 def cmd_pending(args) -> int:
@@ -442,7 +492,10 @@ def cmd_uninstall(args) -> int:
     # Keeping settings and pending recoveries is the default here: the installer offers a
     # separate purge for the other case, and losing a queued recovery to an ordinary
     # uninstall is not something a user would expect or forgive.
-    flags = [] if getattr(args, "purge", False) else ["--keep-state"]
+    # The watcher's log too ("Keep settings and history"): the core uninstall deletes auto-resume.log and errors.log
+    # unless --keep-logs, so the v0.6.17 acceptance's keep-data uninstall and reinstall left auto-resume.log starting
+    # at the reinstall while launcher.log and codex-start.log, which it never names, kept their lines.
+    flags = [] if getattr(args, "purge", False) else ["--keep-state", "--keep-logs"]
     code = _cli(home, ["--quiet", "uninstall"] + flags)
     if code != EXIT_OK:
         return code
@@ -516,6 +569,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("thread_id")
     sub.add_parser("stop")
     sub.add_parser("doctor")
+    sub.add_parser("watcher-running", help="exit 0 only if this installation's watcher holds its mutex now")
     sub.add_parser("verify-home", help="exit 0 only if the install root is provably ours")
     sub.add_parser("claim-home",
                    help="exit 0 only if the install root is ours or holds nothing of ours")
@@ -537,7 +591,7 @@ def build_parser() -> argparse.ArgumentParser:
 COMMANDS = {
     "setup": cmd_setup, "status": cmd_status, "pending": cmd_pending, "enable": cmd_enable,
     "disable": cmd_disable, "cancel": cmd_cancel, "uninstall": cmd_uninstall,
-    "verify-home": cmd_verify_home,
+    "verify-home": cmd_verify_home, "watcher-running": cmd_watcher_running,
     "claim-home": cmd_claim_home, "downgrade-state": cmd_downgrade_state, "remove-entry": cmd_remove_entry,
     "stop": passthrough("stop"), "doctor": passthrough("doctor"), "logs": passthrough("logs"),
 }

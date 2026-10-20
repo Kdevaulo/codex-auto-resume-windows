@@ -622,7 +622,9 @@ class BridgeTests(ControlTestCase):
             "once-words",
             # v0.6.16: Rescan and reconcile (issue #39) - a waiting recovery retired only on proof of newer work,
             # every other one left to wait as it was. It can only reduce what runs; nothing is sent.
-            "rescan"]))
+            "rescan",
+            # v0.6.17: Diagnostics' read of whether the watcher and the bridge run inside another app - nothing sent.
+            "host-app"]))
 
     def test_serve_answers_every_line_with_exactly_one_line(self):
         requests = "\n".join([

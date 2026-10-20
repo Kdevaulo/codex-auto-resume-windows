@@ -84,16 +84,55 @@ def step(source: str, name: str) -> str:
     return source[start:] if end < 0 else source[start:end]
 
 
-def declared_parts(text: str) -> int:
-    """PARTS in a job, and the matrix's part list, which must be 1..PARTS."""
+def excluded_parts(text: str) -> dict[str, set[int]]:
+    """The parts the matrix's `exclude` drops for each edition. The expression has two answers, the one for a
+    quick run and the one for the others, and both must drop the same parts: a quick run is no reason to
+    run a part the whole matrix leaves out."""
+    found = re.search(r"(?m)^\s*exclude: '(.+)'\s*$", text)
+    if not found:
+        return {}
+    answers = []
+    for answer in found.group(1).split("||"):
+        dropped: dict[str, set[int]] = {}
+        for edition, part in re.findall(r'\{"edition":"(\w+)","part":(\d+)\}', answer):
+            dropped.setdefault(edition, set()).add(int(part))
+        answers.append(dropped)
+    if any(answer != answers[0] for answer in answers):
+        raise AssertionError("a quick run and a whole one exclude different parts: %s" % answers)
+    return answers[0]
+
+
+def declared_parts(text: str, edition: str | None = None) -> int:
+    """PARTS in a job, and the matrix's part list, which must be 1..PARTS. A job whose PARTS is one number
+    is a whole job's; test.yml's test job gives each edition its own (`matrix.edition == 'x' && 'N' || 'M'`),
+    so it is asked for an edition, and the matrix's list, less the parts excluded for that edition, must be
+    1..that edition's PARTS."""
     listed = re.search(r"(?m)^\s*part: \[([0-9, ]+)\]\s*$", text)
-    count = re.search(r'(?m)^\s*PARTS: "(\d+)"\s*$', text)
+    count = re.search(r"(?m)^\s*PARTS: (.+?)\s*$", text)
     if not (listed and count):
         raise AssertionError("no part list or no PARTS")
-    numbers = [int(value) for value in listed.group(1).split(",")]
-    if numbers != list(range(1, int(count.group(1)) + 1)):
-        raise AssertionError("the part list %s is not 1..PARTS=%s" % (numbers, count.group(1)))
-    return int(count.group(1))
+    plain = re.fullmatch(r'"(\d+)"', count.group(1))
+    if plain:
+        if edition is not None or excluded_parts(text):
+            raise AssertionError("one PARTS for every edition, but an edition is named or a part excluded")
+        wanted = int(plain.group(1))
+    else:
+        by_edition = re.fullmatch(r"\$\{\{ matrix\.edition == '(\w+)' && '(\d+)' \|\| '(\d+)' \}\}", count.group(1))
+        if not by_edition or edition is None:
+            raise AssertionError("PARTS %s is not a number nor one per edition" % count.group(1))
+        wanted = int(by_edition.group(2) if edition == by_edition.group(1) else by_edition.group(3))
+    numbers = [int(value) for value in listed.group(1).split(",")
+               if int(value) not in excluded_parts(text).get(edition, set())]
+    if numbers != list(range(1, wanted + 1)):
+        raise AssertionError("the part list %s, less the parts excluded, is not 1..PARTS=%s%s"
+                             % (numbers, wanted, " for %s" % edition if edition else ""))
+    return wanted
+
+
+def edition_parts(text: str) -> dict[str, int]:
+    """Each edition's part count in test.yml's test job."""
+    editions = re.search(r"(?m)^        edition: \[([^\]]+)\]\s*$", text).group(1)
+    return {name.strip(): declared_parts(text, name.strip()) for name in editions.split(",")}
 
 
 def documented_counts() -> set[int]:
@@ -106,7 +145,7 @@ def counts_used() -> list[int]:
     """Every part count a workflow uses, every count CONTRIBUTING.md shows, and 1: the whole suite as
     one part."""
     tests = workflow("test.yml")
-    return sorted({1, declared_parts(job(tests, "test")), declared_parts(job(tests, "main-tree")),
+    return sorted({1, *edition_parts(job(tests, "test")).values(), declared_parts(job(tests, "main-tree")),
                    declared_parts(job(workflow("release.yml"), "test")),
                    declared_parts(job(workflow("sync-ko.yml"), "test"))} | documented_counts())
 
@@ -302,9 +341,12 @@ class LaneDurationsTests(unittest.TestCase):
     def test_each_lanes_parts_take_about_as_long_as_each_other(self):
         """At every count a workflow deals a lane into, by the lane's own seconds."""
         tests = workflow("test.yml")
-        counts = sorted({declared_parts(job(tests, "test")), declared_parts(job(tests, "main-tree")),
-                         declared_parts(job(workflow("release.yml"), "test")),
-                         declared_parts(job(workflow("sync-ko.yml"), "test"))})
+        editions = edition_parts(job(tests, "test"))
+        counts = {"standard": sorted({editions["standard"], declared_parts(job(workflow("sync-ko.yml"), "test"))}),
+                  "advanced": [editions["advanced"]],
+                  "release": sorted({declared_parts(job(tests, "main-tree")),
+                                     declared_parts(job(workflow("release.yml"), "test"))})}
+        self.assertEqual(sorted(counts), sorted(parts.LANES), "a lane no workflow deals")
         self.assertEqual(parts.SPREAD, 1.2)
         self.assertEqual(parts.uneven_lanes(counts), [])
 
@@ -713,8 +755,11 @@ class WorkflowPartsTests(unittest.TestCase):
         self.matrix = self.tests[self.tests.index("\n    strategy:"):self.tests.index("\n    steps:")]
 
     def test_every_lane_runs_in_parts_and_each_part_names_its_lane(self):
-        count = declared_parts(self.tests)
-        self.assertGreater(count, 1)
+        counts = edition_parts(self.tests)
+        self.assertEqual(counts, {"standard": 3, "advanced": 5}, "the lanes' own counts (2026-10-20)")
+        self.assertEqual(declared_parts(job(workflow("test.yml"), "main-tree")), 4, "the release lane's count")
+        self.assertEqual(declared_parts(job(workflow("release.yml"), "test")), 4, "the same one in the release")
+        self.assertGreater(min(counts.values()), 1)
         run = step(self.tests, "Run the automated test suite")
         self.assertIn('run: python scripts/test_parts.py --lane $env:CODEX_AR_EDITION --part "$env:PART/$env:PARTS"'
                       " -v --annotate", run)
@@ -729,7 +774,7 @@ class WorkflowPartsTests(unittest.TestCase):
         self.assertEqual(len({python for python, _, _ in entries}), 1)
         editions = re.search(r"(?m)^        edition: \[([^\]]+)\]\s*$", self.matrix).group(1)
         expected = {(edition.strip(), str(part)) for edition in editions.split(",")
-                    for part in range(1, declared_parts(self.tests) + 1)}
+                    for part in range(1, declared_parts(self.tests, edition.strip()) + 1)}
         self.assertEqual(sorted((edition, part) for _, edition, part in entries), sorted(expected))
 
     def test_what_a_lane_checks_once_runs_in_its_first_part_only(self):
@@ -857,8 +902,9 @@ class WorkflowSecondsTests(unittest.TestCase):
             listed = re.search(r"(?m)^        %s: \[([^\]]+)\]\s*$" % re.escape(key), matrix).group(1)
             return [value.strip().strip('"') for value in listed.split(",")]
 
+        dropped = excluded_parts(matrix)
         jobs = [{"python-version": python, "edition": edition, "part": part} for python in axis("python-version")
-                for edition in axis("edition") for part in axis("part")]
+                for edition in axis("edition") for part in axis("part") if int(part) not in dropped.get(edition, ())]
         jobs += [{"python-version": python, "edition": edition, "part": part} for python, edition, part in re.findall(
             r'(?m)^          - \{python-version: "([\d.]+)", experimental: true, edition: (\w+), part: (\d+)\}\s*$', matrix)]
 
@@ -868,7 +914,7 @@ class WorkflowSecondsTests(unittest.TestCase):
         names = [render(self.JOBS["test"][1], values) for values in jobs]
         names += [render(self.JOBS["main-tree"][1], {"part": str(part)})
                   for part in range(1, declared_parts(job(self.source, "main-tree")) + 1)]
-        self.assertEqual(len(jobs), (len(axis("python-version")) + 1) * len(axis("edition")) * declared_parts(test))
+        self.assertEqual(len(jobs), (len(axis("python-version")) + 1) * sum(edition_parts(test).values()))
         self.assertEqual(len(set(names)), len(names), sorted(names))
         self.assertNotIn("release", axis("edition"), "the main-tree job's names are the release lane's alone")
 

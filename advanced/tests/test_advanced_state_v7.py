@@ -70,6 +70,8 @@ class UpgradeTests(StateCase):
         made.run_started(KEY, "headless_run", ac.THREAD, started_at=self.now, ends_by=self.now)
         made.close()
         with contextlib.closing(sqlite3.connect(made.path)) as connection:
+            # A newer version with no readable-from mark (v0.6.17): readable from itself alone.
+            connection.execute("PRAGMA application_id=0")
             connection.execute("PRAGMA user_version=%d" % (schema_module.STAGE4_VERSION + 1))
             connection.commit()
         with self.assertRaises(StateError):

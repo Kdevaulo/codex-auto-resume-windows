@@ -76,7 +76,10 @@ PLAIN = ("status", "settings", "describe", "defaults", "pending", "pending-all",
          "detection-check",
          # v0.6.16: Pending's Rescan and reconcile (issue #39) - each waiting recovery retired only on proof of newer
          # work, or left to wait as it was; nothing sent (rescan.py, control.rescan_pending).
-         "rescan")
+         "rescan",
+         # v0.6.17: Diagnostics - whether the watcher and this bridge run inside another app (an MSIX app's private
+         # view), and which; read only (control/tools.py host_app).
+         "host-app")
 WITH_ARGUMENT = ("update", "enabled", "startup", "cancel", "reset-budget", "retry-now",
                  "timeline", "statistics", "thread-enabled", "cancel-thread", "diagnostics",
                  "preview-continuation", "interruption-recovery",
@@ -387,6 +390,9 @@ def dispatch(control: Control, command: str, payload: dict) -> dict:
             return {"ok": True, "result": control.plugin_copy()}
         if command == "state-access":
             return {"ok": True, "result": control.state_access()}
+        if command == "host-app":
+            # Read only: Windows is asked which process started which, and nothing is done about it.
+            return {"ok": True, "result": control.host_app()}
         if command == "detection-check":
             # Read only: the watcher's own decisions asked on the spot, in the Interface language.
             from . import checkup

@@ -8,22 +8,32 @@ tool, and none reaches the store, the engine or Codex:
   back the lines that match, newest last. errors.log, which keeps exception messages unfiltered, is
   not read.
 * `state_access` asks Windows who may open the state folder (win/acl.py) and gives back one word.
+* `host_app` (v0.6.17) asks Windows whether the watcher and this bridge run inside another app's private
+  view - an MSIX app such as the Codex app or Claude desktop - and which (win/kernel.py host_app): a package
+  family name at most, never a path.
 * `show_demo` asks the watcher's icon to draw one made-up card (win/sync.py DemoEvent) and gives the
   Dashboard the made-up rows it plays (demo.py). Nothing it touches is written anywhere.
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 
 from .. import demo
 from ..logbook import BACKUP_COUNT
-from ..win import acl
+from ..win import acl, kernel
 from ..win.sync import DemoEvent
 from .errors import ControlError
 
 # A line as logbook's formatter writes it: its time, then the message. Anything else is not read.
 LOG_LINE = re.compile(r"\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] ([^\r\n]{1,2000})\Z")
+# The pictures' pin for `host_app` (v0.6.17): set to "outside" only by build/make_screenshots.py's capture, for the
+# window it photographs and the bridge that window starts, so the captured Diagnostics page says what the offscreen
+# render and the envelope say (their own process pins kernel.host_app) on every machine and inside any host app -
+# the pictures are made from inside Claude desktop. Any other value, or none, is the live walk.
+STILL_HOST = "CODEX_AR_STILL_HOST"
+_OUTSIDE = {"state": "outside", "family": None, "app": None}
 # The most lines one answer carries, the longest search, and the most of each file read.
 LOG_LIMIT = 500
 MAX_QUERY = 100
@@ -73,6 +83,33 @@ class ToolsMixin:
     def state_access(self) -> dict:
         """Who Windows lets open the state folder: owner_only, shared or unknown (win/acl.py)."""
         return {"access": acl.state_access(self.paths.state_dir)}
+
+    def host_app(self) -> dict:
+        """Whether the watcher and this bridge - the Dashboard's, started by it - run inside another app, and which.
+
+        Each part is {"state", "family", "app"} (kernel.host_verdict). The watcher's is asked of the process its
+        heartbeat names, only while its mutex is held, and only while that process started no later than the
+        heartbeat says the watcher did - an id Windows gave to another process is UNKNOWN; NOT_RUNNING with no
+        watcher. Read only, on request. A picture's capture pins every walk outside (STILL_HOST)."""
+        walk = kernel.host_app
+        if os.environ.get(STILL_HOST) == "outside":
+            def walk(pid=None, started_by=None):
+                return dict(_OUTSIDE)
+        watcher = {"state": "not_running", "family": None, "app": None}
+        try:
+            with self._open(legacy_ok=True) as store:
+                seen = self._watcher(store)
+        except Exception:
+            seen = {"running": None}
+        if seen.get("running") is None:
+            watcher = {"state": kernel.UNKNOWN, "family": None, "app": None}
+        elif seen.get("running"):
+            pid, started = seen.get("pid"), seen.get("started_at")
+            watcher = (walk(pid, started_by=started)
+                       if isinstance(pid, int) and not isinstance(pid, bool) and pid > 0
+                       and isinstance(started, (int, float)) and not isinstance(started, bool)
+                       else {"state": kernel.UNKNOWN, "family": None, "app": None})
+        return {"watcher": watcher, "bridge": walk()}
 
     def show_demo(self) -> dict:
         """Show me what happens: the made-up rows the Dashboard plays (demo.rows), and whether the

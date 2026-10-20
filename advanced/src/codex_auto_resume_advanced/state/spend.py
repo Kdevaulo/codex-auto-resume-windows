@@ -9,8 +9,16 @@ even when the claim is, since nothing can prove the send it paid for never reach
 The same statements serve both connections: this file's own, where its tables are `main`, and
 core's, where it is attached as `advanced`. The schema name is one of those two constants and is
 never taken from anything else.
+
+A capability's own ceilings count its rows, one for each unit it spent. The global hourly ceiling
+counts claims, not rows (v0.6.17): every capability whose answer one send carries pays its own unit
+there, and the person is told that ceiling in sends - "Sends an hour, all advanced features
+together" - so two capabilities riding one send are one send against it, and the next send the
+hour's twelfth, not its sixth.
 """
 from __future__ import annotations
+
+import math
 
 from codex_auto_resume.domain.plug import Point
 
@@ -26,6 +34,19 @@ CHANNELS = frozenset({Point.SENDER, Point.UNLOADED})
 # How far apart a unit's time and a claim's may be and still be the one claim: a unit is spent at the
 # very time the claim writes, so they are equal, and this only absorbs a float's round trip.
 SAME_CLAIM = 0.001
+# How the units of one claim are told from another claim's, for the hourly ceiling, which counts sends:
+# a claim writes its units together, under its one standard record and at its one time, so they group by
+# (record, time) - on the stored numbers themselves, never on text of them, which would make two claims a
+# ten-millionth of a second apart one. A unit with no standard record is a record of this edition's own,
+# which one capability alone pays for, so there each unit stands for its own claim (its spend id groups
+# it alone). And the claim asking tells `counts` the units it has written itself, by their spend ids: its
+# own units are the send it is paying for, not a send before it, and that is exact where a time and a
+# record cannot be - two claims of the one record at the one reading of the clock are two sends.
+# Nor do two claims ever share a group (v0.6.17): a claim whose record already has units at its reading of the
+# clock writes its own at the next float above it that none has (`claim_time`), so the hour counts each claim
+# once without a column of its own - a file v0.6.16 reads as its own. Units v0.6.16 wrote are grouped as they were.
+CLAIM_GROUPS = ("SELECT count(*) FROM (SELECT 1 FROM %s.spend WHERE at>?%s GROUP BY interruption_id, at, "
+                "CASE WHEN interruption_id IS NULL THEN spend_id END)")
 
 
 def _schema(name) -> str:
@@ -34,19 +55,35 @@ def _schema(name) -> str:
     return name
 
 
+def claims_since(connection, schema, since, paid=()) -> int:
+    """How many sends the units written after `since` paid for - one for each claim. `paid` is the spend
+    ids the claim asking has written already, left out: they are its own."""
+    paid = tuple(int(one) for one in paid)
+    left = (" AND spend_id NOT IN (%s)" % ", ".join("?" for _ in paid)) if paid else ""
+    return int(connection.execute(CLAIM_GROUPS % (_schema(schema), left),
+                                  (since, *paid)).fetchone()[0])
+
+
 class SpendMixin:
     @staticmethod
-    def counts(connection, schema, capability, thread_id, now) -> dict:
-        """What this capability has spent in the last day, overall and in this conversation, and
-        what every capability together has spent in the last hour."""
+    def counts(connection, schema, capability, thread_id, now, paid=()) -> dict:
+        """What this capability has spent in the last day, overall and in this conversation - one for
+        each unit - and how many sends every capability together has paid for in the last hour.
+
+        `paid` is the spend ids the claim asking has written already (ledger.py). They are left out of
+        that hour: the capabilities that ride one send pay a unit each, inside the one claim, and each
+        must see the hour the first of them saw, or the send that reaches the ceiling with the next
+        unit is the one held (v0.6.17)."""
         schema = _schema(schema)
         day, hour = now - DAY, now - HOUR
         row = connection.execute(
-            "SELECT coalesce(sum(capability=? AND at>?), 0) AS capability_day, "
-            "coalesce(sum(capability=? AND thread_id=? AND at>?), 0) AS conversation_day, "
-            "coalesce(sum(at>?), 0) AS global_hour FROM %s.spend WHERE at>?" % schema,
-            (capability, day, capability, thread_id, day, hour, min(day, hour))).fetchone()
-        return {name: int(row[name]) for name in ("capability_day", "conversation_day", "global_hour")}
+            ("SELECT coalesce(sum(capability=? AND at>?), 0) AS capability_day, "
+             "coalesce(sum(capability=? AND thread_id=? AND at>?), 0) AS conversation_day "
+             "FROM %s.spend WHERE at>?") % schema,
+            (capability, day, capability, thread_id, day, min(day, hour))).fetchone()
+        found = {name: int(row[name]) for name in ("capability_day", "conversation_day")}
+        found["global_hour"] = claims_since(connection, schema, hour, paid)
+        return found
 
     def spent(self, capability, thread_id, now=None) -> dict:
         """`counts` on this file's own connection, for a look before the claim. No file, no spend."""
@@ -56,8 +93,25 @@ class SpendMixin:
                 return {"capability_day": 0, "conversation_day": 0, "global_hour": 0}
             return self.counts(connection, "main", capability, thread_id, now)
 
-    def record_spend(self, connection, schema, capability, thread_id, interruption_id, now) -> None:
-        """One unit, inside the caller's transaction. Pruned now and then, never inside a day."""
+    @staticmethod
+    def claim_time(connection, schema, interruption_id, now) -> float:
+        """The time one claim writes its units at, inside the caller's transaction: `now`, or - where units of
+        standard record `interruption_id` already stand at it, another claim's at the same reading of the clock -
+        the next float above it that none of the record's units has. Each claim is a group of its own for the hour
+        (`CLAIM_GROUPS`), and a step of a float's last bit is far inside `SAME_CLAIM`, so the units still name the
+        claim they paid for. A unit with no standard record groups by its spend id already."""
+        schema = _schema(schema)
+        at = _timestamp(now, "time")
+        if interruption_id is None:
+            return at
+        while connection.execute("SELECT 1 FROM %s.spend WHERE interruption_id=? AND at=?" % schema,
+                                 (interruption_id, at)).fetchone() is not None:
+            at = math.nextafter(at, math.inf)
+        return at
+
+    def record_spend(self, connection, schema, capability, thread_id, interruption_id, now) -> int:
+        """One unit, inside the caller's transaction. Pruned now and then, never inside a day. Its spend
+        id, which the claim that wrote it hands back to `counts` as one of its own."""
         schema = _schema(schema)
         if self.registry.get(capability) is None:
             raise StateError("unknown capability")
@@ -67,8 +121,10 @@ class SpendMixin:
         now = _timestamp(now, "time")
         connection.execute("INSERT INTO %s.spend (at, capability, thread_id, interruption_id) "
                            "VALUES (?,?,?,?)" % schema, (now, capability, thread_id, interruption_id))
-        if prune_every(connection.execute("SELECT last_insert_rowid()").fetchone()[0]):
+        spend_id = int(connection.execute("SELECT last_insert_rowid()").fetchone()[0])
+        if prune_every(spend_id):
             self._prune_spend(connection, schema, now)
+        return spend_id
 
     def spends_since(self, capability, since) -> dict:
         """{interruption id: the times of the units a capability spent on it} since `since`, from

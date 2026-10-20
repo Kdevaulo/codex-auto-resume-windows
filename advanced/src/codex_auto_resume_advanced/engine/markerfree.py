@@ -23,18 +23,37 @@ holds one of `codex queue`'s; the tripwire for a paid send that went unknown tur
 off (arming.py). Only a failure before anything was asked of Codex - no app server could be
 started, or the words are not ones core would send - is "not started", which core may retry.
 
+It answers for every send (v0.6.17, issue #42). A continuation queued for when its conversation is opened (P16's
+QUEUE_FOR_OPEN) it carries too - with no marker, under its client id, left in the queue for the person to open - only
+where MQO passed for the Codex in force: that such an item, taken when the conversation is opened, is found in
+Codex's history by its client id, which is how core proves this delivery (`carries`). Unmeasured or failed, and for
+a continuation sent to another Codex session (TO_SESSION), which MQO does not cover, it stands aside for that send:
+core's backend carries it with its marker, and the runtime journals it as overruled, naming queue_for_open or
+other_sessions and why (runtime.CONFLICTS). Every other send - a conversation the app holds - it serves as before.
+
+Beside Continue with no words (v0.6.17, #47 P-6) it serves the sends that carry words, and that capability the routes:
+core asks a route's P15 with the record saying `route`, where only SILENT is taken (runtime._takes), so this answer is
+passed over there - a turn with no words carries no marker either.
+
+Beside Several conversations at once (v0.6.17, #47 P-7) its sends may wait for their receipts on workers, each add in a
+session of its own under its own client id (`pools`), where MQP passed on the Codex in force: that several such adds at
+once are each accepted and each lands only in its own conversation. Unmeasured or failed, its sends go one at a time,
+as before, and the runtime journals parallel_dispatch as overruled for them and why.
+
 No test opens a real Codex: the tests give the channel a session over a fake app server, and the
 live session is opened only by a watcher that has this capability armed.
 """
 from __future__ import annotations
 
 from contextlib import nullcontext
+import uuid
 
 from codex_auto_resume.domain import ids
 from codex_auto_resume.domain.plug import Alternative
 
 from ..codex import inuse
 from ..codex.protocol import Session, SessionRefused
+from ..vocabulary import ArmingWarning, Measurement
 
 CAPABILITY = "marker_free_continuation"
 METHOD = "thread/queue/add"
@@ -68,15 +87,52 @@ class MarkerFreeContinuation:
     `session` is a factory for the app-server session the one call is made in; None opens a live
     one against the Codex the watcher drives (codex/inuse.py), restricted to this capability's one
     method (codex/protocol.CAPABILITY_METHODS)."""
-    __slots__ = ("paths", "_open")
+    __slots__ = ("paths", "_open", "_scoped")
 
     def __init__(self, paths, *, session=None):
         self.paths = paths
         self._open = session
+        self._scoped = None
+
+    def bind(self, scoped):
+        """Its view of the state (state.Scoped): here, only whether a measurement passed or failed on the Codex in
+        force."""
+        self._scoped = scoped
+
+    def carries(self, word):
+        """Whether it can carry its send together with the P16 answer `word` taken for the same record (v0.6.17,
+        runtime.CONFLICTS): True for QUEUE_FOR_OPEN where MQO passed on the Codex in force; otherwise why not, as the
+        statement's warning words say it - MQO failed, or not measured (TO_SESSION: no measurement covers it)."""
+        scoped = self._scoped
+        if word == Alternative.QUEUE_FOR_OPEN and scoped is not None:
+            try:
+                if scoped.passed(Measurement.MQO):
+                    return True
+                if scoped.failed(Measurement.MQO):
+                    return ArmingWarning.MEASUREMENT_FAILED
+            except Exception:
+                pass
+        return ArmingWarning.UNMEASURED
 
     def sender(self, record, backend):
         """P5: this object is the channel. `backend` is core's stand-in, never core's backend."""
         return self
+
+    def pools(self):
+        """Whether its send may wait for its receipt on a worker beside others (core's plughands.Channel, P12;
+        v0.6.17): True where MQP passed on the Codex in force - each send opens a session of its own (`_session`),
+        as MQP's adds did; otherwise why not, as the statement's warning words say it - MQP failed, or not
+        measured."""
+        scoped = self._scoped
+        if scoped is not None:
+            try:
+                if scoped.passed(Measurement.MQP):
+                    return True
+                if scoped.failed(Measurement.MQP):
+                    return ArmingWarning.MEASUREMENT_FAILED
+            except Exception:
+                pass
+        return ArmingWarning.UNMEASURED
 
     def delivery(self, record):
         """P15: no marker; core derives the client id and proves delivery by it."""
@@ -88,15 +144,15 @@ class MarkerFreeContinuation:
         not started. Never raises.
 
         Without a client id - core sends the marker through a channel only when P15 was not
-        taken for this send - the item is added with no id, and the marker in the words is what
-        proves it, as it always was."""
+        taken for this send - the item is added under a fresh id of its own, and the marker in the
+        words is what proves it, as it always was: codex-cli 0.163.0-alpha.10.2's schema makes
+        `clientUserMessageId` required on thread/queue/add, and an add without it is refused (#49)."""
         if (not ids.is_uuid(thread_id) or not isinstance(prompt, str) or not prompt
                 or len(prompt) > MAX_PROMPT or "\0" in prompt
                 or not (client_id is None or ids.is_uuid(client_id))):
             return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
-        params = {"threadId": thread_id, "input": [{"type": "text", "text": prompt}]}
-        if client_id is not None:
-            params["clientUserMessageId"] = client_id
+        params = {"threadId": thread_id, "input": [{"type": "text", "text": prompt}],
+                  "clientUserMessageId": client_id or str(uuid.uuid4())}
         session, opened = None, False
         try:
             with launch_guard if launch_guard is not None else nullcontext(True) as permitted:

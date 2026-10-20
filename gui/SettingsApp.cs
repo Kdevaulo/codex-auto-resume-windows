@@ -276,6 +276,7 @@ namespace CodexAutoResume
         // resolved for, the theme it draws and, since v0.6.10, the design it draws (Design.Drawn) - against
         // what is stored: the Interface language, Theme preference and Design as last read or saved.
         private string openedLanguage, openedTheme, openedDesign, storedLanguage, storedTheme, storedDesign;
+        private string wordsLanguage;
         private bool settingsRead, readingSettings, reopening, recheck;
         private long settingsStamp;
         // The language, theme and design a reopen on its way is for; and the three a new window was last started
@@ -374,6 +375,8 @@ namespace CodexAutoResume
             strings = (Dictionary<string, object>)reply["strings"];
             // The Interface language these words were resolved for, as the settings stored it.
             openedLanguage = Get(reply, "preference") as string;
+            // The language the words are in, whose face the window is set in (Typeface.ForLanguage, v0.6.17).
+            wordsLanguage = Get(reply, "language") as string;
             object names, system;
             if (reply.TryGetValue("endonyms", out names) && names is Dictionary<string, object>)
                 endonyms = (Dictionary<string, object>)names;
@@ -563,8 +566,9 @@ namespace CodexAutoResume
             }
             // v0.6.11: in a language whose letters Windows' UI font does not all have, and Segoe UI does - Vietnamese
             // on a Korean Windows - the window is set in Segoe UI, as the popup, the card and the panel are (Typeface).
+            // v0.6.17: Korean, Japanese and Chinese in the face Windows sets each in, where this machine has it.
             // Before anything is built, so every role's font is a variant of it.
-            Font whole = Typeface.For(Font, strings);
+            Font whole = Typeface.ForLanguage(Font, strings, wordsLanguage);
             if (!ReferenceEquals(whole, Font))
             {
                 Font = whole;
@@ -1076,6 +1080,16 @@ namespace CodexAutoResume
             if (renderJob != null) return SettingsForm.RenderFrames(renderJob);
 
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+            // v0.6.17: opened inside another app's private view of Windows - from the tray of a watcher the Codex app
+            // started - Repair, an update and another version would register this installation where Windows never
+            // looks (HostApp). The window opens again outside, once (HostApp.Outside), and this one ends; where it
+            // cannot, it stays and refuses those three (HostApp.StuckInside). A capture's window stays where it was
+            // started.
+            string inside = Soft.StillReady == null ? HostApp.Inside() : null;
+            if (inside != null && !HostApp.Relaunched(argv) &&
+                HostApp.Relaunch(Application.ExecutablePath, HostApp.Arguments(argv), root))
+                return 0;
+            HostApp.StuckInside = inside;
             var bridge = new Bridge(root);
             if (!bridge.Available)
             {
@@ -1105,7 +1119,11 @@ namespace CodexAutoResume
             double text = TextScale.Read();
             SettingsForm.AdoptTextSize(text, TextScale.Fitting(text, Screen.FromPoint(Cursor.Position).WorkingArea.Size,
                                                                SettingsForm.DpiScale));
-            Application.Run(new SettingsForm(new PersistentBridge(root, bridge)));
+            var window = new SettingsForm(new PersistentBridge(root, bridge));
+            // A window a person opened comes to the front - after Finish, and opened again outside (v0.6.17); a window
+            // that reopens itself, and a capture's, keep their place.
+            if (request.Generation == 0 && Soft.StillReady == null) HostApp.BringToFront(window);
+            Application.Run(window);
             return 0;
         }
     }

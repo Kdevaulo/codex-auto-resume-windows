@@ -255,6 +255,9 @@ namespace CodexAutoResume
             arguments.Add("--reopened=" + Math.Max(1, Math.Min(9, generation)).ToString(CultureInfo.InvariantCulture));
             if (IsFocusName(focus)) arguments.Add("--focus=" + focus);
             ReopenArgumentsWritten(page, focus, arguments);
+            // A window that could not get out of another app's view (v0.6.17): the new one stays where it is too, and
+            // knows it - it does not try again in the middle of a reopen.
+            if (HostApp.StuckInside != null) arguments.Add(HostApp.Outside);
             return string.Join(" ", arguments.ToArray());
         }
 

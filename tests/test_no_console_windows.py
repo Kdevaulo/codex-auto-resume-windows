@@ -511,8 +511,9 @@ class WindowStartTests(unittest.TestCase):
         ("gui/DashboardMaintenance.cs", '"explorer.exe"'):
             "File Explorer on the logs folder the person asked to open, through the shell",
         # v0.6.16, the installer window's three.
-        ("gui/DashboardMaintenance.cs", "exe"):
-            "the installation's new Dashboard after an update, CodexAutoResumeSettings.exe, built /target:winexe",
+        # v0.6.17: the Dashboard after Finish and after an update, started in front from one place.
+        ("gui/HostApp.cs", "exe"):
+            "the installation's Dashboard after Finish or an update, CodexAutoResumeSettings.exe, built /target:winexe",
         ("gui/SettingsRemove.cs", "copy"):
             "the window's own copy in the temporary folder, which shows the uninstall: the same /target:winexe program",
         ("gui/InstallerWindow.cs", "Guide"):
@@ -677,9 +678,10 @@ class SetupStartTests(unittest.TestCase):
             with self.subTest(other):
                 self.assertNotIn(other, self.source + self.window)
         self.assertIsNone(re.search(r"(?<!Use)ShellExecute", self.source + self.window))
-        # The Dashboard, a Windows program, by its full path in the installation it has just made.
-        self.assertEqual(len(re.findall(r"\bProcess\.Start\(", self.window)), 1)
-        self.assertIn("start.UseShellExecute = false;", self.window)
+        # The Dashboard, a Windows program, by its full path in the installation it has just made - started in front
+        # by HostApp.StartInFront since v0.6.17, which WindowStartTests holds to UseShellExecute false.
+        self.assertEqual(len(re.findall(r"\bProcess\.Start\(", self.window)), 0)
+        self.assertIn("HostApp.StartInFront(exe, null, home);", self.window)
 
     def test_its_build_gets_no_window(self):
         self.assertIn('NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)', self.builder)

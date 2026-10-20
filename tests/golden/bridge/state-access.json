@@ -20,6 +20,16 @@
           "access": "shared"
         }
       }
+    },
+    {
+      "case": "Codex's sandbox group reads it",
+      "argument": null,
+      "reply": {
+        "ok": true,
+        "result": {
+          "access": "codex_sandbox"
+        }
+      }
     }
   ]
 }

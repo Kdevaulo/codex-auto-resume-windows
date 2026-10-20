@@ -27,6 +27,7 @@ from codex_auto_resume_advanced import arming  # noqa: E402
 from codex_auto_resume_advanced import ledger as ledger_module  # noqa: E402
 from codex_auto_resume_advanced.registry import Ceilings  # noqa: E402
 from codex_auto_resume_advanced.state import ATTACHED, StateError  # noqa: E402
+from codex_auto_resume_advanced.state.spend import SAME_CLAIM  # noqa: E402
 from codex_auto_resume_advanced.vocabulary import Actor, ArmingState, RecordState  # noqa: E402
 from test_engine import T1, TURN_A  # noqa: E402
 from test_plug_points import POLL, PluggedCase  # noqa: E402
@@ -39,32 +40,36 @@ class LedgerCase(PluggedCase):
     made first, so it is cleaned up last: core's connection holds the advanced file attached
     until the harness closes it."""
 
+    #: Capabilities beside the tests' own that this case's registry and catalogs hold.
+    EXTRA = ()
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.where = Path(temporary.name)
         self.paths = config.Paths(self.where / "home")
-        self.catalogs = ac.catalogs(self.where, ac.definition())
+        self.catalogs = ac.catalogs(self.where, ac.definition(), *self.EXTRA)
         super().setUp()
 
     def advanced(self, h=None, *, home="home", **changes):
-        """An advanced plug for harness `h`, on the harness's clock, with the tests' capability,
-        in the advanced home named `home`."""
+        """An advanced plug for harness `h`, on the harness's clock, with the tests' capability
+        (and this case's `EXTRA` ones), in the advanced home named `home`."""
         h = h or self.h
         made = ac.advanced.AdvancedPlug(
-            config.Paths(self.where / home), registry=ac.Registry((ac.definition(**changes),)), clock=lambda: h.now,
+            config.Paths(self.where / home), registry=ac.Registry((ac.definition(**changes), *self.EXTRA)),
+            clock=lambda: h.now,
             policy=lambda: ac.policy.NONE, view=lambda: ac.view(), catalogs=self.catalogs)
         self.addCleanup(lambda: made._runtime and made._runtime.state.close())
         return made
 
-    def arm(self, plug, state="armed"):
+    def arm(self, plug, state="armed", capability="test_wake"):
         runtime = plug.runtime
-        result = runtime.arming.arm("test_wake", state=state, revision=1,
+        result = runtime.arming.arm(capability, state=state, revision=1,
                                     generation=runtime.state.meta()["generation"],
                                     acknowledged_version=ac.ENGINE, actor=Actor.DASHBOARD)
         self.assertTrue(result["done"], result)
         runtime.states(fresh=True)
-        return ac.code_of(runtime)
+        return ac.code_of(runtime, capability)
 
     def spends(self, plug):
         with contextlib.closing(sqlite3.connect(plug.runtime.state.path)) as connection:
@@ -365,6 +370,164 @@ class SpendTests(LedgerCase):
         self.assert_no_send()
         self.assertEqual(self.h.record()["state"], "waiting_retry")
         self.assertEqual(len(self.spends(plug)), 1, "the claim was granted, then given back: spent")
+
+
+class GlobalHourTests(LedgerCase):
+    """The global hourly ceiling counts sends, not the capabilities that rode them (v0.6.17, P-9).
+
+    A person is told it in sends - "Sends an hour, all advanced features together", twelve by default -
+    so with two capabilities answering for one send it used to leave six, and the second capability of
+    the seventh send was passed over at the ceiling: its answer dropped, core going its own way."""
+
+    CEILINGS = Ceilings(per_day=40, per_conversation=5)
+
+    def setUp(self):
+        self.second = ac.definition(id="test_nap", journal_prefix="tn", ceilings=self.CEILINGS)
+        self.EXTRA = (self.second,)
+        super().setUp()
+
+    def two_on(self):
+        """A plug with both capabilities armed, neither near a day or a conversation ceiling."""
+        plug = self.advanced(ceilings=self.CEILINGS)
+        for capability in ("test_wake", "test_nap"):
+            self.arm(plug, capability=capability)
+        return plug
+
+    def send(self, plug, number, at, *acted, thread=None):
+        """One claim of core's for a standard record, carrying the answers of `acted` - both capabilities
+        where none is named - as core makes it: everything the ledger wrote is taken back where it holds
+        (store/ledger.py). Each send is its own conversation unless `thread` says otherwise, so only the
+        hourly ceiling binds."""
+        acted = acted or ("test_wake", "test_nap")
+        self.h.now = at
+        record = {"interruption_id": self.key(number), "thread_id": thread or self.thread(number)}
+        with self.h.store._transaction() as connection:
+            connection.execute("SAVEPOINT one_claim")
+            answer = plug.runtime.ledger.claim(connection, record, at, dict.fromkeys(acted, frozenset()))
+            connection.execute("ROLLBACK TO one_claim" if answer is Alternative.HOLD else "RELEASE one_claim")
+        return answer
+
+    @staticmethod
+    def key(number) -> str:
+        return "%064x" % number
+
+    @staticmethod
+    def thread(number) -> str:
+        return "0a1b2c3d-0001-7000-8000-%012d" % (number + 100)
+
+    def test_one_send_two_capabilities_ride_is_one_of_the_sends_an_hour_a_person_is_told_of(self):
+        plug = self.two_on()
+        state = plug.runtime.state
+        self.assertEqual(state.meta()["global_hourly"], 12, "what the page says: sends an hour, all together")
+        base = self.h.now
+        for number in range(12):
+            self.assertIs(self.send(plug, number, base + number), DEFER, "send %d" % number)
+        self.assertIs(self.send(plug, 12, base + 12), Alternative.HOLD, "the thirteenth send")
+        self.assertEqual(len(self.spends(plug)), 24, "two capabilities paid for each of the twelve sends")
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 12)
+
+    def test_each_capability_still_counts_its_own_units_by_day_and_by_conversation(self):
+        plug = self.two_on()
+        state = plug.runtime.state
+        base = self.h.now
+        for number in range(3):
+            self.assertIs(self.send(plug, number, base + number, thread=ac.THREAD), DEFER)
+        for capability in ("test_wake", "test_nap"):
+            counts = state.spent(capability, ac.THREAD)
+            self.assertEqual((counts["capability_day"], counts["conversation_day"]), (3, 3), capability)
+            self.assertEqual(counts["global_hour"], 3, "three sends, six units")
+        self.assertEqual(state.spent("test_wake", ac.OTHER_THREAD)["conversation_day"], 0)
+
+    def test_a_second_send_of_one_record_is_a_second_send_against_the_hour(self):
+        """What a resend costs is what it cost before: the one record claimed again, later, is another
+        send - only the capabilities inside one claim are one."""
+        plug = self.two_on()
+        state = plug.runtime.state
+        base = self.h.now
+        self.assertIs(self.send(plug, 1, base, thread=ac.THREAD), DEFER)
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 1)
+        self.assertIs(self.send(plug, 1, base + 30, thread=ac.THREAD), DEFER)
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 2)
+        self.assertEqual(len(self.spends(plug)), 4)
+
+    def test_a_send_one_capability_rides_counts_as_it_did(self):
+        # A guard for behaviour this change leaves alone, not a proof of it: it passes with the fix reverted.
+        plug = self.two_on()
+        base = self.h.now
+        for number in range(12):
+            self.assertIs(self.send(plug, number, base + number, "test_wake"), DEFER)
+        self.assertIs(self.send(plug, 12, base + 12, "test_wake"), Alternative.HOLD)
+        self.assertEqual(len(self.spends(plug)), 12)
+
+    def test_one_record_claimed_twice_at_one_reading_of_the_clock_is_two_sends(self):
+        """Two claims of the one record at the identical time are two sends, though their units bear the
+        one record and the one time: what a claim leaves out of its hour is the units it wrote itself."""
+        plug = self.two_on()
+        base = self.h.now
+        for number in range(11):
+            self.assertIs(self.send(plug, number, base + number), DEFER)
+        self.assertIs(self.send(plug, 99, base + 11), DEFER, "the twelfth send")
+        self.assertIs(self.send(plug, 99, base + 11), Alternative.HOLD, "the thirteenth, at the same time")
+
+    def test_two_claims_of_one_record_at_one_reading_both_granted_are_two_sends_in_the_hour(self):
+        """Two claims of the one record at a bit-identical time, both below the ceiling, used to write their units
+        under the one (record, time) and so count one send in the hour: the twelfth claim after them saw eleven and
+        one more send went than a person allowed. The second claim writes its units at the next float above the
+        first's (state/spend.claim_time), so each counts and the ceiling holds."""
+        plug = self.two_on()
+        state = plug.runtime.state
+        base = self.h.now
+        self.assertIs(self.send(plug, 99, base), DEFER, "the first claim")
+        self.assertIs(self.send(plug, 99, base), DEFER, "the second claim, at the same reading of the clock")
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 2, "two sends, though one time")
+        with contextlib.closing(sqlite3.connect(state.path)) as connection:
+            times = [row[0] for row in connection.execute("SELECT at FROM spend ORDER BY spend_id")]
+        self.assertEqual(len(times), 4, "two capabilities paid for each claim")
+        self.assertEqual(times[0], times[1], "the units of one claim stand at its one time")
+        self.assertEqual(times[2], times[3])
+        self.assertGreater(times[2], times[0], "the second claim's time is apart from the first's")
+        self.assertLessEqual(times[2] - times[0], SAME_CLAIM, "and still names the claim it paid for")
+        for number in range(10):
+            self.assertIs(self.send(plug, number, base + 1 + number), DEFER, "send %d" % (number + 3))
+        self.assertIs(self.send(plug, 50, base + 20), Alternative.HOLD, "the thirteenth send")
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 12)
+
+    def test_a_spend_table_v0616_wrote_counts_as_it_did(self):
+        # A guard for rows this change never writes, not a proof of it: it passes with the fix reverted. v0.6.16
+        # wrote every claim's units at its own time, so two claims of one record at one reading share a group.
+        plug = self.two_on()
+        state = plug.runtime.state
+        now = self.h.now
+        first, second = self.key(1), self.key(2)
+        with state._transaction() as connection:
+            for capability, key, at in (("test_wake", first, now), ("test_nap", first, now),
+                                        ("test_wake", first, now), ("test_wake", second, now + 1),
+                                        ("test_wake", None, now + 2), ("test_wake", None, now + 2)):
+                connection.execute("INSERT INTO spend (at, capability, thread_id, interruption_id) VALUES (?,?,?,?)",
+                                   (at, capability, ac.THREAD, key))
+        counts = state.spent("test_wake", ac.THREAD, now + 3)
+        self.assertEqual(counts["global_hour"], 4, "one for the first record's time, one for the second's, and one "
+                                                   "for each unit of this edition's own records")
+        self.assertEqual(counts["capability_day"], 5)
+
+    def test_the_units_of_this_editions_own_records_at_one_reading_are_the_sends_they_are(self):
+        """A record of this edition's own bears no standard record and is paid for by its one capability,
+        so each of its units is a send of its own, however many fall at one reading of the clock."""
+        plug = self.two_on()
+        state = plug.runtime.state
+        with state._transaction() as connection:
+            for _ in range(3):
+                state.record_spend(connection, "main", "test_wake", ac.THREAD, None, self.h.now)
+        self.assertEqual(state.spent("test_wake", ac.THREAD)["global_hour"], 3)
+
+    def test_the_thirteenth_send_goes_once_the_first_is_an_hour_old(self):
+        # A guard for the hour's edge, which this change leaves alone: it passes with the fix reverted.
+        plug = self.two_on()
+        base = self.h.now
+        for number in range(12):
+            self.assertIs(self.send(plug, number, base + number), DEFER)
+        self.assertIs(self.send(plug, 12, base + 12), Alternative.HOLD)
+        self.assertIs(self.send(plug, 12, base + 3600), DEFER, "the first send is an hour old")
 
 
 class ChannelTests(LedgerCase):

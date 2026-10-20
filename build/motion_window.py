@@ -36,25 +36,35 @@ import motion_plan  # noqa: E402
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 CSC = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Microsoft.NET" / "Framework64" / "v4.0.30319" / "csc.exe"
 # Reads the pictured pages make beyond the envelope's: the power action's card on Settings > General, and the
-# Diagnostics page's State folder and its plugin copy.
-EXTRA_READS = (("power-action", None), ("state-access", None), ("plugin-copy", None))
+# Diagnostics page's State folder, its plugin copy and (v0.6.17) whether the watcher runs inside another app.
+EXTRA_READS = (("power-action", None), ("state-access", None), ("plugin-copy", None), ("host-app", None))
 # How many lines a turn of the wheel scrolls in a picture (WindowRender.RenderWheelLines): Windows' default.
 WHEEL_LINES = 3
 # The longest a render job may take, in seconds.
 RENDER_LIMIT = 30 * 60
 
 
+def _said(raw: bytes) -> str:
+    """What csc wrote, as text, as build/make_setup.py reads it: UTF-8 when it is, else the console's code page (csc
+    writes cp949 on a Korean Windows), never raising - a compile error's message is what this exists to show."""
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("mbcs" if os.name == "nt" else "latin-1", errors="replace")
+
+
 def compile_window(folder: Path) -> Path:
     """The window built from the working tree into `folder`, with its manifest (DPI awareness) as the release has it."""
     import make_screenshots
+    Path(folder).mkdir(parents=True, exist_ok=True)
     exe = Path(folder) / "CodexAutoResumeSettings.exe"
     arguments = [str(CSC), "/nologo", "/target:winexe", "/platform:x64", "/optimize+", "/out:" + str(exe),
                  "/win32manifest:" + str(ROOT / "gui" / "app.manifest"),
                  "/reference:System.dll", "/reference:System.Drawing.dll", "/reference:System.Windows.Forms.dll"]
     arguments += [str(ROOT / name) for name in make_screenshots.window_sources()]
-    done = subprocess.run(arguments, capture_output=True, text=True, timeout=600, creationflags=NO_WINDOW)
+    done = subprocess.run(arguments, capture_output=True, timeout=600, creationflags=NO_WINDOW)
     if done.returncode != 0 or not exe.is_file():
-        raise RuntimeError("the window did not compile:\n" + (done.stdout or "") + (done.stderr or ""))
+        raise RuntimeError("the window did not compile:\n" + _said(done.stdout or b"") + _said(done.stderr or b""))
     return exe
 
 

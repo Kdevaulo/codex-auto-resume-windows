@@ -56,7 +56,8 @@ Everyone below is a person outside the project who helped it, in the order they 
   and resume ([#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
 - [@Zephreo](https://github.com/Zephreo) suggested resuming a goal that was running ([#36](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/36)).
 - [@Kdevaulo](https://github.com/Kdevaulo) reported a terminal conversation continued in the Codex Desktop that
-  was left out of recovery ([#37](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/37)) and an update status that misled when GitHub could not be reached ([#41](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/41)).
+  was left out of recovery ([#37](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/37)) and an update status that misled when GitHub could not be reached ([#41](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/41)),
+  and sent the fix that resumes a goal after a usage-limit reset ([#49](https://github.com/songyb111-gachon/codex-auto-resume-windows/pull/49)).
 - [@weng-wen-jun](https://github.com/weng-wen-jun) asked for a manual rescan that reconciles obsolete
   pending recoveries ([#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)).
 

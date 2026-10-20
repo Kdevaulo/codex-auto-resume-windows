@@ -359,6 +359,7 @@ namespace CodexAutoResume
             if (compatOverall == null || loadingCompat || auditing) return;
             LoadPluginCopy();
             LoadStateAccess();
+            LoadHostApp();
             loadingCompat = true;
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {

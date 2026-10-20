@@ -181,7 +181,7 @@ namespace CodexAutoResume
         private void Adopt(InstallerWords next)
         {
             words = next;
-            Font = Typeface.For(baseFont, words.Catalog);
+            Font = Typeface.ForLanguage(baseFont, words.Catalog, words.Language);
             Soft.BaseFont = Font;
             title.Font = Soft.RoleFont("display");
             version.Font = Font;
@@ -313,8 +313,7 @@ namespace CodexAutoResume
                                                             ? words.Say("installer.update", "Update")
                                                             : words.Say("action.install", "Install"))
                          : words.Say("installer.next", "Next");
-            light.State = name == InstallerFlow.Progress ? "checking"
-                        : name == InstallerFlow.Finish ? (code == 0 ? "monitoring" : "failed") : "idle";
+            light.State = InstallerFlow.Light(flow.Mode, name, code, unconfirmed, previousRunning);
             PerformLayout();
             if (forwardShown && forward.Enabled) ActiveControl = forward;
         }
@@ -446,6 +445,17 @@ namespace CodexAutoResume
             Row(Words(words.Say("installer.options.plugin", "The plugin - its panel and its skill - is added to Codex as part of every installation."), null, Palette.Secondary), 16);
             // An update says what it updates to, as the Dashboard's does (BuildNotes).
             if (flow.Upgrade && !flow.EditionChange && flow.NotesText != null) WhatsNew(16);
+            InsideNote(16);
+        }
+
+        /// v0.6.17: a setup program that could not get out of another app's private view of Windows
+        /// (HostApp.StuckInside) says, before it installs or removes anything, what Windows would keep inside that app.
+        private void InsideNote(int gap)
+        {
+            if (HostApp.StuckInside == null) return;
+            Row(new SoftCallout(words.Say("installer.inside_app",
+                "This may have been started from inside {app}. If so, Windows would keep what it sets up or removes inside that app: the entry in Settings > Apps, the start at sign-in, the notifications' name, the link handler and the Start menu entry. If Settings > Apps lacks the entry afterwards, open the Dashboard from the Start menu and choose Repair installation.",
+                "app", HostApp.Name(HostApp.StuckInside))), gap);
         }
 
         /// A setup program over its own version, installed already (v0.6.16, the owner): Repair - install it again in
@@ -460,6 +470,7 @@ namespace CodexAutoResume
                     words.Say("installer.maintain.repair_help", "Installs this version again in place. Your settings, everything waiting and your sign-in choice are kept.")), 16);
             Row(Way(true, words.Say("installer.remove", "Remove"),
                     words.Say("installer.maintain.remove_help", "Removes Codex Auto Resume from this PC. Next, you choose whether the settings and the recovery history go too.")), 8);
+            InsideNote(16);
         }
 
         /// One of the Maintain page's two ways, chosen when it is the flow's own.
@@ -489,6 +500,7 @@ namespace CodexAutoResume
             Row(Words(flow.Home, null, Palette.Ink), 2);
             Row(Choice(words.Say("installer.uninstall.purge", "Also delete the settings and the recovery history"), flow.Purge, true,
                        delegate(bool on) { flow.Purge = on; }), 16);
+            InsideNote(16);
         }
 
         private void BuildProgress()
@@ -765,6 +777,24 @@ namespace CodexAutoResume
         {
             answered.Set();
             base.OnFormClosed(e);
+        }
+
+        /// A window build/capture_window.ps1 started is never made the foreground window, as the Dashboard's is not
+        /// (SettingsForm.ShowWithoutActivation): the capture reads the caption back and refuses an active one. A
+        /// person's window is never given a capture's event, and opens as always.
+        protected override bool ShowWithoutActivation
+        {
+            get { return Soft.StillReady != null || base.ShowWithoutActivation; }
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams created = base.CreateParams;
+                if (Soft.StillReady != null) created.ExStyle |= 0x08000000;          // WS_EX_NOACTIVATE
+                return created;
+            }
         }
 
         /// Every control on the page that is shown, for the layout audit.

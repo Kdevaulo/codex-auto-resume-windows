@@ -51,6 +51,258 @@ function Ok   { param([string]$m) Write-Host ('  [ok] ' + $m) }
 function Warn { param([string]$m) Write-Host ('  [!]  ' + $m) -ForegroundColor Yellow }
 function Fail { param([string]$m) Write-Host ('  [x]  ' + $m) -ForegroundColor Red; $script:Failed = $true }
 
+# ----------------------------------------------------------------------- inside another app (v0.6.17)
+# A process descended from an MSIX app - the Codex app (OpenAI.Codex), Claude desktop - writes HKCU and %APPDATA%
+# into that app's private view, which Windows itself never reads (measured 2026-10-19). Run by an agent inside one
+# of them, this installer would put the entry in Settings > Apps, the Run value, the notifications' identity, the
+# link handler and the Start menu shortcut where Windows never looks. Nothing in this process tells - not its
+# package, token or job - but a live ancestor with package identity does, walked parent by parent with a
+# creation-time guard against a reused process id; gui/HostApp.cs makes the same decision for the Dashboard and the
+# setup programs. Inside, this script runs again outside through WMI's Win32_Process.Create - the WMI service
+# creates the process, with this run's environment and parameters and CODEX_AUTO_RESUME_OUTSIDE=1, which stops a
+# second relaunch - passes on what that run prints as it prints it, and ends with its exit code. Where it cannot
+# get out, it carries on and says once what will stay inside the app.
+
+# >>> the outside gate: the same text in scripts/bootstrap.ps1, which runs the installation's setup itself in its
+# repair branch. Both scripts ship in every archive but neither can find the other from every place it runs (the kept
+# uninstaller, Codex's plugin copy), so each carries it, and tests/test_host_app.py holds the two copies equal.
+# Opens a process for limited query: its creation time (FILETIME; 0 where it cannot be opened) and its package
+# family name (null without package identity).
+$script:HostAppSource = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+namespace CodexAutoResumeInstall
+{
+    public static class HostApp
+    {
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        static extern IntPtr OpenProcess(uint access, bool inherit, int process);
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool GetProcessTimes(IntPtr process, out long created, out long exited, out long kernel, out long user);
+        [DllImport("kernel32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        static extern int GetPackageFamilyName(IntPtr process, ref uint length, StringBuilder name);
+        [DllImport("kernel32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        static extern int GetCurrentPackageFamilyName(ref uint length, StringBuilder name);
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool CloseHandle(IntPtr handle);
+
+        public static long Open(int id, bool self, out string package)
+        {
+            package = null;
+            IntPtr handle = OpenProcess(0x1000, false, id);
+            if (handle == IntPtr.Zero) return 0;
+            try
+            {
+                long created, exited, kernel, user;
+                if (!GetProcessTimes(handle, out created, out exited, out kernel, out user)) return 0;
+                var name = new StringBuilder(256);
+                uint length = (uint)name.Capacity;
+                int answer = self ? GetCurrentPackageFamilyName(ref length, name) : GetPackageFamilyName(handle, ref length, name);
+                if (answer == 0 && name.Length > 0) package = name.ToString();
+                return created;
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
+        }
+    }
+}
+'@
+
+function Find-PackagedAncestor {
+    <#
+        The package family name of this process, or of its nearest live ancestor that has one, or $null: the
+        decision over a process table, `$Table[pid] = @{ Parent; Created; Package }`. The walk stops - outside -
+        where a parent is not in the table or could not be opened (Created 0), where a parent was created after its
+        child (its id was reused), on a cycle, and after 32 steps. Pure, so a test can feed it a table of its own.
+    #>
+    param([hashtable]$Table, [int]$Self)
+    $row = $Table[$Self]
+    if ($null -eq $row) { return $null }
+    if ($row.Package) { return [string]$row.Package }
+    $seen = @{ $Self = $true }
+    for ($step = 0; $step -lt 32; $step++) {
+        $id = [int]$row.Parent
+        $parent = $Table[$id]
+        if ($null -eq $parent -or -not $parent.Created) { return $null }
+        if ($seen.ContainsKey($id)) { return $null }
+        $seen[$id] = $true
+        if ([long]$parent.Created -gt [long]$row.Created) { return $null }
+        if ($parent.Package) { return [string]$parent.Package }
+        $row = $parent
+    }
+    return $null
+}
+
+function Get-ProcessTable {
+    # This process and its ancestors as far as the walk can go, for Find-PackagedAncestor.
+    param([int]$Self)
+    Add-Type -TypeDefinition $script:HostAppSource -ErrorAction Stop
+    $parents = @{}
+    foreach ($process in @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId -ErrorAction Stop)) {
+        $parents[[int]$process.ProcessId] = [int]$process.ParentProcessId
+    }
+    $table = @{}
+    $id = $Self
+    for ($step = 0; $step -le 33 -and $parents.ContainsKey($id) -and -not $table.ContainsKey($id); $step++) {
+        $package = $null
+        $created = [CodexAutoResumeInstall.HostApp]::Open($id, ($id -eq $Self), [ref]$package)
+        $table[$id] = @{ Parent = $parents[$id]; Created = $created; Package = $package }
+        if (-not $created) { break }
+        $id = $parents[$id]
+    }
+    return $table
+}
+
+function Get-OutsideSource {
+    <#
+        What the run outside executes: $Script - a script or a program - by its full path with this run's switches
+        and values, then $Arguments as they are, everything it prints appended line by line to $Log as it prints it,
+        and its exit code written to $CodeFile last.
+    #>
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile,
+          [hashtable]$Environment)
+    $literal = { param($text) "'" + ([string]$text).Replace("'", "''") + "'" }
+    $call = '& ' + (& $literal $Script)
+    foreach ($name in $Switches) { $call += ' -' + $name }
+    if ($Values) { foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) } }
+    foreach ($argument in $Arguments) { $call += ' ' + (& $literal $argument) }
+    # Variables the run outside has to see (this process's own do not reach it): one line each, before the call.
+    $variables = @()
+    if ($Environment) { foreach ($name in @($Environment.Keys | Sort-Object)) { $variables += '$env:' + $name + ' = ' + (& $literal $Environment[$name]) } }
+    return @(
+        '$ErrorActionPreference = ''Continue'''
+        '$log = ' + (& $literal $Log)
+        '$utf8 = New-Object System.Text.UTF8Encoding $false'
+        '$code = 1'
+        $variables
+        'try {'
+        '    ' + $call + ' *>&1 | ForEach-Object { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
+        '    $code = $LASTEXITCODE'
+        '    if ($null -eq $code) { $code = 0 }'
+        '} catch { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
+        '[IO.File]::WriteAllText(' + (& $literal $CodeFile) + ', [string]$code)'
+        'exit $code'
+    ) -join "`r`n"
+}
+
+function Send-OutsideLines {
+    # The whole lines the run outside has added to $Log since byte $From, printed here; where it has got to. -All
+    # prints a last line that has no line end too.
+    param([string]$Log, [long]$From, [switch]$All)
+    if (-not (Test-Path -LiteralPath $Log)) { return $From }
+    $stream = $null
+    $bytes = $null
+    $read = 0
+    try {
+        $stream = New-Object System.IO.FileStream($Log, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read,
+                                                  ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
+        if ($stream.Length -le $From) { return $From }
+        $null = $stream.Seek($From, [System.IO.SeekOrigin]::Begin)
+        $bytes = New-Object byte[] ([int]($stream.Length - $From))
+        $read = $stream.Read($bytes, 0, $bytes.Length)
+    } catch {
+        return $From
+    } finally {
+        if ($stream) { $stream.Dispose() }
+    }
+    $end = $read
+    if (-not $All) { $end = [Array]::LastIndexOf($bytes, [byte]10, [Math]::Max(0, $read - 1)) + 1 }
+    if ($end -le 0) { return $From }
+    $lines = @([System.Text.Encoding]::UTF8.GetString($bytes, 0, $end) -split "`r`n|`n")
+    if ($lines.Count -gt 0 -and $lines[$lines.Count - 1] -eq '') { $lines = @($lines | Select-Object -First ($lines.Count - 1)) }
+    foreach ($line in $lines) { Write-Host $line }
+    return $From + $end
+}
+
+function Invoke-Outside {
+    <#
+        Runs $Source in Windows PowerShell outside every app's private view: created by WMI's Win32_Process.Create,
+        with this run's environment and CODEX_AUTO_RESUME_OUTSIDE=1, its console hidden (SW_HIDE: WMI refuses
+        CREATE_NO_WINDOW), in this run's folder. Passes on what it writes to $Log as it writes it, and returns its
+        exit code once it has ended - or $null where it could not be started.
+    #>
+    param([string]$Source, [string]$Log, [string]$CodeFile)
+    $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($Source))
+    $line = '"' + $powershell + '" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + $encoded
+    $environment = @(foreach ($variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
+        if ([string]$variable.Key -ne 'CODEX_AUTO_RESUME_OUTSIDE') { [string]$variable.Key + '=' + [string]$variable.Value }
+    }) + 'CODEX_AUTO_RESUME_OUTSIDE=1'
+    $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{
+        ShowWindow = [uint16]0; EnvironmentVariables = [string[]]$environment }
+    $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -ErrorAction Stop -Arguments @{
+        CommandLine = $line; CurrentDirectory = [Environment]::CurrentDirectory; ProcessStartupInformation = $startup }
+    if ($created.ReturnValue -ne 0 -or -not $created.ProcessId) { return $null }
+    $id = [int]$created.ProcessId
+    $process = $null
+    try { $process = [System.Diagnostics.Process]::GetProcessById($id); $null = $process.Handle } catch { $process = $null }
+    $position = [long]0
+    while ($true) {
+        if ($process) { $ended = $process.HasExited }
+        else { $ended = (Test-Path -LiteralPath $CodeFile) -or -not (Get-Process -Id $id -ErrorAction SilentlyContinue) }
+        $position = Send-OutsideLines -Log $Log -From $position
+        if ($ended) { break }
+        Start-Sleep -Milliseconds 200
+    }
+    $null = Send-OutsideLines -Log $Log -From $position -All
+    $said = $null
+    try { $said = [System.IO.File]::ReadAllText($CodeFile).Trim() } catch { $said = $null }
+    $code = 0
+    if ([int]::TryParse([string]$said, [ref]$code)) { return $code }
+    return 1
+}
+
+function Resolve-OutsideRun {
+    <#
+        Whether this run goes on here: $null, or the exit code of the run outside that did its work instead. A run
+        CODEX_AUTO_RESUME_OUTSIDE=1 marks is one: it never relaunches, and the mark goes no further than it.
+    #>
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [hashtable]$Environment)
+    if ($env:CODEX_AUTO_RESUME_OUTSIDE -eq '1') {
+        $env:CODEX_AUTO_RESUME_OUTSIDE = $null
+        return $null
+    }
+    $app = $null
+    try { $app = Find-PackagedAncestor -Table (Get-ProcessTable -Self $PID) -Self $PID } catch { $app = $null }
+    if (-not $app) { return $null }
+    $folder = Join-Path ([System.IO.Path]::GetTempPath()) ('CodexAutoResume-Outside-' + [guid]::NewGuid().ToString('N').Substring(0, 16))
+    $code = $null
+    try {
+        $null = New-Item -ItemType Directory -Path $folder -ErrorAction Stop
+        $log = Join-Path $folder 'output.txt'
+        $codeFile = Join-Path $folder 'code.txt'
+        $source = Get-OutsideSource -Script $Script -Switches $Switches -Values $Values -Arguments $Arguments `
+                                    -Log $log -CodeFile $codeFile -Environment $Environment
+        $code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
+    } catch {
+        $code = $null
+    } finally {
+        Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $code) { return $code }
+    $name = $app
+    if ($app.LastIndexOf('_') -gt 0) { $name = $app.Substring(0, $app.LastIndexOf('_')) }
+    Warn ('This may be running inside ' + $name + '. A program started from the Codex app, Claude or another app ' +
+          'installed as a package can be, and Windows then keeps what it registers inside that app: the entry in ' +
+          'Settings > Apps, the start at sign-in, the notifications'' name, the link handler and the Start menu ' +
+          'entry. If Settings > Apps lacks the entry or it does not start at sign-in, open the Dashboard from the ' +
+          'Start menu and choose Repair installation.')
+    return $null
+}
+# <<< the outside gate
+
+$outsideSwitches = @(foreach ($name in 'SkipStartup', 'Uninstall', 'Purge', 'AllowEditionChange', 'Silent') {
+    if (Get-Variable -Name $name -ValueOnly) { $name }
+})
+$outsideCode = Resolve-OutsideRun -Script $PSCommandPath -Switches $outsideSwitches `
+                                  -Values @{ PluginName = $PluginName; MarketplaceName = $MarketplaceName }
+if ($null -ne $outsideCode) { exit $outsideCode }
+
 # One installation at a time. There are three routes in - a double-clicked Install.cmd,
 # an upgrade, and the Codex plugin's bootstrap - and two of them running together would
 # copy over each other's half-written payload and race on the same plugin cache.
@@ -208,6 +460,24 @@ function Get-Edition {
         return 'advanced'
     }
     return 'standard'
+}
+
+function Get-AppVersion {
+    <#
+        The version the program files under Root (an app\ tree) declare: the plugin manifest's own "version", or
+        $null where there is no manifest, it cannot be read or it names no version. The one fact that tells a repair
+        from an update - this archive's version over the same version already installed - and read the way the
+        product reads it (config.version), from the tree itself rather than from a name.
+    #>
+    param([string]$Root)
+    $manifest = Join-Path (Join-Path $Root '.codex-plugin') 'plugin.json'
+    try {
+        $item = Get-Item -LiteralPath $manifest -Force -ErrorAction Stop
+        if ($item.PSIsContainer) { return $null }
+        $declared = ([IO.File]::ReadAllText($item.FullName) | ConvertFrom-Json).version
+        if ($declared -is [string] -and $declared.Trim()) { return $declared.Trim() }
+    } catch { }
+    return $null
 }
 
 function Get-EditionStatement {
@@ -524,12 +794,21 @@ function Get-UninstallBlocker {
         stopped with half a product left. So the Dashboard is asked to close first, as an update asks it
         (Close-OwnedDashboard), and then what still runs here (Get-InstallationHolder) and each program file at the
         root that something holds are named. An empty list: nothing holds the files. Changes nothing but the windows
-        asked to close.
+        asked to close, and the records they wrote.
+
+        A window asked so writes where it was for the installer to open it again (reopen-after-update-<its process
+        id>.txt) - as it does for an update, for it cannot tell the two apart. An uninstall opens nothing again, so
+        each record is removed here, once the windows have answered: the v0.6.17 acceptance's keep-data uninstall left
+        one in config\, which the uninstall keeps, and the reinstall after it, which is no update, never swept it.
     #>
     $blockers = @()
     if ((Get-OwnedDashboardProcess).Count -gt 0) {
         Step 'Closing the Dashboard so its files can be removed'
         $closed = Close-OwnedDashboard
+        foreach ($record in @(Get-ChildItem -LiteralPath (Join-Path $InstallHome 'config') -File `
+                                            -Filter 'reopen-after-update*.txt' -ErrorAction SilentlyContinue)) {
+            $null = Remove-OwnedItem $record.FullName
+        }
         if ($closed.Unsaved -gt 0) { $blockers += 'A Dashboard window has unsaved Settings changes: save or undo them, then close it.' }
         if ($closed.Stuck -gt 0) { $blockers += 'A Dashboard window could not be closed: close it.' }
         if ($blockers.Count -eq 0) { Ok 'The Dashboard closed' }
@@ -699,6 +978,31 @@ function Install-KeptUninstaller {
         return $false
     }
     return $true
+}
+
+function Test-DefaultHome {
+    <#
+        True when the installation root $Root is the ordinary one, `.codex-auto-resume` in the profile $Profile.
+
+        The kept uninstaller (Install-KeptUninstaller), and with it the entry in Add or remove programs, is for the
+        ordinary home. Whether CODEX_AUTO_RESUME_PLUGIN_HOME is set does not say which home this is: the Dashboard sets
+        it to its own root for every update it starts (gui/DashboardMaintenance.cs, StartBootstrap), and that root is
+        the ordinary home nearly always. Read as "set means moved", every update from the Dashboard kept no uninstaller,
+        so no entry was ever written after one, and Repair could not add it (GitHub #43). So the root this run really
+        installed is compared with the ordinary one.
+
+        Both go through Resolve-Canonical, so one place has one spelling: a different case (the compare ignores it), a
+        trailing separator, `.` and `..`, forward slashes, a `\\?\` prefix, an 8.3 short name (Windows PowerShell's
+        GetFullPath gives the long name of a path that exists, and both exist here) and a junction are all the same
+        folder. Environment variables are not expanded, on purpose: $InstallHome takes the variable as it is written, so
+        a `%USERPROFILE%` in it names another folder, and $Root is the folder the files went to - which is what decides.
+    #>
+    param([string]$Root, [string]$Profile)
+    if ([string]::IsNullOrWhiteSpace($Root) -or [string]::IsNullOrWhiteSpace($Profile)) { return $false }
+    $ordinary = Resolve-Canonical (Join-Path $Profile '.codex-auto-resume')
+    $here = Resolve-Canonical $Root
+    if (-not $ordinary -or -not $here) { return $false }
+    return [string]::Equals($ordinary, $here, [StringComparison]::OrdinalIgnoreCase)
 }
 
 function Read-UninstallEntry {
@@ -1227,6 +1531,14 @@ try {
     $previousEdition = $null
     if ($upgrade) { $previousEdition = Get-Edition -Src (Join-Path $AppDir 'src') }
     $editionChange = $upgrade -and ($previousEdition -ne $edition)
+    # A repair is this archive's version over the same version, in the same edition (the setup program's Repair, or
+    # Install.cmd run again): the last word says it repaired, not that it updated (v0.6.17, the live acceptance).
+    # Read now, while the installed program files are still where they were.
+    $repair = $false
+    if ($upgrade -and -not $editionChange) {
+        $installedVersion = Get-AppVersion -Root $AppDir
+        if ($installedVersion -and ($installedVersion -ceq (Get-AppVersion -Root (Join-Path $Payload 'app')))) { $repair = $true }
+    }
     if ($editionChange) {
         Write-Host ''
         Write-Host (Get-EditionStatement -From $previousEdition -To $edition)
@@ -1478,7 +1790,10 @@ try {
     # The entry in Add or remove programs is written by the engine's setup below, and only where this has
     # left an uninstaller for it to name. Only for the ordinary home: an installation somewhere the person
     # chose through CODEX_AUTO_RESUME_PLUGIN_HOME would need the uninstaller told where it is, and gets none.
-    if ([string]::IsNullOrWhiteSpace($env:CODEX_AUTO_RESUME_PLUGIN_HOME)) {
+    # The ordinary home named by that variable is still the ordinary home (Test-DefaultHome): every update the
+    # Dashboard starts names it so, and kept nothing until v0.6.17 - which this puts back, update by update.
+    if ([string]::IsNullOrWhiteSpace($env:CODEX_AUTO_RESUME_PLUGIN_HOME) -or
+        (Test-DefaultHome -Root $OwnedHome -Profile $env:USERPROFILE)) {
         $null = Install-KeptUninstaller -Source $PSCommandPath
     }
 
@@ -1523,7 +1838,12 @@ try {
     # treating it as success is how this script came to end with "Installed and running."
     # about a watcher nobody had looked at.
     $SETUP_UNCONFIRMED = 2
-    $code = Invoke-Setup $setupArgs
+    # This run looks at the watcher again after the health check (watcher-running, below) and says the last word, so a
+    # watcher setup could not confirm within its wait is "not confirmed yet" in setup's own line, not a verdict
+    # the last word then contradicts (v0.6.17, the live acceptance's second round). Said as a variable for this one
+    # call, the way the bootstrap says it to an installed setup that may be older.
+    $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'
+    try { $code = Invoke-Setup $setupArgs } finally { $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null }
     $watcherUnconfirmed = $code -eq $SETUP_UNCONFIRMED
     if ($code -ne 0 -and -not $watcherUnconfirmed) {
         Fail 'Setup did not complete. Nothing was removed; read the message above.'
@@ -1533,24 +1853,37 @@ try {
     Step 'Checking the installation'
     $null = Invoke-Setup @('doctor')
     if ($LASTEXITCODE -ne 0) { Warn 'The health check reported a problem. Recovery is installed but may not be ready.' }
+    # Setup waits for the watcher it started for a few seconds and no longer. On a busy PC, right after every file
+    # was written fresh, a watcher can take longer than that to take its mutex (v0.6.17 live acceptance: 6 to 9
+    # seconds), and this run then ended "could not be confirmed" under a health check that had just seen the mutex
+    # held. So it is looked at once more, now, before the last word: a watcher running now is a watcher running.
+    # The look's one line is said in English, for this English log, whatever Interface language the PC stores.
+    if ($watcherUnconfirmed) {
+        $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = '1'
+        try { if ((Invoke-Setup @('watcher-running')) -eq 0) { $watcherUnconfirmed = $false } }
+        finally { $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = $null }
+    }
 
     # The Dashboard that closed for this update opens again on the new version, where it was (Open-ClosedDashboard).
     Open-ClosedDashboard -Updated
 
     Write-Host ''
     if ($script:Failed) { Write-Host 'Finished with problems. See the messages above.'; exit 1 }
+    # What was done to an installation that was there: repaired (this version over itself) or updated.
+    $keptLine = if ($repair) { 'Repaired. Your settings and pending recoveries were kept.' }
+                else { 'Updated. Your settings and pending recoveries were kept.' }
     if ($watcherUnconfirmed) {
-        if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
+        if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed.' }
         Write-Host 'The watcher could not be confirmed running, so nothing is being watched yet.'
         Write-Host 'Open Start Menu > Codex Auto Resume and use Start watcher, or run this again.'
     } elseif ($previousWatcherStillRunning) {
-        Write-Host 'Updated. Your settings and pending recoveries were kept.'
+        Write-Host $keptLine
         Write-Host 'The previous version of the watcher was asked to stop and is still finishing'
         Write-Host 'what it was doing; nothing was ended by force. Once it has stopped, open'
         Write-Host 'Start Menu > Codex Auto Resume and use Start watcher - or sign out and back in.'
     } else {
-        if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
+        if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed and running.' }
         Write-Host 'Recommended settings are already on. Nothing else to do.'
     }

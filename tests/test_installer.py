@@ -384,7 +384,7 @@ class UninstallKeepsStateTests(unittest.TestCase):
         self.assertIn('"--keep-state"', self.cli)
 
     def test_the_plugin_bridge_keeps_state_unless_purging(self):
-        self.assertIn('flags = [] if getattr(args, "purge", False) else ["--keep-state"]', self.bridge)
+        self.assertIn('flags = [] if getattr(args, "purge", False) else ["--keep-state", "--keep-logs"]', self.bridge)
 
     def test_the_installer_only_purges_when_asked(self):
         section = self.text[self.text.index("if ($Uninstall)"):self.text.index("# ---", self.text.index("if ($Uninstall)"))]
@@ -447,6 +447,74 @@ class UninstallStatePreservationTests(unittest.TestCase):
         self.run_uninstall()
         self.assertFalse(paths.settings_file.exists())
         self.assertFalse((paths.state_dir / "state.sqlite").exists())
+
+
+class KeepDataKeepsTheLogTests(unittest.TestCase):
+    """The v0.6.17 acceptance: after an uninstall that kept the data and the reinstall, logs/auto-resume.log began
+    at the reinstall and its earlier lines were gone, while launcher.log and codex-start.log kept theirs. The bridge's
+    keep-data uninstall (what install.ps1 runs without -Purge) never asked the core uninstall to keep the logs, and it
+    deletes auto-resume.log and errors.log unless asked. In a scratch home, with the registry, autostart, notification
+    identity, Start menu and Apps entry writers patched out."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.home = Path(self.temp.name) / "home"
+        self.addCleanup(self.close_log)
+
+    @staticmethod
+    def close_log():
+        import logging
+        from codex_auto_resume import logbook
+        logger = logging.getLogger(logbook.LOGGER_NAME)
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+            handler.close()
+
+    def write_log(self, text):
+        from codex_auto_resume import config, logbook
+        paths = config.Paths(self.home)
+        logbook.setup_logging(paths.log_file).info(text)
+        self.close_log()
+        return paths
+
+    def uninstall(self, purge):
+        import argparse
+        from unittest.mock import patch
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import plugin_setup
+        from codex_auto_resume import addremove, cli
+        with patch.dict(os.environ, {plugin_setup.ENV_RUNTIME_HOME: str(self.home)}), \
+             patch.object(cli.startup, "current_value", return_value=None), \
+             patch.object(cli.startup, "notification_identity_owner", return_value=True), \
+             patch.object(cli.startup, "unregister_aumid", return_value=False), \
+             patch.object(cli.startup, "protocol_value", return_value=None), \
+             patch.object(cli.shortcut, "uninstall", return_value=False), \
+             patch.object(addremove, "unregister", return_value=False), \
+             patch.object(cli.App, "watcher_running", return_value=False), \
+             patch("sys.stdout", io.StringIO()):
+            return plugin_setup.cmd_uninstall(argparse.Namespace(purge=purge))
+
+    def test_a_keep_data_uninstall_and_the_reinstall_keep_the_logs_earlier_lines(self):
+        from codex_auto_resume import config
+        paths = self.write_log("before the uninstall")
+        config.Paths(self.home).ensure()
+        paths.error_log.write_text("an earlier error", encoding="utf-8")
+        self.assertEqual(self.uninstall(purge=False), 0)
+        self.assertTrue(paths.log_file.is_file(), "the keep-data uninstall deleted auto-resume.log")
+        self.assertIn("before the uninstall", paths.log_file.read_text(encoding="utf-8"), "the uninstall kept the log")
+        self.assertTrue(paths.error_log.is_file(), "and the error log")
+        # The reinstalled watcher opens the same log, as the engine always does (logbook.setup_logging).
+        self.write_log("after the reinstall")
+        kept = paths.log_file.read_text(encoding="utf-8")
+        self.assertLess(kept.index("before the uninstall"), kept.index("after the reinstall"))
+
+    def test_a_purge_still_takes_the_log(self):
+        from codex_auto_resume import config
+        paths = self.write_log("before the purge")
+        config.Paths(self.home).ensure()
+        self.assertEqual(self.uninstall(purge=True), 0)
+        self.assertFalse(paths.log_file.exists())
 
 
 class UpgradeKeepsTheOwnersChoiceTests(unittest.TestCase):

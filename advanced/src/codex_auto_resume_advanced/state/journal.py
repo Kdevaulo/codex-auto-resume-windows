@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from codex_auto_resume.domain.plug import Alternative, Point
 
-from ..vocabulary import Actor, JournalCode, OffReason, RecordState
+from ..vocabulary import Actor, ArmingWarning, JournalCode, OffReason, RecordState
 
 EVENT_LIMIT = 5000
 WATCH_LIMIT = 150                 # would_have lines kept a capability, its newest (250; 200; 180 until v0.6.16-beta.4: 30 fit)
@@ -36,6 +36,12 @@ def _closed(value, words):
     return value if value in tuple(words) else None
 
 
+def _reason(value):
+    """A reason as the journal keeps it: why a capability is off, or (v0.6.17) one of the statement's warning words -
+    why a capability stood aside for another (runtime.CONFLICTS)."""
+    return _closed(value, OffReason) or _closed(value, ArmingWarning)
+
+
 def _answer(value):
     """What a capability answered, as a word: an alternative at a decision point, or the name of
     the point it gave a value at. Never the value itself - words a capability would have sent,
@@ -44,6 +50,13 @@ def _answer(value):
 
 
 class JournalMixin:
+    def _answer(self, value):
+        """`_answer`'s word, or (v0.6.17) the id of a capability the registry holds - the other capability an
+        `overruled` line names. Still never a value a capability gave."""
+        if isinstance(value, str) and self.registry.get(value) is not None:
+            return value
+        return _answer(value)
+
     def _code(self, code, capability) -> str:
         """`code` if it is one of the journal's own or one of `capability`'s, else "other"."""
         if code in tuple(JournalCode):
@@ -62,9 +75,9 @@ class JournalMixin:
         connection.execute(
             "INSERT INTO journal (at, capability, code, reason, actor, point, answer) "
             "VALUES (?,?,?,?,?,?,?)",
-            (at, capability, self._code(code, capability), _closed(reason, OffReason),
+            (at, capability, self._code(code, capability), _reason(reason),
              _closed(actor, Actor), _closed(point, Point),
-             _answer(answer)))
+             self._answer(answer)))
         if prune_every(connection.execute("SELECT last_insert_rowid()").fetchone()[0]):
             self._prune(connection, at)
 
@@ -92,9 +105,9 @@ class JournalMixin:
         return [{"at": row["at"],
                  "capability": row["capability"] if self.registry.get(row["capability"]) else None,
                  "code": self._code(row["code"], row["capability"]),
-                 "reason": _closed(row["reason"], OffReason), "actor": _closed(row["actor"], Actor),
+                 "reason": _reason(row["reason"]), "actor": _closed(row["actor"], Actor),
                  "point": _closed(row["point"], Point),
-                 "answer": _answer(row["answer"])}
+                 "answer": self._answer(row["answer"])}
                 for row in rows]
 
     # ------------------------------------------------------------------ sampler

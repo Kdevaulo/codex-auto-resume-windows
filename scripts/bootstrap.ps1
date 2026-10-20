@@ -251,6 +251,11 @@ $ReleasesMaxChars = 2097152
 $ReleasesTimeoutMax = 15
 $ReleasesTimeoutMin = 5
 $ReleasesVersionTimeout = 60
+# GitHub #41: when api.github.com refused the list because this network's share of its unauthenticated requests ran out
+# (60 an hour, which a VPN or a shared connection spends for everyone behind it), when that share comes back - the
+# X-RateLimit-Reset it sent, in Unix seconds, or 'unknown' - so the `releases:` line can name the limit rather than a
+# list that "could not be read" (Write-ReleasesUnread). $null for every other failure. Set by Invoke-BoundedWebRequest.
+$RateLimitReset = $null
 
 # What -CheckOnly and -Update answer with. Four codes, because there are four answers and
 # a caller that has to tell them apart should not have to read prose to do it. "Could not
@@ -327,6 +332,246 @@ $ExitLater = 16
 function Step { param([string]$Text) Write-Host ('  ' + $Text) }
 function Ok   { param([string]$Text) Write-Host ('  [ok] ' + $Text) }
 function Fail { param([string]$Text) Write-Host ('  [!] ' + $Text) -ForegroundColor Red }
+
+function Warn { param([string]$m) Write-Host ('  [!]  ' + $m) -ForegroundColor Yellow }
+
+# ----------------------------------------------------------------------- inside another app (v0.6.17)
+# A process descended from an MSIX app - the Codex app, Claude desktop - writes HKCU and %APPDATA% into that app's
+# private view, which Windows itself never reads. The repair branch below runs the installation's setup itself,
+# never through install.ps1, so it asks what install.ps1 asks before it does: run by an agent inside one of those
+# apps, the setup runs again outside through WMI instead, with this run's environment and CODEX_AUTO_RESUME_OUTSIDE=1,
+# what it prints passed on as it prints it, and its exit code this run's (Resolve-OutsideRun). Where it cannot get
+# out, it carries on and says once what may stay inside the app.
+# >>> the outside gate: the same text as build/install/install.ps1's, which tests/test_host_app.py holds equal.
+# Opens a process for limited query: its creation time (FILETIME; 0 where it cannot be opened) and its package
+# family name (null without package identity).
+$script:HostAppSource = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+namespace CodexAutoResumeInstall
+{
+    public static class HostApp
+    {
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        static extern IntPtr OpenProcess(uint access, bool inherit, int process);
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool GetProcessTimes(IntPtr process, out long created, out long exited, out long kernel, out long user);
+        [DllImport("kernel32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        static extern int GetPackageFamilyName(IntPtr process, ref uint length, StringBuilder name);
+        [DllImport("kernel32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+        static extern int GetCurrentPackageFamilyName(ref uint length, StringBuilder name);
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool CloseHandle(IntPtr handle);
+
+        public static long Open(int id, bool self, out string package)
+        {
+            package = null;
+            IntPtr handle = OpenProcess(0x1000, false, id);
+            if (handle == IntPtr.Zero) return 0;
+            try
+            {
+                long created, exited, kernel, user;
+                if (!GetProcessTimes(handle, out created, out exited, out kernel, out user)) return 0;
+                var name = new StringBuilder(256);
+                uint length = (uint)name.Capacity;
+                int answer = self ? GetCurrentPackageFamilyName(ref length, name) : GetPackageFamilyName(handle, ref length, name);
+                if (answer == 0 && name.Length > 0) package = name.ToString();
+                return created;
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
+        }
+    }
+}
+'@
+
+function Find-PackagedAncestor {
+    <#
+        The package family name of this process, or of its nearest live ancestor that has one, or $null: the
+        decision over a process table, `$Table[pid] = @{ Parent; Created; Package }`. The walk stops - outside -
+        where a parent is not in the table or could not be opened (Created 0), where a parent was created after its
+        child (its id was reused), on a cycle, and after 32 steps. Pure, so a test can feed it a table of its own.
+    #>
+    param([hashtable]$Table, [int]$Self)
+    $row = $Table[$Self]
+    if ($null -eq $row) { return $null }
+    if ($row.Package) { return [string]$row.Package }
+    $seen = @{ $Self = $true }
+    for ($step = 0; $step -lt 32; $step++) {
+        $id = [int]$row.Parent
+        $parent = $Table[$id]
+        if ($null -eq $parent -or -not $parent.Created) { return $null }
+        if ($seen.ContainsKey($id)) { return $null }
+        $seen[$id] = $true
+        if ([long]$parent.Created -gt [long]$row.Created) { return $null }
+        if ($parent.Package) { return [string]$parent.Package }
+        $row = $parent
+    }
+    return $null
+}
+
+function Get-ProcessTable {
+    # This process and its ancestors as far as the walk can go, for Find-PackagedAncestor.
+    param([int]$Self)
+    Add-Type -TypeDefinition $script:HostAppSource -ErrorAction Stop
+    $parents = @{}
+    foreach ($process in @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId -ErrorAction Stop)) {
+        $parents[[int]$process.ProcessId] = [int]$process.ParentProcessId
+    }
+    $table = @{}
+    $id = $Self
+    for ($step = 0; $step -le 33 -and $parents.ContainsKey($id) -and -not $table.ContainsKey($id); $step++) {
+        $package = $null
+        $created = [CodexAutoResumeInstall.HostApp]::Open($id, ($id -eq $Self), [ref]$package)
+        $table[$id] = @{ Parent = $parents[$id]; Created = $created; Package = $package }
+        if (-not $created) { break }
+        $id = $parents[$id]
+    }
+    return $table
+}
+
+function Get-OutsideSource {
+    <#
+        What the run outside executes: $Script - a script or a program - by its full path with this run's switches
+        and values, then $Arguments as they are, everything it prints appended line by line to $Log as it prints it,
+        and its exit code written to $CodeFile last.
+    #>
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile,
+          [hashtable]$Environment)
+    $literal = { param($text) "'" + ([string]$text).Replace("'", "''") + "'" }
+    $call = '& ' + (& $literal $Script)
+    foreach ($name in $Switches) { $call += ' -' + $name }
+    if ($Values) { foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) } }
+    foreach ($argument in $Arguments) { $call += ' ' + (& $literal $argument) }
+    # Variables the run outside has to see (this process's own do not reach it): one line each, before the call.
+    $variables = @()
+    if ($Environment) { foreach ($name in @($Environment.Keys | Sort-Object)) { $variables += '$env:' + $name + ' = ' + (& $literal $Environment[$name]) } }
+    return @(
+        '$ErrorActionPreference = ''Continue'''
+        '$log = ' + (& $literal $Log)
+        '$utf8 = New-Object System.Text.UTF8Encoding $false'
+        '$code = 1'
+        $variables
+        'try {'
+        '    ' + $call + ' *>&1 | ForEach-Object { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
+        '    $code = $LASTEXITCODE'
+        '    if ($null -eq $code) { $code = 0 }'
+        '} catch { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
+        '[IO.File]::WriteAllText(' + (& $literal $CodeFile) + ', [string]$code)'
+        'exit $code'
+    ) -join "`r`n"
+}
+
+function Send-OutsideLines {
+    # The whole lines the run outside has added to $Log since byte $From, printed here; where it has got to. -All
+    # prints a last line that has no line end too.
+    param([string]$Log, [long]$From, [switch]$All)
+    if (-not (Test-Path -LiteralPath $Log)) { return $From }
+    $stream = $null
+    $bytes = $null
+    $read = 0
+    try {
+        $stream = New-Object System.IO.FileStream($Log, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read,
+                                                  ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
+        if ($stream.Length -le $From) { return $From }
+        $null = $stream.Seek($From, [System.IO.SeekOrigin]::Begin)
+        $bytes = New-Object byte[] ([int]($stream.Length - $From))
+        $read = $stream.Read($bytes, 0, $bytes.Length)
+    } catch {
+        return $From
+    } finally {
+        if ($stream) { $stream.Dispose() }
+    }
+    $end = $read
+    if (-not $All) { $end = [Array]::LastIndexOf($bytes, [byte]10, [Math]::Max(0, $read - 1)) + 1 }
+    if ($end -le 0) { return $From }
+    $lines = @([System.Text.Encoding]::UTF8.GetString($bytes, 0, $end) -split "`r`n|`n")
+    if ($lines.Count -gt 0 -and $lines[$lines.Count - 1] -eq '') { $lines = @($lines | Select-Object -First ($lines.Count - 1)) }
+    foreach ($line in $lines) { Write-Host $line }
+    return $From + $end
+}
+
+function Invoke-Outside {
+    <#
+        Runs $Source in Windows PowerShell outside every app's private view: created by WMI's Win32_Process.Create,
+        with this run's environment and CODEX_AUTO_RESUME_OUTSIDE=1, its console hidden (SW_HIDE: WMI refuses
+        CREATE_NO_WINDOW), in this run's folder. Passes on what it writes to $Log as it writes it, and returns its
+        exit code once it has ended - or $null where it could not be started.
+    #>
+    param([string]$Source, [string]$Log, [string]$CodeFile)
+    $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($Source))
+    $line = '"' + $powershell + '" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + $encoded
+    $environment = @(foreach ($variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
+        if ([string]$variable.Key -ne 'CODEX_AUTO_RESUME_OUTSIDE') { [string]$variable.Key + '=' + [string]$variable.Value }
+    }) + 'CODEX_AUTO_RESUME_OUTSIDE=1'
+    $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{
+        ShowWindow = [uint16]0; EnvironmentVariables = [string[]]$environment }
+    $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -ErrorAction Stop -Arguments @{
+        CommandLine = $line; CurrentDirectory = [Environment]::CurrentDirectory; ProcessStartupInformation = $startup }
+    if ($created.ReturnValue -ne 0 -or -not $created.ProcessId) { return $null }
+    $id = [int]$created.ProcessId
+    $process = $null
+    try { $process = [System.Diagnostics.Process]::GetProcessById($id); $null = $process.Handle } catch { $process = $null }
+    $position = [long]0
+    while ($true) {
+        if ($process) { $ended = $process.HasExited }
+        else { $ended = (Test-Path -LiteralPath $CodeFile) -or -not (Get-Process -Id $id -ErrorAction SilentlyContinue) }
+        $position = Send-OutsideLines -Log $Log -From $position
+        if ($ended) { break }
+        Start-Sleep -Milliseconds 200
+    }
+    $null = Send-OutsideLines -Log $Log -From $position -All
+    $said = $null
+    try { $said = [System.IO.File]::ReadAllText($CodeFile).Trim() } catch { $said = $null }
+    $code = 0
+    if ([int]::TryParse([string]$said, [ref]$code)) { return $code }
+    return 1
+}
+
+function Resolve-OutsideRun {
+    <#
+        Whether this run goes on here: $null, or the exit code of the run outside that did its work instead. A run
+        CODEX_AUTO_RESUME_OUTSIDE=1 marks is one: it never relaunches, and the mark goes no further than it.
+    #>
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [hashtable]$Environment)
+    if ($env:CODEX_AUTO_RESUME_OUTSIDE -eq '1') {
+        $env:CODEX_AUTO_RESUME_OUTSIDE = $null
+        return $null
+    }
+    $app = $null
+    try { $app = Find-PackagedAncestor -Table (Get-ProcessTable -Self $PID) -Self $PID } catch { $app = $null }
+    if (-not $app) { return $null }
+    $folder = Join-Path ([System.IO.Path]::GetTempPath()) ('CodexAutoResume-Outside-' + [guid]::NewGuid().ToString('N').Substring(0, 16))
+    $code = $null
+    try {
+        $null = New-Item -ItemType Directory -Path $folder -ErrorAction Stop
+        $log = Join-Path $folder 'output.txt'
+        $codeFile = Join-Path $folder 'code.txt'
+        $source = Get-OutsideSource -Script $Script -Switches $Switches -Values $Values -Arguments $Arguments `
+                                    -Log $log -CodeFile $codeFile -Environment $Environment
+        $code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
+    } catch {
+        $code = $null
+    } finally {
+        Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $code) { return $code }
+    $name = $app
+    if ($app.LastIndexOf('_') -gt 0) { $name = $app.Substring(0, $app.LastIndexOf('_')) }
+    Warn ('This may be running inside ' + $name + '. A program started from the Codex app, Claude or another app ' +
+          'installed as a package can be, and Windows then keeps what it registers inside that app: the entry in ' +
+          'Settings > Apps, the start at sign-in, the notifications'' name, the link handler and the Start menu ' +
+          'entry. If Settings > Apps lacks the entry or it does not start at sign-in, open the Dashboard from the ' +
+          'Start menu and choose Repair installation.')
+    return $null
+}
+# <<< the outside gate
 
 function Get-Sha256 {
     <#
@@ -444,6 +689,85 @@ function Assert-TrustedHost {
     }
 }
 
+function Get-RateLimitReset {
+    <#
+        Where $Failure - an exception a request threw, with what it wraps - is GitHub refusing for its rate limit, when
+        the limit resets: the X-RateLimit-Reset it sent, in Unix seconds, or 'unknown' where it sent none that reads;
+        $null for any other failure. A refusal for the limit is a 403 or 429 that says the requests left are 0
+        (X-RateLimit-Remaining, the primary limit) or when to retry (Retry-After, the secondary one), or any 429.
+
+        The response is found on whichever exception in the chain carries one (WebException under Windows PowerShell,
+        HttpResponseException under PowerShell 7), and its headers are read the way each keeps them. Only digits are
+        taken for a time, and only a plausible one; nothing else of the response is read.
+    #>
+    param($Failure)
+    $seen = 0
+    $current = $Failure
+    while ($null -ne $current -and $seen -lt 8) {
+        $seen++
+        $response = $null
+        if ($current.PSObject.Properties.Match('Response').Count) { $response = $current.Response }
+        if ($null -ne $response) {
+            $status = 0
+            try { $status = [int]$response.StatusCode } catch { $status = 0 }
+            if ($status -ne 403 -and $status -ne 429) { return $null }
+            $headers = @{}
+            foreach ($name in @('X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After')) {
+                $value = $null
+                try {
+                    if ($response.Headers -is [Net.WebHeaderCollection]) { $value = $response.Headers[$name] }
+                    else {
+                        $values = $null
+                        if ($response.Headers.TryGetValues($name, [ref]$values)) { $value = @($values)[0] }
+                    }
+                } catch { $value = $null }
+                if ($null -ne $value) { $headers[$name] = ([string]$value).Trim() }
+            }
+            $limited = ($status -eq 429) -or ($headers['X-RateLimit-Remaining'] -eq '0') -or $headers.ContainsKey('Retry-After')
+            if (-not $limited) { return $null }
+            $reset = $headers['X-RateLimit-Reset']
+            if ($reset -match '^[0-9]{9,11}$') { return $reset }
+            $after = $headers['Retry-After']
+            if ($after -match '^[0-9]{1,6}$') {
+                return [string]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + [int64]$after)
+            }
+            return 'unknown'
+        }
+        # What it wraps: under Windows PowerShell the runspace's EndInvoke throws a MethodInvocationException around
+        # a CmdletInvocationException around the WebException. An error record's own exception is looked at only
+        # where nothing is wrapped.
+        $next = $current.InnerException
+        if ($null -eq $next -and $current.PSObject.Properties.Match('ErrorRecord').Count -and
+            $null -ne $current.ErrorRecord -and -not [object]::ReferenceEquals($current.ErrorRecord.Exception, $current)) {
+            $next = $current.ErrorRecord.Exception
+        }
+        $current = $next
+    }
+    return $null
+}
+
+function Write-ReleasesUnread {
+    <#
+        The `releases:` line, said where GitHub's list of this repository's releases was asked for and not read (GitHub
+        #41): `releases: rate-limited <reset>` where GitHub refused for its rate limit ($RateLimitReset: Unix seconds,
+        or `unknown`), `releases: unread` for anything else - so the window can say that pre-releases were not checked,
+        and why, beside an answer that does not depend on them. Its own line, before the answer's; it changes no answer
+        and no exit code. With the reset in this machine's time for whoever reads the output.
+    #>
+    if ($script:RateLimitReset) {
+        Write-Host ('releases: rate-limited ' + $script:RateLimitReset)
+        if ($script:RateLimitReset -ne 'unknown') {
+            $local = [DateTimeOffset]::FromUnixTimeSeconds([int64]$script:RateLimitReset).ToLocalTime()
+            Step ('GitHub refused: the limit on requests from this network was reached. It resets at ' +
+                  $local.ToString('yyyy-MM-dd HH:mm', [Globalization.CultureInfo]::InvariantCulture) + '.')
+        } else {
+            Step 'GitHub refused: the limit on requests from this network was reached.'
+        }
+    } else {
+        Write-Host 'releases: unread'
+    }
+}
+
 function Invoke-BoundedWebRequest {
     <#
         Invoke-WebRequest with $Parameters, answered within $Seconds of being asked - lookup,
@@ -492,6 +816,8 @@ function Invoke-BoundedWebRequest {
         $finished = $true
         try { $answer = @($shell.EndInvoke($pending)) }
         catch {
+            $limit = Get-RateLimitReset $_.Exception
+            if ($limit) { $script:RateLimitReset = $limit }
             $inner = $_.Exception
             while ($null -ne $inner.InnerException) { $inner = $inner.InnerException }
             throw ($What + ' could not be fetched: ' + $inner.Message)
@@ -1195,10 +1521,18 @@ function Invoke-InstalledSetup {
         The installation's own plugin_setup.py with $Arguments, run by its own runtime\python.exe:
         the version that is installed now, whatever this run is about to install. Returns what it
         printed and its exit code. A console program, by the call operator, in this console.
+
+        -Outside (v0.6.17), for a run that writes the registrations: inside another app's private view it runs
+        outside instead, through the outside gate above - what it prints passed on, not returned (Printed is
+        empty), and its exit code the run's - or here, after the gate's one warning, where it cannot get out.
     #>
-    param([string]$Home_, [string[]]$Arguments)
+    param([string]$Home_, [string[]]$Arguments, [switch]$Outside)
     $python = Join-Path $Home_ 'runtime\python.exe'
     $setup = Join-Path $Home_ 'app\scripts\plugin_setup.py'
+    if ($Outside) {
+        $outsideCode = Resolve-OutsideRun -Script $python -Arguments (@($setup) + @($Arguments))
+        if ($null -ne $outsideCode) { return [pscustomobject]@{ Printed = @(); Code = $outsideCode } }
+    }
     $ErrorActionPreference = 'Continue'
     $printed = @(& $python $setup @Arguments)
     $code = $LASTEXITCODE
@@ -1249,7 +1583,8 @@ function Remove-EntryBeforeOlder {
         }
         if ((Compare-ProductVersion -Left $Target -Right $EntryFrom) -ge 0) { return 'kept' }
     } catch { return 'none' }
-    $done = Invoke-InstalledSetup -Home_ $Home_ -Arguments @('remove-entry')
+    # It removes the entry from the registry: outside another app's view, or it removes nothing Windows reads.
+    $done = Invoke-InstalledSetup -Home_ $Home_ -Arguments @('remove-entry') -Outside
     if ($done.Code -eq 0) { return 'removed' }
     if ($done.Code -eq 2) { return 'none' }
     return 'failed'
@@ -1261,7 +1596,8 @@ function Start-CurrentWatcher {
     param([string]$Home_, [switch]$NoStartup)
     $arguments = @('setup', '--keep-state')
     if ($NoStartup) { $arguments += '--no-startup' }
-    $null = Invoke-InstalledSetup -Home_ $Home_ -Arguments $arguments
+    # It writes the registrations the repair branch writes, so outside another app's view as that branch does.
+    $null = Invoke-InstalledSetup -Home_ $Home_ -Arguments $arguments -Outside
 }
 
 # ---------------------------------------------------------------------------- run
@@ -1306,6 +1642,7 @@ if ($Versions) {
     try { $listed = Get-ReleasePages -Release $release }
     catch {
         Fail ('The list of releases could not be read (' + $_.Exception.Message + ').')
+        Write-ReleasesUnread
         Write-Host 'versions: unavailable'
         Step 'Nothing was changed.'
         exit $ExitUnavailable
@@ -1384,6 +1721,7 @@ if ($Pick) {
     try { $listed = Get-ReleasePages -Release $release }
     catch {
         Fail ('The list of releases could not be read (' + $_.Exception.Message + ').')
+        Write-ReleasesUnread
         Write-Host 'pick: unavailable'
         Step 'Nothing was downloaded, and nothing was changed.'
         exit $ExitUnavailable
@@ -1575,12 +1913,14 @@ if ($CheckOnly -or $Update) {
         $prerelease = $null
         if ($listTimeout -le 0) {
             Step 'Too little of the update check''s time is left to look for a pre-release; none is offered.'
+            Write-ReleasesUnread
         } else {
             Step 'Asking api.github.com for this repository''s list of releases, for a newer pre-release.'
             try {
                 $prerelease = Get-NewerPrerelease -Release $release -Installed $current -Stable $newest -TimeoutSec $listTimeout
             } catch {
                 Step 'The list of releases could not be read, so no pre-release is offered. The answer below does not depend on it.'
+                Write-ReleasesUnread
             }
         }
         if ($prerelease) {
@@ -1683,9 +2023,30 @@ if ($null -ne $standing -and $standing -ge 0 -and -not $Force) {
     # removed - a decision, taken while claiming to check the installation over.
     $arguments = @($setup, 'setup', '--keep-state')
     if ($NoStartup) { $arguments += '--no-startup' }
-    & $python @arguments
-    $code = $LASTEXITCODE
-    if ($null -eq $code) { $code = 0 }
+    # This branch looks at the watcher again below (watcher-running) and says the last word, so a watcher setup could
+    # not confirm within its wait is "not confirmed yet" in setup's own line (v0.6.17). Said as a variable for this
+    # one call, never an argument: the setup that runs is the INSTALLED one, which may be older than this script and
+    # rejects an argument it does not know - so it would not run at all - while it ignores a variable it does not read.
+    $lookAgain = @{ CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1' }
+    # Inside another app's private view, the setup runs outside it instead, with this lock still held here, and its
+    # code is this run's (the outside gate above).
+    $outsideCode = Resolve-OutsideRun -Script $python -Arguments $arguments -Environment $lookAgain
+    if ($null -ne $outsideCode) { $code = $outsideCode }
+    else {
+        $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'
+        try { & $python @arguments } finally { $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null }
+        $code = $LASTEXITCODE
+        if ($null -eq $code) { $code = 0 }
+    }
+    # 2 is a setup that did everything but could not confirm the watcher within its wait. A watcher that took its
+    # mutex since - on a busy PC it can take longer than that wait (v0.6.17 live acceptance) - is running, and this
+    # run's code says so: the watcher is looked at once more, here (a look writes nothing, so it need not go outside).
+    if ($code -eq 2) {
+        # In English, for this English log. An installed setup that predates watcher-running fails with 2: still unconfirmed.
+        $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = '1'
+        try { & $python $setup 'watcher-running' } finally { $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = $null }
+        if ($LASTEXITCODE -eq 0) { $code = 0 }
+    }
     exit $code
 }
 

@@ -151,8 +151,9 @@ class SliceTests(unittest.TestCase):
         # after the version as quiet secondary text (the owner's decision of 2026-10-02). 70 since v0.6.16: the installer
         # window - InstallerFlow, InstallerProgress, InstallerWords, InstallerLanguages, InstallerWindow, InstallerSheet
         # and InstallerBar - and SettingsRemove, the uninstall's start of it. 71 with InstallerNotes, what is new in the
-        # version an update goes to; 72 with InstallerClock, the update's time limit less the Notes page's wait.
-        self.assertEqual(len(set(declared)), 72, "the window's types")
+        # version an update goes to; 72 with InstallerClock, the update's time limit less the Notes page's wait. 73 since
+        # v0.6.17: HostApp, whether the program runs inside another app's private view of Windows and the way out.
+        self.assertEqual(len(set(declared)), 73, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,
