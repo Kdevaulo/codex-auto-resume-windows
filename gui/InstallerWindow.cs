@@ -181,7 +181,7 @@ namespace CodexAutoResume
         private void Adopt(InstallerWords next)
         {
             words = next;
-            Font = Typeface.For(baseFont, words.Catalog);
+            Font = Typeface.ForLanguage(baseFont, words.Catalog, words.Language);
             Soft.BaseFont = Font;
             title.Font = Soft.RoleFont("display");
             version.Font = Font;
