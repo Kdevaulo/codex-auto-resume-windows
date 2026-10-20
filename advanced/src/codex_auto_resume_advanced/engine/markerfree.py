@@ -46,6 +46,7 @@ live session is opened only by a watcher that has this capability armed.
 from __future__ import annotations
 
 from contextlib import nullcontext
+import uuid
 
 from codex_auto_resume.domain import ids
 from codex_auto_resume.domain.plug import Alternative
@@ -143,15 +144,15 @@ class MarkerFreeContinuation:
         not started. Never raises.
 
         Without a client id - core sends the marker through a channel only when P15 was not
-        taken for this send - the item is added with no id, and the marker in the words is what
-        proves it, as it always was."""
+        taken for this send - the item is added under a fresh id of its own, and the marker in the
+        words is what proves it, as it always was: codex-cli 0.163.0-alpha.10.2's schema makes
+        `clientUserMessageId` required on thread/queue/add, and an add without it is refused (#49)."""
         if (not ids.is_uuid(thread_id) or not isinstance(prompt, str) or not prompt
                 or len(prompt) > MAX_PROMPT or "\0" in prompt
                 or not (client_id is None or ids.is_uuid(client_id))):
             return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
-        params = {"threadId": thread_id, "input": [{"type": "text", "text": prompt}]}
-        if client_id is not None:
-            params["clientUserMessageId"] = client_id
+        params = {"threadId": thread_id, "input": [{"type": "text", "text": prompt}],
+                  "clientUserMessageId": client_id or str(uuid.uuid4())}
         session, opened = None, False
         try:
             with launch_guard if launch_guard is not None else nullcontext(True) as permitted:

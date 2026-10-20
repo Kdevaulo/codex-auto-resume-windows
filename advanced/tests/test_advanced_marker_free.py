@@ -628,10 +628,18 @@ class ChannelTests(unittest.TestCase):
                     "threadId": T1, "clientUserMessageId": self.CID,
                     "input": [{"type": "text", "text": "go"}]})])
 
-    def test_with_no_client_id_the_add_names_none(self):
+    def test_with_no_client_id_the_add_names_a_fresh_one(self):
+        """codex-cli 0.163.0-alpha.10.2 requires clientUserMessageId on thread/queue/add and refuses an add without
+        it (-32600, #49). Where P15 handed none the marker in the words still proves the send; the id is only
+        Codex's requirement, a fresh one each time."""
         session = self.Session(result={})
-        self.channel(session).send(T1, "go [codex-auto-resume:0123456789abcdef]")
-        self.assertNotIn("clientUserMessageId", session.params[0][1])
+        channel = self.channel(session)
+        channel.send(T1, "go [codex-auto-resume:0123456789abcdef]")
+        channel.send(T1, "go [codex-auto-resume:0123456789abcdef]")
+        first, second = (params["clientUserMessageId"] for _method, params in session.params)
+        self.assertTrue(ids.is_uuid(first) and ids.is_uuid(second))
+        self.assertNotEqual(first, second)
+        self.assertEqual(session.params[0][1]["input"], [{"type": "text", "text": "go [codex-auto-resume:0123456789abcdef]"}])
 
     def test_a_consent_refused_at_the_guard_opens_nothing(self):
         @contextlib.contextmanager
