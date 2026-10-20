@@ -3626,6 +3626,14 @@ offered. The code refuses where the job would end the watcher, and writes what t
 edition (v0.6.11) is where starting a process outside the host's job belongs, for a person who turns
 it on.
 
+What was built for it stays in the code, and refuses where the job would end the watcher. It starts the watcher from
+this plugin's MCP server when none is running, through the same launcher sign-in uses and never while an installation
+holds its lock. Codex starts the server more than once as it opens, so two of them can ask at the same moment; the
+watcher's own single-instance mutex answers that, and the second one exits without doing anything. Nothing new is
+registered with Windows for it: no scheduled task, no subscription, no process left resident to wait for Codex. Each
+time Codex starts the server, one line goes into `logs\codex-start.log`: what Windows wrapped that process in, and
+what was decided. It carries no path, no name and nothing from a conversation.
+
 ### The waiting light breathes, and the pictures show the right light
 
 A light that says the watcher is waiting for a reset held lit and still, while the notification-area
