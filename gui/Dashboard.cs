@@ -864,8 +864,10 @@ namespace CodexAutoResume
                 strip.Controls.Add(button);
             }
             nav.Controls.Add(strip);
-            // As tall as the tabs, measured, and again whenever the window's font changes.
-            EventHandler fit = delegate { nav.Height = strip.PreferredSize.Height + nav.Padding.Vertical; };
+            // As tall as the tabs, measured, and again whenever the window's font changes - with the room the chosen
+            // tab's heavier words take (ShowPage sets it in nav_current): in Microsoft YaHei UI the bold is a face of
+            // its own, a pixel taller than the regular, and the chosen tab was cut off at the strip's foot (v0.6.17).
+            EventHandler fit = delegate { nav.Height = strip.PreferredSize.Height + HeavierTab(strip) + nav.Padding.Vertical; };
             fit(this, EventArgs.Empty);
             FontChanged += fit;
 
@@ -1311,6 +1313,23 @@ namespace CodexAutoResume
             }
             cellWidths[list] = widths;
             FitColumns(list);
+        }
+
+        /// How much taller the tallest tab of `strip` is set in nav_current than in the font it has now: 0 where the
+        /// heavier weight is no taller, as in Segoe UI and Malgun Gothic.
+        private static int HeavierTab(Control strip)
+        {
+            int more = 0;
+            var any = new Size(int.MaxValue, int.MaxValue);
+            Font heavy = Soft.RoleFont("nav_current");
+            foreach (Control control in strip.Controls)
+            {
+                var tab = control as NavButton;
+                if (tab == null || string.IsNullOrEmpty(tab.Text) || ReferenceEquals(tab.Font, heavy)) continue;
+                more = Math.Max(more, TextRenderer.MeasureText(tab.Text, heavy, any, TextFormatFlags.SingleLine).Height -
+                                      TextRenderer.MeasureText(tab.Text, tab.Font, any, TextFormatFlags.SingleLine).Height);
+            }
+            return more;
         }
 
         /// How wide a column must be for its heading to be drawn whole: the heading in the list's
