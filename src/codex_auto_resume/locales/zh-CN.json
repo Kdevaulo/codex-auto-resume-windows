@@ -739,6 +739,7 @@
   "msg.setup_incomplete": "设置未完成：准备恢复状态或开启恢复时失败。请运行 `doctor` 查看原因。",
   "msg.setup_left_stopped": "自动继续已更新。更新前监视程序没有运行，因此保持停止状态；需要时请在仪表板中启动它。",
   "msg.setup_unconfirmed": "自动继续已设置完成，但无法确认监视程序正在运行。请打开仪表板或运行 `doctor` 进行检查。",
+  "msg.setup_unconfirmed_yet": "自动继续已设置完成。尚未确认监视程序正在运行；最后会再检查一次。",
   "msg.toast_after_sleep": "此电脑睡眠了 {time}",
   "msg.toast_after_sleep_count": "睡眠期间到期的任务在等待你：{n} 项",
   "msg.toast_after_sleep_next": "请在“待处理”中允许每个任务继续，或取消它。在此之前不会发送任何内容。",

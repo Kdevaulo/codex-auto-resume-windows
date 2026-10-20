@@ -739,6 +739,7 @@
   "msg.setup_incomplete": "Konfiguracja nie została ukończona: przygotowanie stanu odzyskiwania lub włączenie odzyskiwania nie powiodło się. Uruchom `doctor`, aby zobaczyć dlaczego.",
   "msg.setup_left_stopped": "Automatyczne wznawianie zostało zaktualizowane. Monitor nie działał przed aktualizacją, więc pozostał zatrzymany: uruchom go z Dashboardu, kiedy zechcesz.",
   "msg.setup_unconfirmed": "Automatyczne wznawianie zostało skonfigurowane, ale nie udało się potwierdzić, że monitor działa. Aby to sprawdzić, otwórz Dashboard lub uruchom `doctor`.",
+  "msg.setup_unconfirmed_yet": "Automatyczne wznawianie zostało skonfigurowane. Nie potwierdzono jeszcze, że monitor działa; zostanie sprawdzony ponownie na końcu.",
   "msg.toast_after_sleep": "Ten komputer był uśpiony przez {time}",
   "msg.toast_after_sleep_count": "Zadania, których czas nadszedł w trakcie uśpienia, czekają na Ciebie: {n}",
   "msg.toast_after_sleep_next": "Pozwól każdemu kontynuować na stronie Oczekujące albo je anuluj. Do tego czasu nic nie jest wysyłane.",

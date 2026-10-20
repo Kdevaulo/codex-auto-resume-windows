@@ -23,6 +23,12 @@ LAUNCHER_NAME = "watcher-launcher.py"
 RUNTIME_CONFIG = "runtime.json"
 ICON_NAME = "codex-auto-resume.ico"
 ENV_RUNTIME_HOME = "CODEX_AUTO_RESUME_PLUGIN_HOME"
+# What the installer tells setup about the call it is making, as environment variables set for that one call and
+# never as arguments: the installer may be a newer version than the setup it runs (the bootstrap's check-over runs
+# the INSTALLED plugin_setup.py), and an older one rejects an argument it does not know - so `setup` would not run
+# at all - while it ignores a variable it does not read.
+ENV_WILL_LOOK_AGAIN = "CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN"   # "1": the caller looks at the watcher again after setup
+ENV_ENGLISH = "CODEX_AUTO_RESUME_SETUP_ENGLISH"                   # "1": the caller's log is English: say watcher-running so
 RUNTIME_DIR_NAME = ".codex-auto-resume"
 # The directory names the installer creates under the root - and therefore the ones
 # it would destroy if it ever ran against a directory that merely contained them.
@@ -319,10 +325,14 @@ def cmd_setup(args) -> int:
     print()
     started = looked_again(home, started)
     confirmed = started in ("running", "already-running")
+    # A caller that looks at the watcher again after this (the installer, after its health check) has not heard a
+    # verdict yet: "not confirmed yet" is the true word mid-log, and its own last word is the verdict (v0.6.17, the
+    # live acceptance's second round). A setup run alone, from Codex, has no later look, so its word stays final.
+    unconfirmed_word = "setup_unconfirmed_yet" if os.environ.get(ENV_WILL_LOOK_AGAIN) == "1" else "setup_unconfirmed"
     if incomplete:
         say("setup_incomplete")
     else:
-        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else "setup_unconfirmed")
+        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else unconfirmed_word)
     if register_startup:
         say("setup_autostart")
     print()
@@ -380,6 +390,13 @@ def cmd_watcher_running(args) -> int:
     (build/install/install.ps1, scripts/bootstrap.ps1): a watcher that took the mutex after setup's wait ended is
     running, and the last word says so rather than contradicting the health check printed above it."""
     running = watcher_seen(runtime_home())
+    if os.environ.get(ENV_ENGLISH) == "1":
+        # The installer's log is English, and this line is the one place a localized sentence landed in it (v0.6.17,
+        # the live acceptance: "워처: 실행 중" on a Korean PC). `watcher_seen` has just built the App, which adopted the
+        # Interface language the person stored - and an explicit choice outranks the environment's override
+        # (l10n.resolve), so the line is asked for in English by name, for this one process. What the Dashboard's
+        # Diagnostics shows is another process, and is untouched.
+        l10n.set_preference("en")
     say({True: "watcher_running", False: "watcher_stopped", None: "watcher_unknown"}[running])
     return EXIT_OK if running is True else EXIT_UNCONFIRMED
 

@@ -164,17 +164,22 @@ function Get-OutsideSource {
         and values, then $Arguments as they are, everything it prints appended line by line to $Log as it prints it,
         and its exit code written to $CodeFile last.
     #>
-    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile)
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile,
+          [hashtable]$Environment)
     $literal = { param($text) "'" + ([string]$text).Replace("'", "''") + "'" }
     $call = '& ' + (& $literal $Script)
     foreach ($name in $Switches) { $call += ' -' + $name }
     if ($Values) { foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) } }
     foreach ($argument in $Arguments) { $call += ' ' + (& $literal $argument) }
+    # Variables the run outside has to see (this process's own do not reach it): one line each, before the call.
+    $variables = @()
+    if ($Environment) { foreach ($name in @($Environment.Keys | Sort-Object)) { $variables += '$env:' + $name + ' = ' + (& $literal $Environment[$name]) } }
     return @(
         '$ErrorActionPreference = ''Continue'''
         '$log = ' + (& $literal $Log)
         '$utf8 = New-Object System.Text.UTF8Encoding $false'
         '$code = 1'
+        $variables
         'try {'
         '    ' + $call + ' *>&1 | ForEach-Object { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
         '    $code = $LASTEXITCODE'
@@ -257,7 +262,7 @@ function Resolve-OutsideRun {
         Whether this run goes on here: $null, or the exit code of the run outside that did its work instead. A run
         CODEX_AUTO_RESUME_OUTSIDE=1 marks is one: it never relaunches, and the mark goes no further than it.
     #>
-    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments)
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [hashtable]$Environment)
     if ($env:CODEX_AUTO_RESUME_OUTSIDE -eq '1') {
         $env:CODEX_AUTO_RESUME_OUTSIDE = $null
         return $null
@@ -272,7 +277,7 @@ function Resolve-OutsideRun {
         $log = Join-Path $folder 'output.txt'
         $codeFile = Join-Path $folder 'code.txt'
         $source = Get-OutsideSource -Script $Script -Switches $Switches -Values $Values -Arguments $Arguments `
-                                    -Log $log -CodeFile $codeFile
+                                    -Log $log -CodeFile $codeFile -Environment $Environment
         $code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
     } catch {
         $code = $null
@@ -455,6 +460,24 @@ function Get-Edition {
         return 'advanced'
     }
     return 'standard'
+}
+
+function Get-AppVersion {
+    <#
+        The version the program files under Root (an app\ tree) declare: the plugin manifest's own "version", or
+        $null where there is no manifest, it cannot be read or it names no version. The one fact that tells a repair
+        from an update - this archive's version over the same version already installed - and read the way the
+        product reads it (config.version), from the tree itself rather than from a name.
+    #>
+    param([string]$Root)
+    $manifest = Join-Path (Join-Path $Root '.codex-plugin') 'plugin.json'
+    try {
+        $item = Get-Item -LiteralPath $manifest -Force -ErrorAction Stop
+        if ($item.PSIsContainer) { return $null }
+        $declared = ([IO.File]::ReadAllText($item.FullName) | ConvertFrom-Json).version
+        if ($declared -is [string] -and $declared.Trim()) { return $declared.Trim() }
+    } catch { }
+    return $null
 }
 
 function Get-EditionStatement {
@@ -1508,6 +1531,14 @@ try {
     $previousEdition = $null
     if ($upgrade) { $previousEdition = Get-Edition -Src (Join-Path $AppDir 'src') }
     $editionChange = $upgrade -and ($previousEdition -ne $edition)
+    # A repair is this archive's version over the same version, in the same edition (the setup program's Repair, or
+    # Install.cmd run again): the last word says it repaired, not that it updated (v0.6.17, the live acceptance).
+    # Read now, while the installed program files are still where they were.
+    $repair = $false
+    if ($upgrade -and -not $editionChange) {
+        $installedVersion = Get-AppVersion -Root $AppDir
+        if ($installedVersion -and ($installedVersion -ceq (Get-AppVersion -Root (Join-Path $Payload 'app')))) { $repair = $true }
+    }
     if ($editionChange) {
         Write-Host ''
         Write-Host (Get-EditionStatement -From $previousEdition -To $edition)
@@ -1807,7 +1838,12 @@ try {
     # treating it as success is how this script came to end with "Installed and running."
     # about a watcher nobody had looked at.
     $SETUP_UNCONFIRMED = 2
-    $code = Invoke-Setup $setupArgs
+    # This run looks at the watcher again after the health check (watcher-running, below) and says the last word, so a
+    # watcher setup could not confirm within its wait is "not confirmed yet" in setup's own line, not a verdict
+    # the last word then contradicts (v0.6.17, the live acceptance's second round). Said as a variable for this one
+    # call, the way the bootstrap says it to an installed setup that may be older.
+    $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'
+    try { $code = Invoke-Setup $setupArgs } finally { $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null }
     $watcherUnconfirmed = $code -eq $SETUP_UNCONFIRMED
     if ($code -ne 0 -and -not $watcherUnconfirmed) {
         Fail 'Setup did not complete. Nothing was removed; read the message above.'
@@ -1821,25 +1857,33 @@ try {
     # was written fresh, a watcher can take longer than that to take its mutex (v0.6.17 live acceptance: 6 to 9
     # seconds), and this run then ended "could not be confirmed" under a health check that had just seen the mutex
     # held. So it is looked at once more, now, before the last word: a watcher running now is a watcher running.
-    if ($watcherUnconfirmed -and (Invoke-Setup @('watcher-running')) -eq 0) { $watcherUnconfirmed = $false }
+    # The look's one line is said in English, for this English log, whatever Interface language the PC stores.
+    if ($watcherUnconfirmed) {
+        $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = '1'
+        try { if ((Invoke-Setup @('watcher-running')) -eq 0) { $watcherUnconfirmed = $false } }
+        finally { $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = $null }
+    }
 
     # The Dashboard that closed for this update opens again on the new version, where it was (Open-ClosedDashboard).
     Open-ClosedDashboard -Updated
 
     Write-Host ''
     if ($script:Failed) { Write-Host 'Finished with problems. See the messages above.'; exit 1 }
+    # What was done to an installation that was there: repaired (this version over itself) or updated.
+    $keptLine = if ($repair) { 'Repaired. Your settings and pending recoveries were kept.' }
+                else { 'Updated. Your settings and pending recoveries were kept.' }
     if ($watcherUnconfirmed) {
-        if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
+        if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed.' }
         Write-Host 'The watcher could not be confirmed running, so nothing is being watched yet.'
         Write-Host 'Open Start Menu > Codex Auto Resume and use Start watcher, or run this again.'
     } elseif ($previousWatcherStillRunning) {
-        Write-Host 'Updated. Your settings and pending recoveries were kept.'
+        Write-Host $keptLine
         Write-Host 'The previous version of the watcher was asked to stop and is still finishing'
         Write-Host 'what it was doing; nothing was ended by force. Once it has stopped, open'
         Write-Host 'Start Menu > Codex Auto Resume and use Start watcher - or sign out and back in.'
     } else {
-        if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
+        if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed and running.' }
         Write-Host 'Recommended settings are already on. Nothing else to do.'
     }

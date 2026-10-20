@@ -739,6 +739,7 @@
   "msg.setup_incomplete": "安裝未完成：準備復原狀態資料或開啟復原時失敗。請執行 `doctor` 查看原因。",
   "msg.setup_left_stopped": "自動接續已更新。更新前監看程式沒有執行，因此維持停止狀態；需要時請在儀表板中啟動它。",
   "msg.setup_unconfirmed": "自動接續已安裝，但無法確認監看程式正在執行。請開啟儀表板或執行 `doctor` 來檢查。",
+  "msg.setup_unconfirmed_yet": "自動接續已安裝。尚未確認監看程式正在執行；最後會再檢查一次。",
   "msg.toast_after_sleep": "這台電腦睡眠了 {time}",
   "msg.toast_after_sleep_count": "睡眠期間到期的任務正在等待您：{n} 個",
   "msg.toast_after_sleep_next": "請在「待處理」中允許每個任務接續，或取消它。在此之前不會傳送任何內容。",

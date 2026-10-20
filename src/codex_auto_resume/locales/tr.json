@@ -739,6 +739,7 @@
   "msg.setup_incomplete": "Kurulum tamamlanmadı: kurtarma durumunu hazırlama veya kurtarmayı açma başarısız oldu. Nedenini görmek için `doctor` komutunu çalıştırın.",
   "msg.setup_left_stopped": "Otomatik sürdürme güncellendi. İzleyici güncellemeden önce çalışmıyordu, bu yüzden durdurulmuş olarak bırakıldı: istediğinizde Gösterge Paneli'nden başlatın.",
   "msg.setup_unconfirmed": "Otomatik sürdürme kuruldu, ancak izleyicinin çalıştığı doğrulanamadı. Kontrol etmek için Gösterge Paneli'ni açın veya `doctor` komutunu çalıştırın.",
+  "msg.setup_unconfirmed_yet": "Otomatik sürdürme kuruldu. İzleyicinin çalıştığı henüz doğrulanmadı; sonunda bir kez daha kontrol edilecek.",
   "msg.toast_after_sleep": "Bu bilgisayar {time} uyku modunda kaldı",
   "msg.toast_after_sleep_count": "Uyku sırasında zamanı gelen ve sizi bekleyen görevler: {n}",
   "msg.toast_after_sleep_next": "Her birinin Bekleyenler'den devam etmesine izin verin veya iptal edin. O zamana kadar hiçbir şey gönderilmez.",
