@@ -63,6 +63,30 @@ class ShimTests(unittest.TestCase):
             with self.subTest(name):
                 self.assertNotEqual(before, after)
 
+    def test_a_text_area_shows_the_soft_bar_and_never_windows_own(self):
+        """The log beside the bar is a SoftTextArea: its box is wider than its clip by Windows' own scroll bar, which the
+        real window never shows - only the soft bar. DrawToBitmap printed that native bar anyway (the owner spotted it
+        in the first pictures, 2026-10-20). Where the box keeps it, a frame holds none of its plain greys - its track and
+        arrows are r = g = b, which no colour of the window's palette is - and the bar's place shows what the area
+        itself draws there."""
+        plan = motion.load("install-en")
+        events = len(plan["events"])
+        frames = [{"index": 0, "page": "welcome", "light": 0}, {"index": 1, "page": "options", "light": 40},
+                  {"index": 2, "page": "progress", "progress": events, "light": 80}]
+        data = motion.job(plan, [], Path(self.work.name) / "bar" / "frames")
+        data["frames"] = frames
+        result = motion.render(self.exe, data, Path(self.work.name) / "bar")
+        index, (width, height), picture, bounds = list(motion.pictures(result, Path(self.work.name) / "bar" / "frames"))[-1]
+        self.assertIn("area.0", bounds, "the Progress page shows its log")
+        left, top, wide, tall = (int(value) for value in bounds["native.0"])
+        greys = 0
+        for y in range(max(0, top), min(height, top + tall)):
+            for x in range(max(0, left), min(width, left + wide)):
+                red, green, blue = picture[(y * width + x) * 3:(y * width + x) * 3 + 3]
+                greys += red == green == blue and 40 <= red <= 250
+        self.assertLess(greys, max(8, wide * tall // 200), "Windows' own scroll bar shows in the log (%d plain grey "
+                                                            "pixels where the box keeps it)" % greys)
+
     def test_it_refuses_to_go_back_a_page(self):
         plan = motion.load("install-en")
         data = motion.job(plan, [], Path(self.work.name) / "back" / "frames")
