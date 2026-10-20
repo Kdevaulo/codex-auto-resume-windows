@@ -143,10 +143,12 @@ class HostAppPlacementTests(unittest.TestCase):
         self.assertEqual(loader.count("bridge.Call("), 1)
 
     def test_the_layout_audit_gives_it_its_longest_answer(self):
-        audit = guiscan.read("WindowAudit.cs")
+        # The audit's part of the window, by its type block (guiscan.member_body reads the window's own group).
+        audit = guiscan.type_body("SettingsForm", guiscan.read("WindowAudit.cs"))
         self.assertIn("form.ApplyHostApp(AuditHostApp())", audit)
-        longest = guiscan.member_body("SettingsForm", "AuditHostApp")
-        self.assertEqual(longest.count('"inside"'), 2, "both inside, in two apps: two lines and the sentence")
+        self.assertEqual(audit.count('"inside"'), 2, "both inside, in two apps: two lines and the sentence")
+        self.assertIn('"OpenAI.Codex"', audit)
+        self.assertIn('"Claude"', audit)
 
 
 if __name__ == "__main__":
