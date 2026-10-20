@@ -99,6 +99,11 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
   Codex, and send them one at a time where not;
   and a person's *Send now* wins where it can send, while an early look sends it where *Send now* cannot before a reset.
   When one feature stands aside for another, the journal says so and names it, in place of a silent "acted".
+- **The goal continuation resumes the goal after a usage-limit reset again** (fixed by [@Kdevaulo](https://github.com/Kdevaulo),
+  [#49](https://github.com/songyb111-gachon/codex-auto-resume-windows/pull/49)). Codex 0.163 refuses a queued message that
+  names no client message id, and the goal continuation and the continuation with no marker sent one without it when they
+  carried the marker. Both now always name one; the goal is set active and read back before its continuation is queued,
+  and a failed or unconfirmed activation no longer turns into one ordinary turn.
 - **Two sends for one conversation at the same instant count as two** in "Sends an hour, all advanced features
   together". They used to merge into one, so one later send could pass the number by one; the stored state keeps its
   format, so v0.6.16 still reads it.
