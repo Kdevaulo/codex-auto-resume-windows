@@ -29,6 +29,9 @@ import motion_plan  # noqa: E402
 
 FLOW = (ROOT / "gui" / "InstallerFlow.cs").read_text(encoding="utf-8")
 INSTALL_PS1 = (ROOT / "build" / "install" / "install.ps1").read_text(encoding="utf-8")
+SETUP_CS = (ROOT / "build" / "setup" / "Setup.cs").read_text(encoding="utf-8")
+# The one line the setup program prints itself, before install.ps1 runs (Setup.cs, InstallFrom).
+SETUP_LINE = "Codex Auto Resume setup: unpacking "
 
 
 def plans() -> dict:
@@ -150,6 +153,8 @@ class PlanTests(unittest.TestCase):
         for name, plan in plans().items():
             shown = labels(plan)
             with self.subTest(name):
+                if shown[0][0] == "starting":
+                    shown = shown[1:]
                 self.assertEqual([step for step, _ms in shown],
                                  ["unpack", "codex", "files", "plugin", "setup", "check"])
                 for step, ms in shown:
@@ -162,6 +167,8 @@ class PlanTests(unittest.TestCase):
                 if "line" not in event:
                     continue
                 line = event["line"].strip()
+                if line.startswith(SETUP_LINE):
+                    continue
                 with self.subTest(name=name, line=line):
                     if line.startswith("edition: "):
                         self.assertEqual(line, "edition: " + plan["edition"])
@@ -178,6 +185,16 @@ class PlanTests(unittest.TestCase):
                     self.assertGreater(found, last, "printed before the line above it")
                     last = found
 
+    def test_the_run_begins_with_the_setup_programs_own_line_naming_its_archive(self):
+        import make_release
+        self.assertIn('heard("%s" + Embedded.Archive + " into " + folder.Path);' % SETUP_LINE, SETUP_CS)
+        for name, plan in plans().items():
+            with self.subTest(name):
+                first = plan["events"][0]["line"]
+                archive = make_release.archive_name(plan["edition"], motion.version())
+                self.assertTrue(first.startswith(SETUP_LINE + archive + " into C:\\Users\\ExampleUser\\"), first)
+                self.assertEqual(sum(1 for event in plan["events"] if event.get("line", "").startswith(SETUP_LINE)), 1)
+
     def test_every_line_moves_the_window_on(self):
         """A line the window does not read is a line nobody sees move anything: each event moves the bar, and the run
         ends where install.ps1's last step puts it."""
@@ -189,7 +206,7 @@ class PlanTests(unittest.TestCase):
                         place = unpacked_at() * float(event["unpacked"])
                         self.assertGreater(place, at)
                         at = place
-                    else:
+                    elif not event["line"].startswith(SETUP_LINE):
                         after = advance(event["line"], at, step)
                         self.assertGreater(after[0], at)
                         at, step = after

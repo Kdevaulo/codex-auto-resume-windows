@@ -104,7 +104,10 @@ def load(name) -> dict:
     if "scenes_from" in plan:
         shared = json.loads((path.parent / plan["scenes_from"]).read_text(encoding="utf-8"))
         plan["events"], plan["scenes"] = shared.get("events"), shared.get("scenes")
-    values = plan.get("values") or {}
+    # What a release changes, put in as it is now: the version and the name of the archive the setup program carries.
+    import make_release
+    values = dict(plan.get("values") or {}, version=version(),
+                  archive=make_release.archive_name(plan.get("edition", "standard"), version()))
     plan["events"] = motion_plan._substitute(plan.get("events") or [], values)
     plan["scenes"] = spell_events(motion_plan._substitute(plan.get("scenes") or [], values), plan["events"])
     check(plan)

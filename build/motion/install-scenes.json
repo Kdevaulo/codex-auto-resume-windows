@@ -1,5 +1,6 @@
 {
   "events": [
+    {"line": "Codex Auto Resume setup: unpacking ${archive} into C:\\Users\\ExampleUser\\AppData\\Local\\Temp\\CodexAutoResume-Setup-5f0c2a9e41b7d386", "hold": 60},
     {"unpacked": 0.1, "hold": 90},
     {"unpacked": 0.2, "hold": 90},
     {"unpacked": 0.3, "hold": 90},
@@ -23,7 +24,7 @@
     {"id": "S1", "steps": [{"set": {"page": "welcome"}, "hold": 3000}]},
     {"id": "S2", "steps": [{"move": "button.forward", "frames": 25, "step": 16}, {"hover": "button.forward", "frames": 10, "step": 16}, {"press": "button.forward", "frames": 8, "step": 16}, {"set": {"page": "options"}, "hold": 300}]},
     {"id": "S3", "steps": [{"move": "${reading}", "frames": 25, "step": 16}, {"hold": 2400}, {"move": "button.forward", "frames": 25, "step": 16}, {"hover": "button.forward", "frames": 10, "step": 16}, {"press": "button.forward", "frames": 8, "step": 16}, {"set": {"page": "progress"}, "hold": 300}]},
-    {"id": "S4", "steps": [{"move": "${watching}", "frames": 25, "step": 16}, {"events": [1, 18]}]},
+    {"id": "S4", "steps": [{"move": "${watching}", "frames": 25, "step": 16}, {"events": [1, 19]}]},
     {"id": "S5", "steps": [{"set": {"page": "finish"}, "hold": 2200}, {"move": "button.forward", "frames": 25, "step": 16}, {"hover": "button.forward", "frames": 1, "step": 2000}]}
   ]
 }
