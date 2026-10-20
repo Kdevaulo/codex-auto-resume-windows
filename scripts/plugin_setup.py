@@ -384,6 +384,13 @@ def cmd_watcher_running(args) -> int:
     (build/install/install.ps1, scripts/bootstrap.ps1): a watcher that took the mutex after setup's wait ended is
     running, and the last word says so rather than contradicting the health check printed above it."""
     running = watcher_seen(runtime_home())
+    if getattr(args, "english", False):
+        # The installer's log is English, and this line is the one place a localized sentence landed in it (v0.6.17,
+        # the live acceptance: "워처: 실행 중" on a Korean PC). `watcher_seen` has just built the App, which adopted the
+        # Interface language the person stored - and an explicit choice outranks the environment's override
+        # (l10n.resolve), so the line is asked for in English by name, for this one process. What the Dashboard's
+        # Diagnostics shows is another process, and is untouched.
+        l10n.set_preference("en")
     say({True: "watcher_running", False: "watcher_stopped", None: "watcher_unknown"}[running])
     return EXIT_OK if running is True else EXIT_UNCONFIRMED
 
@@ -559,7 +566,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("thread_id")
     sub.add_parser("stop")
     sub.add_parser("doctor")
-    sub.add_parser("watcher-running", help="exit 0 only if this installation's watcher holds its mutex now")
+    p = sub.add_parser("watcher-running", help="exit 0 only if this installation's watcher holds its mutex now")
+    p.add_argument("--english", action="store_true",
+                   help="say the one line in English whatever Interface language is stored: for the installer's log")
     sub.add_parser("verify-home", help="exit 0 only if the install root is provably ours")
     sub.add_parser("claim-home",
                    help="exit 0 only if the install root is ours or holds nothing of ours")

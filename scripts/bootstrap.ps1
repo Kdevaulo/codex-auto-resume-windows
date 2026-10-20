@@ -2034,7 +2034,7 @@ if ($null -ne $standing -and $standing -ge 0 -and -not $Force) {
     # mutex since - on a busy PC it can take longer than that wait (v0.6.17 live acceptance) - is running, and this
     # run's code says so: the watcher is looked at once more, here (a look writes nothing, so it need not go outside).
     if ($code -eq 2) {
-        & $python $setup 'watcher-running'
+        & $python $setup 'watcher-running' '--english'
         if ($LASTEXITCODE -eq 0) { $code = 0 }
     }
     exit $code

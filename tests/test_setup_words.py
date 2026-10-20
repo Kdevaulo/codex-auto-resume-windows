@@ -50,14 +50,17 @@ def _plugin_setup():
 class ScratchSetup(unittest.TestCase):
     """plugin_setup's `setup` against a scratch home: no real registry, no shortcut, no watcher."""
 
+    PIN_ENGLISH = True       # the language is pinned, so a case's words do not depend on this PC's Windows language
+
     def setUp(self):
         from test_cli import FakeWinreg
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name) / "runtime"
         self.bridge = _plugin_setup()
-        patches = [patch.object(l10n, "current", return_value="en"),
-                   patch.object(startup, "_winreg", return_value=FakeWinreg())]
+        patches = [patch.object(startup, "_winreg", return_value=FakeWinreg())]
+        if self.PIN_ENGLISH:
+            patches.append(patch.object(l10n, "current", return_value="en"))
         for target, replacement in (("install", None), ("uninstall", False), ("current_value", None),
                                     ("register_aumid", True), ("unregister_aumid", False)):
             patches.append(patch.object(startup, target, return_value=replacement))
@@ -167,6 +170,46 @@ class CallersLookAgainTests(unittest.TestCase):
         for path in (ROOT / "skills" / "codex-auto-resume" / "SKILL.md", ROOT / "docs" / "PLUGIN.md"):
             if path.is_file():
                 self.assertNotIn("--will-look-again", path.read_text(encoding="utf-8"), path.name)
+
+
+class EnglishLookTests(ScratchSetup):
+    """The installer's look at the watcher says its line in English, whatever Interface language is stored: the
+    language is the person's own and an explicit one outranks the environment's override, so the call asks for English."""
+    PIN_ENGLISH = False
+
+    def setUp(self):
+        super().setUp()
+        from codex_auto_resume import config
+        self.addCleanup(l10n.set_preference, l10n.SYSTEM)
+        config.Paths(self.home).ensure()
+        config.update_settings(config.Paths(self.home), {"interface_language": "ko"})
+
+    def look(self, *flags):
+        args = self.bridge.build_parser().parse_args(["watcher-running", *flags])
+        output = io.StringIO()
+        with patch.object(self.bridge, "runtime_home", return_value=self.home), contextlib.redirect_stdout(output):
+            code = self.bridge.COMMANDS[args.command](args)
+        return code, output.getvalue().strip()
+
+    def test_a_korean_pc_s_look_is_korean_unless_english_is_asked_for(self):
+        code, said = self.look()
+        self.assertEqual((code, said), (self.bridge.EXIT_UNCONFIRMED, l10n.text("msg.watcher_stopped", "ko")))
+        self.assertNotEqual(said, l10n.text("msg.watcher_stopped", "en"))
+
+    def test_asked_for_english_the_same_look_is_english_with_the_same_answer(self):
+        code, said = self.look("--english")
+        self.assertEqual((code, said), (self.bridge.EXIT_UNCONFIRMED, l10n.text("msg.watcher_stopped", "en")))
+
+    def test_a_running_watcher_is_said_in_english_too(self):
+        with patch.object(self.bridge, "watcher_seen", return_value=True):
+            code, said = self.look("--english")
+        self.assertEqual((code, said), (self.bridge.EXIT_OK, "Watcher: running"))
+
+    def test_the_installer_and_the_bootstrap_ask_for_english_and_nothing_else_does(self):
+        self.assertIn("Invoke-Setup @('watcher-running', '--english')", INSTALL.read_text(encoding="utf-8"))
+        self.assertIn("& $python $setup 'watcher-running' '--english'", BOOTSTRAP.read_text(encoding="utf-8"))
+        for window in sorted((ROOT / "gui").glob("*.cs")):
+            self.assertNotIn("--english", window.read_text(encoding="utf-8"), window.name)
 
 
 def run_powershell(script: str) -> str:

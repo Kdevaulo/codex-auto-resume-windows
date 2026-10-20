@@ -1851,7 +1851,7 @@ try {
     # was written fresh, a watcher can take longer than that to take its mutex (v0.6.17 live acceptance: 6 to 9
     # seconds), and this run then ended "could not be confirmed" under a health check that had just seen the mutex
     # held. So it is looked at once more, now, before the last word: a watcher running now is a watcher running.
-    if ($watcherUnconfirmed -and (Invoke-Setup @('watcher-running')) -eq 0) { $watcherUnconfirmed = $false }
+    if ($watcherUnconfirmed -and (Invoke-Setup @('watcher-running', '--english')) -eq 0) { $watcherUnconfirmed = $false }
 
     # The Dashboard that closed for this update opens again on the new version, where it was (Open-ClosedDashboard).
     Open-ClosedDashboard -Updated
