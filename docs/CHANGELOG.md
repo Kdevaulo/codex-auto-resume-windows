@@ -3212,6 +3212,7 @@ off - and a second pass found 10 more; each is fixed, with a test that failed be
 - A section-by-section review of all sixteen document pairs found 62 places where the English and
   the Korean said different things; each is fixed in the language that was wrong, and the Korean
   guide now has every section the English one has.
+- `CONTRIBUTING`, `SECURITY` and `SUPPORT` moved to `docs/`, in both languages. GitHub reads all three from there, so its security policy tab and the contributing link on a new issue are unchanged.
 
 ### The design settled
 
@@ -3380,6 +3381,91 @@ Pending page's check results still read *OK*, *Waiting*, *Blocked* and *Unknown*
   false or null, read from the job each time - whenever it started a watcher, and the MCP wire golden
   now holds a start in such a job and one in no job. The job is read by the one function the start
   with Codex refuses by.
+
+### The groundwork: where every file goes when the core is Rust
+
+A stage of v0.6.10 that changes nothing a person can see but the version it names; it went out first as the pre-release v0.6.10-alpha. The window draws what it drew, the popup renders the same pixels, the panel serves the same script, and every reply on the wire carries the same fields - `tests/golden/` holds each one to the byte.
+
+`docs/ROADMAP.md` plans to replace the Python core with Rust under one rule - **replace the
+implementation, not the behavior** - and names the eight parts it is built from. That rule can only
+be kept if each part's behaviour is in one place first: a file that does two parts' work is read
+twice, ported twice and kept in step twice, and the second port is where behaviour quietly changes.
+This release is that groundwork.
+
+#### The map
+
+`tests/test_stack.py` places every module on exactly one of the eight Rust parts, on one of the
+parts the Windows interface keeps, or on the few that are neither, and holds the placement four
+ways, each of which only ever shrinks: parts with no package of their own, packages that hold two
+parts, single modules that do two parts' work, and the graph of which part calls which. An entry
+that stops being true fails the test, so the lists cannot go stale while the tree moves.
+`tests/test_layers.py` has held the direction of every import since v0.6.5; this is the other
+question - not which way a call points, but which binary the code ends up inside.
+
+
+#### The Python package, in the plan's layout
+
+The layout the v0.6.5 plan drew is the tree now: `domain/ store/ codex/ compat/ win/ engine/
+control/ mcp/ commands/ runtime/ ui/`. What moved in this release, each by line range and never
+retyped, each old module kept as a front that re-exports every name it had:
+
+- `windows.py` (989 lines, two parts at once) is the Codex adapter in `codex/` - `transport.py`,
+  `appserver.py`, `pairing.py`, `usage.py` - and the Windows platform in `win/` - `kernel.py`,
+  `sync.py`, `homelock.py`, `inventory.py`.
+- `machine.py` is `domain/states.py`, `domain/gates.py` and `domain/public.py`: the stored states,
+  the gates a record passes before anything is sent, and what a person is shown. Its docstring had
+  always called them "three layers, kept apart on purpose".
+- `app.py` is `runtime/`: the composition root, the watcher's loop, and the toasts it raises. The
+  watcher has a package of its own for the first time.
+- `cli.py` is the parser and the command table; the fifteen command bodies are `commands/`.
+- `compat.py` and `compatio.py` are `compat/`, nine files: the registry's model, what a document
+  says about a version, the report, what may be done at a tier, and the io half.
+- `notice_window.py`, the notification card's window code, is `ui/card/`, beside the icon and the
+  popup.
+- Before this: `store/`, `engine/`, `control/`, `brand/`, `codex/`, `ui/popup/`, `ui/tray/` and
+  `mcp/`, and the popup's, panel's and server's large files.
+
+#### The window, in nineteen files
+
+`gui/Controls.cs` was 6,753 lines; `gui/SettingsApp.cs` and `gui/Dashboard.cs` were 4,150 and
+4,353, holding one `partial class` in four declarations. They are nineteen sources now: the
+Settings half, the Dashboard half, the soft controls both are drawn with, and the generated
+palette. Every type and member moved as its own text; the compiler is handed the same code, and
+the pictures are byte for byte what they were. `gui/window.sources` is the compile list and the only
+place it is written, divided into `[settings]`, `[dashboard]`, `[controls]` and `[generated]`, and
+every rule the suite holds the window's code to asks for a group rather than a file.
+
+
+#### The wire, as types
+
+`control/wire.py` writes down the shapes the control layer hands every surface - a record, a row of
+Pending or History, the watcher, the status, the statistics, the Compatibility card's view, a
+setting as `describe` publishes it - as twelve typed contracts. `tests/test_wire_types.py` holds each
+one to the golden replies both ways: every key on the wire is declared, every declared key is on the
+wire, and every value fits its type. 144 fields the window reads are held to a declared key. These
+are what a Rust port declares as structs, and they keep what a port would be tempted to lose:
+"cannot tell" as its own value where a question can go unanswered, and not as false.
+
+
+#### Found while doing it
+
+Splitting a module into a package fails in ways that say nothing at the time, and this release
+built a test for each before moving anything - `tests/test_names.py`, `tests/test_reexports.py`,
+`tests/guiscan.py` - and then an adversarial review of the result. What they found before any of
+it reached anyone:
+
+- A relative import inside a moved function means something else one package level down. In the
+  Codex adapter it made the list of versions the bundled registry verifies silently empty; in the
+  watcher's composition root it would have started the watcher without its notification-area icon.
+  Every in-function import in moved code is now rewritten a level up, and `tests/test_names.py`
+  fails on one that names a module that is not there.
+- A test patch aimed at a front reaches nothing. Five tests had been checking the real thing instead
+  of the stand-in they named - the installer's lock among them - and are aimed at the module that
+  looks each name up.
+- The release build would have failed copying the moved documents, and the picture generator's
+  fake Codex reached no process.
+- The wire goldens read the live compatibility data, so any data publish broke the suite; the first
+  one since they were made did. They read the frozen copy now. (This one is also on `main`.)
 
 ## v0.6.10-alpha — Where every file goes when the core is Rust
 
