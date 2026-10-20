@@ -3366,6 +3366,12 @@ def pinned_installation(workspace: Path, *, watching: bool = True, engine: bool 
         for override in (config.ENV_HOME, config.ENV_CODEX_EXE):
             os.environ.pop(override, None)
         stack.enter_context(_registry_stand_in())
+        # v0.6.17: where the watcher and the bridge run (win/kernel.host_app) is read from the live process table - inside
+        # Claude desktop or the Codex app where the pictures are drawn from one: pinned as an installation started from
+        # the Start menu answers it, outside every app.
+        from codex_auto_resume.win import kernel
+        stack.enter_context(patch.object(kernel, "host_app", side_effect=lambda pid=None, started_by=None: {
+            "state": "outside", "family": None, "app": None}))
         if watching:
             stack.enter_context(_watcher_mutex_held(paths))
         write_heartbeat(paths, ENVELOPE_NOW, word)

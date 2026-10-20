@@ -646,11 +646,15 @@ namespace CodexAutoResume
             // v0.6.11: the Overview's line under what is waiting, whole: that the watcher keeps this PC awake, and the last
             // usage reading (WaitingLine).
             diagWaiting = Fact(facts, S("diag.while_waiting", "While tasks wait"));
+            // v0.6.17, last, so no row before it moves: whether the watcher and this window's bridge run inside another app's
+            // private view (LoadHostApp), and - only while one does - what that means, under the facts.
+            diagHostApp = Fact(facts, S("diag.host_app", "Inside another app"));
+            diagHostApp.Text = S("diag.state_access.unknown", "not checked");
             // v0.6.11: each value stretched across its column, so one longer than the card - a watcher stopped by the
             // memory guard at a time on another day, a state folder other accounts can open - wraps under itself in every
             // language rather than being cut off. A value that fits is drawn where it always was.
             foreach (Label value in new[] { diagVersion, diagWatcher, diagLastCheck, diagEngine, diagRecovery, diagStartup,
-                                            diagUpdate, diagMemory, diagStateAccess, diagWaiting })
+                                            diagUpdate, diagMemory, diagStateAccess, diagWaiting, diagHostApp })
                 value.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
             diagUpgrade = Value("");
             diagUpgrade.ForeColor = Accent;
@@ -665,6 +669,10 @@ namespace CodexAutoResume
             diagStateNote.ForeColor = Accent;
             diagStateNote.MaximumSize = new Size(Px(360), 0);
             health.Controls.Add(diagStateNote);
+            diagHostNote = Value("");
+            diagHostNote.ForeColor = Accent;
+            diagHostNote.MaximumSize = new Size(Px(360), 0);
+            health.Controls.Add(diagHostNote);
 
             TableLayoutPanel tools = MakeCard(S("diag.tools", "Tools"));
             tools.Margin = GridGap(1, false);

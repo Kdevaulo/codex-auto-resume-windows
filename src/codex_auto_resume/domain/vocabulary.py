@@ -506,10 +506,12 @@ class WatcherEnd(StrEnum):
 
 class StateAccess(StrEnum):
     """Who Windows lets open the state folder (control/tools.py, v0.6.11): this account and Windows
-    itself only; other accounts too; or it could not be read."""
+    itself only; other accounts too; or it could not be read - and (v0.6.17) this account with Codex's
+    sandbox group reading it, which Codex's Windows sandbox adds and which is no other person's access."""
     OWNER_ONLY = "owner_only"
     SHARED = "shared"
     UNKNOWN = "unknown"
+    CODEX_SANDBOX = "codex_sandbox"
 
 
 class NotifyEvent(StrEnum):

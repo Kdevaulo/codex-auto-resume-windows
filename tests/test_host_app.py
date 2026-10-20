@@ -182,6 +182,153 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(self.answer("relaunched")["found"], "True|False|-Silent")
 
 
+# ----------------------------------------------------------------------- the Python walk (Diagnostics)
+# The cases HARNESS gives HostApp.Decide, the same tables, for win/kernel.py's decide_host - which Diagnostics asks of
+# the watcher's process and the bridge's own (control/tools.py host_app). (pid, parent, created, package) each.
+PY_CASES = {
+    "packaged ancestor": (100, [(100, 90, 50, None), (90, 80, 40, None), (80, 4, 30, CODEX)]),
+    "own package": (100, [(100, 90, 50, "Claude_pzs8sxrjxfjjc"), (90, 4, 40, None)]),
+    "no package": (100, [(100, 90, 50, None), (90, 80, 40, None), (80, 4, 30, None)]),
+    "parent created after its child": (100, [(100, 90, 50, None), (90, 80, 60, CODEX)]),
+    "parent cannot be opened": (100, [(100, 90, 50, None), (90, 80, 0, None), (80, 4, 0, CODEX)]),
+    "cycle": (100, [(100, 90, 10, None), (90, 80, 10, None), (80, 90, 10, None)]),
+    "self as its own parent": (100, [(100, 100, 10, None)]),
+}
+
+
+class _Counting(dict):
+    """A process table that counts its lookups, as HARNESS's Counting does."""
+    lookups = 0
+
+    def get(self, key, default=None):
+        self.lookups += 1
+        return super().get(key, default)
+
+
+def _table(rows) -> _Counting:
+    table = _Counting()
+    for pid, parent, created, package in rows:
+        dict.__setitem__(table, pid, (parent, created, package))
+    return table
+
+
+def _chain(depth_of_package: int) -> _Counting:
+    """A line of ancestors under pid 1000, each created before its child, the package `depth_of_package` parents up."""
+    rows, pid = [], 1000
+    for depth in range(60):
+        rows.append((pid, pid - 1, 10_000 - depth, "Far.away_abcdefghijklm" if depth == depth_of_package else None))
+        pid -= 1
+    return _table(rows)
+
+
+class PythonWalkTests(unittest.TestCase):
+    """win/kernel.py's walk: HostApp.Decide's answers over HostApp.Decide's tables, guard by guard, with no live
+    process asked - each guard taken out fails one of these."""
+
+    def setUp(self):
+        from codex_auto_resume.win import kernel
+        self.kernel = kernel
+
+    def decide(self, case):
+        start, rows = PY_CASES[case]
+        table = _table(rows)
+        return self.kernel.decide_host(start, table), table.lookups
+
+    def test_the_same_answers_as_hostapp_decide(self):
+        """The answers DecisionTests holds the C# walk to, case by case."""
+        expected = {"packaged ancestor": CODEX, "own package": "Claude_pzs8sxrjxfjjc", "no package": None,
+                    "parent created after its child": None, "parent cannot be opened": None, "cycle": None,
+                    "self as its own parent": None}
+        for case, found in expected.items():
+            with self.subTest(case):
+                self.assertEqual(self.decide(case)[0], found)
+
+    def test_a_parent_created_after_its_child_is_not_its_parent(self):
+        self.assertIsNone(self.decide("parent created after its child")[0])
+
+    def test_a_parent_that_cannot_be_opened_ends_the_walk(self):
+        found, lookups = self.decide("parent cannot be opened")
+        self.assertIsNone(found)
+        self.assertLessEqual(lookups, 2, "the walk went past a parent it could not open")
+
+    def test_a_cycle_stops_at_once(self):
+        for case in ("cycle", "self as its own parent"):
+            with self.subTest(case):
+                found, lookups = self.decide(case)
+                self.assertIsNone(found)
+                self.assertLessEqual(lookups, 4, "the walk went round the cycle")
+
+    def test_the_walk_goes_as_far_as_hostapp_and_no_further(self):
+        steps = self.kernel.HOST_MAX_STEPS
+        self.assertEqual(steps, 32, "HostApp.MaxSteps")
+        self.assertEqual(self.kernel.decide_host(1000, _chain(steps)), "Far.away_abcdefghijklm")
+        table = _chain(steps + 1)
+        self.assertIsNone(self.kernel.decide_host(1000, table))
+        self.assertLessEqual(table.lookups, steps + 2)
+
+    def test_the_apps_name_drops_the_publisher_id(self):
+        self.assertEqual(self.kernel.app_name(CODEX), "OpenAI.Codex")
+        self.assertEqual(self.kernel.app_name("NoHash"), "NoHash")
+        self.assertEqual(self.kernel.app_name(None), "")
+
+    def test_the_verdict_says_inside_outside_or_unknown_and_never_more_than_the_family(self):
+        verdict = self.kernel.host_verdict
+        start, rows = PY_CASES["packaged ancestor"]
+        self.assertEqual(verdict(start, _table(rows)), {"state": "inside", "family": CODEX, "app": "OpenAI.Codex"})
+        start, rows = PY_CASES["no package"]
+        self.assertEqual(verdict(start, _table(rows))["state"], "outside")
+        self.assertEqual(verdict(4242, _table(rows))["state"], "unknown", "a process not in the table")
+        self.assertEqual(verdict(100, _table([(100, 90, 0, None)]))["state"], "unknown", "one that cannot be opened")
+        odd = verdict(100, _table([(100, 90, 50, "C:\\Users\\ExampleUser\\not a family")]))
+        self.assertEqual(odd, {"state": "inside", "family": None, "app": None}, "what is not a family name is not said")
+
+    def test_a_watcher_id_given_to_a_newer_process_is_unknown(self):
+        """The heartbeat says when the watcher started; a process with its id created later is another one."""
+        epoch = 116444736000000000
+        started_at = 1_800_000_000.0
+        created = epoch + int(started_at * 1e7)
+        rows = [(4242, 90, created, None), (90, 4, created - 10, CODEX)]
+        verdict = self.kernel.host_verdict
+        self.assertEqual(verdict(4242, _table(rows), started_by=started_at)["state"], "inside")
+        later = [(4242, 90, created + int(60 * 1e7), None), (90, 4, created - 10, CODEX)]
+        self.assertEqual(verdict(4242, _table(later), started_by=started_at)["state"], "unknown")
+        self.assertEqual(verdict(4242, _table(later))["state"], "inside", "without a start to hold it to")
+
+    def test_the_live_table_is_gathered_as_hostapp_gathers_it(self):
+        """Parent by Toolhelp, each process opened once, the gathering ended where one cannot be opened, on a
+        cycle and after the steps - with Windows stood in for, so no live process is asked."""
+        from unittest.mock import patch
+        kernel = self.kernel
+        parents = {100: 90, 90: 80, 80: 70, 70: 4}
+        opened = {100: (50, None), 90: (40, None), 80: (0, None), 70: (30, CODEX)}
+        asked = []
+
+        def fake_open(_k, pid, own):
+            asked.append((pid, own))
+            return opened[pid]
+        with patch.object(kernel, "_toolhelp_parents", return_value=parents), \
+                patch.object(kernel, "_opened", side_effect=fake_open), \
+                patch.object(kernel.os, "getpid", return_value=100):
+            table = kernel._host_table(object(), 100)
+        self.assertEqual(sorted(table), [80, 90, 100], "gathering stops at the one that cannot be opened")
+        self.assertEqual(asked[0], (100, True), "this process's own package is asked as its own")
+        self.assertTrue(all(not own for _pid, own in asked[1:]))
+        with patch.object(kernel, "_toolhelp_parents", return_value={100: 90, 90: 100}), \
+                patch.object(kernel, "_opened", return_value=(10, None)), \
+                patch.object(kernel.os, "getpid", return_value=1):
+            self.assertEqual(sorted(kernel._host_table(object(), 100)), [90, 100], "a cycle is gathered once")
+        long_line = {pid: pid - 1 for pid in range(2, 200)}
+        with patch.object(kernel, "_toolhelp_parents", return_value=long_line), \
+                patch.object(kernel, "_opened", return_value=(10, None)), \
+                patch.object(kernel.os, "getpid", return_value=1):
+            self.assertEqual(len(kernel._host_table(object(), 199)), kernel.HOST_MAX_STEPS + 2)
+
+    def test_it_never_raises(self):
+        from unittest.mock import patch
+        with patch.object(self.kernel, "_kernel", side_effect=OSError("boom")):
+            self.assertEqual(self.kernel.host_app(), {"state": "unknown", "family": None, "app": None})
+
+
 # ----------------------------------------------------------------------- install.ps1
 GATE = block(INSTALL, "$script:HostAppSource = @'", "$outsideSwitches = @(")
 

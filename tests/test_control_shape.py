@@ -75,6 +75,8 @@ METHODS = {
     # asked on request: the log searched, who may open the state folder, and a demo (control/tools.py).
     "unpostpone", "set_conversation_message", "validated_text", "_log_files", "search_logs",
     "state_access", "show_demo",
+    # v0.6.17: and whether the watcher and the bridge run inside another app (control/tools.py).
+    "host_app",
     # and which edition Codex's copy of this plugin is, asked from Diagnostics (control/watcher.py).
     "plugin_copy",
     # and whether a setting takes a value of the person's own, which Custom... asks (control/policy.py).

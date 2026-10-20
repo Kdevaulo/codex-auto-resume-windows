@@ -36,8 +36,8 @@ import motion_plan  # noqa: E402
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 CSC = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Microsoft.NET" / "Framework64" / "v4.0.30319" / "csc.exe"
 # Reads the pictured pages make beyond the envelope's: the power action's card on Settings > General, and the
-# Diagnostics page's State folder and its plugin copy.
-EXTRA_READS = (("power-action", None), ("state-access", None), ("plugin-copy", None))
+# Diagnostics page's State folder, its plugin copy and (v0.6.17) whether the watcher runs inside another app.
+EXTRA_READS = (("power-action", None), ("state-access", None), ("plugin-copy", None), ("host-app", None))
 # How many lines a turn of the wheel scrolls in a picture (WindowRender.RenderWheelLines): Windows' default.
 WHEEL_LINES = 3
 # The longest a render job may take, in seconds.

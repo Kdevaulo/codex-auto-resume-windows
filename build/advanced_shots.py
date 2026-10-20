@@ -423,6 +423,11 @@ def read_answers(edition: str, variant: str, locale: str, report: bool = False) 
             # accounts answer differently: pinned as an installation answers it, owner only.
             from codex_auto_resume.win import acl
             stack.enter_context(mock.patch.object(acl, "state_access", return_value="owner_only"))
+            # Where the watcher and the bridge run (win/kernel.host_app, v0.6.17) is read from the live process table:
+            # pinned as an installation started from the Start menu answers it, outside every app.
+            from codex_auto_resume.win import kernel
+            stack.enter_context(mock.patch.object(kernel, "host_app", side_effect=lambda pid=None, started_by=None: {
+                "state": "outside", "family": None, "app": None}))
             stack.enter_context(mock.patch.object(powerdown, "available", side_effect=lambda action: {
                 powerdown.SLEEP: (False, powerdown.NO_SLEEP_STATE), powerdown.HIBERNATE: (True, None),
                 powerdown.SHUT_DOWN: (True, None)}.get(action, (False, None))))

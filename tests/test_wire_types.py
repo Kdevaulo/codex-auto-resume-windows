@@ -66,6 +66,9 @@ WHERE = {
     wire.LogLine: [("bridge:logs", "result.lines[]")],
     wire.LogSearch: [("bridge:logs", "result")],
     wire.StateAccessReply: [("bridge:state-access", "result")],
+    # v0.6.17: whether the watcher and the bridge run inside another app.
+    wire.HostAppReply: [("bridge:host-app", "result")],
+    wire.HostAppPart: [("bridge:host-app", "result.watcher"), ("bridge:host-app", "result.bridge")],
     # v0.6.16-beta.3: Diagnostics' check of why a failure was not taken up (checkup.py).
     wire.DetectionCheck: [("bridge:detection-check", "result")],
     wire.CheckConversation: [("bridge:detection-check", "result.conversations[]")],

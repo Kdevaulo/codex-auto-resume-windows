@@ -99,32 +99,34 @@ class StateAccessTests(unittest.TestCase):
         """Codex's Windows sandbox gives its own local accounts - a group of them, and an identifier of its own -
         a way into AppData and Temp, so a state folder there reads as shared. It is: a command Codex runs in its
         sandbox runs as one of those accounts, and could read and change the pending tasks. Only an app's own
-        sandbox (S-1-15-), which runs as this account, is not another; the note then says where the folder is
-        this account's alone."""
+        sandbox (S-1-15-), which runs as this account, is not another. v0.6.17: an identifier handed in alone has
+        every right; the sandbox group's entry that only reads is told apart (tests/test_diagnostics_v0617.py)."""
         sandbox_group, sandbox_identifier = "S-1-5-21-1-2-3-1011", "S-1-5-21-4-5-6-1019343860"
         for other in (sandbox_group, sandbox_identifier):
             with self.subTest(other):
                 self.assertEqual(acl.verdict([OWN, "S-1-5-18", "S-1-5-32-544", other], OWN), "shared")
 
-    def test_the_note_says_where_the_folder_is_this_accounts_alone(self):
-        """"Install it under your own user folder" told a person whose folder was under AppData - inside their user
-        folder already - to do what they had done. The place that helps is the installer's own, by its name."""
+    def test_the_note_never_sends_a_person_to_where_the_folder_already_is(self):
+        """v0.6.11 said "install it where the installer puts it: .codex-auto-resume in your user folder" - and on
+        the owner's PC the folder was that one already (v0.6.17). The note now says how to take the other accounts'
+        access away, on the folder's own Security tab, and names no place to move to."""
         for locale in l10n.LOCALES:
             with self.subTest(locale):
-                self.assertIn(".codex-auto-resume", l10n.catalog(locale)["diag.state_shared_note"])
+                self.assertNotIn(".codex-auto-resume", l10n.catalog(locale)["diag.state_shared_note"])
+        self.assertIn("Properties > Security > Advanced", l10n.catalog("en")["diag.state_shared_note"])
 
     def test_it_never_raises_and_answers_one_of_three_words(self):
         with tempfile.TemporaryDirectory() as folder:
             self.assertIn(acl.state_access(folder), set(StateAccess))
             self.assertEqual(acl.state_access(Path(folder) / "missing"), "unknown")
-        with patch.object(acl, "allowed_sids", side_effect=OSError("boom")):
+        with patch.object(acl, "allowed_entries", side_effect=OSError("boom")):
             self.assertEqual(acl.state_access("C:\\"), "unknown")
 
     def test_it_keeps_no_identifier_and_writes_nothing(self):
         source = (ROOT / "src" / "codex_auto_resume" / "win" / "acl.py").read_text(encoding="utf-8")
         for writer in ("SetNamedSecurityInfo", "SetSecurityInfo", "SetFileSecurity", "SetEntriesInAcl"):
             self.assertNotIn(writer, source)
-        with patch.object(acl, "allowed_sids", return_value=[OWN, "S-1-1-0"]), \
+        with patch.object(acl, "allowed_entries", return_value=[(OWN, acl.EVERYTHING), ("S-1-1-0", 0x1200A9)]), \
                 patch.object(acl, "_own_sid", return_value=OWN):
             self.assertEqual(acl.state_access("C:\\"), "shared")
 

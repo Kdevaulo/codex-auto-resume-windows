@@ -755,22 +755,97 @@ namespace CodexAutoResume
         }
 
         /// The bridge's word for the state folder under Health, and - only while other accounts can open it - what that
-        /// means, under the facts. LayoutAudit hands it the longest, "shared".
+        /// means, under the facts. LayoutAudit hands it the longest, "shared". Codex's sandbox group reading the folder
+        /// (v0.6.17, win/acl.py) is said on the line itself, naming the group, and is no warning.
         private void ApplyStateAccess(string word)
         {
             if (diagStateAccess == null) return;
-            string access = StateAccessWord(word);
-            diagStateAccess.Text = access == "owner_only" ? S("diag.state_access.owner_only", "only your account can open it")
-                                 : access == "shared" ? S("diag.state_access.shared", "other accounts on this PC can open it")
-                                 : S("diag.state_access.unknown", "not checked");
-            diagStateNote.Text = access != "shared" ? ""
-                : S("diag.state_shared_note", "Other accounts on this PC can open the folder that holds this product's settings, pending tasks and logs. They hold no prompts or replies, but they do hold your conversations' ids. To keep them to yourself, install it where the installer puts it: .codex-auto-resume in your user folder.");
+            string[] said = StateAccessSaid(word, S("diag.state_access.owner_only", "only your account can open it"),
+                S("diag.state_access.shared", "other accounts on this PC can open it"),
+                S("diag.state_access.codex_sandbox", "your account; Codex's sandbox (CodexSandboxUsers) can read it - Codex added that"),
+                S("diag.state_access.unknown", "not checked"),
+                S("diag.state_shared_note", "Other accounts on this PC can open the folder that holds this product's settings, pending tasks and logs. They hold no prompts or replies, but they do hold your conversations' ids. To keep them to yourself, remove the other accounts' access in the folder's Properties > Security > Advanced."));
+            diagStateAccess.Text = said[0];
+            diagStateNote.Text = said[1];
         }
 
-        /// The bridge's word for the state folder, read as one of the three there are: anything else is unknown.
+        /// The line under Health and the sentence under the facts for the bridge's word: the sentence only for "shared".
+        /// Pure, for the tests.
+        internal static string[] StateAccessSaid(string word, string ownerOnly, string shared, string codexSandbox,
+                                                 string unknown, string sharedNote)
+        {
+            string access = StateAccessWord(word);
+            string line = access == "owner_only" ? ownerOnly : access == "shared" ? shared
+                        : access == "codex_sandbox" ? codexSandbox : unknown;
+            return new[] { line, access == "shared" ? sharedNote : "" };
+        }
+
+        /// The bridge's word for the state folder, read as one of the four there are: anything else is unknown.
         internal static string StateAccessWord(string access)
         {
-            return access == "owner_only" || access == "shared" ? access : "unknown";
+            return access == "owner_only" || access == "shared" || access == "codex_sandbox" ? access : "unknown";
+        }
+
+        // --------------------------------------------------------- inside another app
+        /// Asked with the state folder (LoadStateAccess): whether the watcher and this window's bridge run inside another
+        /// app's private view - an MSIX app such as the Codex app or Claude desktop - and which.
+        private void LoadHostApp()
+        {
+            if (diagHostApp == null) return;
+            bridge.Queue(delegate
+            {
+                Dictionary<string, object> reply;
+                try { reply = bridge.Call("host-app", null); }
+                catch (Exception) { reply = null; }
+                MethodInvoker apply = delegate { ApplyHostApp(Ok(reply) ? Map(reply, "result") : null); };
+                try { if (IsHandleCreated && !IsDisposed) BeginInvoke(apply); }
+                catch (Exception) { }
+            });
+        }
+
+        /// The bridge's answer under Health - one line - and, only while the watcher or this window runs inside another
+        /// app, what that means and what to do, under the facts. LayoutAudit hands it the longest: both inside, apart.
+        private void ApplyHostApp(Dictionary<string, object> result)
+        {
+            if (diagHostApp == null) return;
+            string[] said = HostAppLines(result, S("diag.no", "no"), S("diag.unknown", "unknown"),
+                S("diag.host_app.watcher", "the watcher runs inside {app}"),
+                S("diag.host_app.window", "this window runs inside {app}"),
+                S("diag.host_app.both", "the watcher and this window run inside {app}"),
+                S("diag.host_app.another", "another app"),
+                S("diag.host_app_note", "Windows keeps what runs inside {app} in that app's private view, so what is set up from there - starting at sign-in, the entry in Settings > Apps, notifications - stays in that view, and the watcher may stop when that app closes. Stop the watcher, then open Codex Auto Resume from the Start menu and start it there."));
+            diagHostApp.Text = said[0];
+            diagHostNote.Text = said[1];
+        }
+
+        /// The line under Health and the sentence under the facts for a `host-app` answer. Outside is `no`, and says
+        /// nothing under the facts; a part not known - Windows would not say, or the watcher's process id is another
+        /// process's now - is `unknown`, unless the other part is inside. Pure, for the tests.
+        internal static string[] HostAppLines(Dictionary<string, object> result, string no, string unknown, string watcherInside,
+                                              string windowInside, string bothInside, string another, string note)
+        {
+            Dictionary<string, object> watcherPart = Map(result, "watcher"), windowPart = Map(result, "bridge");
+            string watcherState = Str(watcherPart, "state"), windowState = Str(windowPart, "state");
+            string watcherApp = HostAppName(watcherPart, another), windowApp = HostAppName(windowPart, another);
+            bool watcherIn = watcherState == "inside", windowIn = windowState == "inside";
+            if (!watcherIn && !windowIn)
+            {
+                bool known = (watcherState == "outside" || watcherState == "not_running") && windowState == "outside";
+                return new[] { known ? no : unknown, "" };
+            }
+            string line = watcherIn && windowIn && watcherApp == windowApp ? bothInside.Replace("{app}", watcherApp)
+                        : watcherIn && windowIn ? watcherInside.Replace("{app}", watcherApp) + Environment.NewLine
+                                                  + windowInside.Replace("{app}", windowApp)
+                        : watcherIn ? watcherInside.Replace("{app}", watcherApp)
+                        : windowInside.Replace("{app}", windowApp);
+            return new[] { line, note.Replace("{app}", watcherIn ? watcherApp : windowApp) };
+        }
+
+        /// The app's name for a person as the bridge gives it, or `another` where it gives none.
+        private static string HostAppName(Dictionary<string, object> hostPart, string another)
+        {
+            string app = Str(hostPart, "app");
+            return string.IsNullOrEmpty(app) ? another : app;
         }
 
         // ------------------------------------------------------------------ Show me what happens
