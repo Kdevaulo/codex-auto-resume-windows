@@ -155,8 +155,10 @@ class MidLogWordTests(ScratchSetup):
                 self.assertNotEqual(table["msg.setup_unconfirmed_yet"], english)
                 self.assertNotEqual(table["msg.setup_unconfirmed_yet"], table["msg.setup_unconfirmed"])
 
-    def test_korean_calls_the_watcher_the_way_the_korean_documents_do(self):
-        self.assertIn("감시기", l10n.text("msg.setup_unconfirmed_yet", "ko"))
+    def test_korean_calls_the_watcher_the_way_the_catalog_does(self):
+        """The window and the setup say 워처 for the watcher, as every other line of the Korean catalog does."""
+        self.assertIn("워처", l10n.text("msg.setup_unconfirmed_yet", "ko"))
+        self.assertNotIn("감시기", l10n.text("msg.setup_unconfirmed_yet", "ko"))
 
 
 class CallersLookAgainTests(unittest.TestCase):
