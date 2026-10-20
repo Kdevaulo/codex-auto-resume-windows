@@ -877,7 +877,7 @@ Also in the final, and what the owner asked for as the beta line went on:
 
 ---
 
-## v0.6.17 — A final on v0.6.16: installs from inside another app, the update that keeps its uninstaller, and the capability pairs that kept each other from working 🚧
+## v0.6.17 — A final on v0.6.16: installs from inside another app, the update that keeps its uninstaller, and the capability pairs that kept each other from working ✅
 
 A final on v0.6.16, with no pre-release of its own. It began on the owner's decision of 2026-10-19 as a quick hotfix, and
 the owner then put all ten findings of the capability-pair audit
@@ -1282,8 +1282,10 @@ Final Rust audit and stabilization: the Rust bug hunt
 Maintenance
 ```
 
-This document records the current direction; v0.6.16 is out: most of the advanced edition, and for both
-editions Rescan and reconcile, a setup program that is an installer, notices that stay until clicked, words
+This document records the current direction; v0.6.17 is out: installs started from inside another app moved outside it,
+the update that keeps its uninstaller, honest words when pre-releases could not be checked, every capability pair that kept
+another from working, and Japanese and Chinese at full speed in their own Windows faces. Before it, v0.6.16 brought most
+of the advanced edition, and for both editions Rescan and reconcile, a setup program that is an installer, notices that stay until clicked, words
 for one recovery's next send and up to three more Codex homes. Before it, v0.6.15 was a fix alone (the
 conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered), and v0.6.14 brought
 eight more ways to recover, Keep it on, the watch log, the reset actions and a compatibility report sent from
