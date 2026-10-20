@@ -41,6 +41,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 import time
+import uuid
 
 from codex_auto_resume import failures
 from codex_auto_resume.domain import ids
@@ -222,26 +223,47 @@ class GoalContinuation:
         """The channel (P5, where M2b passed): the goal set active, then `prompt` added to the
         conversation's queue - under `client_id` where core hands one (the marker-free
         continuation's P15), with the marker in the words otherwise, as always. What came of it is
-        what came of the add: the queued message is the continuation, and the goal is set before
-        it only so that it carries on after it. Never raises."""
+        what came of the add, but only after the *same* goal reads back active. A failed or
+        unconfirmed activation must not silently become an ordinary one-turn continuation.
+        Once activation succeeds, an uncertain queue submission is unknown: Codex may already
+        carry the active goal on. Never raises."""
         if (not ids.is_uuid(thread_id) or not isinstance(prompt, str) or not prompt
                 or len(prompt) > MAX_PROMPT or "\0" in prompt
                 or not (client_id is None or ids.is_uuid(client_id))):
             return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
-        params = {"threadId": thread_id, "input": [{"type": "text", "text": prompt}]}
-        if client_id is not None:
-            params["clientUserMessageId"] = client_id
+        params = {"threadId": thread_id, "input": [{"type": "text", "text": prompt}],
+                  "clientUserMessageId": client_id or str(uuid.uuid4())}
         before = self._goal(thread_id)
+        if before is None or before.status != GoalStatus.USAGE_LIMITED:
+            return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
         session, refused = self._opened(launch_guard)
         if refused is not None:
             return refused
         try:
-            if before is not None and before.status == GoalStatus.USAGE_LIMITED:
-                try:
-                    session.call(SET, {"threadId": thread_id, "status": str(GoalStatus.ACTIVE)})
-                except Exception:
-                    pass                  # the queued turn still continues the conversation
-            result = session.call(ADD, params)
+            try:
+                session.call(SET, {"threadId": thread_id, "status": str(GoalStatus.ACTIVE)})
+            except SessionRefused:
+                return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
+            except Exception as exc:
+                after = self._goal(thread_id)
+                if (getattr(exc, "method", None) == SET and after is not None
+                        and after.goal_id == before.goal_id and after.status == GoalStatus.USAGE_LIMITED):
+                    # Codex explicitly refused the set; the goal was not activated.
+                    return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
+                timed_out = str(exc) == "protocol_timeout"
+                return {"outcome": "unknown",
+                        "error_code": "queue_timeout" if timed_out else "queue_result_unknown"}
+            after = self._goal(thread_id)
+            if after is None or after.goal_id != before.goal_id or after.status != GoalStatus.ACTIVE:
+                return {"outcome": "unknown", "error_code": "queue_result_unknown"}
+            try:
+                result = session.call(ADD, params)
+            except Exception as exc:
+                # Even an explicit queue refusal comes after an effective goal activation.
+                # Never let core re-send while the goal runtime may be about to continue.
+                timed_out = str(exc) == "protocol_timeout"
+                return {"outcome": "unknown",
+                        "error_code": "queue_timeout" if timed_out else "queue_result_unknown"}
         except SessionRefused:
             return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
         except Exception as exc:
