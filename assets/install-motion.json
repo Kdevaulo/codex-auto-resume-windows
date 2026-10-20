@@ -40,40 +40,10 @@
       },
       "sha256": "4aff28c229d120e64e2d3ad5df96870454bfd3a20c507668578cf43f297f9f4b",
       "size": "900x778"
-    },
-    "docs/images/install-update-motion-ko.png": {
-      "bytes": 574278,
-      "frames": 515,
-      "ms": 20636,
-      "scenes": {
-        "U1": 35476,
-        "U2": 61088,
-        "U3": 94129,
-        "U4": 271843,
-        "U5": 111639
-      },
-      "sha256": "39ed9faffd5a453d85989bcd8323700774a4138a28be87cf5f49fc5feec62dc8",
-      "size": "900x859"
-    },
-    "docs/images/install-update-motion.png": {
-      "bytes": 600137,
-      "frames": 515,
-      "ms": 20636,
-      "scenes": {
-        "U1": 36422,
-        "U2": 64627,
-        "U3": 100561,
-        "U4": 282107,
-        "U5": 116317
-      },
-      "sha256": "9db5b8835e410d03298fca7cbae6266013f190f52ba3c08a5adc71b5836ef908",
-      "size": "900x859"
     }
   },
   "inputs": {
     "<install-motion:install-en>": "4705ee2cc96a4dc977b30b8611da1b448738949dfab1d36617d267279442ad65",
-    "<install-motion:install-ko>": "f1e2db69a8fb48f7efc2cb838354439682695fa11e44f84a5c620d9b543e17ad",
-    "<install-motion:install-update-en>": "e6ee7f8d7f5db20b16b83314325804316ae0a8eed98ea4ec99243db2266a0f41",
-    "<install-motion:install-update-ko>": "61bcab32b4f2043f48e9682fe1e8d4270177d7ad096214b04ed0ecface37a99b"
+    "<install-motion:install-ko>": "f1e2db69a8fb48f7efc2cb838354439682695fa11e44f84a5c620d9b543e17ad"
   }
 }

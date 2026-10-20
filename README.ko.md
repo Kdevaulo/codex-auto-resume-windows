@@ -79,10 +79,7 @@ Codex Auto Resume는 정해 둔 몇 시간이 아니라 Codex가 직접 알려 �
 your PC) 창이 뜰 수 있는데, 그때는 **추가 정보**를 누른 뒤 **실행**을 누릅니다. 먼저 확인하는 방법은
 [docs/VERIFY.ko.md](docs/VERIFY.ko.md#내려받은-설치-파일을-실행하기-전에)에 있습니다.
 
-<p align="center">
-<img src="docs/images/install-motion-ko.png" alt="설치 창이 Codex Auto Resume을 설치하는 모습. 창 자신의 그리기 코드가 그렸습니다. 환영 페이지에서 다음, 설치하기 전에 고르는 것, 설치를 누르면 막대가 차오르며 설치 단계가 차례로 바뀌고, 감시기가 실행 중이고 대시보드 열기가 켜진 완료 페이지" width="450">
-<img src="docs/images/install-update-motion-ko.png" alt="이전 버전이 설치된 곳에서 실행한 같은 설치 창. 설치하기 전에 페이지가 어느 버전에서 어느 버전으로 업데이트하는지와 새로운 점을 보여 주고, 업데이트를 누르면 실행 중인 감시기를 멈추고 새 파일을 복사하는 단계가 차례로 바뀌며, 감시기가 실행 중인 완료 페이지" width="450">
-</p>
+<p align="center"><img src="docs/images/install-motion-ko.png" alt="설치 창이 Codex Auto Resume을 설치하는 모습. 창 자신의 그리기 코드가 그렸습니다. 환영 페이지에서 다음, 설치하기 전에 고르는 것, 설치를 누르면 막대가 차오르며 설치 단계가 차례로 바뀌고, 감시기가 실행 중이고 대시보드 열기가 켜진 완료 페이지" width="450"></p>
 
 <details>
 <summary><b>Codex에서 설치</b></summary>

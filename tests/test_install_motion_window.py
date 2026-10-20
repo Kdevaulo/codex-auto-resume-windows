@@ -63,26 +63,6 @@ class ShimTests(unittest.TestCase):
             with self.subTest(name):
                 self.assertNotEqual(before, after)
 
-    def test_it_walks_the_update_over_the_previous_version_with_what_is_new(self):
-        plan = motion.load("install-update-en")
-        events = len(plan["events"])
-        frames = [{"page": "welcome"}, {"page": "options"}, {"page": "progress", "progress": events},
-                  {"page": "finish", "progress": events}]
-        for index, frame in enumerate(frames):
-            frame.update(index=index, light=index * 100)
-        first = motion.load("install-en")
-        data = motion.job(plan, [], Path(self.work.name) / "update" / "frames")
-        data["frames"] = frames
-        result = motion.render(self.exe, data, Path(self.work.name) / "update")
-        self.assertEqual(result["notes"], [])
-        drawn = list(motion.pictures(result, Path(self.work.name) / "update" / "frames"))
-        self.assertEqual(len(drawn), len(frames))
-        # The update's Options page carries what is new, so its window stands taller than a first installation's.
-        walk = motion.job(first, [], Path(self.work.name) / "first" / "frames")
-        walk["frames"] = [{"index": 0, "page": "welcome", "light": 0}]
-        fresh = motion.render(self.exe, walk, Path(self.work.name) / "first")
-        self.assertGreater(drawn[0][1][1], fresh["client"][1])
-
     def test_it_refuses_to_go_back_a_page(self):
         plan = motion.load("install-en")
         data = motion.job(plan, [], Path(self.work.name) / "back" / "frames")

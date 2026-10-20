@@ -1,8 +1,7 @@
 """Make the install motion pictures: the setup program's window installing the product, every frame drawn by the
 window's own code, offscreen.
 
-    python -X utf8 build/make_install_motion.py                  # all four: install-motion[-ko].png and
-                                                                 # install-update-motion[-ko].png in docs/images/
+    python -X utf8 build/make_install_motion.py                  # docs/images/install-motion.png and -ko.png
     python -X utf8 build/make_install_motion.py install-ko       # one of them (a plan's name under build/motion/)
     python -X utf8 build/make_install_motion.py --dry-run        # only the frames each plan asks for, scene by scene
     python -X utf8 build/make_install_motion.py --fidelity       # only the window held to the captured stills
@@ -12,11 +11,7 @@ window's own code, offscreen.
 A plan (build/motion/install-en.json, install-ko.json, their scenes and the installer's lines in
 install-scenes.json) says, on one clock, what a person does and what the installer prints: the Welcome page of a
 first installation, Next, the Options page, Install, the run - each step's line as build/install/install.ps1 prints
-it, the bar and the step's name moving on as the window reads them - and the Finish page, its light lit. The update's
-(install-update-en.json, install-update-ko.json, install-update-scenes.json) is the same setup program over the
-previous final release, installed: its Options page says what it updates from and to and what is new (the version's
-section of docs/CHANGELOG[.ko].md, as the setup program reads it from its archive), and its run stops the running
-watcher before it copies the new files.
+it, the bar and the step's name moving on as the window reads them - and the Finish page, its light lit.
 
 Each frame is drawn by the setup program's own window. build/motion/InstallerRender.cs is compiled TOGETHER with
 the sources build/make_setup.py compiles the setup program from - nothing added to them, nothing taken away - into a
@@ -54,8 +49,7 @@ for _path in (str(ROOT / "src"), str(ROOT / "build")):
 
 import motion_plan  # noqa: E402
 
-# A first installation, and the setup program over an older version: the update.
-PLAN_NAMES = ("install-en", "install-ko", "install-update-en", "install-update-ko")
+PLAN_NAMES = ("install-en", "install-ko")
 PLANS = motion_plan.PLANS
 MANIFEST = ROOT / "assets" / "install-motion.json"
 # The picture-build shim, compiled with the setup program's own sources only here.
@@ -92,20 +86,6 @@ def version(root: Path = ROOT) -> str:
     return json.loads((root / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8-sig"))["version"]
 
 
-def _order(text: str) -> tuple:
-    return tuple(int(part) for part in text.split("."))
-
-
-def previous_final(current: str, root: Path = ROOT) -> str:
-    """The newest final release before `current` that docs/CHANGELOG.md has a section for: the version an update is
-    pictured from."""
-    for line in (root / "docs" / "CHANGELOG.md").read_text(encoding="utf-8").splitlines():
-        found = re.match(r"## v(\d+\.\d+\.\d+)(?: |$)", line)
-        if found and _order(found.group(1)) < _order(current.split("-")[0]):
-            return found.group(1)
-    raise PlanError("docs/CHANGELOG.md has no final release before %s" % current)
-
-
 # ---------------------------------------------------------------------------------------------------- reading
 def plan_path(name) -> Path:
     path = Path(name)
@@ -128,8 +108,6 @@ def load(name) -> dict:
     import make_release
     values = dict(plan.get("values") or {}, version=version(),
                   archive=make_release.archive_name(plan.get("edition", "standard"), version()))
-    if plan.get("from") == "previous":
-        plan["from"] = previous_final(version())
     plan["events"] = motion_plan._substitute(plan.get("events") or [], values)
     plan["scenes"] = spell_events(motion_plan._substitute(plan.get("scenes") or [], values), plan["events"])
     check(plan)
@@ -166,13 +144,6 @@ def check(plan: dict) -> None:
             raise PlanError("an installer plan has %s" % key)
     if plan["edition"] not in EDITIONS:
         raise PlanError("no edition %r" % plan["edition"])
-    if "installed" in plan:
-        # An update: the setup program over an older version of an edition, which it updates in place.
-        if plan["installed"] not in EDITIONS or not re.fullmatch(r"\d+\.\d+\.\d+", str(plan.get("from"))):
-            raise PlanError("an update names the edition installed and the version it is: %r, %r"
-                            % (plan["installed"], plan.get("from")))
-        if _order(plan["from"]) >= _order(version().split("-")[0]):
-            raise PlanError("an update goes from an older version than %s, not %s" % (version(), plan["from"]))
     events = plan.get("events")
     if not isinstance(events, list) or not events:
         raise PlanError("an installer plan has the installer's events")
@@ -321,7 +292,6 @@ def job(plan: dict, frames: list, out: Path, root: Path = ROOT) -> dict:
     return {"out": str(out), "theme": canvas.get("theme", "light"), "design": canvas.get("design", "soft"),
             "locale": plan["locale"], "locales": str(root / "src" / "codex_auto_resume" / "locales"),
             "edition": plan["edition"], "version": version(root), "home": HOME,
-            "installed": plan.get("installed"), "from": plan.get("from"), "docs": str(root / "docs"),
             "events": [{key: value for key, value in event.items() if key != "hold"} for event in plan["events"]],
             "targets": ["button.forward"], "frames": states}
 
@@ -447,10 +417,6 @@ def render_input(plan: dict, root: Path = ROOT) -> str:
     parts += ["%s\0%s" % (name, shots.input_digest(root / name)) for name in sources]
     for locale in sorted({"en", plan["locale"]}):
         parts.append(shots.input_digest(root / "src" / "codex_auto_resume" / "locales" / ("%s.json" % locale)))
-    if "installed" in plan:
-        for name in sorted({"CHANGELOG.md", "CHANGELOG.%s.md" % plan["locale"]}):
-            if (root / "docs" / name).is_file():
-                parts.append(shots.input_digest(root / "docs" / name))
     for _locale, name in FIDELITY:
         if (root / name).is_file():
             parts.append(shots.input_digest(root / name))
@@ -464,7 +430,17 @@ def read_manifest() -> dict:
     return {"inputs": {}, "images": {}, "fidelity": {}}
 
 
+def prune(manifest: dict) -> dict:
+    """`manifest` with only what a plan of PLAN_NAMES makes: a picture no plan makes any more, and its inputs, go."""
+    outputs = {json.loads(plan_path(name).read_text(encoding="utf-8"))["output"] for name in PLAN_NAMES}
+    manifest["images"] = {key: value for key, value in (manifest.get("images") or {}).items() if key in outputs}
+    inputs = {"<install-motion:%s>" % name for name in PLAN_NAMES}
+    manifest["inputs"] = {key: value for key, value in (manifest.get("inputs") or {}).items() if key in inputs}
+    return manifest
+
+
 def write_manifest(manifest: dict) -> None:
+    prune(manifest)
     MANIFEST.write_text(json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
 
 
