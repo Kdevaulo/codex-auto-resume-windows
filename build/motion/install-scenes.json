@@ -1,0 +1,29 @@
+{
+  "events": [
+    {"unpacked": 0.1, "hold": 90},
+    {"unpacked": 0.2, "hold": 90},
+    {"unpacked": 0.3, "hold": 90},
+    {"unpacked": 0.4, "hold": 90},
+    {"unpacked": 0.5, "hold": 90},
+    {"unpacked": 0.6, "hold": 90},
+    {"unpacked": 0.7, "hold": 90},
+    {"unpacked": 0.8, "hold": 90},
+    {"unpacked": 0.9, "hold": 90},
+    {"unpacked": 1.0, "hold": 190},
+    {"line": "edition: ${edition}", "hold": 1000},
+    {"line": "  [ok] Found Codex", "hold": 400},
+    {"line": "  Installing program files", "hold": 500},
+    {"line": "  Copying the program files into place", "hold": 800},
+    {"line": "  [ok] Bundled Python ${python} (no system Python needed)", "hold": 400},
+    {"line": "  Registering the Codex plugin", "hold": 800},
+    {"line": "  Setting up the watcher", "hold": 1100},
+    {"line": "  Checking the installation", "hold": 1100}
+  ],
+  "scenes": [
+    {"id": "S1", "steps": [{"set": {"page": "welcome"}, "hold": 3000}]},
+    {"id": "S2", "steps": [{"move": "button.forward", "frames": 25, "step": 16}, {"hover": "button.forward", "frames": 10, "step": 16}, {"press": "button.forward", "frames": 8, "step": 16}, {"set": {"page": "options"}, "hold": 300}]},
+    {"id": "S3", "steps": [{"move": "${reading}", "frames": 25, "step": 16}, {"hold": 2400}, {"move": "button.forward", "frames": 25, "step": 16}, {"hover": "button.forward", "frames": 10, "step": 16}, {"press": "button.forward", "frames": 8, "step": 16}, {"set": {"page": "progress"}, "hold": 300}]},
+    {"id": "S4", "steps": [{"move": "${watching}", "frames": 25, "step": 16}, {"events": [1, 18]}]},
+    {"id": "S5", "steps": [{"set": {"page": "finish"}, "hold": 2200}, {"move": "button.forward", "frames": 25, "step": 16}, {"hover": "button.forward", "frames": 1, "step": 2000}]}
+  ]
+}
