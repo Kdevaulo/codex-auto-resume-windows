@@ -58,6 +58,13 @@
   :root:lang(ja) { word-break: auto-phrase; }
 }
 :root:lang(ko), :root:lang(ja), :root:lang(zh) { overflow-wrap: anywhere; }
+/* v0.6.17 (#48): Korean, Japanese and Chinese in the face Windows sets each in on a Windows set to that language
+   (win/typeface.py SCRIPT_FACES; the window's and the popup's too), whatever Windows' UI font is - not in whichever
+   East Asian face comes first in the stack - and in the stack where that face is missing. */
+:root:lang(ko) { --font: "Malgun Gothic", system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif; }
+:root:lang(ja) { --font: "Yu Gothic UI", system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif; }
+:root:lang(zh-CN) { --font: "Microsoft YaHei UI", system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif; }
+:root:lang(zh-TW) { --font: "Microsoft JhengHei UI", system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif; }
 body { margin: 0; padding: var(--size-page-pad); background: var(--canvas); color: var(--ink);
        font: var(--type-body)/var(--lh-body) var(--font); -webkit-font-smoothing: antialiased; }
 h1, h2, h3, p, ul { margin: 0; }

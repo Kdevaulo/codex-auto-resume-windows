@@ -335,6 +335,45 @@ namespace CodexAutoResume
             }
         }
 
+        /// The face Windows sets each language with a script face of its own in, on a Windows set to that language
+        /// (v0.6.17, #48; typeface.SCRIPT_FACES, the popup's, the card's and the panel's table too).
+        internal static readonly Dictionary<string, string> ScriptFaces = new Dictionary<string, string>
+        {
+            { "ko", "Malgun Gothic" }, { "ja", "Yu Gothic UI" }, { "zh-CN", "Microsoft YaHei UI" }, { "zh-TW", "Microsoft JhengHei UI" },
+        };
+
+        /// Whether this machine has the face `family` itself (typeface.installed): GDI+ refuses a family it does not have.
+        internal static bool Installed(string family)
+        {
+            if (string.IsNullOrEmpty(family)) return false;
+            try
+            {
+                using (new FontFamily(family)) return true;
+            }
+            catch (ArgumentException) { return false; }
+        }
+
+        /// The window's font for the words `strings` of the language `language` (typeface.language_face): the language's
+        /// own script face (ScriptFaces) at `font`'s size and style where this machine has it - as on a Windows set to
+        /// that language, whatever Windows' UI font is here - and otherwise For(font, strings), as before v0.6.17. Until
+        /// then Japanese on an English Windows was set in Segoe UI with every kana and kanji borrowed through a font
+        /// link, measured and drawn that way, and a click on the Advanced page waited seconds for those measurements.
+        internal static Font ForLanguage(Font font, Dictionary<string, object> strings, string language)
+        {
+            string own;
+            if (font != null && language != null && ScriptFaces.TryGetValue(language, out own) && Installed(own))
+            {
+                try
+                {
+                    using (var family = new FontFamily(own))
+                        if (string.Equals(font.FontFamily.Name, family.Name, StringComparison.OrdinalIgnoreCase)) return font;
+                    return new Font(own, font.SizeInPoints, font.Style, GraphicsUnit.Point);
+                }
+                catch (ArgumentException) { /* gone since it was asked: as before */ }
+            }
+            return For(font, strings);
+        }
+
         /// The window's font for the words `strings`: `font` when its face has every letter of them, or when Segoe UI
         /// lacks one too (a script with a face of its own); Segoe UI at its size and style otherwise
         /// (typeface.face_for). On an English Windows it is always `font`.
