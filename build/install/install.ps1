@@ -1828,7 +1828,7 @@ try {
     # marketplace"); it only does anything when a GitHub registration survived the repoint.
     $null = Invoke-Codex $codex @('plugin', 'marketplace', 'upgrade', $MarketplaceName)
     Progress 'plugin' 2 3
-    $installed =Invoke-Codex $codex @('plugin', 'add', ($PluginName + '@' + $MarketplaceName))
+    $installed = Invoke-Codex $codex @('plugin', 'add', ($PluginName + '@' + $MarketplaceName))
     if ($installed.Code -ne 0 -and (($installed.Err + $installed.Out) -match 'os error 5|back up plugin cache')) {
         # Codex replaces the plugin by backing up its cache directory, and it cannot while
         # a file inside that directory is open. The open file is ours: Codex starts this
