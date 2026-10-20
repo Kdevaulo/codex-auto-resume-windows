@@ -415,11 +415,30 @@ class LoadedTests(GoalCase):
         self.assertEqual(fake.sets(), [{"threadId": T1, "status": "active"}])
         (add,) = fake.adds()
         self.assertTrue(add["input"][0]["text"].endswith(self.h.record()["marker"]))
-        self.assertNotIn("clientUserMessageId", add)
+        self.assertTrue(ids.is_uuid(add["clientUserMessageId"]),
+                        "Codex requires a client ID even when the continuation uses a marker")
         self.assertEqual(self.status(), "active")
         self.follow()
         self.assertEqual(self.h.record()["state"], "recovered")
         self.assertEqual(self.spends(plug), [(CAP, T1, key)])
+
+    def test_a_loaded_goal_set_refusal_does_not_send_a_one_turn_continuation(self):
+        self.measured[Measurement.M2B] = (Verdict.PASS, ENGINE)
+        plug, fake = self.armed(loaded=True, refuse=True)
+        self.h.tick()
+        self.assertEqual(fake.methods(), ["thread/goal/set"])
+        self.assertEqual(self.status(), "usage_limited")
+        self.assert_no_send()
+        self.assertNotEqual(self.h.record()["state"], "recovered")
+
+    def test_a_loaded_goal_with_an_unknown_schema_uses_the_standard_queue(self):
+        self.measured[Measurement.M2B] = (Verdict.PASS, ENGINE)
+        (self.h.home.root / "goals_1.sqlite").unlink()
+        goals_db(self.h.home.root, table="CREATE TABLE thread_goals (thread_id TEXT, status TEXT)")
+        plug, fake = self.armed(loaded=True)
+        self.h.tick()
+        self.assertEqual(len(self.h.backend.send_calls), 1)
+        self.assertEqual(fake.received, [])
 
     def test_with_the_marker_free_continuation_on_too_it_goes_under_the_derived_id(self):
         """Its channel comes first at P5, and carries P15's client id: no marker, the id proves it."""
@@ -809,22 +828,56 @@ class RouteTests(unittest.TestCase):
             set_goal(self.root, T1, "active", goal_id="another-goal")
         self.assertEqual(self.made(self.Session(self, then=replaced)).resume(T1)["outcome"], "unknown")
 
-    def test_the_channel_sets_the_goal_then_queues_and_a_set_that_fails_still_queues(self):
+    def test_the_channel_queues_only_after_confirmed_activation(self):
         cid = ids.continuation_client_id("a" * 64)
-        session = self.Session(self)
+        session = self.Session(self, then=self.activate)
         self.assertEqual(self.made(session).send(T1, "go", client_id=cid)["outcome"], "accepted")
         self.assertEqual([method for method, _params in session.calls], ["thread/goal/set", "thread/queue/add"])
         self.assertEqual(session.calls[1][1]["clientUserMessageId"], cid)
+
+        set_goal(self.root, T1, "usage_limited")
+        marked = self.Session(self, then=self.activate)
+        self.assertEqual(self.made(marked).send(T1, "go")["outcome"], "accepted")
+        self.assertTrue(ids.is_uuid(marked.calls[1][1]["clientUserMessageId"]))
+
+        set_goal(self.root, T1, "usage_limited")
         failing = self.Session(self, fail={"thread/goal/set": AdapterError("protocol_timeout")})
-        self.assertEqual(self.made(failing).send(T1, "go")["outcome"], "accepted")
-        self.assertEqual([method for method, _params in failing.calls], ["thread/goal/set", "thread/queue/add"])
-        refused = self.Session(self, fail={"thread/queue/add": protocol._refused_by_codex("thread/queue/add", -1)})
+        self.assertEqual(self.made(failing).send(T1, "go")["outcome"], "unknown")
+        self.assertEqual([method for method, _params in failing.calls], ["thread/goal/set"])
+
+        set_goal(self.root, T1, "usage_limited")
+        ignored = self.Session(self)
+        self.assertEqual(self.made(ignored).send(T1, "go")["outcome"], "unknown")
+        self.assertEqual([method for method, _params in ignored.calls], ["thread/goal/set"])
+
+        for code in (-32600, -32601):
+            with self.subTest(set_refusal=code):
+                set_goal(self.root, T1, "usage_limited")
+                refused_set = self.Session(self, fail={"thread/goal/set":
+                                                       protocol._refused_by_codex("thread/goal/set", code)})
+                self.assertEqual(self.made(refused_set).send(T1, "go")["outcome"], "not_started")
+                self.assertEqual([method for method, _params in refused_set.calls], ["thread/goal/set"])
+
+        set_goal(self.root, T1, "usage_limited")
+        def replace(method, params):
+            if method == "thread/goal/set":
+                set_goal(self.root, T1, "active", goal_id="another-goal")
+        replaced = self.Session(self, then=replace)
+        self.assertEqual(self.made(replaced).send(T1, "go")["outcome"], "unknown")
+        self.assertEqual([method for method, _params in replaced.calls], ["thread/goal/set"])
+
+        set_goal(self.root, T1, "usage_limited")
+        def activate_before_add(method, params):
+            self.activate(method, params)
+        refused = self.Session(self, then=activate_before_add,
+                               fail={"thread/queue/add": protocol._refused_by_codex("thread/queue/add", -1)})
         self.assertEqual(self.made(refused).send(T1, "go")["outcome"], "unknown")
+        self.assertEqual([method for method, _params in refused.calls], ["thread/goal/set", "thread/queue/add"])
+
         set_goal(self.root, T1, "active")
         quiet = self.Session(self)
-        self.made(quiet).send(T1, "go")
-        self.assertEqual([method for method, _params in quiet.calls], ["thread/queue/add"],
-                         "a goal not paused by the limit is not set")
+        self.assertEqual(self.made(quiet).send(T1, "go")["outcome"], "not_started")
+        self.assertEqual(quiet.calls, [], "a goal no longer paused by the limit is not queued")
 
     def test_its_session_may_call_its_two_methods_and_nothing_else(self):
         allowed = protocol.methods_for_capability(CAP)
@@ -836,6 +889,14 @@ class RouteTests(unittest.TestCase):
     def test_the_m2b_verdict_counts_only_as_a_pass_on_the_codex_in_force(self):
         view = ac.view(capability="loaded_state_detection")
         self.assertTrue(m2b_passed(view, {Measurement.M2B: (Verdict.PASS, ENGINE)}))
+        future = "codex-cli 999.0.0"
+        self.assertTrue(m2b_passed({"engine": {"version": future}},
+                                   {Measurement.M2B: (Verdict.PASS, future)}),
+                        "a measured compatible version needs no code allowlist")
+        for version in ("codex-cli 0.162.1", future, "", None):
+            with self.subTest(version=version):
+                self.assertFalse(m2b_passed({"engine": {"version": version}},
+                                            {Measurement.M2B: (Verdict.PASS, ENGINE)}))
         for measured in ({}, {Measurement.M2B: (Verdict.FAIL, ENGINE)},
                          {Measurement.M2B: (Verdict.PASS, "0.1.0")}, {Measurement.M2: (Verdict.PASS, ENGINE)},
                          {Measurement.M2B: "pass"}):
