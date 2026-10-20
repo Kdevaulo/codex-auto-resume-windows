@@ -82,6 +82,11 @@ the same version it offers **Repair** or **Remove**. It is not code-signed: if W
 [docs/VERIFY.md](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/docs/VERIFY.md#before-you-run-a-downloaded-setup-program)
 shows how to check it first.
 
+<p align="center">
+<img src="docs/images/install-motion.png" alt="The setup window installing Codex Auto Resume, drawn by the window's own code: the Welcome page, Next, the choices before it installs, Install, the steps of the installation one after another as the bar fills, and the finished page with the watcher running and Open the Dashboard ticked" width="450">
+<img src="docs/images/install-update-motion.png" alt="The same setup window over the previous version, installed: the page before it installs says which version it updates from and to and what is new, Update, the steps of the update one after another as the running watcher is stopped and the new files copied, and the finished page with the watcher running" width="450">
+</p>
+
 <details>
 <summary><b>From Codex</b></summary>
 
