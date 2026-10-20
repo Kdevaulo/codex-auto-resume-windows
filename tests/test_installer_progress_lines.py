@@ -327,7 +327,7 @@ VOICE = ("[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
          "function Ok   { param([string]$m) Write-Host ('  [ok] ' + $m) }\n"
          "function Warn { param([string]$m) Write-Host ('  [!]  ' + $m) }\n"
          "function Fail { param([string]$m) Write-Host ('  [x]  ' + $m) }\n")
-PROGRESS = _lift("$script:ProgressLines = $false", "\n}\n") + "\n}\n" if "$script:ProgressLines = $false" in INSTALL_PS1 else ""
+PROGRESS = _lift("function Progress {", "\n}\n") + "\n}\n" if "function Progress {" in INSTALL_PS1 else ""
 
 
 def _probe(script: str, environment: dict | None = None) -> subprocess.CompletedProcess:

@@ -51,26 +51,6 @@ function Ok   { param([string]$m) Write-Host ('  [ok] ' + $m) }
 function Warn { param([string]$m) Write-Host ('  [!]  ' + $m) -ForegroundColor Yellow }
 function Fail { param([string]$m) Write-Host ('  [x]  ' + $m) -ForegroundColor Red; $script:Failed = $true }
 
-# How much of a step is done, for the setup window's bar: `progress: <step> <done>/<total>`, an English line of its own
-# that the window reads and keeps out of the log it shows (gui/InstallerFlow.cs, InstallerProgress). Only when the
-# window asked for it with CODEX_AUTO_RESUME_PROGRESS_LINES=1 ($script:ProgressLines, read once below): Install.cmd's
-# console, the CI logs and every other caller see exactly what they always did. Real counts only, never a guess, and
-# at most one line per whole percent of the step, so the pipe is not flooded.
-$script:ProgressLines = $false
-$script:ProgressSaid = @{}
-function Progress {
-    param([string]$Step, [int]$Done, [int]$Total)
-    if (-not $script:ProgressLines -or $Total -le 0) { return }
-    $count = [Math]::Max(0, [Math]::Min($Done, $Total))
-    $percent = [int][Math]::Floor(100 * $count / $Total)
-    # Nothing for a share below one percent: the bar stands at the step's milestone already.
-    $said = 0
-    if ($script:ProgressSaid.ContainsKey($Step)) { $said = $script:ProgressSaid[$Step] }
-    if ($percent -le $said) { return }
-    $script:ProgressSaid[$Step] = $percent
-    Write-Host ('  progress: ' + $Step + ' ' + $count + '/' + $Total)
-}
-
 # ----------------------------------------------------------------------- inside another app (v0.6.17)
 # A process descended from an MSIX app - the Codex app (OpenAI.Codex), Claude desktop - writes HKCU and %APPDATA%
 # into that app's private view, which Windows itself never reads (measured 2026-10-19). Run by an agent inside one
@@ -952,6 +932,25 @@ function Remove-OwnedItem {
     }
     Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
     return (-not (Test-Path -LiteralPath $Path))
+}
+
+# How much of a step is done, for the setup window's bar: `progress: <step> <done>/<total>`, an English line of its own
+# that the window reads and keeps out of the log it shows (gui/InstallerFlow.cs, InstallerProgress). Only when the
+# window asked for it with CODEX_AUTO_RESUME_PROGRESS_LINES=1 ($script:ProgressLines, read once after the outside
+# gate): Install.cmd's console, the CI logs and every other caller see exactly what they always did. Real counts only,
+# never a guess, and at most one line per whole percent of the step, so the pipe is not flooded.
+function Progress {
+    param([string]$Step, [int]$Done, [int]$Total)
+    if (-not $script:ProgressLines -or $Total -le 0) { return }
+    if ($null -eq $script:ProgressSaid) { $script:ProgressSaid = @{} }
+    $count = [Math]::Max(0, [Math]::Min($Done, $Total))
+    $percent = [int][Math]::Floor(100 * $count / $Total)
+    # Nothing for a share below one percent: the bar stands at the step's milestone already.
+    $said = 0
+    if ($script:ProgressSaid.ContainsKey($Step)) { $said = $script:ProgressSaid[$Step] }
+    if ($percent -le $said) { return }
+    $script:ProgressSaid[$Step] = $percent
+    Write-Host ('  progress: ' + $Step + ' ' + $count + '/' + $Total)
 }
 
 function Get-PayloadTree {
