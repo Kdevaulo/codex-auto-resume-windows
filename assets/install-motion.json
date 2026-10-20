@@ -73,7 +73,7 @@
   "inputs": {
     "<install-motion:install-en>": "4705ee2cc96a4dc977b30b8611da1b448738949dfab1d36617d267279442ad65",
     "<install-motion:install-ko>": "f1e2db69a8fb48f7efc2cb838354439682695fa11e44f84a5c620d9b543e17ad",
-    "<install-motion:install-update-en>": "ae0bd0097c80d7cf430edcccaa94d78d6dd83fe6abf663765ca4e04d2fc983f2",
-    "<install-motion:install-update-ko>": "77ab36a5794fa084122f3a194590b908d9157c8720d6b2cb40f3436b03f78c46"
+    "<install-motion:install-update-en>": "e6ee7f8d7f5db20b16b83314325804316ae0a8eed98ea4ec99243db2266a0f41",
+    "<install-motion:install-update-ko>": "61bcab32b4f2043f48e9682fe1e8d4270177d7ad096214b04ed0ecface37a99b"
   }
 }
