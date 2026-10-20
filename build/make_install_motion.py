@@ -442,8 +442,9 @@ def make(plan: dict, exe: Path, work: Path, still: tuple | None, caption: int, o
     canvas = plan["canvas"]
     theme, design = canvas.get("theme", "light"), canvas.get("design", brand.DEFAULT_DESIGN)
     result = render(exe, job(plan, frames, work / "frames"), work)
-    drawn = list(pictures(result, work / "frames"))
-    sizes = sorted({size for _index, size, _picture, _bounds in drawn})
+    sizes = sorted({tuple(int(value) for value in entry["client"]) for entry in result["frames"]})
+    if len(result["frames"]) != len(frames):
+        raise RuntimeError("the shim drew %d frames of %d" % (len(result["frames"]), len(frames)))
     width = max(size[0] for size in sizes)
     height = max(size[1] for size in sizes) + (caption if still is not None else 0)
     if len({size[0] for size in sizes}) != 1:
@@ -458,10 +459,12 @@ def make(plan: dict, exe: Path, work: Path, still: tuple | None, caption: int, o
     scale = float((plan.get("pointer") or {}).get("scale", 1.5))
     seen_bounds, standing = {}, {}
     origin = (0, caption if still is not None else 0)
-    by_index = {index: (size, picture, bounds) for index, size, picture, bounds in drawn}
+    drawn = pictures(result, work / "frames")
 
     def draw(frame, index):
-        size, client, bounds = by_index[index]
+        number, size, client, bounds = next(drawn)
+        if number != index:
+            raise RuntimeError("the shim's frame %d came where frame %d was wanted" % (number, index))
         seen_bounds.update(bounds)
         if still is not None:
             picture = chromes[size].frame(client)
