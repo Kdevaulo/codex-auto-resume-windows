@@ -97,6 +97,8 @@ Download `CodexAutoResume-Setup-vX.Y.Z.exe` from the
 carries one from v0.6.11 on) and double-click it. That is the whole install: there is nothing to
 unzip.
 
+<img src="images/install-motion.png" alt="The setup window installing Codex Auto Resume, drawn by the window's own code: the Welcome page, Next, the choices before it installs, Install, the steps of the installation one after another as the bar fills, and the finished page with the watcher running and Open the Dashboard ticked" width="450">
+
 The setup program is the release archive of [From the release archive](#from-the-release-archive)
 in one file. It carries that archive byte for byte, with the archive's SHA-256 beside it. When you
 start it, it checks the archive against that digest and stops if they differ, unpacks it into a new
