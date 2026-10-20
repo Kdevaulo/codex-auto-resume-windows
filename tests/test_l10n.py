@@ -392,7 +392,7 @@ class EditionWordOnceTests(unittest.TestCase):
 
     KEY = "installer.options.edition_change"
     # Each language whose edition words carry the word "edition", and that word.
-    CARRIED = {"ko": ("판", "에디션"), "zh-CN": ("版", "版"), "zh-TW": ("版", "版")}
+    CARRIED = {"ko": ("판", "에디션"), "ja": ("版", "エディション"), "zh-CN": ("版", "版"), "zh-TW": ("版", "版")}
 
     def said(self, locale):
         table = l10n.catalog(locale)
@@ -409,6 +409,17 @@ class EditionWordOnceTests(unittest.TestCase):
 
     def test_the_korean_sentence_keeps_its_meaning(self):
         self.assertEqual(self.said("ko"), "여기에는 고급판이 설치되어 있고, 이것은 표준판입니다.")
+
+    def test_every_language_names_the_editions_in_its_own_words(self):
+        """Five languages showed the English "Advanced" and "Standard" beside their own words until v0.6.17 (the re-check
+        saw "v0.6.17 Advanced" on a Japanese Dashboard); every language but English names them in its own."""
+        english = l10n.catalog("en")
+        for locale in l10n.LOCALES:
+            if str(locale) == "en":
+                continue
+            with self.subTest(locale):
+                table = l10n.catalog(locale)
+                self.assertNotEqual(table["edition.advanced"], english["edition.advanced"])
 
     def test_korean_calls_an_edition_pan_everywhere(self):
         """Korean names an edition 판 (고급판, 표준판, the picker's 판 column) and nowhere 에디션: the v0.6.17 re-check

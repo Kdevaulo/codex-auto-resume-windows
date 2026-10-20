@@ -55,6 +55,8 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
   are now remembered, and these three languages are set in the face Windows itself uses for each - Malgun Gothic, Yu
   Gothic UI, Microsoft YaHei UI and Microsoft JhengHei UI - where it is installed: about 0.5 s per click in Japanese
   and 0.2 s in Chinese and Korean there. The other languages look as before.
+- **Every language names the two editions in its own words.** Japanese, German, Spanish, French and Portuguese showed
+  them in English ("Advanced", "Standard") beside their own words.
 - **The setup's log says what it knows.** Where the installer will look at the watcher again at the end, the line
   in the middle says it is not confirmed yet instead of a verdict the last word then contradicts; a Repair's log ends
   "Repaired." instead of "Updated."; and the installer's look at the watcher is written in English like the rest of
