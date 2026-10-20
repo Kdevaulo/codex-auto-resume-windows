@@ -148,6 +148,47 @@ class SandboxReadTests(unittest.TestCase):
             self.assertEqual(self.acl.state_access("C:\\not-read"), "shared", "a group Windows does not name")
 
 
+class HostAppPictureTests(ControlTestCase):
+    """The captured Diagnostics page says where the watcher and its window run as the envelope does - outside -
+    though the capture runs inside Claude desktop and its window starts a bridge of its own, where the envelope's
+    patch of kernel.host_app does not reach (the v0.6.17 picture pass: "Inside another app: unknown" on the still,
+    "no" in the offscreen render). The capture sets CODEX_AR_STILL_HOST=outside for that window, and so its bridge."""
+
+    def answer(self, environment):
+        import os
+        inside = {"state": "inside", "family": "Claude_pzs8sxrjxfjjc", "app": "Claude"}
+        variables = {key: value for key, value in os.environ.items() if key != "CODEX_AR_STILL_HOST"}
+        variables.update(environment)
+        with patch.dict(os.environ, variables, clear=True), \
+                patch.object(kernel, "host_app", side_effect=lambda pid=None, started_by=None: dict(inside)), \
+                patch.object(control.Control, "_watcher",
+                             lambda self, store: {"running": True, "pid": 4242, "started_at": 1.0e9}):
+            return controlcli.dispatch(self.control, "host-app", {})["result"]
+
+    def test_the_captures_pin_answers_outside_whatever_the_live_walk_finds(self):
+        self.assertEqual(self.answer({"CODEX_AR_STILL_HOST": "outside"}), {"watcher": OUTSIDE, "bridge": OUTSIDE})
+
+    def test_without_the_pin_or_with_any_other_value_the_walk_answers(self):
+        for environment in ({}, {"CODEX_AR_STILL_HOST": "1"}, {"CODEX_AR_STILL_HOST": "inside"},
+                            {"CODEX_AR_STILL_HOST": "Outside"}):
+            with self.subTest(environment):
+                self.assertEqual(self.answer(environment)["bridge"]["state"], "inside")
+
+    def test_the_capture_sets_it_for_its_window_and_only_that_answer_reads_it(self):
+        import inspect
+        build = str(Path(__file__).resolve().parents[1] / "build")
+        if build not in sys.path:
+            sys.path.insert(0, build)
+        import make_screenshots
+        import srcscan
+        capture = inspect.getsource(make_screenshots.render_window)
+        self.assertIn('CODEX_AR_STILL_HOST="outside")', capture)
+        self.assertLess(capture.index('CODEX_AR_STILL_HOST="outside"'), capture.index("env=environment"))
+        readers = [srcscan.relative(path) for path in srcscan.package_files()
+                   if "CODEX_AR_STILL_HOST" in srcscan.read(path)]
+        self.assertEqual(readers, ["codex_auto_resume/control/tools.py"])
+
+
 class StateAccessBridgeTests(ControlTestCase):
     def test_the_bridge_says_the_word(self):
         from codex_auto_resume.win import acl
