@@ -23,6 +23,12 @@ LAUNCHER_NAME = "watcher-launcher.py"
 RUNTIME_CONFIG = "runtime.json"
 ICON_NAME = "codex-auto-resume.ico"
 ENV_RUNTIME_HOME = "CODEX_AUTO_RESUME_PLUGIN_HOME"
+# What the installer tells setup about the call it is making, as environment variables set for that one call and
+# never as arguments: the installer may be a newer version than the setup it runs (the bootstrap's check-over runs
+# the INSTALLED plugin_setup.py), and an older one rejects an argument it does not know - so `setup` would not run
+# at all - while it ignores a variable it does not read.
+ENV_WILL_LOOK_AGAIN = "CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN"   # "1": the caller looks at the watcher again after setup
+ENV_ENGLISH = "CODEX_AUTO_RESUME_SETUP_ENGLISH"                   # "1": the caller's log is English: say watcher-running so
 RUNTIME_DIR_NAME = ".codex-auto-resume"
 # The directory names the installer creates under the root - and therefore the ones
 # it would destroy if it ever ran against a directory that merely contained them.
@@ -322,7 +328,7 @@ def cmd_setup(args) -> int:
     # A caller that looks at the watcher again after this (the installer, after its health check) has not heard a
     # verdict yet: "not confirmed yet" is the true word mid-log, and its own last word is the verdict (v0.6.17, the
     # live acceptance's second round). A setup run alone, from Codex, has no later look, so its word stays final.
-    unconfirmed_word = "setup_unconfirmed_yet" if getattr(args, "will_look_again", False) else "setup_unconfirmed"
+    unconfirmed_word = "setup_unconfirmed_yet" if os.environ.get(ENV_WILL_LOOK_AGAIN) == "1" else "setup_unconfirmed"
     if incomplete:
         say("setup_incomplete")
     else:
@@ -384,7 +390,7 @@ def cmd_watcher_running(args) -> int:
     (build/install/install.ps1, scripts/bootstrap.ps1): a watcher that took the mutex after setup's wait ended is
     running, and the last word says so rather than contradicting the health check printed above it."""
     running = watcher_seen(runtime_home())
-    if getattr(args, "english", False):
+    if os.environ.get(ENV_ENGLISH) == "1":
         # The installer's log is English, and this line is the one place a localized sentence landed in it (v0.6.17,
         # the live acceptance: "워처: 실행 중" on a Korean PC). `watcher_seen` has just built the App, which adopted the
         # Interface language the person stored - and an explicit choice outranks the environment's override
@@ -555,9 +561,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--watcher-was-stopped", action="store_true",
                    help="with --keep-state: no watcher ran before the update, so it is started only where it "
                         "runs at sign-in")
-    p.add_argument("--will-look-again", action="store_true",
-                   help="the caller looks at the watcher again after this (watcher-running) and says the last word: "
-                        "a watcher not confirmed here is then said not to be confirmed yet, not to be unconfirmed")
     sub.add_parser("status")
     sub.add_parser("pending")
     sub.add_parser("enable")
@@ -566,9 +569,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("thread_id")
     sub.add_parser("stop")
     sub.add_parser("doctor")
-    p = sub.add_parser("watcher-running", help="exit 0 only if this installation's watcher holds its mutex now")
-    p.add_argument("--english", action="store_true",
-                   help="say the one line in English whatever Interface language is stored: for the installer's log")
+    sub.add_parser("watcher-running", help="exit 0 only if this installation's watcher holds its mutex now")
     sub.add_parser("verify-home", help="exit 0 only if the install root is provably ours")
     sub.add_parser("claim-home",
                    help="exit 0 only if the install root is ours or holds nothing of ours")

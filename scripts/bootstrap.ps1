@@ -441,17 +441,22 @@ function Get-OutsideSource {
         and values, then $Arguments as they are, everything it prints appended line by line to $Log as it prints it,
         and its exit code written to $CodeFile last.
     #>
-    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile)
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile,
+          [hashtable]$Environment)
     $literal = { param($text) "'" + ([string]$text).Replace("'", "''") + "'" }
     $call = '& ' + (& $literal $Script)
     foreach ($name in $Switches) { $call += ' -' + $name }
     if ($Values) { foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) } }
     foreach ($argument in $Arguments) { $call += ' ' + (& $literal $argument) }
+    # Variables the run outside has to see (this process's own do not reach it): one line each, before the call.
+    $variables = @()
+    if ($Environment) { foreach ($name in @($Environment.Keys | Sort-Object)) { $variables += '$env:' + $name + ' = ' + (& $literal $Environment[$name]) } }
     return @(
         '$ErrorActionPreference = ''Continue'''
         '$log = ' + (& $literal $Log)
         '$utf8 = New-Object System.Text.UTF8Encoding $false'
         '$code = 1'
+        $variables
         'try {'
         '    ' + $call + ' *>&1 | ForEach-Object { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
         '    $code = $LASTEXITCODE'
@@ -534,7 +539,7 @@ function Resolve-OutsideRun {
         Whether this run goes on here: $null, or the exit code of the run outside that did its work instead. A run
         CODEX_AUTO_RESUME_OUTSIDE=1 marks is one: it never relaunches, and the mark goes no further than it.
     #>
-    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments)
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [hashtable]$Environment)
     if ($env:CODEX_AUTO_RESUME_OUTSIDE -eq '1') {
         $env:CODEX_AUTO_RESUME_OUTSIDE = $null
         return $null
@@ -549,7 +554,7 @@ function Resolve-OutsideRun {
         $log = Join-Path $folder 'output.txt'
         $codeFile = Join-Path $folder 'code.txt'
         $source = Get-OutsideSource -Script $Script -Switches $Switches -Values $Values -Arguments $Arguments `
-                                    -Log $log -CodeFile $codeFile
+                                    -Log $log -CodeFile $codeFile -Environment $Environment
         $code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
     } catch {
         $code = $null
@@ -2019,14 +2024,17 @@ if ($null -ne $standing -and $standing -ge 0 -and -not $Force) {
     $arguments = @($setup, 'setup', '--keep-state')
     if ($NoStartup) { $arguments += '--no-startup' }
     # This branch looks at the watcher again below (watcher-running) and says the last word, so a watcher setup could
-    # not confirm within its wait is "not confirmed yet" in setup's own line (v0.6.17).
-    $arguments += '--will-look-again'
+    # not confirm within its wait is "not confirmed yet" in setup's own line (v0.6.17). Said as a variable for this
+    # one call, never an argument: the setup that runs is the INSTALLED one, which may be older than this script and
+    # rejects an argument it does not know - so it would not run at all - while it ignores a variable it does not read.
+    $lookAgain = @{ CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1' }
     # Inside another app's private view, the setup runs outside it instead, with this lock still held here, and its
     # code is this run's (the outside gate above).
-    $outsideCode = Resolve-OutsideRun -Script $python -Arguments $arguments
+    $outsideCode = Resolve-OutsideRun -Script $python -Arguments $arguments -Environment $lookAgain
     if ($null -ne $outsideCode) { $code = $outsideCode }
     else {
-        & $python @arguments
+        $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'
+        try { & $python @arguments } finally { $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null }
         $code = $LASTEXITCODE
         if ($null -eq $code) { $code = 0 }
     }
@@ -2034,7 +2042,9 @@ if ($null -ne $standing -and $standing -ge 0 -and -not $Force) {
     # mutex since - on a busy PC it can take longer than that wait (v0.6.17 live acceptance) - is running, and this
     # run's code says so: the watcher is looked at once more, here (a look writes nothing, so it need not go outside).
     if ($code -eq 2) {
-        & $python $setup 'watcher-running' '--english'
+        # In English, for this English log. An installed setup that predates watcher-running fails with 2: still unconfirmed.
+        $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = '1'
+        try { & $python $setup 'watcher-running' } finally { $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = $null }
         if ($LASTEXITCODE -eq 0) { $code = 0 }
     }
     exit $code

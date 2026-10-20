@@ -87,13 +87,18 @@ class ScratchSetup(unittest.TestCase):
             handler.close()
             logger.removeHandler(handler)
 
-    def setup(self, *flags, started="unconfirmed", seen=False):
+    def setup(self, *flags, looks_again=False, started="unconfirmed", seen=False):
+        """setup as the installer runs it: `looks_again` is the variable the installer sets for that one call."""
         args = self.bridge.build_parser().parse_args(["setup", "--no-startup", *flags])
         output = io.StringIO()
+        environment = {self.bridge.ENV_WILL_LOOK_AGAIN: "1"} if looks_again else {}
         with patch.object(self.bridge, "runtime_home", return_value=self.home), \
              patch.object(self.bridge, "start_watcher", return_value=started), \
              patch.object(self.bridge, "watcher_seen", return_value=seen), \
+             patch.dict(os.environ, environment), \
              contextlib.redirect_stdout(output):
+            if not looks_again:
+                os.environ.pop(self.bridge.ENV_WILL_LOOK_AGAIN, None)
             code = self.bridge.cmd_setup(args)
         return code, output.getvalue()
 
@@ -103,7 +108,7 @@ class MidLogWordTests(ScratchSetup):
     nothing does."""
 
     def test_the_installer_s_setup_says_not_confirmed_yet(self):
-        code, text = self.setup("--will-look-again")
+        code, text = self.setup(looks_again=True)
         self.assertEqual(code, self.bridge.EXIT_UNCONFIRMED, "the exit code is still the unconfirmed one")
         self.assertIn(l10n.message("setup_unconfirmed_yet"), text)
         self.assertNotIn(l10n.message("setup_unconfirmed"), text, "no final verdict where a later look follows")
@@ -114,17 +119,22 @@ class MidLogWordTests(ScratchSetup):
         self.assertIn(l10n.message("setup_unconfirmed"), text)
         self.assertNotIn(l10n.message("setup_unconfirmed_yet"), text)
 
+    def test_a_variable_that_is_not_1_changes_nothing(self):
+        with patch.dict(os.environ, {self.bridge.ENV_WILL_LOOK_AGAIN: "0"}):
+            code, text = self.setup()
+        self.assertIn(l10n.message("setup_unconfirmed"), text)
+
     def test_a_confirmed_watcher_is_the_same_word_either_way(self):
-        for flags in ((), ("--will-look-again",)):
-            with self.subTest(flags=flags):
-                code, text = self.setup(*flags, started="running")
+        for looks_again in (False, True):
+            with self.subTest(looks_again=looks_again):
+                code, text = self.setup(looks_again=looks_again, started="running")
                 self.assertEqual(code, self.bridge.EXIT_OK)
                 self.assertIn(l10n.message("setup_done"), text)
                 self.assertNotIn(l10n.message("setup_unconfirmed"), text)
                 self.assertNotIn(l10n.message("setup_unconfirmed_yet"), text)
 
     def test_a_watcher_left_stopped_is_still_said_to_be_left_stopped(self):
-        code, text = self.setup("--keep-state", "--watcher-was-stopped", "--will-look-again")
+        code, text = self.setup("--keep-state", "--watcher-was-stopped", looks_again=True)
         self.assertIn(l10n.message("setup_left_stopped"), text)
         self.assertNotIn(l10n.message("setup_unconfirmed_yet"), text)
 
@@ -150,26 +160,107 @@ class MidLogWordTests(ScratchSetup):
 
 
 class CallersLookAgainTests(unittest.TestCase):
-    """Every script that says setup's last word looks again after it, and says so to setup."""
+    """Every script that says setup's last word looks again after it, and says so to setup - by a variable set for
+    that one call, never an argument (an older installed setup rejects an argument it does not know)."""
 
     def test_install_ps1_tells_setup_it_will_look_again_and_does(self):
         text = INSTALL.read_text(encoding="utf-8")
-        flag = text.index("$setupArgs += '--will-look-again'")
-        run = text.index("$code = Invoke-Setup $setupArgs", flag)        # setup runs after the flag is set
-        self.assertIn("Invoke-Setup @('watcher-running'", text[run:], "and the look that follows is the reason for it")
+        flag = text.index("$env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'")
+        run = text.index("$code = Invoke-Setup $setupArgs", flag)
+        self.assertLess(run - flag, 200, "set for that call")
+        self.assertIn("$env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null", text[run:run + 200], "and not for any other")
+        self.assertIn("Invoke-Setup @('watcher-running')", text[run:], "and the look that follows is the reason for it")
 
     def test_the_bootstraps_check_over_tells_setup_it_will_look_again_and_does(self):
         text = BOOTSTRAP.read_text(encoding="utf-8")
         start = text.index("$arguments = @($setup, 'setup', '--keep-state')")
         branch = text[start:text.index("exit $code", start)]
-        self.assertIn("$arguments += '--will-look-again'", branch)
+        self.assertIn("$lookAgain = @{ CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1' }", branch)
+        self.assertIn("-Environment $lookAgain", branch, "the run outside gets it too")
+        self.assertIn("$env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'", branch, "and the run here")
         self.assertIn("'watcher-running'", branch)
 
+    def test_no_script_passes_setup_an_argument_an_older_setup_lacks(self):
+        """The bootstrap's check-over runs the INSTALLED plugin_setup.py, so what it passes is only what setup has
+        always taken; the two hints are variables."""
+        for path in (INSTALL, BOOTSTRAP):
+            text = path.read_text(encoding="utf-8")
+            for argument in ("--will-look-again", "--english"):
+                self.assertNotIn(argument, text, path.name)
+        self.assertNotIn("--will-look-again", " ".join(self.bridge_parser_options()))
+        self.assertNotIn("--english", " ".join(self.bridge_parser_options()))
+
+    @staticmethod
+    def bridge_parser_options():
+        parser = _plugin_setup().build_parser()
+        options = []
+        for action in parser._subparsers._group_actions:
+            for sub in action.choices.values():
+                options += [string for a in sub._actions for string in a.option_strings]
+        return options
+
     def test_the_plugin_s_own_setup_does_not(self):
-        """Run from Codex (the skill) nothing looks again: nothing there says the flag."""
+        """Run from Codex (the skill) nothing looks again: nothing there says the variable."""
         for path in (ROOT / "skills" / "codex-auto-resume" / "SKILL.md", ROOT / "docs" / "PLUGIN.md"):
             if path.is_file():
-                self.assertNotIn("--will-look-again", path.read_text(encoding="utf-8"), path.name)
+                self.assertNotIn("CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN", path.read_text(encoding="utf-8"), path.name)
+
+
+class OlderInstalledSetupTests(unittest.TestCase):
+    """The bootstrap's check-over runs the installed plugin_setup.py, which can be older than the script that runs it:
+    a 0.6.17 candidate built before these hints exist. What the bootstrap passes it must still run."""
+
+    OLDER = "ede362004"        # the commit before the hints: its plugin_setup.py has neither the variables nor the look
+
+    def older_parser(self):
+        done = subprocess.run(["git", "show", "%s:scripts/plugin_setup.py" % self.OLDER], cwd=str(ROOT),
+                              capture_output=True, text=True, encoding="utf-8",
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if done.returncode != 0:
+            self.skipTest("the commit the older setup is read from is not in this checkout")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "plugin_setup.py"
+            path.write_text(done.stdout, encoding="utf-8")
+            # Imported from where the real one sits, so its own sys.path lines find this tree's src.
+            text = done.stdout.replace("Path(__file__).resolve().parents[1]", "Path(%r)" % str(ROOT))
+            path.write_text(text, encoding="utf-8")
+            spec = importlib.util.spec_from_file_location("plugin_setup_older", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        return module.build_parser()
+
+    def test_what_the_bootstrap_passes_an_older_setup_still_parses(self):
+        parser = self.older_parser()
+        for argv in (["setup", "--keep-state"], ["setup", "--keep-state", "--no-startup"]):
+            with self.subTest(argv):
+                self.assertEqual(parser.parse_args(argv).command, "setup")
+
+    def test_an_argument_for_the_hint_would_have_stopped_it(self):
+        """Why the hint is a variable: the older setup exits 2 on an unknown argument - the code the bootstrap reads
+        as 'watcher not confirmed' - without having run."""
+        parser = self.older_parser()
+        for argument in ("--will-look-again", "--english"):
+            with self.subTest(argument), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as stopped:
+                parser.parse_args(["setup", "--keep-state", argument])
+            self.assertEqual(stopped.exception.code, 2)
+
+    def test_the_variables_reach_the_run_outside_another_app_s_view(self):
+        """Get-OutsideSource, lifted from bootstrap.ps1: the variables a call is given are lines of the source the
+        run outside executes, before the call; none given, none added."""
+        from test_installer import block
+        text = BOOTSTRAP.read_text(encoding="utf-8")
+        function = block(text, "function Get-OutsideSource {", "function Send-OutsideLines {")
+        script = (function + "$with = Get-OutsideSource -Script 'C:\\python.exe' -Arguments @('x') -Log 'l' -CodeFile 'c' "
+                  "-Environment @{ CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1' }\n"
+                  "$without = Get-OutsideSource -Script 'C:\\python.exe' -Arguments @('x') -Log 'l' -CodeFile 'c'\n"
+                  "Write-Host ('WITH ' + (($with -split \"`r`n\") -join '|'))\n"
+                  "Write-Host ('WITHOUT ' + (($without -split \"`r`n\") -join '|'))\n")
+        said = run_powershell(script)
+        with_line = next(line for line in said.splitlines() if line.startswith("WITH "))
+        without_line = next(line for line in said.splitlines() if line.startswith("WITHOUT "))
+        self.assertIn("|$env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'|try {", with_line)
+        self.assertNotIn("$env:", without_line)
+        self.assertIn("|$code = 1|try {", without_line)
 
 
 class EnglishLookTests(ScratchSetup):
@@ -184,10 +275,14 @@ class EnglishLookTests(ScratchSetup):
         config.Paths(self.home).ensure()
         config.update_settings(config.Paths(self.home), {"interface_language": "ko"})
 
-    def look(self, *flags):
-        args = self.bridge.build_parser().parse_args(["watcher-running", *flags])
+    def look(self, english=False):
+        args = self.bridge.build_parser().parse_args(["watcher-running"])
         output = io.StringIO()
-        with patch.object(self.bridge, "runtime_home", return_value=self.home), contextlib.redirect_stdout(output):
+        environment = {self.bridge.ENV_ENGLISH: "1"} if english else {}
+        with patch.object(self.bridge, "runtime_home", return_value=self.home), patch.dict(os.environ, environment), \
+             contextlib.redirect_stdout(output):
+            if not english:
+                os.environ.pop(self.bridge.ENV_ENGLISH, None)
             code = self.bridge.COMMANDS[args.command](args)
         return code, output.getvalue().strip()
 
@@ -197,19 +292,21 @@ class EnglishLookTests(ScratchSetup):
         self.assertNotEqual(said, l10n.text("msg.watcher_stopped", "en"))
 
     def test_asked_for_english_the_same_look_is_english_with_the_same_answer(self):
-        code, said = self.look("--english")
+        code, said = self.look(english=True)
         self.assertEqual((code, said), (self.bridge.EXIT_UNCONFIRMED, l10n.text("msg.watcher_stopped", "en")))
 
     def test_a_running_watcher_is_said_in_english_too(self):
         with patch.object(self.bridge, "watcher_seen", return_value=True):
-            code, said = self.look("--english")
+            code, said = self.look(english=True)
         self.assertEqual((code, said), (self.bridge.EXIT_OK, "Watcher: running"))
 
     def test_the_installer_and_the_bootstrap_ask_for_english_and_nothing_else_does(self):
-        self.assertIn("Invoke-Setup @('watcher-running', '--english')", INSTALL.read_text(encoding="utf-8"))
-        self.assertIn("& $python $setup 'watcher-running' '--english'", BOOTSTRAP.read_text(encoding="utf-8"))
+        for path in (INSTALL, BOOTSTRAP):
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("$env:CODEX_AUTO_RESUME_SETUP_ENGLISH = '1'", text, path.name)
+            self.assertIn("$env:CODEX_AUTO_RESUME_SETUP_ENGLISH = $null", text, "and only for that call: " + path.name)
         for window in sorted((ROOT / "gui").glob("*.cs")):
-            self.assertNotIn("--english", window.read_text(encoding="utf-8"), window.name)
+            self.assertNotIn("CODEX_AUTO_RESUME_SETUP_ENGLISH", window.read_text(encoding="utf-8"), window.name)
 
 
 def run_powershell(script: str) -> str:

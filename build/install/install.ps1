@@ -164,17 +164,22 @@ function Get-OutsideSource {
         and values, then $Arguments as they are, everything it prints appended line by line to $Log as it prints it,
         and its exit code written to $CodeFile last.
     #>
-    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile)
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile,
+          [hashtable]$Environment)
     $literal = { param($text) "'" + ([string]$text).Replace("'", "''") + "'" }
     $call = '& ' + (& $literal $Script)
     foreach ($name in $Switches) { $call += ' -' + $name }
     if ($Values) { foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) } }
     foreach ($argument in $Arguments) { $call += ' ' + (& $literal $argument) }
+    # Variables the run outside has to see (this process's own do not reach it): one line each, before the call.
+    $variables = @()
+    if ($Environment) { foreach ($name in @($Environment.Keys | Sort-Object)) { $variables += '$env:' + $name + ' = ' + (& $literal $Environment[$name]) } }
     return @(
         '$ErrorActionPreference = ''Continue'''
         '$log = ' + (& $literal $Log)
         '$utf8 = New-Object System.Text.UTF8Encoding $false'
         '$code = 1'
+        $variables
         'try {'
         '    ' + $call + ' *>&1 | ForEach-Object { [IO.File]::AppendAllText($log, [string]$_ + "`r`n", $utf8) }'
         '    $code = $LASTEXITCODE'
@@ -257,7 +262,7 @@ function Resolve-OutsideRun {
         Whether this run goes on here: $null, or the exit code of the run outside that did its work instead. A run
         CODEX_AUTO_RESUME_OUTSIDE=1 marks is one: it never relaunches, and the mark goes no further than it.
     #>
-    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments)
+    param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [hashtable]$Environment)
     if ($env:CODEX_AUTO_RESUME_OUTSIDE -eq '1') {
         $env:CODEX_AUTO_RESUME_OUTSIDE = $null
         return $null
@@ -272,7 +277,7 @@ function Resolve-OutsideRun {
         $log = Join-Path $folder 'output.txt'
         $codeFile = Join-Path $folder 'code.txt'
         $source = Get-OutsideSource -Script $Script -Switches $Switches -Values $Values -Arguments $Arguments `
-                                    -Log $log -CodeFile $codeFile
+                                    -Log $log -CodeFile $codeFile -Environment $Environment
         $code = Invoke-Outside -Source $source -Log $log -CodeFile $codeFile
     } catch {
         $code = $null
@@ -1828,16 +1833,17 @@ try {
     }
     if ($SkipStartup) { $setupArgs += '--no-startup' }
     if ($upgrade -and -not $watcherWasRunning) { $setupArgs += '--watcher-was-stopped' }
-    # This run looks at the watcher again after the health check (watcher-running, below) and says the last word, so a
-    # watcher setup could not confirm within its wait is "not confirmed yet" in setup's own line, not a verdict
-    # the last word then contradicts (v0.6.17, the live acceptance's second round).
-    $setupArgs += '--will-look-again'
     # 2 means everything was done but the watcher was not seen running - a real outcome that
     # is neither success nor failure. Treating it as failure would roll back a good install;
     # treating it as success is how this script came to end with "Installed and running."
     # about a watcher nobody had looked at.
     $SETUP_UNCONFIRMED = 2
-    $code = Invoke-Setup $setupArgs
+    # This run looks at the watcher again after the health check (watcher-running, below) and says the last word, so a
+    # watcher setup could not confirm within its wait is "not confirmed yet" in setup's own line, not a verdict
+    # the last word then contradicts (v0.6.17, the live acceptance's second round). Said as a variable for this one
+    # call, the way the bootstrap says it to an installed setup that may be older.
+    $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'
+    try { $code = Invoke-Setup $setupArgs } finally { $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null }
     $watcherUnconfirmed = $code -eq $SETUP_UNCONFIRMED
     if ($code -ne 0 -and -not $watcherUnconfirmed) {
         Fail 'Setup did not complete. Nothing was removed; read the message above.'
@@ -1851,7 +1857,12 @@ try {
     # was written fresh, a watcher can take longer than that to take its mutex (v0.6.17 live acceptance: 6 to 9
     # seconds), and this run then ended "could not be confirmed" under a health check that had just seen the mutex
     # held. So it is looked at once more, now, before the last word: a watcher running now is a watcher running.
-    if ($watcherUnconfirmed -and (Invoke-Setup @('watcher-running', '--english')) -eq 0) { $watcherUnconfirmed = $false }
+    # The look's one line is said in English, for this English log, whatever Interface language the PC stores.
+    if ($watcherUnconfirmed) {
+        $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = '1'
+        try { if ((Invoke-Setup @('watcher-running')) -eq 0) { $watcherUnconfirmed = $false } }
+        finally { $env:CODEX_AUTO_RESUME_SETUP_ENGLISH = $null }
+    }
 
     # The Dashboard that closed for this update opens again on the new version, where it was (Open-ClosedDashboard).
     Open-ClosedDashboard -Updated

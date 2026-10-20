@@ -135,13 +135,7 @@ class EditionChangeTests(unittest.TestCase):
                               env=dict(os.environ, CAR_INSTALLER=str(INSTALLER), CAR_HOME=str(self.home),
                                        CAR_PAYLOAD=str(self.payload), CAR_ALLOW="1" if allow else "0"))
         setup = [line[len("SETUP "):] for line in done.stdout.splitlines() if line.startswith("SETUP ")]
-        arguments = setup[0].split() if setup else None
-        if arguments is not None:
-            # Last of every setup the installer runs: it looks at the watcher again after its health check
-            # (tests/test_setup_words.py). Held here, and left out of what each case below is about.
-            self.assertEqual(arguments[-1], "--will-look-again", arguments)
-            arguments = arguments[:-1]
-        return done.returncode, done.stdout, arguments
+        return done.returncode, done.stdout, (setup[0].split() if setup else None)
 
     @property
     def package(self) -> Path:
