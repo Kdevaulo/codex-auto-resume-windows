@@ -1372,21 +1372,23 @@ if ($Uninstall) {
     $stuck = @()
     # What is in the two program folders goes entry by entry, each proved inside the installation again
     # (Remove-OwnedItem), so the setup window's bar follows the removal (Progress); then each folder itself, as before.
-    $dirs = @(@($AppDir, $RunDir) | Where-Object { Test-Path $_ })
-    $entries = @(foreach ($dir in $dirs) { Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue })
-    $removeTotal = $entries.Count + $dirs.Count
+    $programDirs = @(@($AppDir, $RunDir) | Where-Object { Test-Path $_ })
+    $programEntries = @(foreach ($dir in $programDirs) {
+        Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue
+    })
+    $removeTotal = $programEntries.Count + $programDirs.Count
     $removedCount = 0
-    foreach ($entry in $entries) {
-        $null = Remove-OwnedItem $entry.FullName
+    foreach ($programEntry in $programEntries) {
+        $null = Remove-OwnedItem $programEntry.FullName
         $removedCount++
         Progress 'remove_files' $removedCount $removeTotal
     }
     foreach ($dir in @($AppDir, $RunDir)) {
         if (-not (Test-Path $dir)) { continue }
-        $gone = Remove-OwnedItem $dir
+        $dirGone = Remove-OwnedItem $dir
         $removedCount++
         Progress 'remove_files' $removedCount $removeTotal
-        if (-not $gone) { $stuck += $dir; continue }
+        if (-not $dirGone) { $stuck += $dir; continue }
         # -ErrorAction SilentlyContinue swallows a sharing violation, so ask afterwards
         # rather than assuming. A half-deleted installation reported as "Removed." is
         # worse than an honest failure: nothing tells the user to try again.
@@ -1753,11 +1755,11 @@ try {
         }
         $copyFiles = @($copying | Where-Object { -not $_.Folder }).Count
         $copied = 0
-        foreach ($item in @($copying | Where-Object { $_.Folder })) {
-            New-Item -ItemType Directory -Force -Path $item.To | Out-Null
+        foreach ($payloadItem in @($copying | Where-Object { $_.Folder })) {
+            New-Item -ItemType Directory -Force -Path $payloadItem.To | Out-Null
         }
-        foreach ($item in @($copying | Where-Object { -not $_.Folder })) {
-            [IO.File]::Copy($item.From, $item.To, $true)
+        foreach ($payloadItem in @($copying | Where-Object { -not $_.Folder })) {
+            [IO.File]::Copy($payloadItem.From, $payloadItem.To, $true)
             $copied++
             Progress 'files' $copied $copyFiles
         }
