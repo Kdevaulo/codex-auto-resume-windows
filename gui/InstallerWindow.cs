@@ -779,6 +779,24 @@ namespace CodexAutoResume
             base.OnFormClosed(e);
         }
 
+        /// A window build/capture_window.ps1 started is never made the foreground window, as the Dashboard's is not
+        /// (SettingsForm.ShowWithoutActivation): the capture reads the caption back and refuses an active one. A
+        /// person's window is never given a capture's event, and opens as always.
+        protected override bool ShowWithoutActivation
+        {
+            get { return Soft.StillReady != null || base.ShowWithoutActivation; }
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams created = base.CreateParams;
+                if (Soft.StillReady != null) created.ExStyle |= 0x08000000;          // WS_EX_NOACTIVATE
+                return created;
+            }
+        }
+
         /// Every control on the page that is shown, for the layout audit.
         internal IEnumerable<Control> ShownRows()
         {
