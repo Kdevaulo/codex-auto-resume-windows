@@ -1,6 +1,6 @@
-"""The Dashboard's Advanced features page in the window itself: the layout audit, share 5 of 5 of the languages.
+"""The Dashboard's Advanced features page in the window itself: the layout audit, share 5 of 5 of the audits.
 
-The page is audited in this module's languages (pagecase.layout_languages(5)) at every scaling - each capability
+The page is audited in this module's share of the languages and scalings (pagecase.layout_jobs(5)) - each capability
 open with every warning there is, then unread, the narrowest window on two screens (its tabs on the narrowest screen
 too), the compatibility report's card in each of its states, and Pending's scheduled group - through the window's
 own hook (AdvancedLayoutAudit in advanced/gui/AdvancedPageAudit.cs), with a canary that shows the audit finds what
@@ -27,10 +27,10 @@ from pagecase import CSC, IDS, POWERSHELL  # noqa: E402
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class LayoutTests(pagecase.LayoutCase):
-    """The page in this module's languages at five scalings - and a canary that shows the audit finds what does not
-    fit."""
+    """The page in this module's share of the languages and scalings - and a canary that shows the audit finds what
+    does not fit."""
 
-    LANGUAGES = pagecase.layout_languages(5)
+    JOBS = pagecase.layout_jobs(5)
     CANARY = True
 
     def test_the_audit_finds_what_does_not_fit(self):
