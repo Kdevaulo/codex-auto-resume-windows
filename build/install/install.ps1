@@ -457,6 +457,24 @@ function Get-Edition {
     return 'standard'
 }
 
+function Get-AppVersion {
+    <#
+        The version the program files under Root (an app\ tree) declare: the plugin manifest's own "version", or
+        $null where there is no manifest, it cannot be read or it names no version. The one fact that tells a repair
+        from an update - this archive's version over the same version already installed - and read the way the
+        product reads it (config.version), from the tree itself rather than from a name.
+    #>
+    param([string]$Root)
+    $manifest = Join-Path (Join-Path $Root '.codex-plugin') 'plugin.json'
+    try {
+        $item = Get-Item -LiteralPath $manifest -Force -ErrorAction Stop
+        if ($item.PSIsContainer) { return $null }
+        $declared = ([IO.File]::ReadAllText($item.FullName) | ConvertFrom-Json).version
+        if ($declared -is [string] -and $declared.Trim()) { return $declared.Trim() }
+    } catch { }
+    return $null
+}
+
 function Get-EditionStatement {
     # What moving from one edition to the other keeps and what it changes, in one line said
     # before anything is done. The bootstrap says the same line (scripts/bootstrap.ps1) before
@@ -1508,6 +1526,14 @@ try {
     $previousEdition = $null
     if ($upgrade) { $previousEdition = Get-Edition -Src (Join-Path $AppDir 'src') }
     $editionChange = $upgrade -and ($previousEdition -ne $edition)
+    # A repair is this archive's version over the same version, in the same edition (the setup program's Repair, or
+    # Install.cmd run again): the last word says it repaired, not that it updated (v0.6.17, the live acceptance).
+    # Read now, while the installed program files are still where they were.
+    $repair = $false
+    if ($upgrade -and -not $editionChange) {
+        $installedVersion = Get-AppVersion -Root $AppDir
+        if ($installedVersion -and ($installedVersion -ceq (Get-AppVersion -Root (Join-Path $Payload 'app')))) { $repair = $true }
+    }
     if ($editionChange) {
         Write-Host ''
         Write-Host (Get-EditionStatement -From $previousEdition -To $edition)
@@ -1832,18 +1858,21 @@ try {
 
     Write-Host ''
     if ($script:Failed) { Write-Host 'Finished with problems. See the messages above.'; exit 1 }
+    # What was done to an installation that was there: repaired (this version over itself) or updated.
+    $keptLine = if ($repair) { 'Repaired. Your settings and pending recoveries were kept.' }
+                else { 'Updated. Your settings and pending recoveries were kept.' }
     if ($watcherUnconfirmed) {
-        if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
+        if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed.' }
         Write-Host 'The watcher could not be confirmed running, so nothing is being watched yet.'
         Write-Host 'Open Start Menu > Codex Auto Resume and use Start watcher, or run this again.'
     } elseif ($previousWatcherStillRunning) {
-        Write-Host 'Updated. Your settings and pending recoveries were kept.'
+        Write-Host $keptLine
         Write-Host 'The previous version of the watcher was asked to stop and is still finishing'
         Write-Host 'what it was doing; nothing was ended by force. Once it has stopped, open'
         Write-Host 'Start Menu > Codex Auto Resume and use Start watcher - or sign out and back in.'
     } else {
-        if ($upgrade) { Write-Host 'Updated. Your settings and pending recoveries were kept.' }
+        if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed and running.' }
         Write-Host 'Recommended settings are already on. Nothing else to do.'
     }

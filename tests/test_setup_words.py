@@ -17,7 +17,9 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -33,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INSTALL = ROOT / "build" / "install" / "install.ps1"
 BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
 CATALOGS = ROOT / "src" / "codex_auto_resume" / "locales"
+POWERSHELL = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
 
 
 def _plugin_setup():
@@ -164,6 +167,118 @@ class CallersLookAgainTests(unittest.TestCase):
         for path in (ROOT / "skills" / "codex-auto-resume" / "SKILL.md", ROOT / "docs" / "PLUGIN.md"):
             if path.is_file():
                 self.assertNotIn("--will-look-again", path.read_text(encoding="utf-8"), path.name)
+
+
+def run_powershell(script: str) -> str:
+    """A script run in Windows PowerShell, its output returned; the test is skipped where there is none."""
+    if not POWERSHELL.is_file():
+        raise unittest.SkipTest("Windows PowerShell")
+    with tempfile.TemporaryDirectory() as folder:
+        probe = Path(folder) / "probe.ps1"
+        probe.write_text(script, encoding="utf-8-sig")
+        done = subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                               "-File", str(probe)], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if done.returncode != 0:
+        raise AssertionError(done.stdout + done.stderr)
+    return done.stdout
+
+
+def tree(root: Path, version) -> Path:
+    """An app tree whose plugin manifest declares `version` (none at all for None)."""
+    manifest = root / ".codex-plugin" / "plugin.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    if version is not None:
+        manifest.write_text(json.dumps({"name": "codex-auto-resume", "version": version}), encoding="utf-8")
+    return root
+
+
+class RepairIsToldFromUpdateTests(unittest.TestCase):
+    """A Repair is this archive's version over the same version, in the same edition: its last word says so."""
+
+    def setUp(self):
+        self.text = INSTALL.read_text(encoding="utf-8")
+
+    def decided(self, installed, payload, edition_change=False, upgrade=True):
+        """install.ps1's own decision block, lifted by marker, over two trees: whether it called the run a repair."""
+        from test_installer import block
+        function = block(self.text, "function Get-AppVersion {", "function Get-EditionStatement {")
+        decision = block(self.text, "    $repair = $false", "    if ($editionChange) {")
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            tree(base / "installed", installed)
+            tree(base / "payload" / "app", payload)
+            script = (function + "$AppDir = '%s'\n$Payload = '%s'\n$upgrade = $%s\n$editionChange = $%s\n"
+                      % (base / "installed", base / "payload", str(upgrade).lower(), str(edition_change).lower())
+                      + decision + "Write-Host ('REPAIR ' + $repair)\n")
+            out = run_powershell(script)
+        return out.split("REPAIR ")[-1].strip() == "True"
+
+    def test_the_same_version_over_itself_is_a_repair(self):
+        self.assertTrue(self.decided("0.6.17", "0.6.17"))
+
+    def test_another_version_is_an_update_either_way(self):
+        for installed, payload in (("0.6.16", "0.6.17"), ("0.6.18", "0.6.17"), ("0.6.17-beta.2", "0.6.17"),
+                                   ("0.6.17", "0.6.17-beta.2")):
+            with self.subTest(installed=installed, payload=payload):
+                self.assertFalse(self.decided(installed, payload))
+
+    def test_nothing_that_cannot_be_read_is_a_repair(self):
+        self.assertFalse(self.decided(None, "0.6.17"), "no manifest in the installation")
+        self.assertFalse(self.decided("0.6.17", None), "no manifest in the archive")
+        self.assertFalse(self.decided(None, None))
+
+    def test_a_first_installation_and_an_edition_change_are_neither(self):
+        self.assertFalse(self.decided("0.6.17", "0.6.17", upgrade=False))
+        self.assertFalse(self.decided("0.6.17", "0.6.17", edition_change=True))
+
+    def test_the_decision_is_read_before_the_program_files_move(self):
+        """The installed tree is moved aside after this point: the decision comes before every write."""
+        decision = self.text.index("    $repair = $false")
+        self.assertLess(decision, self.text.index("Step 'Updating program files'"))
+
+    START, END = "    Step 'Checking the installation'", "    Write-Host 'To change anything"
+
+    def last_words(self, repair, upgrade=True, unconfirmed=False, previous_running=False):
+        """install.ps1's closing block, lifted from the health check to the last word, with setup stubbed."""
+        from test_installer import VOICE, block
+        look = 2 if unconfirmed else 0      # what the look at the watcher finds: not running, or running
+        stubs = ("function Invoke-Setup { param([string[]]$Arguments)\n"
+                 "    $global:LASTEXITCODE = %d; return %d }\n" % (look, look)
+                 + "function Open-ClosedDashboard { param([switch]$Updated) }\n")
+        script = ("$script:Failed = $false\n$upgrade = $%s\n$repair = $%s\n$watcherUnconfirmed = $%s\n"
+                  "$previousWatcherStillRunning = $%s\n"
+                  % tuple(str(v).lower() for v in (upgrade, repair, unconfirmed, previous_running))
+                  + block(self.text, self.START, self.END))
+        return run_powershell(VOICE + stubs + script)
+
+    def test_a_repair_says_it_repaired_in_every_ending(self):
+        for case in ({}, {"unconfirmed": True}, {"previous_running": True}):
+            with self.subTest(case):
+                said = self.last_words(True, **case)
+                self.assertIn("Repaired. Your settings and pending recoveries were kept.", said)
+                self.assertNotIn("Updated.", said)
+                self.assertEqual("could not be confirmed" in said, bool(case.get("unconfirmed")), said)
+
+    def test_an_update_still_says_updated_and_a_first_installation_installed(self):
+        for case in ({}, {"unconfirmed": True}, {"previous_running": True}):
+            with self.subTest(case):
+                said = self.last_words(False, **case)
+                self.assertIn("Updated. Your settings and pending recoveries were kept.", said)
+                self.assertNotIn("Repaired", said)
+                self.assertEqual("could not be confirmed" in said, bool(case.get("unconfirmed")), said)
+        self.assertIn("Installed and running.", self.last_words(False, upgrade=False))
+        self.assertIn("Installed.", self.last_words(False, upgrade=False, unconfirmed=True))
+
+    def test_the_setup_window_s_finished_page_and_the_log_agree(self):
+        """The window's finished page for Repair says repaired (installer.done.repaired) and keys only on the
+        watcher sentences of the log, never on "Updated.": the log's new word changes neither page."""
+        window = (ROOT / "gui" / "InstallerWindow.cs").read_text(encoding="utf-8")
+        self.assertIn('flow.Repair && code == 0 ? words.Say("installer.done.repaired"', window)
+        self.assertNotIn("Updated.", window)
+        self.assertNotIn("Repaired.", window)
+        for locale in l10n.LOCALES:
+            self.assertIn("installer.done.repaired", json.loads((CATALOGS / ("%s.json" % locale)).read_text(encoding="utf-8")))
 
 
 if __name__ == "__main__":
