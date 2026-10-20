@@ -48,6 +48,13 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
 - **A finished install or update says the watcher runs when it does.** On a busy PC the watcher can take longer to
   start than the setup waits for it. The last word and the finished page then said it could not be confirmed, right
   under a health check that had just seen it running. The setup now looks once more before its last word.
+- **The Dashboard answers at once in Japanese and Chinese, and Korean, Japanese and Chinese look as Windows draws
+  them** ([#48](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/48)). Every click on the Advanced
+  features page measured its wrapped text again, and Windows measures unspaced Japanese and Chinese slowly when it has
+  to borrow their letters from another font: about 1.7 s per click in Japanese on an English Windows. Measured sizes
+  are now remembered, and these three languages are set in the face Windows itself uses for each - Malgun Gothic, Yu
+  Gothic UI, Microsoft YaHei UI and Microsoft JhengHei UI - where it is installed: about 0.5 s per click in Japanese
+  and 0.2 s in Chinese and Korean there. The other languages look as before.
 - **The setup's log says what it knows.** Where the installer will look at the watcher again at the end, the line
   in the middle says it is not confirmed yet instead of a verdict the last word then contradicts; a Repair's log ends
   "Repaired." instead of "Updated."; and the installer's look at the watcher is written in English like the rest of
