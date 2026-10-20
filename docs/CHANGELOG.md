@@ -48,6 +48,18 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
 - **A finished install or update says the watcher runs when it does.** On a busy PC the watcher can take longer to
   start than the setup waits for it. The last word and the finished page then said it could not be confirmed, right
   under a health check that had just seen it running. The setup now looks once more before its last word.
+- **The setup's log says what it knows.** Where the installer will look at the watcher again at the end, the line
+  in the middle says it is not confirmed yet instead of a verdict the last word then contradicts; a Repair's log ends
+  "Repaired." instead of "Updated."; and the installer's look at the watcher is written in English like the rest of
+  the log.
+- **Diagnostics says when the watcher or the Dashboard runs inside another app**, and which one (the Codex app, Claude
+  desktop). Inside such an app, what an install registers would land in that app's private view and the watcher may
+  end when the app closes; the row says so and what to do.
+- **Diagnostics names Codex's sandbox group when it can read the state folder.** Codex's Windows sandbox gives its own
+  group (CodexSandboxUsers) read access to the folder; that is now said as what it is, not as other accounts on this
+  PC. Any other account, or write access, still gets the warning, whose advice now says how to remove that access
+  instead of telling you to move the folder to where it already is.
+- **The README and the guide show the setup program installing and updating**, in English and Korean.
 - **The motion-picture build reads the compiler's messages in any Windows language**, and a timing test measures
   the tray icon's own CPU work rather than a busy runner.
 
@@ -80,6 +92,11 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
   Codex, and send them one at a time where not;
   and a person's *Send now* wins where it can send, while an early look sends it where *Send now* cannot before a reset.
   When one feature stands aside for another, the journal says so and names it, in place of a silent "acted".
+- **Two sends for one conversation at the same instant count as two** in "Sends an hour, all advanced features
+  together". They used to merge into one, so one later send could pass the number by one; the stored state keeps its
+  format, so v0.6.16 still reads it.
+- **Choosing an option's default stores nothing**, so a later release that changes the default reaches you too. Values
+  stored before stay until you change them.
 - **Groundwork.** The options table checks names in code only, and the stored state says the oldest version that
   reads it safely - kept at its version, so v0.6.16 still reads it with every feature on after *Install another
   version...*.
