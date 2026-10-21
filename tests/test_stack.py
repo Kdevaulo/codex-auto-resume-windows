@@ -193,6 +193,8 @@ ITEM = {_q(name): item for item, names in {
               # v0.6.11: what a screen reader is told of the popup, and asks of it.
               "ui.popup.access"),
     "notifications": ("notice_card", "notice_presence", "notice_window", "notifier", "notify",
+                      # v0.6.18: the Codex app's link to one conversation, and opening it, out of notify.
+                      "codex_link",
                       "ui.card", "ui.card.win32", "ui.card.surfaces", "ui.card.card", "ui.card.stack"),
     "words": ("l10n", "messages", "interface", "ui.words"),
     "brand": ("brand", "brand.checkbox", "brand.colour", "brand.css", "brand.design", "brand.elevation",
