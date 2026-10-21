@@ -1583,8 +1583,35 @@ function Open-ClosedDashboard {
     }
 }
 
+function Start-StoppedWatcher {
+    <#
+        Starts again the watcher this update stopped (the hand-over below), when the update stops before its own setup
+        starts the new version's: a copy that was put back, a payload found incomplete, anything that throws. Without
+        this the closing line said nothing was changed while recovery stayed off until the next sign-in (v0.6.20
+        installer audit, R2). It is the installation's own `setup --keep-state` - whichever version's files are in
+        place, the put-back ones after a rollback - which changes no decision a person made, as the bootstrap's repair
+        runs it. Where that cannot run or does not confirm the watcher, it says recovery is off and how to start it.
+        Once, and only while $script:WatcherStoppedForUpdate says a watcher was stopped and nothing has started one.
+    #>
+    if (-not $script:WatcherStoppedForUpdate) { return }
+    $script:WatcherStoppedForUpdate = $false
+    if ((Test-Path -LiteralPath $Python) -and (Test-Path -LiteralPath (Join-Path $AppDir 'scripts\plugin_setup.py'))) {
+        Step 'Starting the watcher that was stopped for this update again'
+        $restartArgs = @('setup', '--keep-state')
+        if ($SkipStartup) { $restartArgs += '--no-startup' }
+        if ((Invoke-Setup $restartArgs) -eq 0) {
+            Ok 'The watcher was started again'
+            return
+        }
+    }
+    Warn 'The watcher that was stopped for this update is not running, so nothing is being recovered now.'
+    Write-Host '       Open Start Menu > Codex Auto Resume and use Start watcher, or sign out and back in.'
+}
+
 # From here on, the Dashboard windows an update asks to close (below) open again on every way out, through the
-# `finally` at the end - an update that finishes, and one that stops, is refused or is put back alike.
+# `finally` at the end - an update that finishes, and one that stops, is refused or is put back alike. So does the
+# watcher the update stopped, until the update's own setup takes over (Start-StoppedWatcher).
+$script:WatcherStoppedForUpdate = $false
 $script:DashboardsAskedAt = $null
 $script:DashboardsReopened = $false
 $script:DashboardsFallback = @()
@@ -1671,6 +1698,8 @@ try {
             Warn 'The previous watcher is still finishing and was left running.'
         } else {
             Ok 'The previous watcher stopped'
+            # Started again on every way out before the setup below (the `finally` at the end, Start-StoppedWatcher).
+            $script:WatcherStoppedForUpdate = $true
         }
     }
 
@@ -1887,6 +1916,8 @@ try {
     }
 
     Step 'Setting up the watcher'
+    # From here the new version's setup starts the watcher, and nothing else does.
+    $script:WatcherStoppedForUpdate = $false
     $setupArgs = @('setup')
     # An upgrade repairs an installation; it does not get to decide anything for its owner.
     # Plain `setup` runs the engine's `enable` and registers the sign-in entry, so upgrading
@@ -1936,6 +1967,11 @@ try {
     $watcherUnconfirmed = $code -eq $SETUP_UNCONFIRMED
     if ($code -ne 0 -and -not $watcherUnconfirmed) {
         Fail 'Setup did not complete. Nothing was removed; read the message above.'
+        # A watcher stopped for this update that the failed setup did not start again is said, not left unsaid.
+        if ($watcherWasRunning -and (Invoke-Setup @('watcher-running')) -ne 0) {
+            Warn 'The watcher that was stopped for this update is not running, so nothing is being recovered now.'
+            Write-Host '       Open Start Menu > Codex Auto Resume and use Start watcher, or run this again.'
+        }
         exit 1
     }
 
@@ -1981,6 +2017,8 @@ try {
     Write-Host 'or use Start Menu > Codex Auto Resume.'
     exit 0
 } finally {
+    # Every way out before the setup step - a put-back installation, a stop, an error - starts the stopped watcher again.
+    try { Start-StoppedWatcher } catch { }
     # Every way out once the Dashboard was asked to close - a stop, a put-back installation, an error - opens it again.
     try { Open-ClosedDashboard } catch { }
 }
