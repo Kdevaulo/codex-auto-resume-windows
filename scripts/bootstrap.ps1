@@ -1900,11 +1900,93 @@ function Remove-EntryBeforeOlder {
 function Start-CurrentWatcher {
     # The installed version's watcher started again, after a conversion that failed: `setup
     # --keep-state`, the repair branch's own run, which changes no decision a person made.
-    param([string]$Home_, [switch]$NoStartup)
+    # -WasStopped: no watcher ran before (--watcher-was-stopped, v0.6.16 on), so it is started only where it runs at
+    # sign-in anyway. Setup's exit code is left in $script:CurrentWatcherCode; nothing is returned.
+    param([string]$Home_, [switch]$NoStartup, [switch]$WasStopped)
     $arguments = @('setup', '--keep-state')
     if ($NoStartup) { $arguments += '--no-startup' }
+    if ($WasStopped) { $arguments += '--watcher-was-stopped' }
     # It writes the registrations the repair branch writes, so outside another app's view as that branch does.
-    $null = Invoke-InstalledSetup -Home_ $Home_ -Arguments $arguments -Outside
+    $script:CurrentWatcherCode = (Invoke-InstalledSetup -Home_ $Home_ -Arguments $arguments -Outside).Code
+}
+
+function Test-CurrentWatcherStopped {
+    # $true when the installed version says its watcher is not running (`watcher-running` exits 1), $false when it
+    # runs (0), $null when the version cannot say (no such command before v0.6.17: argparse's 2).
+    param([string]$Home_)
+    $code = $null
+    try { $code = (Invoke-InstalledSetup -Home_ $Home_ -Arguments @('watcher-running')).Code } catch { return $null }
+    if ($code -eq 0) { return $false }
+    if ($code -eq 1) { return $true }
+    return $null
+}
+
+function Restore-AfterFailedPick {
+    <#
+        After Install another version...'s installer failed (-Pick, a non-zero exit) while the version that was
+        installed still is - it stopped before it moved anything, or put its copy back - what this run changed
+        before it is put back as it was (v0.6.20 installer audit, R4): the state the conversion rewrote, from the copy
+        the conversion took of it moments before (the newest state.v<N>-backup-*.sqlite written since -Since, and only
+        while the watcher is not running); the uninstaller kept for the entry in Add or remove programs, from the copy
+        saved before remove-entry took it (-KeptCopy); and then the installed version's own `setup --keep-state`,
+        which writes the entry again and starts the watcher (only where it would run at sign-in when none ran before:
+        -WasStopped). Where the installer replaced the program files before it failed, the version it installed
+        owns the converted state, and nothing is put back. Returns 'restored', or 'replaced' for that case.
+    #>
+    param([string]$Home_, [string]$Installed, [string]$Converted, [datetime]$Since, [string]$KeptCopy,
+          [switch]$NoStartup, [switch]$WasStopped)
+    $now = Get-InstalledVersion -Home_ $Home_
+    if (-not $now -or [string]$now -cne $Installed) {
+        Step 'The installer stopped after it had replaced the program files; read its messages above.'
+        return 'replaced'
+    }
+    Step ('v' + $Installed + ' is still installed. Putting back what was changed for the other version.')
+    if ($Converted -clike 'converted *') {
+        $config = Join-Path $Home_ 'config'
+        $state = Join-Path $config 'state.sqlite'
+        $copies = @(Get-ChildItem -LiteralPath $config -File -Filter 'state.v*-backup-*.sqlite' -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -cmatch '^state\.v[345]-backup-[0-9]{8}T[0-9]{6}Z\.sqlite\z' -and
+                                   $_.LastWriteTimeUtc -ge $Since.ToUniversalTime().AddSeconds(-2) -and
+                                   -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+                    Sort-Object -Property Name -Descending)
+        if ($copies.Count -eq 0) {
+            Fail 'The state stays converted for the older version: the copy taken before the conversion was not found.'
+        } elseif ((Test-CurrentWatcherStopped -Home_ $Home_) -eq $false) {
+            Fail 'The state stays converted for the older version: the watcher is running, so it was not replaced under it.'
+        } else {
+            $writing = $state + '.restoring'
+            try {
+                [IO.File]::Copy($copies[0].FullName, $writing, $true)
+                # [NullString]: a plain $null reaches .NET as an empty path, which Replace refuses.
+                [IO.File]::Replace($writing, $state, [NullString]::Value)
+                Ok 'The state was put back as it was before the conversion'
+            } catch {
+                Remove-Item -LiteralPath $writing -Force -ErrorAction SilentlyContinue
+                Fail ('The state stays converted for the older version: ' + $_.Exception.Message)
+            }
+        }
+    }
+    $folder = Join-Path $Home_ 'uninstall'
+    $kept = Join-Path $folder 'install.ps1'
+    if ($KeptCopy -and (Test-Path -LiteralPath $KeptCopy -PathType Leaf) -and -not (Test-Path -LiteralPath $kept)) {
+        try {
+            $item = New-Object IO.DirectoryInfo $folder
+            if ($item.Exists -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'its folder is a link' }
+            if (-not $item.Exists) { $null = [IO.Directory]::CreateDirectory($folder) }
+            [IO.File]::Copy($KeptCopy, $kept, $false)
+            Ok 'The uninstaller kept for the entry in Add or remove programs was put back'
+        } catch {
+            Fail ('The uninstaller kept for the entry in Add or remove programs could not be put back: ' + $_.Exception.Message)
+        }
+    }
+    $script:CurrentWatcherCode = $null
+    try {
+        if ($WasStopped) { Start-CurrentWatcher -Home_ $Home_ -NoStartup:$NoStartup -WasStopped }
+        else { Start-CurrentWatcher -Home_ $Home_ -NoStartup:$NoStartup }
+    } catch { $script:CurrentWatcherCode = $null }
+    if ($script:CurrentWatcherCode -eq 0) { Ok 'The entry in Add or remove programs and the watcher are as they were' }
+    else { Fail 'The installed version''s setup did not confirm everything; open the Dashboard and choose Repair installation.' }
+    return 'restored'
 }
 
 # ---------------------------------------------------------------------------- run
@@ -2455,6 +2537,18 @@ try {
             Step 'Nothing was installed, and nothing was changed.'
             exit $ExitPickRefused
         }
+        # What a failed installer below finds put back (Restore-AfterFailedPick): when this began, whether a watcher
+        # ran, and the uninstaller kept for the entry in Add or remove programs, saved before remove-entry takes it.
+        $pickSince = Get-Date
+        $pickWatcherStopped = Test-CurrentWatcherStopped -Home_ $installHome
+        $pickKeptCopy = Join-Path $work 'kept-uninstaller.ps1'
+        $pickKept = Join-Path (Join-Path $installHome 'uninstall') 'install.ps1'
+        # Read through .NET, not Get-Item: a plain file, never a link.
+        $pickKeptItem = New-Object IO.FileInfo $pickKept
+        if ($pickKeptItem.Exists -and -not ($pickKeptItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            try { [IO.File]::Copy($pickKept, $pickKeptCopy, $true) } catch { }
+        }
+        $converted = 'nothing'
         if ($pickConvert) {
             Step 'Converting the state for the older version, after asking the watcher to stop. A copy of it'
             Step 'as it is now is kept beside it.'
@@ -2502,6 +2596,14 @@ try {
     $code = $LASTEXITCODE
     if ($null -eq $code) { $code = 0 }
     if ($Pick -and $code -eq 0) { Write-Host ('pick: installed ' + $target + ' ' + $targetEdition) }
+    # A failed pick leaves the version that was installed as it was: its state, its entry in Add or remove programs
+    # and its watcher (v0.6.20 installer audit, R4). The exit code stays the installer's.
+    if ($Pick -and $code -ne 0) {
+        Write-Host ''
+        $null = Restore-AfterFailedPick -Home_ $installHome -Installed ([string]$installed) -Converted $converted `
+                                        -Since $pickSince -KeptCopy $pickKeptCopy -NoStartup:$NoStartup `
+                                        -WasStopped:($pickWatcherStopped -eq $true)
+    }
     exit $code
 } catch {
     Write-Host ''
