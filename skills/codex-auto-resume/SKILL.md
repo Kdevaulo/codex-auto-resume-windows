@@ -210,7 +210,7 @@ Report what the command actually printed. Useful fields from `status` and `pendi
   - `turn_started` / `turn_completed` — the continuation started a turn, and the engine is
     following that exact turn to see how it ends.
   - `recovered` — that turn ran and made progress. This is what a recovery that worked looks
-    like.
+    like, also when the turn then failed, or Codex closed or the PC restarted before it ended.
   - `completed_no_progress` — that turn ran and produced nothing.
   - `handed_over` — a person started or joined that turn, or edited the queued message before
     it ran. This is correct, not a fault.

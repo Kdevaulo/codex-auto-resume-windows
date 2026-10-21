@@ -219,7 +219,7 @@
 | 기능 | 근거 등급 | 뒷받침하는 것 | 아직 없는 것 |
 | --- | --- | --- | --- |
 | 결과는 대응시킨 그 턴에서만 읽는다 | INTEGRATION TESTED | `tests/test_outcomes.py:T13OutcomeRulesTests`(6개); `tests/test_engine.py:OutcomeTests`(11개) | - |
-| 끝나지 않는 턴은 마감 시각에 확인 불가가 된다 - 성공이 되는 일은 없다 | INTEGRATION TESTED | `tests/test_outcomes.py:T13OutcomeRulesTests.test_T13_a_row_that_stays_in_progress_becomes_unverified_at_the_deadline`, `test_T13_a_later_terminal_turn_proves_an_in_progress_row_stale` | - |
+| 끝나지 않고 아무것도 해내지 못한 턴은 확인 불가가 된다 - 성공이 되는 일은 없다. 진행을 낸 뒤 끊긴 턴(뒤의 턴이 시작됐거나 PC가 다시 시작됨)은 복구됨이 된다 | INTEGRATION TESTED | `tests/test_outcomes.py:T13OutcomeRulesTests.test_T13_a_row_that_stays_in_progress_becomes_unverified_at_the_deadline`, `test_T13_a_later_terminal_turn_proves_an_in_progress_row_stale`; `tests/test_cut_off_turns.py:CutOffTurnTests` | - |
 | 읽을 수 없는 기록은 마감까지 다시 시도하며, "진전 없음"이 되지 않는다 | INTEGRATION TESTED | `tests/test_outcomes.py:T13OutcomeRulesTests.test_T13_unreadable_history_is_retried_then_hits_the_deadline_never_no_progress`, `test_T13_history_that_becomes_readable_again_is_evaluated_normally` | - |
 | 중간에 끊긴 복구 턴은 "사용자가 중단함"이다 | INTEGRATION TESTED | `tests/test_outcomes.py:T13OutcomeRulesTests.test_T13_an_interrupted_recovery_turn_is_stopped_by_the_user` | 상태 문자열은 스키마에서 온 것이고, 실제 사용자 중단을 담은 캡처는 없다. |
 | 아무것도 내놓지 않고 끝난 턴은 "진전 없음"이며, 연쇄 안에서도 그렇다 | INTEGRATION TESTED | `tests/test_outcomes.py:T15NoProgressTests`(2개) | - |
