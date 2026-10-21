@@ -175,12 +175,18 @@ def overflow_open(dll=None) -> bool:
         dll = _dll
     try:
         user32 = dll("user32")
-        user32.FindWindowW.argtypes, user32.FindWindowW.restype = (W.LPCWSTR, W.LPCWSTR), W.HWND
+        user32.FindWindowExW.argtypes = (W.HWND, W.HWND, W.LPCWSTR, W.LPCWSTR)
+        user32.FindWindowExW.restype = W.HWND
         user32.IsWindowVisible.argtypes, user32.IsWindowVisible.restype = (W.HWND,), W.BOOL
         for name in OVERFLOW_WINDOWS:
-            hwnd = user32.FindWindowW(name, None)
-            if hwnd and user32.IsWindowVisible(hwnd) and not _cloaked(dll, hwnd):
-                return True
+            hwnd, seen = None, 0
+            while seen < 16:                          # one per taskbar at most; the bound only guards the loop
+                hwnd = user32.FindWindowExW(None, hwnd, name, None)
+                if not hwnd:
+                    break
+                seen += 1
+                if user32.IsWindowVisible(hwnd) and not _cloaked(dll, hwnd):
+                    return True
         return False
     except Exception:
         return False

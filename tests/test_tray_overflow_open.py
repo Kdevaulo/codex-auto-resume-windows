@@ -106,32 +106,32 @@ class Function:
 
 
 class FakeWindows:
-    """user32 and dwmapi as overflow_open asks them: {class name: (visible, cloaked)}."""
+    """user32 and dwmapi as overflow_open asks them: [(class name, visible, cloaked)], one per window, in z-order."""
 
     def __init__(self, windows, *, fail=False):
-        self.windows, self.fail = windows, fail
-        self.handles = {name: 100 + index for index, name in enumerate(windows)}
-        self.FindWindowW = Function(self._find)
+        self.windows, self.fail = list(windows), fail
+        self.FindWindowExW = Function(self._find)
         self.IsWindowVisible = Function(self._visible)
         self.DwmGetWindowAttribute = Function(self._attribute)
 
     def __call__(self, name):
         return self
 
-    def _find(self, klass, title):
+    def _find(self, parent, after, klass, title):
         if self.fail:
-            raise OSError("FindWindowW")
-        return self.handles.get(klass, 0)
-
-    def _name(self, hwnd):
-        return next(name for name, handle in self.handles.items() if handle == hwnd)
+            raise OSError("FindWindowExW")
+        start = 0 if not after else after - 100 + 1
+        for index in range(start, len(self.windows)):
+            if self.windows[index][0] == klass:
+                return 100 + index
+        return 0
 
     def _visible(self, hwnd):
-        return self.windows[self._name(hwnd)][0]
+        return self.windows[hwnd - 100][1]
 
     def _attribute(self, hwnd, attribute, pointer, size):
         assert attribute == place.DWMWA_CLOAKED
-        C.cast(pointer, C.POINTER(C.c_ulong))[0] = 1 if self.windows[self._name(hwnd)][1] else 0
+        C.cast(pointer, C.POINTER(C.c_ulong))[0] = 1 if self.windows[hwnd - 100][2] else 0
         return 0
 
 
@@ -142,16 +142,24 @@ class OverflowOpenTests(unittest.TestCase):
         self.WIN11, self.WIN10 = place.OVERFLOW_WINDOWS
 
     def test_the_shown_flyout_is_open(self):
-        self.assertTrue(place.overflow_open(FakeWindows({self.WIN11: (True, False)})))
-        self.assertTrue(place.overflow_open(FakeWindows({self.WIN10: (True, False)})))
+        self.assertTrue(place.overflow_open(FakeWindows([(self.WIN11, True, False)])))
+        self.assertTrue(place.overflow_open(FakeWindows([(self.WIN10, True, False)])))
 
     def test_a_hidden_or_cloaked_flyout_is_closed(self):
-        self.assertFalse(place.overflow_open(FakeWindows({self.WIN11: (False, False)})))
-        self.assertFalse(place.overflow_open(FakeWindows({self.WIN11: (True, True)})))
+        self.assertFalse(place.overflow_open(FakeWindows([(self.WIN11, False, False)])))
+        self.assertFalse(place.overflow_open(FakeWindows([(self.WIN11, True, True)])))
+
+    def test_any_taskbar_s_open_flyout_counts(self):
+        """One flyout window per taskbar: a closed one first does not hide an open one after it."""
+        self.assertTrue(place.overflow_open(FakeWindows([(self.WIN11, False, False), ("Other", True, False),
+                                                         (self.WIN11, True, False)])))
+        self.assertFalse(place.overflow_open(FakeWindows([(self.WIN11, False, False), ("Other", True, False),
+                                                          (self.WIN11, True, True)])))
 
     def test_no_flyout_or_no_answer_is_closed(self):
-        self.assertFalse(place.overflow_open(FakeWindows({})))
-        self.assertFalse(place.overflow_open(FakeWindows({self.WIN11: (True, False)}, fail=True)))
+        self.assertFalse(place.overflow_open(FakeWindows([])))
+        self.assertFalse(place.overflow_open(FakeWindows([("Other", True, False)])))
+        self.assertFalse(place.overflow_open(FakeWindows([(self.WIN11, True, False)], fail=True)))
 
     def test_the_two_class_names_are_windows_own(self):
         self.assertEqual(place.OVERFLOW_WINDOWS, ("TopLevelWindowForOverflowXamlIsland", "NotifyIconOverflowWindow"))
