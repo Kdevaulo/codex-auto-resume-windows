@@ -125,6 +125,9 @@ class CompactContinue:
         written, a Stop handed on, a row no thread follows ended LOST."""
         return follow_up(self._scoped, self.follower, CAPABILITY, self._routes.values())
 
+    # v0.6.20: turned off or watched, the same bookkeeping (runtime.Runtime.tick): a Stop still reaches a live run.
+    tend = tick
+
 
 def make(paths) -> CompactContinue:
     """The capability's factory (registry.CapabilityDef.make): its code for one installation."""

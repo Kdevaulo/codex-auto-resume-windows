@@ -101,6 +101,7 @@ from .engine import foropen, sessions, silent
 from .ledger import ClaimLedger, ceiling_reached
 from .registry import REGISTRY
 from .state import AdvancedState, StateError
+from .state.schema import HEADLESS_CAPABILITIES
 from .vocabulary import (TRIPWIRES, ArmingState, ArmingWarning, CapabilityKind, ContinuationReason, JournalCode,
                          KeepReason, OffReason, OverrideKind, PromptReason)
 
@@ -754,6 +755,20 @@ class Runtime:
         errands = []
         for definition in self.registry.at(Point.TICK):
             state = states.get(definition.id, ArmingState.OFF)
+            tend = (_own(self._code_of(definition), "tend")
+                    if state != ArmingState.ARMED and definition.id in HEADLESS_CAPABILITIES else None)
+            if tend is not None:
+                # v0.6.20: what a run kind turned off or watched still owes what it started - a live run's Stop
+                # handed on and its end written, a model put back (engine/headless.follow_up, engine/fallback.py):
+                # its clean-up alone, never a turn of its own, whatever it stands at.
+                try:
+                    answer = tend(view)
+                    run = None if answer is DEFER else getattr(answer, "run", None)
+                except Exception:
+                    continue                             # already off or watched; the next tick tends it again
+                if callable(run):
+                    errands.append((definition, answer))
+                continue
             if state == ArmingState.OFF:
                 continue
             try:
