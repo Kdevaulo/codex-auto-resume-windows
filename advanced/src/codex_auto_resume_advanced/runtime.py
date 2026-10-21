@@ -312,6 +312,8 @@ class Runtime:
         # {record: (capability, ...)}: the capabilities at P12 a claim that pooled the record paid, journalled as
         # acted once that claim is known to have committed (`moved`, v0.6.17).
         self._pooled = {}
+        # v0.6.20: the capabilities whose words (P4) a committed claim carries, told once core moves it on (`moved`).
+        self._texted = {}
         self._noted = set()
         # (capability, record) a kept-on capability's hook raised for: passed over for it (K8).
         self._skipped = set()
@@ -760,6 +762,7 @@ class Runtime:
         (`_Errands`, v0.6.14); a watched one's is only journalled, never run."""
         self._acted.clear()
         self._pooled.clear()
+        self._texted.clear()
         if not len(self.registry):
             return DEFER
         self.arming.sweep(view)
@@ -964,12 +967,28 @@ class Runtime:
             return self._record_moved(record, RecordMove(state))
         if state == SUBMITTING and isinstance(record, dict):
             self._pooled_acted(record)
+            self._words_sent(record)
         if (self._not_delivered_on_open(record, state) or self._not_dispatched_by_session(record, state)
                 or self._refused_by_codex()):
             self.states(fresh=True)
         if self.arming.moved(record, state):
             self.states(fresh=True)
         return DEFER
+
+    def _words_sent(self, record) -> None:
+        """v0.6.20: a claim that carried a capability's words (P4) committed - core moved it to submitting - so the
+        capability is told, through its optional `words_sent`, what it may now take as said (subagent_parent's lines:
+        told once only when they go, never when a claim held after P4 sent core's own words instead)."""
+        for capability in self._texted.pop(record.get("interruption_id"), ()):
+            definition = self.registry.get(capability)
+            if definition is None:
+                continue
+            told = _own(self._code_of(definition), "words_sent")
+            if told is not None:
+                try:
+                    told(record)
+                except Exception:
+                    pass                                 # nothing kept: the lines are told again at the next send
 
     def _pooled_acted(self, record) -> None:
         """v0.6.17 (#47 P-7): a claim that pooled `record` committed - core moved it to submitting - so the
@@ -1129,6 +1148,8 @@ class Runtime:
             if acted:
                 return Alternative.HOLD
             raise
+        if Point.TEXT in carried and answer is not Alternative.HOLD:
+            self._texted[key] = tuple(capability for point, capability, _w in entries if point == Point.TEXT)
         if Point.CONCURRENCY in carried and answer is not Alternative.HOLD:
             # Journalled once the claim committed (`moved`): this runs inside its transaction.
             self._pooled[key] = tuple(capability for point, capability, _w in entries if point == Point.CONCURRENCY)
