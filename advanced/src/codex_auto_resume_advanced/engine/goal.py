@@ -49,7 +49,7 @@ from codex_auto_resume.domain.plug import DEFER, Alternative
 
 from ..codex import inuse
 from ..codex.goals import Goals
-from ..codex.protocol import Session, SessionRefused
+from ..codex.protocol import Session, SessionRefused, submitted
 from ..measured import MEASURED
 from ..vocabulary import GoalStatus, Measurement, Verdict
 from .markerfree import MAX_PROMPT, _close, _queue_id
@@ -193,7 +193,7 @@ class GoalContinuation:
             # Resumed, paused or cleared by a person since it was asked: nothing to do, and
             # nothing asked of Codex.
             return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
-        session, refused = self._opened(launch_guard)
+        session, refused, _pending = self._opened(launch_guard)
         if refused is not None:
             return refused
         try:
@@ -236,12 +236,15 @@ class GoalContinuation:
         before = self._goal(thread_id)
         if before is None or before.status != GoalStatus.USAGE_LIMITED:
             return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
-        session, refused = self._opened(launch_guard)
+        # v0.6.20: the set - the first change of state - is written inside core's launch guard, with the session's
+        # start, so a Pause or Cancel that commits after the guard stops it (its answer awaited outside).
+        session, refused, pending = self._opened(launch_guard,
+                                                 (SET, {"threadId": thread_id, "status": str(GoalStatus.ACTIVE)}))
         if refused is not None:
             return refused
         try:
             try:
-                session.call(SET, {"threadId": thread_id, "status": str(GoalStatus.ACTIVE)})
+                pending()
             except SessionRefused:
                 return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
             except Exception as exc:
@@ -275,22 +278,29 @@ class GoalContinuation:
         return {"outcome": "accepted", "queue_id": _queue_id(result)}
 
     # ------------------------------------------------------------------ the session
-    def _opened(self, launch_guard):
-        """(the session, None) once consent held and one was opened, or (None, what core is
-        told): consent refused at the guard, or no session - nothing was asked of Codex."""
-        session, opened = None, False
+    def _opened(self, launch_guard, first=None):
+        """(the session, None, the first request's answer to wait for) once consent held and one was opened - `first`,
+        (method, params), written inside the guard with the opening (v0.6.20) - or (None, what core is told, None):
+        consent refused at the guard, or no session - nothing was asked of Codex."""
+        session, opened, pending = None, False, None
         try:
             with launch_guard if launch_guard is not None else nullcontext(True) as permitted:
                 if permitted is not True:
-                    return None, {"outcome": "not_started", "error_code": "queue_consent_refused"}
+                    return None, {"outcome": "not_started", "error_code": "queue_consent_refused"}, None
                 session = self._session()
                 session.__enter__()
                 opened = True
+                if first is not None:
+                    pending = submitted(session, *first)
         except Exception:
+            if pending is not None:
+                # The guard failed as it closed, after the first request was written (as core's queue launch, whose
+                # process exists by then): its answer is read, never called an unsent attempt.
+                return session, None, pending
             if opened:
                 _close(session)
-            return None, {"outcome": "not_started", "error_code": "queue_spawn_failed"}
-        return session, None
+            return None, {"outcome": "not_started", "error_code": "queue_spawn_failed"}, None
+        return session, None, pending
 
     def _session(self):
         if self._open is not None:
