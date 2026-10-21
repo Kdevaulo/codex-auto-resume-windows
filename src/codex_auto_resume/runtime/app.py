@@ -616,7 +616,8 @@ class App(WatchLoop):
 
     def _edition_notices(self, added):
         """What the edition's plug added to the icon's snapshot, taken up by the watcher: the usage meter's warnings
-        (_near_limit) and, from v0.6.18, whether a notice about one conversation offers Open Codex
+        (_near_limit), and from v0.6.18 the weekly update check's offers (_update_offered) and whether a notice about
+        one conversation offers Open Codex
         (notifier.with_open_codex) - true only while the plug says so, so a plug that says nothing, or the standard
         edition's, leaves every notice as it was."""
         extra = added if isinstance(added, dict) else {}
@@ -624,6 +625,22 @@ class App(WatchLoop):
         self._open_codex = isinstance(notice, dict) and notice.get("open_codex") is True
         if added is not DEFER:
             self._near_limit(added)
+            self._update_offered(added)
+
+    def _update_offered(self, added):
+        """The advanced edition's weekly update check offers a newer version (v0.6.18): each offer its plug adds to the
+        icon's snapshot is shown once in this watcher's life, by its key, under the notifications switch, off the tick
+        path like every watcher notice. The standard edition adds none."""
+        update = added.get("update") if isinstance(added, dict) else None
+        notices = update.get("notices") if isinstance(update, dict) else None
+        shown = self.__dict__.setdefault("_update_shown", set())
+        for notice in notices if isinstance(notices, list) else ():
+            key = notice.get("key") if isinstance(notice, dict) else None
+            if not isinstance(key, str) or key in shown or len(shown) > 64:
+                continue
+            shown.add(key)
+            self._watcher_notice("update_offered", {"version": notice.get("version"),
+                                                    "prerelease": notice.get("prerelease") is True})
 
     def _near_limit(self, added):
         """The advanced edition's usage meter at a warning (v0.6.16-beta.3, issue #29): each notice its plug adds to

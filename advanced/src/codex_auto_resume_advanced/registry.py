@@ -98,6 +98,7 @@ from .engine.sessions import make as make_other_sessions
 from .engine.silent import make as make_silent_continuation
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
+from .engine.updatecheck import make as make_idle_update_check
 from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STOP_WORDS, DEFAULT_STYLE, DEFAULT_WARN,
                            DEFAULT_WRAP, ON, PERCENT_RANGE, PERCENTS, POLL_RANGE, SWITCH,
                            POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
@@ -1049,6 +1050,30 @@ USAGE_PAUSE = CapabilityDef(
     requires=("usage_meter",),
 )
 
+# A weekly update check while idle (v0.6.18, the owner's list of 2026-10-21). At P8, at most once in seven days and only
+# while core holds no recovery waiting, being sent or watched, it starts the very check the Dashboard's Check for updates
+# runs - this installation's scripts/bootstrap.ps1 -CheckOnly, by Windows PowerShell's full path, CREATE_NO_WINDOW, the
+# window's 120 s, never killed - on a thread of its own (engine/updatecheck.py); what that check offers, read as the
+# window reads it (a newer release, or the pre-release a pressed check would offer), is one notice of its own kind whose
+# button opens Diagnostics, where an update is installed. It downloads and installs nothing. An administrator's
+# DisableUpdateCheck holds it. The time of the last check is a stamp in `options` (state/choices.py), kept before the
+# check starts, so a failed or refused one waits a week too. It departs from C4 (it acts on a schedule, on its own), C5
+# (the update check without a button pressed) and C7 (the compatibility data, which the check refreshes, refreshed
+# from the watcher). It sends nothing to Codex and reads nothing of it; it stands on engine_present, the installation
+# every recovery stands on, so a Codex the product cannot find holds it with them. Its ceilings are the schema's
+# floor and never bind.
+IDLE_UPDATE_CHECK = CapabilityDef(
+    id="idle_update_check",
+    points=frozenset({Point.TICK}),
+    revision=1,
+    departs_from=("C4", "C5", "C7"),
+    compat="engine_present",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="update",
+    make=make_idle_update_check,
+    codes=("checked", "offered", "unanswered"),
+)
+
 # Longer reset messages (v0.6.14, the owner's answer of 2026-10-08): a message sent at a reset may be up to what one
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
@@ -1121,7 +1146,7 @@ COMPAT_REPORT = CapabilityDef(
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, COMPACT_CONTINUE, MODEL_FALLBACK, HEADLESS_RUN, OTHER_SESSIONS, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
-               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION, SILENT_CONTINUATION,
+               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION, SILENT_CONTINUATION, IDLE_UPDATE_CHECK,
                OPEN_CODEX_BUTTON, LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 # Codex's own retry settings (stage 4's item 6): Attempts (6, 8, 10 or 12; 8 by default) for both of its built-in
@@ -1184,6 +1209,8 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                # v0.6.16-beta.4: what a failure of Codex's own is taken up with, beside the capacity retry (Q12).
                "compact_continue", "model_fallback",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
+               # v0.6.18: the weekly update check, which recovers nothing, among the expert settings.
+               "idle_update_check",
                "structured_rules")
 
 

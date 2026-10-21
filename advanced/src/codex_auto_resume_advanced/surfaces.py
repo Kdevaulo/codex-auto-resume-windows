@@ -148,7 +148,7 @@ def answer(runtime, name, facts):
     if name == Surface.STATUS:
         return status(runtime)
     if name == Surface.TRAY:
-        return dict(badge(runtime), **meter_view(runtime), **notice_view(runtime))
+        return dict(badge(runtime), **meter_view(runtime), **notice_view(runtime), **update_view(runtime))
     if name in BADGE_SURFACES:
         return badge(runtime)
     if not isinstance(facts, dict):
@@ -259,6 +259,24 @@ def notice_view(runtime) -> dict:
     except Exception:
         return {}
     return {"notice": {"open_codex": True}}
+
+
+def update_view(runtime) -> dict:
+    """What the weekly update check offers (v0.6.18), for the watcher to show once: {"update": {"notices": [{"key",
+    "version", "prerelease"}]}} while it stands on and its last check in this process offered a newer version, {}
+    otherwise. A version and a flag, both read back to their shapes by core before anything is shown."""
+    from .engine import updatecheck
+    try:
+        definition = runtime.registry.get(updatecheck.CAPABILITY)
+        if definition is None or runtime.states().get(updatecheck.CAPABILITY) != ArmingState.ARMED:
+            return {}
+        found = runtime._code_of(definition).offered()
+    except Exception:
+        return {}
+    if found is None:
+        return {}
+    version, prerelease = found
+    return {"update": {"notices": [{"key": "update:" + version, "version": version, "prerelease": prerelease}]}}
 
 
 def diagnostics(runtime) -> dict:

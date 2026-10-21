@@ -138,16 +138,16 @@ Codex; nothing runs it unless a person asks, and [SECURITY.md](SECURITY.md) says
 
 ## Today's capabilities
 
-Thirty-one: twenty-two that change how a recovery is made, which conversations are recovered or what
+Thirty-two: twenty-two that change how a recovery is made, which conversations are recovered or what
 follows a turn, three that send at a time you pick - the two at a usage reset, and queued messages - three
-before a usage limit is reached - the usage meter, and the wrap-up and the forced stop that need it - and three
-actions: Longer messages, which only lets a message be longer, Open Codex on a notice, which only adds a button
+before a usage limit is reached - the usage meter, and the wrap-up and the forced stop that need it - one that
+checks for updates once a week, and three actions: Longer messages, which only lets a message be longer, Open Codex on a notice, which only adds a button
 that shows a conversation, and the compatibility report, which only you start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
 is opened. All five added in v0.6.16-beta.4 rest on measurements that were made - running a conversation
 here, the other sessions, compacting a full conversation, another model at capacity and a continuation with
 no words - and four more (the reset credit, the reset message, the usage meter and the forced stop) rest on
 measurements made on `codex-cli 0.162.0-alpha.17.2` and, for the forced stop, again on the newer one. Six rest on
-measurements not made yet, and the other twelve on none. Each measurement made was made by hand, on the
+measurements not made yet, and the other thirteen on none. Each measurement made was made by hand, on the
 owner's machine, first on `codex-cli 0.158.0-alpha.2.1`, again on `codex-cli 0.162.0-alpha.17.2` and, for those this release's
 capabilities rest on, once more on `codex-cli 0.163.0-alpha.10.2` (2026-10-17) - and MQO, MQP and MQG, which decide how
 the continuation with no marker, several conversations at once and the goal continuation sit beside the queue for
@@ -963,6 +963,31 @@ Where Codex refuses it, this stops answering for that version of Codex. It canno
 its id) and A26 (no words at all).
 
 **Ceilings.** 24 a day, and 5 in any one conversation. **Measurement M3B: passed** on `codex-cli 0.163.0-alpha.10.2`; on any other version, a warning.
+
+### Check for updates once a week
+
+**What it does.** At most once a week, while no recovery is waiting, being sent or being watched, the
+watcher runs the same check the Dashboard's **Check for updates** runs: the installed copy's own
+`scripts/bootstrap.ps1 -CheckOnly`, with the same two-minute limit and no window. When it finds a newer
+release - or a newer pre-release, where a check you start would offer one - it shows one notification,
+*A newer version is available*, whose **Open Dashboard** button opens the Diagnostics page, where you
+install it as always. It never downloads or installs anything itself. The notification is a kind of its own
+in **Keep on screen until clicked**. While recovery is paused, or `DisableUpdateCheck` is set, no check is
+made.
+
+**When it helps.** When you would rather hear of a new version than remember to look.
+
+**What it risks.** Each check makes the requests a check you start makes - to github.com, to GitHub's list
+of this project's releases, and for the Codex compatibility data - so GitHub sees this PC's address and the
+time, once a week. A check that fails, that GitHub refuses or that has not finished in time says nothing
+and waits for the next week; the time of the last check is kept in the advanced state, so turning it off
+and on again does not check sooner.
+
+**Departs from** [C4](STANDARDS.md#c-network) (nothing happens on its own, on a schedule),
+[C5](STANDARDS.md#c-network) (the update check runs when a button is pressed) and
+[C7](STANDARDS.md#c-network) (the compatibility data is refreshed only on request, never by the watcher).
+
+**Ceilings.** None come into play: it sends nothing to Codex. It rests on no measurement.
 
 ### Compatibility report
 

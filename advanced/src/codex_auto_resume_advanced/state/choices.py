@@ -38,6 +38,9 @@ OPTION_WORDS = frozenset(str(word) for word in OptionKey)
 # The choices whose missing row is not their default, so a choice of the default is still written for them: the wrap-up's
 # and the stop's window switches, which an opening writes from the usage meter's where it finds none (session._carry_windows).
 CARRIED = frozenset((capability, choice) for capability in WINDOW_FOLLOWERS for choice in WINDOW_CHOICES)
+# v0.6.18: the times a capability's own code keeps in `options` beside its choices (ChoicesMixin.stamp): the weekly update
+# check's last run. Nothing else is ever written so.
+STAMPS = {"idle_update_check": (str(OptionKey.LAST_CHECK),)}
 RULES_LIMIT = 10
 STATUS_RANGE = (100, 599)
 # How far back the Dashboard counts a rule's hits and shows samples.
@@ -198,6 +201,9 @@ class Scoped:
             "channel_paid": lambda interruption_id, claimed_at: state.channel_paid(interruption_id, claimed_at),
             "request": lambda interruption_id: state.override(interruption_id, capability),
             "since": lambda: since(),
+            # v0.6.18: a time its own code keeps (ChoicesMixin.stamp) - read always, written only while it is on.
+            "stamped": lambda key: state.stamped(capability, key),
+            "stamp": lambda key, value: on is not None and on() is True and state.stamp(capability, key, value),
         }
         # v0.6.14, the reset actions: their rules, windows and spends (state/resets.ResetsHandle - writes only while
         # on), whether a measurement passed or failed on the Codex in force (arming.Arming.verdict), and whether
@@ -249,6 +255,30 @@ class ChoicesMixin:
             if option is not None and option.takes(row["value"]):
                 found[option.key] = row["value"]
         return found
+
+    def stamped(self, capability, key) -> int | None:
+        """A time `capability`'s own code keeps under `key` (STAMPS), or None: none kept, no file, or a key that is not
+        one of its stamps."""
+        if str(key) not in STAMPS.get(capability, ()):
+            return None
+        with self._read() as connection:
+            row = None if connection is None else connection.execute(
+                "SELECT value FROM options WHERE capability=? AND choice=?", (capability, str(key))).fetchone()
+        return row["value"] if row is not None and type(row["value"]) is int else None
+
+    def stamp(self, capability, key, value) -> bool:
+        """Keep `value`, a whole number from 1, as `capability`'s stamp `key` (STAMPS), in `options` beside its choices
+        (v0.6.18): a row no reader of a person's choices takes - no capability offers it as a choice, so `options`
+        passes it over and set_option refuses it - and no move to off takes away, so the time outlives a turn off and on.
+        Written by the capability's own code, not a person, so the generation does not move: a page that shows the
+        choices is not made stale by it. Whether it was kept."""
+        if str(key) not in STAMPS.get(capability, ()) or type(value) is not int or value < 1:
+            return False
+        with self._transaction() as connection:
+            connection.execute("INSERT INTO options (capability, choice, value) VALUES (?,?,?) "
+                               "ON CONFLICT (capability, choice) DO UPDATE SET value=excluded.value",
+                               (capability, str(key), value))
+        return True
 
     def set_option(self, capability, key, value, *, generation, actor, at=None) -> int:
         """One choice set, against the generation the Dashboard read. The generation after.
