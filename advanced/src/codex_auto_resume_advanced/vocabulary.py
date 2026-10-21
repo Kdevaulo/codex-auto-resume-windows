@@ -249,6 +249,10 @@ class OptionKey(StrEnum):
     # set_option refuses it - but a time a capability's own code keeps beside its choices (state/choices.py, `stamp`):
     # when the weekly update check last ran (engine/updatecheck.py), in whole Unix seconds.
     LAST_CHECK = "last_check"
+    # and, beside it, the newest version a check offered and not yet put away (engine/updatecheck.encode), and when it
+    # was found.
+    OFFERED_VERSION = "offered_version"
+    OFFERED_AT = "offered_at"
 
 
 class WordingKey(StrEnum):

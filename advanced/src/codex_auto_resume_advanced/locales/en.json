@@ -630,5 +630,5 @@
   "statement.idle_update_check.instead": "The standard edition asks GitHub only when you press Check for updates; nothing is asked on a schedule.",
   "statement.idle_update_check.departs": "C4 (nothing happens on its own, on a schedule), C5 (the update check runs when a button is pressed) and C7 (the Codex compatibility data is refreshed only on request, never by the watcher; the check refreshes it as a check you start does).",
   "statement.idle_update_check.risks": "Each check makes the requests a check you start makes - to github.com, to GitHub's list of this project's releases and for the compatibility data - so GitHub sees this PC's address and the time, once a week. A check that fails, that GitHub refuses or that is still running after the time limit says nothing and waits for the next week.",
-  "statement.idle_update_check.stop": "Turn it off here or turn every advanced feature off; from then on nothing is asked without a click, as before. A notice already shown goes away as notices do."
+  "statement.idle_update_check.stop": "Turn it off here or turn every advanced feature off; from then on nothing is asked without a click, as before, and a version it found is not shown again. While it stays on, a version it found is shown again each time the watcher starts, until that version is installed."
 }

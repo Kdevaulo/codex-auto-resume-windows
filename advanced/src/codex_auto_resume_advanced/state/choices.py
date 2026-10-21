@@ -39,8 +39,9 @@ OPTION_WORDS = frozenset(str(word) for word in OptionKey)
 # and the stop's window switches, which an opening writes from the usage meter's where it finds none (session._carry_windows).
 CARRIED = frozenset((capability, choice) for capability in WINDOW_FOLLOWERS for choice in WINDOW_CHOICES)
 # v0.6.18: the times a capability's own code keeps in `options` beside its choices (ChoicesMixin.stamp): the weekly update
-# check's last run. Nothing else is ever written so.
-STAMPS = {"idle_update_check": (str(OptionKey.LAST_CHECK),)}
+# check's last run, and the newest version it offered and when. Nothing else is ever written so.
+STAMPS = {"idle_update_check": (str(OptionKey.LAST_CHECK), str(OptionKey.OFFERED_VERSION),
+                                str(OptionKey.OFFERED_AT))}
 RULES_LIMIT = 10
 STATUS_RANGE = (100, 599)
 # How far back the Dashboard counts a rule's hits and shows samples.
@@ -204,6 +205,7 @@ class Scoped:
             # v0.6.18: a time its own code keeps (ChoicesMixin.stamp) - read always, written only while it is on.
             "stamped": lambda key: state.stamped(capability, key),
             "stamp": lambda key, value: on is not None and on() is True and state.stamp(capability, key, value),
+            "unstamp": lambda key: on is not None and on() is True and state.unstamp(capability, key),
         }
         # v0.6.14, the reset actions: their rules, windows and spends (state/resets.ResetsHandle - writes only while
         # on), whether a measurement passed or failed on the Codex in force (arming.Arming.verdict), and whether
@@ -279,6 +281,16 @@ class ChoicesMixin:
                                "ON CONFLICT (capability, choice) DO UPDATE SET value=excluded.value",
                                (capability, str(key), value))
         return True
+
+    def unstamp(self, capability, key) -> bool:
+        """Take `capability`'s stamp `key` (STAMPS) away. Whether there was one."""
+        if str(key) not in STAMPS.get(capability, ()):
+            return False
+        with self._transaction(create=False) as connection:
+            if connection is None:
+                return False
+            return connection.execute("DELETE FROM options WHERE capability=? AND choice=?",
+                                      (capability, str(key))).rowcount == 1
 
     def set_option(self, capability, key, value, *, generation, actor, at=None) -> int:
         """One choice set, against the generation the Dashboard read. The generation after.

@@ -17,7 +17,8 @@ where it says `available`; where it says `current` or `newer-local`, a pre-relea
 - exactly what a pressed check would offer, nothing else. An administrator's DisableUpdateCheck, which greys the
 window's button, means no check here either.
 
-What it offers it shows once, as a notice of its own kind (`update_offered`, registered with core in plug.py), whose
+What it offers it shows once in a watcher's life - kept, so a watcher that starts again shows it again until it
+is installed or put away (IdleUpdateCheck) - as a notice of its own kind (`update_offered`, registered with core in plug.py), whose
 one button opens the Dashboard's Diagnostics page, where an update is installed (surfaces.update_view, core's
 runtime/app.py). It never downloads or installs anything. The time of the last check is kept in this edition's own
 state (state/choices.py, `stamp`, under OptionKey.LAST_CHECK), written before the check starts, so a check that fails,
@@ -135,23 +136,32 @@ class _Errand:
 
 
 class IdleUpdateCheck:
-    """idle_update_check's code: its P8 errand, and what it offers for the icon's surface. `run`, `managed` and `start`
-    are seams a test fills: the check (run_check's shape), the administrator's switch, and how the check's thread is
-    started (`start(target)`)."""
-    __slots__ = ("paths", "_scoped", "_run", "_managed", "_start", "_lock", "_offered", "_said", "_running",
-                 "_looked")
+    """idle_update_check's code: its P8 errand, and what it offers for the icon's surface. `run`, `managed`, `start` and
+    `installed` are seams a test fills: the check (run_check's shape), the administrator's switch, how the check's
+    thread is started (`start(target)`), and the version installed here (config.version).
 
-    def __init__(self, paths, *, run=None, managed=None, start=None):
+    What a check offers is kept (v0.6.18), as stamps beside LAST_CHECK - the version (`encode`) and when it was found -
+    so a watcher that starts again still shows it, once in its life, until that version or a newer one is installed, a
+    later check answers that nothing is newer, or a person turns the capability off: an offer found before it last stood
+    on is one they put away."""
+    __slots__ = ("paths", "_scoped", "_run", "_managed", "_start", "_installed", "_lock", "_offered", "_offered_at",
+                 "_found", "_said", "_running", "_looked", "_loaded")
+
+    def __init__(self, paths, *, run=None, managed=None, start=None, installed=None):
         self.paths = paths
         self._scoped = None
         self._run = run or run_check
         self._managed = managed or _update_check_managed
         self._start = start or (lambda target: threading.Thread(target=target, daemon=True).start())
+        self._installed = installed or _installed_version
         self._lock = threading.Lock()
-        self._offered = None                   # (version, prerelease) the last check offered, for this process
+        self._offered = None                   # (version, prerelease) offered and not put away
+        self._offered_at = None                # when it was found, whole seconds
+        self._found = None                     # (version, prerelease) a check found, not yet kept
         self._said = None                      # the journal word of a check that ended, not yet counted
         self._running = False
         self._looked = None
+        self._loaded = False
 
     def bind(self, scoped):
         self._scoped = scoped
@@ -160,7 +170,10 @@ class IdleUpdateCheck:
         scoped = self._scoped
         if scoped is None:
             return DEFER
-        self._count_said()
+        try:
+            self._settle()
+        except Exception:
+            pass
         try:
             now = scoped.now()
             if self._looked is not None and 0 <= now - self._looked < LOOK_EVERY:
@@ -212,7 +225,8 @@ class IdleUpdateCheck:
         return None
 
     def _check(self):
-        """The check, on its own thread: what it offers kept for the surface, and its word for the next tick to count."""
+        """The check, on its own thread: what it offers, shown at once, and its word, for the next tick to keep and
+        count - the thread writes nothing."""
         try:
             answered = self._run(script_of(self.paths), self.paths.home)
             found = offer(*answered) if answered is not None else None
@@ -222,22 +236,119 @@ class IdleUpdateCheck:
         with self._lock:
             if found is not None:
                 self._offered = found
+            self._found = found
             self._said = said
             self._running = False
 
-    def _count_said(self) -> None:
+    def _settle(self) -> None:
+        """On the tick: a check that ended counted and what it found kept (or, answering nothing newer, the kept offer
+        dropped); the kept offer read once; and dropped where the version installed reached it or it was found before
+        the capability last stood on."""
+        scoped = self._scoped
         with self._lock:
-            said, self._said = self._said, None
+            said, found, self._said, self._found = self._said, self._found, None, None
         if said is not None:
             try:
-                self._scoped.count(said)
+                scoped.count(said)
             except Exception:
                 pass
+        if said == "offered" and found is not None:
+            self._keep(found, int(scoped.now()))
+        elif said == "checked":
+            self._drop()
+        if not self._loaded:
+            self._loaded = True
+            kept = decode(scoped.stamped(OptionKey.OFFERED_VERSION))
+            at = scoped.stamped(OptionKey.OFFERED_AT)
+            if kept is not None and type(at) is int:
+                with self._lock:
+                    self._offered, self._offered_at = kept, at
+        with self._lock:
+            offered, at = self._offered, self._offered_at
+        if offered is None:
+            return
+        installed = encode(self._installed())
+        reached = installed is not None and installed >= (encode(offered[0]) or 0)
+        since = scoped.since()
+        put_away = isinstance(since, (int, float)) and type(at) is int and at < since
+        if reached or put_away:
+            self._drop()
+
+    def _keep(self, found, now) -> None:
+        code = encode(found[0])
+        with self._lock:
+            self._offered, self._offered_at = found, now
+        if code is not None:
+            self._scoped.stamp(OptionKey.OFFERED_VERSION, code)
+            self._scoped.stamp(OptionKey.OFFERED_AT, now)
+
+    def _drop(self) -> None:
+        with self._lock:
+            self._offered = self._offered_at = None
+        for key in (OptionKey.OFFERED_VERSION, OptionKey.OFFERED_AT):
+            self._scoped.unstamp(key)
 
     def offered(self):
-        """(version, prerelease) the last check of this process offered, or None."""
+        """(version, prerelease) offered and not put away, or None."""
         with self._lock:
             return self._offered
+
+
+def _installed_version():
+    """The version installed here (core's config.version), or None."""
+    try:
+        from codex_auto_resume.config import version
+        return version()
+    except Exception:
+        return None
+
+
+def _parts(version):
+    """(major, minor, patch, stage) of a release's or a pre-release's version - the stage 9999 for a release, 1000 and
+    the stage's number for an alpha, 2000 and it for a beta - each number below 1000, or None."""
+    if not isinstance(version, str):
+        return None
+    release = RELEASE.match(version)
+    found = release or PRERELEASE.match(version)
+    if found is None:
+        return None
+    numbers = [int(found.group(index)) for index in (1, 2, 3)]
+    if release is not None:
+        stage = 9999
+    else:
+        stage = (1000 if found.group(4) == "alpha" else 2000) + (int(found.group(6)) if found.group(6) else 1)
+    return (*numbers, stage) if all(number < 1000 for number in numbers) else None
+
+
+def encode(version):
+    """`version` as one whole number from 1 that keeps its order - a release after its pre-releases, a later stage after
+    an earlier - for a stamp of `options` (whole numbers from 1), or None for one it cannot hold. Pure."""
+    parts = _parts(version)
+    if parts is None:
+        return None
+    major, minor, patch, stage = parts
+    return ((major * 1000 + minor) * 1000 + patch) * 10000 + stage
+
+
+def decode(value):
+    """(version, prerelease) of a number `encode` made, or None. Pure."""
+    if type(value) is not int or value < 1:
+        return None
+    stage, rest = value % 10000, value // 10000
+    patch, rest = rest % 1000, rest // 1000
+    minor, major = rest % 1000, rest // 1000
+    if major >= 1000:
+        return None
+    base = "%d.%d.%d" % (major, minor, patch)
+    if stage == 9999:
+        version, prerelease = base, False
+    elif 1001 <= stage <= 1999 or 2001 <= stage <= 2999:
+        number = stage % 1000
+        version = base + ("-alpha" if stage < 2000 else "-beta") + ("" if number == 1 else ".%d" % number)
+        prerelease = True
+    else:
+        return None
+    return (version, prerelease) if encode(version) == value else None
 
 
 def make(paths) -> IdleUpdateCheck:

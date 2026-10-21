@@ -981,7 +981,9 @@ made.
 of this project's releases, and for the Codex compatibility data - so GitHub sees this PC's address and the
 time, once a week. A check that fails, that GitHub refuses or that has not finished in time says nothing
 and waits for the next week; the time of the last check is kept in the advanced state, so turning it off
-and on again does not check sooner.
+and on again does not check sooner. A version it found is kept there too and shown again each time the
+watcher starts, until that version is installed, a later check finds nothing newer, or you turn the feature
+off.
 
 **Departs from** [C4](STANDARDS.md#c-network) (nothing happens on its own, on a schedule),
 [C5](STANDARDS.md#c-network) (the update check runs when a button is pressed) and

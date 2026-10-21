@@ -160,6 +160,21 @@ class CheckCase(ac.AdvancedCase):
         code._run = lambda script, home: self.checks.append((script, home)) or self.answer
         code._managed = lambda: self.managed
         code._start = lambda target: target()
+        self.installed = "0.6.18"
+        code._installed = lambda: self.installed
+        self.code = code
+
+    def restart(self):
+        """The watcher started again on the same home: a runtime of its own, the same state."""
+        self.rt.state.close()
+        self.rt = self.runtime(IDLE_UPDATE_CHECK)
+        self.rt.arming.catalogs = statement.CATALOGS
+        code = self.rt._code_of(IDLE_UPDATE_CHECK)
+        code._run = lambda script, home: self.checks.append((script, home)) or self.answer
+        code._managed = lambda: self.managed
+        code._start = lambda target: target()
+        code._installed = lambda: self.installed
+        self.rt.states(fresh=True)
         self.code = code
 
     def on(self, state="armed"):
@@ -256,6 +271,84 @@ class OnTests(CheckCase):
         self.assertIn("update.offered", codes)
         self.rt.arming.disarm(CAP, actor=Actor.DASHBOARD)
         self.rt.states(fresh=True)
+        self.assertEqual(self.notices(), [])
+
+
+class KeptOfferTests(CheckCase):
+    """The offer is kept beside the last check's time, so a watcher that starts again shows it until that version is
+    installed, a later check finds nothing newer, or the person turns the capability off."""
+
+    def test_a_version_is_kept_as_one_whole_number_that_keeps_its_order(self):
+        versions = ["0.6.18-alpha", "0.6.18-alpha.2", "0.6.18-beta", "0.6.18-beta.3", "0.6.18", "0.6.19-alpha",
+                    "0.7.0", "1.0.0"]
+        codes = [updatecheck.encode(version) for version in versions]
+        self.assertEqual(codes, sorted(codes))
+        self.assertEqual(len(set(codes)), len(codes))
+        for version in versions:
+            with self.subTest(version=version):
+                self.assertEqual(updatecheck.decode(updatecheck.encode(version)),
+                                 (version, "-" in version))
+        for odd in ("0.6", "1000.0.0", "0.6.18-gamma", None):
+            self.assertIsNone(updatecheck.encode(odd))
+        for odd in (0, -1, 15000, 10_000_000_000_000_000, "1", 1.5):
+            self.assertIsNone(updatecheck.decode(odd))
+
+    def test_a_watcher_that_starts_again_still_shows_the_offer(self):
+        self.on()
+        self.look()
+        self.look()
+        self.restart()
+        self.look()
+        self.assertEqual(self.notices(), [{"key": "update:0.6.19", "version": "0.6.19", "prerelease": False}])
+        self.assertEqual(len(self.checks), 1, "no new check for it")
+        self.assertEqual(updatecheck.decode(self.rt.state.stamped(CAP, OptionKey.OFFERED_VERSION)), ("0.6.19", False))
+
+    def test_installing_that_version_puts_it_away(self):
+        self.on()
+        self.look()
+        self.look()
+        self.installed = "0.6.19"
+        self.restart()
+        self.look()
+        self.assertEqual(self.notices(), [])
+        self.assertIsNone(self.rt.state.stamped(CAP, OptionKey.OFFERED_VERSION))
+        self.assertIsNone(self.rt.state.stamped(CAP, OptionKey.OFFERED_AT))
+
+    def test_a_pre_release_is_put_away_by_its_release_too(self):
+        self.on()
+        self.answer = PRERELEASE
+        self.look()
+        self.look()
+        self.installed = "0.6.19-beta"
+        self.look()
+        self.assertEqual(len(self.notices()), 1, "an earlier beta does not reach beta.2")
+        self.installed = "0.6.19"
+        self.look()
+        self.assertEqual(self.notices(), [])
+
+    def test_turning_it_off_and_on_again_puts_the_offer_away(self):
+        self.on()
+        self.look()
+        self.look()
+        self.rt.arming.disarm(CAP, actor=Actor.DASHBOARD)
+        self.now += 60
+        self.on()
+        self.restart()
+        self.look()
+        self.assertEqual(self.notices(), [])
+        self.assertIsNone(self.rt.state.stamped(CAP, OptionKey.OFFERED_VERSION))
+
+    def test_a_later_check_that_finds_nothing_newer_puts_it_away(self):
+        self.on()
+        self.look()
+        self.look()
+        self.answer = CURRENT
+        self.look(updatecheck.WEEK)
+        self.look()
+        self.assertEqual(len(self.checks), 2)
+        self.assertEqual(self.notices(), [])
+        self.restart()
+        self.look()
         self.assertEqual(self.notices(), [])
 
 
