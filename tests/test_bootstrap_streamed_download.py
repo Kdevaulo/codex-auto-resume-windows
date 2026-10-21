@@ -203,7 +203,13 @@ foreach ($case in @($cases)) {
     $printed = @(& { try { Get-Remote -Uri $case.uri -OutFile $out -What 'The archive' -Count:$count }
                      catch { $global:Threw = $_.Exception } } 6>&1 | ForEach-Object { [string]$_ })
     $file = $null
-    if (Test-Path -LiteralPath $out) { $file = (Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash.ToLowerInvariant() }
+    # .NET, never Get-FileHash: that cmdlet fails to resolve under the CI runner's PSModulePath (bootstrap.ps1's
+    # Get-Sha256 says why the product moved off it too).
+    if (Test-Path -LiteralPath $out) {
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $file = ([BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($out))) -replace '-', '').ToLowerInvariant() }
+        finally { $sha.Dispose() }
+    }
     # A response a failure carries (as .NET's own WebException carries it) is the failure's, and stays open.
     $carried = @()
     $inner = $null
@@ -357,7 +363,7 @@ class StreamedDownloadTests(unittest.TestCase):
                               capture_output=True, text=True, encoding="utf-8", errors="replace",
                               timeout=600, env=environment)
         cls.stdout, cls.stderr, cls.code = done.stdout, done.stderr, done.returncode
-        cls.results = {}
+        cls.results, cls.words, cls.too_many = {}, {}, None
         marker = cls.stdout.rfind("@@RESULTS@@")
         if done.returncode == 0 and marker >= 0:
             answer = json.loads(cls.stdout[marker + len("@@RESULTS@@"):])
