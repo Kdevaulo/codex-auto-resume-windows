@@ -1264,9 +1264,8 @@ if ($Uninstall) {
     # with 2>$null, and a traceback then replaced the refusal below with a raw error (v0.6.20 installer audit, M1).
     $ErrorActionPreference = 'Continue'
     $verify = & $interpreter $verifier 'verify-home' 2>$null
-    $verifyCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
-    if ($verifyCode -ne 0) {
+    if ($LASTEXITCODE -ne 0) {
         Fail 'This directory is not a Codex Auto Resume installation, so nothing was removed.'
         Write-Host ('       ' + $InstallHome)
         Write-Host '       Refusing to delete anything here: no installation of ours has ever'
@@ -1530,9 +1529,8 @@ if (-not (Test-Path -LiteralPath $claimPython)) { $claimPython = $Python }
 # 'Continue' for this call, as for verify-home above: the exit code decides, never a stderr line (M1).
 $ErrorActionPreference = 'Continue'
 $claim = & $claimPython $claimer 'claim-home' 2>$null
-$claimCode = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
-if ($claimCode -ne 0) {
+if ($LASTEXITCODE -ne 0) {
     Fail 'This directory holds files no installation of ours has claimed; nothing was installed.'
     Write-Host ('       ' + $InstallHome)
     foreach ($line in @($claim | Select-Object -Skip 2)) { Write-Host ('         ' + $line) }
