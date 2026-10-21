@@ -1839,12 +1839,25 @@ try {
         }
     } catch {
         Warn ('Could not replace the installation: ' + $_.Exception.Message)
+        $notBack = @()
         foreach ($undo in $moved) {
             if (Test-Path -LiteralPath $undo.to) { $null = Remove-OwnedItem $undo.to }
+            # Moved back only where the half-copied tree is gone: moved onto a folder that is still there, it went INTO
+            # it (apppp.old-<stamp>), and a later run swept it with the rest (v0.6.20 installer audit, M5). Left
+            # aside under its own name, the journal below keeps it from every sweep.
+            if (Test-Path -LiteralPath $undo.to) { $notBack += $undo; continue }
             Move-Item -LiteralPath $undo.from -Destination $undo.to -Force -ErrorAction SilentlyContinue
+            if (-not (Test-Path -LiteralPath $undo.to)) { $notBack += $undo }
         }
         # The journal is deliberately left where it is. The undo above is best-effort, and if
         # any part of it did not take, that file is the only record of where the tree went.
+        if ($notBack.Count -gt 0) {
+            Fail 'The existing installation could not be put back completely:'
+            foreach ($undo in $notBack) { Write-Host ('       ' + $undo.from + ' could not be put back at ' + $undo.to) }
+            Write-Host '       It is kept under that name until an installation completes.'
+            Write-Host '       Close the ChatGPT/Codex app and run this installer again.'
+            exit 1
+        }
         Fail 'The existing installation was put back; nothing was changed.'
         Write-Host '       Close the ChatGPT/Codex app and run this installer again.'
         exit 1
