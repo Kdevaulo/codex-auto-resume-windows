@@ -293,8 +293,8 @@ changed).
 **E5** A malformed or oversized settings file reads as defaults, a wrong type is refused on write, and a gate vector that does not decode reads UNKNOWN.  
 *tested*: `test_settings.py`, `test_control.py`
 
-**E6** A turn that never finishes is outcome_unverified, never a success, and unreadable history never becomes "no progress".  
-*tested*: `test_outcomes.py`
+**E6** A turn that never finishes and produced nothing is outcome_unverified, never a success; one that produced progress before Codex closed or the PC restarted is recovered, as a failed one with progress is; unreadable history never becomes "no progress".  
+*tested*: `test_outcomes.py`, `test_cut_off_turns.py`
 
 **E7** Uninstall stops before removing anything, registrations included, unless the watcher is definitely not running; a process whose path cannot be read is skipped, never killed.  
 *tested*: `test_cli.py`

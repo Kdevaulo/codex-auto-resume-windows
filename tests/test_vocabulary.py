@@ -71,7 +71,9 @@ LISTS = {
     # v0.6.15-beta: home_removed and home_not_watched - a Codex home's waiting records cancelled.
     # v0.6.16-beta.4: held_by_other_session - open in a terminal's or VS Code's Codex session - and
     # version_newer_than_engine, one of those a newer Codex wrote than the engine here (the version skew guard).
-    "machine.REASONS": ("set", 79, "39ba6491b60545fe"),
+    # 2026-10-21: progress_then_turn_cut_off - a recovery turn that did work and that Codex closing, or the PC going
+    # off, left inProgress for good (engine/outcome.py).
+    "machine.REASONS": ("set", 80, "51cd45279887543c"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -95,7 +97,8 @@ LISTS = {
     # and `send_now`, a schedule or an attempt budget a person's Send now passed (engine/relaxed.py).
     # v0.6.15-beta: and home_removed and home_not_watched, as every reason is.
     # v0.6.16-beta.4: and held_by_other_session and version_newer_than_engine.
-    "machine.GATE_REASONS": ("set", 97, "13e59554471e7298"),
+    # 2026-10-21: and progress_then_turn_cut_off, as every reason is.
+    "machine.GATE_REASONS": ("set", 98, "efef3661b38c49f9"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",

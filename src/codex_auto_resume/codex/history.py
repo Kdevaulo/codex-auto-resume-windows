@@ -534,17 +534,17 @@ class HistoryMixin:
                 "'userMessage' AND instr(item_json,?)>0) FROM thread_items WHERE thread_id=? AND turn_id=? "
                 "AND item_type='userMessage' AND instr(item_json,?)=0",
                 (turns, turn_id, ids.MARKER_PREFIX, turns, turn_id, marker)).fetchone()
-            later_terminal = bool(type(turn["rollout_ordinal"]) is int and connection.execute(
-                "SELECT EXISTS(SELECT 1 FROM thread_turns WHERE %s "
-                "AND status IN ('completed','failed','interrupted'))" % self._after(chain, turn["rollout_ordinal"])[0],
-                self._after(chain, turn["rollout_ordinal"])[1]).fetchone()[0])
+            after, values = self._after(chain, turn["rollout_ordinal"]) if type(turn["rollout_ordinal"]) is int else ("0", ())
+            later_terminal, later_started = map(bool, connection.execute(     # later_started: any status, running too
+                "SELECT EXISTS(SELECT 1 FROM thread_turns WHERE %s AND status IN ('completed','failed','interrupted')), "
+                "EXISTS(SELECT 1 FROM thread_turns WHERE %s)" % (after, after), (*values, *values)).fetchone())
         return {
             "found": True, "ordinal": turn["rollout_ordinal"],     # across a split (rollout.SPAN): Rescan's anchor
             "status": _turn_status(turn["status"]),
             "completed_at": turn["completed_at"] if epoch(turn["completed_at"]) else None,
             "progress": any(counts.get(kind, 0) > 0 for kind in PROGRESS_ITEM_TYPES),
             "foreign_user_messages": foreign, "branded_user_messages": int(bool(branded)),
-            "later_terminal": later_terminal,
+            "later_terminal": later_terminal, "later_started": later_started,   # one turn at a time: so not running
             "compaction_only": "contextCompaction" in counts and set(counts) <= {"contextCompaction", "reasoning"},
         }
 
