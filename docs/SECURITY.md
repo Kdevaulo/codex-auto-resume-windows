@@ -347,7 +347,10 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   points to the planted event. From v0.6.11 the watcher's icon makes one more, the demo event that
   Diagnostics' **Show me what happens** signals, and refuses a planted one the same way; a signal on it
   can do nothing but draw one card of made-up words whose buttons do nothing, which is never a
-  Windows notification and reaches neither the recovery state nor the engine.
+  Windows notification and reaches neither the recovery state nor the engine. From v0.6.20 an object
+  that already exists is refused as well when its owner is another account - one at the same
+  integrity, such as a sandbox account commands may run under in this session - and not the
+  computer's administrators or Windows itself, which only more rights can make owners.
 - **Tools that turn recovery back up request approval through MCP annotations.** This is new in v0.6.0. The plugin's MCP tools that can turn recovery back on or
   up, or change its settings - `resume_auto_recovery`, `enable_conversation_recovery`,
   `reset_recovery_budget`, `start_watcher`, `update_settings`, `restore_default_settings` and,
