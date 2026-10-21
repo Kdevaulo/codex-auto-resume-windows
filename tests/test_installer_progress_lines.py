@@ -484,7 +484,13 @@ class ScriptTests(unittest.TestCase):
         given = BOOTSTRAP.index("if ($progressLines) { $env:%s = '1' }" % VARIABLE)
         self.assertEqual(BOOTSTRAP[given:].splitlines()[1].strip(), "& $installer @arguments")
         self.assertEqual(BOOTSTRAP.count("$env:%s = '1'" % VARIABLE), 1)
-        self.assertNotIn("progress: ", BOOTSTRAP, "the download stays one step")
+        # Its own one count is the archive's bytes (tests/test_bootstrap_streamed_download.py): that line alone, and
+        # only for the archive, only when the window asked.
+        self.assertEqual(BOOTSTRAP.count("progress: "), BOOTSTRAP.count("progress: download "))
+        self.assertEqual(BOOTSTRAP.count("Write-Host ('  progress: download '"), 1)
+        self.assertEqual(BOOTSTRAP.count("-Count:$progressLines"), 1)
+        self.assertIn("Get-Remote -Uri ($base + $name) -OutFile $zip -What 'The archive' -Count:$progressLines\n",
+                      BOOTSTRAP)
 
 
 class PythonTests(unittest.TestCase):

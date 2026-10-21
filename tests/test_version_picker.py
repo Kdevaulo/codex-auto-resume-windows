@@ -47,6 +47,7 @@ from test_version_rule import ACCEPTED, REFUSED  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "build"))
 import legacy_bootstraps as legacy  # noqa: E402
+from download_standin import BRIDGE  # noqa: E402
 
 BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
 POWERSHELL = (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
@@ -641,7 +642,7 @@ class PickerRun(ScriptRun):
     """ScriptRun's scratch plugin, home and TEMP, with the list served page by page and the policy keys
     a stand-in: the network and the registry this test wrote, and nothing of this machine's."""
 
-    RUN = r"""
+    RUN = BRIDGE + r"""
 function global:Invoke-WebRequest {
     param([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing, [switch]$PassThru,
           [int]$MaximumRedirection, [int]$TimeoutSec, [string]$Method)

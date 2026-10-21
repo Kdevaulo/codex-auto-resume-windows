@@ -34,6 +34,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)        # editions lives next to this file
 
 import editions  # noqa: E402
+from download_standin import BRIDGE  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
@@ -283,7 +284,7 @@ ConvertTo-Json $out -Compress
 
 
 # --------------------------------------------------------------------------- the whole script
-RUN = r"""
+RUN = BRIDGE + r"""
 # Where the network was: every request is written down, and none leaves this process. HEAD - the
 # update question - is answered with the redirect a case names; anything else fails the way an
 # offline machine does.

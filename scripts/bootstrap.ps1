@@ -23,7 +23,9 @@
         two words. -Pick fetches a version the list of releases offers, rebuilt the same way.
       * Over HTTPS, with TLS 1.2 at minimum, from github.com - and the final response
         URI has to be one of the three hosts in $AllowedHosts below, because a release
-        download redirects to GitHub's object storage and nowhere else.
+        download redirects to GitHub's object storage and nowhere else. The archive and
+        its checksum hold every address they are redirected to to the same rule before it
+        is asked, and their answer before a byte of it is written (Open-Download).
 
     What it verifies, before anything is executed
       * SHA-256. Against the digest pinned in scripts/release.json when there is one,
@@ -1238,19 +1240,286 @@ function Get-VersionTable {
 function Get-Remote {
     # -Deadline makes -TimeoutSec a deadline for the whole download (Invoke-BoundedWebRequest): what
     # rides on an update check takes it. An archive never does - on a slow link it simply takes long.
+    # Without -Deadline - the archive and its checksum - the body is streamed to the file as it comes
+    # (Save-StreamedDownload), and -Count prints its bytes for the setup window's bar.
     param([string]$Uri, [string]$OutFile, [string]$What, [string[]]$Hosts = $AllowedHosts,
-          [int]$TimeoutSec = 300, [switch]$Deadline)
+          [int]$TimeoutSec = 300, [switch]$Deadline, [switch]$Count)
     # -UseBasicParsing keeps this working on a Windows with no Internet Explorer engine,
     # which is every current one.
     if ($Deadline) {
         $response = Invoke-BoundedWebRequest -What $What -Seconds $TimeoutSec -Parameters @{
             Uri = $Uri; OutFile = $OutFile; UseBasicParsing = $true; PassThru = $true; MaximumRedirection = 5
             TimeoutSec = $TimeoutSec }
-    } else {
+        Assert-TrustedHost -Response $response -What $What -Hosts $Hosts
+        return
+    }
+    # The first request is made here, before anything is sent. Only where it cannot be made at all - the .NET
+    # type or a member missing, or a PowerShell whose language mode does not let a script call it - does the
+    # download go the way it went before; any failure after this one (an HTTP error, the network, a body cut
+    # short, a host refused) is the download's answer, and nothing else is tried.
+    $first = $null
+    try {
+        $first = New-DownloadRequest -Uri ([Uri]$Uri) -Offset 0 -Cookies (New-Object Net.CookieContainer) `
+                                     -TimeoutSec $TimeoutSec
+    } catch { $first = $null }
+    if ($null -eq $first) {
         $response = Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing -PassThru `
                                      -MaximumRedirection 5 -TimeoutSec $TimeoutSec
+        Assert-TrustedHost -Response $response -What $What -Hosts $Hosts
+        return
     }
+    Save-StreamedDownload -First $first -Uri ([Uri]$Uri) -OutFile $OutFile -What $What -Hosts $Hosts `
+                          -TimeoutSec $TimeoutSec -Count:$Count
+}
+
+function Get-ThrownException {
+    # What a .NET call threw, without the wrapper PowerShell puts around it ("Exception calling ... with ...
+    # argument(s)"), so a failure reads as the call's own words and keeps what it carries (a WebException's
+    # Response, which Get-RateLimitReset reads).
+    param($Exception)
+    $current = $Exception
+    while ($current -is [Management.Automation.MethodInvocationException] -and $null -ne $current.InnerException) {
+        $current = $current.InnerException
+    }
+    return $current
+}
+
+function Get-DownloadWords {
+    <#
+        The words Invoke-WebRequest under Windows PowerShell 5.1 says a failure in, so the streamed download
+        says the same: for -Source 'cmdlet' its own resources (WebCmdletStrings), for 'net' those of the .NET
+        request under it (System.SR) - in this PowerShell's language; $Fallback where they cannot be read.
+    #>
+    param([string]$Source, [string]$Name, [string]$Fallback)
+    $words = $null
+    try {
+        if ($Source -eq 'cmdlet') {
+            $assembly = [Microsoft.PowerShell.Commands.WebRequestSession].Assembly
+            $words = (New-Object Resources.ResourceManager('WebCmdletStrings', $assembly)).GetString($Name)
+        } else {
+            $type = [Net.HttpWebRequest].Assembly.GetType('System.SR')
+            $method = $type.GetMethod('GetString', [Reflection.BindingFlags]'NonPublic,Public,Static', $null,
+                                      [type[]]@([string]), $null)
+            $words = $method.Invoke($null, @($Name))
+        }
+    } catch { $words = $null }
+    if ($words) { return [string]$words }
+    return $Fallback
+}
+
+function New-DownloadRequest {
+    <#
+        One request of the streamed download, made and not sent: as Invoke-WebRequest under Windows PowerShell
+        5.1 makes its own - the TLS settings this script set on ServicePointManager, the system proxy and its
+        credentials as .NET has them (the request's own default, which the cmdlet leaves too), the User-Agent the
+        cmdlet sends (a new WebRequestSession's: "Mozilla/5.0 (Windows NT; Windows NT 10.0; <culture>)
+        WindowsPowerShell/<version>"), the cookies of the download so far, $TimeoutSec for a response to begin
+        (0: no limit, as -TimeoutSec 0), and the read timeout the cmdlet leaves alone. It follows no redirect:
+        Open-Download checks each hop before it is asked. With -Offset, it asks for the rest from that byte on.
+    #>
+    param([Uri]$Uri, [long]$Offset, [Net.CookieContainer]$Cookies, [int]$TimeoutSec)
+    $request = [Net.WebRequest]::Create($Uri)
+    if ($request -isnot [Net.HttpWebRequest]) { throw ('Not an HTTP address: ' + $Uri) }
+    $request.Method = 'GET'
+    $request.UserAgent = (New-Object Microsoft.PowerShell.Commands.WebRequestSession).UserAgent
+    $request.CookieContainer = $Cookies
+    $request.AllowAutoRedirect = $false
+    if ($TimeoutSec -le 0) { $request.Timeout = [Threading.Timeout]::Infinite }
+    elseif ($TimeoutSec -gt [int]([int]::MaxValue / 1000)) { $request.Timeout = [int]::MaxValue }
+    else { $request.Timeout = $TimeoutSec * 1000 }
+    if ($Offset -gt 0) { $request.AddRange([long]$Offset) }
+    return $request
+}
+
+# The streamed download's one door to the network: $Request sent, and the response - or what the request threw,
+# as it threw it. As Invoke-WebRequest under Windows PowerShell 5.1 waits for its own: asked without blocking, given
+# up on after the request's Timeout with the cmdlet's own words, and aborted when given up on or when the script is
+# stopped (Ctrl+C) while it waits. A function of this name already in the session stands in for it, as a function
+# named Invoke-WebRequest stands in for the cmdlet - which is how the tests replace the network; every check of
+# what comes back is the caller's, outside it.
+if (-not (Test-Path -LiteralPath 'Function:\Get-DownloadResponse')) {
+    function Get-DownloadResponse {
+        param($Request)
+        $pending = $Request.BeginGetResponse($null, $null)
+        $answered = $false
+        try {
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            while (-not $pending.AsyncWaitHandle.WaitOne(250)) {
+                if ($Request.Timeout -ne [Threading.Timeout]::Infinite -and $clock.ElapsedMilliseconds -ge $Request.Timeout) {
+                    throw (New-Object Net.WebException(
+                        (Get-DownloadWords -Source 'cmdlet' -Name 'RequestTimeout' -Fallback 'The operation has timed out.'),
+                        [Net.WebExceptionStatus]::Timeout))
+                }
+            }
+            $answered = $true
+            try { return $Request.EndGetResponse($pending) }
+            catch { throw (Get-ThrownException $_.Exception) }
+        } finally {
+            if (-not $answered) { $Request.Abort() }
+        }
+    }
+}
+
+function Assert-TrustedHop {
+    # An address the download is about to ask, or the one its answer came from, held to Assert-TrustedHost's
+    # rule and refused in its words: https, and one of the caller's hosts.
+    param([Uri]$Uri, [string]$What, [string[]]$Hosts)
+    $base = New-Object psobject
+    $base | Add-Member -MemberType NoteProperty -Name ResponseUri -Value $Uri
+    $response = New-Object psobject
+    $response | Add-Member -MemberType NoteProperty -Name BaseResponse -Value $base
     Assert-TrustedHost -Response $response -What $What -Hosts $Hosts
+}
+
+function Open-Download {
+    <#
+        The response to the download of $Uri, from -Offset on: its redirects followed here, as -MaximumRedirection 5
+        followed them - 301, 302, 303, 307 and 308, an absolute or a relative Location, at most five - and every
+        address it is sent to checked (Assert-TrustedHop) BEFORE it is asked, so a hop outside the caller's hosts,
+        or over http, is refused without a byte asked of it. The answer is checked again, where it says it came
+        from, before a byte of its body is read. -Request is the first request when it is already made.
+    #>
+    param([Uri]$Uri, [long]$Offset, [Net.CookieContainer]$Cookies, [string]$What, [string[]]$Hosts,
+          [int]$TimeoutSec, $Request)
+    $address = $Uri
+    $hops = 0
+    while ($true) {
+        if ($null -eq $Request) {
+            $Request = New-DownloadRequest -Uri $address -Offset $Offset -Cookies $Cookies -TimeoutSec $TimeoutSec
+        }
+        $response = Get-DownloadResponse -Request $Request
+        $Request = $null
+        $location = $null
+        if (@(301, 302, 303, 307, 308) -contains [int]$response.StatusCode) { $location = $response.Headers['Location'] }
+        # A redirect with nowhere to go is an answer, as it was to the cmdlet.
+        if ([string]::IsNullOrEmpty($location)) { break }
+        $response.Close()
+        if ($hops -ge 5) {
+            throw (New-Object Net.WebException(
+                (Get-DownloadWords -Source 'net' -Name 'net_tooManyRedirections' -Fallback 'Too many automatic redirections were attempted.'),
+                [Net.WebExceptionStatus]::ProtocolError))
+        }
+        $hops++
+        $address = New-Object Uri($address, $location)
+        Assert-TrustedHop -Uri $address -What $What -Hosts $Hosts
+    }
+    $from = $address
+    if ($response.PSObject.Properties.Match('ResponseUri').Count -and $null -ne $response.ResponseUri) {
+        $from = $response.ResponseUri
+    }
+    try { Assert-TrustedHop -Uri $from -What $What -Hosts $Hosts }
+    catch { $response.Close(); throw }
+    return $response
+}
+
+function Save-StreamedDownload {
+    <#
+        The download of $Uri written to $OutFile as it arrives, through a fixed 64 KB buffer - nothing of it held in
+        memory - into a file of its own beside $OutFile, which becomes $OutFile only once all of it has arrived: on
+        any failure nothing is left at $OutFile. The answer is checked (Open-Download) before a byte is written.
+
+        With -Count - the archive's, given the setup window's progress lines ($progressLines) - the bytes as they arrive - `progress:
+        download <bytes>/<total>`, at most one line per whole percent, as install.ps1's Progress says its counts -
+        where the response says how long it is (Content-Length); with no length, no line. The console's own
+        progress bar shows them as the cmdlet's did.
+
+        A body that ends short of its Content-Length is named as cut short, never handed on as a whole file. A
+        connection that drops after some of the body arrived is asked again from where it stopped (Range), through
+        the same checks, at most twice; only a 206 whose Content-Range starts there and ends at the last byte is
+        taken, and anything else is the cut-short failure. A failure before the first byte is the download's answer,
+        as it was.
+    #>
+    param($First, [Uri]$Uri, [string]$OutFile, [string]$What, [string[]]$Hosts, [int]$TimeoutSec, [switch]$Count)
+    $cookies = $First.CookieContainer
+    $response = Open-Download -Uri $Uri -Offset 0 -Cookies $cookies -What $What -Hosts $Hosts -TimeoutSec $TimeoutSec `
+                              -Request $First
+    $partial = $OutFile + '.' + [Guid]::NewGuid().ToString('N') + '.partial'
+    $file = $null
+    $kept = $false
+    $activity = Get-DownloadWords -Source 'cmdlet' -Name 'WriteRequestProgressActivity' -Fallback 'Writing web request'
+    $status = Get-DownloadWords -Source 'cmdlet' -Name 'WriteRequestProgressStatus' `
+                                -Fallback 'Writing request stream... (Number of bytes written: {0})'
+    try {
+        $total = [long]$response.ContentLength
+        # The window reads whole numbers it can hold; a length past that is no line at all.
+        $lines = $Count -and $total -gt 0 -and $total -le [int]::MaxValue
+        $said = 0
+        $shown = [long]-1
+        $file = New-Object IO.FileStream($partial, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $buffer = New-Object byte[] 65536
+        $received = [long]0
+        $resumes = 0
+        while ($true) {
+            $broken = $null
+            try {
+                $stream = $response.GetResponseStream()
+                while ($true) {
+                    # Only the read is the connection's; a failure to write the file is this machine's and ends here.
+                    try { $read = $stream.Read($buffer, 0, $buffer.Length) }
+                    catch { $broken = Get-ThrownException $_.Exception; break }
+                    if ($read -le 0) { break }
+                    $file.Write($buffer, 0, $read)
+                    $received += $read
+                    if ($total -gt 0) { $step = [long][Math]::Floor(100 * $received / $total) }
+                    else { $step = [long][Math]::Floor($received / 1048576) }
+                    if ($step -gt $shown) {
+                        $shown = $step
+                        Write-Progress -Activity $activity -Status ($status -f $received)
+                    }
+                    if ($lines) {
+                        $percent = [int][Math]::Floor(100 * [Math]::Min($received, $total) / $total)
+                        if ($percent -gt $said) {
+                            $said = $percent
+                            Write-Host ('  progress: download ' + [Math]::Min($received, $total) + '/' + $total)
+                        }
+                    }
+                }
+            } finally {
+                $response.Close()
+            }
+            if ($null -eq $broken) { break }
+            $dropped = ($broken -is [IO.IOException]) -or ($broken -is [Net.WebException])
+            # Before the first byte, without a length to resume against, or for anything but the connection: as it was.
+            if (-not $dropped -or $received -le 0 -or $total -le 0) { throw $broken }
+            if ($resumes -ge 2) { throw ($What + ' was cut short: ' + $received + ' of ' + $total + ' bytes arrived.') }
+            $resumes++
+            $response = $null
+            try {
+                $response = Open-Download -Uri $Uri -Offset $received -Cookies $cookies -What $What -Hosts $Hosts `
+                                          -TimeoutSec $TimeoutSec
+            } catch {
+                $failure = Get-ThrownException $_.Exception
+                if (($failure -is [Net.WebException]) -or ($failure -is [IO.IOException])) { $response = $null }
+                else { throw }
+            }
+            $range = $null
+            if ($null -ne $response) { $range = $response.Headers['Content-Range'] }
+            $whole = ([string]$range) -match '^bytes ([0-9]{1,19})-([0-9]{1,19})/([0-9]{1,19}|\*)$'
+            if ($null -eq $response -or [int]$response.StatusCode -ne 206 -or -not $whole -or
+                [long]$Matches[1] -ne $received -or [long]$Matches[2] -ne ($total - 1) -or
+                ($Matches[3] -ne '*' -and [long]$Matches[3] -ne $total)) {
+                if ($null -ne $response) { $response.Close() }
+                throw ($What + ' was cut short: ' + $received + ' of ' + $total + ' bytes arrived.')
+            }
+        }
+        if ($total -ge 0 -and $received -lt $total) {
+            throw ($What + ' was cut short: ' + $received + ' of ' + $total + ' bytes arrived.')
+        }
+        if ($total -ge 0 -and $received -gt $total) {
+            throw ($What + ' was longer than the server said: ' + $received + ' bytes, not ' + $total + '.')
+        }
+        $file.Dispose()
+        $file = $null
+        if (Test-Path -LiteralPath $OutFile) { Remove-Item -LiteralPath $OutFile -Force }
+        [IO.File]::Move($partial, $OutFile)
+        $kept = $true
+    } finally {
+        Write-Progress -Activity $activity -Completed
+        # An answer given up on before or while its body was read is let go of; closing one twice does nothing.
+        if ($null -ne $response) { $response.Close() }
+        if ($null -ne $file) { $file.Dispose() }
+        if (-not $kept) { Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue }
+    }
 }
 
 function Get-CompatibilityTimeout {
@@ -1603,12 +1872,12 @@ function Start-CurrentWatcher {
 # ---------------------------------------------------------------------------- run
 
 # The setup window's progress lines (CODEX_AUTO_RESUME_PROGRESS_LINES=1, gui/InstallerFlow.cs InstallerProgress): this
-# script counts nothing itself, and passes the request on to the installer it runs and to nothing else it starts (the
-# installed setup, a watcher started again). The download stays one step: the archive's request takes -PassThru, for
-# the response Assert-TrustedHost reads, and with it Windows PowerShell 5.1 holds the whole body and writes the
-# -OutFile file only once it has all of it - measured 2026-10-21, a 4 MB body sent over 4 s, polled every 250 ms: the
-# file was absent throughout and whole at the end; without -PassThru it grew as it came, but the host check would
-# have nothing to read. A count of bytes there would have to be a guess, and the bar shows none.
+# script counts one thing itself, the archive's bytes as they arrive (Get-Remote -Count, Save-StreamedDownload:
+# `progress: download <bytes>/<total>`, where the response says its length), and passes the request on to the installer
+# it runs and to nothing else it starts (the installed setup, a watcher started again). The download used to be one
+# step: Invoke-WebRequest -PassThru under Windows PowerShell 5.1 holds the whole body and writes the -OutFile file only
+# once it has all of it (measured 2026-10-21, a 4 MB body sent over 4 s, polled every 250 ms: the file was absent
+# throughout and whole at the end), so there was nothing to count; the streamed download writes as it reads.
 $progressLines = $env:CODEX_AUTO_RESUME_PROGRESS_LINES -ceq '1'
 $env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null
 
@@ -2090,7 +2359,7 @@ try {
         $base = $release.download.Replace('{version}', $target)
         Step ('Downloading v' + $target + ' from github.com over HTTPS.')
         Step ('Nothing is uploaded, and nothing runs until the download is verified.')
-        Get-Remote -Uri ($base + $name) -OutFile $zip -What 'The archive'
+        Get-Remote -Uri ($base + $name) -OutFile $zip -What 'The archive' -Count:$progressLines
     }
 
     $actual = Get-Sha256 -Path $zip
