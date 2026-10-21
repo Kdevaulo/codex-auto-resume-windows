@@ -40,6 +40,8 @@ Project creator and maintainer. Copyright holder.
 - Security review and adversarial audit (three rounds, plus mutation testing, a crash-window matrix, and
   a cross-process race test)
 - Public release preparation
+- The v0.6.x development, maintenance and releases: the Dashboard, the two editions, the installer and the
+  releases themselves, as [CHANGELOG.md](CHANGELOG.md) tells release by release
 
 ## People who reported, suggested and tested
 
