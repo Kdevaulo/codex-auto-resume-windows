@@ -1103,11 +1103,12 @@ and the three for a usage reset you pick. It was to be the first of several pre-
 published as a final instead (owner, 2026-10-10). v0.6.15 was a fix alone (owner, 2026-10-13), so the
 rest went to v0.6.16, which came in four pre-releases and is out: its first, v0.6.16-beta, built the
 six capabilities of stage 3c, and the next three a route of its own, other kinds of session and the
-usage capabilities. What is left - stage 5 and the chat inside the Dashboard - is v0.6.18, which begins
-with a pre-release, v0.6.18-alpha, and publishes each part as a pre-release as it is finished. Each new capability is the advanced edition's alone, off until you
+usage capabilities. v0.6.18 then took two small capabilities of stage 5, Open Codex on a notice and the weekly
+update check, and published them as a final (owner, 2026-10-21). What is left - the rest of stage 5 and the chat inside the Dashboard - is v0.6.19, which begins
+with a pre-release, v0.6.19-alpha, and publishes each part as a pre-release as it is finished. Each new capability is the advanced edition's alone, off until you
 turn it on, with a statement that names the standards it departs from. This is a direction, not a
 promise; [ROADMAP.md](ROADMAP.md) has the whole list: the two additions in its v0.6.12 section, what
-is built in its v0.6.14 and v0.6.16 sections, and the rest in its v0.6.18 section, under the same
+is built in its v0.6.14, v0.6.16 and v0.6.18 sections, and the rest in its v0.6.19 section, under the same
 four headings as below.
 
 - **Recovery through the channels already in use** - several conversations at once,
@@ -1119,12 +1120,13 @@ four headings as below.
   Codex's app server; CLI, TUI and IDE sessions; a full context compacted, then continued; another
   model at capacity; a continuation with no words - all built in v0.6.16-beta.4, described
   [above](#todays-capabilities); and a continuation inside the turn through a Codex Stop hook, planned for
-  v0.6.18. (Codex's own retry settings are offered only once a measurement passes.)
+  v0.6.19. (Codex's own retry settings are offered only once a measurement passes.)
 - **Around recovery** - usage analytics (the live usage meter and the wrap-up near a limit are built,
   described [above](#todays-capabilities)); a provider status feed and push notifications through one courier process, the advanced edition's only
   outbound network code; a local API and web view, remote control over Telegram and a read-only view
-  of other PCs; switching the Codex account on your command; a weekly update check while idle; crash
-  supervision, a wake timer for a reset and *Open Codex* on the card.
+  of other PCs; switching the Codex account on your command; crash supervision and a wake timer for a reset.
+  *Open Codex* on a notice and a weekly update check while idle are built in v0.6.18, described
+  [above](#todays-capabilities).
 - **Also moved here** - watching several Codex homes, which the standard edition gains and
   v0.6.16-beta built; Arabic and
   Hebrew; winget manifests for both editions.

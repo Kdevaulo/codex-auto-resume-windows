@@ -1,4 +1,4 @@
-# Codex Auto Resume roadmap: v0.6.7 → v0.6.21
+# Codex Auto Resume roadmap: v0.6.7 → v0.6.22
 
 This is the current development direction for Codex Auto Resume after v0.6.6.
 
@@ -12,7 +12,7 @@ advanced features, more than any program like this, in two editions → stabiliz
 core with Rust and make it Rust-native → stabilize Rust**
 
 The default recovery behavior stays as conservative as it has always been, through every release
-here: what v0.6.11, v0.6.12, v0.6.14, v0.6.15, v0.6.16 and v0.6.18 add to it is there for a person to turn on, never
+here: what v0.6.11, v0.6.12, v0.6.14, v0.6.15, v0.6.16, v0.6.18 and v0.6.19 add to it is there for a person to turn on, never
 on by itself.
 
 ---
@@ -327,7 +327,7 @@ The repository's landing page on GitHub is tidied in the same stage, while paths
 anyway, so that fewer files sit at its root.
 
 Bugs discovered during this refactor will be fixed with regression tests, but the alpha is
-**not intended to be the full repository-wide bug hunt**; v0.6.19 is. It is the modularization and
+**not intended to be the full repository-wide bug hunt**; v0.6.20 is. It is the modularization and
 nothing else: no feature, and no change anybody could see.
 
 What it carries: the modules that were over their ceiling are packages in the plan's layout -
@@ -569,7 +569,7 @@ and released at the same time, with the same version:
 
 Each has its own archive and pinned digest, and one build attestation names both. An installation
 updates within its edition only; moving between them is a deliberate reinstall, never an update.
-The Rust core carries both (v0.6.20).
+The Rust core carries both (v0.6.21).
 
 ---
 
@@ -766,8 +766,8 @@ carries for a person coming from v0.6.15 is its entry in [CHANGELOG.md](CHANGELO
 
 What v0.6.14 still planned when the owner released it as a final (2026-10-10), moved whole: stage 3c,
 then stages 4, 5 and 6. It was first in v0.6.11's later stages, then v0.6.12's, v0.6.13's and
-v0.6.14's. The owner moved stage 5 out of v0.6.16 on 2026-10-16 so that the v0.6.16 final comes sooner; it is v0.6.18 from
-here (see v0.6.17). v0.6.16
+v0.6.14's. The owner moved stage 5 out of v0.6.16 on 2026-10-16 so that the v0.6.16 final comes sooner; it was v0.6.18 from
+here and is v0.6.19 since 2026-10-21 (see v0.6.17 and v0.6.18). v0.6.16
 comes in as many pre-releases as it needs, from **v0.6.16-beta** on: each finished
 stage is published as a numbered beta while the next is built, and the final v0.6.16 follows the
 last. Every advanced capability here is the advanced edition's alone, off until a person turns it on, with a
@@ -820,7 +820,7 @@ finish its step, and a pause that holds our continuations until the reset
 
 Codex's own retry settings are not offered until Codex allows changing its built-in provider's retry settings
 (measured on 2026-10-16, MB). A continuation inside the turn, through a Codex Stop hook, and chatting with a
-Codex conversation inside the Dashboard were on this list; both are v0.6.18's.
+Codex conversation inside the Dashboard were on this list; both are v0.6.19's.
 
 #### The usage capabilities, finished
 
@@ -882,8 +882,8 @@ Also in the final, and what the owner asked for as the beta line went on:
 A final on v0.6.16, with no pre-release of its own. It began on the owner's decision of 2026-10-19 as a quick hotfix, and
 the owner then put all ten findings of the capability-pair audit
 ([#42](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/42) to [#47](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/47)) into it. What this roadmap planned as v0.6.17 -
-stage 5 and the chat inside the Dashboard, begun with a pre-release - is v0.6.18 from here, and every release after
-it moved one on.
+stage 5 and the chat inside the Dashboard, begun with a pre-release - was v0.6.18 from here, and is v0.6.19 since
+2026-10-21, and every release after it moved one on.
 
 In both editions:
 
@@ -921,15 +921,52 @@ messages in any Windows language; and a timing test measures the icon's own work
 
 ---
 
-## v0.6.18 — The advanced edition's last stage
+## v0.6.18 — A final on v0.6.17: a cut-off recovery turn that worked is recovered, a setup bar that fills by real counts, a streamed update download, and two small advanced capabilities 🚧
+
+A final on v0.6.17, with no pre-release of its own. On 2026-10-21 the owner took the simple parts of what this roadmap
+had planned for v0.6.18 and put them into a release of their own now, with the fixes made meanwhile. The rest of that
+stage - the larger capabilities, the chat inside the Dashboard, the compatibility data, the Stop hook, Arabic and
+Hebrew - is v0.6.19, and every release after it moved one on.
+
+In both editions:
+
+- **A recovery turn that worked and was then cut off is recovered**: Codex closed, or the PC slept or restarted, in the
+  middle of it. It is judged as a failed turn is - progress makes it recovered, with the reason
+  `progress_then_turn_cut_off`; one that did nothing stays unverified - and it is noticed as soon as a later turn of the
+  conversation starts or the PC restarts, where it used to show as running until a later turn finished or a day passed.
+  The owner amended standard E6 for it on 2026-10-21; two recoveries on the owner's own PC were the report.
+- **The setup window's bar fills by real, counted work** - the files copied, the plugin's Codex commands, setup's steps,
+  the health check's checks, the entries removed - and glides only up to what is done; it reaches 100% only after a run
+  that ended well.
+- **The update's archive is downloaded by streaming it**: its real bytes on the bar, every redirect hop checked (https and
+  an allowed host) before it is asked, the answer checked before any byte is written, no partial file after any failure,
+  and a download cut short named and resumed. Nothing else about it changed - the same words, codes, proxy and TLS. The
+  installed version's own updater does the download, so the bytes show from the update after v0.6.18.
+- **The install picture in the README** shows the bar filling by those counts.
+
+In the advanced edition, each off until a person turns it on:
+
+- **Open Codex on a notice**: a button beside *Open Dashboard* opens that conversation in the Codex app, where Windows
+  has a handler for `codex:` links.
+- **A weekly update check while idle**: at most once in seven days, only while nothing waits or runs, the Dashboard's own
+  check; a newer version is offered in a notice of its own, kept across restarts, and nothing is downloaded.
+
+For developers: `test_released_calls` records the four scenarios the owner amended, and the streamed download has a test
+seam of its own.
+
+---
+
+## v0.6.19 — The advanced edition's last stage
 
 Stage 5, moved out of v0.6.16 by the owner on 2026-10-16 so that the v0.6.16 final comes sooner, is a release
-of its own, and the owner moved the in-app chat here the same day. As in v0.6.16, every capability here is the advanced edition's alone, off until a person turns it
+of its own, and the owner moved the in-app chat here the same day. Two of its small capabilities - a weekly update
+check while idle and an *Open Codex* button on a notice - went out in v0.6.18 on 2026-10-21, and what is left is
+here. As in v0.6.16, every capability here is the advanced edition's alone, off until a person turns it
 on, with a statement that names the standards it departs from; some rest on a measurement of the real Codex,
 and one that fails narrows the route, or becomes a warning the person confirms, and does not drop the
 capability.
 
-### v0.6.18-alpha — The last stage's first pre-release (a pre-release)
+### v0.6.19-alpha — The last stage's first pre-release (a pre-release)
 
 The two changes to how the advanced edition stores its choices and how state files are read, which this alpha
 was to make first, are v0.6.17's now (the options table checks names in code only, and state files carry a
@@ -945,8 +982,7 @@ alpha is the first of the last stage's capabilities, published as a pre-release 
 - a loopback API and web view on 127.0.0.1, remote control over Telegram, and a read-only view of
   other PCs through a folder the person syncs,
 - switching the active Codex account on the person's command (measurement MA),
-- a weekly update check while idle,
-- crash supervision, a wake timer for a reset, and an *Open Codex* button on the card.
+- crash supervision and a wake timer for a reset.
 
 ### The chat inside the Dashboard
 
@@ -974,14 +1010,14 @@ alpha is the first of the last stage's capabilities, published as a pre-release 
 
 ---
 
-## v0.6.19 — The final Python audit, both editions
+## v0.6.20 — The final Python audit, both editions
 
-v0.6.19 is the last Python release: the whole repository, both editions, through its bug hunt, and
-the Python reference implementation the Rust migration reproduces. It comes after v0.6.16 and v0.6.18 so that
+v0.6.20 is the last Python release: the whole repository, both editions, through its bug hunt, and
+the Python reference implementation the Rust migration reproduces. It comes after v0.6.16, v0.6.18 and v0.6.19 so that
 the last features written in Python - the rest of the advanced edition - are audited with the rest,
 and the reference the Rust core reproduces holds them.
 
-v0.6.19 is planned as the final comprehensive audit of the Python implementation, in both editions.
+v0.6.20 is planned as the final comprehensive audit of the Python implementation, in both editions.
 
 Unlike v0.6.10-alpha's refactoring, it is intentionally a broad bug hunt.
 
@@ -999,7 +1035,7 @@ Expected areas include:
 - malformed, stale, or corrupted state,
 - fault injection,
 - real Codex integration,
-- Advanced / Experimental recovery paths: every capability of v0.6.11, v0.6.14, v0.6.16 and v0.6.18, each with its
+- Advanced / Experimental recovery paths: every capability of v0.6.11, v0.6.14, v0.6.16, v0.6.18 and v0.6.19, each with its
   warnings, tripwires and ceilings,
 - responsiveness, in every language: whatever lag v0.6.9 left,
 - both editions, and that the standard one still holds none of the advanced code,
@@ -1016,14 +1052,14 @@ for the Rust migration.
 
 ---
 
-## v0.6.20 — Rust: the core replaced as it is, then made Rust-native
+## v0.6.21 — Rust: the core replaced as it is, then made Rust-native
 
-v0.6.20 arrives in two stages too: **v0.6.20-alpha**, a pre-release, replaces the production Python
-core with Rust as it is; the final **v0.6.20** is that core made naturally Rust-oriented. The alpha is
+v0.6.21 arrives in two stages too: **v0.6.21-alpha**, a pre-release, replaces the production Python
+core with Rust as it is; the final **v0.6.21** is that core made naturally Rust-oriented. The alpha is
 a pre-release because the core swapped as it is is a stage on the way to the Rust-native one, not a
 release worth having on its own.
 
-### v0.6.20-alpha — Complete Rust core replacement (a pre-release)
+### v0.6.21-alpha — Complete Rust core replacement (a pre-release)
 
 The alpha is planned to replace the production Python core with Rust, as it is.
 
@@ -1034,7 +1070,7 @@ The rule is:
 
 > **Replace the implementation, not the behavior.**
 
-The Rust implementation should reproduce the final v0.6.19 as closely as practical.
+The Rust implementation should reproduce the final v0.6.20 as closely as practical.
 
 Goals include:
 
@@ -1076,13 +1112,13 @@ Rust
 PowerShell may remain as a thin layer for bootstrap, installation, updating, or similar Windows
 deployment work.
 
-### v0.6.20 — Rust-native restructuring and optimization
+### v0.6.21 — Rust-native restructuring and optimization
 
 The alpha prioritizes behavioral parity.
 
 That may leave some Python-shaped architecture inside the first Rust implementation.
 
-The final v0.6.20 is planned to make the codebase more naturally Rust-oriented.
+The final v0.6.21 is planned to make the codebase more naturally Rust-oriented.
 
 Potential work includes:
 
@@ -1102,9 +1138,9 @@ This is not intended to be the final full-system bug hunt.
 
 ---
 
-## v0.6.21 — Final Rust audit and stabilization: the Rust bug hunt
+## v0.6.22 — Final Rust audit and stabilization: the Rust bug hunt
 
-v0.6.21 is planned as the final comprehensive stabilization pass.
+v0.6.22 is planned as the final comprehensive stabilization pass.
 
 Expected focus includes:
 
@@ -1120,7 +1156,7 @@ Expected focus includes:
 - installer / update / repair / uninstall,
 - malformed or corrupted state,
 - Compatibility Registry cache/offline/failure behavior,
-- Advanced / Experimental capabilities: every capability of v0.6.11, v0.6.14, v0.6.16 and v0.6.18,
+- Advanced / Experimental capabilities: every capability of v0.6.11, v0.6.14, v0.6.16, v0.6.18 and v0.6.19,
 - real Codex recovery,
 - fuzz or property testing where useful.
 
@@ -1142,7 +1178,7 @@ The intended final stack is:
 
 There is currently **no planned v0.7.0 feature cycle**.
 
-After v0.6.21, the project is expected to move primarily into maintenance:
+After v0.6.22, the project is expected to move primarily into maintenance:
 
 - Codex compatibility updates,
 - Compatibility Registry updates,
@@ -1247,33 +1283,40 @@ Most of the advanced edition, in as many pre-releases as it needed
 
         ↓
 
-v0.6.17  🚧 In development
+v0.6.17  ✅ Released
 A final on v0.6.16: installs started from inside another app moved outside it, the update that keeps its
 uninstaller, update checks that say what they could not check, and the capability pairs that kept each other
 from working
 
         ↓
 
-v0.6.18-alpha → v0.6.18
+v0.6.18  🚧 In development
+A final on v0.6.17: a recovery turn that worked and was cut off is recovered, a setup bar that fills by real
+counts, a streamed update download
++ Open Codex on a notice and a weekly update check while idle, in the advanced edition
+
+        ↓
+
+v0.6.19-alpha → v0.6.19
 The advanced edition's last stage, begun in a pre-release: analytics, the courier, the loopback API and remote control,
 account switching, crash supervision, the chat inside the Dashboard, the Stop hook continuation,
 Arabic and Hebrew
 
         ↓
 
-v0.6.19
+v0.6.20
 The final Python audit, both editions
 → freeze Python reference behavior
 
         ↓
 
-v0.6.20-alpha → v0.6.20
+v0.6.21-alpha → v0.6.21
 Complete Rust core replacement, in a pre-release
 + Rust-native restructuring and optimization, in the final
 
         ↓
 
-v0.6.21
+v0.6.22
 Final Rust audit and stabilization: the Rust bug hunt
 → final stable Rust baseline
 
@@ -1282,14 +1325,17 @@ Final Rust audit and stabilization: the Rust bug hunt
 Maintenance
 ```
 
-This document records the current direction; v0.6.17 is out: installs started from inside another app moved outside it,
-the update that keeps its uninstaller, honest words when pre-releases could not be checked, every capability pair that kept
-another from working, and Japanese and Chinese at full speed in their own Windows faces. Before it, v0.6.16 brought most
+This document records the current direction; v0.6.18 is in development: a recovery turn that worked and was then cut
+off is recovered, the setup window's bar fills by real counts, the update's download is streamed, and the advanced edition
+gains Open Codex on a notice and a weekly update check while idle. Before it, v0.6.17 moved installs started from inside
+another app outside it, kept the uninstaller through updates, gave honest words when pre-releases could not be checked,
+fixed every capability pair that kept another from working, and made Japanese and Chinese fast in their own Windows
+faces. Before it, v0.6.16 brought most
 of the advanced edition, and for both editions Rescan and reconcile, a setup program that is an installer, notices that stay until clicked, words
 for one recovery's next send and up to three more Codex homes. Before it, v0.6.15 was a fix alone (the
 conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered), and v0.6.14 brought
 eight more ways to recover, Keep it on, the watch log, the reset actions and a compatibility report sent from
 the app, and the panel beside the chat, in the advanced edition; and a window that no longer hangs while a
-recovery waits, in both. v0.6.17 is in development, a final on v0.6.16 with no pre-release of its own, and v0.6.18 follows it, starting with its
-pre-release, v0.6.18-alpha: the owner moved stage 5 out of v0.6.16 on 2026-10-16, so that the v0.6.16 final came
-sooner, and made v0.6.17 a final on v0.6.16 on 2026-10-19.
+recovery waits, in both. v0.6.18 is a final on v0.6.17 with no pre-release of its own, and v0.6.19 follows it, starting with its
+pre-release, v0.6.19-alpha: the owner moved stage 5 out of v0.6.16 on 2026-10-16, so that the v0.6.16 final came
+sooner, made v0.6.17 a final on v0.6.16 on 2026-10-19, and on 2026-10-21 put the simple parts of stage 5 into v0.6.18 and the rest into v0.6.19.
