@@ -72,6 +72,7 @@ from typing import Callable
 from codex_auto_resume.domain.plug import Point
 
 from .control.codexstart import make as make_start_with_codex
+from .control.opencodex import make as make_open_codex_button
 from .control.sendnow import make as make_send_now
 from .engine.admitted import (ATTEMPTS, DEFAULT_ATTEMPTS, make_codex_gave_up, make_sign_in_retry,
                               make_structured_rules, make_unknown_failure_budget)
@@ -1069,6 +1070,26 @@ LONG_RESET_MESSAGE = CapabilityDef(
     make=make_long_messages,
 )
 
+# Open Codex on a notice (v0.6.18, the owner's list of 2026-10-21): while it stands on, a notice about one conversation
+# offers Open Codex beside Open Dashboard, the Codex app's own link to that conversation (core's notify.codex_thread_uri,
+# measured on Codex app 26.1007), opened by the card through notify.open_in_codex and by Windows' toast through the
+# handler registered for `codex:` - and only where one is (control/opencodex.py reads Software\Classes\codex, never
+# writes it). An action: core never asks it; the icon's surface says whether the button is offered, and core's
+# notifier adds it. It departs from A28 (a button cancels one interruption or opens one page of the Dashboard), B16
+# (Windows is asked only the listed content-free questions: the `codex:` key is read too) and F6 (explorer.exe, which
+# opens the link, is not a listed process). The link only shows a conversation; nothing is sent (A1 kept).
+OPEN_CODEX_BUTTON = CapabilityDef(
+    id="open_codex_button",
+    kind=CapabilityKind.ACTION,
+    points=frozenset(),
+    revision=1,
+    departs_from=("A28", "B16", "F6"),
+    compat=None,
+    ceilings=None,
+    journal_prefix="opencdx",
+    make=make_open_codex_button,
+)
+
 # The compatibility report (v0.6.14 stage 3b, the plan's in-app report): this PC's own records written
 # up as codex-compat-reporter writes them (report/records.py, evidence.py, document.py), shown whole in
 # the Dashboard, saved where the person chooses, and sent to the project as a public pull request -
@@ -1101,7 +1122,7 @@ DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, COMPACT_CONT
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
                USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION, SILENT_CONTINUATION,
-               LONG_RESET_MESSAGE,
+               OPEN_CODEX_BUTTON, LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 # Codex's own retry settings (stage 4's item 6): Attempts (6, 8, 10 or 12; 8 by default) for both of its built-in
 # provider's retry keys, written at P8 and put back (engine/retries.py). MB failed on codex-cli 0.162.0-alpha.17.2 -
@@ -1157,7 +1178,9 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
                # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
                "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",
-               "prompt_queue", "empty_response", "once_more_when_unsure", "send_now", "capacity_retry",
+               "prompt_queue", "empty_response", "once_more_when_unsure", "send_now",
+               # v0.6.18: Open Codex on a notice, beside Send now - both what a person does about one conversation.
+               "open_codex_button", "capacity_retry",
                # v0.6.16-beta.4: what a failure of Codex's own is taken up with, beside the capacity retry (Q12).
                "compact_continue", "model_fallback",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",

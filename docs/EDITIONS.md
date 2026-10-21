@@ -138,16 +138,16 @@ Codex; nothing runs it unless a person asks, and [SECURITY.md](SECURITY.md) says
 
 ## Today's capabilities
 
-Thirty: twenty-two that change how a recovery is made, which conversations are recovered or what
+Thirty-one: twenty-two that change how a recovery is made, which conversations are recovered or what
 follows a turn, three that send at a time you pick - the two at a usage reset, and queued messages - three
-before a usage limit is reached - the usage meter, and the wrap-up and the forced stop that need it - and two
-actions: Longer messages, which only lets a message be longer, and the compatibility report, which only you
-start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
+before a usage limit is reached - the usage meter, and the wrap-up and the forced stop that need it - and three
+actions: Longer messages, which only lets a message be longer, Open Codex on a notice, which only adds a button
+that shows a conversation, and the compatibility report, which only you start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
 is opened. All five added in v0.6.16-beta.4 rest on measurements that were made - running a conversation
 here, the other sessions, compacting a full conversation, another model at capacity and a continuation with
 no words - and four more (the reset credit, the reset message, the usage meter and the forced stop) rest on
 measurements made on `codex-cli 0.162.0-alpha.17.2` and, for the forced stop, again on the newer one. Six rest on
-measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
+measurements not made yet, and the other twelve on none. Each measurement made was made by hand, on the
 owner's machine, first on `codex-cli 0.158.0-alpha.2.1`, again on `codex-cli 0.162.0-alpha.17.2` and, for those this release's
 capabilities rest on, once more on `codex-cli 0.163.0-alpha.10.2` (2026-10-17) - and MQO, MQP and MQG, which decide how
 the continuation with no marker, several conversations at once and the goal continuation sit beside the queue for
@@ -500,6 +500,29 @@ Each of the four that take up a failure the standard edition leaves for you take
 from the last hour, and none from before it was turned on or set to watch; turning it off or setting
 it to watch only ends what it took up and has not sent, and the program ends such a recovery unsent a
 day on the clock after the failure in any case.
+
+### Open Codex on a notice
+
+**What it does.** While it is on, every notice about one conversation - a usage limit detected, a
+continuation being sent, how one ended - offers *Open Codex* beside *Open Dashboard*, on the program's
+card and on Windows' own notification alike. A click shows that conversation in the Codex app through
+Codex's own link to it: a running or minimized app comes to the front at that conversation, and a closed
+one starts there (measured on Codex app 26.1007). The button is offered only where Windows has something
+registered for `codex:` links, which is read and never written. A notice about no one conversation - a
+warning near a limit, the memory guard, the power action - never has it.
+
+**When it helps.** When a notice says something about a conversation and you want to look at it at once.
+
+**What it risks.** The link is Codex's, not this program's: a version of the Codex app that changes it may
+open without the conversation, or not at all. Nothing is sent and nothing in the conversation changes.
+
+**Departs from** [A28](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (a notice's button only cancels
+one interruption or opens one page of the Dashboard), [B16](STANDARDS.md#b-what-it-reads-and-how) (Windows
+is asked only the listed questions; whether something is registered for Codex's links is read too) and
+[F6](STANDARDS.md#f-footprint-on-the-machine) (explorer.exe, which hands the link to Windows, is not one of
+the listed processes).
+
+**Ceilings.** None: it is an action, and sends nothing. It rests on no measurement of its own.
 
 ### Use a reset credit at the limit you pick
 

@@ -347,6 +347,34 @@ def build_cancelled(thread_id, stay=()) -> Notice:
     return _with_click(_notice("cancelled", notify.cancelled_content(thread_id), key=thread_id), stay=stay)
 
 
+# ------------------------------------------------------------- Open Codex (v0.6.18, an edition's)
+# The standard edition's buttons cancel one interruption or open one page of the Dashboard (A28). An edition may ask
+# for one more on a notice about one conversation - the Codex app's own link to it (notify.codex_thread_uri), which
+# only shows a conversation - through what its plug adds to the icon's surface (runtime/app.py reads it); the
+# standard edition never asks, so its notices are exactly as before. The card opens the link through `activate`, which
+# has read exactly such a link since v0.6.16; the toast hands it to Windows as its other buttons are.
+def with_open_codex(notice, on=False):
+    """`notice` with an Open Codex button beside its others when `on` is True and it is about one conversation - its
+    key that conversation's id, a UUID (notify.codex_thread_uri) - after Open Dashboard where it has that button, else
+    last; `notice` itself otherwise, and for anything that is not a Notice. A notice keeps at most
+    notify.MAX_TOAST_ACTIONS buttons, so one that has them all gains none."""
+    if on is not True or not isinstance(notice, Notice):
+        return notice
+    link = notify.codex_thread_uri(notice.key)
+    if link is None or any(uri == link for _label, uri in notice.actions):
+        return notice
+    content = notice.toast_content()
+    if len(toast_actions(content)) >= notify.MAX_TOAST_ACTIONS:
+        return notice
+    button = (l10n.message("toast_button_open_codex"), link)
+    more = list(content.get("more") or ())
+    after = next((index + 1 for index, (_label, uri) in enumerate(more) if notify.parse_open_uri(uri) is not None),
+                 len(more))
+    more.insert(after, button)
+    content["more"] = more
+    return replace(notice, actions=toast_actions(content), content=_frozen(content))
+
+
 # --------------------------------------------------------------------------- the handover
 class Inbox:
     """Notices on their way from any thread to the card host on the icon's thread.

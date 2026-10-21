@@ -79,6 +79,8 @@ class ShippedTests(unittest.TestCase):
                "every_conversation",
                # v0.6.16-beta.4: how a turn run here starts.
                "silent_continuation",
+               # v0.6.18: Open Codex on a notice, an action, before the other two.
+               "open_codex_button",
                "long_reset_message", "compat_report")
 
     def test_the_registry_this_edition_ships_is_its_capabilities_in_their_order(self):
@@ -87,7 +89,7 @@ class ShippedTests(unittest.TestCase):
         self.assertEqual(registry.REGISTRY.ids, self.SHIPPED)
         # The compatibility report is an action, last: it answers at no point, so it is in no list below.
         self.assertEqual([d.id for d in registry.DEFINITIONS if d.kind == CapabilityKind.ACTION],
-                         ["long_reset_message", "compat_report"])
+                         ["open_codex_button", "long_reset_message", "compat_report"])
         # Start-with-Codex answers at P9 alone - it starts the watcher, it does not send; the goal
         # continuation at P16, P3 and P5 - the route, the hold while a goal carries a conversation on,
         # and the channel where M2b passed; the marker-free continuation at P5 and P15, the channel
@@ -124,7 +126,8 @@ class ShippedTests(unittest.TestCase):
              "other_sessions", "marker_free_continuation", "silent_continuation", "reset_credit",
              "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
              "usage_meter", "usage_wrap_up", "usage_pause", "keep_going", "prompt_queue",
-             "empty_response", "once_more_when_unsure", "send_now", "capacity_retry", "compact_continue", "model_fallback",
+             "empty_response", "once_more_when_unsure", "send_now", "open_codex_button", "capacity_retry",
+             "compact_continue", "model_fallback",
              "codex_gave_up",
              "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget", "structured_rules")
 
