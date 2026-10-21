@@ -340,7 +340,19 @@ class Runtime:
                 for capability in self._since:
                     if self._states.get(capability, ArmingState.OFF) != ArmingState.ARMED:
                         self._down_at[capability] = now
+                self._rearmed_silent()
         return self._states
+
+    def _rearmed_silent(self) -> None:
+        """v0.6.20: silent_continuation turned on again after REFUSED_BY_CODEX turned it off - a person's choice made
+        since - is asked again: the process's refusal is forgotten, so it is not shown on while it answers DEFER until
+        the watcher restarts. A refusal met again trips it again."""
+        tripped = self.__dict__.get("_refused_tripped")
+        since = self._since.get(silent.CAPABILITY)
+        if (type(tripped) is float and self._states.get(silent.CAPABILITY) == ArmingState.ARMED
+                and isinstance(since, (int, float)) and since >= tripped):
+            headless.EMPTY_REFUSED = False
+            self._refused_tripped = None
 
     def _code_of(self, definition):
         """A capability's code, made once. One that reads the state is given its own view of it
@@ -1007,7 +1019,7 @@ class Runtime:
         if not headless.EMPTY_REFUSED or self.__dict__.get("_refused_tripped") or self.registry.get(
                 silent.CAPABILITY) is None:
             return False
-        self._refused_tripped = True
+        self._refused_tripped = float(self.clock())
         return self.arming.trip(silent.CAPABILITY, OffReason.REFUSED_BY_CODEX)
 
     def _record_moved(self, record, move):
