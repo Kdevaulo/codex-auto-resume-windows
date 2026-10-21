@@ -50,12 +50,18 @@ from .tools import (PANEL_DISPLAY_MODES, PANEL_PREFERRED_MODE, RESOURCES, SETTIN
 
 
 
+# v0.6.20: settings that hold a path a person chose, said only as whether one is set - as diagnostics.py says them.
+PATH_SETTINGS = frozenset({"codex_exe"})
+
+
 def _no_homes(value):
     """`value` with the Codex homes taken out of every settings mapping in it (v0.6.15-beta): their folders
     are paths, which may hold the Windows user name, and this reply is part of what Codex sends on. A record's
-    home is said by its alias alone (control/records.py)."""
+    home is said by its alias alone (control/records.py). For the same reason a path setting (PATH_SETTINGS,
+    v0.6.20) says only "<set>", or None for none: it is written in the Dashboard alone, never here."""
     if isinstance(value, dict):
-        return {key: _no_homes(item) for key, item in value.items() if key not in DASHBOARD_ONLY}
+        return {key: (("<set>" if item else None) if key in PATH_SETTINGS else _no_homes(item))
+                for key, item in value.items() if key not in DASHBOARD_ONLY}
     if isinstance(value, list):
         return [_no_homes(item) for item in value]
     return value
