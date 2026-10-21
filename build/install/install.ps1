@@ -838,17 +838,28 @@ function Invoke-Codex {
     # Native stderr must not become a terminating error: PowerShell 5.1 wraps it in an
     # ErrorRecord, and `codex` writes ordinary progress there. Capture to files instead
     # of using 2>&1, and judge the result by the exit code alone.
+    #
+    # Telemetry off, as every codex process this product starts (standard C10): the variable and the `-c` overrides the
+    # watcher's own calls carry (src/codex_auto_resume/codex/transport.py, Backend._environment and Backend._argv),
+    # before this call's own arguments; the variable for this call alone. `codex -c ... plugin ...` measured on
+    # codex-cli 0.163.0-alpha.11 against a scratch CODEX_HOME (tests/test_installer_codex_telemetry.py).
     param([string]$Exe, [string[]]$Arguments)
+    $telemetryOff = @('-c', 'analytics.enabled=false', '-c', 'otel.exporter="none"', '-c', 'otel.trace_exporter="none"',
+                      '-c', 'otel.metrics_exporter="none"', '-c', 'otel.log_user_prompt=false',
+                      '-c', 'chatgpt_base_url="https://chatgpt.com/backend-api/"')
     $out = [System.IO.Path]::GetTempFileName()
     $err = [System.IO.Path]::GetTempFileName()
-    $line = (($Arguments | ForEach-Object { Quote-Argument $_ }) -join ' ')
+    $line = ((@($telemetryOff) + @($Arguments) | ForEach-Object { Quote-Argument $_ }) -join ' ')
+    $otelBefore = $env:OTEL_SDK_DISABLED
     try {
+        $env:OTEL_SDK_DISABLED = 'true'
         $p = Start-Process -FilePath $Exe -ArgumentList $line -NoNewWindow -Wait -PassThru `
              -RedirectStandardOutput $out -RedirectStandardError $err
         return @{ Code = $p.ExitCode
                   Out  = (Get-Content -Raw -ErrorAction SilentlyContinue $out)
                   Err  = (Get-Content -Raw -ErrorAction SilentlyContinue $err) }
     } finally {
+        $env:OTEL_SDK_DISABLED = $otelBefore
         Remove-Item -Force -ErrorAction SilentlyContinue $out, $err
     }
 }
