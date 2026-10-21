@@ -166,7 +166,11 @@ function Get-OutsideSource {
     #>
     param([string]$Script, [string[]]$Switches, [hashtable]$Values, [string[]]$Arguments, [string]$Log, [string]$CodeFile,
           [hashtable]$Environment)
-    $literal = { param($text) "'" + ([string]$text).Replace("'", "''") + "'" }
+    # Every character PowerShell ends a single-quoted string at - the ASCII one and U+2018, U+2019, U+201A, U+201B -
+    # doubled: with the ASCII one alone, a path holding a curly quote broke the script, and a folder name made for it
+    # ran code here (v0.6.20 security review, M3).
+    $quotes = '[' + "'" + [char]0x2018 + [char]0x2019 + [char]0x201A + [char]0x201B + ']'
+    $literal = { param($text) "'" + (([string]$text) -replace $quotes, '$0$0') + "'" }
     $call = '& ' + (& $literal $Script)
     foreach ($name in $Switches) { $call += ' -' + $name }
     if ($Values) { foreach ($name in @($Values.Keys | Sort-Object)) { $call += ' -' + $name + ' ' + (& $literal $Values[$name]) } }
