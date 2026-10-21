@@ -58,5 +58,23 @@ class WatchWithNoEngineTests(unittest.TestCase):
         self.assertEqual(len(watched), 2)
 
 
+class VersionDecodeTests(Scratch):
+    def test_a_version_that_is_not_utf8_is_read_not_raised(self):
+        local = self.root / "local"
+        exe = local / "OpenAI" / "Codex" / "bin" / "0abc" / "codex.exe"
+        exe.parent.mkdir(parents=True)
+        exe.write_bytes(b"MZ")
+
+        def run(args, **options):
+            output = b"codex-cli 0.163.0 \xff\n".decode(options["encoding"], options.get("errors", "strict"))
+            return subprocess.CompletedProcess(args, 0, stdout=output)
+        with patch.dict(os.environ, {"LOCALAPPDATA": str(local)}), patch.object(transport.S, "run", run), \
+                patch.object(transport.Backend, "_queue_interface_ok", return_value=True):
+            backend = transport.Backend(self.root / "codex", exe)
+            checks = backend.engine_checks()
+        self.assertEqual(checks["version_runs"], transport.PASS)
+        self.assertTrue(checks["version"].startswith("codex-cli 0.163.0"))
+
+
 if __name__ == "__main__":
     unittest.main()

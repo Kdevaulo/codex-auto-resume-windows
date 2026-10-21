@@ -148,7 +148,7 @@ class Backend:
             return dict(checks)
         try:
             result = S.run([str(self.codex_exe), "--version"], stdout=S.PIPE, stderr=S.DEVNULL,
-                           text=True, encoding="utf-8", timeout=10, creationflags=NO_WINDOW,
+                           text=True, encoding="utf-8", errors="replace", timeout=10, creationflags=NO_WINDOW,
                            shell=False, env=self._environment())
         except (OSError, S.SubprocessError):
             self._last_checks = checks
