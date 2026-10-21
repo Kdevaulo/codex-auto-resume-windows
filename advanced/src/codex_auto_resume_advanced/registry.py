@@ -58,10 +58,10 @@ of a sign-in failure (engine/admitted.py); at P8 and P7, a reset credit used at 
 (engine/credits.py), and at P8, P2 and P3 a message of a person's own sent when the window they picked resets
 (engine/resetmessage.py); and, at P7 and P3, the notice of a usage limit that lifts early (engine/earlyreset.py); at P7, an uncertain continuation sent once more (engine/oncemore.py),
 and one waiting recovery a person asks to send now (control/sendnow.py); at P12, several conversations at once
-(engine/parallel.py); at P16, a conversation queued in Codex for when it is opened (engine/foropen.py); and, at no
-point, two actions: longer
-reset messages, and the compatibility report (report/). The tests define one of their own to hold every
-rule here.
+(engine/parallel.py); at P16, a conversation queued in Codex for when it is opened (engine/foropen.py); from v0.6.18,
+at P8, the weekly update check while idle (engine/updatecheck.py); and, at no point, three actions: longer
+reset messages, Open Codex on a notice (control/opencodex.py), and the compatibility report (report/). The tests define
+one of their own to hold every rule here.
 """
 from __future__ import annotations
 

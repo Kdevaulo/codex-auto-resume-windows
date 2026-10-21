@@ -172,6 +172,9 @@ class WatcherTests(unittest.TestCase):
         def _near_limit(self, added):
             self.shown.append(added)
 
+        def _update_offered(self, added):
+            self.shown.append(added)
+
     def test_the_flag_is_on_only_while_the_surface_asks_for_it(self):
         watcher = self.Watcher()
         App._edition_notices(watcher, {"notice": {"open_codex": True}})
