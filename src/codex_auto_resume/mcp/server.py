@@ -67,6 +67,12 @@ def _no_homes(value):
     return value
 
 
+class UnknownName(LookupError):
+    """A tool or resource this server does not have (v0.6.20): the one lookup answered as invalid params, in its
+    own static words. Any other LookupError - a KeyError or IndexError from inside a handler - is an internal
+    error, whose text never goes out."""
+
+
 PROTOCOL_VERSION = "2025-06-18"
 SUPPORTED_PROTOCOLS = (PROTOCOL_VERSION, "2025-03-26", "2024-11-05")
 SERVER_NAME = "codex-auto-resume"
@@ -180,7 +186,7 @@ class Server:
             # A rejected request is a tool-level failure, not a protocol failure: the
             # model should read the reason and correct itself, not lose the connection.
             return self._result(request_id, self._failure(str(exc), exc.code))
-        except LookupError as exc:
+        except UnknownName as exc:
             return self._error(request_id, INVALID_PARAMS, str(exc))
         except Exception:
             return self._error(request_id, INTERNAL_ERROR, "the request could not be completed")
@@ -213,7 +219,7 @@ class Server:
     def _read_resource(self, params) -> dict:
         uri = params.get("uri")
         if uri != SETTINGS_UI:
-            raise LookupError("unknown resource")
+            raise UnknownName("unknown resource")
         from .panel import settings_page
         l10n.set_preference(self.control.get_settings().get("interface_language"))
         # v0.6.14: where Codex may show it - in the conversation first, or beside it (tools.PANEL_DISPLAY_MODES).
@@ -258,7 +264,7 @@ class Server:
         if tool is None:
             plugged = tool = next((tool for tool in self._plugged_tools() if tool["name"] == name), None)
         if tool is None:
-            raise LookupError("unknown tool")
+            raise UnknownName("unknown tool")
         offered = tool["inputSchema"]["properties"]
         if set(arguments) - set(offered):
             raise ControlError("unrecognized tool arguments")
