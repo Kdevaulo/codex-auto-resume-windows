@@ -65,8 +65,9 @@ class CompactContinue:
             return None
 
     def _compacted(self, record):
-        """Whether the latest turn after `record`'s failure is a compaction alone: True, False - or "failed" for one
-        that ended failed - and None where it cannot be read."""
+        """Whether the latest turn after `record`'s failure is a compaction alone that completed: True, False (none, or
+        one interrupted: nothing was compacted) - or "failed" for one that ended failed - and None where it cannot be
+        read or is still running (v0.6.20: never a continuation onto a context a running compaction has not made)."""
         latest = self._latest(record.get("thread_id"))
         if latest is None:
             return None
@@ -75,7 +76,11 @@ class CompactContinue:
         kinds = {kind for kind, count in latest.kinds.items() if count}
         if not kinds or not kinds <= COMPACTION_KINDS or "contextCompaction" not in kinds:
             return False
-        return "failed" if latest.status == "failed" else True
+        if latest.status == "failed":
+            return "failed"
+        if latest.status == "completed":
+            return True
+        return False if latest.status == "interrupted" else None
 
     def admission(self, failure):
         """P17: ADMIT for a full context window - Codex's contextWindowExceeded - and nothing else."""
