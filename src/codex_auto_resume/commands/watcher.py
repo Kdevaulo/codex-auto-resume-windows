@@ -5,7 +5,7 @@ import time
 
 from .. import config, notice_kinds, notifier, notify
 from ..app import EXIT_ERROR, EXIT_OK
-from ..store import LegacyStore
+from ..store import LegacyStore, StoreError
 from ..windows import WakeEvent
 from .base import CliError, _app, _now, _open_state, _print
 
@@ -61,27 +61,40 @@ def cmd_activate(args) -> int:
     # The button names one interruption, so it stops that task and whatever continues
     # it - not every later interruption in the conversation. Only while an older watcher
     # still owns the state does it fall back to that watcher's thread-wide cancel.
-    with _open_state(app) as store:
-        if isinstance(store, LegacyStore):
-            thread_id = store.thread_of(interruption_id)
-            if thread_id is None:
-                app.logger.info("activation ignored: no record for that interruption")
+    # v0.6.20: tried again while the watcher holds the state, for as long as a card's Cancel is (control/actions.py
+    # CANCEL_RETRY_SECONDS) - a busy store used to end this windowless process in an error nobody saw.
+    from ..control.actions import CANCEL_RETRY_SECONDS
+    deadline = time.monotonic() + CANCEL_RETRY_SECONDS
+    while True:
+        try:
+            with _open_state(app) as store:
+                if isinstance(store, LegacyStore):
+                    thread_id = store.thread_of(interruption_id)
+                    if thread_id is None:
+                        app.logger.info("activation ignored: no record for that interruption")
+                        return EXIT_ERROR
+                    store.cancel_thread(thread_id, _now())
+                else:
+                    record = store.get(interruption_id)
+                    if record is None:
+                        app.logger.info("activation ignored: no record for that interruption")
+                        return EXIT_ERROR
+                    thread_id = record["thread_id"]
+                    result = store.cancel_interruption(interruption_id, _now(), actor="toast")
+                    if isinstance(result, dict) and result.get("changed") is False:
+                        # v0.6.20: a stale notice's Cancel on a recovery that has finished since says nothing:
+                        # the notice below says it was cancelled, which is not true (notifier.activate does the
+                        # same for a card).
+                        app.logger.info("thread %s: the notification's cancel changed nothing; it had already "
+                                        "finished", thread_id)
+                        _print("thread %s had already finished; nothing changed" % thread_id)
+                        return EXIT_OK
+            break
+        except StoreError:
+            if time.monotonic() >= deadline:
+                app.logger.info("activation: the state stayed busy; the cancel was not recorded")
                 return EXIT_ERROR
-            store.cancel_thread(thread_id, _now())
-        else:
-            record = store.get(interruption_id)
-            if record is None:
-                app.logger.info("activation ignored: no record for that interruption")
-                return EXIT_ERROR
-            thread_id = record["thread_id"]
-            result = store.cancel_interruption(interruption_id, _now(), actor="toast")
-            if isinstance(result, dict) and result.get("changed") is False:
-                # v0.6.20: a stale notice's Cancel on a recovery that has finished since says nothing: the notice
-                # below says it was cancelled, which is not true (notifier.activate does the same for a card).
-                app.logger.info("thread %s: the notification's cancel changed nothing; it had already finished",
-                                thread_id)
-                _print("thread %s had already finished; nothing changed" % thread_id)
-                return EXIT_OK
+            time.sleep(0.5)
     app.logger.info("thread %s: cancelled from the notification", thread_id)
     # What it says afterwards is the notice a card's cancel announces (notifier.build_cancelled): the same words,
     # a body that opens its page, and staying on screen when a person chose that kind (v0.6.16) - Windows' toast,

@@ -318,6 +318,7 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     ("commands.install", "diagnostics"): ("cost", "only the diagnostics command writes the export"),
     ("commands.watcher", "ui.tray"): ("cost", "activate opens the settings window through the icon's helper"),
     ("commands.watcher", "control"): ("cost", "only a power action's stop button goes through the control layer"),
+    ("commands.watcher", "control.actions"): ("cost", "a toast's Cancel reads how long a busy state is tried again"),
     ("compat.probes", "windows"): ("cost", "the registry's API and discovery checks read the "
                                            "adapter, only when they run"),
     ("config", "settings"): ("cost", "nearly everything imports config; the settings schema, and the "
