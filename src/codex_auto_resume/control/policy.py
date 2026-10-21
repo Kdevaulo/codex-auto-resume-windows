@@ -141,8 +141,8 @@ class SettingsMixin:
     def restore_defaults(self) -> dict:
         try:
             # The Codex homes are where to watch, not a preference: Restore defaults keeps them, and with them
-            # every recovery waiting there (removing a home cancels those, homes.py).
-            kept = {homes.FIELD: settings.load(self.settings_path())[homes.FIELD]}
+            # every recovery waiting there (removing a home cancels those, homes.py) - never through a read that failed.
+            kept = {homes.FIELD: settings.kept(self.settings_path())[homes.FIELD]}
             saved = settings.save(self.settings_path(), dict(settings.defaults(), **kept))
         except settings.SettingsError as exc:
             # Generic for the same reason as `update_settings` above.
