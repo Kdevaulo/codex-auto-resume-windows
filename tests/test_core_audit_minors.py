@@ -121,5 +121,50 @@ class ClockSetBackTests(unittest.TestCase):
         self.assertEqual(reader.asked, ["usage", "loaded", "usage", "loaded"], "read again after the step back")
 
 
+class HomeKeyTests(Scratch):
+    def setUp(self):
+        super().setUp()
+        self.now = [BASE + 61]
+        self.store = Store(self.root / "state")
+        self.addCleanup(self.store.close)
+        self.store.set_enabled(True, BASE)
+        self.app = HomesApp(self.root, self.store, self.now)
+        self.addCleanup(self.app._home_lock.__exit__, None, None, None)
+        self.homes = runtime_homes.Homes(self.app, clock=lambda: self.now[0])
+        self.addCleanup(self.homes.close)
+
+    def configure(self, *paths):
+        self.app.settings = {configured.FIELD: [{"path": str(path), "alias": "home %d" % index}
+                                                for index, path in enumerate(paths)]}
+
+    def test_a_key_that_changes_with_the_folder_s_reach_retires_nothing(self):
+        path = self.root / "home-b"
+        self.app.homes = {str(path): CodexHome(path)}
+        self.configure(path)
+        self.homes.sync(self.store)
+        key = configured.key(path)
+        self.assertIn(key, self.homes.runs)
+        self.store.register(failure(), BASE, home_key=key)
+        real = configured.key
+        offline = "e" * 64
+        with patch.object(configured, "key", lambda value: offline if Path(value) == path else real(value)):
+            self.homes.sync(self.store)
+        self.assertNotEqual(self.store.get("d" * 64)["state"], "cancelled", "its waiting record is kept")
+        self.assertIn(key, self.homes.runs)
+        self.assertFalse(self.homes.runs[key].retiring)
+        self.homes.sync(self.store)
+        self.assertFalse(self.homes.runs[key].retiring, "the same key again once the drive is back")
+
+    def test_the_start_s_sweep_waits_while_a_named_home_is_out_of_reach(self):
+        self.store.register(failure(), BASE, home_key="c" * 64)
+        self.configure(self.root / "offline-drive")
+        self.homes.sync(self.store)
+        self.assertNotEqual(self.store.get("d" * 64)["state"], "cancelled", "that home may hold it under another key")
+        self.configure()
+        self.homes.sync(self.store)
+        row = self.store.get("d" * 64)
+        self.assertEqual((row["state"], row["last_error"]), ("cancelled", "home_removed"))
+
+
 if __name__ == "__main__":
     unittest.main()
