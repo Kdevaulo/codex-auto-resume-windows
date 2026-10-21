@@ -1,7 +1,9 @@
 """A JSON bridge over the shared control layer.
 
-The standalone Windows window and the MCP server both drive the product through this,
-so neither of them re-implements validation, defaults or persistence.
+The standalone Windows window drives the product through this, so it re-implements no
+validation, defaults or persistence. The MCP server calls the same control layer directly
+(mcp/server.py) and borrows only this module's line encoding, its generic refusal and its
+reading of a statistics range.
 
 Two ways to call it, one set of commands:
 

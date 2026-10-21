@@ -136,9 +136,10 @@ Codex의 승인 동작을 관찰한 적은 없습니다. 테스트는 주석만 
 
 v0.6.0부터 `update_settings`는 고급 설정 — 어떤 엔진 바이너리를 실행할지 정하는 `codex_exe`와
 `detection_lookback_hours` — 을 제시하지도 받아들이지도 않습니다. 설정 창과 패널도 이 둘을 보여 주지 않으며, 클라이언트가 그래도 보내면
-거부합니다. 그리고 `get_status`는 경로에 Windows 사용자 이름이 들어 있는 설치 디렉터리를 알려 주지 않습니다. 다만 `get_status`가 돌려주는
-설정에는 `codex_exe`가 들어 있으며, 손으로든 v0.5.7이나 그 이전의 `update_settings`를 통해서든 엔진 경로가 지정되지 않았다면 비어
-있습니다. 두 변경 모두 v0.6.0에 들어 있습니다. v0.5.7와 그 이전에서는 `update_settings`가 이 두 설정도 받아들이는데,
+거부합니다. 그리고 `get_status`는 경로에 Windows 사용자 이름이 들어 있는 설치 디렉터리를 알려 주지 않습니다. 두 변경 모두 v0.6.0에
+들어 있습니다. `get_status`, `open_settings`, `update_settings`가 돌려주는 설정도 엔진 경로를 담지 않습니다. 그 경로에도 사용자 이름이
+들어 있을 수 있으므로 `codex_exe`에 대해서는 경로가 지정되어 있는지(`<set>`) 아닌지(비어 있음)만 알려 줍니다. 이전 버전은 경로 자체를
+돌려주며, 손으로든 v0.5.7이나 그 이전의 `update_settings`를 통해서든 엔진 경로가 지정되지 않았다면 비어 있습니다. v0.5.7와 그 이전에서는 `update_settings`가 이 두 설정도 받아들이는데,
 destructive 표시가 없어 그 주석으로 승인을 요청하지 않습니다. 그리고 `get_status`는 설치 디렉터리를 `home`으로 알려
 줍니다. 또 `update_settings`는 Windows에 속한 설정, 곧 알림 영역 아이콘(`show_tray`), 움직임 줄이기(`reduce_motion`),
 그리고 v0.6.5부터의 알림 카드(`notification_card`)도 제시하지 않으며, 패널도 이것들을 보여 주지 않습니다.
