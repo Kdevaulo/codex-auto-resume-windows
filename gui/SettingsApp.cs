@@ -891,7 +891,12 @@ namespace CodexAutoResume
             // which before the window has a place answers the primary: a window opened on a smaller secondary screen kept
             // the primary's height and ran off it, its footer out of reach.
             Rectangle screen = (opening ?? OpeningScreen(request)).WorkingArea;
-            int frameWidth = Width - ClientSize.Width, frameHeight = Height - ClientSize.Height;
+            // v0.6.20: the frame its style adds (SizeFromClientSize), not Width less ClientSize.Width: Windows holds a
+            // form's Width to the largest window the screen allows (SystemInformation.MaxWindowTrackSize) while the client
+            // area keeps what was asked, so on a small screen at 200% that read went negative and the clamp let the
+            // window grow past the screen - as the Advanced tab's frame did (HoldTabs, fixed the same way).
+            Size frame = SizeFromClientSize(Size.Empty);
+            int frameWidth = frame.Width, frameHeight = frame.Height;
             if (MinimumSize.Width > screen.Width || MinimumSize.Height > screen.Height)
                 MinimumSize = new Size(Math.Min(MinimumSize.Width, screen.Width), Math.Min(MinimumSize.Height, screen.Height));
             ClientSize = new Size(Math.Max(Px(340), Math.Min(ClientSize.Width, screen.Width - frameWidth)),
