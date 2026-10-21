@@ -255,7 +255,7 @@ changed).
 **D6** Notifications: up to 2 one-line labels of at most 72 chars plus the UUID, no error or account text, at most 3 lines, XML-escaped; the card shows what the toast shows.  
 *tested*: `test_notify.py`
 
-**D7** get_status carries the compatibility summary as codes only and no install path. It does return the settings, including the Custom text and the codex_exe path, read-only, which is disclosed.  
+**D7** get_status carries the compatibility summary as codes only and no install path. It does return the settings, including the Custom text and whether a codex_exe path is set (never the path), read-only, which is disclosed (amended by the owner on 2026-10-22).  
 *tested*: `test_mcp.py`, `test_compat_surfaces.py`
 
 **D8** Values that reach PowerShell travel as environment variables to constant scripts, and PowerShell is run by its full System32 path.  

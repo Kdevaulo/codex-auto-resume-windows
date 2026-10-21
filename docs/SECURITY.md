@@ -162,8 +162,8 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   - When you use this plugin's tools, or ask Codex to run its commands, inside a conversation,
     what they return (status, pending recoveries with their conversation ids, and for the
     commands, local paths that include your Windows user name) becomes part of that
-    conversation, which Codex sends to OpenAI like any tool output. `get_status` also carries the
-    engine path (`codex_exe`) if you have set one, and in v0.5.7 the install path, which contains
+    conversation, which Codex sends to OpenAI like any tool output. `get_status` also says
+    whether you have set an engine path (`codex_exe`), never the path itself, and in v0.5.7 it carried the install path, which contains
     your Windows user name; from v0.6.0, it no longer includes the install path. From v0.6.5 it
     also carries the Codex compatibility summary, as codes only - no version string, no path, no
     free text, and not what other people report about that version.

@@ -473,7 +473,7 @@ conversation to OpenAI like any tool output. That is:
 - from `get_status`: the version and, from v0.6.11, the edition installed (a code: standard,
   advanced, or advanced_not_loaded), whether recovery is on, whether the watcher is running and
   whether sign-in autostart is registered, counts by state, and your settings — which
-  include the Codex executable path if you set one and, from v0.6.3, the text of any Custom
+  say only whether you set a Codex executable path, never the path itself, and, from v0.6.3, the text of any Custom
   message you have written (Codex can read it there, not change it). From v0.6.5 it also
   carries the Codex compatibility summary that the Dashboard's Diagnostics page shows, as codes
   only: the overall result and the one the watcher acts on, whether the
