@@ -25,7 +25,7 @@ USER = "ExampleUser"
 class NoPathTests(McpTestCase):
     def setUp(self):
         super().setUp()
-        self.engine = r"C:\Users\%s\bin\codex.exe" % USER
+        self.engine = r"D:\%s\bin\codex.exe" % USER        # a path that names the person
         values = dict(settings.defaults(), codex_exe=self.engine)
         self.paths.settings_file.write_text(json.dumps(values), encoding="utf-8")
         self.assertEqual(self.control.get_settings()["codex_exe"], self.engine, "the Dashboard reads it whole")
