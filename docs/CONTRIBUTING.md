@@ -203,15 +203,13 @@ checks its own settings on GitHub.
 
 A version built in stages ships each finished stage as a pre-release while the next stage is
 built, so one version can have more pre-releases than one `-alpha` and one `-beta`. The word a
-pre-release carries says how far it can be relied on:
+pre-release carries says whether a person can notice what it brings:
 
-- **`-alpha`, then `-alpha.2`, `-alpha.3`, and so on**, while the stage is not yet for real use:
-  groundwork with nothing to switch on; a feature that cannot yet be said to work end to end,
-  because a live measurement is still pending or a known gap blocks it; or a stored format that
-  may still change before the release.
-- **`-beta`, then `-beta.2`, `-beta.3`, and so on**, once every feature in it works end to end,
-  has passed review and both editions' tests and has been shown to the maintainer as a before and
-  after, and what it stores is what the release will keep. Once a version has had a beta, every
+- **`-alpha`, then `-alpha.2`, `-alpha.3`, and so on**, when it carries nothing a person can
+  notice: refactoring, module splits, groundwork, stored-format or seam work, probes, internal
+  tests.
+- **`-beta`, then `-beta.2`, `-beta.3`, and so on**, when it carries something a person can
+  notice: a new feature, or a change they can see or feel. Once a version has had a beta, every
   later pre-release of it is a `-beta.N`; it never goes back to an alpha.
 - **No suffix** - the release - once every stage is done and live acceptance
   ([`docs/LIVE_ACCEPTANCE.md`](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/docs/LIVE_ACCEPTANCE.md))
