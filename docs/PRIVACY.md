@@ -759,8 +759,10 @@ notification-area icon move, it asks whether battery saver is on and how long Wi
 notification on screen, and it notices when the session is locked or disconnected - which the
 settings window's taskbar button asks Windows outright for this session, so that it stops behind the
 lock screen as the icon does - and whether the icon is in the overflow area, which it reads from the
-settings Windows itself keeps for that icon. It reads these and changes none of them; any answer it
-cannot get means Windows' own toast.
+settings Windows itself keeps for the notification-area icons (`NotifyIconSettings`). To find its own
+icon there it looks through every program's entry: it reads each entry's icon number and whether it
+has a GUID, and the program path only of an entry that could be its own, and keeps none of it. It
+reads these and changes none of them; any answer it cannot get means Windows' own toast.
 
 ## Languages
 
