@@ -334,19 +334,14 @@ class SourceTests(unittest.TestCase):
 
 
 class MinorTests(unittest.TestCase):
-    """M2, M4 and M5 of the audit, which change no behaviour a probe could tell apart in the time a test has."""
+    """M2 and M5 of the audit, which change no behaviour a probe could tell apart in the time a test has. M4 (a Region
+    replaced without disposing it, SoftPin.Cut) was not a finding: Windows Forms' Control.Region setter disposes the
+    region it replaces (its IL calls Region.Dispose, read 2026-10-22), so Cut is left as it was."""
 
     def test_the_log_dialog_s_five_second_look_waits_while_one_is_on_its_way(self):
         tools = guiscan.read("gui/DashboardTools.cs")
         self.assertIn("if (lookingAgain && looking > 0) return;", tools)
         self.assertIn("looking = Math.Max(0, looking - 1);", tools)
-
-    def test_a_replaced_region_is_let_go(self):
-        cut = body("SoftPin", "Cut")
-        self.assertIn("Region before = body.Region;", cut)
-        self.assertIn("if (before != null) before.Dispose();", cut)
-        self.assertLess(cut.index("body.Region = region;"), cut.index("before.Dispose()"),
-                        "disposed only once the control holds the new one")
 
     def test_the_installer_bar_tells_a_screen_reader_it_moved(self):
         show = body("InstallerBar", "Show")

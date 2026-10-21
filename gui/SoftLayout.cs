@@ -1339,18 +1339,15 @@ namespace CodexAutoResume
             place.Offset(-body.Left, -body.Top);
             if (place == hole) return;
             hole = place;
-            // v0.6.20: the region it replaces is let go now: Windows Forms does not dispose a Region it is handed, and
-            // each move of the hole left one to the finalizer.
-            Region before = body.Region;
-            if (place.IsEmpty) body.Region = null;
-            else
+            if (place.IsEmpty)
             {
-                // Everything the window could ever be but the hole, so the content growing needs no new region.
-                var region = new Region(new Rectangle(0, 0, short.MaxValue, short.MaxValue));
-                region.Exclude(place);
-                body.Region = region;
+                body.Region = null;
+                return;
             }
-            if (before != null) before.Dispose();
+            // Everything the window could ever be but the hole, so the content growing needs no new region.
+            var region = new Region(new Rectangle(0, 0, short.MaxValue, short.MaxValue));
+            region.Exclude(place);
+            body.Region = region;
         }
 
         private sealed class PinLayout : System.Windows.Forms.Layout.LayoutEngine
