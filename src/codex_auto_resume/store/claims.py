@@ -110,7 +110,7 @@ class ClaimsMixin:
                 return False, "identity", "unknown_record"
             if resend is not None:
                 return self._resend_claim(connection, settings, row, now, limits, gates, ledger, carried,
-                                          quiet_until, resend)
+                                          quiet_until, resend, caps)
             vector = dict(gates or {})
             vector["consent"] = machine.gate_consent(
                 settings["enabled"], self._thread_enabled(connection, row["thread_id"]),

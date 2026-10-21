@@ -201,5 +201,31 @@ class OutcomeTimeTests(Scratch):
                 self.store.cancel_interruption(key, BASE + 40)
 
 
+class ResendSpacingTests(plug_points.PluggedCase):
+    uncertain = plug_points.ResendTests.uncertain
+
+    def test_a_claim_committed_after_the_gate_holds_the_resend(self):
+        h = self.h
+        first, _plug = self.uncertain()
+        key = first["interruption_id"]
+        h.tick(advance=1)
+        h.tick(advance=898)
+        real = h.store.reserve_detailed
+
+        def reserve(interruption_id, at, **options):
+            if options.get("resend") is not None:
+                # Another engine, or a worker settling, claims in this conversation between the gate and the claim.
+                h.store.register(failure("bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb", "f" * 64, thread=first["thread_id"]),
+                                 at)
+                with h.store._transaction() as connection:
+                    connection.execute("UPDATE interruptions SET last_claim_at=? WHERE interruption_id=?",
+                                       (at, "f" * 64))
+            return real(interruption_id, at, **options)
+        h.store.reserve_detailed = reserve
+        h.tick(advance=2)
+        self.assertEqual(len(h.backend.send_calls), 1, "the spacing is read again in the claim")
+        self.assertEqual(h.store.get(key)["state"], "submission_unknown", "a refused resend stays as it was")
+
+
 if __name__ == "__main__":
     unittest.main()
