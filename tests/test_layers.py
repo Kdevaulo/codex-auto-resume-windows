@@ -108,6 +108,8 @@ LAYER = {_q(name): layer for layer, names in {
                  # v0.6.10: what others report, read beside the registry and never by it.
                  "compat.reported",
                  "pwsh", "notify", "notice_presence", "tray_place",
+                 # v0.6.18: the Codex app's link to one conversation, handed to explorer.exe - out of notify.
+                 "codex_link",
                  # v0.6.10-alpha: store.py became store/. Every part of it is the same layer
                  # the one module was, and `STORE` below covers them by prefix.
                  "store.actions", "store.claims", "store.columns", "store.downgrade",
@@ -240,7 +242,7 @@ PLANNED = {_q(name) for name in ("codex", "win", "ui", "mcp", "domain.public")}
 STORE = {_q("store"), _q("openstate")}              # openstate moves into store/ as store/open.py
 CODEX = {_q("codex"), _q("windows"), _q("codex")}         # Codex's files and processes
 WIN = {_q(name) for name in ("windows", "startup", "addremove", "shortcut", "pwsh", "notify", "notice_presence",
-                             "tray_place", "win")}
+                             "tray_place", "codex_link", "win")}
 UI = {_q(name) for name in ("brand", "notice_card", "notice_window", "ui")}
 MCP = {_q("mcpserver"), _q("mcp")}
 # What the UI may reach: the control layer, the public status mapping (machine, until it is
