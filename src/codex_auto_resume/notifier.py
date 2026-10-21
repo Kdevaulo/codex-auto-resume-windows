@@ -374,6 +374,9 @@ def with_open_codex(notice, on=False):
     if len(toast_actions(content)) >= notify.MAX_TOAST_ACTIONS:
         return notice
     button = (l10n.message("toast_button_open_codex"), link)
+    # The cancel button carries the decision, for the notice its press raises from Windows' toast (notify.py).
+    if content.get("uri"):
+        content["uri"] = notify.with_open_codex_flag(content["uri"])
     more = list(content.get("more") or ())
     after = next((index + 1 for index, (_label, uri) in enumerate(more) if notify.parse_open_uri(uri) is not None),
                  len(more))

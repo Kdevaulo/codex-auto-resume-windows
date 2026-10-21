@@ -86,6 +86,33 @@ def parse_cancel_uri(uri: str) -> str | None:
     return ids.read_interruption_id(values[0])
 
 
+# v0.6.18: a cancel URI may carry the watcher's decision that a notice about one conversation offers Open Codex (an
+# edition's, notifier.with_open_codex), so the notice that says the cancel happened - raised by the separate process
+# Windows starts for a toast's button, which loads no plug (commands/watcher.cmd_activate) - offers it too. The flag
+# only ever adds that button, for the cancelled record's own conversation; parse_cancel_uri passes it over.
+OPEN_CODEX_FLAG = "c"
+
+
+def with_open_codex_flag(uri: str) -> str:
+    """A cancel URI with the Open Codex flag on it; any other URI as it is."""
+    if parse_cancel_uri(uri) is None or cancel_asks_open_codex(uri):
+        return uri
+    return "%s&%s=1" % (uri, OPEN_CODEX_FLAG)
+
+
+def cancel_asks_open_codex(uri) -> bool:
+    """Whether a valid cancel URI carries the Open Codex flag, exactly once and exactly 1."""
+    from urllib.parse import parse_qs, urlsplit
+
+    if parse_cancel_uri(uri) is None:
+        return False
+    try:
+        values = parse_qs(urlsplit(str(uri)).query).get(OPEN_CODEX_FLAG) or []
+    except (ValueError, TypeError):
+        return False
+    return values == ["1"]
+
+
 def open_uri(page: str = "pending") -> str:
     """Capability URI that opens one page of the Dashboard.
 

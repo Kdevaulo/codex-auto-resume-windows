@@ -162,6 +162,47 @@ class NoticeTests(unittest.TestCase):
         self.assertEqual((said, opened), ("opened", [LINK]))
 
 
+class ToastCancelTests(unittest.TestCase):
+    """The notice a cancel pressed on Windows' toast raises comes from a separate process with no plug: the decision
+    rides on the button's own URI."""
+
+    def activate(self, uri):
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+        from codex_auto_resume.commands import watcher as command
+
+        class Store:
+            def get(self, key):
+                return {"thread_id": THREAD} if key == ac.KEY else None
+
+            def cancel_interruption(self, *_args, **_keywords):
+                return None
+
+        @contextmanager
+        def opened(_app):
+            yield Store()
+
+        app = SimpleNamespace(paths=None, settings={}, logger=SimpleNamespace(info=lambda *_a, **_k: None))
+        delivered = []
+        with patch.object(command, "_app", lambda _args: app), patch.object(command, "_open_state", opened),                 patch.object(command, "_print", lambda *_a: None),                 patch.object(notifier, "deliver", lambda notice, **_k: delivered.append(notice) or ("toast", True)):
+            command.cmd_activate(SimpleNamespace(uri=uri))
+        return delivered[-1]
+
+    def test_the_cancel_button_carries_the_decision_and_still_names_its_interruption(self):
+        shown = notifier.with_open_codex(interruption(), True)
+        cancel = shown.toast_content()["uri"]
+        self.assertEqual(notify.parse_cancel_uri(cancel), ac.KEY)
+        self.assertTrue(notify.cancel_asks_open_codex(cancel))
+        self.assertFalse(notify.cancel_asks_open_codex(interruption().toast_content()["uri"]))
+        for odd in (notify.cancel_uri(ac.KEY) + "&c=2", notify.cancel_uri(ac.KEY) + "&c=1&c=1", "x:cancel?c=1"):
+            self.assertFalse(notify.cancel_asks_open_codex(odd), odd)
+
+    def test_the_notice_after_a_toast_s_cancel_offers_open_codex_only_where_the_notice_pressed_did(self):
+        flagged = notifier.with_open_codex(interruption(), True).toast_content()["uri"]
+        self.assertIn(LINK, [uri for _label, uri in self.activate(flagged).actions])
+        self.assertNotIn(LINK, [uri for _label, uri in self.activate(notify.cancel_uri(ac.KEY)).actions])
+
+
 class WatcherTests(unittest.TestCase):
     """What the edition's surface says, taken up by the watcher: the flag follows the surface tick by tick."""
 
