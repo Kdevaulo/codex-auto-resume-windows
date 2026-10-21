@@ -40,10 +40,10 @@ NETWORKING = re.compile(
     r"ftplib|smtplib|poplib|imaplib|telnetlib|xmlrpc|webbrowser|asyncio\.streams)\b",
     re.MULTILINE)
 
-# The PowerShell verbs that would reach the network.
+# The PowerShell verbs that would reach the network - and the .NET request the bootstrap's streamed download makes.
 PS_NETWORK = re.compile(
     r"Invoke-WebRequest|Invoke-RestMethod|System\.Net\.WebClient|DownloadFile|"
-    r"DownloadString|Start-BitsTransfer|\bcurl\b|\bwget\b", re.IGNORECASE)
+    r"DownloadString|Start-BitsTransfer|\bcurl\b|\bwget\b|HttpWebRequest|WebRequest\]::Create", re.IGNORECASE)
 
 # Claims that are only true of the recovery runtime, never of the whole product.
 ABSOLUTES = (
