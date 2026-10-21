@@ -291,7 +291,9 @@ class Backend:
             with launch_guard if launch_guard is not None else nullcontext(True) as permitted:
                 if permitted is not True:
                     return {"outcome": "not_started", "error_code": "queue_consent_refused"}
-                process = S.Popen(self._argv() + ["queue", "--thread", thread_id, "--message", prompt],
+                # v0.6.20: the message as one `--message=` argument - a person's text that starts with "-" ("- keep
+                # going", "---") is then never read as an option, whatever the parser's defaults.
+                process = S.Popen(self._argv() + ["queue", "--thread", thread_id, "--message=" + prompt],
                                   stdin=S.DEVNULL, stdout=S.PIPE, stderr=S.DEVNULL, text=True,
                                   encoding="utf-8", errors="replace", shell=False, close_fds=True,
                                   creationflags=NO_WINDOW, cwd=str(self.codex_home), env=self._environment())
