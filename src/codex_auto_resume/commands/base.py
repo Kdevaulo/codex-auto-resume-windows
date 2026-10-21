@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import os
 import time
 
 from .. import config
@@ -34,6 +35,20 @@ def _now() -> float:
 
 def _print(text: str = "") -> None:
     print(text)
+
+
+# The setup window's request for progress lines (gui/InstallerFlow.cs, InstallerProgress.Variable), which install.ps1
+# passes on to the setup step and the health check alone.
+PROGRESS_LINES = "CODEX_AUTO_RESUME_PROGRESS_LINES"
+
+
+def progress(step: str, done: int, total: int) -> None:
+    """`progress: <step> <done>/<total>` - how much of an installer step is really done, for the setup window's bar,
+    which reads the line and keeps it out of the log it shows. Only when the window asked for it: every other run
+    prints exactly what it always did. Flushed, so the window has it while the step goes on, not when it ends."""
+    if os.environ.get(PROGRESS_LINES) != "1" or total <= 0:
+        return
+    print("progress: %s %d/%d" % (step, max(0, min(done, total)), total), flush=True)
 
 
 def _app(args) -> App:

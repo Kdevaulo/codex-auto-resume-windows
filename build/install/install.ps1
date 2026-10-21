@@ -303,6 +303,13 @@ $outsideCode = Resolve-OutsideRun -Script $PSCommandPath -Switches $outsideSwitc
                                   -Values @{ PluginName = $PluginName; MarketplaceName = $MarketplaceName }
 if ($null -ne $outsideCode) { exit $outsideCode }
 
+# The setup window's progress lines (Progress), read once - after the outside gate, so a run outside gets the variable
+# with the rest of this run's environment - and then taken out of it: what this run starts that lives on (the watcher,
+# the Dashboard it opens again) never inherits it. The setup step and the health check get it back for their own call
+# (Invoke-Setup).
+$script:ProgressLines = $env:CODEX_AUTO_RESUME_PROGRESS_LINES -ceq '1'
+$env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null
+
 # One installation at a time. There are three routes in - a double-clicked Install.cmd,
 # an upgrade, and the Codex plugin's bootstrap - and two of them running together would
 # copy over each other's half-written payload and race on the same plugin cache.
@@ -927,13 +934,53 @@ function Remove-OwnedItem {
     return (-not (Test-Path -LiteralPath $Path))
 }
 
+# How much of a step is done, for the setup window's bar: `progress: <step> <done>/<total>`, an English line of its own
+# that the window reads and keeps out of the log it shows (gui/InstallerFlow.cs, InstallerProgress). Only when the
+# window asked for it with CODEX_AUTO_RESUME_PROGRESS_LINES=1 ($script:ProgressLines, read once after the outside
+# gate): Install.cmd's console, the CI logs and every other caller see exactly what they always did. Real counts only,
+# never a guess, and at most one line per whole percent of the step, so the pipe is not flooded.
+function Progress {
+    param([string]$Step, [int]$Done, [int]$Total)
+    if (-not $script:ProgressLines -or $Total -le 0) { return }
+    if ($null -eq $script:ProgressSaid) { $script:ProgressSaid = @{} }
+    $count = [Math]::Max(0, [Math]::Min($Done, $Total))
+    $percent = [int][Math]::Floor(100 * $count / $Total)
+    # Nothing for a share below one percent: the bar stands at the step's milestone already.
+    $said = 0
+    if ($script:ProgressSaid.ContainsKey($Step)) { $said = $script:ProgressSaid[$Step] }
+    if ($percent -le $said) { return }
+    $script:ProgressSaid[$Step] = $percent
+    Write-Host ('  progress: ' + $Step + ' ' + $count + '/' + $Total)
+}
+
+function Get-PayloadTree {
+    <#
+        Every folder and file under Source, each with where it goes under Destination ({ From; To; Folder }):
+        what the copy of the program files copies, one file at a time so the setup window's bar can follow it
+        (Progress). Hidden and system ones too, as `Copy-Item -Recurse -Force` took them.
+    #>
+    param([string]$Source, [string]$Destination)
+    $base = (Get-Item -LiteralPath $Source -Force -ErrorAction Stop).FullName.TrimEnd('\')
+    foreach ($item in @(Get-ChildItem -LiteralPath $base -Recurse -Force -ErrorAction Stop)) {
+        @{ From = $item.FullName
+           To = (Join-Path $Destination $item.FullName.Substring($base.Length + 1))
+           Folder = [bool]$item.PSIsContainer }
+    }
+}
+
 function Invoke-Setup {
     # The command's stdout must not leak into the return value: a bare call would make
     # the function return every printed line AND the exit code as an array, and any
     # comparison against 0 would then be true no matter how well setup went.
     param([string[]]$Arguments)
     $setup = Join-Path $AppDir 'scripts\plugin_setup.py'
-    & $Python $setup @Arguments | ForEach-Object { Write-Host ('    ' + $_) }
+    # The setup step and the health check count their own steps for the setup window's bar (Progress): the variable
+    # is set for those two calls alone, as the other hints to setup are.
+    $counted = $script:ProgressLines -and @($Arguments).Count -gt 0 -and
+               (@($Arguments)[0] -ceq 'setup' -or @($Arguments)[0] -ceq 'doctor')
+    if ($counted) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = '1' }
+    try { & $Python $setup @Arguments | ForEach-Object { Write-Host ('    ' + $_) } }
+    finally { if ($counted) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null } }
     return $LASTEXITCODE
 }
 
@@ -1323,9 +1370,25 @@ if ($Uninstall) {
         Remove-OwnedItem $stale.FullName
     }
     $stuck = @()
+    # What is in the two program folders goes entry by entry, each proved inside the installation again
+    # (Remove-OwnedItem), so the setup window's bar follows the removal (Progress); then each folder itself, as before.
+    $programDirs = @(@($AppDir, $RunDir) | Where-Object { Test-Path $_ })
+    $programEntries = @(foreach ($dir in $programDirs) {
+        Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue
+    })
+    $removeTotal = $programEntries.Count + $programDirs.Count
+    $removedCount = 0
+    foreach ($programEntry in $programEntries) {
+        $null = Remove-OwnedItem $programEntry.FullName
+        $removedCount++
+        Progress 'remove_files' $removedCount $removeTotal
+    }
     foreach ($dir in @($AppDir, $RunDir)) {
         if (-not (Test-Path $dir)) { continue }
-        if (-not (Remove-OwnedItem $dir)) { $stuck += $dir; continue }
+        $dirGone = Remove-OwnedItem $dir
+        $removedCount++
+        Progress 'remove_files' $removedCount $removeTotal
+        if (-not $dirGone) { $stuck += $dir; continue }
         # -ErrorAction SilentlyContinue swallows a sharing violation, so ask afterwards
         # rather than assuming. A half-deleted installation reported as "Removed." is
         # worse than an honest failure: nothing tells the user to try again.
@@ -1681,12 +1744,24 @@ try {
             Move-Item -Path $pair.dst -Destination $aside -ErrorAction Stop
             $moved += @{ from = $aside; to = $pair.dst }
         }
+        # File by file, so the setup window's bar follows the copy as it goes (Progress): every folder first, then
+        # every file, of both trees - hidden ones too, as the copy of each whole tree took them.
+        $copying = @()
         foreach ($pair in $pairs) {
             New-Item -ItemType Directory -Force -Path $pair.dst | Out-Null
             # Join-Path takes two paths in Windows PowerShell; a third argument is a
             # parameter-binding error, not a longer path.
-            Copy-Item -Path (Join-Path (Join-Path $Payload $pair.src) '*') `
-                      -Destination $pair.dst -Recurse -Force -ErrorAction Stop
+            $copying += @(Get-PayloadTree -Source (Join-Path $Payload $pair.src) -Destination $pair.dst)
+        }
+        $copyFiles = @($copying | Where-Object { -not $_.Folder }).Count
+        $copied = 0
+        foreach ($payloadItem in @($copying | Where-Object { $_.Folder })) {
+            New-Item -ItemType Directory -Force -Path $payloadItem.To | Out-Null
+        }
+        foreach ($payloadItem in @($copying | Where-Object { -not $_.Folder })) {
+            [IO.File]::Copy($payloadItem.From, $payloadItem.To, $true)
+            $copied++
+            Progress 'files' $copied $copyFiles
         }
     } catch {
         Warn ('Could not replace the installation: ' + $_.Exception.Message)
@@ -1744,6 +1819,8 @@ try {
         }
     }
     if ($added.Code -ne 0) { Warn 'Could not register the local marketplace; the Codex skill may be unavailable.' }
+    # Three commands to Codex - add the marketplace, upgrade it, add the plugin - each counted once done (Progress).
+    Progress 'plugin' 1 3
     # Ours, by name - never the no-name form. Without a name, Codex refreshes every Git
     # marketplace the user has configured and reinstalls those vendors' plugins: an action on
     # other people's software that nobody asked this installer to take, and a network fetch on
@@ -1751,6 +1828,7 @@ try {
     # marketplace registered above, the named form is a no-op ("not configured as a Git
     # marketplace"); it only does anything when a GitHub registration survived the repoint.
     $null = Invoke-Codex $codex @('plugin', 'marketplace', 'upgrade', $MarketplaceName)
+    Progress 'plugin' 2 3
     $installed = Invoke-Codex $codex @('plugin', 'add', ($PluginName + '@' + $MarketplaceName))
     if ($installed.Code -ne 0 -and (($installed.Err + $installed.Out) -match 'os error 5|back up plugin cache')) {
         # Codex replaces the plugin by backing up its cache directory, and it cannot while
@@ -1773,6 +1851,7 @@ try {
         if ($editionChange) { Write-PluginNotUpdated -From $previousEdition -To $edition }
         else { Write-PluginNotUpdated }
     } else { Ok 'Codex plugin installed' }
+    Progress 'plugin' 3 3
 
     # Every run, not only when a locked file forced it: a tool server Codex started before the
     # files were replaced is still running the previous version's code, and that code may not

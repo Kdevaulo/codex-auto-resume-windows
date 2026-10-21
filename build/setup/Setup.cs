@@ -289,6 +289,10 @@ namespace CodexAutoResumeSetup
             start.RedirectStandardInput = true;
             start.RedirectStandardOutput = true;
             start.RedirectStandardError = true;
+            // The window reads how much of each step is done (InstallerProgress.Variable); a console run prints exactly
+            // what it always did, whatever this program's own environment says.
+            if (heard != null) start.EnvironmentVariables[CodexAutoResume.InstallerProgress.Variable] = "1";
+            else start.EnvironmentVariables.Remove(CodexAutoResume.InstallerProgress.Variable);
             Closing.OutliveCtrlC();
             try
             {

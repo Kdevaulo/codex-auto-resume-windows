@@ -488,6 +488,10 @@ namespace CodexAutoResume
                 info.CreateNoWindow = true;
                 info.RedirectStandardOutput = true;
                 info.RedirectStandardError = true;
+                // How much of each step is done, for the installer window's bar (InstallerProgress.Variable) - only
+                // where that window reads the lines; every other caller gets exactly the output it always did.
+                if (Heard != null) info.EnvironmentVariables[InstallerProgress.Variable] = "1";
+                else info.EnvironmentVariables.Remove(InstallerProgress.Variable);
                 // The update's answer goes in on the input (-AskFirst); nothing else reads it.
                 if (Asked != null) info.RedirectStandardInput = true;
                 // UTF-8, as the script writes it: the setup step's lines may be Korean (issue #33).
@@ -508,7 +512,8 @@ namespace CodexAutoResume
                                               string line, notes = null;
                                               while ((line = process.StandardOutput.ReadLine()) != null)
                                               {
-                                                  lines.Append(line).Append('\n');
+                                                  // A progress line is the window's alone: read, never kept.
+                                                  if (!InstallerProgress.IsProgress(line)) lines.Append(line).Append('\n');
                                                   heard(line);
                                                   if (line.StartsWith("notes: ", StringComparison.Ordinal))
                                                       notes = line.Substring("notes: ".Length).Trim();

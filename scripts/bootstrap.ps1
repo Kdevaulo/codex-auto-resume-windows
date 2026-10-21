@@ -1602,6 +1602,16 @@ function Start-CurrentWatcher {
 
 # ---------------------------------------------------------------------------- run
 
+# The setup window's progress lines (CODEX_AUTO_RESUME_PROGRESS_LINES=1, gui/InstallerFlow.cs InstallerProgress): this
+# script counts nothing itself, and passes the request on to the installer it runs and to nothing else it starts (the
+# installed setup, a watcher started again). The download stays one step: the archive's request takes -PassThru, for
+# the response Assert-TrustedHost reads, and with it Windows PowerShell 5.1 holds the whole body and writes the
+# -OutFile file only once it has all of it - measured 2026-10-21, a 4 MB body sent over 4 s, polled every 250 ms: the
+# file was absent throughout and whole at the end; without -PassThru it grew as it came, but the host check would
+# have nothing to read. A count of bytes there would have to be a guess, and the bar shows none.
+$progressLines = $env:CODEX_AUTO_RESUME_PROGRESS_LINES -ceq '1'
+$env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null
+
 Write-Host ''
 Write-Host 'Codex Auto Resume - setting up'
 Write-Host ''
@@ -2180,6 +2190,7 @@ try {
     # been touched. It reports and rolls back its own work; this script must not claim
     # otherwise on its way out.
     $started = $true
+    if ($progressLines) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = '1' }
     & $installer @arguments
     $code = $LASTEXITCODE
     if ($null -eq $code) { $code = 0 }
