@@ -76,5 +76,28 @@ class VersionDecodeTests(Scratch):
         self.assertTrue(checks["version"].startswith("codex-cli 0.163.0"))
 
 
+class SlowHelperTests(Scratch):
+    def test_a_delete_that_worked_stays_reported_as_worked(self):
+        ended = []
+
+        class Helper:
+            stdin, stdout = None, None
+
+            def wait(self, timeout=None):
+                raise subprocess.TimeoutExpired("codex", timeout)
+
+            def terminate(self):
+                ended.append(True)
+
+        def enter(client):
+            client.process = Helper()
+            return client
+        with patch.object(appserver.Protocol, "__enter__", enter), \
+                patch.object(appserver.Protocol, "call", return_value={"deleted": True}):
+            backend = transport.Backend(self.root / "codex", self.root / "codex.exe")
+            self.assertIs(backend.delete_queue(THREAD, QUEUED), True)
+        self.assertEqual(ended, [True], "ended once, as before; the second wait running out is not a failed delete")
+
+
 if __name__ == "__main__":
     unittest.main()
