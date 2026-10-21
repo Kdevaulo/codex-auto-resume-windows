@@ -65,10 +65,10 @@ jobs:
     # And five parts for the advanced lane (2026-10-20). The Japanese and Chinese layout audit, one file at
     # 2566 s, bounded every advanced part at 4; a speed-up of those audits and their five modules dealt by
     # (language, scale) cost lets 10607 s deal into 5 parts of about 2121 s (35 minutes) instead of 2652 s (44).
-    # A dev run is 12 + 20 + 4 = 36 jobs: 3 standard parts and 5 advanced parts for each of 3 Pythons and the
-    # next one, and the 4 of the main-tree job. The release lane, here and in release.yml, stays at 4 and moves
-    # to 5 once tests/data/durations.json holds the faster layout audits: at 5 that file's 2561 s leaves its
-    # parts further apart than tests/test_split_runs.py allows.
+    # The release lane is dealt into 5 as well, here and in release.yml (2026-10-21), now that the table
+    # holds the faster layout audits: its 5 parts are 1478 s each, the advanced lane's 5 are 1634 s and the
+    # standard lane's 3 are 1921 s. A dev run is 12 + 20 + 5 = 37 jobs: 3 standard parts and 5 advanced parts
+    # for each of 3 Pythons and the next one, and the 5 of the main-tree job.
     strategy:
       fail-fast: false
       matrix:
@@ -233,7 +233,7 @@ jobs:
       fail-fast: false
       matrix:
         # PARTS below is the length of this list; tests/test_split_runs.py holds the two together.
-        part: [1, 2, 3, 4]
+        part: [1, 2, 3, 4, 5]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -262,7 +262,7 @@ jobs:
         env:
           CODEX_AR_TREE: main
           PART: ${{ matrix.part }}
-          PARTS: "4"
+          PARTS: "5"
         run: python scripts/test_parts.py --lane release --part "$env:PART/$env:PARTS" -v --annotate --seconds "$env:RUNNER_TEMP\seconds.json"
 
       - name: Keep this part's seconds per file

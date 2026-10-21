@@ -120,26 +120,74 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15...v0.6.16)
 
 **From v0.6.15, an ordinary update.** It is the latest release, for both editions, so v0.6.15's *Check for updates*
-offers it in the edition you have, and the plugin in Codex installs it too. It is the final of a line that went out
-in four pre-releases ([v0.6.16-beta](#v0616-beta-several-conversations-at-once-several-codex-homes-and-five-more-ways-to-go-on), [beta.2](#v0616-beta2-conversations-chatgpt-hands-over-and-the-ones-codex-labels-not-at-all-are-recovered), [beta.3](#v0616-beta3-words-for-this-time-a-conversation-codex-records-under-another-id-and-a-usage-meter) and [beta.4](#v0616-beta4-a-conversation-nothing-holds-is-run-here-other-kinds-of-session-and-the-usage-capabilities-finished); an installation
-of any of them is offered it as an ordinary update, being newer), and carries all of them, with what was built
-since beta.4. **The standard edition's improvements** are *Rescan and reconcile* on the Pending page
+offers it in the edition you have, and the plugin in Codex installs it too. The line went out first in four
+pre-releases - v0.6.16-beta, beta.2, beta.3 and beta.4 - and an installation of any of them is offered this as an
+ordinary update, being newer. This entry tells everything those four announced, with what was built since beta.4, so
+it is enough to read on its own; an item marked "new since beta.4" is new to a person who ran beta.4. **The standard
+edition's improvements** are *Rescan and reconcile* on the Pending page
 ([#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)), a setup program that is an
 installer and an update that shows what it is doing, notices you can keep on screen until clicked, words for one
 recovery's next send, up to three more Codex homes, and a conversation Codex records under another id followed.
 The advanced edition's capabilities are listed below, each off until you turn it on.
 
-**Going back.** The watcher's state stays schema 5, as every v0.6.16 beta's. The advanced edition's own file stays
-version 7, as beta.4's - brought up from version 4, 5 or 6 the first time it is opened, every row kept. An advanced
-version older than v0.6.16-beta.4 cannot read it and fails closed: every advanced feature is off there, and
-*Install another version...* says so before it installs one. Going back to v0.6.14 or v0.6.13 converts the state
-down first, which *Install another version...* does for you.
+**Going back.** The watcher's state is schema 5, as every v0.6.16 beta's: each record says which Codex home it is
+of, and it is brought up from schema 4 the first time it is opened, every row kept. Going back to v0.6.14 or v0.6.13
+converts the state down first (`downgrade-state --to 4`), which *Install another version...* does for you: it is
+refused while a continuation sent in an extra home may still be in that home's Codex queue. Every row is kept, and
+none of an extra home's is left for the older release to act on: its waiting recoveries are cancelled, one whose
+recovery turn is running ends unverified, and its finished rows stay as they are. The advanced edition's own file is
+version 7 - the continuations, the conversations kept going and the queued prompts, the usage meter's last reading,
+the turns run here, the Dashboard chat's table for v0.6.17, and the wrap-up's switches and words - brought up from
+version 3, 4, 5 or 6 the first time it is opened, every row kept. An advanced version older than v0.6.16-beta.4
+cannot read it and fails closed: every advanced feature is off there (v0.6.14 reads it the same way: every
+capability off), and *Install another version...* says so before it installs one.
 
 ### Both editions
 
-#### New since v0.6.16-beta.4
+#### Recovering more conversations
 
-- **Rescan and reconcile on the Pending page** (the standard edition's improvement). After *Cancel all*, a button
+- **A conversation ChatGPT hands over to the Codex app, and one Codex gives no label at all, are now recovered**
+  ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+  Detection took up only conversations Codex labels `user` and whose file names `Codex Desktop`.
+  That label is Codex's analytics classification, not a mark of whose a conversation is: a
+  conversation ChatGPT hands over to the app is labelled `chatgpt_handoff` and opened as
+  `codex_work_desktop`, and the app gives no label at all to a session it copies in from another
+  tool (Claude Code, forks made there included) - 41 of 64 conversations on one PC, made by Codex 0.149 to 0.162. None of them
+  was ever recovered, nothing in the log said why, and a person going on with one in Codex met a
+  usage limit unanswered: the watcher fails closed on what it does not recognise, so it left them alone. Both are
+  taken up now, and nothing wider: a subagent's conversation, a review, a memory pass, one an agent
+  made, and the CLI's, the terminal's and VS Code's sessions still stay out, and Codex's state and
+  the conversation's own file must still say the same. Found by a person's report and the read-only
+  check written for it; the tests that hold it fail with the fix taken out. A copied-in turn
+  carries no Codex error code, so nothing in such a session is detected until Codex itself runs a
+  turn there that fails (reported by [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27); proved by [@ZionZhang42](https://github.com/ZionZhang42), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+  It is in v0.6.15 too.
+- **A conversation whose turns Codex records under another id is followed there.** Codex can carry on a
+  conversation's turns under a new id, and a failure there was never found. The watcher now follows every id a
+  conversation has had, in order, so its failure is found and an old one never comes back (reported by
+  [@aca22jy](https://github.com/aca22jy), [#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)).
+- **A conversation continued in, or forked by, the Codex Desktop is recovered as the app's own.** A conversation
+  started in the Codex CLI and then carried on in the Desktop app was reported as "not taken up (other_kind:
+  originator codex-tui)" when it hit a usage limit: Codex rewrites the conversation's row to the app's but its
+  first line keeps the CLI's originator. The same held for the conversation the app forks from a terminal's with
+  "continue in a new chat". Both are now taken up as the app's own; a terminal conversation the app never took
+  over, VS Code's own and a subagent's are not, and who holds a conversation still decides whether anything is
+  sent (reported by [@Kdevaulo](https://github.com/Kdevaulo),
+  [#37](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/37)).
+- **A conversation another Codex session holds waits, and nothing is sent to it.** A conversation open in a
+  terminal or in VS Code shows "Open in another Codex session (a terminal or VS Code); it continues once the Codex
+  app holds it." instead of being sent to; who holds it is read from the process list, and a holder that cannot
+  be named, two holders and a reused process id leave the state unknown.
+- **Every failed turn the watcher does not take up is logged once, with why** - once per turn and reason,
+  across restarts, a few lines at a time (suggested by [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+- **Diagnostics can check why a failure was not taken up.** *Check why a failure was not taken up...* asks the
+  watcher's own rules about the newest 200 conversations, within 10 seconds, and reads nothing of what they say
+  (suggested by [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
+
+#### The Pending page
+
+- **Rescan and reconcile on the Pending page** (the standard edition's improvement; new since beta.4). After
+  *Cancel all*, a button
   that reads every waiting recovery again, once you confirm. It retires a wait only on positive proof that newer
   work of yours superseded it - its exact failed turn in Codex's history followed by a turn you started (a
   continuation of this tool's never counts; after a rollback, nothing does) - rechecks the valid ones under every normal gate, leaves the uncertain ones as they are, and
@@ -147,18 +195,43 @@ down first, which *Install another version...* does for you.
   and resets no budget; the note beside the buttons says how many were retired, rechecked, left unresolved and
   changed meanwhile (reported by [@weng-wen-jun](https://github.com/weng-wen-jun),
   [#39](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/39)).
-- **The setup program is an installer.** Double-clicked, it opens a window of its own in the Dashboard's design and
+- **Words for this time.** One waiting recovery on the Pending page can carry words of yours - **Add words for
+  this time...** on its row - sent once, after the continuation it would send anyway, and then deleted. They
+  start, speed up and skip nothing, and are deleted too when the recovery ends without a send. They are a Custom
+  message in every other way, written only in the Dashboard (standards A26 and A27, amended by the owner).
+
+#### Several Codex homes
+
+- **Up to three more Codex homes.** *Settings > Advanced > Codex homes* names up to three more `CODEX_HOME` folders
+  besides the default one, each with a short alias. One watcher recovers in every home it holds, each through its own
+  reader, Codex process, lock and engine, and a record goes only to its own home. Pending, History, the Codex panel and
+  the cards add the alias to a record of an extra home.
+- **Locked by folder.** Each home is locked by its path and by its folder, so one folder under two names is one home,
+  and two installations never watch it twice. A UNC path, a link, a missing state database and a folder named twice are
+  refused when it is saved.
+- **Only the Dashboard writes them.** Codex's `update_settings` refuses the field, and no Codex reply carries the
+  paths. Restore defaults keeps them. Removing a home cancels the recoveries waiting in it (the owner's answer), and
+  one already in Codex's queue is watched until it settles.
+- **Measured up to 0.162.** MH, a second home reached by the desktop app, passed on codex-cli 0.158 and again on
+  codex-cli 0.162.0-alpha.17.2; on a Codex newer than 0.162 the card says it is unmeasured until it is measured again.
+
+#### The setup program, updates and notices
+
+- **The setup program is an installer** (new since beta.4). Double-clicked, it opens a window of its own in the
+  Dashboard's design and
   the product's eighteen languages: what it installs, which edition and version, and where; the few choices the
   installer has; how far it is and which step it is on; and whether it finished, with the exit code and the log,
   and a button that opens the Dashboard. Run where its own version is installed already, it offers **Repair** and
   **Remove**. No console window opens, and `-Silent` asks nothing and shows nothing, with the same exit codes.
-- **An installation is listed in Windows' Settings > Apps** and in `winget list`, for your Windows user only. Its
+- **An installation is listed in Windows' Settings > Apps** and in `winget list`, for your Windows user only (new
+  since beta.4). Its
   Uninstall button shows the same window and asks whether to delete the settings and the history too. The uninstall
   closes an open Dashboard first and removes nothing while anything still holds the program's files, saying what;
   a failed uninstall stays listed, a finished one takes its entry with it, and installing an older version leaves no
   entry naming a version that is not installed.
   The winget manifests of both editions are made from a release's pinned archives ([WINGET.md](WINGET.md)).
-- **An update shows itself** - from this version's own *Check for updates* on, and the setup program run by hand; the
+- **An update shows itself** (new since beta.4) - from this version's own *Check for updates* on, and the setup
+  program run by hand; the
   update to v0.6.16 from an earlier version runs as that version always did. Before it installs, a notes page says
   from what version to what and what is new in it, read from the verified download; afterwards an "Updated to" page says it is done. The watcher is started
   again on the new version where one ran before or where it runs at sign-in, and one you had stopped stays
@@ -166,84 +239,189 @@ down first, which *Install another version...* does for you.
   v0.6.16, which cannot be asked, is closed as any window is and opened again - and one with unsaved Settings
   changes keeps them and stays open. The notes are shown as plain text, and the window follows the installation's
   own look.
-- **Notices that stay until clicked, chosen for each kind.** *Settings > General > Notifications* lists each kind
+- **Installing over a running v0.6.11 to v0.6.15 watcher no longer reports a false failure**, and the
+  installer's Korean lines reach you and the Dashboard whole (#33). This was the known issue of v0.6.15,
+  v0.6.16-beta and v0.6.16-beta.2: updating from v0.6.11 to v0.6.15 could show an error window saying "Setup did
+  not complete ... Not a state an older watcher owns" with its Korean lines as broken characters, though the update
+  had finished - one step of the installer read the state while the old watcher still held it, in a format that
+  step did not know yet.
+- **Notices that stay until clicked, chosen for each kind** (new since beta.4). *Settings > General >
+  Notifications* lists each kind
   of notice with a box, and a kind ticked there stays on screen until you click it. None is ticked at first.
-- **A click on a notice itself opens its page** - the card's face, or the body of Windows' own notification - the
+- **A click on a notice itself opens its page** (new since beta.4) - the card's face, or the body of Windows' own
+  notification - the
   page its Open Dashboard button opens.
-- **A smoother tray icon while it idles**, in finer steps of the same drawing, and **a smaller edition label**
-  beside the version.
-- **The README is the short one**: the setup program first, the Dashboard shown in motion, and one table of what to
-  read next.
-- **Compatibility data 11** names codex-cli 0.163.0-alpha.10.2 as verified in eight capabilities, after a real
-  recovery on it.
-- **The compatibility report stamps a report with the process's clock**, not the clock its module was imported
-  under.
+- **Settings' Run at Windows sign-in shows what Windows really holds**, and Save writes it only where you moved
+  it; an update keeps the entry you kept (#31).
+- **The panel says how to start the watcher when it is off**, and that nothing starts it while sign-in is off
+  (#31).
+- **Release pages start with direct download links** to the tag's two setup programs, so the page you land on
+  from an update notice begins with what to download.
+- **The version picker reads the advanced edition's new file** and warns that every advanced feature is off in an
+  advanced version older than this one.
 
-#### Since v0.6.15, in the betas
+#### The window
 
-- **[v0.6.16-beta](#v0616-beta-several-conversations-at-once-several-codex-homes-and-five-more-ways-to-go-on): several Codex homes.** One watcher recovers in up to three more `CODEX_HOME` folders,
-  each with an alias and locked by its folder; only the Dashboard writes them.
-- **[beta.2](#v0616-beta2-conversations-chatgpt-hands-over-and-the-ones-codex-labels-not-at-all-are-recovered): v0.6.15's fix** for conversations ChatGPT hands over and the ones Codex labels not at all, on
-  the beta line ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27), reported by
-  [@barkshah2002-pixel](https://github.com/barkshah2002-pixel), proved by
-  [@ZionZhang42](https://github.com/ZionZhang42)). It is in v0.6.15 too.
-- **[beta.3](#v0616-beta3-words-for-this-time-a-conversation-codex-records-under-another-id-and-a-usage-meter): words for this time** on one waiting recovery (standards A26 and A27, amended by the owner); a
-  conversation whose turns Codex records under another id is followed there (reported by
-  [@aca22jy](https://github.com/aca22jy),
-  [#30](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/30)); every failed turn not taken up is
-  logged once, with why, and Diagnostics can check why one was not (suggested by
-  [@barkshah2002-pixel](https://github.com/barkshah2002-pixel),
-  [#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)); Run at Windows sign-in shows what
-  Windows really holds (#31); installing over a running v0.6.11 to v0.6.15 watcher reports no false failure (#33);
-  one-line text boxes show their whole line (#34).
-- **[beta.4](#v0616-beta4-a-conversation-nothing-holds-is-run-here-other-kinds-of-session-and-the-usage-capabilities-finished): other kinds of session.** A conversation continued in, or forked by, the Codex Desktop is
-  recovered as the app's own (reported by [@Kdevaulo](https://github.com/Kdevaulo),
-  [#37](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/37)); a conversation another Codex
-  session holds waits, and nothing is sent to it; release pages start with direct download links; the guide says
-  what Codex does about a full conversation; the version picker reads the advanced edition's new file.
+- **A smoother tray icon while it idles** (new since beta.4), in finer steps of the same drawing, and **a smaller
+  edition label** beside the version.
+- **The product's icon in every window's title bar.** *Install another version...*, the Timeline and the Log
+  showed Windows' default form icon - red, blue and yellow squares - in their title bars; they show the Dashboard's
+  own icon now, in both editions (owner, 2026-10-10).
+- **One-line text boxes show their whole line**, and the Codex homes card no longer runs into what is beside
+  it (#34).
+- **When a card is shown and the keyboard focus moves, the log says where it went**, by window class and
+  program (#32).
+
+#### Documents and compatibility
+
+- **The README is the short one** (new since beta.4): the setup program first, the Dashboard shown in motion, and
+  one table of what to read next.
+- **The guide says what Codex does about a full conversation**: Codex retries a failed request itself, the
+  standard edition never retries a turn that failed because the conversation outgrew its model's context window,
+  and the program never sends `/compact` - a queued `/compact` reaches Codex as plain text.
+- **Compatibility data 11** (new since beta.4) names codex-cli 0.163.0-alpha.10.2 as verified in eight capabilities,
+  after a real recovery on it; it is checked in all twelve of its capabilities.
+- **The compatibility report stamps a report with the process's clock** (new since beta.4), not the clock its module
+  was imported under.
 
 ### Advanced edition
 
-#### New since v0.6.16-beta.4
+#### Several conversations at once, and five more ways to go on
 
-- **Every on/off choice on the Advanced features page is a switch**, as on the Settings page. **Wrap up near a
-  limit** and **Stop near a limit** each have their own five-hour and weekly switches, and the usage meter's pair
-  now decides only its warnings. An update keeps what a beta.4 meter's window switch meant: a window switched off
-  there stays off for the wrap-up and the stop (the owner's request).
-- **Custom... opens the Settings page's small dialog** for a number of your own - the range above it, the number,
-  *Use this value* and *Cancel* - instead of a row of its own under the drop-down; a value taken shows as its own item
-  before *Custom...*, and Cancel leaves the drop-down as it was (the owner's request).
-- **Reinstalling the same edition after an uninstall that kept your data works like an update**: the advanced
-  features you turned on, kept on and set up stay as they were. Installing the advanced edition after the standard
-  one still starts every advanced feature off (standard K2, as the owner amended it on 2026-10-18).
-- **A recovery waiting in a terminal or VS Code conversation ends as cancelled because that kind is off** when the
-  watcher starts with *Recover CLI, TUI and VS Code conversations* off, instead of being reported as superseded.
-- **The notices near a limit are each a kind to keep on screen** - the usage meter's warning, a turn the forced
-  stop could not stop, a queue to resume in Codex, and a conversation that could not be continued after the
-  reset - each ticked or not on its own in the Notifications list.
+- **Several conversations at once.** Two to four continuations wait for Codex's answer at once, each in a
+  conversation of its own, while every check, every claim and the last look before each send still run one at a time
+  (2 by default; more only once MQ passes on your Codex). A send whose fate cannot be known turns it off. Departs from
+  0.5 and A19.
+- **Queue for when a conversation is opened.** A usage-limited conversation the app does not have open is sent the
+  ordinary continuation anyway and left in Codex's queue, for the days you choose (3 to 7); the program takes it back
+  at seven days and an hour whatever it is told, and at once when this is turned off. Opened and not run within three
+  minutes, it is taken back, sent the ordinary way, and this turns off. Departs from A11.
+- **Continue a turn that ended with no reply.** A turn Codex completed with only your message and its reasoning in
+  it - judged by the kinds of item alone, never their words - is continued once in fixed words, a run of them twice at
+  most; a goal Codex keeps going or has stopped is left alone. Departs from 0.5, A13 and A26.
+- **Tell a parent which of its subagents stopped.** One fixed line for each subagent that stopped on a failure, five
+  at most, added to the parent's own continuation; once MS passes, a parent that finished normally is sent one too.
+  Nothing is ever written to a subagent. Departs from 0.5, A15 and A26.
+- **Keep a conversation going.** A conversation you pick, with a count of 1 to 10, is sent "Carry on with the next
+  step of the plan." after each turn that ended well, and stops on no progress, a finished plan, an active goal, a
+  failed or interrupted turn, or the count used; three at most until MK passes. Departs from A13, A26 and B9.
+- **Queue messages for later.** Your own messages for one conversation, after the turn now running, at a time, or
+  every day or week - in order, each once, one waiting for the one before it where you ask; paced like every recovery,
+  fifteen minutes apart and five a day in one conversation (the owner's answer). Departs from A8, A17, A26, A27, C4,
+  D2, H4 and H6.
 
-#### Since v0.6.15, in the betas
+#### Running turns here, and more kinds of conversation
 
-- **[v0.6.16-beta](#v0616-beta-several-conversations-at-once-several-codex-homes-and-five-more-ways-to-go-on): six capabilities** - several conversations at once, queue for when a conversation is
-  opened, continue a turn that ended with no reply, tell a parent which of its subagents stopped, keep a
-  conversation going, and queue messages for later.
-- **[beta.3](#v0616-beta3-words-for-this-time-a-conversation-codex-records-under-another-id-and-a-usage-meter): what a capability needs is turned on with it**, in the one confirmation; a usage meter, Wrap
-  up near a limit and Pause near a limit; Recover every conversation but Codex's own; Keep it on sits in view; a
-  watched capability can be set up; Start with Codex starts the watcher after a restart too (suggested by
-  [@Hunweibyn](https://github.com/Hunweibyn),
-  [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
-- **[beta.4](#v0616-beta4-a-conversation-nothing-holds-is-run-here-other-kinds-of-session-and-the-usage-capabilities-finished): a route of its own and the usage capabilities finished.** A conversation nothing holds is run
-  here on Codex's own app server, with *Turns run here* and a Stop that asks first; CLI, TUI and VS Code
-  conversations are recovered; a full conversation is compacted and then continued; Codex's default model is used
-  when one is at capacity; a continuation can go with no words; the wrap-up's words are yours to write; each usage
-  window is on or off; every number has Custom beside its presets; a stop near a limit goes through the Codex
-  app's own channel; a conversation wrapped up or stopped is continued once after its window resets; *Keep it on*
-  turns a capability on (suggested by [@Hunweibyn](https://github.com/Hunweibyn),
-  [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
-- **Measurements made again** on codex-cli 0.163.0-alpha.10.2: MW, M1, M2b, M5, M6, M7, MP1 to MP3, MIPC, MO, MX,
-  MF, M3B and M6B all passed there. A capability whose measurement was not made on your version of Codex shows it
-  as a warning, as before.
-- **The Dashboard chat and the Codex Stop hook** are v0.6.17's.
+- **Run a conversation here while Codex is closed.** When a recovery is due in a conversation nothing has open,
+  one turn runs here on Codex's own app server, with the program's ordinary continuation and marker and the
+  settings Codex saved for the conversation. Every approval is declined; a conversation saved with full access,
+  an outside sandbox or approvals that go to anyone else is refused before anything starts; the turn ends at the
+  hours you chose (one to six) or at once when the Codex app starts. **Turns run here now** on the Advanced
+  features page lists each turn with its cap and a Stop that asks first - the only way to stop one; no Codex tool
+  reaches it.
+- **Recover CLI, TUI and VS Code conversations.** Also finds the failures of conversations run in a terminal or
+  the VS Code extension. While another Codex session holds one, the continuation goes through `codex queue` for
+  that session; if the session ends first it is taken back. Pending and History add " · CLI" or " · VS Code" to
+  such a row, and one a newer Codex wrote than the engine installed waits until Codex is updated. A recovery
+  waiting in a terminal or VS Code conversation ends as cancelled because that kind is off when the watcher starts
+  with *Recover CLI, TUI and VS Code conversations* off, instead of being reported as superseded (new since beta.4).
+- **Compact a full conversation, then continue.** A turn that failed because the conversation outgrew its model's
+  context window is compacted and continued once: where the app has it open, Pending says "Run /compact in Codex;
+  it continues after"; where nothing holds it and Codex is closed, it is compacted here. The program never sends
+  `/compact`.
+- **Use Codex's default model when one is at capacity.** After the attempts you chose (one to three) on a
+  conversation nothing holds, one turn runs on Codex's default model and the conversation's own model is put back
+  and read back; if Codex refuses, Pending and History say "This conversation now uses another model; switch it
+  back in Codex".
+- **Continue with no words.** A turn run here can start with no words, proven by the id it came back with, and
+  History says "continued with no words, proven by its id"; where Codex refuses it, the usual words are used and
+  the capability turns itself off. Codex's own retry settings are not offered: Codex refuses any write there.
+- **Recover every conversation but Codex's own** takes up a failed turn in any conversation of the app except
+  subagents, reviews, memory passes and the ones an agent made.
+- **Start with Codex starts the watcher after a restart too**, and every start it does not make says why (#31).
+
+#### Near a usage limit
+
+- **Usage meter, Wrap up near a limit and Stop near a limit** (Pause near a limit in beta.3; suggested by
+  [@Hunweibyn](https://github.com/Hunweibyn), [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)). The meter reads your Codex usage on a schedule you pick and warns near
+  a limit; the wrap-up asks each running turn to finish its step; the stop holds the product's continuations until
+  the reset. Both need the meter, which turns on with them. They are finished as follows:
+  - the wrap-up's exact words are shown before they are sent, can be your own for each window, and can carry the
+    numbers (`{percent}`, `{window}`, `{stop_at}`) and the reset time;
+  - **Wrap up near a limit** and **Stop near a limit** each have their own five-hour and weekly switches, and the
+    usage meter's pair decides only its warnings (new since beta.4). An update keeps what a beta.4 meter's window
+    switch meant: a window switched off there stays off for the wrap-up and the stop (the owner's request);
+  - every number has *Custom...* beside its presets, checked before it is saved, with the reason shown. It opens
+    the Settings page's small dialog for a number of your own - the range above it, the number, *Use this value*
+    and *Cancel* - instead of a row of its own under the drop-down; a value taken shows as its own item before
+    *Custom...*, and Cancel leaves the drop-down as it was (the owner's request; the dialog is new since beta.4);
+  - three numbers a window - where to warn, where to wrap up and where to stop the running turn - kept in order;
+  - the stop goes through the Codex app's own internal channel for a conversation the app has open, once a
+    window a reset, and where it cannot, our continuations are held and a notice says so;
+  - a conversation wrapped up or stopped is continued once after its window resets;
+  - the near-limit notices are in all 18 languages, and each is a kind to keep on screen - the usage meter's
+    warning, a turn the forced stop could not stop, a queue to resume in Codex, and a conversation that could not
+    be continued after the reset - each ticked or not on its own in the Notifications list (new since beta.4).
+
+#### Turning capabilities on and keeping them on
+
+- **Every on/off choice on the Advanced features page is a switch**, as on the Settings page (new since beta.4).
+- **What a capability needs, it turns on with it.** A capability can need another, and turning it on turns on
+  what it needs in the one confirmation, with every statement in front of you; turning a needed one off first
+  turns off what needs it (the owner's request; standard K3 amended by the owner).
+- **Keep it on turns a capability on**, in one confirmation, and is refused for one that may not be kept on. It
+  sits in view, in a capability's head card under its state, and the list says "· kept on" (suggested by
+  [@Hunweibyn](https://github.com/Hunweibyn), [#29](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/29)).
+- **A watched capability can be set up**: a message or a credit at a reset, a conversation kept going and a
+  queued message are counted as what they would have done, and never sent.
+- **Reinstalling the same edition after an uninstall that kept your data works like an update** (new since beta.4):
+  the advanced features you turned on, kept on and set up stay as they were. Installing the advanced edition after
+  the standard one still starts every advanced feature off (standard K2, as the owner amended it on 2026-10-18).
+
+#### What changed for the capabilities you have
+
+- **Cancel and Pause take back a message Codex already holds.** A message at a reset, a queued message or one of the
+  edition's own continuations already in Codex's queue is taken back out of it by a Cancel or a Pause, as the program
+  takes back its own; if Codex will not give it back, the row says so and it is never sent again (the owner's answer).
+  A message at a reset taken back this way is cancelled; a queued message, held for you to say go on or cancel. *Send
+  your own message when a limit resets* is revision 2 for it, and asks to be read again.
+- **Longer messages.** *Longer reset messages* is now *Longer messages*, revision 2: it lets a queued message be up to
+  8,154 characters too.
+- **Three capabilities also name H2.** *Short retries when Codex is at capacity* moves A20's caps, which are the
+  engine's, and *Rules for Codex's error codes* and *Retry failures it cannot name* retry failures nothing classified:
+  H2 says no setting can do either, so their statements now name H2 beside the rest. Each is revision 2, and one you
+  turned on turns off until you confirm its statement again.
+- **An edited message is yours.** A message you edit in Codex's queue is left there, never deleted and never counted
+  against the capability that sent it.
+- **A watched capability's log** keeps its newest 200 lines (was 250), so every capability watched at once still fits
+  inside the journal.
+- **The Advanced features page lists them by importance**, the compatibility report first: then what gets work going
+  again after a usage limit by itself, what saves you work, the other common failures, and last the rare cases and
+  expert settings (the owner's order). A capability's warnings never move it down.
+
+#### Measured again
+
+- **On codex-cli 0.162.0-alpha.17.2** every measurement was made again (2026-10-10,
+  [`docs/evidence/live/`](evidence/live/)). MW, M1, M5, M6, M7, MA and MH passed again, M2b and MP1 to MP3 passed
+  for the first time, and M2, M3 and M4 failed again. MU, MN and MR passed too, so the reset credit and the message
+  at a reset no longer carry an unsettled warning there.
+- **On codex-cli 0.163.0-alpha.10.2** (app 26.1013.3656.0) MW, M1, M2b, M5, M6, M7, MP1 to MP3, MIPC, MO, MX, MF,
+  M3B and M6B all passed. A capability whose measurement was not made on your version of Codex shows it as a
+  warning, as before; one whose measurement passed on the Codex in force shows no warning for it.
+- **What follows from the 0.162 measurements.** The goal continuation also acts on a conversation the app holds
+  where M2b passed: it sets the paused goal active, then adds the continuation to the conversation's queue. Its
+  statement says so at revision 2, and one you turned on asks to be confirmed again. The panel beside the chat
+  passed MP1 to MP3, so the [guide](GUIDE.md#the-panel-beside-the-chat) describes it now.
+- **Read-only probes** measure what stop-now, send-now and cloud tasks would need, driving nothing; none of
+  them is built yet.
+
+#### Known limits
+
+- MQ, ME, MS, MK and MT are not measured yet: every capability that rests on one says so as a warning you confirm.
+- The Dashboard's Pending list shows a continuation queued for opening as Codex's own queued row; it does not yet say
+  that it runs when you open the conversation.
+- The Dashboard chat and the Codex Stop hook are v0.6.17's; nothing of them is built here beyond the table that
+  stores the chat.
 
 ### For developers
 
@@ -928,7 +1106,7 @@ now...*. [EDITIONS.md](EDITIONS.md#use-a-reset-credit-at-the-limit-you-pick) des
 **What changed since v0.6.12, in one place.** For a person, one fix, in both editions: the watcher
 finds Codex's engine again after a Codex update moves it, where v0.6.12 went on looking at the old
 path and every recovery waited until the watcher restarted. The pre-release v0.6.13-beta carried it
-first, and its own entry, below, has the detail and how it was checked. The final adds the two cases
+first, and everything it announced is below. The final adds the two cases
 the beta left open - the ChatGPT app running its Codex server from another build while the old one
 stays on disk, and two builds that both pass the engine checks ([Fixes](#fixes)) - and, besides,
 only compatibility data 6 to 8.
@@ -954,10 +1132,15 @@ installation for none.
 
 ### Fixes
 
-- **An update that moves Codex's engine no longer stops recovery.** This is v0.6.13-beta's fix, as
-  its entry below says: before each check the watcher sees whether the `codex.exe` it found is still
-  there and unchanged (its size and write time), and when it is gone or another file stands in its
-  place, it looks for the engine again and runs every engine check again, as at the start.
+- **An update that moves Codex's engine no longer stops recovery.** The watcher found `codex.exe`
+  once, when it started, and never looked again. On 2026-10-07 the Codex app (26.930) updated, put its
+  engine in a new folder under `%LOCALAPPDATA%\OpenAI\Codex\bin` and emptied the old one; from then
+  on the watcher looked for the app's server at the old path, found none, and every recovery waited,
+  saying the ChatGPT app or its Codex server was not running, until the watcher was restarted - at the
+  next sign-in, for most people. Now, before each check, the watcher sees whether the file it found
+  is still there and unchanged (its size and write time); when it is gone or another file stands in
+  its place, it looks for the engine again and runs every engine check again, as at the start.
+  Nothing was sent twice or to another conversation; recoveries waited.
 - **Nor does an update that runs the app's server from another build.** An update can start the
   ChatGPT app's Codex server from a build in another `bin\<hash>` folder and leave the old build on
   disk, unchanged. The beta then kept the old file, looked for the app's server there, found none, and
@@ -986,6 +1169,13 @@ installation for none.
 
 ### For developers
 
+- `tests/test_engine_moved.py`: the same file is not looked for again; an engine moved to another
+  folder is found there; another file at the same path is checked again; none left is refused, never
+  kept; the loop asks before every tick but its first. All five fail with the fix reverted. They have
+  a module of their own because `tests/test_compat_characterization.py` must stay v0.6.10's file for
+  `test_released_calls`.
+- Two tests no longer use a real Codex version as one no data names (`codex-cli 99.0.0`, `99.1.0`), so a
+  new compatibility document cannot break them, as data 7 did.
 - `config.discover_codex_exe` takes `running`, asked only where more than one official build passes:
   the image paths the one ChatGPT app main runs as its `codex.exe` children (`pairing.app_engines`),
   matched case-insensitively. `compat/probes.discover` passes it as the watcher does.
@@ -999,7 +1189,6 @@ installation for none.
   reverted, every one of them fails: each guard's test ends on the case that does look again or
   choose, so none passes only because nothing ever looks. Each guard was also reverted alone, and
   each made its test fail.
-
 
 ## v0.6.13-beta — The watcher finds Codex's engine again after an update moves it
 
@@ -1040,6 +1229,7 @@ The final v0.6.13 follows it, improved further (owner, 2026-10-07).
 
 ## v0.6.12 — Another version from the Dashboard, a power action after usage limits, and recovery beside the Codex app's cloud-environment server
 
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.11...v0.6.12)
 
 **What changed since v0.6.11, in one place.** For a person, two additions and two fixes. In the
@@ -1050,12 +1240,7 @@ turn it on ([below](#the-power-action-after-usage-limit-recoveries)) - asked for
 Both are in the standard edition, and in both editions' windows. The fixes: recovery beside the
 Codex app's cloud-environment server, without which no recovery was sent with the Codex app from
 26.930 on, and a setup program that removes its folder when its console window is closed
-([Fixes](#fixes)). Two pre-releases for the people who build the project came first, each with an
-entry of its own below that has the detail and how it was checked: the test suite in parts and
-pictures taken when the window is ready ([v0.6.12-alpha](CHANGELOG.md#the-suite-in-parts)), and
-every lane's test parts even ([v0.6.12-alpha.2](CHANGELOG.md#every-lanes-parts-even)). Nothing in
-them changes anything for a person. The additions and the fixes were not published as a pre-release
-first: their detail is this entry's.
+([Fixes](#fixes)). Two pre-releases for the people who build the project came first, v0.6.12-alpha (the test suite in parts and pictures taken when the window is ready) and v0.6.12-alpha.2 (every lane's test parts even); nothing in them changes anything for a person, and everything they announced is under *For developers* below. The additions and the fixes were not published as a pre-release first.
 
 **From v0.6.11, it is an ordinary update.** It is the latest release, so v0.6.11's *Check for
 updates* offers it in the edition you have, and so does a v0.6.12 pre-release's; the plugin in
@@ -1078,8 +1263,8 @@ watcher once it passes the checks every recovery passes.
 
 **Every plugin copy from v0.6.0's on reads this version.** `0.6.12` has no word after its three
 numbers, and every bootstrap published from v0.6.0 on compares those, so none of them takes this
-installation for none. Only a pre-release's word needs a later copy: the entries of v0.6.12's
-pre-releases, below, say which.
+installation for none. Only a pre-release's word needs a later copy: v0.6.12-alpha's needs v0.6.9-alpha's or later, and v0.6.12-alpha.2's needs v0.6.11-beta.2's or later; if yours is older, set up and repair with the installation's own copy, `%USERPROFILE%\.codex-auto-resume\app\scripts\bootstrap.ps1`.
+
 
 ### Install another version...
 
@@ -1218,6 +1403,8 @@ standard edition: it keeps every standard, with A28 amended by the owner for its
 
 ### For developers
 
+#### The version picker, the pairing fix and the power action
+
 - `scripts/bootstrap.ps1` gains `-Versions` (lists, exit 0, or `versions: unavailable`, exit 12) and
   `-Pick <version> -Edition <edition> [-Force]` (installs one offered row; refusals exit 15).
   `scripts/release.json` gains `release_pages`. `downgrade-state` gains `--stop-watcher`, with its
@@ -1239,6 +1426,92 @@ standard edition: it keeps every standard, with A28 amended by the owner for its
   additions in `test_cli`, `test_notify`, `test_notice_card`, `test_source`, `test_tray`, `test_mcp`
   and `test_managed`. The product refuses the real power calls while `unittest` is loaded.
 
+#### The suite in parts
+
+- **One place splits the suite, by measured time.** `scripts/test_parts.py` deals the test files
+  into parts balanced by how long each took on that lane when it was last measured (`tests/data/durations.json`, a table for each lane),
+  and runs each part as `unittest discover` runs the suite: the same files, loaded by discover
+  itself, in the same order, with a fresh Python for each suite. Every CI lane, the suite the release
+  runs before it builds, and the ko sync now run it in four parts, a job each; a lane took 78 to 103
+  minutes as one job. `tests/test_split_runs.py` proves that the parts together are exactly the
+  tests discover finds, each once.
+- **Proven to give a whole run's results.** On the owner's PC each lane was run whole - `unittest
+  discover` itself - and in four parts, and the two were compared test by test. Of the tests that
+  ran both ways, 4,268 of the standard lane's 4,274 and 4,595 of the advanced lane's 4,596 came out
+  the same. All but five of the differences were a probe that ran out of time or a check sensitive
+  to timing, under the load of four parts and other work on one PC, and each passes alone, both
+  ways. The five were a real leak, now fixed: `tests/test_gui_own_values.py` set the process's
+  interface language to English and never gave it back, and `tests/test_locale.py` passed in a whole
+  run only because `tests/test_l10n.py` ran between them and reset it. Dealt into different parts,
+  five of its tests - 30 checks - failed. The window tests give the language back when they end now,
+  and that part, run again, came out as the whole run did in every test.
+- **Parts run at once on one PC are not a whole run.** They contend for one desktop and one
+  processor, which CI's parts - a runner each - never do. `--compare` names the part each differing
+  test ran in, prints the command that runs that part alone, and holds it to the whole run; the
+  contributing guide says what it means when they then agree, and when they still differ
+  ([In parts](CONTRIBUTING.md#in-parts)). On that PC, under its load, four parts at once took about
+  half the time: the standard lane 60 minutes against 123.
+- **A CI lane sees the tree as `main` does.** On `dev` and pull requests into it, the `main-tree`
+  job takes every Korean document off the tree, as a promotion to `main` does, and runs the
+  release's suite on what is left. A test that reads a Korean page without asking whether the
+  checkout holds one now fails on `dev`, before it reaches `main`.
+
+#### Every lane's parts even
+
+- **Each lane is dealt by its own times.** v0.6.12-alpha dealt every CI lane's test files into its
+  four parts by one table: each file's median over all the lanes of one CI run. A file does not take
+  every lane as long - `tests/test_neutral_plug.py` took 1,305 s in the advanced lane, where the
+  advanced package sits beside core, and 841 s in the standard one - so on a later CI run of `dev` the
+  standard lane's parts took 19 to 29 minutes, the `main-tree` job's (the release's lane on `main`'s
+  tree) 22 to 28, and the advanced lane's 21 to 41, its first part the heavy one.
+  `tests/data/durations.json` now holds a table for each lane: each file's median over that lane's
+  jobs in two of `dev`'s CI runs on GitHub's runners, read from the job logs. `scripts/test_parts.py`
+  deals a lane by its own table, a file that table lacks by the figure for every lane, which stays,
+  and a file measured nowhere round-robin after the rest, as before. Every workflow already names its
+  lane, so none of them changed.
+- **Before and after, by those tables.** Dealt by the one table, the four parts of each lane come to
+  20 to 24 minutes in the standard lane, 24 to 30 in the advanced and 22 to 32 in the release lane, up
+  to 1.45 times apart, by the lane's own table; measured, the release lane's parts were closer than
+  that table says: 22 to 28 minutes on `dev` and 21 to 23 in v0.6.12-alpha's release run. Dealt by
+  its own table, each lane's parts are within a second of each other, at 21.4, 26.8 and 24.9 minutes.
+  `tests/test_split_runs.py` now holds every lane's parts, by its own table, within 1.2 times of each
+  other at the count the workflows use, which the one table's deal fails in all three lanes; the parts
+  together are still exactly the tests `unittest discover` finds, each once, in every lane and every
+  count from one to eight.
+- **`--record-durations` writes the lane it ran.** It keeps that table's other files and the other
+  lanes' tables, and gives the figure for every lane to a file that had none, so the other lanes deal
+  it by a measurement too. `--list --parts 4 --lane advanced` shows a lane's deal.
+
+#### Faster pictures
+
+- **A window is photographed when it says it may be.** The picture generator photographed each
+  window a fixed fifteen seconds after it started, whatever it was doing by then. Now the window
+  sets an event once the page it opened on is drawn from every answer it asked for and holds still -
+  nothing on its way from the bridge, nothing gliding, and a tick of its clock since - and
+  `build/capture_window.ps1` waits for that, with the fifteen seconds as its limit. None of these
+  windows takes the foreground, and a picture whose caption still comes out active is taken again.
+- **Only stale pictures are drawn.** A run draws only the pictures whose inputs moved, whose files
+  are not the bytes the manifest records, or that were captured at another display scaling, each
+  job in a process of its own, side by side; `--all` draws every one. Measured on the owner's PC
+  while other work ran, a full run took 1,144 s and `--breathe` 126 s before, and 479 s and 30 s
+  after, with two windows at a time; with nothing stale, 7 s.
+- **One window at a time, unless `--windows N` asks for more.** A session once crashed while
+  several windows were being captured at once, so more than one is a trial a person asks for.
+- **A window being photographed answers no pointer.** Windows hands a window that appears under a
+  pointer standing still a mouse move of its own, so a control under a mouse somebody had left there
+  was drawn hovered: v0.6.11-beta.3's Settings pictures show the Custom message card hovered, and
+  pictures made twice differed by where the mouse had been. A window the generator starts now drops
+  the mouse's moves, presses, wheel turns, hover and leave before any control sees them; a person's
+  window answers the mouse as always.
+- **History's clock is pinned.** The window's pictures print every date and time as one moment, the
+  popup's and the panel's, in UTC. History is drawn again byte for byte on another day and in
+  another time zone, where it printed the day the pictures were made.
+
+How it was checked: in a scratch copy, against the generator before it, 63 of 67 pictures came out
+byte for byte the same, and the other four differed only in History's times of day, which two runs
+of the old generator also differ in. A second comparison found seven pictures that differed where
+nothing should have, and in each the old generator's window had had the pointer over it - the case
+the change above closes.
 
 ## v0.6.12-alpha.2 — Every lane's test parts even, each dealt by its own times
 
@@ -1390,15 +1663,11 @@ the change above closes.
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.10...v0.6.11)
 
-**What changed since v0.6.10, in one place.** This release was published first in four
-pre-releases, each with an entry of its own in the changelog that has the detail and how it was
-checked: the ground both editions stand on
-([v0.6.11-alpha](CHANGELOG.md#two-editions-from-one-repository)), the standard
-edition's additions ([v0.6.11-beta](CHANGELOG.md#what-waits-and-what-it-says)), the advanced
-edition's first capabilities, the pre-release offer and the setup programs
-([v0.6.11-beta.2](CHANGELOG.md#the-advanced-editions-first-three-capabilities)), and the page that
-turns those capabilities on ([v0.6.11-beta.3](CHANGELOG.md#the-advanced-features-page)). It adds no
-feature to v0.6.11-beta.3. This entry says what is different for a person coming from v0.6.10.
+**What changed since v0.6.10, in one place.** This release went out first in four pre-releases - v0.6.11-alpha
+(the ground both editions stand on), v0.6.11-beta (the standard edition's additions), v0.6.11-beta.2 (the advanced
+edition's first capabilities, the pre-release offer and the setup programs) and v0.6.11-beta.3 (the page that turns those
+capabilities on) - and this entry tells everything they announced, in full, so it is enough to read on its own. It adds
+no feature to v0.6.11-beta.3. An installation of any of them is offered this as an ordinary update, being newer.
 
 **From v0.6.10, it is an ordinary update.** It is the latest release, so v0.6.10's *Check for
 updates* offers it and installs the standard edition, the only one v0.6.10 knows; the plugin in
@@ -1409,154 +1678,669 @@ continuation ends in a shorter marker, and a Windows set to one of the seven new
 continuation in that language. Every setting it adds is off, or does what v0.6.10 did, until you
 change it; what changes with nothing turned on is what is said and drawn, and a few more
 content-free questions to Windows, which [PRIVACY.md](PRIVACY.md) lists. Going back to v0.6.10
-takes one command first ([below](#the-state-and-going-back)).
+takes one command first (see *The state, and going back*, below).
 
 ### Both editions
 
-### Two editions, and a setup program for each
+#### Two editions, and a setup program for each
 
 - **Standard and advanced, released together with one version.** The standard edition is the product
   as it was, plus only what keeps every one of the project's standards; it is what the plugin in
   Codex installs. The advanced edition is the standard one plus capabilities that each depart, on
   purpose, from at least one standard and say which; until you turn one on, it does what the
-  standard edition does. `build/edition_audit.py` proves from the bytes, in every release build, that
-  the standard archive and setup program hold none of the advanced code.
-- **A setup program for each edition.** Beside each edition's archive, a release now carries
-  `CodexAutoResume-Setup-v<version>.exe` and `CodexAutoResume-Advanced-Setup-v<version>.exe`: the
-  archive in one file, byte for byte, which checks what it carries and runs that archive's own
-  `Install.cmd`, with nothing to unzip. It is unsigned, as the window's executables are, so
-  SmartScreen may ask about it; it has a `.sha256` of its own and is named in the release's one
-  attestation, and [VERIFY.md](VERIFY.md) says how to check it first. v0.6.10 had none.
-- **An update stays in its edition.** `-Update` and *Check for updates* fetch the installed edition's
-  archive. Changing edition is a reinstall: run the other edition's setup program or `Install.cmd`,
-  which says what the change keeps and asks first (no is the default), or `-Edition` with `-Force`
-  from a command line. Settings and everything waiting are kept, and every advanced capability starts
-  off.
-- **The edition, quietly, beside the version** - in smaller grey text at the foot of the Dashboard,
-  in its Diagnostics' Version row and in the heading of the panel in Codex - and after the product's
-  name in the notification-area icon's tooltip, in every language.
-- **Two documents say what each edition keeps.** [STANDARDS.md](STANDARDS.md) lists all 172 of the
-  project's standards by id, each with how it is held and the tests that hold it, and
-  [EDITIONS.md](EDITIONS.md) says what each edition is, what each advanced capability does, risks and
-  departs from, and how to choose, switch, update and verify. The guide, the README and the security,
-  privacy and comparison pages link both.
+  standard edition does.
+- **The standard edition is what every release so far has been.** The advanced edition is the
+  standard one plus one Python package, one skill and some window code of its own; every other
+  file in its archive is the standard archive's, byte for byte, apart from the settings window and
+  one display name. Which edition a copy is, is decided by whether that package sits beside the
+  product's code, and by nothing written anywhere - there is no edition file to get wrong.
+- **The standard archive provably holds none of the advanced code.** `build/edition_audit.py`
+  checks that no advanced path, file, name or marker is in it - in a text file, a binary or a zip
+  inside the zip - that the standard archive rebuilt from `git archive` with `advanced/` deleted is
+  byte-identical, and that every standard entry is in the advanced archive unchanged. It runs in CI
+  and before anything is published.
+- **A release is four files and one proof.** Both archives and their `.sha256` sidecars are
+  published together, and one provenance attestation names both. CI tests each edition in lanes of
+  its own.
+- **A setup program for each edition.** A release now also carries, beside each edition's archive, `CodexAutoResume-Setup-v<version>.exe` and
+  `CodexAutoResume-Advanced-Setup-v<version>.exe`: its edition's release archive in one file, byte for
+  byte, with the archive's SHA-256 beside it. Double-click it and there is nothing to unzip: it checks
+  what it carries, unpacks it into a new folder of its own in the temporary folder, runs that archive's
+  own `Install.cmd` in the same console, and removes the folder afterwards - also when its console
+  window is closed, and from a temporary folder whose paths run past 260 characters. It takes DLLs from
+  System32 alone and stops if a `.config` file is beside it. It is unsigned, as the window's executables
+  are, so SmartScreen may ask about it; it is published with a `.sha256` of its own and named in the
+  release's one attestation, and [VERIFY.md](VERIFY.md) says how to check it before running it. The
+  archives and every other route are unchanged; v0.6.10 had none.
+- **An update stays in the edition that is installed.** `bootstrap.ps1 -Update` keeps it and
+  refuses `-Edition` (exit 12). Asking for the other edition needs `-Edition` and `-Force`;
+  without both it stops with exit 14 before anything is downloaded, and says what changing means. *Check for updates* does the same, and changing edition is a reinstall: run the other edition's setup program or `Install.cmd`.
+- **The installer asks before it changes the edition.** It reads the installed edition before it
+  touches anything, and goes on only with `-AllowEditionChange` or a yes to `Install.cmd`'s
+  question (no is the default). Settings and pending recoveries are kept, every advanced capability
+  starts off, and moving back to standard replaces the app folder whole, so no advanced code stays
+  behind.
+- **Every published bootstrap still updates.** `build/legacy_bootstraps.py` takes each tag's own
+  bootstrap, from v0.5.2 on, out of git, and checks with its own code that it accepts the new
+  archive.
+- **The edition beside the version is now quiet secondary text**: a space after the version with no
+  ` · ` before it, smaller (0.62 of the version, never under 10 px), in the standard secondary grey in
+  both editions, and on the version's baseline - at the foot of the Dashboard, in the Version row of
+  its Diagnostics page and in the heading of the panel in Codex. The notification-area icon's tooltip names the edition after the product, in every language. An advanced installation whose package could not be loaded runs as the standard edition and says so, and `get_status` carries the edition as a code beside the version.
+- **[STANDARDS.md](STANDARDS.md)** lists all 172 of the project's standards by their ids - families 0
+  and A to J, which the standard edition keeps, and K, the advanced edition's own rules, which no
+  capability may depart from - each with how it is held and the tests that hold it. The code reads its
+  ids from it, and a test checks that every test it names exists.
+- **[EDITIONS.md](EDITIONS.md)** says what each edition is, what each advanced capability does, risks
+  and departs from, and how to choose, switch, update and verify. The guide, the README and the
+  security, privacy, comparison, verification and acceptance pages link both and say what each edition
+  does wherever the two differ. They describe the Advanced features page as this release has it (see *The Advanced features page*, below).
+- The installer says which edition it installed, and the settings window's file description names
+  its edition.
 
-### What the standard edition adds
+#### Updates and pre-releases
 
-Each setting here is off, or does what v0.6.10 did, until you change it, and none of them skips a
-check. [v0.6.11-beta's entry](CHANGELOG.md#staying-out-of-the-way) has each in full.
-
-- **What waits says more.** *Why it is waiting* says in a sentence what the first check that did not
-  pass waits for; a recovery's *Timeline* shows what delivery showed; attempts read `3/4` beside the
-  limit they have now; and the Overview, the popup, the panel and `get_status` show Codex's usage as
-  the watcher last read it, with its age - nothing is read for it.
-- **Holding a task back.** A task's own menu can **Postpone** it and **Don't postpone** it again;
-  **Quiet hours** make a recovery wait until they end; **Before resuming a conversation** can give
-  you a chance to object first, or wait for you; **Observe only** checks everything and sends
-  nothing; and a conversation seen for the first time, or a project, can wait for you. From Codex,
-  `postpone_recovery` and `release_hold`, which asks you first, bring the standard edition's tools
-  to nineteen.
-- **Guards and waits.** Custom retry timing within the watcher's own floor; **Stop a task that keeps
-  failing after** a number of hours; a guard that can hold a task whose model, approval mode or git
-  branch changed while it waited, and one that can hold a task whose conversation has used more
-  tokens than you chose; and a notice under any limit set high.
-- **Sleep, the network and memory.** **Ask me after a sleep longer than**; **Keep this PC awake while
-  a task waits**, for at most a number of hours or **Unlimited**, a request the watcher takes back,
-  with no Windows setting changed; **Wait for an internet connection**, asking Windows only; and a
-  limit on the watcher's own memory. Diagnostics shows its peak memory, and a watcher that is gone
-  without having said so is shown as *stopped unexpectedly*.
-- **Values of your own.** **Custom...** ends every drop-down of a value, in the Dashboard and in the
-  panel, from quiet hours at any minute to the memory and token limits, each checked by the
-  settings' own validator; no bound that keeps recovery safe can be passed with it.
-- **Notices and a message of your own.** **When a conversation needs you** tells you once about one
-  this product will never resume; a conversation can have a continuation message of its own; and a
-  status file for your own tools can be written. None of them is on by default.
-- **Diagnostics** can search the log, says who can open the state folder, and can play a recovery
-  with made-up words (**Show me what happens**), sending nothing.
-- **The window, the popup, the card and the panel follow Windows' text size**; the popup speaks to
-  Narrator and other screen readers, every control a person acts on has a name a screen reader says,
-  and the panel has **Ask Codex**, a few things to type to Codex about this product.
-- **Sixteen languages.** Русский, Italiano, Türkçe, Polski, Українська, Tiếng Việt and Bahasa
-  Indonesia join the nine; Arabic and Hebrew are translated and held until the Dashboard is mirrored.
-  Where Windows' interface font lacks a language's letters, that language is set in Segoe UI on all
-  four surfaces.
-- **For administrators**, six policy values under `Software\Policies\CodexAutoResume`, each of which
-  can only hold recovery back, from pausing it to a ceiling on attempts; read and never written, and
-  shown as *Set by your administrator.* wherever they decide.
-- **The marker** at the end of a continuation is `[codex-auto-resume:` and the first 16 of its
-  interruption id's 64 hex digits, where it was the whole id; the rule it serves is unchanged, and a
-  record made before keeps its whole marker.
-
-### Updates and pre-releases
-
-- **Check for updates also offers a newer pre-release, and asks.** Where no release is offered first
-  and a published pre-release is newer than both what is installed and the latest release, it asks
-  whether to install it, saying it is tested less, with **Not now** as the button Enter presses. Only
-  a yes installs it, in your edition, checked against its published `.sha256`. For it the check reads
-  this repository's list of releases too - one more unauthenticated request, to api.github.com, only
-  when you press it. The owner amended two of the project's standards for this, C5 and I12
-  ([STANDARDS.md](STANDARDS.md)).
-- **Numbered pre-releases.** A version can have `-alpha.2`, `-beta.2` and on, and every place that
-  reads this product's version sorts them as they are made; an alpha is not yet for real use, and a
-  beta works end to end and stores what the release will keep ([CONTRIBUTING.md](CONTRIBUTING.md)).
+- **Numbered pre-releases.** A version built in stages ships each finished stage as a pre-release, so
+  it can have more than one alpha and one beta: `-alpha.2`, `-beta.2` and on, from 2 to 999 with no
+  leading zero, the plain word being a stage's first. They sort as they are made - `0.6.11-beta`
+  before `0.6.11-beta.2` before `0.6.11` - and every place that reads this product's version applies
+  the one rule: the bootstrap, the settings window's build, the release workflow, the check of the
+  published bootstraps, the product itself and the community report (`tests/test_version_rule.py`).
+- **Alpha or beta.** The word says how far a pre-release can be relied on. An alpha is not yet for real
+  use: groundwork, a feature not yet shown to work end to end, or a stored format that may still
+  change. A beta works end to end, has passed review and both editions' tests, and stores what the
+  release will keep; once a version has had a beta, every later pre-release of it is a `-beta.N`
+  ([CONTRIBUTING.md](CONTRIBUTING.md)).
+- **The update check offers a newer pre-release, and asks.** The owner amended two of the project's
+  standards for it: C5, under which the update check asked for the latest release alone and took
+  only a plain version, and I12, under which an update never went to a pre-release. *Check for
+  updates* now also reads the list of this repository's ten newest releases - one unauthenticated
+  request to api.github.com, which carries nothing about your machine. Where there is no release to
+  offer first and a published pre-release is newer than both the installed version and the newest
+  release, it asks whether to install it, saying which version and that it is tested less than a
+  release, with **Not now** as the button Enter presses. Only a yes installs it: in the edition you
+  have, after asking the check's questions again and checking it against the `.sha256` published
+  beside it, keeping your settings, a pause, everything waiting and the sign-in choice. Nothing else
+  installs a pre-release - not the watcher, not the panel, not Codex's tools - and `-Update` still
+  installs releases only. From a command line, `-CheckOnly` prints `prerelease: v<version>` on a line
+  of its own, and `-Version <version>` installs it.
+- **A deadline for the whole request.** Under Windows PowerShell 5.1 a timeout bounds only the wait
+  for an answer to begin, so a slow list or compatibility document could keep the check running past
+  the window's two minutes. Both are now given up at their deadline.
 - **A bootstrap that cannot read an installation's version leaves it alone** until `-Force` says to
   replace it, and its update check answers `update: unavailable`.
-- **Fixed:** `-NoStartup` had registered the sign-in start anyway since v0.5.2, and now does not;
-  and under Windows PowerShell 5.1 a slow compatibility document could keep *Check for updates*
-  running past its deadline, where it is now given up.
 
-### Changed, and around the product
+#### What waits, and what it says
+
+Nothing here has a setting.
+
+- ***Why it is waiting* says it in words.** Under its list of checks, a sentence says what the
+  first check that did not pass is waiting for: the Codex app, the conversation being opened, the
+  usage reset, and so on.
+- **A recovery's *Timeline* shows what delivery showed.** After its journal it lists, for each
+  continuation, when it was seen starting a turn in its conversation, that it was handed to Codex
+  and not seen yet, or that its delivery is uncertain - watched for a day and never sent again.
+  Only the records' own columns are read for it, never content.
+- **Attempts are shown beside the limit they have now:** `3/4`, or `19/6` after the limit was
+  lowered - never cut down to the limit.
+
+#### Staying out of the way
+
+Each setting here does what v0.6.10 did until a person changes it: it is off, or it is **Resume
+automatically**, **Resume it like the others** or **Every project**. None of them skips a check.
+What undoes their holding back is a person's choice - **Don't postpone**, **Let it continue**,
+`release_hold`, which Codex asks you about first, and **Let this project resume** - and a task then
+goes only when its schedule and every check let it.
+
+- **A task has a menu of its own**, in the Dashboard's Pending page and in the popup, on a right
+  click, Shift+F10 or the menu key. **Postpone** holds that one task back 30 minutes, 1 hour, 3
+  hours or until 09:00 tomorrow, only ever later - from Codex, `postpone_recovery` takes a number of
+  minutes up to a week - and **Don't postpone**, last under it, takes a postponement you made away
+  again, back to what the schedule says without it: an objection window's time, a retry's wait and a
+  usage reset all stay. Retry now never shortens a postponement, and the Dashboard does not offer it
+  while one is ahead. Every item acts on the exact task and its conversation, and is refused if the
+  row has since become another task. The menus are drawn in the window's own colours, and nothing
+  that was on screen moves.
+- **Quiet hours**, under Settings > Advanced - **Quiet hours from**, **Quiet hours until** and
+  **Quiet hours on** (every day, Monday to Friday, or Saturday and Sunday) - make a recovery that
+  falls due in them wait until they end, on your clock, across midnight and a change of summer
+  time. Time spent in them does not count toward giving up on a usage limit.
+- **How much a conversation asks first.** **Before resuming a conversation** is **Resume
+  automatically** by default. **After a chance to object** raises one more notification when
+  everything else would let the continuation go - "Continuing at 14:07 unless you stop it", with
+  **Don't resume** and **Open Dashboard** - and sends only once **Time to object (minutes)**, 1 to
+  60 and 5 by default, has passed. **Ask me first** and **Only notify me** send nothing until you
+  let the task continue, and their notification says the task waits for you - never that it will
+  resume. **Let it continue** on the task's row does it, asking you to confirm and sending nothing
+  itself, and so does `release_hold` from Codex, which asks you first. The setting applies to
+  interruptions detected after it is chosen; **How this conversation resumes**, on a row, chooses
+  for that conversation alone, and Ask me first or Only notify me chosen there also holds what it
+  has waiting. A task that waits for you has no time: its row says *waiting for you*, and
+  nothing says it is being checked.
+- **Observe only: check everything, send nothing**, under Automatic recovery, lets the watcher do
+  everything but send. Pending and History say when a continuation *would have been sent*, *Why it
+  is waiting* says every check but Observe only passed, and the Overview and the popup say observe
+  only. It is refused twice over - by the watcher on the setting, and by the claim on a switch of
+  the state's own - and a continuation already in Codex's queue when it is turned on is taken back,
+  as a Pause takes it.
+- **Which conversations and projects resume without you.** **A conversation seen for the first
+  time** can be **Only notify me** instead of **Resume it like the others**, and **Projects that may
+  resume** can be **Only projects let resume** or **Every project but those held** instead of
+  **Every project**; a task's row sets its project with **Let this project resume** or **Hold this
+  project for me**. Either only ever holds an interruption for you when it is detected, and a task
+  whose project cannot be read is held, never dropped; **Hold this project for me** also holds at
+  once what that project already has waiting, and **Let this project resume** lets nothing already
+  held go. A project is the one Codex files the conversation under, or else its folder, and the
+  settings keep only a 64-digit SHA-256 digest of it - never a name or a path; at the default it is
+  not even read. Only a task's row sets the lists: no editor draws them, and MCP refuses them.
+- **In Codex**, `postpone_recovery`, not marked destructive since it only holds back, and
+  `release_hold`, marked `destructiveHint` since it lets one held task continue, bring the plugin's
+  tools to nineteen, and `update_settings` offers the new settings under Advanced, Automatic
+  recovery and Notifications. Don't postpone is no tool at all: it brings a send nearer, so only the
+  Dashboard and the popup offer it.
+
+#### Guards and waits
+
+The settings are under Settings > Advanced, each off or unused by default, and each can only make a
+recovery wait longer, stop sooner or wait for you.
+
+- **Custom retry timing.** **Retry timing** gains **Custom**: five waits picked from lists, for a
+  task that fails with a temporary error - the first from 5 seconds to 2 hours, each later one from
+  15 minutes to 6 hours, and the fifth for every attempt after it. The 15 minutes are the watcher's
+  own floor, not a setting: whatever is chosen, one conversation gets a continuation at most every
+  15 minutes and five times in any 24 hours. A rate limit's first wait is still at least a minute,
+  and a Retry-After that Codex's structured error names is the least the first wait may be - none
+  has been seen yet. **Add up to a fifth to each wait** only ever lengthens a wait. A line under the
+  waits, in the Dashboard and in the panel, says what the timing comes to if each continuation fails
+  at once.
+- **Stop a task that keeps failing after**, 1 to 24 hours, stops a task whose temporary failures
+  have gone on longer, less the time it waited for anything but its own retries: time spent paused,
+  postponed, in an objection window, in quiet hours or waiting for the app never counts. It stops
+  the task as running out of attempts does, **Give attempts back** gives the time back, and usage
+  limits are not affected.
+- **If the task changed while it waited** - the task-changed guard - compares, just before a
+  continuation is sent, the conversation's model and approval mode and its folder's git branch or
+  commit with what they were when it stopped. The branch is the folder's `.git/HEAD`, read as a
+  file: git is never run, and a network share path is not read. **Hold it for me** keeps a changed
+  task waiting for you; **Resume, and tell me** sends it and says so on its notification. Only a
+  digest of the three is kept.
+- **Tokens a conversation has used** - the context-cost guard - reads Codex's own count when an
+  interruption is detected, where Codex's list of conversations keeps one as a number. **Show them
+  in Pending** puts it beside the task; **Hold above 100,000** to **Hold above 1,000,000** also keep
+  a task whose conversation has used more waiting for you. Where Codex keeps no count, it does
+  nothing.
+- **High limits are said to be high.** With **Attempts per interruption**, **Stop after this many
+  turns without progress** or **Continuations per task** above 8, 5 or 8, a notice under them, in
+  the Dashboard and the panel, says a task that keeps failing can then be continued many times, and
+  every continuation uses your Codex usage.
+
+#### Sleep, the network and memory
+
+- **Ask me after a sleep longer than**, under Advanced - 30 minutes to 12 hours - holds for you
+  every waiting recovery that fell due while the PC slept longer than that. One notification says
+  how long it slept and how many tasks wait, with one button, **Open Dashboard**, at Pending, where
+  each task's **Let it continue** or **Cancel** decides it.
+- **Keep this PC awake while a task waits**, under General > Windows - **On mains power only** or
+  **Always** - asks Windows not to let the PC sleep on its own while a task waits, for at most
+  **Keep it awake for at most** (6 hours by default) each time tasks start waiting. It is a request
+  the watcher makes and takes back - when nothing waits, when the hours are up, on a pause and when
+  it stops - and no Windows setting changes: the lid and Sleep still sleep the PC, and nothing wakes
+  a sleeping one. While this or **Ask me after a sleep longer than** is on, the watcher also hears
+  the PC wake and looks again at once, forgetting what it last read of the app and of your usage.
+- **Wait for an internet connection**, under Advanced, asks Windows' Network List Manager - which
+  answers from what Windows already knows, sending nothing - whether the PC is online, just before
+  usage would be read for a recovery that is due. While Windows reports no connection the recovery
+  waits and looks again every minute, and no usage is read; *Why it is waiting* says "No internet
+  (Windows reports)". It is off by default because behind some proxies Windows reports no internet
+  where there is.
+- **The watcher's memory.** After every check the watcher asks Windows how much memory its own
+  process has committed, and Diagnostics shows the most as **Peak memory**. That and the record of
+  how the watcher stopped, below, are all of this section that happens at the defaults. **When the
+  watcher uses too much memory**, under General > Windows, can **Warn me**, once, or **Warn me, then
+  stop the watcher**: after the check it is in, never while a continuation is being sent, the way a
+  Stop does, with nothing waiting lost and nothing to start it again on its own. The limit is **Too
+  much memory is more than**, 256 to 2048 MB, 1024 by default.
+- **Stopped, or stopped unexpectedly.** A watcher that is gone without having said so, in the same
+  Windows sign-in and the same start of Windows, is shown as *stopped unexpectedly at* the time it
+  was last seen - or *stopped by the memory guard at* - in Diagnostics and in the panel, and the
+  Overview's Right now says the same without the time. One that ended with an earlier sign-in, or
+  before Windows last started, is only not running, as before.
+
+#### Notices and usage
+
+- **When a conversation needs you**, under Settings > General > Notifications, off by default,
+  tells you once about a conversation this product will never resume, because only you can move it
+  on: a request refused or a conversation too long, a content policy, a sign-in Codex needs, or
+  Codex giving up - one check box each - and, with **When a turn has not moved for** set from 10
+  minutes to 2 hours, a latest turn still in progress that has recorded nothing new for that long.
+  Each has its kind in a word, one next step and one button, **Open Dashboard**, at Settings;
+  nothing is resumed, sent or recorded as a recovery for any of them, and a turn you stopped
+  yourself is never told. The stall is read from the turn's own columns and when its newest item
+  was recorded, never from what an item says, so it never says why. **Play a sound for these**
+  gives them Windows' reminder sound; they are then always Windows' own notification, which Do not
+  disturb holds back.
+- **Codex's usage, as last read.** The Overview's Waiting card, *Why it is waiting* for a usage
+  limit, the popup, the panel and `get_status` show the watcher's last usage reading with its age:
+  "Codex usage, read 2m ago: 5-hour 100%, resets 14:42 · weekly 62%, ...". Nothing is read for it -
+  usage is still read only when a recovery is due - so it can be hours old, and its age says so.
+  Only the numbers are kept: which window, how much of it is used, its length and its reset; no
+  account, plan or credit. A used-up weekly limit also says the day and time it resets, and that
+  `/usage` in Codex can redeem a reset credit if your account has one, which this product never
+  knows.
+- **A status file for your own tools.** **Write a status file for other tools**, under General >
+  Windows, off by default, has the watcher write `status.json` in its settings folder after every
+  check: whether it runs, whether recovery is on, how many tasks wait and when the next is looked
+  at, and Codex's usage as last read. It holds no conversation, name or path, nothing in this
+  product reads it, and it is removed when the setting is turned off.
+
+#### The message sent
+
+- **Message styles stay four.** Minimal, Standard, Detailed, and Custom last. v0.6.11-beta offered a fifth, Careful, which asked what Detailed already asks, so it was folded into Detailed: a stored Careful is Detailed on load and in the migration, the next save writes `detailed`, and a write that names Careful is refused. Every other style's words are byte for byte what they were, in every language.
+- **Message for this conversation...**, on a task's row in the Dashboard's Pending page, gives one
+  conversation a continuation message of its own, sent instead of the style's whenever that
+  conversation is continued, and only for an interruption that is recovered. It is a Custom
+  message in every other way - the same placeholders and 2,000 characters, sent exactly as typed,
+  with the dialog's own Preview - for at most 50 conversations, and **Remove message** takes it
+  away. No model can set it: no MCP tool writes it, `update_settings` refuses it, and the
+  diagnostics bundle records only that one is set.
+
+#### Diagnostics
+
+- **Search the log...** opens this product's own log with a search box, newest last, looked at
+  again every five seconds while it is open. The log holds reason codes, ids and times - never a
+  prompt, a reply or an error's text - and `errors.log` is not read there.
+- **State folder**, under Health, says who Windows lets open the folder that holds the settings,
+  the pending tasks and the logs: *only your account can open it*, *other accounts on this PC can
+  open it* - with a sentence on what that means, and where to install instead - or *not checked*.
+  It reads the folder's access list and changes nothing.
+- **Show me what happens** plays a recovery with made-up words: a made-up task waits on Pending for
+  a minute, then shows in History, and while the watcher runs its icon shows a Demo card whose
+  buttons do nothing. None of it touches the recovery state, the card is never a Windows
+  notification, and nothing is sent.
+- **While tasks wait** says whole what the Overview's line under Waiting says about keeping the PC
+  awake and the last usage reading.
+- **After an edition change, Codex's copy of the plugin.** When Codex cannot replace its copy of
+  the plugin after an installation changed edition, the installer now says which edition that copy
+  still is, and that only its skill's text waits for closing the ChatGPT/Codex app and running the
+  installer again - the plugin's tools already run what was just installed. Diagnostics says so too
+  until the copy is replaced.
+
+#### The window, the panel and accessibility
+
+- **Windows' text size.** The Dashboard, the popup, the notification card and the panel draw their
+  text at Windows' **Text size** (Settings > Accessibility), which they read and never change. The
+  first three are drawn that much larger as a whole, so nothing is cut, and never larger than the
+  screen holds; in the panel the type grows and other lines wrap. At 100% everything is drawn as
+  before.
+- **Screen readers.** The popup, which draws itself, now tells Narrator and other screen readers its
+  counts, each task's row and its switch - "Auto-resume: " and the task - its notes and its two
+  buttons, by name, role, state and place, and follows the keyboard; a screen reader's press is
+  exactly a click on what was drawn. Every control a person can act on in the Dashboard has a name a
+  screen reader says, in every language, and every focus ring stands at least 3:1 off what it
+  touches, in every design and theme.
+- **Ask Codex**, folded in the panel before Appearance: a few things to type to Codex about this
+  product - its status, what it waits for, pausing it, its settings - in the panel's language.
+- **One line on the Overview.** Keeping the PC awake and the last usage reading share the one line
+  under Waiting, so the card has no line more; it ends in an ellipsis where it does not fit, and its
+  whole text is its tooltip and what a screen reader says. No button, header or position that was
+  there before moves, and Pending and History stay flat rows.
+
+#### Languages
+
+- **Sixteen languages.** Русский, Italiano, Türkçe, Polski, Українська, Tiếng Việt and Bahasa
+  Indonesia join the nine, in the Dashboard, the popup, the notifications, the panel and the
+  continuation message. *System* takes Windows' first display language to its own catalog in any
+  region - Portuguese from anywhere to Português (Brasil), Chinese by its script - and anything
+  else to English. The two language lists name each language in itself only, after *System* or
+  *Same as the interface*; about ten rows show and the rest scroll, and typing a letter goes to the
+  next language that begins with it.
+- **Arabic and Hebrew are translated, and held.** Their catalogs are complete and current, but
+  nothing offers them: no list shows them, no Windows language reaches them, and a Windows set to
+  either is answered in English. They are written right to left, and they ship only once every
+  surface mirrors. The popup, the notification card and the panel already do, held by tests and
+  reached by no one while the two are held. The Dashboard does not: WinForms mirrors only a form's
+  direct children and none of the painting the window does itself, so every layout and painter of
+  it has to be mirrored by hand - a stage of its own.
+- **One face per language.** Every letter of every catalog is found in the faces each surface draws
+  with. Where Windows' interface font lacks a letter of a language - Vietnamese on a Korean Windows,
+  Cyrillic under Microsoft JhengHei UI - that language is set in Segoe UI on all four surfaces,
+  rather than one word in two faces; every language the interface font has whole keeps it, and on
+  an English Windows nothing changes. The popup and the card are laid out with every string each of
+  their places can hold, in every language from 100% to 300%, and nothing is cut.
+
+#### The marker
+
+- **A continuation now ends in `[codex-auto-resume:` and the first 16 of its interruption id's 64
+  hex digits**, as the maintainer asked, where it carried the whole id. The rule it serves is
+  unchanged: one marker per interruption, and delivery counts only when that marker is found in
+  that exact conversation - two of them, or one at or before the failed turn, are still ambiguous.
+  A record made before keeps the whole id's marker and is found by it; a record whose short marker
+  another record of the same conversation already carries gets the whole one, so no two share a
+  marker; and the closing `]` keeps a 16-digit marker from being found inside a 64-digit one. The
+  channel is unchanged, `codex queue --thread --message`, and so are the words before the marker.
+- **Why no marker at all is advanced-only.** A message queued through Codex's App Server,
+  `thread/queue/add`, can carry a client id that Codex keeps with it, and delivery could be proven
+  by that instead of a marker. But the standard edition sends through one channel only, the
+  `codex queue` command line, which takes no client id; a second channel, and delivery proven
+  without the marker, depart from the standard edition's rules. So a continuation without a marker
+  can only ever be an advanced capability that a person turns on, with a statement of what it
+  departs from. It is the advanced edition's *A continuation with no marker*, below.
+
+#### Custom..., Unlimited and the review before it shipped
+
+- **Custom... at the end of every drop-down of a value**, in the Dashboard and in the panel: quiet
+  hours at any minute and on any days, a Custom retry wait within its list's range, **Stop a task that
+  keeps failing after**, **When a turn has not moved for** and **Ask me after a sleep longer than**
+  from minutes to a week, the memory limit from 128 to 16384 MB, and the context-cost limit from
+  10,000 to 10,000,000 tokens - [the guide](GUIDE.md) has the table. In the
+  Dashboard a small dialog takes the number and its unit, the hour and the minute, or the seven days,
+  and **Use this value** asks the settings' own validator before the drop-down shows it; in the panel
+  Save asks the same validator. A value is kept in its shortest exact form, and one past its bounds is
+  refused on write and read as the default. The Statistics page's Period is not a setting, so it has no
+  Custom... item.
+- **Unlimited** for **Keep it awake for at most**: the PC is then kept awake for as long as a task
+  waits, and let go, as always, when none does, on a pause and when the watcher stops. Only a limit
+  that is yours alone has it: no bound that keeps recovery safe has Unlimited or a value past it, and
+  the watcher's own floor, one continuation per conversation every 15 minutes and five in any 24
+  hours, is not a setting.
+- **Reviewed before it shipped.** The panel's retry preview no longer promises a wait of your own that
+  is past its bounds; the panel groups a count's thousands as its language does, as the Dashboard
+  does; the German range ends in one full stop, and the Japanese and Korean hint over the seven days
+  asks for a day of the week; and a drop-down is measured again when a value of your own is taken, so
+  a long list of days is not cut off.
+
+#### Changed in the standard edition
 
 - **The Design called *Soft, without motion* is gone**, since it drew exactly what Soft with Reduce
-  motion draws: a stored one opens as Soft with Reduce motion on, the same picture. Soft, Classic
-  (v0.6.2) and Plain remain, and Reduce motion is the one way to stop the motion in each.
-- **Bundled compatibility data 5:** codex-cli 0.159.0 is CHECKED in all twelve of its capabilities,
-  and 0.158.0-alpha.2.1 in two.
-- **A compatibility report that passes is filed by the repository**, with no step by the maintainer,
-  under written rules ([SECURITY.md](SECURITY.md)); the counts still reach a machine only with a
-  release.
+  motion draws: a stored one opens as Soft with Reduce motion on, the same picture. The Design's description says only what each look is. Soft, Classic (v0.6.2) and Plain remain, and Reduce motion is the one way to stop the motion in each.
+- **`-NoStartup` works again.** Since v0.5.2 the bootstrap handed the installer its switches by
+  position, so a switch landed on the wrong parameter and the sign-in start was registered anyway.
+  The bootstrap passes them by name now, and the installer reads an older bootstrap's switch as
+  the one it meant.
+- **Nothing the product starts can flash a console window.** Nothing did in v0.6.10 either. Now a
+  test covers everything either edition ships, and the ways one could have appeared are closed: the
+  sign-in start refuses an interpreter that would open one, the watcher restarts itself only
+  windowless, and diagnostics reads the Windows build without starting a program.
 
-### The state, and going back
+#### For administrators
 
-- **The watcher's state is schema 4**, upgraded under the watcher's mutex after a copy
-  (`state.v3-backup-*.sqlite`), in one transaction. v0.6.10 refuses it, as a state from a newer
-  version, and sends nothing.
-- **To go back to v0.6.10,** stop the watcher, run `downgrade-state --to 3` from this release
-  ([the guide's commands](GUIDE.md#commands)), and only then install v0.6.10. It takes a copy, keeps
-  every row, and writes what v0.6.10 reads, never looser than it was: a continuation that may have
-  gone out with a short marker is never sent again, Observe only becomes a pause, and a hold
-  switches its conversation off ([The state database](CHANGELOG.md#the-state-database)).
-- **The advanced edition's own file**, `config\advanced\advanced.sqlite`, is version 2; the standard
-  edition has none, and a purge removes it.
+- **Six policy values** under `Software\Policies\CodexAutoResume`, in `HKEY_LOCAL_MACHINE` or
+  `HKEY_CURRENT_USER`, each of which can only hold recovery back: `DisableAutoResume` pauses it and
+  refuses Resume while set; `ForceObserveOnly` turns Observe only on; `DisableUpdateCheck` greys
+  **Check for updates...**, which then asks nothing; `DisableStatusFile` keeps the status file off;
+  `MaxRecoveryAttempts`, 1 to 20, is a ceiling on attempts per interruption; and `QuietHours`, as
+  `22:00-07:00` or `22:00-07:00 weekdays`, adds quiet hours beside a person's own.
+  [The guide](GUIDE.md#settings-an-administrator-manages) has the whole table.
+- **Read, never written, and applied, never stored.** `startup.py` is still the only code that
+  writes the registry. The values are applied after the settings are read, never to the file, so a
+  person's own choices apply again once a value goes - except a pause, since resuming is theirs to
+  do. Both places' restrictions hold, a malformed value is ignored, one that is there and cannot be
+  read holds the most it could, and a change that would loosen one is refused with
+  `managed_by_policy`. What a value decides is greyed in the Dashboard's Settings and the panel,
+  with *Set by your administrator.*; the Overview says *managed by your administrator* or *paused
+  by your administrator*; Diagnostics names the values in force, and the diagnostics bundle holds
+  their names, never what they say. Only an installed copy reads them - a source checkout reads
+  none - and they are a statement a cooperating installation obeys, not a lock.
+
+#### Around the product
+
+- **Compatibility data 5.** The bundled compatibility data is sequence 5, written by the owner's compatibility tool from that
+  machine's own records of real recoveries: codex-cli 0.159.0 is CHECKED in all twelve of its
+  capabilities, and codex-cli 0.158.0-alpha.2.1 in two, the engine's presence and exact-thread recovery.
+  None is VERIFIED yet. The recordings are under `docs/evidence/compat/`.
+- **A compatibility report that passes is filed with no step by the maintainer.**
+  `.github/workflows/community-file.yml` wakes when a report's check finishes, and once a day. It
+  judges each open report pull request again, against `main` as it is by then, and files this
+  project's own regeneration of the report - never the sender's bytes - in one commit that adds
+  exactly that report and writes the index, the folder's README and the counts again. The pull
+  request is closed, not merged, with one comment saying where the report went, or why it waits,
+  or what to do about a refusal. A report used to wait for the maintainer to run their tool.
+- **What the maintainer judged is written down as rules**, counted from `main`'s own history and
+  keyed by numeric account id: accounts at least 30 days old, one open report per account, at most
+  3 filings per account and 5 per Codex version in any 7 days, a budget of Codex versions the
+  project's data does not name, half the counts file's room kept free, and a failure on a version
+  this project verifies held for the maintainer. A report that meets a limit waits, with the date
+  it is looked at again; a younger account's, or a second open one from the same account, is closed
+  with when to send it again. The repository variable `COMMUNITY_AUTOFILE` pauses filing on anything
+  but unset or `on`, `COMMUNITY_BLOCKED` refuses an account, and a withdrawn report's account and
+  Codex version are listed in `docs/evidence/community/withdrawn.json` so that report is not filed
+  again.
+- **A report comes from a `compat-report/` branch**, as the reporter's `submit` opens it. The check
+  refuses one opened by hand from another branch, which the filer would never have answered, and a
+  refusal's comment says to close the pull request before sending again, since `submit` sends
+  nothing while one of the same account is open.
+- **Nothing a stranger sends can reach the write access.** The job that reads their files holds no
+  write access and no token while Python runs; the job that writes starts on a fresh runner, runs
+  no Python and no repository code, re-derives every commit from git, and moves `main` only
+  forward, only from the commit the plan was made on and only onto the tree that was tested - hash
+  for hash. [SECURITY.md](SECURITY.md) has the whole list.
+- **Two holes the review found are closed for good.** A login Windows keeps for a device (`nul`,
+  `con`, `com1`...) is refused as a report's folder: one such file on `main` would have stopped
+  every Windows checkout of it. And a Codex version has one spelling: `0.1.0`, `00.1.0` and
+  `0.01.0` are one engine to the product, and a report now has to write it the product's way.
+- The folder's README is written by `build/community_report.py` from the index, and
+  `tests/test_reported_data.py` holds it to that; the maintainer's tool imports that code from
+  `main` instead of keeping a copy of its own, which had drifted.
+- **The measurements the advanced edition will build on.** Its `measure` was run on the maintainer's
+  PC against codex-cli 0.158.0-alpha.2.1, on throwaway conversations only, and its content-free
+  records are in `docs/evidence/live/`. A watcher started through WMI outlives Codex's kill-on-close
+  job (MW); a message queued while no app holds the conversation is delivered once it is opened
+  (M1); a queued `/compact` arrives as plain text, not as a command (M7); and an unattended turn
+  whose one approval was declined completed without running the command or opening a window (M6).
+  Codex refuses an empty `thread/queue/add` (M3), and a goal set from outside is not taken up by
+  the app while it holds the conversation (M2). M4 and M5 lacked what they need on that PC; MA and MH, which needed the maintainer at the app, passed there on 2026-09-28. Two probes that had judged the live machine wrongly were corrected
+  first.
+- **A link that dev breaks is found on dev.** The Korean documents' sync takes an anchor written
+  out as an anchor, and the suite builds the Korean branch's tree from the commit under test, so a
+  broken link is found there, not after a release.
+- **The pictures are drawn again for what this adds** - Diagnostics among them, from a state folder
+  with the access list an installation has, so it shows no warning an installed product would not.
+
+#### Fixed along the way
+
+- **The Korean branch's sync no longer runs out of time.** The suite takes 77 minutes on a runner, so
+  v0.6.11-beta's sync hit its 60-minute limit and was reported as cancelled. Its tests now run in four
+  parts at once, the publishing job publishes only the tree those parts tested, and a scheduled check,
+  `ko-watch`, fails when the Korean branch is still behind `main` six hours after `main` moved.
+- **A slow scenario is not a hung one.** The scenario comparisons gave all their scenarios one
+  30-minute deadline, which slow runners reached with nothing hung. Each scenario now has a limit of
+  its own, half an hour, and a worker that says nothing that long is stopped and its scenario named.
+- **The compatibility tests are no longer tied to the published sequence.** They built their document
+  at sequence 4, so publishing compatibility data 5 made it a rollback and failed every lane. Their
+  document is now the bundled sequence plus one, whatever sequence that is.
+- **The standard archive's documents name no advanced identifier.** Two of them spelled names of the
+  advanced package that the edition audit refuses in the standard archive; they now say the same in
+  words.
+
+#### The state, and going back
+
+- **Schema 4.** The state gains room for what the settings above hold back with - a postponement,
+  a word for why a task waits for you, a word for how much a conversation asks, the observe-only
+  switch, the needs-you notices, a guard's digest and token count - and for what the watcher says
+  about itself: its last usage reading, since when it keeps the PC awake, its peak memory, and how
+  it last stopped, with the sign-in and the start of Windows it ran in. At the defaults what the
+  settings hold back with is empty, and so is the keep-awake time, since nothing keeps the PC
+  awake. The rest of what the watcher says about itself is written at every setting: its peak
+  memory and the record of how it stopped, with the sign-in and the start of Windows, at every
+  check, and its usage reading whenever usage is read for a recovery that is due. Nothing that decides a send reads the notices. Schema 3 is upgraded
+  under the watcher's mutex, after a forensic copy (`state.v3-backup-*.sqlite`), in one
+  transaction.
+- **Going back takes one command first.** v0.6.11-alpha and v0.6.10 refuse a state this release
+  wrote, as one from a newer version, and send nothing. To go back to either, stop the watcher, run
+  `downgrade-state --to 3` from this release ([the guide's commands](GUIDE.md#commands)), and only
+  then install the older release. It takes a copy (`state.v4-backup-*.sqlite`), keeps every row and
+  writes what v0.6.10 reads, never looser than it was: every marker is the whole id's again, a
+  continuation that may have gone out with a short marker is made final and never sent again, a
+  conversation whose continuation v0.6.10 could not follow to its turn is switched off, Observe only
+  becomes a Pause, a hold or a tier other than Resume automatically switches its conversation off,
+  and a postponement becomes the schedule. What only schema 4 holds - the notices, the last
+  reading, the guards' digests - is left behind. It is proved against the tagged v0.6.10's own
+  store and watcher on the simulated Codex; no real older release has been installed over a
+  downgraded state yet.
+- **Under an older watcher.** While a v0.6.x watcher still owns a schema-3 state, this release can
+  still pause recovery, switch a conversation off and cancel its recoveries, written so that the
+  older watcher reads every row.
+- **The advanced edition's own file**, `config\advanced\advanced.sqlite`, is version 2; the standard edition has none, and a purge removes it. It goes from version 1 to version 2 the first time this version opens one an earlier pre-release made: a column for the warnings a person confirmed is added, and every row keeps what it held. The advanced edition of v0.6.11-alpha and v0.6.11-beta refuses a version-2 file: it reads every capability as off - it has none to turn on - writes nothing to it, and leaves the file for this version or a later one to read again; nothing takes it back to version 1. v0.6.11-beta.2 reads it as it is, so a capability turned on here is still on there, and the hourly limit set here still holds; v0.6.11-beta.2 has no page to turn one on again, only Codex's tools to turn one off, so turn off here first whatever you want off there.
+- **Going back to a pre-release of this line.** The state is schema 4 from v0.6.11-beta on, so going back to v0.6.11-beta, beta.2 or beta.3 takes only that release's `Install.cmd`; going back to v0.6.11-alpha or v0.6.10 takes `downgrade-state --to 3` from this release first, as above. v0.6.11-beta reads the settings this version writes: Detailed in place of Careful as Detailed, and a value of your own taken with Custom..., or Unlimited, as that setting's default.
 
 ### Advanced edition
 
-### The advanced edition's first capabilities, and the page that turns them on
+#### What the advanced edition stands on
 
-- **Advanced features**, a tab after Settings in the advanced edition's Dashboard, is the one place a
-  capability is turned on. It shows each capability's state and statement - what it does, what the
-  standard edition does instead, the standards it departs from, what can go wrong and how to stop it,
-  every warning it carries now, and its limits - and **Turn on** or **Watch first** asks once more,
-  with all of that in front of you. A yes confirms those warnings, for the version of Codex shown;
-  if anything changed while you read, the page reads it again and asks again. Codex's tools, the
-  panel and the icon only ever turn a capability off; **Turn every advanced feature off** turns them
-  all off at once, a pause stops all of them, and one limit of at most 12 sends an hour stands over
-  them together.
-- **Start with Codex, through WMI.** Codex ends what its plugins start (measured for v0.6.9). On,
-  this starts the watcher whenever Codex starts and, where Codex's job would end it, through WMI,
-  outside that job, so closing Codex does not end it.
-- **A continuation with no marker.** The words go without the marker, through Codex's app server
-  under a client id derived from the interruption, and delivery is proven by that id alone. A send it
-  cannot prove is held, never sent again, and turns the capability off.
+What follows is what every advanced capability goes through.
+
+- **Thirteen places where core asks or tells.** At each, the standard edition asks and tells
+  nobody. An advanced capability may always hold something back there; it can never send by itself - the one send is
+  still core's, after core's own consent check, claim and pre-send look. A plug is handed copies,
+  cannot write core's tables, and a channel it names is held to core's launch guard. The claim
+  counts both editions' sends under one lock, so the five-a-day and fifteen-minute limits hold
+  across them. Core tells the plug each move of a record as it writes it, so what turns a
+  capability off is read from the records, never from the journal, which only a person reads.
+- **Its own state, kept apart.** Advanced state lives in `config/advanced/advanced.sqlite`. Nothing
+  is added to the product's state or settings files, and a purge removes it.
+- **Who turns a capability on, and what turns it off.** Each capability carries a statement, in each of the product's languages, naming the standards it departs from. It is off, watched without acting, or on,
+  and only the Dashboard can turn one on. It can be turned off from anywhere, including from inside
+  Codex, and "All advanced features off" is one action. A capability turns itself off when a
+  submission's result is unknown, a local check fails, the Codex version changes, its statement
+  changes or its code fails. Read-only Windows policy keys can forbid the edition, force it to
+  watch only, or allow only named capabilities.
+- **Measuring before building.** Some capabilities depend on what only a live machine can show.
+  `measure <id>` and `measure-verdict` record, content-free, what a person saw on a throwaway
+  conversation, in `docs/evidence/live/`.
+
+#### The advanced edition's first three capabilities
+
+Each is off until a person turns it on after reading its statement, which says what it does, what
+the standard edition does instead, which standards it departs from, what can go wrong and how to
+stop it; and each turns itself off again when what was agreed to stops being true. A pause stops all
+of them, and every check a send passes stays the standard edition's. [EDITIONS.md](EDITIONS.md) has
+each one in full.
+
+- **Start with Codex, through WMI.** Codex ends what its plugins start (measured for v0.6.9): its MCP
+  servers run in a job that ends with it. On, start-with-Codex starts the watcher whenever Codex
+  starts, and where Codex's job would end it, starts it through WMI (`Win32_Process` `Create`, with no
+  window), whose own host is its parent, outside the job - so closing Codex does not end it
+  (measurement MW). Off, the advanced edition answers exactly as the standard edition does, before a
+  single probe.
+- **A continuation with no marker.** The words go without the `[codex-auto-resume:` marker, into the
+  conversation's queue through Codex's app server (`thread/queue/add`) under a client id derived from
+  the interruption, and delivery is proven by that id alone (measurement M7). A send it cannot prove
+  is held as uncertain, never sent again, and turns the capability off. Past its ceilings - five a
+  conversation, 24 a day - continuations carry the marker, as the standard edition's do.
 - **Goal continuation.** For a usage limit whose reset has passed, in a conversation the Codex app
-  does not hold, the goal the limit paused is set active again - an existing goal only, never its
-  words - so that Codex carries it on when the app next opens the conversation.
-- **Warnings, not refusals.** A measurement that failed or was never made, a compatibility grade of
-  Failed here, Incompatible or Unknown, or a version of Codex nobody knows is a warning you confirm
-  by turning the capability on. Only an administrator's policy refuses or limits - `ForbidAdvanced`,
-  `AllowedCapabilities` and `ForceShadow`, read and never written. A capability still turns itself
-  off at a new statement, a new Codex version, a failure you did not confirm or a send whose delivery
-  became uncertain, and the page says which.
+  does not hold, the goal the limit paused is set active again through the app server
+  (`thread/goal/set`) - an existing goal only, by its id and status, never its words - so that Codex
+  carries it on when the app next opens the conversation. M2 found that the app does not take such a
+  goal up while it holds the conversation, and saw the goal live again once the app loaded it; so it
+  acts only where the app does not, and looks again just before the set. Nobody has yet followed
+  Codex carrying such a goal on by itself. Ceilings: three a conversation, twelve a day.
+- **A warning, not a refusal.** A measurement a capability rests on that failed or was never made for
+  the Codex in force, a compatibility grade of Failed here, Incompatible or Unknown, or a Codex version
+  nobody knows is a warning in its statement, and turning it on confirms exactly those warnings - the
+  owner's rule of 2026-09-26, in place of a refusal. Only an administrator's policy still refuses.
+  What turns a capability off by itself stays: a new statement, a new Codex version, a failure the
+  person did not confirm, or a send it paid for whose delivery became uncertain.
+- **The Codex the watcher drives.** The capabilities use the `codex.exe` and the Codex home the
+  watcher found and checked, its `codex_exe` setting and `--codex-home` included.
+- **What they stand on.** MA and MH, the two measurements that needed the owner at the app, passed on
+  codex-cli 0.158.0-alpha.2.1 on 2026-09-28 (`docs/evidence/live/`). The harness gains M2b, which sets
+  an existing paused goal active in a throwaway conversation the Desktop has open; until it passes,
+  the goal continuation never acts on a conversation the app holds.
+
+#### The Advanced features page
+
+The advanced edition's Dashboard has one more tab, **Advanced features**, after Settings. It is the
+one place a capability is turned on; Codex's tools, the panel and the notification-area icon still
+only turn capabilities off. [EDITIONS.md](EDITIONS.md) says what each capability does.
+
+- **What it shows.** Every capability as a row, in a fixed order, with its name and its state - off,
+  watched or on - in your language. Choose one and the page shows its statement: what it does, what
+  the standard edition does instead, which standards it departs from, what can go wrong and how to
+  stop it, every warning it carries now, and its own limits, a day in all and a day in any one
+  conversation. Start with Codex sends nothing, and the page says that those limits never come into
+  play for it.
+- **Turn on and Watch first.** Each asks first in the window's own dialog, with the statement and
+  every warning in front of you. Turn on also names the version of Codex it is turned on for, and
+  says that a new version turns it off until you turn it on again. A yes confirms those warnings and
+  sends exactly what was shown - the statement's revision, the generation the list was read at, the
+  warnings and the Codex version - and nothing else. Watch first has the capability asked wherever
+  it would act, noting what it would have done, while it does nothing.
+- **When something changed while you read.** If the list or the statement moved after it was shown,
+  the page reads them again and asks again with what holds now. Where they cannot be read again, or
+  keep changing, it says that nothing was turned on; where an administrator's policy now refuses the
+  capability, it says that, rather than asking you to confirm what cannot happen. A statement that
+  cannot be read says so where it would be, and then the capability cannot be turned on or watched.
+- **Why it turned itself off.** A capability that a tripwire turned off says so under its state, and
+  why: a measurement or a compatibility check of what it relies on failed, the compatibility data
+  says that does not work with this version of Codex, it could not prove that a continuation it sent
+  arrived, an error of its own, a new statement to read first, or a new version of Codex. Turning it
+  off yourself shows no such line.
+- **Your administrator's policy.** Where `ForbidAdvanced`, `AllowedCapabilities` or `ForceShadow`
+  applies, the page says so in words, and Turn on and Watch first follow it: nothing can be turned on
+  or watched, this capability cannot be, or it can only be watched.
+- **Turn off and Turn every advanced feature off** do what they say, at once.
+- **The hourly limit.** One limit stands over all the capabilities together, 12 sends an hour. The
+  page shows it as a number you can set from 1 to 12 and never past 12; the change is sent with the
+  generation the page read, and if something changed while you chose, it is not made and the page
+  says so.
+- **It follows the watcher.** The page reads the list again after everything you do there, and
+  whenever the watcher's status says a capability was turned on or off - here, through Codex's tools
+  or by a tripwire.
+- **In every language, on every screen.** Its words are in all eighteen languages, kept as the
+  window's own are (`build/l10n.py --advanced`). Where the screen is narrower than the seven tabs at
+  a large Windows text size, the tabs take a second row instead of cutting the last one off. A
+  window that reopens itself on this page - for a theme, a language or Windows' colours - comes back
+  to it. An advanced installation whose own part could not be loaded runs as the standard edition and
+  shows no such tab.
+
+### How it was checked
+
+- **The ground both editions stand on.** every one of the 283 simulated scenarios gives identical records and identical
+  calls to Codex with a plug that defers everywhere, and in the advanced lane with the advanced
+  package's own plug. A review from three sides reproduced 21 problems before this was released -
+  among them, a plug could change a conversation it was handed and send to one the person had turned
+  off - and a second pass found 10 more; each is fixed, with a test that failed before.
+- **The standard edition's additions.** every one of the 283 scenarios v0.6.10 was tested with, their test modules
+  byte for byte the tag's, runs against the tagged v0.6.10 package and against this one, and every
+  `send`, `usage`, `loaded`, `delete_queue` and `app_identity` call is the same, in the same order,
+  with the same arguments - the marker aside. The nine older languages' Standard continuation is
+  v0.6.10's byte for byte, read from the tag. `tests/golden/defaults-v0.6.10.json` holds every
+  default v0.6.10 shipped, written from the tag, and `tests/test_defaults_golden.py` names each
+  setting added since, with its default and why that default does what v0.6.10 did, and fails on one
+  it does not name. A review after each of the stage's three parts reproduced problems - among them,
+  Observe only left a continuation already in Codex's queue to be delivered while the Overview said
+  nothing is sent; a postponement of a minute made before an objection window opened took the whole
+  window's place; the time ceiling counted time spent waiting, which its help said it never counts; a
+  policy value that could not be read was taken for one that was not there, which lifted
+  `ForceObserveOnly`; and after `downgrade-state --to 3` v0.6.10 could take the failure of a
+  continuation's turn for a new task, and resume one that had been cancelled. Each is fixed, with a
+  test that failed before.
+- **The advanced edition's first capabilities.** each capability is tested off, watched (asked wherever it would act, doing
+  nothing), and turned on end to end against the simulated Codex through the real session and a fake
+  app server - its unit spent before it sends, a turn-off that wins at the claim, its ceilings, the
+  tripwires that turn it off, turning it on again, a warning confirmed, Codex's tools unable to turn it
+  on, and an installation moved to the standard edition and back. A review after the capabilities
+  reproduced four problems: they found Codex by a discovery of their own, ignoring the `codex_exe`
+  setting and the Codex home the watcher runs with, so with two engines installed every send was "not
+  started"; the marker-free continuation did not say that it departs from B3 and B4, as it does; a
+  later standard send of the same record going unknown turned off a capability that had paid for an
+  earlier one; and the app could open a conversation between the goal continuation's look and its set.
+  Each is fixed, with a test that failed before.
+- **The Advanced features page.** `advanced/tests/test_advanced_page.py` compiles the advanced window and drives
+  the page through the window's own hooks, never shown, against replies this edition's real bridge
+  made in a temporary home with a policy, a compatibility view and measurements of the test's own -
+  so it reads no real installation, policy or Codex. It holds every row and every field the page
+  shows, that what Turn on and Watch first send is exactly what was shown and is what the real bridge
+  accepts, the second question after something changed and the two answers that say nothing was
+  turned on, every refusal, a capability that turned itself off, the hourly limit, the list read again
+  when the watcher says something changed, and a window that reopens itself on the page; it audits the
+  page in every language at every scaling, the tabs on the narrowest screen included, and holds that
+  the standard window carries no name and no literal of it. A review of the page found that a
+  confirmation gone stale could be asked again where it could not be read again or a policy now
+  refused it, that a capability that turned itself off did not say why, that the seventh tab could be
+  cut off on a 4:3, 5:4 or portrait screen at a large text size, that a window reopening itself
+  forgot the page, and that its German, Japanese and Korean words were not consistent; each is fixed,
+  with a test.
 
 ## v0.6.11-beta.3 — The Advanced features page, where a capability is turned on
 
@@ -2428,6 +3212,7 @@ off - and a second pass found 10 more; each is fixed, with a test that failed be
 - A section-by-section review of all sixteen document pairs found 62 places where the English and
   the Korean said different things; each is fixed in the language that was wrong, and the Korean
   guide now has every section the English one has.
+- `CONTRIBUTING`, `SECURITY` and `SUPPORT` moved to `docs/`, in both languages. GitHub reads all three from there, so its security policy tab and the contributing link on a new issue are unchanged.
 
 ### The design settled
 
@@ -2597,6 +3382,91 @@ Pending page's check results still read *OK*, *Waiting*, *Blocked* and *Unknown*
   now holds a start in such a job and one in no job. The job is read by the one function the start
   with Codex refuses by.
 
+### The groundwork: where every file goes when the core is Rust
+
+A stage of v0.6.10 that changes nothing a person can see but the version it names; it went out first as the pre-release v0.6.10-alpha. The window draws what it drew, the popup renders the same pixels, the panel serves the same script, and every reply on the wire carries the same fields - `tests/golden/` holds each one to the byte.
+
+`docs/ROADMAP.md` plans to replace the Python core with Rust under one rule - **replace the
+implementation, not the behavior** - and names the eight parts it is built from. That rule can only
+be kept if each part's behaviour is in one place first: a file that does two parts' work is read
+twice, ported twice and kept in step twice, and the second port is where behaviour quietly changes.
+This release is that groundwork.
+
+#### The map
+
+`tests/test_stack.py` places every module on exactly one of the eight Rust parts, on one of the
+parts the Windows interface keeps, or on the few that are neither, and holds the placement four
+ways, each of which only ever shrinks: parts with no package of their own, packages that hold two
+parts, single modules that do two parts' work, and the graph of which part calls which. An entry
+that stops being true fails the test, so the lists cannot go stale while the tree moves.
+`tests/test_layers.py` has held the direction of every import since v0.6.5; this is the other
+question - not which way a call points, but which binary the code ends up inside.
+
+
+#### The Python package, in the plan's layout
+
+The layout the v0.6.5 plan drew is the tree now: `domain/ store/ codex/ compat/ win/ engine/
+control/ mcp/ commands/ runtime/ ui/`. What moved in this release, each by line range and never
+retyped, each old module kept as a front that re-exports every name it had:
+
+- `windows.py` (989 lines, two parts at once) is the Codex adapter in `codex/` - `transport.py`,
+  `appserver.py`, `pairing.py`, `usage.py` - and the Windows platform in `win/` - `kernel.py`,
+  `sync.py`, `homelock.py`, `inventory.py`.
+- `machine.py` is `domain/states.py`, `domain/gates.py` and `domain/public.py`: the stored states,
+  the gates a record passes before anything is sent, and what a person is shown. Its docstring had
+  always called them "three layers, kept apart on purpose".
+- `app.py` is `runtime/`: the composition root, the watcher's loop, and the toasts it raises. The
+  watcher has a package of its own for the first time.
+- `cli.py` is the parser and the command table; the fifteen command bodies are `commands/`.
+- `compat.py` and `compatio.py` are `compat/`, nine files: the registry's model, what a document
+  says about a version, the report, what may be done at a tier, and the io half.
+- `notice_window.py`, the notification card's window code, is `ui/card/`, beside the icon and the
+  popup.
+- Before this: `store/`, `engine/`, `control/`, `brand/`, `codex/`, `ui/popup/`, `ui/tray/` and
+  `mcp/`, and the popup's, panel's and server's large files.
+
+#### The window, in nineteen files
+
+`gui/Controls.cs` was 6,753 lines; `gui/SettingsApp.cs` and `gui/Dashboard.cs` were 4,150 and
+4,353, holding one `partial class` in four declarations. They are nineteen sources now: the
+Settings half, the Dashboard half, the soft controls both are drawn with, and the generated
+palette. Every type and member moved as its own text; the compiler is handed the same code, and
+the pictures are byte for byte what they were. `gui/window.sources` is the compile list and the only
+place it is written, divided into `[settings]`, `[dashboard]`, `[controls]` and `[generated]`, and
+every rule the suite holds the window's code to asks for a group rather than a file.
+
+
+#### The wire, as types
+
+`control/wire.py` writes down the shapes the control layer hands every surface - a record, a row of
+Pending or History, the watcher, the status, the statistics, the Compatibility card's view, a
+setting as `describe` publishes it - as twelve typed contracts. `tests/test_wire_types.py` holds each
+one to the golden replies both ways: every key on the wire is declared, every declared key is on the
+wire, and every value fits its type. 144 fields the window reads are held to a declared key. These
+are what a Rust port declares as structs, and they keep what a port would be tempted to lose:
+"cannot tell" as its own value where a question can go unanswered, and not as false.
+
+
+#### Found while doing it
+
+Splitting a module into a package fails in ways that say nothing at the time, and this release
+built a test for each before moving anything - `tests/test_names.py`, `tests/test_reexports.py`,
+`tests/guiscan.py` - and then an adversarial review of the result. What they found before any of
+it reached anyone:
+
+- A relative import inside a moved function means something else one package level down. In the
+  Codex adapter it made the list of versions the bundled registry verifies silently empty; in the
+  watcher's composition root it would have started the watcher without its notification-area icon.
+  Every in-function import in moved code is now rewritten a level up, and `tests/test_names.py`
+  fails on one that names a module that is not there.
+- A test patch aimed at a front reaches nothing. Five tests had been checking the real thing instead
+  of the stand-in they named - the installer's lock among them - and are aimed at the module that
+  looks each name up.
+- The release build would have failed copying the moved documents, and the picture generator's
+  fake Codex reached no process.
+- The wire goldens read the live compatibility data, so any data publish broke the suite; the first
+  one since they were made did. They read the frozen copy now. (This one is also on `main`.)
+
 ## v0.6.10-alpha — Where every file goes when the core is Rust
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.9...v0.6.10-alpha)
@@ -2755,6 +3625,14 @@ offered. The code refuses where the job would end the watcher, and writes what t
 `logs\codex-start.log`, so the next Codex is one line away from being measured again. The advanced
 edition (v0.6.11) is where starting a process outside the host's job belongs, for a person who turns
 it on.
+
+What was built for it stays in the code, and refuses where the job would end the watcher. It starts the watcher from
+this plugin's MCP server when none is running, through the same launcher sign-in uses and never while an installation
+holds its lock. Codex starts the server more than once as it opens, so two of them can ask at the same moment; the
+watcher's own single-instance mutex answers that, and the second one exits without doing anything. Nothing new is
+registered with Windows for it: no scheduled task, no subscription, no process left resident to wait for Codex. Each
+time Codex starts the server, one line goes into `logs\codex-start.log`: what Windows wrapped that process in, and
+what was decided. It carries no path, no name and nothing from a conversation.
 
 ### The waiting light breathes, and the pictures show the right light
 
@@ -3108,6 +3986,37 @@ page of its own and with an entry of its own right after this one in the changel
 renaming a tag does not rename what is already attached to a release - the same name for different
 bytes. The digest pinned in `scripts/release.json` is this release's, and it is the one to check
 against.
+
+#### v0.6.6-beta
+
+**A pre-release, kept on [its own page](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/tag/v0.6.6-beta).** Built from `b17076d`, published and
+announced as `v0.6.6` on 2026-09-20 and renamed `v0.6.6-beta` on 2026-09-21. It went out without the panel's own
+theme, which was asked for the same day, so v0.6.6 was cut a third time. Its notes are v0.6.6's
+above less *The panel in Codex has a theme of its own*: the ordinary breath, the taskbar button that
+moves where it is installed, the product's own scroll bars and dialog, and the pictures cut to the
+window. Its evidence was measured on its own tree: 2,572 tests, and a window built twice to
+`c572844e…`, 387,072 bytes.
+
+- It was announced, so it is said plainly: **the tag `v0.6.6` has named three archives**, and this
+  was the first announced under it. Its digest is
+  `e620280bd5b40ad354d767fe22dd65ec8ed3eefe6b2f0af20d20759fca7e81a3`; `scripts/release.json` pins v0.6.6's, so a copy taken from the beta's page fails the
+  comparison, which is the comparison doing its job.
+- Nothing is served it: the update check reads the tag out of the URL `releases/latest` ends at and
+  accepts `vMAJOR.MINOR.PATCH` alone. A machine running it keeps it and is not moved back to v0.6.5.
+  Because the number is the same, the update check does not offer it v0.6.6 either: the v0.6.6
+  archive's `Install.cmd` installs over it, and so does the setup script given `-Force`.
+
+#### v0.6.6-alpha
+
+**A pre-release, kept on [its own page](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/tag/v0.6.6-alpha).** Built from `f63d904`, tagged
+`v0.6.6` and published on 2026-09-20, then stopped before it was announced: its gentler light - a
+smaller swing - was too faint to see, and the scroll bars, the dialog and the pictures' edges had not
+been made the product's own yet. It carried two things: a slower, shallower status light (a 4.4 s
+cycle, the dot dimming 38% of the way rather than 60%, the glow peaking at 0.30), and the taskbar
+button that moves where it is installed, which v0.6.6 carries too.
+
+- Its archive is called `CodexAutoResume-v0.6.6-win-x64.zip` as well, and its digest is
+  `3b99217b084148111d07cfc51c9ad8f5bddb6fd50029979ed1b1b6796be0b956`. Nothing is served it, for the same reason as the beta.
 
 ### Evidence
 
