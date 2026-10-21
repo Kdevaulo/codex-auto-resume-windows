@@ -672,6 +672,7 @@
   "installer.step.files": "프로그램 파일 복사 중",
   "installer.step.finishing": "마무리 중",
   "installer.step.plugin": "Codex에 플러그인 추가 중",
+  "installer.step.prepare": "프로그램 파일 준비 중",
   "installer.step.remove_files": "프로그램 파일 제거 중",
   "installer.step.remove_plugin": "Codex에서 플러그인 제거 중",
   "installer.step.setup": "워처 설정 중",

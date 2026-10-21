@@ -1165,6 +1165,7 @@
   "installer.step.files": "Copying the program files",
   "installer.step.finishing": "Finishing",
   "installer.step.plugin": "Adding the plugin to Codex",
+  "installer.step.prepare": "Preparing the program files",
   "installer.step.remove_files": "Removing the program files",
   "installer.step.remove_plugin": "Removing the plugin from Codex",
   "installer.step.setup": "Setting up the watcher",

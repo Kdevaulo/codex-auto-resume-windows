@@ -672,6 +672,7 @@
   "installer.step.files": "正在複製程式檔案",
   "installer.step.finishing": "正在完成",
   "installer.step.plugin": "正在將外掛程式加入 Codex",
+  "installer.step.prepare": "正在準備程式檔案",
   "installer.step.remove_files": "正在移除程式檔案",
   "installer.step.remove_plugin": "正在從 Codex 中移除外掛程式",
   "installer.step.setup": "正在設定監看程式",

@@ -672,6 +672,7 @@
   "installer.step.files": "Đang sao chép các tệp chương trình",
   "installer.step.finishing": "Đang hoàn tất",
   "installer.step.plugin": "Đang thêm plugin vào Codex",
+  "installer.step.prepare": "Đang chuẩn bị các tệp chương trình",
   "installer.step.remove_files": "Đang gỡ bỏ các tệp chương trình",
   "installer.step.remove_plugin": "Đang gỡ plugin khỏi Codex",
   "installer.step.setup": "Đang thiết lập bộ theo dõi",

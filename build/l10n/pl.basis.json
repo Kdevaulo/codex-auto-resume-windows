@@ -672,6 +672,7 @@
   "installer.step.files": "fc0cb82225d80899",
   "installer.step.finishing": "0052205c862f09bf",
   "installer.step.plugin": "dde1b5eb2c12ad00",
+  "installer.step.prepare": "fa7d99fce6c701ba",
   "installer.step.remove_files": "796201325a5e5e3e",
   "installer.step.remove_plugin": "70055fb72af2c067",
   "installer.step.setup": "70308ce5415b83c8",

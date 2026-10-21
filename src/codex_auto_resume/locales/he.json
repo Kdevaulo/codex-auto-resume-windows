@@ -672,6 +672,7 @@
   "installer.step.files": "מעתיק את קובצי התוכנה",
   "installer.step.finishing": "מסיים",
   "installer.step.plugin": "מוסיף את התוסף ל-Codex",
+  "installer.step.prepare": "מכין את קובצי התוכנה",
   "installer.step.remove_files": "מסיר את קובצי התוכנה",
   "installer.step.remove_plugin": "מסיר את התוסף מ-Codex",
   "installer.step.setup": "מגדיר את תהליך הניטור",

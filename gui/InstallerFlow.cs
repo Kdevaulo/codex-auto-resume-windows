@@ -547,9 +547,11 @@ namespace CodexAutoResume
         private static readonly Milestone[] Installing =
         {
             new Milestone("edition: ", 0.27, "codex"),
-            new Milestone("[ok] Found Codex", 0.30, "files"),
-            new Milestone("Installing program files", 0.33, "files"),
-            new Milestone("Updating program files", 0.33, "files"),
+            // Codex found, the folder claimed and the old payload set aside: a step of its own, so "Copying the program
+            // files" names only the copy (v0.6.18 acceptance: the label showed twice, the watcher and Dashboard between).
+            new Milestone("[ok] Found Codex", 0.30, "prepare"),
+            new Milestone("Installing program files", 0.33, "prepare"),
+            new Milestone("Updating program files", 0.33, "prepare"),
             new Milestone("Stopping the running watcher", 0.40, "watcher"),
             // The Dashboard's close and the copy itself have their own lines (v0.6.16 acceptance: the step stayed on
             // the watcher through both, while the log went on).
@@ -571,10 +573,10 @@ namespace CodexAutoResume
             new Milestone("SHA-256 ", 0.25, "verify"),
             new Milestone("[ok] SHA-256", 0.25, "verify"),
             new Milestone("[ok] Archive contents verified", 0.30, "verify"),
-            new Milestone("Installing", 0.35, "files"),
-            new Milestone("[ok] Found Codex", 0.40, "files"),
-            new Milestone("Updating program files", 0.45, "files"),
-            new Milestone("Installing program files", 0.45, "files"),
+            new Milestone("Installing", 0.35, "prepare"),
+            new Milestone("[ok] Found Codex", 0.40, "prepare"),
+            new Milestone("Updating program files", 0.45, "prepare"),
+            new Milestone("Installing program files", 0.45, "prepare"),
             new Milestone("Stopping the running watcher", 0.50, "watcher"),
             new Milestone("Closing the Dashboard", 0.53, "dashboard"),
             new Milestone("Copying the program files into place", 0.57, "files"),
@@ -766,6 +768,7 @@ namespace CodexAutoResume
             "verify_setup", "Checking the setup program",
             "unpack", "Unpacking the files",
             "codex", "Looking for Codex",
+            "prepare", "Preparing the program files",
             "files", "Copying the program files",
             "watcher", "Stopping the watcher that is running",
             "dashboard", "Closing the Dashboard",

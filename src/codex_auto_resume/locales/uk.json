@@ -672,6 +672,7 @@
   "installer.step.files": "Копіювання файлів програми",
   "installer.step.finishing": "Завершення",
   "installer.step.plugin": "Додавання плагіна до Codex",
+  "installer.step.prepare": "Підготовка файлів програми",
   "installer.step.remove_files": "Видалення файлів програми",
   "installer.step.remove_plugin": "Видалення плагіна з Codex",
   "installer.step.setup": "Налаштування монітора",

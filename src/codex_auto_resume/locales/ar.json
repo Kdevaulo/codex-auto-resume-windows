@@ -672,6 +672,7 @@
   "installer.step.files": "جارٍ نسخ ملفات البرنامج",
   "installer.step.finishing": "جارٍ الإنهاء",
   "installer.step.plugin": "جارٍ إضافة الإضافة إلى Codex",
+  "installer.step.prepare": "جارٍ تجهيز ملفات البرنامج",
   "installer.step.remove_files": "جارٍ إزالة ملفات البرنامج",
   "installer.step.remove_plugin": "جارٍ إزالة الإضافة من Codex",
   "installer.step.setup": "جارٍ إعداد المراقِب",

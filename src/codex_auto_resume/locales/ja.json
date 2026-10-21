@@ -672,6 +672,7 @@
   "installer.step.files": "プログラムファイルをコピーしています",
   "installer.step.finishing": "仕上げています",
   "installer.step.plugin": "Codex にプラグインを追加しています",
+  "installer.step.prepare": "プログラムファイルを準備しています",
   "installer.step.remove_files": "プログラムファイルを削除しています",
   "installer.step.remove_plugin": "Codex からプラグインを削除しています",
   "installer.step.setup": "監視プロセスを設定しています",

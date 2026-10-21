@@ -672,6 +672,7 @@
   "installer.step.files": "Programmdateien werden kopiert",
   "installer.step.finishing": "Abschluss",
   "installer.step.plugin": "Plugin wird zu Codex hinzugefügt",
+  "installer.step.prepare": "Programmdateien werden vorbereitet",
   "installer.step.remove_files": "Programmdateien werden entfernt",
   "installer.step.remove_plugin": "Plugin wird aus Codex entfernt",
   "installer.step.setup": "Watcher wird eingerichtet",

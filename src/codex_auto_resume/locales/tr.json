@@ -672,6 +672,7 @@
   "installer.step.files": "Program dosyaları kopyalanıyor",
   "installer.step.finishing": "Tamamlanıyor",
   "installer.step.plugin": "Eklenti Codex'e ekleniyor",
+  "installer.step.prepare": "Program dosyaları hazırlanıyor",
   "installer.step.remove_files": "Program dosyaları kaldırılıyor",
   "installer.step.remove_plugin": "Eklenti Codex'ten kaldırılıyor",
   "installer.step.setup": "İzleyici ayarlanıyor",

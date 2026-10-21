@@ -672,6 +672,7 @@
   "installer.step.files": "Copia dei file del programma",
   "installer.step.finishing": "Completamento",
   "installer.step.plugin": "Aggiunta del plugin a Codex",
+  "installer.step.prepare": "Preparazione dei file del programma",
   "installer.step.remove_files": "Rimozione dei file del programma",
   "installer.step.remove_plugin": "Rimozione del plugin da Codex",
   "installer.step.setup": "Configurazione del monitor",

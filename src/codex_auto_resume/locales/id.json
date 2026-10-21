@@ -672,6 +672,7 @@
   "installer.step.files": "Menyalin file program",
   "installer.step.finishing": "Menyelesaikan",
   "installer.step.plugin": "Menambahkan plugin ke Codex",
+  "installer.step.prepare": "Menyiapkan file program",
   "installer.step.remove_files": "Menghapus file program",
   "installer.step.remove_plugin": "Menghapus plugin dari Codex",
   "installer.step.setup": "Menyiapkan pemantau",

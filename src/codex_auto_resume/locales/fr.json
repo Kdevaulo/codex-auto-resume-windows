@@ -672,6 +672,7 @@
   "installer.step.files": "Copie des fichiers du programme",
   "installer.step.finishing": "Finalisation",
   "installer.step.plugin": "Ajout du plugin à Codex",
+  "installer.step.prepare": "Préparation des fichiers du programme",
   "installer.step.remove_files": "Suppression des fichiers du programme",
   "installer.step.remove_plugin": "Retrait du plugin de Codex",
   "installer.step.setup": "Configuration du surveillant",
