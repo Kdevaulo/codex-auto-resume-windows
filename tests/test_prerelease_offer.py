@@ -48,6 +48,7 @@ if _HERE not in sys.path:
 from test_edition_bootstrap import archive, stub_installer  # noqa: E402
 import editions  # noqa: E402
 import languages  # noqa: E402
+from download_standin import BRIDGE  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
@@ -528,7 +529,7 @@ class RateLimitTests(unittest.TestCase):
 
 
 # ------------------------------------------------------------------------------ the whole script
-RUN = r"""
+RUN = BRIDGE + r"""
 # Where the network was: every request is written down, and none leaves this process. HEAD - the
 # update question - is answered with the redirect a case names; GET without a file, the list of
 # releases, with the body a case wrote; a download with the archive and the checksum a case wrote.

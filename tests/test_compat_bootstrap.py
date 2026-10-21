@@ -524,7 +524,8 @@ class ScriptTextTests(unittest.TestCase):
                         refresh.index("Get-Remote -Uri $CompatibilityUrl"))
 
     def test_the_archive_download_keeps_its_three_hosts(self):
-        self.assertIn("Get-Remote -Uri ($base + $name) -OutFile $zip -What 'The archive'\n", self.TEXT)
+        self.assertIn("Get-Remote -Uri ($base + $name) -OutFile $zip -What 'The archive' -Count:$progressLines\n",
+                      self.TEXT)
         self.assertRegex(self.TEXT, r"\[string\[\]\]\$Hosts = \$AllowedHosts")
 
     def test_nothing_is_piped_from_the_network_into_anything(self):
