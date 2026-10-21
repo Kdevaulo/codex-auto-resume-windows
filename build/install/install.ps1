@@ -1242,11 +1242,6 @@ if ($Uninstall) {
     # the canonical root. Every deletion below is confined to that canonical path, not to
     # the string this script started from - so a junction cannot widen the target after
     # the check has passed.
-    if (-not (Test-Path $Python)) {
-        Warn 'No installed runtime found here, so nothing can be verified or removed.'
-        Write-Host ('       Looked in ' + $InstallHome)
-        exit 1
-    }
     # Ask the *payload's* copy of the engine, not the installed one.
     #
     # `verify-home` arrived in v0.5.4, and this uninstaller has to work against an
@@ -1257,7 +1252,14 @@ if ($Uninstall) {
     $verifier = Join-Path $Payload 'app\scripts\plugin_setup.py'
     if (-not (Test-Path $verifier)) { $verifier = Join-Path $AppDir 'scripts\plugin_setup.py' }
     $interpreter = $Python
-    if (-not (Test-Path $interpreter)) { $interpreter = Join-Path $Payload 'runtime\python.exe' }
+    if (-not (Test-Path -LiteralPath $interpreter)) { $interpreter = Join-Path $Payload 'runtime\python.exe' }
+    # Refused only when neither interpreter is there: an uninstall run from the archive (Uninstall.cmd) over an
+    # installation whose runtime\ an earlier run already removed still has the payload's to ask (v0.6.20 audit, R3).
+    if (-not (Test-Path -LiteralPath $interpreter)) {
+        Warn 'No installed runtime found here, so nothing can be verified or removed.'
+        Write-Host ('       Looked in ' + $InstallHome)
+        exit 1
+    }
     $verify = & $interpreter $verifier 'verify-home' 2>$null
     if ($LASTEXITCODE -ne 0) {
         Fail 'This directory is not a Codex Auto Resume installation, so nothing was removed.'
@@ -1382,27 +1384,43 @@ if ($Uninstall) {
     $stuck = @()
     # What is in the two program folders goes entry by entry, each proved inside the installation again
     # (Remove-OwnedItem), so the setup window's bar follows the removal (Progress); then each folder itself, as before.
-    $programDirs = @(@($AppDir, $RunDir) | Where-Object { Test-Path $_ })
-    $programEntries = @(foreach ($dir in $programDirs) {
-        Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue
-    })
-    $removeTotal = $programEntries.Count + $programDirs.Count
-    $removedCount = 0
-    foreach ($programEntry in $programEntries) {
-        $null = Remove-OwnedItem $programEntry.FullName
-        $removedCount++
-        Progress 'remove_files' $removedCount $removeTotal
+    #
+    # The retry this branch asks for below needs what it ran on: runtime\python.exe, and app\scripts and app\src for
+    # verify-home (the kept uninstaller has no payload to fall back on). So app\ goes first, those two of it last and
+    # only while nothing before them stuck, and runtime\ only once app\ is gone: one file held open under app\ used to
+    # leave runtime\ deleted anyway, and the retry then stopped at "No installed runtime found" for good (v0.6.20
+    # installer audit, R3).
+    $retryNeeds = @('scripts', 'src')
+    $programDirs = @(@($AppDir, $RunDir) | Where-Object { Test-Path -LiteralPath $_ })
+    $programEntries = @{}
+    $removeTotal = $programDirs.Count
+    foreach ($dir in $programDirs) {
+        $inside = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue)
+        if ($dir -eq $AppDir) {
+            $inside = @($inside | Where-Object { $retryNeeds -notcontains $_.Name }) +
+                      @($inside | Where-Object { $retryNeeds -contains $_.Name })
+        }
+        $programEntries[$dir] = $inside
+        $removeTotal += $inside.Count
     }
-    foreach ($dir in @($AppDir, $RunDir)) {
-        if (-not (Test-Path $dir)) { continue }
-        $dirGone = Remove-OwnedItem $dir
-        $removedCount++
-        Progress 'remove_files' $removedCount $removeTotal
-        if (-not $dirGone) { $stuck += $dir; continue }
-        # -ErrorAction SilentlyContinue swallows a sharing violation, so ask afterwards
-        # rather than assuming. A half-deleted installation reported as "Removed." is
-        # worse than an honest failure: nothing tells the user to try again.
-        if (Test-Path $dir) { $stuck += $dir }
+    $removedCount = 0
+    foreach ($dir in $programDirs) {
+        foreach ($programEntry in $programEntries[$dir]) {
+            if ($stuck.Count -gt 0 -and $retryNeeds -contains $programEntry.Name) { continue }
+            # -ErrorAction SilentlyContinue swallows a sharing violation, so Remove-OwnedItem asks afterwards. A
+            # half-deleted installation reported as "Removed." is worse than an honest failure.
+            if (-not (Remove-OwnedItem $programEntry.FullName)) { $stuck += $programEntry.FullName }
+            $removedCount++
+            Progress 'remove_files' $removedCount $removeTotal
+        }
+        if ($stuck.Count -eq 0) {
+            $dirGone = Remove-OwnedItem $dir
+            $removedCount++
+            Progress 'remove_files' $removedCount $removeTotal
+            if (-not $dirGone) { $stuck += $dir }
+        }
+        # Nothing of runtime\ goes while anything of app\ is left.
+        if ($stuck.Count -ne 0) { break }
     }
     if ($stuck.Count -gt 0) {
         Write-Host ''
@@ -1410,6 +1428,7 @@ if ($Uninstall) {
         foreach ($dir in $stuck) { Write-Host ('       ' + $dir) }
         Write-Host '       Close the ChatGPT/Codex app and run this again. The watcher is'
         Write-Host '       already stopped and unregistered, so nothing is running now.'
+        if (Test-Path -LiteralPath $Python) { Write-Host 'The installed runtime was kept so this uninstall can be retried.' }
         exit 1
     }
     # The last thing to go is the proof that any of this was ours.
