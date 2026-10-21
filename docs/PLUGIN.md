@@ -46,7 +46,7 @@ GitHub has no interpreter to run it with - and with the declaration in the repos
 manifest, `codex plugin add` from a clone succeeds and registers the server as *enabled*,
 pointing at an executable that is not there. The user gets a permanently failing entry
 rather than an error they can act on. Measured against `codex-cli 0.153.4`, in an
-isolated `CODEX_HOME`. `.mcp.json` itself stays in the repository, because a
+isolated `CODEX_HOME`. Its source, `build/plugin-mcp.json`, stays in the repository (the release build writes the `.mcp.json` into the archive), because a
 security-relevant declaration should be reviewable as source rather than assembled out of
 a string in a build script.
 

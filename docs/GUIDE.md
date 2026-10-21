@@ -84,7 +84,7 @@ v0.6.0.
 
 The plugin as added from GitHub carries the skills, that setup script and the engine's Python
 source, but no interpreter to run that source, and its manifest declares no MCP server (the
-`.mcp.json` it carries points at an executable that only the release contains); the running
+`.mcp.json` the release adds points at an executable that only the release contains); the running
 watcher, the settings window, the panel's own server and the Windows runtime all come from
 that release. That is why there is a download, and why it is worth reading
 [`docs/PLUGIN.md`](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/docs/PLUGIN.md)
@@ -781,7 +781,7 @@ task", "show auto resume statistics", "show the timeline for that recovery", "tr
 now", "give that recovery its attempts back", "start the watcher", "clear auto resume history",
 "preview the auto resume message", "uninstall auto resume".
 
-"Preview the auto resume message" uses `preview_recovery_message`, one of the plugin's 19 tools. It
+"Preview the auto resume message" uses `preview_recovery_message`, one of the plugin's 20 tools. It
 is read-only: it shows the exact text the watcher would send for one kind of interruption, under the
 current language and style or under ones named for the preview alone, and it saves nothing and sends
 nothing. Codex can change the interface language, the continuation language, the message style,
@@ -1425,7 +1425,7 @@ A value that is there and cannot be read - access is denied, say, to it or to th
 taken for one that is not there: it holds the most it could. A switch is set, the ceiling is 1, and quiet
 hours whose times cannot be read send nothing at any hour, as `ForceObserveOnly` does.
 The watcher reads them at every check, the Dashboard and the panel whenever they read the settings.
-While any of the six values above is there, in either place, **Install another version...** offers no
+While any of these values but `DisablePowerAction` is there, in either place, **Install another version...** offers no
 version before v0.6.11-beta, the first that reads them: an older one would stop keeping them.
 
 What a value decides is drawn greyed, with **Set by your administrator** under it, in the Dashboard's
