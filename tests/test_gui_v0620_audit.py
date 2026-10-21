@@ -333,6 +333,27 @@ class SourceTests(unittest.TestCase):
         self.assertNotIn("Screen.FromPoint(Cursor.Position).WorkingArea.Size", body("Program", "Main"))
 
 
+class MinorTests(unittest.TestCase):
+    """M2, M4 and M5 of the audit, which change no behaviour a probe could tell apart in the time a test has."""
+
+    def test_the_log_dialog_s_five_second_look_waits_while_one_is_on_its_way(self):
+        tools = guiscan.read("gui/DashboardTools.cs")
+        self.assertIn("if (lookingAgain && looking > 0) return;", tools)
+        self.assertIn("looking = Math.Max(0, looking - 1);", tools)
+
+    def test_a_replaced_region_is_let_go(self):
+        cut = body("SoftPin", "Cut")
+        self.assertIn("Region before = body.Region;", cut)
+        self.assertIn("if (before != null) before.Dispose();", cut)
+        self.assertLess(cut.index("body.Region = region;"), cut.index("before.Dispose()"),
+                        "disposed only once the control holds the new one")
+
+    def test_the_installer_bar_tells_a_screen_reader_it_moved(self):
+        show = body("InstallerBar", "Show")
+        self.assertIn("AccessibilityNotifyClients(AccessibleEvents.ValueChange, -1);", show)
+        self.assertIn("AccessibilityNotifyClients(AccessibleEvents.DescriptionChange, -1);", show)
+
+
 @unittest.skipUnless(os.name == "nt" and CSC.is_file() and POWERSHELL.is_file(),
                      "needs the in-box C# compiler and Windows PowerShell")
 class BuiltTests(unittest.TestCase):
