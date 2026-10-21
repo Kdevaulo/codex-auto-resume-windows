@@ -767,8 +767,10 @@ settings window's taskbar button asks Windows outright for this session, so that
 lock screen as the icon does - and whether the icon is in the overflow area, which it reads from the
 settings Windows itself keeps for the notification-area icons (`NotifyIconSettings`). To find its own
 icon there it looks through every program's entry: it reads each entry's icon number and whether it
-has a GUID, and the program path only of an entry that could be its own, and keeps none of it. It
-reads these and changes none of them; any answer it cannot get means Windows' own toast.
+has a GUID, and the program path only of an entry that could be its own, and keeps none of it. The icon
+also reads whether the overflow flyout's own window is shown - a window's class and whether it is shown,
+nothing of what is in it, and nothing kept - because the icon moves while the flyout is open and stands
+still only while it is closed. It reads these and changes none of them; any answer it cannot get means Windows' own toast.
 
 ## Languages
 

@@ -510,8 +510,8 @@ breathes slowly in its place, every 5.6 seconds, for as long as it lasts; after 
 turns red and sweeps out and back like a recovery, twice as quickly - once every 1.98 seconds -
 blinking as it goes, every 1.2 seconds, and stays red until you have seen it: click the icon to open the popup, or bring the Dashboard to the
 front. A recovery that starts afterwards clears it as well. Nothing moves under Reduce motion, Windows' animation setting, High Contrast or battery
-saver, while the session is locked, or while Windows keeps the icon in the overflow area, where
-nobody would see it. While the Dashboard is open, its taskbar button moves the same way and
+saver, while the session is locked, or while Windows keeps the icon in the overflow flyout and the flyout is closed,
+where nobody would see it; it moves while you have the flyout open. While the Dashboard is open, its taskbar button moves the same way and
 stops for the same reasons.
 
 <img src="images/status-light.png" alt="The status light breathing on a card: a cyan dot that dims to about two thirds of its colour and comes back over 4.4 seconds, with a soft glow that grows out from under it as it brightens and is gone at the bottom of the breath" width="112">

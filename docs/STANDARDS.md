@@ -446,7 +446,7 @@ changed).
 **H12** Each recoverable category has its own switch, and a switched-off category is never recorded.  
 *tested*: `test_engine.py`
 
-**H13** An explicit interface-language choice wins over Windows and CODEX_AUTO_RESUME_LANG and survives restarts, repairs and updates; motion stops under Reduce motion, Windows' animation setting, High Contrast, battery saver, a locked session and the overflow area.  
+**H13** An explicit interface-language choice wins over Windows and CODEX_AUTO_RESUME_LANG and survives restarts, repairs and updates; motion stops under Reduce motion, Windows' animation setting, High Contrast, battery saver, a locked session and a closed overflow flyout (amended by the owner on 2026-10-22).  
 *tested*: `test_locale.py`, `test_tray_icon_motion.py`
 
 **H14** The power action after usage-limit recoveries is off by default and armed only in the Dashboard, once or always. MCP, the icon and a notice may only turn it off or stop it for its batch, and a stop is honoured before anything else is looked at. It acts only when every usage-limit recovery of its batch has ended as the person chose, no recovery is open or followed, Codex's history has caught up, no Codex turn runs, no input is queued, nobody has used the PC for two minutes and a notice's countdown has run out. Anything it cannot read means it does nothing, and it sends nothing.  

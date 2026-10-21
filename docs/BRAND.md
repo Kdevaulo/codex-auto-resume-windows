@@ -316,7 +316,7 @@ and the window's taskbar button reads the icon's own from `Brand.Mark`. The READ
 as an animated PNG drawn from the icon's own frames (`docs/images/icon-motion.png`, made by
 `build/make_screenshots.py`). It holds still under Reduce motion, Windows' animation setting, High
 Contrast, battery saver, a locked session, and while Windows' own settings for the icon say it sits
-in the overflow area (`tray_place.IconPlacement`, which reads them and writes nothing): the icon's
+in the overflow area and the flyout is closed (`tray_place.IconPlacement`, which reads them and writes nothing; it moves while the flyout is open): the icon's
 rectangle cannot say, because Windows 11 build 26200 gives an icon in the overflow area the overflow
 button's own rectangle rather than none, and the icon moved there unseen.
 
@@ -408,7 +408,7 @@ High Contrast, which replaces every design and draws one look whichever is chose
 corners. Depth is the design's and never High Contrast's. What moves is no design's: the light and
 the controls move unless a stopper holds them, and the stoppers are each surface's own and the same
 in every design - Reduce motion, Windows' animation effects and High Contrast everywhere, and battery
-saver, a locked session, the overflow area or a hidden surface where they apply. Each design's light
+saver, a locked session, a closed overflow flyout or a hidden surface where they apply. Each design's light
 keeps its word beside it.
 
 **A design changes paint, never layout.** Every size, padding, dot and reserved shadow margin is the
