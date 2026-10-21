@@ -201,6 +201,14 @@ class UsageStop(UsagePause):
         waiting = self._waiting()
         if not waiting:
             return
+        try:
+            # v0.6.20: while any window it holds has not reset - the weekly one still held when the five-hour one
+            # resets - no continuation of its own starts either: the pause's own promise (holding()), which holds the
+            # wrap-up's continuation after the reset the same way (`holds`).
+            if self.holding():
+                return
+        except Exception:
+            return
         now, rows = scoped.now(), scoped.meter.rows()
         turns, source, start = Turns(self._codex_home()), self._source(), self._start or ipc.start_turn
         for row in waiting:
