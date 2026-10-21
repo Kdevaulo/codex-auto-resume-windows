@@ -69,9 +69,13 @@ accounts.**
 They are credited here because they did meaningful design and implementation work, and because readers
 of the source deserve to know how it was produced. They are deliberately **not**:
 
-- listed as commit authors or co-authors with invented email addresses,
 - given GitHub accounts, profiles, or contributor avatars,
-- named as copyright holders.
+- named as copyright holders,
+- given an e-mail address of their own invention.
+
+The commits that were written with Claude carry a `Co-Authored-By` trailer that names the Claude model that wrote
+them, with Anthropic's own `noreply@anthropic.com` address. People, the maintainer and everyone who reported or
+suggested something, are credited by their GitHub login.
 
 Copyright is held by the human maintainer. Responsibility for the code, including its safety properties,
 rests with the maintainer, not with the tools.
