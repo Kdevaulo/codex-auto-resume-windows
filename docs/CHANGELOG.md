@@ -1,5 +1,112 @@
 # Changelog
 
+## v0.6.18 — A recovery turn that worked and was cut off is recovered, a setup bar that fills by real counts, and a streamed update download
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.17...v0.6.18)
+
+**From v0.6.17, an ordinary update.** It is the latest release, for both editions, so v0.6.17's *Check for updates*
+offers it in the edition you have, and the plugin in Codex installs it too. It has no pre-release of its own: it is
+v0.6.17 with the changes below. Both editions change in the first group; the second is the advanced edition's alone,
+and what it changes is off until you turn it on. What this release does not carry - the rest of the advanced
+edition's last stage, which the roadmap had planned for v0.6.18 - is v0.6.19 now.
+
+**Going back.** The watcher's state stays schema 5 and the advanced edition's own file stays version 7, as in
+v0.6.17, and the file's mark of the oldest version that reads it is unchanged, so *Install another version...* back
+to v0.6.17 or v0.6.16 keeps every advanced feature on there, as it was. The weekly update check keeps three numbers in
+the file's table of choices - when it last ran, the newest version it offered, and when - beside the choices
+themselves. No feature offers them as a choice, and v0.6.17 and v0.6.16 pass over a row they do not know, as every
+reader of that table always did, so going back loses nothing and shows nothing of them. Nothing else was added to
+either file.
+
+### Both editions
+
+- **A recovery turn that worked and was then cut off is recovered.** Codex writes a turn's end only while the turn is
+  running, so a recovery turn that Codex closing, or the PC sleeping or restarting, interrupted said it was in progress
+  for good. Such a turn is now taken to be cut off as soon as a later turn of the same conversation has started - Codex
+  runs one turn at a time - or as soon as Windows has started since the turn began, and it is judged as a failed turn
+  is: one that made progress is **recovered**, with the reason `progress_then_turn_cut_off`, which keeps that the turn
+  itself did not end cleanly; one that did nothing stays unverified, as it did. Before, the record showed the turn as
+  running until a later turn of the conversation finished or a day had passed, and then called it unverified however
+  much it had done. A message you write in the conversation still hands it over first, a turn that is really running
+  still shows as running, and a history that cannot be read never counts as "no progress". The owner amended standard
+  E6 for it on 2026-10-21; two recoveries on the owner's own PC were the report.
+- **The setup window's bar fills by real, counted work.** The setup program shows it, and so does an update or an
+  uninstall started from the Dashboard or from Settings. The installer now counts the files it copies, the files and
+  folders it removes and the plugin's three commands to Codex; setup counts its own seven steps and the health check
+  its eight checks. Each says how far it has got on a line of its own, which the window reads and keeps out of the log
+  it shows. The bar glides on up to the share of the work that is done and stops there, never past it, and reaches
+  100% only after a run that ended well. It does not move while a picture is being taken or while the window is out of
+  sight, and with motion reduced it jumps instead of gliding. A window that gets no such line - an older installer
+  behind it, say - reads the installer as before. The lines are asked for by the window alone: every other caller of
+  the installer, the setup step and the health check - `Install.cmd`'s console, a log, the watcher the setup starts -
+  gets exactly the output it always did.
+- **The update's archive is streamed, and every step of the download is checked.** The release archive and its
+  `.sha256` come in through a request that reads the body 64 KB at a time into a file of its own beside the target.
+  The file is moved into place only when it is whole, so no partial archive is left behind after any failure.
+  Each redirect is followed by hand, at most five, and every address it names is held to the update's own rule - https,
+  and one of the hosts the update is allowed to ask - and to the same words when it is refused, *before* it is asked;
+  the answer's status and address are checked before a single byte is written. A body that stops short of the length
+  the server announced is named as cut short, and a dropped connection is resumed from where it stopped, at most
+  twice, and only on an answer that continues exactly there; a failed resume says what it got, so a GitHub rate limit
+  is still named as one. Where the server says how long the archive is, the real bytes received go to the setup
+  window's bar, once per whole percent. Everything else is as it was: the same words and exit codes, the system proxy,
+  the same user agent and 300-second limit, TLS as the system sets it, and the digest check after the download.
+  **The download is done by the updater of the version you are updating from**, so this takes effect from the update
+  after this one: the update to v0.6.18 still downloads as v0.6.17's updater does, and the bar shows the bytes from
+  the update after it.
+- **The README's and the guide's install picture shows the bar filling by those counts**, in English and Korean.
+
+### Advanced edition
+
+- **Open Codex on a notice.** While it is on, and where Windows has a handler for `codex:` links, every notice about
+  one conversation - a usage limit detected, a continuation being sent, how one ended - offers *Open Codex* beside
+  *Open Dashboard*, on the program's card and on Windows' own notification alike. A click shows that conversation in
+  the Codex app through Codex's own link to it: a running or minimized app comes to the front at that conversation,
+  and a closed one starts there (measured on Codex app 26.1007). Whether Windows has a handler for `codex:` is read,
+  never written. A notice about no one conversation - a warning near a limit, the memory guard, the power action -
+  never has the button, and the notice shown after you cancel a recovery from Windows' notification offers it exactly
+  where the notice you pressed offered it. Nothing is sent to Codex and nothing in the conversation changes. It
+  departs from standards A28, B16 and F6, which the page where you turn it on says.
+- **A weekly update check while idle.** While it is on, the watcher runs the Dashboard's own *Check for updates* - the
+  installed copy's bootstrap script with `-CheckOnly`, no window, two minutes at most - at most once in seven days, and
+  only while nothing is waiting, being sent or being watched and recovery is not paused; where the update check is
+  turned off by policy it makes none. A newer release - or a newer pre-release, where a check you start would offer
+  one - appears as one notification, *A newer version is available*, a kind of its own in *Keep on screen until
+  clicked*, whose *Open Dashboard* button opens Diagnostics, where you install it as always. Nothing is downloaded or
+  installed by it. The time of the last check is kept before the check starts, so a check that fails, that GitHub
+  refuses or that takes too long says nothing and waits for the next week, and turning the feature off and on again
+  does not check sooner. A version it offered is kept across restarts and shown again each time the watcher starts,
+  until that version is installed, a later check finds nothing newer, or you turn the feature off. Each check makes
+  the requests a check you start makes - to github.com, to GitHub's list of releases and for the Codex compatibility
+  data - so GitHub sees this PC's address and the time, once a week. It departs from standards C4, C5 and C7, which
+  the page says.
+- **Both are listed in the advanced edition's count of capabilities** (thirty-two now), with a section of each in the
+  editions document and its words in all 18 languages. The advanced edition's Korean catalog calls the watcher 워처,
+  as the product's own does.
+
+### For developers
+
+- **`test_released_calls` records an amendment.** Its rule is still that the scenario modules - `test_engine`,
+  `test_outcomes` and the rest of the list in `tests/neutral.py` - are v0.6.10's, byte for byte. The owner's amendment
+  of E6 changes four scenarios (the later-terminal-turn and stuck-observing cases of `test_outcomes`' T13 and T17, and
+  the two of `test_engine`'s that mirror them): they now expect `turn_completed`, then a recovery with
+  `progress_then_turn_cut_off`. The new `AMENDED` record names the four test ids, the date and the decision. A module
+  may differ from the tag in those tests' bodies alone, v0.6.10's run takes each of them from the tag's own module, and
+  the calls v0.6.10's made must still begin the calls this checkout's makes: an amended scenario may ask for more ticks,
+  never for other calls before them. The cut-off rule has its own module, `tests/test_cut_off_turns.py`.
+- **The streamed download has a test seam.** `Get-DownloadResponse` in `scripts/bootstrap.ps1` is the one door to the
+  network for a download without a deadline; a function of that name in the session stands in for it, as one named
+  `Invoke-WebRequest` does. The whole-script tests bridge it to their `Invoke-WebRequest` stand-ins
+  (`tests/download_standin.py`), `tests/test_bootstrap_streamed_download.py` holds the behaviour above, and the privacy
+  test counts that .NET request as reaching the network. Its tests hash with .NET, as the product does, so they hold
+  under the CI runner's `PSModulePath`.
+- **The progress lines have a test module of their own**, `tests/test_installer_progress_lines.py`. The installer's
+  copy and removal loops use names of their own, because PowerShell's names are case-blind and the removal's `$entries`
+  was the table of Add or remove programs entries the uninstall tests stand in for; and its progress function sits
+  beside the helpers every lifted installer test takes.
+- **The CI release lane is dealt into five parts**, as the standard and advanced lanes' parts are, by the seconds of
+  tests recorded in `tests/data/durations.json`, now that the faster layout audits are in it.
+
 ## v0.6.17 — Installs from inside another app, the update that keeps its uninstaller, and the capability pairs that kept each other from working
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16...v0.6.17)
