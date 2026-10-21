@@ -79,6 +79,10 @@ namespace CodexAutoResume
         internal bool Maintaining;
         /// What is new in Version: its section of the changelog the archive carries, or null where there is none.
         internal string NotesText;
+        /// The Dashboard's Install another version... (v0.6.18 acceptance): run as an update is - the bootstrap's lines
+        /// on the bar, the Dashboard's own rules after it - but named for what it is, for an older version or the other
+        /// edition is not an update. The bootstrap prints no notes for a pick, so it has no Notes page.
+        internal bool Another;
 
         internal InstallerFlow(string mode, string home, string edition, string installed, string version)
         {
@@ -102,6 +106,7 @@ namespace CodexAutoResume
             // Repair runs from the first page; Remove goes on to the uninstall's own (Choose).
             if (Maintaining) return new[] { Maintain, Confirm, Progress, Finish };
             // The Notes page comes between the download and the install (InstallerWindow.Ask).
+            if (Mode == Update && Another) return new[] { Progress, Finish };
             if (Mode == Update) return new[] { Progress, Notes, Finish };
             if (Mode == Uninstall) return new[] { Confirm, Progress, Finish };
             return new[] { Welcome, Options, Progress, Finish };
@@ -569,6 +574,8 @@ namespace CodexAutoResume
         {
             new Milestone("Asking github.com which release is newest", 0.05, "ask"),
             new Milestone("Asking api.github.com for this repository's list of releases", 0.05, "ask"),
+            // Install another version...'s -Pick, which asks for the whole list again before it downloads.
+            new Milestone("Asking api.github.com for this repository's whole list of releases", 0.05, "ask"),
             new Milestone("Downloading v", 0.10, "download"),
             new Milestone("SHA-256 ", 0.25, "verify"),
             new Milestone("[ok] SHA-256", 0.25, "verify"),
