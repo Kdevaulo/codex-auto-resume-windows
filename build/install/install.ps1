@@ -1077,6 +1077,42 @@ function Test-DefaultHome {
     return [string]::Equals($ordinary, $here, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Protect-RelocatedHome {
+    <#
+        An installation root outside the person's profile $Profile (CODEX_AUTO_RESUME_PLUGIN_HOME) given an access list of
+        its own: the person, SYSTEM and Administrators, full control, inherited by everything under it, and nothing
+        inherited from above. A folder made under a drive root takes the root's `Authenticated Users: Modify`, and every
+        other account on the PC could then replace the launcher, the program or the runtime that run as the person at
+        each sign-in (v0.6.20 security review, R2). Inside the profile nothing changes: the profile is the person's own.
+
+        Chosen over refusing such a home: an installation already relocated keeps working and is made private on its next
+        update or repair, and nothing the person can do there today is taken away. Where the drive keeps no access list
+        (FAT, exFAT) or the list cannot be written, it says so and goes on. Returns 'profile', 'protected' or 'failed'.
+    #>
+    param([string]$Root, [string]$Profile)
+    if (-not [string]::IsNullOrWhiteSpace($Profile) -and (Test-PathInside $Root $Profile)) { return 'profile' }
+    try {
+        $person = [Security.Principal.WindowsIdentity]::GetCurrent().User
+        $system = New-Object Security.Principal.SecurityIdentifier 'S-1-5-18'
+        $administrators = New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-544'
+        $acl = New-Object Security.AccessControl.DirectorySecurity
+        $acl.SetAccessRuleProtection($true, $false)
+        $inherit = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+        foreach ($who in @($person, $system, $administrators)) {
+            $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+                $who, [Security.AccessControl.FileSystemRights]::FullControl, $inherit,
+                [Security.AccessControl.PropagationFlags]::None, [Security.AccessControl.AccessControlType]::Allow)))
+        }
+        (New-Object IO.DirectoryInfo $Root).SetAccessControl($acl)
+        return 'protected'
+    } catch {
+        Warn ('The installation folder outside your profile could not be made private to you: ' + $_.Exception.Message)
+        Write-Host '       Other accounts on this PC may be able to change its files. Install into your profile, or'
+        Write-Host '       give the folder an access list that lets only you, SYSTEM and Administrators change it.'
+        return 'failed'
+    }
+}
+
 function Read-UninstallEntry {
     # The two values that say whose an entry in Add or remove programs is, or $null when there is none. The only
     # read of the registry in this file, and one of the two calls into it (Remove-UninstallEntry is the other);
@@ -1558,6 +1594,10 @@ $OwnedHome = Resolve-Canonical (@($claim)[1])
 if (-not $OwnedHome -or -not (Test-PathInside $AppDir $OwnedHome)) {
     Fail 'The installation root could not be resolved; nothing was installed.'
     exit 1
+}
+# A root outside the profile is made private to the person before a file of the program goes into it (R2).
+if ((Protect-RelocatedHome -Root $OwnedHome -Profile $env:USERPROFILE) -eq 'protected') {
+    Ok 'The installation folder, outside your profile, is private to you'
 }
 
 # Finish the previous run's move before deciding anything else.
