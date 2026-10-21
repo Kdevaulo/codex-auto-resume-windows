@@ -1879,7 +1879,13 @@ try {
         } catch {
             $aside = $target + '.old-' + (Get-Date -Format 'yyyyMMddHHmmss')
             Move-Item -LiteralPath $target -Destination $aside -Force -ErrorAction SilentlyContinue
-            Copy-Item -LiteralPath $source -Destination $target -Force
+            # A second failure is said, and the run goes on to its setup: thrown here, it ended the update after the
+            # program trees were replaced and before the watcher was set up, with no last word (v0.6.20 audit, M6).
+            try { Copy-Item -LiteralPath $source -Destination $target -Force -ErrorAction Stop }
+            catch {
+                Fail ($name + ' could not be replaced: ' + $_.Exception.Message)
+                Write-Host '       Close the Dashboard and run this installer again; the rest of the update goes on.'
+            }
         }
     }
     foreach ($stale in (Get-ChildItem -LiteralPath $OwnedHome -File -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
