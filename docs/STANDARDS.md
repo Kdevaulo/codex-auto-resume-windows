@@ -158,7 +158,7 @@ changed).
 **B5** Only the newest database generation is read, and only if every column it reads exists; paths must stay inside the Codex home.  
 *tested*: `test_source.py`
 
-**B6** Rollout files only under <home>\sessions. It reads the first line (at most 256 KiB: id and origin), and for a usage limit only, up to 8 MiB before the failure, in memory, keeping only the reset time and the limit id.  
+**B6** Rollout files only under <home>\sessions. It reads the first line (at most 256 KiB: id and origin), and for a usage limit only, up to 8 MiB before the failure, in memory, keeping only the reset time and the limit id. Only when a person presses *Rescan and reconcile*, and only for a waiting recovery whose history has not caught up, it reads that conversation's rollout file from start to end, a line at a time, up to 32 MiB (a larger file is not read): each line is parsed in memory and dropped, and only whether a message of the person's that carries no marker of its own follows the failed turn's end is kept. It also lists the file names under <home>\sessions, opening none, to follow a conversation Codex split across files (amended by the owner on 2026-10-22).  
 *tested for the path; code for the byte caps*: `test_source.py`
 
 **B7** Queries that return message content are bounded by instr(col, marker)>0; other people's rows come back only as counts or booleans.  

@@ -39,6 +39,12 @@ belongs to that vendor's own reporting process, not here.
   parsed in memory to find the reset time. That part of the file is conversation content.
   Only the reset time and the name of the limit it belongs to, taken from the rate-limit snapshot,
   are kept. Everything else is discarded, and nothing else from it is stored, logged or sent.
+- Only when you press *Rescan and reconcile*, and only for a waiting recovery whose conversation
+  Codex's history has not caught up with, that conversation's whole rollout file, up to 32 MiB (a
+  larger one is not read), a line at a time, parsed in memory and dropped, to see whether a message
+  of yours that carries no marker of this tool's follows the failed turn's end. That is conversation
+  content too; only the yes-or-no answer is kept. It also lists the file names under the
+  `sessions` folder, opening none, to follow a conversation Codex split across files.
 - To prove its own message arrived, it has SQLite search that conversation's user messages and
   queued messages for this tool's marker. Only rows containing the marker come back.
 - The recorded error of a failed turn. Its structured error type decides the category; only when a
