@@ -74,7 +74,14 @@ def cmd_activate(args) -> int:
                 app.logger.info("activation ignored: no record for that interruption")
                 return EXIT_ERROR
             thread_id = record["thread_id"]
-            store.cancel_interruption(interruption_id, _now(), actor="toast")
+            result = store.cancel_interruption(interruption_id, _now(), actor="toast")
+            if isinstance(result, dict) and result.get("changed") is False:
+                # v0.6.20: a stale notice's Cancel on a recovery that has finished since says nothing: the notice
+                # below says it was cancelled, which is not true (notifier.activate does the same for a card).
+                app.logger.info("thread %s: the notification's cancel changed nothing; it had already finished",
+                                thread_id)
+                _print("thread %s had already finished; nothing changed" % thread_id)
+                return EXIT_OK
     app.logger.info("thread %s: cancelled from the notification", thread_id)
     # What it says afterwards is the notice a card's cancel announces (notifier.build_cancelled): the same words,
     # a body that opens its page, and staying on screen when a person chose that kind (v0.6.16) - Windows' toast,
