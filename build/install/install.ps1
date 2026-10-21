@@ -983,6 +983,12 @@ function Invoke-Setup {
     $counted = $script:ProgressLines -and @($Arguments).Count -gt 0 -and
                (@($Arguments)[0] -ceq 'setup' -or @($Arguments)[0] -ceq 'doctor')
     if ($counted) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = '1' }
+    # Setup's exit code decides, never its stderr. Run outside another app, this script's streams are merged
+    # (Get-OutsideSource: `*>&1`), and Windows PowerShell then makes each stderr line of a native program a
+    # NativeCommandError, which this script's 'Stop' made terminating: setup's `error: ...` line stopped setup half way
+    # and failed the install (v0.6.20 installer audit, R1). For this call alone; the bootstrap's Invoke-InstalledSetup
+    # does the same.
+    $ErrorActionPreference = 'Continue'
     try { & $Python $setup @Arguments | ForEach-Object { Write-Host ('    ' + $_) } }
     finally { if ($counted) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null } }
     return $LASTEXITCODE
