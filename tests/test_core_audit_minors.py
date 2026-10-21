@@ -99,5 +99,27 @@ class SlowHelperTests(Scratch):
         self.assertEqual(ended, [True], "ended once, as before; the second wait running out is not a failed delete")
 
 
+class ClockSetBackTests(unittest.TestCase):
+    class Reader(FreshnessMixin):
+        def __init__(self):
+            self.now, self.asked = 10_000.0, []
+            self.clock = lambda: self.now
+            self._usage_cache, self._loaded_cache = None, {}
+            self.options = {"loaded_check_seconds": 5}
+            self.backend = types.SimpleNamespace(
+                usage=lambda: self.asked.append("usage") or {"available": True},
+                app_identity=lambda: {"pid": 1},
+                loaded=lambda thread, app: self.asked.append("loaded") or "loaded")
+
+    def test_a_clock_set_back_ends_both_caches(self):
+        reader = self.Reader()
+        reader.usage(), reader.loaded(THREAD)
+        reader.usage(), reader.loaded(THREAD)
+        self.assertEqual(reader.asked, ["usage", "loaded"], "kept while fresh")
+        reader.now -= 3600
+        reader.usage(), reader.loaded(THREAD)
+        self.assertEqual(reader.asked, ["usage", "loaded", "usage", "loaded"], "read again after the step back")
+
+
 if __name__ == "__main__":
     unittest.main()
