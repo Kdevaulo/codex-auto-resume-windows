@@ -598,6 +598,10 @@ foreach ($pair in @(@('/missing', 300), @('/rate', 300), @('/agent', 300), @('/s
 $old = Get-Outcome { $null = Invoke-WebRequest -Uri ($base + '/loop') -OutFile $scratch -UseBasicParsing -PassThru `
                                                -MaximumRedirection 5 -TimeoutSec 300 }
 $out['loop'] = @{ old = $old; words = (Get-DownloadWords -Source 'net' -Name 'net_tooManyRedirections' -Fallback 'none') }
+# A request that fails as it is sent: one aborted before.
+$request = New-DownloadRequest -Uri ([Uri]($base + '/agent2')) -Offset 0 -Cookies (New-Object Net.CookieContainer) -TimeoutSec 300
+$request.Abort()
+$out['aborted'] = Get-Outcome { $null = Get-DownloadResponse -Request $request }
 # A port nothing listens on.
 $new = Get-Outcome {
     $request = New-DownloadRequest -Uri ([Uri]$env:CAR_CLOSED) -Offset 0 -Cookies (New-Object Net.CookieContainer) -TimeoutSec 300
@@ -684,6 +688,12 @@ class RealRequestBesideTheCmdletTests(unittest.TestCase):
         # say it in. Where it came in the shown one, the words are the same.
         if loop["old"]["threw"].isascii():
             self.assertEqual(loop["words"], loop["old"]["threw"])
+
+    def test_a_request_failing_as_it_is_sent_fails_in_its_own_words(self):
+        aborted = self.outcome("aborted")
+        self.assertEqual(aborted["type"], "System.Net.WebException")
+        self.assertEqual(aborted["status"], "RequestCanceled")
+        self.assertFalse(aborted["threw"].startswith("Exception calling"), aborted)
 
     def test_the_request_is_sent_as_the_cmdlet_sends_its_own(self):
         pair = self.outcome("/agent")

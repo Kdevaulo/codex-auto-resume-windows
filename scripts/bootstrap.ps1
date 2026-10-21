@@ -1340,9 +1340,11 @@ function New-DownloadRequest {
 if (-not (Test-Path -LiteralPath 'Function:\Get-DownloadResponse')) {
     function Get-DownloadResponse {
         param($Request)
-        $pending = $Request.BeginGetResponse($null, $null)
         $answered = $false
         try {
+            # A request that fails as it is sent (one already aborted) fails in its own words, as one that fails later.
+            try { $pending = $Request.BeginGetResponse($null, $null) }
+            catch { $answered = $true; throw (Get-ThrownException $_.Exception) }
             $clock = [Diagnostics.Stopwatch]::StartNew()
             while (-not $pending.AsyncWaitHandle.WaitOne(250)) {
                 if ($Request.Timeout -ne [Threading.Timeout]::Infinite -and $clock.ElapsedMilliseconds -ge $Request.Timeout) {
