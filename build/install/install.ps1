@@ -1250,7 +1250,7 @@ if ($Uninstall) {
     # installation. The payload travels with this script and is always its own version,
     # so it can always answer. Measured, by running exactly that against a v0.5.3 tree.
     $verifier = Join-Path $Payload 'app\scripts\plugin_setup.py'
-    if (-not (Test-Path $verifier)) { $verifier = Join-Path $AppDir 'scripts\plugin_setup.py' }
+    if (-not (Test-Path -LiteralPath $verifier)) { $verifier = Join-Path $AppDir 'scripts\plugin_setup.py' }
     $interpreter = $Python
     if (-not (Test-Path -LiteralPath $interpreter)) { $interpreter = Join-Path $Payload 'runtime\python.exe' }
     # Refused only when neither interpreter is there: an uninstall run from the archive (Uninstall.cmd) over an
@@ -1288,7 +1288,7 @@ if ($Uninstall) {
         Write-Host '       Close it, and run this uninstaller again.'
         exit 1
     }
-    if (Test-Path $Python) {
+    if (Test-Path -LiteralPath $Python) {
         Step 'Removing the watcher, autostart, notification identity and Start Menu entry'
         # Without -Purge this keeps settings and pending recoveries, which is what the
         # message at the end of this branch promises. It used to call plain `uninstall`,
@@ -1383,7 +1383,7 @@ if ($Uninstall) {
         foreach ($process in $ours) { Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue }
         Start-Sleep -Milliseconds 800
     }
-    foreach ($stale in (Get-ChildItem -Path $OwnedHome -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
+    foreach ($stale in (Get-ChildItem -LiteralPath $OwnedHome -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
         # Its True or False is not a line for the log or the setup window.
         $null = Remove-OwnedItem $stale.FullName
     }
@@ -1457,7 +1457,7 @@ if ($Uninstall) {
                         'runtime.json', '.owned-by-codex-auto-resume',
                         '.codex-auto-resume-install-journal.json')) {
         $path = Join-Path $OwnedHome $file
-        if (Test-Path $path) { $null = Remove-OwnedItem $path }
+        if (Test-Path -LiteralPath $path) { $null = Remove-OwnedItem $path }
     }
     if ($Purge) {
         # Only on an explicit request: this is the user's recovery history.
@@ -1493,7 +1493,7 @@ if ($Uninstall) {
 }
 
 # -------------------------------------------------------------------------- install
-if (-not (Test-Path $Payload)) { Fail 'This installer is missing its payload folder.'; exit 1 }
+if (-not (Test-Path -LiteralPath $Payload)) { Fail 'This installer is missing its payload folder.'; exit 1 }
 
 # Said before anything is done: which edition this archive installs. Every route in - Install.cmd,
 # the bootstrap, an update - passes here, so every install says it.
@@ -1526,7 +1526,7 @@ if ((Invoke-Codex $codex @('plugin', '--help')).Code -ne 0) {
 # the deletions would authorise them backwards, which is not authorisation.
 $claimer = Join-Path $Payload 'app\scripts\plugin_setup.py'
 $claimPython = Join-Path $Payload 'runtime\python.exe'
-if (-not (Test-Path $claimPython)) { $claimPython = $Python }
+if (-not (Test-Path -LiteralPath $claimPython)) { $claimPython = $Python }
 # 'Continue' for this call, as for verify-home above: the exit code decides, never a stderr line (M1).
 $ErrorActionPreference = 'Continue'
 $claim = & $claimPython $claimer 'claim-home' 2>$null
@@ -1653,7 +1653,7 @@ $script:DashboardsAskedAt = $null
 $script:DashboardsReopened = $false
 $script:DashboardsFallback = @()
 try {
-    $upgrade = Test-Path $AppDir
+    $upgrade = Test-Path -LiteralPath $AppDir
 
     # Which edition is installed, read while the old program files are still where they were.
     # The move-aside below takes the whole app tree away, which is why no advanced package can
@@ -1694,7 +1694,7 @@ try {
     # whatever was using them has exited, which is normally by now - except the ones the
     # journal still accounts for, which are either the tree just put back or the one an
     # interrupted run was replacing and could not.
-    foreach ($stale in (Get-ChildItem -Path $OwnedHome -Directory -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
+    foreach ($stale in (Get-ChildItem -LiteralPath $OwnedHome -Directory -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
         $canonical = Resolve-Canonical $stale.FullName
         if ($canonical -and ($claimedAside -contains $canonical)) {
             Step ('Keeping ' + $stale.Name + ' until this installation is complete')
@@ -1723,7 +1723,7 @@ try {
     $watcherWasRunning = (Get-OwnedWatcherProcess).Count -gt 0
     if ($watcherWasRunning) {
         Step 'Stopping the running watcher so the new version takes over'
-        if ((Test-Path $Python) -and (Test-Path (Join-Path $AppDir 'scripts\plugin_setup.py'))) {
+        if ((Test-Path -LiteralPath $Python) -and (Test-Path -LiteralPath (Join-Path $AppDir 'scripts\plugin_setup.py'))) {
             $null = Invoke-Setup @('stop')
         }
         $deadline = (Get-Date).AddSeconds(60)
@@ -1789,10 +1789,10 @@ try {
     # fails while putting it back is still free.
     $rootFiles = @('CodexAutoResumeSettings.exe', 'codex-auto-resume.ico')
     foreach ($pair in $pairs) {
-        if (-not (Test-Path (Join-Path $Payload $pair.src))) { Fail ('Payload is incomplete: ' + $pair.src); exit 1 }
+        if (-not (Test-Path -LiteralPath (Join-Path $Payload $pair.src))) { Fail ('Payload is incomplete: ' + $pair.src); exit 1 }
     }
     foreach ($name in $rootFiles) {
-        if (-not (Test-Path (Join-Path $Payload $name))) { Fail ('Payload is incomplete: ' + $name); exit 1 }
+        if (-not (Test-Path -LiteralPath (Join-Path $Payload $name))) { Fail ('Payload is incomplete: ' + $name); exit 1 }
     }
 
     # Move everything aside first, copy second, and undo the whole thing on any failure -
@@ -1806,7 +1806,7 @@ try {
     $stamp = Get-Date -Format 'yyyyMMddHHmmss'
     $plan = @()
     foreach ($pair in $pairs) {
-        if (-not (Test-Path $pair.dst)) { continue }
+        if (-not (Test-Path -LiteralPath $pair.dst)) { continue }
         $aside = $pair.dst + '.old-' + $stamp
         $plan += @{ src = $pair.src; dst = $pair.dst; aside = $aside }
     }
@@ -1817,7 +1817,7 @@ try {
         if ($plan.Count -gt 0) { Write-CopyJournal -Path $Journal -Root $OwnedHome -Entries $plan }
         foreach ($pair in $plan) {
             $aside = $pair.aside
-            Move-Item -Path $pair.dst -Destination $aside -ErrorAction Stop
+            Move-Item -LiteralPath $pair.dst -Destination $aside -ErrorAction Stop
             $moved += @{ from = $aside; to = $pair.dst }
         }
         # File by file, so the setup window's bar follows the copy as it goes (Progress): every folder first, then
@@ -1842,8 +1842,8 @@ try {
     } catch {
         Warn ('Could not replace the installation: ' + $_.Exception.Message)
         foreach ($undo in $moved) {
-            if (Test-Path $undo.to) { $null = Remove-OwnedItem $undo.to }
-            Move-Item -Path $undo.from -Destination $undo.to -Force -ErrorAction SilentlyContinue
+            if (Test-Path -LiteralPath $undo.to) { $null = Remove-OwnedItem $undo.to }
+            Move-Item -LiteralPath $undo.from -Destination $undo.to -Force -ErrorAction SilentlyContinue
         }
         # The journal is deliberately left where it is. The undo above is best-effort, and if
         # any part of it did not take, that file is the only record of where the tree went.
@@ -1864,17 +1864,17 @@ try {
         $source = Join-Path $Payload $name
         $target = Join-Path $InstallHome $name
         try {
-            Copy-Item -Path $source -Destination $target -Force -ErrorAction Stop
+            Copy-Item -LiteralPath $source -Destination $target -Force -ErrorAction Stop
         } catch {
             $aside = $target + '.old-' + (Get-Date -Format 'yyyyMMddHHmmss')
-            Move-Item -Path $target -Destination $aside -Force -ErrorAction SilentlyContinue
-            Copy-Item -Path $source -Destination $target -Force
+            Move-Item -LiteralPath $target -Destination $aside -Force -ErrorAction SilentlyContinue
+            Copy-Item -LiteralPath $source -Destination $target -Force
         }
     }
-    foreach ($stale in (Get-ChildItem -Path $OwnedHome -File -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
+    foreach ($stale in (Get-ChildItem -LiteralPath $OwnedHome -File -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
         $null = Remove-OwnedItem $stale.FullName
     }
-    if (-not (Test-Path $Python)) { Fail 'The bundled Python runtime is missing from the payload.'; exit 1 }
+    if (-not (Test-Path -LiteralPath $Python)) { Fail 'The bundled Python runtime is missing from the payload.'; exit 1 }
     $runtimeVersion = & $Python -c 'import sys;print(str(sys.version_info[0])+chr(46)+str(sys.version_info[1]))'
     Ok ('Bundled Python ' + $runtimeVersion + ' (no system Python needed)')
 

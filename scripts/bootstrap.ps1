@@ -1764,9 +1764,9 @@ function Get-Edition {
 function Get-InstalledVersion {
     param([string]$Home_)
     $manifest = Join-Path $Home_ 'app\.codex-plugin\plugin.json'
-    if (-not (Test-Path (Join-Path $Home_ 'runtime\python.exe'))) { return $null }
-    if (-not (Test-Path $manifest)) { return $null }
-    try { return (Get-Content $manifest -Raw -Encoding UTF8 | ConvertFrom-Json).version }
+    if (-not (Test-Path -LiteralPath (Join-Path $Home_ 'runtime\python.exe'))) { return $null }
+    if (-not (Test-Path -LiteralPath $manifest)) { return $null }
+    try { return (Get-Content -LiteralPath $manifest -Raw -Encoding UTF8 | ConvertFrom-Json).version }
     catch { return $null }
 }
 
@@ -2472,9 +2472,9 @@ try {
     $zip = Join-Path $work $name
 
     if ($ArchivePath) {
-        if (-not (Test-Path $ArchivePath)) { Fail ('No such file: ' + $ArchivePath); exit 1 }
+        if (-not (Test-Path -LiteralPath $ArchivePath)) { Fail ('No such file: ' + $ArchivePath); exit 1 }
         Step ('Using the archive you provided: ' + $ArchivePath)
-        Copy-Item -Path $ArchivePath -Destination $zip -Force
+        Copy-Item -LiteralPath $ArchivePath -Destination $zip -Force
     } else {
         $base = $release.download.Replace('{version}', $target)
         Step ('Downloading v' + $target + ' from github.com over HTTPS.')
