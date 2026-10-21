@@ -47,42 +47,7 @@ Codex에서 설치할 때는 GitHub에서 릴리스를 내려받습니다. 그�
 
 **Windows 10/11. Python 불필요. 관리자 권한 불필요.**
 
-### Codex에서 설치 (권장)
-
-플러그인을 추가한 뒤, Codex에게 **auto resume 설정해줘** 라고 말하면 됩니다.
-
-```
-codex plugin marketplace add songyb111-gachon/codex-auto-resume-windows
-codex plugin add codex-auto-resume@codex-auto-resume-windows
-```
-
-그러면 플러그인의 설치 스크립트가 실행됩니다. 이 저장소의 릴리스에서 해당 버전 압축 파일을
-HTTPS로 내려받아, 플러그인의
-[`scripts/release.json`](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/scripts/release.json)에
-그 버전용으로 기록된 digest와 SHA-256을 대조합니다. 이 digest는 릴리스가 게시된 뒤 이 저장소에
-커밋되는 것으로, 릴리스 자체에서 오는 값이 아닙니다. 플러그인에 들어 있는 `release.json`에
-digest가 없는 버전이면 릴리스에 함께 게시된 `.sha256`과 대조하고, 그렇게 했다고 알려 줍니다.
-digest가 기록된 마지막 버전보다 새로운 버전이 여기에 해당하고, 설치된 플러그인 자신의 버전은
-언제나 여기에 해당합니다. 릴리스는 자기 자신의 digest를 담을 수 없고, 설치한 뒤에는 플러그인이 설치된
-사본에서 실행되기 때문입니다. 이어서 내용이 정말 이 제품의 이 버전인지 확인한 다음에야, 현재
-Windows 사용자에게만 설치합니다. 설치되는 것은 설치 폴더(기본값 `%USERPROFILE%\.codex-auto-resume`)
-안의 파일, 시작 메뉴 항목(알림이 켜져 있을 때이며, 기본값은 켜짐입니다), 사용자 단위 레지스트리 값, 그리고 Codex에 등록되는 이 플러그인과 그
-마켓플레이스(그 설치본을 가리킵니다)입니다. 플러그인의 지침에 따라 Codex가 실행하기 전에 무엇을
-할지 먼저 알려 줍니다.
-
-이 경로는 게시된 압축 파일을 내려받으며, v0.5.0부터 v0.5.7까지의 압축 파일은 모두 예전의 단일 작업(single-job) 릴리스
-워크플로가 빌드했습니다. 이 워크플로는 GitHub Actions를 고정되지 않은 태그로 참조했고, 그 실행 파일은 바이트 단위로 똑같이 다시 빌드할 수 없습니다. 무엇이
-이를 대신하는지는 [릴리스 압축 파일로 설치](#릴리스-압축-파일로-설치)의 2단계에 있습니다. 그 변경은 v0.6.0부터입니다.
-
-GitHub에서 추가한 플러그인에는 스킬과 그 설치 스크립트와 엔진의 Python 소스가 들어 있지만, 그
-소스를 실행할 인터프리터가 없고, 매니페스트에는 MCP 서버가 선언되어 있지 않습니다(릴리스가 더하는
-`.mcp.json`이 가리키는 실행 파일은 릴리스에만 있습니다). 실제로 실행되는 워처와 설정 창과 패널의
-서버와 Windows 런타임은 모두 그 릴리스에서 옵니다.
-그래서 다운로드가 필요하며, 스크립트가 무엇을 하고 무엇을 하지 않는지 미리 확인하고 싶다면
-[`docs/PLUGIN.ko.md`](PLUGIN.ko.md)를
-읽어 보세요.
-
-### 설치 파일로 설치
+### 설치 파일로 설치 (권장)
 
 [최신 릴리스](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/latest)에서
 `CodexAutoResume-Setup-vX.Y.Z.exe`를 받아(v0.6.10과 그 전의 릴리스에는 없습니다) 더블클릭합니다. 설치는 그것으로
@@ -146,6 +111,41 @@ digest를 고정합니다. 설치 파일이 담은 압축 파일이 바로 그 �
 digest도 바꿀 수 있기 때문입니다. Smart App Control을 켜 두었다면 설치 파일이 **실행** 선택지 없이
 차단될 수 있으며, 다른 경로가 실행하는 서명 없는 파일도 마찬가지로 차단될 수 있습니다. 이 프로젝트는
 Smart App Control을 끄라고 요청하지 않습니다.
+
+### Codex에서 설치
+
+플러그인을 추가한 뒤, Codex에게 **auto resume 설정해줘** 라고 말하면 됩니다.
+
+```
+codex plugin marketplace add songyb111-gachon/codex-auto-resume-windows
+codex plugin add codex-auto-resume@codex-auto-resume-windows
+```
+
+그러면 플러그인의 설치 스크립트가 실행됩니다. 이 저장소의 릴리스에서 해당 버전 압축 파일을
+HTTPS로 내려받아, 플러그인의
+[`scripts/release.json`](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/scripts/release.json)에
+그 버전용으로 기록된 digest와 SHA-256을 대조합니다. 이 digest는 릴리스가 게시된 뒤 이 저장소에
+커밋되는 것으로, 릴리스 자체에서 오는 값이 아닙니다. 플러그인에 들어 있는 `release.json`에
+digest가 없는 버전이면 릴리스에 함께 게시된 `.sha256`과 대조하고, 그렇게 했다고 알려 줍니다.
+digest가 기록된 마지막 버전보다 새로운 버전이 여기에 해당하고, 설치된 플러그인 자신의 버전은
+언제나 여기에 해당합니다. 릴리스는 자기 자신의 digest를 담을 수 없고, 설치한 뒤에는 플러그인이 설치된
+사본에서 실행되기 때문입니다. 이어서 내용이 정말 이 제품의 이 버전인지 확인한 다음에야, 현재
+Windows 사용자에게만 설치합니다. 설치되는 것은 설치 폴더(기본값 `%USERPROFILE%\.codex-auto-resume`)
+안의 파일, 시작 메뉴 항목(알림이 켜져 있을 때이며, 기본값은 켜짐입니다), 사용자 단위 레지스트리 값, 그리고 Codex에 등록되는 이 플러그인과 그
+마켓플레이스(그 설치본을 가리킵니다)입니다. 플러그인의 지침에 따라 Codex가 실행하기 전에 무엇을
+할지 먼저 알려 줍니다.
+
+이 경로는 게시된 압축 파일을 내려받으며, v0.5.0부터 v0.5.7까지의 압축 파일은 모두 예전의 단일 작업(single-job) 릴리스
+워크플로가 빌드했습니다. 이 워크플로는 GitHub Actions를 고정되지 않은 태그로 참조했고, 그 실행 파일은 바이트 단위로 똑같이 다시 빌드할 수 없습니다. 무엇이
+이를 대신하는지는 [릴리스 압축 파일로 설치](#릴리스-압축-파일로-설치)의 2단계에 있습니다. 그 변경은 v0.6.0부터입니다.
+
+GitHub에서 추가한 플러그인에는 스킬과 그 설치 스크립트와 엔진의 Python 소스가 들어 있지만, 그
+소스를 실행할 인터프리터가 없고, 매니페스트에는 MCP 서버가 선언되어 있지 않습니다(릴리스가 더하는
+`.mcp.json`이 가리키는 실행 파일은 릴리스에만 있습니다). 실제로 실행되는 워처와 설정 창과 패널의
+서버와 Windows 런타임은 모두 그 릴리스에서 옵니다.
+그래서 다운로드가 필요하며, 스크립트가 무엇을 하고 무엇을 하지 않는지 미리 확인하고 싶다면
+[`docs/PLUGIN.ko.md`](PLUGIN.ko.md)를
+읽어 보세요.
 
 ### 릴리스 압축 파일로 설치
 
@@ -282,17 +282,17 @@ Codex의 도구도 제공하지 않습니다.
 
 예라고 하면 목록을 다시 읽고(보여 줄 때처럼 제공되지 않게 된 버전은 아무것도 설치하지 않습니다), 그 버전의
 압축 파일(고정된 다이제스트가 없으면 그 `.sha256`도)을 내려받아 모든 설치가 하듯 파일과 내용을 확인한 뒤에야
-설치 잠금을 잡습니다. v0.6.2부터 v0.6.11-alpha까지의 버전은 한 단계 오래된 스키마의 상태를 읽으므로, 그런
-버전이면 이어서 워처에게 멈추라고 요청하고 최대 1분 기다리며 절대 강제로 끝내지 않고, `downgrade-state --to 3`이
+설치 잠금을 잡습니다. 더 오래된 상태를 읽는 버전, 곧 v0.6.11-beta부터 v0.6.14까지와 v0.6.15 핫픽스(스키마 4)나 v0.6.2부터 v0.6.11-alpha까지(스키마 3)는
+이어서 워처에게 멈추라고 요청하고 최대 1분 기다리며 절대 강제로 끝내지 않고, `downgrade-state --to 4`나 `--to 3`이
 하듯 상태를 바꿉니다. 지금 상태의 사본을 옆에 남기고, 이미 Codex로 갔을 수 있는 이어가기는 끝난 것으로 해서 다시
 보내지 않으며, 사용자를 기다리던 대화와 Codex가 아직 이어가기를 전달할 수 있는 대화는 끄고, 지켜보기만이 켜져
 있으면 일시 정지로 바꿉니다. 1분 안에 멈추지 않는 워처가 있으면 아무것도 설치하지 않고 상태도 그대로 두지만,
 그 워처는 멈추라는 요청을 받았으므로 그 뒤에 멈출 수 있고, 그때 다시 시작해 주는 것은 없습니다. 머리글이 워처가
-돌지 않는다고 말하면 **워처 시작**을 누르세요. 바꾸기에 실패하면 워처를 다시 시작하고 아무것도 설치하지 않습니다. 그다음 그 버전 자신의 설치 프로그램이 돌며 모든 기록, 일시 정지, 로그인 시
-시작 선택을 그대로 둡니다. 이번 릴리스보다 오래된 버전은 설정 > 앱의 항목도, 그것을 위해 보관한 제거 프로그램도 모르므로, 그 둘이 있는 설치본
+돌지 않는다고 말하면 **워처 시작**을 누르세요. 바꾸기에 실패하면 워처를 다시 시작하고 아무것도 설치하지 않습니다. 그다음 그 버전 자신의 설치 프로그램이 설치 창에서 돌며(다른 버전을 설치한다는 머리글 아래, 막대는 내려받기와 단계로 차오르고, 끝나면 종료 코드와 로그를 보여 줍니다) 모든 기록, 일시 정지, 로그인 시
+시작 선택을 그대로 둡니다. v0.6.16보다 오래된 버전은 설정 > 앱의 항목도, 그것을 위해 보관한 제거 프로그램도 모르므로, 그 둘이 있는 설치본
 위에 그런 버전을 고르면 먼저 둘을 지웁니다. 이 모든 것이 도는 동안 페이지의 모든 동작 단추는 **워처 시작**까지 흐리게 표시됩니다.
 
-끝나면 창은 워처가 이제 설치한 버전으로 도는지, 그리고 상태를 바꿨다면 이어가기 몇 개를 끝난 것으로 했고 대화
+설치되었고 *대시보드 열기*가 선택되어 있으면 새 대시보드가 열리고 이 창은 업데이트 뒤처럼 닫힙니다. 그렇지 않으면 창은 워처가 이제 설치한 버전으로 도는지, 그리고 상태를 바꿨다면 이어가기 몇 개를 끝난 것으로 했고 대화
 몇 개를 껐는지 말합니다. 설치한 버전으로 돌게 하려면 창을 닫았다가 다시 여세요. 쓰고 있는 판의 오래된 버전이면
 확인 창은 그 버전에서 *업데이트 확인*으로 돌아오라고도 말하지만, 그것이 될 때만 말합니다. 릴리스에서라면 어느
 버전의 확인이든 최신 릴리스를 권하고, 사전 릴리스에서라면 확인이 사전 릴리스를 권하는 첫 버전인 v0.6.11-beta.2
@@ -562,8 +562,7 @@ VS Code)에서 열려 있습니다. Codex 앱이 잡으면 이어집니다."라�
 - 단일 인스턴스 보호, 선택적인 사용자 단위 Windows 자동 시작, 보수적인 제거를 갖췄습니다.
 - 설정을 바꾸는 방법이 세 가지(시작 메뉴의 대시보드, Codex 안의 패널, 명령줄)이고, 모두 같은
   검증기를 거쳐 같은 파일에 쓰므로 서로 어긋날 수 없습니다.
-- 화면 언어는 아홉 개입니다. 영어, 한국어, 일본어, 중국어 간체·번체, 스페인어, 독일어, 프랑스어,
-  브라질 포르투갈어이며, 직접 고르지 않으면 Windows를 따릅니다.
+- 화면 언어는 열여섯 개입니다([언어](#언어) 참고). 직접 고르지 않으면 Windows를 따릅니다.
 - 밝은 테마와 어두운 테마가 있습니다. 직접 고르지 않으면 대시보드와 팝업은 Windows를, 패널은
   Codex를 따릅니다. 고대비는 언제나 따릅니다.
 - 이어서 하기 메시지를 다듬을 수 있습니다. 언어, 간단히·기본·자세히 스타일, 또는 직접 쓴 문장(직접
@@ -740,7 +739,7 @@ Codex 안의 설정 패널은 대화 안뿐 아니라 대화 옆, Codex 앱의 �
 - **돌아오면 다시 읽기.** 채팅 옆에서는 사용자가 패널로 돌아올 때 상태를 다시 읽습니다. 15초에 한 번을 넘지 않고, 거기서
   무언가를 바꾸는 중일 때는 절대 읽지 않으며, 키보드는 있던 컨트롤에 그대로 둡니다. 타이머는 돌리지 않습니다.
 
-Codex 앱이 패널을 그곳에 제대로 보여 주는지 재는 측정 MP1~MP3은 `codex-cli 0.162`에서 통과했습니다
+Codex 앱이 패널을 그곳에 제대로 보여 주는지 재는 측정 MP1~MP3은 `codex-cli 0.162`와 `codex-cli 0.163`에서 통과했습니다
 ([LIVE_ACCEPTANCE.ko.md](LIVE_ACCEPTANCE.ko.md)).
 
 ## 소스에서 실행하기
@@ -760,7 +759,7 @@ cd codex-auto-resume-windows
 빌드할 것은 없습니다. 먼저 환경을 확인하세요.
 
 ```bash
-python src\auto_resume.py doctor
+python src/auto_resume.py doctor
 ```
 
 `doctor`는 메시지를 큐에 넣지 않고 Codex의 파일을 하나도 쓰기 모드로 열지 않습니다. 만들 수 있는 것은
@@ -771,15 +770,15 @@ python src\auto_resume.py doctor
 ## 빠른 시작
 
 ```bash
-python src\auto_resume.py doctor
+python src/auto_resume.py doctor
 ```
 
 ```bash
-python src\auto_resume.py enable
+python src/auto_resume.py enable
 ```
 
 ```bash
-python src\auto_resume.py run
+python src/auto_resume.py run
 ```
 
 `run`은 포그라운드에 머물며 폴링합니다. 작업하는 동안 터미널에 띄워 두세요.
@@ -787,25 +786,25 @@ python src\auto_resume.py run
 무엇을 하고 있는지 확인하기:
 
 ```bash
-python src\auto_resume.py status
+python src/auto_resume.py status
 ```
 
 ```bash
-python src\auto_resume.py pending
+python src/auto_resume.py pending
 ```
 
 ```bash
-python src\auto_resume.py logs
+python src/auto_resume.py logs
 ```
 
 멈추기:
 
 ```bash
-python src\auto_resume.py disable
+python src/auto_resume.py disable
 ```
 
 ```bash
-python src\auto_resume.py stop
+python src/auto_resume.py stop
 ```
 
 `disable`은 kill switch입니다. 대기 중인 기록은 남긴 채 이후의 재개를 모두 즉시 막습니다. `stop`은
@@ -827,6 +826,7 @@ python src\auto_resume.py stop
 | `install` | 소유 디렉터리와 상태 생성 (`--startup`) |
 | `uninstall` | 자동 시작과 소유한 상태·로그 제거 (`--keep-logs`, `--keep-state`) |
 | `diagnostics` | 공유하기 전에 읽어 볼, 민감한 값을 가린 진단 파일 하나를 씁니다 (`--out`) |
+| `downgrade-state --to 4` | v0.6.11부터 v0.6.14까지의 릴리스와 v0.6.15 핫픽스가 읽을 수 있게 상태 파일을 다시 씁니다. 먼저 워처를 멈추거나 아래처럼 `--stop-watcher`를 쓰세요. 바꾸는 방식은 `--to 3`과 같으며, *다른 버전 설치...*가 이것을 씁니다 |
 | `downgrade-state --to 3` | v0.6.0부터 v0.6.10까지의 릴리스가 읽을 수 있게 상태 파일을 다시 씁니다. 먼저 워처를 멈추세요. 이미 나갔을 수 있는 이어가기는 끝난 것으로 표시하고, 사용자의 확인을 기다리던 대화와 Codex가 아직 이어가기를 전달할 수 있는 대화는 끕니다. `--stop-watcher`를 주면 대신 워처에게 멈추라고 요청하고 최대 1분 기다리며 절대 강제로 끝내지 않고, 한 일을 한 줄로 말합니다. *다른 버전 설치...*가 이것을 씁니다 |
 | `downgrade-state --to 2` | v0.5 릴리스가 읽을 수 있게 상태 파일을 다시 씁니다. 먼저 워처를 멈추세요 |
 | `compat` | Codex 호환성 레지스트리가 이 Codex에 대해 말하는 것을 워처의 마지막 보고에서 보여 줍니다 (`--live`는 지금 확인하고 아무것도 쓰지 않음, `--json`, `--import FILE`은 데이터 파일을 검증해 통과할 때만 보관) |
@@ -1303,7 +1303,7 @@ Codex 사용량(개요가 보여 주는 것과 같은 숫자)이 들어 있습�
 
 ### 여러 Codex 홈
 
-이번 릴리스부터 워처 하나가 처음 찾은 홈(`CODEX_HOME` 또는 `%USERPROFILE%\.codex`) 말고도 Codex 홈을 최대 세 개 더
+v0.6.16부터(처음에는 v0.6.15-beta로 게시되었습니다) 워처 하나가 처음 찾은 홈(`CODEX_HOME` 또는 `%USERPROFILE%\.codex`) 말고도 Codex 홈을 최대 세 개 더
 맡아 복구할 수 있습니다. *설정 > 고급 > Codex 홈*에 목록이 있습니다. 폴더 - 안에 `state_<N>.sqlite`가 있는 Codex 홈 - 를
 더하고 짧은 별칭을 붙이세요. 네트워크(UNC) 경로, 링크, 상태 데이터베이스가 없는 폴더, 이미 다른 이름으로 목록에 있는 같은
 폴더는 거절됩니다. 홈마다 따로 읽기, `CODEX_HOME`을 그 홈으로 둔 Codex 프로세스, 잠금, 엔진으로 복구하며, 기록은 자기 홈으로만
@@ -1409,7 +1409,7 @@ Windows보다 우선하며 재시작·복구·업데이트 뒤에도 유지됩�
 선택 사항이고, 사용자 단위이며, 꼭 필요하지 않습니다.
 
 ```bash
-python src\auto_resume.py install --startup
+python src/auto_resume.py install --startup
 ```
 
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 아래에 값 하나만 씁니다. 관리자 권한이 필요
@@ -1423,7 +1423,8 @@ python src\auto_resume.py install --startup
 
 ## 제거
 
-릴리스 압축 파일의 `Uninstall.cmd`를 실행하거나, Codex에게 auto resume 제거를 요청하면 됩니다.
+Windows **설정 > 앱**에서 제거하거나, 설치 프로그램을 다시 실행해 **제거**를 고르거나, 릴리스 압축 파일의
+`Uninstall.cmd`를 실행하거나, Codex에게 auto resume 제거를 요청하면 됩니다.
 `Uninstall.cmd`는 기본적으로 설정과 대기 중인 재개를 남겨 두므로(기본 로그와 오류 로그는 지우고,
 `logs\launcher.log`와 `logs\codex-start.log`는 남습니다) 다시 설치해도 잃지 않습니다.
 이것까지 지우려면 `Uninstall.cmd -Purge`를 실행하거나 설치 폴더(기본값
@@ -1439,11 +1440,11 @@ Windows 등록과 플러그인을 제거하며, 함께 지워 달라고 하지 �
 로그가, `--keep-state`를 붙이면 설정과 대기 중인 복구가 남습니다).
 
 ```bash
-python src\auto_resume.py uninstall
+python src/auto_resume.py uninstall
 ```
 
 ```bash
-python src\auto_resume.py uninstall --keep-logs
+python src/auto_resume.py uninstall --keep-logs
 ```
 
 제거는 의도적으로 보수적입니다.
@@ -1616,18 +1617,17 @@ Codex에 등록된 이 플러그인과 마켓플레이스를 남기며, 이 중 
   제출되었고, 30초 뒤 전달이 따로 확인되었습니다. 한 번의 실행일 뿐 쌓인 실적은 아닙니다. 일시적
   장애의 복구는 테스트로만 확인했고, 실제 장애로는 아직 겪어 보지 않았습니다.
 - 알림 영역 팝업은 탐색기에서 실제로 아이콘을 클릭해 여는 방식으로는 아직 확인하지 않았습니다.
-- 일본어, 중국어 간체·번체, 스페인어, 독일어, 프랑스어, 브라질 포르투갈어 번역은 원어민의 검토를
-  거치지 않았습니다.
+- 어떤 번역도 원어민의 검토를 거치지 않았습니다. 테스트는 각 번역이 빠짐없는지, 자리 표시자를 지키는지,
+  최신인지를 확인하며 문구는 확인하지 않습니다.
 
 ## 테스트
 
 자동 테스트 실행:
 
-```bash
+```powershell
+$env:PYTHONPATH = 'src'
 python -m unittest discover -s tests
 ```
-
-먼저 `PYTHONPATH=src`를 설정하세요(Windows에서는 `set PYTHONPATH=src`).
 
 이 테스트들은 가짜 객체와 임시 디렉터리를 씁니다. ChatGPT 앱에 접속하지 않고 어떤 대화에도 메시지를
 보내지 않으므로 어디서든 안전하게 실행할 수 있으며, CI가 돌리는 것도 이 테스트입니다. CI는 이 테스트를
@@ -1638,8 +1638,8 @@ python -m unittest discover -s tests
 분류, 사용량 읽기를 검증합니다. 어떤 대화에도 메시지를 보내지 않지만, 사용량을 읽을 때는 워처가
 재개하기 전에 하듯이 Codex를 통해 OpenAI에 현재 사용량을 묻습니다.
 
-```bash
-set CODEX_AR_LIVE=1 && python -m unittest tests.test_integration_live
+```powershell
+$env:CODEX_AR_LIVE = '1'; $env:PYTHONPATH = 'src'; python -m unittest tests.test_integration_live
 ```
 
 ## 보안
@@ -1665,6 +1665,8 @@ Software Foundation의 서명을 유지합니다.
 
 ## 그 밖의 문서
 
+- 표준판과 고급판이 각각 무엇인지, 고급 기능 하나하나가 무엇을 하고 무엇을 감수하는지, 판을 고르고 바꾸는 법: [docs/EDITIONS.ko.md](EDITIONS.ko.md)
+- 이 제품이 지키는 모든 기준을 id별로, 저마다 어떻게 지켜지는지와 그것을 지키는 테스트와 함께: [docs/STANDARDS.ko.md](STANDARDS.ko.md)
 - 플러그인 계층, 설치 스크립트가 가져올 수 있는 것과 확인하는 것, 업데이트와 제거의 수명 주기, 사용량 한도 안내에 체크박스를 넣지 못하는 이유: [docs/PLUGIN.ko.md](PLUGIN.ko.md)
 - 내려받은 압축 파일을 확인하고 릴리스를 직접 다시 빌드하는 방법, 그리고 그 확인이 증명하는 것과 증명하지 못하는 것: [docs/VERIFY.ko.md](VERIFY.ko.md)
 - 이 제품이 한다고 말하는 모든 것과, 그 하나하나가 실제로 확보한 근거 등급(실제 저장소와 엔진으로 시험한 것, 구현만 된 것, 아무도 동작을 지켜보지 못한 것): [docs/FEATURE_MATRIX.ko.md](FEATURE_MATRIX.ko.md)
@@ -1677,6 +1679,7 @@ Software Foundation의 서명을 유지합니다.
 - 무엇을 읽고, 무엇을 저장하고, 무엇이 어디로 가는지: [PRIVACY.ko.md](PRIVACY.ko.md)
 - 위협 모델, 적대적 검토 결과, 취약점을 알리는 방법: [SECURITY.ko.md](SECURITY.ko.md)
 - 문제 종류마다 어디에 알릴지, 공개 이슈에 붙여넣으면 안 되는 것: [SUPPORT.ko.md](SUPPORT.ko.md)
+- 만든 사람과 도운 도구, 그리고 문제를 알려 주고 기능을 제안하고 시험해 준 분들: [CONTRIBUTORS.ko.md](CONTRIBUTORS.ko.md)
 - 테스트, 릴리스 빌드, fixture 규칙, 그리고 변경이 지켜야 할 안전 속성: [CONTRIBUTING.ko.md](CONTRIBUTING.ko.md)
 
 ## 개발과 기여
