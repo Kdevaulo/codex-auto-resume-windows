@@ -43,7 +43,7 @@ MIXINS = (package.OptionsMixin, package.AnnounceMixin, package.FreshnessMixin,
 
 # The forty-one methods the one class had, counted the day it was split.
 METHODS = {
-    "__init__", "_after_send", "_delete", "_legacy_carry", "_owner", "_projection_now",
+    "__init__", "_after_send", "_cut_off", "_delete", "_legacy_carry", "_owner", "_projection_now",
     "_refused", "_stop_for_budget", "_usage_wait", "_wait", "allowed", "announce",
     "apply_policy", "attempt", "collect", "correlate", "delay_for", "dispatch",
     "first_delay", "fresh_throughout", "guard_queued", "limits", "loaded", "observe",
