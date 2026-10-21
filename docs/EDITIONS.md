@@ -136,6 +136,10 @@ you start it in the Dashboard (below). Its archive also carries
 the harness the project uses to measure whether a capability's route works on a given version of
 Codex; nothing runs it unless a person asks, and [SECURITY.md](SECURITY.md) says what it does.
 
+No capability stores a secret today. The package carries one way to keep a capability's secret, in Windows'
+Credential Manager under a name of its own and never in its database, a settings file or a log, for a capability
+that will need one; nothing calls it, and it never reads Codex's own credentials.
+
 ## Today's capabilities
 
 Thirty-two: twenty-two that change how a recovery is made, which conversations are recovered or what
