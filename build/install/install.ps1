@@ -1461,11 +1461,19 @@ if ($Uninstall) {
     }
     if ($Purge) {
         # Only on an explicit request: this is the user's recovery history.
+        # Asked whether it worked: a held log file used to stay while this said it was removed (v0.6.20 audit, M3).
+        $kept = @()
         foreach ($dir in @((Join-Path $OwnedHome 'config'), (Join-Path $OwnedHome 'logs'))) {
-            if (Test-Path $dir) { $null = Remove-OwnedItem $dir }
+            if ((Test-Path -LiteralPath $dir) -and -not (Remove-OwnedItem $dir)) { $kept += $dir }
         }
         Write-Host ''
-        Write-Host 'Removed, including settings and recovery history.'
+        if ($kept.Count -gt 0) {
+            Fail 'Removed, but some settings or recovery history could not be removed:'
+            foreach ($dir in $kept) { Write-Host ('       ' + $dir) }
+            Write-Host '       The program is gone; close what is using them, then delete them yourself.'
+        } else {
+            Write-Host 'Removed, including settings and recovery history.'
+        }
     } else {
         Write-Host ''
         Write-Host 'Removed. Settings and pending recoveries were kept.'
