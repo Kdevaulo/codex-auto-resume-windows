@@ -119,6 +119,9 @@ class ReasonCode(StrEnum):
     # A recovery that worked and was interrupted again, usually by the next usage limit: the record is
     # `recovered`, because it was, and this reason keeps that the turn itself did not end cleanly.
     PROGRESS_THEN_TURN_FAILED = "progress_then_turn_failed"
+    # And one that worked and whose turn Codex never finished: Codex closed, or the PC went off, mid-turn, so its row
+    # says inProgress for good - a later turn of the conversation has started, or Windows started since (2026-10-21).
+    PROGRESS_THEN_TURN_CUT_OFF = "progress_then_turn_cut_off"
     TURN_INTERRUPTED = "turn_interrupted"
     # a withdrawal's, as WithdrawReason
     CANCEL = "cancel"
