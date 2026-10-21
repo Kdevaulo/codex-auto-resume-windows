@@ -394,6 +394,8 @@ class WatchLoop:
                     self._failure_baseline()            # made good at the next tick if a write was refused
                 if icon is not None:
                     self._update_tray(icon, store)
+                else:
+                    self._edition_surface(store)
                 last_tick = time.monotonic()
                 if once:
                     if engine is None:

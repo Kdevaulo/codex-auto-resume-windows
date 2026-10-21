@@ -79,7 +79,9 @@ def cmd_activate(args) -> int:
     # What it says afterwards is the notice a card's cancel announces (notifier.build_cancelled): the same words,
     # a body that opens its page, and staying on screen when a person chose that kind (v0.6.16) - Windows' toast,
     # as the power-stop branch above raises its own.
-    notifier.deliver(notifier.build_cancelled(thread_id, notice_kinds.chosen(app.settings)), inbox=None,
-                     setting=False)
+    # v0.6.18: with Open Codex where the notice pressed offered it - the decision the watcher made, carried on the
+    # button's URI (notify.cancel_asks_open_codex), since this process loads no plug.
+    notifier.deliver(notifier.with_open_codex(notifier.build_cancelled(thread_id, notice_kinds.chosen(app.settings)),
+                                              notify.cancel_asks_open_codex(args.uri)), inbox=None, setting=False)
     _print("thread %s cancelled" % thread_id)
     return EXIT_OK

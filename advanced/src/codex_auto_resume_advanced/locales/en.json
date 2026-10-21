@@ -618,5 +618,17 @@
   "page.row.compact": "Run /compact in Codex; it continues after",
   "page.row.model_not_restored": "This conversation now uses another model; switch it back in Codex",
   "page.row.silent": "continued with no words, proven by its id",
-  "page.keep_on.never": "It cannot be kept on: turning itself off when something goes wrong is what keeps it safe."
+  "page.keep_on.never": "It cannot be kept on: turning itself off when something goes wrong is what keeps it safe.",
+  "name.open_codex_button": "Open Codex on a notice",
+  "statement.open_codex_button.does": "Adds an Open Codex button to every notice about one conversation, beside Open Dashboard, on the product's card and on Windows' own notification alike. A click shows that conversation in the Codex app through Codex's own link to it: a running or minimized app comes to the front at that conversation, and a closed one starts there. The button is offered only where Windows can open Codex's links. Nothing is sent, and nothing in the conversation changes.",
+  "statement.open_codex_button.instead": "The standard edition's notices offer only Don't resume (or Don't retry) and Open Dashboard; you open the conversation in Codex yourself.",
+  "statement.open_codex_button.departs": "A28 (a notice's button only cancels one interruption or opens one page of the Dashboard), B16 (Windows is asked only the listed questions; whether something is registered for Codex's links is read too) and F6 (explorer.exe, which hands the link to Windows, is not one of the listed processes).",
+  "statement.open_codex_button.risks": "The link is Codex's, not this product's: a version of the Codex app that changes it may open without the conversation, or not at all. Windows opens it with whatever is registered for codex: links. That registration is only read, never written.",
+  "statement.open_codex_button.stop": "Turn it off here or turn every advanced feature off. Notices are then exactly as they were; a card already on screen keeps the buttons it was shown with.",
+  "name.idle_update_check": "Check for updates once a week",
+  "statement.idle_update_check.does": "At most once a week, while no recovery is waiting or being sent, runs the same check the Dashboard's Check for updates runs: this installation's own, with the same time limit. When it finds a newer release - or a newer pre-release, where a check you start would offer one - it shows one notice whose button opens the Dashboard's Diagnostics page, where you install it. It never downloads or installs anything itself. While recovery is paused, or your administrator turned the update check off, no check is made.",
+  "statement.idle_update_check.instead": "The standard edition asks GitHub only when you press Check for updates; nothing is asked on a schedule.",
+  "statement.idle_update_check.departs": "C4 (nothing happens on its own, on a schedule), C5 (the update check runs when a button is pressed) and C7 (the Codex compatibility data is refreshed only on request, never by the watcher; the check refreshes it as a check you start does).",
+  "statement.idle_update_check.risks": "Each check makes the requests a check you start makes - to github.com, to GitHub's list of this project's releases and for the compatibility data - so GitHub sees this PC's address and the time, once a week. A check that fails, that GitHub refuses or that is still running after the time limit says nothing and waits for the next week.",
+  "statement.idle_update_check.stop": "Turn it off here or turn every advanced feature off; from then on nothing is asked without a click, as before, and a version it found is not shown again. While it stays on, a version it found is shown again each time the watcher starts, until that version is installed."
 }

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import re
 import subprocess
 import time
 
@@ -83,6 +84,33 @@ def parse_cancel_uri(uri: str) -> str | None:
     if len(values) != 1:
         return None
     return ids.read_interruption_id(values[0])
+
+
+# v0.6.18: a cancel URI may carry the watcher's decision that a notice about one conversation offers Open Codex (an
+# edition's, notifier.with_open_codex), so the notice that says the cancel happened - raised by the separate process
+# Windows starts for a toast's button, which loads no plug (commands/watcher.cmd_activate) - offers it too. The flag
+# only ever adds that button, for the cancelled record's own conversation; parse_cancel_uri passes it over.
+OPEN_CODEX_FLAG = "c"
+
+
+def with_open_codex_flag(uri: str) -> str:
+    """A cancel URI with the Open Codex flag on it; any other URI as it is."""
+    if parse_cancel_uri(uri) is None or cancel_asks_open_codex(uri):
+        return uri
+    return "%s&%s=1" % (uri, OPEN_CODEX_FLAG)
+
+
+def cancel_asks_open_codex(uri) -> bool:
+    """Whether a valid cancel URI carries the Open Codex flag, exactly once and exactly 1."""
+    from urllib.parse import parse_qs, urlsplit
+
+    if parse_cancel_uri(uri) is None:
+        return False
+    try:
+        values = parse_qs(urlsplit(str(uri)).query).get(OPEN_CODEX_FLAG) or []
+    except (ValueError, TypeError):
+        return False
+    return values == ["1"]
 
 
 def open_uri(page: str = "pending") -> str:
@@ -627,6 +655,23 @@ def near_limit_content(minutes, percent, reset_at, kind=None) -> dict:
             if type(reset_at) is int else say("usage.window", window=window, percent=share))
     return _content(l10n.message("toast_near_limit"), body,
                     more=[(l10n.message("toast_button_open"), open_uri("overview"))])
+
+
+# v0.6.18: the version a weekly update check of the advanced edition may name - a release's three numbers, or a
+# pre-release's with -alpha or -beta and a stage's number, as the Dashboard holds the check's `prerelease:` line to.
+UPDATE_VERSION = re.compile(r"(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})"
+                            r"(-(alpha|beta)(\.([2-9]|[1-9][0-9]{1,2}))?)?\Z")
+
+
+def update_offered_content(version, prerelease=False):
+    """The advanced edition's weekly update check found a newer version (v0.6.18): which one - a release, or a
+    pre-release, said as such - and one button that opens Diagnostics, where an update is installed. None for a version
+    of any other shape. About no conversation; only that check's surface ever asks for it."""
+    if not isinstance(version, str) or not UPDATE_VERSION.match(version):
+        return None
+    body = l10n.message("toast_update_offered_prerelease_body" if prerelease else "toast_update_offered_body")
+    return _content(l10n.message("toast_update_offered"), body.replace("{version}", version),
+                    more=[(l10n.message("toast_button_open"), open_uri("diagnostics"))])
 
 
 # ------------------------------------------------- the power action after recoveries (v0.6.12)

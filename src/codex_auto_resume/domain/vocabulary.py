@@ -617,3 +617,5 @@ class NoticeKind(StrEnum):
     NEAR_LIMIT_NOT_STOPPED = "near_limit_not_stopped"
     NEAR_LIMIT_PRESS_RESUME = "near_limit_press_resume"
     NEAR_LIMIT_NOT_CONTINUED = "near_limit_not_continued"
+    # v0.6.18: the advanced edition's weekly update check offers a newer version - shown only from its plug's surface.
+    UPDATE_OFFERED = "update_offered"
