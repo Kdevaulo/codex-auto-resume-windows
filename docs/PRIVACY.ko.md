@@ -396,7 +396,7 @@ OpenTelemetry exporter(`otel.exporter`, `otel.trace_exporter`, `otel.metrics_exp
 `open_settings`, 그리고 각종 제어 도구(`retry_now`, `cancel_recovery`, `reset_recovery_budget`,
 `pause_auto_recovery`와 `resume_auto_recovery`, `disable_conversation_recovery`와
 `enable_conversation_recovery`, `clear_recovery_history`, `start_watcher`, `update_settings`,
-`restore_default_settings`, 그리고 이번 릴리스부터 `postpone_recovery`와 `release_hold`), 그리고 v0.6.2 다음 릴리스부터 `preview_recovery_message`이며, 고급판에는
+`restore_default_settings`, 이번 릴리스부터 `postpone_recovery`와 `release_hold`, 그리고 `turn_off_power_action`), 그리고 v0.6.2 다음 릴리스부터 `preview_recovery_message`이며, 고급판에는
 `list_advanced_capabilities`, `disarm_advanced_capability`, `disarm_all_advanced`도 있습니다. 이것들이 Codex 대화 안에서
 실행되면 돌려준 내용이 그 대화의 일부가 됩니다. 한 줄 요약은 언제나 그렇고, 구조화된 데이터도 그럴 수
 있습니다. Codex는 여느 도구 출력과 마찬가지로 그 대화를 OpenAI로 보냅니다. 그 내용은 다음과 같습니다:
@@ -523,6 +523,11 @@ OpenTelemetry exporter(`otel.exporter`, `otel.trace_exporter`, `otel.metrics_exp
 - `config/reopen-after-update-<프로세스 id>.txt`(이번 릴리스부터, 업데이트(설치 프로그램이나 `-Silent`)가 열려 있는 대시보드에 닫아 달라고
   요청하는 순간에만) — 대시보드가 있던 페이지, 화면에서의 위치와 크기, 테마와 디자인, 어느 컨트롤에 초점이 있었는지이며, 대화나 경로나
   글은 없습니다. 설치기가 이를 한 번 읽어 새 버전을 있던 자리에서 열고 지웁니다;
+- `config/edition-left.txt`(이번 릴리스부터, 제거가 상태를 남겨 둘 때에만, 곧 `Uninstall.cmd`가 `-Purge` 없이 돌 때와
+  `uninstall --keep-state`일 때) - 그 제거가 치운 판의 이름 한 단어입니다. 설치기는 남은 상태 위에 고급판을 설치할 때 이를 읽어 같은 판이
+  돌아오는 것인지 판을 바꾸는 것인지 가리고, 다음 설치가 이를 지웁니다. 경로도 id도 글도 없습니다.
+  `Uninstall.cmd -Purge`로 `config/`의 나머지와 함께 지워지고, 명령줄의 `uninstall`은 `--keep-state`를 주지
+  않는 한 이것도 지웁니다;
 - `logs/` — 워처가 무엇을 했는지 사유 코드와 대화 UUID로 기록하는 `auto-resume.log`, 문제가 생겼을 때의
   Python traceback이 남는 `errors.log`, 실행될 때마다 한 줄씩(실패했다면 그 이유도) 남는 `launcher.log`.
   v0.6.8 다음 릴리스부터는 `codex-start.log`도 있습니다. Codex가 플러그인의 MCP 서버를 시작할 때마다 한 줄씩,

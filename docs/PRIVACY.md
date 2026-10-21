@@ -463,7 +463,7 @@ The plugin gives Codex tools — `get_status`, `list_pending`, `get_recovery_tim
 `get_recovery_statistics`, `open_settings`, and the controls (`retry_now`, `cancel_recovery`,
 `reset_recovery_budget`, `pause_auto_recovery` and `resume_auto_recovery`,
 `disable_conversation_recovery` and `enable_conversation_recovery`, `clear_recovery_history`,
-`start_watcher`, `update_settings`, `restore_default_settings`, and from v0.6.11 `postpone_recovery` and `release_hold`), and, from v0.6.3, `preview_recovery_message` — in the advanced edition also
+`start_watcher`, `update_settings`, `restore_default_settings`, from v0.6.11 `postpone_recovery` and `release_hold`, and from v0.6.12 `turn_off_power_action`), and, from v0.6.3, `preview_recovery_message` — in the advanced edition also
 `list_advanced_capabilities`, `disarm_advanced_capability` and `disarm_all_advanced` — and a skill that runs the
 tool's commands (for example `status`, `pending`, `doctor` and `logs`). When they run inside a
 Codex conversation, what they return becomes part of that conversation. The
@@ -626,6 +626,12 @@ default (or wherever `CODEX_AUTO_RESUME_PLUGIN_HOME`, or failing that
   or `-Silent`) asks an open Dashboard to close: the page the Dashboard was on, its place and size on screen,
   its theme and design and which control had the focus - no conversation, path or text. The installer reads it
   once to open the new version where it was, and deletes it;
+- `config/edition-left.txt`, from v0.6.16, only when an uninstall keeps your state (as `Uninstall.cmd` does
+  unless you pass `-Purge`, and `uninstall --keep-state` does): one word, the edition that uninstall took
+  away. The installer reads it when it installs the advanced edition over state left behind, to tell the same
+  edition coming back from a change of edition, and the next install deletes it. No path, id or text. It goes
+  with the rest of `config/` under `Uninstall.cmd -Purge`, and the command line's `uninstall` deletes it unless
+  you pass `--keep-state`;
 - `logs/` — `auto-resume.log`, what the watcher did, by reason code and conversation UUID;
   `errors.log`, the Python traceback when something goes wrong; `launcher.log`, a line
   per launch (and why, if one failed); and, from v0.6.9, `codex-start.log`, a line each time Codex
