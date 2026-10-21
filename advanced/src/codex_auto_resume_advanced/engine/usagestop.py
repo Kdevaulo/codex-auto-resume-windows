@@ -234,6 +234,12 @@ class UsageStop(UsagePause):
             word = start(thread, row["words"] + "\n\n" + ids.short_marker(row["record_id"]), gate=guard)
             if word == ipc.Stop.HELD:
                 continue                                                # held by core: asked again when it lets go
+            if word == ipc.Stop.UNCONFIRMED:
+                # v0.6.20: written, no answer in time - it may have started. Nothing is said of a failure: the next look
+                # after the backoff finds a newer turn (ended SUPERSEDED, nothing sent twice) or starts it again.
+                self._backoff[row["record_id"]] = (failures + 1,
+                                                   now + min(BACKOFF_SECONDS * 2 ** failures, BACKOFF_MOST))
+                continue
             if word == ipc.Start.STARTED:
                 self._backoff.pop(row["record_id"], None)
                 handle.end(ContinuationReason.SENT, thread_id=thread)

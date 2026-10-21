@@ -293,7 +293,8 @@ def stop_turn(thread_id, turn_id=None, *, channel=None, gate=None) -> tuple:
 def start_turn(thread_id, text, *, channel=None, gate=None):
     """Start a turn of `thread_id` the app holds with `text` - the product's continuation after a window reset, for a
     conversation the forced stop stopped (its queue may be paused): Start.STARTED, or the Stop word of what failed -
-    NO_CLIENT above all, the app not holding the conversation. `gate` is core's errand guard, around the start's
+    NO_CLIENT above all, the app not holding the conversation; UNCONFIRMED where it was written and no answer came in
+    time (it may have started). `gate` is core's errand guard, around the start's
     writing (HELD where it refuses). `channel` is a seam (a Channel of a test's own pipe)."""
     try:
         opened = channel if channel is not None else Channel()
@@ -310,8 +311,15 @@ def start_turn(thread_id, text, *, channel=None, gate=None):
                          {"thread": thread_id}).get("handledByClientId")
         if not isinstance(owner, str) or not owner:
             return Stop.NO_CLIENT
-        _request(opened, client, "thread-follower-start-turn", REQUESTS["thread-follower-start-turn"],
-                 {"thread": thread_id, "message": str(uuid.uuid4()), "text": text}, target=owner, gate=gate)
+        try:
+            _request(opened, client, "thread-follower-start-turn", REQUESTS["thread-follower-start-turn"],
+                     {"thread": thread_id, "message": str(uuid.uuid4()), "text": text}, target=owner, gate=gate)
+        except _Failed as failed:
+            # v0.6.20: written and no answer in time - the turn may have started, as a stop with no answer may have
+            # been made: UNCONFIRMED, never said to have failed; the next look at the turns tells which.
+            if failed.word == Stop.NO_ANSWER:
+                return Stop.UNCONFIRMED
+            raise
         return Start.STARTED
     except _Failed as failed:
         return failed.word
