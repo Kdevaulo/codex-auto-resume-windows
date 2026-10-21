@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 
-from .. import machine, oncewords, projects, quiet, settings
+from .. import homes, machine, oncewords, projects, quiet, settings
 from ..machine import CLAIMED, OBSERVING, WAITING
 from ..store import TERMINAL, StoreError
 from ..store.actions import CHANGED, RECHECKED, RETIRED, UNRESOLVED
@@ -21,6 +21,7 @@ from .errors import (ControlError,
                      _identifier,
                      _refusal,
                      _thread_id)
+from .records import _other_homes, _reader
 
 
 # A cancel must not fail because the watcher happens to be writing. The store already
@@ -381,8 +382,22 @@ class ActionsMixin:
         if not isinstance(always, bool):
             raise ControlError("always must be true or false", code="invalid_enabled")
         with self._open() as store:
-            self._bound_record(store, key, thread)
-        project = self._project_of(source, thread)
+            record = self._bound_record(store, key, thread)
+        # v0.6.20: each record's project read through its own Codex home's reader, as Pending labels it
+        # (control/records.py) - the default home's state has no conversation of a home Settings added.
+        others, readers, seen = _other_homes(self.get_settings().get(homes.FIELD)), {}, {}
+
+        def project_of(row):
+            home, reader = others.get(row.get("home_key") or ""), source
+            if home is not None and source is not None:
+                if home[1] not in readers:
+                    readers[home[1]] = _reader(source, home[1])
+                reader = readers[home[1]]
+            mark = (row.get("home_key") or "", row["thread_id"])
+            if mark not in seen:
+                seen[mark] = self._project_of(reader, row["thread_id"])
+            return seen[mark]
+        project = project_of(record)
         if project is None:
             raise ControlError("the project of that conversation cannot be read",
                                code="project_unreadable")
@@ -395,13 +410,11 @@ class ActionsMixin:
         allowed, held = projects.allows(saved, project), 0
         if not allowed:
             with self._open() as store:
-                keys, seen = [], {thread: project}
+                keys = []
                 for row in store.pending():
                     if row["hold"] is not None or row["state"] not in WAITING:
                         continue
-                    if row["thread_id"] not in seen:
-                        seen[row["thread_id"]] = self._project_of(source, row["thread_id"])
-                    if seen[row["thread_id"]] == project:
+                    if project_of(row) == project:
                         keys.append(row["interruption_id"])
                 held = store.hold_waiting(keys, projects.hold_for(saved, project), time.time(), actor=actor)
         return {"thread_id": thread, "always": always, "project_policy": saved["project_policy"],
