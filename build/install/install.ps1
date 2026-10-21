@@ -308,6 +308,7 @@ if ($null -ne $outsideCode) { exit $outsideCode }
 # the Dashboard it opens again) never inherits it. The setup step and the health check get it back for their own call
 # (Invoke-Setup).
 $script:ProgressLines = $env:CODEX_AUTO_RESUME_PROGRESS_LINES -ceq '1'
+$script:ProgressSaid = @{}
 $env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null
 
 # One installation at a time. There are three routes in - a double-clicked Install.cmd,
@@ -942,7 +943,10 @@ function Remove-OwnedItem {
 function Progress {
     param([string]$Step, [int]$Done, [int]$Total)
     if (-not $script:ProgressLines -or $Total -le 0) { return }
-    if ($null -eq $script:ProgressSaid) { $script:ProgressSaid = @{} }
+    # Read through Get-Variable: the bootstrap runs this script under Set-StrictMode 2.0, where reading a variable
+    # never set throws (v0.6.18's installer audit: every Dashboard update failed and rolled back).
+    $said_table = Get-Variable -Name ProgressSaid -Scope Script -ValueOnly -ErrorAction SilentlyContinue
+    if ($null -eq $said_table) { $script:ProgressSaid = @{} }
     $count = [Math]::Max(0, [Math]::Min($Done, $Total))
     $percent = [int][Math]::Floor(100 * $count / $Total)
     # Nothing for a share below one percent: the bar stands at the step's milestone already.
