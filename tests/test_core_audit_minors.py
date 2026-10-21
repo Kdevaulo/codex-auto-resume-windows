@@ -166,5 +166,40 @@ class HomeKeyTests(Scratch):
         self.assertEqual((row["state"], row["last_error"]), ("cancelled", "home_removed"))
 
 
+class OutcomeTimeTests(Scratch):
+    def setUp(self):
+        super().setUp()
+        self.store = Store(self.root / "state")
+        self.addCleanup(self.store.close)
+        self.store.set_enabled(True, BASE)
+
+    def register(self, key="d" * 64, turn=TURN, **options):
+        self.store.register(failure(turn, key), BASE, **options)
+        return key
+
+    def test_a_cancelled_recovery_has_its_outcome_time(self):
+        key = self.register()
+        self.store.cancel_interruption(key, BASE + 10)
+        self.assertEqual((self.store.get(key)["state"], self.store.get(key)["outcome_at"]), ("cancelled", BASE + 10))
+
+    def test_a_conversation_switched_off_gives_its_records_their_outcome_time(self):
+        key = self.register()
+        self.store.cancel_thread(T1, BASE + 20)
+        self.assertEqual((self.store.get(key)["state"], self.store.get(key)["outcome_at"]), ("cancelled", BASE + 20))
+
+    def test_a_claim_released_to_an_end_has_its_outcome_time_and_one_released_to_wait_has_none(self):
+        for target, expected in (("cancelled", BASE + 30), ("waiting_retry", None)):
+            with self.subTest(target):
+                key = self.register(key=("a" if expected else "b") * 64,
+                                    turn="cccccccc-cccc-7ccc-8ccc-%012d" % len(target),
+                                    state="waiting_retry", next_retry_at=BASE)
+                claimed = self.store.reserve_detailed(key, BASE + 1)
+                self.assertTrue(claimed[0], claimed)
+                self.assertTrue(self.store.release_claim(key, target, "released_before_send", BASE + 30))
+                row = self.store.get(key)
+                self.assertEqual((row["state"], row["outcome_at"]), (target, expected))
+                self.store.cancel_interruption(key, BASE + 40)
+
+
 if __name__ == "__main__":
     unittest.main()
