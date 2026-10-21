@@ -1373,13 +1373,30 @@ function Assert-TrustedHop {
     Assert-TrustedHost -Response $response -What $What -Hosts $Hosts
 }
 
+function New-ServerError {
+    <#
+        The WebException the cmdlet's request threw for a response it would not take - under -MaximumRedirection a
+        3xx it did not follow (no Location, or 304, 305, 306) - in .NET's words ("The remote server returned an
+        error: (304) Not Modified."), with the response on it as .NET puts it there.
+    #>
+    param($Response)
+    $code = [int]$Response.StatusCode
+    $name = Get-DownloadWords -Source 'net' -Name ('net_httpstatuscode_' + ([Net.HttpStatusCode]$code).ToString()) -Fallback ''
+    if (-not $name -and $Response.PSObject.Properties.Match('StatusDescription').Count) { $name = [string]$Response.StatusDescription }
+    $status = '(' + $code + ')'
+    if ($name) { $status += ' ' + $name }
+    $words = Get-DownloadWords -Source 'net' -Name 'net_servererror' -Fallback 'The remote server returned an error: {0}.'
+    return (New-Object Net.WebException(($words -f $status), $null, [Net.WebExceptionStatus]::ProtocolError, $Response))
+}
+
 function Open-Download {
     <#
         The response to the download of $Uri, from -Offset on: its redirects followed here, as -MaximumRedirection 5
-        followed them - 301, 302, 303, 307 and 308, an absolute or a relative Location, at most five - and every
-        address it is sent to checked (Assert-TrustedHop) BEFORE it is asked, so a hop outside the caller's hosts,
-        or over http, is refused without a byte asked of it. The answer is checked again, where it says it came
-        from, before a byte of its body is read. -Request is the first request when it is already made.
+        followed them - 300, 301, 302, 303 and 307, and 308 as well, an absolute or a relative Location, at most
+        five - and every address it is sent to checked (Assert-TrustedHop) BEFORE it is asked, so a hop outside the
+        caller's hosts, or over http, is refused without a byte asked of it. Any other 3xx, or one with no Location,
+        fails as the cmdlet's request failed for it (New-ServerError). The answer is checked again, where it says it
+        came from, before a byte of its body is read. -Request is the first request when it is already made.
     #>
     param([Uri]$Uri, [long]$Offset, [Net.CookieContainer]$Cookies, [string]$What, [string[]]$Hosts,
           [int]$TimeoutSec, $Request)
@@ -1391,10 +1408,13 @@ function Open-Download {
         }
         $response = Get-DownloadResponse -Request $Request
         $Request = $null
+        $code = [int]$response.StatusCode
+        if ($code -lt 300 -or $code -gt 399) { break }
         $location = $null
-        if (@(301, 302, 303, 307, 308) -contains [int]$response.StatusCode) { $location = $response.Headers['Location'] }
-        # A redirect with nowhere to go is an answer, as it was to the cmdlet.
-        if ([string]::IsNullOrEmpty($location)) { break }
+        if (@(300, 301, 302, 303, 307, 308) -contains $code) { $location = $response.Headers['Location'] }
+        # A 3xx the cmdlet's request did not follow was its failure, the response on it.
+        if ([string]::IsNullOrEmpty($location)) { throw (New-ServerError -Response $response) }
+        $next = New-Object Uri($address, $location)
         $response.Close()
         if ($hops -ge 5) {
             throw (New-Object Net.WebException(
@@ -1402,7 +1422,7 @@ function Open-Download {
                 [Net.WebExceptionStatus]::ProtocolError))
         }
         $hops++
-        $address = New-Object Uri($address, $location)
+        $address = $next
         Assert-TrustedHop -Uri $address -What $What -Hosts $Hosts
     }
     $from = $address

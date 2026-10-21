@@ -204,23 +204,37 @@ foreach ($case in @($cases)) {
                      catch { $global:Threw = $_.Exception } } 6>&1 | ForEach-Object { [string]$_ })
     $file = $null
     if (Test-Path -LiteralPath $out) { $file = (Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash.ToLowerInvariant() }
+    # A response a failure carries (as .NET's own WebException carries it) is the failure's, and stays open.
+    $carried = @()
+    $inner = $null
+    $link = $global:Threw
+    while ($null -ne $link) {
+        if ($link -is [Net.WebException] -and $null -ne $link.Response) { $carried += ,$link.Response }
+        if ($link -ne $global:Threw -and $null -eq $inner) { $inner = $link.GetType().FullName }
+        $link = $link.InnerException
+    }
     $results += ,@{
         name = $case.name; printed = $printed; file = $file; asked = $global:Asked; old = $global:OldPath
         threw = $(if ($global:Threw) { $global:Threw.Message } else { $null })
         type = $(if ($global:Threw) { $global:Threw.GetType().FullName } else { $null })
+        status = $(if ($global:Threw -is [Net.WebException]) { [string]$global:Threw.Status } else { $null })
+        inner = $inner; carried = $carried.Count
         reset = $(if ($global:Threw) { Get-RateLimitReset $global:Threw } else { $null })
         leftovers = @(Get-ChildItem -LiteralPath $folder -Force | Where-Object { $_.Name -ne 'download.zip' } |
                       ForEach-Object { $_.Name })
-        open = @($global:Made | Where-Object { -not $_.Closed }).Count
+        open = @($global:Made | Where-Object { -not $_.Closed -and $carried -notcontains $_ }).Count
     }
 }
-$words = Get-DownloadWords -Source 'net' -Name 'net_tooManyRedirections' -Fallback 'none'
-'@@RESULTS@@' + (ConvertTo-Json -InputObject @{ cases = $results; tooMany = $words } -Depth 7 -Compress)
+$words = @{}
+foreach ($name in @('net_tooManyRedirections', 'net_resubmitprotofailed', 'net_servererror', 'net_httpstatuscode_NotModified')) {
+    $words[$name] = Get-DownloadWords -Source 'net' -Name $name -Fallback 'none'
+}
+'@@RESULTS@@' + (ConvertTo-Json -InputObject @{ cases = $results; words = $words } -Depth 7 -Compress)
 """
 
 WANTED_STANDIN = ("$wanted = @('Step', 'Get-FinalUri', 'Assert-TrustedHost', 'Get-RateLimitReset', 'Get-Remote', "
                   "'Get-ThrownException', 'Get-DownloadWords', 'New-DownloadRequest', 'Assert-TrustedHop', "
-                  "'Open-Download', 'Save-StreamedDownload')\n")
+                  "'New-ServerError', 'Open-Download', 'Save-StreamedDownload')\n")
 
 
 def redirect(location, status=302):
@@ -252,6 +266,14 @@ class StreamedDownloadTests(unittest.TestCase):
                                                                                          {"status": 200}]},
         {"name": "six_hops", "uri": ARCHIVE,
          "answers": [redirect("https://github.com/hop%d" % n) for n in range(1, 7)] + [{"status": 200}]},
+        # What the cmdlet's request did with the rest of 3xx: followed a 300 with a Location, failed on any other
+        # it did not follow, and on a Location that is no address.
+        {"name": "multiple_choices", "uri": ARCHIVE,
+         "answers": [redirect(ASSETS, 300), {"status": 200}]},
+        {"name": "not_modified", "uri": ARCHIVE,
+         "answers": [{"status": 304, "location": ASSETS, "to": 0, "length": 0}, {"status": 200}]},
+        {"name": "redirect_nowhere", "uri": ARCHIVE,
+         "answers": [{"status": 302, "to": 0, "length": 0}, {"status": 200}]},
         {"name": "answer_untrusted", "uri": ARCHIVE,
          "answers": [{"status": 200, "final": "https://downloads.example.com/archive.zip"}]},
         # G3 / G5: no partial file; a short body named.
@@ -325,7 +347,8 @@ class StreamedDownloadTests(unittest.TestCase):
         if done.returncode == 0 and marker >= 0:
             answer = json.loads(cls.stdout[marker + len("@@RESULTS@@"):])
             cls.results = {row["name"]: row for row in answer["cases"]}
-            cls.too_many = answer["tooMany"]
+            cls.words = answer["words"]
+            cls.too_many = cls.words["net_tooManyRedirections"]
 
     @classmethod
     def tearDownClass(cls):
@@ -486,6 +509,27 @@ class StreamedDownloadTests(unittest.TestCase):
                 self.assertNothingWritten(row)
                 self.assertEqual(row["old"], 0)
 
+    def test_a_300_with_a_location_is_followed(self):
+        row = self.case("multiple_choices")
+        self.assertIsNone(row["threw"], row)
+        self.assertEqual(row["file"], BODY_SHA)
+        self.assertEqual([ask["uri"] for ask in row["asked"]], [ARCHIVE, ASSETS])
+
+    def test_a_3xx_the_cmdlet_did_not_follow_fails_as_it_failed(self):
+        for name in ("not_modified", "redirect_nowhere"):
+            with self.subTest(name):
+                row = self.case(name)
+                self.assertEqual(row["type"], "System.Net.WebException")
+                self.assertEqual(row["status"], "ProtocolError")
+                self.assertEqual(row["carried"], 1, "the response on it, as .NET puts it there")
+                self.assertEqual(len(row["asked"]), 1)
+                self.assertNothingWritten(row)
+        expected = self.words["net_servererror"].replace(
+            "{0}", "(304) " + self.words["net_httpstatuscode_NotModified"])
+        self.assertEqual(self.case("not_modified")["threw"], expected)
+        self.assertTrue(self.case("redirect_nowhere")["threw"].startswith(
+            self.words["net_servererror"].split("{0}")[0] + "(302)"))
+
     def test_a_resume_redirected_away_is_refused_in_the_hosts_words(self):
         row = self.case("resume_redirected_away")
         self.assertEqual(row["threw"], "The archive " + REFUSED + "downloads.example.com")
@@ -537,6 +581,10 @@ class Recorder(http.server.BaseHTTPRequestHandler):
             self.answer(404, b"Not Found")
         elif self.path == "/rate":
             self.answer(403, b"rate limit", {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1999999999"})
+        elif self.path == "/notmodified":
+            self.answer(304, b"", {"Location": "/ok"})
+        elif self.path == "/nowhere":
+            self.answer(302, b"")
         elif self.path.startswith("/loop"):
             self.answer(302, b"", {"Location": "/loop%d" % len(Recorder.seen)})
         elif self.path == "/slow":
@@ -566,7 +614,7 @@ class QuietServer(http.server.ThreadingHTTPServer):
 
 REAL_PROBE = r"""
 $wanted = @('Get-ThrownException', 'Get-DownloadWords', 'New-DownloadRequest', 'Get-DownloadResponse',
-            'Get-RateLimitReset')
+            'Get-RateLimitReset', 'New-ServerError')
 """ + LIFT + r"""
 $base = $env:CAR_SERVER
 function Get-Outcome { param([scriptblock]$Ask)
@@ -598,6 +646,17 @@ foreach ($pair in @(@('/missing', 300), @('/rate', 300), @('/agent', 300), @('/s
 $old = Get-Outcome { $null = Invoke-WebRequest -Uri ($base + '/loop') -OutFile $scratch -UseBasicParsing -PassThru `
                                                -MaximumRedirection 5 -TimeoutSec 300 }
 $out['loop'] = @{ old = $old; words = (Get-DownloadWords -Source 'net' -Name 'net_tooManyRedirections' -Fallback 'none') }
+# A 3xx the cmdlet's request did not follow, asked by the streamed download's own request, which follows none.
+foreach ($path in @('/notmodified', '/nowhere')) {
+    $new = Get-Outcome {
+        $request = New-DownloadRequest -Uri ([Uri]($base + $path)) -Offset 0 -Cookies (New-Object Net.CookieContainer) -TimeoutSec 300
+        $response = Get-DownloadResponse -Request $request
+        throw (New-ServerError -Response $response)
+    }
+    $old = Get-Outcome { $null = Invoke-WebRequest -Uri ($base + $path) -OutFile $scratch -UseBasicParsing -PassThru `
+                                                   -MaximumRedirection 5 -TimeoutSec 300 }
+    $out[$path] = @{ new = $new; old = $old }
+}
 # A request that fails as it is sent: one aborted before.
 $request = New-DownloadRequest -Uri ([Uri]($base + '/agent2')) -Offset 0 -Cookies (New-Object Net.CookieContainer) -TimeoutSec 300
 $request.Abort()
@@ -688,6 +747,16 @@ class RealRequestBesideTheCmdletTests(unittest.TestCase):
         # say it in. Where it came in the shown one, the words are the same.
         if loop["old"]["threw"].isascii():
             self.assertEqual(loop["words"], loop["old"]["threw"])
+
+    def test_a_3xx_not_followed_reads_as_the_cmdlet_says_it(self):
+        for path in ("/notmodified", "/nowhere"):
+            with self.subTest(path):
+                pair = self.outcome(path)
+                self.assertEqual(pair["new"]["type"], pair["old"]["type"])
+                self.assertEqual(pair["new"]["status"], pair["old"]["status"])
+                # In the language shown, the same words (see the too-many-redirects test for why only there).
+                if pair["old"]["threw"].isascii():
+                    self.assertEqual(pair["new"], pair["old"])
 
     def test_a_request_failing_as_it_is_sent_fails_in_its_own_words(self):
         aborted = self.outcome("aborted")
