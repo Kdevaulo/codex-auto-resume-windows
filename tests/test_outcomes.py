@@ -190,16 +190,19 @@ class T13OutcomeRulesTests(Base):
 
     def test_T13_a_later_terminal_turn_proves_an_in_progress_row_stale(self):
         """Codex only updates the running turn's row, so a later finished turn means
-        ours can never finish: `outcome_unverified(stale_turn_row)`, without waiting
-        for the deadline."""
+        ours can never finish, without waiting for the deadline. Ours made progress, so
+        it is judged as a failed turn with progress is: `recovered(progress_then_turn_cut_off)`,
+        through turn_completed (owner amended E6, 2026-10-21)."""
         w = self.world()
         w.enable()
         thread, key, turn = w.started()
         self.assertEqual(w.get(key)["state"], "turn_started")
         w.home.add_turn(thread, status="completed")
         w.tick(30)
+        self.assertEqual(w.get(key)["state"], "turn_completed")
+        w.tick(1)
         row = w.get(key)
-        self.assertEqual((row["state"], row["last_error"]), ("outcome_unverified", "stale_turn_row"))
+        self.assertEqual((row["state"], row["last_error"]), ("recovered", "progress_then_turn_cut_off"))
         self.assertEqual(row["recovery_turn_id"], turn)
 
     def test_T13_an_interrupted_recovery_turn_is_stopped_by_the_user(self):
@@ -466,8 +469,11 @@ class T17StuckObservingTests(Base):
         self.assertEqual(w.get(first)["state"], "turn_started")
         w.fail(thread)
         w.tick(1)
+        # Ours made progress before it was cut off: recovered, through turn_completed (owner amended E6, 2026-10-21).
+        self.assertEqual(w.get(first)["state"], "turn_completed")
+        w.tick(1)
         self.assertEqual((w.get(first)["state"], w.get(first)["last_error"]),
-                         ("outcome_unverified", "stale_turn_row"))
+                         ("recovered", "progress_then_turn_cut_off"))
         newer = [row for row in w.records(thread) if row["interruption_id"] != first]
         self.assertEqual(len(newer), 1)
         self.assertIsNone(newer[0]["parent_interruption_id"])
