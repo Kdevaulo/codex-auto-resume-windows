@@ -1246,11 +1246,24 @@ function Get-Remote {
     # rides on an update check takes it. An archive never does - on a slow link it simply takes long.
     # Without -Deadline - the archive and its checksum - the body is streamed to the file as it comes
     # (Save-StreamedDownload), and -Count prints its bytes for the setup window's bar.
+    # With -Deadline, -MaxBytes bounds what of the body is written (Save-BoundedDownload): one byte past it at most.
     param([string]$Uri, [string]$OutFile, [string]$What, [string[]]$Hosts = $AllowedHosts,
-          [int]$TimeoutSec = 300, [switch]$Deadline, [switch]$Count)
+          [int]$TimeoutSec = 300, [switch]$Deadline, [switch]$Count, [long]$MaxBytes = 0)
     # -UseBasicParsing keeps this working on a Windows with no Internet Explorer engine,
     # which is every current one.
     if ($Deadline) {
+        # Every hop checked before it is asked and the body bounded as it arrives, as the archive's download does; the
+        # request under a deadline below only where the .NET request cannot be made at all (the archive's own rule).
+        $bounded = $null
+        try {
+            $bounded = New-DownloadRequest -Uri ([Uri]$Uri) -Offset 0 -Cookies (New-Object Net.CookieContainer) `
+                                           -TimeoutSec $TimeoutSec
+        } catch { $bounded = $null }
+        if ($null -ne $bounded) {
+            Save-BoundedDownload -First $bounded -Uri ([Uri]$Uri) -OutFile $OutFile -What $What -Hosts $Hosts `
+                                 -Seconds $TimeoutSec -MaxBytes $MaxBytes
+            return
+        }
         $response = Invoke-BoundedWebRequest -What $What -Seconds $TimeoutSec -Parameters @{
             Uri = $Uri; OutFile = $OutFile; UseBasicParsing = $true; PassThru = $true; MaximumRedirection = 5
             TimeoutSec = $TimeoutSec }
@@ -1401,15 +1414,21 @@ function Open-Download {
         caller's hosts, or over http, is refused without a byte asked of it. Any other 3xx, or one with no Location,
         fails as the cmdlet's request failed for it (New-ServerError); a Location that is no address, as it failed
         for that. The answer is checked again, where it says it came from, before a byte of its body is read.
-        -Request is the first request when it is already made.
+        -Request is the first request when it is already made. With -Clock (Save-BoundedDownload), $TimeoutSec is a
+        deadline for all of it, from when that clock started: each request gets only what is left of it.
     #>
     param([Uri]$Uri, [long]$Offset, [Net.CookieContainer]$Cookies, [string]$What, [string[]]$Hosts,
-          [int]$TimeoutSec, $Request)
+          [int]$TimeoutSec, $Request, [Diagnostics.Stopwatch]$Clock)
     $address = $Uri
     $hops = 0
     while ($true) {
         if ($null -eq $Request) {
-            $Request = New-DownloadRequest -Uri $address -Offset $Offset -Cookies $Cookies -TimeoutSec $TimeoutSec
+            $seconds = $TimeoutSec
+            if ($null -ne $Clock) {
+                $seconds = $TimeoutSec - [int][Math]::Floor($Clock.Elapsed.TotalSeconds)
+                if ($seconds -le 0) { throw ($What + ' did not arrive within ' + $TimeoutSec + ' s.') }
+            }
+            $Request = New-DownloadRequest -Uri $address -Offset $Offset -Cookies $Cookies -TimeoutSec $seconds
         }
         $response = Get-DownloadResponse -Request $Request
         $Request = $null
@@ -1564,6 +1583,74 @@ function Save-StreamedDownload {
     }
 }
 
+function Save-BoundedDownload {
+    <#
+        A download that rides on an update check (Get-Remote -Deadline): all of it - every hop, the answer and its body
+        - within $Seconds of being asked, and no more than $MaxBytes of its body written (0: no bound). Every redirect
+        hop is held to the caller's hosts BEFORE it is asked, and the answer before a byte of it is read (Open-Download,
+        the archive's own rule); the body goes through a fixed 64 KB buffer into a file of its own beside $OutFile, read
+        no further than one byte past $MaxBytes - a file longer than the bound, which the caller refuses as too large,
+        never one of whatever length a server chose - and becomes $OutFile only once it is all there. On any failure
+        nothing is left at $OutFile. It replaced Invoke-WebRequest -MaximumRedirection 5 -OutFile under a deadline,
+        which followed every redirect before it checked where the answer came from and wrote the whole body before
+        anyone looked at its size (v0.6.20 security review, M5). A rate limit a failure carries is noted as that
+        download's was (Get-RateLimitReset).
+    #>
+    param($First, [Uri]$Uri, [string]$OutFile, [string]$What, [string[]]$Hosts, [int]$Seconds, [long]$MaxBytes)
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $late = $What + ' did not arrive within ' + $Seconds + ' s.'
+    $deadline = [long]$Seconds * 1000
+    try {
+        $response = Open-Download -Uri $Uri -Offset 0 -Cookies $First.CookieContainer -What $What -Hosts $Hosts `
+                                  -TimeoutSec $Seconds -Request $First -Clock $clock
+    } catch {
+        $limit = Get-RateLimitReset $_.Exception
+        if ($limit) { $script:RateLimitReset = $limit }
+        throw
+    }
+    $partial = $OutFile + '.' + [Guid]::NewGuid().ToString('N') + '.partial'
+    $file = $null
+    $kept = $false
+    try {
+        $total = [long]$response.ContentLength
+        $file = New-Object IO.FileStream($partial, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $buffer = New-Object byte[] 65536
+        $received = [long]0
+        $stream = $response.GetResponseStream()
+        while ($true) {
+            $left = $deadline - $clock.ElapsedMilliseconds
+            if ($left -le 0) { throw $late }
+            # A read that waits is given only what is left; a stream that takes no timeout is bounded by the check above.
+            try { $stream.ReadTimeout = [int][Math]::Min([long][int]::MaxValue, $left) } catch { }
+            $want = $buffer.Length
+            if ($MaxBytes -gt 0) { $want = [int][Math]::Min([long]$want, $MaxBytes + 1 - $received) }
+            try { $read = $stream.Read($buffer, 0, $want) }
+            catch {
+                if ($clock.ElapsedMilliseconds -ge $deadline) { throw $late }
+                throw
+            }
+            if ($read -le 0) { break }
+            $file.Write($buffer, 0, $read)
+            $received += $read
+            if ($MaxBytes -gt 0 -and $received -gt $MaxBytes) { break }
+        }
+        if ($clock.ElapsedMilliseconds -gt $deadline) { throw $late }
+        $over = $MaxBytes -gt 0 -and $received -gt $MaxBytes
+        if (-not $over -and $total -ge 0 -and $received -lt $total) {
+            throw ($What + ' was cut short: ' + $received + ' of ' + $total + ' bytes arrived.')
+        }
+        $file.Dispose()
+        $file = $null
+        if (Test-Path -LiteralPath $OutFile) { Remove-Item -LiteralPath $OutFile -Force }
+        [IO.File]::Move($partial, $OutFile)
+        $kept = $true
+    } finally {
+        $response.Close()
+        if ($null -ne $file) { $file.Dispose() }
+        if (-not $kept) { Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 function Get-CompatibilityTimeout {
     <#
         The seconds the refresh that rides on an update check may wait for its download,
@@ -1627,7 +1714,7 @@ function Update-CompatibilityData {
         $file = Join-Path $folder 'codex_compat.json'
         try {
             Get-Remote -Uri $CompatibilityUrl -OutFile $file -What 'The compatibility data' `
-                       -Hosts $CompatibilityHosts -TimeoutSec $TimeoutSec -Deadline
+                       -Hosts $CompatibilityHosts -TimeoutSec $TimeoutSec -Deadline -MaxBytes $CompatibilityMaxBytes
         } catch { return 'unavailable' }
         if (-not (Test-Path -LiteralPath $file)) { return 'unavailable' }
         if ((Get-Item -LiteralPath $file).Length -gt $CompatibilityMaxBytes) { return 'refused too_large' }
