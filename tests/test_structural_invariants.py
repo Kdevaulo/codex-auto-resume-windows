@@ -36,8 +36,10 @@ PROCESS_STARTERS = SPAWNERS | {
     "ShellExecuteW", "ShellExecuteExW", "CreateProcessW"}
 QUEUE_WORD = re.compile(r"\bqueue\b")
 # The message flag as an argument: a token on its own, or after `queue` in a command line.
-# "`codex queue` still offers --thread/--message" is a sentence, and does not match.
-MESSAGE_ARGUMENT = re.compile(r"^\s*--message\s*$|\bqueue\s+(?:\S+\s+)*?--message\b")
+# "`codex queue` still offers --thread/--message" is a sentence, and does not match. The send spells
+# `"--message=" + prompt`, read here as `--message={}` (one argument, so a message starting with "-"
+# is the message, not an option).
+MESSAGE_ARGUMENT = re.compile(r"^\s*--message(?:=\{\})?\s*$|\bqueue\s+(?:\S+\s+)*?--message\b")
 
 
 def calls(predicate):
