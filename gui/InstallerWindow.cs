@@ -509,6 +509,7 @@ namespace CodexAutoResume
         {
             string heading = flow.Mode == InstallerFlow.Uninstall ? words.Say("installer.progress.removing", "Removing")
                            : flow.Repair ? words.Say("installer.progress.repairing", "Repairing")
+                           : flow.Another ? words.Say("installer.progress.another", "Installing another version")
                            : flow.Mode == InstallerFlow.Update ? words.Say("installer.progress.updating", "Updating")
                            : words.Say("installer.progress.installing", "Installing");
             Row(Words(heading, "title", Palette.Ink), 0);
@@ -574,7 +575,9 @@ namespace CodexAutoResume
 
         private void BuildFinish()
         {
-            Row(Words(flow.Mode == InstallerFlow.Update && code == 0
+            Row(Words(flow.Another && code == 0
+                      ? words.Say("installer.done.installed_version", "Installed v{version}", "version", flow.Version)
+                      : flow.Mode == InstallerFlow.Update && code == 0
                       ? words.Say("installer.done.updated_to", "Updated to v{version}", "version", flow.Version)
                       : flow.Repair && code == 0 ? words.Say("installer.done.repaired", "Codex Auto Resume is repaired.")
                       : words.Outcome(flow.Mode, code), "title", Palette.Ink), 0);
