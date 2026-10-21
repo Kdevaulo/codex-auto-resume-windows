@@ -316,6 +316,8 @@ class DispatchMixin:
                         self._release(key, claim, target, why, delay)
                     self.log(current["thread_id"], target, why)
                     return
+                if not resend and self._once_words_moved(claim):     # given back (engine/delivery.py)
+                    return
                 if once is not None and not self._spend_once_words(claim, once):
                     message = plain             # v0.6.16-beta.3: never sent twice (engine/delivery.py)
                 self.log(current["thread_id"], "queue_submission_started", None)

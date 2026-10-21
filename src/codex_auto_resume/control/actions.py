@@ -316,19 +316,26 @@ class ActionsMixin:
                 raise ControlError("the state is busy", code="state_busy")
             return {"interruption_id": key, "thread_id": thread, "set": False}
         self.validated_text(text)
-        with self._open() as store:
-            record = self._bound_record(store, key, thread)
-        state = record["state"]
-        if record["cancel_requested"]:
-            raise ControlError("that recovery was cancelled", code="cancel_requested")
-        if state in CLAIMED:
-            raise ControlError("that recovery is being sent now", code="being_sent")
-        if state in OBSERVING:
-            raise ControlError("that recovery is already running in Codex", code="observing")
-        if state not in WAITING:
-            raise ControlError("that recovery is already in Codex", code="in_flight")
+
+        def still_waiting():
+            # Under the file's lock (oncewords.put): the watcher looks at the words again under the same lock after
+            # its claim (engine/delivery.py), so a claim can never fall between this check and the write - words
+            # written here either go with the next continuation or are refused now, never deleted unsent.
+            with self._open() as store:
+                record = self._bound_record(store, key, thread)
+            state = record["state"]
+            if record["cancel_requested"]:
+                raise ControlError("that recovery was cancelled", code="cancel_requested")
+            if state in CLAIMED:
+                raise ControlError("that recovery is being sent now", code="being_sent")
+            if state in OBSERVING:
+                raise ControlError("that recovery is already running in Codex", code="observing")
+            if state not in WAITING:
+                raise ControlError("that recovery is already in Codex", code="in_flight")
+
+        still_waiting()                 # refused before the lock, as before, for a record that plainly does not wait
         try:
-            held.put(key, text)
+            held.put(key, text, guard=still_waiting)
         except oncewords.OnceWordsError as exc:
             if exc.code == "too_many_messages":
                 raise ControlError(str(exc), code="too_many_messages") from None
