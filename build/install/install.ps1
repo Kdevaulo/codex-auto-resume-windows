@@ -1384,7 +1384,8 @@ if ($Uninstall) {
         Start-Sleep -Milliseconds 800
     }
     foreach ($stale in (Get-ChildItem -Path $OwnedHome -Filter '*.old-*' -ErrorAction SilentlyContinue)) {
-        Remove-OwnedItem $stale.FullName
+        # Its True or False is not a line for the log or the setup window.
+        $null = Remove-OwnedItem $stale.FullName
     }
     $stuck = @()
     # What is in the two program folders goes entry by entry, each proved inside the installation again
