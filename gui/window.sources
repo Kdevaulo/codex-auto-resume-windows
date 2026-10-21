@@ -44,6 +44,7 @@ gui/WindowReopen.cs
 gui/WindowAudit.cs
 gui/SettingsRemove.cs
 gui/WindowRender.cs
+gui/ChildTree.cs
 
 [dashboard]
 gui/Dashboard.cs

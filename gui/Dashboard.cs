@@ -53,6 +53,11 @@ namespace CodexAutoResume
         // to succeed on the fourth - the first version of this class failed every start for
         // a missing "-c", and the fallback hid it completely.
         private const int MaxFailures = 3;
+        // v0.6.20: and tried again once this long has passed since it was given up - a laptop resumed from sleep in
+        // the middle of a call counts as a failure, and three of those used to leave every call of the window's life,
+        // every five seconds, a fresh interpreter. One more failure gives it up for as long again.
+        internal static int RetryMilliseconds = 300000;
+        private readonly Stopwatch givenUp = new Stopwatch();
         private readonly Bridge once;
         private readonly string python;
         private readonly string appSrc;
@@ -119,6 +124,11 @@ namespace CodexAutoResume
             lock (gate)
             {
                 if (closed) throw new ObjectDisposedException("the window is closing");
+                if (failures >= MaxFailures && givenUp.ElapsedMilliseconds >= RetryMilliseconds)
+                {
+                    failures = MaxFailures - 1;
+                    givenUp.Reset();
+                }
                 if (failures < MaxFailures)
                 {
                     try
@@ -130,6 +140,7 @@ namespace CodexAutoResume
                     catch (Exception)
                     {
                         failures++;
+                        if (failures >= MaxFailures) givenUp.Restart();
                         StopLocked();
                         // Ended by Stop while the window closes: the request may already have
                         // been carried out, and there is nobody left to show a second answer to.
@@ -149,9 +160,12 @@ namespace CodexAutoResume
             if (closed) throw new ObjectDisposedException("the window is closing");
             if (Answers != null) return Answers(command, argument);
             System.Threading.Interlocked.Increment(ref calls);
-            try { return once.Call(command, argument); }
+            try { return once.Call(command, argument, Bridge.LongCallMilliseconds); }
             finally { System.Threading.Interlocked.Decrement(ref calls); }
         }
+
+        /// Whether the long-lived process is given up for now (for the tests).
+        internal bool GivenUp { get { return failures >= MaxFailures; } }
 
         private Dictionary<string, object> Ask(string command, string argument)
         {
@@ -204,6 +218,9 @@ namespace CodexAutoResume
         internal void Stop()
         {
             closed = true;
+            // v0.6.20: the one-shot children too - the fallback of a call a worker is in the middle of, and CallOnce's -
+            // which ending `process` never reached: StopLocked had set it to null before the fallback started.
+            once.Stop();
             if (System.Threading.Monitor.TryEnter(gate))
             {
                 try { StopLocked(); }
