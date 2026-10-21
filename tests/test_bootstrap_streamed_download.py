@@ -282,7 +282,16 @@ class StreamedDownloadTests(unittest.TestCase):
         {"name": "drop_without_length", "uri": ARCHIVE,
          "answers": [redirect(ASSETS), {"status": 200, "length": -1, "drop": 100000}]},
         {"name": "short_body", "uri": ARCHIVE, "count": True,
-         "answers": [redirect(ASSETS), {"status": 200, "to": 200000, "length": SIZE}]},
+         "answers": [redirect(ASSETS), {"status": 200, "to": 200000, "length": SIZE},
+                     redirect(ASSETS), {"status": 206, "from": 200000, "to": 250000, "length": 100000,
+                                        "range": "bytes 200000-299999/300000"},
+                     redirect(ASSETS), {"status": 206, "from": 250000, "to": 260000, "length": 50000,
+                                        "range": "bytes 250000-299999/300000"}]},
+        {"name": "short_body_resumed", "uri": ARCHIVE, "count": True,
+         "answers": [redirect(ASSETS), {"status": 200, "to": 200000, "length": SIZE},
+                     redirect(OBJECTS), {"status": 206, "from": 200000, "range": "bytes 200000-299999/300000"}]},
+        {"name": "short_before_first_byte", "uri": ARCHIVE,
+         "answers": [redirect(ASSETS), {"status": 200, "to": 0, "length": SIZE}, {"status": 206}]},
         {"name": "target_cannot_be_written", "uri": ARCHIVE, "readonly": True,
          "answers": [redirect(ASSETS), {"status": 200}]},
         # G6: a dropped connection resumed from where it stopped, through the same checks.
@@ -467,9 +476,24 @@ class StreamedDownloadTests(unittest.TestCase):
 
     def test_a_short_body_is_named_as_cut_short(self):
         row = self.case("short_body")
-        self.assertEqual(row["threw"], "The archive was cut short: 200000 of 300000 bytes arrived.")
+        self.assertEqual(row["threw"], "The archive was cut short: 260000 of 300000 bytes arrived.")
         self.assertNothingWritten(row)
-        self.assertEqual(len(row["asked"]), 2, "a body that ended cleanly is not asked for again")
+        self.assertEqual([ask["range"] for ask in row["asked"]],
+                         ["", "", "bytes=200000-", "bytes=200000-", "bytes=250000-", "bytes=250000-"],
+                         "a body closed early is asked for again from where it stopped, twice at most")
+
+    def test_a_body_closed_early_is_resumed_as_a_dropped_one(self):
+        row = self.case("short_body_resumed")
+        self.assertIsNone(row["threw"], row)
+        self.assertEqual(row["file"], BODY_SHA)
+        self.assertEqual([(ask["uri"], ask["range"]) for ask in row["asked"]],
+                         [(ARCHIVE, ""), (ASSETS, ""), (ARCHIVE, "bytes=200000-"), (OBJECTS, "bytes=200000-")])
+
+    def test_a_body_closed_before_its_first_byte_is_not_resumed(self):
+        row = self.case("short_before_first_byte")
+        self.assertEqual(row["threw"], "The archive was cut short: 0 of 300000 bytes arrived.")
+        self.assertEqual(len(row["asked"]), 2)
+        self.assertNothingWritten(row)
 
     def test_a_target_that_cannot_be_written_is_not_a_dropped_connection(self):
         row = self.case("target_cannot_be_written")

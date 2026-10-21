@@ -1452,10 +1452,10 @@ function Save-StreamedDownload {
         progress bar shows them as the cmdlet's did.
 
         A body that ends short of its Content-Length is named as cut short, never handed on as a whole file. A
-        connection that drops after some of the body arrived is asked again from where it stopped (Range), through
-        the same checks, at most twice; only a 206 whose Content-Range starts there and ends at the last byte is
-        taken, and anything else is the cut-short failure. A failure before the first byte is the download's answer,
-        as it was.
+        connection that drops, or closes, after some of the body arrived and before all of it is asked again from
+        where it stopped (Range), through the same checks, at most twice; only a 206 whose Content-Range starts there
+        and ends at the last byte is taken, and anything else is the cut-short failure. A failure before the first
+        byte is the download's answer, as it was.
     #>
     param($First, [Uri]$Uri, [string]$OutFile, [string]$What, [string[]]$Hosts, [int]$TimeoutSec, [switch]$Count)
     $cookies = $First.CookieContainer
@@ -1505,11 +1505,17 @@ function Save-StreamedDownload {
             } finally {
                 $response.Close()
             }
-            if ($null -eq $broken) { break }
-            $dropped = ($broken -is [IO.IOException]) -or ($broken -is [Net.WebException])
-            # Before the first byte, without a length to resume against, or for anything but the connection: as it was.
-            if (-not $dropped -or $received -le 0 -or $total -le 0) { throw $broken }
-            if ($resumes -ge 2) { throw ($What + ' was cut short: ' + $received + ' of ' + $total + ' bytes arrived.') }
+            $short = $What + ' was cut short: ' + $received + ' of ' + $total + ' bytes arrived.'
+            if ($null -eq $broken) {
+                # The whole of it, or all there is to know of it; or closed early, which is resumed as a drop is.
+                if ($total -lt 0 -or $received -ge $total) { break }
+                if ($received -le 0) { throw $short }
+            } else {
+                $dropped = ($broken -is [IO.IOException]) -or ($broken -is [Net.WebException])
+                # Before the first byte, without a length to resume against, or for anything but the connection: as it was.
+                if (-not $dropped -or $received -le 0 -or $total -le 0) { throw $broken }
+            }
+            if ($resumes -ge 2) { throw $short }
             $resumes++
             $response = $null
             try {
@@ -1527,7 +1533,7 @@ function Save-StreamedDownload {
                 [long]$Matches[1] -ne $received -or [long]$Matches[2] -ne ($total - 1) -or
                 ($Matches[3] -ne '*' -and [long]$Matches[3] -ne $total)) {
                 if ($null -ne $response) { $response.Close() }
-                throw ($What + ' was cut short: ' + $received + ' of ' + $total + ' bytes arrived.')
+                throw $short
             }
         }
         if ($total -ge 0 -and $received -lt $total) {
