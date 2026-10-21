@@ -1454,8 +1454,9 @@ function Save-StreamedDownload {
         A body that ends short of its Content-Length is named as cut short, never handed on as a whole file. A
         connection that drops, or closes, after some of the body arrived and before all of it is asked again from
         where it stopped (Range), through the same checks, at most twice; only a 206 whose Content-Range starts there
-        and ends at the last byte is taken, and anything else is the cut-short failure. A failure before the first
-        byte is the download's answer, as it was.
+        and ends at the last byte is taken, and anything else is the cut-short failure - with what that request got
+        where it failed (a rate limit is named as one, and still found on what is thrown). A failure before the
+        first byte is the download's answer, as it was.
     #>
     param($First, [Uri]$Uri, [string]$OutFile, [string]$What, [string[]]$Hosts, [int]$TimeoutSec, [switch]$Count)
     $cookies = $First.CookieContainer
@@ -1523,16 +1524,19 @@ function Save-StreamedDownload {
                                           -TimeoutSec $TimeoutSec
             } catch {
                 $failure = Get-ThrownException $_.Exception
-                if (($failure -is [Net.WebException]) -or ($failure -is [IO.IOException])) { $response = $null }
-                else { throw }
+                $asked = $short + ' Asking for the rest: ' + $failure.Message
+                if ($failure -is [Net.WebException]) {
+                    throw (New-Object Net.WebException($asked, $failure, $failure.Status, $failure.Response))
+                }
+                if ($failure -is [IO.IOException]) { throw (New-Object IO.IOException($asked, $failure)) }
+                throw
             }
-            $range = $null
-            if ($null -ne $response) { $range = $response.Headers['Content-Range'] }
+            $range = $response.Headers['Content-Range']
             $whole = ([string]$range) -match '^bytes ([0-9]{1,19})-([0-9]{1,19})/([0-9]{1,19}|\*)$'
-            if ($null -eq $response -or [int]$response.StatusCode -ne 206 -or -not $whole -or
+            if ([int]$response.StatusCode -ne 206 -or -not $whole -or
                 [long]$Matches[1] -ne $received -or [long]$Matches[2] -ne ($total - 1) -or
                 ($Matches[3] -ne '*' -and [long]$Matches[3] -ne $total)) {
-                if ($null -ne $response) { $response.Close() }
+                $response.Close()
                 throw $short
             }
         }

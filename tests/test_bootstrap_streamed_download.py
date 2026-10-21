@@ -321,6 +321,10 @@ class StreamedDownloadTests(unittest.TestCase):
                                         "range": "bytes 100000-199999/300000"}]},
         {"name": "resume_failed", "uri": ARCHIVE,
          "answers": [redirect(ASSETS), {"status": 200, "drop": 100000}, {"throw": "io"}]},
+        {"name": "resume_rate_limited", "uri": ARCHIVE,
+         "answers": [redirect(ASSETS), {"status": 200, "drop": 100000},
+                     {"throw": "web", "status": 403, "message": "The remote server returned an error: (403) Forbidden.",
+                      "headers": {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1999999999"}}]},
         {"name": "resume_redirected_away", "uri": ARCHIVE,
          "answers": [redirect(ASSETS), {"status": 200, "drop": 100000},
                      redirect("https://downloads.example.com/rest.zip"), {"status": 206}]},
@@ -528,12 +532,27 @@ class StreamedDownloadTests(unittest.TestCase):
 
     def test_a_resume_answered_otherwise_is_cut_short_with_nothing_left(self):
         for name, received in (("resume_answered_200", 100000), ("resume_wrong_start", 100000),
-                               ("resume_wrong_end", 100000), ("resume_failed", 100000)):
+                               ("resume_wrong_end", 100000)):
             with self.subTest(name):
                 row = self.case(name)
                 self.assertEqual(row["threw"], "The archive was cut short: %d of 300000 bytes arrived." % received)
                 self.assertNothingWritten(row)
                 self.assertEqual(row["old"], 0)
+
+    def test_a_failed_resume_says_what_it_got(self):
+        row = self.case("resume_failed")
+        self.assertEqual(row["threw"], "The archive was cut short: 100000 of 300000 bytes arrived. Asking for the rest: "
+                                       "The connection was closed before an answer came.")
+        self.assertEqual(row["type"], "System.IO.IOException")
+        self.assertNothingWritten(row)
+        row = self.case("resume_rate_limited")
+        self.assertEqual(row["threw"], "The archive was cut short: 100000 of 300000 bytes arrived. Asking for the rest: "
+                                       "The remote server returned an error: (403) Forbidden.")
+        self.assertEqual(row["type"], "System.Net.WebException")
+        self.assertEqual(row["status"], "ProtocolError")
+        self.assertEqual(row["reset"], "1999999999", "a rate limit on the resume is still named as one")
+        self.assertNothingWritten(row)
+        self.assertEqual(row["old"], 0)
 
     def test_a_300_with_a_location_is_followed(self):
         row = self.case("multiple_choices")
