@@ -54,8 +54,8 @@ class ActionsMixin:
                 if member["state"] in WAITING and member["submitted_at"] is None:
                     connection.execute(
                         "UPDATE interruptions SET state='cancelled', cancel_requested=1, "
-                        "last_error='user_cancelled', next_retry_at=? WHERE interruption_id=?",
-                        (now, key))
+                        "last_error='user_cancelled', next_retry_at=?, outcome_at=? WHERE interruption_id=?",
+                        (now, now, key))
                     self._event(connection, now, "cancel", record=member, from_state=member["state"],
                                 to_state="cancelled", reason="user_cancelled", actor=actor)
                     effects[key], changed = "cancelled", True
@@ -114,8 +114,8 @@ class ActionsMixin:
                 else:
                     connection.execute(
                         "UPDATE interruptions SET state='cancelled', cancel_requested=1, "
-                        "last_error='user_cancelled', next_retry_at=? WHERE interruption_id=?",
-                        (now, row["interruption_id"]))
+                        "last_error='user_cancelled', next_retry_at=?, outcome_at=? WHERE interruption_id=?",
+                        (now, now, row["interruption_id"]))
                     self._event(connection, now, "cancel", record=row, from_state=row["state"],
                                 to_state="cancelled", reason="user_cancelled", actor=actor)
 

@@ -229,14 +229,15 @@ class OneSenderTests(unittest.TestCase):
         that names `queue` asks it for `--help`, to prove the flags still exist."""
         spawns = calls(lambda node: getattr(node.func, "attr", getattr(node.func, "id", None)) in SPAWNERS
                        and "queue" in constants(node))
-        sending = [(where, name, node) for where, name, node in spawns if "--message" in constants(node)]
+        # v0.6.20: the message goes as one `--message=<text>` argument (tests/test_message_leading_hyphen.py).
+        sending = [(where, name, node) for where, name, node in spawns if "--message=" in constants(node)]
         self.assertEqual([(where, name) for where, name, _ in sending],
                          [("codex_auto_resume/codex/transport.py", "Backend.send")])
         self.assertEqual(sending[0][2].func.attr, "Popen")
-        self.assertLessEqual({"--thread", "--message"}, constants(sending[0][2]))
+        self.assertLessEqual({"--thread", "--message="}, constants(sending[0][2]))
         for where, name, node in spawns:
             with self.subTest(where=where, name=name):
-                self.assertTrue("--message" in constants(node) or "--help" in constants(node),
+                self.assertTrue("--message=" in constants(node) or "--help" in constants(node),
                                 "a process names `queue` without being the send or the help probe")
 
     def test_every_function_that_starts_a_process_and_names_the_queue_is_known(self):

@@ -88,7 +88,16 @@ OWN = {**quiet.OWN, **ladder.OWN, **power.OWN, **needsyou.OWN, **memguard.OWN, *
 
 
 class SettingsError(ValueError):
-    """A rejected write. Reads never raise; they fall back to defaults."""
+    """A rejected write. `load` never raises; it falls back to defaults (`read` tells a file it cannot read)."""
+
+
+class Unreadable(SettingsError):
+    """v0.6.20: the settings file is there and could not be read now (`transient`: a sharing violation from an
+    antivirus, a backup or a sync tool), or holds no JSON (a hand edit's typo). Never the defaults: nobody chose them."""
+
+    def __init__(self, reason: str, transient: bool):
+        super().__init__("the settings file could not be read just now (%s); try again" % reason)
+        self.reason, self.transient = reason, transient
 
 
 def _boolean(value, default):
@@ -574,17 +583,41 @@ def _migrate(raw) -> dict:
     return _fold_style(_fold_design(raw))
 
 
-def load(path: Path) -> dict:
-    """Read settings, falling back to defaults for anything missing or malformed."""
+def read(path: Path) -> dict:
+    """Read settings as `load` does, but raise Unreadable for a file that is there and cannot be read now or holds no
+    JSON (v0.6.20): the watcher keeps the settings it has then, and a save keeps the file. No file is the defaults."""
+    target = Path(path)
     try:
-        target = Path(path)
         if (not target.is_file() or target.is_symlink()
                 or target.stat().st_size > MAX_SETTINGS_BYTES):
             return defaults()
         raw = json.loads(target.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeError):
-        return defaults()
+    except FileNotFoundError:
+        return defaults()               # gone between the look and the read: no file
+    except OSError as exc:
+        raise Unreadable(type(exc).__name__, True) from None
+    except (ValueError, UnicodeError) as exc:
+        raise Unreadable(type(exc).__name__, False) from None
     return coerce(_migrate(raw))
+
+
+def load(path: Path) -> dict:
+    """Read settings, falling back to defaults for anything missing or malformed."""
+    try:
+        return read(path)
+    except Unreadable:
+        return defaults()
+
+
+def kept(path: Path) -> dict:
+    """What a save keeps of the stored settings (v0.6.20): a file that holds no settings is repaired by the save, as
+    before; a file that could not be read just now is never overwritten with the defaults - the save is refused."""
+    try:
+        return read(path)
+    except Unreadable as exc:
+        if exc.transient:
+            raise
+        return defaults()
 
 
 def save(path: Path, values: dict) -> dict:
@@ -614,7 +647,7 @@ def save(path: Path, values: dict) -> dict:
 def update(path: Path, changes: dict) -> dict:
     """Validate and merge an edit into the stored settings."""
     clean = validate_update(changes)
-    return save(path, dict(load(path), **clean))
+    return save(path, dict(kept(path), **clean))
 
 
 # Fields that exist - stored, validated, defaulted - but that no surface offers yet, because

@@ -296,7 +296,7 @@ class DispatchMixin:
                     key, at, limits=self.forced_limits(limits) if forced else limits, gates=vector,
                     ledger=self.plug, carried=carried, quiet_until=self.quiet_until(at), relaxed=relaxed,
                     resend=self.resend_window() if resend else None, forced=forced,
-                    caps=None if resend else self.caps(relaxed))
+                    caps=self.caps() if resend else self.caps(relaxed))
                 if not claimed:
                     if not resend:                          # a resend refused stays as it was
                         self._refused(current, gate, reason)
