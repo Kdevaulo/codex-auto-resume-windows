@@ -1395,8 +1395,9 @@ function Open-Download {
         followed them - 300, 301, 302, 303 and 307, and 308 as well, an absolute or a relative Location, at most
         five - and every address it is sent to checked (Assert-TrustedHop) BEFORE it is asked, so a hop outside the
         caller's hosts, or over http, is refused without a byte asked of it. Any other 3xx, or one with no Location,
-        fails as the cmdlet's request failed for it (New-ServerError). The answer is checked again, where it says it
-        came from, before a byte of its body is read. -Request is the first request when it is already made.
+        fails as the cmdlet's request failed for it (New-ServerError); a Location that is no address, as it failed
+        for that. The answer is checked again, where it says it came from, before a byte of its body is read.
+        -Request is the first request when it is already made.
     #>
     param([Uri]$Uri, [long]$Offset, [Net.CookieContainer]$Cookies, [string]$What, [string[]]$Hosts,
           [int]$TimeoutSec, $Request)
@@ -1414,7 +1415,12 @@ function Open-Download {
         if (@(300, 301, 302, 303, 307, 308) -contains $code) { $location = $response.Headers['Location'] }
         # A 3xx the cmdlet's request did not follow was its failure, the response on it.
         if ([string]::IsNullOrEmpty($location)) { throw (New-ServerError -Response $response) }
-        $next = New-Object Uri($address, $location)
+        try { $next = New-Object Uri($address, $location) }
+        catch {
+            throw (New-Object Net.WebException(
+                (Get-DownloadWords -Source 'net' -Name 'net_resubmitprotofailed' -Fallback 'Cannot handle redirect from HTTP/HTTPS protocols to other dissimilar ones.'),
+                (Get-ThrownException $_.Exception), [Net.WebExceptionStatus]::ProtocolError, $response))
+        }
         $response.Close()
         if ($hops -ge 5) {
             throw (New-Object Net.WebException(

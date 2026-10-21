@@ -274,6 +274,8 @@ class StreamedDownloadTests(unittest.TestCase):
          "answers": [{"status": 304, "location": ASSETS, "to": 0, "length": 0}, {"status": 200}]},
         {"name": "redirect_nowhere", "uri": ARCHIVE,
          "answers": [{"status": 302, "to": 0, "length": 0}, {"status": 200}]},
+        {"name": "bad_location", "uri": ARCHIVE,
+         "answers": [redirect("http://[bad"), {"status": 200}]},
         {"name": "answer_untrusted", "uri": ARCHIVE,
          "answers": [{"status": 200, "final": "https://downloads.example.com/archive.zip"}]},
         # G3 / G5: no partial file; a short body named.
@@ -530,6 +532,17 @@ class StreamedDownloadTests(unittest.TestCase):
         self.assertTrue(self.case("redirect_nowhere")["threw"].startswith(
             self.words["net_servererror"].split("{0}")[0] + "(302)"))
 
+    def test_a_location_that_is_no_address_fails_as_it_failed(self):
+        row = self.case("bad_location")
+        self.assertEqual(row["threw"], self.words["net_resubmitprotofailed"])
+        self.assertNotEqual(row["threw"], "none")
+        self.assertEqual(row["type"], "System.Net.WebException")
+        self.assertEqual(row["status"], "ProtocolError")
+        self.assertEqual(row["inner"], "System.UriFormatException")
+        self.assertEqual(row["carried"], 1)
+        self.assertEqual(len(row["asked"]), 1)
+        self.assertNothingWritten(row)
+
     def test_a_resume_redirected_away_is_refused_in_the_hosts_words(self):
         row = self.case("resume_redirected_away")
         self.assertEqual(row["threw"], "The archive " + REFUSED + "downloads.example.com")
@@ -585,6 +598,8 @@ class Recorder(http.server.BaseHTTPRequestHandler):
             self.answer(304, b"", {"Location": "/ok"})
         elif self.path == "/nowhere":
             self.answer(302, b"")
+        elif self.path == "/badlocation":
+            self.answer(302, b"", {"Location": "http://[bad"})
         elif self.path.startswith("/loop"):
             self.answer(302, b"", {"Location": "/loop%d" % len(Recorder.seen)})
         elif self.path == "/slow":
@@ -657,6 +672,9 @@ foreach ($path in @('/notmodified', '/nowhere')) {
                                                    -MaximumRedirection 5 -TimeoutSec 300 }
     $out[$path] = @{ new = $new; old = $old }
 }
+$old = Get-Outcome { $null = Invoke-WebRequest -Uri ($base + '/badlocation') -OutFile $scratch -UseBasicParsing -PassThru `
+                                               -MaximumRedirection 5 -TimeoutSec 300 }
+$out['badlocation'] = @{ old = $old; words = (Get-DownloadWords -Source 'net' -Name 'net_resubmitprotofailed' -Fallback 'none') }
 # A request that fails as it is sent: one aborted before.
 $request = New-DownloadRequest -Uri ([Uri]($base + '/agent2')) -Offset 0 -Cookies (New-Object Net.CookieContainer) -TimeoutSec 300
 $request.Abort()
@@ -757,6 +775,14 @@ class RealRequestBesideTheCmdletTests(unittest.TestCase):
                 # In the language shown, the same words (see the too-many-redirects test for why only there).
                 if pair["old"]["threw"].isascii():
                     self.assertEqual(pair["new"], pair["old"])
+
+    def test_a_location_that_is_no_address_reads_as_the_cmdlet_says_it(self):
+        bad = self.outcome("badlocation")
+        self.assertEqual(bad["old"]["type"], "System.Net.WebException")
+        self.assertEqual(bad["old"]["status"], "ProtocolError")
+        self.assertNotEqual(bad["words"], "none")
+        if bad["old"]["threw"].isascii():
+            self.assertEqual(bad["words"], bad["old"]["threw"])
 
     def test_a_request_failing_as_it_is_sent_fails_in_its_own_words(self):
         aborted = self.outcome("aborted")
