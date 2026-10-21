@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from .. import config, notice_kinds, notifier, notify
+from .. import config, edition, notice_kinds, notifier, notify
 from ..app import EXIT_ERROR, EXIT_OK
 from ..store import LegacyStore, StoreError
 from ..windows import WakeEvent
@@ -26,6 +26,21 @@ def cmd_stop(args) -> int:
         return EXIT_OK
     _print("no running watcher found")
     return EXIT_OK
+
+
+def _open_codex_on(app) -> bool:
+    """Whether a notice raised here may offer Open Codex now (v0.6.20): never in the standard edition, whose buttons
+    cancel, stop the power action or open a Dashboard page and nothing else (A28); in the advanced edition only while
+    its plug's icon surface says so - the capability on and Windows able to open the link - as the watcher's own
+    notices ask it (runtime/app.py). Asked only of a cancel URI that carries the flag."""
+    if edition.name() != edition.Edition.ADVANCED:
+        return False
+    try:
+        added = edition.plug(app.paths).surface("tray", {})
+    except Exception:
+        return False
+    notice = added.get("notice") if isinstance(added, dict) else None
+    return isinstance(notice, dict) and notice.get("open_codex") is True
 
 
 def cmd_activate(args) -> int:
@@ -101,7 +116,10 @@ def cmd_activate(args) -> int:
     # as the power-stop branch above raises its own.
     # v0.6.18: with Open Codex where the notice pressed offered it - the decision the watcher made, carried on the
     # button's URI (notify.cancel_asks_open_codex), since this process loads no plug.
+    # v0.6.20: the flag is honoured only where the edition offers the button now (_open_codex_on), so a crafted URI
+    # cannot put Open Codex on a standard edition's notice (A28).
+    open_codex = notify.cancel_asks_open_codex(args.uri) and _open_codex_on(app)
     notifier.deliver(notifier.with_open_codex(notifier.build_cancelled(thread_id, notice_kinds.chosen(app.settings)),
-                                              notify.cancel_asks_open_codex(args.uri)), inbox=None, setting=False)
+                                              open_codex), inbox=None, setting=False)
     _print("thread %s cancelled" % thread_id)
     return EXIT_OK
