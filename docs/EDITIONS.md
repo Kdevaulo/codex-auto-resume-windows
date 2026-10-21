@@ -519,8 +519,8 @@ open without the conversation, or not at all. Nothing is sent and nothing in the
 **Departs from** [A28](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (a notice's button only cancels
 one interruption or opens one page of the Dashboard), [B16](STANDARDS.md#b-what-it-reads-and-how) (Windows
 is asked only the listed questions; whether something is registered for Codex's links is read too) and
-[F6](STANDARDS.md#f-footprint-on-the-machine) (explorer.exe, which hands the link to Windows, is not one of
-the listed processes).
+[F6](STANDARDS.md#f-footprint-on-the-machine) (starting explorer.exe with a Codex link, which hands the link to Windows, is not one of
+its listed uses: showing the logs folder).
 
 **Ceilings.** None: it is an action, and sends nothing. It rests on no measurement of its own.
 

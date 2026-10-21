@@ -338,7 +338,7 @@ K군은 2026-09-28에 더했습니다. 실행 중에 이 파일을 읽는 것은
 **F5** 소유가 증명되지 않은 것은 지우지 않습니다. 밝혀 둔 예외는 이름으로 바꾸는 사용자 단위의 단일 항목들과, 다시 가리키게 하는 마켓플레이스입니다.  
 *테스트*: `test_installer_ownership.py`
 
-**F6** 시작하는 프로세스: 자기 것 - 워처, 설정 창, 그 뒤에서 도는 함께 들어 있는 Python; codex app-server --stdio, codex queue, --version과 queue --help 확인; 설치하고 제거할 때의 codex plugin 명령; 그리고 고정된 스크립트를 전체 경로로 실행하는 PowerShell. 모두 인수 목록으로 시작합니다.  
+**F6** 시작하는 프로세스: 자기 것 - 워처, 설정 창, 그 뒤에서 도는 함께 들어 있는 Python; codex app-server --stdio, codex queue, --version과 queue --help 확인; 설치하고 제거할 때의 codex plugin 명령; 그리고 고정된 스크립트를 전체 경로로 실행하는 PowerShell. 모두 인수 목록으로 시작합니다. 사람이 클릭하면 로그 폴더를 보여 주려고 explorer.exe를, 안내서 링크를 열려고 기본 브라우저를, 설치를 제거하려고 임시 폴더에 둔 자기 설치 프로그램 사본을 시작하기도 합니다(2026-10-22 소유자가 고침).  
 *테스트*: `test_structural_invariants.py`, `test_pwsh.py`
 
 **F7** 단일 인스턴스: 사용자와 상태 디렉터리마다의 뮤텍스, 멈춤 이벤트, Codex 홈마다의 잠금. 두 번째 워처는 끝나고, 전송 관문은 그 잠금을 요구하며, 두 번째 설치는 거부합니다.  

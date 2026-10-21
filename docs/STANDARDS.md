@@ -337,7 +337,7 @@ changed).
 **F5** Nothing is destroyed without proven ownership; the disclosed exceptions are per-user singletons replaced by name and the marketplace repointed.  
 *tested*: `test_installer_ownership.py`
 
-**F6** Processes it starts: its own - the watcher, the settings window and the bundled Python behind them; codex app-server --stdio, codex queue, and the --version and queue --help probes; the codex plugin commands when it installs and uninstalls; and PowerShell by its full path with constant scripts - always as argument lists.  
+**F6** Processes it starts: its own - the watcher, the settings window and the bundled Python behind them; codex app-server --stdio, codex queue, and the --version and queue --help probes; the codex plugin commands when it installs and uninstalls; and PowerShell by its full path with constant scripts - always as argument lists. On a person's click it also starts explorer.exe to show the logs folder, hands the guide link to the default browser, and starts a copy of its own setup program from a temporary folder to remove the installation (amended by the owner on 2026-10-22).  
 *tested*: `test_structural_invariants.py`, `test_pwsh.py`
 
 **F7** Single instance: a per-user, per-state-directory mutex, a stop event and a per-Codex-home lock; a second watcher exits, the send gate requires the lock, and a second installation is refused.  
