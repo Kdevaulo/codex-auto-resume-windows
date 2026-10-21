@@ -100,7 +100,10 @@ namespace CodexAutoResume
         protected override void OnVisibleChanged(EventArgs e)
         {
             base.OnVisibleChanged(e);
-            if (Visible && layer != null) layer.Render();
+            if (layer == null) return;
+            // Drawn as it opens; its picture let go as it closes (a row menu is filled anew each time it opens).
+            if (Visible) layer.Render();
+            else layer.Dispose();
         }
 
         protected override void Dispose(bool disposing)
@@ -184,7 +187,10 @@ namespace CodexAutoResume
         protected override void OnVisibleChanged(EventArgs e)
         {
             base.OnVisibleChanged(e);
-            if (Visible && layer != null) layer.Render();
+            if (layer == null) return;
+            // Drawn as it opens; its picture let go as it closes (a row menu is filled anew each time it opens).
+            if (Visible) layer.Render();
+            else layer.Dispose();
         }
 
         protected override void Dispose(bool disposing)
