@@ -152,9 +152,11 @@ asking can let a prompt-injected turn reverse a pause.
 From v0.6.0, `update_settings` neither offers nor accepts the advanced settings - `codex_exe`,
 which engine binary to run, and `detection_lookback_hours` - which the settings window and the
 panel do not show either; a client that sends them anyway is refused. And `get_status` does not
-report the installation directory, whose path contains your Windows user name, though the
-settings it returns do include `codex_exe`, which is empty unless an engine path has been set,
-by hand or through `update_settings` in v0.5.7 or earlier. Both changes ship in v0.6.0. In
+report the installation directory, whose path contains your Windows user name. Both changes
+ship in v0.6.0. Nor do the settings it, `open_settings` and `update_settings` return carry the
+engine path: they say of `codex_exe` only whether one is set (`<set>`) or not (empty), since that
+path can hold your user name too. Up to v0.6.18 they return the path itself, empty unless one has
+been set, by hand or through `update_settings` in v0.5.7 or earlier. In
 v0.5.7 and earlier, `update_settings` accepts those two settings as well and is not marked
 destructive, so it does not request approval through that annotation, and `get_status`
 reports the installation directory as `home`. Nor does `update_settings` offer the preferences

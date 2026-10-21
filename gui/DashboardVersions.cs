@@ -458,6 +458,15 @@ namespace CodexAutoResume
         /// The confirmed row installed through the installed bootstrap's -Pick: its version, held to the version rule
         /// before it reaches the command line, its edition, and -Force exactly when the row is older or of the other
         /// edition, which the bootstrap requires then and refuses otherwise.
+        ///
+        /// v0.6.18 acceptance (the owner): in the installer window, as an update runs (InstallUpdate) - the download's
+        /// share and the steps on the bar from the lines as they come (Heard, with the progress lines asked for), then the
+        /// finished page with its exit code (PickCode) and the log - headed as an install of another version
+        /// (InstallerFlow.Another), never as an update. The bootstrap prints no notes for a pick (-AskFirst is the
+        /// update's alone), so there is no Notes page. What it printed still reaches PickLine whole, and once the window
+        /// has closed AfterPick or ReportPick says what it always said - except where the pick installed and the window
+        /// opens the new Dashboard: then this one, still running from its renamed .old file, closes, as after an update
+        /// (saying first what the conversion did, where there was one).
         private void InstallPick(string root, string script, string[] row)
         {
             if (!VersionRule.IsMatch(row[0]) || (row[1] != "standard" && row[1] != "advanced")) return;
@@ -473,36 +482,68 @@ namespace CodexAutoResume
             // would close mid-pick, its result never said.
             updatingHere = true;
             diagUpdate.Text = S("diag.update_installing", "installing...");
-            System.Threading.ThreadPool.QueueUserWorkItem(delegate
-            {
-                string printed, errors, reason, installed;
-                int code;
-                int[] converted = null;
-                string ran = StartBootstrap(root, script, flag, UpdateMilliseconds, out printed, out errors, out code);
-                string releases = ran == "done" ? ReleasesLine(printed) : null;
-                string outcome = ran;
-                reason = null;
-                installed = null;
-                if (ran == "done")
+            string outcome = "failed", reason = null, installed = null, detail = "", releases = null;
+            int[] converted = null;
+            string app = Path.Combine(root, "app");
+            var flow = new InstallerFlow(InstallerFlow.Update, root, edition,
+                                         InstallerFlow.EditionOfSource(Path.Combine(app, "src")), version);
+            flow.Another = true;
+            flow.From = InstallerFlow.VersionOf(ReadText(Path.Combine(Path.Combine(app, ".codex-plugin"), "plugin.json")));
+            var window = new InstallerWindow(flow, new InstallerWords(strings, openedLanguage), null,
+                delegate(InstallerFlow answered, Action<string> line, Action<double> unpacked)
                 {
-                    outcome = PickLine(printed, code, out reason, out converted, out installed);
-                    if (outcome == "installed" && installed != version + " " + edition) outcome = "failed";
-                }
-                string detail = Tail(printed + "\n" + errors);
-                MethodInvoker finish = delegate
-                {
-                    updatingHere = false;
-                    SetBusy(false);
-                    if (outcome == "installed") AfterPick(before, version, converted);
-                    else
+                    string printed, errors, ran;
+                    int code;
+                    Heard = line;
+                    try { ran = StartBootstrap(root, script, flag, UpdateMilliseconds, out printed, out errors, out code); }
+                    finally { Heard = null; }
+                    releases = ran == "done" ? ReleasesLine(printed) : null;
+                    outcome = ran;
+                    if (ran == "done")
                     {
-                        diagUpdate.Text = shown;
-                        ReportPick(outcome, reason, converted, detail, releases);
+                        outcome = PickLine(printed, code, out reason, out converted, out installed);
+                        if (outcome == "installed" && installed != version + " " + edition) outcome = "failed";
                     }
-                };
-                try { if (IsHandleCreated && !IsDisposed) BeginInvoke(finish); }
-                catch (Exception) { }
-            });
+                    detail = Tail(printed + "\n" + errors);
+                    return PickCode(ran, outcome, code);
+                }, null, Font);
+            window.ShowDialog(this);
+            updatingHere = false;
+            SetBusy(false);
+            // An update's rule (InstallUpdate): what ran before runs again on the version installed, this Dashboard too.
+            if (outcome == "installed" && window.OpenDashboard &&
+                File.Exists(Path.Combine(root, "CodexAutoResumeSettings.exe")))
+            {
+                if (converted != null)
+                {
+                    var told = new StringBuilder(S("pick.done_converted", "Your state was converted for it, and a copy of it as it was is kept in the state folder."));
+                    AppendConverted(told, converted);
+                    Tell(told.ToString());
+                }
+                if (OpenNewDashboard(root))
+                {
+                    Close();
+                    return;
+                }
+            }
+            if (outcome == "installed") AfterPick(before, version, converted);
+            else
+            {
+                diagUpdate.Text = shown;
+                ReportPick(outcome, reason, converted, detail, releases);
+            }
+        }
+
+        /// The installer window's code for a pick (InstallerWindow.Runner): 0 where it installed; the window's own codes
+        /// where the bootstrap could not be started (NotStarted) or has not finished (StillRunning); otherwise the
+        /// bootstrap's exit code - 15 for a refusal, 12 for a list it could not read - and 1 for an exit code 0 whose
+        /// answer PickLine did not take as installed, which is no success. Pure.
+        internal static int PickCode(string ran, string outcome, int code)
+        {
+            if (outcome == "installed") return 0;
+            if (ran == "running") return InstallerFlow.StillRunning;
+            if (ran == "incomplete" || ran == "failed") return InstallerFlow.NotStarted;
+            return code == 0 ? 1 : code;
         }
 
         /// Installed: said as an update is, with whether the watcher changed hands (the pid and start time WatcherIdentity
