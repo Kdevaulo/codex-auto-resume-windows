@@ -303,7 +303,8 @@ class WatchLoop:
             if not watching:
                 return None             # the whole interval was waited in one go
             try:
-                engine.watch()
+                if engine is not None:          # v0.6.20: none while it is rebuilt; the homes' watch still runs
+                    engine.watch()
             except Exception:
                 self._record_failure("watch")
             if homes is not None:
