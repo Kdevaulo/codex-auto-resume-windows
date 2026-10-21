@@ -2,7 +2,8 @@
 
 > 🌐 한국어 문서입니다. English version: [`main` 브랜치의 docs/DEVELOPMENT.md](https://github.com/songyb111-gachon/codex-auto-resume-windows/blob/main/docs/DEVELOPMENT.md)
 
-이 프로젝트는 한 명의 인간 관리자가 두 개의 AI 코딩 도구와 함께 네 단계에 걸쳐 만들었습니다. 여기에
+이 프로젝트는 한 명의 인간 관리자가 두 개의 AI 코딩 도구와 함께 다섯 단계(0부터 4까지)에 걸쳐 만들었습니다. 이 문서는
+v0.5 릴리스까지의 작업을 다루며, 그 뒤의 일은 [CHANGELOG.ko.md](CHANGELOG.ko.md)와 [ROADMAP.ko.md](ROADMAP.ko.md)에 있습니다. 여기에
 기록하는 이유는 **조사 과정 자체가 이 프로젝트 가치의 큰 부분**이기 때문입니다. 대부분의 노력은 Windows
 ChatGPT/Codex 데스크톱 앱이 실제로 무엇을 지원하는지 알아내고, 무엇을 **지원하지 않는지** 증명하는 데
 들어갔습니다.
@@ -118,5 +119,5 @@ Claude Code가 미완성 프로토타입을 인수해 검토하고, 건전한 �
 
 ## 크레딧
 
-[`../CONTRIBUTORS.ko.md`](CONTRIBUTORS.ko.md)를 참고하세요. OpenAI Codex와 Anthropic Claude Code는 AI 개발
+[CONTRIBUTORS.ko.md](CONTRIBUTORS.ko.md)를 참고하세요. OpenAI Codex와 Anthropic Claude Code는 AI 개발
 도구이지 인간 기여자나 GitHub 계정이 아닙니다. 저작권은 인간 관리자에게 있습니다.
