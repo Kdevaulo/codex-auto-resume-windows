@@ -101,7 +101,10 @@ SmartScreen이 *Windows의 PC 보호*(Windows protected your PC) 창을 띄울 �
 
 ```powershell
 (Get-FileHash .\CodexAutoResume-Setup-vX.Y.Z.exe -Algorithm SHA256).Hash
-gh attestation verify .\CodexAutoResume-Setup-vX.Y.Z.exe --repo songyb111-gachon/codex-auto-resume-windows
+gh attestation verify .\CodexAutoResume-Setup-vX.Y.Z.exe `
+    --repo songyb111-gachon/codex-auto-resume-windows `
+    --signer-workflow songyb111-gachon/codex-auto-resume-windows/.github/workflows/release.yml `
+    --source-ref refs/tags/vX.Y.Z
 ```
 
 첫 값이 `.sha256` 파일의 값과 같아야 합니다. `scripts/release.json`은 설치 파일이 아니라 압축 파일의
@@ -172,7 +175,10 @@ GitHub에서 추가한 플러그인에는 스킬과 그 설치 스크립트와 �
    (attestation은 v0.5.4 이후의 압축 파일에 있습니다).
 
    ```powershell
-   gh attestation verify .\CodexAutoResume-vX.Y.Z-win-x64.zip --repo songyb111-gachon/codex-auto-resume-windows
+   gh attestation verify .\CodexAutoResume-vX.Y.Z-win-x64.zip `
+       --repo songyb111-gachon/codex-auto-resume-windows `
+       --signer-workflow songyb111-gachon/codex-auto-resume-windows/.github/workflows/release.yml `
+       --source-ref refs/tags/vX.Y.Z
    ```
 
    하나라도 맞지 않으면 파일을 지우고 실행하지 마세요. 각 확인이 무엇을 증명하고 무엇은 증명하지 못하는지는

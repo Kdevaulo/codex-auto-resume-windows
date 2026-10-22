@@ -110,7 +110,10 @@ its attestation do. In PowerShell, in the folder you downloaded it to:
 
 ```powershell
 (Get-FileHash .\CodexAutoResume-Setup-vX.Y.Z.exe -Algorithm SHA256).Hash
-gh attestation verify .\CodexAutoResume-Setup-vX.Y.Z.exe --repo songyb111-gachon/codex-auto-resume-windows
+gh attestation verify .\CodexAutoResume-Setup-vX.Y.Z.exe `
+    --repo songyb111-gachon/codex-auto-resume-windows `
+    --signer-workflow songyb111-gachon/codex-auto-resume-windows/.github/workflows/release.yml `
+    --source-ref refs/tags/vX.Y.Z
 ```
 
 The first value must match the `.sha256` file. `scripts/release.json` pins archives, not setup
@@ -187,7 +190,10 @@ If you would rather download the release yourself instead of having the plugin's
    built the archive (archives from v0.5.4 on carry an attestation):
 
    ```powershell
-   gh attestation verify .\CodexAutoResume-vX.Y.Z-win-x64.zip --repo songyb111-gachon/codex-auto-resume-windows
+   gh attestation verify .\CodexAutoResume-vX.Y.Z-win-x64.zip `
+       --repo songyb111-gachon/codex-auto-resume-windows `
+       --signer-workflow songyb111-gachon/codex-auto-resume-windows/.github/workflows/release.yml `
+       --source-ref refs/tags/vX.Y.Z
    ```
 
    If anything does not match, delete the file and do not run it.
