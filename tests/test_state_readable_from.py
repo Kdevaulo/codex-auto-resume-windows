@@ -1,7 +1,7 @@
 """The state marked readable from a version (v0.6.18), as advanced.sqlite has been since v0.6.17.
 
-PRAGMA application_id holds store/schema.py MARK with, in its low 16 bits, the oldest version whose
-reader may use the state (READABLE_FROM). A later version that adds only what an older reader passes
+PRAGMA application_id holds store/schema.py MARK with the schema that wrote the mark (bits 8-15) and
+the oldest version whose reader may use the state (READABLE_FROM, bits 0-7). A later version that adds only what an older reader passes
 over keeps the older number there, and that reader uses the state instead of refusing it as newer.
 Schema 5 stays schema 5: a release before v0.6.18 reads no mark, and opens a marked state exactly as
 it opens an unmarked one - which the released code itself is asked here (tests/released.py).
@@ -60,8 +60,17 @@ LATER = ("ALTER TABLE interruptions ADD COLUMN later_word TEXT NOT NULL DEFAULT 
          "PRAGMA user_version=%d" % (SCHEMA_VERSION + 1))
 
 
-def marked(version: int) -> str:
-    return "PRAGMA application_id=%d" % (MARK | version)
+def mark(readable: int, written: int = SCHEMA_VERSION) -> int:
+    return MARK | written << 8 | readable
+
+
+# This version's own mark: written by schema 5, readable from 5.
+OURS = mark(5)
+
+
+def marked(readable: int, written: int = SCHEMA_VERSION + 1) -> str:
+    """A later schema's mark, as that version writes it."""
+    return "PRAGMA application_id=%d" % mark(readable, written)
 
 
 def snapshot(store) -> dict:
@@ -91,7 +100,7 @@ class MarkTests(Scratch):
         self.assertEqual((SCHEMA_VERSION, READABLE_FROM), (5, 5))
         with Store(self.state) as store:
             self.assertEqual((store.schema_version(), store.readable_from()), (5, 5))
-        self.assertEqual(pragma(self.state, "application_id"), MARK | 5)
+        self.assertEqual(pragma(self.state, "application_id"), OURS)
         self.assertEqual(pragma(self.state, "user_version"), 5)
 
     def test_the_owner_marks_a_state_once_and_a_reader_writes_nothing(self):
@@ -102,7 +111,7 @@ class MarkTests(Scratch):
         self.assertEqual(pragma(self.state, "application_id"), 0, "an open without the mutex writes nothing")
         with Store(self.state, migrate=True, check=True):
             pass
-        self.assertEqual(pragma(self.state, "application_id"), MARK | 5)
+        self.assertEqual(pragma(self.state, "application_id"), OURS)
         # Once marked, the owner's open is a read again: no write lock taken, so none waited for.
         with patch.object(Store, "_transaction", side_effect=AssertionError("a write at open")):
             with Store(self.state, migrate=True, check=True) as store:
@@ -110,12 +119,12 @@ class MarkTests(Scratch):
 
     def test_a_mark_that_is_not_this_versions_is_made_this_versions(self):
         self.filled()
-        for found in (MARK | 3, MARK | 9, 0x12340005):
+        for found in (mark(3), mark(9), mark(5, 4), MARK | 5, 0x12340505):
             with self.subTest(found=hex(found)):
                 rewrite(self.state, "PRAGMA application_id=%d" % found)
                 with Store(self.state, migrate=True):
                     pass
-                self.assertEqual(pragma(self.state, "application_id"), MARK | 5)
+                self.assertEqual(pragma(self.state, "application_id"), OURS)
 
     def test_a_state_brought_forward_is_marked_and_one_put_back_is_not(self):
         before = self.filled()
@@ -126,7 +135,7 @@ class MarkTests(Scratch):
         with Store(self.state, migrate=True, check=True) as store:
             self.assertEqual(store.schema_version(), 5)
             self.assertEqual(len(store.all_records()), len(before["records"]))
-        self.assertEqual(pragma(self.state, "application_id"), MARK | 5)
+        self.assertEqual(pragma(self.state, "application_id"), OURS)
 
     def test_a_mark_written_in_a_transaction_goes_with_it(self):
         """The mark is written inside the opening's transaction, so an opening that fails leaves none."""
@@ -155,13 +164,15 @@ class LaterStateTests(Scratch):
             self.assertEqual({row[0] for row in db.execute("SELECT later_word FROM interruptions")}, {"kept"},
                              "the later column keeps its value, and a new row its default")
             self.assertEqual(db.execute("SELECT word FROM later_things").fetchall(), [("mine",)])
-        self.assertEqual((pragma(self.state, "user_version"), pragma(self.state, "application_id")), (6, MARK | 5),
+        self.assertEqual((pragma(self.state, "user_version"), pragma(self.state, "application_id")), (6, mark(5, 6)),
                          "nothing upgraded: the version and the mark are the later version's")
 
     def test_a_later_state_without_the_mark_or_marked_later_is_refused_as_today(self):
         self.filled()
         rewrite(self.state, *LATER)
-        for found in (0, MARK | 6, MARK | 7, 0x12340005):
+        # No mark, one readable from a later version only, a foreign id - and this version's own mark under a later
+        # schema: a later version that moved the schema without writing a mark of its own fails closed.
+        for found in (0, mark(6, 6), mark(7, 6), 0x12340605, OURS, MARK | 5):
             with self.subTest(found=hex(found)):
                 rewrite(self.state, "PRAGMA application_id=%d" % found)
                 for migrate in (False, True):
@@ -272,7 +283,7 @@ class ReleasedTests(Scratch):
             with self.subTest(tag=tag):
                 Scratch.setUp(self)
                 before = self.filled()
-                self.assertEqual(pragma(self.state, "application_id"), MARK | 5)
+                self.assertEqual(pragma(self.state, "application_id"), OURS)
                 found = released.run(tag, _OPEN_AND_WRITE, self.state, THREAD, OTHER)
                 self.assertEqual(found["version"], 5)
                 self.assertEqual({name: found[name] for name in before}, json.loads(json.dumps(before)))
@@ -281,7 +292,7 @@ class ReleasedTests(Scratch):
                     self.assertTrue(store.thread_enabled(OTHER))
                     self.assertEqual(len(store.all_records()), len(before["records"]) + 1)
                 self.assertEqual((pragma(self.state, "user_version"), pragma(self.state, "application_id")),
-                                 (5, MARK | 5))
+                                 (5, OURS))
 
 
 if __name__ == "__main__":
