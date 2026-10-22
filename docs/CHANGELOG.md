@@ -189,8 +189,8 @@ again if you come forward. Nothing else was added to either file.
   Portuguese, Russian, Ukrainian, Polish, Turkish, Arabic, Hebrew, Vietnamese and Indonesian. Each now says one word for each thing - for example the
   watcher, the continuation, a turn, the recovery, the edition's own name and, in Korean, the usage limit and its
   reset, are one term each across both catalogs - and keeps the formal or informal address its language uses
-  (Traditional Chinese addresses you as 您 in both catalogs; German keeps *Sie* and Spanish and Italian the formal
-  "you" throughout). A usage window is no longer worded as an application window in the Asian languages, the word for
+  (Traditional Chinese addresses you as 您 in both catalogs; German keeps *Sie*, and Spanish and Italian the
+  informal *tú* and *tu*, throughout). A usage window is no longer worded as an application window in the Asian languages, the word for
   "change the edition" no longer reads as changing the version, a few sentences that claimed more than the English
   (that a long conversation is "the usual cause") were corrected, and broken text - stray spaces inside words, split
   measurement ids, wrong particles and genders - was made consistent. The advanced-edition statements (goal
