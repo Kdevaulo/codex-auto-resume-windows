@@ -193,7 +193,9 @@ _LOCAL = {
     "gui/InstallerFlow.cs": {"manifest"},
     # v0.6.16: the render mode's job (build/motion_window.py writes it, not the bridge): the job, its forms and
     # frames, and a frame's own parts - never a reply's.
-    "gui/WindowRender.cs": {"job", "forms", "frame", "answer", "combo", "listed", "scroll", "Map(forms, locale)"},
+    # v0.6.20: and a frame's chosen Pending row and its open row menu.
+    "gui/WindowRender.cs": {"job", "forms", "frame", "answer", "combo", "listed", "scroll", "Map(forms, locale)",
+                            "selected", "menu"},
 }
 
 # The window was two files until v0.6.10-alpha, when each became several. The three tables above
