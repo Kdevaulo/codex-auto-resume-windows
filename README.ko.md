@@ -77,7 +77,7 @@ Codex Auto Resume은 정해 둔 몇 시간이 아니라 Codex가 직접 알려 �
 바뀐 점을 먼저 보여 주고, 업데이트 뒤에는 워처를 다시 시작하고 열려 있던 대시보드를 다시 엽니다. 같은 버전
 위에서 실행하면 **복구**와 **제거**를 고를 수 있습니다. 코드 서명이 없어 *Windows의 PC 보호*(Windows protected
 your PC) 창이 뜰 수 있는데, 그때는 **추가 정보**를 누른 뒤 **실행**을 누릅니다. 먼저 확인하는 방법은
-[docs/VERIFY.ko.md](docs/VERIFY.ko.md#내려받은-설치-파일을-실행하기-전에)에 있습니다.
+[docs/VERIFY.ko.md](docs/VERIFY.ko.md#내려받은-설치-마법사를-실행하기-전에)에 있습니다.
 
 <p align="center"><img src="docs/images/install-motion-ko.png" alt="설치 창이 Codex Auto Resume을 설치하는 모습. 창 자신의 그리기 코드가 그렸습니다. 환영 페이지에서 다음, 설치하기 전에 고르는 것, 설치를 누르면 막대가 차오르며 설치 단계가 차례로 바뀌고, 워처가 실행 중이고 대시보드 열기가 켜진 완료 페이지" width="450"></p>
 
