@@ -22,6 +22,31 @@ _TABLES_V4 = _TABLES_V3 | {"notices"}
 # Schema 5 (v0.6.15-beta) adds two columns and no table.
 _TABLES_V5 = _TABLES_V4
 
+# Readable from (v0.6.18, as advanced.sqlite has been since v0.6.17): PRAGMA application_id holds MARK with, in its low
+# 16 bits, the oldest version whose reader may use the state. A later version that adds only what an older reader
+# passes over - a table, a column at the end of a table, with a default - keeps the older number there, and that reader
+# uses the state instead of refusing it as newer: every table it knows holding at least its columns, first, nothing
+# upgraded and the version and the mark left as they are. A state marked newer than the reader is refused as before,
+# and one without the mark is readable from its own version alone, as every state v0.6.17 and earlier wrote is.
+# The mark keeps schema 5: a release before v0.6.18 reads no mark, so a schema 6 - however readable - would be refused
+# there as newer. Kept at 5, it is read there as its own; the mark serves every version from v0.6.18 on.
+READABLE_FROM = 5
+# "CA" in the high half of SQLite's application id - advanced.sqlite's own mark, the same convention.
+MARK = 0x43410000
+MARKED = "PRAGMA application_id=%d" % (MARK | READABLE_FROM)
+
+
+def readable_from(connection, version: int) -> int:
+    """The oldest version whose reader may use the state `connection` holds, at user_version `version`: the mark's,
+    or `version` itself where the state has none."""
+    found = connection.execute("PRAGMA application_id").fetchone()[0]
+    return found & 0xFFFF if found & 0xFFFF0000 == MARK else version
+
+
+def marked(connection) -> bool:
+    """Whether the state carries this version's mark (MARKED) already: a current state is marked once."""
+    return connection.execute("PRAGMA application_id").fetchone()[0] == MARK | READABLE_FROM
+
 
 class SchemaMixin:
     @staticmethod
@@ -82,7 +107,9 @@ class SchemaMixin:
         connection.execute("PRAGMA user_version=5")
 
     @staticmethod
-    def _validate_schema(connection: sqlite3.Connection) -> None:
+    def _validate_schema(connection: sqlite3.Connection, *, newer: bool = False) -> None:
+        """Every table exactly as this version makes it - or, in a later version's state marked readable from this one
+        (`newer`), holding at least this version's columns, first: what that version added after them is passed over."""
         expected = {
             "settings": (set(_SETTINGS_COLUMNS), "singleton"),
             "threads": (set(_THREAD_COLUMNS), "thread_id"),
@@ -94,6 +121,8 @@ class SchemaMixin:
         for table, (columns, primary_name) in expected.items():
             information = list(connection.execute(f"PRAGMA table_info({table})"))
             found = {row[1] for row in information}
+            if newer:
+                found = {row[1] for row in information[:len(columns)]}
             if found != columns:
                 raise StoreError("Malformed state schema")
             primary = {row[1] for row in information if row[5] == 1}
@@ -106,3 +135,9 @@ class SchemaMixin:
         """The schema on disk now. A watcher that finds a newer one stops using it."""
         with self._read() as connection:
             return connection.execute("PRAGMA user_version").fetchone()[0]
+
+    def readable_from(self) -> int:
+        """The oldest version whose reader may use the state on disk now (READABLE_FROM): a watcher that finds a newer
+        schema stops using it only where this is newer too."""
+        with self._read() as connection:
+            return readable_from(connection, connection.execute("PRAGMA user_version").fetchone()[0])

@@ -46,7 +46,7 @@ class ActionsMixin:
             if row is None:
                 return None
             chain = [_validated_record(dict(value)) for value in connection.execute(
-                "SELECT * FROM interruptions WHERE chain_origin_id=? ORDER BY detected_at",
+                self._record_sql + " WHERE chain_origin_id=? ORDER BY detected_at",
                 (row["chain_origin_id"],))]
             effects, changed = {}, False
             for member in chain:
@@ -81,7 +81,7 @@ class ActionsMixin:
         keys = [key for key in interruption_ids if isinstance(key, str)]
         with self._transaction() as connection:
             rows = [_validated_record(dict(row)) for key in keys for row in connection.execute(
-                "SELECT * FROM interruptions WHERE interruption_id=? AND submitted_at IS NULL AND state IN (%s)"
+                self._record_sql + " WHERE interruption_id=? AND submitted_at IS NULL AND state IN (%s)"
                 % ",".join("?" for _ in WAITING), (key,) + tuple(sorted(WAITING)))]
             for row in rows:
                 connection.execute(
@@ -100,7 +100,7 @@ class ActionsMixin:
                 "INSERT INTO threads (thread_id, enabled) VALUES (?,0) "
                 "ON CONFLICT(thread_id) DO UPDATE SET enabled=0", (thread_id,)
             )
-            for value in connection.execute("SELECT * FROM interruptions WHERE thread_id=?", (thread_id,)).fetchall():
+            for value in connection.execute(self._record_sql + " WHERE thread_id=?", (thread_id,)).fetchall():
                 row = _validated_record(dict(value))
                 if row["state"] in TERMINAL:
                     continue
@@ -237,7 +237,7 @@ class ActionsMixin:
         with self._transaction() as connection:
             hidden = kept = 0
             for value in connection.execute(
-                    "SELECT * FROM interruptions WHERE history_hidden_at IS NULL").fetchall():
+                    self._record_sql + " WHERE history_hidden_at IS NULL").fetchall():
                 row = _validated_record(dict(value))
                 if row["state"] not in TERMINAL:
                     kept += 1
