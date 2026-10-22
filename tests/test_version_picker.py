@@ -102,6 +102,7 @@ foreach ($name in $wanted) {
 $constants = @{}
 foreach ($name in @('$ReleasesHosts', '$ReleasesMaxChars', '$ReleasesTimeoutMin', '$PickFloor', '$EditionsSince',
                     '$PolicySince', '$PolicyKeys', '$PolicyPath', '$PolicyValues', '$StateSchemaSince',
+                    '$StateReadableFrom', '$StateMarkSince',
                     '$AdvancedStateSince', '$PickPageSize', '$PickMaxPages', '$PickBudgetSeconds', '$PickPageTimeoutMax',
                     '$PickNewerPrereleases', '$PickOlderPrereleases')) {
     $found = $ast.FindAll({ param($n)

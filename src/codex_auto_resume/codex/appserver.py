@@ -130,7 +130,7 @@ class Protocol:
                 try:
                     process.wait(timeout=4)
                 except S.TimeoutExpired:
-                    pass    # v0.6.20: never raised from here - a delete that worked stays reported as worked
+                    pass    # v0.6.18: never raised from here - a delete that worked stays reported as worked
         finally:
             if hasattr(self, "reader"):
                 self.reader.join(timeout=1)

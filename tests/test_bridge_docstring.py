@@ -1,4 +1,4 @@
-"""v0.6.20 (audit M5): the bridge's own description says who drives the product through it.
+"""v0.6.18 (audit M5): the bridge's own description says who drives the product through it.
 
 controlcli's docstring said the MCP server drives the product through the bridge; it calls the control layer
 directly (mcp/server.py builds a Control and never sends a bridge command). A reader who trusted the docstring would

@@ -383,7 +383,7 @@ class ActionsMixin:
             raise ControlError("always must be true or false", code="invalid_enabled")
         with self._open() as store:
             record = self._bound_record(store, key, thread)
-        # v0.6.20: each record's project read through its own Codex home's reader, as Pending labels it
+        # v0.6.18: each record's project read through its own Codex home's reader, as Pending labels it
         # (control/records.py) - the default home's state has no conversation of a home Settings added.
         others, readers, seen = _other_homes(self.get_settings().get(homes.FIELD)), {}, {}
 

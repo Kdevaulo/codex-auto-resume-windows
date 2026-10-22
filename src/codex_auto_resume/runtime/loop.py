@@ -29,6 +29,7 @@ from ..windows import AdapterError, Mutex, StopEvent, wait_any
 from .afterwork import AfterWork
 from .health import Health
 from .homes import Homes
+from .setaside import sweep as sweep_set_aside
 from .waking import Waking
 
 
@@ -303,7 +304,7 @@ class WatchLoop:
             if not watching:
                 return None             # the whole interval was waited in one go
             try:
-                if engine is not None:          # v0.6.20: none while it is rebuilt; the homes' watch still runs
+                if engine is not None:          # v0.6.18: none while it is rebuilt; the homes' watch still runs
                     engine.watch()
             except Exception:
                 self._record_failure("watch")
@@ -332,6 +333,7 @@ class WatchLoop:
         health = self._new_health()
         if not once:
             self._failure_baseline()
+            sweep_set_aside(self.paths, self.logger.info)
         # Not `tray`: `from . import tray` names the module in this file too, and a local
         # that shadows a module name reads as that module to anything scanning the source.
         icon = None if once else self._start_tray(stop)
@@ -347,7 +349,8 @@ class WatchLoop:
             while True:
                 ok = False
                 try:
-                    if store.schema_version() > SCHEMA_VERSION:
+                    # v0.6.18: a later version's schema marked readable from this one is used as it is (READABLE_FROM).
+                    if store.schema_version() > SCHEMA_VERSION and store.readable_from() > SCHEMA_VERSION:
                         raise StateFromNewerVersion("newer schema")
                     # Built lazily and retried: a transient codex.exe probe failure (an
                     # antivirus scan or an in-progress Codex update at logon) must defer
@@ -383,7 +386,7 @@ class WatchLoop:
                     exit_code = EXIT_SCHEMA_NEWER
                     break
                 except Unreadable:
-                    # v0.6.20: no engine yet - said once (App._read_settings); nothing is sent or cancelled.
+                    # v0.6.18: no engine yet - said once (App._read_settings); nothing is sent or cancelled.
                     if engine is not None:
                         self._record_failure("tick")
                 except StoreError:

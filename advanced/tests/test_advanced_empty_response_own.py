@@ -1,4 +1,4 @@
-"""Empty-response recovery answers only conversations core takes for a person's own (v0.6.20, the advanced audit's R4):
+"""Empty-response recovery answers only conversations core takes for a person's own (v0.6.18, the advanced audit's R4):
 a subagent's, a review's or another kind Codex makes for itself ended with only reasoning is never continued - core
 would hold its record WAITING for good (not_user_conversation), ahead of the capability's others at P2 - and one made
 before is ended.

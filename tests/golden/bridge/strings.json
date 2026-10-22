@@ -423,6 +423,8 @@
           "msg.toast_starting_body": "Sending the continuation to this conversation.",
           "msg.toast_starting_title": "Resuming now",
           "msg.toast_stopped_body": "Automatic recovery stopped for this task.",
+          "msg.toast_handed_over_body": "You are continuing this conversation yourself, so it will not be resumed automatically.",
+          "msg.toast_parent_cancelled_body": "Automatic recovery was cancelled for this task, so it will not be resumed automatically.",
           "msg.toast_thread": "Conversation: {uuid}",
           "msg.toast_transient": "Codex was temporarily interrupted. Retrying automatically.",
           "msg.toast_unknown_body": "Nothing will be sent again; check the conversation.",

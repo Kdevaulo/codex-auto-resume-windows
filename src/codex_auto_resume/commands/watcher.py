@@ -29,7 +29,7 @@ def cmd_stop(args) -> int:
 
 
 def _open_codex_on(app) -> bool:
-    """Whether a notice raised here may offer Open Codex now (v0.6.20): never in the standard edition, whose buttons
+    """Whether a notice raised here may offer Open Codex now (v0.6.18): never in the standard edition, whose buttons
     cancel, stop the power action or open a Dashboard page and nothing else (A28); in the advanced edition only while
     its plug's icon surface says so - the capability on and Windows able to open the link - as the watcher's own
     notices ask it (runtime/app.py). Asked only of a cancel URI that carries the flag."""
@@ -76,7 +76,7 @@ def cmd_activate(args) -> int:
     # The button names one interruption, so it stops that task and whatever continues
     # it - not every later interruption in the conversation. Only while an older watcher
     # still owns the state does it fall back to that watcher's thread-wide cancel.
-    # v0.6.20: tried again while the watcher holds the state, for as long as a card's Cancel is (control/actions.py
+    # v0.6.18: tried again while the watcher holds the state, for as long as a card's Cancel is (control/actions.py
     # CANCEL_RETRY_SECONDS) - a busy store used to end this windowless process in an error nobody saw.
     from ..control.actions import CANCEL_RETRY_SECONDS
     deadline = time.monotonic() + CANCEL_RETRY_SECONDS
@@ -97,7 +97,7 @@ def cmd_activate(args) -> int:
                     thread_id = record["thread_id"]
                     result = store.cancel_interruption(interruption_id, _now(), actor="toast")
                     if isinstance(result, dict) and result.get("changed") is False:
-                        # v0.6.20: a stale notice's Cancel on a recovery that has finished since says nothing:
+                        # v0.6.18: a stale notice's Cancel on a recovery that has finished since says nothing:
                         # the notice below says it was cancelled, which is not true (notifier.activate does the
                         # same for a card).
                         app.logger.info("thread %s: the notification's cancel changed nothing; it had already "
@@ -116,7 +116,7 @@ def cmd_activate(args) -> int:
     # as the power-stop branch above raises its own.
     # v0.6.18: with Open Codex where the notice pressed offered it - the decision the watcher made, carried on the
     # button's URI (notify.cancel_asks_open_codex), since this process loads no plug.
-    # v0.6.20: the flag is honoured only where the edition offers the button now (_open_codex_on), so a crafted URI
+    # v0.6.18: the flag is honoured only where the edition offers the button now (_open_codex_on), so a crafted URI
     # cannot put Open Codex on a standard edition's notice (A28).
     open_codex = notify.cancel_asks_open_codex(args.uri) and _open_codex_on(app)
     notifier.deliver(notifier.with_open_codex(notifier.build_cancelled(thread_id, notice_kinds.chosen(app.settings)),

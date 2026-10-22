@@ -1,4 +1,4 @@
-"""v0.6.20 (audit R2): Always or Never for a project reads each record's project in its own Codex home.
+"""v0.6.18 (audit R2): Always or Never for a project reads each record's project in its own Codex home.
 
 A record of a Codex home Settings added (v0.6.15-beta) is labelled on Pending through that home's reader
 (control/records.py). Always/Never on its row read the project through the default home's reader instead, which

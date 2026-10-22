@@ -225,7 +225,7 @@ class AfterResetTests(StopCase):
         five minutes, then ten, twenty - up to an hour."""
         plug, turn = self.running()
         # The meter reads no fresh usage here: its own reading after its spacing would hold a window again, and
-        # nothing of the stop's own starts while one holds (v0.6.20, test_advanced_stop_held_windows).
+        # nothing of the stop's own starts while one holds (v0.6.18, test_advanced_stop_held_windows).
         plug.runtime._code_of(plug.runtime.registry.get("usage_meter"))._app_running = lambda: False
         self.h.tick(advance=61)
         self.h.tick(advance=61)

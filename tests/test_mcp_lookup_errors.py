@@ -1,4 +1,4 @@
-"""v0.6.20 (audit M2): only an unknown tool or resource is "invalid params"; a lookup that breaks inside is internal.
+"""v0.6.18 (audit M2): only an unknown tool or resource is "invalid params"; a lookup that breaks inside is internal.
 
 The server answered every LookupError as INVALID_PARAMS with the exception's own text. That was meant for an
 unknown tool and an unknown resource; it also caught a KeyError or an IndexError raised inside a handler or the

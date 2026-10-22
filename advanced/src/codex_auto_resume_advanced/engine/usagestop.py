@@ -202,7 +202,7 @@ class UsageStop(UsagePause):
         if not waiting:
             return
         try:
-            # v0.6.20: while any window it holds has not reset - the weekly one still held when the five-hour one
+            # v0.6.18: while any window it holds has not reset - the weekly one still held when the five-hour one
             # resets - no continuation of its own starts either: the pause's own promise (holding()), which holds the
             # wrap-up's continuation after the reset the same way (`holds`).
             if self.holding():
@@ -235,7 +235,7 @@ class UsageStop(UsagePause):
             if word == ipc.Stop.HELD:
                 continue                                                # held by core: asked again when it lets go
             if word == ipc.Stop.UNCONFIRMED:
-                # v0.6.20: written, no answer in time - it may have started. Nothing is said of a failure: the next look
+                # v0.6.18: written, no answer in time - it may have started. Nothing is said of a failure: the next look
                 # after the backoff finds a newer turn (ended SUPERSEDED, nothing sent twice) or starts it again.
                 self._backoff[row["record_id"]] = (failures + 1,
                                                    now + min(BACKOFF_SECONDS * 2 ** failures, BACKOFF_MOST))

@@ -161,7 +161,7 @@ class MarkerFreeContinuation:
                 session = self._session()
                 session.__enter__()
                 opened = True
-                # v0.6.20: the add written inside core's launch guard, with the session's start - a Pause or Cancel
+                # v0.6.18: the add written inside core's launch guard, with the session's start - a Pause or Cancel
                 # that commits after the guard stops it; its answer awaited outside.
                 pending = submitted(session, METHOD, params)
         except Exception:

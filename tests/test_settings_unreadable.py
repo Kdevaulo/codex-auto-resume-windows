@@ -1,7 +1,7 @@
-"""A settings file that cannot be read now is never taken as the defaults (v0.6.20, the core audit's R1).
+"""A settings file that cannot be read now is never taken as the defaults (v0.6.18, the core audit's R1).
 
 An antivirus scan, a backup or a sync tool can hold the settings file for a moment (a sharing violation), and a hand
-edit can leave a typo in it. Until v0.6.20 that one read handed back the defaults and the watcher acted on them: Observe
+edit can leave a typo in it. Until v0.6.18 that one read handed back the defaults and the watcher acted on them: Observe
 only written off in the state, categories switched off recovered again, and every waiting record of an extra Codex home
 cancelled for good. Now the watcher keeps the settings in force and reads again at the next tick; with no good read yet
 it builds no engine at all, so nothing is sent or cancelled; and a save never writes the defaults over a file it could

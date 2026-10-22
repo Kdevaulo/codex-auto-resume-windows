@@ -84,7 +84,7 @@ class EmptyResponse:
         return self._home if self._home is not None else inuse.home(self.paths)
 
     def _source(self):
-        """Core's reader, judging a conversation as core does (v0.6.20) - a person's own, or P19's widening while
+        """Core's reader, judging a conversation as core does (v0.6.18) - a person's own, or P19's widening while
         Recover every conversation is on - never a subagent's, a review's or another kind Codex makes for itself, which
         core never recovers and whose record would wait for good (as the wrap-up and the forced stop judge one)."""
         from codex_auto_resume.codex import LocalSource
@@ -147,7 +147,7 @@ class EmptyResponse:
 
     @staticmethod
     def _not_own(handle, source) -> None:
-        """v0.6.20: a continuation waiting for a conversation core does not take for a person's own - made before this
+        """v0.6.18: a continuation waiting for a conversation core does not take for a person's own - made before this
         look judged them so, or one Recover every conversation widened to and no longer does - ended: core holds it
         WAITING for good (not_user_conversation), ahead of this capability's others at P2."""
         try:

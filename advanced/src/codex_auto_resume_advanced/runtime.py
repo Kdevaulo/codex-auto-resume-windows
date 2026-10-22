@@ -312,7 +312,7 @@ class Runtime:
         # {record: (capability, ...)}: the capabilities at P12 a claim that pooled the record paid, journalled as
         # acted once that claim is known to have committed (`moved`, v0.6.17).
         self._pooled = {}
-        # v0.6.20: the capabilities whose words (P4) a committed claim carries, told once core moves it on (`moved`).
+        # v0.6.18: the capabilities whose words (P4) a committed claim carries, told once core moves it on (`moved`).
         self._texted = {}
         self._noted = set()
         # (capability, record) a kept-on capability's hook raised for: passed over for it (K8).
@@ -346,7 +346,7 @@ class Runtime:
         return self._states
 
     def _rearmed_silent(self) -> None:
-        """v0.6.20: silent_continuation turned on again after REFUSED_BY_CODEX turned it off - a person's choice made
+        """v0.6.18: silent_continuation turned on again after REFUSED_BY_CODEX turned it off - a person's choice made
         since - is asked again: the process's refusal is forgotten, so it is not shown on while it answers DEFER until
         the watcher restarts. A refusal met again trips it again."""
         tripped = self.__dict__.get("_refused_tripped")
@@ -773,7 +773,7 @@ class Runtime:
             tend = (_own(self._code_of(definition), "tend")
                     if state != ArmingState.ARMED and definition.id in HEADLESS_CAPABILITIES else None)
             if tend is not None:
-                # v0.6.20: what a run kind turned off or watched still owes what it started - a live run's Stop
+                # v0.6.18: what a run kind turned off or watched still owes what it started - a live run's Stop
                 # handed on and its end written, a model put back (engine/headless.follow_up, engine/fallback.py):
                 # its clean-up alone, never a turn of its own, whatever it stands at.
                 try:
@@ -976,7 +976,7 @@ class Runtime:
         return DEFER
 
     def _words_sent(self, record) -> None:
-        """v0.6.20: a claim that carried a capability's words (P4) committed - core moved it to submitting - so the
+        """v0.6.18: a claim that carried a capability's words (P4) committed - core moved it to submitting - so the
         capability is told, through its optional `words_sent`, what it may now take as said (subagent_parent's lines:
         told once only when they go, never when a claim held after P4 sent core's own words instead)."""
         for capability in self._texted.pop(record.get("interruption_id"), ()):

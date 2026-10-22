@@ -92,7 +92,7 @@ class SettingsError(ValueError):
 
 
 class Unreadable(SettingsError):
-    """v0.6.20: the settings file is there and could not be read now (`transient`: a sharing violation from an
+    """v0.6.18: the settings file is there and could not be read now (`transient`: a sharing violation from an
     antivirus, a backup or a sync tool), or holds no JSON (a hand edit's typo). Never the defaults: nobody chose them."""
 
     def __init__(self, reason: str, transient: bool):
@@ -589,7 +589,7 @@ def _migrate(raw) -> dict:
 
 def read(path: Path) -> dict:
     """Read settings as `load` does, but raise Unreadable for a file that is there and cannot be read now or holds no
-    JSON (v0.6.20): the watcher keeps the settings it has then, and a save keeps the file. No file is the defaults."""
+    JSON (v0.6.18): the watcher keeps the settings it has then, and a save keeps the file. No file is the defaults."""
     target = Path(path)
     try:
         if (not target.is_file() or target.is_symlink()
@@ -614,7 +614,7 @@ def load(path: Path) -> dict:
 
 
 def kept(path: Path) -> dict:
-    """What a save keeps of the stored settings (v0.6.20): a file that holds no settings is repaired by the save, as
+    """What a save keeps of the stored settings (v0.6.18): a file that holds no settings is repaired by the save, as
     before; a file that could not be read just now is never overwritten with the defaults - the save is refused."""
     try:
         return read(path)

@@ -1,4 +1,4 @@
-"""A continuation after the reset written to the app with no answer in time is not told as one that failed (v0.6.20,
+"""A continuation after the reset written to the app with no answer in time is not told as one that failed (v0.6.18,
 the advanced audit's M1): the turn may have started, as a stop with no answer may have been made - UNCONFIRMED, no
 "could not continue" notice; the next look at the turns finds the newer turn and ends it SUPERSEDED, nothing sent twice.
 """

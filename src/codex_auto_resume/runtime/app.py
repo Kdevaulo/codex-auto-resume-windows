@@ -83,7 +83,7 @@ class App(WatchLoop):
         # leave them - which is what every part of this process works from - kept apart from the
         # stored ones the engine is handed with them.
         self.managed = self._read_managed()
-        # v0.6.20: a settings file that is there and cannot be read leaves the defaults on screen alone - no engine is
+        # v0.6.18: a settings file that is there and cannot be read leaves the defaults on screen alone - no engine is
         # built, so nothing is sent or cancelled, until a read succeeds (`engine`, refresh_settings).
         self._settings_unread = False
         stored = self._read_settings()
@@ -286,7 +286,7 @@ class App(WatchLoop):
 
     def engine(self, store: Store, *, dispatch_lock=None) -> Engine:
         if not self._settings_good:
-            # v0.6.20: never built on defaults a failed read left; the loop tries again next tick, quietly.
+            # v0.6.18: never built on defaults a failed read left; the loop tries again next tick, quietly.
             self.refresh_settings(None)
             if not self._settings_good:
                 raise policy.Unreadable("not read yet", True)
@@ -362,7 +362,7 @@ class App(WatchLoop):
         return (status.st_mtime_ns, status.st_size)
 
     def _read_settings(self):
-        """The stored settings, or None while the file is there and cannot be read (v0.6.20, settings.read): said in
+        """The stored settings, or None while the file is there and cannot be read (v0.6.18, settings.read): said in
         the log once, by its error's class name alone, and once more when it is read again."""
         try:
             stored = policy.read(self.paths.settings_file)
@@ -398,7 +398,7 @@ class App(WatchLoop):
             self.logger.info("administrator's policy keys: %s", ", ".join(held.codes()) or "none")
             self.managed = held
         if stamp != self._settings_stamp_seen:
-            # v0.6.20: a read that fails keeps the settings in force, and the stamp unseen so the next tick reads again.
+            # v0.6.18: a read that fails keeps the settings in force, and the stamp unseen so the next tick reads again.
             stored = self._read_settings()
             if stored is not None:
                 self._settings_stamp_seen, self._stored, self._settings_good = stamp, stored, True

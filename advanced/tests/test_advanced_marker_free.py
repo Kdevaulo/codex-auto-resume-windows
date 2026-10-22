@@ -650,7 +650,7 @@ class ChannelTests(unittest.TestCase):
                          {"outcome": "not_started", "error_code": "queue_consent_refused"})
 
     def test_a_guard_that_fails_as_it_closes_reads_the_add_it_wrote(self):
-        """v0.6.20 (the advanced audit's M3): the add is written inside the guard, so a guard that fails as it closes
+        """v0.6.18 (the advanced audit's M3): the add is written inside the guard, so a guard that fails as it closes
         comes after it - its answer is read, as core's queue launch reads the receipt of a process that exists, never
         called an unsent attempt that core may send again."""
         @contextlib.contextmanager

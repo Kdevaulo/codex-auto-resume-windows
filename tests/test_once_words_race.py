@@ -1,4 +1,4 @@
-"""v0.6.20 (audit R1): words for this time a person writes while the watcher is mid-dispatch are sent or stay.
+"""v0.6.18 (audit R1): words for this time a person writes while the watcher is mid-dispatch are sent or stay.
 
 The watcher reads a waiting recovery's words before its claim (A26) and takes them off the file as the continuation
 carrying them is handed to Codex. A person who adds, edits or takes away the words between that read and the claim

@@ -78,7 +78,7 @@ class UpgradeHandoverTests(unittest.TestCase):
 
     def test_the_watcher_is_handed_over_before_the_files_are_replaced(self):
         handover = self.source.index("$previousWatcherStillRunning = $false")
-        swap = self.source.index("Move-Item -Path $pair.dst -Destination $aside")
+        swap = self.source.index("Move-Item -LiteralPath $pair.dst -Destination $aside")
         setup = self.source.index("$setupArgs = @('setup')")
         self.assertLess(handover, swap)
         self.assertLess(swap, setup)

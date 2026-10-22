@@ -1,4 +1,4 @@
-"""A recovery message that starts with "-" reaches `codex queue` as the message (v0.6.20, the security audit's R1).
+"""A recovery message that starts with "-" reaches `codex queue` as the message (v0.6.18, the security audit's R1).
 
 The person's Custom message, an advanced queued prompt or a chat message may start with "-" - a Markdown bullet
 ("- keep going"), a rule ("---"), "-1 more step" - and the validators allow it. Passed as `--message <text>`, a parser

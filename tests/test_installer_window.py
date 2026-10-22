@@ -587,7 +587,7 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(self.answer["installed_at"], {"none": None, "advanced": "advanced", "standard": "standard"})
         self.assertEqual(self.answer["entries"], ["advanced", "standard"])
         self.assertIn("$_.Name -ceq 'codex_auto_resume_advanced'", INSTALL_PS1)
-        self.assertIn("$upgrade = Test-Path $AppDir", INSTALL_PS1)
+        self.assertIn("$upgrade = Test-Path -LiteralPath $AppDir", INSTALL_PS1)
 
     def test_the_home_and_the_version_are_install_ps1s(self):
         self.assertEqual(self.answer["home"], [r"C:\Users\ExampleUser\.codex-auto-resume", r"D:\Elsewhere"])

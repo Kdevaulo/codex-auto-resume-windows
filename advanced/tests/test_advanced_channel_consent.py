@@ -1,4 +1,4 @@
-"""The P5 channels write their first change of state inside core's launch guard (v0.6.20, the advanced audit's M3):
+"""The P5 channels write their first change of state inside core's launch guard (v0.6.18, the advanced audit's M3):
 goal_continuation's thread/goal/set and marker_free_continuation's thread/queue/add go with the session's start, so a
 Pause or Cancel that commits once the guard is let go stops them - as core's queue launch and the stop's IPC request
 are guarded. The answer is awaited outside the guard, which holds core's write lock.

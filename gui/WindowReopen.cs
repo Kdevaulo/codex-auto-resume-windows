@@ -767,8 +767,16 @@ namespace CodexAutoResume
             if (auditing || installRoot == null) return;
             try
             {
+                bool created;
                 updateClose = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.ManualReset,
-                                                                    UpdateEventName(installRoot));
+                                                                    UpdateEventName(installRoot), out created);
+                if (!created && SquattedEvent(updateClose))
+                {
+                    // Made first by someone this window takes no orders from: not listened to, as if it were not there.
+                    updateClose.Dispose();
+                    updateClose = null;
+                    return;
+                }
                 updateWait = System.Threading.ThreadPool.RegisterWaitForSingleObject(updateClose, UpdateHeard, null, -1, true);
                 FormClosed += delegate
                 {
@@ -778,6 +786,70 @@ namespace CodexAutoResume
             }
             catch (Exception) { /* no event to listen on: an update leaves this window as it always did */ }
         }
+
+        /// Whether an update event that existed before this window opened it was made by someone the window takes no
+        /// orders from (v0.6.18, security M6) - the rule the watcher's own named objects follow (win/kernel.py): a label
+        /// below Medium integrity, or an owner that is neither this account nor one only more rights can set (the
+        /// administrators, Windows itself). A Low process - a browser's sandbox, say - or another account that made it
+        /// first and set it would close every Dashboard as it opened. What cannot be read is not trusted.
+        internal static bool SquattedEvent(System.Threading.WaitHandle handle)
+        {
+            IntPtr owner, group, dacl, sacl, descriptor;
+            // SE_KERNEL_OBJECT; OWNER_SECURITY_INFORMATION | LABEL_SECURITY_INFORMATION
+            if (GetSecurityInfo(handle.SafeWaitHandle, 6, 0x1 | 0x10, out owner, out group, out dacl, out sacl,
+                                out descriptor) != 0)
+                return true;
+            try
+            {
+                string made = owner == IntPtr.Zero ? null
+                    : new System.Security.Principal.SecurityIdentifier(owner).Value;
+                using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+                {
+                    string me = identity.User == null ? null : identity.User.Value;
+                    return !TrustedOwner(made, me) || IntegrityRid(sacl) < MediumIntegrity;
+                }
+            }
+            catch (Exception) { return true; }
+            finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
+        }
+
+        private const int MediumIntegrity = 0x2000;
+
+        /// Whether an object owned by `owner` is this account's `user` own, or made by someone with more rights: the
+        /// computer's administrators (an elevated process of this account) or Windows itself. Pure.
+        internal static bool TrustedOwner(string owner, string user)
+        {
+            if (string.IsNullOrEmpty(owner) || string.IsNullOrEmpty(user)) return false;
+            return owner == user || owner == "S-1-5-32-544" || owner == "S-1-5-18";
+        }
+
+        /// The mandatory label's level in a SACL as its last RID; none is Medium, as Windows treats it.
+        private static int IntegrityRid(IntPtr sacl)
+        {
+            if (sacl == IntPtr.Zero) return MediumIntegrity;
+            int count = Marshal.ReadInt16(sacl, 4) & 0xFFFF;               // ACL.AceCount
+            IntPtr ace = sacl + 8;                                          // after the ACL header
+            for (int i = 0; i < count; i++)
+            {
+                int size = Marshal.ReadInt16(ace, 2) & 0xFFFF;             // ACE_HEADER.AceSize
+                if (Marshal.ReadByte(ace) == 0x11)                          // SYSTEM_MANDATORY_LABEL_ACE_TYPE
+                {
+                    string label = new System.Security.Principal.SecurityIdentifier(ace + 8).Value;
+                    return int.Parse(label.Substring(label.LastIndexOf('-') + 1), CultureInfo.InvariantCulture);
+                }
+                if (size <= 0) break;
+                ace += size;
+            }
+            return MediumIntegrity;
+        }
+
+        [DllImport("advapi32.dll", ExactSpelling = true)]
+        private static extern uint GetSecurityInfo(Microsoft.Win32.SafeHandles.SafeWaitHandle handle, int objectType,
+                                                   uint securityInfo, out IntPtr owner, out IntPtr group,
+                                                   out IntPtr dacl, out IntPtr sacl, out IntPtr descriptor);
+
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        private static extern IntPtr LocalFree(IntPtr memory);
 
         /// The event was set: heard once (the wait is registered to run once), and answered on the window's own thread.
         private void UpdateHeard(object state, bool timedOut)

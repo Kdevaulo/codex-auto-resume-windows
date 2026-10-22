@@ -1,4 +1,4 @@
-"""v0.6.20 (audit R3): a stale notice's Cancel never says "Automatic recovery cancelled" for a finished recovery.
+"""v0.6.18 (audit R3): a stale notice's Cancel never says "Automatic recovery cancelled" for a finished recovery.
 
 A detection notice can stay in Windows' notification centre, or on screen, long after its recovery was recovered.
 A Cancel pressed on it then changes nothing (the store answers changed: False), yet both routes still raised the

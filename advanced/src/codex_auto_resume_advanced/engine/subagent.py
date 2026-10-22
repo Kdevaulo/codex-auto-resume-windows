@@ -83,7 +83,7 @@ class SubagentParent:
         self._scoped = None
         self._home = home
         self._looked = None
-        # v0.6.20: the lines P4 put in a parent's words, by its interruption, told once the claim carrying them commits.
+        # v0.6.18: the lines P4 put in a parent's words, by its interruption, told once the claim carrying them commits.
         self._pending = {}
 
     def bind(self, scoped):
@@ -132,7 +132,7 @@ class SubagentParent:
         key = record.get("interruption_id")
         if not ids.is_interruption_id(key) or not scoped.continuations.on():
             return DEFER                                 # watched: only core's words
-        # v0.6.20: told only once the claim carrying these words commits (`words_sent`): a claim held after P4, or
+        # v0.6.18: told only once the claim carrying these words commits (`words_sent`): a claim held after P4, or
         # core's own words sent instead (a conversation's Custom message, the validator), tells nothing - and the
         # lines come again at the next send.
         if len(self._pending) >= SEEN_LIMIT:

@@ -167,7 +167,7 @@ class ToastCancelTests(unittest.TestCase):
     rides on the button's own URI."""
 
     def activate(self, uri, on=True):
-        """`on`: whether the capability stands on here now (v0.6.20: commands/watcher.py honours the flag only
+        """`on`: whether the capability stands on here now (v0.6.18: commands/watcher.py honours the flag only
         then, and never in the standard edition)."""
         from contextlib import contextmanager
         from types import SimpleNamespace

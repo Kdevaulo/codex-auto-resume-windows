@@ -67,7 +67,7 @@ class CompactContinue:
     def _compacted(self, record):
         """Whether the latest turn after `record`'s failure is a compaction alone that completed: True, False (none, or
         one interrupted: nothing was compacted) - or "failed" for one that ended failed - and None where it cannot be
-        read or is still running (v0.6.20: never a continuation onto a context a running compaction has not made)."""
+        read or is still running (v0.6.18: never a continuation onto a context a running compaction has not made)."""
         latest = self._latest(record.get("thread_id"))
         if latest is None:
             return None
@@ -130,7 +130,7 @@ class CompactContinue:
         written, a Stop handed on, a row no thread follows ended LOST."""
         return follow_up(self._scoped, self.follower, CAPABILITY, self._routes.values())
 
-    # v0.6.20: turned off or watched, the same bookkeeping (runtime.Runtime.tick): a Stop still reaches a live run.
+    # v0.6.18: turned off or watched, the same bookkeeping (runtime.Runtime.tick): a Stop still reaches a live run.
     tend = tick
 
 
