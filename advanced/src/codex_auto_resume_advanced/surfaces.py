@@ -148,7 +148,7 @@ def answer(runtime, name, facts):
     if name == Surface.STATUS:
         return status(runtime)
     if name == Surface.TRAY:
-        return dict(badge(runtime), **meter_view(runtime))
+        return dict(badge(runtime), **meter_view(runtime), **notice_view(runtime), **update_view(runtime))
     if name in BADGE_SURFACES:
         return badge(runtime)
     if not isinstance(facts, dict):
@@ -243,6 +243,40 @@ def meter_view(runtime) -> dict:
             notices.append(dict(notice, used_percent=None))
     return {"meter": {"read_at": max(row["read_at"] for row in rows.values()), "windows": shown,
                       "notices": notices}}
+
+
+def notice_view(runtime) -> dict:
+    """What the watcher adds to the notices it builds (v0.6.18): {"notice": {"open_codex": true}} while Open Codex on
+    a notice stands on and Windows can open a `codex:` link here (control/opencodex.py), {} otherwise - so with it
+    off, or with no handler, every notice is exactly the standard edition's. A closed flag, nothing else."""
+    from .control import opencodex
+    try:
+        definition = runtime.registry.get(opencodex.CAPABILITY)
+        if definition is None or runtime.states().get(opencodex.CAPABILITY) != ArmingState.ARMED:
+            return {}
+        if runtime.action(definition).available() is not True:
+            return {}
+    except Exception:
+        return {}
+    return {"notice": {"open_codex": True}}
+
+
+def update_view(runtime) -> dict:
+    """What the weekly update check offers (v0.6.18), for the watcher to show once: {"update": {"notices": [{"key",
+    "version", "prerelease"}]}} while it stands on and its last check in this process offered a newer version, {}
+    otherwise. A version and a flag, both read back to their shapes by core before anything is shown."""
+    from .engine import updatecheck
+    try:
+        definition = runtime.registry.get(updatecheck.CAPABILITY)
+        if definition is None or runtime.states().get(updatecheck.CAPABILITY) != ArmingState.ARMED:
+            return {}
+        found = runtime._code_of(definition).offered()
+    except Exception:
+        return {}
+    if found is None:
+        return {}
+    version, prerelease = found
+    return {"update": {"notices": [{"key": "update:" + version, "version": version, "prerelease": prerelease}]}}
 
 
 def diagnostics(runtime) -> dict:

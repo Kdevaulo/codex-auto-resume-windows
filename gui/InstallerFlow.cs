@@ -79,6 +79,10 @@ namespace CodexAutoResume
         internal bool Maintaining;
         /// What is new in Version: its section of the changelog the archive carries, or null where there is none.
         internal string NotesText;
+        /// The Dashboard's Install another version... (v0.6.18 acceptance): run as an update is - the bootstrap's lines
+        /// on the bar, the Dashboard's own rules after it - but named for what it is, for an older version or the other
+        /// edition is not an update. The bootstrap prints no notes for a pick, so it has no Notes page.
+        internal bool Another;
 
         internal InstallerFlow(string mode, string home, string edition, string installed, string version)
         {
@@ -102,6 +106,7 @@ namespace CodexAutoResume
             // Repair runs from the first page; Remove goes on to the uninstall's own (Choose).
             if (Maintaining) return new[] { Maintain, Confirm, Progress, Finish };
             // The Notes page comes between the download and the install (InstallerWindow.Ask).
+            if (Mode == Update && Another) return new[] { Progress, Finish };
             if (Mode == Update) return new[] { Progress, Notes, Finish };
             if (Mode == Uninstall) return new[] { Confirm, Progress, Finish };
             return new[] { Welcome, Options, Progress, Finish };
@@ -518,6 +523,12 @@ namespace CodexAutoResume
     /// not know leaves both as they were, and the bar never goes back. The lines are the scripts' own English ones,
     /// which they print in every language - the words the setup step prints in the person's language are never
     /// read. The setup program's own two steps, checking its archive and unpacking it, come first (Unpacked).
+    ///
+    /// Inside a step the bar moves only as far as the work really is: where the step counts what it does - the files
+    /// copied or removed, the plugin's commands, setup's own steps, the health check's checks - it says so on a
+    /// progress line (Variable), and the bar takes that share of the way to the next milestone (Within). Nothing
+    /// moves it with time: a step that counts nothing, or an older installer that prints no progress line, leaves the
+    /// bar at its milestone until the next one. What the bar draws glides up to that place (Glide), never past it.
     internal static class InstallerProgress
     {
         internal struct Milestone
@@ -541,9 +552,11 @@ namespace CodexAutoResume
         private static readonly Milestone[] Installing =
         {
             new Milestone("edition: ", 0.27, "codex"),
-            new Milestone("[ok] Found Codex", 0.30, "files"),
-            new Milestone("Installing program files", 0.33, "files"),
-            new Milestone("Updating program files", 0.33, "files"),
+            // Codex found, the folder claimed and the old payload set aside: a step of its own, so "Copying the program
+            // files" names only the copy (v0.6.18 acceptance: the label showed twice, the watcher and Dashboard between).
+            new Milestone("[ok] Found Codex", 0.30, "prepare"),
+            new Milestone("Installing program files", 0.33, "prepare"),
+            new Milestone("Updating program files", 0.33, "prepare"),
             new Milestone("Stopping the running watcher", 0.40, "watcher"),
             // The Dashboard's close and the copy itself have their own lines (v0.6.16 acceptance: the step stayed on
             // the watcher through both, while the log went on).
@@ -561,14 +574,16 @@ namespace CodexAutoResume
         {
             new Milestone("Asking github.com which release is newest", 0.05, "ask"),
             new Milestone("Asking api.github.com for this repository's list of releases", 0.05, "ask"),
+            // Install another version...'s -Pick, which asks for the whole list again before it downloads.
+            new Milestone("Asking api.github.com for this repository's whole list of releases", 0.05, "ask"),
             new Milestone("Downloading v", 0.10, "download"),
             new Milestone("SHA-256 ", 0.25, "verify"),
             new Milestone("[ok] SHA-256", 0.25, "verify"),
             new Milestone("[ok] Archive contents verified", 0.30, "verify"),
-            new Milestone("Installing", 0.35, "files"),
-            new Milestone("[ok] Found Codex", 0.40, "files"),
-            new Milestone("Updating program files", 0.45, "files"),
-            new Milestone("Installing program files", 0.45, "files"),
+            new Milestone("Installing", 0.35, "prepare"),
+            new Milestone("[ok] Found Codex", 0.40, "prepare"),
+            new Milestone("Updating program files", 0.45, "prepare"),
+            new Milestone("Installing program files", 0.45, "prepare"),
             new Milestone("Stopping the running watcher", 0.50, "watcher"),
             new Milestone("Closing the Dashboard", 0.53, "dashboard"),
             new Milestone("Copying the program files into place", 0.57, "files"),
@@ -619,6 +634,105 @@ namespace CodexAutoResume
             if (total <= 0) return 0.0;
             return UnpackedAt * Math.Min(1.0, Math.Max(0.0, (double)done / total));
         }
+
+        // ------------------------------------------------------------------ how much of a step is done
+
+        /// The variable this window sets for the installer it starts, and for no one else: with it, install.ps1 and the
+        /// setup step it runs say how much of a step is done, as `progress: <step> <done>/<total>` lines of their own.
+        /// Without it - Install.cmd's console, the CI logs, an older caller - they print exactly what they always did.
+        internal const string Variable = "CODEX_AUTO_RESUME_PROGRESS_LINES";
+
+        internal const string ProgressPrefix = "progress: ";
+
+        /// The most a step's own count moves the bar to: the whole bar is the finish's alone (InstallerBar.Finish).
+        internal const double Ceiling = 0.99;
+
+        /// Reads a progress line: its step, and how many of how many are done. False for any other line, and for one
+        /// whose count is not whole numbers with 0 <= done <= total and total > 0. Pure.
+        internal static bool ParseProgress(string line, out string step, out int done, out int total)
+        {
+            step = null;
+            done = total = 0;
+            string said = (line ?? "").Trim();
+            if (!said.StartsWith(ProgressPrefix, StringComparison.Ordinal)) return false;
+            string[] parts = said.Substring(ProgressPrefix.Length).Split(' ');
+            if (parts.Length != 2 || parts[0].Length == 0) return false;
+            foreach (char c in parts[0]) if (!(c >= 'a' && c <= 'z') && c != '_') return false;
+            string[] count = parts[1].Split('/');
+            if (count.Length != 2) return false;
+            int d, t;
+            var invariant = System.Globalization.CultureInfo.InvariantCulture;
+            if (!int.TryParse(count[0], System.Globalization.NumberStyles.None, invariant, out d) ||
+                !int.TryParse(count[1], System.Globalization.NumberStyles.None, invariant, out t)) return false;
+            if (t <= 0 || d > t) return false;
+            step = parts[0];
+            done = d;
+            total = t;
+            return true;
+        }
+
+        /// Whether `line` is one of the window's own progress lines, which are read for the bar and kept out of the log.
+        internal static bool IsProgress(string line)
+        {
+            string step;
+            int done, total;
+            return ParseProgress(line, out step, out done, out total);
+        }
+
+        /// The place of the milestone after the one at `place` in `mode`'s table: the nearest place beyond it, or the
+        /// whole bar after the last. Pure.
+        internal static double NextPlace(string mode, double place)
+        {
+            double next = 1.0;
+            foreach (Milestone milestone in Of(mode))
+                if (milestone.At > place && milestone.At < next) next = milestone.At;
+            return next;
+        }
+
+        /// The bar's place with `done` of `total` of the step that began at the milestone `place`: that share of the gap
+        /// to the next milestone, never past it, and never the whole bar (Ceiling). Pure.
+        internal static double Within(string mode, double place, int done, int total)
+        {
+            if (total <= 0) return place;
+            double share = Math.Min(1.0, Math.Max(0.0, (double)done / total));
+            double next = NextPlace(mode, place);
+            return Math.Min(place + (next - place) * share, Math.Max(place, Ceiling));
+        }
+
+        /// The bar's place after `line`, where it is a progress line of the step under way (`step`, begun at the
+        /// milestone `place`): forward only. A line of another step, or no progress line, leaves it. True when it
+        /// moved. Pure.
+        internal static bool Progressed(string mode, string line, double place, string step, ref double at)
+        {
+            string said;
+            int done, total;
+            if (!ParseProgress(line, out said, out done, out total) || said != step) return false;
+            double next = Within(mode, place, done, total);
+            if (next <= at) return false;
+            at = next;
+            return true;
+        }
+
+        // ------------------------------------------------------------------ the bar's glide
+
+        /// How fast the bar closes on where the work is: most of a gap within this many seconds (an exponential ease),
+        /// and never slower than MinimumSpeed, so a new milestone is reached well within half a second.
+        internal const double GlideSeconds = 0.08;
+        internal const double MinimumSpeed = 0.4;
+
+        /// The longest the glide to the whole bar may hold the Finish page back, in seconds.
+        internal const double FinishSeconds = 0.4;
+
+        /// What the bar shows `seconds` after it showed `shown`, gliding toward `target`: closer, never past it, never
+        /// back. Pure.
+        internal static double Glide(double shown, double target, double seconds)
+        {
+            if (target <= shown) return shown;
+            if (seconds <= 0) return shown;
+            double gap = target - shown;
+            double step = Math.Max(gap * (1.0 - Math.Exp(-seconds / GlideSeconds)), MinimumSpeed * seconds);
+            return step >= gap - 0.0005 ? target : shown + step;
+        }
     }
 
     /// The installer's words, from the product's own catalog - the strings of the language the window speaks - with
@@ -661,6 +775,7 @@ namespace CodexAutoResume
             "verify_setup", "Checking the setup program",
             "unpack", "Unpacking the files",
             "codex", "Looking for Codex",
+            "prepare", "Preparing the program files",
             "files", "Copying the program files",
             "watcher", "Stopping the watcher that is running",
             "dashboard", "Closing the Dashboard",

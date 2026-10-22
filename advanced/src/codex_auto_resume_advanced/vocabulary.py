@@ -245,6 +245,14 @@ class OptionKey(StrEnum):
     STOP_WORDS_WEEKLY = "stop_words_weekly"
     WRAP_RESET_TIME = "wrap_reset_time"
     WRAP_AFTER_RESET = "wrap_after_reset"
+    # v0.6.18: not a person's choice - no capability offers it as one (registry.Option), so `options` never reads it and
+    # set_option refuses it - but a time a capability's own code keeps beside its choices (state/choices.py, `stamp`):
+    # when the weekly update check last ran (engine/updatecheck.py), in whole Unix seconds.
+    LAST_CHECK = "last_check"
+    # and, beside it, the newest version a check offered and not yet put away (engine/updatecheck.encode), and when it
+    # was found.
+    OFFERED_VERSION = "offered_version"
+    OFFERED_AT = "offered_at"
 
 
 class WordingKey(StrEnum):

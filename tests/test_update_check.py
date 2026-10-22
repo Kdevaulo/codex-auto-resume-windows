@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from download_standin import BRIDGE
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "scripts" / "bootstrap.ps1"
@@ -506,7 +507,7 @@ class NeverGoesBackwardsTests(unittest.TestCase):
 # tag, and every other request - a download - fails the way an offline machine does. Every
 # request is written down. The plugin's addresses point at a port nothing listens on as well, in
 # case the stub were ever bypassed.
-STUBBED_RUN = r"""
+STUBBED_RUN = BRIDGE + r"""
 function global:Invoke-WebRequest {
     param([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing, [switch]$PassThru,
           [int]$MaximumRedirection, [int]$TimeoutSec, [string]$Method)

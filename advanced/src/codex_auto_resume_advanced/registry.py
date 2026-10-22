@@ -58,10 +58,10 @@ of a sign-in failure (engine/admitted.py); at P8 and P7, a reset credit used at 
 (engine/credits.py), and at P8, P2 and P3 a message of a person's own sent when the window they picked resets
 (engine/resetmessage.py); and, at P7 and P3, the notice of a usage limit that lifts early (engine/earlyreset.py); at P7, an uncertain continuation sent once more (engine/oncemore.py),
 and one waiting recovery a person asks to send now (control/sendnow.py); at P12, several conversations at once
-(engine/parallel.py); at P16, a conversation queued in Codex for when it is opened (engine/foropen.py); and, at no
-point, two actions: longer
-reset messages, and the compatibility report (report/). The tests define one of their own to hold every
-rule here.
+(engine/parallel.py); at P16, a conversation queued in Codex for when it is opened (engine/foropen.py); from v0.6.18,
+at P8, the weekly update check while idle (engine/updatecheck.py); and, at no point, three actions: longer
+reset messages, Open Codex on a notice (control/opencodex.py), and the compatibility report (report/). The tests define
+one of their own to hold every rule here.
 """
 from __future__ import annotations
 
@@ -72,6 +72,7 @@ from typing import Callable
 from codex_auto_resume.domain.plug import Point
 
 from .control.codexstart import make as make_start_with_codex
+from .control.opencodex import make as make_open_codex_button
 from .control.sendnow import make as make_send_now
 from .engine.admitted import (ATTEMPTS, DEFAULT_ATTEMPTS, make_codex_gave_up, make_sign_in_retry,
                               make_structured_rules, make_unknown_failure_budget)
@@ -97,6 +98,7 @@ from .engine.sessions import make as make_other_sessions
 from .engine.silent import make as make_silent_continuation
 from .engine.oncemore import make as make_once_more
 from .engine.parallel import DEFAULT_WORKERS, WORKERS, make as make_parallel
+from .engine.updatecheck import make as make_idle_update_check
 from .engine.usage import (DEFAULT_PAUSE, DEFAULT_POLL, DEFAULT_STOP_WORDS, DEFAULT_STYLE, DEFAULT_WARN,
                            DEFAULT_WRAP, ON, PERCENT_RANGE, PERCENTS, POLL_RANGE, SWITCH,
                            POLL_CHOICES, STYLES, make_meter, make_pause, make_wrap_up)
@@ -1048,6 +1050,30 @@ USAGE_PAUSE = CapabilityDef(
     requires=("usage_meter",),
 )
 
+# A weekly update check while idle (v0.6.18, the owner's list of 2026-10-21). At P8, at most once in seven days and only
+# while core holds no recovery waiting, being sent or watched, it starts the very check the Dashboard's Check for updates
+# runs - this installation's scripts/bootstrap.ps1 -CheckOnly, by Windows PowerShell's full path, CREATE_NO_WINDOW, the
+# window's 120 s, never killed - on a thread of its own (engine/updatecheck.py); what that check offers, read as the
+# window reads it (a newer release, or the pre-release a pressed check would offer), is one notice of its own kind whose
+# button opens Diagnostics, where an update is installed. It downloads and installs nothing. An administrator's
+# DisableUpdateCheck holds it. The time of the last check is a stamp in `options` (state/choices.py), kept before the
+# check starts, so a failed or refused one waits a week too. It departs from C4 (it acts on a schedule, on its own), C5
+# (the update check without a button pressed) and C7 (the compatibility data, which the check refreshes, refreshed
+# from the watcher). It sends nothing to Codex and reads nothing of it; it stands on engine_present, the installation
+# every recovery stands on, so a Codex the product cannot find holds it with them. Its ceilings are the schema's
+# floor and never bind.
+IDLE_UPDATE_CHECK = CapabilityDef(
+    id="idle_update_check",
+    points=frozenset({Point.TICK}),
+    revision=1,
+    departs_from=("C4", "C5", "C7"),
+    compat="engine_present",
+    ceilings=Ceilings(per_day=1, per_conversation=1),
+    journal_prefix="update",
+    make=make_idle_update_check,
+    codes=("checked", "offered", "unanswered"),
+)
+
 # Longer reset messages (v0.6.14, the owner's answer of 2026-10-08): a message sent at a reset may be up to what one
 # continuation carries (continuation.PROMPT_LIMIT, 8,154 characters) instead of A27's 2,000 - a separate opt-in, off
 # until a person turns it on after its statement, which names A27. An action: it answers at no point and sends
@@ -1067,6 +1093,26 @@ LONG_RESET_MESSAGE = CapabilityDef(
     ceilings=None,
     journal_prefix="longmsg",
     make=make_long_messages,
+)
+
+# Open Codex on a notice (v0.6.18, the owner's list of 2026-10-21): while it stands on, a notice about one conversation
+# offers Open Codex beside Open Dashboard, the Codex app's own link to that conversation (core's notify.codex_thread_uri,
+# measured on Codex app 26.1007), opened by the card through notify.open_in_codex and by Windows' toast through the
+# handler registered for `codex:` - and only where one is (control/opencodex.py reads Software\Classes\codex, never
+# writes it). An action: core never asks it; the icon's surface says whether the button is offered, and core's
+# notifier adds it. It departs from A28 (a button cancels one interruption or opens one page of the Dashboard), B16
+# (Windows is asked only the listed content-free questions: the `codex:` key is read too) and F6 (explorer.exe, which
+# opens the link, is not a listed process). The link only shows a conversation; nothing is sent (A1 kept).
+OPEN_CODEX_BUTTON = CapabilityDef(
+    id="open_codex_button",
+    kind=CapabilityKind.ACTION,
+    points=frozenset(),
+    revision=1,
+    departs_from=("A28", "B16", "F6"),
+    compat=None,
+    ceilings=None,
+    journal_prefix="opencdx",
+    make=make_open_codex_button,
 )
 
 # The compatibility report (v0.6.14 stage 3b, the plan's in-app report): this PC's own records written
@@ -1100,8 +1146,8 @@ COMPAT_REPORT = CapabilityDef(
 DEFINITIONS = (START_WITH_CODEX, GOAL_CONTINUATION, QUEUE_FOR_OPEN, COMPACT_CONTINUE, MODEL_FALLBACK, HEADLESS_RUN, OTHER_SESSIONS, MARKER_FREE, CAPACITY_RETRY, STRUCTURED_RULES,
                UNKNOWN_FAILURE_BUDGET, CODEX_GAVE_UP, SIGN_IN_RETRY, RESET_CREDIT, RESET_MESSAGE, EARLY_RESET,
                ONCE_MORE, SEND_NOW, PARALLEL_DISPATCH, PROMPT_QUEUE, EMPTY_RESPONSE, SUBAGENT_PARENT, KEEP_GOING,
-               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION, SILENT_CONTINUATION,
-               LONG_RESET_MESSAGE,
+               USAGE_METER, USAGE_WRAP_UP, USAGE_PAUSE, EVERY_CONVERSATION, SILENT_CONTINUATION, IDLE_UPDATE_CHECK,
+               OPEN_CODEX_BUTTON, LONG_RESET_MESSAGE,
                COMPAT_REPORT)
 # Codex's own retry settings (stage 4's item 6): Attempts (6, 8, 10 or 12; 8 by default) for both of its built-in
 # provider's retry keys, written at P8 and put back (engine/retries.py). MB failed on codex-cli 0.162.0-alpha.17.2 -
@@ -1157,10 +1203,14 @@ SHOWN_ORDER = ("compat_report", "start_with_codex",
                "early_reset", "parallel_dispatch", "reset_message", "long_reset_message",
                # v0.6.16-beta.3 (issue #29): the usage meter and what it serves, beside the other usage-limit features.
                "usage_meter", "usage_wrap_up", "usage_pause", "keep_going",
-               "prompt_queue", "empty_response", "once_more_when_unsure", "send_now", "capacity_retry",
+               "prompt_queue", "empty_response", "once_more_when_unsure", "send_now",
+               # v0.6.18: Open Codex on a notice, beside Send now - both what a person does about one conversation.
+               "open_codex_button", "capacity_retry",
                # v0.6.16-beta.4: what a failure of Codex's own is taken up with, beside the capacity retry (Q12).
                "compact_continue", "model_fallback",
                "codex_gave_up", "goal_continuation", "subagent_parent", "sign_in_retry", "unknown_failure_budget",
+               # v0.6.18: the weekly update check, which recovers nothing, among the expert settings.
+               "idle_update_check",
                "structured_rules")
 
 

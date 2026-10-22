@@ -318,7 +318,8 @@ class PolicyTests(ArmingCase):
             self.assertEqual(names & writes, set(), path.name)
             if "winreg" in names:
                 users.add(path.name)
-        self.assertEqual(users, {"policy.py"})
+        # v0.6.18: Open Codex on a notice reads whether a handler for codex: is registered - a read too.
+        self.assertEqual(users, {"policy.py", "opencodex.py"})
 
 
 class TripwireTests(ArmingCase):

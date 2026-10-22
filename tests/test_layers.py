@@ -96,6 +96,9 @@ LAYER = {_q(name): layer for layer, names in {
                # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them - pure
                # but for the look at a folder; its identity is handed in from win/folderid.py.
                "homes",
+               # v0.6.18: a Codex home this PC's Codex uses that is not watched yet - the rules, and the Codex app's
+               # list read; the account's variable is handed in from win/userenv.py.
+               "homefind",
                # v0.6.16: the kinds of notice that may stay on screen until clicked - pure but for the catalogs.
                "notice_kinds"),
     "adapters": ("store", "openstate", "codex", "windows", "compat", "compatio", "startup", "shortcut",
@@ -108,6 +111,8 @@ LAYER = {_q(name): layer for layer, names in {
                  # v0.6.10: what others report, read beside the registry and never by it.
                  "compat.reported",
                  "pwsh", "notify", "notice_presence", "tray_place",
+                 # v0.6.18: the Codex app's link to one conversation, handed to explorer.exe - out of notify.
+                 "codex_link",
                  # v0.6.10-alpha: store.py became store/. Every part of it is the same layer
                  # the one module was, and `STORE` below covers them by prefix.
                  "store.actions", "store.claims", "store.columns", "store.downgrade",
@@ -126,6 +131,8 @@ LAYER = {_q(name): layer for layer, names in {
                  "win", "win.dll", "win.homelock", "win.inventory", "win.kernel", "win.sync",
                  # v0.6.11: the administrator's policy keys, read and never written.
                  "win.policykeys",
+                 # v0.6.18: and the account's own CODEX_HOME, read and never written.
+                 "win.userenv",
                  # and what Windows says of power and of the internet, and the one power request.
                  "win.power", "win.network",
                  # and what it says of the watcher's own process and of this sign-in.
@@ -197,6 +204,8 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.afterwork",
               # v0.6.15-beta: and the other Codex homes it holds, each with an engine of its own.
               "runtime.homes",
+              # v0.6.18: and what an update set aside and could not delete, swept as it starts.
+              "runtime.setaside",
               # v0.6.16-beta.3: and its own decisions asked on request, for Diagnostics' check (issue #27).
               "checkup",
               # v0.6.16: and its own rules asked again of every waiting recovery, for Rescan and reconcile (issue #39).
@@ -240,7 +249,7 @@ PLANNED = {_q(name) for name in ("codex", "win", "ui", "mcp", "domain.public")}
 STORE = {_q("store"), _q("openstate")}              # openstate moves into store/ as store/open.py
 CODEX = {_q("codex"), _q("windows"), _q("codex")}         # Codex's files and processes
 WIN = {_q(name) for name in ("windows", "startup", "addremove", "shortcut", "pwsh", "notify", "notice_presence",
-                             "tray_place", "win")}
+                             "tray_place", "codex_link", "win")}
 UI = {_q(name) for name in ("brand", "notice_card", "notice_window", "ui")}
 MCP = {_q("mcpserver"), _q("mcp")}
 # What the UI may reach: the control layer, the public status mapping (machine, until it is
@@ -316,6 +325,7 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     ("commands.install", "diagnostics"): ("cost", "only the diagnostics command writes the export"),
     ("commands.watcher", "ui.tray"): ("cost", "activate opens the settings window through the icon's helper"),
     ("commands.watcher", "control"): ("cost", "only a power action's stop button goes through the control layer"),
+    ("commands.watcher", "control.actions"): ("cost", "a toast's Cancel reads how long a busy state is tried again"),
     ("compat.probes", "windows"): ("cost", "the registry's API and discovery checks read the "
                                            "adapter, only when they run"),
     ("config", "settings"): ("cost", "nearly everything imports config; the settings schema, and the "

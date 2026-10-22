@@ -1,6 +1,6 @@
 """Where every module goes when the core is Rust, and what may call what once it is.
 
-`docs/ROADMAP.md` names the stack v0.6.20 is planned to arrive at: the Windows interface in
+`docs/ROADMAP.md` names the stack v0.6.21 is planned to arrive at: the Windows interface in
 C# and the core in Rust, in eight parts -
 
     Watcher · Recovery engine · Classifier / Policy · State machine ·
@@ -71,6 +71,8 @@ ITEM = {_q(name): item for item, names in {
                 "runtime.afterwork",
                 # v0.6.15-beta: the other Codex homes a watcher holds.
                 "runtime.homes",
+                # v0.6.18: what an update set aside and could not delete, swept as it starts.
+                "runtime.setaside",
                 # v0.6.16-beta.3: its own decisions asked on request, for Diagnostics' check (issue #27).
                 "checkup",
                 # v0.6.16: and its own rules asked again of every waiting recovery, for Rescan and reconcile (issue #39).
@@ -130,6 +132,8 @@ ITEM = {_q(name): item for item, names in {
                "poweraction",
                # v0.6.15-beta: the Codex homes a watcher is set to watch, as Settings keep them.
                "homes",
+               # v0.6.18: and a Codex home this PC's Codex uses that is not watched yet, offered in the Dashboard.
+               "homefind",
                # v0.6.16: the kinds of notice a person can keep on screen until clicked, and an edition's.
                "notice_kinds"),
     "machine": ("machine", "domain", "domain.errors", "domain.ids", "domain.public",
@@ -193,6 +197,8 @@ ITEM = {_q(name): item for item, names in {
               # v0.6.11: what a screen reader is told of the popup, and asks of it.
               "ui.popup.access"),
     "notifications": ("notice_card", "notice_presence", "notice_window", "notifier", "notify",
+                      # v0.6.18: the Codex app's link to one conversation, and opening it, out of notify.
+                      "codex_link",
                       "ui.card", "ui.card.win32", "ui.card.surfaces", "ui.card.card", "ui.card.stack"),
     "words": ("l10n", "messages", "interface", "ui.words"),
     "brand": ("brand", "brand.checkbox", "brand.colour", "brand.css", "brand.design", "brand.elevation",
@@ -200,6 +206,8 @@ ITEM = {_q(name): item for item, names in {
     "platform": ("win", "win.dll", "win.homelock", "win.inventory", "win.kernel", "win.sync",
                  # v0.6.11: the administrator's policy keys, read from the registry.
                  "win.policykeys",
+                 # v0.6.18: and the account's own CODEX_HOME, read from the registry.
+                 "win.userenv",
                  # and what Windows says of power and of the internet, and the one power request.
                  "win.power", "win.network",
                  # and what it says of the watcher's own process and of this sign-in.

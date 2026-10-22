@@ -1114,9 +1114,12 @@ class OutcomeTests(EngineCase):
         self.running()
         self.h.home.add_turn(T1)
         self.h.tick(advance=1)
+        # The turn made progress: recovered, through turn_completed (owner amended E6, 2026-10-21).
+        self.assertEqual(self.h.record()["state"], "turn_completed")
+        self.h.tick(advance=1)
         row = self.h.record()
-        self.assertEqual(row["state"], "outcome_unverified")
-        self.assertEqual(row["last_error"], "stale_turn_row")
+        self.assertEqual(row["state"], "recovered")
+        self.assertEqual(row["last_error"], "progress_then_turn_cut_off")
 
     def test_T13_an_interrupted_turn_was_stopped_by_the_user(self):
         turn = self.running()
@@ -1181,7 +1184,7 @@ class OutcomeTests(EngineCase):
             with self.subTest(client_id=client_id):
                 h = self.fresh()
                 self.send_and_hold(h)
-                turn = h.home.dispatch(T1, status="inProgress")
+                turn = h.home.dispatch(T1, status="inProgress", progress=False)
                 h.home.add_item(T1, turn, "userMessage", "and also this", client_id)
                 h.tick(advance=1)
                 parent = h.record()
@@ -1206,9 +1209,12 @@ class OutcomeTests(EngineCase):
         # in a turn of their own, which fails with a transient error.
         self.h.home.fail_transient(T1, completed=int(self.h.now))
         self.h.tick(advance=1)
+        self.assertEqual(self.h.records()[0]["state"], "turn_completed")
+        self.h.tick(advance=1)
         first, second = self.h.records()
-        self.assertEqual(first["state"], "outcome_unverified")
-        self.assertEqual(first["last_error"], "stale_turn_row")
+        # It made progress before it was cut off: recovered (owner amended E6, 2026-10-21).
+        self.assertEqual(first["state"], "recovered")
+        self.assertEqual(first["last_error"], "progress_then_turn_cut_off")
         self.assertIsNone(second["parent_interruption_id"], "the user's turn is not our continuation")
         self.h.tick(advance=901)
         self.assertEqual(len(self.h.backend.send_calls), 2)

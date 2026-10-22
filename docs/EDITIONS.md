@@ -130,24 +130,28 @@ interruption, the samples of failures it could not classify, the reset rules and
 the usage windows - and, until each is sent, cancelled or ended, the words of a message you wrote for a
 reset - are kept in
 `config/advanced/advanced.sqlite`, in fixed words, ids, numbers and Codex's own error codes - never a
-word of an error or a conversation, and of yours only a message waiting for a reset - and nothing of it is written into the standard edition's state. It adds no network code; one capability,
-the compatibility report, asks gh - the GitHub CLI you installed - to reach GitHub, and only when
-you start it in the Dashboard (below). Its archive also carries
+word of an error or a conversation, and of yours only a message waiting for a reset - and nothing of it is written into the standard edition's state. It adds no network code. Two capabilities cause GitHub traffic: the compatibility report asks gh - the GitHub CLI you
+installed - to reach GitHub, and only when you start it in the Dashboard (below), and
+*Check for updates once a week* runs the installed `bootstrap.ps1 -CheckOnly` once a week (below). Its archive also carries
 the harness the project uses to measure whether a capability's route works on a given version of
 Codex; nothing runs it unless a person asks, and [SECURITY.md](SECURITY.md) says what it does.
 
+No capability stores a secret today. The package carries one way to keep a capability's secret, in Windows'
+Credential Manager under a name of its own and never in its database, a settings file or a log, for a capability
+that will need one; nothing calls it, and it never reads Codex's own credentials.
+
 ## Today's capabilities
 
-Thirty: twenty-two that change how a recovery is made, which conversations are recovered or what
+Thirty-two: twenty-two that change how a recovery is made, which conversations are recovered or what
 follows a turn, three that send at a time you pick - the two at a usage reset, and queued messages - three
-before a usage limit is reached - the usage meter, and the wrap-up and the forced stop that need it - and two
-actions: Longer messages, which only lets a message be longer, and the compatibility report, which only you
-start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
+before a usage limit is reached - the usage meter, and the wrap-up and the forced stop that need it - one that
+checks for updates once a week, and three actions: Longer messages, which only lets a message be longer, Open Codex on a notice, which only adds a button
+that shows a conversation, and the compatibility report, which only you start. Four rest on a measurement each that was made - the first three, and queue for when a conversation
 is opened. All five added in v0.6.16-beta.4 rest on measurements that were made - running a conversation
 here, the other sessions, compacting a full conversation, another model at capacity and a continuation with
 no words - and four more (the reset credit, the reset message, the usage meter and the forced stop) rest on
 measurements made on `codex-cli 0.162.0-alpha.17.2` and, for the forced stop, again on the newer one. Six rest on
-measurements not made yet, and the other eleven on none. Each measurement made was made by hand, on the
+measurements not made yet, and the other thirteen on none. Each measurement made was made by hand, on the
 owner's machine, first on `codex-cli 0.158.0-alpha.2.1`, again on `codex-cli 0.162.0-alpha.17.2` and, for those this release's
 capabilities rest on, once more on `codex-cli 0.163.0-alpha.10.2` (2026-10-17) - and MQO, MQP and MQG, which decide how
 the continuation with no marker, several conversations at once and the goal continuation sit beside the queue for
@@ -501,6 +505,29 @@ from the last hour, and none from before it was turned on or set to watch; turni
 it to watch only ends what it took up and has not sent, and the program ends such a recovery unsent a
 day on the clock after the failure in any case.
 
+### Open Codex on a notice
+
+**What it does.** While it is on, every notice about one conversation - a usage limit detected, a
+continuation being sent, how one ended - offers *Open Codex* beside *Open Dashboard*, on the program's
+card and on Windows' own notification alike. A click shows that conversation in the Codex app through
+Codex's own link to it: a running or minimized app comes to the front at that conversation, and a closed
+one starts there (measured on Codex app 26.1007). The button is offered only where Windows has something
+registered for `codex:` links, which is read and never written. A notice about no one conversation - a
+warning near a limit, the memory guard, the power action - never has it.
+
+**When it helps.** When a notice says something about a conversation and you want to look at it at once.
+
+**What it risks.** The link is Codex's, not this program's: a version of the Codex app that changes it may
+open without the conversation, or not at all. Nothing is sent and nothing in the conversation changes.
+
+**Departs from** [A28](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (a notice's button only cancels
+one interruption or opens one page of the Dashboard), [B16](STANDARDS.md#b-what-it-reads-and-how) (Windows
+is asked only the listed questions; whether something is registered for Codex's links is read too) and
+[F6](STANDARDS.md#f-footprint-on-the-machine) (starting explorer.exe with a Codex link, which hands the link to Windows, is not one of
+its listed uses: showing the logs folder).
+
+**Ceilings.** None: it is an action, and sends nothing. It rests on no measurement of its own.
+
 ### Use a reset credit at the limit you pick
 
 **What it does.** On the page you pick a usage limit ahead of time - the next time the 5-hour limit
@@ -580,7 +607,7 @@ recover no failure), [C4](STANDARDS.md#c-network) (it sends at a time you chose)
 [C9](STANDARDS.md#c-network) (it reads usage when no recovery is due),
 [D2](STANDARDS.md#d-privacy-and-the-data-it-keeps) (your words are kept until they are sent),
 [H4](STANDARDS.md#h-user-control) (a Pause takes back a message Codex already holds and cancels it, rather
-than returning it to waiting; revision 2, from v0.6.15-beta) and
+than returning it to waiting; revision 2, from v0.6.16-beta, first published as v0.6.15-beta) and
 [H6](STANDARDS.md#h-user-control) (Cancel no longer reaches a message being sent). It keeps A27: a
 message is at most 2,000 characters, as the Custom message is, unless Longer reset messages is on.
 Switching its conversation off cancels it (H5).
@@ -594,7 +621,7 @@ there, the statement carries it as a warning.
 ### Longer messages
 
 **What it does.** An action: it sends nothing and answers at no point of a recovery. While it is on, a
-message you schedule for a reset, and from v0.6.15-beta (revision 2) a message you queue, may be up to
+message you schedule for a reset, and from v0.6.16-beta (revision 2) a message you queue, may be up to
 8,154 characters - the most one continuation can carry - instead of 2,000. Turned off, every waiting
 message longer than 2,000 characters is cancelled.
 
@@ -941,6 +968,33 @@ its id) and A26 (no words at all).
 
 **Ceilings.** 24 a day, and 5 in any one conversation. **Measurement M3B: passed** on `codex-cli 0.163.0-alpha.10.2`; on any other version, a warning.
 
+### Check for updates once a week
+
+**What it does.** At most once a week, while no recovery is waiting, being sent or being watched, the
+watcher runs the same check the Dashboard's **Check for updates** runs: the installed copy's own
+`scripts/bootstrap.ps1 -CheckOnly`, with the same two-minute limit and no window. When it finds a newer
+release - or a newer pre-release, where a check you start would offer one - it shows one notification,
+*A newer version is available*, whose **Open Dashboard** button opens the Diagnostics page, where you
+install it as always. It never downloads or installs anything itself. The notification is a kind of its own
+in **Keep on screen until clicked**. While recovery is paused, or `DisableUpdateCheck` is set, no check is
+made.
+
+**When it helps.** When you would rather hear of a new version than remember to look.
+
+**What it risks.** Each check makes the requests a check you start makes - to github.com, to GitHub's list
+of this project's releases, and for the Codex compatibility data - so GitHub sees this PC's address and the
+time, once a week. A check that fails, that GitHub refuses or that has not finished in time says nothing
+and waits for the next week; the time of the last check is kept in the advanced state, so turning it off
+and on again does not check sooner. A version it found is kept there too and shown again each time the
+watcher starts, until that version is installed, a later check finds nothing newer, or you turn the feature
+off.
+
+**Departs from** [C4](STANDARDS.md#c-network) (nothing happens on its own, on a schedule),
+[C5](STANDARDS.md#c-network) (the update check runs when a button is pressed) and
+[C7](STANDARDS.md#c-network) (the compatibility data is refreshed only on request, never by the watcher).
+
+**Ceilings.** None come into play: it sends nothing to Codex. It rests on no measurement.
+
 ### Compatibility report
 
 **What it does.** Writes a compatibility report from this PC's own records, as codex-compat-reporter
@@ -1036,11 +1090,11 @@ a table of pinned digests for each edition; the advanced edition's starts with v
 
 ## What comes next
 
-v0.6.12 adds two things people asked for. One is a way to install another version or edition from
+v0.6.12 added two things people asked for. One is a way to install another version or edition from
 the Dashboard - any release or pre-release of either edition - which says first what the change
 means, as the installer does when you switch (a change of edition turns every advanced capability
 off), and checks what it downloads as every install does. It was planned for v0.6.11 and not
-finished in time; it is built for v0.6.12 and described [above](#switching). The
+finished in time; it was built for v0.6.12 and is described [above](#switching). The
 other is a power action - sleep, hibernate or shut down - once every recovery waiting for a usage
 limit to reset has ended. It keeps every standard (H14 and F15 in [STANDARDS.md](STANDARDS.md), with
 A28 amended by the owner for its stop button), so it is in the standard edition, off until a person
@@ -1053,12 +1107,13 @@ and the three for a usage reset you pick. It was to be the first of several pre-
 published as a final instead (owner, 2026-10-10). v0.6.15 was a fix alone (owner, 2026-10-13), so the
 rest went to v0.6.16, which came in four pre-releases and is out: its first, v0.6.16-beta, built the
 six capabilities of stage 3c, and the next three a route of its own, other kinds of session and the
-usage capabilities. What is left - stage 5 and the chat inside the Dashboard - is v0.6.18, which begins
-with a pre-release, v0.6.18-alpha, and publishes each part as a pre-release as it is finished. Each new capability is the advanced edition's alone, off until you
+usage capabilities. v0.6.18 then took two small capabilities of stage 5, Open Codex on a notice and the weekly
+update check, and published them as a final (owner, 2026-10-21). What is left - the rest of stage 5 and the chat inside the Dashboard - is v0.6.19, which begins
+with a pre-release, v0.6.19-alpha, and publishes each part as a pre-release as it is finished. Each new capability is the advanced edition's alone, off until you
 turn it on, with a statement that names the standards it departs from. This is a direction, not a
 promise; [ROADMAP.md](ROADMAP.md) has the whole list: the two additions in its v0.6.12 section, what
-is built in its v0.6.14 and v0.6.16 sections, and the rest in its v0.6.18 section, under the same
-four headings as below.
+is built in its v0.6.14, v0.6.16 and v0.6.18 sections, and the rest in its v0.6.19 section, under the same
+headings as the last four bullets below.
 
 - **Recovery through the channels already in use** - several conversations at once,
   empty-response recovery, an unloaded conversation through a queue that waits for it, a subagent
@@ -1069,12 +1124,19 @@ four headings as below.
   Codex's app server; CLI, TUI and IDE sessions; a full context compacted, then continued; another
   model at capacity; a continuation with no words - all built in v0.6.16-beta.4, described
   [above](#todays-capabilities); and a continuation inside the turn through a Codex Stop hook, planned for
-  v0.6.18. (Codex's own retry settings are offered only once a measurement passes.)
+  v0.6.19. (Codex's own retry settings are offered only once a measurement passes.)
 - **Around recovery** - usage analytics (the live usage meter and the wrap-up near a limit are built,
   described [above](#todays-capabilities)); a provider status feed and push notifications through one courier process, the advanced edition's only
   outbound network code; a local API and web view, remote control over Telegram and a read-only view
-  of other PCs; switching the Codex account on your command; a weekly update check while idle; crash
-  supervision, a wake timer for a reset and *Open Codex* on the card.
-- **Also moved here** - watching several Codex homes, which the standard edition gains and
-  v0.6.16-beta built; Arabic and
-  Hebrew; winget manifests for both editions.
+  of other PCs; switching the Codex account on your command; crash supervision and a wake timer for a reset.
+  *Open Codex* on a notice and a weekly update check while idle are built in v0.6.18, described
+  [above](#todays-capabilities).
+- **The chat inside the Dashboard** - chatting with a Codex conversation inside the Dashboard, reading it and
+  sending it a message: advanced only, off by default, on this PC only and never through a remote channel, with
+  "in progress" while a turn runs and the result once it ends, and approvals still answered in Codex.
+- **Compatibility data for the advanced edition** - verdicts for each Codex engine in a file of its own, which
+  installed advanced editions fetch, and the compatibility reporter counting the advanced edition's outcomes as
+  "reported" without ever raising a verdict.
+- **Also moved here** - a continuation inside the turn through a Codex Stop hook, and Arabic and Hebrew. Watching
+  several Codex homes, which the standard edition gains, was built in v0.6.16-beta, and the winget manifests for both
+  editions in v0.6.16 ([WINGET.md](WINGET.md)).

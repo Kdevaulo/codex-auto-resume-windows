@@ -32,6 +32,21 @@ INSTALL_PS1 = (ROOT / "build" / "install" / "install.ps1").read_text(encoding="u
 SETUP_CS = (ROOT / "build" / "setup" / "Setup.cs").read_text(encoding="utf-8")
 # The one line the setup program prints itself, before install.ps1 runs (Setup.cs, InstallFrom).
 SETUP_LINE = "Codex Auto Resume setup: unpacking "
+# The setup window's progress lines, `progress: <step> <done>/<total>`: real counts the installer prints inside a step
+# when the window asks (gui/InstallerFlow.cs, InstallerProgress). Each step's printer, the milestone line it follows,
+# the indent the window receives it with (install.ps1 prints its own with two spaces; Invoke-Setup indents what the
+# setup step and the health check print by four), and its fixed total where the source fixes one.
+PROGRESS = re.compile(r"progress: (\w+) (\d+)/(\d+)\Z")
+PLUGIN_SETUP = (ROOT / "scripts" / "plugin_setup.py").read_text(encoding="utf-8")
+STATUS_PY = (ROOT / "src" / "codex_auto_resume" / "commands" / "status.py").read_text(encoding="utf-8")
+COUNTED = {
+    "files": (INSTALL_PS1, "Progress 'files' ", "Copying the program files into place", "  ", None),
+    "plugin": (INSTALL_PS1, "Progress 'plugin' ", "Registering the Codex plugin", "  ", 3),
+    "setup": (PLUGIN_SETUP, 'progress("setup", ', "Setting up the watcher", "    ",
+              int(re.search(r"^SETUP_STEPS = (\d+)$", PLUGIN_SETUP, re.M).group(1))),
+    "check": (STATUS_PY, 'progress("check", ', "Checking the installation", "    ",
+              int(re.search(r"^DOCTOR_CHECKS = (\d+)$", STATUS_PY, re.M).group(1))),
+}
 
 
 def plans() -> dict:
@@ -57,6 +72,18 @@ def advance(line: str, at: float, step: str) -> tuple:
         if said.startswith(starts):
             return (place, named) if place > at else (at, step)
     return at, step
+
+
+def ceiling() -> float:
+    return float(re.search(r"const double Ceiling = ([0-9.]+);", FLOW).group(1))
+
+
+def within(begun: float, done: int, total: int) -> float:
+    """InstallerProgress.Within, in Python, for a first installation: `done` of `total` of the step that began at the
+    milestone `begun` - that share of the gap to the next milestone, never the whole bar."""
+    following = [place for _starts, place, _step in milestones() if place > begun]
+    after = min(following) if following else 1.0
+    return min(begun + (after - begun) * min(1.0, done / total), max(begun, ceiling()))
 
 
 def labels(plan: dict) -> list:
@@ -188,7 +215,7 @@ class PlanTests(unittest.TestCase):
                 if shown[0][0] == "starting":
                     shown = shown[1:]
                 self.assertEqual([step for step, _ms in shown],
-                                 ["unpack", "codex", "files", "plugin", "setup", "check"])
+                                 ["unpack", "codex", "prepare", "files", "plugin", "setup", "check"])
                 for step, ms in shown:
                     self.assertGreaterEqual(ms, 900, step)
 
@@ -199,8 +226,8 @@ class PlanTests(unittest.TestCase):
                 if "line" not in event:
                     continue
                 line = event["line"].strip()
-                if line.startswith(SETUP_LINE):
-                    continue
+                if line.startswith(SETUP_LINE) or PROGRESS.match(line):
+                    continue  # the progress lines: test_the_progress_lines_are_the_installers_real_counts
                 with self.subTest(name=name, line=line):
                     if line.startswith("edition: "):
                         self.assertEqual(line, "edition: " + plan["edition"])
@@ -217,6 +244,38 @@ class PlanTests(unittest.TestCase):
                     self.assertGreater(found, last, "printed before the line above it")
                     last = found
 
+    def test_the_progress_lines_are_the_installers_real_counts(self):
+        """The bar in the picture fills as the window's does (owner 2026-10-21: only as far as the work is): each
+        counted step shows its own progress lines, after its milestone, from the printer that prints them, with the
+        indent the window gets, counting up to the step's total."""
+        for name, plan in plans().items():
+            milestone, said = None, {}
+            for event in plan["events"]:
+                text = event.get("line")
+                if text is None:
+                    continue
+                found = PROGRESS.match(text.strip())
+                if not found:
+                    milestone = text.strip()
+                    continue
+                step, done, total = found.group(1), int(found.group(2)), int(found.group(3))
+                with self.subTest(name=name, line=text):
+                    self.assertIn(step, COUNTED, "a step no installer counts")
+                    source, printer, after, indent, fixed = COUNTED[step]
+                    self.assertIn(printer, source, "printed where the step is counted")
+                    self.assertEqual(milestone, after, "inside its own step")
+                    self.assertTrue(text.startswith(indent) and not text.startswith(indent + " "))
+                    if fixed is not None:
+                        self.assertEqual(total, fixed)
+                    last_done, last_total = said.get(step, (0, total))
+                    self.assertEqual(total, last_total, "one total for the whole step")
+                    self.assertGreater(done, last_done, "counting up")
+                    self.assertLessEqual(done, total)
+                    said[step] = (done, total)
+            with self.subTest(name=name):
+                self.assertEqual(sorted(said), sorted(COUNTED), "every counted step shows its count")
+                self.assertTrue(all(done == total for done, total in said.values()), "each count reaches its total")
+
     def test_the_run_begins_with_the_setup_programs_own_line_naming_its_archive(self):
         import make_release
         self.assertIn('heard("%s" + Embedded.Archive + " into " + folder.Path);' % SETUP_LINE, SETUP_CS)
@@ -228,21 +287,34 @@ class PlanTests(unittest.TestCase):
                 self.assertEqual(sum(1 for event in plan["events"] if event.get("line", "").startswith(SETUP_LINE)), 1)
 
     def test_every_line_moves_the_window_on(self):
-        """A line the window does not read is a line nobody sees move anything: each event moves the bar, and the run
-        ends where install.ps1's last step puts it."""
+        """A line the window does not read is a line nobody sees move anything. As InstallerWindow.Heard reads them: a
+        milestone begins its step, measured from the milestone before it, and takes the bar to its place - where the
+        step before was counted to its end the bar stands there already, and the step's name moves on; a progress line
+        of the step under way takes the bar to its share of the gap to the next milestone (InstallerProgress.
+        Progressed), or holds it at the ceiling, which only the finish passes. The run ends at the health check's last
+        count, short of the whole bar."""
         for name, plan in plans().items():
-            at, step = 0.0, "starting"
+            at, step, reached = 0.0, "starting", 0.0
             for event in plan["events"]:
                 with self.subTest(name=name, event=event):
                     if "unpacked" in event:
                         place = unpacked_at() * float(event["unpacked"])
                         self.assertGreater(place, at)
-                        at = place
+                        at = reached = place
                     elif not event["line"].startswith(SETUP_LINE):
-                        after = advance(event["line"], at, step)
-                        self.assertGreater(after[0], at)
-                        at, step = after
-            self.assertEqual(at, milestones()[-1][1])
+                        counted = PROGRESS.match(event["line"].strip())
+                        if counted:
+                            self.assertEqual(counted.group(1), step, "a count of the step under way")
+                            after = within(reached, int(counted.group(2)), int(counted.group(3)))
+                            self.assertTrue(after > at or at == ceiling(), "moves the bar, or holds it at the ceiling")
+                            at = max(at, after)
+                        else:
+                            place, named = advance(event["line"], reached, step)
+                            self.assertGreater(place, reached, "a milestone the window reads begins its step")
+                            self.assertTrue(place > at or named != step, "moves the bar or the step's name")
+                            reached, step, at = place, named, max(at, place)
+            self.assertEqual(at, within(milestones()[-1][1], 1, 1))
+            self.assertLess(at, 1.0)
 
     def test_the_unpacking_fills_its_share_of_the_bar(self):
         for name, plan in plans().items():

@@ -72,6 +72,7 @@ NOTICE_STATUS = {
     "near_limit_not_stopped": "attention",
     "near_limit_press_resume": "attention",
     "near_limit_not_continued": "attention",
+    "update_offered": "attention",  # v0.6.18: the advanced edition's weekly update check offers a newer version
 }
 # v0.6.12: the power action after usage-limit recoveries (runtime/afterwork.py), whose kinds are words of
 # its own (domain/power_vocabulary.PowerNotice). Its notices are raised whatever the notification switches
@@ -298,11 +299,26 @@ def _build(event, detail, identity=None, *, sound=False):
         return _notice("near_limit_" + said if said in notify.NEAR_LIMIT_KINDS else "near_limit",
                        notify.near_limit_content(detail.get("minutes"), detail.get("percent"),
                                                  detail.get("reset_at"), said), key=None)
+    if event == "update_offered":
+        # v0.6.18: the advanced edition's weekly update check found a newer version, as a pressed check would offer it.
+        # About this installation, not a conversation, so it has no key and replaces no card; its one button opens
+        # Diagnostics, where an update is installed. A version not of a release's or a pre-release's shape says nothing.
+        content = notify.update_offered_content(detail.get("version"), detail.get("prerelease") is True)
+        return None if content is None else _notice("update_offered", content, key=None)
     if event in POWER_EVENTS:
         # v0.6.12: the power action (runtime/afterwork.py). About this PC, not a conversation, so it has
         # no key and replaces no card. Only the countdown's has a stop button, named by its batch (A28).
         return _notice(event, notify.power_content(event, detail), key=None)
     if event == "stopped":
+        if detail.get("reason") in notify.NOT_RESUMED:
+            # 2026-10-22: born stopped because the person took the conversation over, or its recovery was cancelled
+            # (notify.not_resumed_content) - nothing gave up, so it is not said as a stop. The card names the new
+            # failure's reason in its chip and the sentence on its line, as a held interruption's does.
+            category = detail.get("category") or "usage_limit"
+            content = notify.not_resumed_content(thread_id, identity, reason=detail["reason"], category=category)
+            chip = l10n.text(reasons.label_key(category), l10n.current())
+            return _notice("stopped", content, key=thread_id, chip=chip, chip_tone="attention",
+                           line=notify.not_resumed_message(detail["reason"]))
         reason = ("no_progress" if state == "no_progress_exhausted"
                   else "time" if detail.get("reason") == "chain_time_cap"
                   else "attempts" if state == "retry_budget_exhausted" else None)
@@ -345,6 +361,37 @@ def build_power_stopped(stay=()) -> Notice:
 def build_cancelled(thread_id, stay=()) -> Notice:
     """What a cancel from a notification button says afterwards, as `notify.cancelled` does."""
     return _with_click(_notice("cancelled", notify.cancelled_content(thread_id), key=thread_id), stay=stay)
+
+
+# ------------------------------------------------------------- Open Codex (v0.6.18, an edition's)
+# The standard edition's buttons cancel one interruption or open one page of the Dashboard (A28). An edition may ask
+# for one more on a notice about one conversation - the Codex app's own link to it (notify.codex_thread_uri), which
+# only shows a conversation - through what its plug adds to the icon's surface (runtime/app.py reads it); the
+# standard edition never asks, so its notices are exactly as before. The card opens the link through `activate`, which
+# has read exactly such a link since v0.6.16; the toast hands it to Windows as its other buttons are.
+def with_open_codex(notice, on=False):
+    """`notice` with an Open Codex button beside its others when `on` is True and it is about one conversation - its
+    key that conversation's id, a UUID (notify.codex_thread_uri) - after Open Dashboard where it has that button, else
+    last; `notice` itself otherwise, and for anything that is not a Notice. A notice keeps at most
+    notify.MAX_TOAST_ACTIONS buttons, so one that has them all gains none."""
+    if on is not True or not isinstance(notice, Notice):
+        return notice
+    link = notify.codex_thread_uri(notice.key)
+    if link is None or any(uri == link for _label, uri in notice.actions):
+        return notice
+    content = notice.toast_content()
+    if len(toast_actions(content)) >= notify.MAX_TOAST_ACTIONS:
+        return notice
+    button = (l10n.message("toast_button_open_codex"), link)
+    # The cancel button carries the decision, for the notice its press raises from Windows' toast (notify.py).
+    if content.get("uri"):
+        content["uri"] = notify.with_open_codex_flag(content["uri"])
+    more = list(content.get("more") or ())
+    after = next((index + 1 for index, (_label, uri) in enumerate(more) if notify.parse_open_uri(uri) is not None),
+                 len(more))
+    more.insert(after, button)
+    content["more"] = more
+    return replace(notice, actions=toast_actions(content), content=_frozen(content))
 
 
 # --------------------------------------------------------------------------- the handover
@@ -417,15 +464,18 @@ def _presence() -> dict:
     return notice_presence.snapshot(notify.aumid())
 
 
-def deliver(notice, *, inbox=None, setting=True, probe=None, show=notify.show_content):
+def deliver(notice, *, inbox=None, setting=True, probe=None, show=None):
     """Show one notice by exactly one route. Returns (route, shown): route "card" or "toast".
 
     Card: the host accepted it (`shown` is True) and will end it with `complete` - the silent
     history copy once the card has been seen, or today's toast if it never could be. Toast:
     today's toast, exactly as `notify` has always raised it. The presence probes are only read
     when the card is possible at all. Called on the notifications thread, never on the tick path
-    and never on the icon's thread (raising a toast runs PowerShell).
+    and never on the icon's thread (raising a toast runs PowerShell). `show` is notify.show_content
+    unless given, looked up when called: a default bound at import kept the real toast past a test's
+    patch of notify.show_content, and test runs raised real toasts under the product's identity.
     """
+    show = notify.show_content if show is None else show
     allowed = False
     # A notice with a sound of its own (v0.6.11, a needs-you notice a person asked to hear) is Windows'
     # toast: the card makes no sound, and the sound is the toast's own audio element (notify.py).
@@ -446,7 +496,7 @@ def sounds(notice) -> bool:
     return dict(getattr(notice, "content", ()) or ()).get("sound") is True
 
 
-def complete(notice, card_shown, *, show=notify.show_content) -> bool:
+def complete(notice, card_shown, *, show=None) -> bool:
     """End a notice the card took, once its host knows how it went. Called once per notice.
 
     `card_shown` True: the card was on screen whole (or was clicked, or a newer card about the
@@ -454,8 +504,9 @@ def complete(notice, card_shown, *, show=notify.show_content) -> bool:
     notification center only. Anything else: the card could not be drawn, had no room, or its
     host went away before it was seen - today's toast is raised instead, exactly as the toast
     route raises it. Either way the notification center ends up with the notice once. Runs
-    PowerShell: a worker thread's job.
+    PowerShell: a worker thread's job. `show`, as `deliver`'s, is looked up when called.
     """
+    show = notify.show_content if show is None else show
     if notice.kind == "demo":
         return False                       # made up: no history copy, and no toast in its place
     content = notice.toast_content()
@@ -472,6 +523,7 @@ def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None,
     "opened" / "not_opened"     (v0.6.16) the Codex app's link to one conversation (notify.codex_thread_uri), the
                                 destination a click on a notice may have: `open_link(link)`, Windows' URL handler
     "cancelled"                  a cancel URI: that one interruption, through the control layer
+    "already_finished"           (v0.6.18) a cancel URI whose recovery had finished: nothing changed, nothing said
     "stopped"                    a power-stop URI (v0.6.12): the power action stopped for its batch
     "refused" / "failed"         the control layer said no (a coded refusal) or broke
     "ignored"                    anything else, including every malformed URI
@@ -534,9 +586,11 @@ def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None,
         return "failed"
     thread_id = (result or {}).get("thread_id")
     if (result or {}).get("changed", True) is False:
+        # v0.6.18: a stale notice's Cancel on a recovery that has finished since - nothing is announced, since the
+        # notice it would raise says the recovery was cancelled, which is not true.
         say("thread %s: a notification card's cancel changed nothing; it had already finished" % thread_id)
-    else:
-        say("thread %s: cancelled from a notification card" % thread_id)
+        return "already_finished"
+    say("thread %s: cancelled from a notification card" % thread_id)
     if announce is not None and thread_id:
         try:
             announce(build_cancelled(thread_id, stay))

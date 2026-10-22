@@ -25,16 +25,37 @@ class OutcomeMixin:
                 self.transition(row, "outcome_unverified", "outcome_deadline")
             return
         status = seen["status"]
-        if seen["foreign_user_messages"] > 0:
+        if seen["foreign_user_messages"] > 0 and seen.get("progress_before_foreign") is True:
+            # Our continuation worked, then a person's message entered the turn - one they had queued in the Codex
+            # app, or an answer to a question Codex asked them (2026-10-22, the owner's 04:24 and 16:38): a recovery,
+            # through turn_completed as every outcome goes, decided while the turn may still run. Not handed over, so
+            # the turn's own next failure - a usage limit, which stops the person too - is a chain child that is
+            # recovered (gates.birth_stop), not one born superseded that nobody resumes.
+            if row["state"] == "turn_started":
+                self.transition(row, "turn_completed", None, recovery_turn_status=status)
+            else:
+                self.transition(row, "recovered", "progress_then_user_joined", recovery_turn_status=status)
+        elif seen["foreign_user_messages"] > 0:
+            # A person joined before the turn did anything: theirs, handed over at once.
             self.transition(row, "handed_over", "user_joined", user_joined=True,
                             recovery_turn_status=status)
         elif status == "other":
             self.transition(row, "outcome_unverified", "unknown_turn_status", recovery_turn_status="other")
         elif status == "inProgress":
-            if seen["later_terminal"]:
-                # The row can never finish: Codex only updates a turn row while it is
-                # the one in progress, so a later finished turn means this one is stale.
-                self.transition(row, "outcome_unverified", "stale_turn_row")
+            if self._cut_off(row, seen):
+                # The row can never finish: Codex only updates a turn row while it is the
+                # one in progress, and Codex closing, or the PC going off, mid-turn leaves
+                # it saying inProgress forever. Judged as a failed turn is: one that did
+                # work was a recovery (`progress_then_turn_cut_off`, through turn_completed
+                # as every outcome goes); one that did nothing is unverified, as it was.
+                # Nothing is registered as a failure: there is no failed turn to register.
+                if not seen["progress"]:
+                    self.transition(row, "outcome_unverified", "stale_turn_row")
+                elif row["state"] == "turn_started":
+                    self.transition(row, "turn_completed", None, recovery_turn_status=status)
+                else:
+                    self.transition(row, "recovered", "progress_then_turn_cut_off",
+                                    recovery_turn_status=status)
             elif now >= deadline:
                 self.transition(row, "outcome_unverified", "outcome_deadline")
             elif row["recovery_turn_status"] != "inProgress":
@@ -68,6 +89,25 @@ class OutcomeMixin:
                                     recovery_turn_status=status)
             elif status == "interrupted":
                 self.transition(row, "stopped_by_user", "turn_interrupted", recovery_turn_status=status)
+
+    # A Windows start this many seconds after the turn was seen starting ended it.
+    CUT_OFF_BOOT_MARGIN = 5.0
+
+    def _cut_off(self, row, seen) -> bool:
+        """Whether a recovery turn whose row still says inProgress can no longer finish: a later
+        turn of its conversation has started (any status - Codex runs one turn at a time), or
+        Windows started after it began (the boot time the watcher's heartbeat records)."""
+        if seen.get("later_started", seen.get("later_terminal")):
+            return True
+        started = row.get("turn_started_at")
+        if not started:
+            return False
+        try:
+            status = self.store.watcher_status() or {}
+        except Exception:
+            return False
+        booted = status.get("booted_at")
+        return machine.epoch(booted, *machine.EPOCH_STORE) and booted > started + self.CUT_OFF_BOOT_MARGIN
 
     def observe_all(self):
         for row in self._records(OBSERVING):

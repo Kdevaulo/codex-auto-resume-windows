@@ -190,16 +190,19 @@ class T13OutcomeRulesTests(Base):
 
     def test_T13_a_later_terminal_turn_proves_an_in_progress_row_stale(self):
         """Codex only updates the running turn's row, so a later finished turn means
-        ours can never finish: `outcome_unverified(stale_turn_row)`, without waiting
-        for the deadline."""
+        ours can never finish, without waiting for the deadline. Ours made progress, so
+        it is judged as a failed turn with progress is: `recovered(progress_then_turn_cut_off)`,
+        through turn_completed (owner amended E6, 2026-10-21)."""
         w = self.world()
         w.enable()
         thread, key, turn = w.started()
         self.assertEqual(w.get(key)["state"], "turn_started")
         w.home.add_turn(thread, status="completed")
         w.tick(30)
+        self.assertEqual(w.get(key)["state"], "turn_completed")
+        w.tick(1)
         row = w.get(key)
-        self.assertEqual((row["state"], row["last_error"]), ("outcome_unverified", "stale_turn_row"))
+        self.assertEqual((row["state"], row["last_error"]), ("recovered", "progress_then_turn_cut_off"))
         self.assertEqual(row["recovery_turn_id"], turn)
 
     def test_T13_an_interrupted_recovery_turn_is_stopped_by_the_user(self):
@@ -424,7 +427,11 @@ class T16UserJoinedTests(Base):
         while the turn is still running."""
         for client_id in (None, "0a1b2c3d-0016-7000-8000-000000000001"):
             with self.subTest(client_id=client_id):
-                w, thread, key, turn = self.join(client_id)
+                w = self.world()
+                w.enable()
+                thread, key = w.queued()
+                turn = w.home.dispatch(thread, status="inProgress", progress=False)
+                w.home.add_item(thread, turn, "userMessage", "typed while it ran", client_id)
                 w.tick(1)
                 row = w.get(key)
                 self.assertEqual((row["state"], row["last_error"]), ("handed_over", "user_joined"))
@@ -435,11 +442,15 @@ class T16UserJoinedTests(Base):
     def test_T16_a_steered_message_from_codexsim_is_seen_the_same_way(self):
         w = self.world()
         w.enable()
-        thread, key, _ = w.started(steer_user=True)
+        thread, key, _ = w.started(steer_user=True, progress=False)
         self.assertEqual(w.get(key)["state"], "handed_over")
 
     def test_T16_when_the_handed_over_turn_fails_the_child_is_superseded_and_never_claimed(self):
-        w, thread, key, turn = self.join(None)
+        w = self.world()
+        w.enable()
+        thread, key = w.queued()
+        turn = w.home.dispatch(thread, status="inProgress", progress=False)
+        w.home.add_item(thread, turn, "userMessage", "typed while it ran", None)
         w.tick(1)
         w.finish(thread, turn, "failed", SERVER_5XX)
         w.tick(1)
@@ -466,8 +477,11 @@ class T17StuckObservingTests(Base):
         self.assertEqual(w.get(first)["state"], "turn_started")
         w.fail(thread)
         w.tick(1)
+        # Ours made progress before it was cut off: recovered, through turn_completed (owner amended E6, 2026-10-21).
+        self.assertEqual(w.get(first)["state"], "turn_completed")
+        w.tick(1)
         self.assertEqual((w.get(first)["state"], w.get(first)["last_error"]),
-                         ("outcome_unverified", "stale_turn_row"))
+                         ("recovered", "progress_then_turn_cut_off"))
         newer = [row for row in w.records(thread) if row["interruption_id"] != first]
         self.assertEqual(len(newer), 1)
         self.assertIsNone(newer[0]["parent_interruption_id"])
@@ -1405,7 +1419,7 @@ class T48NotificationTests(Base):
 
         w = self.world()
         w.enable()
-        thread, key, turn = w.started(steer_user=True)
+        thread, key, turn = w.started(steer_user=True, progress=False)
         w.finish(thread, turn, "failed", SERVER_5XX)
         w.tick(1)
         child = w.records(thread)[-1]

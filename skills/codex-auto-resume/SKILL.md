@@ -90,7 +90,8 @@ version's release archive from the project's GitHub releases over HTTPS, checks 
 SHA-256, checks the contents are this product at this version, and only then installs,
 for their Windows user only and without administrator rights. Besides the files in
 `%USERPROFILE%\.codex-auto-resume` it registers the watcher to start at sign-in (unless
-`-NoStartup`), a Start Menu entry and a notification sender, and this plugin with Codex.
+`-NoStartup`), a Start Menu entry and a notification sender, an entry in Windows' Apps list and a link handler
+for its notification buttons, and this plugin with Codex.
 
 Nothing this project builds is code-signed, so Smart App Control may block its two small
 programs, and SmartScreen may warn about a downloaded `Install.cmd`. Say so plainly if it
@@ -210,7 +211,7 @@ Report what the command actually printed. Useful fields from `status` and `pendi
   - `turn_started` / `turn_completed` — the continuation started a turn, and the engine is
     following that exact turn to see how it ends.
   - `recovered` — that turn ran and made progress. This is what a recovery that worked looks
-    like.
+    like, also when the turn then failed, or Codex closed or the PC restarted before it ended.
   - `completed_no_progress` — that turn ran and produced nothing.
   - `handed_over` — a person started or joined that turn, or edited the queued message before
     it ran. This is correct, not a fault.

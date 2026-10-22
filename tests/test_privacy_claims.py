@@ -40,10 +40,10 @@ NETWORKING = re.compile(
     r"ftplib|smtplib|poplib|imaplib|telnetlib|xmlrpc|webbrowser|asyncio\.streams)\b",
     re.MULTILINE)
 
-# The PowerShell verbs that would reach the network.
+# The PowerShell verbs that would reach the network - and the .NET request the bootstrap's streamed download makes.
 PS_NETWORK = re.compile(
     r"Invoke-WebRequest|Invoke-RestMethod|System\.Net\.WebClient|DownloadFile|"
-    r"DownloadString|Start-BitsTransfer|\bcurl\b|\bwget\b", re.IGNORECASE)
+    r"DownloadString|Start-BitsTransfer|\bcurl\b|\bwget\b|HttpWebRequest|WebRequest\]::Create", re.IGNORECASE)
 
 # Claims that are only true of the recovery runtime, never of the whole product.
 ABSOLUTES = (
@@ -338,7 +338,7 @@ class WordingTests(unittest.TestCase):
                    "v0.4.0", "v0.4.1", "v0.5.0", "v0.5.1", "v0.5.2", "v0.5.3", "v0.5.4", "v0.5.5",
                    "v0.5.6", "v0.5.7", "v0.6.0", "v0.6.1", "v0.6.2", "v0.6.3", "v0.6.4", "v0.6.5",
                    "v0.6.6", "v0.6.7", "v0.6.8", "v0.6.9", "v0.6.10", "v0.6.11", "v0.6.12",
-                   "v0.6.13", "v0.6.14", "v0.6.15", "v0.6.16")
+                   "v0.6.13", "v0.6.14", "v0.6.15", "v0.6.16", "v0.6.17")
         text = (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
         missing = [tag for tag in shipped
                    if not re.search(r"^##\s+%s\b" % re.escape(tag), text, re.M)]

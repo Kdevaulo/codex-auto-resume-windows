@@ -66,7 +66,9 @@ namespace CodexAutoResume
         // window is on screen, and the window is measured and audited before it is (Fit, InstallerAudit).
         private bool backShown, cancelShown, forwardShown;
         private int code = int.MinValue;
-        private double at;
+        // Where the work is (at), and the place of the milestone that began the step under way (reached), which a
+        // progress line's share is measured from (InstallerProgress.Within).
+        private double at, reached;
         private string step = "starting";
         private WrapLabel stepLabel, busyNote;
 
@@ -507,6 +509,7 @@ namespace CodexAutoResume
         {
             string heading = flow.Mode == InstallerFlow.Uninstall ? words.Say("installer.progress.removing", "Removing")
                            : flow.Repair ? words.Say("installer.progress.repairing", "Repairing")
+                           : flow.Another ? words.Say("installer.progress.another", "Installing another version")
                            : flow.Mode == InstallerFlow.Update ? words.Say("installer.progress.updating", "Updating")
                            : words.Say("installer.progress.installing", "Installing");
             Row(Words(heading, "title", Palette.Ink), 0);
@@ -572,7 +575,9 @@ namespace CodexAutoResume
 
         private void BuildFinish()
         {
-            Row(Words(flow.Mode == InstallerFlow.Update && code == 0
+            Row(Words(flow.Another && code == 0
+                      ? words.Say("installer.done.installed_version", "Installed v{version}", "version", flow.Version)
+                      : flow.Mode == InstallerFlow.Update && code == 0
                       ? words.Say("installer.done.updated_to", "Updated to v{version}", "version", flow.Version)
                       : flow.Repair && code == 0 ? words.Say("installer.done.repaired", "Codex Auto Resume is repaired.")
                       : words.Outcome(flow.Mode, code), "title", Palette.Ink), 0);
@@ -678,27 +683,87 @@ namespace CodexAutoResume
 
         private void Post(MethodInvoker action)
         {
+            // Without a handle - between two showings of the window (SettingsForm.InstallPick shows it again after
+            // WinForms ended its modal loop) - what the run says is kept and told once it has one again: the run's
+            // end is never lost (v0.6.18 acceptance, B2).
+            lock (waiting)
+            {
+                if (!IsHandleCreated && !IsDisposed)
+                {
+                    waiting.Add(action);
+                    return;
+                }
+            }
             try { if (IsHandleCreated && !IsDisposed) BeginInvoke(action); }
             catch (Exception) { /* the window is gone */ }
         }
 
-        /// One line the installer printed: into the log, and onto the bar where it begins a step.
+        private readonly List<MethodInvoker> waiting = new List<MethodInvoker>();
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            MethodInvoker[] told;
+            lock (waiting)
+            {
+                told = waiting.ToArray();
+                waiting.Clear();
+            }
+            foreach (MethodInvoker action in told) BeginInvoke(action);
+        }
+
+        /// Whether the installer is still running: the window stays, and is shown again, until it is not.
+        internal bool Running { get { return running; } }
+
+        private const int WM_SHOWWINDOW = 0x0018;
+        private const int SW_PARENTCLOSING = 1;
+
+        /// The Dashboard minimized under the window - by a person's Show desktop, or by another program - hides the
+        /// windows it owns (WM_SHOWWINDOW, SW_PARENTCLOSING), and WinForms ends a modal window's loop once it is
+        /// hidden, with no close asked: the run went on unseen (v0.6.18 acceptance, B2). While it runs, the window
+        /// stays where it is instead.
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_SHOWWINDOW && running && m.WParam == IntPtr.Zero && m.LParam.ToInt64() == SW_PARENTCLOSING)
+            {
+                m.Result = IntPtr.Zero;
+                return;
+            }
+            base.WndProc(ref m);
+        }
+
+        /// One line the installer printed: into the log, and onto the bar where it begins a step. A progress line
+        /// (InstallerProgress.Variable) moves the bar within the step under way and is kept out of the log: it is the
+        /// window's, not the person's to read.
         internal void Heard(string line)
         {
+            if (InstallerProgress.IsProgress(line))
+            {
+                if (InstallerProgress.Progressed(flow.Mode, line, reached, step, ref at)) bar.Value = at;
+                return;
+            }
             log.AppendLine(line ?? "");
             logArea.Box.AppendText((line ?? "") + Environment.NewLine);
             string said = (line ?? "").Trim();
             if (said.StartsWith("The watcher could not be confirmed running", StringComparison.Ordinal)) unconfirmed = true;
             if (said.StartsWith("The previous version of the watcher was asked to stop", StringComparison.Ordinal)) previousRunning = true;
             if (said.StartsWith("[ok] The Dashboard was opened again on the new version", StringComparison.Ordinal)) reopened = true;
-            if (InstallerProgress.Advance(flow.Mode, line, ref at, ref step)) ShowStep();
+            // Measured from the milestone, not from where a progress line took the bar: a step counted to its end stands
+            // at the next milestone's place, and that milestone's line still begins its step.
+            double place = reached;
+            if (InstallerProgress.Advance(flow.Mode, line, ref place, ref step))
+            {
+                reached = place;
+                at = Math.Max(at, place);
+                ShowStep();
+            }
         }
 
         private void Unpacking(double share)
         {
             double place = InstallerProgress.Unpacked((int)Math.Round(share * 1000), 1000);
             if (place <= at) return;
-            at = place;
+            at = reached = place;
             step = share >= 1.0 ? "unpack" : share <= 0 ? "verify_setup" : "unpack";
             ShowStep();
         }
@@ -729,11 +794,22 @@ namespace CodexAutoResume
                 log.AppendLine(ExitCode());
                 logArea.Box.AppendText(ExitCode() + Environment.NewLine);
             }
-            at = ended == 0 ? 1.0 : at;
-            bar.Value = at;
             logShown = ended != 0;
-            // The Finish page is measured again for what the run left it saying - a notice about the watcher, the
-            // failure's own lines - so the window is as tall as it now needs.
+            // A run that ended well fills the bar - a short glide where it may move, at once where it may not - and
+            // the Finish page follows; any other ending leaves the bar where the work stopped.
+            if (ended == 0)
+            {
+                at = 1.0;
+                bar.Finish(ShowFinish);
+            }
+            else ShowFinish();
+        }
+
+        // The Finish page is measured again for what the run left it saying - a notice about the watcher, the failure's
+        // own lines - so the window is as tall as it now needs.
+        private void ShowFinish()
+        {
+            if (IsDisposed) return;
             page = InstallerFlow.Finish;
             Fit();
         }
@@ -763,7 +839,11 @@ namespace CodexAutoResume
                 if (forward.Enabled) Answer(false);
                 return;
             }
-            if (running && e.CloseReason == CloseReason.UserClosing)
+            // Any other close while it runs is refused the same way, Windows ending the session alone excepted: a raw
+            // WM_CLOSE from another program arrives as TaskManagerClosing, and the Dashboard's own closing as
+            // FormOwnerClosing. v0.6.18 acceptance: an older installer, run by Install another version..., closed the
+            // pick's window part-way that way - the run went on unseen and the pick said it had failed.
+            if (running && e.CloseReason != CloseReason.WindowsShutDown)
             {
                 e.Cancel = true;
                 closingAsked = true;
@@ -862,9 +942,24 @@ namespace CodexAutoResume
     }
 
     /// The installer's progress: a well, as a field is, filled with the accent as far as the installer has come.
+    ///
+    /// Two values: Value, where the work is, and Shown, what is drawn. Shown glides up to Value on a timer
+    /// (InstallerProgress.Glide) and stops it once there; neither ever goes back. Nothing glides under a capture
+    /// (Soft.StillReady: the pictures and the install motion stay exact) or where it cannot be seen; with motion
+    /// reduced the bar jumps, and redraws at most about once a second.
     internal sealed class InstallerBar : Control
     {
-        private double value;
+        private double value, shown;
+        private int said = -1;
+        private readonly Timer timer = new Timer();
+        private readonly Stopwatch clock = new Stopwatch();
+        private long lastDrawn = -ReducedInterval;
+        private MethodInvoker finished;
+        private long finishStarted;
+
+        /// The frame of the glide, in milliseconds (about 60 a second), and the redraw of a bar with motion reduced.
+        internal const int GlideInterval = 16;
+        internal const int ReducedInterval = 1000;
 
         internal InstallerBar()
         {
@@ -873,20 +968,157 @@ namespace CodexAutoResume
             TabStop = false;
             AccessibleRole = AccessibleRole.ProgressBar;
             BackColor = Palette.Card;
+            timer.Tick += delegate { Tick(); };
+            clock.Start();
         }
 
-        /// How far along, from 0 to 1.
+        /// Where the work is, from 0 to 1: forward only.
         internal double Value
         {
             get { return value; }
             set
             {
                 double next = Math.Max(0.0, Math.Min(1.0, value));
-                if (Math.Abs(next - this.value) < 0.0001) return;
+                if (next <= this.value + 0.0001) return;
                 this.value = next;
-                AccessibleDescription = ((int)Math.Round(next * 100)).ToString(System.Globalization.CultureInfo.InvariantCulture) + "%";
-                Invalidate();
+                Follow();
             }
+        }
+
+        /// What the bar draws now, from 0 to 1.
+        internal double Shown { get { return shown; } }
+
+        /// Whether the bar's timer runs: only while what it draws has somewhere left to go.
+        internal bool Moving { get { return timer.Enabled; } }
+
+        /// The run ended well: the bar goes to the whole of it - a short glide, at most FinishSeconds, where it may
+        /// move - and then `then` runs, at once where it may not.
+        internal void Finish(MethodInvoker then)
+        {
+            value = 1.0;
+            if (Mode() != Moves.Glide)
+            {
+                Show(1.0);
+                Halt();
+                if (then != null) then();
+                return;
+            }
+            finished = then;
+            finishStarted = clock.ElapsedMilliseconds;
+            Run(GlideInterval);
+        }
+
+        internal enum Moves { None, Glide, Reduced }
+
+        /// How the bar may move: not at all under a capture (the pictures stay exact) or where it is not seen, by
+        /// jumps with motion reduced, gliding otherwise. Pure.
+        internal static Moves MotionFor(bool capture, bool seen, bool reduced)
+        {
+            if (capture || !seen) return Moves.None;
+            return reduced ? Moves.Reduced : Moves.Glide;
+        }
+
+        // How the bar may move now.
+        private Moves Mode()
+        {
+            Form form = FindForm();
+            bool seen = IsHandleCreated && Visible && Soft.Shown(this) &&
+                        (form == null || (form.Visible && form.WindowState != FormWindowState.Minimized));
+            return MotionFor(Soft.StillReady != null, seen, seen && Soft.ReduceMotion);
+        }
+
+        private void Follow()
+        {
+            switch (Mode())
+            {
+                case Moves.Glide:
+                    Run(GlideInterval);
+                    break;
+                case Moves.Reduced:
+                    if (clock.ElapsedMilliseconds - lastDrawn >= ReducedInterval) { Show(value); Halt(); }
+                    else Run(ReducedInterval);
+                    break;
+                default:
+                    Halt();
+                    Show(value);
+                    break;
+            }
+        }
+
+        private long lastTick;
+
+        private void Run(int interval)
+        {
+            if (timer.Enabled && timer.Interval == interval) return;
+            timer.Interval = interval;
+            lastTick = clock.ElapsedMilliseconds;
+            timer.Start();
+        }
+
+        private void Halt()
+        {
+            timer.Stop();
+        }
+
+        private void Tick()
+        {
+            long now = clock.ElapsedMilliseconds;
+            Moves mode = Mode();
+            if (mode == Moves.Glide && !(finished != null && now - finishStarted >= (long)(InstallerProgress.FinishSeconds * 1000)))
+                Show(InstallerProgress.Glide(shown, value, (now - lastTick) / 1000.0));
+            else
+                Show(value);
+            lastTick = now;
+            if (shown < value) return;
+            Halt();
+            MethodInvoker then = finished;
+            finished = null;
+            if (then != null) then();
+        }
+
+        // Draws `next`, forward only; the percent read out changes only when its whole number does.
+        private void Show(double next)
+        {
+            if (next <= shown) return;
+            shown = Math.Min(next, value);
+            lastDrawn = clock.ElapsedMilliseconds;
+            int percent = (int)Math.Round(shown * 100);
+            if (percent != said)
+            {
+                said = percent;
+                AccessibleDescription = percent.ToString(System.Globalization.CultureInfo.InvariantCulture) + "%";
+                // v0.6.18: and said: a screen reader is told the bar moved, or it never hears the progress.
+                if (IsHandleCreated)
+                {
+                    AccessibilityNotifyClients(AccessibleEvents.DescriptionChange, -1);
+                    AccessibilityNotifyClients(AccessibleEvents.ValueChange, -1);
+                }
+            }
+            Invalidate();
+        }
+
+        // Off the page, or the window going: no timer runs, and the bar shows where the work is.
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (!Visible && timer.Enabled && finished == null) { Halt(); Show(value); }
+        }
+
+        protected override void OnParentChanged(EventArgs e)
+        {
+            base.OnParentChanged(e);
+            if (Parent == null && timer.Enabled && finished == null) { Halt(); Show(value); }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                finished = null;
+                timer.Stop();
+                timer.Dispose();
+            }
+            base.Dispose(disposing);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -896,7 +1128,7 @@ namespace CodexAutoResume
             Rectangle track = ClientRectangle;
             float radius = track.Height / 2f;
             Soft.InsetWell(g, track, radius, false);
-            int filled = (int)Math.Round(track.Width * value);
+            int filled = (int)Math.Round(track.Width * shown);
             if (filled <= 0) return;
             var face = new Rectangle(track.X, track.Y, Math.Max(track.Height, filled), track.Height);
             var smoothing = g.SmoothingMode;

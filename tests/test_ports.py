@@ -90,6 +90,9 @@ ENGINE_TO_STORE = {
     "hold_changed",
     # v0.6.15-beta: a worker's own store closed once its receipt came (engine/launches.py) - never the engine's.
     "close",
+    # v0.6.18: when Windows last started, read off the watcher's heartbeat, so a recovery turn begun before it is
+    # known to be cut off (engine/outcome.py, OutcomeMixin._cut_off; standard E6 as the owner amended it).
+    "watcher_status",
     # and a needs-you notice kept so it is told once (engine/notices.py) - never at the defaults.
     "raise_notice",
     # and what fell due during a long sleep, held for a person (engine/freshness.py) - never at the
