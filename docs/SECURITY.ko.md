@@ -338,7 +338,7 @@ write-ahead log를 쓰는 경우, 읽는 동안에도 SQLite가 그 옆의 공�
   v0.5.7에서는 `restore_default_settings`와 `cancel_recovery`에만 표시가 있고,
   `set_auto_recovery`, `reset_recovery_budget`, `start_watcher`, 그리고 그 릴리스에서는 엔진 경로도
   제시하는 `update_settings`에는 승인을 요청하는 destructive 주석이 없습니다. 또 그 릴리스에서는 일시
-  중지로 회수된 복구가 그대로 취소됩니다. 고급판은 도구 세 개 - `list_advanced_capabilities`,
+  정지로 회수된 복구가 그대로 취소됩니다. 고급판은 도구 세 개 - `list_advanced_capabilities`,
   `disarm_advanced_capability`, `disarm_all_advanced` - 를 더합니다. 기능 목록을 보여 주거나 기능을 끌 뿐이라
   destructive 주석을 달지 않으며, 기능을 켜는 도구는 없습니다(`advanced/tests/test_advanced_surfaces.py`).
 - **직접 입력 메시지는 대시보드에서만 씁니다.** 이 항목은 v0.6.3에서 새로 생겼습니다. 직접 입력
