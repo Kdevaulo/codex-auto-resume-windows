@@ -109,7 +109,7 @@ class StoryboardTests(unittest.TestCase):
                 menu = [frame for frame in frames if frame.scene == "S1m" and "menu" in state(frame)]
                 self.assertTrue(menu)
                 self.assertTrue(all(state(frame)["page"] == "pending" for frame in menu))
-                after = [frame for frame in frames if frame.scene == "S5"]
+                after = [frame for frame in frames if frame.scene == "S5" and state(frame)["page"] == "history"]
                 self.assertNotIn("menu", state(after[0]), "History opens with the menu closed")
                 self.assertNotIn("selected", state(after[0]), "the chosen row stays on Pending")
 
@@ -146,10 +146,10 @@ class RenderTests(unittest.TestCase):
                    "menu": {"at": "task.0"}},
                   {"index": 2, "locale": "en", "page": "pending", "light": 0, "selected": {"pending": 0},
                    "menu": {"at": "task.0"}, "hover": "menu.4"},
-                  {"index": 3, "locale": "en", "page": "pending", "light": 0, "selected": {"pending": 0}}]
+                  {"index": 3, "locale": "en", "page": "pending", "light": 0, "selected": {"pending": 1}}]
         job = {"out": str(work / "out"), "theme": "light", "design": "soft",
                "forms": {"en": {"answers": motion_window.answers("en")}},
-               "targets": ["task.0", "menu.0", "menu.4", "menu.5"], "frames": frames}
+               "targets": ["task.0", "task.1", "menu.0", "menu.4", "menu.5"], "frames": frames}
         cls.result = motion_window.render(exe, job, work)
         cls.pictures = list(motion_window.pictures(cls.result, work / "out"))
         cls.place = cls.run_place(work, exe)
@@ -204,10 +204,14 @@ foreach ($case in @(@(100, 100), @(950, 100), @(100, 600), @(950, 600))) {
             return [picture[(row * width + x) * 3:(row * width + x + wide) * 3] for row in range(y, y + tall)]
         self.assertNotEqual(area(opened), area(held), "the item in hand looks no different")
 
-    def test_a_closed_menu_names_no_items_and_leaves_the_row_chosen(self):
+    def test_a_closed_menu_names_no_items_and_a_chosen_row_is_drawn_chosen(self):
+        """The list chooses its first row as it fills (frame 0), so the row a frame chooses is shown on the second."""
         self.assertNotIn("menu.4", self.pictures[3][2])
-        self.assertIn("task.0", self.pictures[3][2])
-        self.assertNotEqual(self.pictures[0][1], self.pictures[3][1], "the chosen row is drawn chosen")
+        width = self.result["client"][0]
+        x, y, wide, tall = self.pictures[3][2]["task.1"]
+        def row(picture):
+            return [picture[(line * width + x) * 3:(line * width + x + wide) * 3] for line in range(y, y + tall)]
+        self.assertNotEqual(row(self.pictures[0][1]), row(self.pictures[3][1]), "the second row, chosen, looks unchosen")
 
     def test_a_menu_with_no_room_turns_round_as_windows_turns_it(self):
         # A window 336 by 236 with 18 px of shadow round its card of 300 by 200, in a client area of 1000 by 664.
