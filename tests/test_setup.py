@@ -677,8 +677,8 @@ class DocsTests(unittest.TestCase):
         self.assertGreaterEqual(latest, SETUP_SINCE, "releases/latest answers with v%s, which has no setup program"
                                 % ".".join(map(str, latest)))
         for name, (heading, korean) in _install_documents(
-                "### With the setup program", "### 설치 파일로 설치",
-                readme=("### With the setup program", "### 설치 프로그램으로 설치")).items():
+                "### With the setup program", "### 설치 마법사로 설치",
+                readme=("### With the setup program", "### 설치 마법사로 설치")).items():
             with self.subTest(name):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 section = text[text.index(heading):]
@@ -705,9 +705,9 @@ class DocsTests(unittest.TestCase):
         it is the setup program's in the README, and the guide leads with it too (the docs review, 2026-10-22: the
         two listed different routes first); the plugin and the archive routes follow it."""
         for name, ((install, recommended), _) in _install_documents(
-                ("## Install", "### With the setup program (recommended)"), ("## 설치", "### 설치 파일로 설치 (권장)"),
+                ("## Install", "### With the setup program (recommended)"), ("## 설치", "### 설치 마법사로 설치 (권장)"),
                 readme=(("## Install", "### With the setup program (recommended)"),
-                        ("## 설치", "### 설치 프로그램으로 설치 (권장)"))).items():
+                        ("## 설치", "### 설치 마법사로 설치 (권장)"))).items():
             with self.subTest(name):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 start = text.index("\n%s\n" % install)
