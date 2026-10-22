@@ -140,7 +140,7 @@ class FoundTests(unittest.TestCase):
         def never():
             raise AssertionError("a checkout asked a place")
         self.assertIsNone(config.installed_home())
-        self.assertEqual(homefind.found(never, never), [])
+        self.assertEqual(homefind.found(never, never, installed=config.installed_home()), [])
 
     def test_the_variable_first_then_the_app_each_folder_once(self):
         with patch.object(homefind, "looks", return_value=True):
@@ -149,7 +149,6 @@ class FoundTests(unittest.TestCase):
 
     def test_each_place_is_asked_when_looked_up(self):
         with patch.object(homefind, "looks", return_value=True), \
-                patch.object(homefind, "environment_home", return_value=None), \
                 patch.object(homefind, "app_homes", return_value=["E:\\app"]):
             self.assertEqual(homefind.found(), ["E:\\app"])
 
@@ -255,7 +254,7 @@ class ControlTests(Case):
         self.paths.ensure()
         self.control = control.Control(self.paths)
         self.other = self.codex_home("other")
-        for target, name, value in ((homefind, "looks", True), (homefind, "environment_home", str(self.other)),
+        for target, name, value in ((homefind, "looks", True), (userenv, "codex_home", str(self.other)),
                                     (homefind, "app_homes", []), (control.Control, "watcher_running", True),
                                     (control.Control, "startup_enabled", False)):
             patcher = patch.object(target, name, return_value=value)

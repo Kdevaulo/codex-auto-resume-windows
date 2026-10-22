@@ -8,7 +8,8 @@ not offered again (DISMISSED). A switch turns the looking off (SWITCH, on by def
 Where it looks, and nowhere else:
 
 * the CODEX_HOME variable of this Windows account, as Windows holds it for the programs it starts
-  (HKEY_CURRENT_USER\Environment, read only - win/userenv.py);
+  (HKEY_CURRENT_USER\Environment, read only - win/userenv.py, which the control layer hands in as
+  `environment`: this module is below the adapters and reads no registry);
 * the Codex app's own list of where it has run, which it writes for the browser extension it talks to:
   %LOCALAPPDATA%\OpenAI\Codex\chrome-native-hosts-v2.json - or the same file in the Codex app's package
   folder, where Windows keeps an MSIX app's writes. Read only, at most APP_FILE_MAX bytes, and only each
@@ -17,9 +18,10 @@ Where it looks, and nowhere else:
 codex-cli keeps its config.toml inside the home it uses, so it names no other home. Never a process's command
 line, its environment or its memory, never Codex's databases or another of its files (B11, B16).
 
-Only an installed copy looks (config.installed_home), as only an installed copy asks for an administrator's
-policy keys (control/policy.py): a copy run from a checkout - the test suite - finds nothing, so no test
-reads this machine's registry or Codex app. A test that means to look stands in for `looks`.
+Only an installed copy looks (config.installed_home, which the control layer hands in), as only an installed
+copy asks for an administrator's policy keys (control/policy.py): a copy run from a checkout - the test suite -
+finds nothing, so no test reads this machine's registry or Codex app. A test that means to look stands in for
+`looks`.
 
 A folder is offered only if it is one the product could watch (homes.problem: a local folder, not a link,
 holding Codex's state), is not the default home or a home already added - by key, the resolved and
@@ -32,8 +34,7 @@ import json
 import os
 from pathlib import Path
 
-from . import config, homes
-from .win import userenv
+from . import homes
 
 SWITCH = "home_suggestions"
 DISMISSED = "home_suggestions_dismissed"
@@ -76,11 +77,6 @@ def dismissed_with(stored, path) -> list:
     return (kept + [os.path.normpath(path)])[-DISMISSED_MAX:]
 
 
-def environment_home(registry=None):
-    """The account's CODEX_HOME as Windows holds it (win/userenv.py), or None."""
-    return userenv.codex_home(registry)
-
-
 def app_homes(local_appdata=None) -> list:
     """Each `paths.codexHome` the Codex app's list of where it has run names, in its order: from its file under
     LOCALAPPDATA, else the same file in its package folder. Read only and capped; a file that is not there, is too
@@ -113,18 +109,18 @@ def app_homes(local_appdata=None) -> list:
     return []
 
 
-def looks() -> bool:
-    """Whether this copy looks at all: an installed one (config.installed_home), never a checkout."""
-    return config.installed_home() is not None
+def looks(installed) -> bool:
+    """Whether this copy looks at all: an installed one - `installed` is config.installed_home() - never a checkout."""
+    return installed is not None
 
 
-def found(environment=None, app=None) -> list:
-    """The folders the two places name, the account's variable first, each once (by spelling), at most
-    FOUND_MAX - as named, not yet checked. Nothing where this copy does not look (`looks`). Each place is
-    looked up when asked (environment_home, app_homes), so a test that stands in for one is asked instead."""
-    if not looks():
+def found(environment=None, app=None, installed=None) -> list:
+    """The folders the two places name - `environment`, the account's variable (win/userenv.py codex_home), first -
+    each once (by spelling), at most FOUND_MAX, as named and not yet checked. Nothing where this copy does not look
+    (`looks`). The app's list is looked up when asked (app_homes), so a test that stands in for it is asked instead."""
+    if not looks(installed):
         return []
-    environment = environment or environment_home
+    environment = environment or (lambda: None)
     app = app or app_homes
     listed, seen = [], set()
     for path in [environment()] + list(app()):

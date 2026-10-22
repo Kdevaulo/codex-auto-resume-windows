@@ -323,13 +323,14 @@ def _home_found():
     @contextmanager
     def using(workspace):
         from codex_auto_resume import config, homefind
+        from codex_auto_resume.win import userenv
 
         other = workspace / "other-codex"
         other.mkdir(exist_ok=True)
         (other / "state_5.sqlite").write_bytes(b"")
         app = [str(config.codex_home()), str(other) + "\\"]
         with patch.object(homefind, "looks", return_value=True), \
-                patch.object(homefind, "environment_home", return_value=str(other)), \
+                patch.object(userenv, "codex_home", return_value=str(other)), \
                 patch.object(homefind, "app_homes", return_value=app):
             yield
     return using

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from .. import config, homefind, homes, managed, notice_kinds, settings
 from ..store import StoreError
-from ..win import folderid, policykeys
+from ..win import folderid, policykeys, userenv
 from .errors import ControlError, _thread_id
 
 
@@ -143,7 +143,8 @@ class SettingsMixin:
         uses that is not watched yet and was not set aside - and whether it looks at all and every home is added.
         Read only: nothing is added here; Add writes `codex_homes` through update_settings, as the card's own Add."""
         values = self.get_settings()
-        named = homefind.found() if homefind.on(values) else []
+        looked = homefind.on(values)
+        named = homefind.found(userenv.codex_home, installed=config.installed_home()) if looked else []
         return homefind.offer(values, config.codex_home(), named, folderid.identity)
 
     def dismiss_home_suggestion(self, path) -> dict:
