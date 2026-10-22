@@ -95,8 +95,10 @@ $track = [Windows.Forms.SystemInformation]::MaxWindowTrackSize
 $window.MinimumSize = [Drawing.Size]::Empty
 $window.ClientSize = [Drawing.Size]::new($track.Width + 600, $track.Height + 600)
 $held = $window.Width - $window.ClientSize.Width
+# The screen KeepOnScreen measures for a window built with a catalog, which opens on none: the one Screen.FromControl
+# answers for it as it is when KeepOnScreen looks.
+$work = [Windows.Forms.Screen]::FromControl($window).WorkingArea
 $null = $F.GetMethod('KeepOnScreen', $flags).Invoke($window, @())
-$work = $F.GetMethod('OpeningScreen', $flags).Invoke($null, [object[]]@($F.GetField('request', $flags).GetValue($window))).WorkingArea
 $frame = $fromClient.Invoke($window, [object[]]@([Drawing.Size]::Empty))
 $px = @($F.GetMethods($flags) | Where-Object { $_.Name -eq 'Px' -and $_.GetParameters().Count -eq 1 })[0]
 $out = @{ heldFrame = $held; work = @($work.Width, $work.Height); frame = @($frame.Width, $frame.Height)

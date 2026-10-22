@@ -328,8 +328,11 @@ class SourceTests(unittest.TestCase):
     def test_keep_on_screen_measures_the_screen_the_window_opens_on(self):
         keep = "\n".join(line for line in body("SettingsForm", "KeepOnScreen").splitlines()
                          if not line.lstrip().startswith("//"))
-        self.assertNotIn("Screen.FromControl", keep)
-        self.assertIn("OpeningScreen(request)", keep)
+        # The screen it opens on; Screen.FromControl (the primary) only for a window the audit builds, never shown.
+        self.assertIn("Rectangle screen = (opening ?? Screen.FromControl(this)).WorkingArea;", keep)
+        constructor = guiscan.settings()
+        self.assertLess(constructor.index("if (catalog == null) opening = OpeningScreen(request);"),
+                        constructor.index("            KeepOnScreen();"))
         self.assertNotIn("Screen.FromPoint(Cursor.Position).WorkingArea.Size", body("Program", "Main"))
 
 

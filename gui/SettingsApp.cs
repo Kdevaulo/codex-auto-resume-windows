@@ -887,10 +887,13 @@ namespace CodexAutoResume
         /// scrolling one can. Settled here, before it is shown, so it never jumps once it is.
         private void KeepOnScreen()
         {
-            // v0.6.20: the screen it opens on - the pointer's, or a reopen's (OpeningScreen) - and not Screen.FromControl,
-            // which before the window has a place answers the primary: a window opened on a smaller secondary screen kept
-            // the primary's height and ran off it, its footer out of reach.
-            Rectangle screen = (opening ?? OpeningScreen(request)).WorkingArea;
+            // v0.6.20: the screen it opens on - the pointer's, or a reopen's (OpeningScreen, taken as `opening`) - and not
+            // Screen.FromControl, which before the window has a place answers the primary: a window opened on a smaller
+            // secondary screen kept the primary's height and ran off it, its footer out of reach. A window LayoutAudit or
+            // the render mode builds opens on no screen and is measured against the primary, as it always was: the
+            // audit's sizes at a scaling this machine is not set to are taken from there (wherever the pointer is, its
+            // 200% text-size audit cut the Settings section list off against a smaller screen).
+            Rectangle screen = (opening ?? Screen.FromControl(this)).WorkingArea;
             // v0.6.20: the frame its style adds (SizeFromClientSize), not Width less ClientSize.Width: Windows holds a
             // form's Width to the largest window the screen allows (SystemInformation.MaxWindowTrackSize) while the client
             // area keeps what was asked, so on a small screen at 200% that read went negative and the clamp let the
