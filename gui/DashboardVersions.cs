@@ -510,6 +510,14 @@ namespace CodexAutoResume
             window.ShowDialog(this);
             updatingHere = false;
             SetBusy(false);
+            // The window stays until the run has ended (InstallerWindow.OnFormClosing); only Windows ending the session
+            // closes it sooner, and then the bootstrap may still be at work: said so, never as a failure with nothing
+            // under it (v0.6.18 acceptance).
+            if (window.Code == int.MinValue) outcome = "running";
+            // A failure always says what it can: what the bootstrap printed, else the window's log, else its ending.
+            if (string.IsNullOrEmpty(detail)) detail = Tail(window.Log);
+            if (string.IsNullOrEmpty(detail))
+                detail = new InstallerWords(strings, openedLanguage).Outcome(InstallerFlow.Update, window.Code);
             // An update's rule (InstallUpdate): what ran before runs again on the version installed, this Dashboard too.
             if (outcome == "installed" && window.OpenDashboard &&
                 File.Exists(Path.Combine(root, "CodexAutoResumeSettings.exe")))
