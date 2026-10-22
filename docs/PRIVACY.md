@@ -298,7 +298,16 @@ notification card and the icon's motion ask a few more, all content-free and des
 values an administrator may set under `Software\Policies\CodexAutoResume` in `HKEY_LOCAL_MACHINE` and
 `HKEY_CURRENT_USER` - five switches, a number and a span of hours (the guide's *Settings an
 administrator manages*) - each time it reads its settings. Nothing else under that key is read, and a
-PC nobody manages has none. Also from v0.6.11, and only while the setting that needs it is on (each
+PC nobody manages has none. From v0.6.18, to suggest a Codex home this PC's Codex uses that is not
+watched yet (the guide's *Several Codex homes*), an installed copy's Dashboard reads two things each time
+it shows *Settings > Advanced*, unless the switch *Suggest Codex homes found on this PC* is off: the
+`CODEX_HOME` value of your account's environment (`HKEY_CURRENT_USER\Environment`), read and never
+written; and the Codex app's own list of where it has run,
+`%LOCALAPPDATA%\OpenAI\Codex\chrome-native-hosts-v2.json` (at most 1 MiB, opened for reading), of which
+only each entry's `codexHome` folder is kept - nothing else in that file is looked at. The folders found
+are checked as a home you add is checked, shown only on that card, and never sent anywhere or told to
+Codex; one you set aside with **Not now** is kept in the settings file, and the diagnostics file says only
+how many. Also from v0.6.11, and only while the setting that needs it is on (each
 is off by default): how long the PC has been awake (`QueryUnbiasedInterruptTime`), which beside the
 clock says how long it slept, and a notice from Windows when it wakes
 (`RegisterSuspendResumeNotification`), for **Ask me after a sleep longer than** and **Keep this PC
