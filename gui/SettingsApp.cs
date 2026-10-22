@@ -809,6 +809,8 @@ namespace CodexAutoResume
             }
             // General holds the power action's card: what Windows offers is asked the first time it is shown.
             LoadPowerWhereShown();
+            // v0.6.18: Advanced holds the homes' card: the Codex home it suggests is asked each time it is shown.
+            LoadHomeSuggestionWhereShown();
         }
 
         private const int WM_SETREDRAW = 0x000B;
