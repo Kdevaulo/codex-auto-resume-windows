@@ -794,7 +794,11 @@ namespace CodexAutoResume
                 if (forward.Enabled) Answer(false);
                 return;
             }
-            if (running && e.CloseReason == CloseReason.UserClosing)
+            // Any other close while it runs is refused the same way, Windows ending the session alone excepted: a raw
+            // WM_CLOSE from another program arrives as TaskManagerClosing, and the Dashboard's own closing as
+            // FormOwnerClosing. v0.6.18 acceptance: an older installer, run by Install another version..., closed the
+            // pick's window part-way that way - the run went on unseen and the pick said it had failed.
+            if (running && e.CloseReason != CloseReason.WindowsShutDown)
             {
                 e.Cancel = true;
                 closingAsked = true;
