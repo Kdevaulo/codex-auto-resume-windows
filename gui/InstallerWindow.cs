@@ -683,8 +683,53 @@ namespace CodexAutoResume
 
         private void Post(MethodInvoker action)
         {
+            // Without a handle - between two showings of the window (SettingsForm.InstallPick shows it again after
+            // WinForms ended its modal loop) - what the run says is kept and told once it has one again: the run's
+            // end is never lost (v0.6.18 acceptance, B2).
+            lock (waiting)
+            {
+                if (!IsHandleCreated && !IsDisposed)
+                {
+                    waiting.Add(action);
+                    return;
+                }
+            }
             try { if (IsHandleCreated && !IsDisposed) BeginInvoke(action); }
             catch (Exception) { /* the window is gone */ }
+        }
+
+        private readonly List<MethodInvoker> waiting = new List<MethodInvoker>();
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            MethodInvoker[] told;
+            lock (waiting)
+            {
+                told = waiting.ToArray();
+                waiting.Clear();
+            }
+            foreach (MethodInvoker action in told) BeginInvoke(action);
+        }
+
+        /// Whether the installer is still running: the window stays, and is shown again, until it is not.
+        internal bool Running { get { return running; } }
+
+        private const int WM_SHOWWINDOW = 0x0018;
+        private const int SW_PARENTCLOSING = 1;
+
+        /// The Dashboard minimized under the window - by a person's Show desktop, or by another program - hides the
+        /// windows it owns (WM_SHOWWINDOW, SW_PARENTCLOSING), and WinForms ends a modal window's loop once it is
+        /// hidden, with no close asked: the run went on unseen (v0.6.18 acceptance, B2). While it runs, the window
+        /// stays where it is instead.
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_SHOWWINDOW && running && m.WParam == IntPtr.Zero && m.LParam.ToInt64() == SW_PARENTCLOSING)
+            {
+                m.Result = IntPtr.Zero;
+                return;
+            }
+            base.WndProc(ref m);
         }
 
         /// One line the installer printed: into the log, and onto the bar where it begins a step. A progress line

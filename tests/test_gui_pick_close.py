@@ -39,8 +39,11 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 PROBE = r"""
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
+# A failing probe fails its test: never a dialog on the desktop waiting for someone (every handler below exits with 3).
+[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::ThrowException)
+function Stop-Probe([object]$Problem) { [Console]::Error.WriteLine('probe failed: ' + $Problem); [Environment]::Exit(3) }
 $asm = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
-$any = [Reflection.BindingFlags]'Static,Instance,NonPublic,Public'
+$script:any = [Reflection.BindingFlags]'Static,Instance,NonPublic,Public'
 Add-Type -ReferencedAssemblies System.Windows.Forms -TypeDefinition @'
 using System; using System.Threading; using System.Runtime.InteropServices;
 public static class CarPickCloseRunner {
@@ -54,51 +57,89 @@ public static class CarPickCloseRunner {
 }
 '@
 $flowType = $asm.GetType('CodexAutoResume.InstallerFlow', $true)
-$windowType = $asm.GetType('CodexAutoResume.InstallerWindow', $true)
+$script:windowType = $asm.GetType('CodexAutoResume.InstallerWindow', $true)
 $wordsType = $asm.GetType('CodexAutoResume.InstallerWords', $true)
-$flow = [Activator]::CreateInstance($flowType, $any, $null,
+if ($null -eq $script:windowType.GetField('closingAsked', $script:any)) { Stop-Probe 'InstallerWindow has no closingAsked' }
+$flow = [Activator]::CreateInstance($flowType, $script:any, $null,
                                     [object[]]@('update', 'C:\Users\ExampleUser\.codex-auto-resume', 'standard', 'standard', '0.6.17'), $null)
-$flowType.GetField('Another', $any).SetValue($flow, $true)
-$words = [Activator]::CreateInstance($wordsType, $any, $null, [object[]]@($null, 'en'), $null)
-$runner = [Delegate]::CreateDelegate($windowType.GetNestedType('Runner', $any), [CarPickCloseRunner].GetMethod('Run'))
-$window = [Activator]::CreateInstance($windowType, $any, $null, [object[]]@($flow, $words, $null, $runner, $null, $null), $null)
-$owner = New-Object System.Windows.Forms.Form
-$owner.Text = 'car-pick-close-owner'
-$owner.StartPosition = 'Manual'; $owner.Location = New-Object System.Drawing.Point(-4000, -4000)
-$window.StartPosition = 'Manual'; $window.Location = New-Object System.Drawing.Point(-4000, -3000)
+$flowType.GetField('Another', $script:any).SetValue($flow, $true)
+$words = [Activator]::CreateInstance($wordsType, $script:any, $null, [object[]]@($null, 'en'), $null)
+$runner = [Delegate]::CreateDelegate($script:windowType.GetNestedType('Runner', $script:any), [CarPickCloseRunner].GetMethod('Run'))
+$script:window = [Activator]::CreateInstance($script:windowType, $script:any, $null, [object[]]@($flow, $words, $null, $runner, $null, $null), $null)
+$script:owner = New-Object System.Windows.Forms.Form
+$script:owner.Text = 'car-pick-close-owner'
+$script:owner.StartPosition = 'Manual'; $script:owner.Location = New-Object System.Drawing.Point(-4000, -4000)
+$script:window.StartPosition = 'Manual'; $script:window.Location = New-Object System.Drawing.Point(-4000, -3000)
 $script:events = New-Object System.Collections.ArrayList
 $script:result = @{}
-$window.add_FormClosing({ param($s, $e) [void]$script:events.Add('window ' + [string]$e.CloseReason + ' ' + $e.Cancel) })
-$owner.add_Shown({
+$script:window.add_FormClosing({
+  param($s, $e)
+  try { [void]$script:events.Add('window ' + [string]$e.CloseReason + ' ' + $e.Cancel) } catch { Stop-Probe $_ }
+})
+$script:owner.add_Shown({
+  try {
     # A raw WM_CLOSE, as Process.CloseMainWindow and every other program sends it, then the owner's own close.
-    $post = New-Object System.Windows.Forms.Timer
-    $post.Interval = 1500
-    $post.add_Tick({ $post.Stop(); [void][CarPickCloseRunner]::PostMessage($window.Handle, 0x10, [IntPtr]::Zero, [IntPtr]::Zero) })
-    $post.Start()
-    $shut = New-Object System.Windows.Forms.Timer
-    $shut.Interval = 3000
-    $shut.add_Tick({ $shut.Stop(); $script:result.busy = [bool]$windowType.GetField('closingAsked', $any).GetValue($window); $owner.Close() })
-    $shut.Start()
-    # Once the run has ended the window may close: the person's Finish.
-    $done = New-Object System.Windows.Forms.Timer
-    $done.Interval = 250
-    $done.add_Tick({
-        if ([CarPickCloseRunner]::Ended -eq 0 -and $windowType.GetProperty('Page', $any).GetValue($window) -eq 'finish') {
-            $done.Stop(); $window.Close()
-        }
+    $script:post = New-Object System.Windows.Forms.Timer
+    $script:post.Interval = 1500
+    $script:post.add_Tick({
+      try {
+        $script:post.Stop()
+        [void][CarPickCloseRunner]::PostMessage($script:window.Handle, 0x10, [IntPtr]::Zero, [IntPtr]::Zero)
+      } catch { Stop-Probe $_ }
     })
-    $done.Start()
-    $null = $window.ShowDialog($owner)
+    $script:post.Start()
+    $script:shut = New-Object System.Windows.Forms.Timer
+    $script:shut.Interval = 3000
+    $script:shut.add_Tick({
+      try {
+        $script:shut.Stop()
+        $script:result.busy = [bool]$script:windowType.GetField('closingAsked', $script:any).GetValue($script:window)
+        $script:owner.Close()
+      } catch { Stop-Probe $_ }
+    })
+    $script:shut.Start()
+    # Once the run has ended the window may close: the person's Finish.
+    $script:done = New-Object System.Windows.Forms.Timer
+    $script:done.Interval = 250
+    $script:done.add_Tick({
+      try {
+        if ([CarPickCloseRunner]::Ended -eq 0 -and
+            $script:windowType.GetProperty('Page', $script:any).GetValue($script:window) -eq 'finish') {
+            $script:done.Stop(); $script:window.Close()
+        }
+      } catch { Stop-Probe $_ }
+    })
+    $script:done.Start()
+    $null = $script:window.ShowDialog($script:owner)
     $script:result.returned_at = [DateTime]::UtcNow.Ticks
     $script:result.ended_at = [CarPickCloseRunner]::EndedAt
     $script:result.ended = [CarPickCloseRunner]::Ended
-    $script:result.code = $windowType.GetProperty('Code', $any).GetValue($window)
-    $owner.BeginInvoke([Action]{ $owner.Close() }) | Out-Null
+    $script:result.code = $script:windowType.GetProperty('Code', $script:any).GetValue($script:window)
+    $script:owner.BeginInvoke([Action]{ $script:owner.Close() }) | Out-Null
+  } catch { Stop-Probe $_ }
 })
-[System.Windows.Forms.Application]::Run($owner)
+[System.Windows.Forms.Application]::Run($script:owner)
 $script:result.events = @($script:events)
 $script:result | ConvertTo-Json -Compress
 """
+
+
+def run_probe(probe: Path, arguments: list, timeout: int, **env) -> subprocess.CompletedProcess:
+    """Runs `probe` in Windows PowerShell with its output in files beside it, never in pipes: a process a probe left
+    behind can hold an inherited pipe past any timeout (tests/test_probe_never_waits.py). A probe that has not ended in
+    `timeout` seconds is ended and answers code None."""
+    said, errors = probe.with_suffix(".out"), probe.with_suffix(".err")
+    try:
+        with open(said, "wb") as out, open(errors, "wb") as err:
+            code = subprocess.run([str(POWERSHELL), "-STA", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe), *arguments], stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                                  timeout=timeout, creationflags=NO_WINDOW, env=dict(os.environ, **env)).returncode
+    except subprocess.TimeoutExpired:
+        code = None
+    text = lambda path: path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+    if code is None:
+        return subprocess.CompletedProcess([], None, text(said), "the probe did not end within %d s: %s" % (timeout, text(errors)))
+    return subprocess.CompletedProcess([], code, text(said), text(errors))
 
 
 def body(member: str) -> str:
@@ -141,10 +182,7 @@ class WindowTests(unittest.TestCase):
                        check=True, capture_output=True, timeout=300, creationflags=NO_WINDOW)
         probe = Path(cls.folder.name) / "probe.ps1"
         probe.write_text(PROBE, encoding="utf-8-sig")
-        result = subprocess.run([str(POWERSHELL), "-STA", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                                 "-File", str(probe)], capture_output=True, text=True, encoding="utf-8",
-                                errors="replace", timeout=120, env=dict(os.environ, CAR_EXE=str(exe)),
-                                creationflags=NO_WINDOW)
+        result = run_probe(probe, [], 60, CAR_EXE=str(exe))
         cls.result = result
         lines = result.stdout.strip().splitlines()
         cls.answer = json.loads(lines[-1]) if result.returncode == 0 and lines else {}
