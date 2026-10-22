@@ -144,17 +144,46 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
     installer says so and goes on. A path holding a curly single quote is a path and never code: the gate doubles
     every single-quote character PowerShell knows. The compatibility data's download checks every redirect before it
     is asked and writes no more than one byte past its bound, as the archive's download does.
+- **Fixes from the security audit and a bug hunt.**
+  - A named object another account made first is refused. The watcher's mutex and its stop, wake and demo events have
+    names anyone can work out; the check refused one made by a process of lower integrity, but a process of another
+    account at the same integrity - the sandbox account Codex runs commands under, say - could still create one first
+    with a permissive access list and then hold it or signal it. An existing one is now refused too when its owner is
+    neither this account, the administrators nor SYSTEM.
+  - The Dashboard ignores a close-for-update event that someone else made first. An update asks the Dashboard's
+    windows to close through a named event; one created and set first by a low-integrity process or another account
+    closed every Dashboard as it opened. The Dashboard now refuses an event that existed before it under the same rule
+    as above.
+  - A compatibility document that runs more than 100 sequences ahead of the data the release bundles is refused. Any
+    number up to 2^31-1 was taken in, so one imported file, or one mistaken document, at the top number refused every
+    later document as a rollback - the project's own refreshes and the data of every release - and its
+    *incompatible* entries kept the gate there for good. One kept from before is now not in force and blocks no later
+    import.
+  - The watcher sweeps what an update set aside and could not delete, as it starts. An update moves the old program,
+    runtime and Dashboard files aside as `.old-` folders and deletes them after the copy unless something still had
+    them open; about 14 MB each stayed in the home until the next install. The watcher now removes them once it holds
+    its mutex - only in an installation folder provably its own, never while an install is running or its copy journal
+    is there, never through a link, renaming a folder first so one still in use is never half deleted - and writes one
+    log line saying what it removed and what it left.
 - **A state that is marked readable from schema 5** (see *Going back* above) is used by a later schema that so marks
   itself instead of being refused, and the version picker keeps it for a target that reads the mark.
-- **The Korean, Japanese, Simplified Chinese and Traditional Chinese texts were reviewed** against the English in both
-  catalogs, the standard's and the advanced edition's, and now say one word for each thing: for example the watcher, the
-  continuation and the edition's own name - and, in Korean, the usage limit and its reset - are one term each across
-  both catalogs. A usage window is no longer worded as an application window in any of the four, the word
-  for "change the edition" no longer reads as changing the version, a few sentences that claimed more than the English
+- **Thirteen of the translations were reviewed** against the English in both catalogs, the standard's and the advanced
+  edition's: Korean, Japanese, Simplified and Traditional Chinese, German, French, Italian, Spanish, Brazilian
+  Portuguese, Arabic, Hebrew, Vietnamese and Indonesian. Each now says one word for each thing - for example the
+  watcher, the continuation, a turn, the recovery, the edition's own name and, in Korean, the usage limit and its
+  reset, are one term each across both catalogs - and keeps the formal or informal address its language uses
+  (Traditional Chinese addresses you as 您 in both catalogs; German keeps *Sie* and Spanish and Italian the formal
+  "you" throughout). A usage window is no longer worded as an application window in the Asian languages, the word for
+  "change the edition" no longer reads as changing the version, a few sentences that claimed more than the English
   (that a long conversation is "the usual cause") were corrected, and broken text - stray spaces inside words, split
-  measurement ids, wrong particles - and the register were made consistent (Traditional Chinese addresses you as 您 in
-  both catalogs). The English is unchanged. The Korean usage-limit notice now says the usage is reset (재설정), as every
-  other Korean string does.
+  measurement ids, wrong particles and genders - was made consistent. The advanced-edition statements (goal
+  continuation, continuation with no marker, start with Codex) that were still in English in Arabic and in Hebrew are
+  translated, and both languages, which are held back until the Dashboard mirrors right to left but ship, were read
+  string by string. The English is unchanged. The Korean usage-limit notice now says the usage is reset (재설정), as
+  every other Korean string does.
+- **The Korean documents were reviewed page by page against the English.** Every Korean page now names the versions
+  its English page names, follows its English page again where it had drifted, and uses the Korean interface's own
+  words (워처, 사전 릴리스, 공개, 재설정, 설치 마법사 for the setup program and 설치 프로그램 for the installer).
 - **The documents say what the code does now.** A full review of the README, the guide, the privacy, security, support,
   plugin, editions, verify, brand, comparison, contributing and contributors pages, the feature matrix, the roadmap and
   this changelog against the code corrected their counts and lists - the plugin's twenty tools, the advanced edition's
@@ -224,6 +253,12 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
     it is treated as no app running, so the pipe's server can no longer impersonate the watcher.
   - A resend's claim reads the conversation's day and spacing limits again, as a first claim does, so a claim of the
     same conversation committed between the resend's check and its claim is counted.
+  - A goal set while the Codex app may have opened the conversation is unknown, not accepted. *Goal continuation* asks
+    whether the app still does not hold the conversation just before it sets the goal, but the app could open it in
+    between, and such a set is not seen though the goal read back as active. The question is now asked again once the
+    goal reads back; where the app holds the conversation then, the answer is unknown: neither route tries it again,
+    and the capability's tripwire turns it off, as its statement already says of a result it cannot confirm. The set is
+    never taken back.
 
 ### For developers
 
@@ -267,6 +302,9 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
   uninstall's sweep, the Codex calls' telemetry (`tests/test_installer_codex_telemetry.py`) and the outside gate's
   quotes (`tests/test_outside_gate_quotes.py`), among others. The update-check test records the compatibility data's
   request at the bounded download's door, which it now goes through.
+- **The bug hunt's fixes have test modules of their own**: the named object's owner (`tests/test_named_object_owner.py`),
+  the update event (`tests/test_update_event_squat.py`), the sequence lead (`tests/test_compat_sequence_lead.py`) and the
+  set-aside sweep (`tests/test_set_aside_sweep.py`), and the goal race in the advanced edition's own tests.
 - **The CI release lane is dealt into five parts**, as the standard and advanced lanes' parts are, by the seconds of
   tests recorded in `tests/data/durations.json`, now that the faster layout audits are in it.
 
