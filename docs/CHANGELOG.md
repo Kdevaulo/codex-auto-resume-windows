@@ -118,6 +118,32 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
   - While the default home's engine is being rebuilt - during a Codex update, say - and another home has something
     queued, the one-second watch no longer writes a "watch failed" traceback every second; it watches the other homes
     until the engine is back.
+- **Fixes from an audit of the installer and the update.**
+  - A line that setup writes to stderr no longer stops the installer half way when it runs outside another app: setup's
+    exit code decides, as it does inside one. `verify-home` and `claim-home` likewise answer with their exit code, so a
+    line on stderr no longer replaces their refusal with a raw error.
+  - An update that is put back, or that stops before its setup, starts again the watcher it stopped, and a failed
+    setup says when that watcher is not running.
+  - A failed *Install another version...* puts back what it changed while the previous version is still installed: the
+    state it converted (from the copy the conversion took), the kept uninstaller and with it the entry in Settings >
+    Apps, and the watcher.
+  - An uninstall that cannot remove a program file keeps the runtime and what its verification runs, so the retry can
+    finish; it used to delete the runtime anyway and leave the retry stuck at "No installed runtime found". A purge
+    says it removed the settings and recovery history only when it did, and names what something still held, and the
+    uninstall's sweep of its leftovers no longer prints a bare `True` or `False` into its log.
+  - A bracket in the installation's folder or in an archive's path is a character, not a wildcard, so an update there
+    moves the old files aside as everywhere else. A rollback that cannot clear the half-copied tree leaves the
+    previous one aside under its own name, never inside it, and says it could not put everything back. A Dashboard
+    program that cannot be replaced is said, and the update goes on to set up the watcher instead of ending there.
+  - The installer's calls to `codex` run with telemetry off, with the same variable and overrides as the watcher's
+    own (standard C10).
+  - An installation folder outside your profile (the plugin home variable) is made private to you - you, SYSTEM and
+    Administrators, full control, nothing inherited - before the program goes into it, because a folder under a drive
+    root inherits `Authenticated Users: Modify` and other accounts on the PC could replace the launcher, the program
+    or the runtime that run as you at each sign-in. Where the drive keeps no access list, or it cannot be written, the
+    installer says so and goes on. A path holding a curly single quote is a path and never code: the gate doubles
+    every single-quote character PowerShell knows. The compatibility data's download checks every redirect before it
+    is asked and writes no more than one byte past its bound, as the archive's download does.
 - **A state that is marked readable from schema 5** (see *Going back* above) is used by a later schema that so marks
   itself instead of being refused, and the version picker keeps it for a target that reads the mark.
 - **The Korean, Japanese, Simplified Chinese and Traditional Chinese texts were reviewed** against the English in both
@@ -237,6 +263,10 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
   this time mid-dispatch (`tests/test_once_words_race.py`), per-home project rules (`tests/test_project_rule_homes.py`),
   the stale and busy cancels (`tests/test_stale_cancel.py`, `tests/test_toast_cancel_busy.py`), and the advanced
   edition's weekly-check log lines (its own test module).
+- **The installer audit's fixes have test modules of their own**: the setup step's stderr, the watcher's restart, the
+  uninstall's sweep, the Codex calls' telemetry (`tests/test_installer_codex_telemetry.py`) and the outside gate's
+  quotes (`tests/test_outside_gate_quotes.py`), among others. The update-check test records the compatibility data's
+  request at the bounded download's door, which it now goes through.
 - **The CI release lane is dealt into five parts**, as the standard and advanced lanes' parts are, by the seconds of
   tests recorded in `tests/data/durations.json`, now that the faster layout audits are in it.
 
