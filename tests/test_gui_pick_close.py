@@ -124,6 +124,24 @@ $script:result | ConvertTo-Json -Compress
 """
 
 
+def run_probe(probe: Path, arguments: list, timeout: int, **env) -> subprocess.CompletedProcess:
+    """Runs `probe` in Windows PowerShell with its output in files beside it, never in pipes: a process a probe left
+    behind can hold an inherited pipe past any timeout (tests/test_probe_never_waits.py). A probe that has not ended in
+    `timeout` seconds is ended and answers code None."""
+    said, errors = probe.with_suffix(".out"), probe.with_suffix(".err")
+    try:
+        with open(said, "wb") as out, open(errors, "wb") as err:
+            code = subprocess.run([str(POWERSHELL), "-STA", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe), *arguments], stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                                  timeout=timeout, creationflags=NO_WINDOW, env=dict(os.environ, **env)).returncode
+    except subprocess.TimeoutExpired:
+        code = None
+    text = lambda path: path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+    if code is None:
+        return subprocess.CompletedProcess([], None, text(said), "the probe did not end within %d s: %s" % (timeout, text(errors)))
+    return subprocess.CompletedProcess([], code, text(said), text(errors))
+
+
 def body(member: str) -> str:
     return guiscan.member_body("SettingsForm", member)
 
@@ -164,13 +182,7 @@ class WindowTests(unittest.TestCase):
                        check=True, capture_output=True, timeout=300, creationflags=NO_WINDOW)
         probe = Path(cls.folder.name) / "probe.ps1"
         probe.write_text(PROBE, encoding="utf-8-sig")
-        try:
-            result = subprocess.run([str(POWERSHELL), "-STA", "-NoProfile", "-NonInteractive", "-ExecutionPolicy",
-                                     "Bypass", "-File", str(probe)], capture_output=True, text=True, encoding="utf-8",
-                                    errors="replace", timeout=60, env=dict(os.environ, CAR_EXE=str(exe)),
-                                    creationflags=NO_WINDOW)
-        except subprocess.TimeoutExpired:
-            result = subprocess.CompletedProcess([], 1, "", "the probe did not end within a minute")
+        result = run_probe(probe, [], 60, CAR_EXE=str(exe))
         cls.result = result
         lines = result.stdout.strip().splitlines()
         cls.answer = json.loads(lines[-1]) if result.returncode == 0 and lines else {}

@@ -57,7 +57,7 @@ public static class CarPickHiddenRunner {
 '@
 $flowType = $asm.GetType('CodexAutoResume.InstallerFlow', $true)
 $script:windowType = $asm.GetType('CodexAutoResume.InstallerWindow', $true)
-foreach ($member in @('Running', 'Page', 'Code')) {
+foreach ($member in @(@('Page', 'Code') + @(if ($How -eq 'gap') { 'Running' }))) {
     if ($null -eq $script:windowType.GetProperty($member, $script:any)) { Stop-Probe ('InstallerWindow has no ' + $member) }
 }
 $flow = [Activator]::CreateInstance($flowType, $script:any, $null,
@@ -116,6 +116,24 @@ $script:r | ConvertTo-Json -Compress
 """
 
 
+def run_probe(probe: Path, arguments: list, timeout: int, **env) -> subprocess.CompletedProcess:
+    """Runs `probe` in Windows PowerShell with its output in files beside it, never in pipes: a process a probe left
+    behind can hold an inherited pipe past any timeout (tests/test_probe_never_waits.py). A probe that has not ended in
+    `timeout` seconds is ended and answers code None."""
+    said, errors = probe.with_suffix(".out"), probe.with_suffix(".err")
+    try:
+        with open(said, "wb") as out, open(errors, "wb") as err:
+            code = subprocess.run([str(POWERSHELL), "-STA", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                   "-File", str(probe), *arguments], stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                                  timeout=timeout, creationflags=NO_WINDOW, env=dict(os.environ, **env)).returncode
+    except subprocess.TimeoutExpired:
+        code = None
+    text = lambda path: path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+    if code is None:
+        return subprocess.CompletedProcess([], None, text(said), "the probe did not end within %d s: %s" % (timeout, text(errors)))
+    return subprocess.CompletedProcess([], code, text(said), text(errors))
+
+
 def body(member: str) -> str:
     return guiscan.member_body("SettingsForm", member)
 
@@ -153,17 +171,11 @@ class WindowTests(unittest.TestCase):
                         *[str(path) for path in guiscan.sources()]],
                        check=True, capture_output=True, timeout=300, creationflags=NO_WINDOW)
         probe = Path(cls.folder.name) / "probe.ps1"
-        probe.write_text(PROBE, encoding="utf-8-sig")
+        for how in ("owner", "gap"):
+            probe.with_name("probe-%s.ps1" % how).write_text(PROBE, encoding="utf-8-sig")
         cls.answers, cls.failures = {}, {}
         for how in ("owner", "gap"):
-            try:
-                result = subprocess.run([str(POWERSHELL), "-STA", "-NoProfile", "-NonInteractive", "-ExecutionPolicy",
-                                         "Bypass", "-File", str(probe), "-How", how], capture_output=True, text=True,
-                                        encoding="utf-8", errors="replace", timeout=60,
-                                        env=dict(os.environ, CAR_EXE=str(exe)), creationflags=NO_WINDOW)
-            except subprocess.TimeoutExpired:
-                cls.failures[how] = "the probe did not end within a minute"
-                continue
+            result = run_probe(probe.with_name("probe-%s.ps1" % how), ["-How", how], 60, CAR_EXE=str(exe))
             lines = result.stdout.strip().splitlines()
             if result.returncode == 0 and lines:
                 cls.answers[how] = json.loads(lines[-1])
