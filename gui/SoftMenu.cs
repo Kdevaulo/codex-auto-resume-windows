@@ -1,6 +1,6 @@
-// Codex Auto Resume - the window's right-click menus, in its own material (v0.6.20).
+// Codex Auto Resume - the window's right-click menus, in its own material (v0.6.18).
 //
-// Until v0.6.20 a row's menu was Windows' ToolStrip menu in the window's colours: a square window with Windows' square
+// Until v0.6.18 a row's menu was Windows' ToolStrip menu in the window's colours: a square window with Windows' square
 // drop shadow, a band of tint under the item in hand. The owner asked for it in our design (2026-10-22). Now every menu
 // the window opens is a card of the cards' own material - their ground, their radius, their hairline and in dark their
 // one-pixel top light - lifted by the cards' own shadow, which spills outside the card over whatever is behind it, as
@@ -26,7 +26,7 @@ using System.Windows.Forms;
 namespace CodexAutoResume
 {
     /// A row's own menu (v0.6.11): the Pending list's - postpone the task, let a held one continue, how its conversation
-    /// resumes. v0.6.20: a card of the cards' material (see the file's head). Every right-click menu of the window is one
+    /// resumes. v0.6.18: a card of the cards' material (see the file's head). Every right-click menu of the window is one
     /// of these, and every submenu a SoftMenuDrop made by Branch.
     internal sealed class SoftMenu : ContextMenuStrip
     {
@@ -208,7 +208,7 @@ namespace CodexAutoResume
         }
     }
 
-    /// The menus' renderer (v0.6.20), one for every menu and submenu, and its colour table: every colour it draws is one
+    /// The menus' renderer (v0.6.18), one for every menu and submenu, and its colour table: every colour it draws is one
     /// of these, and every one of these is the palette's.
     internal sealed class SoftMenuRenderer : ToolStripRenderer
     {
@@ -338,7 +338,7 @@ namespace CodexAutoResume
         }
     }
 
-    /// The card a menu is drawn as (v0.6.20): its window layered, what the menu draws of itself laid into a rounded card
+    /// The card a menu is drawn as (v0.6.18): its window layered, what the menu draws of itself laid into a rounded card
     /// with the cards' shadow round it, and put on the screen with an alpha for every pixel. Off in High Contrast, where
     /// the menu is Windows' own.
     internal sealed class SoftMenuLayer : IDisposable

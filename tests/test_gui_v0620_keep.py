@@ -1,4 +1,4 @@
-r"""KeepOnScreen measures the window's frame from its style (v0.6.20, the parked "KeepOnScreen at 200%").
+r"""KeepOnScreen measures the window's frame from its style (v0.6.18, the parked "KeepOnScreen at 200%").
 
 It took the frame as Width less ClientSize.Width. Windows holds a form's Width to the largest window the screen allows
 (SystemInformation.MaxWindowTrackSize) while ClientSize keeps what was asked, so on a small screen at 200% or more

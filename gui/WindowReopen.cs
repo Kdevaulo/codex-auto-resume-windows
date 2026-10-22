@@ -495,7 +495,7 @@ namespace CodexAutoResume
             });
         }
 
-        /// Windows' app mode or High Contrast changed: the theme the window would draw may have. v0.6.20: or the window
+        /// Windows' app mode or High Contrast changed: the theme the window would draw may have. v0.6.18: or the window
         /// is now on a monitor of another scale (WM_DPICHANGED) - moved there, or the monitor's scaling changed.
         protected override void WndProc(ref Message m)
         {
@@ -527,7 +527,7 @@ namespace CodexAutoResume
             if (colours) BeginInvoke(new MethodInvoker(delegate { CheckReopen(false); }));
         }
 
-        /// What a window drawn at `drawn` does once it is on a monitor whose scale is `now` (v0.6.20): KeepWindow at the
+        /// What a window drawn at `drawn` does once it is on a monitor whose scale is `now` (v0.6.18): KeepWindow at the
         /// same scale, or where the new one cannot be told (0); with unsaved edits, ReopenOnceSaved - it opens again at
         /// the new scale once they are saved or put back; otherwise ReopenWindow. Pure, so the rule can be checked
         /// without a second monitor.
@@ -547,7 +547,7 @@ namespace CodexAutoResume
                                  Math.Max(1, (int)Math.Round(bounds.Height * factor)));
         }
 
-        /// After WM_DPICHANGED (v0.6.20): the window opens again at the scale of the monitor it is on now (ScaleDecision),
+        /// After WM_DPICHANGED (v0.6.18): the window opens again at the scale of the monitor it is on now (ScaleDecision),
         /// where it is and as large as it was there - never under unsaved edits, while minimized, an action is on its
         /// way or a dialog is open over it: the clock looks again once that is over (TickReopen). The new window reads
         /// its monitor's scale as it opens (Program.Main), so a window at the scale of its monitor stays.
@@ -583,7 +583,7 @@ namespace CodexAutoResume
             if (reopening || auditing || rendering) return;
             bool normal = WindowState == FormWindowState.Normal;
             Rectangle bounds = normal ? Bounds : RestoreBounds;
-            // v0.6.20: on a monitor of another scale (CheckScale), as large at that scale as it is at this one.
+            // v0.6.18: on a monitor of another scale (CheckScale), as large at that scale as it is at this one.
             if (reopenScale > 0) bounds = ScaledBounds(bounds, DisplayScale, reopenScale);
             // The invisible border as it is now; maximized, as it was last measured on screen, or as the window this
             // one replaced measured it.

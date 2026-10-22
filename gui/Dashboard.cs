@@ -53,7 +53,7 @@ namespace CodexAutoResume
         // to succeed on the fourth - the first version of this class failed every start for
         // a missing "-c", and the fallback hid it completely.
         private const int MaxFailures = 3;
-        // v0.6.20: and tried again once this long has passed since it was given up - a laptop resumed from sleep in
+        // v0.6.18: and tried again once this long has passed since it was given up - a laptop resumed from sleep in
         // the middle of a call counts as a failure, and three of those used to leave every call of the window's life,
         // every five seconds, a fresh interpreter. One more failure gives it up for as long again.
         internal static int RetryMilliseconds = 300000;
@@ -218,7 +218,7 @@ namespace CodexAutoResume
         internal void Stop()
         {
             closed = true;
-            // v0.6.20: the one-shot children too - the fallback of a call a worker is in the middle of, and CallOnce's -
+            // v0.6.18: the one-shot children too - the fallback of a call a worker is in the middle of, and CallOnce's -
             // which ending `process` never reached: StopLocked had set it to null before the fallback started.
             once.Stop();
             if (System.Threading.Monitor.TryEnter(gate))

@@ -1,4 +1,4 @@
-"""v0.6.20: the README's first motion picture opens a Pending row's own menu (the owner: "첫 apng에 우클릭 장면도
+"""v0.6.18: the README's first motion picture opens a Pending row's own menu (the owner: "첫 apng에 우클릭 장면도
 추가해줘" - add a right-click scene to the first APNG).
 
 After the Pending page opens, the pointer goes to the first waiting task, right-clicks it - the row is chosen, a ripple

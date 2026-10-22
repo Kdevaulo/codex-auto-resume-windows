@@ -1,4 +1,4 @@
-r"""v0.6.20's audit of the window (plans/v0620-audit/gui.md): the four REAL findings and the MINOR ones fixed with them.
+r"""v0.6.18's audit of the window (plans/v0620-audit/gui.md): the four REAL findings and the MINOR ones fixed with them.
 
 R1. The one-shot bridge (Bridge.Call) read the child's stdout to its end, then its stderr, and only then waited 30 s for
     an exit that had already come: nothing limited it. A controlcli that hung held the call for good - and, run as the

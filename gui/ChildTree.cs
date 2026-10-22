@@ -1,4 +1,4 @@
-// Codex Auto Resume - ending a child of the window's, with what it started (v0.6.20).
+// Codex Auto Resume - ending a child of the window's, with what it started (v0.6.18).
 //
 // The one-shot bridge (Bridge.Call in gui/SettingsApp.cs) runs controlcli in a python.exe of its own. When that child
 // does not answer in time it is ended - and so is what it started and still runs, since a probe of Codex that kept

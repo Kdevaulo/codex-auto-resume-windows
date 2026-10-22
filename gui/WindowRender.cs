@@ -7,7 +7,7 @@
 // a bridge, so nothing is read from an installation, nothing is written anywhere but the job's folder, and no
 // process is started. For each frame of the job it is put in a state - a page, a Settings section, a scroll
 // offset, a control's hover or pressed face, a drop-down's value, its open list, a Pending row chosen and its own
-// menu open (v0.6.20), the moment of its lights -
+// menu open (v0.6.18), the moment of its lights -
 // waits until it holds still as a capture waits (Settled), and draws itself into a bitmap; only what changed
 // since the frame before is written.
 
@@ -317,7 +317,7 @@ namespace CodexAutoResume
         // The Pending row the last frame chose (RenderSelected), or -1.
         private int renderSelected = -1;
 
-        /// v0.6.20: the Pending row a right click chose - `{"pending": n}` - as the list chooses the row under the pointer
+        /// v0.6.18: the Pending row a right click chose - `{"pending": n}` - as the list chooses the row under the pointer
         /// (DashboardPages, MouseDown); none again once no frame names one. True when anything changed.
         private bool RenderSelected(Dictionary<string, object> selected)
         {
@@ -406,7 +406,7 @@ namespace CodexAutoResume
             DrawToBitmap(picture, new Rectangle(Point.Empty, ClientSize));
             renderRows = null;
             renderMenu = null;
-            // v0.6.20: a Pending row's own menu, over everything: a window of its own too (SoftMenu), drawn by its own
+            // v0.6.18: a Pending row's own menu, over everything: a window of its own too (SoftMenu), drawn by its own
             // card where it opens.
             RenderDropList(picture, Map(frame, "droplist"), writer);
             var menu = Map(frame, "menu");

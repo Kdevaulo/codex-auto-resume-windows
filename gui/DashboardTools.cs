@@ -496,7 +496,7 @@ namespace CodexAutoResume
             dialog.CancelButton = close;
 
             int token = 0;
-            // v0.6.20: how many looks are on their way. The five-second look waits while one is, so a slow bridge does
+            // v0.6.18: how many looks are on their way. The five-second look waits while one is, so a slow bridge does
             // not gather a worker behind its lock every five seconds; a search goes as ever, and the token drops the
             // older answer.
             int looking = 0;

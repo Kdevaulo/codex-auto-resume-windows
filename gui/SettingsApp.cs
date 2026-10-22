@@ -131,7 +131,7 @@ namespace CodexAutoResume
 
     internal sealed class Bridge
     {
-        /// The longest one call may take (v0.6.20): twice the long-lived pipe's own reply limit, for the interpreter's
+        /// The longest one call may take (v0.6.18): twice the long-lived pipe's own reply limit, for the interpreter's
         /// start on top of the answer. Past it the child is ended, with what it started (ChildTree.End), and the call
         /// throws, as a pipe that does not answer does: a stuck controlcli - a locked state file, a stuck import, an
         /// antivirus scan holding python.exe - could otherwise hold the call, and with it every later one queued behind
@@ -361,13 +361,13 @@ namespace CodexAutoResume
         private string openedLanguage, openedTheme, openedDesign, storedLanguage, storedTheme, storedDesign;
         private string wordsLanguage;
         private bool settingsRead, readingSettings, reopening, recheck;
-        // v0.6.20: the screen the window opens on (OpeningScreen), taken once.
+        // v0.6.18: the screen the window opens on (OpeningScreen), taken once.
         private Screen opening;
-        // v0.6.20: on a monitor of another scale since WM_DPICHANGED (CheckScale), in the middle of a move or resize, held
+        // v0.6.18: on a monitor of another scale since WM_DPICHANGED (CheckScale), in the middle of a move or resize, held
         // for later, and the scale a reopen for it opens at (0: none).
         private bool scaleMoved, sizing, recheckScale;
         private double reopenScale;
-        // v0.6.20: the words were not had in time and the window opened in English (StringsWaitMilliseconds); the reply,
+        // v0.6.18: the words were not had in time and the window opened in English (StringsWaitMilliseconds); the reply,
         // once it comes, is lateReply until the window has taken it (TakeLateWords).
         private bool lateWords;
         private volatile Dictionary<string, object> lateReply;
@@ -446,7 +446,7 @@ namespace CodexAutoResume
                                                                                CultureInfo.InvariantCulture));
         }
 
-        /// How long a window with no words cached for it waits for them before it opens (v0.6.20), in English, its own
+        /// How long a window with no words cached for it waits for them before it opens (v0.6.18), in English, its own
         /// words: on the window's own thread, before there is a window, so past this a stuck interpreter left a process
         /// running with no window and no taskbar button - after every update or change of language, whose words are not
         /// cached yet - and a second click started a second one. The words that come later open the window again in its
@@ -517,7 +517,7 @@ namespace CodexAutoResume
 
         private static readonly double SystemScale = MeasureDpiScale();
         private static double dpiScale = SystemScale;
-        // v0.6.20: the scale of the monitor the window is drawn for (AdoptDisplayScale) - SystemScale until it is adopted.
+        // v0.6.18: the scale of the monitor the window is drawn for (AdoptDisplayScale) - SystemScale until it is adopted.
         private static double displayScale = SystemScale;
 
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
@@ -582,7 +582,7 @@ namespace CodexAutoResume
             dpiScale = displayScale * TextSize;
         }
 
-        /// v0.6.20: draws the window from here on at `scale`, the scale of the monitor it opens on (ScaleOfMonitor), in
+        /// v0.6.18: draws the window from here on at `scale`, the scale of the monitor it opens on (ScaleOfMonitor), in
         /// place of the one Windows had at sign-in (SystemScale). Before AdoptTextSize, and before the window is made
         /// (Program.Main).
         ///
@@ -600,7 +600,7 @@ namespace CodexAutoResume
         /// The scale the window is drawn for (AdoptDisplayScale), without the text size.
         internal static double DisplayScale { get { return displayScale; } }
 
-        /// How much larger a size in points is drawn than Windows draws it (v0.6.20): Windows turns points into pixels
+        /// How much larger a size in points is drawn than Windows draws it (v0.6.18): Windows turns points into pixels
         /// at the sign-in scale whatever monitor the window is on, so on a monitor of another scale the window's fonts
         /// are made that much larger or smaller - as LayoutAudit stands another scaling in, which matched a real window
         /// to the pixel. 1 where the monitor's scale is the sign-in's.
@@ -747,7 +747,7 @@ namespace CodexAutoResume
                 else asking = System.Threading.Tasks.Task.Factory.StartNew<Dictionary<string, object>>(AskStrings);
             }
             Text = "Codex Auto Resume";
-            // v0.6.11: at the text size the window opens at (TextScale, AdoptTextSize); v0.6.20: and at the scale of the
+            // v0.6.11: at the text size the window opens at (TextScale, AdoptTextSize); v0.6.18: and at the scale of the
             // monitor it opens on (AtDisplayScale).
             Font = windowFont ?? AtDisplayScale(TextScale.Apply(SystemFonts.MessageBoxFont, textRead, TextSize));
             // The type roles (Soft.RoleFont) are variants of the window's own font.
@@ -887,14 +887,14 @@ namespace CodexAutoResume
         /// scrolling one can. Settled here, before it is shown, so it never jumps once it is.
         private void KeepOnScreen()
         {
-            // v0.6.20: the screen it opens on - the pointer's, or a reopen's (OpeningScreen, taken as `opening`) - and not
+            // v0.6.18: the screen it opens on - the pointer's, or a reopen's (OpeningScreen, taken as `opening`) - and not
             // Screen.FromControl, which before the window has a place answers the primary: a window opened on a smaller
             // secondary screen kept the primary's height and ran off it, its footer out of reach. A window LayoutAudit or
             // the render mode builds opens on no screen and is measured against the primary, as it always was: the
             // audit's sizes at a scaling this machine is not set to are taken from there (wherever the pointer is, its
             // 200% text-size audit cut the Settings section list off against a smaller screen).
             Rectangle screen = (opening ?? Screen.FromControl(this)).WorkingArea;
-            // v0.6.20: the frame its style adds (SizeFromClientSize), not Width less ClientSize.Width: Windows holds a
+            // v0.6.18: the frame its style adds (SizeFromClientSize), not Width less ClientSize.Width: Windows holds a
             // form's Width to the largest window the screen allows (SystemInformation.MaxWindowTrackSize) while the client
             // area keeps what was asked, so on a small screen at 200% that read went negative and the clamp let the
             // window grow past the screen - as the Advanced tab's frame did (HoldTabs, fixed the same way).
@@ -915,7 +915,7 @@ namespace CodexAutoResume
         }
 
         /// Control.DefaultFont, which an unparented control measures in, at FontFactor too - as LayoutAudit sets it for a
-        /// scaling it stands in (v0.6.20). Once, before the window is made; nothing where the factor is 1.
+        /// scaling it stands in (v0.6.18). Once, before the window is made; nothing where the factor is 1.
         internal static void ScaleDefaultFont()
         {
             if (Math.Abs(FontFactor - 1f) < 0.001f) return;
@@ -1400,7 +1400,7 @@ namespace CodexAutoResume
             Design.Opened = request.Design ?? storedDesign;
             Palette.AdoptDesign(Design.Opened);
             Palette.Adopt(Theme.Current(Theme.Opened));
-            // v0.6.20: drawn at the scale of the monitor it opens on, the pointer's or a reopen's (AdoptDisplayScale).
+            // v0.6.18: drawn at the scale of the monitor it opens on, the pointer's or a reopen's (AdoptDisplayScale).
             Screen opening = SettingsForm.OpeningScreen(request);
             SettingsForm.AdoptDisplayScale(SettingsForm.ScaleOfMonitor(SettingsForm.OpeningPlace(request, Cursor.Position)));
             SettingsForm.ScaleDefaultFont();

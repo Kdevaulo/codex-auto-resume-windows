@@ -226,7 +226,7 @@ class OneShotBridgeTests(unittest.TestCase):
         self.assertIn("info.RedirectStandardInput = true", self.method)
         self.assertIn("new UTF8Encoding(false).GetBytes(argument)", self.method,
                       "a redirected stdin takes the console code page unless the bytes are UTF-8")
-        # v0.6.20: closed on its own task beside the reads, so a child that never reads cannot hold the write.
+        # v0.6.18: closed on its own task beside the reads, so a child that never reads cannot hold the write.
         self.assertIn("Stream input = process.StandardInput.BaseStream;", self.method)
         self.assertIn("input.Close();", self.method)
 

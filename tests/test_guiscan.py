@@ -107,7 +107,7 @@ class SliceTests(unittest.TestCase):
         self.assertEqual(len(parts), len(holders))
         self.assertGreater(len(parts), 4, "it was four, in two files, before v0.6.10-alpha")
         # v0.6.16: SettingsRemove.cs, the uninstall's own start of the installer window, is no part of the form either.
-        # v0.6.20: nor ChildTree.cs, the one-shot bridge's child ended with what it started.
+        # v0.6.18: nor ChildTree.cs, the one-shot bridge's child ended with what it started.
         self.assertEqual(sorted(set(guiscan.window_sources()) - set(holders)),
                          ["gui/ChildTree.cs", "gui/SettingsRemove.cs", "gui/WindowJson.cs"],
                          "the window sources that are not the form")
@@ -155,7 +155,7 @@ class SliceTests(unittest.TestCase):
         # and InstallerBar - and SettingsRemove, the uninstall's start of it. 71 with InstallerNotes, what is new in the
         # version an update goes to; 72 with InstallerClock, the update's time limit less the Notes page's wait. 73 since
         # v0.6.17: HostApp, whether the program runs inside another app's private view of Windows and the way out. 74 since
-        # v0.6.20: ChildTree, a one-shot bridge child ended with what it started, the watcher spared; 76 with SoftMenuDrop
+        # v0.6.18: ChildTree, a one-shot bridge child ended with what it started, the watcher spared; 76 with SoftMenuDrop
         # and SoftMenuLayer, a submenu and the card every right-click menu is drawn as (gui/SoftMenu.cs).
         self.assertEqual(len(set(declared)), 76, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and

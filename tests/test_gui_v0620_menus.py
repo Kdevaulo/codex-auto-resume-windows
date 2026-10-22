@@ -1,4 +1,4 @@
-r"""v0.6.20: the right-click menus in the window's own design (the owner, 2026-10-22, with a picture of the Pending row's
+r"""v0.6.18: the right-click menus in the window's own design (the owner, 2026-10-22, with a picture of the Pending row's
 menu: "우클릭 할 때 뜨는 거도 우리 디자인에 맞추자").
 
 Every menu the window opens is a SoftMenu, every submenu a SoftMenuDrop made by its Branch, and both are drawn by the one

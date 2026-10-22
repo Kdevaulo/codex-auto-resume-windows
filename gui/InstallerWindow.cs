@@ -1038,7 +1038,7 @@ namespace CodexAutoResume
             {
                 said = percent;
                 AccessibleDescription = percent.ToString(System.Globalization.CultureInfo.InvariantCulture) + "%";
-                // v0.6.20: and said: a screen reader is told the bar moved, or it never hears the progress.
+                // v0.6.18: and said: a screen reader is told the bar moved, or it never hears the progress.
                 if (IsHandleCreated)
                 {
                     AccessibilityNotifyClients(AccessibleEvents.DescriptionChange, -1);
