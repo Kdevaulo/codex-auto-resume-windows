@@ -274,6 +274,8 @@ namespace CodexAutoResume
                 PerformLayout();
                 if (!HoldStill(true)) writer.Note("frame " + frame["index"] + ": the " + page + " page did not hold still: " + Unsettled());
             }
+            // The chosen row again, now that the page holds still (RenderSelected).
+            RenderSelected(Map(frame, "selected"));
             RenderScroll(page, Map(frame, "scroll"));
             RenderFace(Str(frame, "hover"), Str(frame, "pressed"), writer);
             object light;
@@ -322,10 +324,16 @@ namespace CodexAutoResume
             object given;
             int row = selected != null && selected.TryGetValue("pending", out given) && given != null
                 ? Convert.ToInt32(given, CultureInfo.InvariantCulture) : -1;
-            if (row == renderSelected || pendingList == null) return false;
+            if (pendingList == null || (row < 0 && renderSelected < 0)) return false;
             renderSelected = row;
+            // Asked of every frame, not only when it changes: a read the window makes while it settles fills the list
+            // again, and the row chosen with it.
+            bool chosen = row >= 0 && row < pendingList.Items.Count;
+            if (chosen && pendingList.SelectedIndices.Count == 1 && pendingList.Items[row].Selected) return false;
+            if (!chosen && pendingList.SelectedIndices.Count == 0) return false;
             pendingList.SelectedIndices.Clear();
-            if (row >= 0 && row < pendingList.Items.Count) pendingList.Items[row].Selected = true;
+            if (chosen) pendingList.Items[row].Selected = true;
+            pendingList.Invalidate();
             return true;
         }
 

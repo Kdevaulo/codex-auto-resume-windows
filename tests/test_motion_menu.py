@@ -111,6 +111,7 @@ class StoryboardTests(unittest.TestCase):
                 self.assertTrue(all(state(frame)["page"] == "pending" for frame in menu))
                 after = [frame for frame in frames if frame.scene == "S5"]
                 self.assertNotIn("menu", state(after[0]), "History opens with the menu closed")
+                self.assertNotIn("selected", state(after[0]), "the chosen row stays on Pending")
 
     def test_the_moves_keep_the_storyboard_s_frame_rate(self):
         plan = motion_plan.load(make_motion.plan_path("readme-en"))

@@ -284,6 +284,10 @@ def _step(run, step):
         state = copy.deepcopy(step["set"])
         if "page" in state and "section" not in state and state["page"] != run.window.get("page"):
             run.window.pop("section", None)
+        # The Pending row a right click chose shows only on Pending: another page leaves it behind, and the window that
+        # opens again in another language has chosen nothing.
+        if ("page" in state and state["page"] != "pending") or "locale" in state:
+            run.window.pop("selected", None)
         if ("page" in state or "section" in state or "locale" in state) and "scroll" not in state:
             run.window.pop("scroll", None)
         for key, value in state.items():
