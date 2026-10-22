@@ -130,9 +130,12 @@ uses SQLite's write-ahead log, SQLite may still update the shared-memory index f
 it while reading. Codex's state changes when the product asks official Codex interfaces to act:
 `codex queue` (add one message), `thread/queue/delete` (withdraw that same message), and
 `codex plugin` / `codex plugin marketplace` at install and uninstall (register, refresh or remove
-this product's plugin and marketplace). The advanced edition asks for two more, each only while
-the capability that uses it is on: `thread/queue/add` (add one message, with no marker) and
-`thread/goal/set` (set active again a goal the usage limit paused). Its measurement harness, when
+this product's plugin and marketplace). The advanced edition asks for more, each only while
+the capability that uses it is on, and only the methods that capability declares (the advanced package's
+`codex/protocol.py`): adding one message to a queue with no marker, setting a goal the usage limit paused
+active again, resuming, starting and interrupting a turn, compacting a conversation, reading the list of models and
+putting a conversation's model back, reading usage and spending a reset credit. *Stop near a limit* also stops a
+running turn through the Codex app's own channel, the `\\.\pipe\codex-ipc` pipe. Its measurement harness, when
 a person runs a measurement by hand, asks for more whether or not any capability is on - among
 them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `turn/start` (see
 *The measurement harness* under [The advanced edition](#the-advanced-edition)).
@@ -338,9 +341,9 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   administrator's `DisablePowerAction` holds it - one turned on before does nothing while the value is
   set. The code refuses to act whenever `unittest` is
   loaded, so no test can make a real call.
-- **Named objects planted by a less-trusted process are refused.** This is new in v0.6.0. The watcher's single-instance mutex and its stop event have
+- **Named objects planted by a less-trusted process are refused.** This is new in v0.6.0. The watcher's single-instance mutex, its stop event and the wake event the control layer signals to make it look now have
   predictable names in the session namespace, where a process running at Low integrity may create
-  objects. If either already exists with an integrity label below Medium (the level an ordinary
+  objects. If any of them already exists with an integrity label below Medium (the level an ordinary
   user's programs run at), the watcher refuses it and logs `named_object_squatted`. A planted
   mutex makes the watcher refuse to run and status read unknown; uninstall treats that unknown as
   it treats any other, and aborts before removing anything. A planted stop event makes the watcher
@@ -412,15 +415,17 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   interruption recoverable and every gate has passed, it is attached only to a recoverable
   kind of interruption, and it cannot skip a check or choose a different conversation.
 - **A notification button can cancel one recovery or open one page, and nothing else.** The
-  `codex-auto-resume:` handler accepts exactly two requests. `cancel` names one interruption
+  `codex-auto-resume:` handler accepts exactly three requests. `cancel` names one interruption
   by its opaque id, which has to match a real record, and can only stop a recovery. `open`,
   new in v0.6.3 for the **Open Dashboard** button, names one page from a fixed list -
   Overview, Pending, History, Statistics, Diagnostics or Settings - and opens it. It changes no
   state and cannot cause a send, so a page that knows the scheme can at worst open a window.
-  Anything else is logged as unsupported and ignored. From v0.6.5 the notification card's
+  The third, from v0.6.12, stops the power action for one batch, named by that batch's opaque id, which every batch
+end replaces; it can only turn the action off. Anything else is logged as unsupported and ignored. From v0.6.5 the notification card's
   buttons are the toast's buttons, as data, and a press is handled inside the watcher rather than
-  through the handler - parsed by the same two parsers, with the same two outcomes: one exact
-  interruption cancelled through the control layer, or one of the window's own pages opened. The
+  through the handler - parsed by the same three parsers, with the same three outcomes: one exact
+  interruption cancelled through the control layer, one of the window's own pages opened, or one batch's power
+  action stopped. The
   card imports nothing that can send, and the tests hold it to that. From v0.6.11 the needs-you
   notice, off by default, has one button, **Open Dashboard**, at the Settings page: no cancel, and
   no setting is written from a notification - which kinds are told is chosen on that page. What it
@@ -439,8 +444,9 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   another. What it changes is that conversation's switch, which is policy: it sends
   nothing, and turning it on leaves every gate to run. The popup runs inside the watcher
   process, on the notification-area icon's thread, and is a front end like the Dashboard: it
-  asks the control layer for four things only - the pending list, the status, the global
-  switch and the per-task switch - and imports nothing that can put a continuation into
+  asks the control layer only for what its rows and menus offer - the pending list, the status, the global
+  switch and the per-task switch, postponing a task and taking that back, letting a held task continue, a
+  conversation's or a project's rule, and, in the icon's menu, turning the power action off - and imports nothing that can put a continuation into
   Codex. **Cancel all** on the Pending page cancels every pending recovery one exact record
   at a time. Cancelling is the only action offered in bulk, because it can only reduce what
   the tool does; there is deliberately no bulk retry. The advanced edition has one exception: a
@@ -661,6 +667,16 @@ capability, in plain words.
   read-only - while the capability is watched as well as while it is on. At most 12 a day, and 3 in
   one conversation.
 
+Those four are the first. The others each have a statement in [EDITIONS.md](EDITIONS.md), which the Dashboard shows
+before a person turns one on, and the ones that add to what this page lists are: *Check for updates once a week*
+(unattended requests to GitHub, where C4, C5 and C7 allow only a pressed button), *Open Codex on a notice* (starts
+`explorer.exe` with a `codex:` link and reads, never writes, the handler Windows has registered for such links), *Stop
+near a limit* (stops a running turn through the Codex app's own pipe), *Run a conversation here while Codex is
+closed*, *Compact a full conversation, then continue* and *Use Codex's default model when one is at capacity* (resume,
+start, interrupt and, for the last two, compact or change a conversation's model, through an app server of their own),
+*Use a reset credit at the limit you pick* (reads usage on a schedule and spends one reset credit) and *Usage meter*
+and *Send your own message when a limit resets* (read usage on a schedule).
+
 Each capability's session with the app server is started as core starts its own, with the same
 arguments and environment. It may call only the methods that capability declares
 (the advanced package's `codex/protocol.py`), and never calls a sign-in, token or attestation
@@ -832,8 +848,9 @@ version resource described below are new in v0.6.0.
   refuses to publish if the two builds differ. Text files are checked out with CRLF everywhere
   (`.gitattributes`), because their line endings are part of the archive's bytes. Two full builds
   from fresh clones on one machine, with the same compiler, Python and zlib, produced
-  byte-identical archives. Whether GitHub's runner produces the same bytes as a local build has
-  not been verified.
+  byte-identical archives. For v0.6.0, the archive GitHub's runner published and a rebuild on another Windows machine had the same SHA-256 - a
+  same-toolchain match, since the two used the same compiler build ([VERIFY.md](VERIFY.md)); two different
+  compiler builds have never been compared.
 - **Version resource.** From v0.6.0. Both executables carry a Windows version resource -
   product, publisher, file and product version - generated from the plugin manifest, so a file's
   Properties name what it is. That is a label, not a signature: it says nothing about who built
@@ -875,7 +892,10 @@ may not be pinned yet. For v0.5.4 and later, you can also check the build proven
 the GitHub CLI:
 
 ```powershell
-gh attestation verify .\CodexAutoResume-vX.Y.Z-win-x64.zip --repo songyb111-gachon/codex-auto-resume-windows
+gh attestation verify .\CodexAutoResume-vX.Y.Z-win-x64.zip `
+    --repo songyb111-gachon/codex-auto-resume-windows `
+    --signer-workflow songyb111-gachon/codex-auto-resume-windows/.github/workflows/release.yml `
+    --source-ref refs/tags/vX.Y.Z
 ```
 
 The advanced edition's archive, from v0.6.11, is checked the same way, under its own name
@@ -1017,15 +1037,19 @@ Found while planning v0.6.5, fixed in v0.6.5 (v0.6.4 still has each of these):
 
 - The blocking usage bucket cannot always be identified from history with certainty, so live
 availability is re-checked immediately before sending. This reduces but does not eliminate the
-uncertainty. - The tool no longer requires an exact engine version. An unrecognised build is
+uncertainty.
+- The tool no longer requires an exact engine version. An unrecognised build is
 accepted when the `codex queue` interface probe passes, which means a Codex update can change
 *semantics* without the probe noticing. This is mitigated rather than eliminated: every send is
 still proven afterwards by the per-interruption marker in that exact thread, an unproven send
 is never recorded as a recovery, and `status`/`doctor`/the log state clearly when the engine is
-unverified. - Unloaded threads are not resumed at all; this is a documented product limitation,
-not a security control. - If withdrawing its own queued message cannot be confirmed, the record
+unverified.
+- Unloaded threads are not resumed at all; this is a documented product limitation,
+not a security control.
+- If withdrawing its own queued message cannot be confirmed, the record
 becomes `submission_unknown` and the message may stay in Codex's queue, where it may be
-delivered if the conversation is opened later. The tool never sends it again. - A
+delivered if the conversation is opened later. The tool never sends it again.
+- A
 lower-integrity process that holds the watcher's mutex or stop event name keeps recovery from
 running while it holds it, in v0.5.7 and in v0.6.0 alike. From v0.6.0, a planted
 mutex makes status read unknown and a planted stop event makes the watcher refuse to start, so
@@ -1035,34 +1059,41 @@ the running watcher's mutex and takes it when the watcher exits: that mutex carr
 watcher's own Medium label, so it is not refused, and status reports a running watcher, as in
 v0.5.7. In v0.5.7 a planted mutex makes status report a running watcher and the real one exit
 as a duplicate, and a planted, signalled stop event makes a real watcher quit on start, logging
-only an ordinary stop request - nothing that points to the planted event. - Content in a
+only an ordinary stop request - nothing that points to the planted event.
+- Content in a
 conversation can pause recovery without a prompt, in v0.5.7 (through `set_auto_recovery`) and
 in v0.6.0 (through `pause_auto_recovery`) alike. Pausing withdraws a continuation already
 waiting in Codex's queue. From v0.6.0 a withdrawal that can be confirmed returns that recovery
 to waiting with its attempt returned, so resuming picks it up; only a withdrawal that cannot be
 confirmed (`submission_unknown`), or a pause over an already uncertain submission (`failed`),
 is final. In v0.5.7 the recovery is cancelled for good and resuming does not bring it back.
-Either way the message is never sent twice. - From v0.6.0, content in a conversation can also
+Either way the message is never sent twice.
+- From v0.6.0, content in a conversation can also
 switch recovery off for one conversation without a prompt, through
 `disable_conversation_recovery` - and that one is not reversible. It cancels every recovery
 that conversation has waiting, switching the conversation back on does not revive them, and
 giving attempts back refuses a cancelled recovery. What it costs is unfinished work left
-unresumed, never a message sent twice. - Whether Codex shows an approval prompt for the tools
-marked destructive is up to Codex's approval settings, not this product. - Nothing this project
+unresumed, never a message sent twice.
+- Whether Codex shows an approval prompt for the tools
+marked destructive is up to Codex's approval settings, not this product.
+- Nothing this project
 builds is Authenticode-signed (the two executables, the setup programs, `Install.cmd`,
 `Uninstall.cmd` and the PowerShell scripts); the bundled Python interpreter keeps the signatures
 it was published with: the Python Software Foundation's on `pythonw.exe`, `python.exe` and the
 Python DLLs, and
 Microsoft's on the two Visual C++ runtime DLLs. Releases are not GitHub-immutable. Trust in a
 download rests on the pinned digest and the provenance attestation (*Release integrity*,
-*Verifying a release*). - Archives v0.5.0 through v0.5.7 were built by
+*Verifying a release*).
+- Archives v0.5.0 through v0.5.7 were built by
 the earlier single-job workflow with floating action tags and executables that are not
-reproducible. Whether a local rebuild reproduces, byte for byte, an archive GitHub's runner
-publishes from v0.6.0 on has not been verified. - A Custom message is sent as written, and
+reproducible. For v0.6.0 a rebuild on another Windows machine reproduced, byte for byte, the archive GitHub's runner published,
+with the same compiler build ([VERIFY.md](VERIFY.md)); two different compiler builds have never been compared.
+- A Custom message is sent as written, and
 Codex reads it as your own words. The checks above decide which values it may contain and
 that it cannot change what is recovered; they do not judge what it asks Codex to do. Any
 program running under your Windows account can also edit `config/settings.json`, as it can
-your other files; the placeholder and length checks still apply to what it writes. - The Codex
+your other files; the placeholder and length checks still apply to what it writes.
+- The Codex
 compatibility data a refresh fetches is not signed. It comes over HTTPS from this repository's
 `main` branch, so anyone who can change that branch can change what the next refresh on every
 machine receives. What such data could do is bounded by the rules under *Compatibility data can
@@ -1070,7 +1101,8 @@ only restrict*: at worst it marks a Codex build incompatible and recovery stops 
 until the data changes again - unfinished work left unresumed, never a message sent that the
 local checks would refuse. A document that requires a signature is refused whole until something
 verifies one. Any program running under your Windows account can also write
-`config/compat-cache.json`; it is validated on every read, and the same rules apply to it. - What
+`config/compat-cache.json`; it is validated on every read, and the same rules apply to it.
+- What
 other people report can be made up. The check a report's pull request runs refuses one that could
 not have been measured - a setup that could not have written it, times the machine could not have
 recorded, a copy of a filed report - but nothing proves that a plausible report was measured, so
