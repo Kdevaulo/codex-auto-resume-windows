@@ -310,6 +310,15 @@ def _build(event, detail, identity=None, *, sound=False):
         # no key and replaces no card. Only the countdown's has a stop button, named by its batch (A28).
         return _notice(event, notify.power_content(event, detail), key=None)
     if event == "stopped":
+        if detail.get("reason") in notify.NOT_RESUMED:
+            # 2026-10-22: born stopped because the person took the conversation over, or its recovery was cancelled
+            # (notify.not_resumed_content) - nothing gave up, so it is not said as a stop. The card names the new
+            # failure's reason in its chip and the sentence on its line, as a held interruption's does.
+            category = detail.get("category") or "usage_limit"
+            content = notify.not_resumed_content(thread_id, identity, reason=detail["reason"], category=category)
+            chip = l10n.text(reasons.label_key(category), l10n.current())
+            return _notice("stopped", content, key=thread_id, chip=chip, chip_tone="attention",
+                           line=notify.not_resumed_message(detail["reason"]))
         reason = ("no_progress" if state == "no_progress_exhausted"
                   else "time" if detail.get("reason") == "chain_time_cap"
                   else "attempts" if state == "retry_budget_exhausted" else None)
