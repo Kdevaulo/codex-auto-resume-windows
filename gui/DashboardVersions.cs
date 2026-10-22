@@ -508,6 +508,15 @@ namespace CodexAutoResume
                     return PickCode(ran, outcome, code);
                 }, null, Font);
             window.ShowDialog(this);
+            // WinForms ends a modal window's loop once the window is hidden, with no close asked - the Dashboard
+            // minimized under it hid it (v0.6.18 acceptance, B2). The pick follows its run to the end all the same: this
+            // window back as it was, and the setup window shown again, until the installer has ended.
+            while (window.Running && !window.IsDisposed)
+            {
+                if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+                window.ShowDialog(this);
+            }
+            if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
             updatingHere = false;
             SetBusy(false);
             // The window stays until the run has ended (InstallerWindow.OnFormClosing); only Windows ending the session
