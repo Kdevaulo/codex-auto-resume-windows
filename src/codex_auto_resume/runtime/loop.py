@@ -29,6 +29,7 @@ from ..windows import AdapterError, Mutex, StopEvent, wait_any
 from .afterwork import AfterWork
 from .health import Health
 from .homes import Homes
+from .setaside import sweep as sweep_set_aside
 from .waking import Waking
 
 
@@ -332,6 +333,7 @@ class WatchLoop:
         health = self._new_health()
         if not once:
             self._failure_baseline()
+            sweep_set_aside(self.paths, self.logger.info)
         # Not `tray`: `from . import tray` names the module in this file too, and a local
         # that shadows a module name reads as that module to anything scanning the source.
         icon = None if once else self._start_tray(stop)
