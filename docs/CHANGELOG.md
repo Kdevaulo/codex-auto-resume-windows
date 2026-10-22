@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.6.18 — A recovery that worked is recovered however its turn ended, Install another version in the setup window, a setup bar that fills by real counts, a streamed update download, and the fixes of a full audit
+## v0.6.18 — A recovery that worked is recovered however its turn ended, a suggestion for the Codex homes this PC uses, Install another version in the setup window, a setup bar that fills by real counts, a streamed update download, and the fixes of a full audit
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.17...v0.6.18)
 
@@ -25,10 +25,27 @@ The state conversion that *Install another version...* makes for an older target
 advanced feature on there, as it was. The weekly update check keeps three numbers in the advanced file's table of
 choices - when it last ran, the newest version it offered, and when - beside the choices themselves. No feature
 offers them as a choice, and v0.6.17 and v0.6.16 pass over a row they do not know, as every reader of that table
-always did, so going back loses nothing and shows nothing of them. Nothing else was added to either file.
+always did, so going back loses nothing and shows nothing of them. The settings file gains two keys of the Codex homes
+suggestion (below), on by default and the folders set aside; v0.6.17 and v0.6.16 do not know them and drop them the next
+time they save the file, so going back loses nothing but the folders you set aside with *Not now*, which are suggested
+again if you come forward. Nothing else was added to either file.
 
 ### Both editions
 
+- **A Codex home this PC uses and the watcher does not watch is suggested.** This is the release's improvement to the
+  standard edition. The Codex homes card in Settings > Advanced now says *Codex also uses <folder>. Watch it too?* with
+  **Add** and **Not now**. Add puts the folder among the extra Codex homes through the one way a home is added, so the
+  limit of three still holds, and with all three taken the line says so instead of offering; **Not now** remembers the
+  folder and never offers it again. A switch, *Suggest Codex homes found on this PC*, is on by default and turns the
+  looking off; nothing is added until you choose Add. It looks in two places only, and reads them without writing:
+  the `CODEX_HOME` variable of your Windows account (`HKEY_CURRENT_USER\Environment`), and the Codex app's own list of
+  where it has run (`chrome-native-hosts-v2.json`, which it writes for its browser extension), at most 1 MiB of it, of
+  which only each entry's `codexHome` is kept. A folder is offered only if it is a local folder holding Codex's state
+  database that is not the default home and not already added. It looks only in an installed copy, never in a
+  checkout; nothing is sent anywhere and nothing is told to Codex; the diagnostics count the folders you set aside and
+  name none. The standard B16, which lists every registry read, names the `CODEX_HOME` one, marked as extended for this
+  suggestion at the owner's request; the guide's *Several Codex homes* and the privacy notice say where it looks and
+  what is kept. Its words are in all 18 languages.
 - **A recovery turn that worked and was then cut off is recovered.** Codex writes a turn's end only while the turn is
   running, so a recovery turn that Codex closing, or the PC sleeping or restarting, interrupted said it was in progress
   for good. Such a turn is now taken to be cut off as soon as a later turn of the same conversation has started - Codex
@@ -144,17 +161,48 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
     installer says so and goes on. A path holding a curly single quote is a path and never code: the gate doubles
     every single-quote character PowerShell knows. The compatibility data's download checks every redirect before it
     is asked and writes no more than one byte past its bound, as the archive's download does.
+- **Fixes from the security audit and a bug hunt.**
+  - A named object another account made first is refused. The watcher's mutex and its stop, wake and demo events have
+    names anyone can work out; the check refused one made by a process of lower integrity, but a process of another
+    account at the same integrity - the sandbox account Codex runs commands under, say - could still create one first
+    with a permissive access list and then hold it or signal it. An existing one is now refused too when its owner is
+    neither this account, the administrators nor SYSTEM.
+  - The Dashboard ignores a close-for-update event that someone else made first. An update asks the Dashboard's
+    windows to close through a named event; one created and set first by a low-integrity process or another account
+    closed every Dashboard as it opened. The Dashboard now refuses an event that existed before it under the same rule
+    as above.
+  - A compatibility document that runs more than 100 sequences ahead of the data the release bundles is refused. Any
+    number up to 2^31-1 was taken in, so one imported file, or one mistaken document, at the top number refused every
+    later document as a rollback - the project's own refreshes and the data of every release - and its
+    *incompatible* entries kept the gate there for good. One kept from before is now not in force and blocks no later
+    import.
+  - The watcher sweeps what an update set aside and could not delete, as it starts. An update moves the old program,
+    runtime and Dashboard files aside as `.old-` folders and deletes them after the copy unless something still had
+    them open; about 14 MB each stayed in the home until the next install. The watcher now removes them once it holds
+    its mutex - only in an installation folder provably its own, never while an install is running or its copy journal
+    is there, never through a link, renaming a folder first so one still in use is never half deleted - and writes one
+    log line saying what it removed and what it left.
 - **A state that is marked readable from schema 5** (see *Going back* above) is used by a later schema that so marks
   itself instead of being refused, and the version picker keeps it for a target that reads the mark.
-- **The Korean, Japanese, Simplified Chinese and Traditional Chinese texts were reviewed** against the English in both
-  catalogs, the standard's and the advanced edition's, and now say one word for each thing: for example the watcher, the
-  continuation and the edition's own name - and, in Korean, the usage limit and its reset - are one term each across
-  both catalogs. A usage window is no longer worded as an application window in any of the four, the word
-  for "change the edition" no longer reads as changing the version, a few sentences that claimed more than the English
+- **All 17 translations were reviewed** against the English in both catalogs, the standard's and the advanced
+  edition's: Korean, Japanese, Simplified and Traditional Chinese, German, French, Italian, Spanish, Brazilian
+  Portuguese, Russian, Ukrainian, Polish, Turkish, Arabic, Hebrew, Vietnamese and Indonesian. Each now says one word for each thing - for example the
+  watcher, the continuation, a turn, the recovery, the edition's own name and, in Korean, the usage limit and its
+  reset, are one term each across both catalogs - and keeps the formal or informal address its language uses
+  (Traditional Chinese addresses you as 您 in both catalogs; German keeps *Sie*, and Spanish and Italian the
+  informal *tú* and *tu*, throughout). A usage window is no longer worded as an application window in the Asian languages, the word for
+  "change the edition" no longer reads as changing the version, a few sentences that claimed more than the English
   (that a long conversation is "the usual cause") were corrected, and broken text - stray spaces inside words, split
-  measurement ids, wrong particles - and the register were made consistent (Traditional Chinese addresses you as 您 in
-  both catalogs). The English is unchanged. The Korean usage-limit notice now says the usage is reset (재설정), as every
-  other Korean string does.
+  measurement ids, wrong particles and genders - was made consistent. The advanced-edition statements (goal
+  continuation, continuation with no marker, start with Codex) that were still in English in Arabic and in Hebrew are
+  translated, and both languages, which are held back until the Dashboard mirrors right to left but ship, were read
+  string by string. The English is unchanged. The Korean usage-limit notice now says the usage is reset (재설정), as
+  every other Korean string does. The Russian *Retry now* button now reads "Повторить сейчас", a verb like the English, and
+  the two strings that quote it follow (suggested by [@TheEleage](https://github.com/TheEleage), in a review of the
+  Russian labels in their fork).
+- **The Korean documents were reviewed page by page against the English.** Every Korean page now names the versions
+  its English page names, follows its English page again where it had drifted, and uses the Korean interface's own
+  words (워처, 사전 릴리스, 공개, 재설정, 설치 마법사 for the setup program and 설치 프로그램 for the installer).
 - **The documents say what the code does now.** A full review of the README, the guide, the privacy, security, support,
   plugin, editions, verify, brand, comparison, contributing and contributors pages, the feature matrix, the roadmap and
   this changelog against the code corrected their counts and lists - the plugin's twenty tools, the advanced edition's
@@ -224,6 +272,12 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
     it is treated as no app running, so the pipe's server can no longer impersonate the watcher.
   - A resend's claim reads the conversation's day and spacing limits again, as a first claim does, so a claim of the
     same conversation committed between the resend's check and its claim is counted.
+  - A goal set while the Codex app may have opened the conversation is unknown, not accepted. *Goal continuation* asks
+    whether the app still does not hold the conversation just before it sets the goal, but the app could open it in
+    between, and such a set is not seen though the goal read back as active. The question is now asked again once the
+    goal reads back; where the app holds the conversation then, the answer is unknown: neither route tries it again,
+    and the capability's tripwire turns it off, as its statement already says of a result it cannot confirm. The set is
+    never taken back.
 
 ### For developers
 
@@ -267,6 +321,12 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
   uninstall's sweep, the Codex calls' telemetry (`tests/test_installer_codex_telemetry.py`) and the outside gate's
   quotes (`tests/test_outside_gate_quotes.py`), among others. The update-check test records the compatibility data's
   request at the bounded download's door, which it now goes through.
+- **The bug hunt's fixes have test modules of their own**: the named object's owner (`tests/test_named_object_owner.py`),
+  the update event (`tests/test_update_event_squat.py`), the sequence lead (`tests/test_compat_sequence_lead.py`) and the
+  set-aside sweep (`tests/test_set_aside_sweep.py`), and the goal race in the advanced edition's own tests.
+- **The Codex homes suggestion has its own test module**, `tests/test_home_suggestions.py`. It reads no registry below the
+  adapters: the control layer hands the suggestion the account's `CODEX_HOME` and whether this copy is installed, so no
+  test reads this machine's registry or Codex app, and a test that means to look stands in for the lookup.
 - **The CI release lane is dealt into five parts**, as the standard and advanced lanes' parts are, by the seconds of
   tests recorded in `tests/data/durations.json`, now that the faster layout audits are in it.
 
