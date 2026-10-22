@@ -40,8 +40,8 @@ def body(type_name: str, member: str) -> str:
 
 # A stand-in for the installation's python.exe. `-c CODE APP_SRC serve` answers one request a line; `-c CODE APP_SRC
 # COMMAND [-]` answers once. CAR_FAKE_MODE: ok answers {"ok":true,"echo":COMMAND,"took":LENGTH-OF-ARGUMENT}; hang
-# never answers; flood writes 300 KB to stderr before it reads its stdin, then answers; tree starts a python.exe that
-# keeps its stdout and a pythonw.exe of its own, and ends without a word; slow answers strings in Korean after 3 s.
+# does not answer for two minutes (CAR_FAKE_HANG_MS), every process it starts alike; flood writes 300 KB to stderr
+# before it reads its stdin, then answers; tree starts a python.exe that keeps its stdout and a pythonw.exe of its own, and ends without a word; slow answers strings in Korean after 3 s.
 # Every process writes "role pid" to CAR_FAKE_PIDS.
 FAKE = r"""
 using System;
@@ -57,6 +57,12 @@ static class Fake {
                 try { File.AppendAllText(pids, role + " " + Process.GetCurrentProcess().Id + "\n"); return; }
                 catch (IOException) { Thread.Sleep(20); }
             }
+    }
+    // "Never answers", for as long as a test can need it - never for ever: a stand-in nothing ends (the watcher's) ends
+    // itself, so a test that could not end it still finishes (CAR_FAKE_HANG_MS, two minutes unless a test says less).
+    static int HangMs() {
+        int ms;
+        return int.TryParse(Environment.GetEnvironmentVariable("CAR_FAKE_HANG_MS"), out ms) && ms > 0 ? ms : 120000;
     }
     static string Answer(string mode, string command, string argument) {
         if (mode == "slow") {
@@ -74,11 +80,11 @@ static class Fake {
         return Process.Start(info);
     }
     static int Main(string[] args) {
-        if (args.Length > 0 && args[0] == "--hang") { Note(args[1]); Thread.Sleep(Timeout.Infinite); return 0; }
+        if (args.Length > 0 && args[0] == "--hang") { Note(args[1]); Thread.Sleep(HangMs()); return 0; }
         string mode = Environment.GetEnvironmentVariable("CAR_FAKE_MODE") ?? "ok";
         string command = args.Length > 3 ? args[3] : "";
         Note((command == "serve" ? "serve-" : "child-") + mode);
-        if (mode == "hang") { Thread.Sleep(Timeout.Infinite); return 0; }
+        if (mode == "hang") { Thread.Sleep(HangMs()); return 0; }
         if (command != "serve") {
             if (mode == "tree") {
                 string self = Process.GetCurrentProcess().MainModule.FileName;
@@ -358,7 +364,9 @@ class BuiltTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.folder = tempfile.TemporaryDirectory()
-        work = Path(cls.folder.name)
+        # Resolved: on a runner whose TEMP is an 8.3 short name, the stand-ins' own paths are the long ones, and the
+        # cleanup below - which ends what the stand-in started by its path inside this folder - matched nothing.
+        work = Path(cls.folder.name).resolve()
         cls.home = work / "home"
         (cls.home / "runtime").mkdir(parents=True)
         (cls.home / "app" / "src").mkdir(parents=True)
