@@ -678,7 +678,7 @@ class DocsTests(unittest.TestCase):
                                 % ".".join(map(str, latest)))
         for name, (heading, korean) in _install_documents(
                 "### With the setup program", "### 설치 파일로 설치",
-                readme=("### With the setup program", "### 설치 프로그램으로 설치")).items():
+                readme=("### With the setup program", "### 설치 마법사로 설치")).items():
             with self.subTest(name):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 section = text[text.index(heading):]
@@ -707,7 +707,7 @@ class DocsTests(unittest.TestCase):
         for name, ((install, recommended), _) in _install_documents(
                 ("## Install", "### With the setup program (recommended)"), ("## 설치", "### 설치 파일로 설치 (권장)"),
                 readme=(("## Install", "### With the setup program (recommended)"),
-                        ("## 설치", "### 설치 프로그램으로 설치 (권장)"))).items():
+                        ("## 설치", "### 설치 마법사로 설치 (권장)"))).items():
             with self.subTest(name):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 start = text.index("\n%s\n" % install)
