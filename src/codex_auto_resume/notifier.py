@@ -455,15 +455,18 @@ def _presence() -> dict:
     return notice_presence.snapshot(notify.aumid())
 
 
-def deliver(notice, *, inbox=None, setting=True, probe=None, show=notify.show_content):
+def deliver(notice, *, inbox=None, setting=True, probe=None, show=None):
     """Show one notice by exactly one route. Returns (route, shown): route "card" or "toast".
 
     Card: the host accepted it (`shown` is True) and will end it with `complete` - the silent
     history copy once the card has been seen, or today's toast if it never could be. Toast:
     today's toast, exactly as `notify` has always raised it. The presence probes are only read
     when the card is possible at all. Called on the notifications thread, never on the tick path
-    and never on the icon's thread (raising a toast runs PowerShell).
+    and never on the icon's thread (raising a toast runs PowerShell). `show` is notify.show_content
+    unless given, looked up when called: a default bound at import kept the real toast past a test's
+    patch of notify.show_content, and test runs raised real toasts under the product's identity.
     """
+    show = notify.show_content if show is None else show
     allowed = False
     # A notice with a sound of its own (v0.6.11, a needs-you notice a person asked to hear) is Windows'
     # toast: the card makes no sound, and the sound is the toast's own audio element (notify.py).
@@ -484,7 +487,7 @@ def sounds(notice) -> bool:
     return dict(getattr(notice, "content", ()) or ()).get("sound") is True
 
 
-def complete(notice, card_shown, *, show=notify.show_content) -> bool:
+def complete(notice, card_shown, *, show=None) -> bool:
     """End a notice the card took, once its host knows how it went. Called once per notice.
 
     `card_shown` True: the card was on screen whole (or was clicked, or a newer card about the
@@ -492,8 +495,9 @@ def complete(notice, card_shown, *, show=notify.show_content) -> bool:
     notification center only. Anything else: the card could not be drawn, had no room, or its
     host went away before it was seen - today's toast is raised instead, exactly as the toast
     route raises it. Either way the notification center ends up with the notice once. Runs
-    PowerShell: a worker thread's job.
+    PowerShell: a worker thread's job. `show`, as `deliver`'s, is looked up when called.
     """
+    show = notify.show_content if show is None else show
     if notice.kind == "demo":
         return False                       # made up: no history copy, and no toast in its place
     content = notice.toast_content()
