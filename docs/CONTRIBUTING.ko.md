@@ -16,7 +16,7 @@
   늘려도 함께 담는 런타임은 바뀌지 않습니다. 워크플로나, 이 문서와 README가 밝히는 최소 버전이 그 파일과
   어긋나면 `tests/test_python_support.py`가 실패합니다.
 - 유닛 테스트 이상을 실행하려면 ChatGPT/Codex 데스크톱 앱.
-- 창과 MCP 런처(`gui/McpLauncher.cs`), 이 작은 C# 실행 파일 두 개를 빌드하려면 .NET Framework
+- 창, MCP 런처(`gui/McpLauncher.cs`), 설치 프로그램(`build/setup/`, `build/make_setup.py`가 빌드), 이 C# 프로그램 세 개를 빌드하려면 .NET Framework
   4.8(지원되는 모든 Windows에 이미 들어 있습니다). 창 자체는 `gui/SettingsApp.cs`(창과 설정 페이지)와
   `gui/Dashboard.cs`(페이지 이동과 개요, 대기 중, 기록, 통계, 진단 페이지)이고, 두 파일이 그리는 데 쓰는
   부드러운 컨트롤은 `gui/SoftTheme.cs`(색과 크기와 모션), `gui/SoftDepth.cs`(그림자),
@@ -152,19 +152,21 @@ py build/measure_window.py --tree <다른 체크아웃>
 ## 릴리스 빌드
 
 이 절은 v0.6.0부터의 릴리스 과정을 설명합니다. 릴리스 워크플로를 빌드 작업과 게시 작업으로 나눈 것, 커밋으로 고정한 action, Dependabot, 재현
-가능한 실행 파일, CRLF 체크아웃, 실행 파일의 버전 리소스는 v0.6.0에서 새로 생겼습니다. 지금까지 게시된 모든 압축 파일(v0.5.0부터
-v0.5.7까지)은 action을 움직이는 태그로 참조하던 예전의 단일 작업 워크플로가 빌드했고, 그 실행 파일은 재현할 수 없습니다.
+가능한 실행 파일, CRLF 체크아웃, 실행 파일의 버전 리소스는 v0.6.0에서 새로 생겼습니다. v0.5.0부터
+v0.5.7까지의 모든 압축 파일은 action을 움직이는 태그로 참조하던 예전의 단일 작업 워크플로가 빌드했고, 그 실행 파일은 재현할 수 없습니다.
 
 ```bash
 powershell -ExecutionPolicy Bypass -File build/make_gui.ps1
 python build/make_release.py
+python build/make_release.py --edition advanced
 python build/smoke_archive.py build/dist/CodexAutoResume-v<version>-win-x64.zip <version>
 ```
 
 첫 번째는 `CodexAutoResumeSettings.exe`와 `codex-auto-resume-mcp.exe`를 빌드해 재현 가능하게
 만들고(아래 참고), 사용한 컴파일러와 각 실행 파일의 SHA-256을 출력합니다. 그 단계 때문에 `PATH`에
 `python`이 있어야 합니다. 두 번째는 고정된 embeddable Python을 내려받아(체크섬을 확인합니다)
-페이로드를 조립한 뒤 ZIP과 그 SHA-256을 `build/dist/`에 씁니다.
+페이로드를 조립한 뒤 ZIP과 그 SHA-256을 `build/dist/`에 씁니다. 판마다의 설치 프로그램인 `CodexAutoResume-Setup-v<version>.exe`와
+`CodexAutoResume-Advanced-Setup-v<version>.exe`도 `.sha256` 파일과 함께 나옵니다.
 
 세 번째는 압축 파일의 바이트 그 자체를 돌려 봅니다. ZIP을 풀고, 그 실행에만 존재하는 상태
 디렉터리를 대상으로 압축 파일 안의 인터프리터로 압축 파일 안의 엔진을 실행하며, 두 실행 파일의 버전
@@ -271,8 +273,8 @@ Get-Content .\build\dist\CodexAutoResume-v<version>-win-x64.zip.sha256
 GitHub가 그 로그를 아직 보관하고 있는 동안 릴리스 실행 로그의 같은 줄과 비교하고, 두 압축 파일 안의
 파일들을 비교하세요. [docs/VERIFY.ko.md](VERIFY.ko.md)에 둘 다 풀지 않고 비교하는 코드가 있습니다.
 안의 파일이 모두 같은데도 압축 파일의 다이제스트가 다르다면, 압축 파일을 쓴 Python과 zlib를 살펴보세요.
-소스에 `build/normalize_pe.py`가 없는 태그는 이 모든 것보다 앞선 것이라서 - 지금까지 게시된 모든
-릴리스, 곧 v0.5.0부터 v0.5.7까지가 그렇습니다 - 그 실행 파일은 일치하지 않습니다.
+소스에 `build/normalize_pe.py`가 없는 태그는 이 모든 것보다 앞선 것이라서 - v0.5.0부터 v0.5.7까지의 모든
+릴리스가 그렇습니다 - 그 실행 파일은 일치하지 않습니다.
 
 ### 릴리스가 게시된 다음: 그 다이제스트를 고정하기
 
@@ -291,7 +293,7 @@ Codex 플러그인은 릴리스를 내려받아 설치하므로, 그 압축 파�
 
 1. 게시된 `CodexAutoResume-v<version>-win-x64.zip`을 내려받습니다.
 2. `Get-FileHash <zip> -Algorithm SHA256` — 그리고 함께 게시된 `.sha256`과 대조해 확인합니다.
-3. 그 다이제스트를 `scripts/release.json`의 해당 버전 아래에 넣고 커밋합니다.
+3. 그 다이제스트를 `scripts/release.json`의 해당 버전 아래에 - 표준판 압축 파일은 `sha256`에, 고급판 것은 `advanced` 표의 `sha256`에 - 넣고 커밋합니다.
 
 계획된 프리 릴리스, 곧 `v0.6.9-alpha`처럼 접미사가 붙은 태그는 아예 고정하지 않습니다. 표의 키는 릴리스이고,
 `releases/latest`는 프리 릴리스를 답하지 않으며, 태그가 달린 버전에 고정이 있는지 보는 검사에는
@@ -385,8 +387,8 @@ python build/l10n.py prune ja               # 영어에 더 이상 없는 키 �
 python build/l10n.py check                  # 하나라도 불완전하면 종료 코드 1
 ```
 
-그래서 영어 문장을 추가하거나 바꾸는 일은 모든 카탈로그가 따라올 때까지 끝난 것이 아닙니다. 나머지 여덟
-카탈로그에서 그 키는 빠졌거나 낡은 것이 되고, 각 카탈로그를 번역해 가져오거나(`import`) 검토했다고
+그래서 영어 문장을 추가하거나 바꾸는 일은 모든 카탈로그가 따라올 때까지 끝난 것이 아닙니다. 나머지
+모든 카탈로그에서 그 키는 빠졌거나 낡은 것이 되고, 각 카탈로그를 번역해 가져오거나(`import`) 검토했다고
 표시할(`mark`) 때까지 `tests/test_l10n.py`가 실패합니다. 자리표시자를 잃거나 없던 것을 만들어 낸 가져오기는
 거부됩니다. 여기 있는 어느 것도 네트워크에 닿지 않으며, 지역화 모듈과 이 도구가 그렇다는 것을 테스트가
 확인합니다.
@@ -457,8 +459,10 @@ python scripts/ko_sync.py --reviewed README.md
 
 ## 스크린샷
 
-`python build/make_screenshots.py`가 작업 트리에서 전체 모음을 렌더링합니다. Codex 패널과 창의 개요,
-대기 중, 설정 페이지를 영어와 한국어로 만들어 `assets/`에 넣고 `docs/images/`에 복사본을 둡니다. 손으로
+`python build/make_screenshots.py`가 작업 트리에서 전체 모음을 렌더링합니다. 대시보드의 모든 페이지, Codex 패널,
+팝업, 알림 카드를 영어와 한국어로, 일부는 일본어와 중국어 간체, 독일어로도 만들어 `assets/`에 넣고 `docs/images/`에 복사본을 둡니다.
+움직이는 그림, 소셜 미리보기, 고급 페이지의 정지 그림은 저마다 생성기가 따로 있습니다. `build/make_motion.py`, `build/make_social.py`,
+`build/advanced_shots.py`입니다. 손으로
 찍는 것도, 찍은 뒤에 손보는 것도 없습니다. 전체를 다시 만드는 일은 두 단계이고, 이 순서로, 둘 다
 PowerShell에서 돌립니다. Git Bash 같은 POSIX 셸에서 띄우면 headless Edge가 곧바로 끝나고 아무것도
 출력하지 않습니다.
@@ -514,7 +518,7 @@ embeddable Python을 `build/cache/`로 내려받기도 합니다.
 디자인도 같은 방식으로 고정합니다. 디자인별 그림이 아니면 모든 그림은 부드럽게입니다.
 
 `assets/screenshots.json`에는 각 이미지가 어떤 입력에서 렌더링되었는지 다이제스트가 기록됩니다.
-창은 두 부분으로 나누어 기록합니다. 하나는 창을 컴파일하는 파일들입니다 — 소스 세 개, 팔레트, DPI
+창은 두 부분으로 나누어 기록합니다. 하나는 창을 컴파일하는 파일들입니다 — `gui/window.sources`가 컴파일하는 모든 소스(`<window sources>` 입력 하나), DPI
 매니페스트, 플러그인 매니페스트, 아이콘, 캡처·빌드 스크립트. 그 목록이 `build/make_screenshots.py`의
 `WINDOW_INPUTS`입니다. 다른 하나는 브리지가 창에 건네는 내용입니다. 생성기가 임시 설치본을 상대로 창이
 묻는 것과 똑같은 질문을 브리지에 던지고, 시계와 경로와 기계마다 달라지는 답은 고정한 채 그 응답의
