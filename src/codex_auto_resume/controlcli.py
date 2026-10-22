@@ -81,7 +81,9 @@ PLAIN = ("status", "settings", "describe", "defaults", "pending", "pending-all",
          "rescan",
          # v0.6.17: Diagnostics - whether the watcher and this bridge run inside another app (an MSIX app's private
          # view), and which; read only (control/tools.py host_app).
-         "host-app")
+         "host-app",
+         # v0.6.18: the Codex home Settings > Advanced offers to watch too, read only (homefind.py).
+         "home-suggestion")
 WITH_ARGUMENT = ("update", "enabled", "startup", "cancel", "reset-budget", "retry-now",
                  "timeline", "statistics", "thread-enabled", "cancel-thread", "diagnostics",
                  "preview-continuation", "interruption-recovery",
@@ -101,7 +103,9 @@ WITH_ARGUMENT = ("update", "enabled", "startup", "cancel", "reset-budget", "retr
                  # caller that arms (H14) - and turned off.
                  "power-arm", "power-disarm",
                  # v0.6.16-beta.3: one waiting recovery's words for this time - read, set or taken away.
-                 "once-words")
+                 "once-words",
+                 # v0.6.18: Not now for that offer - the folder is never offered again.
+                 "home-dismiss")
 # Big enough for the largest Save the settings layer accepts: eight Custom messages of 2000
 # characters each, and the window writes every line break as a six-character escape, so a
 # valid Save can come to nearly 100 KiB. At 64 KiB such a Save was refused as "request too
@@ -402,6 +406,11 @@ def dispatch(control: Control, command: str, payload: dict) -> dict:
         if command == "demo":
             # Made-up rows for the Dashboard, and a made-up card asked of the icon: nothing is sent.
             return {"ok": True, "result": control.show_demo()}
+        if command == "home-suggestion":
+            # Read only: the account's CODEX_HOME and the Codex app's list of where it ran, and nothing is added.
+            return {"ok": True, "result": control.home_suggestion()}
+        if command == "home-dismiss":
+            return {"ok": True, "result": control.dismiss_home_suggestion((payload or {}).get("path"))}
         if command == "power-action":
             # Read only: Windows is asked whether each action is available, and nothing is done.
             return {"ok": True, "result": control.power_options()}

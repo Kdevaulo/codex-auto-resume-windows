@@ -21,8 +21,8 @@ from pathlib import Path
 import sys
 import tempfile
 
-from . import (continuation, failures, guards, homes, l10n, ladder, memguard, needsyou, notice_kinds, ownvalues,
-               power, projects, quiet, reasons, settings_schema, statusfile)
+from . import (continuation, failures, guards, homefind, homes, l10n, ladder, memguard, needsyou, notice_kinds,
+               ownvalues, power, projects, quiet, reasons, settings_schema, statusfile)
 from .domain.vocabulary import (Design, ImportanceTier, NewConversationPolicy, NotifyEvent,
                                 ProjectPolicy, Theme)
 
@@ -295,6 +295,10 @@ FIELDS[statusfile.FIELD] = (False, _boolean)
 # v0.6.15-beta: the Codex homes watched beside the default one (homes.py) - none by default, the default
 # home alone, as before. Written in the Dashboard alone (DASHBOARD_ONLY), where each is checked (homes.strict).
 FIELDS[homes.FIELD] = ([], homes.coerce)
+# v0.6.18: whether the Dashboard offers a Codex home it finds that is not watched yet, and the folders set aside with
+# Not now (homefind.py) - both the Dashboard's alone (DASHBOARD_ONLY): a folder is a path, which MCP is never told.
+FIELDS[homefind.SWITCH] = (True, _boolean)
+FIELDS[homefind.DISMISSED] = ([], homefind.coerce_dismissed)
 # v0.6.16: where a click on a notice's face or body goes (notifier.click_uri) - its Dashboard page, the conversation's
 # chat here, or Codex at that conversation. Offered and read only while the in-app chat is on (notifier.chat_on), so
 # until v0.6.16-beta.4's chat is merged it waits in NOT_YET_OFFERED and every click opens the page.
@@ -680,7 +684,7 @@ ROW_ACTION_FIELDS = frozenset({projects.ALWAYS, projects.NEVER, continuation.BY_
 # Fields only the Dashboard's own section writes (v0.6.15-beta): the Codex homes, each checked against the
 # folders on this PC when it is written (control/policy.py). `describe()` leaves them out, so no generated
 # editor draws them and MCP's schema never offers them - and update_settings refuses them by name besides.
-DASHBOARD_ONLY = frozenset({homes.FIELD})
+DASHBOARD_ONLY = frozenset({homes.FIELD, homefind.SWITCH, homefind.DISMISSED})
 
 
 def describe() -> list:
