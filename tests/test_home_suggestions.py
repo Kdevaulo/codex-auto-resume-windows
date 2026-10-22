@@ -128,7 +128,9 @@ class AppFileTests(unittest.TestCase):
         self.assertEqual(homefind.app_homes(str(self.local)), ["D:\\packaged"])
 
     def test_too_big_not_json_or_another_shape_answers_nothing(self):
-        for document in ('{"entries": [' + " " * homefind.APP_FILE_MAX + "]}", "not json", '{"entries": 3}', "[1]"):
+        # Too big: a whole, valid list followed by more than the cap allows - never read in part and believed.
+        too_big = json.dumps({"entries": [{"paths": {"codexHome": "D:\\big"}}]}) + " " * homefind.APP_FILE_MAX
+        for document in (too_big, "not json", '{"entries": 3}', "[1]"):
             with self.subTest(document[:20]):
                 self.write(document)
                 self.assertEqual(homefind.app_homes(str(self.local)), [])
