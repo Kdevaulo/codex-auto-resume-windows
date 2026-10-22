@@ -445,11 +445,6 @@ CANARY_MODULE = LAYOUT_MODULES
 # v0.6.17 too (the remembered answers cut every language's measuring, CJK's most).
 AUDIT_COST = {"ja": 1270, "zh-TW": 420, "zh-CN": 320, "ko": 50}
 OTHER_AUDIT_COST = 10
-# At most this many audits of the costliest language in one module (2026-10-23). The deal takes a module's processes
-# to run side by side as if each had the runner to itself, and they do not: in dev run 39843036304 the module with all
-# four of the Japanese audits that fit in its time took 727 s of the advanced lane, the one with the fifth Japanese and
-# most of the rest 364 s - one file bounding a part. Two to a module spreads Japanese over three.
-COSTLIEST_PER_MODULE = 2
 
 
 def audit_cost(locale: str) -> float:
@@ -465,11 +460,9 @@ def layout_deal() -> tuple:
     A module takes as long as the slowest of its LAYOUT_WORKERS processes, and that is at least its longest audit; so
     module by module, the longest audit left sets the module's time and the module is filled - longest first, each to
     its least loaded process - with every audit that fits in that time, keeping one for each module still to come.
-    No module takes more than COSTLIEST_PER_MODULE of the costliest language's audits, which contend for one runner.
     The last module takes what is left, beside the canary. Each (language, scaling) is in exactly one module.
     Deterministic: a tuple per module of (locale, scale), in l10n.LOCALES and SCALES order."""
     locales = [str(locale) for locale in l10n.LOCALES]
-    costliest = max(audit_cost(locale) for locale in locales)
     left = sorted(((locale, scale) for locale in locales for scale in SCALES),
                   key=lambda job: (-audit_cost(job[0]), locales.index(job[0]), SCALES.index(job[1])))
     modules = []
@@ -484,9 +477,6 @@ def layout_deal() -> tuple:
         for job in list(left):
             if len(left) <= later:
                 break
-            if (not last and audit_cost(job[0]) == costliest
-                    and sum(audit_cost(done[0]) == costliest for done in taken) >= COSTLIEST_PER_MODULE):
-                continue
             least = min(range(LAYOUT_WORKERS), key=lambda share: (loads[share], share))
             if last or loads[least] + audit_cost(job[0]) <= wall:
                 loads[least] += audit_cost(job[0])
