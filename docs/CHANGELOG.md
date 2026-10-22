@@ -167,9 +167,9 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
     log line saying what it removed and what it left.
 - **A state that is marked readable from schema 5** (see *Going back* above) is used by a later schema that so marks
   itself instead of being refused, and the version picker keeps it for a target that reads the mark.
-- **Thirteen of the translations were reviewed** against the English in both catalogs, the standard's and the advanced
+- **All 17 translations were reviewed** against the English in both catalogs, the standard's and the advanced
   edition's: Korean, Japanese, Simplified and Traditional Chinese, German, French, Italian, Spanish, Brazilian
-  Portuguese, Arabic, Hebrew, Vietnamese and Indonesian. Each now says one word for each thing - for example the
+  Portuguese, Russian, Ukrainian, Polish, Turkish, Arabic, Hebrew, Vietnamese and Indonesian. Each now says one word for each thing - for example the
   watcher, the continuation, a turn, the recovery, the edition's own name and, in Korean, the usage limit and its
   reset, are one term each across both catalogs - and keeps the formal or informal address its language uses
   (Traditional Chinese addresses you as 您 in both catalogs; German keeps *Sie* and Spanish and Italian the formal
@@ -180,7 +180,9 @@ always did, so going back loses nothing and shows nothing of them. Nothing else 
   continuation, continuation with no marker, start with Codex) that were still in English in Arabic and in Hebrew are
   translated, and both languages, which are held back until the Dashboard mirrors right to left but ship, were read
   string by string. The English is unchanged. The Korean usage-limit notice now says the usage is reset (재설정), as
-  every other Korean string does.
+  every other Korean string does. The Russian *Retry now* button now reads "Повторить сейчас", a verb like the English, and
+  the two strings that quote it follow (suggested by [@TheEleage](https://github.com/TheEleage), in a review of the
+  Russian labels in their fork).
 - **The Korean documents were reviewed page by page against the English.** Every Korean page now names the versions
   its English page names, follows its English page again where it had drifted, and uses the Korean interface's own
   words (워처, 사전 릴리스, 공개, 재설정, 설치 마법사 for the setup program and 설치 프로그램 for the installer).
