@@ -505,11 +505,21 @@ namespace CodexAutoResume
                 // is stretched or moved meanwhile - .NET's own handling, where it applies, scales the fonts alone.
                 m.Result = IntPtr.Zero;
                 if (auditing || !shown) return;
+                // The size it had at the scale it is drawn at, when no drag took it there (the monitor's scaling changed,
+                // or a key moved it): nothing has resized it yet. A drag took it at its start (WM_ENTERSIZEMOVE).
+                if (!scaleMoved && !sizing) drawnSize = SizeAtDrawnScale();
                 scaleMoved = true;
                 if (!sizing) BeginInvoke(new MethodInvoker(CheckScale));
                 return;
             }
-            if (m.Msg == WM_ENTERSIZEMOVE) sizing = true;
+            if (m.Msg == WM_ENTERSIZEMOVE)
+            {
+                sizing = true;
+                // v0.6.18 B3: the size it has at the scale it is drawn at, before a drag can take it to a monitor of
+                // another scale - where Windows resizes a per-monitor window to that monitor's scale itself, in the drag,
+                // so the size a reopen reads afterwards has been scaled once already.
+                if (!scaleMoved) drawnSize = SizeAtDrawnScale();
+            }
             if (m.Msg == WM_EXITSIZEMOVE)
             {
                 sizing = false;
@@ -545,6 +555,23 @@ namespace CodexAutoResume
             double factor = now / drawn;
             return new Rectangle(bounds.X, bounds.Y, Math.Max(1, (int)Math.Round(bounds.Width * factor)),
                                  Math.Max(1, (int)Math.Round(bounds.Height * factor)));
+        }
+
+        /// The window's size as it is drawn - its restored size while maximized - for a reopen at another scale.
+        private Size SizeAtDrawnScale()
+        {
+            return WindowState == FormWindowState.Normal ? Size : RestoreBounds.Size;
+        }
+
+        /// The bounds a window that stands at `at` opens again in at scale `now`, from the size it had while it was drawn
+        /// at `drawn` (`drawnSize`, taken before anything resized it): that size at the new scale, ScaledBounds' rule, from
+        /// where it stands now. Never from its size after the move: Windows has already scaled that once, in the drag,
+        /// and scaling it again made 1522x1052 at 144 DPI 676x467 at 96 (v0.6.18 B3). Empty `drawnSize`: `current`'s.
+        internal static Rectangle ReopenBounds(Rectangle current, Size drawnSize, double drawn, double now)
+        {
+            Size size = drawnSize.IsEmpty ? current.Size : drawnSize;
+            Rectangle scaled = ScaledBounds(new Rectangle(current.Location, size), drawn, now);
+            return scaled;
         }
 
         /// After WM_DPICHANGED (v0.6.18): the window opens again at the scale of the monitor it is on now (ScaleDecision),
@@ -584,7 +611,7 @@ namespace CodexAutoResume
             bool normal = WindowState == FormWindowState.Normal;
             Rectangle bounds = normal ? Bounds : RestoreBounds;
             // v0.6.18: on a monitor of another scale (CheckScale), as large at that scale as it is at this one.
-            if (reopenScale > 0) bounds = ScaledBounds(bounds, DisplayScale, reopenScale);
+            if (reopenScale > 0) bounds = ReopenBounds(bounds, drawnSize, DisplayScale, reopenScale);
             // The invisible border as it is now; maximized, as it was last measured on screen, or as the window this
             // one replaced measured it.
             Padding measured = normal ? InvisibleFrame() : Padding.Empty;

@@ -367,6 +367,10 @@ namespace CodexAutoResume
         // for later, and the scale a reopen for it opens at (0: none).
         private bool scaleMoved, sizing, recheckScale;
         private double reopenScale;
+        // v0.6.18 B3: the window's size while it was still at the scale it is drawn at (ReopenBounds); empty until a move.
+        private Size drawnSize;
+        // v0.6.18 B3: the bounds a reopened window was placed at (PlaceOnScreen), held to as it is shown (KeepPlacedBounds).
+        private Rectangle placedBounds;
         // v0.6.18: the words were not had in time and the window opened in English (StringsWaitMilliseconds); the reply,
         // once it comes, is lateReply until the window has taken it (TakeLateWords).
         private bool lateWords;
@@ -834,6 +838,7 @@ namespace CodexAutoResume
                 // sees where that one's was, with the invisible border that window measured around it.
                 StartPosition = FormStartPosition.Manual;
                 Bounds = PlaceOnScreen(request.Bounds, Screen.FromRectangle(request.Bounds).WorkingArea, MinimumSize, request.Frame);
+                placedBounds = Bounds;
             }
             if (request.Maximized) WindowState = FormWindowState.Maximized;
             // A dark title bar over a dark window.
@@ -867,6 +872,9 @@ namespace CodexAutoResume
             Shown += delegate
             {
                 shown = true;
+                // v0.6.18 B3: a window that replaces another is the size it was placed at once it is on screen, whatever
+                // creating it on a monitor of another scale than Windows' own did to that size on the way.
+                KeepPlacedBounds();
                 // Words that came before the window had a handle to be told on (StringsWaitMilliseconds).
                 TakeLateWords();
                 // Measured once it is on screen, for a reopen from this window maximized (Reopen).
@@ -904,6 +912,15 @@ namespace CodexAutoResume
                 MinimumSize = new Size(Math.Min(MinimumSize.Width, screen.Width), Math.Min(MinimumSize.Height, screen.Height));
             ClientSize = new Size(Math.Max(Px(340), Math.Min(ClientSize.Width, screen.Width - frameWidth)),
                                   Math.Max(Px(340), Math.Min(ClientSize.Height, screen.Height - frameHeight)));
+        }
+
+        /// A reopened window back at the bounds it was placed at, when anything on the way to the screen changed them and
+        /// it is neither maximized nor minimized.
+        private void KeepPlacedBounds()
+        {
+            if (placedBounds.IsEmpty || WindowState != FormWindowState.Normal) return;
+            if (Bounds != placedBounds) Bounds = placedBounds;
+            placedBounds = Rectangle.Empty;
         }
 
         /// Where CenterScreen puts a window `size` big on a screen whose work area is `area`: centred, and never above or
