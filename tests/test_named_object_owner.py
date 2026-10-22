@@ -1,4 +1,4 @@
-"""A named object another account created first is refused, not only one of a lower integrity (v0.6.20, security M2).
+"""A named object another account created first is refused, not only one of a lower integrity (v0.6.18, security M2).
 
 The watcher's mutex and its stop, wake and demo events have names anyone who reads the code can work out. The
 v0.6.0 check refuses one a lower-integrity process made first. A process of ANOTHER account at the same

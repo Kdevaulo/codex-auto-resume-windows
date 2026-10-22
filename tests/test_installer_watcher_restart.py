@@ -2,7 +2,7 @@
 
 install.ps1 asks a running watcher to stop before it replaces the program files. A copy that failed was put back and
 the run ended "The existing installation was put back; nothing was changed." - with the watcher still stopped, so
-nothing was recovered until the next sign-in (the v0.6.20 installer audit, R2). Every way out before the setup step
+nothing was recovered until the next sign-in (the v0.6.18 installer audit, R2). Every way out before the setup step
 now runs the installation's own `setup --keep-state` again (Start-StoppedWatcher, from the install branch's
 `finally`), and a failed setup says when the watcher it stopped is not running.
 

@@ -1,4 +1,4 @@
-"""The core audit's minor findings, each held where it was found (v0.6.20, plans/v0620-audit/core.md M1-M7).
+"""The core audit's minor findings, each held where it was found (v0.6.18, plans/v0620-audit/core.md M1-M7).
 
 M1 a watch with no default engine logs nothing every second; M2 `codex --version` output that is not UTF-8 is read,
 not raised; M3 a queue delete that worked stays reported as worked when the helper is slow to go; M4 a clock set back

@@ -1,7 +1,7 @@
 """A purge says it removed the settings and the recovery history only when it did.
 
 -Purge removed config\ and logs\ without asking whether that worked, and always ended "Removed, including settings
-and recovery history" - over a log file something still held (the v0.6.20 installer audit, M3). The uninstall tail is
+and recovery history" - over a log file something still held (the v0.6.18 installer audit, M3). The uninstall tail is
 lifted verbatim and run against scratch folders (tests/test_installer_uninstall_sweep.py's harness). Nothing real is
 asked or changed.
 """

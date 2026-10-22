@@ -1,7 +1,7 @@
-"""One compatibility document with a sequence far ahead cannot lock every later one out (v0.6.20, security M4).
+"""One compatibility document with a sequence far ahead cannot lock every later one out (v0.6.18, security M4).
 
 A document's sequence orders the data: a lower one than the cache's is refused as a rollback, and the bundled
-baseline of a release supersedes only a cache of a lower sequence. Before v0.6.20 any sequence up to 2^31-1 was
+baseline of a release supersedes only a cache of a lower sequence. Before v0.6.18 any sequence up to 2^31-1 was
 taken in. One imported file (or a mistaken document on main) at 2^31-1 then refused every later document - the
 project's own refreshes and every new release's bundled data - and the INCOMPATIBLE entries it carried kept the
 gate at "incompatible" for good, with no surface to undo it. Now a document may run at most MAX_SEQUENCE_LEAD
@@ -79,7 +79,7 @@ class SequenceLeadTests(unittest.TestCase):
         self.assertEqual((result["imported"], result["reason"]), (False, "invalid_field"))
 
     def test_one_kept_from_before_is_not_in_force_and_blocks_nothing(self):
-        """A home that took one in before v0.6.20: its restrictions stop applying, and the next refresh is taken."""
+        """A home that took one in before v0.6.18: its restrictions stop applying, and the next refresh is taken."""
         envelope = {"format": compat.CACHE_FORMAT, "fetched_at": NOW - 3600, "origin": "file",
                     "document": a_document(2 ** 31 - 1, incompatible=True)}
         self.paths.ensure()

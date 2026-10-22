@@ -523,7 +523,7 @@ def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None,
     "opened" / "not_opened"     (v0.6.16) the Codex app's link to one conversation (notify.codex_thread_uri), the
                                 destination a click on a notice may have: `open_link(link)`, Windows' URL handler
     "cancelled"                  a cancel URI: that one interruption, through the control layer
-    "already_finished"           (v0.6.20) a cancel URI whose recovery had finished: nothing changed, nothing said
+    "already_finished"           (v0.6.18) a cancel URI whose recovery had finished: nothing changed, nothing said
     "stopped"                    a power-stop URI (v0.6.12): the power action stopped for its batch
     "refused" / "failed"         the control layer said no (a coded refusal) or broke
     "ignored"                    anything else, including every malformed URI
@@ -586,7 +586,7 @@ def activate(uri, *, control=None, open_dashboard=None, announce=None, log=None,
         return "failed"
     thread_id = (result or {}).get("thread_id")
     if (result or {}).get("changed", True) is False:
-        # v0.6.20: a stale notice's Cancel on a recovery that has finished since - nothing is announced, since the
+        # v0.6.18: a stale notice's Cancel on a recovery that has finished since - nothing is announced, since the
         # notice it would raise says the recovery was cancelled, which is not true.
         say("thread %s: a notification card's cancel changed nothing; it had already finished" % thread_id)
         return "already_finished"

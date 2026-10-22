@@ -3,7 +3,7 @@
 install.ps1 copies the Dashboard and its icon to the installation's root after the program trees. Where the copy
 failed (the Dashboard is open) it moved the old file aside and copied again - with no -ErrorAction and no try, so a
 second failure threw after app\\ and runtime\\ were replaced and before setup ran: the watcher stopped, no last word
-(the v0.6.20 installer audit, M6). Now the second failure is a Fail line, and the run carries on to its setup and ends
+(the v0.6.18 installer audit, M6). Now the second failure is a Fail line, and the run carries on to its setup and ends
 "Finished with problems".
 
 The root-file copy is lifted verbatim and run under Set-StrictMode 2.0 against scratch folders, with Copy-Item stood in

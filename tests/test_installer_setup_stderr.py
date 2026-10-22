@@ -5,7 +5,7 @@ through the wrapper Get-OutsideSource writes: `& install.ps1 ... *>&1 | ForEach-
 streams merged so, Windows PowerShell 5.1 turns each stderr line of a native program the script runs into a
 NativeCommandError, and install.ps1's `$ErrorActionPreference = 'Stop'` made it terminating: setup's `error: ...` line
 (a failed `install` step, a doctor warning) killed the setup child half way and failed the install past its own
-"Setup did not complete" message (the v0.6.20 installer audit, R1). Setup's exit code decides, not its stderr.
+"Setup did not complete" message (the v0.6.18 installer audit, R1). Setup's exit code decides, not its stderr.
 
 Invoke-Setup and Get-OutsideSource are lifted out of install.ps1 and run as the outside run runs them, under
 Set-StrictMode 2.0 as the bootstrap runs the installer; the setup step is a scratch script, run by this Python.

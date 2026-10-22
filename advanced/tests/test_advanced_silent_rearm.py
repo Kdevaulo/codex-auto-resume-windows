@@ -1,4 +1,4 @@
-"""silent_continuation turned on again after Codex refused a turn with no input is asked again (v0.6.20, the advanced
+"""silent_continuation turned on again after Codex refused a turn with no input is asked again (v0.6.18, the advanced
 audit's M2): before, the process's refusal stayed for the watcher's life, so the Dashboard showed it on while it answered
 DEFER until a restart. A refusal met again turns it off again.
 """

@@ -2,7 +2,7 @@
 
 A home moved with CODEX_AUTO_RESUME_PLUGIN_HOME to a folder under a drive root inherits the root's
 `Authenticated Users:(OI)(CI)(IO)(M)`, so every other account on the PC could replace the launcher, the program or
-the runtime that run as the person at each sign-in (the v0.6.20 security review, R2). install.ps1 now gives such a
+the runtime that run as the person at each sign-in (the v0.6.18 security review, R2). install.ps1 now gives such a
 root a protected access list - the person, SYSTEM and Administrators, inherited below - and leaves a root inside the
 profile as it is.
 

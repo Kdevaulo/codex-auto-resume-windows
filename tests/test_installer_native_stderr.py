@@ -3,7 +3,7 @@
 install.ps1 runs both with `2>$null` under `$ErrorActionPreference = 'Stop'`. In Windows PowerShell 5.1 a native
 program's stderr line still becomes a NativeCommandError there, and 'Stop' made it terminating: a traceback from
 either replaced the installer's own refusal ("not a Codex Auto Resume installation", "holds files no installation of
-ours has claimed") with a raw PowerShell error (the v0.6.20 installer audit, M1). Both calls run with 'Continue' now,
+ours has claimed") with a raw PowerShell error (the v0.6.18 installer audit, M1). Both calls run with 'Continue' now,
 and the exit code alone decides.
 
 The two regions are lifted verbatim and run under Set-StrictMode 2.0 against scratch folders; the engine's command is

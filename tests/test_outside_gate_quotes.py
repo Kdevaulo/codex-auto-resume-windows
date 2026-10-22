@@ -4,7 +4,7 @@ install.ps1 and the bootstrap build the script that runs outside another app's p
 each path and value as a single-quoted literal. Only the ASCII quote was doubled, but PowerShell also ends such a
 string at U+2018, U+2019, U+201A and U+201B: a profile or unpack folder holding one (O'Brien typed on a phone) broke
 the script, and a folder named for it (`x'; <command> #` with a curly quote) ran its command in the outside run (the
-v0.6.20 security review, M3).
+v0.6.18 security review, M3).
 
 Get-OutsideSource is lifted from each script and the script it writes is run as the run outside runs it, against a
 stand-in at a scratch path with such a name that writes down what it was given. Nothing of the product runs.

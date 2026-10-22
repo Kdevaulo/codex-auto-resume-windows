@@ -788,7 +788,7 @@ namespace CodexAutoResume
         }
 
         /// Whether an update event that existed before this window opened it was made by someone the window takes no
-        /// orders from (v0.6.20, security M6) - the rule the watcher's own named objects follow (win/kernel.py): a label
+        /// orders from (v0.6.18, security M6) - the rule the watcher's own named objects follow (win/kernel.py): a label
         /// below Medium integrity, or an owner that is neither this account nor one only more rights can set (the
         /// administrators, Windows itself). A Low process - a browser's sandbox, say - or another account that made it
         /// first and set it would close every Dashboard as it opened. What cannot be read is not trusted.

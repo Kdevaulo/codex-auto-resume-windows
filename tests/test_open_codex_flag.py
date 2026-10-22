@@ -1,4 +1,4 @@
-"""v0.6.20 (docs audit R6, D4): a crafted cancel URI cannot put Open Codex on a standard edition's notice.
+"""v0.6.18 (docs audit R6, D4): a crafted cancel URI cannot put Open Codex on a standard edition's notice.
 
 Open Codex on a notice is an advanced capability that departs from A28 (a notification's buttons cancel, stop the
 power action, or open one Dashboard page - nothing else). The watcher carries its decision on the cancel button's URI

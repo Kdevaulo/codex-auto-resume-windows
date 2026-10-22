@@ -1,4 +1,4 @@
-"""What an update moved aside and could not delete, swept when the watcher starts (v0.6.20).
+"""What an update moved aside and could not delete, swept when the watcher starts (v0.6.18).
 
 An update moves `app`, `runtime` and the Dashboard's files aside as `<name>.old-<stamp>` before it copies the new
 ones (build/install/install.ps1), and deletes them once the copy is in place - unless something still had them open:

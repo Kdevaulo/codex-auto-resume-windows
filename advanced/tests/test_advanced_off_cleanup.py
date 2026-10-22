@@ -1,4 +1,4 @@
-"""A run kind turned off still finishes what it started (v0.6.20, the advanced audit's R1 and R3).
+"""A run kind turned off still finishes what it started (v0.6.18, the advanced audit's R1 and R3).
 
 headless_run, compact_continue and model_fallback run turns of their own on Codex's app server. Turned off - by the
 person, All off, a tripwire or an edition's entry - or watched, P8 used to stop asking them anything, so a turn already

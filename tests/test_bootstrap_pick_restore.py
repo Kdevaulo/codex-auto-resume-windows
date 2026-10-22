@@ -4,7 +4,7 @@ The bootstrap's -Pick converts the state for an older version (downgrade-state, 
 entry in Add or remove programs and its kept uninstaller away (remove-entry) before the older version's installer
 runs. When that installer then stopped - Codex not found, another installation running, a copy it put back - the
 current version was still installed, but on a state converted for the older one, with its watcher stopped and no
-entry in Settings > Apps until a Repair (the v0.6.20 installer audit, R4). Restore-AfterFailedPick puts back the
+entry in Settings > Apps until a Repair (the v0.6.18 installer audit, R4). Restore-AfterFailedPick puts back the
 state from the copy the conversion took, the kept uninstaller from the copy saved before remove-entry, and runs the
 installed version's `setup --keep-state`, which writes the entry again and starts the watcher.
 

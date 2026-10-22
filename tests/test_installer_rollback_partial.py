@@ -3,7 +3,7 @@
 When the copy of the program files fails, install.ps1 removes what it had copied and moves the previous tree back. If
 part of the new tree could not be removed, `Move-Item aside -> target` moved the previous tree INTO it
 (app\\app.old-<stamp>), the journal still found its target there, and a later run swept the previous tree with the
-rest - and the run said "nothing was changed" (the v0.6.20 installer audit, M5). Now a tree is moved back only where
+rest - and the run said "nothing was changed" (the v0.6.18 installer audit, M5). Now a tree is moved back only where
 its target is gone; otherwise it stays aside under its own name, which the journal keeps from the sweep, and the run
 says it could not put everything back.
 

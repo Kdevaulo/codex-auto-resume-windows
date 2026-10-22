@@ -453,7 +453,7 @@ function Get-OutsideSource {
           [hashtable]$Environment)
     # Every character PowerShell ends a single-quoted string at - the ASCII one and U+2018, U+2019, U+201A, U+201B -
     # doubled: with the ASCII one alone, a path holding a curly quote broke the script, and a folder name made for it
-    # ran code here (v0.6.20 security review, M3).
+    # ran code here (v0.6.18 security review, M3).
     $quotes = '[' + "'" + [char]0x2018 + [char]0x2019 + [char]0x201A + [char]0x201B + ']'
     $literal = { param($text) "'" + (([string]$text) -replace $quotes, '$0$0') + "'" }
     $call = '& ' + (& $literal $Script)
@@ -1601,7 +1601,7 @@ function Save-BoundedDownload {
         never one of whatever length a server chose - and becomes $OutFile only once it is all there. On any failure
         nothing is left at $OutFile. It replaced Invoke-WebRequest -MaximumRedirection 5 -OutFile under a deadline,
         which followed every redirect before it checked where the answer came from and wrote the whole body before
-        anyone looked at its size (v0.6.20 security review, M5). A rate limit a failure carries is noted as that
+        anyone looked at its size (v0.6.18 security review, M5). A rate limit a failure carries is noted as that
         download's was (Get-RateLimitReset).
     #>
     param($First, [Uri]$Uri, [string]$OutFile, [string]$What, [string[]]$Hosts, [int]$Seconds, [long]$MaxBytes)
@@ -2024,7 +2024,7 @@ function Restore-AfterFailedPick {
     <#
         After Install another version...'s installer failed (-Pick, a non-zero exit) while the version that was
         installed still is - it stopped before it moved anything, or put its copy back - what this run changed
-        before it is put back as it was (v0.6.20 installer audit, R4): the state the conversion rewrote, from the copy
+        before it is put back as it was (v0.6.18 installer audit, R4): the state the conversion rewrote, from the copy
         the conversion took of it moments before (the newest state.v<N>-backup-*.sqlite written since -Since, and only
         while the watcher is not running); the uninstaller kept for the entry in Add or remove programs, from the copy
         saved before remove-entry took it (-KeptCopy); and then the installed version's own `setup --keep-state`,
@@ -2696,7 +2696,7 @@ try {
     if ($null -eq $code) { $code = 0 }
     if ($Pick -and $code -eq 0) { Write-Host ('pick: installed ' + $target + ' ' + $targetEdition) }
     # A failed pick leaves the version that was installed as it was: its state, its entry in Add or remove programs
-    # and its watcher (v0.6.20 installer audit, R4). The exit code stays the installer's.
+    # and its watcher (v0.6.18 installer audit, R4). The exit code stays the installer's.
     if ($Pick -and $code -ne 0) {
         Write-Host ''
         $null = Restore-AfterFailedPick -Home_ $installHome -Installed ([string]$installed) -Converted $converted `

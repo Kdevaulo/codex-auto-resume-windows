@@ -20,7 +20,7 @@ until the app has the conversation open (A11) and queues its continuation throug
   goal is left as it was and the answer is "not started", so core gives its claim back and the
   standard continuation follows once the app holds the conversation. The app can still open it
   between that look and the set; so the look is asked once more after the goal reads back active,
-  and where the app holds the conversation then the answer is unknown (v0.6.20): never accepted on
+  and where the app holds the conversation then the answer is unknown (v0.6.18): never accepted on
   a set the app may not see, never a second send.
 * P3 - thread_available, once the app holds the conversation. While its goal is active - Codex's
   own goal runtime is carrying the conversation on - the standard continuation is held back, for
@@ -184,7 +184,7 @@ class GoalContinuation:
         before the set: seconds after core last looked, in which the app may have opened the
         conversation - and M2 found a goal set while the app holds it is not seen. Anything but
         yes leaves the goal as it was, and nothing was asked of Codex that changes it. It is asked
-        once more after the goal reads back active (v0.6.20): the app can still open the
+        once more after the goal reads back active (v0.6.18): the app can still open the
         conversation between that look and the set, and a set it may not see is unknown.
 
         Accepted only when the goal reads back active and the same goal, and the app still does not
@@ -224,7 +224,7 @@ class GoalContinuation:
         if after is None or after.goal_id != before.goal_id or after.status != GoalStatus.ACTIVE:
             return {"outcome": "unknown", "error_code": "queue_result_unknown"}
         if still_unloaded is not None and not _yes(still_unloaded):
-            # v0.6.20: the app holds the conversation now, and may have opened it between the look and the set -
+            # v0.6.18: the app holds the conversation now, and may have opened it between the look and the set -
             # where M2 found a goal set is not seen, so nothing may carry the conversation on. The set cannot be
             # taken back without racing the app again: unknown, never a second send.
             return {"outcome": "unknown", "error_code": "queue_result_unknown"}
@@ -247,7 +247,7 @@ class GoalContinuation:
         before = self._goal(thread_id)
         if before is None or before.status != GoalStatus.USAGE_LIMITED:
             return {"outcome": "not_started", "error_code": "queue_preflight_failed"}
-        # v0.6.20: the set - the first change of state - is written inside core's launch guard, with the session's
+        # v0.6.18: the set - the first change of state - is written inside core's launch guard, with the session's
         # start, so a Pause or Cancel that commits after the guard stops it (its answer awaited outside).
         session, refused, pending = self._opened(launch_guard,
                                                  (SET, {"threadId": thread_id, "status": str(GoalStatus.ACTIVE)}))
@@ -291,7 +291,7 @@ class GoalContinuation:
     # ------------------------------------------------------------------ the session
     def _opened(self, launch_guard, first=None):
         """(the session, None, the first request's answer to wait for) once consent held and one was opened - `first`,
-        (method, params), written inside the guard with the opening (v0.6.20) - or (None, what core is told, None):
+        (method, params), written inside the guard with the opening (v0.6.18) - or (None, what core is told, None):
         consent refused at the guard, or no session - nothing was asked of Codex."""
         session, opened, pending = None, False, None
         try:

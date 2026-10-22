@@ -1,4 +1,4 @@
-"""The forced stop's continuation after a reset waits while another of its windows still holds (v0.6.20, the advanced
+"""The forced stop's continuation after a reset waits while another of its windows still holds (v0.6.18, the advanced
 audit's R2): the five-hour window stopped at 97% resets while the weekly one is still held at 98% - the pause's own
 promise, "no further continuation from this product until that window resets", holds the stop's own turn too.
 """

@@ -3,7 +3,7 @@
 docs/STANDARDS.md C10 says every codex process this product starts runs with its telemetry off. The watcher's
 app-server and queue calls carry OTEL_SDK_DISABLED=true and the `-c` overrides (codex/transport.py, Backend._environment
 and Backend._argv); install.ps1's `codex plugin ...` calls (Invoke-Codex: the plugin probe, marketplace add, upgrade
-and remove, plugin add and remove, the two lists) carried neither (the v0.6.20 docs audit, REAL #1). Measured before
+and remove, plugin add and remove, the two lists) carried neither (the v0.6.18 docs audit, REAL #1). Measured before
 the change against a scratch CODEX_HOME on codex-cli 0.163.0-alpha.11: `codex -c analytics.enabled=false ... plugin
 list --json` exits 0 and prints the list; a wrong value for the same key fails to load the configuration, so the
 override is really read.

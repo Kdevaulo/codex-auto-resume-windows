@@ -1,4 +1,4 @@
-r"""The Dashboard does not listen to a close-for-update event someone else made first (v0.6.20, security M6).
+r"""The Dashboard does not listen to a close-for-update event someone else made first (v0.6.18, security M6).
 
 An update asks this installation's Dashboard windows to close themselves through a named event,
 `Local\CodexAutoResume.CloseForUpdate.<16 hex of the installation's path>` (gui/WindowReopen.cs WatchForUpdate,

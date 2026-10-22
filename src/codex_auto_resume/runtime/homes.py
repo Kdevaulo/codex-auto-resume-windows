@@ -88,7 +88,7 @@ class Homes:
         can be started (each at most every RETRY_SECONDS), and rebuild every engine on a new codex.exe."""
         wanted = self.configured()
         now = self.clock()
-        # v0.6.20: a home's key hashes its resolved path, which can change with the folder's reach - a mapped network
+        # v0.6.18: a home's key hashes its resolved path, which can change with the folder's reach - a mapped network
         # drive resolves to its UNC form online and to its letter offline. A key that no longer matches is never a
         # removal alone: a run whose path Settings still name is kept, and while a named folder is out of reach the
         # start's sweep waits, since that home may be known by another key once it is back.

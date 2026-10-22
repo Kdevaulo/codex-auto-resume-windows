@@ -2,7 +2,7 @@ r"""The downloads that ride on an update check follow the archive's rule: every 
 
 Get-Remote -Deadline - the Codex compatibility data's fetch - ran Invoke-WebRequest -MaximumRedirection 5 -OutFile under
 a deadline: every redirect was followed before the host was checked, on the final answer only, and the whole body was
-written to disk before its size was compared with the 256 KiB bound (the v0.6.20 security review, M5). It now goes
+written to disk before its size was compared with the 256 KiB bound (the v0.6.18 security review, M5). It now goes
 through Save-BoundedDownload: Open-Download holds each hop to the caller's hosts before it is asked, the body is read no
 further than one byte past -MaxBytes, the deadline covers every hop and the body, and nothing is left at the target
 after a failure. The old request stays only where the .NET one cannot be made, as for the archive.

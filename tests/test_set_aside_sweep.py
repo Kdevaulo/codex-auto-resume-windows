@@ -1,4 +1,4 @@
-"""What an update set aside and could not delete is swept when the watcher starts (v0.6.20, OPEN-ITEMS #10).
+"""What an update set aside and could not delete is swept when the watcher starts (v0.6.18, OPEN-ITEMS #10).
 
 An update moves `app`, `runtime` and the Dashboard's files aside as `<name>.old-<stamp>` and deletes them once the
 copy is in place - unless something still had them open. They stayed in the home until the next install, about

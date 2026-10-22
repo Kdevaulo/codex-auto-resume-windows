@@ -199,7 +199,7 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.afterwork",
               # v0.6.15-beta: and the other Codex homes it holds, each with an engine of its own.
               "runtime.homes",
-              # v0.6.20: and what an update set aside and could not delete, swept as it starts.
+              # v0.6.18: and what an update set aside and could not delete, swept as it starts.
               "runtime.setaside",
               # v0.6.16-beta.3: and its own decisions asked on request, for Diagnostics' check (issue #27).
               "checkup",

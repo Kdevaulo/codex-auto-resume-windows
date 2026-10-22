@@ -267,7 +267,7 @@ def methods_for_capability(capability) -> frozenset:
 
 
 def submitted(session, method, params=None):
-    """v0.6.20: one request written now - inside a guard its caller holds (core's launch guard around a channel's first
+    """v0.6.18: one request written now - inside a guard its caller holds (core's launch guard around a channel's first
     change of state) - and its answer awaited later, outside it: a callable that gives the answer, or raises what the
     request raised. A session with no `submit` (a test's) is called whole, now. Never raises itself."""
     try:

@@ -3,7 +3,7 @@
 install.ps1 and the bootstrap tested and moved paths built from CODEX_AUTO_RESUME_PLUGIN_HOME or -ArchivePath with
 `-Path` or a bare Test-Path, which read `[1]` as a character class. Over an installation in `...\\inst[1]`, `$upgrade`
 came out false and the move-aside failed, so the copy stopped half way; the bootstrap read no installed version there
-(the v0.6.20 installer audit, M4). Windows user names cannot hold brackets, so only a chosen home or file path met it.
+(the v0.6.18 installer audit, M4). Windows user names cannot hold brackets, so only a chosen home or file path met it.
 
 The copy is lifted verbatim from install.ps1 (tests/test_installer_watcher_restart.py's harness) and run over a
 scratch home with brackets in its name, under Set-StrictMode 2.0; Get-InstalledVersion is lifted from the bootstrap.

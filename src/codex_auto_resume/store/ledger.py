@@ -269,7 +269,7 @@ class LedgerMixin:
         answer being what it carries. Granted, the record is `submitting` again with its vector, submission_safe
         passed as a resend, which is what marks it resent; its attempt and its link of the chain are not charged
         again - its first claim paid them; the day and the spacing are read again here, as for a first claim
-        (v0.6.20, `_caps_refusal`). Refused, nothing is written: it stays the uncertain submission it was."""
+        (v0.6.18, `_caps_refusal`). Refused, nothing is written: it stays the uncertain submission it was."""
         if gates is None or limits is None or not machine.resend_candidate(row, now, window):
             return False, "submission_safe", "possibly_sent"
         vector = dict(gates)

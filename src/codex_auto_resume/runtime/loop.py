@@ -304,7 +304,7 @@ class WatchLoop:
             if not watching:
                 return None             # the whole interval was waited in one go
             try:
-                if engine is not None:          # v0.6.20: none while it is rebuilt; the homes' watch still runs
+                if engine is not None:          # v0.6.18: none while it is rebuilt; the homes' watch still runs
                     engine.watch()
             except Exception:
                 self._record_failure("watch")
@@ -386,7 +386,7 @@ class WatchLoop:
                     exit_code = EXIT_SCHEMA_NEWER
                     break
                 except Unreadable:
-                    # v0.6.20: no engine yet - said once (App._read_settings); nothing is sent or cancelled.
+                    # v0.6.18: no engine yet - said once (App._read_settings); nothing is sent or cancelled.
                     if engine is not None:
                         self._record_failure("tick")
                 except StoreError:

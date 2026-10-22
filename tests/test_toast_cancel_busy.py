@@ -1,4 +1,4 @@
-"""v0.6.20 (audit M3): the toast's Cancel is tried again while the watcher holds the state, as a card's is.
+"""v0.6.18 (audit M3): the toast's Cancel is tried again while the watcher holds the state, as a card's is.
 
 A card's Cancel goes through the control layer, which tries a busy store again for CANCEL_RETRY_SECONDS. The toast's
 went straight to the store once: a lock held past the store's own wait ended the windowless `activate` process in an

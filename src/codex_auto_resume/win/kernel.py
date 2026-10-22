@@ -351,7 +351,7 @@ def _refuse_if_squatted(handle, existed: bool) -> None:
         raise AdapterError("named_object_squatted")
 
 
-# Owners an existing object may have and still be this account's own (v0.6.20, security M2): this
+# Owners an existing object may have and still be this account's own (v0.6.18, security M2): this
 # account, and the two that only someone with more rights than it can set - the computer's
 # administrators, which an elevated process of this account makes its objects with, and Windows itself.
 TRUSTED_OWNERS = frozenset({"S-1-5-32-544", "S-1-5-18"})

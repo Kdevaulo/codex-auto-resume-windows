@@ -1,4 +1,4 @@
-"""The goal continuation's last instant: the app opens the conversation between core's look and the set (v0.6.20).
+"""The goal continuation's last instant: the app opens the conversation between core's look and the set (v0.6.18).
 
 The route asks core's look - consent still given, the app still not holding the conversation - once its session is
 up, at the last moment before thread/goal/set (test_advanced_goal RaceTests). The app could still open the

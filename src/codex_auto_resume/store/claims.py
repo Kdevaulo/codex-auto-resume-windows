@@ -198,7 +198,7 @@ class ClaimsMixin:
 
         Only the engine calls this, and only between the claim and starting the queue process, so nothing can have
         reached Codex. The claim time is kept - the daily cap and cooldown still count it - but the attempt counters are
-        given back, because no attempt happened. One that ends the record gives it its outcome time (v0.6.20).
+        given back, because no attempt happened. One that ends the record gives it its outcome time (v0.6.18).
         """
         _timestamp(now, "now")
         if target not in WAITING | {"cancelled", "superseded", "superseded_by_user"}:

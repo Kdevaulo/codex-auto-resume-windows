@@ -1,4 +1,4 @@
-"""The forced stop's channel to the Codex app's pipe trusts only this account's own server (v0.6.20, security review
+"""The forced stop's channel to the Codex app's pipe trusts only this account's own server (v0.6.18, security review
 S5): the pipe is opened at SECURITY_IDENTIFICATION, so whoever serves it cannot act as the watcher's account, and the
 server process (GetNamedPipeServerProcessId) must run as this account, in this session, at no lower integrity and
 outside an AppContainer before anything is written - else NO_PIPE, as where no app runs. Scratch pipes only, never

@@ -1,4 +1,4 @@
-"""Compact-then-continue continues only after a compaction that completed (v0.6.20, the advanced audit's M5): one still
+"""Compact-then-continue continues only after a compaction that completed (v0.6.18, the advanced audit's M5): one still
 running is waited for, and one interrupted compacted nothing - before, either let the continuation go onto a context
 never compacted, to fail again and spend a unit.
 """

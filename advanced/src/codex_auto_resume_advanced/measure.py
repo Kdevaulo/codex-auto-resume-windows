@@ -1782,7 +1782,7 @@ def _ipc_look(found):
             found["exists"] = True              # the pipe is there but could not be opened now
         return found
     if not channel.server_trusted(channel.server_pid(k32, pipe)):
-        # v0.6.20 (S5): served by a process that is not this account's own - looked at no further.
+        # v0.6.18 (S5): served by a process that is not this account's own - looked at no further.
         k32.CloseHandle(pipe)
         found["exists"] = True
         return found

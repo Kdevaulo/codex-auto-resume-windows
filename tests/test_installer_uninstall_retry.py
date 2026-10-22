@@ -2,7 +2,7 @@
 
 The uninstall removed every entry of app\\ and runtime\\ whatever failed, then said "run this again". One file held
 open under app\\ (an MCP child, an antivirus scan) left runtime\\ deleted, and the retry - from the Apps entry's kept
-uninstaller or from Uninstall.cmd - stopped at "No installed runtime found here" every time after (the v0.6.20
+uninstaller or from Uninstall.cmd - stopped at "No installed runtime found here" every time after (the v0.6.18
 installer audit, R3). Now app\\ goes first, its scripts\\ and src\\ (what verify-home runs) last and only while nothing
 before them stuck, and runtime\\ only once app\\ is gone; the refusal waits until the payload's interpreter was looked
 for too.

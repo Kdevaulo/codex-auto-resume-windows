@@ -110,7 +110,7 @@ def _overlapped():
     return _OVERLAPPED[0]
 
 
-# v0.6.20 (security review S5): the pipe is opened at SECURITY_IDENTIFICATION, so whoever serves it may learn who asks
+# v0.6.18 (security review S5): the pipe is opened at SECURITY_IDENTIFICATION, so whoever serves it may learn who asks
 # but never act as us; and its server is checked before anything is written (`server_trusted`).
 SECURITY_SQOS = 0x00100000 | 0x00010000            # SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION
 
@@ -415,7 +415,7 @@ def start_turn(thread_id, text, *, channel=None, gate=None):
             _request(opened, client, "thread-follower-start-turn", REQUESTS["thread-follower-start-turn"],
                      {"thread": thread_id, "message": str(uuid.uuid4()), "text": text}, target=owner, gate=gate)
         except _Failed as failed:
-            # v0.6.20: written and no answer in time - the turn may have started, as a stop with no answer may have
+            # v0.6.18: written and no answer in time - the turn may have started, as a stop with no answer may have
             # been made: UNCONFIRMED, never said to have failed; the next look at the turns tells which.
             if failed.word == Stop.NO_ANSWER:
                 return Stop.UNCONFIRMED

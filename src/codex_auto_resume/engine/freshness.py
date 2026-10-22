@@ -18,7 +18,7 @@ from ..machine import WAITING, WATCHED
 class FreshnessMixin:
     def usage(self):
         now = self.clock()
-        # v0.6.20: a clock set back (a manual change, an NTP step) ends a cached reading too.
+        # v0.6.18: a clock set back (a manual change, an NTP step) ends a cached reading too.
         if self._usage_cache is None or not 0 <= now - self._usage_cache[0] <= 30:
             self._usage_cache = (now, self.backend.usage())
         return self._usage_cache[1]

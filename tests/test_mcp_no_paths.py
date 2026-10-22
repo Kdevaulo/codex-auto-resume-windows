@@ -1,4 +1,4 @@
-"""v0.6.20 (audit M1): no MCP reply carries the codex_exe path a person chose.
+"""v0.6.18 (audit M1): no MCP reply carries the codex_exe path a person chose.
 
 The Codex homes left every MCP reply in v0.6.15-beta because their folders are paths, which may hold the Windows
 user name, and these replies are part of what Codex sends on. The codex_exe setting is such a path too, and

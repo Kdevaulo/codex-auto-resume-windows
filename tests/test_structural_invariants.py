@@ -231,7 +231,7 @@ class OneSenderTests(unittest.TestCase):
         that names `queue` asks it for `--help`, to prove the flags still exist."""
         spawns = calls(lambda node: getattr(node.func, "attr", getattr(node.func, "id", None)) in SPAWNERS
                        and "queue" in constants(node))
-        # v0.6.20: the message goes as one `--message=<text>` argument (tests/test_message_leading_hyphen.py).
+        # v0.6.18: the message goes as one `--message=<text>` argument (tests/test_message_leading_hyphen.py).
         sending = [(where, name, node) for where, name, node in spawns if "--message=" in constants(node)]
         self.assertEqual([(where, name) for where, name, _ in sending],
                          [("codex_auto_resume/codex/transport.py", "Backend.send")])

@@ -1,7 +1,7 @@
 """The uninstall's sweep of its own leftovers prints no bare True or False.
 
 The sweep of `*.old-*` leftovers in install.ps1's uninstall branch called Remove-OwnedItem without `$null =`, so
-each removal printed a bare True or False into the uninstall's log and the setup window (the v0.6.20 installer
+each removal printed a bare True or False into the uninstall's log and the setup window (the v0.6.18 installer
 audit, M2).
 
 The uninstall tail is lifted verbatim (tests/test_installer_uninstall_retry.py's harness: scratch folders, Codex and

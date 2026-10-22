@@ -1,4 +1,4 @@
-"""A subagent's stop is told once when the parent's words carrying it go (v0.6.20, the advanced audit's R5): P4 builds
+"""A subagent's stop is told once when the parent's words carrying it go (v0.6.18, the advanced audit's R5): P4 builds
 the words before the claim, so a claim held after it (a ceiling, the cooldown, a gate, the ledger) or core's own words
 sent instead used to leave every child marked told - and none was ever mentioned. Now each is marked only once the claim
 that carries the lines commits.

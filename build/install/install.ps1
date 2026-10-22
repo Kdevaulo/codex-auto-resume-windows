@@ -168,7 +168,7 @@ function Get-OutsideSource {
           [hashtable]$Environment)
     # Every character PowerShell ends a single-quoted string at - the ASCII one and U+2018, U+2019, U+201A, U+201B -
     # doubled: with the ASCII one alone, a path holding a curly quote broke the script, and a folder name made for it
-    # ran code here (v0.6.20 security review, M3).
+    # ran code here (v0.6.18 security review, M3).
     $quotes = '[' + "'" + [char]0x2018 + [char]0x2019 + [char]0x201A + [char]0x201B + ']'
     $literal = { param($text) "'" + (([string]$text) -replace $quotes, '$0$0') + "'" }
     $call = '& ' + (& $literal $Script)
@@ -1001,7 +1001,7 @@ function Invoke-Setup {
     # Setup's exit code decides, never its stderr. Run outside another app, this script's streams are merged
     # (Get-OutsideSource: `*>&1`), and Windows PowerShell then makes each stderr line of a native program a
     # NativeCommandError, which this script's 'Stop' made terminating: setup's `error: ...` line stopped setup half way
-    # and failed the install (v0.6.20 installer audit, R1). For this call alone; the bootstrap's Invoke-InstalledSetup
+    # and failed the install (v0.6.18 installer audit, R1). For this call alone; the bootstrap's Invoke-InstalledSetup
     # does the same.
     $ErrorActionPreference = 'Continue'
     try { & $Python $setup @Arguments | ForEach-Object { Write-Host ('    ' + $_) } }
@@ -1083,7 +1083,7 @@ function Protect-RelocatedHome {
         its own: the person, SYSTEM and Administrators, full control, inherited by everything under it, and nothing
         inherited from above. A folder made under a drive root takes the root's `Authenticated Users: Modify`, and every
         other account on the PC could then replace the launcher, the program or the runtime that run as the person at
-        each sign-in (v0.6.20 security review, R2). Inside the profile nothing changes: the profile is the person's own.
+        each sign-in (v0.6.18 security review, R2). Inside the profile nothing changes: the profile is the person's own.
 
         Chosen over refusing such a home: an installation already relocated keeps working and is made private on its next
         update or repair, and nothing the person can do there today is taken away. Where the drive keeps no access list
@@ -1305,14 +1305,14 @@ if ($Uninstall) {
     $interpreter = $Python
     if (-not (Test-Path -LiteralPath $interpreter)) { $interpreter = Join-Path $Payload 'runtime\python.exe' }
     # Refused only when neither interpreter is there: an uninstall run from the archive (Uninstall.cmd) over an
-    # installation whose runtime\ an earlier run already removed still has the payload's to ask (v0.6.20 audit, R3).
+    # installation whose runtime\ an earlier run already removed still has the payload's to ask (v0.6.18 audit, R3).
     if (-not (Test-Path -LiteralPath $interpreter)) {
         Warn 'No installed runtime found here, so nothing can be verified or removed.'
         Write-Host ('       Looked in ' + $InstallHome)
         exit 1
     }
     # 'Continue' for this call: under 'Stop', Windows PowerShell 5.1 makes a native stderr line a terminating error even
-    # with 2>$null, and a traceback then replaced the refusal below with a raw error (v0.6.20 installer audit, M1).
+    # with 2>$null, and a traceback then replaced the refusal below with a raw error (v0.6.18 installer audit, M1).
     $ErrorActionPreference = 'Continue'
     $verify = & $interpreter $verifier 'verify-home' 2>$null
     $ErrorActionPreference = 'Stop'
@@ -1444,7 +1444,7 @@ if ($Uninstall) {
     # The retry this branch asks for below needs what it ran on: runtime\python.exe, and app\scripts and app\src for
     # verify-home (the kept uninstaller has no payload to fall back on). So app\ goes first, those two of it last and
     # only while nothing before them stuck, and runtime\ only once app\ is gone: one file held open under app\ used to
-    # leave runtime\ deleted anyway, and the retry then stopped at "No installed runtime found" for good (v0.6.20
+    # leave runtime\ deleted anyway, and the retry then stopped at "No installed runtime found" for good (v0.6.18
     # installer audit, R3).
     $retryNeeds = @('scripts', 'src')
     $programDirs = @(@($AppDir, $RunDir) | Where-Object { Test-Path -LiteralPath $_ })
@@ -1511,7 +1511,7 @@ if ($Uninstall) {
     }
     if ($Purge) {
         # Only on an explicit request: this is the user's recovery history.
-        # Asked whether it worked: a held log file used to stay while this said it was removed (v0.6.20 audit, M3).
+        # Asked whether it worked: a held log file used to stay while this said it was removed (v0.6.18 audit, M3).
         $kept = @()
         foreach ($dir in @((Join-Path $OwnedHome 'config'), (Join-Path $OwnedHome 'logs'))) {
             if ((Test-Path -LiteralPath $dir) -and -not (Remove-OwnedItem $dir)) { $kept += $dir }
@@ -1677,7 +1677,7 @@ function Start-StoppedWatcher {
     <#
         Starts again the watcher this update stopped (the hand-over below), when the update stops before its own setup
         starts the new version's: a copy that was put back, a payload found incomplete, anything that throws. Without
-        this the closing line said nothing was changed while recovery stayed off until the next sign-in (v0.6.20
+        this the closing line said nothing was changed while recovery stayed off until the next sign-in (v0.6.18
         installer audit, R2). It is the installation's own `setup --keep-state` - whichever version's files are in
         place, the put-back ones after a rollback - which changes no decision a person made, as the bootstrap's repair
         runs it. Where that cannot run or does not confirm the watcher, it says recovery is off and how to start it.
@@ -1898,7 +1898,7 @@ try {
         foreach ($undo in $moved) {
             if (Test-Path -LiteralPath $undo.to) { $null = Remove-OwnedItem $undo.to }
             # Moved back only where the half-copied tree is gone: moved onto a folder that is still there, it went INTO
-            # it (apppp.old-<stamp>), and a later run swept it with the rest (v0.6.20 installer audit, M5). Left
+            # it (apppp.old-<stamp>), and a later run swept it with the rest (v0.6.18 installer audit, M5). Left
             # aside under its own name, the journal below keeps it from every sweep.
             if (Test-Path -LiteralPath $undo.to) { $notBack += $undo; continue }
             Move-Item -LiteralPath $undo.from -Destination $undo.to -Force -ErrorAction SilentlyContinue
@@ -1935,7 +1935,7 @@ try {
             $aside = $target + '.old-' + (Get-Date -Format 'yyyyMMddHHmmss')
             Move-Item -LiteralPath $target -Destination $aside -Force -ErrorAction SilentlyContinue
             # A second failure is said, and the run goes on to its setup: thrown here, it ended the update after the
-            # program trees were replaced and before the watcher was set up, with no last word (v0.6.20 audit, M6).
+            # program trees were replaced and before the watcher was set up, with no last word (v0.6.18 audit, M6).
             try { Copy-Item -LiteralPath $source -Destination $target -Force -ErrorAction Stop }
             catch {
                 Fail ($name + ' could not be replaced: ' + $_.Exception.Message)
