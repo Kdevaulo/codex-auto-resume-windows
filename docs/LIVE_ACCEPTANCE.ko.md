@@ -187,7 +187,7 @@ python scripts/live_evidence.py
 **증명하는 것.** 압축 파일이 설치되고, 자기가 담고 있는 파일로 플러그인을 등록하며, 기존 설치 옆에
 두 번째 설치본을 만들지 않고 하나로 끝난다는 것.
 
-**할 일.** 압축을 풀고 `Install.cmd`를 실행해 끝까지 둡니다. 그다음 Codex를 열어 플러그인이 등록됐는지,
+**할 일.** 설치 프로그램 `CodexAutoResume-Setup-vX.Y.Z.exe`를 실행하거나, 압축을 풀고 `Install.cmd`를 실행해 끝까지 둡니다. 그다음 Codex를 열어 플러그인이 등록됐는지,
 패널이 열리는지(*open auto resume settings*) 확인합니다.
 
 **통과.** 설치가 종료 코드 0으로 끝났고, 설치본이 한 곳(기본값은 `%USERPROFILE%\.codex-auto-resume`)에
@@ -195,7 +195,7 @@ python scripts/live_evidence.py
 워처가 돌고 있는지 확인하지 못했다는 뜻으로, 그 자체가 하나의 답이며 이 단계의 통과는 아닙니다.
 그대로 기록하고 워처를 직접 보는 다음 단계로 넘어가세요.
 
-**기록.** `route`를 `"Install.cmd"`나 `"plugin-bootstrap"`으로, `setup_exit_code`, `install_root`를
+**기록.** `route`를 `"setup"`, `"Install.cmd"`, `"plugin-bootstrap"` 중 하나로, `setup_exit_code`, `install_root`를
 `"default"`나 `"custom"`으로, `plugin_registered`.
 
 ### 3. 워처가 돌고 있고, 보이는 곳에서 그렇게 말하는가 — `watcher-starts`
@@ -239,8 +239,8 @@ python scripts/live_evidence.py
 만들어 내지 마세요.
 
 **기록.** `category`(실패 분류. `usage_limit`, 일시적 분류 하나, 종단 분류 하나, 또는 `unknown`),
-`code`(표시된 공개 코드), `thread`와 `record`(진단 내보내기의 별칭), 토스트를 봤다면
-`notification_shown`.
+`code`(표시된 공개 코드), `thread`와 `record`(진단 내보내기의 별칭), 토스트를 봤는지는 단계의
+`note`에 적습니다(검증기에는 그것을 위한 `observed` 키가 없습니다).
 
 ### 5. 연속 메시지가 바로 그 대화에만 갔는가 — `continuation-exact-thread`
 
@@ -256,8 +256,8 @@ python scripts/live_evidence.py
 대화도 아무것도 받지 않았습니다.
 
 **기록.** `thread`와 `record`(별칭), `queue_items_owned`(워처가 소유한 대기열 항목 수. 1),
-`other_threads_touched`(무언가를 받은 다른 대화의 수. 0), 연속 메시지의 마커를 확인했다면
-`marker_present`.
+`other_threads_touched`(무언가를 받은 다른 대화의 수. 0), 연속 메시지의 마커를 확인했는지는
+`note`에 적습니다.
 
 ### 6. 엔진이 자기 연속 메시지가 시작한 턴을 지켜봤는가 — `follows-its-turn`
 
@@ -291,7 +291,7 @@ python scripts/live_evidence.py
 합니다. `outcome_unverified`도 이 단계의 통과입니다. 제품이 추측하지 않겠다고 말한 것이니까요.
 
 **기록.** `record`(별칭), `code`, 결과 시각이 저장됐으면 `outcome_at_recorded`를 `true`로, 기록이
-사유를 보여 주면 `reason`.
+사유를 보여 주면 그 사유는 `note`에.
 
 ### 8. 창이 같은 말로 보여 주는가 — `dashboard-shows-it`
 
@@ -337,8 +337,8 @@ python scripts/live_evidence.py
 **통과.** 확인이 즉시 일어나고, 기록은 다음 단계로 가거나 같은 이유로 다시 기다립니다. 버튼을 눌렀다는
 이유로 무언가가 보내지는 일은 없습니다.
 
-**기록.** `code_before`, `code_after`, `continuation_sent`를 `false`로, 버튼이 비활성화된 상황을
-`"disabled-while-paused"`처럼 짧은 기계값으로 `offered_when`에.
+**기록.** `code_before`, `code_after`, `continuation_sent`를 `false`로, 버튼이 비활성화된 상황은
+`"disabled-while-paused"`처럼 짧은 기계값으로 `note`에.
 
 ### 11. 시도 횟수 되돌리기가 명시적이고 제한되며 전송이 아닌가 — `give-attempts-back`
 
@@ -363,7 +363,7 @@ python scripts/live_evidence.py
 
 **기록.** `code_before`(`exhausted`), `code_after`(되돌아간 대기 코드), 버튼이 조용해졌을 때 기록이
 쓴 재설정 횟수를 `budget_resets`(3)로, `continuation_sent`를 `false`로, 대화가 꺼져 있다고 말했으면
-`said_thread_is_off`를 `true`로.
+그 사실은 `note`에.
 
 ### 12. 일시 정지가 회수하고, 다시 켜기가 이어받는가 — `pause-resume`
 
@@ -438,9 +438,9 @@ v0.6.3이 일부러 바꾼 기본값 하나도 함께 바뀝니다. 연속 메�
 다른 복사본을 시작하는 항목은 보고된 채 남습니다. 평범한 제거에서는 설정과 대기 중인 복구가 살아
 남습니다.
 
-**기록.** `route`를 `"Uninstall.cmd"`, `"codex"`, `"source"` 중 하나로, `watcher_stopped`,
+**기록.** `route`를 `"apps"`(설정 > 앱), `"setup"`(설치 프로그램의 제거), `"Uninstall.cmd"`, `"codex"`, `"source"` 중 하나로, `watcher_stopped`,
 `startup_entry`를 `"removed"`, `"kept-not-ours"`, `"absent"` 중 하나로, `state_kept`, 지우기를 거부한
-디렉터리 수를 `refused_directories`로.
+디렉터리 수는 `note`에.
 
 ## v0.6.3에서 더해진 확인, 그리고 적을 곳
 
@@ -513,7 +513,8 @@ v0.6.3은 제품이 무엇을 말하고 보여 주는지를 바꿀 뿐, 복구�
 적지 않습니다.
 
 **머리글의 활동 상태와 움직임 줄이기 — 8단계, `dashboard-shows-it`에 메모.** 단계가 진행되는 동안
-대시보드 머리글의 상태 점 옆 낱말을 봅니다. 기다리는 것이 없으면 *감시 중*, 작업이 때를 기다리면
+팝업과 Codex 안의 패널 맨 위, 상태 불빛 옆 낱말을 봅니다(대시보드 머리글은 자기 표제 - *Watching for interruptions*,
+*Automatic recovery paused*, *Watcher not running* - 를 그대로 두며, 그 불빛은 같은 규칙을 따릅니다). 기다리는 것이 없으면 *감시 중*, 작업이 때를 기다리면
 *기다리는 중*, 때가 되면 *확인 중*, 연속 메시지가 Codex에서 도는 동안 *복구 중*, 복구가 일시 정지되면
 *일시 중지됨*, 이 단계에서 워처를 멈추면 *확인이 필요합니다*입니다. 그다음 **설정 → 모양 → 움직임
 줄이기**를 켭니다. *통과:* 낱말마다 대기 중 쪽과 명령줄이 말하는 상황과 맞고, 움직임 줄이기를 켜면
@@ -601,8 +602,8 @@ v0.6.10 다음 릴리스는 두 판으로 나오며, 판마다 실제 기기에�
 13단계와 14단계 사이에, 13단계가 남긴 설치본을 고급판으로 바꾸어 아래를 확인하고, 14단계 전에 다시 표준판으로
 되돌립니다. 그래야 14, 15단계가 적힌 대로 표준판에서 진행됩니다.
 
-**기능 켜기.** 대시보드에서 설정 다음의 마지막 탭인 **고급 기능**을 열고 기능을 고릅니다. Codex와 함께 시작,
-마커 없는 이어서 하기, 목표 이어서 하기 가운데 하나입니다. 켜는 것이 읽었다고 말하는 것이므로 설명과 모든
+**기능 켜기.** 대시보드에서 설정 다음의 마지막 탭인 **고급 기능**을 열고 기능을 고릅니다(페이지에 모든 기능이 호환성 보고서부터 나열됩니다. 이 점검표가 다루는 것은 Codex와 함께 시작,
+마커 없는 이어서 하기, 목표 이어서 하기이며, 나머지는 [EDITIONS.ko.md](EDITIONS.ko.md)의 저마다의 절을 통해 인수합니다). 켜는 것이 읽었다고 말하는 것이므로 설명과 모든
 경고를 읽은 뒤 **켜기**를 고르고 '예'라고 답합니다. 읽는 동안 무언가 바뀌었으면 페이지가 지금 상태의 기능으로
 다시 물으므로, 다시 읽은 뒤 답합니다. 아무것도 켜지 않았다고 말하면 그 까닭도 함께 말합니다. 같은 기능의
 **끄기**나 **고급 기능 모두 끄기**가 기능을 끕니다. 스스로 꺼진 기능은 상태 아래에 그렇다는 것과 까닭을
@@ -614,8 +615,8 @@ v0.6.10 다음 릴리스는 두 판으로 나오며, 판마다 실제 기기에�
 | Codex를 닫아도 살아남는 Codex와 함께 시작하기 | 고급판에서 | 이 표 | 하지 않음 |
 | 버려도 되는 대화에서의 마커 없는 이어가기 | 고급판에서 | 이 표 | 하지 않음 |
 | 버려도 되는 대화에서의 목표 이어가기 | 고급판에서, 사용량 한도가 실제로 걸렸을 때 | 이 표 | 하지 않음 |
-| M2b: 앱이 대화를 열어 둔 채 활성으로 돌린 목표와 큐에 넣은 턴 | 그 릴리스의 소스 체크아웃에서 | `docs/evidence/live/measurement-m2b.json` | 하지 않음 |
-| MP1~MP3: Codex 앱 오른쪽 사이드 패널, 대화 옆의 설정 패널 | 그 릴리스의 소스 체크아웃에서, 워처를 켜 둔 채 | `docs/evidence/live/measurement-mp1.json`, `-mp2`, `-mp3` | 하지 않음 |
+| M2b: 앱이 대화를 열어 둔 채 활성으로 돌린 목표와 큐에 넣은 턴 | 그 릴리스의 소스 체크아웃에서 | `docs/evidence/live/measurement-m2b.json` | `codex-cli 0.163.0-alpha.10.2`에서 통과, 이번 릴리스에서는 하지 않음 |
+| MP1~MP3: Codex 앱 오른쪽 사이드 패널, 대화 옆의 설정 패널 | 그 릴리스의 소스 체크아웃에서, 워처를 켜 둔 채 | `docs/evidence/live/measurement-mp1.json`, `-mp2`, `-mp3` | `codex-cli 0.162`와 `0.163.0-alpha.10.2`에서 통과, 이번 릴리스에서는 하지 않음 |
 
 **판 바꾸기 - 13단계 뒤, `upgrade-keeps-decisions`에 적음.** 표준판 설치본 위에 고급판 압축 파일의
 `Install.cmd`나 고급판 설치 파일을 실행합니다. 무엇이든 옮기기 전에 판이 바뀐다고 말하고 묻습니다. 예라고
