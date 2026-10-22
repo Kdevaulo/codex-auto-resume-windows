@@ -84,7 +84,7 @@
       "passed": true,
       "worst": 0
     },
-    "window": "9047c793f16b769d9657dbc0d3d3f42ce2617b3489ee090f114899615fd0e3c6"
+    "window": "efe1040d9924b13d628928ca241eb30cca89d49dcfdfa8a468f16d900078a315"
   },
   "images": {
     "docs/images/advanced-page-after-ko.png": {
@@ -153,22 +153,22 @@
     }
   },
   "inputs": {
-    "<advanced shot:P1-after:en>": "869a7b0c4019e94f0fc06663fb5c94fdf660bb8e464460192f3d33928cb99a41",
-    "<advanced shot:P1-after:ko>": "c46420b0189ec30e0b4992dd0d95db019ee9aecb19fc6f9673990cd98c7a4bf8",
-    "<advanced shot:P1-before:en>": "07541d9ed9c119aadf7bbf56866a4ecbf30c4712af6b171416e211619f53485b",
-    "<advanced shot:P1-before:ko>": "074436177cf1af997d7b93ae9b3b69599761b7a3ad6abbad7ad5cf2e75c32e25",
-    "<advanced shot:P4-after:en>": "fc17ea769401629f0632d4d5c963d05a3f3803458bfae917ac702e0848fa9958",
-    "<advanced shot:P4-after:ko>": "53f21f2cdb201e0d1dec3a702bf9b0c7d43a64f6b9055900b6849281e5fab99c",
-    "<advanced shot:P4-before:en>": "6aff08112088d0350232d7455fd017b24de228ad7066c94748c16fcd0fde3ec6",
-    "<advanced shot:P4-before:ko>": "c0d413aca15220388f5314ab1e5e03d61c9b8ec7e779bd8b4e10f67d0634c001",
-    "<advanced shot:P5:en>": "4f38f622ce5c9f755de7d0784fe999b7f12986f3b8bd87cc6b32ad84f32de70e",
-    "<advanced shot:P5:ko>": "3f69ed9541ca335132cae593d32ba79a047e4f747c2e0709bc5bc9a9cacd0ca7",
-    "<advanced shot:P7-after:en>": "a7b388c5b4a28a01cd6498c89ce221628c2c74c40652cfacb612e3703e06e945",
-    "<advanced shot:P7-after:ko>": "cab27ef80e8c9740718b582bb6c87fd9bbf31137f54fed525a37e34114c85287",
-    "<advanced shot:P7-before:en>": "ce3989a4017e2fabf7c5530bc99db32bdc0684a46b4283a439d65a0c47af066d",
-    "<advanced shot:P7-before:ko>": "c93b1785207dccdce3ac699bf338054ba4feffe3fce9fcd16f9bdeb504d1615d",
-    "<advanced shot:P8:en>": "e25c9b9bd2379db2c68c495dd034968a450f5408ba3d9102dcf8aaf8a16b1adf",
-    "<advanced shot:P8:ko>": "ac2141c7d680bfb5dff4039c4f5e0f283844342156f040a5df912ce6447a05c9"
+    "<advanced shot:P1-after:en>": "402cf6ee20d3510704137c9c3a2d51cfca8b26a19373d430b38fbf36de05ac2a",
+    "<advanced shot:P1-after:ko>": "4eff18dbd5cfde57f795dffb7549a343d5e37e8eb318078be47e8376609c95fe",
+    "<advanced shot:P1-before:en>": "924503b1041b8dc3a6ee50a4eec73881923856d60a99c4ce9b9c728f91f6c24d",
+    "<advanced shot:P1-before:ko>": "650e9f53583017b6a60d6c1375954f737fdb2ef828e945f15f9bce848e760886",
+    "<advanced shot:P4-after:en>": "7c08e38c53da2b7e230ef8afde74e7f5506b2b5b422c1a81378e2e2951e0c953",
+    "<advanced shot:P4-after:ko>": "ab3bbb20105bb8fe94154fb359b2d4276a6217685401d3b4acddf852e04a75e8",
+    "<advanced shot:P4-before:en>": "0705d60574e7e3ee65593919b948851fbe82fb1359effb2fd5182932a2881b61",
+    "<advanced shot:P4-before:ko>": "4f77dab159c3b2d62459ebbb224e828f8b2088f4e5538a6c186a58ab65cc8bc6",
+    "<advanced shot:P5:en>": "e0ab622fbaa1e5ba54127fc23ff0038bbfd1669ff655015ed828ef7cf48d4ad0",
+    "<advanced shot:P5:ko>": "adce1d5011b0028b52be2485d5da7c5107eb351b00f778be997b7ac8e9d9fbc5",
+    "<advanced shot:P7-after:en>": "a77ee213e2bb79378b8648b9d472ecf21043d2393175dc3ac1122a9c653f955b",
+    "<advanced shot:P7-after:ko>": "ce326519a40b4012aa0352b402f1b75040a22b6c1a02461be2457fc7edff1f8d",
+    "<advanced shot:P7-before:en>": "7042099b5f08fd1096004df9fa9358dc0fb5164770500ed3da867544e1fd5247",
+    "<advanced shot:P7-before:ko>": "82a3fbf3086129f2f523029574b3b7b79c1d45993a278b3d186cc47d5e898bbe",
+    "<advanced shot:P8:en>": "3dab72e542988c134cc2922a3b20f189b811a4ba778d4987a8b775d5643f2f28",
+    "<advanced shot:P8:ko>": "df10de4640859aa4de333807cc44178ca2323e24cd66478854144b4468a20034"
   },
   "parts": {
     "<advanced shot:P1-after:en>": {
