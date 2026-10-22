@@ -25,16 +25,18 @@
 설정, 복구마다의 상태와 사유와 무엇을 기다리는지, 내용 없는 기록, 각 로그의 마지막 300줄을 담은 JSON 파일
 하나를 지정한 위치에 씁니다. 대화 id와 중단 id는 그 파일 안에서만 뜻이 통하는 별칭으로 바뀌고, 경로와
 Windows 사용자 이름, 이메일 형태의 문구는 지워집니다. 한 번 읽어 본 뒤, 로그 원문 대신 이 파일을 첨부해
-주세요. `python src\auto_resume.py diagnostics`도 같은 파일을 만듭니다.
+주세요. `python src/auto_resume.py diagnostics`도 같은 파일을 만듭니다. 진단 화면은 실행 중인 Codex 버전과 호환성 데이터가 그 버전에 붙인
+단어(*Verified*, *Checked*, *Compatible*, *Failed here*, *Incompatible*, *Unknown*)도 보여 주니, 신고할 때 둘 다 적어 주세요.
+아래 터미널 명령은 소스 체크아웃용입니다.
 
 소스에서 설치하셨다면 터미널에서:
 
 ```bash
-python src\auto_resume.py doctor
+python src/auto_resume.py doctor
 ```
 
 ```bash
-python src\auto_resume.py status
+python src/auto_resume.py status
 ```
 
 `doctor`는 찾아낸 Codex 엔진, 앱이 페어링되어 있는지, 재시작 관리자 프로브가 동작하는지, 로컬 기록을
@@ -46,8 +48,8 @@ python src\auto_resume.py status
 
 | 문제 | 함께 넣으면 도움이 되는 것 |
 | --- | --- |
-| **설치·업그레이드·복구 실패** | `Install.cmd`의 전체 출력, 사용 중인 Windows 버전, 그리고 Codex 앱이 열려 있었는지 여부 |
-| **Codex 버전 호환성** | `doctor`가 보여 주는 엔진 버전, 그리고 그 버전에 붙이는 단어(*verified*, *checked*, *compatible*, *failed here*, *incompatible*, *unknown* 가운데 하나) |
+| **설치·업그레이드·복구 실패** | 설치 창의 마지막 페이지(종료 코드와 로그) 또는 `Install.cmd`의 전체 출력, 사용 중인 Windows 버전, 그리고 Codex 앱이 열려 있었는지 여부 |
+| **Codex 버전 호환성** | 진단 화면(소스 체크아웃에서는 `doctor`)이 보여 주는 Codex 버전, 그리고 그 버전에 붙이는 단어(*verified*, *checked*, *compatible*, *failed here*, *incompatible*, *unknown* 가운데 하나) |
 | **복구되지 말았어야 할 장애가 복구됨** | `pending`이나 로그 줄에 표시된 장애 분류, 그리고 대신 기대하신 동작 |
 | **복구할 수 있는 장애를 놓침** | Codex가 화면에 보여 준 내용, 그리고 그 시각 전후의 로그 줄 |
 | **작업이 `waiting_for_loaded_thread`에 머무름** | 그 대화가 앱에 열려 있었는지 여부 — 아래 항목을 참고하세요 |
@@ -88,10 +90,11 @@ Codex에게 플러그인의 `reset_recovery_budget` tool을 `list_pending`에 �
 그 작업은 Codex에서 직접 이어 가야 합니다. Codex 안의 설정 패널에는 이 기능이 없습니다.
 
 **Windows가 설치기에 경고를 띄우거나 막습니다.** 이 프로젝트가 빌드하는 것은 어느 것도 Authenticode
-서명이 되어 있지 않습니다. `Install.cmd`와 `Uninstall.cmd`도, PowerShell 스크립트도, 릴리스에 든 작은
-프로그램 두 개 — 설정 창과 MCP 런처 — 도 마찬가지입니다. `.cmd` 파일은 파일 안에 서명을 담을 수
+서명이 되어 있지 않습니다. 대부분의 사람이 실행하는 설치 프로그램도, `Install.cmd`와 `Uninstall.cmd`도, PowerShell 스크립트도,
+릴리스에 든 작은 프로그램 두 개 — 설정 창과 MCP 런처 — 도 마찬가지입니다. SmartScreen이 *Windows의 PC 보호*라고 하면
+아래 설명대로 파일을 확인한 뒤 **추가 정보**를 누르고 **실행**을 고르세요. `.cmd` 파일은 파일 안에 서명을 담을 수
 없습니다. 내려받은 ZIP을 탐색기로 풀면 풀린 파일에도 다운로드 표시(mark of the web)가 남기 때문에,
-그것을 실행할 때 SmartScreen이 경고할 수 있습니다. 스마트 앱 컨트롤이 켜져 있다면 서명되지 않은
+그것을 실행할 때에도 SmartScreen이 경고할 수 있습니다. 스마트 앱 컨트롤이 켜져 있다면 서명되지 않은
 프로그램을 막을 수도 있습니다. 로그인할 때 실행되는 프로세스는 함께 담긴 `pythonw.exe`이며, 여기에는
 Python Software Foundation의 서명이 그대로 있습니다. `python.exe`와 인터프리터의 DLL, 확장 모듈도
 마찬가지입니다(인터프리터에 딸린 Visual C++ 런타임 DLL 두 개는 Microsoft가 서명했습니다). 무엇이든
