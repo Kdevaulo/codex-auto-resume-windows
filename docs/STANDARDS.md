@@ -114,7 +114,7 @@ changed).
 **A22** Waits are bounded. A transient wait comes only from a preset ladder or from Custom's five waits, each picked from a closed list and never typed; a Retry-After or jitter only lengthens a wait, and a rate limit's first wait is at least a minute.  
 *tested*: `test_recovery.py`, `test_ladder_and_guards.py`
 
-**A23** One failure is recovered once. The same Codex turn under a new identity is refused. A chain child inherits its counters, and is created already stopped if its parent was cancelled, handed over or out of budget.  
+**A23** One failure is recovered once. The same Codex turn under a new identity is refused. A chain child inherits its counters, and is created already stopped if its parent was cancelled or out of budget, or handed over by a person who joined before the recovery turn made any progress (amended by the owner on 2026-10-22).  
 *tested*: `test_store.py`, `test_recovery.py`
 
 **A24** Give attempts back: only for exhausted records, at most 3 per task, never for cancelled or possibly-sent ones. It sends nothing and never switches a conversation on.  
