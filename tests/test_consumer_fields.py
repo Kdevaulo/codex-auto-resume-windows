@@ -166,6 +166,8 @@ _RECEIVERS = {
     "gui/SettingsHomes.cs": {
         "view": [("bridge:status", "status.codex_homes"), ("bridge:dashboard", "status.codex_homes")],
         "home": [("bridge:status", "status.codex_homes.homes[]"), ("bridge:dashboard", "status.codex_homes.homes[]")],
+        # v0.6.18: the Codex home the card suggests, and what Not now leaves to suggest.
+        "suggestion": [("bridge:home-suggestion", "result"), ("bridge:home-dismiss", "result")],
     },
     "panel": {
         "payload": [("@", "")],
@@ -288,7 +290,7 @@ _TYPED = {
         "offer": wire.PowerChoice, "choice": wire.PowerChoice, "powerView": wire.PowerView,
         "armed": wire.PowerArmed, "shown": wire.PowerShown, "last": wire.PowerLast,
     },
-    "gui/SettingsHomes.cs": {"view": wire.HomesView, "home": wire.HomeView},
+    "gui/SettingsHomes.cs": {"view": wire.HomesView, "home": wire.HomeView, "suggestion": wire.HomeSuggestion},
 }
 TYPED = {(name, receiver): contract for name, table in _spread(_TYPED).items()
          for receiver, contract in table.items()}

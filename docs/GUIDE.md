@@ -1467,6 +1467,14 @@ Pending, History, the Codex panel and the cards show the alias beside a record o
 - **Measured up to 0.162.** That the desktop app reaches a second home (measurement MH) passed on
   `codex-cli 0.158` and again on `codex-cli 0.162`. On a Codex newer than 0.162 the card says it is
   unmeasured until it is measured again.
+- **A home it finds is suggested, never added.** From v0.6.18 the card says *Codex also uses <folder>.
+  Watch it too?* when this PC's Codex uses a Codex home that is not watched yet. It looks in two places
+  only: the `CODEX_HOME` variable of your Windows account, and the Codex app's own list of where it has
+  run (`%LOCALAPPDATA%\OpenAI\Codex\chrome-native-hosts-v2.json`). A folder is offered only if it could be
+  added - a local Codex home with its state database, not the default home or one already listed, under
+  any spelling. **Add** adds it as *Add a Codex home...* does, with the same limit of three; with three
+  added the card says so instead. **Not now** sets that folder aside for good. The switch *Suggest Codex
+  homes found on this PC*, on by default, turns the looking off.
 
 ### Languages
 

@@ -9,9 +9,9 @@ applied after the settings are read, never written into the file.
 """
 from __future__ import annotations
 
-from .. import config, homes, managed, notice_kinds, settings
+from .. import config, homefind, homes, managed, notice_kinds, settings
 from ..store import StoreError
-from ..win import folderid, policykeys
+from ..win import folderid, policykeys, userenv
 from .errors import ControlError, _thread_id
 
 
@@ -137,6 +137,23 @@ class SettingsMixin:
             homes.strict(changes[homes.FIELD], config.codex_home(), folderid.identity)
         except ValueError as exc:
             raise settings.SettingsError(str(exc)) from None
+
+    def home_suggestion(self) -> dict:
+        """v0.6.18: the Codex home Settings > Advanced offers to watch too (homefind.offer) - one this PC's Codex
+        uses that is not watched yet and was not set aside - and whether it looks at all and every home is added.
+        Read only: nothing is added here; Add writes `codex_homes` through update_settings, as the card's own Add."""
+        values = self.get_settings()
+        looked = homefind.on(values)
+        named = homefind.found(userenv.codex_home, installed=config.installed_home()) if looked else []
+        return homefind.offer(values, config.codex_home(), named, folderid.identity)
+
+    def dismiss_home_suggestion(self, path) -> dict:
+        """v0.6.18: Not now - `path` is never offered again (homefind.DISMISSED) - and what is offered next."""
+        if not isinstance(path, str) or not path.strip():
+            raise ControlError("name the folder to set aside", code="request_failed")
+        stored = settings.load(self.settings_path()).get(homefind.DISMISSED)
+        self.update_settings({homefind.DISMISSED: homefind.dismissed_with(stored, path.strip())})
+        return self.home_suggestion()
 
     def restore_defaults(self) -> dict:
         try:
