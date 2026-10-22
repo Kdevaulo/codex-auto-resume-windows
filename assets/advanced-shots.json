@@ -1,5 +1,47 @@
 {
   "fidelity": {
+    "en/diagnostics": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/history": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/overview": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/pending": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/settings": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
+    "en/statistics": {
+      "exact": 1.0,
+      "light": 388,
+      "outside": 0,
+      "passed": true,
+      "worst": 0
+    },
     "ko/diagnostics": {
       "exact": 1.0,
       "light": 388,
@@ -42,7 +84,7 @@
       "passed": true,
       "worst": 0
     },
-    "window": "65c143d609e9e7a76c0f8865ebf5791b2bd67098f574c3a22c6f3602b492543c"
+    "window": "9047c793f16b769d9657dbc0d3d3f42ce2617b3489ee090f114899615fd0e3c6"
   },
   "images": {
     "docs/images/advanced-page-after-ko.png": {
@@ -111,22 +153,22 @@
     }
   },
   "inputs": {
-    "<advanced shot:P1-after:en>": "8d918d1308062afd9f49fc5d3ba7a660a0dbf96401923e5e9953f334de5395f6",
-    "<advanced shot:P1-after:ko>": "60d667439e63579f663ad40a9daee3718e05a7025c1b80d9f18f1df87e082614",
-    "<advanced shot:P1-before:en>": "66235caffdc2b6904854c3e2c40f1180272e2b8b7ead4240e13d15d5924a219f",
-    "<advanced shot:P1-before:ko>": "ad6b4cbc1e2800e5f1ea8d52d39e568e77889d8b852de96f05d0552261828219",
-    "<advanced shot:P4-after:en>": "e6039d81b0ac87fc4ccf14fbd160c58bd40fcbeaaded4162181881edf60fc1af",
-    "<advanced shot:P4-after:ko>": "63661c0cc4648a162ee13eeb7971e62d4ef674d15ce5600270ee33ad1a310f4a",
-    "<advanced shot:P4-before:en>": "0f2de86de1805e0b8ec97990f99933b318d1660ca54dbe43ce1e7b26228a0d68",
-    "<advanced shot:P4-before:ko>": "5a6ba92600730cae0c04d39d718a9421a63101e1ade56752a085c3e1adfb88e9",
-    "<advanced shot:P5:en>": "c07347126bca8a4d257e3051974e1691143613bb8b4d6c2ea49c08ceca6c4013",
-    "<advanced shot:P5:ko>": "f03cd2a4f744173c774e23e80f77e1a4ffb01fd024e5740fc5f3319f9dab8286",
-    "<advanced shot:P7-after:en>": "1162e84be6edf458aa16bf02e8fd6d4f484514f158fcf909c7d98e8ec8704033",
-    "<advanced shot:P7-after:ko>": "67448f302d9a73d83c1af2373778b48596258062b69681195d2afb9d2333bef9",
-    "<advanced shot:P7-before:en>": "d91f54a2cc02c9a9d6fc3b2bb2d2e6bad71896bd4d0f48556a93eff4a0ecd3be",
-    "<advanced shot:P7-before:ko>": "7e3c6905d7e0137d50df8593ecb9d60199e560d501b7c156fd1e4095b567435b",
-    "<advanced shot:P8:en>": "1bf5a6cf686b89568966f8c7c67e567a56594ab4db1fe58ae0a18458f75b2a0e",
-    "<advanced shot:P8:ko>": "b501eb80892833e59ddc648e09f6e23296c4324d8a3764e5f244a1836b75441e"
+    "<advanced shot:P1-after:en>": "869a7b0c4019e94f0fc06663fb5c94fdf660bb8e464460192f3d33928cb99a41",
+    "<advanced shot:P1-after:ko>": "c46420b0189ec30e0b4992dd0d95db019ee9aecb19fc6f9673990cd98c7a4bf8",
+    "<advanced shot:P1-before:en>": "07541d9ed9c119aadf7bbf56866a4ecbf30c4712af6b171416e211619f53485b",
+    "<advanced shot:P1-before:ko>": "074436177cf1af997d7b93ae9b3b69599761b7a3ad6abbad7ad5cf2e75c32e25",
+    "<advanced shot:P4-after:en>": "fc17ea769401629f0632d4d5c963d05a3f3803458bfae917ac702e0848fa9958",
+    "<advanced shot:P4-after:ko>": "53f21f2cdb201e0d1dec3a702bf9b0c7d43a64f6b9055900b6849281e5fab99c",
+    "<advanced shot:P4-before:en>": "6aff08112088d0350232d7455fd017b24de228ad7066c94748c16fcd0fde3ec6",
+    "<advanced shot:P4-before:ko>": "c0d413aca15220388f5314ab1e5e03d61c9b8ec7e779bd8b4e10f67d0634c001",
+    "<advanced shot:P5:en>": "4f38f622ce5c9f755de7d0784fe999b7f12986f3b8bd87cc6b32ad84f32de70e",
+    "<advanced shot:P5:ko>": "3f69ed9541ca335132cae593d32ba79a047e4f747c2e0709bc5bc9a9cacd0ca7",
+    "<advanced shot:P7-after:en>": "a7b388c5b4a28a01cd6498c89ce221628c2c74c40652cfacb612e3703e06e945",
+    "<advanced shot:P7-after:ko>": "cab27ef80e8c9740718b582bb6c87fd9bbf31137f54fed525a37e34114c85287",
+    "<advanced shot:P7-before:en>": "ce3989a4017e2fabf7c5530bc99db32bdc0684a46b4283a439d65a0c47af066d",
+    "<advanced shot:P7-before:ko>": "c93b1785207dccdce3ac699bf338054ba4feffe3fce9fcd16f9bdeb504d1615d",
+    "<advanced shot:P8:en>": "e25c9b9bd2379db2c68c495dd034968a450f5408ba3d9102dcf8aaf8a16b1adf",
+    "<advanced shot:P8:ko>": "ac2141c7d680bfb5dff4039c4f5e0f283844342156f040a5df912ce6447a05c9"
   },
   "parts": {
     "<advanced shot:P1-after:en>": {
