@@ -304,6 +304,12 @@ $PolicyValues = @('DisableAutoResume', 'ForceObserveOnly', 'DisableUpdateCheck',
 # the word `convert3` on its row, which has meant "converted first" since schema 3 was the only older
 # one); a target on any other is not offered at all.
 $StateSchemaSince = @(@('0.6.16-beta', 5), @('0.6.15', 4), @('0.6.15-beta', 5), @('0.6.11-beta', 4), @('0.6.0', 3))
+# The oldest schema whose reader may use this version's state (store/schema.py READABLE_FROM), and the first version
+# whose store reads that mark. A target on this version's own schema keeps the state as it is (`kept`), and so does one
+# from $StateMarkSince on whose schema is $StateReadableFrom or later: it reads a newer state so marked as its own. A
+# version before $StateMarkSince knows no mark and reads its own schema alone.
+$StateReadableFrom = 5
+$StateMarkSince = '0.6.18'
 # The advanced settings' form from each version on, newest first; the first row is this version's
 # own. An advanced target on an older form cannot read them: every advanced feature is off there.
 # v0.6.15 is v0.6.14's code (form 3) between v0.6.15-beta and v0.6.16-beta (both form 4).
@@ -1166,7 +1172,9 @@ function Get-VersionVerdict {
     if ((Compare-ProductVersion -Left $number -Right $PickFloor) -lt 0) { return $null }
     if ($Edition -eq 'advanced' -and (Compare-ProductVersion -Left $number -Right $EditionsSince) -lt 0) { return $null }
     $schema = Get-SinceValue -Version $number -Table $StateSchemaSince
-    if ($schema -ne $StateSchemaSince[0][1] -and $schema -ne 4 -and $schema -ne 3) { return $null }
+    $kept = ($schema -eq $StateSchemaSince[0][1] -or
+             ($schema -ge $StateReadableFrom -and (Compare-ProductVersion -Left $number -Right $StateMarkSince) -ge 0))
+    if (-not $kept -and $schema -ne 4 -and $schema -ne 3) { return $null }
     $order = Compare-ProductVersion -Left $number -Right $Installed
     $other = $Edition -ne $InstalledEdition
     $row = [pscustomobject]@{ Version = $number; Edition = $Edition; Answer = 'refused'; Detail = '' }
@@ -1189,7 +1197,7 @@ function Get-VersionVerdict {
     $words = @()
     if ($order -gt 0) { $words += 'newer' } elseif ($order -lt 0) { $words += 'older' } else { $words += 'same' }
     if ($Entry.Prerelease) { $words += 'prerelease' } else { $words += 'release' }
-    if ($schema -eq $StateSchemaSince[0][1]) { $words += 'kept' } else { $words += 'convert3' }
+    if ($kept) { $words += 'kept' } else { $words += 'convert3' }
     if (-not $Entry.Prerelease -and $number -ceq [string]$Latest) { $words += 'latest' }
     if ($other) { $words += 'edition' }
     if ($Edition -eq 'advanced' -and (Get-SinceValue -Version $number -Table $AdvancedStateSince) -ne $AdvancedStateSince[0][1]) {

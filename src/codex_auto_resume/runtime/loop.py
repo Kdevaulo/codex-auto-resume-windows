@@ -347,7 +347,8 @@ class WatchLoop:
             while True:
                 ok = False
                 try:
-                    if store.schema_version() > SCHEMA_VERSION:
+                    # v0.6.18: a later version's schema marked readable from this one is used as it is (READABLE_FROM).
+                    if store.schema_version() > SCHEMA_VERSION and store.readable_from() > SCHEMA_VERSION:
                         raise StateFromNewerVersion("newer schema")
                     # Built lazily and retried: a transient codex.exe probe failure (an
                     # antivirus scan or an in-progress Codex update at logon) must defer
