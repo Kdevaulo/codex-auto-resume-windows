@@ -90,6 +90,15 @@ class DealTests(unittest.TestCase):
             round_deal += max(sum(costs[index::pagecase.LAYOUT_WORKERS]) for index in range(pagecase.LAYOUT_WORKERS))
         self.assertLess(dealt, round_deal * 0.8)
 
+    def test_no_module_audits_more_than_its_share_of_the_costliest_language(self):
+        """The processes of one module contend for one runner: in dev run 39843036304 the module with four Japanese
+        audits took twice as long as the one with the fifth and most of the rest."""
+        counts = [sum(1 for locale, _ in pagecase.layout_jobs(module) if locale == "ja")
+                  for module in range(1, pagecase.LAYOUT_MODULES + 1)]
+        self.assertEqual(sum(counts), len(pagecase.SCALES))
+        self.assertLessEqual(max(counts), pagecase.COSTLIEST_PER_MODULE)
+        self.assertEqual(max(pagecase.AUDIT_COST, key=pagecase.AUDIT_COST.get), "ja")
+
     def test_japanese_is_never_two_audits_in_one_process(self):
         for module in range(1, pagecase.LAYOUT_MODULES + 1):
             costs = module_costs(module)
