@@ -44,7 +44,7 @@ class Scratch(unittest.TestCase):
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)
-        self.root = Path(folder.name)
+        self.root = Path(folder.name).resolve()   # the backend resolves its exe; a runner's TEMP is an 8.3 short name
 
 
 class WatchWithNoEngineTests(unittest.TestCase):

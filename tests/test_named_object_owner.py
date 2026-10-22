@@ -53,7 +53,10 @@ class ForeignOwnerTests(unittest.TestCase):
     def test_this_accounts_own_objects_are_read_as_its_own(self):
         handle = plant("mutex", self.app.mutex().name, None)
         self.addCleanup(close, handle)
-        self.assertEqual(kernel._owner_sid(handle), kernel._user_sid())
+        # An elevated token (a CI runner's administrator) gives what it makes to the Administrators group, which
+        # trusted_owner accepts as this account's own; any other token gives it to the account itself.
+        self.assertIn(kernel._owner_sid(handle), {kernel._user_sid(), *kernel.TRUSTED_OWNERS})
+        self.assertTrue(kernel.trusted_owner(kernel._owner_sid(handle), kernel._user_sid()))
         self.assertIs(self.app.watcher_running(), False, "a real second watcher's mutex is still honoured")
 
     def test_a_mutex_another_account_made_first_is_refused(self):

@@ -58,9 +58,13 @@ class RelocatedHomeAclTests(unittest.TestCase):
                   block("function Resolve-Canonical", "function Get-Edition") +
                   block("function Protect-RelocatedHome", "function Read-UninstallEntry") +
                   "$answer = Protect-RelocatedHome -Root %s -Profile %s\n" % (ps_literal(self.home), ps_literal(profile)) +
-                  "function Rules { param($Path) $acl = Get-Acl -LiteralPath $Path\n"
-                  "  @{ protected = $acl.AreAccessRulesProtected; sids = @($acl.Access | ForEach-Object {\n"
-                  "     try { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { [string]$_.IdentityReference } }) } }\n"
+                  # Read through .NET as the installer writes: Get-Acl lives in a module a CI runner's PSModulePath
+                  # cannot load into Windows PowerShell.
+                  "function Rules { param($Path)\n"
+                  "  if ([IO.Directory]::Exists($Path)) { $acl = (New-Object IO.DirectoryInfo $Path).GetAccessControl() }\n"
+                  "  else { $acl = (New-Object IO.FileInfo $Path).GetAccessControl() }\n"
+                  "  @{ protected = $acl.AreAccessRulesProtected; sids = @($acl.GetAccessRules($true, $true,\n"
+                  "     [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value }) } }\n"
                   "$me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value\n"
                   "ConvertTo-Json -Compress -Depth 4 @{ answer = $answer; me = $me; root = (Rules %s); child = (Rules %s) }\n"
                   % (ps_literal(self.home), ps_literal(self.home / "watcher-launcher.py")))
