@@ -380,8 +380,9 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   this product can only mark its tools, and Codex's approval settings decide whether a prompt
   appears. `update_settings` offers and accepts only the settings a person can change in the
   window, not the engine path (`codex_exe`) or the detection look-back, and `get_status` does not
-  include the install path. From v0.6.3 it also leaves out the text of the Custom message
-  (see the next item). In v0.5.7 only `restore_default_settings` and `cancel_recovery` are
+  include the install path. From v0.6.3 `update_settings` also leaves out the text of the Custom message, while the
+  settings `get_status` carries include it, read-only: Codex can read it there and cannot change it (see
+  the next item). In v0.5.7 only `restore_default_settings` and `cancel_recovery` are
   marked; `set_auto_recovery`, `reset_recovery_budget`, `start_watcher` and `update_settings`,
   which there also offers the engine path, have no destructive annotation requesting approval,
   and a pause-withdrawn recovery there is cancelled outright. The advanced edition adds three

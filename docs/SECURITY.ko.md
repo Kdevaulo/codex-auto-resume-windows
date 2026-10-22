@@ -333,7 +333,8 @@ write-ahead log를 쓰는 경우, 읽는 동안에도 SQLite가 그 옆의 공�
   수 있을 뿐이고, 확인 창이 뜰지는 Codex의 승인 설정이 정합니다. `update_settings`는 창에서 사람이 바꿀
   수 있는 설정만 제시하고 받아들이며, 엔진
   경로(`codex_exe`)나 감지 조회 기간은 다루지 않습니다. `get_status`에는 설치 경로가 들어 있지 않습니다.
-  v0.6.2 다음 릴리스부터는 직접 입력 메시지의 문장도 다루지 않습니다(다음 항목 참고).
+  v0.6.2 다음 릴리스부터는 `update_settings`가 직접 입력 메시지의 문장도 다루지 않으며, `get_status`가 돌려주는 설정에는 그 문장이
+  읽기 전용으로 들어 있어 Codex가 읽을 수는 있어도 바꿀 수는 없습니다(다음 항목 참고).
   v0.5.7에서는 `restore_default_settings`와 `cancel_recovery`에만 표시가 있고,
   `set_auto_recovery`, `reset_recovery_budget`, `start_watcher`, 그리고 그 릴리스에서는 엔진 경로도
   제시하는 `update_settings`에는 승인을 요청하는 destructive 주석이 없습니다. 또 그 릴리스에서는 일시
