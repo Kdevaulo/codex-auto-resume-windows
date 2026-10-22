@@ -39,8 +39,11 @@ PROBE = r"""
 param([string]$How)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
+# A failing probe fails its test: never a dialog on the desktop waiting for someone (every handler below exits with 3).
+[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::ThrowException)
+function Stop-Probe([object]$Problem) { [Console]::Error.WriteLine('probe failed: ' + $Problem); [Environment]::Exit(3) }
 $asm = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
-$any = [Reflection.BindingFlags]'Static,Instance,NonPublic,Public'
+$script:any = [Reflection.BindingFlags]'Static,Instance,NonPublic,Public'
 Add-Type -ReferencedAssemblies System.Windows.Forms -TypeDefinition @'
 using System; using System.Threading; using System.Runtime.InteropServices;
 public static class CarPickHiddenRunner {
@@ -53,47 +56,62 @@ public static class CarPickHiddenRunner {
 }
 '@
 $flowType = $asm.GetType('CodexAutoResume.InstallerFlow', $true)
-$windowType = $asm.GetType('CodexAutoResume.InstallerWindow', $true)
-$flow = [Activator]::CreateInstance($flowType, $any, $null,
+$script:windowType = $asm.GetType('CodexAutoResume.InstallerWindow', $true)
+foreach ($member in @('Running', 'Page', 'Code')) {
+    if ($null -eq $script:windowType.GetProperty($member, $script:any)) { Stop-Probe ('InstallerWindow has no ' + $member) }
+}
+$flow = [Activator]::CreateInstance($flowType, $script:any, $null,
                                     [object[]]@('update', 'C:\Users\ExampleUser\.codex-auto-resume', 'standard', 'standard', '0.6.17'), $null)
-$flowType.GetField('Another', $any).SetValue($flow, $true)
-$words = [Activator]::CreateInstance($asm.GetType('CodexAutoResume.InstallerWords', $true), $any, $null, [object[]]@($null, 'en'), $null)
-$runner = [Delegate]::CreateDelegate($windowType.GetNestedType('Runner', $any), [CarPickHiddenRunner].GetMethod('Run'))
-$window = [Activator]::CreateInstance($windowType, $any, $null, [object[]]@($flow, $words, $null, $runner, $null, $null), $null)
-$owner = New-Object System.Windows.Forms.Form
-$owner.StartPosition = 'Manual'; $owner.Location = New-Object System.Drawing.Point(-4000, -4000)
-$window.StartPosition = 'Manual'; $window.Location = New-Object System.Drawing.Point(-4000, -3000)
+$flowType.GetField('Another', $script:any).SetValue($flow, $true)
+$words = [Activator]::CreateInstance($asm.GetType('CodexAutoResume.InstallerWords', $true), $script:any, $null, [object[]]@($null, 'en'), $null)
+$runner = [Delegate]::CreateDelegate($script:windowType.GetNestedType('Runner', $script:any), [CarPickHiddenRunner].GetMethod('Run'))
+$script:window = [Activator]::CreateInstance($script:windowType, $script:any, $null, [object[]]@($flow, $words, $null, $runner, $null, $null), $null)
+$script:owner = New-Object System.Windows.Forms.Form
+$script:owner.StartPosition = 'Manual'; $script:owner.Location = New-Object System.Drawing.Point(-4000, -4000)
+$script:window.StartPosition = 'Manual'; $script:window.Location = New-Object System.Drawing.Point(-4000, -3000)
+$script:how = $How
 $script:r = @{ how = $How }
-$owner.add_Shown({
-    $t = New-Object System.Windows.Forms.Timer; $t.Interval = 1500
-    $t.add_Tick({ $t.Stop()
+function Get-Window([string]$Name) { return $script:windowType.GetProperty($Name, $script:any).GetValue($script:window) }
+$script:owner.add_Shown({
+  try {
+    $script:hide = New-Object System.Windows.Forms.Timer; $script:hide.Interval = 1500
+    $script:hide.add_Tick({
+      try {
+        $script:hide.Stop()
         # The Dashboard minimized under the window; or the window hidden outright, which ends the loop whatever it does.
-        if ($How -eq 'owner') { [void][CarPickHiddenRunner]::ShowWindow($owner.Handle, 6) } else { $window.Hide() }
+        if ($script:how -eq 'owner') { [void][CarPickHiddenRunner]::ShowWindow($script:owner.Handle, 6) } else { $script:window.Hide() }
+      } catch { Stop-Probe $_ }
     })
-    $t.Start()
-    $done = New-Object System.Windows.Forms.Timer; $done.Interval = 250
-    $done.add_Tick({ if ([CarPickHiddenRunner]::Ended -eq 0 -and $windowType.GetProperty('Page', $any).GetValue($window) -eq 'finish') { $done.Stop(); $window.Close() } })
-    $done.Start()
-    $null = $window.ShowDialog($owner)
+    $script:hide.Start()
+    $script:done = New-Object System.Windows.Forms.Timer; $script:done.Interval = 250
+    $script:done.add_Tick({
+      try {
+        if ([CarPickHiddenRunner]::Ended -eq 0 -and (Get-Window 'Page') -eq 'finish') { $script:done.Stop(); $script:window.Close() }
+      } catch { Stop-Probe $_ }
+    })
+    $script:done.Start()
+    $null = $script:window.ShowDialog($script:owner)
     $script:r.first_ended = [CarPickHiddenRunner]::Ended
-    $script:r.owner_iconic = [CarPickHiddenRunner]::IsIconic($owner.Handle)
-    if ($How -eq 'gap') {
+    $script:r.owner_iconic = [CarPickHiddenRunner]::IsIconic($script:owner.Handle)
+    if ($script:how -eq 'gap') {
         # The run ends while the window has no handle; then it is shown again, as SettingsForm.InstallPick does.
-        while ([CarPickHiddenRunner]::Ended -ne 0) { Start-Sleep -Milliseconds 100 }
+        $deadline = (Get-Date).AddSeconds(20)
+        while ([CarPickHiddenRunner]::Ended -ne 0 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 100 }
         Start-Sleep -Milliseconds 500
-        $script:r.running_in_gap = [bool]$windowType.GetProperty('Running', $any).GetValue($window)
+        $script:r.running_in_gap = [bool](Get-Window 'Running')
         $shows = 0
-        while ($windowType.GetProperty('Running', $any).GetValue($window) -and -not $window.IsDisposed -and $shows -lt 3) {
+        while ((Get-Window 'Running') -and -not $script:window.IsDisposed -and $shows -lt 3) {
             $shows++
-            $null = $window.ShowDialog($owner)
+            $null = $script:window.ShowDialog($script:owner)
         }
         $script:r.shows = $shows
     }
-    $script:r.code = $windowType.GetProperty('Code', $any).GetValue($window)
-    $script:r.page = $windowType.GetProperty('Page', $any).GetValue($window)
-    $owner.BeginInvoke([Action]{ $owner.Close() }) | Out-Null
+    $script:r.code = Get-Window 'Code'
+    $script:r.page = Get-Window 'Page'
+    $script:owner.BeginInvoke([Action]{ $script:owner.Close() }) | Out-Null
+  } catch { Stop-Probe $_ }
 })
-[System.Windows.Forms.Application]::Run($owner)
+[System.Windows.Forms.Application]::Run($script:owner)
 $script:r | ConvertTo-Json -Compress
 """
 
