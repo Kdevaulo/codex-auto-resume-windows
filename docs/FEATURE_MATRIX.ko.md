@@ -81,7 +81,7 @@
   그런 테스트는 기능이 없으면 스스로 건너뜁니다. 건너뛴 테스트는 아무것도 증명하지 않으므로,
   건너뛸 가능성이 있는 곳은 네 번째 칸에 적었습니다.
 
-  v0.6.6의 나무를 전부 돌린 기록은 다음과 같다. 메인테이너의 Windows 11 기계에서 Python 3.13
+  v0.6.6의 나무를 전부 돌린 기록은 다음과 같다(과거의 수치이며 지금의 테스트 모음은 훨씬 큽니다). 메인테이너의 Windows 11 기계에서 Python 3.13
   (8개 건너뜀)으로 2,572개 테스트가 실패 없이 통과했고, GitHub의 Windows 러너에서
   3.12, 3.13, 3.14, 3.15 모두 초록불이었다.
 
@@ -489,13 +489,15 @@
 | 홈의 짧은 경로 표기와 대소문자 표기가 같은 설치로 풀린다 | UNIT TESTED | `tests/test_plugin.py:ShortPathOwnershipTests`(7개) | - |
 | `codex-auto-resume:` 프로토콜 처리기는 사용자별로 등록되고, activate 동사만 싣고, 우리 것일 때만 지워진다 | UNIT TESTED | `tests/test_notify.py:ProtocolRegistrationTests`(4개); `tests/test_cli.py:DoctorProtocolCheckTests` | 가짜 레지스트리를 상대로 한다. **실제 프로토콜 등록도, 실제 알림 버튼에서 온 활성화 기록도 없다.** v0.6.3부터 같은 동사가 대시보드 열기 요청도 싣는데, 그것을 덮는 테스트는 없다(11절). |
 | 워처 실행기는 시스템 실행 파일을 절대 경로로 부르고, 현재 디렉터리로는 아무것도 찾지 않는다 | UNIT TESTED | `tests/test_upgrade_handover.py:LauncherPathTests`(3개) | - |
-| 여러 Codex 홈(이번 릴리스, 표준판): 최대 세 개 더, 각각 별칭과 함께, 대시보드만 쓴다 - Codex의 update_settings는 거절하고 Codex로 가는 어떤 응답에도 경로가 실리지 않는다. 각 홈은 경로와 폴더로 잠가 이름이 둘인 한 폴더는 한 홈이다. UNC 경로, 링크, 상태 데이터베이스가 없는 폴더, 두 번 지정된 폴더는 거절된다. 홈마다 엔진 하나가 따로 읽기, 백엔드, 잠금, NULL 플러그를 쓴다. 한 홈의 기록은 다른 홈으로 보내지 않는다. 홈을 빼면 기다리던 복구가 취소되고, 대기열에 들어간 것은 끝날 때까지 지켜본다 | INTEGRATION TESTED | `tests/test_homes.py`(11개); `tests/test_homes_identity.py`(10개); `tests/test_settings_homes.py`(10개) | MH는 codex-cli 0.158에서만 통과했다. 실제 설치에서 두 번째 홈을 지켜본 적은 없다. |
+| 여러 Codex 홈(이번 릴리스, 표준판): 최대 세 개 더, 각각 별칭과 함께, 대시보드만 쓴다 - Codex의 update_settings는 거절하고 Codex로 가는 어떤 응답에도 경로가 실리지 않는다. 각 홈은 경로와 폴더로 잠가 이름이 둘인 한 폴더는 한 홈이다. UNC 경로, 링크, 상태 데이터베이스가 없는 폴더, 두 번 지정된 폴더는 거절된다. 홈마다 엔진 하나가 따로 읽기, 백엔드, 잠금, NULL 플러그를 쓴다. 한 홈의 기록은 다른 홈으로 보내지 않는다. 홈을 빼면 기다리던 복구가 취소되고, 대기열에 들어간 것은 끝날 때까지 지켜본다 | INTEGRATION TESTED | `tests/test_homes.py`(11개); `tests/test_homes_identity.py`(10개); `tests/test_settings_homes.py`(10개) | MH는 codex-cli 0.158에서 통과했고 0.162에서 다시 통과했다. 실제 설치에서 두 번째 홈을 지켜본 적은 없다. |
 
 ## 13. 설치, 업그레이드, 복구, 제거
 
 | 기능 | 근거 등급 | 뒷받침하는 것 | 아직 없는 것 |
 | --- | --- | --- | --- |
 | 설치 관리자가 PowerShell로 파싱된다 | REAL WINDOWS TESTED | `tests/test_installer.py:ParseTests.test_the_installer_parses_as_powershell`가 진짜 PowerShell 파서로 `build/install/install.ps1`을 읽는다 | 파싱은 실행이 아니다. 스위트에서 설치 관리자를 끝까지 돌리는 것은 없다. |
+| 설치 창의 막대는 센 작업만큼만 찬다(v0.6.18): 복사한 파일, 플러그인의 Codex 명령, 설정의 단계, 상태 점검의 검사, 지운 항목. 끝난 몫까지만 미끄러지듯 올라가고, 100%는 잘 끝난 실행 뒤에야 닿으며, 설치기의 진행 줄은 bootstrap의 엄격 모드에서도 유지된다 | INTEGRATION TESTED | `tests/test_installer_progress_lines.py:ProgressTests`(11개), `ScriptTests`(9개), `PythonTests`(4개), `RouteTests`(3개); `tests/test_installer_progress_strict.py:StrictModeTests`(3개) | 실제 설치와 실제 업데이트에서 막대를 지켜보는 사람. |
+| 업데이트의 압축 파일은 스트리밍으로 받는다(v0.6.18): 막대에 실제 바이트가 보이고, 리다이렉트 한 번마다 묻기 전에 확인하며(https와 허용된 호스트), 응답은 한 바이트를 쓰기 전에 확인하고, 어떤 실패 뒤에도 일부만 받은 파일이 남지 않으며, 중간에 끊긴 다운로드는 그렇다고 말하고 이어 받는다 | INTEGRATION TESTED, 로컬 서버를 상대로, 그리고 cmdlet 옆의 실제 요청으로 | `tests/test_bootstrap_streamed_download.py:StreamedDownloadTests`(27개)와 `RealRequestBesideTheCmdletTests`(10개) | GitHub 자체에서의 내려받기. 일부러 어떤 테스트도 거기에 닿지 않는다. |
 | 관리자 권한이 필요 없고, 서비스나 예약 작업을 만들지 않고, 기계 전역 레지스트리를 쓰지 않고, 설치 때 아무것도 내려받지 않고, 번들 런타임을 쓴다 | UNIT TESTED | `tests/test_installer.py:SafetyTests`(12개) | `build/install/install.ps1`에 대한 소스 확인이다. 실제 설치는 수행되지 않는다. |
 | 프로그램 디렉터리는 지우지 않고 옆으로 옮기며, 어느 단계에서 실패해도 설치가 되돌려진다 | UNIT TESTED | `tests/test_installer.py:InPlaceUpgradeTests`(7개) | - |
 | 옆으로 옮긴 기록은 첫 이동 전에 통째로 쓰이고, 무엇을 쓸어내기 전에 읽히며, 두 나무가 제자리에 있을 때만 지워진다 | UNIT TESTED | `tests/test_installer.py:CrashDuringTheCopyTests`(10개), `JournalRecoveryTests`(11개, `test_a_tree_left_aside_by_an_interrupted_run_is_put_back`, `test_a_path_outside_the_installation_is_never_moved`, `test_a_journal_that_cannot_be_read_stops_before_the_sweep` 포함) | 실제 설치에서 정전을 흉내 내 본 적은 없다. 크래시 지점은 테스트가 고른 것이다. |
@@ -625,7 +627,7 @@ v0.6.5에서 새로 생겼습니다. 답하는 것은 좁습니다. 이 PC의 Co
 
 v0.6.10 다음 릴리스에서 새로 생겼습니다. 표준판은 위의 모든 줄입니다. 고급판은 같은 프로그램에, 표준판이 지키는
 기준에서 벗어나는 기능 - Codex와 함께 시작하기, 마커 없는 이어가기, 목표 이어가기, 표준판이 그냥 두는 것을 복구하는 여섯 가지, 그리고 이번 릴리스에서 더한, Codex 앱이 쥐고 있지 않은
-대화를 실행하거나 복구하는 다섯 가지 - 을 더한 것이며, 그 기능들은
+대화를 실행하거나 복구하는 다섯 가지, 그 뒤로 [EDITIONS.ko.md](EDITIONS.ko.md)가 나열하는 서른두 가지 가운데 나머지 - 을 더한 것이며, 그 기능들은
 저마다 사람이 켜기 전까지 꺼져 있습니다. 아래 줄들은 두 판을 떼어 두는 일과, 켜진 기능이 하는 일에 관한 것이고,
 [SECURITY.ko.md](SECURITY.ko.md)와 [PRIVACY.ko.md](PRIVACY.ko.md)가 같은 것을 글로 말합니다. 고급판의 줄들은
 `tests/codexsim.py`로 돌린 엔진과 가짜 앱 서버에, 대시보드 페이지의 줄은 컴파일된 창에 기대며, 어느 기능도 아직 출시된 그대로 실제
@@ -642,7 +644,7 @@ Codex에 대고 돌려 본 적은 없습니다.
 | 일시 중지와 동의가 모든 기능보다 먼저다. 일시 중지된 워처는 플러그에 아무것도 묻지 않고, 꺼진 대화나 취소된 레코드는 넘기지 않으며, 마지막 확인 뒤에 확정된 일시 중지는 경로를 실행 보호 장치에서 멈춘다 | INTEGRATION TESTED | `tests/test_plug_points.py:ConsentFirstTests` (2개), `UnloadedTests.test_a_pause_that_commits_after_the_pre_send_look_stops_the_route_at_the_guard`; `advanced/tests/test_advanced_start_with_codex.py:CoreCarryOutTests.test_a_pause_stops_the_start_and_no_wmi_create_is_made` | - |
 | 기능마다의 상한은 선점할 때, Codex에 무엇이든 묻기 전에 쓰고, 그것을 넘으면 코어가 표준판처럼 한다. 모든 기능 위에 한 시간 12번의 상한 하나가 있고, 낮출 수는 있어도 올릴 수는 없다 | INTEGRATION TESTED | `advanced/tests/test_advanced_marker_free.py:SpendBeforeSendTests` (2개), `CeilingTests` (2개); `advanced/tests/test_advanced_goal.py:SpendBeforeSendTests` (2개), `CeilingTests` (2개); `advanced/tests/test_advanced_arming.py:CeilingTests.test_the_global_ceiling_is_lowered_in_the_dashboard_and_never_raised_past_twelve` | - |
 | WMI를 통해 Codex와 함께 시작하기: 켜져 있으면 Codex가 MCP 서버를 시작할 때 코어가 워처를 시작하며, Codex의 작업 개체가 끝낼 상황이면 고정된 PowerShell 스크립트 하나가 실행하는, 창 없는 `Win32_Process.Create`를 거친다. 쓰는 상한은 없고, WMI의 거부는 pid가 아니라 코드이며, 지켜보는 중이면 기록만 한다 | UNIT TESTED | `advanced/tests/test_advanced_start_with_codex.py:ArmingTests` (3개), `RouteTests` (5개), `CoreCarryOutTests` (5개), `NoSpendTests.test_it_spends_no_ceiling_unit_it_starts_it_does_not_send`; `tests/test_plug_points.py:StartRouteTests` (6개) | 실제 프로세스를 시작하거나 WMI에 닿는 테스트는 없다. 경로는 이 코드가 아니라 측정 도구로 실제 기계에서 한 번 쟀다(MW, `docs/evidence/live/measurement-mw.json`: Codex가 플러그인 서버에 거는 것과 같은 제한을 둔 작업 개체 안에서 WMI로 시작해 그 밖에 자리 잡았고, 그 작업 개체를 닫은 뒤에도 살아 있었다. codex-cli 0.163.0-alpha.10.2). 이 기능이 시작한 워처가 Codex 자체보다 오래 사는 것을 사람이 지켜본 적은 아직 없으며, [LIVE_ACCEPTANCE.ko.md](LIVE_ACCEPTANCE.ko.md)가 그것을 요구한다. |
-| 마커 없는 이어가기: 켜져 있으면 글이 마커 없이, 중단에서 만든 클라이언트 id를 달고 `thread/queue/add`로 가며, 그 id만이 전달을 증명한다. 증명할 수 없는 전송은 붙들어 두고 다시 보내지 않으며 기능을 끄고, 상한을 넘으면 코어가 마커를 달아 보낸다 | INTEGRATION TESTED | `advanced/tests/test_advanced_marker_free.py:ArmedTests` (2개), `TripwireTests` (4개), `ChannelTests` (9개), `ShadowNeverActsTests.test_watched_it_journals_what_it_would_have_done_and_core_sends_the_marker`; `tests/test_plug_points.py:DeliveryTests` (12개) | 가짜 앱 서버를 상대로 한다. 클라이언트 id를 단 `thread/queue/add`는 이 코드가 아니라 측정 도구로 실제 Codex에서 한 번 쟀다(M7, `docs/evidence/live/measurement-m7.json`). |
+| 마커 없는 이어가기: 켜져 있으면 글이 마커 없이, 중단에서 만든 클라이언트 id를 달고 `thread/queue/add`로 가며, 그 id만이 전달을 증명한다. 증명할 수 없는 전송은 붙들어 두고 다시 보내지 않으며 기능을 끄고, 상한을 넘으면 코어가 마커를 달아 보낸다 | INTEGRATION TESTED | `advanced/tests/test_advanced_marker_free.py:ArmedTests` (2개), `TripwireTests` (4개), `ChannelTests` (10개), `ShadowNeverActsTests.test_watched_it_journals_what_it_would_have_done_and_core_sends_the_marker`; `tests/test_plug_points.py:DeliveryTests` (12개) | 가짜 앱 서버를 상대로 한다. 클라이언트 id를 단 `thread/queue/add`는 이 코드가 아니라 측정 도구로 실제 Codex에서 한 번 쟀다(M7, `docs/evidence/live/measurement-m7.json`). |
 | 목표 이어가기: 켜져 있으면, 앱이 쥐고 있지 않은 대화의 사용 한도에서 그 대화의 멈춘 목표를 `thread/goal/set`으로 활성으로 돌린다 - 목표를 새로 만들지 않고 그 글도 건드리지 않는다. 목표가 활성인 동안 표준 이어서 하기를 최대 10분 붙들어 두고, 앱이 쥐고 있는 대화에서는 지금 쓰는 Codex에서 M2b가 통과했을 때만 움직인다 | INTEGRATION TESTED | `advanced/tests/test_advanced_goal.py:UnloadedTests` (6개), `RaceTests` (2개), `LoadedTests` (5개), `TripwireTests` (5개), `RouteTests` (12개), `GoalsReaderTests` (4개) | 가짜 앱 서버와 테스트가 만든 목표 데이터베이스를 상대로 한다. M2는 앱이 쥐고 있는 대화에서 실패했고(`docs/evidence/live/measurement-m2.json`), 그래서 앱이 쥐고 있지 않은 곳에서 움직인다. M2b는 아직 재지 않았고, 이 코드로 실제 목표를 활성으로 돌린 적도 없다. |
 | 기능의 앱 서버 세션은 밝혀 둔 메서드만 부르고 로그인·토큰·증명 메서드는 부르지 않는다. Codex의 승인, 권한, 입력, 정보 요청 일곱 가지에는 Codex 스키마가 저마다에 주는 거절로 답하고, 그 밖의 모든 요청에는 오류로 답한다 | UNIT TESTED | `advanced/tests/test_advanced_measure.py:AllowListTests` (5개), `RefusalTests` (5개); `advanced/tests/test_advanced_marker_free.py:ChannelTests.test_its_session_may_call_its_one_method_and_nothing_else`; `advanced/tests/test_advanced_goal.py:RouteTests.test_its_session_may_call_its_two_methods_and_nothing_else` | 거절 표는 한 Codex가 생성한 스키마와만 대조했다. |
 | 측정 도구는 사람이 브리지로 `measure`를 보낼 때만, 켜진 기능이 있든 없든 측정을 돌린다. 여기에 닿는 MCP tool은 없고 판을 만드는 것은 측정을 돌리지 않는다. 그 세션은 그 측정의 메서드만 부르고, 기록에는 참거짓 값, 횟수, 정해진 낱말, 별칭만 들어가며 대화의 id는 들어가지 않는다 | UNIT TESTED | `advanced/tests/test_advanced_measure.py:InvocationTests` (6개), `AllowListTests` (5개), `RecordTests` (11개), `ThreadTests` (5개), `M6Tests` (5개), `M2bTests` (4개), `SidePanelMeasurementTests` (11개) | 어떤 측정은 가리킨 대화에 무언가를 한다. M2와 M2b는 그 목표를 활성으로 돌리고, M2b와 M7은 이 제품이 쓴 글을 큐에 넣으며, M6은 모델 턴을 시작한다. 설치본에서도 그 호출을 하고, 그다음에야 `docs/evidence/live/`가 없어 기록이 거절된다(`measure.run`). 실제 Codex에 대고 측정을 돌리는 테스트는 없고, `docs/evidence/live/`의 기록은 프로젝트 소유자의 기계에서 손으로 잰 것이다. |
@@ -683,6 +685,8 @@ Codex에 대고 돌려 본 적은 없습니다.
 | 글 없이 이어가기(이번 릴리스): 여기서 실행하는 대화의 이어서 하기를 글 없이 시작하고, 도착은 경로가 그 턴에 돌려준 id로 증명하며, 기록은 "글 없이 이어 갔고 id로 증명했습니다"라고 말한다. Codex가 입력 없는 턴을 거절하면 다음 시도는 글을 달고 기능은 꺼지며 켜 둔 채로 둘 수 없다. 하루 24번, 대화 하나에 5번 | UNIT TESTED | `tests/test_silent_core.py:SilentTests`(5개); `advanced/tests/test_advanced_silent_continuation.py`(6개); `advanced/tests/test_advanced_rows.py:SilentTests`(2개) | M3B는 codex-cli 0.163.0-alpha.10.2에서 통과했다(`docs/evidence/live/measurement-m3b.json`). 실제 대화에 대고 돌린 적은 없다. |
 | 엔진이 마지막으로 쓴 것보다 새 Codex가 쓴 터미널이나 VS Code의 대화는 자기만의 이유로 기다리고("여기 있는 것보다 새 Codex가 이 대화를 마지막으로 실행했습니다. Codex를 업데이트하면 이어 갑니다.") 아무것도 보내지 않는다. 종류를 이름으로 부르지 않으면 아무것도 읽지 않고, 읽을 수 없는 버전은 아무것도 막지 않는다(이번 릴리스) | INTEGRATION TESTED | `tests/test_session_kinds.py:VersionSkewTests`(5개) | 더 새 Codex가 쓴 실제 대화로 겪은 적은 없다. |
 | Codex CLI에서 시작해 Codex 데스크톱 앱에서 이어 가거나 앱이 갈라낸 대화는 앱 자신의 대화로 받아들여 사용량 한도를 복구한다(이번 릴리스, 이슈 #37). 앱이 넘겨받은 적 없는 대화, VS Code 자체의 대화, 하위 에이전트의 대화는 받아들이지 않는다 | INTEGRATION TESTED | `tests/test_adopted_cli.py:AdoptedTests`(5개) | 대화는 Codex가 적는 필드로 손수 만든 것이고, 앱에서 CLI 대화를 이어 간 실제 대화로 돌린 적은 없다. |
+| 알림에서 Codex 열기(v0.6.18): *대시보드 열기* 옆의 단추가 Codex 자신의 링크로 그 대화를 열며, 기능이 켜져 있는 동안에만, 그리고 Windows에 `codex:` 링크 처리기가 있는 곳에서만 그렇다. 표준판은 취소 링크의 그 표시를 무시한다 | UNIT TESTED | `advanced/tests/test_advanced_open_codex_button.py`(17개: `DefinitionTests`, `HandlerTests`, `NoticeTests`, `SurfaceTests`, `ToastCancelTests`, `WatcherTests`); `tests/test_open_codex_flag.py:OpenCodexFlagTests`(3개) | Codex 앱이 닫혀 있거나, 돌고 있거나, 최소화된 채로 실제 알림을 누르는 것. |
+| 일주일에 한 번 업데이트 확인(v0.6.18): 많아야 이레에 한 번, 기다리거나 도는 것이 없을 때만, 대시보드 자신의 확인으로 한다. 더 새로운 버전은 재시작해도 남는 알림으로 안내하고, 내려받는 것은 없으며, 확인할 때마다 감시기의 로그에 한 줄을 쓴다 | UNIT TESTED | `advanced/tests/test_advanced_idle_update_check.py`(24개); `advanced/tests/test_advanced_update_check_log.py`(9개) | 실제 설치본의 한 주. 일부러 어떤 테스트도 GitHub에 닿지 않는다. |
 
 ---
 
@@ -709,7 +713,7 @@ Codex에 대고 돌려 본 적은 없습니다.
 | 실제 화면의 알림 카드 | REAL WINDOWS TESTED, 사람의 눈 밖에서, 그리고 화면 밖에서 그린 그림으로(`docs/images/notification-card.png`와 그 짝) | 실제 배경 화면 위, 실제 작업 표시줄 옆에서 카드가 나타나고 쌓이고 사라지는 것과 알림 센터의 조용한 사본을 사람이 지켜보고, [LIVE_ACCEPTANCE.ko.md](LIVE_ACCEPTANCE.ko.md)를 실행하며 적어 두는 것. |
 | GitHub를 상대로 한 호환성 데이터 새로 받기 | REAL WINDOWS TESTED, 내려받기를 대신 세워 두고 | 실제 설치본에서 호환성 데이터 새로 받기를 한 번, 업데이트 확인을 한 번 누르고, 그 답과 써진 캐시를 기록하는 것. |
 | 아이콘의 움직임 | UNIT TESTED, 그리고 README에 아이콘 자신의 프레임으로 그린 움직이는 PNG로 | 실제 작업 표시줄에서 알림 영역 아이콘 자체가 숨 쉬고 도는 것과, 움직임 줄이기에서 멈춰 있는 것을 녹화하는 것. |
-| 실제 Codex에서의 고급판 세 기능 | INTEGRATION TESTED, 가짜 앱 서버를 상대로, 경로마다 측정 도구로 한 번씩 재고 | 고급판에서 [LIVE_ACCEPTANCE.ko.md](LIVE_ACCEPTANCE.ko.md)의 판마다 확인 목록을 돌리는 것: Codex를 닫아도 살아남는 Codex와 함께 시작하기, 버려도 되는 대화에서의 마커 없는 이어가기와 목표 이어가기, 그리고 M2b. |
+| 실제 Codex에서의 고급판 기능 | INTEGRATION TESTED, 가짜 앱 서버를 상대로, 경로마다 측정 도구로 한 번씩 재고 | 고급판에서 [LIVE_ACCEPTANCE.ko.md](LIVE_ACCEPTANCE.ko.md)의 판마다 확인 목록을 돌리는 것: Codex를 닫아도 살아남는 Codex와 함께 시작하기, 버려도 되는 대화에서의 마커 없는 이어가기와 목표 이어가기, 그리고 M2b. |
 | 창에서 고급 기능 켜기 | REAL WINDOWS TESTED, 보이지 않는 창에서 페이지 자신의 훅으로 | 고급판에서 [LIVE_ACCEPTANCE.ko.md](LIVE_ACCEPTANCE.ko.md)의 판마다 확인 목록을 돌리며, 사람이 실제 설치본의 고급 기능 페이지에서 기능을 켜 보고 메모하기. |
 | Codex 안에서 본 것이 무엇이든 | - | 이 제품이 Codex 안에서 일하는 것을 지켜본 사람이 없다. 누군가 지켜보고 저장소가 그것을 기록하기 전까지, 이 문서의 어떤 항목도 REAL CODEX VISUALLY TESTED라고 말할 수 없다. |
 
