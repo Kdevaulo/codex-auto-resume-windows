@@ -84,6 +84,33 @@ again if you come forward. Nothing else was added to either file.
   open. Reduce motion, Windows' own animation setting, High Contrast, battery saver and a locked session hold the icon
   still as before, and nothing drawn changes: the frames, rates and colours are the same. Standard H13 says so. The
   owner's report was that the icon seemed still again.
+- **The setup window's bar fills by real, counted work.** The setup program shows it, and so does an update or an
+  uninstall started from the Dashboard or from Settings. The installer now counts the files it copies, the files and
+  folders it removes and the plugin's three commands to Codex; setup counts its own seven steps and the health check
+  its eight checks. Each says how far it has got on a line of its own, which the window reads and keeps out of the log
+  it shows. The bar glides on up to the share of the work that is done and stops there, never past it, and reaches
+  100% only after a run that ended well. It does not move while a picture is being taken or while the window is out of
+  sight, and with motion reduced it jumps instead of gliding. A window that gets no such line - an older installer
+  behind it, say - reads the installer as before. The lines are asked for by the window alone: every other caller of
+  the installer, the setup step and the health check - `Install.cmd`'s console, a log, the watcher the setup starts -
+  gets exactly the output it always did.
+- **The update's archive is streamed, and every step of the download is checked.** The release archive and its
+  `.sha256` come in through a request that reads the body 64 KB at a time into a file of its own beside the target.
+  The file is moved into place only when it is whole, so no partial archive is left behind after any failure.
+  Each redirect is followed by hand, at most five, and every address it names is held to the update's own rule - https,
+  and one of the hosts the update is allowed to ask - and to the same words when it is refused, *before* it is asked;
+  the answer's status and address are checked before a single byte is written. A body that stops short of the length
+  the server announced is named as cut short, and a dropped connection is resumed from where it stopped, at most
+  twice, and only on an answer that continues exactly there; a failed resume says what it got, so a GitHub rate limit
+  is still named as one. Where the server says how long the archive is, the real bytes received go to the setup
+  window's bar, once per whole percent. Everything else is as it was: the same words and exit codes, the system proxy,
+  the same user agent and 300-second limit, TLS as the system sets it, and the digest check after the download.
+  **The download is done by the updater of the version you are updating from**, so this takes effect from the update
+  after this one: the update to v0.6.18 still downloads as v0.6.17's updater does, and the bar shows the bytes from
+  the update after it.
+- **The README's and the guide's install picture shows the bar filling by those counts**, in English and Korean. The
+  README's first motion picture now also right-clicks a waiting task on the Pending page and opens its menu, as the
+  window draws it, before it goes on to History.
 - **Install another version... runs in the setup window.** The Dashboard's picker used to run the installer with no
   window of its own. It now opens the same window an update does, headed *Installing another version* and finished
   with *Installed v...*, with the download and the installer's steps on its bar as they happen, and the finished page
@@ -93,6 +120,25 @@ again if you come forward. Nothing else was added to either file.
 - **The setup window's steps no longer show one label twice.** The step before the copy - finding Codex, claiming the
   folder, setting the old program files aside - is named *Preparing the program files*, so *Copying the program files*
   shows once, for the copy alone; the watcher's and the Dashboard's steps no longer sit between two of the same name.
+- **The right-click menu of a Pending row is drawn in the product's own design.** It is a rounded card with the
+  window's shadow and hairline, the item in hand a raised pill, the palette's colours, the window's font and its scale
+  (100% to 200%), and submenus open beside their parent's card. In High Contrast the menu stays Windows' own. The items,
+  their words, their order and what they do are unchanged. The README's first motion picture shows it: a right-click
+  on a waiting task opens that menu.
+- **Fixes from an audit of the Dashboard window.**
+  - The Dashboard never hangs on a stuck call to the program behind it. A call reads the program's output and errors
+    together, gives up after 60 seconds (180 for a one-shot call), and ends only the child processes it started,
+    never the watcher; closing the window ends every one-shot child on its way out. A bridge the window gave up on is
+    tried again after five minutes.
+  - The window no longer waits for its words: it opens in English after five seconds without them and opens again in
+    its own language when they arrive.
+  - The window is drawn at the scale of the monitor it opens on, and redrawn at the next monitor's scale after Windows
+    reports a scale change - once a drag ends, and never while you have unsaved edits.
+  - The window is kept on, and centred on, the screen it opens on rather than the primary one, and a width it holds
+    never makes it larger than the screen (on a small screen at 200% or more it used to grow past the work area).
+  - The log dialog skips its five-second look while a look is still on its way.
+  - The setup window's bar is announced to screen readers: its percent and its description tell assistive technology
+    when they change.
 - **Fixes from an audit of the control layer.**
   - Words for this time that you write, change or take away while the watcher is already sending a recovery are now
     either sent or kept, never deleted unsent: the watcher looks at them again after it claims the recovery and gives
@@ -327,6 +373,11 @@ again if you come forward. Nothing else was added to either file.
 - **The Codex homes suggestion has its own test module**, `tests/test_home_suggestions.py`. It reads no registry below the
   adapters: the control layer hands the suggestion the account's `CODEX_HOME` and whether this copy is installed, so no
   test reads this machine's registry or Codex app, and a test that means to look stands in for the lookup.
+- **The window audit and the menus have test modules of their own**: `tests/test_gui_v0620_audit.py` (the real window against a
+  stand-in `python.exe`), `tests/test_gui_v0620_menus.py`, `tests/test_gui_v0620_keep.py` and `tests/test_motion_menu.py`
+  (the picture's right-click scene, with the `right` and `dismiss` steps and the `selected` and `menu` states in the
+  motion plan). A window the layout audit builds is measured against the primary screen, as it always was; a person's
+  window measures the screen it opens on.
 - **The CI release lane is dealt into five parts**, as the standard and advanced lanes' parts are, by the seconds of
   tests recorded in `tests/data/durations.json`, now that the faster layout audits are in it.
 
