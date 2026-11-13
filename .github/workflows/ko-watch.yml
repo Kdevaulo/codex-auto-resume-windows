@@ -13,8 +13,7 @@ name: ko watch
 # It runs none of the repository's code: no checkout, two reads through the API.
 
 on:
-  schedule:
-    - cron: "23 */6 * * *"
+  # Fork maintenance: manual only; this fork does not have a 'ko' branch.
   workflow_dispatch:
 
 permissions: {}
