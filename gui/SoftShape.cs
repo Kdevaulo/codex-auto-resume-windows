@@ -96,24 +96,27 @@ namespace CodexAutoResume
             return 3;
         }
 
-        private static void Turn(int turns, double x, double y, double vx, double vy, List<double> into)
+        /// Writes the point (x, y) of the top-right corner's frame, turned onto corner `turns` at (vx, vy), at `at`.
+        private static void Turn(int turns, double x, double y, double vx, double vy, double[] into, int at)
         {
             if (turns == 1) { double t = x; x = -y; y = t; }
             else if (turns == 2) { x = -x; y = -y; }
             else if (turns == 3) { double t = x; x = y; y = -t; }
-            into.Add(vx + x);
-            into.Add(vy + y);
+            into[at] = vx + x;
+            into[at + 1] = vy + y;
         }
 
         /// The outline of the box, as shape.outline gives it: per corner [0, x0, y0 .. x3, y3] for a Bezier and
         /// [1, cx, cy, r, start, sweep] for an arc in GDI+'s degrees, or [2, x, y] for a corner not rounded. Empty for
-        /// a box too small to round (under a pixel across).
+        /// a box too small to round (under a pixel across). Every paint asks for it, so it allocates only its arrays.
         internal static List<double[]> Outline(double left, double top, double right, double bottom, double radius,
                                                double smoothing, Corners corners)
         {
-            var segments = new List<double[]>();
+            var segments = new List<double[]>(12);
             Corner corner = Of(radius, smoothing, Math.Min(right - left, bottom - top) / 2.0);
             if (corner.Radius * 2.0 <= 1.0) return segments;
+            double r = corner.Radius, p = corner.P, a = corner.A, b = corner.B, c = corner.C, d = corner.D;
+            double beta = 45.0 * corner.Smoothing;
             for (int step = 0; step < 4; step++)
             {
                 Corners name = InOrder(step);
@@ -121,33 +124,41 @@ namespace CodexAutoResume
                 double vy = name == Corners.TopLeft || name == Corners.TopRight ? top : bottom;
                 if ((corners & name) == 0)
                 {
-                    segments.Add(new[] { 2.0, vx, vy });
+                    var point = new double[3];
+                    point[0] = 2.0;
+                    point[1] = vx;
+                    point[2] = vy;
+                    segments.Add(point);
                     continue;
                 }
                 int turns = Turns(name);
-                double r = corner.Radius, p = corner.P, a = corner.A, b = corner.B, c = corner.C, d = corner.D;
                 double start = (270.0 + 90.0 * turns) % 360.0;
-                var centre = new List<double>();
-                Turn(turns, -r, r, vx, vy, centre);
+                var arc = new double[6];
+                arc[0] = 1.0;
+                Turn(turns, -r, r, vx, vy, arc, 1);
+                arc[3] = r;
                 if (!corner.Smoothed)
                 {
-                    segments.Add(new[] { 1.0, centre[0], centre[1], r, start, 90.0 });
+                    arc[4] = start;
+                    arc[5] = 90.0;
+                    segments.Add(arc);
                     continue;
                 }
-                double beta = 45.0 * corner.Smoothing;
-                var first = new List<double> { 0.0 };
-                Turn(turns, -p, 0.0, vx, vy, first);
-                Turn(turns, -p + a, 0.0, vx, vy, first);
-                Turn(turns, -p + a + b, 0.0, vx, vy, first);
-                Turn(turns, -p + a + b + c, d, vx, vy, first);
-                segments.Add(first.ToArray());
-                segments.Add(new[] { 1.0, centre[0], centre[1], r, start + beta, 90.0 - 2.0 * beta });
-                var second = new List<double> { 0.0 };
-                Turn(turns, -d, p - a - b - c, vx, vy, second);
-                Turn(turns, 0.0, p - a - b, vx, vy, second);
-                Turn(turns, 0.0, p - a, vx, vy, second);
-                Turn(turns, 0.0, p, vx, vy, second);
-                segments.Add(second.ToArray());
+                arc[4] = start + beta;
+                arc[5] = 90.0 - 2.0 * beta;
+                var first = new double[9];
+                Turn(turns, -p, 0.0, vx, vy, first, 1);
+                Turn(turns, -p + a, 0.0, vx, vy, first, 3);
+                Turn(turns, -p + a + b, 0.0, vx, vy, first, 5);
+                Turn(turns, -p + a + b + c, d, vx, vy, first, 7);
+                var second = new double[9];
+                Turn(turns, -d, p - a - b - c, vx, vy, second, 1);
+                Turn(turns, 0.0, p - a - b, vx, vy, second, 3);
+                Turn(turns, 0.0, p - a, vx, vy, second, 5);
+                Turn(turns, 0.0, p, vx, vy, second, 7);
+                segments.Add(first);
+                segments.Add(arc);
+                segments.Add(second);
             }
             return segments;
         }
