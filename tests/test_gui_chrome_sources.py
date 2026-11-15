@@ -101,7 +101,12 @@ class DialogSourceTests(unittest.TestCase):
         bar = guiscan.member_body("Soft", "DialogBar")
         self.assertIn("soft.Titled = true;", bar)
         self.assertIn("dialog.ShowIcon = false;", bar)
-        self.assertIn("if (Titled && titleCard == null) BuildTitle();", guiscan.member_body("SoftDialog", "OnHandleCreated"))
+        made = guiscan.member_body("SoftDialog", "CreateHandle")
+        self.assertLess(made.index("MakeTitle();"), made.index("base.CreateHandle();"), "the window is made with its title in it")
+        self.assertIn("if (Titled && titleCard == null) BuildTitle();", guiscan.member_body("SoftDialog", "MakeTitle"))
+        self.assertIn("if (dialog != null) dialog.MakeTitle();", guiscan.member_body("SettingsForm", "Materialise"),
+                      "the layout audit lays a dialog out as it is once made")
+        self.assertIn("Controls.SetChildIndex(titleGround, Controls.Count - 1);", guiscan.member_body("SoftDialog", "OnControlAdded"))
         build = guiscan.member_body("SoftDialog", "BuildTitle")
         for part in ("titleGround.Dock = DockStyle.Top;", "Controls.Add(titleGround);",
                      "ClientSize = new Size(ClientSize.Width, ClientSize.Height + grown);",

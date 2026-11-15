@@ -14,7 +14,8 @@ The build test compiles the window once (csc); the pixel test loads the compiled
 icon, then holds it to the .ico's own 24 px image. Run on its own.
 
 Since 2026-11-01 (the owner: a window opened inside the app has no icon) the Timeline dialog wears none - the picture of it
-draws none (RenderDialog) - and IconImage serves the picture of whatever window does carry one.
+draws none (RenderDialog) - and IconImage serves the picture of whatever window does carry one. Since v0.6.24 no window
+has Windows' title bar at all (gui/SoftChrome.cs), so PaintDialog draws no title bar and no icon either.
 """
 from __future__ import annotations
 

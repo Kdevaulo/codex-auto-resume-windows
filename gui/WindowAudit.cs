@@ -1069,6 +1069,9 @@ namespace CodexAutoResume
 
         private static void Materialise(Control parent)
         {
+            // v0.6.24: a dialog with its title card, as it is once its window is made (SoftDialog).
+            var dialog = parent as SoftDialog;
+            if (dialog != null) dialog.MakeTitle();
             foreach (Control child in parent.Controls)
             {
                 if (!OwnVisible(child) || child.Handle == IntPtr.Zero) continue;

@@ -1363,6 +1363,9 @@ namespace CodexAutoResume
                 int line = Math.Max(headline.PreferredSize.Height, detail.PreferredSize.Height + detail.Margin.Vertical);
                 int body = Math.Max(2 * line, Math.Max(2 * HaloDot.Extent + Px(2),
                                                       startButton.PreferredSize.Height + startButton.Margin.Vertical));
+                // v0.6.24: and the Start button, at the card's foot, clear of the caption buttons at its top (4 px under them).
+                body = Math.Max(body, startButton.PreferredSize.Height + Px(Brand.CaptionInsetTop + Brand.CaptionButtonH + 4) -
+                                      hero.Padding.Top);
                 header.Height = body + hero.Padding.Vertical + header.Padding.Vertical;
             };
             fit(this, EventArgs.Empty);

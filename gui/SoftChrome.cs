@@ -1024,7 +1024,7 @@ namespace CodexAutoResume
 
     /// A dialog of the window's (v0.6.24): a Form whose caption is ours. Its ClientSize means what it says - a Form works
     /// its window out from its styles, which still count WS_CAPTION - and Soft.DialogBar gives it its title card and the
-    /// caption buttons in it (BuildTitle) as it is made, once its own code has laid it out: a strip docked at its top, the
+    /// caption buttons in it (BuildTitle) as its window is made, once its own code has laid it out: a strip docked at its top, the
     /// last control it holds and so the first docked (Windows' docking goes from the last-added control inward), the card
     /// in it 16 px in from the dialog's edges, as its body card is. The dialog grows once by the strip; everything it laid
     /// out stands below it as it stood, and its own controls keep their places in Controls.
@@ -1053,10 +1053,28 @@ namespace CodexAutoResume
             return soft == null ? 0 : soft.TitleReserve;
         }
 
-        protected override void OnHandleCreated(EventArgs e)
+        // Made just before its window is - by ShowDialog, or by the first of its controls to need a window (the layout audit,
+        // the render mode) - so its own code has laid it out, and the window is made with the title already in it.
+        protected override void CreateHandle()
         {
-            base.OnHandleCreated(e);
+            MakeTitle();
+            base.CreateHandle();
+        }
+
+        /// Its title card now, if Soft.DialogBar asked for one and it has none yet: for what lays a dialog out without making
+        /// its window (the layout audit's Materialise makes its controls' windows alone).
+        internal void MakeTitle()
+        {
             if (Titled && titleCard == null) BuildTitle();
+        }
+
+        // A control the dialog's code adds after the title (one that needed a window early): the strip stays the last, the
+        // first docked.
+        protected override void OnControlAdded(ControlEventArgs e)
+        {
+            base.OnControlAdded(e);
+            if (titleGround != null && e.Control != titleGround && titleGround.Parent == this)
+                Controls.SetChildIndex(titleGround, Controls.Count - 1);
         }
 
         private void BuildTitle()
