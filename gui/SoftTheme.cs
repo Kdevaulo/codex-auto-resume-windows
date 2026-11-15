@@ -811,21 +811,11 @@ namespace CodexAutoResume
             return Color.FromArgb((int)Math.Round(255 * Math.Max(0, Math.Min(1, opacity))), colour);
         }
 
+        /// v0.6.24: every rounded body's outline - Figma's squircle at the design's smoothing (Shape.Smoothing), and
+        /// in Classic and Plain, or where the budget leaves a corner circular (a pill), the arcs it always drew.
         internal static GraphicsPath Rounded(RectangleF bounds, float radius)
         {
-            var path = new GraphicsPath();
-            float diameter = Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height));
-            if (diameter <= 1f)
-            {
-                path.AddRectangle(bounds);
-                return path;
-            }
-            path.AddArc(bounds.X, bounds.Y, diameter, diameter, 180, 90);
-            path.AddArc(bounds.Right - diameter, bounds.Y, diameter, diameter, 270, 90);
-            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(bounds.X, bounds.Bottom - diameter, diameter, diameter, 90, 90);
-            path.CloseFigure();
-            return path;
+            return Shape.Squircle(bounds, radius, Shape.Smoothing);
         }
 
         /// A body filling `face`: the fill, then the hairline inside its edge - the panel's
