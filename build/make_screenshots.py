@@ -3713,8 +3713,13 @@ def still_radius(dpi: int) -> int:
 
 def still_job(dpi: int) -> dict:
     """The render job's `still` (gui/WindowRender.cs FramedStill): the corners' radius and the resolution a capture's
-    bitmap has at `dpi`. No title bar: the window's caption is its own (v0.6.24)."""
-    return {"radius": still_radius(dpi), "dpi": dpi}
+    bitmap has at `dpi`. No title bar: the window's caption is its own (v0.6.24). And, only while the window cuts its own
+    outer corner (brand.WINDOW_SQUIRCLE, plans/v0624-stage1-design.md 5.6), the corner's kind: the card's squircle at
+    `dpi` and its hairline (WindowRender CornerStill), in place of the 8 px circle Windows rounds a window with."""
+    job = {"radius": still_radius(dpi), "dpi": dpi}
+    if brand.WINDOW_SQUIRCLE:
+        job["corner"] = "squircle"
+    return job
 
 
 def stills_dpi_problem(recorded: dict) -> str | None:

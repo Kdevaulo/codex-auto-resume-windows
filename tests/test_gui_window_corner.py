@@ -130,6 +130,17 @@ namespace CodexAutoResume
                                ",\"rects\":" + Rects(WindowShape.RegionRects(edge)) + ",\"gdi\":" + Rects(gdi) +
                                ",\"pixels\":" + Pixels(fast.Pixels) + "}");
                 }
+                else if (w[0] == "still")
+                {
+                    // still width height radius smoothing scale ground line: a picture all `ground` cut as a still is.
+                    int width = I(w[1]), height = I(w[2]);
+                    Color ground = ColorTranslator.FromHtml(w[6]), line = ColorTranslator.FromHtml(w[7]);
+                    var edge = new WindowShape.Edge(width, height, D(w[3]), D(w[4]), D(w[5]));
+                    var pixels = new int[width * height];
+                    for (int i = 0; i < pixels.Length; i++) pixels[i] = ground.ToArgb();
+                    WindowShape.CutStill(pixels, edge, line);
+                    output.Add("{\"hair\":" + edge.Hair + ",\"pixels\":" + Pixels(pixels) + "}");
+                }
                 else if (w[0] == "decide")
                 {
                     var rows = new List<string>();
@@ -370,6 +381,62 @@ class CompositeTests(unittest.TestCase):
         self.assertEqual(double[:5], [], "the companion paints inside the region")
         self.assertEqual(gaps[:5], [], "a pixel the corner covers that neither paints")
         self.assertLessEqual(worst, 2.0, "a channel further than 2 levels from the ideal")
+
+
+@unittest.skipUnless(CSC.is_file(), "needs the in-box C# compiler")
+class StillTests(unittest.TestCase):
+    """5.6: a still's corner is cut by the same decision - the window's own corner at the still's scale while the switch
+    is on, Windows' 8 px circle as today while it is off."""
+
+    def test_the_still_job_names_the_corner_only_while_the_switch_is_on(self):
+        import sys
+        from unittest import mock
+        sys.path.insert(0, str(ROOT / "build"))
+        try:
+            import make_screenshots as shots
+        finally:
+            sys.path.remove(str(ROOT / "build"))
+        self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI})
+        with mock.patch.object(brand, "WINDOW_SQUIRCLE", True):
+            self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI, "corner": "squircle"})
+
+    def test_the_render_and_the_capture_cut_by_the_same_decision(self):
+        framed = guiscan.member_body("SettingsForm", "FramedStill")
+        self.assertIn("Bitmap rounded = StillSquircle() ? CornerStill(square, dpi) : Rounded(square, radius);", framed)
+        self.assertIn('renderStill.TryGetValue("corner", out value) && value as string == "squircle"',
+                      guiscan.member_body("SettingsForm", "StillSquircle"))
+        still = guiscan.member_body("SettingsForm", "CornerStill")
+        self.assertIn("new WindowShape.Edge(width, height, Palette.RadiusCard, Shape.Smoothing,", still)
+        self.assertIn("WindowShape.CutStill(pixels, edge, Palette.Line);", still)
+        script = (ROOT / "build" / "capture_window.ps1").read_text(encoding="utf-8")
+        for step in ("GetWindowRgn($handle, $own) -gt 1", "[System.Drawing.Region]::FromHrgn($own)",
+                     "$shaped.Translate(-$cropLeft, 0)", "$paint.FillRegion($brush, $shaped)", "$radius = 0"):
+            self.assertIn(step, script)
+        # The region's cut comes before Windows' circle, which it turns off.
+        self.assertLess(script.index("GetWindowRgn($handle"), script.index("$path.AddArc(0, 0, $d, $d, 180, 90)"))
+
+    def test_a_still_s_corner_is_the_ideal_edge_without_the_shadow(self):
+        for design, scale in (("soft", 1.5), ("soft", 2.0), ("classic", 1.5)):
+            width, height = (int(round(side * scale)) for side in LOGICAL)
+            radius = brand.design_radii(design)["card"]
+            smoothing = shape.design_smoothing(design)
+            answer = ask(["still %d %d %r %r %r %s %s" % (width, height, float(radius), smoothing, scale, _hex(GROUND),
+                                                          _hex(LINE))])[0]
+            pixels = struct.unpack("<%dI" % (width * height), base64.b64decode(answer["pixels"]))
+            ideal = _Ideal(width, height, radius * scale, smoothing, answer["hair"], 1, 0)
+            worst = 0.0
+            for y in range(height):
+                for x in range(width):
+                    value = pixels[y * width + x]
+                    alpha = (value >> 24) / 255.0
+                    outer, inner = ideal.covers(x, y)
+                    for c, shift in enumerate((16, 8, 0)):
+                        for under in (0, 255):
+                            want = GROUND[c] * inner + LINE[c] * (outer - inner) + (1.0 - outer) * under
+                            got = ((value >> shift) & 255) * alpha + under * (1.0 - alpha)
+                            worst = max(worst, abs(got - want))
+            with self.subTest(design=design, scale=scale):
+                self.assertLessEqual(worst, 2.0)
 
 
 @unittest.skipUnless(CSC.is_file(), "needs the in-box C# compiler")

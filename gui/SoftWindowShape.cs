@@ -401,6 +401,38 @@ namespace CodexAutoResume
             return ExtCreateRegion(IntPtr.Zero, data.Length, data);
         }
 
+        // ------------------------------------------------------------------ a still's corner (5.6)
+
+        /// A still's corner as the screen shows the window's own: its pixels opaque where the window owns them, and round
+        /// them the edge its companion paints - the picture and the hairline at their coverage, the outline's coverage its
+        /// alpha - with no shadow, as a capture's corners are clear. `pixels` is a Format32bppArgb bitmap's, not
+        /// premultiplied, `edge.Width` by `edge.Height`, changed in place.
+        internal static void CutStill(int[] pixels, Edge edge, Color line)
+        {
+            for (int y = 0; y < edge.Height; y++)
+                for (int x = 0; x < edge.Width; x++)
+                {
+                    int at = y * edge.Width + x;
+                    double outer = edge.CoverOuter(x, y), inner = edge.CoverInner(x, y);
+                    int pixel = pixels[at];
+                    if (inner >= 1.0)
+                    {
+                        pixels[at] = unchecked((int)0xFF000000) | (pixel & 0xFFFFFF);
+                        continue;
+                    }
+                    if (outer <= 0.0)
+                    {
+                        pixels[at] = 0;
+                        continue;
+                    }
+                    double edgeShare = outer - inner;
+                    int red = Byte((((pixel >> 16) & 255) * inner + line.R * edgeShare) / outer);
+                    int green = Byte((((pixel >> 8) & 255) * inner + line.G * edgeShare) / outer);
+                    int blue = Byte(((pixel & 255) * inner + line.B * edgeShare) / outer);
+                    pixels[at] = unchecked((int)((uint)Byte(outer * 255.0) << 24 | (uint)red << 16 | (uint)green << 8 | (uint)blue));
+                }
+        }
+
         // ------------------------------------------------------------------ the companion's picture
 
         /// Where the companion's picture goes, row by row: an array (the tests) or the memory of a DIB section (the window).

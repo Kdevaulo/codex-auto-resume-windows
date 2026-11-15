@@ -58,6 +58,9 @@ Add-Type -Namespace CaptureNative -Name Win -MemberDefinition @'
 [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
 [DllImport("user32.dll")] public static extern bool GetWindowInfo(IntPtr h, ref WINDOWINFO info);
+[DllImport("user32.dll")] public static extern int GetWindowRgn(IntPtr h, IntPtr region);
+[DllImport("gdi32.dll")] public static extern IntPtr CreateRectRgn(int l, int t, int r, int b);
+[DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr o);
 public struct RECT { public int L, T, R, B; }
 public struct POINT { public int X, Y; }
 public struct WINDOWINFO {
@@ -183,6 +186,7 @@ try {
     $client = New-Object CaptureNative.Win+RECT
     $origin = New-Object CaptureNative.Win+POINT
     $cut = $bitmap
+    $cropLeft = 0
     if ([CaptureNative.Win]::GetClientRect($handle, [ref]$client) -and
         [CaptureNative.Win]::ClientToScreen($handle, [ref]$origin)) {
         $left = $origin.X - $rect.L
@@ -192,6 +196,7 @@ try {
             ($width - $left - $right) -gt 0 -and ($height - $bottom) -gt 0) {
             $crop = New-Object System.Drawing.Rectangle $left, 0, ($width - $left - $right), ($height - $bottom)
             $cut = $bitmap.Clone($crop, $bitmap.PixelFormat)
+            $cropLeft = $left
         }
     }
     # And the corners Windows rounds. They are DWM's, not the window's, so they are not in
@@ -202,6 +207,28 @@ try {
     $dpi = [CaptureNative.Win]::GetDpiForWindow($handle)
     if ($dpi -le 0) { $dpi = 96 }
     $radius = [int][Math]::Round(8.0 * $dpi / 96.0)
+    # v0.6.24 (W5): a window that cuts its own corner (gui/SoftWindowShape.cs, while Brand.WindowSquircle is on) has a
+    # window region instead, and no corner of DWM's: the picture is cut by that region, moved as the crop moved it. Only
+    # the window's own pixels - the anti-aliased edge and the shadow round it are its companion's, another window that
+    # PrintWindow does not draw; a still drawn offscreen adds the edge (WindowRender CornerStill).
+    $own = [CaptureNative.Win]::CreateRectRgn(0, 0, 0, 0)
+    $shaped = $null
+    try {
+        if ([CaptureNative.Win]::GetWindowRgn($handle, $own) -gt 1) {
+            $shaped = [System.Drawing.Region]::FromHrgn($own)
+            $shaped.Translate(-$cropLeft, 0)
+        }
+    } finally { [void][CaptureNative.Win]::DeleteObject($own) }
+    if ($null -ne $shaped) {
+        $rounded = New-Object System.Drawing.Bitmap $cut.Width, $cut.Height, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $paint = [System.Drawing.Graphics]::FromImage($rounded)
+        $brush = New-Object System.Drawing.TextureBrush $cut
+        $paint.FillRegion($brush, $shaped)
+        $brush.Dispose(); $shaped.Dispose(); $paint.Dispose()
+        if (-not [object]::ReferenceEquals($cut, $bitmap)) { $cut.Dispose() }
+        $cut = $rounded
+        $radius = 0
+    }
     if ($radius -gt 0 -and $cut.Width -gt 2 * $radius -and $cut.Height -gt 2 * $radius) {
         $rounded = New-Object System.Drawing.Bitmap $cut.Width, $cut.Height, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
         $paint = [System.Drawing.Graphics]::FromImage($rounded)
