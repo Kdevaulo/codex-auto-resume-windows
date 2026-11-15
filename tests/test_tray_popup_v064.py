@@ -828,25 +828,35 @@ class PopupThemeTests(unittest.TestCase):
         return window
 
     def corner(self, window):
+        """The ground the popup shows where nothing stands on it: until v0.6.24 its grey canvas, at its corner; since,
+        the popup is its card (layers.py) and has no canvas round it - its card's own ground, just inside its edge."""
         canvas = window.render()
-        return pixel_reader(canvas, canvas.width)(1, 1)
+        if not window._card:
+            return pixel_reader(canvas, canvas.width)(1, 1)
+        card = window._plan["card"]
+        return pixel_reader(canvas, canvas.width)(card[0] + 4, (card[1] + card[3]) // 2)
+
+    @staticmethod
+    def ground(theme):
+        """What `corner` reads in `theme`, with no High Contrast."""
+        return brand.rgb(brand.card_ground(theme, "soft"))
 
     def test_system_follows_windows_and_a_choice_overrides_it_on_the_next_frame(self):
         window = self.window()
         window.show(activate=False, origin=OFFSCREEN)
         self.pump(0.1)
         self.assertEqual(window._theme, "dark")
-        self.assertEqual(self.corner(window), brand.rgb(brand.DARK["canvas"]))
+        self.assertEqual(self.corner(window), self.ground("dark"))
         popup.set_theme("light")
         window._update()
         self.assertEqual(window._theme, "light")
-        self.assertEqual(self.corner(window), brand.rgb(brand.LIGHT["canvas"]))
+        self.assertEqual(self.corner(window), self.ground("light"))
         self.mode["light"] = True
         popup.set_theme("dark")
         window.hide()
         window.show(activate=False, origin=OFFSCREEN)
         self.pump(0.1)
-        self.assertEqual(self.corner(window), brand.rgb(brand.DARK["canvas"]))
+        self.assertEqual(self.corner(window), self.ground("dark"))
 
     def test_windows_changing_its_app_mode_repaints_an_open_popup(self):
         user32 = ctypes.WinDLL("user32")
@@ -854,13 +864,13 @@ class PopupThemeTests(unittest.TestCase):
         window = self.window()
         window.show(activate=False, origin=OFFSCREEN)
         self.pump(0.1)
-        self.assertEqual(self.corner(window), brand.rgb(brand.DARK["canvas"]))
+        self.assertEqual(self.corner(window), self.ground("dark"))
         self.mode["light"] = True
         user32.SendMessageW(window.hwnd, popup.WM_SETTINGCHANGE, 0, 0)
         self.assertEqual(window._theme, "light")
         self.assertTrue(window._static_dirty)
-        self.assertEqual(self.corner(window), brand.rgb(brand.LIGHT["canvas"]))
-        self.assertIs(window._framed_dark, False)
+        self.assertEqual(self.corner(window), self.ground("light"))
+        self.assertIs(window._framed_dark, None if window._card else False, "the card has no frame of DWM's")
 
     def test_high_contrast_wins_in_the_window_too(self):
         popup.set_theme("dark")
@@ -869,8 +879,8 @@ class PopupThemeTests(unittest.TestCase):
             window.show(activate=False, origin=OFFSCREEN)
             self.pump(0.1)
             self.assertTrue(window._renderer.contrast)
-            self.assertEqual(self.corner(window), popup.system_rgb("Control"))
-            self.assertIs(window._framed_dark, False)
+            self.assertEqual(self.corner(window), popup.system_rgb("Window" if window._card else "Control"))
+            self.assertIs(window._framed_dark, None if window._card else False, "the card has no frame of DWM's")
 
     def test_a_read_that_carries_new_settings_changes_an_open_popup(self):
         stored = dict(settings.defaults(), interface_language="ko", theme="light", reduce_motion=True)
@@ -906,7 +916,7 @@ class PopupThemeTests(unittest.TestCase):
         self.assertEqual((window.locale, window._theme), ("de", "dark"))
         self.assertEqual(window._vm["toggle_text"], interface.STRINGS["de"]["action.pause"])
         self.assertIs(icon._popup, window)       # the same popup, and no watcher restarted
-        self.assertEqual(self.corner(window), brand.rgb(brand.DARK["canvas"]))
+        self.assertEqual(self.corner(window), self.ground("dark"))
 
 
 if __name__ == "__main__":

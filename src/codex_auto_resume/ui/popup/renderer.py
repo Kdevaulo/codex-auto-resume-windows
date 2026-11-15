@@ -12,7 +12,7 @@ import math
 from ... import brand, l10n
 from .elevation import lift_coverage, recipe_shadows, shadow_step, tile_ground, well_coverage
 from .fonts import _Fonts
-from .gdiplus import _Canvas, _Painter, _ShadowImage, _gdiplus_acquire, _gdiplus_release
+from .gdiplus import PIXEL_FORMAT_32BPP_PARGB, _Canvas, _Painter, _ShadowImage, _gdiplus_acquire, _gdiplus_release
 from .layout import layout as plan, mirror   # the method below shares its name
 from .motion import face_state, mixed
 from .theme import SYSTEM_COLOURS, contrast_colour, system_rgb
@@ -65,6 +65,9 @@ class Renderer:
         self.contrast = False            # High Contrast: system colours, and no shadow, tint or glow
         self.theme = "light"             # v0.6.4: "light" or "dark", as the window resolved it
         self.design = "soft"             # v0.6.10: one of brand.DESIGNS, as the window adopted it
+        # v0.6.24: the card alone - transparent round it, no lift: the popup's window is the card, its shadow the desktop's
+        # (layers.py). Off for the notification card, which cuts its own corners, and for the popup's plain window.
+        self.lone = False
         self._images = {}                # this scale, theme and design's shadow images, by shape and colour
         self._images_look = None
         self._ground_key = None
@@ -164,8 +167,21 @@ class Renderer:
                         rect = item["rect"]
                         paint.stroke_round((rect[0] - grow, rect[1] - grow, rect[2] + grow, rect[3] + grow),
                                            self._corner(item, scale) + grow, self._argb("focus"), ring)
+        if self.lone:
+            self._seal(plan)
         self._keep_halo_band(plan)
         return self.draw_halo(plan, frame, restore=False)
+
+    def _seal(self, plan):
+        """The card alone (v0.6.24): each line of words' alpha put back to the ground's - GDI's text clears what it covers;
+        all else drawn on the opaque card keeps it whole."""
+        canvas, ground, width = self.canvas, memoryview(self._ground_pixels), self.canvas.width
+        _dll("gdi32").GdiFlush()
+        memory = memoryview((C.c_ubyte * len(ground)).from_address(canvas.bits.value)).cast("B")
+        for left, top, right, bottom in (item["rect"] for item in plan["items"] if item["kind"] == "text"):
+            for row in range(max(0, int(top)), min(canvas.height, int(bottom))):
+                start, stop = (row * width + max(0, int(left))) * 4 + 3, (row * width + min(width, int(right))) * 4
+                memory[start:stop:4] = ground[start:stop:4]
 
     # How far on the seventh press's sweep is, or None: the window says, and it is drawn with the light.
     sweep_ms = None
@@ -310,13 +326,17 @@ class Renderer:
                 parts.append((kind, item["rect"], item.get("radius"), item.get("tone"), item.get("checked"),
                               item.get("busy"), kind == "switch" and item["target"] in glides, item.get("fraction")))
         key = (plan["size"], scale, self._theme(), self._design(), self._system_key(), bool(plan.get("rtl")),
-               tuple(parts))
+               tuple(parts), self.lone)
         if self._ground_key == key and self._ground_pixels is not None:
             C.memmove(canvas.bits, self._ground_pixels, len(self._ground_pixels))
             return
         drawn = [item for item in plan["items"] if not (item["kind"] == "switch" and item["target"] in glides)]
-        with _Painter(canvas) as paint:
-            paint.fill_round((0, 0, canvas.width, canvas.height), 0, self._argb("canvas"))
+        if self.lone:                    # nothing round the card: premultiplied, and transparent but for it
+            _dll("gdi32").GdiFlush()
+            C.memset(canvas.bits, 0, canvas.width * canvas.height * 4)
+        with (_Painter(canvas, PIXEL_FORMAT_32BPP_PARGB) if self.lone else _Painter(canvas)) as paint:
+            if not self.lone:
+                paint.fill_round((0, 0, canvas.width, canvas.height), 0, self._argb("canvas"))
             # The card, then every tile's lift, then everything that stands on the card: a tile's
             # shadow falls on the card, and never over a tile drawn before it - the highlight above
             # the second tile would otherwise lie across the bottom edge of the first.
@@ -407,7 +427,8 @@ class Renderer:
             # The panel's card: its lift, its ground (dark lifts it a step toward `raised`), dark's
             # one-pixel top light inside the border, and the hairline. In Classic, v0.6.2's accent bar.
             rect, radius = item["rect"], self._corner(item, scale)
-            self._lift(paint, "card", rect, radius, scale)
+            if not self.lone:            # alone (v0.6.24), its shadow is the desktop's (layers.py)
+                self._lift(paint, "card", rect, radius, scale)
             ground = (self._argb("surface") if self.contrast
                       else _pack(brand.rgb(brand.card_ground(self._theme(), self._design()))))
             paint.fill_round(rect, radius, ground)

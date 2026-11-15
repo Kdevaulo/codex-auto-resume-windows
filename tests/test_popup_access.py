@@ -370,7 +370,9 @@ class ScreenReaderTests(unittest.TestCase):
                 variant = self.child(index)
                 self.assertEqual(self.call(pointer, 22, *([ctypes.POINTER(ctypes.c_long)] * 4), ctypes.c_void_p)(
                     pointer, *[ctypes.byref(part) for part in box], ctypes.addressof(variant)), 0)
-                corner = ctypes.wintypes.POINT(item["rect"][0], item["rect"][1])
+                # v0.6.24: the window is the card, so a rectangle of the plan is that far from the window's corner.
+                dx, dy = self.window._client_offset()
+                corner = ctypes.wintypes.POINT(item["rect"][0] - dx, item["rect"][1] - dy)
                 with popup.win32._PerMonitorDpi():
                     user32.ClientToScreen(self.window.hwnd, ctypes.byref(corner))
                 with self.subTest(item["name"]):
