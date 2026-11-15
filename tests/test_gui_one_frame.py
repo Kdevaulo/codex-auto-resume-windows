@@ -27,7 +27,9 @@ list and its host noted; Settings shown on General and then Advanced, Save's and
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
 import tempfile
 import time
 import unittest
@@ -36,7 +38,7 @@ import guiscan
 from codex_auto_resume import settings
 
 from test_gui_layout import fullest_snapshot
-from test_gui_v0611_access import CSC, POWERSHELL, compile_window, reply, run_probe
+from test_gui_v0611_access import CSC, NO_WINDOW, POWERSHELL, compile_window, reply, run_probe
 
 COMMON = r"""
 $ErrorActionPreference = 'Stop'
@@ -170,6 +172,75 @@ $script:frame.Dispose()
 [IO.File]::WriteAllText((Join-Path $work 'result.json'), (ConvertTo-Json $out -Compress -Depth 6), $utf8)
 """
 
+# A stand-in for the bridge's Python, as tests/busycase.py has one: every command answered at once with an empty result,
+# each one's name written to CAR_FAKE_LOG, and `power-action` answered only once the file CAR_FAKE_GATE exists.
+FAKE = r"""
+using System;
+using System.IO;
+using System.Text.RegularExpressions;
+using System.Threading;
+static class Fake {
+    static int Main(string[] args) {
+        if (Array.IndexOf(args, "serve") < 0) { Console.Out.Write("{\"ok\":true,\"result\":{}}"); return 0; }
+        string gate = Environment.GetEnvironmentVariable("CAR_FAKE_GATE");
+        string log = Environment.GetEnvironmentVariable("CAR_FAKE_LOG");
+        string line;
+        while ((line = Console.In.ReadLine()) != null) {
+            string id = Regex.Match(line, "\"id\":(\\d+)").Groups[1].Value;
+            string name = Regex.Match(line, "\"command\":\"([a-z_-]+)\"").Groups[1].Value;
+            if (name == "power-action") while (!File.Exists(gate)) Thread.Sleep(20);
+            File.AppendAllText(log, name + "\n");
+            Console.Out.Write("{\"id\":" + id + ",\"reply\":{\"ok\":true,\"result\":{}}}\n");
+            Console.Out.Flush();
+        }
+        return 0;
+    }
+}
+"""
+
+HELD_CLICK = COMMON.replace("$nowhere = [string](Join-Path $work 'nowhere')", "$nowhere = [string]$env:CAR_HOME") + r"""
+$gate = [string]$env:CAR_FAKE_GATE
+$log = [string]$env:CAR_FAKE_LOG
+$schema = $parse.Invoke($null, [object[]]@([IO.File]::ReadAllText((Join-Path $work 'schema.json'), $utf8)))
+$null = $type.GetMethod('BuildEditors', $any).Invoke($script:window, [object[]]@($schema, (Read-Json 'settings.json')))
+$null = Invoke-Window 'ShowPage' @('settings')
+$null = $script:window.Handle
+$script:asked = 0
+$type.GetField('DialogAnswers', $any).SetValue($null, [Func[string,string,bool]]{ param($text, $affirm) $script:asked++; $true })
+function Reading { return [bool]$type.GetField('powerReading', $any).GetValue($script:window) }
+function Busy { return [int]$type.GetField('busy', $any).GetValue($script:window) }
+function Asked([string]$name) { if (-not (Test-Path $log)) { return 0 }; return @(Get-Content $log | Where-Object { $_ -eq $name }).Count }
+function Settle {
+    $end = [DateTime]::UtcNow.AddSeconds(30)
+    while (((Reading) -or (Busy) -gt 0) -and [DateTime]::UtcNow -lt $end) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 }
+    for ($k = 0; $k -lt 25; $k++) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 }
+}
+$type.GetField('auditing', $any).SetValue($script:window, $false)
+# The card's first read, answered: what Windows offers is known, and the switch can be turned.
+New-Item -ItemType File -Path $gate -Force | Out-Null
+$null = Invoke-Window 'ShowSection' @('general')
+Settle
+$out = @{ can = [bool]$type.GetField('powerCanSwitch', $any).GetValue($script:window)
+          enabled = [bool]$type.GetField('powerSwitch', $any).GetValue($script:window).Enabled }
+# General shown again: the card asks again, and the answer waits. The switch is clicked meanwhile.
+Remove-Item $gate
+$null = Invoke-Window 'ShowSection' @('advanced')
+$null = Invoke-Window 'ShowSection' @('general')
+$out.reading = Reading
+$null = Invoke-Window 'PowerSwitched' @()
+for ($k = 0; $k -lt 25; $k++) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 20 }
+$out.while = @{ asked = $script:asked; arms = (Asked 'power-arm'); reading = (Reading) }
+# The answer comes.
+New-Item -ItemType File -Path $gate -Force | Out-Null
+Settle
+$out.after = @{ asked = $script:asked; arms = (Asked 'power-arm'); reading = (Reading) }
+$type.GetField('DialogAnswers', $any).SetValue($null, $null)
+$type.GetField('auditing', $any).SetValue($script:window, $true)
+$script:window.Dispose()
+$null = $bridge.GetType().GetMethod('Stop', $any).Invoke($bridge, @())
+[IO.File]::WriteAllText((Join-Path $work 'result.json'), (ConvertTo-Json $out -Compress -Depth 5), $utf8)
+"""
+
 _exe = None
 _folder = None
 
@@ -266,11 +337,56 @@ class SettingsButtonsTests(unittest.TestCase):
                 self.assertEqual(seen["after"], self.answer["before"])
 
 
+@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
+class HeldPowerClickTests(unittest.TestCase):
+    """The switch looks as it did while its card is read: a click then is kept and taken at the answer, never dropped."""
+
+    @classmethod
+    def setUpClass(cls):
+        work = workspace()
+        (work / "schema.json").write_text(json.dumps(settings.describe(), ensure_ascii=False), encoding="utf-8")
+        (work / "settings.json").write_text(json.dumps(settings.defaults(), ensure_ascii=False), encoding="utf-8")
+        cls.home = work / "home"
+        (cls.home / "runtime").mkdir(parents=True)
+        (cls.home / "app" / "src").mkdir(parents=True)
+        source = work / "fake.cs"
+        source.write_text(FAKE, encoding="utf-8")
+        for name in ("python.exe", "pythonw.exe"):
+            subprocess.run([str(CSC), "/nologo", "/target:exe", "/out:" + str(cls.home / "runtime" / name), str(source)],
+                           check=True, capture_output=True, timeout=300, creationflags=NO_WINDOW)
+        try:
+            cls.answer = run_probe(HELD_CLICK, work, 300, CAR_EXE=str(_exe), CAR_HOME=str(cls.home),
+                                   CAR_FAKE_GATE=str(work / "gate"), CAR_FAKE_LOG=str(work / "asked.log"))
+        finally:
+            # The stand-in, if the probe left it running: only processes run from this test's own home.
+            script = ("Get-Process -Name python,pythonw -ErrorAction SilentlyContinue | Where-Object { $_.Path -and "
+                      "$_.Path.StartsWith($env:CAR_HOME, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force")
+            subprocess.run([str(POWERSHELL), "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True,
+                           timeout=120, creationflags=NO_WINDOW, env=dict(os.environ, CAR_HOME=str(cls.home)))
+
+    def test_what_the_test_stands_on(self):
+        """The first read answered let the switch be turned, and the second was on its way when it was clicked."""
+        self.assertTrue(self.answer["can"])
+        self.assertTrue(self.answer["enabled"], "the switch looks as it can be turned")
+        self.assertTrue(self.answer["reading"])
+        self.assertTrue(self.answer["while"]["reading"])
+
+    def test_a_click_during_the_read_is_taken_once_at_its_answer(self):
+        held, after = self.answer["while"], self.answer["after"]
+        self.assertEqual((held["asked"], held["arms"]), (0, 0), "nothing is asked or armed before the answer")
+        self.assertFalse(after["reading"])
+        self.assertEqual(after["asked"], 1, "turning on asks once, after the answer")
+        self.assertEqual(after["arms"], 1, "the click was dropped: the switch was never turned")
+
+
 class SourceTests(unittest.TestCase):
     def test_a_cards_read_is_no_action_in_flight(self):
         call = guiscan.member_body("SettingsForm", "CallAsync")
-        self.assertIn("if (!cardRead) SetBusy(true);", call)
-        self.assertIn("if (!cardRead) SetBusy(false);", call)
+        for on in ("true", "false"):
+            with self.subTest(on=on):
+                self.assertIn("if (cardRead) SetCardRead(%s);" % on, call)
+                self.assertIn("else SetBusy(%s);" % on, call)
+        self.assertIn("busy > 0 || cardReads > 0", guiscan.member_body("SettingsForm", "Hero"))
         for member in ("LoadPower", "LoadHomeSuggestion"):
             with self.subTest(member):
                 self.assertIn("}, CardRead);", guiscan.member_body("SettingsForm", member))

@@ -127,7 +127,8 @@ namespace CodexAutoResume
 
         /// What Windows offers here, and what is armed: on a worker, as every call is (CallAsync). Never while the
         /// window is being audited, which hands the card its states itself (AuditPower). A read of the card, not an action
-        /// in flight (CardRead, v0.6.24): the window's other buttons stay as they are, and the switch waits for it.
+        /// in flight (CardRead, v0.6.24): the window's other buttons stay as they are, and a click on the switch meanwhile
+        /// is kept and taken once the card is drawn from the answer (powerClickHeld).
         private void LoadPower()
         {
             if (powerCard == null || auditing || powerReading) return;
@@ -137,7 +138,22 @@ namespace CodexAutoResume
                 powerReading = false;
                 if (Ok(reply)) ApplyPowerOptions(Map(reply, "result"));
                 else ShowPower();
+                TakeHeldPowerClick();
             }, CardRead);
+        }
+
+        /// v0.6.24: a click on the switch while what Windows offers is being read (LoadPower). The switch looks as it did -
+        /// the read is no action in flight that turns it off - so the click is not dropped: it is kept, once however often
+        /// it comes, and taken the moment the card is drawn from the answer, as a click then would be (PowerSwitched: the
+        /// switch's state then, the question before turning on). An answer after which the switch cannot be turned - the
+        /// action no longer offered, an administrator's key - leaves nothing changed.
+        private bool powerClickHeld;
+
+        private void TakeHeldPowerClick()
+        {
+            if (!powerClickHeld) return;
+            powerClickHeld = false;
+            if (powerSwitch != null && !powerSwitch.IsDisposed) PowerSwitched();
         }
 
         private void ApplyPowerOptions(Dictionary<string, object> options)
@@ -297,7 +313,12 @@ namespace CodexAutoResume
         /// only takes automation away, as Pause does - and it moves at once.
         private void PowerSwitched()
         {
-            // Nor while what Windows offers is being read (LoadPower): the card is drawn again from its answer.
+            // While what Windows offers is being read (LoadPower), kept and taken at its answer (TakeHeldPowerClick).
+            if (powerReading && powerCanSwitch && busy == 0)
+            {
+                powerClickHeld = true;
+                return;
+            }
             if (!powerCanSwitch || busy > 0 || powerReading) return;
             if (Map(powerView, "armed") != null)
             {
