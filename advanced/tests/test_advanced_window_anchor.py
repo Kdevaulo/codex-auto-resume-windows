@@ -32,8 +32,11 @@ from codex_auto_resume_advanced.vocabulary import Actor, CapabilityKind, Measure
 
 CAP = "window_anchor"
 FIVE = anchor.WINDOW_SECONDS
-# What the measured request is, word for word (plans/v0620-window-anchor-measure-result.md, Q2 (a)).
-MEASURED = ["exec", "--skip-git-repo-check", "--ephemeral", "--json", "-s", "read-only", "-c",
+# What the measured request is, word for word (plans/v0620-window-anchor-measure-result.md, Q2 (a)) - and, from v0.6.24,
+# with the switch that keeps the person's programs out right after `exec` (plans/v0624-measure-2-result.md, T3), on a home
+# whose config.toml declares no MCP server.
+MEASURED = ["exec", "-c", "notify=[]", "--disable", "hooks", "--disable", "plugins", "--disable", "apps",
+            "--skip-git-repo-check", "--ephemeral", "--json", "-s", "read-only", "-c",
             'model_reasoning_effort="low"', "Reply with OK"]
 # What `codex exec --json` printed in the measurement, with a reply whose words must never be kept.
 PRINTED = (b'{"type":"thread.started","thread_id":"00000000-0000-7000-8000-00000000abcd"}\n'
@@ -112,7 +115,7 @@ class DefinitionTests(unittest.TestCase):
                          (CapabilityKind.ROUTE, frozenset({Point.TICK}), "usage_probe"))
         self.assertEqual(WINDOW_ANCHOR.departs_from, ("A1", "A2", "A13", "A25", "A26", "B3", "B4", "C4", "C9", "F6"))
         self.assertEqual(WINDOW_ANCHOR.measurements, (Measurement.MANCHOR,))
-        self.assertEqual(measured.MEASURED[Measurement.MANCHOR], (Verdict.PASS, "codex-cli 0.165.0-alpha.1.2"))
+        self.assertEqual(measured.MEASURED[Measurement.MANCHOR], (Verdict.PASS, "codex-cli 0.167.0-alpha.4.1"))
         self.assertEqual(statement.CATALOGS.missing(WINDOW_ANCHOR), [])
         self.assertEqual([option.key for option in WINDOW_ANCHOR.options],
                          [OptionKey.ANCHOR_AT_1, OptionKey.ANCHOR_AT_2, OptionKey.ANCHOR_AT_3,
