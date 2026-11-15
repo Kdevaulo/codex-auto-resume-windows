@@ -65,7 +65,7 @@ namespace CodexAutoResume
         /// with the Preview of what the next continuation there says, and Save, Remove message and Cancel.
         private Form BuildConversationMessage(Dictionary<string, object> row, string current)
         {
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = S("conversation.title", "Message for this conversation") + " - " + Conversation(row);
             dialog.Font = Font;
             dialog.BackColor = Canvas;
@@ -255,7 +255,7 @@ namespace CodexAutoResume
         /// continuation with them, and Save and Cancel.
         private Form BuildOnceWords(Dictionary<string, object> row, string current)
         {
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = S("once.title", "Words for this time") + " - " + Conversation(row);
             dialog.Font = Font;
             dialog.BackColor = Canvas;
@@ -487,7 +487,7 @@ namespace CodexAutoResume
         /// open, so a line the watcher writes appears; the log is read by the bridge (control/tools.py), never here.
         private Form BuildLogs()
         {
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = S("logs.title", "Log");
             dialog.Font = Font;
             dialog.BackColor = Canvas;
@@ -700,7 +700,7 @@ namespace CodexAutoResume
         /// first - in a read-only well, with Copy and Close. Asked once, when the dialog opens.
         private Form BuildDetectionCheck()
         {
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = S("check.title", "Why a failure was not taken up");
             dialog.Font = Font;
             dialog.BackColor = Canvas;

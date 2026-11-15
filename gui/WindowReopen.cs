@@ -609,6 +609,9 @@ namespace CodexAutoResume
         protected override void WndProc(ref Message m)
         {
             if (m.Msg == WM_COPYDATA && TakeOpenRequest(ref m)) return;
+            // v0.6.24: then the window's own caption (gui/SoftChrome.cs): its frame, what the pointer is over, its buttons -
+            // before anything else the window handles. It answers none of the open request's messages.
+            if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
             if (m.Msg == WM_DPICHANGED)
             {
                 // Taken here and not handed on: the window opens again at the new scale (CheckScale), and nothing of it

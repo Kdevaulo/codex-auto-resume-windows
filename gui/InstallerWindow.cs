@@ -150,6 +150,13 @@ namespace CodexAutoResume
             head.Controls.Add(title);
             head.Controls.Add(version);
             head.Layout += delegate { ArrangeHeader(head); };
+            // v0.6.24: the window's caption buttons in the header card's top outer corner (gui/SoftChrome.cs); the ground,
+            // the card, its light and its two lines drag the window.
+            chrome = ChromeHost.Install(this, header, ground);
+            chrome.Drag(head);
+            chrome.Drag(light);
+            chrome.Drag(title);
+            chrome.Drag(version);
 
             sheet.Dock = DockStyle.Fill;
             sheet.Margin = new Padding(0);
@@ -263,7 +270,9 @@ namespace CodexAutoResume
             int top = Math.Max(0, (head.Height - lineOne - lineTwo) / 2);
             // v0.6.20: mirrored, the light at the right and the two lines left of it (Mirror).
             bool mirrored = Mirror.Of(head);
-            int lines = Math.Max(1, head.Width - column - Px(8));
+            // v0.6.24: the two lines stop 8 px before the caption buttons, which stand in the card's padding and past it.
+            int keep = chrome == null ? 0 : Math.Max(0, Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - Px(16));
+            int lines = Math.Max(1, head.Width - column - Px(8) - keep);
             light.SetBounds(Mirror.X(mirrored, head.Width, 0, column), 0, column, head.Height);
             title.SetBounds(Mirror.X(mirrored, head.Width, column + Px(8), lines), top, lines, lineOne);
             version.SetBounds(Mirror.X(mirrored, head.Width, column + Px(8), lines), top + lineOne + Px(2), lines, lineTwo - Px(2));
@@ -808,6 +817,8 @@ namespace CodexAutoResume
         /// stays where it is instead.
         protected override void WndProc(ref Message m)
         {
+            // v0.6.24: the window's own caption first (gui/SoftChrome.cs): its frame, what the pointer is over, its buttons.
+            if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
             if (m.Msg == WM_SHOWWINDOW && running && m.WParam == IntPtr.Zero && m.LParam.ToInt64() == SW_PARENTCLOSING)
             {
                 m.Result = IntPtr.Zero;
@@ -1002,8 +1013,61 @@ namespace CodexAutoResume
             {
                 CreateParams created = base.CreateParams;
                 if (Soft.StillReady != null) created.ExStyle |= 0x08000000;          // WS_EX_NOACTIVATE
+                // v0.6.24: made at the size its ClientSize says, with no Windows caption (Chrome.Uncaption).
+                Chrome.Uncaption(created, ClientSize);
                 return created;
             }
+        }
+
+        // ------------------------------------------------------------------ the window's own caption (v0.6.24)
+        // No Windows title bar (gui/SoftChrome.cs): the caption buttons stand in the header card, the frame has no caption
+        // and no top frame, and ClientSize means what it says - a Form works its window out from its styles, which still
+        // count WS_CAPTION.
+        private ChromeHost chrome;
+
+        /// The window's caption, for the tests.
+        internal ChromeHost CaptionHost { get { return chrome; } }
+
+        private void PassOn(ref Message m)
+        {
+            base.WndProc(ref m);
+        }
+
+        private Padding OwnFrame()
+        {
+            CreateParams created = CreateParams;
+            return Chrome.Frame(created.Style, created.ExStyle);
+        }
+
+        protected override Size SizeFromClientSize(Size clientSize)
+        {
+            return Chrome.WindowSize(clientSize, OwnFrame());
+        }
+
+        protected override void SetClientSizeCore(int x, int y)
+        {
+            SuspendLayout();
+            try
+            {
+                base.SetClientSizeCore(x, y);
+                Size outer = SizeFromClientSize(new Size(x, y));
+                if (Size != outer) Size = outer;
+                // As Control.SetClientSizeCore keeps it: the client asked for, even where Form held the window to the
+                // largest the screen allows (SystemInformation.MaxWindowTrackSize) - which a picture drawn at a pinned
+                // scale then sizes itself past with SetWindowPos (WindowRender.OpenForRender).
+                if (ClientSize != new Size(x, y)) UpdateBounds(Left, Top, Width, Height, x, y);
+            }
+            finally { ResumeLayout(true); }
+        }
+
+        protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
+        {
+            // Back from maximised or minimised at the size it had (ChromeHost.Restoring).
+            if (chrome != null) chrome.Restoring(ref width, ref height, specified, CreateParams);
+            base.SetBoundsCore(x, y, width, height, specified);
+            if (IsHandleCreated) return;
+            Size client = Chrome.ClientOf(Size, OwnFrame());
+            if (client != ClientSize) UpdateBounds(Left, Top, Width, Height, client.Width, client.Height);
         }
 
         /// Every control on the page that is shown, for the layout audit.

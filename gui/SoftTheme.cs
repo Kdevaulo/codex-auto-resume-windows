@@ -190,8 +190,11 @@ namespace CodexAutoResume
         /// Windows' message font at 100%: 9 pt, in every language Windows ships.
         internal const float NormalPoints = 9f;
         /// What the screen has to hold, in logical pixels, frames included: the window at its narrowest (SettingsForm's
-        /// MinimumSize, 800 by 420) and its tallest dialog (a conversation's message, 520 high).
-        internal const int NarrowestWidth = 816, NarrowestHeight = 568;
+        /// MinimumSize, 800 by 420) and its tallest dialog (a conversation's message, 520 high). v0.6.24: that dialog with
+        /// everything it is - 520, its body card's 29 (DialogCardGrowth), its title card's strip, 62 (16 above the card,
+        /// a caption button's 26 and 10 above and below it: SoftDialog.BuildTitle) and the frame below it, 8 - and no
+        /// title bar of Windows' (it was 568 with one).
+        internal const int NarrowestWidth = 816, NarrowestHeight = 619;
 
         /// Windows' text size now, as a factor (Factor).
         internal static double Read()
@@ -853,12 +856,28 @@ namespace CodexAutoResume
         internal const int DarkTitleBarAttribute = 20;
         internal const int DarkTitleBarAttributeBefore20H1 = 19;
 
-        /// A top-level window's title bar in the dark theme, as Windows draws its own dark apps'. Nothing
-        /// in light or High Contrast; a Windows that knows neither attribute keeps its light title bar.
+        // DWMWA_WINDOW_CORNER_PREFERENCE and DWMWCP_ROUND (Windows 11): the corners Windows rounds a window with.
+        internal const int CornerPreferenceAttribute = 33, CornerRound = 2;
+
+        /// A top-level window's frame as Windows draws it round a window whose caption is ours (v0.6.24, gui/SoftChrome.cs):
+        /// asked for round corners in every theme - a window with no caption strip may otherwise lose them (Windows 11; a
+        /// Windows that knows no such attribute keeps its square ones) - and in the dark theme Windows' dark border, as it
+        /// draws its own dark apps'. A Windows that knows neither dark attribute keeps its light border.
         internal static void TitleBar(Form form)
         {
             // v0.6.20: and mirrored when the window being built is (Mirror.Window) - every window and dialog calls this.
             Mirror.Apply(form);
+            if (form != null)
+            {
+                EventHandler round = delegate
+                {
+                    int corner = CornerRound;
+                    try { DwmSetWindowAttribute(form.Handle, CornerPreferenceAttribute, ref corner, 4); }
+                    catch (Exception) { /* no dwmapi, or no such attribute: Windows' own corners */ }
+                };
+                form.HandleCreated += round;
+                if (form.IsHandleCreated) round(form, EventArgs.Empty);
+            }
             if (!Palette.Dark || form == null) return;
             EventHandler apply = delegate
             {
@@ -878,9 +897,13 @@ namespace CodexAutoResume
         /// itself is better with none; its own main window, the tray icon and the popup keep theirs). Every dialog the window
         /// builds calls this and not Soft.TitleBar, so one that is added has no icon without asking; a dialog is never in the
         /// taskbar (ShowInTaskbar = false), so there is no button to give an icon either. tests/test_gui_dialog_icons.py.
+        /// v0.6.24: and the caption is the dialog's own - a title card at its top with its title and the caption buttons
+        /// (SoftDialog, made as the dialog is), Windows' title bar gone.
         internal static void DialogBar(Form dialog)
         {
             if (dialog != null) dialog.ShowIcon = false;
+            var soft = dialog as SoftDialog;
+            if (soft != null) soft.Titled = true;
             TitleBar(dialog);
         }
 

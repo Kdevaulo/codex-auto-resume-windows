@@ -44,7 +44,7 @@ namespace CodexAutoResume
         /// the dialog opens and on Write again, on the bridge's worker (bridge.Queue).
         private Form BuildOwnReport()
         {
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = S("ownreport.title", "Compatibility report from this PC");
             dialog.Font = Font;
             dialog.BackColor = Canvas;

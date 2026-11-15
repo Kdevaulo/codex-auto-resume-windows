@@ -356,7 +356,7 @@ namespace CodexAutoResume
         /// An alias for a home, asked in a small dialog: 1 to 32 characters on one line. Null when cancelled.
         private string AskAlias(string current)
         {
-            using (var dialog = new Form())
+            using (var dialog = new SoftDialog())
             {
                 dialog.Text = S("homes.alias", "Name for this Codex home");
                 dialog.Font = Font;

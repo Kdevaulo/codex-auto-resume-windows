@@ -14,7 +14,8 @@ The build test compiles the window once (csc); the pixel test loads the compiled
 icon, then holds it to the .ico's own 24 px image. Run on its own.
 
 Since 2026-11-01 (the owner: a window opened inside the app has no icon) the Timeline dialog wears none - the picture of it
-draws none (RenderDialog) - and IconImage serves the picture of whatever window does carry one.
+draws none (RenderDialog) - and IconImage serves the picture of whatever window does carry one. Since v0.6.24 no window
+has Windows' title bar at all (gui/SoftChrome.cs), so PaintDialog draws no title bar and no icon either.
 """
 from __future__ import annotations
 
@@ -136,11 +137,13 @@ class SourceTests(unittest.TestCase):
         self.assertIn("Soft.DialogBar(dialog);", body)
         self.assertNotIn("dialog.Icon", body)
         render = guiscan.member_body("SettingsForm", "RenderDialog")
-        self.assertIn("form.ShowIcon ? form.Icon : null", render, "a form's Icon is Windows' default where none is set")
+        self.assertNotIn("form.Icon", render, "v0.6.24: no title bar is drawn round it, so no icon is read for one")
 
-    def test_a_rendered_dialog_draws_the_decoded_icon(self):
+    def test_a_rendered_dialog_draws_no_title_bar_and_no_icon(self):
+        """v0.6.24: no window has Windows' title bar; the dialog's own title card is in the picture of its client area.
+        IconImage still serves a picture of whatever carries the product's icon (the pixel test above)."""
         body = guiscan.member_body("SettingsForm", "PaintDialog")
-        self.assertIn("IconImage(icon, small)", body)
+        self.assertNotIn("IconImage(", body)
         self.assertNotIn("DrawIcon(", body)
 
 
