@@ -20,9 +20,9 @@ Held here:
   catalog, for an update and a repair and the Dashboard's update, with the light of a watcher that runs; the
   left-stopped line gives the left-stopped box and not this one; a plain update gives neither; the two lines
   together give the left-stopped box alone.
-* LayoutTests - the setup window's layout audit (test_installer_window's) lays the started-again Finish page out in
-  its own variant, beside the left-stopped one: a started-again sentence too long for the card is reported, so a quiet
-  report is known to have looked.
+* LayoutTests - the setup window's layout audit (build/setup/SetupWindow.cs InstallerAudit) lays the started-again
+  Finish page out in a finish of its own beside the left-stopped one; here in English at the smallest and the largest
+  scaling, and in every language at every scaling by test_installer_window.LayoutAuditTests.
 """
 from __future__ import annotations
 
@@ -58,9 +58,12 @@ def catalog(locale: str) -> dict:
     return json.loads((LOCALES / ("%s.json" % locale)).read_text(encoding="utf-8"))
 
 
-class LastWords(LastWordTests):
-    """install.ps1's last word as it prints, for a watcher in each state (the helper only: no test of LastWordTests
-    runs again here)."""
+class LastWords:
+    """install.ps1's last word as it prints, for a watcher in each state. A plain class borrowing LastWordTests' script
+    runner: none of its tests run again here."""
+
+    run_script = LastWordTests.run_script
+    WORD = LastWordTests.WORD
 
     def last_word(self, *, again=False, left=False, repair=False):
         text = INSTALL.read_text(encoding="utf-8")
@@ -296,22 +299,21 @@ class FinishPageTests(unittest.TestCase):
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class LayoutTests(unittest.TestCase):
-    """The audit's started-again variant. Every language at every scaling is test_installer_window's own
-    LayoutAuditTests, which now lays this Finish page out as well; this one proves the variant is looked at."""
+    """The audit's started-again variant, in English at the smallest and the largest scaling. Every language at every
+    scaling and text size is test_installer_window's own LayoutAuditTests, which lays this Finish page out as well
+    (a long sentence in a callout is wrapped, and the Finish page is measured again for what the run left it saying,
+    so what the audit can find here is a word or a button the window cuts off, not a callout that is too tall)."""
 
     AUDIT = r"""
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
 $assembly = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
 $audit = $assembly.GetType('CodexAutoResume.InstallerAudit', $true).GetMethod('LayoutAudit', [Reflection.BindingFlags]'Static,NonPublic')
+$catalog = [IO.File]::ReadAllText($env:CAR_CATALOG, [Text.Encoding]::UTF8)
 $out = @{}
-foreach ($name in @('plain', 'canary')) {
-    $catalog = [IO.File]::ReadAllText((Join-Path $env:CAR_WORK ($name + '.json')), [Text.Encoding]::UTF8)
-    $out[$name] = @{}
-    foreach ($pair in (ConvertFrom-Json $env:CAR_PAIRS)) {
-        $out[$name][('{0:F2}/{1:F2}' -f [double]$pair[0], [double]$pair[1])] = [string]$audit.Invoke($null,
-            [object[]]@([string]$catalog, 'en', [double]$pair[0], [double]$pair[1]))
-    }
+foreach ($pair in (ConvertFrom-Json $env:CAR_PAIRS)) {
+    $out[('{0:F2}/{1:F2}' -f [double]$pair[0], [double]$pair[1])] = [string]$audit.Invoke($null,
+        [object[]]@([string]$catalog, 'en', [double]$pair[0], [double]$pair[1]))
 }
 [IO.File]::WriteAllText($env:CAR_RESULT, ($out | ConvertTo-Json -Depth 4 -Compress), (New-Object Text.UTF8Encoding $false))
 """
@@ -320,14 +322,9 @@ foreach ($name in @('plain', 'canary')) {
     def setUpClass(cls):
         cls.work = Path(tempfile.mkdtemp(prefix="installer-started-again-audit-"))
         exe = _build(cls.work)
-        english = l10n.catalog("en")
-        (cls.work / "plain.json").write_text(json.dumps(english), encoding="utf-8")
-        # A sentence the card cannot hold, in this one box.
-        long = " ".join(["The watcher had ended unexpectedly before, so it was started again and is running."] * 12)
-        (cls.work / "canary.json").write_text(json.dumps(dict(english, **{KEY: long})), encoding="utf-8")
         result = cls.work / "result.json"
-        cls.result = _powershell(cls.AUDIT, cls.work, 900, CAR_EXE=str(exe), CAR_WORK=str(cls.work),
-                                 CAR_PAIRS=json.dumps(PAIRS[:1]), CAR_RESULT=str(result))
+        cls.result = _powershell(cls.AUDIT, cls.work, 900, CAR_EXE=str(exe), CAR_CATALOG=str(LOCALES / "en.json"),
+                                 CAR_PAIRS=json.dumps([PAIRS[0], PAIRS[4]]), CAR_RESULT=str(result))
         cls.answer = (json.loads(result.read_text(encoding="utf-8-sig"))
                       if cls.result.returncode == 0 and result.is_file() else {})
 
@@ -339,15 +336,11 @@ foreach ($name in @('plain', 'canary')) {
         if not self.answer:
             self.fail("the audit did not run: " + (self.result.stderr or self.result.stdout)[-3000:])
 
-    def test_the_started_again_finish_fits_in_english(self):
-        self.assertEqual(self.answer["plain"]["1.00/1.00"], "")
-
-    def test_a_started_again_sentence_the_card_cannot_hold_is_reported_on_its_own_finish(self):
-        report = self.answer["canary"]["1.00/1.00"]
-        self.assertIn(" started again :: ", report, "the started-again finish was laid out and looked at")
-        self.assertIn("the page needs", report)
-        # Only the variant that carries the long sentence: the left-stopped finish does not.
-        self.assertFalse([line for line in report.splitlines() if "/finish 0 ::" in line], report)
+    def test_nothing_is_cut_off_at_the_smallest_and_the_largest_scaling(self):
+        self.assertEqual(sorted(self.answer), ["1.00/1.00", "2.00/1.00"])
+        for pair, report in self.answer.items():
+            with self.subTest(pair):
+                self.assertEqual(report, "", "\n" + "\n".join(report.splitlines()[:30]))
 
 
 if __name__ == "__main__":
