@@ -7,8 +7,8 @@
   "values": {},
   "canvas": {
     "size": [
-      752,
-      883
+      808,
+      939
     ],
     "ground": "canvas",
     "theme": "light",
@@ -21,8 +21,8 @@
   },
   "pointer": {
     "rest": [
-      800,
-      560
+      856,
+      588
     ],
     "scale": 2.0
   },
