@@ -107,7 +107,8 @@ namespace CodexAutoResume
             LoadHomeSuggestion();
         }
 
-        /// On a worker, as every call is (CallAsync). Never while the window is being audited.
+        /// On a worker, as every call is (CallAsync). Never while the window is being audited. A read of the card, not an
+        /// action in flight (CardRead, v0.6.24): the window's buttons stay as they are.
         private void LoadHomeSuggestion()
         {
             if (homesCard == null || auditing || homesSuggestReading) return;
@@ -116,7 +117,7 @@ namespace CodexAutoResume
             {
                 homesSuggestReading = false;
                 if (Ok(reply)) ApplyHomeSuggestion(Map(reply, "result"));
-            });
+            }, CardRead);
         }
 
         /// The line as the bridge says it: the folder offered with Add and Not now, or - every home added - that it

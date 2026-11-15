@@ -126,7 +126,8 @@ namespace CodexAutoResume
         }
 
         /// What Windows offers here, and what is armed: on a worker, as every call is (CallAsync). Never while the
-        /// window is being audited, which hands the card its states itself (AuditPower).
+        /// window is being audited, which hands the card its states itself (AuditPower). A read of the card, not an action
+        /// in flight (CardRead, v0.6.24): the window's other buttons stay as they are, and the switch waits for it.
         private void LoadPower()
         {
             if (powerCard == null || auditing || powerReading) return;
@@ -136,7 +137,7 @@ namespace CodexAutoResume
                 powerReading = false;
                 if (Ok(reply)) ApplyPowerOptions(Map(reply, "result"));
                 else ShowPower();
-            });
+            }, CardRead);
         }
 
         private void ApplyPowerOptions(Dictionary<string, object> options)
@@ -296,7 +297,8 @@ namespace CodexAutoResume
         /// only takes automation away, as Pause does - and it moves at once.
         private void PowerSwitched()
         {
-            if (!powerCanSwitch || busy > 0) return;
+            // Nor while what Windows offers is being read (LoadPower): the card is drawn again from its answer.
+            if (!powerCanSwitch || busy > 0 || powerReading) return;
             if (Map(powerView, "armed") != null)
             {
                 powerSwitch.Checked = false;
