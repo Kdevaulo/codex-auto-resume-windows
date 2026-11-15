@@ -24,6 +24,11 @@ everything in it. The owner, 2026-11-15, looking at it: the grey part outside th
   the layering style bit is cleared and set again" (the same page).
 
 `card_still` draws the same card and shadow over nothing, offscreen, for the pictures and the tests.
+
+What it costs (2026-11-15, this PC, a window far off every screen, medians): a frame of the light 0.35 / 0.34 / 0.67 ms
+at 100 / 150 / 200 % (its rows only; the 33 ms frame has room for it many times over), a first opening 22 / 31 / 44 ms
+and an opening again 11 / 12 / 16 ms - the plain window took 26 / 44 / 66 and 12 / 15 / 14 ms. The shadow is drawn once
+a size, scale and look, never per frame.
 """
 from __future__ import annotations
 
