@@ -230,8 +230,9 @@ namespace CodexAutoResume
             return said;
         }
 
-        // Maximised over the whole monitor, as with an auto-hide taskbar, with Windows' answer of which edges have one
-        // stubbed (Chrome.AppBarEdges): bottom, then none.
+        // Maximised, with Windows' answer of which edges of its monitor have an auto-hide bar stubbed (Chrome.AppBarEdges):
+        // none, then each edge alone. Windows holds a maximised window to the work area, so an edge it reaches is one with
+        // no taskbar standing there - as with the taskbar hidden.
         private static Dictionary<string, object> TopLevelAutoHide(SettingsForm form)
         {
             var said = new Dictionary<string, object>();
@@ -249,7 +250,7 @@ namespace CodexAutoResume
             var asked = new List<object>();
             try
             {
-                foreach (int edges in new[] { 8, 2, 0 })
+                foreach (int edges in new[] { 0, 1, 2, 4, 8 })
                 {
                     int answer = edges;
                     stub.SetValue(null, (Func<Rectangle, int>)delegate(Rectangle on) { asked.Add(Numbers(on.Left, on.Top, on.Width, on.Height)); return answer; });
@@ -467,13 +468,23 @@ class TopLevelChromeTests(unittest.TestCase):
         said = self.answer["autohide"]
         self.assertNotEqual(said.get("stub"), "missing", "Chrome.AppBarEdges is what a test stubs")
         left, top, width, height = said["monitor"]
-        whole = [left, top, width, height]
-        self.assertEqual(said["edges0"]["client"], whole, "no auto-hide bar: the whole monitor")
-        self.assertEqual(said["edges8"]["client"], [left, top, width, height - 2], "bottom: 2 px left at the foot")
-        self.assertEqual(said["edges2"]["client"], [left, top + 2, width, height - 2], "top: 2 px left at the top")
+        monitor = (left, top, left + width, top + height)
+        ltrb = lambda box: [box[0], box[1], box[0] + box[2], box[1] + box[3]]
+        plain = ltrb(said["edges0"]["client"])
+        self.assertTrue(monitor[0] <= plain[0] < plain[2] <= monitor[2] and monitor[1] <= plain[1] < plain[3] <= monitor[3])
+        left_room = 0
+        for bit, side, inward in ((1, 0, 1), (2, 1, 1), (4, 2, -1), (8, 3, -1)):
+            expected = list(plain)
+            if plain[side] == monitor[side]:
+                expected[side] += 2 * inward
+                left_room += 1
+            with self.subTest(edge=bit):
+                self.assertEqual(ltrb(said["edges%d" % bit]["client"]), expected,
+                                 "2 px left at an edge the window reaches, nothing where the work area stops short of it")
+        self.assertGreater(left_room, 0, "at least one edge of the monitor was reached")
         self.assertTrue(said["asked"], "asked of the monitor the window is maximised on")
         for asked in said["asked"]:
-            self.assertEqual(asked, whole)
+            self.assertEqual(asked, [left, top, width, height])
         self.assertEqual(said["restored"]["state"], "Normal")
 
     def test_the_room_left_for_an_auto_hide_bar_is_at_its_edge_alone(self):
