@@ -428,6 +428,9 @@ class TipCard:
         if light != self._light:
             self._light, self._light_since = light, time.monotonic()
         self.strings, self.locale = strings, locale
+        # What a screen reader is told: the tooltip's whole text, never cut to szTip's 127 characters (design 7.2 named
+        # tooltip()'s; the main session decided 2026-11-15 to keep it uncut - more for a screen reader, nothing lost, and
+        # szTip itself is unchanged).
         self.text = tooltip_joined(parts)
         screen = self._screen
         scale = screen["dpi"] / 96.0
