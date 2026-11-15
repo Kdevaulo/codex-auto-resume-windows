@@ -295,11 +295,13 @@ namespace CodexAutoResume
                         each.Value.NotesText = SampleNotes;
                     }
                     foreach (int ended in Endings())
+                    for (int pass = 0; pass < (ended == 0 ? 2 : 1); pass++)
                     {
                         using (var window = new InstallerWindow(each.Value, words, delegate(string other) { return words; },
                                                                 delegate { return 0; }, null, font))
                         {
-                            string where = each.Key + "/" + (ended == int.MinValue ? "pages" : "finish " + ended);
+                            bool again = pass == 1;
+                            string where = each.Key + "/" + (ended == int.MinValue ? "pages" : "finish " + ended) + (again ? " started again" : "");
                             if (ended == int.MinValue)
                             {
                                 foreach (string page in each.Value.Pages())
@@ -313,7 +315,9 @@ namespace CodexAutoResume
                                 ? "The watcher could not be confirmed running, so nothing is being watched yet.\n" +
                                   "The previous version of the watcher was asked to stop and is still finishing\n" +
                                   DesktopShortcut.FailedLine + "\n" + DesktopShortcut.TakenLine + "\n" +
-                                  InstallerFlow.LeftStoppedLine + "update, so it was left stopped; nothing is being watched yet."
+                                  // Never both in one run: one finish has the left-stopped box, the other the started-again one.
+                                  (again ? InstallerFlow.StartedAgainLine + "update (in this sign-in, not by a stop or a restart), so it was started again and is running."
+                                         : InstallerFlow.LeftStoppedLine + "update, so it was left stopped; nothing is being watched yet.")
                                 : "  [x]  Something did not work.");
                             Check(window, where, findings);
                         }
