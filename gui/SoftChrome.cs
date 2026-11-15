@@ -118,13 +118,44 @@ namespace CodexAutoResume
         /// frames Windows gives that style, and nothing at the top.
         internal static Padding Frame(int style, int exStyle)
         {
+            Padding captioned = CaptionedFrame(style, exStyle);
+            return new Padding(captioned.Left, 0, captioned.Right, captioned.Bottom);
+        }
+
+        /// The frame Windows gives a window of `style` with its own caption: what WinForms still counts where it works a
+        /// window's size out with no way for us to answer (Uncaptioned).
+        internal static Padding CaptionedFrame(int style, int exStyle)
+        {
             var rect = new RECT();
             try
             {
                 if (!AdjustWindowRectEx(ref rect, style, false, exStyle)) return Padding.Empty;
             }
             catch (Exception) { return Padding.Empty; }
-            return new Padding(Math.Max(0, -rect.Left), 0, Math.Max(0, rect.Right), Math.Max(0, rect.Bottom));
+            return new Padding(Math.Max(0, -rect.Left), Math.Max(0, -rect.Top), Math.Max(0, rect.Right), Math.Max(0, rect.Bottom));
+        }
+
+        /// A window size WinForms worked out from `client` with Windows' caption counted (`captioned`) - as the window is
+        /// made (Form.FillInCreateParamsStartPosition) and as it comes back from maximised or minimised
+        /// (Form.RestoreWindowBoundsIfNecessary), each through Control's own SizeFromClientSize(int, int), which no form can
+        /// answer - is that client's window inside `frame`, with no caption. Any other size is kept as it was asked.
+        internal static Size Uncaptioned(Size asked, Size client, Padding frame, Padding captioned)
+        {
+            if (client.IsEmpty || frame == captioned || asked != WindowSize(client, captioned)) return asked;
+            return WindowSize(client, frame);
+        }
+
+        private const int WS_MAXIMIZE = 0x01000000, WS_MINIMIZE = 0x20000000;
+
+        /// The window `created` makes, from the client `client`, with no caption: for a form's CreateParams, so a top-level
+        /// window is made at the size its ClientSize says and not one Windows caption taller.
+        internal static void Uncaption(CreateParams created, Size client)
+        {
+            int style = created.Style & ~(WS_MAXIMIZE | WS_MINIMIZE);
+            Size outer = Uncaptioned(new Size(created.Width, created.Height), client, Frame(style, created.ExStyle),
+                                     CaptionedFrame(style, created.ExStyle));
+            created.Width = outer.Width;
+            created.Height = outer.Height;
         }
 
         /// The window `client` needs inside `frame` (Frame): what Form.SizeFromClientSize answers once the caption is ours, so
@@ -1235,6 +1266,17 @@ namespace CodexAutoResume
         protected override Size SizeFromClientSize(Size clientSize)
         {
             return Chrome.WindowSize(clientSize, OwnFrame());
+        }
+
+        // The window made at the size its ClientSize says: Form fills it in with Windows' caption counted (Chrome.Uncaption).
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams created = base.CreateParams;
+                Chrome.Uncaption(created, ClientSize);
+                return created;
+            }
         }
 
         protected override void SetClientSizeCore(int x, int y)

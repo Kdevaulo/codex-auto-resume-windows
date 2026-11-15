@@ -126,6 +126,8 @@ namespace CodexAutoResume
             {
                 CreateParams created = base.CreateParams;
                 if (Soft.StillReady != null) created.ExStyle |= 0x08000000;          // WS_EX_NOACTIVATE
+                // v0.6.24: made at the size its ClientSize says, with no Windows caption (Chrome.Uncaption).
+                Chrome.Uncaption(created, ClientSize);
                 return created;
             }
         }
