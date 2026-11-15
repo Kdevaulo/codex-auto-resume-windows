@@ -660,3 +660,15 @@ details.inner > .fold-body > .setting { border-top: 1px solid var(--line); }
   .segment input:checked + span { forced-color-adjust: none; background: Highlight; color: HighlightText;
                                   border-color: Highlight; box-shadow: none; }
 }
+/* v0.6.24 (owner, O11): Soft's corners as a superellipse where the engine draws `corner-shape`, the nearest it comes to
+   the window's and the popup's squircle (brand/shape.py's CSS_CORNER), and plain border-radius everywhere else. Each
+   role's radius is pointed at the one the superellipse takes (--squircle-*, brand.css_corner); a design with circular
+   corners keeps its own radii, which its block declares above this one's reach, and says --corner-shape: round. The
+   border, the shadows and the background follow the corner shape. Only what is rounded by a role: a pill stays a pill. */
+@supports (corner-shape: superellipse(2)) {
+  :root { --radius-card: var(--squircle-card); --radius-control: var(--squircle-control);
+          --radius-small: var(--squircle-small); --radius-check: var(--squircle-check); }
+  .card, .day-scene, button, .combo-box, input[type=number], .combo-list, .combo-option, input.check, .master,
+  .segment span, details.card.fold > summary, details.inner > summary, .prow, .stored-text, .callout, .bubble,
+  .savebar { corner-shape: var(--corner-shape); }
+}

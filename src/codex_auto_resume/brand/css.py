@@ -17,6 +17,7 @@ from .light import (GLOW,
                     glow_reach)
 from .motion import MOTION
 from .scale import LAYOUT, LINE_HEIGHT, RADII, SPACING, TYPE_SCALE
+from .shape import CSS_CORNER, design_smoothing
 from .tokens import DESIGNS, THEMES, palette, theme_name
 
 
@@ -75,6 +76,24 @@ def css_scale() -> str:
     parts.append("--glow-arc-sweep: %sdeg;" % _number(light["arc_sweep"]))
     parts.append("--glow-arc-still: %sdeg;" % _number(light["arc_still_at"]))
     parts.append(css_check_box())
+    parts.append(css_corner())
+    return " ".join(parts)
+
+
+# v0.6.24 (O11): the roles whose corners the panel draws as a superellipse where its engine has `corner-shape`
+# (panel.css's @supports block); a pill (999px, 50%) is a pill everywhere and is none of them.
+CORNER_ROLES = ("card", "control", "small", "check")
+
+
+def css_corner() -> str:
+    """Soft's corner where the panel's engine draws `corner-shape`: `--corner-shape`, and `--squircle-<role>`, the
+    radius each role takes with it (shape.CSS_CORNER). Read only inside panel.css's @supports block, which points
+    `--radius-<role>` at these; a design that keeps circular corners says `--corner-shape: round` in its own block
+    (css_design_blocks), and its own radii there outrank the block's."""
+    if not design_smoothing("soft"):
+        return "--corner-shape: round;"
+    parts = ["--corner-shape: superellipse(%s);" % _number(CSS_CORNER["superellipse"])]
+    parts += ["--squircle-%s: %s;" % (role, _css_length(RADII[role] * CSS_CORNER["reach"])) for role in CORNER_ROLES]
     return " ".join(parts)
 
 
@@ -206,6 +225,8 @@ def _design_declarations(theme, design, extra) -> str:
         parts.append("--card-ground: var(--surface);")
     parts.append(" ".join("--radius-%s: %spx;" % (name.replace("_", "-"), _number(value))
                           for name, value in DESIGN_RADII[design].items()))
+    if not design_smoothing(design):
+        parts.append("--corner-shape: round;")         # v0.6.24: circular corners (shape.DESIGN_SMOOTHING)
     if extra is not None:
         parts.append(extra(theme, design))
     return " ".join(part for part in parts if part)
