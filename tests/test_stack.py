@@ -71,8 +71,9 @@ ITEM = {_q(name): item for item, names in {
                 "runtime.afterwork",
                 # v0.6.15-beta: the other Codex homes a watcher holds.
                 "runtime.homes",
-                # v0.6.18: what an update set aside and could not delete, swept as it starts.
-                "runtime.setaside",
+                # v0.6.18: what an update set aside and could not delete, swept as it starts - and, v0.6.24, from the
+                # Dashboard's bridge too, so beside the package rather than in runtime/.
+                "setaside",
                 # v0.6.23: the notices an edition's plug adds, out of runtime/app.py.
                 "runtime.plugnotices",
                 # v0.6.16-beta.3: its own decisions asked on request, for Diagnostics' check (issue #27).

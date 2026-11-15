@@ -1,4 +1,5 @@
-"""What an update moved aside and could not delete, swept when the watcher starts (v0.6.18).
+"""What an update moved aside and could not delete, swept when the watcher starts (v0.6.18) and from the Dashboard's
+bridge (v0.6.24, controlcli.sweep_soon) - beside the package, not in runtime/, so the bridge loads no watcher with it.
 
 An update moves `app`, `runtime` and the Dashboard's files aside as `<name>.old-<stamp>` before it copies the new
 ones (build/install/install.ps1), and deletes them once the copy is in place - unless something still had them open:
@@ -23,7 +24,7 @@ from pathlib import Path
 import re
 import shutil
 
-from .. import config, windows
+from . import config, windows
 
 # install.ps1: `$pair.dst + '.old-' + $stamp`, the stamp Get-Date -Format 'yyyyMMddHHmmss'; and the name a folder is
 # given here just before it is deleted, so one whose deletion stopped half way is swept the next time.

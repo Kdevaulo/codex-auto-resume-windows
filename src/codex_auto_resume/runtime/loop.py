@@ -29,7 +29,7 @@ from ..windows import AdapterError, Mutex, StopEvent, wait_any
 from .afterwork import AfterWork
 from .health import Health
 from .homes import Homes
-from .setaside import sweep as sweep_set_aside
+from ..setaside import sweep as sweep_set_aside
 from .waking import Waking
 
 

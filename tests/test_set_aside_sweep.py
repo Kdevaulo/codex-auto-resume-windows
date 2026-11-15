@@ -2,7 +2,7 @@
 
 An update moves `app`, `runtime` and the Dashboard's files aside as `<name>.old-<stamp>` and deletes them once the
 copy is in place - unless something still had them open. They stayed in the home until the next install, about
-14 MB each. The watcher now sweeps them as it starts (runtime/setaside.py): never in a home not provably ours,
+14 MB each. The watcher now sweeps them as it starts (setaside.py): never in a home not provably ours,
 never while an install runs or its copy journal is there (the only complete tree may be under an `.old-` name),
 never through a link, and never half way through a folder still in use.
 
@@ -18,7 +18,7 @@ import tempfile
 import unittest
 
 from codex_auto_resume import config
-from codex_auto_resume.runtime import setaside
+from codex_auto_resume import setaside
 
 STAMP = "20261020123456"
 ROOT = Path(__file__).resolve().parents[1]
