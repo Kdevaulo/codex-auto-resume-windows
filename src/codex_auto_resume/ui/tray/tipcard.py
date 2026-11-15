@@ -44,8 +44,14 @@ TIP_STYLE = WS_EX_LAYERED | popup.WS_EX_TOOLWINDOW | popup.WS_EX_TOPMOST | WS_EX
 WM_MOUSEACTIVATE, MA_NOACTIVATE, WM_NCHITTEST, HTTRANSPARENT = 0x0021, 3, 0x0084, -1
 WM_DISPLAYCHANGE, WM_THEMECHANGED, WM_DPICHANGED = 0x007E, 0x031A, 0x02E0
 # Its timers: the one-second redraw (the countdown, and what the snapshot says now), the light's frames while it
-# breathes, and its fade's.
-TIP_TICK, TIP_FRAME, TIP_FADE = 1, 2, 3
+# breathes, its fade's, and the backstop's look at the pointer.
+TIP_TICK, TIP_FRAME, TIP_FADE, TIP_WATCH = 1, 2, 3, 4
+# The backstop, where the shell's NIN_POPUPCLOSE never comes (the hidden-icons flyout closed, Explorer gone, a sleep with no
+# lock): every TIP_WATCH_MS it looks where the pointer is, and after TIP_AWAY_S off the icon - its box grown by TIP_NEAR
+# px, as an anchor point is one pixel - and off the card, the card goes as if the pointer had left. And on a suspend or
+# a resume (WM_POWERBROADCAST).
+TIP_WATCH_MS, TIP_AWAY_S, TIP_NEAR = 250, 1.0, 16
+WM_POWERBROADCAST, PBT_APMSUSPEND, PBT_APMRESUMESUSPEND, PBT_APMRESUMEAUTOMATIC = 0x0218, 0x0004, 0x0007, 0x0012
 # What a screen reader is told of it (oleacc.h): a tooltip, read only, shown and hidden.
 ROLE_SYSTEM_TOOLTIP, STATE_SYSTEM_READONLY = 0x0D, 0x40
 EVENT_OBJECT_SHOW, EVENT_OBJECT_HIDE = 0x8002, 0x8003
@@ -67,6 +73,27 @@ def tip_place(plan, work, monitor, box) -> tuple:
     gap = int(round(TIP_GAP * plan["scale"]))
     x, y, _ = popup.place((card[2] - card[0], card[3] - card[1]), work, monitor, icon=box, gap=gap)
     return x - card[0], y - card[1]
+
+
+def tip_pointer():
+    """Where the pointer is, in per-monitor pixels, or None when Windows cannot say."""
+    popup._declare()
+    spot = W.POINT()
+    with popup._PerMonitorDpi():
+        if not popup._dll("user32").GetCursorPos(C.byref(spot)):
+            return None
+    return spot.x, spot.y
+
+
+def tip_away(pointer, box, origin, size, near) -> bool:
+    """Whether the pointer is off the icon's box (grown by `near` px) and off the card at `origin` of `size`."""
+    if pointer is None:
+        return False
+    x, y = pointer
+    left, top, right, bottom = box
+    if left - near <= x < right + near and top - near <= y < bottom + near:
+        return False
+    return not (origin[0] <= x < origin[0] + size[0] and origin[1] <= y < origin[1] + size[1])
 
 
 def tip_screen(icon=None, point=None) -> dict:
@@ -235,6 +262,7 @@ class TipCard:
         self._access = None
         self._light, self._light_since = None, time.monotonic()
         self._frame_running = False
+        self._away_since = None                  # since when the backstop has seen the pointer away, or None
         # How opaque it is, and its fade: ("in", started_ms) or ("out", started_ms, the alpha it left from), or None.
         self._alpha, self._fade = 255, None
 
@@ -271,7 +299,7 @@ class TipCard:
         self.visible = False
         self._fade = None
         if hwnd:
-            for timer in (TIP_TICK, TIP_FRAME, TIP_FADE):
+            for timer in (TIP_TICK, TIP_FRAME, TIP_FADE, TIP_WATCH):
                 user32.KillTimer(hwnd, timer)
             user32.DestroyWindow(hwnd)
         self._frame_running = False
@@ -305,7 +333,9 @@ class TipCard:
         if not self.visible:
             access.tell(self.hwnd, EVENT_OBJECT_SHOW)
         self.visible = True
+        self._away_since = None
         user32.SetTimer(self.hwnd, TIP_TICK, 1000, None)
+        user32.SetTimer(self.hwnd, TIP_WATCH, TIP_WATCH_MS, None)
         self._sync_frames()
 
     def hide(self, at_once=True):
@@ -320,7 +350,7 @@ class TipCard:
             return
         self.visible = False
         user32 = popup._dll("user32")
-        for timer in (TIP_TICK, TIP_FRAME):
+        for timer in (TIP_TICK, TIP_FRAME, TIP_WATCH):
             user32.KillTimer(self.hwnd, timer)
         self._frame_running = False
         access.tell(self.hwnd, EVENT_OBJECT_HIDE)
@@ -341,6 +371,22 @@ class TipCard:
                 popup._dll("user32").SetWindowPos(self.hwnd, C.c_void_p(popup.HWND_TOPMOST), self._origin[0],
                                                   self._origin[1], width, height, popup.SWP_NOACTIVATE)
         self._sync_frames()
+
+    def watch(self):
+        """The backstop's look (TIP_WATCH): the pointer away from the icon and the card for TIP_AWAY_S, and the card goes,
+        fading as when the pointer leaves - for when the shell's word that it left never comes."""
+        if not self.visible or self._plan is None or self._screen is None:
+            return
+        scale = self._plan["scale"]
+        if not tip_away(tip_pointer(), self._screen["box"], self._origin, self._plan["size"],
+                        int(round(TIP_NEAR * scale))):
+            self._away_since = None
+            return
+        now = time.monotonic()
+        if self._away_since is None:
+            self._away_since = now
+        elif now - self._away_since >= TIP_AWAY_S:
+            self.hide(at_once=False)
 
     # ------------------------------------------------------------------ what it shows
     _still = False
@@ -486,6 +532,8 @@ class TipCard:
                     self._light_step()
                 elif wparam == TIP_FADE:
                     self._fade_step()
+                elif wparam == TIP_WATCH:
+                    self.watch()
                 return 0
             if message == access.WM_GETOBJECT:
                 answered = access.answer(self, wparam, lparam, TipAccessible)
@@ -502,6 +550,8 @@ class TipCard:
                     self._push()
                     self._sync_frames()
             elif message in (WM_DISPLAYCHANGE, WM_DPICHANGED):
+                self.hide()
+            elif message == WM_POWERBROADCAST and wparam in (PBT_APMSUSPEND, PBT_APMRESUMESUSPEND, PBT_APMRESUMEAUTOMATIC):
                 self.hide()
         except Exception as exc:                 # the card must never take the watcher down
             self.log("tray tip card message failed (%s)" % type(exc).__name__)

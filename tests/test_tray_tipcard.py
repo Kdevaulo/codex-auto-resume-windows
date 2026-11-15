@@ -470,5 +470,43 @@ class CardStateTests(unittest.TestCase):
         self.assertEqual(len(self.hidden()), 1, "hidden already: nothing")
 
 
+    def backstop(self, pointer, steps):
+        """The card shown by the icon at ICON with its card above it; the backstop looks at `steps` seconds with the pointer
+        at `pointer`. Returns whether it is still shown after each look."""
+        from unittest import mock
+        card = self.card
+        card._moves = lambda: False
+        card._plan, card._screen, card._origin = {"scale": 1.0, "size": (300, 80)}, {"box": (1700, 1040, 1724, 1064)}, (1562, 952)
+        clock = [0.0]
+        seen = []
+        with mock.patch.object(self.tipcard, "tip_pointer", lambda: pointer), \
+                mock.patch.object(self.tipcard, "time", type("Clock", (), {"monotonic": staticmethod(lambda: clock[0])})):
+            for at in steps:
+                clock[0] = at
+                card._wndproc(card.hwnd, popup.WM_TIMER, self.tipcard.TIP_WATCH, 0)
+                seen.append(card.visible)
+        return seen
+
+    def test_the_backstop_hides_it_a_second_after_the_pointer_went_elsewhere(self):
+        """Review R3: with NIN_POPUPCLOSE missed (the flyout closed, Explorer gone, a sleep with no lock) it stayed up."""
+        self.assertEqual(self.backstop((100, 100), (0.0, 0.25, 0.5, 0.75, 1.0)), [True, True, True, True, False])
+        self.assertEqual(len(self.hidden()), 1)
+
+    def test_the_backstop_keeps_it_while_the_pointer_is_on_the_icon_near_it_or_on_the_card(self):
+        for pointer in ((1710, 1050), (1690, 1050), (1600, 980)):
+            with self.subTest(pointer=pointer):
+                self.card.visible = True
+                self.assertEqual(self.backstop(pointer, (0.0, 1.0, 2.0, 5.0)), [True] * 4)
+
+    def test_a_suspend_or_a_resume_hides_it(self):
+        tipcard = self.tipcard
+        for event in (tipcard.PBT_APMSUSPEND, tipcard.PBT_APMRESUMESUSPEND, tipcard.PBT_APMRESUMEAUTOMATIC):
+            with self.subTest(event=event):
+                self.card.visible, self.card._fade = True, None
+                self.card._moves = lambda: False
+                self.card._wndproc(self.card.hwnd, tipcard.WM_POWERBROADCAST, event, 0)
+                self.assertFalse(self.card.visible)
+
+
 if __name__ == "__main__":
     unittest.main()

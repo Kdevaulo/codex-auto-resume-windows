@@ -61,7 +61,7 @@ class TipShapeTests(unittest.TestCase):
 
     def test_what_the_icon_asks_of_the_card(self):
         public = {name for name, value in vars(tipcard.TipCard).items() if callable(value) and not name.startswith("_")}
-        self.assertEqual(public, {"create", "destroy", "show", "hide", "tick", "frame", "render"})
+        self.assertEqual(public, {"create", "destroy", "show", "hide", "tick", "watch", "frame", "render"})
         self.assertEqual(tipplan.TIP_WIDTH, (280, 360))
         self.assertEqual(tipplan.TIP_GAP, 8)
 
