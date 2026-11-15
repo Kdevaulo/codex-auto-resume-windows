@@ -257,6 +257,31 @@ class DrawTests(unittest.TestCase):
         blue, green, red, alpha = pixels[index:index + 4]
         return (red, green, blue), alpha
 
+    def test_the_card_has_no_lift_no_drop_shadow_and_no_lit_edge(self):
+        """Decided for the card as for the icon's menu (the owner, 2026-11-01 and 11-02, test_tray_menu_no_glow): a lift's
+        shadow and highlight shone as a halo round a floating surface on a dark taskbar. Fails if one comes back: the
+        renderer is asked for no lift and no inset light, the card fills its window, and in dark the row inside its top
+        hairline is the card's own ground."""
+        from unittest import mock
+        renderer = self.tipcard.TipRenderer()
+        self.addCleanup(renderer.close)
+        parts = words.tooltip_parts(FIXTURES["metered"], EN, NOW, "advanced")
+        for theme in ("light", "dark"):
+            for design in brand.DESIGNS:
+                with self.subTest(theme=theme, design=design):
+                    renderer.theme, renderer.design, renderer.contrast = theme, design, False
+                    plan = renderer.tip_layout(parts, "monitoring", 1.5, "en")
+                    self.assertEqual(plan["card"], (0, 0) + tuple(plan["size"]), "no room is kept round it for a shadow")
+                    with mock.patch.object(renderer, "_lift", wraps=renderer._lift) as lift,                             mock.patch.object(renderer, "_inner", wraps=renderer._inner) as inner:
+                        pixels = bytes(renderer.draw_tip(plan, None).pixels())
+                    self.assertFalse(any(call.args[0] == "card" for call in lift.call_args_list), "a lift")
+                    self.assertFalse(any(call.args[0] == "card" for call in inner.call_args_list), "an inset light")
+                    width = plan["size"][0]
+                    border = int(max(1.0, round(1.5)))
+                    ground = brand.rgb(brand.card_ground(theme, design))
+                    for x in (width // 2 - 30, width // 2 + 30):
+                        self.assertEqual(self.pixel(plan, pixels, x, border), (ground, 255))
+
     def test_round_the_card_nothing_is_drawn_and_on_it_everything_is_opaque(self):
         for theme in ("light", "dark"):
             with self.subTest(theme):

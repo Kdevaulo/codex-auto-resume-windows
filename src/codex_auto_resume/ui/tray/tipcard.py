@@ -119,6 +119,9 @@ class TipRenderer(popup.Renderer):
         card = plan["items"][0]
         radius = self._corner(card, scale)
         with popup._Painter(canvas, popup.PIXEL_FORMAT_32BPP_PARGB) as paint:
+            # The card's ground and hairline, and nothing round it: no lift, no drop shadow and no lit edge, exactly as
+            # the icon's menu (the owner, 2026-11-01 and 11-02; tests/test_tray_menu_no_glow.py) - a floating surface by the
+            # taskbar showed its shadow and highlight as a halo on a dark taskbar. The card fills its window for that reason.
             ground = (self._argb("surface") if self.contrast
                       else popup._pack(brand.rgb(brand.card_ground(self._theme(), self._design()))))
             paint.fill_round(card["rect"], radius, ground)
