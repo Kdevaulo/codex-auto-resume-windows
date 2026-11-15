@@ -134,19 +134,25 @@ def card_radius(renderer, plan) -> int:
 
 def stamp_shadows(canvas, shadows, size, radius, scale, origin, images):
     """`shadows` under a card of `size` whose corner is at `origin` in `canvas` (PARGB, premultiplied), from the shared
-    shadow images - made once per shadow and kept in `images` - with their middles left out: the card covers them."""
+    shadow images - their middles left out - kept in `images` by the image's own shape (lift_coverage's key, which a
+    taller or shorter card shares) and its colour: one image a shadow, whatever sizes the card has had. An image this
+    draw does not use is let go."""
     width, height = size
+    used = set()
     with _Painter(canvas, PIXEL_FORMAT_32BPP_PARGB) as paint:
         for shadow in reversed(shadows):
-            key = (shadow, width, height, radius, scale)
+            mask = lift_coverage(width, height, radius, shadow.blur * scale)
+            key = (mask["key"], shadow.colour, shadow.alpha)
+            used.add(key)
             image = images.get(key)
             if image is None:
-                image = images[key] = _ShadowImage(lift_coverage(width, height, radius, shadow.blur * scale),
-                                                   brand.rgb(shadow.colour), shadow.alpha)
+                image = images[key] = _ShadowImage(mask, brand.rgb(shadow.colour), shadow.alpha)
             extent = image.extent
             image.stamp(paint, origin[0] - extent + shadow_step(shadow.dx * scale),
                         origin[1] - extent + shadow_step(shadow.dy * scale), width + 2 * extent, height + 2 * extent,
                         middle=False)
+    for key in set(images) - used:
+        images.pop(key).close()
 
 
 def cut_card(picture, ground, ground_width, card, origin):
@@ -283,8 +289,6 @@ class CardLayers:
         key = (shadows, size, radius, scale)
         if key == self._shadow_key:
             return False
-        if self._shadow_key is None or self._shadow_key[3] != scale or self._shadow_key[0] != shadows:
-            self._drop_images()
         self.shadows, self.margin = shadows, float_reach(shadows, scale)
         if shadows:
             self.picture.ensure(size[0] + 2 * self.margin, size[1] + 2 * self.margin)

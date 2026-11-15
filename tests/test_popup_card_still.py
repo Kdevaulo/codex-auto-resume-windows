@@ -217,6 +217,25 @@ class ShadowLayerTests(_Drawn):
                                      + margin + (right - left) // 2) * 4 + 3]
                     self.assertGreater(below, 0, "and still all round it")
 
+    def test_one_image_a_shadow_whatever_sizes_the_card_has_had(self):
+        from codex_auto_resume.ui.popup import gdiplus
+        from test_tray_popup import EN, FakeControl, WindowsTests
+        self.renderer.theme, self.renderer.lone = "dark", True
+        layer, counts = self.layer(), []
+        for repeat in range(2):
+            for count in range(len(WindowsTests.ROWS) + 1):
+                model = tray_popup.PopupModel(EN)
+                model.apply_outcome(("read",), tray_popup.perform(("read",), FakeControl(WindowsTests.ROWS[:count])),
+                                    time.time())
+                vm = model.view(time.time())
+                plan = self.renderer.layout(vm, 1.5, "en")
+                self.renderer.draw(vm, plan, frame=tray_popup.halo(vm["light"], 0, 0))
+                layer.shade(self.renderer, plan)
+                counts.append(len(layer.images))
+        self.assertEqual(set(counts), {len(tray_popup.float_shadows("dark"))})
+        before = gdiplus.gdiplus_objects()
+        layer._drop_images()
+        self.assertEqual(before - gdiplus.gdiplus_objects(), len(tray_popup.float_shadows("dark")))
 
 
 class RecipeTests(unittest.TestCase):
