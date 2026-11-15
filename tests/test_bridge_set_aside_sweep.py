@@ -77,16 +77,29 @@ class SweepSoonTests(unittest.TestCase):
             self.assertTrue(old.exists())
         self.assertEqual(self.waited, list(controlcli.SWEEP_AFTER))
 
-    def test_the_watchers_gates_hold(self):
-        """It is the watcher's own sweep: nothing while an install runs, or its copy journal is there."""
+    def test_the_watchers_gates_hold_and_it_looks_again_while_they_are_closed(self):
+        """It is the watcher's own sweep: nothing while an install runs, or its copy journal is there - and a closed
+        gate is a reason to look again later, not an end (the v0.6.24 review: a Dashboard opened during an update or a
+        Repair looked once and never again)."""
         old = self.home / ("CodexAutoResumeSettings.exe.old-" + STAMP)
         old.write_bytes(b"MZ")
         with patch.object(windows, "install_in_progress", return_value=True):
             self.run_soon()
         self.assertTrue(old.exists())
+        self.assertEqual(self.waited, list(controlcli.SWEEP_AFTER), "every look of the window, the gate closed")
+        self.waited.clear()
         (self.home / setaside.JOURNAL).write_text("{}", encoding="utf-8")
         self.run_soon()
         self.assertTrue(old.exists())
+        self.assertEqual(self.waited, list(controlcli.SWEEP_AFTER))
+
+    def test_an_install_that_ends_between_two_looks_is_swept_after_it(self):
+        old = self.home / ("CodexAutoResumeSettings.exe.old-" + STAMP)
+        old.write_bytes(b"MZ")
+        with patch.object(windows, "install_in_progress", side_effect=[True, False]):
+            self.run_soon()
+        self.assertFalse(old.exists())
+        self.assertEqual(self.waited, list(controlcli.SWEEP_AFTER[:2]))
 
     def test_a_failure_ends_the_sweep_and_nothing_else(self):
         with patch.object(setaside, "sweep", side_effect=OSError("no")) as sweep:

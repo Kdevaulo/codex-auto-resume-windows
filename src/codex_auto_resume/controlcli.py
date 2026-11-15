@@ -651,18 +651,21 @@ def sweep_soon(control: Control, *, wait=time.sleep):
     v0.6.23 final's live acceptance found it still in the installation after the in-app update, until the next
     install. An update over a stopped watcher starts no watcher at all. The Dashboard the update opens again is the
     first of ours to start after the old window has gone, so its bridge looks too: soon after it starts, and again
-    while anything is still in use (SWEEP_AFTER) - a window still closing, a Dashboard of the old version - and leaves
-    whatever is still in use to the next start. Nothing is said to the window; a failure costs the sweep alone."""
-    from .setaside import sweep
+    while anything set aside is still there (SWEEP_AFTER) - a window still closing, a Dashboard of the old version, an
+    install or a Repair still running (a gate the sweep keeps closed), a program still running from a folder - and
+    leaves whatever is there at the last look to the next start. Asked of what is there, not of what the sweep said:
+    a closed gate sweeps nothing and leaves nothing "in use", and stopping on that answer stopped a Dashboard opened
+    during an update after one look (v0.6.24 review). Nothing is said to the window; a failure costs the sweep alone."""
+    from .setaside import candidates, sweep
 
     def run():
         for delay in SWEEP_AFTER:
             wait(delay)
             try:
-                _swept, left = sweep(control.paths)
+                sweep(control.paths)
+                if not candidates(control.paths.home):
+                    return
             except Exception:                       # noqa: BLE001 - never the bridge's concern
-                return
-            if not left:
                 return
 
     worker = threading.Thread(target=run, name="set-aside sweep", daemon=True)
