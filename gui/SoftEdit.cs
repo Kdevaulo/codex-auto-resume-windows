@@ -293,6 +293,22 @@ namespace CodexAutoResume
                     caret = new Point(unchecked((short)(place & 0xFFFF)), unchecked((short)((place >> 16) & 0xFFFF)));
                     known = true;
                 }
+                else if (end > 0 && end <= box.TextLength)
+                {
+                    // The caret after the last character: EM_POSFROMCHAR has no place for it (it answers -1), so the
+                    // menu went to the box's corner (v0.6.24 review). Take the last character's place and step past
+                    // it - past its width, or to the next line's start after a line break.
+                    long last = SendMessage(box.Handle, EM_POSFROMCHAR, (IntPtr)(end - 1), IntPtr.Zero).ToInt64();
+                    if (last != -1)
+                    {
+                        caret = new Point(unchecked((short)(last & 0xFFFF)), unchecked((short)((last >> 16) & 0xFFFF)));
+                        char after = box.Text[end - 1];
+                        if (after == '\n') caret = new Point(0, caret.Y + box.Font.Height);
+                        else caret.X += TextRenderer.MeasureText(after.ToString(), box.Font, Size.Empty,
+                                                                 TextFormatFlags.NoPadding).Width;
+                        known = true;
+                    }
+                }
             }
             if (!known) caret = Point.Empty;
             Size room = box.ClientSize;

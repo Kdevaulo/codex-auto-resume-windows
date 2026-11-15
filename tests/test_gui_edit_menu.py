@@ -257,6 +257,8 @@ try {
   $null = [EditProbeCatcher]::SendMessage($plain.Handle, 0x007B, $plain.Handle, [IntPtr](200 + (300 -shl 16)))
   $plain.Select(4, 0)
   $null = [EditProbeCatcher]::SendMessage($plain.Handle, 0x007B, $plain.Handle, [IntPtr]-1)
+  $plain.Select($plain.TextLength, 0)
+  $null = [EditProbeCatcher]::SendMessage($plain.Handle, 0x007B, $plain.Handle, [IntPtr]-1)
 } finally {
   $field.SetValue($null, $keep)
 }
@@ -354,11 +356,20 @@ class WindowTests(unittest.TestCase):
         self.assertFalse(self.answer["everShown"])
         self.assertEqual(self.answer["passedOn"], 0, "WM_CONTEXTMENU never got past our hook")
         opened = self.answer["opened"]
-        self.assertEqual(len(opened), 2)
+        self.assertEqual(len(opened), 3)
         self.assertEqual(opened[0], [200, 300], "a right-click opens where the pointer is")
         left, top, right, bottom = self.answer["plainScreen"]
         x, y = opened[1]
         self.assertTrue(left <= x < right and top <= y < bottom, "Shift+F10 opens at the caret, inside the box")
+
+    def test_the_caret_after_the_last_character_opens_after_it_not_at_the_corner(self):
+        # v0.6.24 review: EM_POSFROMCHAR has no place for the caret after the last character, and the menu went to the
+        # box's top-left corner. It opens after that character now, right of a caret inside the text.
+        left, top, right, bottom = self.answer["plainScreen"]
+        inside, end = self.answer["opened"][1], self.answer["opened"][2]
+        self.assertTrue(left <= end[0] < right and top <= end[1] < bottom, "inside the box")
+        self.assertGreater(end[0], inside[0], "the caret at the end is right of the caret after 'abc '")
+        self.assertGreater(end[0], left + 20, "not the box's left edge")
 
     def test_six_words_each_with_its_mnemonic(self):
         words = self.answer["words"]
