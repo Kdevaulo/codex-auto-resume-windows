@@ -265,9 +265,10 @@ class ManifestTests(unittest.TestCase):
         expected = {"<window sources>", "gui/app.manifest", "assets/codex-auto-resume.ico",
                     ".codex-plugin/plugin.json", "build/capture_window.ps1",
                     "build/make_gui.ps1", "build/make_screenshots.py",
-                    # v0.6.20: the stills are drawn offscreen by the render job and framed with the kept title bar.
-                    "build/motion_window.py", "build/window_frame.py", "build/frame/window-caption.png",
-                    "build/frame/frame.json"}
+                    # v0.6.20: the stills are drawn offscreen by the render job. v0.6.24: the window draws its
+                    # own caption, so no title bar kept from a capture frames them any more (test_pinned_stills
+                    # holds that build/window_frame.py and build/frame/ are gone).
+                    "build/motion_window.py"}
         self.assertEqual(sorted(expected - inputs), [],
                          "the window is compiled from these, so a change to one of them "
                          "must mark the screenshots stale")
