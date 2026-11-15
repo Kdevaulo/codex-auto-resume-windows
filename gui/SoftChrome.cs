@@ -542,8 +542,9 @@ namespace CodexAutoResume
                     int code = m.WParam.ToInt32();
                     NcHover(code);
                     // Windows 11 opens its snap layouts from the maximise button's hover: Windows' own handling of the move.
-                    if (code == Chrome.HTMAXBUTTON) return false;
-                    if (code == Chrome.HTMINBUTTON || code == Chrome.HTCLOSE)
+                    // Where there are none (Windows 10) the move goes no further, as over the other two.
+                    if (code == Chrome.HTMAXBUTTON && Chrome.SnapLayouts) return false;
+                    if (IsButton(code))
                     {
                         m.Result = IntPtr.Zero;
                         return true;

@@ -148,9 +148,12 @@ class WindowSourceTests(unittest.TestCase):
                                   ("SoftDialog", "gui/SoftChrome.cs")):
             body = guiscan.member_body(type_name, "WndProc")
             with self.subTest(type_name):
-                first = [line.strip() for line in body.splitlines()
-                         if line.strip() and not line.strip().startswith(("//", "{", "protected"))][0]
-                self.assertEqual(first, "if (chrome != null && chrome.Intercept(ref m, PassOn)) return;")
+                lines = [line.strip() for line in body.splitlines()
+                         if line.strip() and not line.strip().startswith(("//", "{", "protected"))]
+                # The Dashboard takes an open request first (tests/test_tray_reuses_window.py), which is no frame message.
+                if lines[0] == "if (m.Msg == WM_COPYDATA && TakeOpenRequest(ref m)) return;":
+                    lines = lines[1:]
+                self.assertEqual(lines[0], "if (chrome != null && chrome.Intercept(ref m, PassOn)) return;")
                 self.assertIn("Chrome.WindowSize(clientSize, OwnFrame())", guiscan.member_body(type_name, "SizeFromClientSize"))
                 self.assertIn("UpdateBounds(Left, Top, Width, Height, client.Width, client.Height)",
                               guiscan.member_body(type_name, "SetBoundsCore"))
@@ -204,7 +207,8 @@ class ButtonSourceTests(unittest.TestCase):
         self.assertIn("case Chrome.WM_NCLBUTTONUP:", presses)
         self.assertNotIn("pass(", presses, "no button message over a button goes on to DefWindowProc")
         self.assertEqual(presses.count("if (!IsButton(code)) return false;"), 2)
-        self.assertIn("if (code == Chrome.HTMAXBUTTON) return false;", intercept, "its hover goes on: the snap layouts")
+        self.assertIn("if (code == Chrome.HTMAXBUTTON && Chrome.SnapLayouts) return false;", intercept,
+                      "its hover goes on where Windows has snap layouts")
         self.assertIn("return code == Chrome.HTMINBUTTON || code == Chrome.HTMAXBUTTON || code == Chrome.HTCLOSE;",
                       guiscan.member_body("ChromeHost", "IsButton"))
         act = guiscan.member_body("ChromeHost", "Act")
