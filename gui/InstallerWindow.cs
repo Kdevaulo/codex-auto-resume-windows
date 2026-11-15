@@ -1050,6 +1050,10 @@ namespace CodexAutoResume
                 base.SetClientSizeCore(x, y);
                 Size outer = SizeFromClientSize(new Size(x, y));
                 if (Size != outer) Size = outer;
+                // As Control.SetClientSizeCore keeps it: the client asked for, even where Form held the window to the
+                // largest the screen allows (SystemInformation.MaxWindowTrackSize) - which a picture drawn at a pinned
+                // scale then sizes itself past with SetWindowPos (WindowRender.OpenForRender).
+                if (ClientSize != new Size(x, y)) UpdateBounds(Left, Top, Width, Height, x, y);
             }
             finally { ResumeLayout(true); }
         }

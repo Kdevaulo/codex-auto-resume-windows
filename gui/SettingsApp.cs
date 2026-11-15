@@ -881,6 +881,8 @@ namespace CodexAutoResume
 
             BuildFooter();
             BuildHeader();
+            // v0.6.24: taller by what the header grew for the caption buttons (OpeningClient).
+            if (captionRoom > 0) ClientSize = new Size(ClientSize.Width, ClientSize.Height + captionRoom);
             BuildColumns();
             BuildDashboard();
             // v0.6.24: the tab strip's ground and the save bar's ground drag the window as the header's does (never a tab).
@@ -1024,6 +1026,17 @@ namespace CodexAutoResume
         /// The window's caption, for the tests and the audit.
         internal ChromeHost CaptionHost { get { return chrome; } }
 
+        // What the header grew by for its caption buttons (BuildHeader's fit): 16 px at 100 %, 27 at 150 % in English.
+        private int captionRoom;
+
+        /// The client area the window opens at: OpeningWidth by OpeningHeight, and taller by what the header grew for its
+        /// caption buttons, so every page is as tall as it was with Windows' title bar. The window is still shorter outside
+        /// than it was: that title bar and the top frame (31 px at 100 %, 45 at 150 %) are gone, and the room is 16 and 27.
+        internal Size OpeningClient
+        {
+            get { return new Size(Px(OpeningWidth), Px(OpeningHeight) + captionRoom); }
+        }
+
         private void PassOn(ref Message m)
         {
             base.WndProc(ref m);
@@ -1048,6 +1061,10 @@ namespace CodexAutoResume
                 base.SetClientSizeCore(x, y);
                 Size outer = SizeFromClientSize(new Size(x, y));
                 if (Size != outer) Size = outer;
+                // As Control.SetClientSizeCore keeps it: the client asked for, even where Form held the window to the
+                // largest the screen allows (SystemInformation.MaxWindowTrackSize) - which a picture drawn at a pinned
+                // scale then sizes itself past with SetWindowPos (WindowRender.OpenForRender).
+                if (ClientSize != new Size(x, y)) UpdateBounds(Left, Top, Width, Height, x, y);
             }
             finally { ResumeLayout(true); }
         }
@@ -1363,9 +1380,11 @@ namespace CodexAutoResume
                 int line = Math.Max(headline.PreferredSize.Height, detail.PreferredSize.Height + detail.Margin.Vertical);
                 int body = Math.Max(2 * line, Math.Max(2 * HaloDot.Extent + Px(2),
                                                       startButton.PreferredSize.Height + startButton.Margin.Vertical));
-                // v0.6.24: and the Start button, at the card's foot, clear of the caption buttons at its top (4 px under them).
-                body = Math.Max(body, startButton.PreferredSize.Height + Px(Brand.CaptionInsetTop + Brand.CaptionButtonH + 4) -
-                                      hero.Padding.Top);
+                // v0.6.24: and the Start button, at the card's foot, clear of the caption buttons at its top (4 px under them) -
+                // what that adds to the header the window opens taller by (CaptionRoom), so the pages keep their height.
+                int clear = startButton.PreferredSize.Height + Px(Brand.CaptionInsetTop + Brand.CaptionButtonH + 4) - hero.Padding.Top;
+                captionRoom = Math.Max(0, clear - body);
+                body = Math.Max(body, clear);
                 header.Height = body + hero.Padding.Vertical + header.Padding.Vertical;
             };
             fit(this, EventArgs.Empty);
