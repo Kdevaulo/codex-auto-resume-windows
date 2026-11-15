@@ -62,6 +62,8 @@ namespace CodexAutoResume
         private bool running, logShown, unconfirmed, previousRunning, closingAsked;
         // The watcher was not running before this update or repair and was left stopped (InstallerFlow.LeftStoppedLine).
         private bool leftStopped;
+        // The watcher had ended unexpectedly before this update or repair and was started again (InstallerFlow.StartedAgainLine).
+        private bool startedAgain;
         // What the Finish page says of the shortcut on the Desktop: what install.ps1 said of it (-DesktopShortcut given on
         // the command line), and what became of the Finish page's own box.
         private bool desktopFailed, desktopTaken;
@@ -666,6 +668,8 @@ namespace CodexAutoResume
                 Row(new SoftCallout(words.Say("installer.done.unconfirmed", "The watcher could not be confirmed running, so nothing is being watched yet. Start it from the Dashboard.")), 12);
             if (code == 0 && leftStopped)
                 Row(new SoftCallout(words.Say("installer.done.left_stopped", "The watcher was not running before, so it was left stopped and nothing is being watched yet. Start it with Start watcher on the Dashboard, or open Codex Auto Resume from the Start menu and start it there.")), 12);
+            if (code == 0 && startedAgain && !leftStopped)
+                Row(new SoftCallout(words.Say("installer.done.started_again", "The watcher had ended unexpectedly before, so it was started again and is running.")), 12);
             if (code == 0 && previousRunning)
                 Row(new SoftCallout(words.Say("installer.done.previous_running", "The previous watcher is still finishing what it was doing. Once it has stopped, start the watcher from the Dashboard.")), 12);
             if (code == 0 && desktopFailed)
@@ -843,6 +847,7 @@ namespace CodexAutoResume
             if (said.StartsWith("The watcher could not be confirmed running", StringComparison.Ordinal)) unconfirmed = true;
             if (said.StartsWith("The previous version of the watcher was asked to stop", StringComparison.Ordinal)) previousRunning = true;
             if (said.StartsWith(InstallerFlow.LeftStoppedLine, StringComparison.Ordinal)) leftStopped = true;
+            if (said.StartsWith(InstallerFlow.StartedAgainLine, StringComparison.Ordinal)) startedAgain = true;
             if (said.StartsWith("[ok] The Dashboard was opened again on the new version", StringComparison.Ordinal)) reopened = true;
             if (said.StartsWith(DesktopShortcut.FailedLine, StringComparison.Ordinal)) desktopFailed = true;
             if (said.StartsWith(DesktopShortcut.TakenLine, StringComparison.Ordinal)) desktopTaken = true;

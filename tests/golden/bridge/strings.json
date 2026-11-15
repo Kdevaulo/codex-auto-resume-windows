@@ -1271,6 +1271,7 @@
           "installer.done.updated_to": "Updated to v{version}",
           "installer.done.installed_version": "Installed v{version}",
           "installer.done.left_stopped": "The watcher was not running before, so it was left stopped and nothing is being watched yet. Start it with Start watcher on the Dashboard, or open Codex Auto Resume from the Start menu and start it there.",
+          "installer.done.started_again": "The watcher had ended unexpectedly before, so it was started again and is running.",
           "installer.maintain.heading": "Version {version} is already installed",
           "installer.maintain.repair": "Repair",
           "installer.maintain.repair_help": "Installs this version again in place. Your settings, everything waiting and your sign-in choice are kept.",

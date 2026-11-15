@@ -665,6 +665,7 @@
   "installer.done.installed": "Codex Auto Resume est installé.",
   "installer.done.installed_version": "v{version} installée",
   "installer.done.left_stopped": "Le surveillant ne tournait pas avant, il reste donc arrêté et rien n'est surveillé pour l'instant. Lancez-le avec « Démarrer le surveillant » dans le Tableau de bord, ou ouvrez Codex Auto Resume depuis le menu Démarrer et lancez-le là.",
+  "installer.done.started_again": "Le surveillant s'était arrêté de façon inattendue avant : il a donc été redémarré et tourne.",
   "installer.done.not_started": "Le programme d'installation n'a pas pu démarrer.",
   "installer.done.open": "Ouvrir le Tableau de bord",
   "installer.done.previous_running": "Le surveillant précédent termine encore ce qu'il faisait. Une fois arrêté, lancez le surveillant depuis le Tableau de bord.",
