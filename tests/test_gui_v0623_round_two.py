@@ -155,6 +155,8 @@ $tip8.Dispose()
 
 PROBE_REVEAL = r"""
 # ------------------------------------------------------------------ F12, F13: a part coming and going
+# The window's thread busy for `ms`, its messages left waiting: no frame is painted and no timer ticks meanwhile.
+function Busy([int]$ms) { $busy = [Diagnostics.Stopwatch]::StartNew(); while ($busy.ElapsedMilliseconds -lt $ms) { } }
 $ground13 = Make 'SoftStack'; Place $ground13 20 20 400 300; Pump 30
 $part = New-Object Windows.Forms.Panel; $part.BackColor = [Drawing.Color]::FromArgb(255, 10, 120, 200)
 $part.Location = New-Object Drawing.Point 20, 20; $part.Size = New-Object Drawing.Size 120, 40
@@ -162,6 +164,9 @@ $ground13.Controls.Add($part); Pump 30
 $live = [int](SF 'SoftReveal' 'Live'); $moving = [int](SF 'Transition' 'Moving'); $cells = $ground13.Controls.Count
 $place = $form.RectangleToClient($part.RectangleToScreen((New-Object Drawing.Rectangle 0, 0, $part.Width, $part.Height)))
 $entered = [bool](S 'SoftReveal' 'Entered' @($part))
+# The window's thread kept from its messages past brand's time before the cover's first frame, as a loaded runner kept it
+# (GitHub's, 2026-11-14: read a moment later, the fade had already ended): its time begins with its first frame.
+Busy ((T 'Motion').GetProperty('Duration', $static).GetValue($null) + 100)
 $cover = @($form.Controls | Where-Object { $_.GetType().Name -eq 'SoftReveal' })[0]
 $out.reveal = @{ entered = $entered; live = ([int](SF 'SoftReveal' 'Live') - $live); moving = ([int](SF 'Transition' 'Moving') - $moving)
                  start = [double](P $cover 'Opacity'); onTop = ($form.Controls.GetChildIndex($cover) -eq 0); bounds = @($cover.Left, $cover.Top, $cover.Width, $cover.Height)
@@ -175,6 +180,7 @@ $out.reveal.after = @(([int](SF 'SoftReveal' 'Live') - $live), ([int](SF 'Transi
 $script:hidden = 0
 $null = S 'SoftReveal' 'Leaving' @($part, [Action]{ try { $part.Visible = $false; $script:hidden++ } catch { exit 3 } })
 $out.reveal.leaving = @([int]$script:hidden, [bool]$part.Visible, ([int](SF 'SoftReveal' 'Live') - $live))
+Busy ((T 'Motion').GetProperty('Duration', $static).GetValue($null) + 100)
 $leaving = @($form.Controls | Where-Object { $_.GetType().Name -eq 'SoftReveal' })[0]
 $out.reveal.leavingStart = [double](P $leaving 'Opacity')
 Pump 400
@@ -346,7 +352,8 @@ class RevealTests(first.Probed):
         self.assertTrue(reveal["entered"])
         self.assertEqual(reveal["live"], 1)
         self.assertEqual(reveal["moving"], 1, "no picture is taken while it is up")
-        self.assertLess(reveal["start"], 1.0, "on its way in, not simply there (read a moment after it starts)")
+        self.assertLess(reveal["start"], 1.0, "on its way in, not simply there (read with the window's thread kept busy past "
+                                             "brand's time: its time begins with its first frame)")
         self.assertTrue(reveal["onTop"])
         self.assertEqual(reveal["bounds"], reveal["place"], "over the part's own place: nothing moves")
         self.assertEqual(reveal["cells"], 0, "on the window, never in the table the part is laid out in")
@@ -356,7 +363,7 @@ class RevealTests(first.Probed):
     def test_a_part_hidden_is_hidden_at_once_and_its_picture_fades_out(self):
         reveal = self.answer["reveal"]
         self.assertEqual(reveal["leaving"], [1, False, 1])
-        self.assertGreater(reveal["leavingStart"], 0.0, "on its way out, not simply gone")
+        self.assertGreater(reveal["leavingStart"], 0.0, "on its way out, not simply gone (the thread kept busy as it entered)")
         self.assertEqual(reveal["left"], 0)
 
     def test_with_motion_reduced_nothing_is_covered(self):

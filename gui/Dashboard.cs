@@ -2203,13 +2203,21 @@ namespace CodexAutoResume
         /// Stamps the moment the window's thread last had a key or the mouse, and lets every message through.
         private sealed class PrepareInput : IMessageFilter
         {
-            private readonly Stopwatch since = Stopwatch.StartNew();
+            private static readonly Stopwatch running = Stopwatch.StartNew();
+
+            /// The clock it reads, in milliseconds: one that runs, for the window. v0.6.24: the idle-turns probe
+            /// (tests/test_gui_idle_turns.py) holds it still while it raises the turns that follow a mouse move, so what those
+            /// turns do no longer hangs on how long a loaded runner takes between the move and them (GitHub's, 2026-11-13
+            /// and 2026-11-14: past PrepareAfterInputMilliseconds, before the first).
+            internal static Func<long> Now = delegate { return running.ElapsedMilliseconds; };
+
+            private long last = Now();
 
             /// Milliseconds since the last key or mouse message.
-            internal long Since { get { return since.ElapsedMilliseconds; } }
+            internal long Since { get { return Now() - last; } }
 
             /// Counts from now, as a key or the mouse would: no step in the first moments it is listened to.
-            internal void Restart() { since.Restart(); }
+            internal void Restart() { last = Now(); }
 
             public bool PreFilterMessage(ref Message m)
             {
@@ -2217,7 +2225,7 @@ namespace CodexAutoResume
                 // WM_KEYFIRST-WM_KEYLAST, WM_MOUSEFIRST-WM_MOUSELAST, and the mouse over a frame (WM_NCMOUSEMOVE-WM_NCXBUTTONDBLCLK).
                 if ((message >= 0x0100 && message <= 0x0109) || (message >= 0x0200 && message <= 0x020E) ||
                     (message >= 0x00A0 && message <= 0x00AD))
-                    since.Restart();
+                    Restart();
                 return false;
             }
         }

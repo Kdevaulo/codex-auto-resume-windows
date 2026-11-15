@@ -880,7 +880,7 @@ namespace CodexAutoResume
     /// Ground paints it for the part) and over that one picture of the part (DrawToBitmap), the part's fading in, or out, on
     /// brand's curve. Two bitmaps for the whole fade, none for a frame. The cover stands on the part's window, not beside the
     /// part - a table or a row would lay it out as one of its own - over the part's place as far as it can be seen, and takes
-    /// itself away when brand's time is over, painted or not; while it is there the window counts it as moving
+    /// itself away when brand's time, counted from its first frame, is over, painted or not; while it is there the window counts it as moving
     /// (Transition.Moving), so no picture is taken of it. A shadow cannot fade: the part's lift is there, or gone, at once.
     /// With motion reduced, in High Contrast, or out of sight (Motion.Allowed), nothing is covered. A page that changes - the
     /// Dashboard's, a Settings section, a step of the installer - is still one finished frame.
@@ -911,8 +911,16 @@ namespace CodexAutoResume
             Transition.Moving++;
             timer.Interval = Motion.Interval;
             timer.Tick += delegate { Tick(); };
-            clock.Start();
             timer.Start();
+        }
+
+        // v0.6.24: the fade's time begins with its first frame - painted, or ticked where nothing paints it (a window off
+        // the screen) - not when the cover is put up. Counted from there, a window's thread kept from its messages past
+        // brand's time after it (the page laying itself out around the part, a loaded PC; GitHub's runners, 2026-11-14)
+        // showed the part at once: the fade was over before its first frame.
+        private void Begin()
+        {
+            if (!clock.IsRunning) clock.Start();
         }
 
         /// Whether `part` may fade now: shown on screen (Motion.Allowed), in a window, with a size.
@@ -995,6 +1003,7 @@ namespace CodexAutoResume
         // A frame: the part a step further in, or out; at the end of brand's transition the cover takes itself away.
         private void Tick()
         {
+            Begin();
             if (clock.Elapsed.TotalMilliseconds >= Motion.Duration || !Soft.Shown(this) || !Visible) Finish();
             else Invalidate();
         }
@@ -1014,6 +1023,7 @@ namespace CodexAutoResume
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            Begin();
             Graphics g = e.Graphics;
             var all = new Rectangle(-offset.X, -offset.Y, face.Width, face.Height);
             g.DrawImageUnscaled(ground, all.X, all.Y);
