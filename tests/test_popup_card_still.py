@@ -185,6 +185,40 @@ class StillTests(_Drawn):
         self.assertEqual(len(sizes), 1)
 
 
+@unittest.skipUnless(os.name == "nt", "the popup is drawn by GDI+")
+class ShadowLayerTests(_Drawn):
+    """The shadow window's own picture (layers.CardLayers), drawn without a window (its hwnd is never used here)."""
+
+    def layer(self):
+        layer = tray_popup.CardLayers(0)
+
+        def close():
+            layer._drop_images()
+            layer.picture.close()
+        self.addCleanup(close)
+        return layer
+
+    def test_nothing_of_the_shadow_lies_under_the_card(self):
+        """The opening fades the card and its shadow together: a shadow under the card's body would show through the
+        half-clear card as a dark frame inside its edge (review, 2026-11-15: alpha 139-205 up to 24 px in, in dark)."""
+        for scale in SCALES:
+            for theme in brand.THEMES:
+                with self.subTest(scale=scale, theme=theme):
+                    plan, width, pixels = self.draw(scale, theme)
+                    layer = self.layer()
+                    layer.shade(self.renderer, plan)
+                    picture, margin = layer.picture.pixels(), layer.margin
+                    left, top, right, bottom = plan["card"]
+                    under = [picture[((y - top + margin) * layer.picture.width + x - left + margin) * 4 + 3]
+                             for y in range(top, bottom) for x in range(left, right)
+                             if pixels[(y * width + x) * 4 + 3] == 255]
+                    self.assertEqual(max(under), 0, "shadow under the card's body")
+                    below = picture[((bottom - top + margin + int(3 * scale)) * layer.picture.width
+                                     + margin + (right - left) // 2) * 4 + 3]
+                    self.assertGreater(below, 0, "and still all round it")
+
+
+
 class RecipeTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "nt", "the popup's package is Windows'")
     def test_the_popup_floats_the_notification_card_s_shadows(self):

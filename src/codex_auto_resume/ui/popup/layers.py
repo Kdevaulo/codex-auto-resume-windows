@@ -149,6 +149,26 @@ def stamp_shadows(canvas, shadows, size, radius, scale, origin, images):
                         middle=False)
 
 
+def cut_card(picture, ground, ground_width, card, origin):
+    """Nothing of the shadow under the card: every pixel the card covers wholly - its ground's alpha 255, the ground the
+    renderer drew through the shared GDI+ path - made clear in `picture`, the card's corner at `origin` there. The edge's
+    antialiased pixels keep the shadow, so the card laid over it composes as one picture does; only what the card hides
+    is gone - which the opening's fade, the card and its shadow see-through together, would otherwise show as a dark
+    frame inside the card's edge."""
+    left, top, right, bottom = card
+    width = right - left
+    _dll("gdi32").GdiFlush()
+    memory = memoryview((C.c_ubyte * (picture.width * picture.height * 4)).from_address(picture.bits.value)).cast("B")
+    for row in range(bottom - top):
+        start = ((top + row) * ground_width + left) * 4 + 3
+        alpha = bytes(ground[start:start + width * 4:4])
+        first, last = alpha.find(b"\xff"), alpha.rfind(b"\xff")
+        if first < 0:
+            continue
+        at = ((origin[1] + row) * picture.width + origin[0] + first) * 4
+        memory[at:at + (last - first + 1) * 4] = bytes((last - first + 1) * 4)
+
+
 def _over(canvas, source, card, at):
     """The card's rectangle of `source` (premultiplied) laid over `canvas` with its corner at `at`, by GDI+ (exact
     source-over between two premultiplied surfaces, one pixel to one pixel)."""
@@ -271,6 +291,7 @@ class CardLayers:
             _dll("gdi32").GdiFlush()
             C.memset(self.picture.bits, 0, self.picture.width * self.picture.height * 4)
             stamp_shadows(self.picture, shadows, size, radius, scale, (self.margin, self.margin), self.images)
+            cut_card(self.picture, renderer._ground_pixels, renderer.canvas.width, card, (self.margin, self.margin))
         self._shadow_key, self._shadow_owed = key, True
         return True
 
