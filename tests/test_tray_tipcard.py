@@ -421,5 +421,54 @@ class AccessibleTests(unittest.TestCase):
         self.assertEqual(count.value, 0)
 
 
+class _User32:
+    """user32 as the card's window calls it, for a card with no window: every call kept, each answered yes."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, name):
+        return self
+
+    def __getattr__(self, name):
+        if name.startswith("__"):
+            raise AttributeError(name)
+
+        def call(*arguments):
+            self.calls.append((name, arguments))
+            return 1
+        return call
+
+
+class CardStateTests(unittest.TestCase):
+    """The card's own decisions - hiding, fading, its backstop - with Windows stood in for: nothing is made or shown."""
+
+    def setUp(self):
+        from unittest import mock
+        from codex_auto_resume.ui.tray import tipcard
+        self.tipcard, self.user32 = tipcard, _User32()
+        for target, name, value in ((popup, "_dll", self.user32), (tipcard.access, "tell", lambda *unused: None)):
+            patcher = mock.patch.object(target, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.card = tipcard.TipCard(content=lambda: None)
+        self.card.hwnd, self.card.visible = 0x99, True
+        self.card._moves = lambda: True
+
+    def hidden(self):
+        return [arguments for name, arguments in self.user32.calls if name == "ShowWindow" and arguments[1] == popup.SW_HIDE]
+
+    def test_a_hide_at_once_ends_a_fade_out_on_its_way(self):
+        """Review M1: a click, the popup or the menu while the card fades - it kept fading beside them."""
+        self.card.hide(at_once=False)
+        self.assertEqual(self.card._fade[0], "out")
+        self.assertEqual(self.hidden(), [])
+        self.card.hide(at_once=True)
+        self.assertIsNone(self.card._fade)
+        self.assertEqual(len(self.hidden()), 1)
+        self.card.hide(at_once=True)
+        self.assertEqual(len(self.hidden()), 1, "hidden already: nothing")
+
+
 if __name__ == "__main__":
     unittest.main()

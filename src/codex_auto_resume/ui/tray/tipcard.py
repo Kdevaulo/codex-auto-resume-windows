@@ -310,8 +310,13 @@ class TipCard:
 
     def hide(self, at_once=True):
         """Hidden - at once, or (`at_once` False: the pointer left) fading out in brand's press time where motion is
-        allowed. Hidden already, nothing."""
-        if not self.visible or not self.hwnd:
+        allowed. Hidden already, nothing - but a hide at once ends a fade-out on its way (a click, the popup, the menu
+        come while it fades: it is gone before they show)."""
+        if not self.hwnd:
+            return
+        if not self.visible:
+            if at_once and self._fade is not None and self._fade[0] == "out":
+                self._gone()
             return
         self.visible = False
         user32 = popup._dll("user32")
