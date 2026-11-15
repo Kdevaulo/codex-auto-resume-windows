@@ -1309,7 +1309,7 @@ The second pre-release of v0.6.23, in both editions: Persian, Czech, Hungarian a
 Thai drawn in the face Windows sets it in; a page opens in about a tenth of a second the first time its tab is pressed, because the pages are made ready while the window
 is idle; and the setup program's Finish page keeps a shortcut that is already on the desktop. The final follows.
 
-### v0.6.23 🚧 — The final: what came after the second pre-release
+### v0.6.23 ✅ — The final: what came after the second pre-release
 
 The final of the line, in both editions: the notification-area icon's menu gains *Open the popup*, right after *Open Dashboard*, which opens the popup as a left click on the icon does;
 and the popup's menu for a waiting task offers what the Dashboard's Pending menu offers - *Message for this conversation...*, *Add words for this time...* or *Change words for this time...*
@@ -1334,6 +1334,10 @@ Expected areas include:
 - the switch of the bundled Python to 3.15, if CPython 3.15.3 is out by then (moved out of v0.6.23 on 2026-11-10).
 
 Right after the final v0.6.24 is published and verified, the last Python version is kept as a repository of its own, as above.
+
+### v0.6.24-beta 🚧 — The window's new look and a quicker return after an update (a pre-release)
+
+The first pre-release of v0.6.24. In both editions: the window and its dialogs have no Windows title bar, their minimise, maximise and close buttons are line glyphs in the first card; Soft's rounded things have squircle corners, the Dashboard window's own outer corner among them; the tray icon's popup is its card alone with a float shadow; hovering the icon shows a card with the state and the usage bars; a text box's right-click menu is drawn in the window's design; a notification card fading shows no dark band; the Dashboard answers within a few seconds after an update, and an update starts only a watcher that ended unexpectedly in this sign-in. In the advanced edition: the 5-hour window's one near-zero request starts none of the person's programs, and the Korean wording of its pages was read key by key. The third round's audits follow.
 
 ---
 
@@ -1636,8 +1640,13 @@ The second pre-release: four more languages (Persian, Czech, Hungarian, Thai) an
 
         ↓
 
-v0.6.23  🚧 In development
+v0.6.23  ✅ Released
 The final: the Python audit in two rounds, both editions, with the code ready for Python 3.15 (the switch to it comes later), and the tray's and the popup's menus
+
+        ↓
+
+v0.6.24-beta  🚧 In development
+The first pre-release: a window without Windows' title bar, squircle corners, the tray icon's card, a text box's own right-click menu and a Dashboard that answers in seconds after an update
 
         ↓
 
