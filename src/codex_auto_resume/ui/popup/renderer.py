@@ -65,9 +65,8 @@ class Renderer:
         self.contrast = False            # High Contrast: system colours, and no shadow, tint or glow
         self.theme = "light"             # v0.6.4: "light" or "dark", as the window resolved it
         self.design = "soft"             # v0.6.10: one of brand.DESIGNS, as the window adopted it
-        # v0.6.24: the card alone - nothing round it but transparent pixels, and no lift of its own: the popup's window
-        # is the card (layers.py) and its shadow lies on the desktop in a window of its own. Off for the notification
-        # card, which cuts its own corners (notice_card.premultiply), and for the popup's plain window.
+        # v0.6.24: the card alone - transparent round it, no lift: the popup's window is the card, its shadow the desktop's
+        # (layers.py). Off for the notification card, which cuts its own corners, and for the popup's plain window.
         self.lone = False
         self._images = {}                # this scale, theme and design's shadow images, by shape and colour
         self._images_look = None
@@ -174,20 +173,14 @@ class Renderer:
         return self.draw_halo(plan, frame, restore=False)
 
     def _seal(self, plan):
-        """The card alone (v0.6.24): the alpha of every line of words put back to the ground's - GDI's text clears the
-        alpha of what it draws; everything else drawn over the ground lies on the opaque card and keeps it whole. Line by
-        line rather than the whole canvas: a tenth of the pixels at most."""
-        canvas, ground = self.canvas, memoryview(self._ground_pixels)
-        width, height = canvas.width, canvas.height
+        """The card alone (v0.6.24): each line of words' alpha put back to the ground's - GDI's text clears what it covers;
+        all else drawn on the opaque card keeps it whole."""
+        canvas, ground, width = self.canvas, memoryview(self._ground_pixels), self.canvas.width
         _dll("gdi32").GdiFlush()
-        memory = memoryview((C.c_ubyte * (width * height * 4)).from_address(canvas.bits.value)).cast("B")
-        for item in plan["items"]:
-            if item["kind"] != "text":
-                continue
-            left, top, right, bottom = (int(value) for value in item["rect"])
-            left, right = max(0, left), min(width, right)
-            for row in range(max(0, top), min(height, bottom)):
-                start, stop = (row * width + left) * 4 + 3, (row * width + right) * 4
+        memory = memoryview((C.c_ubyte * len(ground)).from_address(canvas.bits.value)).cast("B")
+        for left, top, right, bottom in (item["rect"] for item in plan["items"] if item["kind"] == "text"):
+            for row in range(max(0, int(top)), min(canvas.height, int(bottom))):
+                start, stop = (row * width + max(0, int(left))) * 4 + 3, (row * width + min(width, int(right))) * 4
                 memory[start:stop:4] = ground[start:stop:4]
 
     # How far on the seventh press's sweep is, or None: the window says, and it is drawn with the light.
