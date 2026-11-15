@@ -88,10 +88,7 @@ namespace CodexAutoResume
                         // v0.6.20: the still a capture takes of the window, when the job asks (StillFrame).
                         var still = Map(job, "still");
                         if (still != null)
-                            using (Bitmap caption = StillFrame.LoadCaption(Str(still, "caption")))
-                            using (Bitmap framed = StillFrame.FramedStill(picture, caption, Int(still, "left"),
-                                                                          Int(still, "right"), Int(still, "radius"),
-                                                                          Int(still, "dpi")))
+                            using (Bitmap framed = StillFrame.FramedStill(picture, Int(still, "radius"), Int(still, "dpi")))
                                 framed.Save(Path.Combine(folder, "still-" + Int(frame, "index").ToString("D5",
                                             CultureInfo.InvariantCulture) + ".png"), ImageFormat.Png);
                     }
@@ -567,28 +564,12 @@ namespace CodexAutoResume
             }
         }
     }
-    /// v0.6.20: the still a capture takes of the setup window, framed with Windows' title bar kept from a capture at the
-    /// job's scale (build/window_frame.py) and its corners cut as build/capture_window.ps1 cuts them. The very members of
-    /// gui/WindowRender.cs (SettingsForm), which this program does not compile: tests/test_install_motion.py holds each
-    /// one to the window's, character for character.
+    /// v0.6.20: the still a capture takes of the setup window, its corners cut as build/capture_window.ps1 cuts them -
+    /// v0.6.24: and no title bar, the window's caption its own. The very members of gui/WindowRender.cs (SettingsForm),
+    /// which this program does not compile: tests/test_pinned_stills.py holds each one to the window's, character for
+    /// character.
     internal static class StillFrame
     {
-        /// The title bar a still is framed with, as 32-bit ARGB, its file let go at once.
-        internal static Bitmap LoadCaption(string path)
-        {
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) throw new InvalidDataException("the job's still names no title bar: " + path);
-            using (var read = new Bitmap(path))
-            {
-                var caption = new Bitmap(read.Width, read.Height, PixelFormat.Format32bppArgb);
-                using (Graphics g = Graphics.FromImage(caption))
-                {
-                    g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
-                    g.DrawImage(read, new Rectangle(0, 0, read.Width, read.Height), 0, 0, read.Width, read.Height, GraphicsUnit.Pixel);
-                }
-                return caption;
-            }
-        }
-
         private static int[] Argb(Bitmap picture)
         {
             var pixels = new int[picture.Width * picture.Height];
@@ -603,27 +584,15 @@ namespace CodexAutoResume
             return pixels;
         }
 
-        /// The window as build/capture_window.ps1 photographs it, from the client area drawn here: Windows' title bar above
-        /// it - the caption the job gives, taken from a capture at the job's scale (build/window_frame.py): its first `left`
-        /// px and its last `right` px as they are, and between them its plain bar - and the corners Windows rounds cut, as
-        /// that script cuts them (the same GDI+ fill of the same path, `radius` px, so the same pixels) - its resolution
-        /// `dpi`, as a capture's bitmap has the monitor's, so the PNG it is saved as says the same. Nothing of the screen is
-        /// read: Windows draws a window's title bar on a monitor, at that monitor's DPI, and this one is on none.
-        internal static Bitmap FramedStill(Bitmap client, Bitmap caption, int left, int right, int radius, int dpi)
+        /// The window as build/capture_window.ps1 photographs it, from the client area drawn here - v0.6.24: the whole window,
+        /// its caption its own - opaque, with the corners Windows rounds cut, as that script cuts them (the same GDI+ fill of
+        /// the same path, `radius` px, so the same pixels), its resolution `dpi`, as a capture's bitmap has the monitor's, so
+        /// the PNG it is saved as says the same. Nothing of the screen is read.
+        internal static Bitmap FramedStill(Bitmap client, int radius, int dpi)
         {
-            int width = client.Width, top = caption.Height, height = top + client.Height;
-            int across = caption.Width;
-            left = Math.Max(0, Math.Min(left, Math.Min(width, across - 1)));
-            right = Math.Max(0, Math.Min(right, Math.Min(width - left, across - left - 1)));
-            int[] bar = Argb(caption), body = Argb(client);
-            var pixels = new int[width * height];
-            for (int y = 0; y < top; y++)
-                for (int x = 0; x < width; x++)
-                {
-                    int from = x < left ? x : x >= width - right ? across - (width - x) : left;
-                    pixels[y * width + x] = bar[y * across + from];
-                }
-            for (int i = 0; i < body.Length; i++) pixels[top * width + i] = unchecked((int)0xFF000000) | (body[i] & 0xFFFFFF);
+            int width = client.Width, height = client.Height;
+            int[] pixels = Argb(client);
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = unchecked((int)0xFF000000) | (pixels[i] & 0xFFFFFF);
             using (var square = new Bitmap(width, height, PixelFormat.Format32bppArgb))
             {
                 BitmapData data = square.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);

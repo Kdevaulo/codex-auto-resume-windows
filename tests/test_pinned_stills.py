@@ -2,14 +2,14 @@
 
 The owner (2026-10-30): the pictures the same every time, whatever monitor is connected. With the 150 % monitor
 unplugged, the laptop's 200 % panel drew every window still at 2000x1386 where the committed set is 1500x1041. Now the
-window draws its stills itself, offscreen, at build/make_screenshots.py PINNED_DPI, framed with Windows' title bar kept
-from one capture at that scale (build/window_frame.py) - and on the 200 % laptop all 23 stills so drawn were the
-committed 150 % captures byte for byte. These hold the pieces that make that so:
+window draws its stills itself, offscreen, at build/make_screenshots.py PINNED_DPI - and on the 200 % laptop all 23 stills
+so drawn were the committed 150 % captures byte for byte. v0.6.24: no window has Windows' title bar any more (its caption
+is its own, gui/SoftChrome.cs), so a still is the client area alone with its corners cut, and the title bar once kept
+from a capture (build/window_frame.py, build/frame/) went. These hold the pieces that make that so:
 
 - the pin lives in the render mode only (a job's `scale`), and what it pins: the display scale, the text size, the
   screen the window opens on, a list's header;
-- the title bar kept is the one every committed window picture shows, and is refused once it stops being this tree's
-  window's (title, icon, DPI);
+- a still has no title bar, and nothing reads the one that was kept;
 - the setup window's offscreen still is framed by the very code the window's is;
 - the generator, its manifest and its staleness speak of the pinned DPI, never the display's.
 
@@ -34,7 +34,6 @@ for _path in (str(ROOT / "src"), str(ROOT / "build"), str(ROOT / "tests")):
 
 import guiscan  # noqa: E402
 import make_screenshots as shots  # noqa: E402
-import window_frame  # noqa: E402
 
 SHIM = ROOT / "build" / "motion" / "InstallerRender.cs"
 
@@ -52,7 +51,7 @@ class PinTests(unittest.TestCase):
         self.assertIsNone(shots.stills_dpi_problem(recorded))
         self.assertIn("200", shots.stills_dpi_problem({"window_dpi": 200}) or "")
         opening = re.search(r"internal const int OpeningHeight = (\d+);", guiscan.read("gui/SettingsApp.cs"))
-        self.assertEqual(int(opening.group(1)), shots.OPENING_HEIGHT, "the client height under a still's title bar")
+        self.assertEqual(int(opening.group(1)), shots.OPENING_HEIGHT, "a still's client height")
 
     def test_the_render_mode_alone_pins_and_only_when_the_job_names_a_scale(self):
         adopt = guiscan.member_body("SettingsForm", "AdoptRenderScale")
@@ -86,7 +85,7 @@ class PinTests(unittest.TestCase):
     def test_the_setup_windows_still_is_framed_by_the_windows_own_code(self):
         shim = SHIM.read_text(encoding="utf-8")
         frame = guiscan.type_body("StillFrame", shim)
-        for member in ("LoadCaption", "Argb", "FramedStill", "Rounded"):
+        for member in ("Argb", "FramedStill", "Rounded"):
             pattern = re.compile(r"(?m)^[ \t]*(?:(?:%s)[ \t]+)*[\w<>,\[\]\.\?]+[ \t]+%s[ \t]*\("
                                  % ("|".join(guiscan.MODIFIERS), member))
             found = pattern.search(frame)
@@ -107,65 +106,35 @@ class PinTests(unittest.TestCase):
                      "TextureBrush $cut", "FillPath("):
             self.assertIn(step, script)
         self.assertIn("8.0 * $dpi / 96.0", script)
-        self.assertEqual(window_frame.radius(shots.PINNED_DPI), 12)
+        self.assertEqual(shots.still_radius(shots.PINNED_DPI), 12)
 
 
-class TitleBarTests(unittest.TestCase):
-    def test_the_kept_title_bars_are_this_trees_windows(self):
-        for kind in window_frame.KINDS:
-            self.assertEqual(window_frame.problems(kind, shots.PINNED_DPI), [], kind)
-            job = window_frame.still_job(kind, shots.PINNED_DPI)
-            self.assertEqual(job["radius"], 12)
-            self.assertEqual((job["left"], job["right"]), (window_frame.LEFT, window_frame.RIGHT))
-        for title in ('Text = "%s";' % window_frame.TITLE,):
-            self.assertIn(title, guiscan.read("gui/SettingsApp.cs"))
-            self.assertIn(title, guiscan.read("gui/InstallerWindow.cs"))
+class NoTitleBarTests(unittest.TestCase):
+    """v0.6.24: a still is the window's client area - its caption buttons in it - with the corners cut, and nothing else."""
 
-    def test_a_title_bar_of_another_window_is_refused(self):
-        self.assertTrue(window_frame.problems("window", 192))
-        self.assertTrue(window_frame.problems("window", shots.PINNED_DPI, "dark"))
-        with mock.patch.object(window_frame, "TITLE", "Another"):
-            self.assertTrue(window_frame.problems("window", shots.PINNED_DPI))
-        with mock.patch.object(window_frame, "icon_digest", return_value="0" * 64):
-            with self.assertRaises(window_frame.FrameError):
-                window_frame.still_job("setup", shots.PINNED_DPI)
-        with mock.patch.object(window_frame, "FOLDER", Path(tempfile.gettempdir()) / "car-no-frame-here"):
-            self.assertTrue(window_frame.problems("window", shots.PINNED_DPI))
+    def test_the_still_job_is_the_corners_and_the_resolution_alone(self):
+        self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI})
 
-    def test_the_kept_title_bar_is_the_one_every_committed_window_picture_shows(self):
-        width, rows, caption, _alpha = shots.read_png(window_frame.caption_path("window"))
-        recorded = manifest()
-        # Each distinct picture once: the docs/images copies are the same bytes.
-        distinct = {}
-        for key, record in recorded["lights"].items():
-            if record["surface"] == "window":
-                distinct.setdefault(recorded["images"][key]["sha256"], key)
-        windows = sorted(distinct.values())
-        self.assertGreaterEqual(len(windows), 23)
-        for key in windows:
-            w, _h, rgb, alpha = shots.read_png(ROOT / key)
-            for y in range(rows):
-                for x in range(w):
-                    if alpha is not None and alpha[y * w + x] < 255:
-                        continue                     # a corner the capture cut round
-                    source = x if x < window_frame.LEFT else (
-                        width - (w - x) if x >= w - window_frame.RIGHT else window_frame.LEFT)
-                    self.assertEqual(rgb[(y * w + x) * 3:(y * w + x) * 3 + 3],
-                                     caption[(y * width + source) * 3:(y * width + source) * 3 + 3],
-                                     "%s (%d, %d)" % (key, x, y))
+    def test_the_render_mode_frames_no_title_bar(self):
+        framed = guiscan.member_body("SettingsForm", "FramedStill")
+        self.assertIn("internal static Bitmap FramedStill(Bitmap client, int radius, int dpi)",
+                      guiscan.read("gui/WindowRender.cs"))
+        self.assertNotIn("caption", framed)
+        self.assertIn("Rounded(square, radius)", framed)
+        frames = guiscan.member_body("SettingsForm", "RenderFrames")
+        self.assertIn('FramedStill(picture, StillNumber(renderStill, "radius"), StillNumber(renderStill, "dpi"))', frames)
+        self.assertNotIn("LoadCaption", guiscan.read("gui/WindowRender.cs"))
+        self.assertNotIn("LoadCaption", SHIM.read_text(encoding="utf-8"))
 
-    def test_taking_a_title_bar_fills_the_corners_back_in(self):
-        width, height = 6, 5
-        rgb = bytes([243] * width * height * 3)
-        alpha = bytearray([255] * width * height)
-        alpha[0] = 0
-        alpha[width - 1] = 40
-        rows, rgba = window_frame.caption_rows(width, height, rgb, bytes(alpha), 3)
-        self.assertEqual(rows, 2)
-        self.assertEqual(rgba[0:4], bytes([243, 243, 243, 255]))
-        self.assertEqual(set(rgba[3::4]), {255})
-        with self.assertRaises(window_frame.FrameError):
-            window_frame.caption_rows(width, height, rgb, bytes(alpha), height)
+    def test_the_kept_title_bars_are_gone_and_nothing_reads_them(self):
+        self.assertFalse((ROOT / "build" / "window_frame.py").exists())
+        self.assertFalse((ROOT / "build" / "frame").exists())
+        readers = []
+        for folder in ("build", "gui", "scripts", "src", "advanced"):
+            for path in (ROOT / folder).rglob("*"):
+                if path.suffix in (".py", ".cs", ".ps1") and "window_frame" in path.read_text(encoding="utf-8", errors="replace"):
+                    readers.append(path.relative_to(ROOT).as_posix())
+        self.assertEqual(readers, [])
 
 
 class GeneratorTests(unittest.TestCase):
@@ -220,9 +189,10 @@ class GeneratorTests(unittest.TestCase):
         self.assertIn('"window_drawn": "captured" if WINDOW_CAPTURE else "offscreen"', text)
         self.assertNotIn('"system_dpi": dpi', text)
         self.assertIn("--capture", text)
-        for name in ("build/motion_window.py", "build/window_frame.py", "build/frame/window-caption.png",
-                     "build/frame/frame.json"):
-            self.assertIn(name, shots.WINDOW_INPUTS)
+        self.assertIn("build/motion_window.py", shots.WINDOW_INPUTS)
+        # v0.6.24: the title bar once kept from a capture is no input: no window has one.
+        for name in ("build/window_frame.py", "build/frame/window-caption.png", "build/frame/frame.json"):
+            self.assertNotIn(name, shots.WINDOW_INPUTS)
 
     def test_every_window_job_is_drawn_at_the_pinned_scale(self):
         import inspect

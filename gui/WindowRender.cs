@@ -131,16 +131,11 @@ namespace CodexAutoResume
                 AdoptRenderScale(job);
                 Soft.StillLightMs = 0;
                 PersistentBridge.Answers = RenderAnswer;
-                // The window as the picture frames it, and the title bar a dialog is drawn with over it (RenderDialog).
-                renderOuter = new Size(0, 0);
-                var outer = Items(job, "outer");
-                if (outer != null && outer.Count == 2)
-                    renderOuter = new Size(Convert.ToInt32(outer[0], CultureInfo.InvariantCulture),
-                                           Convert.ToInt32(outer[1], CultureInfo.InvariantCulture));
+                // The colour of the border Windows draws round a dialog (RenderDialog). v0.6.24: the job's `outer` is not read -
+                // no window has Windows' caption, so the window the picture frames is its client area.
                 renderChrome = Map(job, "chrome");
                 // v0.6.20: each frame also as the still a capture takes of the window (FramedStill), when the job asks.
                 renderStill = Map(job, "still");
-                if (renderStill != null) renderCaption = LoadCaption(Str(renderStill, "caption"));
                 // The job's command line, read as the window's own is (ParseArguments), for what a page takes from it:
                 // the advanced edition's `--capability=`. The standard window takes nothing here.
                 var arguments = new List<string>();
@@ -173,9 +168,7 @@ namespace CodexAutoResume
                     {
                         writer.Write(index, picture, form.RenderBounds(targets, frame));
                         if (renderStill != null)
-                            using (Bitmap still = FramedStill(picture, renderCaption, StillNumber(renderStill, "left"),
-                                                              StillNumber(renderStill, "right"), StillNumber(renderStill, "radius"),
-                                                              StillNumber(renderStill, "dpi")))
+                            using (Bitmap still = FramedStill(picture, StillNumber(renderStill, "radius"), StillNumber(renderStill, "dpi")))
                                 writer.WriteStill(index, still);
                     }
                 }
@@ -187,8 +180,6 @@ namespace CodexAutoResume
             finally
             {
                 if (form != null) form.Dispose();
-                if (renderCaption != null) renderCaption.Dispose();
-                renderCaption = null;
                 PersistentBridge.Answers = null;
                 lock (RenderMisses) writer.Finish(RenderMisses);
             }
@@ -235,7 +226,7 @@ namespace CodexAutoResume
             Size opened = form.ClientSize;
             form.TopLevel = false;
             form.FormBorderStyle = FormBorderStyle.None;
-            form.ClientSize = RenderPinned ? opened : new Size(form.Px(OpeningWidth), form.Px(OpeningHeight));
+            form.ClientSize = RenderPinned ? opened : form.OpeningClient;
             form.CreateControl();
             IntPtr made = form.Handle;
             // v0.6.20: and as large as it is. Form.SetBoundsCore holds a form to the largest window the screen allows
@@ -537,6 +528,38 @@ namespace CodexAutoResume
             if (control.Parent != null) control.Parent.Invalidate(true);
         }
 
+        /// v0.6.24: the caption buttons under `root` (gui/SoftChrome.cs) drawn again over the picture of it, where they stand.
+        /// DrawToBitmap prints a window's children from the top of the z-order down, so the card the buttons stand over -
+        /// lower in the z-order, as on the screen - was printed over them and they were in no picture.
+        private static void PaintCaptionOver(Bitmap picture, Control root)
+        {
+            var found = new List<CaptionButton>();
+            var walk = new Stack<Control>();
+            walk.Push(root);
+            while (walk.Count > 0)
+            {
+                Control parent = walk.Pop();
+                foreach (Control child in parent.Controls)
+                {
+                    var button = child as CaptionButton;
+                    if (button != null) { if (OwnVisible(button)) found.Add(button); }
+                    else if (OwnVisible(child)) walk.Push(child);
+                }
+            }
+            foreach (CaptionButton button in found)
+            {
+                Point at = Point.Empty;
+                for (Control c = button; c != null && c != root; c = c.Parent) at.Offset(c.Left, c.Top);
+                var place = new Rectangle(at, button.Size);
+                if (!new Rectangle(Point.Empty, picture.Size).Contains(place)) continue;
+                using (var face = new Bitmap(button.Width, button.Height, PixelFormat.Format32bppArgb))
+                {
+                    button.DrawToBitmap(face, new Rectangle(Point.Empty, button.Size));
+                    using (Graphics g = Graphics.FromImage(picture)) g.DrawImageUnscaled(face, at.X, at.Y);
+                }
+            }
+        }
+
         /// A list's own scroll bars, which its clip hides on screen, are drawn whole by DrawToBitmap - over the soft bar
         /// beside them (the owner, 2026-10-26: "고급판 캡처에서는 우리의 스크롤이 적용이 안 되네"). Each showing list's
         /// gutters are painted again on top, as far as the window shows that list, as the screen draws them.
@@ -585,6 +608,7 @@ namespace CodexAutoResume
             var picture = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppArgb);
             Invalidate(true);
             DrawToBitmap(picture, new Rectangle(Point.Empty, ClientSize));
+            PaintCaptionOver(picture, this);
             PaintListGutters(picture);
             renderRows = null;
             renderMenu = null;
@@ -767,16 +791,14 @@ namespace CodexAutoResume
         }
 
         // ------------------------------------------------------------------ a dialog the window opened (v0.6.20)
-        // The window the picture frames, as big as its caption and client area together, and the colours of the title bar
-        // Windows draws round a dialog (the job: `outer` and `chrome`); both from the committed still of the window.
-        private static Size renderOuter;
+        // The colour of the border Windows draws round a dialog (the job's `chrome`, from the committed still of the window).
         private static Dictionary<string, object> renderChrome;
 
         // The named parts of the dialog the last picture showed (`dialog.close`), in client coordinates.
         private Dictionary<string, Rectangle> renderDialogBounds;
 
-        /// Where a dialog's window `size` big goes over the window `owner` big, both with their title bars: centred on it,
-        /// as StartPosition.CenterParent centres a dialog on the window that opened it.
+        /// Where a dialog's window `size` big goes over the window `owner` big: centred on it, as StartPosition.CenterParent
+        /// centres a dialog on the window that opened it.
         internal static Point RenderDialogPlace(Size size, Size owner)
         {
             return new Point((owner.Width - size.Width) / 2, (owner.Height - size.Height) / 2);
@@ -795,10 +817,10 @@ namespace CodexAutoResume
 
         /// A dialog the window opens, over the picture: built by the very method the click builds it with (BuildTimeline,
         /// which OpenTimeline shows) from the reply the bridge gives for the chosen row, its controls laid out and drawn as
-        /// the window's own are (a top-level window in a picture would need the screen), then framed by the title bar
-        /// and border Windows draws round it - its title, the product's icon, the three caption buttons - and centred on
-        /// the window (RenderDialogPlace) over a soft shadow. `hover` or `pressed` naming `dialog.close` gives its
-        /// Close button that face.
+        /// the window's own are (a top-level window in a picture would need the screen) - its title card and caption
+        /// buttons among them (v0.6.24: no window has Windows' title bar) - within the border Windows draws round it, and
+        /// centred on the window (RenderDialogPlace) over a soft shadow. `hover` or `pressed` naming `dialog.close` gives
+        /// the title card's Close button that face.
         private void RenderDialog(Bitmap picture, Dictionary<string, object> dialog, string hover, string pressed,
                                   RenderWriter writer)
         {
@@ -814,10 +836,6 @@ namespace CodexAutoResume
             {
                 // Its client area at the size it opens at, kept when the window's own frame is taken off it.
                 Size client = form.ClientSize;
-                string title = form.Text;
-                // The icon the dialog's title bar shows: none (Soft.DialogBar sets ShowIcon = false), and a form's Icon is
-                // Windows' default one where none was given - never to be drawn.
-                Icon icon = form.ShowIcon ? form.Icon : null;
                 form.TopLevel = false;
                 form.FormBorderStyle = FormBorderStyle.None;
                 form.ClientSize = client;
@@ -825,6 +843,8 @@ namespace CodexAutoResume
                 // of the window: the grounds in it would stamp the window's own lifts into the dialog.
                 form.CreateControl();
                 IntPtr made = form.Handle;
+                // v0.6.24: as it is once made - its title card at its top (SoftDialog), as a person's opens.
+                client = form.ClientSize;
                 form.Visible = true;
                 for (int turn = 0; turn < 20; turn++)
                 {
@@ -834,7 +854,9 @@ namespace CodexAutoResume
                     form.PerformLayout();
                     System.Threading.Thread.Sleep(10);
                 }
-                var close = form.CancelButton as Control;
+                // v0.6.24: the title card's Close (SoftDialog's caption), where Windows' title bar had its own.
+                var soft = form as SoftDialog;
+                Control close = soft != null && soft.CaptionHost != null ? soft.CaptionHost.CloseButton : null;
                 if (close != null) SetRenderFace(close, hover == "dialog.close" || pressed == "dialog.close", pressed == "dialog.close");
                 Application.DoEvents();
                 using (var body = new Bitmap(client.Width, client.Height, PixelFormat.Format32bppArgb))
@@ -843,22 +865,20 @@ namespace CodexAutoResume
                     using (Graphics ground = Graphics.FromImage(body)) ground.Clear(form.BackColor);
                     form.Invalidate(true);
                     form.DrawToBitmap(body, new Rectangle(Point.Empty, client));
+                    PaintCaptionOver(body, form);
                     PaintListGutters(body, form);
-                    // The window's own caption height: what the picture frames above its client area.
-                    int caption = Math.Max(0, renderOuter.Height - ClientSize.Height);
+                    // v0.6.24: no caption, the window's or the dialog's: the window's client area is the whole of it.
                     int border = Math.Max(1, Px(1));
-                    Size outer = new Size(client.Width + 2 * border, caption + client.Height + border);
-                    Point place = RenderDialogPlace(outer, renderOuter);
-                    // Client coordinates: the owner's own caption is above them.
-                    place.Y -= caption;
-                    PaintDialog(picture, body, place, outer, caption, border, title, icon, form.BackColor);
+                    Size outer = new Size(client.Width + 2 * border, client.Height + 2 * border);
+                    Point place = RenderDialogPlace(outer, ClientSize);
+                    PaintDialog(picture, body, place, outer, border, form.BackColor);
                     renderDialogBounds = new Dictionary<string, Rectangle>();
                     renderDialogBounds["dialog.window"] = new Rectangle(place.X, place.Y, outer.Width, outer.Height);
                     if (close != null)
                     {
                         Point inForm = new Point(close.Left, close.Top);
                         for (Control up = close.Parent; up != null && up != form; up = up.Parent) { inForm.X += up.Left; inForm.Y += up.Top; }
-                        renderDialogBounds["dialog.close"] = new Rectangle(place.X + border + inForm.X, place.Y + caption + inForm.Y,
+                        renderDialogBounds["dialog.close"] = new Rectangle(place.X + border + inForm.X, place.Y + border + inForm.Y,
                                                                           close.Width, close.Height);
                     }
                 }
@@ -909,12 +929,10 @@ namespace CodexAutoResume
             using (var scaled = new Icon(icon, new Size(size, size))) return scaled.ToBitmap();
         }
 
-        /// The dialog's window over `picture`: a soft shadow, the border, the title bar and the drawn client area.
-        private void PaintDialog(Bitmap picture, Bitmap body, Point place, Size outer, int caption, int border,
-                                 string title, Icon icon, Color ground)
+        /// The dialog's window over `picture`: a soft shadow, the border and the drawn client area - its title card and caption
+        /// buttons in it (v0.6.24).
+        private void PaintDialog(Bitmap picture, Bitmap body, Point place, Size outer, int border, Color ground)
         {
-            Color bar = ChromeColour(renderChrome, "caption", Canvas);
-            Color ink = ChromeColour(renderChrome, "ink", Ink);
             Color line = ChromeColour(renderChrome, "line", Soft.Mix(Canvas, Ink, 0.35));
             using (Graphics g = Graphics.FromImage(picture))
             {
@@ -930,75 +948,23 @@ namespace CodexAutoResume
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
                 using (var brush = new SolidBrush(line))
                     g.FillRectangle(brush, place.X, place.Y, outer.Width, outer.Height);
-                using (var brush = new SolidBrush(bar))
-                    g.FillRectangle(brush, place.X + border, place.Y + border, outer.Width - 2 * border, caption - border);
                 // The dialog's own ground under what its controls drew: a control that draws part of itself clear shows it,
                 // not the shadow that lies under the whole window.
                 using (var brush = new SolidBrush(ground))
-                    g.FillRectangle(brush, place.X + border, place.Y + caption, body.Width, body.Height);
-                g.DrawImageUnscaled(body, place.X + border, place.Y + caption);
-                // The product's icon, the title, and the caption buttons: Close, Maximise and the Minimise this dialog
-                // does not offer (MinimizeBox is off), drawn lighter.
-                int small = Math.Min(caption - 2 * border, Px(16));
-                int middle = place.Y + caption / 2;
-                if (icon != null)
-                    using (Bitmap mark = IconImage(icon, small))
-                        g.DrawImage(mark, new Rectangle(place.X + Px(12), middle - small / 2, small, small));
-                // The title starts where the icon was, as Windows' does when a title bar has none.
-                int titleLeft = place.X + Px(12) + (icon != null ? small + Px(10) : 0);
-                // Windows' own caption font, as it draws a title - at the scale the window is drawn at (AtDisplayScale,
-                // v0.6.20): Windows gives it in points, which it turns into pixels at the scale it signed in at.
-                using (Font windows = SystemFonts.CaptionFont)
-                using (Font font = AtDisplayScale(windows))
-                    TextRenderer.DrawText(g, title ?? "", font,
-                                          new Rectangle(titleLeft, place.Y, outer.Width, caption),
-                                          ink, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix |
-                                          TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
-                int button = Px(46), glyph = Px(10);
-                float stroke = Math.Max(1f, (float)Math.Round(DpiScale));
-                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                int right = place.X + outer.Width - border;
-                using (var pen = new Pen(ink, stroke))
-                using (var faint = new Pen(Soft.WithAlpha(ink, 0.43), stroke))
-                {
-                    float cx = right - button / 2f;
-                    g.DrawLine(pen, cx - glyph / 2f, middle - glyph / 2f, cx + glyph / 2f, middle + glyph / 2f);
-                    g.DrawLine(pen, cx - glyph / 2f, middle + glyph / 2f, cx + glyph / 2f, middle - glyph / 2f);
-                    cx -= button;
-                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
-                    g.DrawRectangle(pen, (int)(cx - glyph / 2f), middle - glyph / 2, glyph, glyph);
-                    cx -= button;
-                    g.DrawLine(faint, cx - glyph / 2f, middle, cx + glyph / 2f, middle);
-                }
+                    g.FillRectangle(brush, place.X + border, place.Y + border, body.Width, body.Height);
+                g.DrawImageUnscaled(body, place.X + border, place.Y + border);
             }
         }
 
         // ------------------------------------------------------------------ the still a capture takes (v0.6.20)
-        // The job's `still`: {"caption": a PNG of the title bar, "left", "right": how much of it is kept at each end,
-        // "radius": the corners' in px}; and that title bar, loaded.
+        // The job's `still`: {"radius": the corners' in px, "dpi": the resolution a capture's bitmap has}. v0.6.24: no title
+        // bar - the window's caption is its own, in its client area, so the client area is the whole window.
         private static Dictionary<string, object> renderStill;
-        private static Bitmap renderCaption;
 
         private static int StillNumber(Dictionary<string, object> still, string key)
         {
             object value;
             return still.TryGetValue(key, out value) && value != null ? Convert.ToInt32(value, CultureInfo.InvariantCulture) : 0;
-        }
-
-        /// The title bar a still is framed with, as 32-bit ARGB, its file let go at once.
-        internal static Bitmap LoadCaption(string path)
-        {
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) throw new InvalidDataException("the job's still names no title bar: " + path);
-            using (var read = new Bitmap(path))
-            {
-                var caption = new Bitmap(read.Width, read.Height, PixelFormat.Format32bppArgb);
-                using (Graphics g = Graphics.FromImage(caption))
-                {
-                    g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
-                    g.DrawImage(read, new Rectangle(0, 0, read.Width, read.Height), 0, 0, read.Width, read.Height, GraphicsUnit.Pixel);
-                }
-                return caption;
-            }
         }
 
         private static int[] Argb(Bitmap picture)
@@ -1015,27 +981,15 @@ namespace CodexAutoResume
             return pixels;
         }
 
-        /// The window as build/capture_window.ps1 photographs it, from the client area drawn here: Windows' title bar above
-        /// it - the caption the job gives, taken from a capture at the job's scale (build/window_frame.py): its first `left`
-        /// px and its last `right` px as they are, and between them its plain bar - and the corners Windows rounds cut, as
-        /// that script cuts them (the same GDI+ fill of the same path, `radius` px, so the same pixels) - its resolution
-        /// `dpi`, as a capture's bitmap has the monitor's, so the PNG it is saved as says the same. Nothing of the screen is
-        /// read: Windows draws a window's title bar on a monitor, at that monitor's DPI, and this one is on none.
-        internal static Bitmap FramedStill(Bitmap client, Bitmap caption, int left, int right, int radius, int dpi)
+        /// The window as build/capture_window.ps1 photographs it, from the client area drawn here - v0.6.24: the whole window,
+        /// its caption its own - opaque, with the corners Windows rounds cut, as that script cuts them (the same GDI+ fill of
+        /// the same path, `radius` px, so the same pixels), its resolution `dpi`, as a capture's bitmap has the monitor's, so
+        /// the PNG it is saved as says the same. Nothing of the screen is read.
+        internal static Bitmap FramedStill(Bitmap client, int radius, int dpi)
         {
-            int width = client.Width, top = caption.Height, height = top + client.Height;
-            int across = caption.Width;
-            left = Math.Max(0, Math.Min(left, Math.Min(width, across - 1)));
-            right = Math.Max(0, Math.Min(right, Math.Min(width - left, across - left - 1)));
-            int[] bar = Argb(caption), body = Argb(client);
-            var pixels = new int[width * height];
-            for (int y = 0; y < top; y++)
-                for (int x = 0; x < width; x++)
-                {
-                    int from = x < left ? x : x >= width - right ? across - (width - x) : left;
-                    pixels[y * width + x] = bar[y * across + from];
-                }
-            for (int i = 0; i < body.Length; i++) pixels[top * width + i] = unchecked((int)0xFF000000) | (body[i] & 0xFFFFFF);
+            int width = client.Width, height = client.Height;
+            int[] pixels = Argb(client);
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = unchecked((int)0xFF000000) | (pixels[i] & 0xFFFFFF);
             using (var square = new Bitmap(width, height, PixelFormat.Format32bppArgb))
             {
                 BitmapData data = square.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);

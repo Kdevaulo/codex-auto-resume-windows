@@ -167,7 +167,9 @@ class SliceTests(unittest.TestCase):
         # 97 with RuntimeChoice (v0.6.23), which Python this installation runs under. 99 with the design audit's second round:
         # ListSwitchFeel, how Pending's switches answer the pointer and their calls, and SoftReveal, a part fading over its ground.
         # 100 since v0.6.24: Shape, the squircle every rounded body is drawn with (gui/SoftShape.cs).
-        self.assertEqual(len(set(declared)), 100, "the window's types")
+        # 106 with the chrome (gui/SoftChrome.cs, no Windows title bar): ChromeLayout, Chrome, ChromeHost, DragThrough,
+        # CaptionButton and SoftDialog.
+        self.assertEqual(len(set(declared)), 106, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,

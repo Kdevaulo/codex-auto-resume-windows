@@ -75,6 +75,7 @@ gui/SoftMenu.cs
 gui/SoftCallout.cs
 gui/SoftDays.cs
 gui/SoftMirror.cs
+gui/SoftChrome.cs
 gui/Marks.cs
 
 [generated]

@@ -73,8 +73,12 @@ class PinnedSizeTests(unittest.TestCase):
             result = motion_window.render(exe, job, out)
         wanted = [int(round(OPENING[0] * scale)), int(round(OPENING[1] * scale))]
         self.assertGreater(wanted[0], largest[0])
-        self.assertEqual(result["client"], wanted,
-                         "at scale %s on a machine whose largest window is %dx%d" % (scale, largest[0], largest[1]))
+        said = "at scale %s on a machine whose largest window is %dx%d" % (scale, largest[0], largest[1])
+        self.assertEqual(result["client"][0], wanted[0], said)
+        # v0.6.24: the window opens taller by what its header grew for the caption buttons (SettingsForm.OpeningClient:
+        # 16 px at 100 % in English, never past Windows' title bar and top frame, 31) - so its pages keep their height.
+        self.assertGreaterEqual(result["client"][1], wanted[1], said)
+        self.assertLessEqual(result["client"][1], wanted[1] + int(round(31 * scale)), said)
 
     def test_the_scale_outgrows_a_ci_runner_and_a_large_monitor(self):
         self.assertEqual(scale_beyond((1044, 788)), 1.5)

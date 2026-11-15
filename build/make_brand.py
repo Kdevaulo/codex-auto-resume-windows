@@ -203,6 +203,8 @@ def sections():
     scale.append(("AccentBar", "int", int(brand.ACCENT_BAR)))
     # v0.6.24: Figma's corner smoothing, the share of a radius a corner eases into its sides (brand/shape.py).
     scale.append(("CornerSmoothing", "double", float(shape.DESIGN_SMOOTHING[brand.DEFAULT_DESIGN])))
+    # v0.6.24: the caption buttons' glyph stroke (brand.CAPTION_STROKE; the buttons' sizes are LAYOUT's caption_*).
+    scale.append(("CaptionStroke", "double", float(brand.CAPTION_STROKE)))
 
     layout = []
     for key, value in brand.LAYOUT.items():

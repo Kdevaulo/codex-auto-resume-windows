@@ -151,11 +151,11 @@ class RenderTests(unittest.TestCase):
     def test_the_dialog_is_centred_on_the_window_with_its_close_button_inside_it(self):
         window = self.bounds(6)["dialog.window"]
         close = self.bounds(6)["dialog.close"]
-        outer_w, outer_h = self.outer
-        caption = outer_h - self.result["client"][1]
+        # v0.6.24: no window has Windows' title bar (gui/SoftChrome.cs), so the window's client area is the whole of it:
+        # centred on that - not on the committed still, which had a title bar until the pictures are drawn again.
+        outer_w, outer_h = self.result["client"]
         self.assertAlmostEqual(window[0] + window[2] / 2.0, outer_w / 2.0, delta=1.0)
-        # Client coordinates have the window's own title bar above them: centred on the whole window, title bar included.
-        self.assertAlmostEqual(window[1] + caption + window[3] / 2.0, outer_h / 2.0, delta=1.0)
+        self.assertAlmostEqual(window[1] + window[3] / 2.0, outer_h / 2.0, delta=1.0)
         self.assertTrue(window[0] < close[0] and close[0] + close[2] < window[0] + window[2])
         self.assertTrue(window[1] < close[1] and close[1] + close[3] < window[1] + window[3])
         self.assertGreater(close[0] + close[2] / 2.0, window[0] + window[2] / 2.0, "Close is on the right, as the dialog puts it")
