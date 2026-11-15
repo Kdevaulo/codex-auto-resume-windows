@@ -200,6 +200,8 @@ def sections():
         scale.append(("TransitionEase" + part, "double", value))
     # v0.6.10: Classic's accent bar inside a card's left hairline, and its current tab's underline.
     scale.append(("AccentBar", "int", int(brand.ACCENT_BAR)))
+    # v0.6.24: the caption buttons' glyph stroke (brand.CAPTION_STROKE; the buttons' sizes are LAYOUT's caption_*).
+    scale.append(("CaptionStroke", "double", float(brand.CAPTION_STROKE)))
 
     layout = []
     for key, value in brand.LAYOUT.items():

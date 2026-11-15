@@ -80,6 +80,7 @@ namespace CodexAutoResume
         internal const double TransitionEaseX2 = 0.68;
         internal const double TransitionEaseY2 = 1;
         internal const int AccentBar = 3;
+        internal const double CaptionStroke = 1.3;
 
         internal const string HexAccent = "#1257B8";
         internal const string HexBrand = "#1257B8";
@@ -173,6 +174,13 @@ namespace CodexAutoResume
         internal const int FocusWidth = 2;
         internal const int FocusOffset = 2;
         internal const int Hairline = 1;
+        internal const int CaptionButtonW = 34;
+        internal const int CaptionButtonH = 26;
+        internal const int CaptionGap = 4;
+        internal const int CaptionGlyph = 10;
+        internal const int CaptionGlyphCorner = 2;
+        internal const int CaptionInsetTop = 10;
+        internal const int CaptionInsetEnd = 10;
 
         // The panel's light elevation (brand.SHADOWS): one shadow in ShadowDark and one highlight in
         // ShadowLight per recipe, in CSS px, and how far each recipe reaches past its box. A blur

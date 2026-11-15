@@ -93,7 +93,21 @@ LAYOUT = {
     "focus_width": 2,
     "focus_offset": 2,
     "hairline": 1,
+    # v0.6.24: the window's own caption buttons - minimise, maximise, close - in its first card, where Windows' title bar
+    # was (gui/SoftChrome.cs): each a body this big, this far apart, its glyph in a box this big with corners this round,
+    # the group this far in from the card's top and outer edge. The glyph's stroke is CAPTION_STROKE.
+    "caption_button_w": 34,
+    "caption_button_h": 26,
+    "caption_gap": 4,
+    "caption_glyph": 10,
+    "caption_glyph_corner": 2,
+    "caption_inset_top": 10,
+    "caption_inset_end": 10,
 }
+
+# v0.6.24: the caption buttons' glyph stroke, in CSS px - never thinner than one device pixel where it is drawn. Not in
+# LAYOUT, whose every size is a whole pixel.
+CAPTION_STROKE = 1.3
 
 
 
