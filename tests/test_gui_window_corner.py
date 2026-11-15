@@ -401,8 +401,11 @@ class StillTests(unittest.TestCase):
             self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI, "corner": "squircle"})
 
     def test_the_render_and_the_capture_cut_by_the_same_decision(self):
-        framed = guiscan.member_body("SettingsForm", "FramedStill")
-        self.assertIn("Bitmap rounded = StillSquircle() ? CornerStill(square, dpi) : Rounded(square, radius);", framed)
+        frames = guiscan.member_body("SettingsForm", "RenderFrames")
+        self.assertIn('StillSquircle() ? SquircleStill(picture, StillNumber(renderStill, "dpi"))', frames)
+        self.assertIn("Bitmap cut = CornerStill(square, dpi);", guiscan.member_body("SettingsForm", "SquircleStill"))
+        # FramedStill is the setup window's too (build/motion/InstallerRender.cs keeps it word for word): unchanged.
+        self.assertNotIn("Squircle", guiscan.member_body("SettingsForm", "FramedStill"))
         self.assertIn('renderStill.TryGetValue("corner", out value) && value as string == "squircle"',
                       guiscan.member_body("SettingsForm", "StillSquircle"))
         still = guiscan.member_body("SettingsForm", "CornerStill")

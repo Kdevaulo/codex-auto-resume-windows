@@ -804,6 +804,13 @@ namespace CodexAutoResume
             }
         }
 
+        // The shadow's colour: the ink PaintDialog shades a still's dialog with in light (5.2 item 2, O12), and in dark the
+        // theme's own shadow, all but black - a light ink would be a glow round the window, never a shadow.
+        private static Color Shade()
+        {
+            return Palette.Dark ? Tokens.ShadowDark : Palette.Ink;
+        }
+
         private Color Ground()
         {
             return form.BackColor.A == 255 ? form.BackColor : Palette.Canvas;
@@ -858,7 +865,7 @@ namespace CodexAutoResume
                     throw new InvalidOperationException("no bitmap for the companion");
                 kept = SelectObject(memory, bitmap);
                 bitmapSize = whole;
-                WindowShape.Compose(edge, ground, line, Color.Black, new WindowShape.MemorySink(bits, 4 * whole.Width));
+                WindowShape.Compose(edge, ground, line, Shade(), new WindowShape.MemorySink(bits, 4 * whole.Width));
                 var dimensions = new SIZE { Width = whole.Width, Height = whole.Height };
                 var from = new POINT();
                 var blend = new BLENDFUNCTION { Op = 0, Flags = 0, Alpha = 255, Format = 1 };

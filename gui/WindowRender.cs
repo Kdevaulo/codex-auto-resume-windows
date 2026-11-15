@@ -168,7 +168,10 @@ namespace CodexAutoResume
                     {
                         writer.Write(index, picture, form.RenderBounds(targets, frame));
                         if (renderStill != null)
-                            using (Bitmap still = FramedStill(picture, StillNumber(renderStill, "radius"), StillNumber(renderStill, "dpi")))
+                            // v0.6.24 W5: cut by the same decision as the window - its own corner while the switch is on (the job
+                            // says so, make_screenshots.still_job), else Windows' 8 px circle as a capture is cut.
+                            using (Bitmap still = StillSquircle() ? SquircleStill(picture, StillNumber(renderStill, "dpi"))
+                                                                  : FramedStill(picture, StillNumber(renderStill, "radius"), StillNumber(renderStill, "dpi")))
                                 writer.WriteStill(index, still);
                     }
                 }
@@ -999,9 +1002,7 @@ namespace CodexAutoResume
                         Marshal.Copy(pixels, y * width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), width);
                 }
                 finally { square.UnlockBits(data); }
-                // v0.6.24 W5: cut by the same decision as the window - its own corner while the switch is on (the job says so,
-                // make_screenshots.still_job), else Windows' 8 px circle as a capture is cut.
-                Bitmap rounded = StillSquircle() ? CornerStill(square, dpi) : Rounded(square, radius);
+                Bitmap rounded = Rounded(square, radius);
                 if (dpi > 0) rounded.SetResolution(dpi, dpi);
                 return rounded;
             }
@@ -1012,6 +1013,28 @@ namespace CodexAutoResume
         {
             object value;
             return renderStill != null && renderStill.TryGetValue("corner", out value) && value as string == "squircle";
+        }
+
+        /// v0.6.24 W5: the window as a still while it cuts its own outer corner: FramedStill's opaque client area, cut by
+        /// CornerStill, its resolution `dpi`.
+        internal static Bitmap SquircleStill(Bitmap client, int dpi)
+        {
+            int width = client.Width, height = client.Height;
+            int[] pixels = Argb(client);
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = unchecked((int)0xFF000000) | (pixels[i] & 0xFFFFFF);
+            using (var square = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+            {
+                BitmapData data = square.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                try
+                {
+                    for (int y = 0; y < height; y++)
+                        Marshal.Copy(pixels, y * width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), width);
+                }
+                finally { square.UnlockBits(data); }
+                Bitmap cut = CornerStill(square, dpi);
+                if (dpi > 0) cut.SetResolution(dpi, dpi);
+                return cut;
+            }
         }
 
         /// v0.6.24 W5: `square` with the window's own outer corner as the screen shows it while Brand.WindowSquircle is on -
