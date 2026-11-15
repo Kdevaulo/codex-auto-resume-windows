@@ -12,8 +12,13 @@ Scratch homes only; the installer's lock is answered here, never asked of this P
 from __future__ import annotations
 
 import io
+import os
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -105,6 +110,77 @@ class SweepSoonTests(unittest.TestCase):
         with patch.object(setaside, "sweep", side_effect=OSError("no")) as sweep:
             self.run_soon()
         self.assertEqual(sweep.call_count, 1)
+
+
+class RunningProgramTests(unittest.TestCase):
+    """A folder a running program's file lies in is never deleted (the v0.6.24 review): Windows renames a folder while
+    a program runs from it, so the rename alone did not keep the sweep away from it."""
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.paths = config.Paths(str(Path(folder.name) / "home"))
+        self.assertTrue(self.paths.claim_home())
+        self.home = self.paths.home
+
+    def sweep(self, **given):
+        return setaside.sweep(self.paths, installing=lambda: False, **given)
+
+    def plant(self, name="runtime.old-" + STAMP) -> Path:
+        tree = self.home / name
+        (tree / "Lib").mkdir(parents=True)
+        (tree / "lib.py").write_text("x", encoding="utf-8")
+        (tree / "Lib" / "json.py").write_text("x", encoding="utf-8")
+        return tree
+
+    @unittest.skipUnless(os.name == "nt" and Path(os.environ.get("SystemRoot", r"C:\Windows"), "System32",
+                                                  "PING.EXE").is_file(), "needs Windows' PING.EXE")
+    def test_nothing_is_deleted_while_a_program_runs_from_it_and_all_once_it_has_ended(self):
+        tree = self.plant()
+        program = tree / "PING.EXE"
+        shutil.copy(Path(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "PING.EXE"), program)
+        running = subprocess.Popen([str(program), "-n", "60", "127.0.0.1"], stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, creationflags=0x08000000)
+        self.addCleanup(lambda: running.poll() is None and (running.kill(), running.wait()))
+        try:
+            for _ in range(50):                          # until Windows lists it
+                if str(program).lower() in (os.path.normcase(image) for image in windows.running_images() or ()):
+                    break
+                time.sleep(0.1)
+            self.assertEqual(self.sweep(), (0, 1))
+            self.assertTrue(all(path.exists() for path in (program, tree / "lib.py", tree / "Lib" / "json.py")),
+                            "nothing around the running program deleted")
+            self.assertEqual(running.poll(), None)
+        finally:
+            running.kill()
+            running.wait()
+        self.assertEqual(self.sweep(), (1, 0), "taken once it has ended")
+        self.assertFalse(tree.exists())
+
+    def test_where_the_list_cannot_be_made_every_folder_is_left(self):
+        tree = self.plant()
+        old = self.home / ("CodexAutoResumeSettings.exe.old-" + STAMP)
+        old.write_bytes(b"MZ")
+        self.assertEqual(self.sweep(running=lambda: None), (1, 1))
+        self.assertTrue(tree.exists())
+        self.assertFalse(old.exists(), "a file is its own proof: Windows refuses to delete a running program")
+        self.assertEqual(self.sweep(running=self.fail_to_list), (0, 1))
+        self.assertTrue(tree.exists())
+
+    @staticmethod
+    def fail_to_list():
+        raise OSError("no snapshot")
+
+    def test_a_program_elsewhere_or_in_a_folder_of_a_like_name_holds_nothing(self):
+        tree = self.plant()
+        beside = str(tree) + "x" + os.sep + "python.exe"
+        self.assertEqual(self.sweep(running=lambda: [beside.lower(), r"c:\windows\system32\ping.exe"]), (1, 0))
+        self.assertFalse(tree.exists())
+
+    def test_the_list_holds_this_process(self):
+        images = windows.running_images()
+        self.assertIsInstance(images, list)
+        self.assertIn(os.path.normcase(str(Path(sys.executable).resolve())), [os.path.normcase(i) for i in images])
 
 
 class ServeTests(unittest.TestCase):

@@ -185,6 +185,31 @@ def app_name(family) -> str:
     return family[:cut] if cut > 0 else family
 
 
+def running_images():
+    """The program file of every process this account may look at, each a full path in lower case - or None where
+    the list cannot be made. One Toolhelp snapshot for the process ids, then each process opened for limited query
+    alone and asked its image (QueryFullProcessImageNameW); one that cannot be opened is another account's or gone.
+    v0.6.24: what setaside.sweep asks before it deletes a folder, which Windows renames while a program runs from it."""
+    k = _kernel()
+    pids = _toolhelp_parents(k)
+    if not pids:
+        return None
+    found = []
+    for pid in pids:
+        if not pid:
+            continue
+        handle = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            continue
+        try:
+            buffer, count = C.create_unicode_buffer(32768), W.DWORD(32768)
+            if k.QueryFullProcessImageNameW(handle, 0, buffer, C.byref(count)) and buffer.value:
+                found.append(buffer.value.lower())
+        finally:
+            k.CloseHandle(handle)
+    return found
+
+
 def _toolhelp_parents(k) -> dict:
     """Every process's parent id, from one Toolhelp snapshot."""
     k.CreateToolhelp32Snapshot.argtypes = [W.DWORD, W.DWORD]
