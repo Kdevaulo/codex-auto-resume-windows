@@ -1688,15 +1688,17 @@ class WindowsTests(unittest.TestCase):
             target, (left, top, right, bottom) = painted["targets"][0]
             self.assertEqual(target[0], "check")
             x, y = (left + right) // 2, (top + bottom) // 2
+            # v0.6.24: the window is the card, so a click's point is the card's own; on the plan it is that far further in.
+            dx, dy = window._client_offset()
             # A read takes that task away and the layout is rebuilt, but not yet painted.
             window.model.rows = [item for item in window.model.rows if item["interruption_id"] != target[1]]
             window._rebuild(time.time())
             self.assertNotEqual(popup.hit_test(window._plan["targets"], x, y), target)
-            self.assertEqual(window._hit((y << 16) | x), target)
+            self.assertEqual(window._hit(((y - dy) << 16) | (x - dx)), target)
             window._invalidate()
             self.pump(0.2)
             self.assertIs(window._painted_plan, window._plan)
-            self.assertEqual(window._hit((y << 16) | x), popup.hit_test(window._plan["targets"], x, y))
+            self.assertEqual(window._hit(((y - dy) << 16) | (x - dx)), popup.hit_test(window._plan["targets"], x, y))
         finally:
             window.destroy()
 

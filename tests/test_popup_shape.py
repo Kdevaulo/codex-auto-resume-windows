@@ -49,8 +49,10 @@ PACKAGE = "codex_auto_resume.ui.popup"
 # under the line budget; `access` in v0.6.11, what a screen reader is told, which the messages answer from.
 # v0.6.20 drew the icon's right-click menu here, in two files: `menuplan`, where its items go and what a key
 # reaches - asking Windows nothing, so the seventh of that half - and `menuwindow`, its window, after the popup's.
+# v0.6.24: `layers`, the window that is the card and its shadow below it, which the window is made of beside its messages.
 MODULES = ("words", "model", "placement", "motion", "elevation", "layout", "menuplan",
-           "win32", "fonts", "theme", "gdiplus", "renderer", "access", "hidden", "messages", "window", "menuwindow")
+           "win32", "fonts", "theme", "gdiplus", "renderer", "layers", "access", "hidden", "messages", "window",
+           "menuwindow")
 ASKS_WINDOWS_NOTHING = MODULES[:7]
 
 # What `tray_popup.<name>` gave before the split, name for name. `countdown` is the one public
@@ -102,6 +104,9 @@ SURFACE = {
     "menu_end", "menu_layout", "menu_letter", "menu_mirror", "menu_place", "menu_step", "menu_usable",
     # The popup's row menus drawn by the same code (v0.6.20): a submenu's place, and a row menu's items numbered.
     "menu_beside", "menu_numbered",
+    # v0.6.24: the popup is its card - its two layers, the window's side of them, its offscreen still, and the shadows
+    # that float under it (the notification card's rule).
+    "CardLayers", "PopupCard", "card_still", "float_reach", "float_shadows",
 }
 
 

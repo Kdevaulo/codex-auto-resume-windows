@@ -16,6 +16,7 @@ from .motion import face_amount, face_length, face_state, mixed, opening
 from .placement import focus_order, hit_test, next_focus
 from . import access
 from .hidden import PopupHidden
+from .layers import WM_POPUP_PAINT
 from .win32 import (GWL_EXSTYLE,
                     KEY_WAS_DOWN,
                     LWA_ALPHA,
@@ -65,6 +66,9 @@ class PopupMessages(PopupHidden):
 
     # --------------------------------------------------------------------- messages
     def _wndproc(self, hwnd, message, wparam, lparam):
+        layers = self._layers
+        if layers is not None and hwnd == layers.shadow_hwnd:
+            return _dll("user32").DefWindowProcW(hwnd, message, wparam, lparam)   # the card's shadow (v0.6.24)
         try:
             handled = self._handle(hwnd, message, wparam, lparam)
             if handled is not None:
@@ -86,7 +90,10 @@ class PopupMessages(PopupHidden):
                 if self._opening is not None:
                     self._opening_step()
                 self._sync_frames()
-                user32.InvalidateRect(hwnd, None, False)
+                if self._card:
+                    self._push()                     # the card: the light's rows uploaded now (v0.6.24)
+                else:
+                    user32.InvalidateRect(hwnd, None, False)
             elif wparam == TIMER_TICK:
                 self._ticks += 1
                 self._still = self._ask_still()      # battery saver or a lock, within a second of it (_sync_frames)
@@ -98,6 +105,10 @@ class PopupMessages(PopupHidden):
             return 0
         if message == WM_POPUP_RESULT:
             self._finished(wparam)
+            return 0
+        if message == WM_POPUP_PAINT:
+            if self._owed:
+                self._push()
             return 0
         if message == access.WM_GETOBJECT:
             # v0.6.11: a screen reader asking what is in the window (access.py); anything else it asks,
@@ -175,7 +186,9 @@ class PopupMessages(PopupHidden):
         paint = PAINTSTRUCT()
         dc = user32.BeginPaint(hwnd, C.byref(paint))
         try:
-            if dc and self._renderer is not None and (self._plan is not None or self.visible):
+            if self._card:
+                self._redraw()                       # the card's picture is pushed, never painted (v0.6.24)
+            elif dc and self._renderer is not None and (self._plan is not None or self.visible):
                 canvas = self.render()
                 _dll("gdi32").SetDIBitsToDevice(dc, 0, 0, canvas.width, canvas.height, 0, 0, 0,
                                                 canvas.height, canvas.bits, C.byref(canvas.info), 0)
@@ -190,9 +203,7 @@ class PopupMessages(PopupHidden):
         plan = self._painted_plan
         if plan is None:
             return None
-        x = C.c_short(lparam & 0xFFFF).value
-        y = C.c_short((lparam >> 16) & 0xFFFF).value
-        return hit_test(plan["targets"], x, y)
+        return hit_test(plan["targets"], *self._client_point(lparam))
 
     def _mouse_move(self, hwnd, lparam):
         user32 = _dll("user32")
@@ -235,6 +246,10 @@ class PopupMessages(PopupHidden):
         self._end_opening()
         if self._holds() or not self.hwnd or self._home is None:
             return
+        if self._card:                           # the card (v0.6.24): its layers' blend, and nothing on screen yet
+            self._alpha, self._opening = 0, (None, max(1, int(round(brand.SPACING["xs"] * self.dpi / 96.0))))
+            self._below = self._opening[1]
+            return
         user32 = _dll("user32")
         try:
             user32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, user32.GetWindowLongW(self.hwnd, GWL_EXSTYLE) | WS_EX_LAYERED)
@@ -259,12 +274,20 @@ class PopupMessages(PopupHidden):
         if done:
             self._end_opening()
             return
-        _dll("user32").SetLayeredWindowAttributes(self.hwnd, 0, alpha, LWA_ALPHA)
+        if self._card:
+            self._alpha = alpha
+        else:
+            _dll("user32").SetLayeredWindowAttributes(self.hwnd, 0, alpha, LWA_ALPHA)
         self._stand(below)
 
     def _end_opening(self):
         """Nothing left of an opening: in its place, and no longer layered - drawn again at once, so no frame is empty."""
         self._opening = None
+        if self._card:
+            faded, self._alpha = self._alpha != 255, 255
+            if self._below or faded:
+                self._stand(0)
+            return
         if self._below:
             self._stand(0)
         if self._layered and self.hwnd:
@@ -277,6 +300,10 @@ class PopupMessages(PopupHidden):
     def _stand(self, below):
         """Where it opens to, `below` px lower: moved, never sized."""
         self._below = below
+        if self._card:
+            if self._home is not None and self.hwnd and self.visible:
+                self._layers.stand(self.hwnd, (self._home[0], self._home[1] + below), self._alpha)
+            return
         if self._home is not None and self.hwnd:
             with _PerMonitorDpi():
                 _dll("user32").SetWindowPos(self.hwnd, None, self._home[0], self._home[1] + below, 0, 0,

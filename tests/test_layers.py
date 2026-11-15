@@ -251,7 +251,9 @@ LAYER = {_q(name): layer for layer, names in {
               # v0.6.11: what a screen reader is told of the popup, and asks of it.
               "ui.popup.access",
               # v0.6.20: the icon's right-click menu, drawn by the popup's renderer.
-              "ui.popup.menuplan", "ui.popup.menuwindow", "ui.popup.hidden"),
+              "ui.popup.menuplan", "ui.popup.menuwindow", "ui.popup.hidden",
+              # v0.6.24: the window that is the card, and its shadow below it.
+              "ui.popup.layers"),
 }.items() for name in names}
 
 # The roles the target rules speak of: today's modules, and the packages the split moves them

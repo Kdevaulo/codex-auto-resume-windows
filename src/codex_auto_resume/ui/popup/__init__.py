@@ -22,6 +22,7 @@ Then Windows, and what is drawn with it:
     theme       light or dark, motion or none, High Contrast, and the text size
     gdiplus     the surfaces drawn on, and the counting that proves nothing leaks
     renderer    drawing it into memory
+    layers      the window that is the card, its shadow below it, and its still (v0.6.24)
     access      what a screen reader is told of it, and asks of it (v0.6.11)
     messages    what Windows says to the window, and what each message decides
     window      the window itself, and the life of one popup
@@ -202,6 +203,7 @@ from .gdiplus import (PIXEL_FORMAT_32BPP_PARGB,
                       _gdiplus_release,
                       gdiplus_objects)  # noqa: F401
 from .renderer import CHIP_ALPHA, DOT_FILL, Renderer  # noqa: F401
+from .layers import CardLayers, PopupCard, card_still, float_reach, float_shadows  # noqa: F401
 from .access import MenuAccessible, PopupAccessible, accessible_items  # noqa: F401
 from .hidden import PopupHidden  # noqa: F401
 from .messages import REFRESH_TICKS  # noqa: F401
