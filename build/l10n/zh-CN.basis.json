@@ -771,6 +771,7 @@
   "msg.setup_done": "baffe83d079f2725",
   "msg.setup_incomplete": "1222ed6425f78ce7",
   "msg.setup_left_stopped": "330089e0e2999b87",
+  "msg.setup_started_again": "d579dc729667295c",
   "msg.setup_unconfirmed": "5ce70d5d620b9e41",
   "msg.setup_unconfirmed_yet": "d8586decfe2ab306",
   "msg.toast_account_changed": "d0acbca5fc31b0e3",

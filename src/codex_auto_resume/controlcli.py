@@ -54,6 +54,8 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import threading
+import time
 
 from . import config, l10n
 # Read at the top since v0.6.10-alpha: `windows` is the front of the Codex adapter now, and
@@ -635,11 +637,48 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# v0.6.24: when the long-lived bridge looks for what an update set aside, in seconds after the one before - first once
+# the window's first reads are on their way, then while something is still in use, for about twelve minutes in all.
+SWEEP_AFTER = (3.0, 10.0, 30.0, 120.0, 600.0)
+
+
+def sweep_soon(control: Control, *, wait=time.sleep):
+    """v0.6.24: sweep what an update set aside and could not delete (setaside.py, the watcher's own sweep, with
+    every gate it has), on a thread of its own, from the Dashboard's long-lived bridge.
+
+    The watcher sweeps as it starts, and an update starts it while the window that ran the update is still open: that
+    window is the previous CodexAutoResumeSettings.exe, which the update could only rename to `.old-<stamp>` - and the
+    v0.6.23 final's live acceptance found it still in the installation after the in-app update, until the next
+    install. An update over a stopped watcher starts no watcher at all. The Dashboard the update opens again is the
+    first of ours to start after the old window has gone, so its bridge looks too: soon after it starts, and again
+    while anything set aside is still there (SWEEP_AFTER) - a window still closing, a Dashboard of the old version, an
+    install or a Repair still running (a gate the sweep keeps closed), a program still running from a folder - and
+    leaves whatever is there at the last look to the next start. Asked of what is there, not of what the sweep said:
+    a closed gate sweeps nothing and leaves nothing "in use", and stopping on that answer stopped a Dashboard opened
+    during an update after one look (v0.6.24 review). Nothing is said to the window; a failure costs the sweep alone."""
+    from .setaside import candidates, sweep
+
+    def run():
+        for delay in SWEEP_AFTER:
+            wait(delay)
+            try:
+                sweep(control.paths)
+                if not candidates(control.paths.home):
+                    return
+            except Exception:                       # noqa: BLE001 - never the bridge's concern
+                return
+
+    worker = threading.Thread(target=run, name="set-aside sweep", daemon=True)
+    worker.start()
+    return worker
+
+
 def main(argv=None) -> int:
     _use_utf8()
     args = build_parser().parse_args(argv)
     control = Control(args.home or config.installed_home())
     if args.command == "serve":
+        sweep_soon(control)
         return serve(control, sys.stdin, sys.stdout)
     try:
         payload = _payload(_argument(getattr(args, "json", ""), sys.stdin))

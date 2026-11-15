@@ -789,6 +789,7 @@
   "msg.setup_done": "Automatické pokračování je nastavené a hlídač běží.",
   "msg.setup_incomplete": "Instalace nebyla dokončena: příprava stavu obnovení nebo zapnutí obnovení selhalo. Spusťte `doctor` a zjistěte proč.",
   "msg.setup_left_stopped": "Automatické pokračování je aktualizované. Hlídač před aktualizací neběžel, proto zůstal zastavený: až ho budete chtít, spusťte ho z okna Dashboard.",
+  "msg.setup_started_again": "Automatické pokračování je aktualizované. Hlídač před aktualizací nečekaně skončil (v tomto přihlášení, ne zastavením ani restartem), proto byl znovu spuštěn a běží.",
   "msg.setup_unconfirmed": "Automatické pokračování je nastavené, ale nepodařilo se potvrdit, že hlídač běží. Zkontrolujte to otevřením okna Dashboard nebo spuštěním `doctor`.",
   "msg.setup_unconfirmed_yet": "Automatické pokračování je nastavené. Zatím není potvrzeno, že hlídač běží; na konci se to zkontroluje znovu.",
   "msg.toast_after_sleep": "Tento počítač spal {time}",

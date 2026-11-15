@@ -210,8 +210,9 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.afterwork",
               # v0.6.15-beta: and the other Codex homes it holds, each with an engine of its own.
               "runtime.homes",
-              # v0.6.18: and what an update set aside and could not delete, swept as it starts.
-              "runtime.setaside",
+              # v0.6.18: and what an update set aside and could not delete, swept as it starts - and, v0.6.24, from
+              # the Dashboard's bridge, beside the package so the bridge loads no watcher with it.
+              "setaside",
               # v0.6.16-beta.3: and its own decisions asked on request, for Diagnostics' check (issue #27).
               "checkup",
               # v0.6.16: and its own rules asked again of every waiting recovery, for Rescan and reconcile (issue #39).
@@ -346,6 +347,8 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     ("ownreport.reading", "settings"): ("cost", "the settings that report is read with, only when a report is written"),
     # v0.6.16: Rescan and reconcile, which builds an engine for each Codex home, only when a person asks for it.
     ("controlcli", "rescan"): ("cost", "Rescan and reconcile and the engines it asks, only when it runs"),
+    # v0.6.24: what an update set aside, swept by the long-lived bridge on a thread of its own.
+    ("controlcli", "setaside"): ("cost", "the set-aside sweep, only in the long-lived bridge, on its own thread"),
     # v0.6.15-beta: the Codex version in force, read only while another Codex home is added (homes.unmeasured).
     ("control.watcher", "compatio"): ("cost", "the compatibility report's Codex version, read only while another "
                                               "Codex home is added"),
