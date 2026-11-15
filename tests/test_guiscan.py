@@ -170,7 +170,8 @@ class SliceTests(unittest.TestCase):
         # 101 with EditMenu, a text box's right-click menu with Windows' own words (gui/SoftEdit.cs).
         # 107 with the chrome (gui/SoftChrome.cs, no Windows title bar): ChromeLayout, Chrome, ChromeHost, DragThrough,
         # CaptionButton and SoftDialog.
-        self.assertEqual(len(set(declared)), 107, "the window's types")
+        # 109 with the window's own outer corner (gui/SoftWindowShape.cs): WindowShape and WindowCorner.
+        self.assertEqual(len(set(declared)), 109, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,

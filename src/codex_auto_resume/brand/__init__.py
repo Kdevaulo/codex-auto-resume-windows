@@ -86,6 +86,7 @@ from .scale import (CAPTION_STROKE,
                     TYPE,
                     TYPE_ROLES,
                     TYPE_SCALE,
+                    WINDOW_SQUIRCLE,
                     padding)  # noqa: F401
 from .design import (ACCENT_BAR,
                      DEFAULT_DESIGN,
