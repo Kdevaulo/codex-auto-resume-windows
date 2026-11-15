@@ -94,7 +94,7 @@ namespace CodexAutoResume
                     form.auditing = true;
                     form.TopLevel = false;
                     form.MinimumSize = Size.Empty;
-                    form.ClientSize = new Size(form.Px(OpeningWidth), form.Px(OpeningHeight));
+                    form.ClientSize = form.OpeningClient;
                     // On a screen as wide as anything needs, whatever this machine's is: the window holds its tabs on one
                     // row (HoldTabs), and the narrow screen is one the audit stands in on purpose (AuditNarrowestOn).
                     form.advancedScreen = int.MaxValue;

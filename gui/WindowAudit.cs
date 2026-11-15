@@ -124,7 +124,7 @@ namespace CodexAutoResume
                     // screen it would open on neither clamps its size nor ever shows it.
                     form.TopLevel = false;
                     form.MinimumSize = Size.Empty;
-                    form.ClientSize = new Size(form.Px(OpeningWidth), form.Px(OpeningHeight));
+                    form.ClientSize = form.OpeningClient;
                     form.BuildEditors(schema, current);
                     // Held by the window, so each page is filled from it as the page is built (PageFor).
                     if (snapshot != null) form.ApplySnapshot(snapshot);
@@ -440,7 +440,7 @@ namespace CodexAutoResume
                     form.auditing = true;
                     form.TopLevel = false;
                     form.MinimumSize = Size.Empty;
-                    var opening = new Size(form.Px(OpeningWidth), form.Px(OpeningHeight));
+                    var opening = form.OpeningClient;
                     form.ClientSize = opening;
                     Size planned = Size.Empty;
                     int needs = 0;

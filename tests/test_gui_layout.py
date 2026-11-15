@@ -1468,6 +1468,12 @@ HEIGHTS = (
 )
 
 
+# The tallest client area a 1920 by 1080 screen at 150 % lets the window have (KeepOnScreen): its work area, 1008 device px
+# above a 72 px taskbar, less the window's frame below its client area - 11 px at 144 DPI; v0.6.24, no title bar (952 with
+# Windows' title bar and top frame, 45 px more). See test_the_overview_scrolls_only_in_a_window_shorter_than_its_rows_own_tallest_cards.
+SHORTEST_AT_150 = 1008 - 11
+
+
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class LayoutAuditTests(unittest.TestCase):
     """Every page of the real window, in every language at five scalings, at its opening size.
@@ -1749,7 +1755,12 @@ class LayoutAuditTests(unittest.TestCase):
         window as tall as the rows' own tallest cards, taken from the cards, in every language at every scaling: the
         page does not scroll there, leaves no space under the rows, cuts off no card and nothing in one, and puts every
         button in its corner over no text - and a pixel shorter it scrolls. And that window fits a 1920 by 1080 screen at
-        150%, whose work area leaves the window 952 device pixels, where KeepOnScreen makes it that tall."""
+        150%, whose work area (1008 device pixels) leaves the window's client area 997, where KeepOnScreen makes it that
+        tall: the work area less the window's frame below it, 11 px at 144 DPI (SM_CYSIZEFRAME 5 + SM_CXPADDEDBORDER 6).
+        v0.6.24: 952 until then - less Windows' title bar and the top frame too, 45 more (SM_CYCAPTION 34 + 11), which no
+        window has now (gui/SoftChrome.cs). The window is shorter outside than it was: in English the shortest is 976 + 11
+        = 987 px where it was 949 + 56 = 1005 - its client 27 px taller for the caption buttons in the hero, 45 less
+        frame."""
         for locale in l10n.LOCALES:
             for scale in SCALES:
                 key = "%.2f" % scale
@@ -1761,7 +1772,7 @@ class LayoutAuditTests(unittest.TestCase):
                     lines = [line for line in report.splitlines() if "the shortest window" in line]
                     self.assertEqual(lines, [], "\n" + "\n".join(lines[:20]))
             with self.subTest(locale=locale, screen="1920 by 1080 at 150%"):
-                self.assertLessEqual(self.answer["shortest"][locale]["1.50"][0], 952)
+                self.assertLessEqual(self.answer["shortest"][locale]["1.50"][0], SHORTEST_AT_150)
 
     def test_the_overviews_rows_are_as_tall_as_their_cards_and_a_little_more(self):
         """SettingsForm.OverviewHeights, the heights the Overview's rows are given: alike, each as tall as the tallest

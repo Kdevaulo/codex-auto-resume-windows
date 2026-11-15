@@ -226,7 +226,7 @@ namespace CodexAutoResume
             Size opened = form.ClientSize;
             form.TopLevel = false;
             form.FormBorderStyle = FormBorderStyle.None;
-            form.ClientSize = RenderPinned ? opened : new Size(form.Px(OpeningWidth), form.Px(OpeningHeight));
+            form.ClientSize = RenderPinned ? opened : form.OpeningClient;
             form.CreateControl();
             IntPtr made = form.Handle;
             // v0.6.20: and as large as it is. Form.SetBoundsCore holds a form to the largest window the screen allows
