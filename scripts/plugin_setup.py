@@ -53,8 +53,8 @@ EXIT_UNCONFIRMED = 2
 # every other caller - an older install.ps1, the bootstrap's own calls - hears EXIT_OK, as it always has.
 EXIT_LEFT_STOPPED = 4
 # v0.6.24 (the owner, 2026-11-14): everything was done, and the watcher, which was not running before this update
-# because it had ended by itself - a shutdown, a sign-out, a crash, never a person's stop - was started again and seen
-# running. A success, said apart so the installer's last word can say why a stopped watcher runs now. Only for a
+# because it had ended unexpectedly in this sign-in - a crash, an end from outside, the memory guard's; never a person's
+# stop, a restart, a shutdown or a sign-out (ended_by_itself) - was started again and seen running. A success, said apart so the installer's last word can say why a stopped watcher runs now. Only for a
 # caller that asks for it (ENV_SAYS_STARTED_AGAIN); every other caller hears EXIT_OK.
 EXIT_STARTED_AGAIN = 5
 
@@ -252,30 +252,41 @@ def watcher_seen(home: Path):
 
 
 def ended_by_itself(home: Path) -> bool:
-    """Whether the watcher that is not running now ended without being asked to (v0.6.24, the owner 2026-11-14).
+    """Whether the watcher that is not running now ended in this sign-in of this start of Windows, unasked (v0.6.24).
 
-    The heartbeat it wrote says so (store watcher_status, `end_mark`): every tick writes RUNNING, and only a watcher
-    that stops on purpose writes over it - CLEAN when its stop event was signalled (Stop watcher on the Dashboard or in
-    the Codex panel, the tray's Stop, `codex-auto-resume stop`), MEMORY_GUARD when the memory guard stopped it for the
-    launcher to start again. A watcher ended from outside writes nothing, and RUNNING stays: measured on this product's
-    own PC (2026-11-12/13), a fast-startup shutdown logged the session off and ended the watcher with no stop line and
-    no crash; a sleep did not end it at all. So RUNNING or MEMORY_GUARD left by a watcher that is gone is an end by
-    itself, and CLEAN a stop. No heartbeat, or one that cannot be read, is neither: False, and the watcher is left as
-    the person had it. Read on a connection of its own, as the launcher reads it (watcher_launcher._ended_cleanly)."""
+    The heartbeat it wrote says how it ended (store watcher_status): every tick writes RUNNING, a watcher whose stop
+    event was signalled - Stop watcher on the Dashboard or in the Codex panel, the tray's Stop, `codex-auto-resume
+    stop` - writes CLEAN as it exits, and the memory guard writes MEMORY_GUARD. A watcher ended from outside writes
+    nothing: measured on this product's own PC (2026-11-12/13), a fast-startup shutdown logged the session off and
+    ended the watcher with no stop line. An end with a restart, a shutdown or a sign-out is expected, not a fault (the
+    owner, 2026-11-14: a restart is meant to end it), and keeps the v0.6.16 rule; only an end nobody caused while this sign-in
+    went on - a crash, an end from outside with no stop written, the memory guard's - is one by itself.
+
+    One rule with the Dashboard's: control/watcher.how_it_ended reads RUNNING left in this sign-in of this start of
+    Windows as UNEXPECTED, and anything from an earlier sign-in or start as nothing. The memory guard's end it reads
+    whenever it was; asked again as a heartbeat left RUNNING, it is one by itself only where it too was in this sign-in
+    and start. CLEAN, no heartbeat, or one that cannot be read: False, and the watcher is left as it was. Read on a
+    connection of its own, as the launcher reads it (watcher_launcher._ended_cleanly)."""
     try:
+        from codex_auto_resume.control.watcher import how_it_ended
         from codex_auto_resume.domain.vocabulary import WatcherEnd
         from codex_auto_resume.store import Store
+        from codex_auto_resume.win import ownprocess
         state_dir = config.Paths(home).state_dir
         if not (Path(state_dir) / "state.sqlite").is_file():
             return False
         store = Store(state_dir, check=False)
         try:
-            mark = (store.watcher_status() or {}).get("end_mark")
+            status = store.watcher_status()
         finally:
             store.close()
+        if not isinstance(status, dict) or status.get("end_mark") not in (WatcherEnd.RUNNING, WatcherEnd.MEMORY_GUARD):
+            return False
+        ended, _at = how_it_ended(dict(status, end_mark=WatcherEnd.RUNNING.value), False,
+                                  ownprocess.sign_in(), ownprocess.booted_at())
     except Exception:                               # noqa: BLE001 - a fact not known is no end by itself
         return False
-    return mark in (WatcherEnd.RUNNING, WatcherEnd.MEMORY_GUARD)
+    return ended == WatcherEnd.UNEXPECTED
 
 
 def looked_again(home: Path, started: str) -> str:

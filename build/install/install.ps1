@@ -2404,9 +2404,9 @@ try {
     # G1). Setup says it only when asked (CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED), so a caller that does not ask -
     # an older installer, the bootstrap - still hears 0.
     $SETUP_LEFT_STOPPED = 4
-    # 5 means everything was done and the watcher, which was not running before this update because it had ended by
-    # itself - a shutdown, a sign-out, a crash, not a stop - was started again and seen running (plugin_setup.py
-    # ended_by_itself, v0.6.24): a success, whose last word says why a watcher that was not running runs now. Said only
+    # 5 means everything was done and the watcher, which was not running before this update because it had ended
+    # unexpectedly in this sign-in - a crash, not a stop, a restart, a shutdown or a sign-out - was started again and
+    # seen running (plugin_setup.py ended_by_itself, v0.6.24): a success, whose last word says why a watcher that was not running runs now. Said only
     # when asked (CODEX_AUTO_RESUME_SETUP_SAYS_STARTED_AGAIN), as 4 is.
     $SETUP_STARTED_AGAIN = 5
     # This run looks at the watcher again after the health check (watcher-running, below) and says the last word, so a
@@ -2479,14 +2479,14 @@ try {
         $what = if ($repair) { 'repair' } else { 'update' }
         Write-Host ('The watcher was not running before this ' + $what + ', so it was left stopped; nothing is being watched yet.')
         # v0.6.24: which - a watcher that ended by itself is started again ($watcherStartedAgain, below).
-        Write-Host 'It had been stopped with Stop watcher, or never started; it had not ended by itself.'
+        Write-Host 'It had been stopped, or had ended with a restart, a shutdown or a sign-out, or had never started.'
         Write-Host 'Open Start Menu > Codex Auto Resume and use Start watcher, or use Start watcher on the Dashboard.'
     } elseif ($watcherStartedAgain) {
         Write-Host $keptLine
         $what = if ($repair) { 'repair' } else { 'update' }
         # Not InstallerFlow.LeftStoppedLine's start: the Finish page's left-stopped box is not this one's.
-        Write-Host ('The watcher had ended by itself before this ' + $what + ' (a shutdown, a sign-out or a crash; it ' +
-                    'was not stopped), so it was started again and is running.')
+        Write-Host ('The watcher had ended unexpectedly before this ' + $what + ' (in this sign-in, not by a stop or ' +
+                    'a restart), so it was started again and is running.')
         Write-Host 'Recommended settings are already on. Nothing else to do.'
     } else {
         if ($upgrade) { Write-Host $keptLine }

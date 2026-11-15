@@ -1255,7 +1255,7 @@
   "installer.welcome.heading": "Welcome",
   "installer.welcome.what": "When a Codex conversation stops at a usage limit or a dropped connection, Codex Auto Resume carries it on by itself once it can.",
   "msg.setup_left_stopped": "Auto resume is updated. The watcher was not running before the update, so it was left stopped: start it from the Dashboard when you want it.",
-  "msg.setup_started_again": "Auto resume is updated. The watcher had ended by itself before the update (a shutdown, a sign-out or a crash, not a stop), so it was started again and is running.",
+  "msg.setup_started_again": "Auto resume is updated. The watcher had ended unexpectedly before the update (in this sign-in, not by a stop or a restart), so it was started again and is running.",
   "installer.update.heading": "v{from} → v{to}",
   "installer.update.whats_new": "What's new",
   "installer.update.no_notes": "What is new in this version could not be read from the download.",

@@ -1,16 +1,20 @@
-"""An update starts again a watcher that ended by itself, and keeps one the person stopped stopped (v0.6.24).
+"""An update starts again a watcher that ended unexpectedly in this sign-in, and keeps every other stopped (v0.6.24).
 
 The v0.6.16 rule left every watcher that was not running before an update stopped (setup --watcher-was-stopped). The
-owner (2026-11-14) wants "stopped by the person" told apart from "ended by itself". The heartbeat already tells them
-apart (store watcher_status, `end_mark`): every tick writes RUNNING; a watcher whose stop event is signalled - Stop
-watcher on the Dashboard or in the Codex panel, the tray's Stop, `codex-auto-resume stop` - writes CLEAN as it exits,
-and the memory guard writes MEMORY_GUARD. A watcher ended from outside writes nothing: measured on this product's PC
-(2026-11-12/13), a fast-startup shutdown logged the session off and ended the watcher with no stop line and no crash.
+owner (2026-11-14) wants "stopped by the person" told apart from "ended by itself", and an end with a restart, a
+shutdown or a sign-out is expected, not a fault: it keeps the v0.6.16 rule. The heartbeat tells them apart (store
+watcher_status): every tick writes RUNNING, with the sign-in and the start of Windows it runs in; a watcher whose stop
+event is signalled - Stop watcher on the Dashboard or in the Codex panel, the tray's Stop, `codex-auto-resume stop` -
+writes CLEAN as it exits, and the memory guard writes MEMORY_GUARD. A watcher ended from outside writes nothing:
+measured on this product's PC (2026-11-12/13), a fast-startup shutdown logged the session off and ended the watcher
+with no stop line. control/watcher.how_it_ended reads RUNNING left in this sign-in and start as UNEXPECTED, and one
+from an earlier sign-in or start as nothing - one rule for the Dashboard and for setup.
 
 Held here:
 
-* EndedByItselfTests - plugin_setup.ended_by_itself over a real store in a scratch home: RUNNING and MEMORY_GUARD are
-  ends by itself; CLEAN, no heartbeat and no state are not.
+* EndedByItselfTests - plugin_setup.ended_by_itself over a real store in a scratch home, this sign-in and start of
+  Windows given: RUNNING and MEMORY_GUARD left in them are ends by itself; the same from an earlier start of Windows
+  or another sign-in (a restart, a shutdown, a sign-out), CLEAN, no heartbeat and no state are not.
 * SetupStartsAgainTests - setup --keep-state --watcher-was-stopped (test_plugin.BridgeTests' guards: no registry,
   no Start menu, no watcher): a watcher that ended by itself is started and said to be started again, with
   EXIT_STARTED_AGAIN for a caller that asks and EXIT_OK for every other; one that was stopped is left stopped.
@@ -34,18 +38,31 @@ from test_installer_window import POWERSHELL
 from codex_auto_resume import config, l10n
 from codex_auto_resume.domain.vocabulary import WatcherEnd
 from codex_auto_resume.store import Store
+from codex_auto_resume.win import ownprocess
 
 NOW = 1_794_600_000.0
+MONTH = 30 * 86400.0
+# This sign-in and this start of Windows, as ownprocess reads them, given to every test.
+SIGN_IN = "00000000000a1b2c"
+BOOTED = NOW - 7200.0
 
 
-def beat(home: Path, end=None) -> None:
-    """A heartbeat in `home`'s state, as a watcher's tick writes it, and how it ended where `end` says."""
+def this_session(case: unittest.TestCase) -> None:
+    for name, value in (("sign_in", SIGN_IN), ("booted_at", BOOTED)):
+        guard = patch.object(ownprocess, name, return_value=value)
+        guard.start()
+        case.addCleanup(guard.stop)
+
+
+def beat(home: Path, end=None, *, at=NOW, sign_in=SIGN_IN, booted_at=BOOTED) -> None:
+    """A heartbeat in `home`'s state, as a watcher's tick writes it - in this sign-in and start of Windows unless said
+    otherwise - and how it ended where `end` says."""
     store = Store(config.Paths(home).state_dir)
     try:
-        store.heartbeat(NOW, pid=1, session_id="s", started_at=NOW - 60, ok=True, engine_state="verified",
-                        code_version="0.6.23")
+        store.heartbeat(at, pid=1, session_id="s", started_at=at - 60, ok=True, engine_state="verified",
+                        code_version="0.6.23", sign_in=sign_in, booted_at=booted_at)
         if end is not None:
-            assert store.watcher_ended(NOW + 1, end)
+            assert store.watcher_ended(at + 1, end)
     finally:
         store.close()
 
@@ -56,6 +73,7 @@ class EndedByItselfTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name) / "home"
         self.bridge = test_plugin._load("plugin_setup_under_test", test_plugin.ROOT / "scripts" / "plugin_setup.py")
+        this_session(self)
 
     def test_no_state_is_no_end_by_itself(self):
         self.assertFalse(self.bridge.ended_by_itself(self.home))
@@ -64,13 +82,23 @@ class EndedByItselfTests(unittest.TestCase):
         Store(config.Paths(self.home).state_dir).close()
         self.assertFalse(self.bridge.ended_by_itself(self.home))
 
-    def test_a_heartbeat_left_saying_running_is_an_end_by_itself(self):
+    def test_a_heartbeat_left_saying_running_in_this_sign_in_is_an_end_by_itself(self):
         beat(self.home)
-        self.assertTrue(self.bridge.ended_by_itself(self.home), "a shutdown, a sign-out, a crash: no word written")
+        self.assertTrue(self.bridge.ended_by_itself(self.home), "a crash, an end from outside: no word written")
 
-    def test_the_memory_guards_end_is_an_end_by_itself(self):
+    def test_the_memory_guards_end_in_this_sign_in_is_an_end_by_itself(self):
         beat(self.home, WatcherEnd.MEMORY_GUARD)
         self.assertTrue(self.bridge.ended_by_itself(self.home))
+
+    def test_an_end_with_a_restart_a_shutdown_or_a_sign_out_is_not(self):
+        """The owner, 2026-11-14: a restart is meant to end it. Its heartbeat is from an earlier start of Windows (a
+        restart, a shutdown, fast startup's too) or another sign-in (a sign-out)."""
+        for end in (None, WatcherEnd.MEMORY_GUARD):
+            for case in (dict(at=NOW - MONTH, booted_at=NOW - MONTH - 3600), dict(booted_at=BOOTED - 86400),
+                         dict(sign_in="00000000000f0f0f"), dict(sign_in=None), dict(booted_at=None)):
+                with self.subTest(end=end, case=case):
+                    beat(self.home, end, **case)
+                    self.assertFalse(self.bridge.ended_by_itself(self.home))
 
     def test_a_stop_is_not(self):
         beat(self.home, WatcherEnd.CLEAN)
@@ -93,10 +121,11 @@ class SetupStartsAgainTests(unittest.TestCase):
 
     ARGV = ["setup", "--keep-state", "--watcher-was-stopped"]
 
-    def run_setup(self, end, asked):
+    def run_setup(self, end, asked, **heartbeat):
+        this_session(self)
         self.pretend_installed()
         if end != "none":
-            beat(self.home, end)
+            beat(self.home, end, **heartbeat)
         names = (self.bridge.ENV_SAYS_STARTED_AGAIN, self.bridge.ENV_SAYS_LEFT_STOPPED)
         with patch.dict(os.environ, {name: "1" for name in names} if asked else {}):
             if not asked:
@@ -119,6 +148,14 @@ class SetupStartsAgainTests(unittest.TestCase):
         self.assertTrue(started)
         self.assertEqual(code, self.bridge.EXIT_OK, "an older install.ps1 and the bootstrap read 0 and 2 only")
 
+    def test_a_watcher_that_ended_with_an_earlier_start_of_windows_stays_stopped(self):
+        """The review's case: last month's heartbeat, from an earlier boot, the sign-in start off."""
+        code, started, text = self.run_setup(None, asked=True, at=NOW - MONTH, booted_at=NOW - MONTH - 3600)
+        self.assertFalse(started)
+        self.assertEqual(code, self.bridge.EXIT_LEFT_STOPPED)
+        self.assertIn(l10n.message("setup_left_stopped"), text)
+        self.assertNotIn(l10n.message("setup_started_again"), text)
+
     def test_a_watcher_the_person_stopped_stays_stopped(self):
         for end in (WatcherEnd.CLEAN, "none"):
             with self.subTest(end=end):
@@ -133,6 +170,7 @@ class SetupStartsAgainTests(unittest.TestCase):
         self.assertEqual(len(set(codes)), len(codes))
 
     def test_a_watcher_started_again_but_not_seen_is_not_confirmed(self):
+        this_session(self)
         self.pretend_installed()
         beat(self.home)
         with patch.dict(os.environ, {self.bridge.ENV_SAYS_STARTED_AGAIN: "1"}), \
@@ -183,21 +221,22 @@ class InstallerWordTests(unittest.TestCase):
     def test_a_watcher_started_again_is_the_last_word(self):
         said = self.last_word(True)
         self.assertIn("Updated. Your settings and pending recoveries were kept.", said)
-        self.assertIn("The watcher had ended by itself before this update (a shutdown, a sign-out or a crash; it was "
-                      "not stopped), so it was started again and is running.", said)
+        self.assertIn("The watcher had ended unexpectedly before this update (in this sign-in, not by a stop or a "
+                      "restart), so it was started again and is running.", said)
         self.assertNotIn(left_stopped_line(), said, "not the Finish page's left-stopped box")
         self.assertIn("this repair", self.last_word(True, repair=True))
 
-    def test_a_watcher_left_stopped_says_it_had_not_ended_by_itself(self):
+    def test_a_watcher_left_stopped_says_why(self):
         said = self.last_word(False, left=True)
         self.assertIn("The watcher was not running before this update, so it was left stopped", said)
-        self.assertIn("It had been stopped with Stop watcher, or never started; it had not ended by itself.", said)
+        self.assertIn("It had been stopped, or had ended with a restart, a shutdown or a sign-out, or had never "
+                      "started.", said)
         self.assertNotIn("started again", said)
 
     def test_a_watcher_that_ran_before_ends_as_before(self):
         said = self.last_word(False)
         self.assertIn("Recommended settings are already on. Nothing else to do.", said)
-        self.assertNotIn("ended by itself", said)
+        self.assertNotIn("ended unexpectedly", said)
 
 
 if __name__ == "__main__":

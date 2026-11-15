@@ -789,7 +789,7 @@
   "msg.setup_done": "Otomatik sürdürme kuruldu ve izleyici çalışıyor.",
   "msg.setup_incomplete": "Kurulum tamamlanmadı: kurtarma durumunu hazırlama veya kurtarmayı açma başarısız oldu. Nedenini görmek için `doctor` komutunu çalıştırın.",
   "msg.setup_left_stopped": "Otomatik sürdürme güncellendi. İzleyici güncellemeden önce çalışmıyordu, bu yüzden durdurulmuş olarak bırakıldı: istediğinizde Gösterge Paneli'nden başlatın.",
-  "msg.setup_started_again": "Otomatik sürdürme güncellendi. İzleyici güncellemeden önce kendiliğinden sona ermişti (kapatma, oturum kapatma ya da çökme; durdurma değil), bu yüzden yeniden başlatıldı ve çalışıyor.",
+  "msg.setup_started_again": "Otomatik sürdürme güncellendi. İzleyici güncellemeden önce beklenmedik şekilde sona ermişti (bu oturumda; durdurma ya da yeniden başlatma ile değil), bu yüzden yeniden başlatıldı ve çalışıyor.",
   "msg.setup_unconfirmed": "Otomatik sürdürme kuruldu, ancak izleyicinin çalıştığı doğrulanamadı. Kontrol etmek için Gösterge Paneli'ni açın veya `doctor` komutunu çalıştırın.",
   "msg.setup_unconfirmed_yet": "Otomatik sürdürme kuruldu. İzleyicinin çalıştığı henüz doğrulanmadı; sonunda bir kez daha kontrol edilecek.",
   "msg.toast_after_sleep": "Bu bilgisayar {time} uyku modunda kaldı",
