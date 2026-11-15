@@ -43,6 +43,7 @@ from collections import namedtuple
 import math
 
 from . import brand, l10n
+from .brand import shape
 from .ui import popup
 
 WIDTH = popup.WIDTH                       # the popup's width, so the two are one product
@@ -548,18 +549,31 @@ def shadow_margin(shadows, scale) -> int:
 
 
 # ---------------------------------------------------------------------- the card's edge
-_CORNERS = {}                                  # radius -> corner_coverage(radius), a few at most
+_CORNERS = {}                                  # (radius, smoothing) -> corner_coverage, a few at most
 
 
-def corner_coverage(radius) -> tuple:
+def corner_coverage(radius, smoothing=None) -> tuple:
     """How much of each pixel of a card's top-left corner square the card covers, 0-255.
 
-    The rounded rectangle's own antialiasing, done once per radius: rows of `radius` bytes.
-    The other three corners are this square turned round. Kept for the next call, since the
-    status light's band is cut by it with every breath.
+    The rounded rectangle's own antialiasing, done once per radius: rows of bytes, as many as the
+    corner is long. The other three corners are this square turned round. Kept for the next call,
+    since the status light's band is cut by it with every breath. v0.6.24: the corner is the
+    squircle (brand/shape.py) at `smoothing`, Soft's unless said, and a pixel is what share of its
+    4 x 4 sub-samples is inside it; with no smoothing it is the circle as before, byte for byte.
     """
-    if radius in _CORNERS:
-        return _CORNERS[radius]
+    smoothing = shape.design_smoothing() if smoothing is None else smoothing
+    key = (radius, smoothing)
+    if key in _CORNERS:
+        return _CORNERS[key]
+    made = shape.profile(radius, smoothing, 1e9)
+    rows = _squircle_corner(made) if shape.smoothed(made.corner) else _round_corner(radius)
+    if len(_CORNERS) >= 8:                     # a card per scale; nothing grows without end
+        _CORNERS.clear()
+    _CORNERS[key] = rows
+    return rows
+
+
+def _round_corner(radius) -> tuple:
     size = int(math.ceil(radius))
     rows = []
     for j in range(size):
@@ -570,13 +584,55 @@ def corner_coverage(radius) -> tuple:
                 distance = -1.0
             row[i] = int(round(min(1.0, max(0.0, 0.5 - distance)) * 255))
         rows.append(bytes(row))
-    if len(_CORNERS) >= 8:                     # a card per scale; nothing grows without end
-        _CORNERS.clear()
-    _CORNERS[radius] = tuple(rows)
-    return _CORNERS[radius]
+    return tuple(rows)
 
 
-def premultiply(pixels, width, height, radius, top=0) -> bytearray:
+def _squircle_corner(made) -> tuple:
+    """The squircle's corner square, a column at a time. Below the diagonal a pixel's sixteen
+    sub-samples all lie on the half where the outline is v = f(u), so each of its four sub-columns
+    covers as many of its four sub-rows as lie at or past f there - arithmetic, not sixteen asks - and
+    only the rows the outline crosses are worked out: under them the corner is empty, past them full.
+    Above the diagonal is its mirror; on it, the pixels round the corner's middle are asked."""
+    size = int(math.ceil(made.p))
+    middle = made.middle
+    half = []                                  # half[i][j], j < i: the pixel u-column i, v-row j
+    edge_at, ceil = shape.edge_at, math.ceil
+    for i in range(size):
+        column = bytearray(size)
+        if i + 1 <= middle:                    # every sub-sample before the middle, with v <= u: outside
+            half.append(column)
+            continue
+        edges = [edge_at(made, i + (s + 0.5) / 4.0) if i + (s + 0.5) / 4.0 >= middle else float(size)
+                 for s in range(4)]
+        first = max(0, min(i, int(math.floor(min(edges) - 0.875))))
+        full = max(first, min(i, int(ceil(max(edges) - 0.125))))
+        for j in range(first, full):
+            count = 16
+            for edge in edges:
+                skipped = int(ceil(4.0 * (edge - j) - 0.5))
+                count -= 4 if skipped > 4 else (skipped if skipped > 0 else 0)
+            column[j] = (count * 255 + 8) // 16
+        column[full:i] = b"\xff" * (i - full)
+        half.append(column)
+    across = list(zip(*half))                  # across[r][c] = half[c][r]
+    rows = []
+    for r in range(size):
+        row = bytearray(size)
+        row[:r] = half[r][:r]
+        row[r + 1:] = bytes(across[r][r + 1:])
+        if r + 1 <= middle:
+            row[r] = 0
+        elif r >= middle + 1:
+            row[r] = 255
+        else:
+            count = sum(1 for sy in range(4) for sx in range(4)
+                        if shape.inside_corner(made, r + (sx + 0.5) / 4.0, r + (sy + 0.5) / 4.0))
+            row[r] = (count * 255 + 8) // 16
+        rows.append(bytes(row))
+    return tuple(rows)
+
+
+def premultiply(pixels, width, height, radius, top=0, smoothing=None) -> bytearray:
     """A card's opaque BGRX pixels as premultiplied BGRA with its rounded corners cut out.
 
     Every pixel is opaque but those in the four corner squares, which take the rounded
@@ -587,7 +643,7 @@ def premultiply(pixels, width, height, radius, top=0) -> bytearray:
     data = bytearray(pixels)
     band = len(data) // (4 * width) if width else 0
     data[3::4] = b"\xff" * (width * band)
-    rows = corner_coverage(radius)
+    rows = corner_coverage(radius, smoothing)
     size = len(rows)
     for j in range(min(size, height)):
         for i in range(min(size, width)):

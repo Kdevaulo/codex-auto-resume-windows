@@ -191,11 +191,14 @@ namespace CodexAutoResume
             if (!Shadow(recipe, index, out dx, out dy, out blur, out alpha, out inset, out tone)) return;
             int reach = Spread(blur * scale / 2);
             radius = (float)Math.Max(0, Math.Min(radius, Math.Min(body.Width, body.Height) / 2.0));
+            // v0.6.24: a squircle's corner runs P along each side (Shape), so the bitmap's corners are that long.
+            double smoothing = Shape.Smoothing;
+            double corner = Shape.Of(radius, smoothing, Math.Min(body.Width, body.Height) / 2.0).P;
             int core, pad, left = body.X, top = body.Y;
             double fx = 0, fy = 0;
             if (inset)
             {
-                core = (int)Math.Ceiling(radius) + reach + (int)Math.Ceiling(Math.Max(Math.Abs(dx), Math.Abs(dy)) * scale) + 1;
+                core = (int)Math.Ceiling(corner) + reach + (int)Math.Ceiling(Math.Max(Math.Abs(dx), Math.Abs(dy)) * scale) + 1;
                 pad = 0;
             }
             else
@@ -205,7 +208,7 @@ namespace CodexAutoResume
                 int ix, iy;
                 Whole(dx * scale, out ix, out fx);
                 Whole(dy * scale, out iy, out fy);
-                core = (int)Math.Ceiling(radius) + reach;
+                core = (int)Math.Ceiling(corner) + reach;
                 pad = reach + 1;
                 left = body.X + ix - pad;
                 top = body.Y + iy - pad;
@@ -213,7 +216,7 @@ namespace CodexAutoResume
             int canonical = 2 * core + 1;
             int width = body.Width >= canonical ? canonical : body.Width;
             int height = body.Height >= canonical ? canonical : body.Height;
-            Template template = Get(recipe, index, scale, width, height, radius, fx, fy,
+            Template template = Get(recipe, index, scale, width, height, radius, smoothing, fx, fy,
                                     width == canonical ? pad + core : -1, height == canonical ? pad + core : -1);
 
             GraphicsState state = g.Save();
@@ -259,7 +262,7 @@ namespace CodexAutoResume
         }
 
         private static Template Get(string recipe, int index, double scale, int width, int height, double radius,
-                                    double fx, double fy, int middleX, int middleY)
+                                    double smoothing, double fx, double fy, int middleX, int middleY)
         {
             // The theme, the recipe and the shadow, then the shape: a theme's bitmaps are never another's.
             long key = (Tokens.Dark ? 1 : 0) * 16 + Math.Max(0, RecipeId(recipe)) * 4 + Math.Min(3, index);
@@ -269,6 +272,10 @@ namespace CodexAutoResume
             key = key * 16 + (int)Math.Round(fx * 8);
             key = key * 16 + (int)Math.Round(fy * 8);
             key = key * 16384 + Math.Min(16383, (int)Math.Round(radius * 8));
+            // v0.6.24: whether the corners are smoothed, so a design without it never shares a bitmap. One bit is
+            // the whole of it: the window's smoothing is its design's, 0 or Brand.CornerSmoothing, and a change of
+            // design drops every bitmap anyway (Palette.Adopt, Forget).
+            key = key * 2 + (smoothing > 0 ? 1 : 0);
             Template template;
             if (cache.TryGetValue(key, out template))
             {
@@ -283,8 +290,8 @@ namespace CodexAutoResume
             bool inset;
             Color tone;
             Shadow(recipe, index, out dx, out dy, out blur, out alpha, out inset, out tone);
-            template = inset ? Inner(dx, dy, blur, alpha, tone, scale, width, height, radius)
-                             : Outer(blur, alpha, tone, scale, width, height, radius, fx, fy);
+            template = inset ? Inner(dx, dy, blur, alpha, tone, scale, width, height, radius, smoothing)
+                             : Outer(blur, alpha, tone, scale, width, height, radius, smoothing, fx, fy);
             template.MiddleX = middleX;
             template.MiddleY = middleY;
             template.Used = ++stamped;
@@ -293,31 +300,72 @@ namespace CodexAutoResume
         }
 
         private static Template Outer(double blur, double alpha, Color tone, double scale, int width, int height,
-                                      double radius, double fx, double fy)
+                                      double radius, double smoothing, double fx, double fy)
         {
             double sigma = blur * scale / 2;
             int pad = Spread(sigma) + 1;
             int across = width + 2 * pad, down = height + 2 * pad;
             var shape = new double[across * down];
-            Cover(shape, across, down, pad + fx, pad + fy, width, height, radius);
-            return Make(Blur(shape, across, down, sigma), across, down, alpha, tone);
+            Cover(shape, across, down, pad + fx, pad + fy, width, height, radius, smoothing);
+            // v0.6.24: a squircle's corners are longer than a circle's, and so is the bitmap blurred. Moved by whole
+            // pixels its coverage is symmetric both ways, so a quarter is blurred and the rest is its mirror.
+            bool mirrored = fx == 0 && fy == 0 && Shape.Of(radius, smoothing, Math.Min(width, height) / 2.0).Smoothed;
+            return Make(mirrored ? BlurQuarter(shape, across, down, sigma) : Blur(shape, across, down, sigma),
+                        across, down, alpha, tone);
+        }
+
+        /// Blur for a grid symmetric about both its middles: the top-left quarter blurred, the rest its mirror.
+        private static double[] BlurQuarter(double[] source, int across, int down, double sigma)
+        {
+            int spread = Spread(sigma);
+            if (spread == 0) return source;
+            var kernel = new double[2 * spread + 1];
+            for (int i = 0; i < kernel.Length; i++)
+                kernel[i] = Phi((i - spread + 0.5) / sigma) - Phi((i - spread - 0.5) / sigma);
+            int halfAcross = (across + 1) / 2, halfDown = (down + 1) / 2;
+            var middle = new double[halfDown * halfAcross];
+            for (int y = 0; y < halfDown; y++)
+            {
+                int row = y * across;
+                for (int x = 0; x < halfAcross; x++)
+                {
+                    double sum = 0;
+                    int from = Math.Max(0, x - spread), to = Math.Min(across - 1, x + spread);
+                    for (int k = from; k <= to; k++) sum += source[row + k] * kernel[k - x + spread];
+                    middle[y * halfAcross + x] = sum;
+                }
+            }
+            var result = new double[source.Length];
+            for (int x = 0; x < halfAcross; x++)
+                for (int y = 0; y < halfDown; y++)
+                {
+                    double sum = 0;
+                    int from = Math.Max(0, y - spread), to = Math.Min(down - 1, y + spread);
+                    for (int k = from; k <= to; k++)
+                        sum += middle[(k < halfDown ? k : down - 1 - k) * halfAcross + x] * kernel[k - y + spread];
+                    result[y * across + x] = sum;
+                    result[y * across + across - 1 - x] = sum;
+                    result[(down - 1 - y) * across + x] = sum;
+                    result[(down - 1 - y) * across + across - 1 - x] = sum;
+                }
+            return result;
         }
 
         /// An inset shadow is cast by everything outside the box, moved by the offset, blurred,
         /// and seen only inside the box. With no blur - dark's one-pixel top light - it is that edge,
         /// moved, and nothing else.
         private static Template Inner(double dx, double dy, double blur, double alpha, Color tone, double scale,
-                                      int width, int height, double radius)
+                                      int width, int height, double radius, double smoothing)
         {
             double sigma = blur * scale / 2, ox = dx * scale, oy = dy * scale;
             int margin = Spread(sigma) + (int)Math.Ceiling(Math.Max(Math.Abs(ox), Math.Abs(oy))) + 1;
             int across = width + 2 * margin, down = height + 2 * margin;
             var outside = new double[across * down];
-            Cover(outside, across, down, margin + ox, margin + oy, width, height, radius);
+            Cover(outside, across, down, margin + ox, margin + oy, width, height, radius, smoothing);
             for (int i = 0; i < outside.Length; i++) outside[i] = 1 - outside[i];
             double[] blurred = Blur(outside, across, down, sigma);
             var inside = new double[width * height];
-            Cover(inside, width, height, 0, 0, width, height, radius);
+            Cover(inside, width, height, 0, 0, width, height, radius, smoothing);
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
                     inside[y * width + x] *= blurred[(y + margin) * across + x + margin];
@@ -353,11 +401,37 @@ namespace CodexAutoResume
         }
 
         /// How much of each pixel a rounded rectangle covers: sixteen samples where its edge
-        /// crosses the pixel, one elsewhere.
+        /// crosses the pixel, one elsewhere. v0.6.24: the squircle's (Shape.Inside) where the corners are smoothed;
+        /// the circle's below, as before, where they are not.
         private static void Cover(double[] grid, int across, int down, double left, double top,
-                                  double width, double height, double radius)
+                                  double width, double height, double radius, double smoothing)
         {
             radius = Math.Max(0, Math.Min(radius, Math.Min(width, height) / 2));
+            Shape.Profile shape = Shape.ProfileOf(radius, smoothing, Math.Min(width, height) / 2);
+            if (shape.Corner.Smoothed)
+            {
+                double mx = left + width / 2, my = top + height / 2, hw = width / 2, hh = height / 2;
+                for (int y = 0; y < down; y++)
+                    for (int x = 0; x < across; x++)
+                    {
+                        // The ray's distance leans a little off the true one, so a pixel is taken whole only a full
+                        // pixel from the outline.
+                        double distance = Shape.Distance(shape, x + 0.5 - mx, y + 0.5 - my, hw, hh);
+                        double value;
+                        if (distance <= -1) value = 1;
+                        else if (distance >= 1) value = 0;
+                        else
+                        {
+                            int hits = 0;
+                            for (int sy = 0; sy < 4; sy++)
+                                for (int sx = 0; sx < 4; sx++)
+                                    if (Shape.Inside(shape, x + (sx + 0.5) / 4 - mx, y + (sy + 0.5) / 4 - my, hw, hh)) hits++;
+                            value = hits / 16.0;
+                        }
+                        grid[y * across + x] = value;
+                    }
+                return;
+            }
             double cx = left + width / 2, cy = top + height / 2, hx = width / 2 - radius, hy = height / 2 - radius;
             for (int y = 0; y < down; y++)
                 for (int x = 0; x < across; x++)

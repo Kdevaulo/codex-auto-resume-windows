@@ -14,6 +14,7 @@ hold it to that, in four parts:
 from __future__ import annotations
 
 import ctypes
+import math
 import os
 from pathlib import Path
 import sys
@@ -26,6 +27,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from codex_auto_resume import brand, interface  # noqa: E402
+from codex_auto_resume.brand import shape  # noqa: E402
 from codex_auto_resume.ui import popup, tray  # noqa: E402
 from codex_auto_resume.ui.popup import access, menuwindow  # noqa: E402
 from codex_auto_resume.ui.tray import menu as tray_menu  # noqa: E402
@@ -528,7 +530,9 @@ class LookTests(unittest.TestCase):
                 plan, pixels = self.draw(locale=locale, selected=2)
                 width = plan["size"][0]
                 left, top, right, bottom = plan["card"]
-                radius = int(brand.RADII["card"]) + 1
+                # v0.6.24: the card's corner is Soft's squircle, which eases into its side 1.6 radii from the vertex
+                radius = int(math.ceil(shape.corner(brand.RADII["card"], shape.design_smoothing("soft"),
+                                                    (bottom - top) / 2.0).p)) + 1
                 holes = [(x, y) for y in range(top, bottom) for x in range(left + radius, right - radius)
                          if pixels[(y * width + x) * 4 + 3] != 255]
                 self.assertEqual(holes[:5], [])

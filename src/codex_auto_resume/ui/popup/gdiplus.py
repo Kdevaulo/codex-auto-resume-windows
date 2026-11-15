@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ctypes as C
 import threading
+from ...brand import shape
 from .win32 import (BITMAPINFO,
                     BITMAPINFOHEADER,
                     GdiplusStartupInput,
@@ -15,7 +16,8 @@ from .win32 import (BITMAPINFO,
                     UNIT_PIXEL,
                     _declare,
                     _dll,
-                    _pack)
+                    _pack,
+                    _signature)
 
 
 # GetGuiResources cannot see GDI+ objects, so this module counts its own: every image,
@@ -72,6 +74,19 @@ PIXEL_FORMAT_32BPP_RGB = 0x00022009
 PIXEL_FORMAT_32BPP_PARGB = 0x000E200B
 
 
+# v0.6.24: a corner is Figma's squircle (brand/shape.py) - one Bezier, the arc and another Bezier - so a path
+# takes GdipAddPathBezier beside GdipAddPathArc. Declared here, once, beside the one caller.
+_BEZIER_DECLARED = {"done": False}
+
+
+def _bezier_call(gp):
+    if not _BEZIER_DECLARED["done"]:
+        F = C.c_float
+        _signature(gp.GdipAddPathBezier, C.c_int, C.c_void_p, F, F, F, F, F, F, F, F)
+        _BEZIER_DECLARED["done"] = True
+    return gp.GdipAddPathBezier
+
+
 class _Painter:
     """Antialiased shapes straight into a canvas's pixels, through the GDI+ flat API.
 
@@ -81,9 +96,14 @@ class _Painter:
     counted in and out (`gdiplus_objects`).
     """
 
-    def __init__(self, canvas, pixel_format=PIXEL_FORMAT_32BPP_RGB):
+    def __init__(self, canvas, pixel_format=PIXEL_FORMAT_32BPP_RGB, smoothing=None):
         # v0.6.20: PARGB for a canvas whose alpha is kept - the icon's drawn menu, a layered window whose card and
         # shadow are drawn over nothing (menuwindow.py); everything else draws opaque, and its alpha is not read.
+        # v0.6.24: how much its rounded shapes smooth their corners (brand/shape.py) - the canvas's, which is
+        # Soft's unless its owner says otherwise (_Canvas.smoothing).
+        self.smoothing = getattr(canvas, "smoothing", None) if smoothing is None else smoothing
+        if self.smoothing is None:
+            self.smoothing = shape.design_smoothing()
         self.gp = _dll("gdiplus")
         self.bitmap = C.c_void_p()
         self.graphics = C.c_void_p()
@@ -141,6 +161,19 @@ class _Painter:
         radius = max(0.0, min(float(radius), (right - left) / 2.0, (bottom - top) / 2.0))
         if radius <= 0.0:
             self.gp.GdipAddPathRectangle(path, left, top, right - left, bottom - top)
+            return path
+        found = shape.corner(radius, self.smoothing, min(right - left, bottom - top) / 2.0)
+        if shape.smoothed(found):
+            # The squircle: per corner a Bezier, its arc and the Bezier back to the next side, which GDI+ joins
+            # with the straight sides between them. A corner the budget left round is the arcs below exactly.
+            bezier = _bezier_call(self.gp)
+            for segment in shape.outline((left, top, right, bottom), radius, self.smoothing):
+                if segment[0] == "bezier":
+                    bezier(path, *[float(value) for point in segment[1:] for value in point])
+                else:
+                    (cx, cy), r, start, sweep = segment[1:]
+                    self.gp.GdipAddPathArc(path, cx - r, cy - r, 2.0 * r, 2.0 * r, start, sweep)
+            self.gp.GdipClosePathFigure(path)
             return path
         d = radius * 2.0
         self.gp.GdipAddPathArc(path, left, top, d, d, 180.0, 90.0)
@@ -339,6 +372,9 @@ class _Canvas:
         self.bits = C.c_void_p()
         self.info = BITMAPINFO()
         self.width = self.height = 0
+        # v0.6.24: the corners its painters round (brand/shape.py's smoothing): None is Soft's. The owner of a
+        # canvas drawn in another design sets the design's (shape.design_smoothing) before it paints.
+        self.smoothing = None
 
     def ensure(self, width, height):
         if self.bitmap and (width, height) == (self.width, self.height):

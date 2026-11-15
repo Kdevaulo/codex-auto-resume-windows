@@ -66,6 +66,7 @@ gui/HostApp.cs
 [controls]
 gui/SoftTheme.cs
 gui/SoftDepth.cs
+gui/SoftShape.cs
 gui/SoftLayout.cs
 gui/SoftFields.cs
 gui/SoftCombo.cs

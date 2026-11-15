@@ -233,6 +233,8 @@ LAYER = {_q(name): layer for layer, names in {
               "brand.mark", "brand.motion", "brand.scale", "brand.tokens",
               # v0.6.10: the four designs, a tenth file.
               "brand.design",
+              # v0.6.24: the corner every rounded thing is drawn with (Figma's squircle).
+              "brand.shape",
               # v0.6.10-alpha: tray.py became tray/ - the same icon in eleven files, all of
               # them the front. `UI` below covers them by prefix.
               "ui.tray.animation", "ui.tray.cards", "ui.tray.clicks", "ui.tray.dashboard", "ui.tray.icon",
