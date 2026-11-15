@@ -22,9 +22,15 @@ always had them, and leaves the previous version's `.old-` file where an update 
   The window is a little shorter outside - Windows' title bar and top frame are gone - and every page keeps the height it had, because
   the window opens taller by exactly what the header grew for the buttons. Where a day's own picture lies under a button, the glyph is
   kept readable against it.
-- **Soft corners are squircles.** In the Soft design every rounded thing - cards, buttons, menus, the popup, the notification card
-  and the Dashboard window's own outer corner - is drawn with one smoothed corner (Figma's 60 % smoothing, capped where a side is
-  short; pills stay pills), and its shadows follow it. Classic and Plain keep their round arcs, as before.
+  A dialog with its title in a card of its own is a little taller than it was under Windows' title bar, so on a small
+  screen the largest text size the window uses is one step lower (a 1920 x 1080 screen at 100 %: 1.68 instead of 1.83).
+  A window restored from maximised or minimised comes back at exactly its size, and a maximised window leaves the edge
+  of an auto-hide taskbar free so the taskbar still slides out.
+- **Soft corners are squircles.** In the Soft design every rounded thing - cards, buttons, menus, the popup and the
+  notification card - is drawn with one smoothed corner (Figma's 60 % smoothing, capped where a side is short; pills stay
+  pills), and its shadows follow it. Classic and Plain keep their round arcs, as before. The Dashboard window's own outer
+  corner can be drawn the same way, but stays Windows' round corner in this pre-release until it has been checked on real
+  screens.
 - **The tray icon's popup is its card alone.** No grey ground lies round it any more, and a float shadow lies under it that only ever
   darkens. It opens a little faster than the plain window did, and a frame of its status light costs well under a millisecond. Where
   Windows refuses a window of this kind, the popup is the plain window it was, with its own drop shadow.
