@@ -205,7 +205,9 @@ ITEM = {_q(name): item for item, names in {
               # v0.6.20: the icon's right-click menu, drawn by the popup's renderer.
               "ui.popup.menuplan", "ui.popup.menuwindow", "ui.popup.hidden",
               # v0.6.24: the window that is the card, and its shadow below it.
-              "ui.popup.layers"),
+              "ui.popup.layers",
+              # v0.6.24: the status light, out of the renderer.
+              "ui.popup.light"),
     "notifications": ("notice_card", "notice_presence", "notice_window", "notifier", "notify",
                       # v0.6.23: the buttons' URIs and the handover to the card host, out of notify and notifier.
                       "notice_uris", "notice_inbox",

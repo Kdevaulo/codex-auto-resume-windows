@@ -51,7 +51,7 @@ PACKAGE = "codex_auto_resume.ui.popup"
 # reaches - asking Windows nothing, so the seventh of that half - and `menuwindow`, its window, after the popup's.
 # v0.6.24: `layers`, the window that is the card and its shadow below it, which the window is made of beside its messages.
 MODULES = ("words", "model", "placement", "motion", "elevation", "layout", "menuplan",
-           "win32", "fonts", "theme", "gdiplus", "renderer", "layers", "access", "hidden", "messages", "window",
+           "win32", "fonts", "theme", "gdiplus", "light", "renderer", "layers", "access", "hidden", "messages", "window",
            "menuwindow")
 ASKS_WINDOWS_NOTHING = MODULES[:7]
 
