@@ -169,17 +169,26 @@ class Renderer:
                         paint.stroke_round((rect[0] - grow, rect[1] - grow, rect[2] + grow, rect[3] + grow),
                                            self._corner(item, scale) + grow, self._argb("focus"), ring)
         if self.lone:
-            self._seal()
+            self._seal(plan)
         self._keep_halo_band(plan)
         return self.draw_halo(plan, frame, restore=False)
 
-    def _seal(self):
-        """The card alone (v0.6.24): every pixel's alpha put back to the ground's - GDI's text clears the alpha of what it
-        draws, and everything drawn over the ground lies on the opaque card, so the ground's alpha is the card's shape."""
-        canvas, ground = self.canvas, self._ground_pixels
+    def _seal(self, plan):
+        """The card alone (v0.6.24): the alpha of every line of words put back to the ground's - GDI's text clears the
+        alpha of what it draws; everything else drawn over the ground lies on the opaque card and keeps it whole. Line by
+        line rather than the whole canvas: a tenth of the pixels at most."""
+        canvas, ground = self.canvas, memoryview(self._ground_pixels)
+        width, height = canvas.width, canvas.height
         _dll("gdi32").GdiFlush()
-        memory = memoryview((C.c_ubyte * (canvas.width * canvas.height * 4)).from_address(canvas.bits.value)).cast("B")
-        memory[3::4] = memoryview(ground)[3::4]
+        memory = memoryview((C.c_ubyte * (width * height * 4)).from_address(canvas.bits.value)).cast("B")
+        for item in plan["items"]:
+            if item["kind"] != "text":
+                continue
+            left, top, right, bottom = (int(value) for value in item["rect"])
+            left, right = max(0, left), min(width, right)
+            for row in range(max(0, top), min(height, bottom)):
+                start, stop = (row * width + left) * 4 + 3, (row * width + right) * 4
+                memory[start:stop:4] = ground[start:stop:4]
 
     # How far on the seventh press's sweep is, or None: the window says, and it is drawn with the light.
     sweep_ms = None
