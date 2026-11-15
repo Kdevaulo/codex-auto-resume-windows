@@ -131,6 +131,10 @@ def _camel(key: str) -> str:
 
 
 def _literal(kind: str, value) -> str:
+    if kind == "bool":
+        if not isinstance(value, bool):
+            raise ValueError("%r is not a bool" % (value,))
+        return "true" if value else "false"
     if kind == "int":
         if int(value) != value:
             raise ValueError("%r is not an integer" % (value,))
@@ -205,6 +209,9 @@ def sections():
     scale.append(("CornerSmoothing", "double", float(shape.DESIGN_SMOOTHING[brand.DEFAULT_DESIGN])))
     # v0.6.24: the caption buttons' glyph stroke (brand.CAPTION_STROKE; the buttons' sizes are LAYOUT's caption_*).
     scale.append(("CaptionStroke", "double", float(brand.CAPTION_STROKE)))
+    # v0.6.24: whether the Dashboard cuts its own outer corner (brand.WINDOW_SQUIRCLE; gui/SoftWindowShape.cs) - off until
+    # the measurement M-CORNER passes.
+    scale.append(("WindowSquircle", "bool", bool(brand.WINDOW_SQUIRCLE)))
 
     layout = []
     for key, value in brand.LAYOUT.items():

@@ -39,6 +39,9 @@ namespace CodexAutoResume
         internal Size Client;
         /// A window that can be resized by its edges, and is: not maximised.
         internal bool Sizable, Maximized, Mirrored;
+        /// v0.6.24 W5: the window's whole rectangle is its client area (its own outer corner, gui/SoftWindowShape.cs), so
+        /// the left, right and bottom resize bands are answered here too, as the top one is.
+        internal bool Edges;
         /// The top resize band, in device px: the frame Windows had at the top, now inside the client area.
         internal int Band;
         /// The three buttons, Empty where the window has none.
@@ -54,7 +57,8 @@ namespace CodexAutoResume
     internal static class Chrome
     {
         internal const int HTTRANSPARENT = -1, HTNOWHERE = 0, HTCLIENT = 1, HTCAPTION = 2, HTMINBUTTON = 8, HTMAXBUTTON = 9,
-                           HTTOP = 12, HTTOPLEFT = 13, HTTOPRIGHT = 14, HTCLOSE = 20;
+                           HTLEFT = 10, HTRIGHT = 11, HTTOP = 12, HTTOPLEFT = 13, HTTOPRIGHT = 14, HTBOTTOM = 15,
+                           HTBOTTOMLEFT = 16, HTBOTTOMRIGHT = 17, HTCLOSE = 20;
         internal const int WM_NCCALCSIZE = 0x0083, WM_NCHITTEST = 0x0084, WM_NCMOUSEMOVE = 0x00A0, WM_NCLBUTTONDOWN = 0x00A1,
                            WM_NCLBUTTONUP = 0x00A2, WM_NCLBUTTONDBLCLK = 0x00A3, WM_NCMOUSELEAVE = 0x02A2, WM_SYSCOMMAND = 0x0112;
         internal const int SC_MINIMIZE = 0xF020, SC_MAXIMIZE = 0xF030, SC_RESTORE = 0xF120, SC_CLOSE = 0xF060;
@@ -78,6 +82,19 @@ namespace CodexAutoResume
         internal static int Hit(Point p, ChromeLayout l)
         {
             if (p.X < 0 || p.Y < 0 || p.X >= l.Client.Width || p.Y >= l.Client.Height) return HTNOWHERE;
+            if (l.Edges && l.Sizable && !l.Maximized)
+            {
+                // No frame round the window (its own outer corner): its bottom, left and right bands as its top one.
+                int corner = 2 * l.Band;
+                if (p.Y >= l.Client.Height - l.Band)
+                {
+                    if (p.X < corner) return HTBOTTOMLEFT;
+                    if (p.X >= l.Client.Width - corner) return HTBOTTOMRIGHT;
+                    return HTBOTTOM;
+                }
+                if (p.Y >= l.Band && p.X < l.Band) return p.Y >= l.Client.Height - corner ? HTBOTTOMLEFT : HTLEFT;
+                if (p.Y >= l.Band && p.X >= l.Client.Width - l.Band) return p.Y >= l.Client.Height - corner ? HTBOTTOMRIGHT : HTRIGHT;
+            }
             if (l.Sizable && !l.Maximized && p.Y < l.Band)
             {
                 int corner = 2 * l.Band;
@@ -247,6 +264,8 @@ namespace CodexAutoResume
         private CaptionButton tipFor;
         private SoftTipWindow tip;
         private readonly LayoutEventHandler dirtied;
+        // v0.6.24 W5: the window's own outer corner (gui/SoftWindowShape.cs), only where it asked for one and the switch is on.
+        private WindowCorner corner;
 
         private ChromeHost(Form form, Control card, Control holder)
         {
@@ -285,6 +304,39 @@ namespace CodexAutoResume
             host.Place();
             if (form.IsHandleCreated) host.Created();
             return host;
+        }
+
+        /// v0.6.24 W5: the window's own outer corner - the card's, smoothed as the cards are - in place of Windows' round
+        /// one, for the window that asks (the Dashboard): only with Brand.WindowSquircle on, on Windows 11, outside High
+        /// Contrast and a remote session (WindowShape.Wanted). Off, nothing is made and the window is as it was.
+        internal void OwnCorner()
+        {
+            if (corner != null || !form.TopLevel || !WindowShape.Wanted()) return;
+            corner = WindowCorner.Attach(form);
+            corner.Changed += delegate { dirty = true; };
+            if (form.IsHandleCreated) Created();
+        }
+
+        /// The window's outer corner now: its own, or Windows' - round on Windows 11, square before.
+        internal WindowShape.Corner OuterCorner
+        {
+            get
+            {
+                if (corner != null) return corner.Now;
+                return WindowShape.Windows11 ? WindowShape.Corner.Round : WindowShape.Corner.Square;
+            }
+        }
+
+        /// Whether the window has no frame at all (its own outer corner): its ClientSize is its size.
+        internal bool Frameless
+        {
+            get { return corner != null && corner.Shaped; }
+        }
+
+        /// The window's own corner, for the tests; null where it has none.
+        internal WindowCorner Corner
+        {
+            get { return corner; }
         }
 
         private IEnumerable<CaptionButton> Buttons()
@@ -493,6 +545,7 @@ namespace CodexAutoResume
             layout.Sizable = border == FormBorderStyle.Sizable || border == FormBorderStyle.SizableToolWindow;
             layout.Maximized = Zoomed;
             layout.Mirrored = Mirror.Of(form);
+            layout.Edges = Frameless;
             layout.Band = layout.Sizable ? TopBand() : 0;
             layout.Minimize = Showing(MinimizeButton) ? InForm(MinimizeButton) : Rectangle.Empty;
             layout.Maximize = Showing(MaximizeButton) ? InForm(MaximizeButton) : Rectangle.Empty;
@@ -551,6 +604,8 @@ namespace CodexAutoResume
         /// Handles `m` before the form does: true when it is answered here and the form must not see it again.
         internal bool Intercept(ref Message m, Pass pass)
         {
+            // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
+            if (corner != null && corner.Intercept(ref m)) return true;
             switch (m.Msg)
             {
                 case Chrome.WM_NCCALCSIZE:
@@ -713,6 +768,8 @@ namespace CodexAutoResume
 
         public void Dispose()
         {
+            if (corner != null) corner.Dispose();
+            corner = null;
             CloseTip();
             sceneBeat.Stop();
             sceneBeat.Dispose();

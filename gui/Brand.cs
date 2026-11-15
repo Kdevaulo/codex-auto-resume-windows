@@ -82,6 +82,7 @@ namespace CodexAutoResume
         internal const int AccentBar = 3;
         internal const double CornerSmoothing = 0.6;
         internal const double CaptionStroke = 1.3;
+        internal const bool WindowSquircle = false;
 
         internal const string HexAccent = "#1257B8";
         internal const string HexBrand = "#1257B8";
