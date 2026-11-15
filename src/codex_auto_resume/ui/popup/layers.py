@@ -27,8 +27,6 @@ everything in it. The owner, 2026-11-15, looking at it: the grey part outside th
 """
 from __future__ import annotations
 
-from collections import namedtuple
-from functools import lru_cache
 from ctypes import wintypes as W
 import ctypes as C
 import math
@@ -68,15 +66,28 @@ WM_POPUP_PAINT = WM_APP + 4              # the card's picture is owed (PopupCard
 # The notification card's rule (notice_card.float_shadows and shadow_margin), held equal to it by
 # tests/test_popup_card_window.py: the popup cannot call it there - the card's module imports the popup - and the two
 # cards are one product, so one rule draws both.
-FloatShadow = namedtuple("FloatShadow", "dx dy blur colour alpha")
+class FloatShadow(tuple):
+    """(dx, dy, blur, colour, alpha): one shadow under the card, equal to the notification card's of the same five."""
+
+    __slots__ = ()
+
+    def __new__(cls, dx, dy, blur, colour, alpha):
+        return tuple.__new__(cls, (dx, dy, blur, colour, alpha))
+
+    dx, dy, blur = property(lambda self: self[0]), property(lambda self: self[1]), property(lambda self: self[2])
+    colour, alpha = property(lambda self: self[3]), property(lambda self: self[4])
+
+
 FLOAT_SHADOW_INK, FLOAT_SHADOW_THEME, DARK_ENOUGH = "shadow_dark", "dark", 0.05
+_FLOATS = {}                             # (theme, design) -> float_shadows: asked on every frame, the same each time
 
 
-@lru_cache(maxsize=16)
 def float_shadows(theme, design="soft") -> tuple:
     """The card recipe's outer shadows as they may be drawn over a wallpaper: one in a light colour redrawn in
     FLOAT_SHADOW_INK at the alpha that darkens a white ground as much, a highlight (lighter than the canvas it was made
     for) dropped, inset shadows left to the card; none for a design without depth."""
+    if (theme, design) in _FLOATS:
+        return _FLOATS[(theme, design)]
     tokens = brand.palette(theme, design)
     ink = brand.palette(FLOAT_SHADOW_THEME)[FLOAT_SHADOW_INK]
     ground = brand.luminance(tokens["canvas"])
@@ -92,6 +103,8 @@ def float_shadows(theme, design="soft") -> tuple:
             continue
         darkening = shadow.alpha * (1.0 - brand.luminance(colour)) / (1.0 - brand.luminance(ink))
         found.append(FloatShadow(shadow.dx, shadow.dy, shadow.blur, ink, round(darkening, 4)))
+    if len(_FLOATS) < 32:                # two themes by three designs; nothing grows without end
+        _FLOATS[(theme, design)] = tuple(found)
     return tuple(found)
 
 

@@ -71,7 +71,8 @@ class CardWindowTests(unittest.TestCase):
 
     def rect(self, hwnd):
         box = wintypes.RECT()
-        self.user32.GetWindowRect(hwnd, ctypes.byref(box))
+        with tray_popup._PerMonitorDpi():                 # physical pixels, as the popup places its windows
+            self.user32.GetWindowRect(hwnd, ctypes.byref(box))
         return box.left, box.top, box.right, box.bottom
 
     def style(self, hwnd):
@@ -196,11 +197,14 @@ class CardWindowTests(unittest.TestCase):
     # ---------------------------------------------------------------- where things are
     def test_it_opens_its_card_the_window_s_gap_from_the_taskbar(self):
         window = self.make()
-        work, monitor = (0, 0, 1920, 1040), (0, 0, 1920, 1080)
-        icon = (1700, 1050, 1724, 1074)
+        # A monitor of its own far off every real one (placement reads only the rectangles it is given), its taskbar at
+        # the bottom: nothing is put on this machine's screen.
+        x0, y0 = OFFSCREEN
+        work, monitor = (x0, y0, x0 + 1920, y0 + 1040), (x0, y0, x0 + 1920, y0 + 1080)
+        icon = (x0 + 1200, y0 + 1050, x0 + 1224, y0 + 1074)
         with mock.patch.object(tray_popup.window.Popup, "_screen_now",
-                               lambda self: {"icon": icon, "cursor": (1710, 1060), "dpi": 144, "work": work,
-                                             "monitor": monitor}):
+                               lambda self: {"icon": icon, "cursor": (icon[0] + 10, icon[1] + 10), "dpi": 144,
+                                             "work": work, "monitor": monitor}):
             window.show(activate=False)
             try:
                 left, top, right, bottom = self.rect(window.hwnd)
@@ -223,8 +227,9 @@ class CardWindowTests(unittest.TestCase):
         index = next(number for number, item in enumerate(items, 1) if item["target"] == target)
         out = [ctypes.c_long() for _ in range(4)]
         child = access.VARIANT()
-        child.vt, child.lVal = 3, index
-        box._location(None, *[ctypes.pointer(value) for value in out], child)
+        child.vt, child.value.lVal = 3, index                       # VT_I4: the item's child id
+        variant = (ctypes.addressof(child),) if access._WIDE else (3, 0, index, 0)
+        self.assertEqual(box._location(None, *[ctypes.pointer(value) for value in out], *variant), 0)
         screen_left, screen_top = OFFSCREEN[0] + items[index - 1]["rect"][0] - card[0], \
             OFFSCREEN[1] + items[index - 1]["rect"][1] - card[1]
         self.assertEqual((out[0].value, out[1].value), (screen_left, screen_top))
