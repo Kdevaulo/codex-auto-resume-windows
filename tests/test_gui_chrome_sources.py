@@ -116,6 +116,23 @@ class DialogSourceTests(unittest.TestCase):
         self.assertNotIn("Padding = new Padding", build.replace("titleCard.Padding = new Padding", ""),
                          "no padding of the dialog's: its anchored controls would move with it")
 
+    def test_the_text_size_the_window_opens_at_counts_the_title_card(self):
+        """TextScale.Fitting offers a text size only where the tallest dialog fits the screen: that dialog's real height -
+        a conversation's message, its body card, its title card's strip and the frame below - counted, or a text size is
+        offered whose dialogs Windows then holds to the screen with the strip cutting them."""
+        from codex_auto_resume import brand
+        tools = guiscan.member_body("SettingsForm", "BuildConversationMessage")
+        asked = int(re.search(r"dialog\.ClientSize = new Size\(Px\(\d+\), Px\((\d+)\)\);", tools).group(1))
+        growth = int(re.search(r"new Size\(Px\(\d+\), Px\((\d+)\)\)", guiscan.member_body("SettingsForm", "DialogCardGrowth")).group(1))
+        build = guiscan.member_body("SoftDialog", "BuildTitle")
+        self.assertIn("int gap = Soft.Px(16);", build)
+        self.assertIn("Math.Max(line, Soft.Px(Brand.CaptionButtonH)) + 2 * Soft.Px(Brand.CaptionInsetTop)", build)
+        strip = 16 + brand.LAYOUT["caption_button_h"] + 2 * brand.LAYOUT["caption_inset_top"]
+        frame = 8  # SM_CYSIZEFRAME + SM_CXPADDEDBORDER at 96 DPI, below the client area; no title bar above it
+        bound = int(re.search(r"NarrowestHeight = (\d+);", guiscan.controls()).group(1))
+        self.assertGreaterEqual(bound, asked + growth + strip + frame)
+        self.assertIn("NarrowestHeight", guiscan.member_body("TextScale", "Fitting"))
+
     def test_every_dialog_that_fits_its_height_counts_its_title(self):
         for source, member, type_name in (("gui/SettingsOwn.cs", "BuildOwnValue", "SettingsForm"),
                                           ("advanced/gui/AdvancedEditor.cs", "FitEditor", None),

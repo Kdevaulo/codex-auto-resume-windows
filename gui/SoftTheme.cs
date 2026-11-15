@@ -190,8 +190,11 @@ namespace CodexAutoResume
         /// Windows' message font at 100%: 9 pt, in every language Windows ships.
         internal const float NormalPoints = 9f;
         /// What the screen has to hold, in logical pixels, frames included: the window at its narrowest (SettingsForm's
-        /// MinimumSize, 800 by 420) and its tallest dialog (a conversation's message, 520 high).
-        internal const int NarrowestWidth = 816, NarrowestHeight = 568;
+        /// MinimumSize, 800 by 420) and its tallest dialog (a conversation's message, 520 high). v0.6.24: that dialog with
+        /// everything it is - 520, its body card's 29 (DialogCardGrowth), its title card's strip, 62 (16 above the card,
+        /// a caption button's 26 and 10 above and below it: SoftDialog.BuildTitle) and the frame below it, 8 - and no
+        /// title bar of Windows' (it was 568 with one).
+        internal const int NarrowestWidth = 816, NarrowestHeight = 619;
 
         /// Windows' text size now, as a factor (Factor).
         internal static double Read()
