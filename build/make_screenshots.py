@@ -31,8 +31,9 @@ writes the canonical assets and copies them to `docs/images/`. The popup and the
 are drawn off-screen by their own renderers, moving, and need neither the window nor Edge; the
 icon's motion is drawn from the icon's own frames and needs nothing of Windows at all. The window's
 stills are drawn by the window itself, offscreen, at a pinned 150 % whatever the display is
-(v0.6.20, PINNED_DPI: nothing is shown on the screen), framed with Windows' title bar kept from one
-capture at that scale (build/window_frame.py); `--capture` photographs real windows instead, which
+(v0.6.20, PINNED_DPI: nothing is shown on the screen), the whole window - no window has Windows' title bar
+since v0.6.24, its caption is its own - with its corners cut as a capture's are (still_job); `--capture`
+photographs real windows instead, which
 needs a monitor at 150 % as the primary and the settings window built (build/make_gui.ps1). The panel
 is rendered still by headless Edge, and `--breathe` then draws the window's and the panel's lights
 moving over the still (see "pictures that breathe").
@@ -137,12 +138,9 @@ WINDOW_INPUTS = (
     "gui/app.manifest",                   # its DPI awareness, and so its size
     "assets/codex-auto-resume.ico",       # the mark in the title bar, which is captured
     "build/capture_window.ps1",           # how much of the window is captured (--capture)
-    # v0.6.20: how a still is drawn offscreen - the window's render job and the answers it is given - and the title
-    # bar it is framed with, kept from a capture at PINNED_DPI with what it is a picture of.
+    # v0.6.20: how a still is drawn offscreen - the window's render job and the answers it is given. v0.6.24: with no
+    # title bar kept from a capture any more (the window's caption is its own).
     "build/motion_window.py",
-    "build/window_frame.py",
-    "build/frame/window-caption.png",
-    "build/frame/frame.json",
     # Whether the icon and the DPI manifest are compiled into the binary at all, and
     # which sources go into it. The two entries above it are only inputs because this
     # file passes them to the compiler.
@@ -2882,12 +2880,12 @@ def render_window_offscreen(targets: dict, theme: str | None = None, design: str
     shown and on no screen, at the pinned scale and Windows' plain text size, answered from the bridge's own replies
     asked of the pinned scratch installation (build/motion_window.py answers - the same records, clock, registry and
     engine the envelope is asked of) in the language this job is in, with `theme` and `design` stored; each page at
-    rest, its light at the capture's moment. Each is framed as build/capture_window.ps1 frames a capture - Windows'
-    title bar above it, kept from a capture at PINNED_DPI (build/window_frame.py), and the corners cut round - and
+    rest, its light at the capture's moment. Each is framed as build/capture_window.ps1 frames a capture - the
+    corners cut round - and
     written where the capture wrote it. Nothing is shown on the screen, no pointer matters, and nothing of a real
-    installation is read. On a 200 % laptop every picture so drawn was the committed 150 % capture, byte for byte."""
+    installation is read. On a 200 % laptop every picture so drawn was the committed 150 % capture, byte for byte.
+    v0.6.24: no title bar above it - the window's caption is its own, in its client area (still_job)."""
     import motion_window
-    import window_frame
     theme, design = theme or THEME, design or brand.DEFAULT_DESIGN
     locale = os.environ.get(l10n.ENV_LANG) or "en"
     stored = {}
@@ -2903,7 +2901,7 @@ def render_window_offscreen(targets: dict, theme: str | None = None, design: str
             # The Settings page opens on the section with the most to show, as the capture opens it.
             frame["section"] = "continuation"
         frames.append(frame)
-    still = window_frame.still_job("window", PINNED_DPI, theme)
+    still = still_job(PINNED_DPI)
     answers = motion_window.answers(locale, stored or None)
     with tempfile.TemporaryDirectory() as name:
         work = Path(name)
@@ -3669,14 +3667,29 @@ def input_digest(path: Path) -> str:
 
 
 # v0.6.20: the scale every window still is drawn at, whatever display this machine has. The stills are drawn by the
-# window itself, offscreen (gui/WindowRender.cs, a job naming `scale`), framed with Windows' title bar taken once from
-# a capture at this scale (build/window_frame.py) - so a picture made on the laptop's panel at 200 % is the picture a
-# capture on a monitor at 150 % made, byte for byte (the owner, 2026-10-30: every picture the same, whatever monitor is
-# connected). 150 % is what every committed window picture has been since v0.6.11 (1500x1041).
+# window itself, offscreen (gui/WindowRender.cs, a job naming `scale`) - so a picture made on the laptop's panel at
+# 200 % is the picture a capture on a monitor at 150 % made, byte for byte (the owner, 2026-10-30: every picture the
+# same, whatever monitor is connected). 150 % is what every committed window picture has been since v0.6.11. v0.6.24:
+# a still is the window's client area alone, its caption its own - Windows' title bar, once taken from a capture at this
+# scale and kept beside this generator, is on no window any more and went.
 PINNED_DPI = 144
 PINNED_SCALE = PINNED_DPI / 96.0
-# The window's opening client height in logical px (gui/SettingsApp.cs OpeningHeight): under a still's title bar.
+# The window's opening client height in logical px (gui/SettingsApp.cs OpeningHeight): a still's whole height.
 OPENING_HEIGHT = 664
+# The corners Windows rounds a window with at 96 DPI, which build/capture_window.ps1 cuts a capture's round with (8 px at
+# the window's DPI): a still drawn offscreen is cut the same.
+STILL_CORNER = 8
+
+
+def still_radius(dpi: int) -> int:
+    """The corners' radius at `dpi`, as build/capture_window.ps1 rounds it."""
+    return int(round(STILL_CORNER * dpi / 96.0))
+
+
+def still_job(dpi: int) -> dict:
+    """The render job's `still` (gui/WindowRender.cs FramedStill): the corners' radius and the resolution a capture's
+    bitmap has at `dpi`. No title bar: the window's caption is its own (v0.6.24)."""
+    return {"radius": still_radius(dpi), "dpi": dpi}
 
 
 def stills_dpi_problem(recorded: dict) -> str | None:
@@ -4196,11 +4209,9 @@ def run_jobs(jobs: list, workers: int | None = None) -> tuple:
         import make_release
         make_release.fetch_runtime()
     # v0.6.20: what every window job is told beside itself - photographed or drawn offscreen - and, drawn, the one
-    # window compiled for all of them before any starts (`window_exe`), its title bar checked first.
+    # window compiled for all of them before any starts (`window_exe`).
     told = {"capture": WINDOW_CAPTURE}
     if windows and not WINDOW_CAPTURE:
-        import window_frame
-        window_frame.still_job("window", PINNED_DPI)
         told["exe"] = str(window_exe())
     started, gate, stopping = [], threading.Lock(), threading.Event()
     contained = kill_on_close_job()

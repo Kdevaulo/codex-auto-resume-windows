@@ -35,7 +35,8 @@ POWERSHELL = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "W
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 SOURCES = sorted(list((ROOT / "gui").glob("*.cs")) + list((ROOT / "advanced" / "gui").glob("*.cs")))
-MADE = re.compile(r"\b(?:var|Form)\s+(\w+)\s*=\s*new Form\(\)")
+# v0.6.24: a dialog is a SoftDialog (its caption its own, gui/SoftChrome.cs); a plain Form is held to the rule too.
+MADE = re.compile(r"\b(?:var|Form)\s+(\w+)\s*=\s*new (?:Form|SoftDialog)\(\)")
 # How far after `new Form()` a builder sets the window up: every builder here does it in its first dozen lines.
 REACH = 40
 
@@ -89,11 +90,13 @@ class DialogIconTests(unittest.TestCase):
         self.assertIn("Icon = Icon.ExtractAssociatedIcon(", (ROOT / "gui" / "InstallerWindow.cs").read_text(encoding="utf-8"))
 
     def test_a_picture_of_a_dialog_draws_no_icon_either(self):
+        """v0.6.24: nor any title bar - the dialog's title card is in the picture of its client area, drawn by itself."""
         render = guiscan.member_body("SettingsForm", "RenderDialog")
-        self.assertIn("form.ShowIcon ? form.Icon : null", render)
+        self.assertNotIn("form.Icon", render)
         paint = guiscan.member_body("SettingsForm", "PaintDialog")
-        self.assertIn("if (icon != null)", paint)
-        self.assertIn("titleLeft", paint)
+        for drawn in ("IconImage(", "titleLeft", "CaptionFont", "caption"):
+            self.assertNotIn(drawn, paint)
+        self.assertIn("g.DrawImageUnscaled(body, place.X + border, place.Y + border);", paint)
 
 
 class RunTests(unittest.TestCase):
