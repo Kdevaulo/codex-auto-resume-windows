@@ -883,6 +883,17 @@ namespace CodexAutoResume
             Panel strip = soft.TitleGround;
             SoftCard card = soft.TitleCard;
             int gap = Soft.Px(16);
+            // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller than what it laid
+            // out (SystemInformation.MaxWindowTrackSize): every dialog audit leaves such a one's geometry alone, as the
+            // window opens only at a text size whose dialogs its screen holds (TextScale.Fitting). Its title is still asked
+            // to be there, last and below nothing of its own.
+            Size most = SystemInformation.MaxWindowTrackSize;
+            if (dialog.Width >= most.Width || dialog.Height >= most.Height)
+            {
+                if (dialog.Controls.GetChildIndex(strip) != dialog.Controls.Count - 1)
+                    findings.Add(where + " :: the title's strip is not the last control the dialog holds");
+                return;
+            }
             if (strip.Top != 0 || strip.Left != 0 || strip.Width != dialog.ClientSize.Width)
                 findings.Add(where + " :: the title's strip is at " + strip.Bounds + " in a dialog " + dialog.ClientSize.Width + " wide");
             if (card.Left != gap || card.Top != gap || card.Width != strip.Width - 2 * gap || card.Bottom != strip.Height)

@@ -499,9 +499,10 @@ namespace CodexAutoResume
             // window the screen allows (SystemInformation.MaxWindowTrackSize), so Windows has made it smaller than
             // what it holds was laid out for - 1980 wide at 200% and the largest text size, on a screen 1024 wide.
             // The window opens only at a text size whose dialogs its screen holds (TextScale.Fitting).
+            // v0.6.24: asked once the dialog has its title card (Materialise makes it, SoftDialog), which makes it taller.
+            Materialise(dialog);
             Size most = SystemInformation.MaxWindowTrackSize;
             bool whole = dialog.Width < most.Width && dialog.Height < most.Height;
-            Materialise(dialog);
             dialog.PerformLayout();
             if (whole)
             {
