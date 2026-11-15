@@ -32,7 +32,8 @@ from codex_auto_resume.ui import tray  # noqa: E402
 from codex_auto_resume.ui.tray import icon as icon_module, words  # noqa: E402
 from codex_auto_resume.ui.tray.win32 import (CALLBACK, NIF_SHOWTIP, NIF_TIP, NIM_ADD, NIM_MODIFY,  # noqa: E402
                                              NIM_SETVERSION, NIN_KEYSELECT, NIN_SELECT, WM_CONTEXTMENU,
-                                             WM_DESTROY, WM_LBUTTONDBLCLK, WM_WTSSESSION_CHANGE, WTS_SESSION_LOCK,
+                                             WM_DESTROY, WM_LBUTTONDBLCLK, WM_TIMER, WM_WTSSESSION_CHANGE,
+                                             WTS_SESSION_LOCK,
                                              WTS_REMOTE_DISCONNECT)
 
 EN = interface.STRINGS["en"]
@@ -258,31 +259,74 @@ class FallbackTests(IconCase):
         self.assert_windows_tooltip_back()
         self.assertEqual(card.destroyed, 1)
 
-    def test_a_shell_that_never_says_the_pointer_rests_gives_windows_tooltip_back(self):
-        clock = [100.0]
-        fake = types.SimpleNamespace(monotonic=lambda: clock[0], time=time.time)
-        with mock.patch.object(icon_module, "time", fake):
-            for step in range(7):                      # the pointer moving over the icon for three seconds
-                clock[0] = 100.0 + 0.5 * step
-                self.event(WM_MOUSEMOVE)
-                if step < 6:
-                    self.assertIsNot(self.icon._tip, False, "not before %s s" % icon_module.TIP_PROBE_S)
-        self.assert_windows_tooltip_back()
 
-    def test_moves_apart_are_new_visits_and_a_shell_that_once_said_it_is_trusted(self):
-        clock = [100.0]
-        fake = types.SimpleNamespace(monotonic=lambda: clock[0], time=time.time)
-        with mock.patch.object(icon_module, "time", fake):
-            for at in (100.0, 100.8, 102.0, 102.9, 104.0, 104.5):      # never three seconds without a gap of one
-                clock[0] = at
-                self.event(WM_MOUSEMOVE)
-            self.assertIsNone(self.icon._tip)
-            self.icon._tip = Card()
-            self.event(NIN_POPUPOPEN, anchor(1710, 1050))
-            for step in range(20):
-                clock[0] = 200.0 + 0.5 * step
-                self.event(WM_MOUSEMOVE)
-        self.assertIsInstance(self.icon._tip, Card)
+class SilentShellTests(IconCase):
+    """A shell that never says the pointer rests on the icon (NIN_POPUPOPEN) with Windows' tooltip off: each visit is timed
+    from its first move (TIMER_TIP), so a pointer that comes to rest - and sends no more moves - is counted too; after
+    TIP_SILENT_VISITS silent visits Windows' own tooltip comes back. One visit never decides, a shell that has said the word
+    once is never timed again, and the word after a fallback turns the card back on at once."""
+
+    def setUp(self):
+        super().setUp()
+        self.clock = [100.0]
+        fake = types.SimpleNamespace(monotonic=lambda: self.clock[0], time=time.time)
+        patcher = mock.patch.object(icon_module, "time", fake)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.on_icon = True
+        self.icon._pointer_on_icon = lambda: self.on_icon
+
+    def visit(self, at, moves=(0.0, 0.1, 0.2), rest=10.0):
+        """The pointer comes onto the icon - a few moves - and rests there; the visit's timer fires TIP_PROBE_S after its
+        first move."""
+        for offset in moves:
+            self.clock[0] = at + offset
+            self.event(WM_MOUSEMOVE)
+        self.clock[0] = at + icon_module.TIP_PROBE_S
+        self.icon._wndproc(self.icon._hwnd, WM_TIMER, icon_module.TIMER_TIP, 0)
+        self.clock[0] = at + rest
+
+    def showtip(self):
+        return [bool(flags & NIF_SHOWTIP) for action, flags, _ in self.shell.notified if action == NIM_MODIFY]
+
+    def test_a_resting_pointer_brings_windows_tooltip_back_after_two_silent_visits(self):
+        """R1: moves only came while the pointer moved; resting, it sent none and was never counted."""
+        self.visit(100.0)
+        self.assertTrue(self.icon._tip_shows(), "one visit never decides")
+        self.assertEqual(self.showtip(), [])
+        self.visit(120.0)
+        self.assertFalse(self.icon._tip_shows())
+        self.assertEqual(self.showtip(), [True], "Windows' tooltip, never none")
+        self.assertIsNot(self.icon._tip, False, "the card is not given up: the shell may still say the word")
+        timers = [arguments for name, arguments in self.shell.calls if name == "SetTimer"]
+        self.assertEqual([(timer[1], timer[2]) for timer in timers], [(icon_module.TIMER_TIP, 2000)] * 2)
+
+    def test_a_pointer_that_only_passed_by_is_not_a_silent_visit(self):
+        self.on_icon = False
+        for at in (100.0, 120.0, 140.0):
+            self.visit(at, moves=(0.0, 0.1))
+        self.assertTrue(self.icon._tip_shows())
+
+    def test_a_slow_drift_before_the_word_switches_nothing_off_for_good(self):
+        """R2: a drift of moves for three seconds before the shell's first word used to give the card up for the icon's
+        whole life; now one visit cannot, and the word that follows shows the card."""
+        self.visit(100.0, moves=[0.25 * step for step in range(14)])
+        card = self.with_card()
+        self.event(NIN_POPUPOPEN, anchor(1710, 1050))
+        self.assertEqual(len(card.shown), 1)
+        for at in (120.0, 140.0, 160.0):
+            self.visit(at)
+        self.assertTrue(self.icon._tip_shows(), "a shell that has said the word is never timed again")
+
+    def test_the_word_after_a_fallback_turns_the_card_back_on_at_once(self):
+        self.visit(100.0)
+        self.visit(120.0)
+        self.assertFalse(self.icon._tip_shows())
+        card = self.with_card()
+        self.event(NIN_POPUPOPEN, anchor(1710, 1050))
+        self.assertTrue(self.icon._tip_shows())
+        self.assertEqual(self.showtip(), [True, False], "Windows' tooltip off again as the card comes back")
+        self.assertEqual(len(card.shown), 1)
 
 
 def _pump(seconds):

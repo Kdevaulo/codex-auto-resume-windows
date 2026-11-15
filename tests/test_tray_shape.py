@@ -76,6 +76,8 @@ METHODS = {
     # v0.6.24: the icon's own tooltip card (icon.py): whether it is shown, what it shows, showing and hiding it, the
     # pointer's moves while the shell has not yet said it rests on the icon, and Windows' tooltip back when it cannot be.
     "_tip_shows", "_tip_content", "_show_tip", "_hide_tip", "_tip_moved", "_tip_gone",
+    # and, for a shell that never says the pointer rests, each visit timed from its first move (review R1, R2).
+    "_tip_probe", "_pointer_on_icon",
 }
 
 
