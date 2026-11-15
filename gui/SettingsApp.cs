@@ -883,6 +883,10 @@ namespace CodexAutoResume
             BuildHeader();
             BuildColumns();
             BuildDashboard();
+            // v0.6.24: the tab strip's ground and the save bar's ground drag the window as the header's does (never a tab).
+            chrome.Drag(nav);
+            foreach (Control strip in nav.Controls) chrome.Drag(strip);
+            chrome.Drag(footer);
             if (catalog == null) opening = OpeningScreen(request);
             KeepOnScreen();
             if (catalog == null && !request.HasBounds)
@@ -1009,6 +1013,65 @@ namespace CodexAutoResume
                 if (fallback != null) fallback.SetValue(null, AtDisplayScale(Control.DefaultFont));
             }
             catch (Exception) { /* measured in Windows' own size: a few pixels off, never a failure */ }
+        }
+
+        // ------------------------------------------------------------------- the window's own caption (v0.6.24)
+        // No Windows title bar: the caption buttons stand in the hero (BuildHeader, gui/SoftChrome.cs), the window's frame
+        // has no caption and no top frame (ChromeHost.Intercept, called first by WndProc), and its ClientSize means what it
+        // says - a Form works its window out from its styles, which still count WS_CAPTION.
+        private ChromeHost chrome;
+
+        /// The window's caption, for the tests and the audit.
+        internal ChromeHost CaptionHost { get { return chrome; } }
+
+        private void PassOn(ref Message m)
+        {
+            base.WndProc(ref m);
+        }
+
+        private Padding OwnFrame()
+        {
+            CreateParams created = CreateParams;
+            return Chrome.Frame(created.Style, created.ExStyle);
+        }
+
+        protected override Size SizeFromClientSize(Size clientSize)
+        {
+            return Chrome.WindowSize(clientSize, OwnFrame());
+        }
+
+        protected override void SetClientSizeCore(int x, int y)
+        {
+            SuspendLayout();
+            try
+            {
+                base.SetClientSizeCore(x, y);
+                Size outer = SizeFromClientSize(new Size(x, y));
+                if (Size != outer) Size = outer;
+            }
+            finally { ResumeLayout(true); }
+        }
+
+        protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
+        {
+            base.SetBoundsCore(x, y, width, height, specified);
+            if (IsHandleCreated) return;
+            Size client = Chrome.ClientOf(Size, OwnFrame());
+            if (client != ClientSize) UpdateBounds(Left, Top, Width, Height, client.Width, client.Height);
+        }
+
+        /// The headline ends at least 8 px before the caption buttons (Brand.CaptionInsetEnd from the card's edge): with the
+        /// Start button shown its column keeps it clear, and hidden - its column then gone - the headline's own margin does.
+        /// The line under it, the light and the Start button stay where they are.
+        private void KeepHeadlineClear()
+        {
+            if (chrome == null) return;
+            int column = Soft.OwnVisible(startButton)
+                ? Math.Max(startButton.Width, startButton.PreferredSize.Width) + startButton.Margin.Horizontal : 0;
+            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - Math.Max(hero.Padding.Left, hero.Padding.Right);
+            int margin = Math.Max(0, reach - column);
+            var wanted = new Padding(0, 0, margin, 0);
+            if (headline.Margin != wanted) headline.Margin = wanted;
         }
 
         // ------------------------------------------------------------------- chrome
@@ -1276,6 +1339,18 @@ namespace CodexAutoResume
             hero.Controls.Add(startButton, 2, 0);
             hero.SetRowSpan(startButton, 2);
             header.Controls.Add(hero);
+            // v0.6.24: the window's caption buttons in the hero's top outer corner, over the card and its day's scene
+            // (gui/SoftChrome.cs) - the window's own children, as the header (a SoftPage) moves what it holds of its own to
+            // its right when mirrored; the ground, the card, its words and its light drag the window.
+            chrome = ChromeHost.Install(this, hero, this);
+            chrome.Drag(header);
+            chrome.Drag(headline);
+            chrome.Drag(detail);
+            chrome.Drag(stateDot);
+            startButton.VisibleChanged += delegate { KeepHeadlineClear(); };
+            startButton.SizeChanged += delegate { KeepHeadlineClear(); };
+            hero.Layout += delegate { KeepHeadlineClear(); };
+            KeepHeadlineClear();
             // Measured, not a formula of the font: two lines of the taller of the two, each row
             // half the card so the pair stays centred on the dot, and never less than the dot's
             // glow or the Start button need. Again whenever the window's font changes.
@@ -1305,6 +1380,8 @@ namespace CodexAutoResume
             dayJoined = true;
             header.Controls.Add(dayScene);
             dayScene.BringToFront();
+            // v0.6.24: the caption buttons stand over the scene, which is drawn under them (ChromeHost.Scene).
+            chrome.Scene = dayScene;
             EventHandler place = delegate { PlaceDayScene(); };
             hero.SizeChanged += place;
             headline.TextChanged += place;

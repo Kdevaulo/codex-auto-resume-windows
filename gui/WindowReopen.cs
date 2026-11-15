@@ -608,6 +608,8 @@ namespace CodexAutoResume
         /// is now on a monitor of another scale (WM_DPICHANGED) - moved there, or the monitor's scaling changed.
         protected override void WndProc(ref Message m)
         {
+            // v0.6.24: the window's own caption first (gui/SoftChrome.cs): its frame, what the pointer is over, its buttons.
+            if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
             if (m.Msg == WM_COPYDATA && TakeOpenRequest(ref m)) return;
             if (m.Msg == WM_DPICHANGED)
             {

@@ -234,8 +234,10 @@ namespace CodexAutoResume
             tipWait.Tick += delegate { tipWait.Stop(); ShowTip(); };
         }
 
-        /// The caption of `form`, its buttons standing in `card` - a child of `holder`, or `holder` itself - at the card's top
-        /// outer corner (Brand.CaptionInsetTop, CaptionInsetEnd), over everything else in it.
+        /// The caption of `form`, its buttons standing in `card` at the card's top outer corner (Brand.CaptionInsetTop,
+        /// CaptionInsetEnd), over everything in it. They are children of `holder` - the card itself, or a control the card is
+        /// in, which lays out nothing it holds of its own accord (a Panel, a Form: never a table, never a SoftPage, which
+        /// moves what it holds to its right when mirrored) - so they stand over what is laid on the card too (the day's scene).
         internal static ChromeHost Install(Form form, Control card, Control holder)
         {
             var host = new ChromeHost(form, card, holder);
@@ -288,7 +290,20 @@ namespace CodexAutoResume
         /// Where the card is, in the coordinates of what holds the buttons.
         private Rectangle CardFace
         {
-            get { return holder == card ? card.ClientRectangle : card.Bounds; }
+            get { return InHolder(card); }
+        }
+
+        /// Where `control` is in the coordinates of what holds the buttons: its client area when it is the holder.
+        internal Rectangle InHolder(Control control)
+        {
+            if (control == holder) return holder.ClientRectangle;
+            int x = 0, y = 0;
+            for (Control c = control; c != null && c != holder; c = c.Parent)
+            {
+                x += c.Left;
+                y += c.Top;
+            }
+            return new Rectangle(x, y, control.Width, control.Height);
         }
 
         /// The buttons as the form's properties say (Chrome.Pair) and where they go in the card.
@@ -313,12 +328,14 @@ namespace CodexAutoResume
             dirty = true;
         }
 
-        /// The buttons over the card and over anything laid on it (the day's scene), as the card's first controls.
+        /// The buttons over the card and over anything laid on it (the day's scene): just above what of the holder's the card
+        /// is in, so the rest of the holder's order - its docking - is as it was.
         internal void Raise()
         {
-            if (holder.IsDisposed) return;
-            int top = card.Parent == holder ? holder.Controls.GetChildIndex(card) : 0;
-            if (scene != null && scene.Parent == holder) top = Math.Min(top, holder.Controls.GetChildIndex(scene));
+            if (holder.IsDisposed || holder == card) return;
+            Control under = card;
+            while (under != null && under.Parent != holder) under = under.Parent;
+            int top = under == null ? 0 : holder.Controls.GetChildIndex(under);
             foreach (CaptionButton button in Buttons())
                 if (button.Parent == holder) holder.Controls.SetChildIndex(button, top);
         }
@@ -336,7 +353,6 @@ namespace CodexAutoResume
                 scene.LocationChanged += delegate { InvalidateOverScene(); };
                 scene.SizeChanged += delegate { InvalidateOverScene(); };
                 Drag(scene);
-                Raise();
                 SceneBeat();
             }
         }
@@ -359,8 +375,9 @@ namespace CodexAutoResume
         private void InvalidateOverScene()
         {
             if (scene == null) return;
+            Rectangle under = InHolder(scene);
             foreach (CaptionButton button in Buttons())
-                if (button.Visible && button.Bounds.IntersectsWith(scene.Bounds)) button.Invalidate();
+                if (button.Visible && button.Bounds.IntersectsWith(under)) button.Invalidate();
         }
 
         /// The card's own colour, which a button shows at rest.
@@ -880,13 +897,13 @@ namespace CodexAutoResume
             Graphics g = e.Graphics;
             g.FillRectangle(Soft.Fill(host.Face), ClientRectangle);
             SoftDayScene scene = host.Scene;
-            if (scene == null || scene.IsDisposed || !scene.Visible || scene.Look == null || scene.Parent != Parent ||
-                !scene.Bounds.IntersectsWith(Bounds))
-                return;
+            if (scene == null || scene.IsDisposed || !scene.Visible || scene.Look == null) return;
+            Rectangle at = host.InHolder(scene);
+            if (!at.IntersectsWith(Bounds)) return;
             // The day's scene where it lies under the button, drawn by the scene itself.
-            var under = Rectangle.Intersect(new Rectangle(Left - scene.Left, Top - scene.Top, Width, Height), scene.ClientRectangle);
+            var under = Rectangle.Intersect(new Rectangle(Left - at.Left, Top - at.Top, Width, Height), scene.ClientRectangle);
             GraphicsState state = g.Save();
-            g.TranslateTransform(scene.Left - Left, scene.Top - Top);
+            g.TranslateTransform(at.Left - Left, at.Top - Top);
             g.SetClip(under, CombineMode.Intersect);
             if (scene.Region != null) g.SetClip(scene.Region, CombineMode.Intersect);
             using (var args = new PaintEventArgs(g, under)) InvokePaint(scene, args);
@@ -1006,22 +1023,34 @@ namespace CodexAutoResume
 
     /// A dialog of the window's (v0.6.24): a Form whose caption is ours. Its ClientSize means what it says - a Form works
     /// its window out from its styles, which still count WS_CAPTION - and Soft.DialogBar gives it its title card and the
-    /// caption buttons in it (BuildTitle) as it is made, once its own code has laid it out: every dialog grows once by the
-    /// card and the gap above it, its own layout kept below them (Padding.Top).
+    /// caption buttons in it (BuildTitle) as it is made, once its own code has laid it out: a strip docked at its top, the
+    /// last control it holds and so the first docked (Windows' docking goes from the last-added control inward), the card
+    /// in it 16 px in from the dialog's edges, as its body card is. The dialog grows once by the strip; everything it laid
+    /// out stands below it as it stood, and its own controls keep their places in Controls.
     internal sealed class SoftDialog : Form
     {
         private ChromeHost chrome;
+        private Panel titleGround;
         private SoftCard titleCard;
         private Label titleWords;
         internal bool Titled;
 
-        /// The title card, its words and the caption it holds (null until the dialog is made): for the tests and the audit.
+        /// The title card, its words, the strip it stands in and the caption it holds (null until the dialog is made): for
+        /// the tests and the audit.
         internal SoftCard TitleCard { get { return titleCard; } }
         internal Label TitleWords { get { return titleWords; } }
+        internal Panel TitleGround { get { return titleGround; } }
         internal ChromeHost CaptionHost { get { return chrome; } }
 
-        /// How much the title card took of the dialog's height: the card and the ground's gap above it.
-        internal int TitleReserve;
+        /// How much of the dialog's height its title takes once it is made: 0 before.
+        internal int TitleReserve { get { return titleGround == null ? 0 : titleGround.Height; } }
+
+        /// The same of any dialog: what a dialog that fits its height to what it holds adds for its title.
+        internal static int TitleRoom(Form dialog)
+        {
+            var soft = dialog as SoftDialog;
+            return soft == null ? 0 : soft.TitleReserve;
+        }
 
         protected override void OnHandleCreated(EventArgs e)
         {
@@ -1032,6 +1061,9 @@ namespace CodexAutoResume
         private void BuildTitle()
         {
             int gap = Soft.Px(16);
+            titleGround = new Panel();
+            titleGround.BackColor = BackColor;
+            titleGround.Margin = new Padding(0);
             titleCard = new SoftCard();
             titleCard.ColumnCount = 1;
             titleCard.RowCount = 1;
@@ -1051,20 +1083,25 @@ namespace CodexAutoResume
             titleWords.Text = Text;
             TextChanged += delegate { if (titleWords != null) titleWords.Text = Text; };
             titleCard.Controls.Add(titleWords, 0, 0);
-            Controls.Add(titleCard);
-            chrome = ChromeHost.Install(this, titleCard, this);
-            chrome.Drag(titleWords);
             int line = Math.Max(titleWords.Font.Height,
                                 TextRenderer.MeasureText("Ag", titleWords.Font, new Size(int.MaxValue, 0), TextFormatFlags.NoPrefix).Height);
             int height = Math.Max(line, Soft.Px(Brand.CaptionButtonH)) + 2 * Soft.Px(Brand.CaptionInsetTop);
+            titleGround.Height = gap + height;
+            titleGround.Width = ClientSize.Width;
+            titleCard.SetBounds(gap, gap, Math.Max(1, ClientSize.Width - 2 * gap), height);
+            titleCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            titleGround.Controls.Add(titleCard);
+            chrome = ChromeHost.Install(this, titleCard, titleGround);
+            chrome.Drag(titleWords);
             // The words start where a card's do and stop short of the buttons; the card mirrors its own padding (Mirror.Display).
             int end = Soft.Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Soft.Px(8);
             titleCard.Padding = new Padding(Soft.Px(20), Soft.Px(Brand.CaptionInsetTop), end, Soft.Px(Brand.CaptionInsetTop));
-            titleCard.SetBounds(gap, gap, Math.Max(1, ClientSize.Width - 2 * gap), height);
-            titleCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            TitleReserve = gap + height;
-            Padding = new Padding(Padding.Left, Padding.Top + TitleReserve, Padding.Right, Padding.Bottom);
-            ClientSize = new Size(ClientSize.Width, ClientSize.Height + TitleReserve);
+            int grown = titleGround.Height;
+            SuspendLayout();
+            titleGround.Dock = DockStyle.Top;
+            Controls.Add(titleGround);
+            ClientSize = new Size(ClientSize.Width, ClientSize.Height + grown);
+            ResumeLayout(true);
             chrome.Place();
         }
 

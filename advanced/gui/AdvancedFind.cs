@@ -96,7 +96,7 @@ namespace CodexAutoResume
         private Form BuildFind()
         {
             ForgetFind();
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = Word("page.find.title", "Find a conversation");
             dialog.Font = Font;
             dialog.BackColor = Canvas;

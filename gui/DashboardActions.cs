@@ -52,7 +52,7 @@ namespace CodexAutoResume
             // The tests' answers to the window's questions, in place of the dialog (null for every window a person opens):
             // a test that drives a click through its handler must never show a dialog on anyone's desktop.
             if (DialogAnswers != null) return DialogAnswers(text, affirm);
-            using (var dialog = new Form())
+            using (var dialog = new SoftDialog())
             {
                 dialog.Text = "Codex Auto Resume";
                 dialog.Font = Font;
@@ -1355,7 +1355,7 @@ namespace CodexAutoResume
         private Form BuildTimeline(Dictionary<string, object> row, List<object> events, List<object> receipts)
         {
             {
-                var dialog = new Form();
+                var dialog = new SoftDialog();
                 dialog.Text = S("timeline.title", "Timeline") + " - " + Conversation(row);
                 dialog.Font = Font;
                 dialog.BackColor = Canvas;

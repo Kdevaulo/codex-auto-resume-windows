@@ -602,7 +602,7 @@ namespace CodexAutoResume
             exampleNames = new Dictionary<string, string>();
             foreach (string name in new[] { ExampleProject, ExampleService, ExampleApp, ExampleDocs })
                 exampleNames[ExampleThread(name)] = name;
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = Word("page.example.title", "{name}: an example", "name", AdvancedName(example.Id));
             dialog.Font = Font;
             dialog.BackColor = Canvas;
@@ -703,7 +703,8 @@ namespace CodexAutoResume
             int buttonsTall = exampleButtons.GetPreferredSize(new Size(width, 0)).Height;
             int frame = dialog.Height - dialog.ClientSize.Height;
             int most = Math.Min(area.Height, SystemInformation.MaxWindowTrackSize.Height) - frame - Px(48);
-            int want = Math.Max(Math.Min(Px(240), most), Math.Min(tall + buttonsTall, most));
+            // v0.6.24: and the dialog's title card above it, once it has one (SoftDialog.TitleRoom).
+            int want = Math.Max(Math.Min(Px(240), most), Math.Min(tall + buttonsTall + SoftDialog.TitleRoom(dialog), most));
             if (dialog.ClientSize.Height != want) dialog.ClientSize = new Size(width, want);
         }
 
@@ -908,7 +909,8 @@ namespace CodexAutoResume
             dialog.TopLevel = false;
             dialog.Visible = true;
             Materialise(dialog);
-            int full = exampleBody.GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height + exampleButtons.Height;
+            int full = exampleBody.GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height + exampleButtons.Height +
+                       SoftDialog.TitleRoom(dialog);
             if (full > dialog.ClientSize.Height) dialog.ClientSize = new Size(dialog.ClientSize.Width, full);
             dialog.PerformLayout();
             Application.DoEvents();
