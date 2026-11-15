@@ -64,12 +64,19 @@ def tooltip(snapshot: dict, strings: dict, now: float, edition: str | None = Non
     catalog's word, as every surface that shows the version does (v0.6.11). The standard edition, or none, and
     the title is the name alone (v0.6.14). Since v0.6.24 the join of `tooltip_parts`, word for word what it was."""
     parts = tooltip_parts(snapshot, strings, now, edition)
+    text = tooltip_joined(parts)
+    return text[:TIP_CHARS - 1] if parts["line"] else text
+
+
+def tooltip_joined(parts) -> str:
+    """The parts as one text, never cut short: the title (and the edition's word), the state line, the meter - each on a
+    line of its own, the pieces of a line joined as the tooltip has always joined them. What the drawn card tells a
+    screen reader (tipcard.py), and, cut to szTip's length, what Windows is given."""
     title = parts["title"] + (" · " + parts["edition"] if parts["edition"] else "")
     if not parts["line"]:
         return title
-    line = " · ".join(text for text, _ in parts["line"])
     meter = " · ".join(row["text"] for row in parts["meter"])
-    return (title + "\n" + line + ("\n" + meter if meter else ""))[:TIP_CHARS - 1]
+    return title + "\n" + " · ".join(text for text, _ in parts["line"]) + ("\n" + meter if meter else "")
 
 
 # The key a surface puts an edition plug's fields under - domain/plug.EXTRA, which

@@ -308,7 +308,7 @@ class Renderer:
                 parts.append((kind, item["rect"], item["primary"], self._lifted(item, pressed)))
             elif kind not in ("text", "focusable", "halo", "scene", "title_press"):
                 parts.append((kind, item["rect"], item.get("radius"), item.get("tone"), item.get("checked"),
-                              item.get("busy"), kind == "switch" and item["target"] in glides))
+                              item.get("busy"), kind == "switch" and item["target"] in glides, item.get("fraction")))
         key = (plan["size"], scale, self._theme(), self._design(), self._system_key(), bool(plan.get("rtl")),
                tuple(parts))
         if self._ground_key == key and self._ground_pixels is not None:
@@ -448,6 +448,8 @@ class Renderer:
                 paint.fill_round(rect, radius, _pack(brand.rgb(ground)))
         elif kind == "switch":
             self._switch(paint, item, scale)
+        elif kind == "meter":
+            self._meter(paint, item, scale)
         elif kind == "button" and self._lifted(item, pressed):
             self._lift(paint, "control", item["rect"], self._control_radius(scale), scale)
 
@@ -563,6 +565,22 @@ class Renderer:
             start, end = self._rgb(off_knob), self._rgb("on_accent")
             colour = _pack(tuple(int(round(a + (b - a) * amount)) for a, b in zip(start, end)), faded)
         paint.fill_circle(knob_left + knob / 2.0, (top + bottom) / 2.0, knob / 2.0, colour)
+
+    def _meter(self, paint, item, scale):
+        """A usage window's bar (v0.6.24, the icon's card - ui/tray/tipplan.py): a pill sunk into the card as a well is,
+        filled in the accent as far as the window is used (`fraction`, 0 to 1) - from its right end when mirrored. A
+        little used is at least a dot, never nothing; in High Contrast the pill has an edge, as there is no shade."""
+        left, top, right, bottom = rect = item["rect"]
+        radius = (bottom - top) / 2.0
+        paint.fill_round(rect, radius, self._argb("inset"))
+        self._well(paint, rect, radius, scale)
+        if self.contrast:
+            paint.stroke_round(rect, radius, self._argb("line"), max(1.0, round(scale)))
+        fraction = max(0.0, min(1.0, float(item.get("fraction") or 0.0)))
+        if fraction > 0.0:
+            reach = max(bottom - top, (right - left) * fraction)
+            fill = (right - reach, top, right, bottom) if item.get("mirrored") else (left, top, left + reach, bottom)
+            paint.fill_round(fill, radius, self._argb("accent"))
 
     def face_colours(self, item, state) -> tuple:
         """((fill), (edge)) as (red, green, blue): what a button looks like in `state` (motion.face_state)."""

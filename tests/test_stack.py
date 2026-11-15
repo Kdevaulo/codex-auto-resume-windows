@@ -193,7 +193,9 @@ ITEM = {_q(name): item for item, names in {
                 "mcp", "mcp.panel", "mcp.server", "mcp.tools", "mcpserver"),
     "tray": ("ui", "ui.tray", "ui.tray.animation", "ui.tray.cards", "ui.tray.clicks",
              "ui.tray.dashboard", "ui.tray.icon", "ui.tray.menu", "ui.tray.model",
-             "ui.tray.motion", "ui.tray.stored", "ui.tray.win32", "ui.tray.words", "tray_place"),
+             "ui.tray.motion", "ui.tray.stored", "ui.tray.win32", "ui.tray.words", "tray_place",
+             # v0.6.24: the icon's own tooltip card - its plan and its window.
+             "ui.tray.tipplan", "ui.tray.tipcard"),
     "popup": ("ui.popup", "ui.popup.elevation", "ui.popup.fonts", "ui.popup.gdiplus",
               "ui.popup.layout", "ui.popup.model", "ui.popup.motion", "ui.popup.placement",
               "ui.popup.renderer", "ui.popup.theme", "ui.popup.win32", "ui.popup.window",

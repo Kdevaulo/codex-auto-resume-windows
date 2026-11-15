@@ -34,13 +34,14 @@ from codex_auto_resume.ui.tray import animation, cards, clicks, icon, menu, stor
 
 PACKAGE = "codex_auto_resume.ui.tray"
 
-# The eleven, in the order `__init__` imports them, which is their dependency order.
+# The eleven, in the order `__init__` imports them, which is their dependency order - and since v0.6.24 the two of the
+# icon's own tooltip card, which `__init__` does not import: `icon` makes the card the first time the pointer rests on it.
 MODULES = ("words", "model", "motion", "win32", "menu", "stored", "cards", "clicks",
-           "animation", "icon", "dashboard")
+           "animation", "tipplan", "tipcard", "icon", "dashboard")
 
 # The four that reach Win32, directly or through `win32`. The other seven are why the icon's
 # frames can be drawn with no icon, no window and no shell.
-CALLS_WINDOWS = ("win32", "menu", "animation", "icon")
+CALLS_WINDOWS = ("win32", "menu", "animation", "icon", "tipcard")
 
 MIXINS = (menu.MenuMixin, stored.StoredMixin, cards.CardsMixin, clicks.ClicksMixin,
           animation.AnimationMixin)
@@ -72,6 +73,9 @@ METHODS = {
     "_open_popup", "_popup_can_open",
     # v0.6.23 (second round, standard H13): battery saver and a locked session, as the icon reads them, handed to the popup.
     "_popup_held",
+    # v0.6.24: the icon's own tooltip card (icon.py): whether it is shown, what it shows, showing and hiding it, the
+    # pointer's moves while the shell has not yet said it rests on the icon, and Windows' tooltip back when it cannot be.
+    "_tip_shows", "_tip_content", "_show_tip", "_hide_tip", "_tip_moved", "_tip_gone",
 }
 
 
@@ -109,7 +113,7 @@ class ShapeTests(unittest.TestCase):
         named = re.findall(r"^from \.(\w+) import", source, re.M)
         self.assertEqual(named, [module for module in MODULES if module in named])
         self.assertEqual([module for module in MODULES if module not in named],
-                         ["stored", "cards", "clicks", "animation"])
+                         ["stored", "cards", "clicks", "animation", "tipplan", "tipcard"])
 
     def test_only_the_four_call_windows(self):
         for module in MODULES:
