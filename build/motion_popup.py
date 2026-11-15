@@ -50,9 +50,16 @@ class PopupFrames:
         self.renderer = tray_popup.Renderer()
         self.renderer.theme = theme
         self.renderer.design = self.design
+        # v0.6.24: the popup is its card alone, with a float shadow under it (the card window and the shadow window);
+        # a picture of it is that card over the theme's canvas, `pad` round it, as the stills are (popup_picture).
+        self.renderer.lone = True
+        self.theme = theme
+        self.pad = tray_popup.layers.still_pad(scale)
         self._views = {}
         self._held = None             # the view whose ground the renderer's canvas holds, or None
-        self.size = self.view((), (), 0)[1]["size"]
+        card = self.view((), (), 0)[1]["card"]
+        self.shift = (self.pad - card[0], self.pad - card[1])
+        self.size = (card[2] - card[0] + 2 * self.pad, card[3] - card[1] + 2 * self.pad)
 
     def view(self, off=(), busy=(), ticks=0):
         """(the model's view, its layout) with the rows in `off` switched off, the rows in `busy` awaiting an answer,
@@ -79,10 +86,11 @@ class PopupFrames:
 
     def bounds(self) -> dict:
         """{"popup.switch.<n>": (left, top, width, height)} of each row's Auto-resume switch, rows counted from 1, in
-        the canvas's pixels - where the popup's own layout puts them (the popup is the whole picture)."""
+        the canvas's pixels - where the popup's own layout puts them, moved with the card in the picture."""
         plan = self.view()[1]
+        dx, dy = self.shift
         rects = [item["rect"] for item in plan["items"] if item["kind"] == "switch"]
-        return {"popup.switch.%d" % (index + 1): (rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1])
+        return {"popup.switch.%d" % (index + 1): (rect[0] + dx, rect[1] + dy, rect[2] - rect[0], rect[3] - rect[1])
                 for index, rect in enumerate(rects)}
 
     def drawn(self, frame, closed: bytes) -> bytes:
@@ -102,14 +110,15 @@ class PopupFrames:
                 gliding[("check", tasks[row - 1])] = amount
         light = self.tray.halo(vm["light"], frame.t, frame.t, design=self.design)
         if gliding:
-            canvas = self.renderer.draw(vm, plan, frame=light, glides=gliding)
+            self.renderer.draw(vm, plan, frame=light, glides=gliding)
             self._held = None
         elif self._held == key:
-            canvas = self.renderer.draw_halo(plan, light)
+            self.renderer.draw_halo(plan, light)
         else:
-            canvas = self.renderer.draw(vm, plan, frame=light)
+            self.renderer.draw(vm, plan, frame=light)
             self._held = key
-        return self.shots.bgra_rgb(canvas.pixels())
+        _w, _h, bgra = self.shots.popup_picture(self.renderer, plan, self.pad, self.theme, self.design)
+        return self.shots.bgra_rgb(bgra)
 
     def is_the_still(self, frame, closed: bytes, still: Path) -> bool:
         """Whether the picture at `frame` is, pixel for pixel, the first frame of the committed `still`: the popup the
