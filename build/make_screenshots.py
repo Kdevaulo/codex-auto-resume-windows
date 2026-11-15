@@ -1119,34 +1119,51 @@ def render_popup(target: Path, locale: str, *, theme: str | None = None, design:
     renderer = tray_popup.Renderer()
     renderer.theme = theme                      # said, not left to the renderer's default
     renderer.design = design                    # and the design, likewise
+    # v0.6.24: the popup is its card alone on the screen - no grey ground of its own, its shadow the desktop's
+    # (layers.py) - so its picture is that card and its float shadow over the theme's canvas, drawn as the screen
+    # has them (`card_still`), as the notification card's pictures are.
+    renderer.lone = True
     try:
         plan = renderer.layout(view, scale, tray_popup.locale_of(strings))
-        width, height = plan["size"]
-        record = picture_record("popup", theme, design, popup_lights(plan, theme, design))
+        pad = tray_popup.layers.still_pad(scale)
+        card = plan["card"]
+        record = picture_record("popup", theme, design,
+                                popup_lights(plan, theme, design, (pad - card[0], pad - card[1])))
+        red, green, blue = brand.rgb(brand.palette(theme, design)["canvas"])
 
         def at(moment):
             return tray_popup.halo(view["light"], moment, moment, design=design)
 
-        canvas = renderer.draw(view, plan, frame=at(0))
+        def picture():
+            width, height, still = tray_popup.card_still(renderer, plan, pad)
+            ground = bytearray(bytes((blue, green, red, 255)) * (width * height))
+            _over(ground, width, still, width, height, 0, 0)
+            return width, height, bytes(ground)
+
+        renderer.draw(view, plan, frame=at(0))
+        width, height, first = picture()
         timeline = light_timeline(record) if moving else None
         if timeline is None:
-            write_png(target, width, height, canvas.pixels())
+            write_png(target, width, height, first)
             return record
 
         def frames():
-            yield timeline.delay, bgra_rgb(canvas.pixels())
+            yield timeline.delay, bgra_rgb(first)
             for moment in timeline.moments[1:]:
-                yield timeline.delay, bgra_rgb(renderer.draw_halo(plan, at(moment)).pixels())
+                renderer.draw_halo(plan, at(moment))
+                yield timeline.delay, bgra_rgb(picture()[2])
         write_apng(target, width, height, frames())
         return record
     finally:
         renderer.close()
 
 
-def popup_lights(plan, theme: str, design: str) -> list:
-    """The popup's one light, the plan's halo item, on the popup's card: a record's lights, in device px."""
+def popup_lights(plan, theme: str, design: str, shift=(0, 0)) -> list:
+    """The popup's one light, the plan's halo item, on the popup's card: a record's lights, in device px, moved by
+    `shift` (the card's place in a picture of the card alone)."""
     scale = plan.get("scale", 1.0)
-    return [{"x": item["cx"], "y": item["cy"], "radius": brand.STATUS_DOT["popup"] * scale, "scale": scale,
+    return [{"x": item["cx"] + shift[0], "y": item["cy"] + shift[1], "radius": brand.STATUS_DOT["popup"] * scale,
+             "scale": scale,
              "state": item["state"], "ground": brand.card_ground(theme, design)}
             for item in plan["items"] if item["kind"] == "halo"]
 
