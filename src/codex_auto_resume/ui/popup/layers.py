@@ -280,6 +280,7 @@ class CardLayers:
         self._body = None                # (dc, size, source) last handed to the card window
         self.shown = False
         self._shadow_shown = False
+        self._shadow_at = None           # (where, alpha) the shadow window was last given
 
     def shade(self, renderer, plan) -> bool:
         """The shadow picture for this plan's card, drawn again only when its size, scale or look changed."""
@@ -330,9 +331,12 @@ class CardLayers:
             return True
         where = (at[0] - self.margin, at[1] - self.margin)
         owed, size = self._shadow_owed, (self.picture.width, self.picture.height)
+        if not owed and self._shadow_at == (where, alpha):
+            return True                      # nothing of it changed: a frame of the light is the card's call alone
         ok = update(self.shadow_hwnd, at=where, alpha=alpha, dc=self.picture.dc, size=size,
                     dirty=None if owed else NOTHING)
         self._shadow_owed = owed and not ok
+        self._shadow_at = (where, alpha) if ok else None
         return ok
 
     def show(self):
@@ -354,7 +358,7 @@ class CardLayers:
 
     def forget(self):
         """What is on screen is no longer known (the card window was hidden or remade): the next push is whole."""
-        self._body = None
+        self._body = self._shadow_at = None
 
     def _drop_images(self):
         for image in self.images.values():

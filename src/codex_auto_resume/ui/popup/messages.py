@@ -274,10 +274,10 @@ class PopupMessages(PopupHidden):
         if done:
             self._end_opening()
             return
-        if self._card:
-            self._alpha = alpha
-        else:
-            _dll("user32").SetLayeredWindowAttributes(self.hwnd, 0, alpha, LWA_ALPHA)
+        if self._card:                           # the frame's push moves and fades it (WM_TIMER), in one call
+            self._alpha, self._below = alpha, below
+            return
+        _dll("user32").SetLayeredWindowAttributes(self.hwnd, 0, alpha, LWA_ALPHA)
         self._stand(below)
 
     def _end_opening(self):

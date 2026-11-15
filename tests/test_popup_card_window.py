@@ -171,7 +171,9 @@ class CardWindowTests(unittest.TestCase):
         card = window._plan["card"]
         self.assertEqual(body[0]["dirty"], (0, top - card[1], card[2] - card[0], bottom - card[1]))
         shadow = [keywords for hwnd, keywords in calls if hwnd == window._layers.shadow_hwnd]
-        self.assertTrue(all(keywords["dirty"] == layers.NOTHING for keywords in shadow), "its shadow: no pixel again")
+        self.assertEqual(shadow, [], "its shadow did not change: no call at all")
+        window._push()
+        self.assertEqual(len(calls), 2, "a frame of the light is one call, on the card")
 
     def test_a_whole_frame_uploads_the_card_from_its_corner_of_the_canvas(self):
         window = self.make()
@@ -204,6 +206,8 @@ class CardWindowTests(unittest.TestCase):
         self.assertIsNone(window._opening, "it arrives")
         self.assertEqual((window._alpha, window._below), (255, 0))
         alphas = [keywords["alpha"] for hwnd, keywords in calls if hwnd == window.hwnd]
+        frames = len(alphas)
+        self.assertLessEqual(len(calls), 2 * frames + 2, "a frame of the opening: one call each window")
         self.assertEqual(alphas[0], 0)
         self.assertEqual(alphas[-1], 255)
         self.assertEqual(alphas, sorted(alphas), "only ever more opaque")
