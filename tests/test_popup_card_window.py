@@ -264,6 +264,8 @@ class CardWindowTests(unittest.TestCase):
         self.assertFalse(window._renderer.lone, "its grey ground again")
         self.assertTrue(window.visible)
         self.assertTrue(any("card window unavailable" in line for line in logged), logged)
+        self.assertTrue(self.user32.GetClassLongW(window.hwnd, GCL_STYLE) & tray_popup.CS_DROPSHADOW,
+                        "today's plain window, its class shadow too")
         self.assertEqual(window._client_offset(), (0, 0))
         canvas = window.render()
         self.assertEqual(canvas.pixels()[3], 255, "drawn opaque, for WM_PAINT")

@@ -40,7 +40,8 @@ from ... import brand
 from .elevation import lift_coverage, shadow_step
 from .gdiplus import PIXEL_FORMAT_32BPP_PARGB, _Canvas, _Painter, _ShadowImage, _gdiplus_made
 from .theme import appearance
-from .win32 import (DWMWA_USE_IMMERSIVE_DARK_MODE,
+from .win32 import (CS_DROPSHADOW,
+                    DWMWA_USE_IMMERSIVE_DARK_MODE,
                     DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
                     DWMWA_WINDOW_CORNER_PREFERENCE,
                     DWMWCP_ROUND,
@@ -65,6 +66,7 @@ from .win32 import (DWMWA_USE_IMMERSIVE_DARK_MODE,
 ULW_ALPHA, AC_SRC_ALPHA, SWP_NOMOVE_NOSIZE = 0x2, 0x1, 0x0002 | 0x0001
 WS_EX_NOACTIVATE, WS_EX_TRANSPARENT = 0x08000000, 0x00000020
 WM_POPUP_PAINT = WM_APP + 4              # the card's picture is owed (PopupCard._redraw)
+GCL_STYLE = -26
 
 
 # --------------------------------------------------------------------- the shadow's recipe
@@ -442,6 +444,7 @@ class PopupCard:
         if self._renderer is not None:
             self._renderer.lone = False
         user32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, user32.GetWindowLongW(self.hwnd, GWL_EXSTYLE) & ~WS_EX_LAYERED)
+        self._class_shadow()
         self._round_corners()
         self._static_dirty = True
         if self._plan is not None and self._screen is not None:
@@ -484,6 +487,16 @@ class PopupCard:
                     break
         except Exception:
             pass                                   # a frame that stays light is not worth a failure
+
+    def _class_shadow(self):
+        """The plain window's class drop shadow (CS_DROPSHADOW), as the popup's class had it before v0.6.24: the card's
+        class is registered without it, since the card floats its own."""
+        user32 = _dll("user32")
+        setter = getattr(user32, "SetClassLongPtrW", None) or user32.SetClassLongW
+        getter = getattr(user32, "GetClassLongPtrW", None) or user32.GetClassLongW
+        _signature(setter, C.c_size_t, C.c_void_p, C.c_int, C.c_ssize_t)
+        _signature(getter, C.c_size_t, C.c_void_p, C.c_int)
+        setter(self.hwnd, GCL_STYLE, getter(self.hwnd, GCL_STYLE) | CS_DROPSHADOW)
 
     def _client_offset(self):
         """Where the card's window's (0, 0) is on the plan: the card's corner, for the window is the card (v0.6.24); the

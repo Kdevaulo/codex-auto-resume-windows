@@ -189,6 +189,8 @@ class Popup(PopupMessages, PopupCard):
             self._renderer = Renderer()
             self._card = self._renderer.lone = owner is not None
             if not self._card:
+                if klass.style == 0:
+                    self._class_shadow()         # no card after all: the plain window, its class shadow too
                 self._round_corners()
             getter = getattr(user32, "GetDpiForWindow", None)
             self.dpi = (getter(self.hwnd) if getter is not None else 0) or 96
