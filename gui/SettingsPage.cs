@@ -1654,7 +1654,8 @@ namespace CodexAutoResume
         {
             if (heroHeld) return;
             string word = ActivityWord(status, pending, now);
-            string light = BusyLight(HeaderLight(status, pending, word), busy > 0);
+            // An action in flight, or a card's read (cardReads, v0.6.24).
+            string light = BusyLight(HeaderLight(status, pending, word), busy > 0 || cardReads > 0);
             string head = Headline(strings, status, pending);
             HeroTold(ref light, ref head);
             stateDot.State = light;

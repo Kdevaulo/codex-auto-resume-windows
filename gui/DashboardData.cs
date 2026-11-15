@@ -1323,11 +1323,32 @@ namespace CodexAutoResume
             UpdateCountdowns();
         }
 
+        /// CallAsync's last argument for a read that only fills a card as it is shown (CardRead).
+        private const bool CardRead = true;
+
+        /// A card's read started or answered (CallAsync's CardRead, v0.6.24): the header's light shows it at once, both
+        /// ways, as it shows an action (Hero, BusyLight); no button changes.
+        private void SetCardRead(bool on)
+        {
+            cardReads = Math.Max(0, cardReads + (on ? 1 : -1));
+            UpdateCountdowns();
+        }
+
         /// Runs one bridge command on a worker and hands its reply back on this thread.
         /// Confirmation and file dialogs stay on this thread, before the call starts.
-        private void CallAsync(string command, string argument, Action<Dictionary<string, object>> done)
+        ///
+        /// v0.6.24 (the v0.6.23 final's live acceptance, I2: Settings' Restore defaults and Save greyed for one frame and
+        /// plain again, 12.6 s after a window opened on Settings). `cardRead`: a read that asks only what a card shows as it
+        /// is shown - what Windows offers the power action's card (LoadPower), the Codex home the homes' card suggests
+        /// (LoadHomeSuggestion) - is no action in flight (SetBusy). Counted as one, it turned every button in the window off
+        /// as General or Advanced showed - Save and Restore defaults with them, which could act all along - and on again at
+        /// its answer, greyed once it outlasted BusyHold's moment. Its own card refuses what it cannot do meanwhile (the
+        /// power switch: PowerSwitched); every other button stays as it is, and the bridge answers its calls in turn. The
+        /// header's light shows it working as it shows an action (SetCardRead): a read in flight is work.
+        private void CallAsync(string command, string argument, Action<Dictionary<string, object>> done, bool cardRead = false)
         {
-            SetBusy(true);
+            if (cardRead) SetCardRead(true);
+            else SetBusy(true);
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
                 Dictionary<string, object> reply;
@@ -1335,7 +1356,8 @@ namespace CodexAutoResume
                 catch (Exception error) { reply = Failure(error); }
                 MethodInvoker finish = delegate
                 {
-                    SetBusy(false);
+                    if (cardRead) SetCardRead(false);
+                    else SetBusy(false);
                     done(reply);
                 };
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(finish); }

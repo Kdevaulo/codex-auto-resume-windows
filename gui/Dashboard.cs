@@ -1211,6 +1211,9 @@ namespace CodexAutoResume
         private bool refreshing, refreshAgain;
         // Actions in flight. While there is one, every other action waits its turn, visibly.
         private int busy;
+        // v0.6.24: reads of a card in flight (CallAsync's CardRead). The header's light shows them as it shows `busy`; unlike
+        // `busy`, they hold back no action and turn no button off.
+        private int cardReads;
         // Work a page started that outlasts the call that started it: a job of the service this window talks to, which
         // ends with the window. While there is any, the window does not reopen itself (CheckReopen, HoldReopen); unlike
         // `busy`, it holds back no other action.
