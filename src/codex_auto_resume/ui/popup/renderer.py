@@ -9,6 +9,7 @@ from __future__ import annotations
 from ctypes import wintypes as W
 import ctypes as C
 from ... import brand, l10n
+from ...brand import shape
 from .elevation import lift_coverage, recipe_shadows, shadow_step, tile_ground, well_coverage
 from .fonts import _Fonts
 from .gdiplus import PIXEL_FORMAT_32BPP_PARGB, _Canvas, _Painter, _ShadowImage, _gdiplus_acquire, _gdiplus_release
@@ -52,6 +53,8 @@ class Renderer(StatusLight):
             _gdiplus_release()
             raise
         self.fonts = None
+        self._contrast = False
+        self._look_design = "soft"
         self.contrast = False            # High Contrast: system colours, and no shadow, tint or glow
         self.theme = "light"             # v0.6.4: "light" or "dark", as the window resolved it
         self.design = "soft"             # v0.6.10: one of brand.DESIGNS, as the window adopted it
@@ -181,6 +184,38 @@ class Renderer(StatusLight):
         with _Painter(self.canvas) as paint:
             self._scene(paint, plan, milliseconds)
         return self.canvas
+
+    # ------------------------------------------------------------------ the look
+    # The design and High Contrast also decide how the corners are drawn (v0.6.24): the canvas is told its smoothing here,
+    # whenever either is set, so that the popup, its menus and the icon's card - every surface this draws - follow
+    # their own design and none can draw another's (Soft's squircle in Classic or Plain).
+    @property
+    def design(self):
+        return self._look_design
+
+    @design.setter
+    def design(self, value):
+        self._look_design = value
+        self._corners_follow_the_look()
+
+    @property
+    def contrast(self):
+        return self._contrast
+
+    @contrast.setter
+    def contrast(self, value):
+        self._contrast = value
+        self._corners_follow_the_look()
+
+    def smoothing(self):
+        """How much this look smooths its corners (brand/shape.py): its design's, and Soft's in High Contrast - which
+        replaces every design - as the notification card (ui/card/card.py) does."""
+        return shape.design_smoothing(brand.DEFAULT_DESIGN if self.contrast else self._design())
+
+    def _corners_follow_the_look(self):
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None:
+            canvas.smoothing = self.smoothing()
 
     # ------------------------------------------------------------------ colours
     def _theme(self):
