@@ -238,6 +238,8 @@ LAYER = {_q(name): layer for layer, names in {
               "ui.tray.animation", "ui.tray.cards", "ui.tray.clicks", "ui.tray.dashboard", "ui.tray.icon",
               "ui.tray.menu", "ui.tray.model", "ui.tray.motion", "ui.tray.stored", "ui.tray.win32",
               "ui.tray.words",
+              # v0.6.24: the icon's own tooltip card - its plan and its window.
+              "ui.tray.tipplan", "ui.tray.tipcard",
               # v0.6.10-alpha: what every surface writes the same way.
               "ui", "ui.words",
               # v0.6.10-alpha: tray_popup.py became tray_popup/ - the same popup in twelve
@@ -378,6 +380,8 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     ("ui.tray.menu", "ui.popup"): ("cost", "the theme the menu is drawn in, only when it opens"),
     ("ui.tray.motion", "ui.popup"): ("cost", "whether the popup asks for attention"),
     ("ui.tray.stored", "ui.popup"): ("cost", "the popup's theme and motion, adopted with the settings"),
+    ("ui.tray.icon", "ui.tray.tipcard"): ("cost", "the icon's tooltip card, made the first time the pointer rests on it"),
+    ("ui.tray.icon", "ui.popup"): ("cost", "where the icon is, only as its tooltip card is shown"),
     ("codex.transport", "compat.files"): ("cost", "the versions the bundled registry verifies, "
                                                      "read once from the bundled baseline"),
     ("codex.transport", "compat"): ("cost", "the package compat/files.py is in, which Python loads "

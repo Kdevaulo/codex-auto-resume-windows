@@ -50,6 +50,7 @@ from .win32 import (CALLBACK,
                     WM_RBUTTONUP,
                     WM_TIMER,
                     WM_TRAY_FRAMES,
+                    WM_USER,
                     WM_WTSSESSION_CHANGE,
                     WTS_CONSOLE_CONNECT,
                     WTS_CONSOLE_DISCONNECT,
@@ -58,9 +59,22 @@ from .win32 import (CALLBACK,
                     WTS_SESSION_LOCK,
                     WTS_SESSION_UNLOCK,
                     _dll)
-from .words import tooltip
+from .words import tooltip, tooltip_parts
 from ...win.dll import LRESULT, WNDCLASSW, WNDPROC
 from ...win.sync import DemoEvent
+
+
+# v0.6.24: with NIF_SHOWTIP left out under version 4, the shell draws no tooltip and says instead when the pointer rests
+# on the icon and when it leaves (shellapi.h: WM_USER + 6 and + 7); the icon shows its own card then (tipcard.py).
+NIN_POPUPOPEN, NIN_POPUPCLOSE = WM_USER + 6, WM_USER + 7
+WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_RBUTTONDOWN = 0x0200, 0x0201, 0x0204
+# Until the shell has once said the pointer rests on the icon (NIN_POPUPOPEN), each visit of the pointer is timed from its
+# first move (TIMER_TIP): TIP_PROBE_S on, with the pointer still on the icon - resting on it, or moving over it within the
+# last TIP_EPISODE_GAP_S - and no word, the visit was a silent one. After TIP_SILENT_VISITS of them this Windows is taken
+# to send none with its tooltip off, and its own tooltip comes back - the standard tooltip, never none - until the shell
+# says the word after all, which turns the card back on at once. Once it has said it, no visit is timed again.
+TIP_PROBE_S, TIP_EPISODE_GAP_S, TIP_SILENT_VISITS = 2.0, 1.0, 2
+TIMER_TIP = 3
 
 
 class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
@@ -140,6 +154,16 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
         # at once a second (win/sync.py DemoEvent); signalled, `on_demo()` draws one made-up card.
         self.demo_name, self.on_demo = demo_name, on_demo
         self._demo = None
+        # v0.6.24: the icon's own tooltip card (tipcard.TipCard): None until the pointer first rests on the icon, False
+        # once it could not be made or shown - Windows' own tooltip from then on (NIF_SHOWTIP, _notify). `_tip_heard`: the
+        # shell has said NIN_POPUPOPEN at least once; `_tip_moves`: (first, last) move of the visit being timed while it
+        # has not; `_tip_silent`: how many visits went by with no word; `_tip_fallback`: Windows' tooltip is back because of
+        # them (until the word comes).
+        self._tip = None
+        self._tip_heard = False
+        self._tip_moves = None
+        self._tip_silent = 0
+        self._tip_fallback = False
 
     # ----------------------------------------------------------------- public
     def start(self) -> bool:
@@ -292,8 +316,11 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
         return snapshot
 
     def _notify(self, action):
-        # NIF_SHOWTIP: under version 4 the shell hides the standard tooltip unless asked.
-        data = self._data(NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP)
+        # NIF_SHOWTIP: under version 4 the shell hides the standard tooltip unless asked - and since v0.6.24 it is not
+        # asked while the icon's own card can be shown (_tip_shows), which the shell's NIN_POPUPOPEN calls for. szTip is
+        # the whole tooltip either way: what a screen reader and Windows' own surfaces read.
+        flags = NIF_MESSAGE | NIF_ICON | NIF_TIP | (0 if self._tip_shows() else NIF_SHOWTIP)
+        data = self._data(flags)
         self._last_tip = data.szTip
         return _dll("shell32").Shell_NotifyIconW(action, C.byref(data))
 
@@ -304,6 +331,109 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
         data.uID = 1
         data.uVersion = NOTIFYICON_VERSION_4
         self._version4 = bool(_dll("shell32").Shell_NotifyIconW(NIM_SETVERSION, C.byref(data)))
+        if self._tip_shows():
+            self._notify(NIM_MODIFY)            # the icon was added with Windows' tooltip, before the version was known
+
+    # ----------------------------------------------------------------- the tooltip card (v0.6.24)
+    def _tip_shows(self) -> bool:
+        """Whether hovering shows the icon's own card rather than Windows' tooltip: only under version 4, whose shell says
+        when the pointer rests on the icon, only while the card has not failed, and not while the shell has been silent."""
+        return (bool(getattr(self, "_version4", False)) and getattr(self, "_tip", None) is not False
+                and not getattr(self, "_tip_fallback", False))
+
+    def _tip_content(self):
+        """What the card shows, read on its own thread each time it is drawn: (tooltip_parts, the snapshot, the catalog)."""
+        with self._lock:
+            strings = dict(self.strings)
+        snapshot = self._shown()
+        return tooltip_parts(snapshot, strings, time.time(), self.edition), snapshot, strings
+
+    def _show_tip(self, wparam):
+        """NIN_POPUPOPEN: the card beside the icon, at the shell's anchor point (GET_X_LPARAM / GET_Y_LPARAM of wParam) -
+        not over the popup or the menu, which say more."""
+        self._tip_heard, self._tip_moves, self._tip_silent = True, None, 0
+        if self._hwnd:
+            _dll("user32").KillTimer(self._hwnd, TIMER_TIP)
+        if self._tip_fallback:
+            self._tip_fallback = False           # the shell does say it: the card again, and Windows' tooltip off
+            self._notify(NIM_MODIFY)
+        if not self._tip_shows():
+            return
+        popup, menu = self._popup, self._menu_drawn
+        if (popup is not None and popup.visible) or (menu and menu.visible):
+            return
+        point = (C.c_short(wparam & 0xFFFF).value, C.c_short((wparam >> 16) & 0xFFFF).value)
+        try:
+            if self._tip is None:
+                from .tipcard import TipCard
+                self._tip = TipCard(content=self._tip_content, held=self._popup_held, log=self.log)
+            from .. import popup as tray_popup
+            self._tip.show(icon=lambda: tray_popup.icon_rect(self._hwnd, 1), point=point)
+        except Exception as exc:
+            self._tip_gone("tray tip card unavailable (%s)" % type(exc).__name__)
+
+    def _hide_tip(self, at_once=True):
+        """The card hidden: at once for a click, the menu, the popup, a lock; fading (`at_once` False) as the pointer leaves."""
+        tip = getattr(self, "_tip", None)
+        if not tip:
+            return
+        try:
+            tip.hide(at_once)
+        except Exception as exc:
+            self._tip_gone("tray tip card failed (%s)" % type(exc).__name__)
+
+    def _tip_moved(self):
+        """The pointer moved over the icon. Until the shell has once said it rests there, a visit's first move starts its
+        timer (TIMER_TIP, TIP_PROBE_S); a resting pointer sends no moves, so the timer, not the moves, decides."""
+        if self._tip_heard or not self._tip_shows() or not self._hwnd:
+            return
+        now = time.monotonic()
+        if self._tip_moves is None:
+            self._tip_moves = (now, now)
+            _dll("user32").SetTimer(self._hwnd, TIMER_TIP, int(TIP_PROBE_S * 1000), None)
+        else:
+            self._tip_moves = (self._tip_moves[0], now)
+
+    def _tip_probe(self):
+        """A visit's TIP_PROBE_S are up with no word from the shell. It was a silent visit if the pointer is still on the
+        icon - resting on it, or moving over it a moment ago; a pointer that only passed by asked for no tooltip. After
+        TIP_SILENT_VISITS silent visits, Windows' own tooltip comes back (_tip_fallback)."""
+        if self._hwnd:
+            _dll("user32").KillTimer(self._hwnd, TIMER_TIP)
+        moves, self._tip_moves = self._tip_moves, None
+        if self._tip_heard or moves is None or not self._tip_shows():
+            return
+        if not (time.monotonic() - moves[1] < TIP_EPISODE_GAP_S or self._pointer_on_icon()):
+            return
+        self._tip_silent += 1
+        if self._tip_silent >= TIP_SILENT_VISITS:
+            self.log("tray tip card waits: no hover word from the shell, Windows' tooltip meanwhile")
+            self._tip_fallback = True
+            self._notify(NIM_MODIFY)
+
+    def _pointer_on_icon(self) -> bool:
+        """Whether the pointer is on the icon's rectangle, both read in per-monitor pixels; no when either cannot be read."""
+        from .. import popup as tray_popup
+        try:
+            with tray_popup._PerMonitorDpi():
+                rect = tray_popup.icon_rect(self._hwnd, 1)
+                spot = W.POINT()
+                _dll("user32").GetCursorPos(C.byref(spot))
+        except Exception:
+            return False
+        return bool(rect) and rect[0] <= spot.x < rect[2] and rect[1] <= spot.y < rect[3]
+
+    def _tip_gone(self, why):
+        """The card cannot be used: let it go, and give Windows' own tooltip back for the rest of the icon's life."""
+        self.log(why)
+        tip, self._tip = self._tip, False
+        if tip:
+            try:
+                tip.destroy()
+            except Exception:
+                pass
+        if self._hwnd:
+            self._notify(NIM_MODIFY)
 
     def _refresh(self):
         with self._lock:
@@ -348,6 +478,8 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
             self._session_away = False
         else:
             return
+        if self._session_locked or self._session_away:
+            self._hide_tip()                     # nobody is at the screen to read it
         self._refresh()
 
 
@@ -358,7 +490,15 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
             if message == CALLBACK:
                 event = lparam & 0xFFFF
                 if self._version4:
-                    if event in (NIN_SELECT, NIN_KEYSELECT):
+                    if event == NIN_POPUPOPEN:
+                        self._show_tip(wparam)
+                    elif event == NIN_POPUPCLOSE:
+                        self._hide_tip(at_once=False)
+                    elif event == WM_MOUSEMOVE:
+                        self._tip_moved()
+                    elif event in (WM_LBUTTONDOWN, WM_RBUTTONDOWN):
+                        self._hide_tip()
+                    elif event in (NIN_SELECT, NIN_KEYSELECT):
                         self._select(keyboard=event == NIN_KEYSELECT)
                     elif event == WM_LBUTTONDBLCLK:
                         self._double_click()
@@ -375,7 +515,9 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
                         self._double_click()
                 return 0
             if message == WM_TIMER:
-                if wparam == TIMER_FRAME:
+                if wparam == TIMER_TIP:
+                    self._tip_probe()
+                elif wparam == TIMER_FRAME:
                     self._animate()
                 else:
                     self._refresh()
@@ -388,6 +530,7 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
                 self._session_changed(wparam)
                 return 0
             if self._taskbar_created and message == self._taskbar_created:
+                self._hide_tip()
                 self._hide_popup()
                 self._notify(NIM_ADD)
                 self._set_version()
@@ -398,6 +541,7 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
             if message == WM_DESTROY:
                 user32.KillTimer(hwnd, TIMER_TICK)
                 user32.KillTimer(hwnd, TIMER_FRAME)
+                user32.KillTimer(hwnd, TIMER_TIP)
                 self._motion_ms = None
                 if self._session_watch:
                     try:
@@ -409,6 +553,12 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
                     self._session_watch = False
                 self._drop_cards()
                 self._drop_menu()
+                tip, self._tip = self._tip, None
+                if tip:
+                    try:
+                        tip.destroy()
+                    except Exception as exc:
+                        self.log("tray tip card cleanup failed (%s)" % type(exc).__name__)
                 demo, self._demo = self._demo, None
                 if demo is not None:
                     demo.__exit__(None, None, None)
