@@ -41,6 +41,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from codex_auto_resume import brand      # noqa: E402
+from codex_auto_resume.brand import shape      # noqa: E402
 from codex_auto_resume.ui import tray
 
 TARGET = ROOT / "gui" / "Brand.cs"
@@ -200,6 +201,8 @@ def sections():
         scale.append(("TransitionEase" + part, "double", value))
     # v0.6.10: Classic's accent bar inside a card's left hairline, and its current tab's underline.
     scale.append(("AccentBar", "int", int(brand.ACCENT_BAR)))
+    # v0.6.24: Figma's corner smoothing, the share of a radius a corner eases into its sides (brand/shape.py).
+    scale.append(("CornerSmoothing", "double", float(shape.DESIGN_SMOOTHING[brand.DEFAULT_DESIGN])))
 
     layout = []
     for key, value in brand.LAYOUT.items():
@@ -684,7 +687,17 @@ def design_rules() -> str:
         lines += ["                return 0;\n", "            }\n"]
     for role in roles:
         lines.append('            if (role == "%s") return %s;\n' % (role, _literal("int", radii[default][role])))
-    lines += ["            return 0;\n", "        }\n",
+    lines += ["            return 0;\n", "        }\n"]
+    smoothing = shape.DESIGN_SMOOTHING
+    lines += ["\n",
+              "        /// v0.6.24: how much a design smooths its corners (brand/shape.py's DESIGN_SMOOTHING): Figma's corner\n",
+              "        /// smoothing, a share of the radius; 0 is the circular corner.\n",
+              "        internal static double DesignSmoothing(string design)\n",
+              "        {\n"]
+    for name in brand.DESIGNS:
+        if smoothing[name] != smoothing[default]:
+            lines.append('            if (design == "%s") return %s;\n' % (name, _literal("double", smoothing[name])))
+    lines += ["            return %s;\n" % _literal("double", smoothing[default]), "        }\n",
               "\n",
               "        /// One design in one theme (Brand.Look): `design` as DesignOf reads it, dark or light. What the window\n",
               "        /// adopts, and the one question it asks about a design, so none of its own code names one.\n",

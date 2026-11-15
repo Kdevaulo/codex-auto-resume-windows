@@ -166,7 +166,8 @@ class SliceTests(unittest.TestCase):
         # in a UI callback, and OwnProcess, this process's id asked of Windows once; and the twelve types of the motion and surface work.
         # 97 with RuntimeChoice (v0.6.23), which Python this installation runs under. 99 with the design audit's second round:
         # ListSwitchFeel, how Pending's switches answer the pointer and their calls, and SoftReveal, a part fading over its ground.
-        self.assertEqual(len(set(declared)), 99, "the window's types")
+        # 100 since v0.6.24: Shape, the squircle every rounded body is drawn with (gui/SoftShape.cs).
+        self.assertEqual(len(set(declared)), 100, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,

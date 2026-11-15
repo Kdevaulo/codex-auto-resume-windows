@@ -11,6 +11,9 @@ from __future__ import annotations
 # multiplies by its own scale factor; the panel writes these as CSS pixels. One table,
 # so a card in the window and a card in Codex round their corners by the same amount.
 RADII = {"card": 16, "control": 11, "chip": 999, "small": 7, "check": 5}
+# v0.6.24: how far a corner eases into its sides - Figma's corner smoothing, 60 % (brand/shape.py). A
+# corner of radius R begins (1 + this) * R from its vertex instead of R; the radii above are unchanged.
+CORNER_SMOOTHING = 0.6
 SPACING = {"xs": 4, "s": 8, "m": 12, "l": 16, "xl": 24, "xxl": 32}
 # The notification-area popup's type sizes. The panel sets its own (TYPE_SCALE, below) and
 # the settings window keeps the system message font, so this table is the popup's alone.
