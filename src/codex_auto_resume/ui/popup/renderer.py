@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from ctypes import wintypes as W
 import ctypes as C
-import math
 from ... import brand, l10n
+from ...brand import shape
 from .elevation import lift_coverage, recipe_shadows, shadow_step, tile_ground, well_coverage
 from .fonts import _Fonts
 from .gdiplus import PIXEL_FORMAT_32BPP_PARGB, _Canvas, _Painter, _ShadowImage, _gdiplus_acquire, _gdiplus_release
 from .layout import layout as plan, mirror   # the method below shares its name
+from .light import StatusLight
 from .motion import face_state, mixed
 from .theme import SYSTEM_COLOURS, contrast_colour, system_rgb
 from .win32 import (DT_CALCRECT,
@@ -31,16 +32,6 @@ from .win32 import (DT_CALCRECT,
                     _pack)
 
 
-# What each state is drawn with. Fill tokens for the dot, text tokens for its word: `active`
-# is fill-only and never carries text, which is why the two tables are separate. The dot is
-# brand's status light, as in the window and the panel: every state in which the watcher runs
-# with recovery on is the `active` cyan it had before v0.6.3, a pause keeps its grey, and a
-# problem is amber. The word beside it, and its glow, tell the running states apart. Keyed by
-# light, not by word: brand's own table, so a watcher not known to be running is `idle` grey
-# (v0.6.10), which no word is.
-DOT_FILL = dict(brand.STATUS_FILL)
-
-
 # A reason chip's text colour; its ground is that colour mixed CHIP_ALPHA of the way into the
 # card's surface, as the panel mixes it, whatever the chip sits on.
 CHIP_ALPHA = 0.12
@@ -50,7 +41,7 @@ CHIP_ALPHA = 0.12
 _BREAK_AT_SPACES = frozenset({"ko"})
 
 
-class Renderer:
+class Renderer(StatusLight):
     """Draws a view model into its own canvas. Owns every GDI and GDI+ object it makes."""
 
     def __init__(self):
@@ -62,6 +53,8 @@ class Renderer:
             _gdiplus_release()
             raise
         self.fonts = None
+        self._contrast = False
+        self._look_design = "soft"
         self.contrast = False            # High Contrast: system colours, and no shadow, tint or glow
         self.theme = "light"             # v0.6.4: "light" or "dark", as the window resolved it
         self.design = "soft"             # v0.6.10: one of brand.DESIGNS, as the window adopted it
@@ -183,29 +176,6 @@ class Renderer:
                 start, stop = (row * width + max(0, int(left))) * 4 + 3, (row * width + min(width, int(right))) * 4
                 memory[start:stop:4] = ground[start:stop:4]
 
-    # How far on the seventh press's sweep is, or None: the window says, and it is drawn with the light.
-    sweep_ms = None
-
-    def _sweep(self, paint, item, milliseconds):
-        """The arc round the light with its head leading, then two rings, in the room the plan keeps for it (`sweep_reach`)."""
-        numbers = brand.SWEEP
-        cx, cy = item["cx"], item["cy"]
-        unit = item["sweep_reach"] / numbers["reach"]
-        colour = brand.rgb(brand.status_colour(item["state"], self._theme()))
-        covered, opacity, rings = brand.sweep_at(milliseconds, brand.ease)
-        for (spread, ring), width in zip(rings, (1.6, 1.2)):
-            if ring > 0:
-                radius = unit * (numbers["ring_from"] + (numbers["reach"] - numbers["ring_from"]) * spread)
-                paint.stroke_round((cx - radius, cy - radius, cx + radius, cy + radius), radius, _pack(colour, ring), max(1.0, unit * width))
-        if opacity <= 0:
-            return
-        radius = unit * numbers["arc_radius"]
-        if covered > 0.001:
-            paint.arc(cx, cy, radius, -90.0, 360.0 * covered, _pack(colour, opacity), max(1.0, unit * 2.4))
-        angle = math.radians(360.0 * covered - 90.0)
-        paint.fill_circle(cx + radius * math.cos(angle), cy + radius * math.sin(angle), max(1.5, unit * numbers["head_radius"]),
-                          _pack(brand.rgb(brand.ICON_ACCENT), opacity))
-
     def draw_scene(self, plan, milliseconds):
         """Only the day's scene, for an animation frame. No word stands on it (the plan keeps it past the last one)."""
         item = next((entry for entry in plan["items"] if entry["kind"] == "scene"), None)
@@ -215,39 +185,37 @@ class Renderer:
             self._scene(paint, plan, milliseconds)
         return self.canvas
 
-    def draw_halo(self, plan, frame, *, restore=True):
-        """Only the halo, for an animation frame; everything else in the canvas is kept.
+    # ------------------------------------------------------------------ the look
+    # The design and High Contrast also decide how the corners are drawn (v0.6.24): the canvas is told its smoothing here,
+    # whenever either is set, so that the popup, its menus and the icon's card - every surface this draws - follow
+    # their own design and none can draw another's (Soft's squircle in Classic or Plain).
+    @property
+    def design(self):
+        return self._look_design
 
-        The band of rows behind the halo was saved when the whole frame was drawn, so a
-        frame is one memory copy and two antialiased circles rather than the whole window.
-        """
-        item = next((entry for entry in plan["items"] if entry["kind"] == "halo"), None)
-        if item is None:
-            return self.canvas
-        if restore:
-            if self._halo_plan is not plan or self._halo_band is None:
-                raise ValueError("the whole frame has to be drawn before its halo")
-            offset, band = self._halo_band
-            C.memmove(self.canvas.bits.value + offset, band, len(band))
-        with _Painter(self.canvas) as paint:
-            self._halo(paint, item, plan["scale"], frame)
-            if self.sweep_ms is not None:
-                self._sweep(paint, item, self.sweep_ms)
-        return self.canvas
+    @design.setter
+    def design(self, value):
+        self._look_design = value
+        self._corners_follow_the_look()
 
     @property
-    def halo_plan(self):
-        return self._halo_plan
+    def contrast(self):
+        return self._contrast
 
-    @property
-    def halo_rows(self):
-        """(first row, row after the last) of the band draw_halo draws into, or None: all a frame of the
-        light changes, which the notification card copies out and nothing else (v0.6.10)."""
-        if self._halo_band is None:
-            return None
-        offset, band = self._halo_band
-        row = self.canvas.width * 4
-        return offset // row, (offset + len(band)) // row
+    @contrast.setter
+    def contrast(self, value):
+        self._contrast = value
+        self._corners_follow_the_look()
+
+    def smoothing(self):
+        """How much this look smooths its corners (brand/shape.py): its design's, and Soft's in High Contrast - which
+        replaces every design - as the notification card (ui/card/card.py) does."""
+        return shape.design_smoothing(brand.DEFAULT_DESIGN if self.contrast else self._design())
+
+    def _corners_follow_the_look(self):
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None:
+            canvas.smoothing = self.smoothing()
 
     # ------------------------------------------------------------------ colours
     def _theme(self):
@@ -629,48 +597,6 @@ class Renderer:
         if state == "pressed":
             self._well(paint, rect, radius, scale)
         paint.stroke_round(rect, radius, _pack(edge), max(1.0, round(scale)))
-
-    # ------------------------------------------------------------------ the status light
-    def _keep_halo_band(self, plan):
-        canvas = self.canvas
-        item = next((entry for entry in plan["items"] if entry["kind"] == "halo"), None)
-        self._halo_plan = plan
-        if item is None:
-            self._halo_band = None
-            return
-        _dll("gdi32").GdiFlush()
-        # The item's radius is the largest glow any frame draws; leave room for its soft edge.
-        reach = max(item["radius"], item.get("sweep_reach", 0.0)) + 2 * plan["scale"] + 2
-        top = max(0, int(item["cy"] - reach))
-        bottom = min(canvas.height, int(math.ceil(item["cy"] + reach)))
-        offset = top * canvas.width * 4
-        self._halo_band = (offset, C.string_at(canvas.bits.value + offset, (bottom - top) * canvas.width * 4))
-
-    def _halo(self, paint, item, scale, frame):
-        """The state dot, flat and the size it always was, with its glow and the checking arc."""
-        state, cx, cy = item["state"], item["cx"], item["cy"]
-        dot, light = brand.STATUS_DOT["popup"], brand.GLOW
-        arc = frame.get("arc") if frame is not None else None
-        arc_radius, arc_width = (dot + light["arc_gap"]) * scale, light["arc_width"] * scale
-        if self.contrast:
-            # A solid dot in a system colour, and the arc, if any, in the same colour.
-            colour = _pack(system_rgb(brand.status_system(state)))
-            paint.fill_circle(cx, cy, dot * scale, colour)
-            if arc is not None:
-                paint.arc(cx, cy, arc_radius, arc, light["arc_sweep"], colour, arc_width)
-            return
-        self._light(paint, cx, cy, dot, scale, DOT_FILL.get(state, "idle"), frame)
-        if arc is not None:
-            paint.arc(cx, cy, arc_radius, arc, light["arc_sweep"], self._argb("active", light["arc_alpha"]),
-                      arc_width)
-
-    def _light(self, paint, cx, cy, dot, scale, fill, frame):
-        """The dot and its glow for a brand.glow frame (None: off). Dimmed, the dot is its colour over the card."""
-        dim, opacity = (frame["dim"], frame["opacity"]) if frame is not None else (0.0, 0.0)
-        if opacity > 0:
-            paint.glow(cx, cy, brand.glow_radius(dot, frame["spread"]) * scale, brand.glow_stops(dot), self._rgb(fill),
-                       opacity)
-        paint.fill_circle(cx, cy, dot * scale, self._argb(fill, 1.0 - dim))
 
     @staticmethod
     def _own_direction_left(item):
