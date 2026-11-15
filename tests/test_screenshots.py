@@ -1517,9 +1517,10 @@ class PopupDrawingTests(unittest.TestCase):
         # Every file of each, not the one file each used to be: since v0.6.10-alpha the popup
         # is thirteen - fourteen since v0.6.10, with the window's messages out of window.py, fifteen
         # since v0.6.11 told a screen reader what is in it, seventeen since v0.6.20 drew the icon's
-        # right-click menu there - and the palette is ten - eleven since v0.6.10, with brand/design.py,
-        # which decides how every design draws the popup and the card, so it is in their key too.
-        self.assertEqual(len([name for name in found if name.startswith("ui/popup/")]), 18)
+        # right-click menu there, twenty since v0.6.24 drew the popup as its card alone (layers.py) and gave the
+        # status light a module of its own (light.py) - and the palette is ten - eleven since v0.6.10, with
+        # brand/design.py, which decides how every design draws the popup and the card, so it is in their key too.
+        self.assertEqual(len([name for name in found if name.startswith("ui/popup/")]), 20)
         # Thirteen since v0.6.24, with brand/shape.py: the squircle every rounded thing on the popup and the card is.
         self.assertEqual(len([name for name in found if name.startswith("brand/")]), 13,
                          "thirteen since brand/shape.py")
@@ -1864,8 +1865,8 @@ class CardPictureTests(unittest.TestCase):
                 "the card's own light": ("ui/card/card.py", "brand.glow(self.vm[\"status\"], age, age,",
                                          "brand.glow(self.vm[\"status\"], age + 1, age,"),
                 "its floating shadow": ("notice_card.py", "DARK_ENOUGH = 0.05", "DARK_ENOUGH = 0.06"),
-                "the popup's renderer it is painted by": ("ui/popup/renderer.py", "class Renderer:",
-                                                          "class Renderer:\n    painted = True\n"),
+                "the popup's renderer it is painted by": ("ui/popup/renderer.py", "class Renderer(StatusLight):",
+                                                          "class Renderer(StatusLight):\n    painted = True\n"),
                 "a colour token": ("brand/tokens.py", '"canvas":  "#E9EEF4"', '"canvas":  "#E9EEF5"')}.items():
             changed = dict(real)
             self.assertIn(old, changed[name], what)
@@ -2116,7 +2117,8 @@ class IconMotionPictureTests(unittest.TestCase):
         stays = {
             "the icon's menu": ("ui/tray/menu.py", "MENU_OPEN, MENU_TOGGLE, MENU_STOP, MENU_PENDING = 1, 2, 3, 4",
                                 "MENU_OPEN, MENU_TOGGLE, MENU_STOP, MENU_PENDING = 1, 2, 3, 5"),
-            "the popup's renderer": ("ui/popup/renderer.py", "class Renderer:", "class Renderer:\n    painted = True\n"),
+            "the popup's renderer": ("ui/popup/renderer.py", "class Renderer(StatusLight):",
+                                     "class Renderer(StatusLight):\n    painted = True\n"),
             "the notification card": ("notice_card.py", "DARK_ENOUGH = 0.05", "DARK_ENOUGH = 0.06"),
             "a comment on the motion": ("ui/tray/motion.py", "# The badge's own deep blue", "# The badge's deep blue"),
         }
