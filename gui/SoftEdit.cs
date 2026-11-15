@@ -39,10 +39,19 @@ namespace CodexAutoResume
         private const uint RESOURCE_ENUM_LN = 0x0001, RESOURCE_ENUM_MUI = 0x0002;
 
         /// The six commands, in the order Windows' menu has them: Undo, Cut, Copy, Paste, Delete, Select all.
-        internal static readonly int[] Commands = { EM_UNDO, WM_CUT, WM_COPY, WM_PASTE, WM_CLEAR, EM_SETSEL };
+        /// Filled one by one: a constant array initializer makes the compiler name a class at random, and the build
+        /// would no longer be reproducible (build/normalize_pe.py refuses it).
+        internal static readonly int[] Commands = Six();
 
-        /// Where a separator comes: before Cut and before Select all, as in Windows' menu.
-        internal static readonly int[] RuleBefore = { 1, 5 };
+        private static int[] Six()
+        {
+            var six = new int[6];
+            six[0] = EM_UNDO; six[1] = WM_CUT; six[2] = WM_COPY; six[3] = WM_PASTE; six[4] = WM_CLEAR; six[5] = EM_SETSEL;
+            return six;
+        }
+
+        /// Whether a separator comes before the item: before Cut and before Select all, as in Windows' menu.
+        internal static bool RuleBefore(int item) { return item == 1 || item == 5; }
 
         /// The English words, as Windows shows them, for when user32's menu cannot be read.
         internal static readonly string[] Fallback = { "&Undo", "Cu&t", "&Copy", "&Paste", "&Delete", "Select &All" };
@@ -238,11 +247,11 @@ namespace CodexAutoResume
         {
             string[] said = Words();
             bool[] usable = StatesOf(box);
-            var items = new ToolStripItem[Commands.Length + RuleBefore.Length];
+            var items = new ToolStripItem[Commands.Length + 2];
             int at = 0;
             for (int i = 0; i < Commands.Length; i++)
             {
-                if (Array.IndexOf(RuleBefore, i) >= 0) items[at++] = new ToolStripSeparator();
+                if (RuleBefore(i)) items[at++] = new ToolStripSeparator();
                 string word = said[i];
                 int tab = word.IndexOf('\t');
                 var item = new ToolStripMenuItem(tab >= 0 ? word.Substring(0, tab) : word);

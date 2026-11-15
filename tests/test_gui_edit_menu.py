@@ -86,8 +86,9 @@ class SourceTests(unittest.TestCase):
 
     def test_six_commands_in_windows_order_with_two_lines(self):
         menu = guiscan.type_body("EditMenu")
-        self.assertIn("Commands = { EM_UNDO, WM_CUT, WM_COPY, WM_PASTE, WM_CLEAR, EM_SETSEL };", menu)
-        self.assertIn("RuleBefore = { 1, 5 };", menu)
+        self.assertIn("six[0] = EM_UNDO; six[1] = WM_CUT; six[2] = WM_COPY; six[3] = WM_PASTE; six[4] = WM_CLEAR; "
+                      "six[5] = EM_SETSEL;", menu)
+        self.assertIn("return item == 1 || item == 5;", menu)
         self.assertIn('Fallback = { "&Undo", "Cu&t", "&Copy", "&Paste", "&Delete", "Select &All" };', menu)
         for name, value in (("EM_UNDO", "0x00C7"), ("WM_UNDO", "0x0304"), ("WM_CUT", "0x0300"), ("WM_COPY", "0x0301"),
                             ("WM_PASTE", "0x0302"), ("WM_CLEAR", "0x0303"), ("EM_SETSEL", "0x00B1"),
