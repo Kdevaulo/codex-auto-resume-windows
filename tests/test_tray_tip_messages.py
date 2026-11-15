@@ -301,7 +301,8 @@ class LiveCardTests(unittest.TestCase):
     """The real card, placed far off every screen: it is made, shown without taking the foreground or a click, drawn,
     and hidden at once or fading."""
 
-    FAR = {"box": (-31000, -31000, -30976, -30976), "dpi": 144, "work": (-32000, -32000, -30000, -30960),
+    # The icon in the taskbar, below the work area, as it stands: the card goes TIP_GAP above the taskbar's edge.
+    FAR = {"box": (-31000, -30950, -30976, -30926), "dpi": 144, "work": (-32000, -32000, -30000, -30960),
            "monitor": (-32000, -32000, -30000, -30900)}
 
     def setUp(self):
@@ -331,7 +332,9 @@ class LiveCardTests(unittest.TestCase):
         style = user32.GetWindowLongW(self.card.hwnd, -20) & 0xFFFFFFFF
         self.assertEqual(style & self.tipcard.TIP_STYLE, self.tipcard.TIP_STYLE)
         rect = wintypes.RECT()
-        user32.GetWindowRect(self.card.hwnd, ctypes.byref(rect))
+        from codex_auto_resume.ui import popup
+        with popup._PerMonitorDpi():                 # the card's own pixels, as it placed itself
+            user32.GetWindowRect(self.card.hwnd, ctypes.byref(rect))
         width, height = self.card._plan["size"]
         self.assertEqual((rect.right - rect.left, rect.bottom - rect.top), (width, height))
         self.assertEqual(rect.bottom, self.FAR["work"][3] - 12, "TIP_GAP at 150 % above the taskbar")
