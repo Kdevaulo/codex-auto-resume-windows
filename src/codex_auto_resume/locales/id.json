@@ -789,6 +789,7 @@
   "msg.setup_done": "Lanjut otomatis sudah disiapkan dan pemantau sedang berjalan.",
   "msg.setup_incomplete": "Penyiapan tidak selesai: gagal menyiapkan status pemulihan atau mengaktifkan pemulihan. Jalankan `doctor` untuk melihat penyebabnya.",
   "msg.setup_left_stopped": "Lanjut otomatis telah diperbarui. Pemantau tidak berjalan sebelum pembaruan, jadi tetap dihentikan: jalankan dari Dasbor saat Anda membutuhkannya.",
+  "msg.setup_started_again": "Lanjut otomatis telah diperbarui. Pemantau telah berhenti dengan sendirinya sebelum pembaruan (dimatikan, keluar dari akun, atau macet, bukan dihentikan), jadi dijalankan lagi dan kini berjalan.",
   "msg.setup_unconfirmed": "Lanjut otomatis sudah disiapkan, tetapi pemantau tidak dapat dipastikan berjalan. Buka Dasbor, atau jalankan `doctor`, untuk memeriksa.",
   "msg.setup_unconfirmed_yet": "Lanjut otomatis sudah disiapkan. Pemantau belum dipastikan berjalan; akan diperiksa lagi di akhir.",
   "msg.toast_after_sleep": "PC ini tidur selama {time}",

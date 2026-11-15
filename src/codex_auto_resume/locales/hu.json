@@ -789,6 +789,7 @@
   "msg.setup_done": "Az automatikus folytatás be van állítva, és a figyelő fut.",
   "msg.setup_incomplete": "A telepítés nem fejeződött be: a helyreállítási állapot előkészítése vagy a helyreállítás bekapcsolása sikertelen volt. Az ok megtekintéséhez futtassa a `doctor` parancsot.",
   "msg.setup_left_stopped": "Az automatikus folytatás frissítve. A figyelő a frissítés előtt nem futott, ezért leállítva maradt: indítsa el az Irányítópultról, amikor szeretné.",
+  "msg.setup_started_again": "Az automatikus folytatás frissítve. A figyelő a frissítés előtt magától leállt (leállítás, kijelentkezés vagy összeomlás miatt, nem megállítással), ezért újra elindult, és fut.",
   "msg.setup_unconfirmed": "Az automatikus folytatás be van állítva, de nem sikerült megerősíteni, hogy a figyelő fut. Az ellenőrzéshez nyissa meg az Irányítópultot, vagy futtassa a `doctor` parancsot.",
   "msg.setup_unconfirmed_yet": "Az automatikus folytatás be van állítva. Még nincs megerősítve, hogy a figyelő fut; a végén újra megnézzük.",
   "msg.toast_after_sleep": "A számítógép alvási ideje: {time}",

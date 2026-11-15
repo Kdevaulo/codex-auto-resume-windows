@@ -29,6 +29,7 @@ ENV_RUNTIME_HOME = "CODEX_AUTO_RESUME_PLUGIN_HOME"
 # at all - while it ignores a variable it does not read.
 ENV_WILL_LOOK_AGAIN = "CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN"   # "1": the caller looks at the watcher again after setup
 ENV_SAYS_LEFT_STOPPED = "CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED"  # "1": the caller reads EXIT_LEFT_STOPPED (v0.6.23)
+ENV_SAYS_STARTED_AGAIN = "CODEX_AUTO_RESUME_SETUP_SAYS_STARTED_AGAIN"  # "1": the caller reads EXIT_STARTED_AGAIN (v0.6.24)
 ENV_ENGLISH = "CODEX_AUTO_RESUME_SETUP_ENGLISH"                   # "1": the caller's log is English: say watcher-running so
 RUNTIME_DIR_NAME = ".codex-auto-resume"
 # The directory names the installer creates under the root - and therefore the ones
@@ -51,6 +52,11 @@ EXIT_UNCONFIRMED = 2
 # (v0.6.23 acceptance G1: both said "Nothing else to do"). Only for a caller that asks for it (ENV_SAYS_LEFT_STOPPED):
 # every other caller - an older install.ps1, the bootstrap's own calls - hears EXIT_OK, as it always has.
 EXIT_LEFT_STOPPED = 4
+# v0.6.24 (the owner, 2026-11-14): everything was done, and the watcher, which was not running before this update
+# because it had ended by itself - a shutdown, a sign-out, a crash, never a person's stop - was started again and seen
+# running. A success, said apart so the installer's last word can say why a stopped watcher runs now. Only for a
+# caller that asks for it (ENV_SAYS_STARTED_AGAIN); every other caller hears EXIT_OK.
+EXIT_STARTED_AGAIN = 5
 
 sys.path.insert(0, str(PLUGIN_ROOT / "src"))
 from codex_auto_resume import addremove, config, control, edition, l10n, shortcut, startup # noqa: E402
@@ -245,6 +251,33 @@ def watcher_seen(home: Path):
     return App(config.Paths(home), console=False, enable_logging=False).watcher_running()
 
 
+def ended_by_itself(home: Path) -> bool:
+    """Whether the watcher that is not running now ended without being asked to (v0.6.24, the owner 2026-11-14).
+
+    The heartbeat it wrote says so (store watcher_status, `end_mark`): every tick writes RUNNING, and only a watcher
+    that stops on purpose writes over it - CLEAN when its stop event was signalled (Stop watcher on the Dashboard or in
+    the Codex panel, the tray's Stop, `codex-auto-resume stop`), MEMORY_GUARD when the memory guard stopped it for the
+    launcher to start again. A watcher ended from outside writes nothing, and RUNNING stays: measured on this product's
+    own PC (2026-11-12/13), a fast-startup shutdown logged the session off and ended the watcher with no stop line and
+    no crash; a sleep did not end it at all. So RUNNING or MEMORY_GUARD left by a watcher that is gone is an end by
+    itself, and CLEAN a stop. No heartbeat, or one that cannot be read, is neither: False, and the watcher is left as
+    the person had it. Read on a connection of its own, as the launcher reads it (watcher_launcher._ended_cleanly)."""
+    try:
+        from codex_auto_resume.domain.vocabulary import WatcherEnd
+        from codex_auto_resume.store import Store
+        state_dir = config.Paths(home).state_dir
+        if not (Path(state_dir) / "state.sqlite").is_file():
+            return False
+        store = Store(state_dir, check=False)
+        try:
+            mark = (store.watcher_status() or {}).get("end_mark")
+        finally:
+            store.close()
+    except Exception:                               # noqa: BLE001 - a fact not known is no end by itself
+        return False
+    return mark in (WatcherEnd.RUNNING, WatcherEnd.MEMORY_GUARD)
+
+
 def looked_again(home: Path, started: str) -> str:
     """What `start_watcher` answered, with one more look where it could not confirm a watcher that is still starting.
 
@@ -349,7 +382,11 @@ def cmd_setup(args) -> int:
     # v0.6.16: an update starts again what it stopped, and nothing the person had turned off. The installer says
     # --watcher-was-stopped when no watcher of this installation ran before it; the watcher is then started only
     # where it would run at the next sign-in anyway. A first installation, and every other repair, starts it as before.
-    left_stopped = (keep_state and getattr(args, "watcher_was_stopped", False)
+    # v0.6.24 (the owner, 2026-11-14): and where it ended by itself rather than being stopped (ended_by_itself) - the
+    # person never turned that one off, so it is started again, and said so.
+    was_stopped = keep_state and getattr(args, "watcher_was_stopped", False)
+    started_again = was_stopped and ended_by_itself(home)
+    left_stopped = (was_stopped and not started_again
                     and not control.Control(config.Paths(home)).startup_enabled())
     started = "left-stopped" if left_stopped else start_watcher(home)
     progress("setup", 7, SETUP_STEPS)
@@ -368,7 +405,8 @@ def cmd_setup(args) -> int:
     if incomplete:
         say("setup_incomplete")
     else:
-        say("setup_done" if confirmed else "setup_left_stopped" if left_stopped else unconfirmed_word)
+        say("setup_started_again" if confirmed and started_again else "setup_done" if confirmed
+            else "setup_left_stopped" if left_stopped else unconfirmed_word)
     if register_startup:
         say("setup_autostart")
     print()
@@ -376,7 +414,7 @@ def cmd_setup(args) -> int:
     if incomplete:
         return EXIT_ERROR
     if confirmed:
-        return EXIT_OK
+        return EXIT_STARTED_AGAIN if started_again and os.environ.get(ENV_SAYS_STARTED_AGAIN) == "1" else EXIT_OK
     if left_stopped:
         return EXIT_LEFT_STOPPED if os.environ.get(ENV_SAYS_LEFT_STOPPED) == "1" else EXIT_OK
     return EXIT_UNCONFIRMED

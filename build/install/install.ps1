@@ -2404,16 +2404,27 @@ try {
     # G1). Setup says it only when asked (CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED), so a caller that does not ask -
     # an older installer, the bootstrap - still hears 0.
     $SETUP_LEFT_STOPPED = 4
+    # 5 means everything was done and the watcher, which was not running before this update because it had ended by
+    # itself - a shutdown, a sign-out, a crash, not a stop - was started again and seen running (plugin_setup.py
+    # ended_by_itself, v0.6.24): a success, whose last word says why a watcher that was not running runs now. Said only
+    # when asked (CODEX_AUTO_RESUME_SETUP_SAYS_STARTED_AGAIN), as 4 is.
+    $SETUP_STARTED_AGAIN = 5
     # This run looks at the watcher again after the health check (watcher-running, below) and says the last word, so a
     # watcher setup could not confirm within its wait is "not confirmed yet" in setup's own line, not a verdict
     # the last word then contradicts (v0.6.17, the live acceptance's second round). Said as a variable for this one
     # call, the way the bootstrap says it to an installed setup that may be older.
     $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'
     $env:CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED = '1'
+    $env:CODEX_AUTO_RESUME_SETUP_SAYS_STARTED_AGAIN = '1'
     try { $code = Invoke-Setup $setupArgs }
-    finally { $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null; $env:CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED = $null }
+    finally {
+        $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null; $env:CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED = $null
+        $env:CODEX_AUTO_RESUME_SETUP_SAYS_STARTED_AGAIN = $null
+    }
     $watcherUnconfirmed = $code -eq $SETUP_UNCONFIRMED
     $watcherLeftStopped = $code -eq $SETUP_LEFT_STOPPED
+    $watcherStartedAgain = $code -eq $SETUP_STARTED_AGAIN
+    if ($watcherStartedAgain) { $code = 0 }
     if ($code -ne 0 -and -not $watcherUnconfirmed -and -not $watcherLeftStopped) {
         Fail 'Setup did not complete. Nothing was removed; read the message above.'
         # A watcher stopped for this update that the failed setup did not start again is said, not left unsaid.
@@ -2467,7 +2478,16 @@ try {
         Write-Host $keptLine
         $what = if ($repair) { 'repair' } else { 'update' }
         Write-Host ('The watcher was not running before this ' + $what + ', so it was left stopped; nothing is being watched yet.')
+        # v0.6.24: which - a watcher that ended by itself is started again ($watcherStartedAgain, below).
+        Write-Host 'It had been stopped with Stop watcher, or never started; it had not ended by itself.'
         Write-Host 'Open Start Menu > Codex Auto Resume and use Start watcher, or use Start watcher on the Dashboard.'
+    } elseif ($watcherStartedAgain) {
+        Write-Host $keptLine
+        $what = if ($repair) { 'repair' } else { 'update' }
+        # Not InstallerFlow.LeftStoppedLine's start: the Finish page's left-stopped box is not this one's.
+        Write-Host ('The watcher had ended by itself before this ' + $what + ' (a shutdown, a sign-out or a crash; it ' +
+                    'was not stopped), so it was started again and is running.')
+        Write-Host 'Recommended settings are already on. Nothing else to do.'
     } else {
         if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed and running.' }
