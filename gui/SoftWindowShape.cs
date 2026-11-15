@@ -649,7 +649,7 @@ namespace CodexAutoResume
         private readonly Form form;
         private CornerLayer layer;
         private WindowShape.Corner now;
-        private bool busy, preferred, failed;
+        private bool busy, again, preferred, failed;
         private Size shapedSize;
         private int shapedDpi;
         private Color shapedGround, shapedLine;
@@ -739,8 +739,30 @@ namespace CodexAutoResume
         /// message behind.
         internal void Sync()
         {
-            if (busy || !form.IsHandleCreated) return;
+            if (!form.IsHandleCreated) return;
+            if (busy)
+            {
+                // A change inside our own (the region's, or the window's own handling of it - a form put back to its
+                // restored bounds): looked at again once this one is done, still in this message.
+                again = true;
+                return;
+            }
             busy = true;
+            try
+            {
+                int rounds = 0;
+                do
+                {
+                    again = false;
+                    SyncOnce();
+                }
+                while (again && ++rounds < 4);
+            }
+            finally { busy = false; }
+        }
+
+        private void SyncOnce()
+        {
             try
             {
                 WindowShape.Corner want = Want();
@@ -780,7 +802,6 @@ namespace CodexAutoResume
                 EventHandler changed = Changed;
                 if (changed != null) changed(this, EventArgs.Empty);
             }
-            finally { busy = false; }
         }
 
         private Color Ground()
