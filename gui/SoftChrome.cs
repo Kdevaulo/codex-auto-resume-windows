@@ -921,7 +921,8 @@ namespace CodexAutoResume
         {
             Color muted = Palette.Contrast ? SystemColors.WindowText : !overScene.IsEmpty ? overScene : Palette.Muted;
             Color none = SurfaceLook.None(Palette.Inset);
-            if (!Enabled) return new SurfaceLook(none, none, Soft.WithAlpha(muted, 0.43));
+            // High Contrast: what is not offered is in the person's GrayText, as Windows draws a command that is off.
+            if (!Enabled) return new SurfaceLook(none, none, Palette.Contrast ? SystemColors.GrayText : Soft.WithAlpha(muted, 0.43));
             if (!Hot && !Down) return new SurfaceLook(none, none, muted);
             if (Palette.Contrast) return new SurfaceLook(SystemColors.Highlight, SystemColors.Highlight, SystemColors.HighlightText);
             if (Command == Chrome.SC_CLOSE)
