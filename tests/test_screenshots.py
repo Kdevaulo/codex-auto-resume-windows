@@ -877,7 +877,8 @@ class BreathingPictureTests(unittest.TestCase):
     def test_the_popup_s_frames_are_the_popup_s_own_drawing(self):
         """Frame k of the popup's picture is the popup drawn whole with its light at moment k - byte for byte - so
         the picture moves exactly as the popup's own renderer moves it: `draw_halo`, the popup's call for a frame of
-        its light, over the band it keeps, is what the generator writes."""
+        its light, over the band it keeps, is what the generator writes. Since v0.6.24 the popup is its card alone, so
+        a frame is that card and its float shadow over the theme's canvas (`popup_picture`)."""
         from codex_auto_resume.ui import popup as tray_popup
         g = self.generator
         with tempfile.TemporaryDirectory() as folder:
@@ -889,14 +890,17 @@ class BreathingPictureTests(unittest.TestCase):
                 strings, view = g.popup_view("en")
                 renderer = tray_popup.Renderer()
                 renderer.theme, renderer.design = g.THEME, "soft"
+                renderer.lone = True
                 try:
                     plan = renderer.layout(view, g.POPUP_SCALE, tray_popup.locale_of(strings))
+                    pad = tray_popup.layers.still_pad(g.POPUP_SCALE)
                     self.assertEqual(len(pictures), timeline.steps)
                     for step in (0, 1, 33, 66, 99, timeline.steps - 1):
                         moment = timeline.moments[step]
-                        whole = renderer.draw(view, plan, frame=tray_popup.halo(view["light"], moment, moment))
+                        renderer.draw(view, plan, frame=tray_popup.halo(view["light"], moment, moment))
+                        whole = g.popup_picture(renderer, plan, pad, g.THEME, "soft")[2]
                         with self.subTest(step=step):
-                            self.assertEqual(pictures[step], g.bgra_rgb(whole.pixels()))
+                            self.assertEqual(pictures[step], g.bgra_rgb(whole))
                 finally:
                     renderer.close()
         self.assertEqual(record["lights"][0]["state"], view["light"])
@@ -1176,7 +1180,7 @@ class ContentTests(unittest.TestCase):
 
             def layout(self, view, scale, locale):
                 seen.append((self.theme, self.design))
-                return {"size": (1, 1), "scale": scale,
+                return {"size": (1, 1), "scale": scale, "card": (0, 0, 1, 1),
                         "items": [{"kind": "halo", "cx": 0.5, "cy": 0.5, "state": "idle"}]}
 
             def draw(self, view, plan, frame=None):
@@ -1185,7 +1189,8 @@ class ContentTests(unittest.TestCase):
             def close(self):
                 pass
 
-        with tempfile.TemporaryDirectory() as scratch, patch.object(tray_popup, "Renderer", Renderer):
+        # v0.6.24: the popup's picture is its card alone (card_still, still_pad) - stood in for, as the renderer is.
+        with tempfile.TemporaryDirectory() as scratch, patch.object(tray_popup, "Renderer", Renderer),                 patch.object(tray_popup, "card_still", lambda renderer, plan, pad: (1, 1, bytes(4))),                 patch.object(tray_popup.layers, "still_pad", lambda scale: 0):
             make_screenshots.render_popup(Path(scratch) / "popup.png", "en")
             make_screenshots.render_popup(Path(scratch) / "popup.png", "en", design="plain")
         self.assertEqual(seen, [(theme, "soft"), (theme, "plain")])
