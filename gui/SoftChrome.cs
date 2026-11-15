@@ -158,6 +158,66 @@ namespace CodexAutoResume
             created.Height = outer.Height;
         }
 
+        // ------------------------------------------------------------------ an auto-hide taskbar (or other appbar)
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct APPBARDATA
+        {
+            public int Size;
+            public IntPtr Window;
+            public int CallbackMessage;
+            public int Edge;
+            public RECT Rect;
+            public IntPtr Param;
+        }
+
+        [DllImport("shell32.dll")]
+        private static extern IntPtr SHAppBarMessage(int message, ref APPBARDATA data);
+
+        private const int ABM_GETSTATE = 0x4, ABM_GETAUTOHIDEBAREX = 0xB, ABS_AUTOHIDE = 0x1;
+
+        /// How much of the monitor a maximised window leaves at an edge where an auto-hide bar waits: the pointer reaches
+        /// the bar there, and the bar can slide out over the window. Two pixels, as other windows with a caption of their
+        /// own leave (one is lost to rounding at some scalings).
+        internal const int AutoHideRoom = 2;
+
+        /// The edges of `monitor` with an auto-hide appbar on them - the taskbar set to hide itself - each a bit, 1 << ABE_
+        /// (left 1, top 2, right 4, bottom 8): asked of Windows (SHAppBarMessage) only while a window is maximised, and
+        /// what the tests stub.
+        internal static Func<Rectangle, int> AppBarEdges = AutoHideEdges;
+
+        private static int AutoHideEdges(Rectangle monitor)
+        {
+            try
+            {
+                var state = new APPBARDATA();
+                state.Size = Marshal.SizeOf(typeof(APPBARDATA));
+                if ((SHAppBarMessage(ABM_GETSTATE, ref state).ToInt64() & ABS_AUTOHIDE) == 0) return 0;
+                int edges = 0;
+                for (int edge = 0; edge < 4; edge++)
+                {
+                    var bar = new APPBARDATA();
+                    bar.Size = Marshal.SizeOf(typeof(APPBARDATA));
+                    bar.Edge = edge;
+                    bar.Rect = new RECT { Left = monitor.Left, Top = monitor.Top, Right = monitor.Right, Bottom = monitor.Bottom };
+                    if (SHAppBarMessage(ABM_GETAUTOHIDEBAREX, ref bar) != IntPtr.Zero) edges |= 1 << edge;
+                }
+                return edges;
+            }
+            catch (Exception) { return 0; }
+        }
+
+        /// The client of a maximised window, `client`, short by AutoHideRoom at each edge of `monitor` in `edges`
+        /// (AppBarEdges) that it reaches; where it stops short of that edge already (the work area), as it was.
+        internal static Rectangle LeaveForAppBars(Rectangle client, Rectangle monitor, int edges)
+        {
+            int left = client.Left, top = client.Top, right = client.Right, bottom = client.Bottom;
+            if ((edges & 1) != 0 && left <= monitor.Left) left = monitor.Left + AutoHideRoom;
+            if ((edges & 2) != 0 && top <= monitor.Top) top = monitor.Top + AutoHideRoom;
+            if ((edges & 4) != 0 && right >= monitor.Right) right = monitor.Right - AutoHideRoom;
+            if ((edges & 8) != 0 && bottom >= monitor.Bottom) bottom = monitor.Bottom - AutoHideRoom;
+            return Rectangle.FromLTRB(left, top, Math.Max(left, right), Math.Max(top, bottom));
+        }
 
         /// The window `client` needs inside `frame` (Frame): what Form.SizeFromClientSize answers once the caption is ours, so
         /// a form's ClientSize means what it says.
@@ -664,6 +724,17 @@ namespace CodexAutoResume
             Rectangle client = Chrome.ClientFor(Rectangle.FromLTRB(proposed.Left, proposed.Top, proposed.Right, proposed.Bottom),
                                                 Rectangle.FromLTRB(computed.Left, computed.Top, computed.Right, computed.Bottom),
                                                 maximized);
+            // Maximised over an auto-hide taskbar: a little of that edge left, or the bar could never be brought out.
+            if (maximized)
+            {
+                try
+                {
+                    Rectangle monitor = Screen.FromRectangle(Rectangle.FromLTRB(proposed.Left, proposed.Top, proposed.Right, proposed.Bottom)).Bounds;
+                    int edges = Chrome.AppBarEdges(monitor);
+                    if (edges != 0) client = Chrome.LeaveForAppBars(client, monitor, edges);
+                }
+                catch (Exception) { /* the whole monitor, as before */ }
+            }
             var answer = new Chrome.RECT { Left = client.Left, Top = client.Top, Right = client.Right, Bottom = client.Bottom };
             Marshal.StructureToPtr(answer, m.LParam, false);
             dirty = true;
