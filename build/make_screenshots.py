@@ -1129,16 +1129,12 @@ def render_popup(target: Path, locale: str, *, theme: str | None = None, design:
         card = plan["card"]
         record = picture_record("popup", theme, design,
                                 popup_lights(plan, theme, design, (pad - card[0], pad - card[1])))
-        red, green, blue = brand.rgb(brand.palette(theme, design)["canvas"])
 
         def at(moment):
             return tray_popup.halo(view["light"], moment, moment, design=design)
 
         def picture():
-            width, height, still = tray_popup.card_still(renderer, plan, pad)
-            ground = bytearray(bytes((blue, green, red, 255)) * (width * height))
-            _over(ground, width, still, width, height, 0, 0)
-            return width, height, bytes(ground)
+            return popup_picture(renderer, plan, pad, theme, design)
 
         renderer.draw(view, plan, frame=at(0))
         width, height, first = picture()
@@ -1156,6 +1152,18 @@ def render_popup(target: Path, locale: str, *, theme: str | None = None, design:
         return record
     finally:
         renderer.close()
+
+
+def popup_picture(renderer, plan, pad: int, theme: str, design: str) -> tuple:
+    """(width, height, BGRA): the popup's card the renderer last drew alone (`lone`) and its float shadow, as the
+    screen shows the two windows (`card_still`), over the theme's canvas, `pad` px of it round the card. The still
+    pictures and the popup's motion pictures are both this."""
+    from codex_auto_resume.ui import popup as tray_popup
+    width, height, still = tray_popup.card_still(renderer, plan, pad)
+    red, green, blue = brand.rgb(brand.palette(theme, design)["canvas"])
+    ground = bytearray(bytes((blue, green, red, 255)) * (width * height))
+    _over(ground, width, still, width, height, 0, 0)
+    return width, height, bytes(ground)
 
 
 def popup_lights(plan, theme: str, design: str, shift=(0, 0)) -> list:
