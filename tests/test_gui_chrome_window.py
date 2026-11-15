@@ -10,8 +10,9 @@ A SoftDialog on its own: its ClientSize is what it was asked plus the title's st
 out below it as they were and kept in their places in Controls; Close alone or the pair as its boxes ask; mirrored, the
 buttons at the left.
 
-The day's scenes (brand.DAY_LOOKS): each drawn offscreen where the window places it, and the glyph's colour held to 3:1
-against what the scene puts under each button (WCAG's non-text contrast) - plans/v0624-stage1-design.md 3.3, O6.
+The day's scenes (brand.DAY_LOOKS): each drawn offscreen where the window places it under a caption of the window's own,
+and the colour each glyph takes held to 3:1 against what the scene puts under it (WCAG's non-text contrast) - O6 of
+plans/v0624-stage1-design.md, decided 2026-11-15: ink or OnAccent where Muted would not stand out, Muted where it does.
 
 GUI test module (it compiles the window and builds windows that are never shown): run on its own, through gui_lock.sh.
 """
@@ -31,9 +32,6 @@ from test_gui_v0611_access import CSC, POWERSHELL, compile_window, run_probe
 
 LOCALES = ("en", "de", "ar", "he", "ja", "vi")
 SCALES = (1.0, 1.5, 2.0)
-# The days whose scene puts less than 3:1 under the caption glyphs (measured 2026-11-15, 1.6 to 2.4): open point O6 of the
-# design, for the main session to decide - never changed silently here.
-O6_OPEN = {"chuseok", "new_year", "christmas"}
 CAPTION_WORDS = ("caption", "title card", "title's strip", "title ends", "headline ends", "Start button lies")
 
 PROBE = r"""
@@ -123,46 +121,51 @@ $out.dialogs.close = Dialog $false $false $false
 $out.dialogs.pair = Dialog $false $true $false
 $out.dialogs.mirrored = Dialog $false $true $true
 
-# The day's scenes where the window places one (SettingsForm.PlaceDayScene: DayArt.Fit), drawn offscreen, and the glyph's
-# colour against the mean of what each scene puts under each button's glyph box.
-$host1 = New-Object Windows.Forms.Panel
-$host1.Size = New-Object Drawing.Size 1000, 200
-$host1.CreateControl()
+# The day's scenes where the window places one (SettingsForm.PlaceDayScene: DayArt.Fit), under a caption of the window's own
+# (ChromeHost over a card, its Scene the day's): each button's background painted as the window paints it, the colour its
+# glyph then takes at rest (CaptionButton.OverSceneInk: Empty is Palette.Muted, as on every other day), and the mean of what
+# the scene put in the glyph's box of that very picture.
 $muted = (T 'Palette').GetField('Muted', $static).GetValue($null)
 $fit = (T 'DayArt').GetMethod('Fit', $static)
 foreach ($look in (ConvertFrom-Json $env:CAR_LOOKS)) {
+    $holder = New-Object Windows.Forms.Form
+    $holder.TopLevel = $false
+    $holder.ClientSize = New-Object Drawing.Size 1000, 200
+    $card = [Activator]::CreateInstance((T 'SoftCard'), $true)
+    $card.SetBounds(0, 0, 972, 90)
+    $holder.Controls.Add($card)
+    $caption = S 'ChromeHost' 'Install' @($holder, $card, $holder)
     $scene = [Activator]::CreateInstance((T 'SoftDayScene'), $true)
-    $host1.Controls.Add($scene)
+    $holder.Controls.Add($scene)
     # A hero 972 by 90 at 100 %: its words end at 300, the scene to its edge less the hairline.
     $call = [object[]]@([string]$look, [int]300, [int]0, [int]972, [int]971, [int]1, [int]89, [int]0, [double]0, [int]0)
     $null = $fit.Invoke($null, $call)
     $left = [int]$call[7]; $unit = [double]$call[8]; $fade = [int]$call[9]
     $width = 971 - $left
     $scene.GetType().GetMethod('Place', $instance).Invoke($scene, (Bare @($true, [string]$look, [int]$left, [int]1, [int]$width, [int]88, [double]$unit, [int]$fade))) | Out-Null
-    $bitmap = New-Object Drawing.Bitmap $scene.Width, $scene.Height
-    $g = [Drawing.Graphics]::FromImage($bitmap)
-    $e = New-Object Windows.Forms.PaintEventArgs $g, $scene.ClientRectangle
-    $scene.GetType().GetMethod('OnPaint', $instance).Invoke($scene, (Bare @($e))) | Out-Null
-    $g.Dispose()
-    $ratios = @()
-    # Each glyph's 10 px box, centred in its 34 by 26 button, the buttons 10 in from the hero's top and edge, 4 apart.
-    foreach ($k in 0, 1, 2) {
-        $buttonLeft = 972 - 10 - 34 - $k * 38
-        $gx = $buttonLeft + 12 - $left; $gy = 10 + 8 - 1
+    $caption.GetType().GetProperty('Scene', $instance).SetValue($caption, $scene, $null)
+    $said = @()
+    foreach ($name in 'MinimizeButton', 'MaximizeButton', 'CloseButton') {
+        $button = $caption.GetType().GetField($name, $instance).GetValue($caption)
+        $bitmap = New-Object Drawing.Bitmap $button.Width, $button.Height
+        $g = [Drawing.Graphics]::FromImage($bitmap)
+        $e = New-Object Windows.Forms.PaintEventArgs $g, $button.ClientRectangle
+        $button.GetType().GetMethod('OnPaintBackground', $instance).Invoke($button, (Bare @($e))) | Out-Null
+        $g.Dispose()
+        $ink = $button.GetType().GetProperty('OverSceneInk', $instance).GetValue($button, $null)
+        if ($ink.IsEmpty) { $ink = $muted }
+        $gx = [int](($button.Width - 10) / 2); $gy = [int](($button.Height - 10) / 2)
         $r = 0.0; $gg = 0.0; $b = 0.0; $n = 0
         for ($y = $gy; $y -lt $gy + 10; $y++) { for ($x = $gx; $x -lt $gx + 10; $x++) {
-            if ($x -lt 0 -or $x -ge $bitmap.Width -or $y -lt 0 -or $y -ge $bitmap.Height) { continue }
             $p = $bitmap.GetPixel($x, $y); $r += $p.R; $gg += $p.G; $b += $p.B; $n++
         } }
-        if ($n -eq 0) { $ratios += ,@(-1, -1, -1); continue }
-        $ratios += ,@([int]($r / $n), [int]($gg / $n), [int]($b / $n))
+        $bitmap.Dispose()
+        $said += ,@{ box = (Box $button); onScene = [bool]$button.Bounds.IntersectsWith($scene.Bounds);
+                     under = @([int]($r / $n), [int]($gg / $n), [int]($b / $n)); ink = @([int]$ink.R, [int]$ink.G, [int]$ink.B) }
     }
-    $bitmap.Dispose()
-    $out.scenes[[string]$look] = @{ left = $left; under = $ratios }
-    $host1.Controls.Remove($scene)
-    $scene.Dispose()
+    $out.scenes[[string]$look] = @{ left = $left; buttons = $said }
+    $holder.Dispose()
 }
-$host1.Dispose()
 $out.muted = @([int]$muted.R, [int]$muted.G, [int]$muted.B)
 [IO.File]::WriteAllText((Join-Path $env:CAR_WORK 'result.json'), ($out | ConvertTo-Json -Depth 8 -Compress))
 """
@@ -267,21 +270,22 @@ class CaptionWindowTests(unittest.TestCase):
         self.assertLess(boxes["MaximizeButton"][0], boxes["MinimizeButton"][0])
 
     def test_every_day_s_scene_leaves_the_glyphs_readable(self):
-        """3:1 under every glyph, except on the days whose scene is open point O6 (O6_OPEN): measured 1.6 to 2.4 there,
-        named for the main session to decide (plans/v0624-stage1-design.md 3.3, 17). Held exactly, so a decision that
-        mends one - or a scene that breaks another - shows here."""
+        """O6, decided by the main session 2026-11-15: over a day's scene each glyph at rest takes whichever of ink and
+        OnAccent stands out by 3:1 (WCAG's non-text contrast) from what the scene puts under it, measured from the scene's
+        own drawing where the button stands - and keeps Muted, as on every other day, wherever Muted already does."""
         self.assertEqual(sorted(self.answer["scenes"]), sorted(brand.DAY_LOOKS))
-        muted = "#%02X%02X%02X" % tuple(self.answer["muted"])
-        short = set()
+        hex_of = lambda rgb: "#%02X%02X%02X" % tuple(rgb)
+        muted = hex_of(self.answer["muted"])
+        on_scene = 0
         for look, said in self.answer["scenes"].items():
-            for index, under in enumerate(said["under"]):
+            for index, button in enumerate(said["buttons"]):
                 with self.subTest(look=look, button=index):
-                    self.assertGreaterEqual(min(under), 0, "the glyph's box lies on the scene")
-                    ratio = brand_colour.contrast(muted, "#%02X%02X%02X" % tuple(under))
-                    if ratio < 3.0:
-                        short.add(look)
-        self.assertEqual(short, O6_OPEN, "the days under 3:1 (WCAG non-text contrast) are the ones open as O6")
-
+                    under, ink = hex_of(button["under"]), hex_of(button["ink"])
+                    on_scene += button["onScene"]
+                    self.assertGreaterEqual(brand_colour.contrast(ink, under), 3.0, "the glyph stands out from the scene")
+                    if brand_colour.contrast(muted, under) >= 3.0:
+                        self.assertEqual(ink, muted, "no change where Muted already stands out")
+        self.assertGreater(on_scene, 0, "the buttons stood over the scenes measured")
 
 if __name__ == "__main__":
     unittest.main()

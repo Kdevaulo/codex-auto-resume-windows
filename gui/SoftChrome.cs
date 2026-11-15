@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -158,6 +159,33 @@ namespace CodexAutoResume
             menu = KeyInBrackets.Replace(menu, "");
             menu = menu.Replace("&&", "\u0001").Replace("&", "").Replace("\u0001", "&").Trim();
             return menu.Length == 0 ? fallback : menu;
+        }
+
+        /// WCAG's relative luminance of `colour` (its alpha ignored).
+        internal static double Luminance(Color colour)
+        {
+            Func<int, double> channel = delegate(int value)
+            {
+                double c = value / 255.0;
+                return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+            };
+            return 0.2126 * channel(colour.R) + 0.7152 * channel(colour.G) + 0.0722 * channel(colour.B);
+        }
+
+        /// WCAG's contrast ratio of two colours, 1 to 21.
+        internal static double Contrast(Color one, Color other)
+        {
+            double first = Luminance(one), second = Luminance(other);
+            return (Math.Max(first, second) + 0.05) / (Math.Min(first, second) + 0.05);
+        }
+
+        /// A caption glyph's colour at rest over a day's scene (O6, the main session 2026-11-15): `muted` as on every other
+        /// day where it stands out from what the scene puts under the glyph (`under`) by WCAG's 3:1 for what is not text;
+        /// otherwise whichever of `ink` and `light` (OnAccent) stands out the more. Empty: keep `muted`.
+        internal static Color OverScene(Color under, Color muted, Color ink, Color light)
+        {
+            if (Contrast(muted, under) >= 3.0) return Color.Empty;
+            return Contrast(ink, under) >= Contrast(light, under) ? ink : light;
         }
 
         /// Whether this Windows has snap layouts on the maximise button (Windows 11, build 22000 on): where it does, the
@@ -820,7 +848,7 @@ namespace CodexAutoResume
         /// the way to ink). Faint and still where the window does not offer it. High Contrast: the person's Highlight.
         private SurfaceLook Wanted()
         {
-            Color muted = Palette.Contrast ? SystemColors.WindowText : Palette.Muted;
+            Color muted = Palette.Contrast ? SystemColors.WindowText : !overScene.IsEmpty ? overScene : Palette.Muted;
             Color none = SurfaceLook.None(Palette.Inset);
             if (!Enabled) return new SurfaceLook(none, none, Soft.WithAlpha(muted, 0.43));
             if (!Hot && !Down) return new SurfaceLook(none, none, muted);
@@ -893,22 +921,68 @@ namespace CodexAutoResume
             Invalidate();
         }
 
+        // The glyph's colour at rest over the day's scene where the button stands (Chrome.OverScene), worked out each time the
+        // scene under it is drawn; Empty on every other day, and wherever `muted` already stands out.
+        private Color overScene = Color.Empty;
+
+        /// What the glyph is drawn in at rest over the day's scene, or Empty (for the tests).
+        internal Color OverSceneInk { get { return overScene; } }
+
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
-            g.FillRectangle(Soft.Fill(host.Face), ClientRectangle);
             SoftDayScene scene = host.Scene;
-            if (scene == null || scene.IsDisposed || !scene.Visible || scene.Look == null) return;
-            Rectangle at = host.InHolder(scene);
-            if (!at.IntersectsWith(Bounds)) return;
-            // The day's scene where it lies under the button, drawn by the scene itself.
+            Rectangle at = scene == null || scene.IsDisposed || !scene.Visible || scene.Look == null ? Rectangle.Empty : host.InHolder(scene);
+            if (at.IsEmpty || !at.IntersectsWith(Bounds) || Width <= 0 || Height <= 0)
+            {
+                overScene = Color.Empty;
+                g.FillRectangle(Soft.Fill(host.Face), ClientRectangle);
+                return;
+            }
+            // The day's scene where it lies under the button, drawn by the scene itself - into a picture of the button, so
+            // the glyph can be held to what is under it (O6) - then laid down.
             var under = Rectangle.Intersect(new Rectangle(Left - at.Left, Top - at.Top, Width, Height), scene.ClientRectangle);
-            GraphicsState state = g.Save();
-            g.TranslateTransform(at.Left - Left, at.Top - Top);
-            g.SetClip(under, CombineMode.Intersect);
-            if (scene.Region != null) g.SetClip(scene.Region, CombineMode.Intersect);
-            using (var args = new PaintEventArgs(g, under)) InvokePaint(scene, args);
-            g.Restore(state);
+            using (var drawn = new Bitmap(Width, Height, PixelFormat.Format32bppArgb))
+            {
+                using (Graphics b = Graphics.FromImage(drawn))
+                {
+                    b.FillRectangle(Soft.Fill(host.Face), new Rectangle(0, 0, Width, Height));
+                    b.TranslateTransform(at.Left - Left, at.Top - Top);
+                    b.SetClip(under, CombineMode.Intersect);
+                    if (scene.Region != null) b.SetClip(scene.Region, CombineMode.Intersect);
+                    using (var args = new PaintEventArgs(b, under)) InvokePaint(scene, args);
+                }
+                g.DrawImageUnscaled(drawn, 0, 0);
+                overScene = Palette.Contrast ? Color.Empty
+                          : Chrome.OverScene(UnderGlyph(drawn), Palette.Muted, Palette.Ink, Palette.OnAccent);
+            }
+        }
+
+        // The mean colour of what lies in the glyph's box (Glyph) in a picture of the button.
+        private Color UnderGlyph(Bitmap drawn)
+        {
+            int box = Math.Max(1, Soft.Px(Brand.CaptionGlyph));
+            var glyph = Rectangle.Intersect(new Rectangle((Width - box) / 2, (Height - box) / 2, box, box), new Rectangle(0, 0, Width, Height));
+            if (glyph.Width <= 0 || glyph.Height <= 0) return host.Face;
+            BitmapData data = drawn.LockBits(glyph, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            long r = 0, gr = 0, bl = 0;
+            try
+            {
+                var row = new int[glyph.Width];
+                for (int y = 0; y < glyph.Height; y++)
+                {
+                    Marshal.Copy(new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), row, 0, glyph.Width);
+                    foreach (int pixel in row)
+                    {
+                        r += (pixel >> 16) & 0xFF;
+                        gr += (pixel >> 8) & 0xFF;
+                        bl += pixel & 0xFF;
+                    }
+                }
+            }
+            finally { drawn.UnlockBits(data); }
+            int count = glyph.Width * glyph.Height;
+            return Color.FromArgb(255, (int)(r / count), (int)(gr / count), (int)(bl / count));
         }
 
         protected override void OnPaint(PaintEventArgs e)
