@@ -15,7 +15,8 @@ Dashboard about every half second after it was reopened, and saw two states that
   asks the bridge what Windows offers the power action's card as it is shown (LoadPower), and that read was counted as an
   action in flight (SetBusy): it turned every button in the window off and on again at its answer, greyed once it
   outlasted BusyHold's moment - Save and Restore defaults with them, which could act all along. A read that only fills a
-  card as it is shown is no longer counted (CallAsync's CardRead); the power switch waits for its own card's read.
+  card as it is shown no longer turns the buttons off (CallAsync's CardRead); the header's light still shows it as work
+  (SetCardRead), and the power switch waits for its own card's read.
 
 Both probes run the real compiled window in a frame far off the screen that is never activated, as the other GUI probes
 do, with a bridge rooted where nothing is: History filled from a snapshot of forty finished recoveries, every step of the
@@ -133,6 +134,10 @@ SETTINGS = COMMON + r"""
 # The schema read as it is, a List: a function's return of it would be unrolled into an array.
 $schema = $parse.Invoke($null, [object[]]@([IO.File]::ReadAllText((Join-Path $work 'schema.json'), $utf8)))
 $null = $type.GetMethod('BuildEditors', $any).Invoke($script:window, [object[]]@($schema, (Read-Json 'settings.json')))
+# A snapshot read, the watcher running: the header's light is the watcher's, and moves to the working one while work runs.
+$null = Invoke-Window 'ApplySnapshot' @((Read-Json 'snapshot.json'))
+$dot = $type.GetField('stateDot', $any).GetValue($script:window)
+function Light { return [string]$dot.GetType().GetProperty('State', $any).GetValue($dot, $null) }
 $null = Invoke-Window 'ShowPage' @('settings')
 $script:window.Visible = $true
 $script:frame.Show()
@@ -142,7 +147,7 @@ $restore = $type.GetField('restoreButton', $any).GetValue($script:window)
 $script:changes = New-Object Collections.ArrayList
 $save.add_EnabledChanged([EventHandler]{ param($s, $e) $null = $script:changes.Add(@{ button = 'save'; enabled = [bool]$s.Enabled }) })
 $restore.add_EnabledChanged([EventHandler]{ param($s, $e) $null = $script:changes.Add(@{ button = 'restore'; enabled = [bool]$s.Enabled }) })
-$out = @{ shown = @{ save = ([bool]$save.Visible -and [bool]$save.Enabled); restore = ([bool]$restore.Visible -and [bool]$restore.Enabled) } }
+$out = @{ before = (Light); shown = @{ save = ([bool]$save.Visible -and [bool]$save.Enabled); restore = ([bool]$restore.Visible -and [bool]$restore.Enabled) } }
 # From here the window asks as a window on the screen does: the power action's card asks the bridge what Windows offers as
 # General is shown, the homes' card its suggestion as Advanced is.
 $type.GetField('auditing', $any).SetValue($script:window, $false)
@@ -150,10 +155,11 @@ function Section([string]$name, [string]$flag) {
     $script:changes.Clear()
     $null = Invoke-Window 'ShowSection' @($name)
     $asked = [bool]$type.GetField($flag, $any).GetValue($script:window)
+    $during = Light
     $waited = 0
     while ([bool]$type.GetField($flag, $any).GetValue($script:window) -and $waited -lt 1500) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 10; $waited++ }
     Pump 30
-    return @{ asked = $asked; answered = -not [bool]$type.GetField($flag, $any).GetValue($script:window); changes = @($script:changes)
+    return @{ asked = $asked; during = $during; after = (Light); answered = -not [bool]$type.GetField($flag, $any).GetValue($script:window); changes = @($script:changes)
               save = [bool]$save.Enabled; restore = [bool]$restore.Enabled; visible = [bool]$save.Visible }
 }
 $out.general = Section 'general' 'powerReading'
@@ -228,6 +234,7 @@ class SettingsButtonsTests(unittest.TestCase):
         work = workspace()
         (work / "schema.json").write_text(json.dumps(settings.describe(), ensure_ascii=False), encoding="utf-8")
         (work / "settings.json").write_text(json.dumps(settings.defaults(), ensure_ascii=False), encoding="utf-8")
+        (work / "snapshot.json").write_text(json.dumps(fullest_snapshot(time.time()), ensure_ascii=False), encoding="utf-8")
         cls.answer = run_probe(SETTINGS, work, 300, CAR_EXE=str(_exe))
 
     def test_what_the_test_stands_on(self):
@@ -247,6 +254,16 @@ class SettingsButtonsTests(unittest.TestCase):
                 seen = self.answer[section]
                 self.assertEqual(seen["changes"], [], "Save or Restore defaults turned off and on around a card's read")
                 self.assertTrue(seen["save"] and seen["restore"])
+
+    def test_the_headers_light_shows_the_card_read_as_work(self):
+        """The owner's rule (a light that does not move while work runs reads as broken or idle): a card's read lights the
+        header's working light while it is on its way, as an action does, and the watcher's own light comes back after."""
+        self.assertNotEqual(self.answer["before"], "checking", "nothing was in flight before the sections were shown")
+        for section in ("general", "advanced"):
+            with self.subTest(section):
+                seen = self.answer[section]
+                self.assertEqual(seen["during"], "checking", "the header's light did not show the card's read")
+                self.assertEqual(seen["after"], self.answer["before"])
 
 
 class SourceTests(unittest.TestCase):
