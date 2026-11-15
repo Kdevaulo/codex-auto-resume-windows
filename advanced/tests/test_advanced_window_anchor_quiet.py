@@ -253,15 +253,22 @@ class NamesStayInMemoryTests(FallbackCase):
         class Keep(logging.Handler):
             def emit(self, record):
                 records.append(record.getMessage())
+        # On the watcher's own logger, whatever an earlier test left: logbook.setup_logging sets propagate False, so a
+        # handler on the root alone hears nothing after a module that set the logbook up has run.
         handler, root = Keep(level=logging.DEBUG), logging.getLogger()
         logger = logging.getLogger(LOGGER_NAME)
-        before = (root.level, logger.level)
-        root.addHandler(handler)
+        before = (root.level, logger.level, logger.disabled, logging.root.manager.disable)
+        for target in (logger, root):
+            target.addHandler(handler)
+            self.addCleanup(target.removeHandler, handler)
         root.setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
-        self.addCleanup(root.removeHandler, handler)
+        logger.disabled = False
+        logging.disable(logging.NOTSET)
         self.addCleanup(root.setLevel, before[0])
         self.addCleanup(logger.setLevel, before[1])
+        self.addCleanup(setattr, logger, "disabled", before[2])
+        self.addCleanup(logging.disable, before[3])
         self.code._log = anchor._log_line
         self.refusing((1, b"", INVALID_TRANSPORT), (0, PRINTED, b""))
         sent = self.run_once()
