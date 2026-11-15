@@ -528,6 +528,38 @@ namespace CodexAutoResume
             if (control.Parent != null) control.Parent.Invalidate(true);
         }
 
+        /// v0.6.24: the caption buttons under `root` (gui/SoftChrome.cs) drawn again over the picture of it, where they stand.
+        /// DrawToBitmap prints a window's children from the top of the z-order down, so the card the buttons stand over -
+        /// lower in the z-order, as on the screen - was printed over them and they were in no picture.
+        private static void PaintCaptionOver(Bitmap picture, Control root)
+        {
+            var found = new List<CaptionButton>();
+            var walk = new Stack<Control>();
+            walk.Push(root);
+            while (walk.Count > 0)
+            {
+                Control parent = walk.Pop();
+                foreach (Control child in parent.Controls)
+                {
+                    var button = child as CaptionButton;
+                    if (button != null) { if (OwnVisible(button)) found.Add(button); }
+                    else if (OwnVisible(child)) walk.Push(child);
+                }
+            }
+            foreach (CaptionButton button in found)
+            {
+                Point at = Point.Empty;
+                for (Control c = button; c != null && c != root; c = c.Parent) at.Offset(c.Left, c.Top);
+                var place = new Rectangle(at, button.Size);
+                if (!new Rectangle(Point.Empty, picture.Size).Contains(place)) continue;
+                using (var face = new Bitmap(button.Width, button.Height, PixelFormat.Format32bppArgb))
+                {
+                    button.DrawToBitmap(face, new Rectangle(Point.Empty, button.Size));
+                    using (Graphics g = Graphics.FromImage(picture)) g.DrawImageUnscaled(face, at.X, at.Y);
+                }
+            }
+        }
+
         /// A list's own scroll bars, which its clip hides on screen, are drawn whole by DrawToBitmap - over the soft bar
         /// beside them (the owner, 2026-10-26: "고급판 캡처에서는 우리의 스크롤이 적용이 안 되네"). Each showing list's
         /// gutters are painted again on top, as far as the window shows that list, as the screen draws them.
@@ -576,6 +608,7 @@ namespace CodexAutoResume
             var picture = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppArgb);
             Invalidate(true);
             DrawToBitmap(picture, new Rectangle(Point.Empty, ClientSize));
+            PaintCaptionOver(picture, this);
             PaintListGutters(picture);
             renderRows = null;
             renderMenu = null;
@@ -832,6 +865,7 @@ namespace CodexAutoResume
                     using (Graphics ground = Graphics.FromImage(body)) ground.Clear(form.BackColor);
                     form.Invalidate(true);
                     form.DrawToBitmap(body, new Rectangle(Point.Empty, client));
+                    PaintCaptionOver(body, form);
                     PaintListGutters(body, form);
                     // v0.6.24: no caption, the window's or the dialog's: the window's client area is the whole of it.
                     int border = Math.Max(1, Px(1));
