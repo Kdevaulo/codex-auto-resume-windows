@@ -52,6 +52,19 @@ CLI_0166_ALPHA_6 = "codex-cli 0.166.0-alpha.6"
 # MS and MANCHOR were not made again, and MK and MGAVE stayed blocked.
 CLI_0167_ALPHA_3_2 = "codex-cli 0.167.0-alpha.3.2"
 
+# The Codex of 2026-11-15 (the Codex app's bundled engine), v0.6.24's measurement sitting 2 (plans/v0624-measure-2-result.md):
+# MANCHOR made again by the measurement session, on the real home with near-zero requests, for the anchor's request with
+# `-c notify=[] --disable hooks --disable plugins --disable apps -c mcp_servers={<declared>={enabled=false}}`:
+# (1) the window starts - T2, 19:59:00 -> 19:59:05: reset read 00:59:05 at +10 s and +70 s, drift 0, reset - start =
+# 18005 s; that run was without `-c notify=[]`, and run C, with it, completed the same turn;
+# (2) the cost - 22,022 input tokens (12,288 cached), 5 output, exit 0, about 5 s;
+# (3) nothing of the person's starts - no config, plugin or apps MCP server, no hook, no notify program: only conhost.exe
+# ran under the request, and codex-start.log had no line;
+# (4) the config is kept - the model and provider are unchanged (scratch home).
+# It replaces sitting 1's S2 statement that the anchor's exec starts the person's MCP servers and trusted hooks, which holds
+# for the old argv (the one sent once more, as before, where Codex refuses the switch: engine/anchor.REFUSALS).
+CLI_0167_ALPHA_4_1 = "codex-cli 0.167.0-alpha.4.1"
+
 MEASURED = {
     Measurement.M1: (Verdict.PASS, CLI_0167_ALPHA_3_2),
     Measurement.M2: (Verdict.FAIL, CLI_0167_ALPHA_3_2),
@@ -100,8 +113,10 @@ MEASURED = {
     Measurement.MQG: (Verdict.PASS, CLI_0167_ALPHA_3_2),
     # 2026-10-29 (v0.6.20, window_anchor): one ephemeral, read-only, low-effort `codex exec` on an idle 5-hour window
     # fixed its reset five hours after the request and left no conversation, rollout or history line; a second request
-    # in the running window did not move the reset.
-    Measurement.MANCHOR: (Verdict.PASS, CODEX_0165_ALPHA_1_2),
+    # in the running window did not move the reset. 2026-11-15 (v0.6.24): made again on codex-cli 0.167.0-alpha.4.1 with the
+    # switch that keeps the person's MCP servers, hooks, plugins, apps and notify program out (CLI_0167_ALPHA_4_1 above):
+    # the window started, the reset fixed five hours on, and nothing of the person's ran.
+    Measurement.MANCHOR: (Verdict.PASS, CLI_0167_ALPHA_4_1),
     # 2026-10-29 (v0.6.20, issue #50), the measurement session: a queued message with a local image file was shown at once
     # as the person's own with its picture and ran (MIMG); turn/steer from the product's own app-server session was
     # refused (-32600) for a turn the Desktop was running (MSTEER).
