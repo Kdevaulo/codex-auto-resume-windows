@@ -158,6 +158,7 @@ namespace CodexAutoResume
             created.Height = outer.Height;
         }
 
+
         /// The window `client` needs inside `frame` (Frame): what Form.SizeFromClientSize answers once the caption is ours, so
         /// a form's ClientSize means what it says.
         internal static Size WindowSize(Size client, Padding frame)
@@ -586,6 +587,8 @@ namespace CodexAutoResume
             {
                 case Chrome.WM_NCCALCSIZE:
                     return CalcSize(ref m, pass);
+                case WM_WINDOWPOSCHANGED:
+                    return PositionChanged(ref m, pass);
                 case Chrome.WM_NCHITTEST:
                     if (!form.TopLevel) return false;
                     pass(ref m);
@@ -665,6 +668,43 @@ namespace CodexAutoResume
             Marshal.StructureToPtr(answer, m.LParam, false);
             dirty = true;
             return true;
+        }
+
+        private const int WM_WINDOWPOSCHANGED = 0x0047;
+        // The client the window had as it left its normal state, kept until it is back in it (Restoring).
+        private Size restoreClient = Size.Empty;
+        private bool restoring;
+
+        // The window moved or changed state. WinForms keeps the client size a window had as it is maximised or minimised
+        // (Form.UpdateWindowState) and gives it back on the way to normal (RestoreWindowBoundsIfNecessary) - as a window size
+        // worked out with Windows' caption, which this window does not have. The same client is kept here, for Restoring.
+        private bool PositionChanged(ref Message m, Pass pass)
+        {
+            if (!form.TopLevel) return false;
+            FormWindowState before = form.WindowState;
+            Size client = form.ClientSize;
+            restoring = before != FormWindowState.Normal;
+            try { pass(ref m); }
+            finally { restoring = false; }
+            FormWindowState after = form.WindowState;
+            if (before == FormWindowState.Normal && after != FormWindowState.Normal) restoreClient = client;
+            else if (after == FormWindowState.Normal) restoreClient = Size.Empty;
+            return true;
+        }
+
+        /// The size the form's SetBoundsCore is asked for (`created` its CreateParams): on the way back from maximised or
+        /// minimised, the window of the client it had then with no caption (Chrome.Uncaptioned) - exactly the size it had -
+        /// where WinForms asks for that client's window with Windows' caption counted. Any other size, as asked.
+        internal void Restoring(ref int width, ref int height, BoundsSpecified specified, CreateParams created)
+        {
+            if (!restoring || restoreClient.IsEmpty || form.WindowState != FormWindowState.Normal) return;
+            if ((specified & BoundsSpecified.Size) == 0) return;
+            const int MaximizeOrMinimize = 0x01000000 | 0x20000000;
+            int style = created.Style & ~MaximizeOrMinimize;
+            Size outer = Chrome.Uncaptioned(new Size(width, height), restoreClient, Chrome.Frame(style, created.ExStyle),
+                                            Chrome.CaptionedFrame(style, created.ExStyle));
+            width = outer.Width;
+            height = outer.Height;
         }
 
         private void NcHover(int code)
@@ -1297,6 +1337,8 @@ namespace CodexAutoResume
 
         protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
         {
+            // Back from maximised or minimised at the size it had (ChromeHost.Restoring).
+            if (chrome != null) chrome.Restoring(ref width, ref height, specified, CreateParams);
             base.SetBoundsCore(x, y, width, height, specified);
             if (IsHandleCreated) return;
             Size client = Chrome.ClientOf(Size, OwnFrame());

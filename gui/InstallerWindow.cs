@@ -1062,6 +1062,8 @@ namespace CodexAutoResume
 
         protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
         {
+            // Back from maximised or minimised at the size it had (ChromeHost.Restoring).
+            if (chrome != null) chrome.Restoring(ref width, ref height, specified, CreateParams);
             base.SetBoundsCore(x, y, width, height, specified);
             if (IsHandleCreated) return;
             Size client = Chrome.ClientOf(Size, OwnFrame());
