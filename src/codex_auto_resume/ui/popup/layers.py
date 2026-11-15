@@ -246,8 +246,9 @@ class CardLayers:
         self.shadows, self.margin = (), 0
         self._shadow_key = None
         self._shadow_owed = True         # the shadow window's picture is not yet on screen
-        self._body = None                # (size, card) last handed to the card window
+        self._body = None                # (dc, size, source) last handed to the card window
         self.shown = False
+        self._shadow_shown = False
 
     def shade(self, renderer, plan) -> bool:
         """The shadow picture for this plan's card, drawn again only when its size, scale or look changed."""
@@ -293,6 +294,8 @@ class CardLayers:
         return self.stand_shadow(at, alpha)
 
     def stand_shadow(self, at, alpha) -> bool:
+        if self.shown and bool(self.shadows) != self._shadow_shown:
+            self._show_shadow()              # High Contrast or a design without depth came or went while it was open
         if not self.shadows:
             return True
         where = (at[0] - self.margin, at[1] - self.margin)
@@ -304,19 +307,20 @@ class CardLayers:
 
     def show(self):
         """The shadow window raised to the top of the topmost windows - the card window it owns goes above it - and shown."""
-        user32 = _dll("user32")
         with _PerMonitorDpi():
-            user32.SetWindowPos(self.shadow_hwnd, C.c_void_p(HWND_TOPMOST), 0, 0, 0, 0,
-                                SWP_NOACTIVATE | SWP_NOMOVE_NOSIZE)
-            if self.shadows:
-                user32.ShowWindow(self.shadow_hwnd, SW_SHOWNOACTIVATE)
-            else:
-                user32.ShowWindow(self.shadow_hwnd, SW_HIDE)
+            _dll("user32").SetWindowPos(self.shadow_hwnd, C.c_void_p(HWND_TOPMOST), 0, 0, 0, 0,
+                                        SWP_NOACTIVATE | SWP_NOMOVE_NOSIZE)
+        self._show_shadow()
         self.shown = True
+
+    def _show_shadow(self):
+        """The shadow window shown while there is a shadow, hidden while there is none."""
+        _dll("user32").ShowWindow(self.shadow_hwnd, SW_SHOWNOACTIVATE if self.shadows else SW_HIDE)
+        self._shadow_shown = bool(self.shadows)
 
     def hide(self):
         _dll("user32").ShowWindow(self.shadow_hwnd, SW_HIDE)
-        self.shown = False
+        self.shown = self._shadow_shown = False
 
     def forget(self):
         """What is on screen is no longer known (the card window was hidden or remade): the next push is whole."""

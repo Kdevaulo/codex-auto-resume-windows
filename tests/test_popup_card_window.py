@@ -135,6 +135,21 @@ class CardWindowTests(unittest.TestCase):
                 self.assertFalse(self.user32.IsWindowVisible(window._layers.shadow_hwnd))
                 self.assertTrue(window._card, "still the card: its fill and its hairline")
 
+    def test_high_contrast_coming_while_it_is_open_takes_its_shadow_away_and_going_brings_it_back(self):
+        window = self.make()
+        window.show(activate=False, origin=OFFSCREEN)
+        shadow = window._layers.shadow_hwnd
+        self.assertTrue(self.user32.IsWindowVisible(shadow))
+        with mock.patch.object(tray_popup.theme, "high_contrast", lambda: True):
+            window._read_look()
+            window._invalidate()
+            window._push()
+            self.assertFalse(self.user32.IsWindowVisible(shadow), "no shadow in High Contrast")
+        window._read_look()
+        window._invalidate()
+        window._push()
+        self.assertTrue(self.user32.IsWindowVisible(shadow), "and back with the theme")
+
     def test_destroyed_both_windows_go(self):
         window = self.make()
         window.show(activate=False, origin=OFFSCREEN)
