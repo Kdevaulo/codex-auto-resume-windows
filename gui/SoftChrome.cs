@@ -594,6 +594,16 @@ namespace CodexAutoResume
             bool mirrored = Mirror.Of(form);
             int width = Soft.Px(Brand.CaptionButtonW), height = Soft.Px(Brand.CaptionButtonH), gap = Soft.Px(Brand.CaptionGap);
             int x = mirrored ? face.Left + Soft.Px(Brand.CaptionInsetEnd) : face.Right - Soft.Px(Brand.CaptionInsetEnd) - GroupWidth;
+            // v0.6.24-beta.2 (the owner, 2026-11-16): a dialog's title row has its Close's cross as far in from the dialog's
+            // end edge as the title's first letter is from its start (GlyphEnd, SoftDialog.TitleStart) - the right edge, the
+            // left mirrored; the buttons' hit areas reach past it, the cross sets the look.
+            if (ground && GlyphEnd >= 0 && Soft.OwnVisible(CloseButton))
+            {
+                RectangleF ink = CaptionButton.CrossInk(width, height);
+                int close = mirrored ? GlyphEnd - (int)Math.Round(ink.Left)
+                                     : holder.ClientSize.Width - GlyphEnd - (int)Math.Round(ink.Right);
+                x = mirrored ? close : close + width - GroupWidth;
+            }
             // In a card, CaptionInsetTop below its top; in a row on the ground (OnGround), centred in the row.
             int y = ground ? face.Top + (face.Height - height) / 2 : face.Top + Soft.Px(Brand.CaptionInsetTop);
             foreach (CaptionButton button in Shown())
@@ -669,6 +679,10 @@ namespace CodexAutoResume
 
         /// v0.6.24-beta.2 (the owner's choice B, 2026-11-16): `card` is no card but a row on the window's own ground - a
         /// dialog's title - and the buttons stand at its end, centred in its height, CaptionInsetEnd in from its edge.
+        /// v0.6.24-beta.2: with OnGround, how far the Close cross's far end stands in from the holder's end edge (its right,
+        /// its left mirrored), in device px; -1: the buttons CaptionInsetEnd in from the row's end, as a card has them.
+        internal int GlyphEnd = -1;
+
         internal bool OnGround
         {
             get { return ground; }
@@ -1572,6 +1586,16 @@ namespace CodexAutoResume
         /// The glyph in a box Brand.CaptionGlyph across, centred: minimise a line, maximise a square with small round
         /// corners, restore two of them, close a cross - each in a stroke of Brand.CaptionStroke, never under a device pixel,
         /// with round ends.
+        /// Where the close cross's ink lies across a button `width` by `height` (Glyph): the ends of its strokes from 1 to 9 of
+        /// its box, with their round caps - the extent the dialog's title row measures its end gap by (ChromeHost.GlyphEnd).
+        internal static RectangleF CrossInk(int width, int height)
+        {
+            float unit = Soft.PxF(1.0), box = Soft.PxF(Brand.CaptionGlyph);
+            float ox = (float)Math.Round((width - box) / 2f), oy = (float)Math.Round((height - box) / 2f);
+            float half = Math.Max(1f, Soft.PxF(Brand.CaptionStroke)) / 2f;
+            return RectangleF.FromLTRB(ox + unit - half, oy + unit - half, ox + 9 * unit + half, oy + 9 * unit + half);
+        }
+
         internal void Glyph(Graphics g, Color ink)
         {
             float unit = Soft.PxF(1.0), box = Soft.PxF(Brand.CaptionGlyph);
@@ -1695,6 +1719,23 @@ namespace CodexAutoResume
         internal SoftDialog()
         {
             FocusCues.Watch(this);
+        }
+
+        /// How far the title's first letter stands in from the dialog's start edge (its left, its right mirrored), in device
+        /// px: the side gap its card keeps (16), the words' inset in their row (TitleWordsInset), and the room Windows' text
+        /// drawing keeps before a first letter (TitleLead). The Close cross stands as far in from the end edge.
+        internal int TitleStart
+        {
+            get { return Soft.Px(16) + Soft.Px(TitleWordsInset) + TitleLead(titleWords == null ? Soft.RoleFont("heading") : titleWords.Font); }
+        }
+
+        /// What a Label's text drawing keeps before its first letter in `font`: half of what its padding adds to the
+        /// text's width (TextRenderer pads both sides alike).
+        internal static int TitleLead(Font font)
+        {
+            int padded = TextRenderer.MeasureText("Ag", font, new Size(int.MaxValue, 0), TextFormatFlags.SingleLine).Width;
+            int bare = TextRenderer.MeasureText("Ag", font, new Size(int.MaxValue, 0), TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width;
+            return Math.Max(0, (padded - bare) / 2);
         }
 
         /// How much of the dialog's height its title takes once it is made: 0 before.
@@ -1952,6 +1993,9 @@ namespace CodexAutoResume
             chrome.Drag(titleWords);
             // The words start TitleWordsInset in from the side gap and stop short of the buttons; the row mirrors its own
             // padding (Mirror.Display).
+            // v0.6.24-beta.2 (the owner, 2026-11-16): the Close cross as far in from the dialog's end edge as the title's
+            // first letter is from its start edge (TitleStart, ChromeHost.GlyphEnd).
+            chrome.GlyphEnd = TitleStart;
             int end = Soft.Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Soft.Px(8);
             titleRow.Padding = new Padding(Soft.Px(TitleWordsInset), 0, end, 0);
             int grown = titleGround.Height;

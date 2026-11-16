@@ -958,7 +958,9 @@ namespace CodexAutoResume
             foreach (CaptionButton button in new[] { caption.MinimizeButton, caption.MaximizeButton, caption.CloseButton })
             {
                 if (!Soft.OwnVisible(button)) continue;
-                if (button.Parent != strip || !row.Bounds.Contains(button.Bounds))
+                // v0.6.24-beta.2: in the row's height, in the strip - its end may reach past the row's (the cross sets the gap).
+                if (button.Parent != strip || !strip.ClientRectangle.Contains(button.Bounds) || button.Top < row.Top ||
+                    button.Bottom > row.Bottom)
                     findings.Add(where + " :: the caption's " + button.AccessibleName + " button is outside the title row");
                 else if (strip.Controls.GetChildIndex(button) > strip.Controls.GetChildIndex(row))
                     findings.Add(where + " :: the caption's " + button.AccessibleName + " button lies under the title row");
@@ -969,10 +971,23 @@ namespace CodexAutoResume
                 findings.Add(where + " :: the title row has no Close button");
                 return;
             }
-            if (group.Top - row.Top != (row.Height - group.Height) / 2 ||
-                (mirrored ? group.Left - row.Left : row.Right - group.Right) != Soft.Px(Brand.CaptionInsetEnd))
+            if (group.Top - row.Top != (row.Height - group.Height) / 2)
                 findings.Add(where + " :: the caption buttons stand at " + group + " in the title row at " + row.Bounds);
             Rectangle shown = new Rectangle(row.Left + words.Left, row.Top + words.Top, words.Width, words.Height);
+            // v0.6.24-beta.2 (the owner, 2026-11-16): the Close cross's far end as far in from the dialog's end edge as the
+            // title's first letter from its start edge, within a pixel - each worked out from what is there, not from the
+            // constants that place them (SoftDialog.TitleStart, ChromeHost.GlyphEnd).
+            CaptionButton close = caption.CloseButton;
+            if (Soft.OwnVisible(close))
+            {
+                RectangleF ink = CaptionButton.CrossInk(close.Width, close.Height);
+                int lead = SoftDialog.TitleLead(words.Font);
+                int letter = mirrored ? strip.Width - (shown.Right - lead) : shown.Left + lead;
+                int cross = mirrored ? (int)Math.Round(close.Left + ink.Left) : strip.Width - (int)Math.Round(close.Left + ink.Right);
+                if (Math.Abs(letter - cross) > 1)
+                    findings.Add(where + " :: the title's first letter is " + letter + " px in from its edge, the Close cross " +
+                                 cross + " px from the other");
+            }
             int start = mirrored ? row.Right - shown.Right : shown.Left - row.Left;
             if (start != Soft.Px(SoftDialog.TitleWordsInset))
                 findings.Add(where + " :: the title starts " + start + " px in from its row, not " + Soft.Px(SoftDialog.TitleWordsInset));
