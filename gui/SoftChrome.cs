@@ -244,6 +244,18 @@ namespace CodexAutoResume
             return Rectangle.FromLTRB(left, top, Math.Max(left, right), Math.Max(top, bottom));
         }
 
+        /// Where a window whose visible box is `window` big goes over a window whose visible box is `owner`: centred on it,
+        /// and held inside `work` (the work area of the monitor the owner is on) against the edge it would cross - its top
+        /// left kept inside where it is larger than the work area. An empty `work` holds it nowhere.
+        internal static Point CentreOn(Rectangle owner, Size window, Rectangle work)
+        {
+            int x = owner.X + (owner.Width - window.Width) / 2, y = owner.Y + (owner.Height - window.Height) / 2;
+            if (work.IsEmpty) return new Point(x, y);
+            x = Math.Max(work.Left, Math.Min(x, work.Right - window.Width));
+            y = Math.Max(work.Top, Math.Min(y, work.Bottom - window.Height));
+            return new Point(x, y);
+        }
+
         /// The window `client` needs inside `frame` (Frame): what Form.SizeFromClientSize answers once the caption is ours, so
         /// a form's ClientSize means what it says.
         internal static Size WindowSize(Size client, Padding frame)
@@ -1632,8 +1644,85 @@ namespace CodexAutoResume
         protected override void WndProc(ref Message m)
         {
             if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
+            // Centred on the window that opened it as it is first shown (OnOwner): the caption leaves this message alone.
+            if (m.Msg == WM_WINDOWPOSCHANGING && !placed) OnOwner(m.LParam);
             if (chrome == null && m.Msg == Chrome.WM_NCCALCSIZE && CalcSizeEarly(ref m)) return;
             base.WndProc(ref m);
+        }
+
+        // ------------------------------------------------------------------ centred on the window that opened it
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WINDOWPOS { public IntPtr Window, After; public int X, Y, Width, Height; public uint Flags; }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr window, int command);
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr window, out Chrome.RECT rect);
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out Chrome.RECT rect, int size);
+
+        private const int WM_WINDOWPOSCHANGING = 0x0046, GW_OWNER = 4, DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+        private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_SHOWWINDOW = 0x0040;
+        private bool placed;
+
+        /// The work area of the monitor the window `owner` is on, which a dialog over it is kept inside: what the tests stub.
+        internal static Func<IntPtr, Rectangle> WorkAreaOf = delegate(IntPtr owner) { return Screen.FromHandle(owner).WorkingArea; };
+
+        /// v0.6.24 (the owner, 2026-11-16: wherever the Dashboard is, its dialogs open at its middle, not the monitor's): a
+        /// dialog asked to open centred on its owner (StartPosition.CenterParent) is placed as it is first shown - the last
+        /// moment before it is on a screen, whatever moved it before - its visible box (DWM's frame bounds: Windows'
+        /// invisible borders not counted) centred on its owner's, held inside the work area of the monitor the owner is on
+        /// (Chrome.CentreOn). Only once: a dialog moved by hand stays where it is put. A dialog with no owner on the screen -
+        /// none, or only WinForms' hidden taskbar owner - is left where WinForms put it (CenterScreen).
+        private void OnOwner(IntPtr lParam)
+        {
+            if (lParam == IntPtr.Zero || !IsHandleCreated) return;
+            var pos = (WINDOWPOS)Marshal.PtrToStructure(lParam, typeof(WINDOWPOS));
+            if ((pos.Flags & SWP_SHOWWINDOW) == 0) return;
+            placed = true;
+            if (StartPosition != FormStartPosition.CenterParent || WindowState != FormWindowState.Normal || !TopLevel) return;
+            try
+            {
+                IntPtr owner = GetWindow(Handle, GW_OWNER);
+                if (owner == IntPtr.Zero || !IsWindowVisible(owner) || IsIconic(owner)) return;
+                Chrome.RECT box, ownerBox;
+                if (!GetWindowRect(Handle, out box) || !GetWindowRect(owner, out ownerBox)) return;
+                Rectangle whole = Rectangle.FromLTRB(box.Left, box.Top, box.Right, box.Bottom);
+                Rectangle seen = Seen(Handle, whole);
+                var inset = new Padding(seen.Left - whole.Left, seen.Top - whole.Top, whole.Right - seen.Right, whole.Bottom - seen.Bottom);
+                Size size = (pos.Flags & SWP_NOSIZE) != 0 ? whole.Size : new Size(pos.Width, pos.Height);
+                var visible = new Size(Math.Max(0, size.Width - inset.Horizontal), Math.Max(0, size.Height - inset.Vertical));
+                Rectangle over = Seen(owner, Rectangle.FromLTRB(ownerBox.Left, ownerBox.Top, ownerBox.Right, ownerBox.Bottom));
+                Point at = Chrome.CentreOn(over, visible, WorkAreaOf(owner));
+                pos.X = at.X - inset.Left;
+                pos.Y = at.Y - inset.Top;
+                pos.Flags &= ~SWP_NOMOVE;
+                Marshal.StructureToPtr(pos, lParam, false);
+            }
+            catch (Exception) { /* where WinForms put it */ }
+        }
+
+        // What a person sees of `window`, whose window rectangle is `whole`: DWM's frame bounds, where DWM gives sensible
+        // ones (inside `whole`, no more than 64 px in at a side); otherwise the window rectangle.
+        private static Rectangle Seen(IntPtr window, Rectangle whole)
+        {
+            try
+            {
+                Chrome.RECT r;
+                if (DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS, out r, Marshal.SizeOf(typeof(Chrome.RECT))) != 0)
+                    return whole;
+                Rectangle seen = Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
+                bool sensible = seen.Width > 0 && seen.Height > 0 && whole.Contains(seen)
+                             && seen.Left - whole.Left <= 64 && seen.Top - whole.Top <= 64
+                             && whole.Right - seen.Right <= 64 && whole.Bottom - seen.Bottom <= 64;
+                return sensible ? seen : whole;
+            }
+            catch (Exception) { return whole; }
         }
 
         // The client calculation before the title row exists (the window is being made): the caption is ours from the
