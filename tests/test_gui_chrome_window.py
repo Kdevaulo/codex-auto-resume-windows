@@ -251,7 +251,13 @@ class CaptionWindowTests(unittest.TestCase):
         card = self.answer["dialogs"]["pair"]["card"]
         right = card[0] + card[2]
         boxes = {name: pair[name]["box"] for name in pair}
-        self.assertEqual(boxes["CloseButton"][0] + 34, right - 10, "close 10 in from the row's end")
+        # v0.6.24-beta.2 (the owner, 2026-11-16): the Close cross's right end as far from the dialog's right edge as the
+        # title's first letter from its left - 16 + 6 and what the text drawing keeps before a letter; held to the pixel by
+        # the title audit and tests/test_gui_v0624_dialog_title_row.py. The cross: strokes 1 to 9 of a 10 px box centred in
+        # the 34 px button, round caps half the 1.3 px stroke past them.
+        cross = 600 - (boxes["CloseButton"][0] + 12 + 9 + 0.65)
+        self.assertTrue(22 <= cross <= 26, "the cross %.2f px from the right edge, as the title from the left" % cross)
+        self.assertLessEqual(boxes["CloseButton"][0] + 34, 600, "inside the dialog")
         self.assertLess(boxes["MinimizeButton"][0], boxes["MaximizeButton"][0])
         self.assertLess(boxes["MaximizeButton"][0], boxes["CloseButton"][0])
         self.assertEqual({pair[name]["box"][1] for name in pair}, {card[1] + (card[3] - 26) // 2}, "centred in the row")
@@ -266,7 +272,9 @@ class CaptionWindowTests(unittest.TestCase):
     def test_mirrored_the_buttons_stand_at_the_left_in_the_other_order(self):
         said = self.answer["dialogs"]["mirrored"]
         boxes = {name: said["buttons"][name]["box"] for name in said["buttons"]}
-        self.assertEqual(boxes["CloseButton"][0], said["card"][0] + 10)
+        cross = boxes["CloseButton"][0] + 12 + 1 - 0.65
+        self.assertTrue(22 <= cross <= 26, "mirrored: the cross %.2f px from the left edge, as the title from the right" % cross)
+        self.assertGreaterEqual(boxes["CloseButton"][0], 0)
         self.assertLess(boxes["CloseButton"][0], boxes["MaximizeButton"][0])
         self.assertLess(boxes["MaximizeButton"][0], boxes["MinimizeButton"][0])
 
