@@ -288,15 +288,19 @@ class PopupDesignTests(unittest.TestCase):
         window = self.window()
         window.show(activate=False, origin=OFFSCREEN)
         canvas = window.render()
+        # v0.6.24: the popup is its card, with nothing round it - the design reads in the card's own ground.
+        card = window._plan["card"]
+        at = (card[0] + 4, (card[1] + card[3]) // 2)
         pixel = pixel_reader(canvas, canvas.width)
-        self.assertEqual(pixel(1, 1), brand.rgb(brand.LIGHT["canvas"]))
+        self.assertEqual(pixel(*at), brand.rgb(brand.card_ground("light", "soft")))
         window.follow_settings(dict(theme="light", design="plain"))
         window._update()
         self.assertEqual(window._design, "plain")
-        self.assertTrue(window._static_dirty)
+        # About to be drawn whole - or, since v0.6.24, already drawn: the card is put on screen at once when it moves.
+        self.assertTrue(window._static_dirty or window._renderer.design == "plain")
         canvas = window.render()
         self.assertEqual(window._renderer.design, "plain")
-        self.assertEqual(pixel_reader(canvas, canvas.width)(1, 1), brand.rgb(brand.PLAIN_LIGHT["canvas"]))
+        self.assertEqual(pixel_reader(canvas, canvas.width)(*at), brand.rgb(brand.card_ground("light", "plain")))
         self.assertFalse(window._reduced, "Plain moves as Soft does")
         # A Still stored by v0.6.10, as the settings layer hands it over: Soft, held by Reduce motion.
         window.follow_settings(stored_still())

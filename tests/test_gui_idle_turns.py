@@ -189,12 +189,20 @@ namespace CodexAutoResume
             Application.RaiseIdle(EventArgs.Empty);
             Application.RaiseIdle(EventArgs.Empty);
             outMap["editors_changed_once_still"] = Count(form.columns) != built;
-            // A mouse move on the window, heard as the message loop takes it.
+            // A mouse move on the window, heard as the message loop takes it, with the clock the window waits on held where it
+            // stands (PrepareInput.Now): the turns after it are raised while the mouse is recent however long the runner
+            // takes before them. On a clock that ran, GitHub's runners spent PrepareAfterInputMilliseconds and more between
+            // the move and the first turn (2026-11-13, 2026-11-14) and none was raised; the probe now stalls that long on
+            // purpose, so a clock that runs again fails here every time.
+            Func<long> running = PrepareInput.Now;
+            long held = running();
+            PrepareInput.Now = delegate { return held; };
             IdleTurnsProbe.PostMessage(form.Handle, 0x0200, IntPtr.Zero, (IntPtr)((40 << 16) | 40));
             Application.DoEvents();
-            // Only turns raised while the mouse is still recent count: the clock read before each, so a runner that stalls
-            // past PrepareAfterInputMilliseconds between two turns (GitHub's, 2026-11-13) stops raising them, and the turns
-            // it did raise are held to what they must do. A step taken on any of them fails, as before.
+            System.Threading.Thread.Sleep(PrepareAfterInputMilliseconds + 50);
+            // Only turns raised while the mouse is still recent count: the clock read before each, so a mouse move the window
+            // never heard (no clock stamped) raises none, and the turns raised are held to what they must do. A step taken on
+            // any of them fails, as before.
             built = Count(form.columns);
             int recentTurns = 0;
             bool changedAfterInput = false;
@@ -207,6 +215,8 @@ namespace CodexAutoResume
             }
             outMap["turns_after_input"] = (double)recentTurns;
             outMap["editors_changed_after_input"] = changedAfterInput;
+            // The clock runs again, from the moment it was held: the mouse grows old.
+            PrepareInput.Now = running;
             System.Threading.Thread.Sleep(PrepareAfterInputMilliseconds + 50);
             for (int i = 0; i < 500 && form.buildQueued; i++) Application.RaiseIdle(EventArgs.Empty);
             outMap["editors_built"] = !form.buildQueued && form.editors.Count > 20;

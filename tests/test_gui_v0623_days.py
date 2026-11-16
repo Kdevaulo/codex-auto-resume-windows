@@ -195,6 +195,10 @@ class TrayGateTests(unittest.TestCase):
         callers = [path for path in (ROOT / "src").rglob("*.py") if "days=True" in path.read_text(encoding="utf-8")]
         self.assertEqual([path.name for path in callers], ["app.py"])
         for path in (ROOT / "build").rglob("*.py"):
+            # build/stage/ is make_release's generated copy of the package (git-ignored): its app.py is src's, not a
+            # generator, and it exists only where an archive was built - never on CI.
+            if path.relative_to(ROOT / "build").parts[0] == "stage":
+                continue
             self.assertNotIn("days=True", path.read_text(encoding="utf-8"), path)
 
     def test_the_pictures_clock_is_no_such_day_in_any_time_zone(self):

@@ -137,6 +137,11 @@ class WindowTests(unittest.TestCase):
         user32.GetWindowLongW.argtypes, user32.GetWindowLongW.restype = [ctypes.c_void_p, ctypes.c_int], ctypes.c_long
         return bool(user32.GetWindowLongW(window.hwnd, -20) & 0x00080000)
 
+    def whole(self, window):
+        """Arrived, or simply there: opaque and nothing of the fade left. Since v0.6.24 the popup is its card, a layered
+        window always, faded by its layers' blend (layers.py); the plain window it falls back to is an ordinary one."""
+        return window._alpha == 255 if window._card else not self.layered(window)
+
     def record_openings(self):
         seen = []
         real = popup_messages.opening
@@ -160,7 +165,7 @@ class WindowTests(unittest.TestCase):
         self.assertGreater(rise, 0, "below its place")
         self.assertEqual(window._frame_ms, motion.GLIDE_FRAME_MS)
         self.assertTrue(self.until(lambda: window._opening is None), "it arrives")
-        self.assertFalse(self.layered(window), "an ordinary window once it has arrived")
+        self.assertTrue(self.whole(window), "whole once it has arrived")
         self.assertEqual(window._below, 0)
         on_the_way = [step for step in seen if not step[3]]
         self.assertTrue(on_the_way, "its first frame is faded out and below its place, whatever the runner's speed")
@@ -186,7 +191,7 @@ class WindowTests(unittest.TestCase):
                     with mock.patch.object(tray_popup.theme, "reduced_motion", return_value=True):
                         window.show(activate=False, origin=(-32000, -32000))
                 self.assertIsNone(window._opening)
-                self.assertFalse(self.layered(window))
+                self.assertTrue(self.whole(window))
                 self.assertEqual(window._below, 0)
 
     def test_closed_while_it_opens_it_leaves_nothing_behind(self):
@@ -195,7 +200,7 @@ class WindowTests(unittest.TestCase):
         self.assertIsNotNone(window._opening)
         window.hide()
         self.assertIsNone(window._opening)
-        self.assertFalse(self.layered(window))
+        self.assertTrue(self.whole(window))
         self.assertEqual(window._below, 0)
         self.assertFalse(window._frame_running)
 

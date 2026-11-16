@@ -87,6 +87,9 @@ namespace CodexAutoResume
             AuditedNotes = 0;
             AuditedShortest = 0;
             AuditedHero = 0;
+            AuditedCaption = 0;
+            AuditedCaptionGeometry = "";
+            AuditedTitleCards = 0;
             AuditedAlike = 0;
             AuditedWraps = 0;
             AuditedPower = 0;
@@ -121,7 +124,7 @@ namespace CodexAutoResume
                     // screen it would open on neither clamps its size nor ever shows it.
                     form.TopLevel = false;
                     form.MinimumSize = Size.Empty;
-                    form.ClientSize = new Size(form.Px(OpeningWidth), form.Px(OpeningHeight));
+                    form.ClientSize = form.OpeningClient;
                     form.BuildEditors(schema, current);
                     // Held by the window, so each page is filled from it as the page is built (PageFor).
                     if (snapshot != null) form.ApplySnapshot(snapshot);
@@ -219,9 +222,11 @@ namespace CodexAutoResume
                     form.AuditPins("header", findings);
                     AuditSpoken("header with Start", form, findings);
                     form.AuditHero("header with Start", findings);
+                    form.AuditCaption("header with Start", findings);
                     form.startButton.Visible = false;
                     form.PerformLayout();
                     form.AuditHero("header", findings);
+                    form.AuditCaption("header", findings);
                     // The reopen note, beside every button of the Settings page's save card, at the opening width
                     // and at the narrowest the window goes: 800 wide, less a sizable frame's 8 px on each side -
                     // each in both orders a window comes to a width in (AuditReopenNote).
@@ -435,7 +440,7 @@ namespace CodexAutoResume
                     form.auditing = true;
                     form.TopLevel = false;
                     form.MinimumSize = Size.Empty;
-                    var opening = new Size(form.Px(OpeningWidth), form.Px(OpeningHeight));
+                    var opening = form.OpeningClient;
                     form.ClientSize = opening;
                     Size planned = Size.Empty;
                     int needs = 0;
@@ -808,6 +813,120 @@ namespace CodexAutoResume
                 findings.Add(where + " :: the light's box is " + stateDot.Size + ", too small for its glow");
         }
 
+        internal static int AuditedCaption, AuditedTitleCards;
+        /// Each header the caption was audited in: `where:x,y,width,height;clear;inset` - the buttons' group in the header,
+        /// how far the headline ends before it, and how far the group stands in from the hero's outer edge (for the tests).
+        internal static string AuditedCaptionGeometry = "";
+
+        /// v0.6.24: the window's caption buttons (gui/SoftChrome.cs) where they stand - in the header, over the hero and
+        /// its day's scene, Brand.CaptionInsetTop below the hero's top and CaptionInsetEnd in from its outer edge (the left,
+        /// mirrored), minimise, maximise, close in reading order, each Brand.CaptionButtonW by CaptionButtonH - with the
+        /// headline ending at least 8 px before them and the Start button clear of them.
+        private void AuditCaption(string where, List<string> findings)
+        {
+            AuditedCaption++;
+            if (chrome == null)
+            {
+                findings.Add(where + " :: the window has no caption buttons");
+                return;
+            }
+            bool mirrored = Mirror.Of(this);
+            CaptionButton minimize = chrome.MinimizeButton, maximize = chrome.MaximizeButton, close = chrome.CloseButton;
+            // The hero where the buttons are: in the window's own coordinates (they are the window's children).
+            Rectangle card = chrome.InHolder(hero);
+            int headerIndex = Controls.GetChildIndex(header);
+            Rectangle group = Rectangle.Empty;
+            foreach (CaptionButton button in new[] { minimize, maximize, close })
+            {
+                if (!Soft.OwnVisible(button) || button.Parent != this)
+                {
+                    findings.Add(where + " :: the caption's " + button.AccessibleName + " button is not shown over the header");
+                    continue;
+                }
+                if (button.Size != new Size(Px(Brand.CaptionButtonW), Px(Brand.CaptionButtonH)))
+                    findings.Add(where + " :: the caption's " + button.AccessibleName + " button is " + button.Size);
+                if (Controls.GetChildIndex(button) > headerIndex)
+                    findings.Add(where + " :: the caption's " + button.AccessibleName + " button lies under the header");
+                group = group.IsEmpty ? button.Bounds : Rectangle.Union(group, button.Bounds);
+            }
+            if (group.IsEmpty) return;
+            if (mirrored ? !(close.Left < maximize.Left && maximize.Left < minimize.Left)
+                         : !(minimize.Left < maximize.Left && maximize.Left < close.Left))
+                findings.Add(where + " :: the caption buttons are not in reading order");
+            if (group.Top - card.Top != Px(Brand.CaptionInsetTop))
+                findings.Add(where + " :: the caption buttons stand " + (group.Top - card.Top) + " px below the hero's top, not " +
+                             Px(Brand.CaptionInsetTop));
+            int inset = mirrored ? group.Left - card.Left : card.Right - group.Right;
+            if (inset != Px(Brand.CaptionInsetEnd))
+                findings.Add(where + " :: the caption buttons stand " + inset + " px in from the hero's edge, not " + Px(Brand.CaptionInsetEnd));
+            Rectangle words = chrome.InHolder(headline);
+            int clear = mirrored ? words.Left - group.Right : group.Left - words.Right;
+            if (clear < Px(8)) findings.Add(where + " :: the headline ends " + clear + " px from the caption buttons");
+            if (Soft.OwnVisible(startButton) && chrome.InHolder(startButton).IntersectsWith(group))
+                findings.Add(where + " :: the Start button lies under the caption buttons");
+            AuditedCaptionGeometry += where + ":" + group.X + "," + group.Y + "," + group.Width + "," + group.Height + ";" + clear + ";" +
+                                      inset + "\n";
+        }
+
+        /// v0.6.24: a dialog's title card (SoftDialog): 16 px in from the dialog's edges at its top, as wide as the dialog less
+        /// those, its caption buttons in it at the card's top outer corner, its words ending at least 8 px before them, and
+        /// the dialog's own layout below it.
+        internal static void AuditTitleCard(string where, Form dialog, List<string> findings)
+        {
+            AuditedTitleCards++;
+            var soft = dialog as SoftDialog;
+            if (soft == null || soft.TitleCard == null || soft.CaptionHost == null)
+            {
+                findings.Add(where + " :: the dialog has no title card");
+                return;
+            }
+            Panel strip = soft.TitleGround;
+            SoftCard card = soft.TitleCard;
+            int gap = Soft.Px(16);
+            // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller than what it laid
+            // out (HeldByScreen): every dialog audit leaves such a one's geometry alone, as the window opens only at a text
+            // size whose dialogs its screen holds (TextScale.Fitting). Its title is still asked to be there, last and below
+            // nothing of its own.
+            if (HeldByScreen(dialog))
+            {
+                if (dialog.Controls.GetChildIndex(strip) != dialog.Controls.Count - 1)
+                    findings.Add(where + " :: the title's strip is not the last control the dialog holds");
+                return;
+            }
+            if (strip.Top != 0 || strip.Left != 0 || strip.Width != dialog.ClientSize.Width)
+                findings.Add(where + " :: the title's strip is at " + strip.Bounds + " in a dialog " + dialog.ClientSize.Width + " wide");
+            if (card.Left != gap || card.Top != gap || card.Width != strip.Width - 2 * gap || card.Bottom != strip.Height)
+                findings.Add(where + " :: the title card is at " + card.Bounds + " in its strip " + strip.Size);
+            bool mirrored = Mirror.Of(dialog);
+            ChromeHost caption = soft.CaptionHost;
+            Rectangle group = Rectangle.Empty;
+            foreach (CaptionButton button in new[] { caption.MinimizeButton, caption.MaximizeButton, caption.CloseButton })
+            {
+                if (!Soft.OwnVisible(button)) continue;
+                if (button.Parent != strip || !card.Bounds.Contains(button.Bounds))
+                    findings.Add(where + " :: the caption's " + button.AccessibleName + " button is outside the title card");
+                else if (strip.Controls.GetChildIndex(button) > strip.Controls.GetChildIndex(card))
+                    findings.Add(where + " :: the caption's " + button.AccessibleName + " button lies under the title card");
+                group = group.IsEmpty ? button.Bounds : Rectangle.Union(group, button.Bounds);
+            }
+            if (group.IsEmpty)
+            {
+                findings.Add(where + " :: the title card has no Close button");
+                return;
+            }
+            if (group.Top - card.Top != Soft.Px(Brand.CaptionInsetTop) ||
+                (mirrored ? group.Left - card.Left : card.Right - group.Right) != Soft.Px(Brand.CaptionInsetEnd))
+                findings.Add(where + " :: the caption buttons stand at " + group + " in the title card at " + card.Bounds);
+            Label words = soft.TitleWords;
+            int clear = mirrored ? card.Left + words.Left - group.Right : group.Left - (card.Left + words.Right);
+            if (clear < Soft.Px(8)) findings.Add(where + " :: the title ends " + clear + " px from the caption buttons");
+            foreach (Control child in dialog.Controls)
+                if (child != strip && child.Dock != DockStyle.None && Soft.OwnVisible(child) && child.Top < strip.Bottom)
+                    findings.Add(where + " :: " + AuditName(child) + " starts at " + child.Top + ", inside the title's strip");
+            if (dialog.Controls.GetChildIndex(strip) != dialog.Controls.Count - 1)
+                findings.Add(where + " :: the title's strip is not the last control the dialog holds");
+        }
+
         private readonly HashSet<Control> auditedPins = new HashSet<Control>();
 
         /// Every pinned control on screen that is not in its corner or covers text (AuditPin), and every button an
@@ -960,6 +1079,9 @@ namespace CodexAutoResume
 
         private static void Materialise(Control parent)
         {
+            // v0.6.24: a dialog with its title card, as it is once its window is made (SoftDialog).
+            var dialog = parent as SoftDialog;
+            if (dialog != null) dialog.MakeTitle();
             foreach (Control child in parent.Controls)
             {
                 if (!OwnVisible(child) || child.Handle == IntPtr.Zero) continue;
@@ -1179,6 +1301,7 @@ namespace CodexAutoResume
                 dialog.PerformLayout();
                 if (timelineList != null) AuditList("timeline/" + AuditName(timelineList), timelineList, findings);
                 AuditSpoken("timeline", dialog, findings);
+                AuditTitleCard("timeline", dialog, findings);
             }
         }
 
@@ -1211,6 +1334,7 @@ namespace CodexAutoResume
                     AuditList("logs/" + AuditName(logsList), logsList, findings);
                 }
                 AuditSpoken("logs", dialog, findings);
+                AuditTitleCard("logs", dialog, findings);
             }
             // v0.6.16-beta.3: the check of why a failure was not taken up, as it stands before its answer.
             using (Form dialog = BuildDetectionCheck())
@@ -1219,6 +1343,7 @@ namespace CodexAutoResume
                 Materialise(dialog);
                 dialog.PerformLayout();
                 AuditSpoken("detection_check", dialog, findings);
+                AuditTitleCard("detection_check", dialog, findings);
             }
             // v0.6.19: this PC's own compatibility report, as it stands before its answer.
             using (Form dialog = BuildOwnReport())
@@ -1227,6 +1352,7 @@ namespace CodexAutoResume
                 Materialise(dialog);
                 dialog.PerformLayout();
                 AuditSpoken("own_report", dialog, findings);
+                AuditTitleCard("own_report", dialog, findings);
             }
         }
 
@@ -1264,6 +1390,7 @@ namespace CodexAutoResume
                 ShowVersionRows(state, rows, listed);
                 if (versionsList != null) AuditList("versions/" + AuditName(versionsList), versionsList, findings);
                 AuditSpoken("versions", dialog, findings);
+                AuditTitleCard("versions", dialog, findings);
             }
         }
 
@@ -1279,13 +1406,26 @@ namespace CodexAutoResume
                 dialog.TopLevel = false;
                 Materialise(dialog);
                 dialog.PerformLayout();
-                // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller: the window
-                // opens only at a text size whose dialogs its screen holds (TextScale.Fitting).
-                bool whole = dialog.ClientSize.Width >= Px(600);
+                // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller than it was
+                // laid out for (HeldByScreen): the window opens only at a text size whose dialogs its screen holds
+                // (TextScale.Fitting). v0.6.24: its title card's strip is in the dialog now, as large as the text, where
+                // Windows' caption was outside it - so in a dialog held to a small screen (200% at the largest text size
+                // on 1024 by 768) the text box is left less than a line: what is cut off there is the screen's, and no
+                // whole line is asked in it, as in the Settings page's own-value dialogs (AuditOwnDialog).
+                bool whole = !HeldByScreen(dialog);
                 if (whole && conversationArea != null && conversationArea.Right > dialog.ClientSize.Width)
                     findings.Add("conversation message :: its text box reaches past the dialog, " + conversationArea.Right +
                                  " in " + dialog.ClientSize.Width);
-                AuditSpoken("conversation message", dialog, findings);
+                AuditLines = whole;
+                try
+                {
+                    AuditSpoken("conversation message", dialog, findings);
+                    AuditTitleCard("conversation message", dialog, findings);
+                }
+                finally
+                {
+                    AuditLines = true;
+                }
             }
         }
 
@@ -1301,11 +1441,26 @@ namespace CodexAutoResume
                 dialog.TopLevel = false;
                 Materialise(dialog);
                 dialog.PerformLayout();
-                bool whole = dialog.ClientSize.Width >= Px(600);
+                // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller than it was
+                // laid out for (HeldByScreen): the window opens only at a text size whose dialogs its screen holds
+                // (TextScale.Fitting). v0.6.24: its title card's strip is in the dialog now, as large as the text, where
+                // Windows' caption was outside it - so in a dialog held to a small screen (200% at the largest text size
+                // on 1024 by 768) the text box is left less than a line: what is cut off there is the screen's, and no
+                // whole line is asked in it, as in the Settings page's own-value dialogs (AuditOwnDialog).
+                bool whole = !HeldByScreen(dialog);
                 if (whole && onceWordsArea != null && onceWordsArea.Right > dialog.ClientSize.Width)
                     findings.Add("words for this time :: its text box reaches past the dialog, " + onceWordsArea.Right +
                                  " in " + dialog.ClientSize.Width);
-                AuditSpoken("words for this time", dialog, findings);
+                AuditLines = whole;
+                try
+                {
+                    AuditSpoken("words for this time", dialog, findings);
+                    AuditTitleCard("words for this time", dialog, findings);
+                }
+                finally
+                {
+                    AuditLines = true;
+                }
             }
         }
 
@@ -1357,10 +1512,21 @@ namespace CodexAutoResume
 
         /// Whether AuditSpoken holds every text box it passes to a whole line (AuditTextLine). Off only while a dialog that
         /// Windows has made smaller than it was laid out for - one larger than SystemInformation.MaxWindowTrackSize, on a
-        /// small screen - is asked its names (SettingsForm.AuditOwnValues): what is cut off there is the screen's clamp, not
-        /// the layout, the reason the rest of that dialog's layout is not walked either, and the window never opens at
-        /// that text size on that screen (TextScale.Fitting).
+        /// small screen (HeldByScreen) - is asked its names (SettingsForm.AuditOwnValues, and from v0.6.24 the
+        /// conversation's message and the words for this time): what is cut off there is the screen's clamp, not the
+        /// layout, the reason the rest of that dialog's layout is not walked either, and the window never opens at that
+        /// text size on that screen (TextScale.Fitting).
         internal static bool AuditLines = true;
+
+        /// Whether Windows has made `dialog` smaller than it was laid out for: no form is larger than the largest window the
+        /// screen allows (SystemInformation.MaxWindowTrackSize), so on a screen too small for it - 200% at the largest text
+        /// size on a screen 1024 wide - it is held to that. The window opens only at a text size whose dialogs its screen
+        /// holds (TextScale.Fitting), so no person meets such a dialog: the audit leaves its layout alone.
+        internal static bool HeldByScreen(Form dialog)
+        {
+            Size most = SystemInformation.MaxWindowTrackSize;
+            return dialog.Width >= most.Width || dialog.Height >= most.Height;
+        }
 
         /// v0.6.11: every control in `parent` that is showing, that a person can act on (Actionable), and that a screen
         /// reader would announce with no name - the name it is given (AccessibleName), or else the one Windows makes of

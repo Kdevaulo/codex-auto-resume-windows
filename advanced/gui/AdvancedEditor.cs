@@ -183,7 +183,7 @@ namespace CodexAutoResume
             editorPrompt = editing ? Whole(Get(row, "prompt_id")) : -1;
             string title = editing ? Word("page.editor.title_edit", "Edit the message")
                                    : Word("page.editor.title_new", "Schedule a message");
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = title;
             dialog.Font = Font;
             dialog.BackColor = Canvas;
@@ -421,7 +421,8 @@ namespace CodexAutoResume
             editorBody.PerformLayout();
             int tall = Math.Max(editorBody.Height, editorBody.GetPreferredSize(new Size(width, 0)).Height);
             int buttonsTall = editorButtons.GetPreferredSize(new Size(width, 0)).Height;
-            int want = Math.Max(Px(240), Math.Min(tall + buttonsTall, EditorMost()));
+            // v0.6.24: and the dialog's title card above it, once it has one (SoftDialog.TitleRoom).
+            int want = Math.Max(Px(240), Math.Min(tall + buttonsTall + SoftDialog.TitleRoom(editorDialog), EditorMost()));
             if (editorDialog.ClientSize.Height != want) editorDialog.ClientSize = new Size(width, want);
         }
 

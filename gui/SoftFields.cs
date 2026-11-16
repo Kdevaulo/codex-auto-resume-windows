@@ -763,7 +763,7 @@ namespace CodexAutoResume
             if (hooked) return;
             foreach (Control child in Spin.Controls)
             {
-                if (child is TextBox) continue;
+                if (child is TextBox) { EditMenu.Attach((TextBox)child); continue; }   // its edit part: our menu
                 Control buttons = child;
                 hooked = true;
                 buttons.HandleCreated += delegate { painter = new SpinPainter(buttons); };
@@ -1186,6 +1186,7 @@ namespace CodexAutoResume
             Box.LostFocus += delegate { focus.To(0.0, Motion.Allowed(this)); };
             Box.TextChanged += delegate { Changed(); };
             Box.HandleCreated += delegate { Changed(); };
+            EditMenu.Attach(Box);                        // a right-click opens our menu, with Windows' words
             watcher = new Watcher(this);
             clip.BackColor = Palette.Inset;
             clip.Controls.Add(Box);

@@ -1,7 +1,6 @@
 """The popup's seventh press: seven presses of its title, the light's sweep, and one sentence in the state line for a moment."""
 from __future__ import annotations
 
-import ctypes as C
 import time
 
 from ... import brand
@@ -25,8 +24,7 @@ class PopupHidden:
         plan = self._painted_plan
         if plan is None:
             return
-        x = C.c_short(lparam & 0xFFFF).value
-        y = C.c_short((lparam >> 16) & 0xFFFF).value
+        x, y = self._client_point(lparam)
         for item in plan["items"]:
             if item["kind"] == "title_press":
                 left, top, right, bottom = item["rect"]

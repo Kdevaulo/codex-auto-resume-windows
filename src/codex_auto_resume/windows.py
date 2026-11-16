@@ -21,7 +21,7 @@ from .win.homelock import HomeLock, INSTALL_LOCK, install_in_progress
 from .win.inventory import resource_users, restart_manager_available
 from .win.kernel import (APPMODEL_ERROR_NO_PACKAGE, CREATE_BREAKAWAY_FROM_JOB,
                          JOB_BREAKAWAY_OK, JOB_KILL_ON_CLOSE, JOB_SILENT_BREAKAWAY_OK,
-                         NO_WINDOW, process_context, process_identity)
+                         NO_WINDOW, process_context, process_identity, running_images)
 from .win.sync import Mutex, StopEvent, WakeEvent, wait_any
 
 __all__ = ["APPMODEL_ERROR_NO_PACKAGE", "AdapterError", "Backend", "CREATE_BREAKAWAY_FROM_JOB",
@@ -30,5 +30,5 @@ __all__ = ["APPMODEL_ERROR_NO_PACKAGE", "AdapterError", "Backend", "CREATE_BREAK
            "Protocol", "REQUIRED_QUEUE_FLAGS", "StopEvent", "UNAVAILABLE", "WakeEvent",
            "app_engines", "canonical_uuid", "desktop_pair",
            "install_in_progress", "inventory", "official_engine", "parse_usage", "process_context",
-           "process_identity", "resource_users", "restart_manager_available",
+           "process_identity", "resource_users", "restart_manager_available", "running_images",
            "verified_versions", "wait_any"]

@@ -75,7 +75,9 @@ class MirrorSourceTests(unittest.TestCase):
                         "mirrored in light as in dark")
         for source in guiscan.sources() + [ROOT / name for name in advanced_sources()]:
             text = source.read_text(encoding="utf-8")
-            for match in re.finditer(r"var dialog = new Form\(\);|using \(var dialog = new Form\(\)\)", text):
+            # v0.6.24: a dialog is a SoftDialog (gui/SoftChrome.cs).
+            for match in re.finditer(r"var dialog = new (?:Form|SoftDialog)\(\);|using \(var dialog = new (?:Form|SoftDialog)\(\)\)",
+                                     text):
                 with self.subTest(source=source.name, at=match.start()):
                     self.assertIn("Soft.DialogBar(dialog);", text[match.start():match.start() + 800])
         self.assertIn("TitleBar(dialog);", guiscan.member_body("Soft", "DialogBar"))

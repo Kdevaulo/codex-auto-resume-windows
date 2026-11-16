@@ -9,6 +9,7 @@ from __future__ import annotations
 from ctypes import wintypes as W
 import ctypes as C
 import itertools
+import math
 import os
 import threading
 import time
@@ -21,10 +22,11 @@ from .model import PopupModel, select_action
 from .motion import GLIDE_FRAME_MS, animates, glide_amount, halo, next_glides, scene_ms
 from .placement import focus_order, place
 from .renderer import Renderer
+from .layers import PopupCard
 from ...win import textsize
 from . import access
 from . import theme as look                # the questions below are asked through it
-from .theme import adopt_settings, appearance, design_setting, effective_theme, theme_setting
+from .theme import adopt_settings, design_setting, effective_theme, theme_setting
 from .win32 import (MF_CHECKED,
                     MF_GRAYED,
                     MF_POPUP,
@@ -36,10 +38,6 @@ from .win32 import (MF_CHECKED,
                     TPM_RIGHTALIGN,
                     TPM_RIGHTBUTTON,
                     CS_DROPSHADOW,
-                    DWMWA_USE_IMMERSIVE_DARK_MODE,
-                    DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
-                    DWMWA_WINDOW_CORNER_PREFERENCE,
-                    DWMWCP_ROUND,
                     HWND_TOPMOST,
                     IDC_ARROW,
                     MONITORINFO,
@@ -53,13 +51,13 @@ from .win32 import (MF_CHECKED,
                     TIMER_TICK,
                     WM_POPUP_RESULT,
                     WM_POPUP_STRINGS,
+                    WS_EX_LAYERED,
                     WS_EX_TOOLWINDOW,
                     WS_EX_TOPMOST,
                     WS_POPUP,
                     _PerMonitorDpi,
                     _declare,
-                    _dll,
-                    _signature)
+                    _dll)
 from .words import locale_of, say, vocabulary
 
 
@@ -71,7 +69,7 @@ _LIVING = set()
 
 
 # ------------------------------------------------------------------------------ the window
-class Popup(PopupMessages):
+class Popup(PopupMessages, PopupCard):
     """The window itself. Created, shown, hidden and destroyed on the icon's thread only;
     `set_strings` is the one method another thread may call."""
 
@@ -90,6 +88,9 @@ class Popup(PopupMessages):
     # Nothing on its way in, no face changing and no frame timer (v0.6.23), for a Popup made without __init__.
     _opening = _faces = _frame_ms = _home = _face_states = None
     _below, _layered = 0, False
+    # v0.6.24: the window is the card (layers.py) - its two layers, whether it is the card (False: the plain window it
+    # falls back to), how opaque the opening has it, whether a picture is owed, and which rows the last frame drew.
+    _layers, _card, _alpha, _owed, _rows = None, False, 255, False, None
 
     def __init__(self, *, control=None, source=None, strings=None, on_dashboard=None, log=None,
                  anchor=None, theme_menu=None, make_menu=None, days=False, held=None):
@@ -167,7 +168,8 @@ class Popup(PopupMessages):
         self._proc = WNDPROC(self._wndproc)
         _LIVING.add(self)
         klass = WNDCLASSW()
-        klass.style = CS_DROPSHADOW
+        # v0.6.24: no class shadow - the card's own lies on the desktop (layers.py); a plain window keeps it.
+        klass.style = 0 if self._can_be_card() else CS_DROPSHADOW
         klass.lpfnWndProc = self._proc
         klass.hInstance = instance
         klass.hCursor = user32.LoadCursorW(None, C.c_void_p(IDC_ARROW))
@@ -178,13 +180,18 @@ class Popup(PopupMessages):
             raise OSError("RegisterClassW")
         try:
             with _PerMonitorDpi():
-                self.hwnd = user32.CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST, self._class,
-                                                   say(self.model.strings, "tray.title"), WS_POPUP,
-                                                   0, 0, WIDTH, 120, None, None, instance, None)
+                owner = self._make_layers(instance) if klass.style == 0 else None
+                style = WS_EX_TOOLWINDOW | WS_EX_TOPMOST | (WS_EX_LAYERED if owner else 0)
+                self.hwnd = user32.CreateWindowExW(style, self._class, say(self.model.strings, "tray.title"), WS_POPUP,
+                                                   0, 0, WIDTH, 120, owner, None, instance, None)
             if not self.hwnd:
                 raise OSError("CreateWindowExW")
             self._renderer = Renderer()
-            self._round_corners()
+            self._card = self._renderer.lone = owner is not None
+            if not self._card:
+                if klass.style == 0:
+                    self._class_shadow()         # no card after all: the plain window, its class shadow too
+                self._round_corners()
             getter = getattr(user32, "GetDpiForWindow", None)
             self.dpi = (getter(self.hwnd) if getter is not None else 0) or 96
         except Exception:
@@ -201,12 +208,15 @@ class Popup(PopupMessages):
                 self.log("tray popup menu cleanup failed (%s)" % type(exc).__name__)
         access.disconnect(self)
         hwnd, self.hwnd = self.hwnd, None
-        _LIVING.discard(self)
         self.visible = False
         if hwnd:
             for timer in (TIMER_TICK, TIMER_FRAME, TIMER_FIRST):
                 user32.KillTimer(hwnd, timer)
             user32.DestroyWindow(hwnd)
+        layers, self._layers, self._card = self._layers, None, False
+        if layers is not None:
+            layers.close()                       # the shadow window, which owned the card's: after it
+        _LIVING.discard(self)
         self._frame_running = False
         self._opening, self._layered = None, False
         if self._renderer is not None:
@@ -277,6 +287,9 @@ class Popup(PopupMessages):
         if self.visible:
             self.visible = False
             user32.ShowWindow(hwnd, SW_HIDE)
+            if self._layers is not None:
+                self._layers.hide()
+                self._layers.forget()
             self.hidden_at = time.monotonic()
         self._end_opening()
         self._faces, self._face_states = {}, None
@@ -327,22 +340,6 @@ class Popup(PopupMessages):
             self._theme, self._design = theme, design
             self._static_dirty = True
 
-    def _frame_theme(self):
-        """Tell DWM whether the window is dark, so the hairline Windows 11 draws round it matches."""
-        dark = appearance(self._theme, contrast=self._contrast) == "dark"
-        if not self.hwnd or dark == self._framed_dark:
-            return
-        self._framed_dark = dark
-        try:
-            value = C.c_int(1 if dark else 0)
-            dwm = _dll("dwmapi")
-            _signature(dwm.DwmSetWindowAttribute, C.c_long, C.c_void_p, W.DWORD, C.c_void_p, W.DWORD)
-            for attribute in (DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1):
-                if dwm.DwmSetWindowAttribute(self.hwnd, attribute, C.byref(value), C.sizeof(value)) == 0:
-                    break
-        except Exception:
-            pass                                   # a frame that stays light is not worth a failure
-
     def follow_settings(self, values):
         """Take up what a read of the stored settings says: the language, the theme, the design, Reduce motion.
 
@@ -359,24 +356,6 @@ class Popup(PopupMessages):
         self._reduced = look.reduced_motion() or self._contrast
 
     # ------------------------------------------------------------------- presenting
-    def _round_corners(self):
-        try:
-            value = C.c_int(DWMWCP_ROUND)
-            dwm = _dll("dwmapi")
-            _signature(dwm.DwmSetWindowAttribute, C.c_long, C.c_void_p, W.DWORD, C.c_void_p, W.DWORD)
-            self._rounded = dwm.DwmSetWindowAttribute(self.hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
-                                                      C.byref(value), C.sizeof(value)) == 0
-        except Exception:
-            self._rounded = False
-
-    def _shape(self, width, height):
-        if self._rounded:
-            return
-        radius = int(round(8 * self.dpi / 96.0)) * 2
-        region = _dll("gdi32").CreateRoundRectRgn(0, 0, width + 1, height + 1, radius, radius)
-        if region and not _dll("user32").SetWindowRgn(self.hwnd, region, True):
-            _dll("gdi32").DeleteObject(region)            # only a region the system took is its own
-
     def _screen_now(self):
         user32 = _dll("user32")
         with _PerMonitorDpi():
@@ -417,18 +396,31 @@ class Popup(PopupMessages):
         self._frame_theme()
         self._start_opening()
         self.visible = True
-        user32.InvalidateRect(self.hwnd, None, False)
+        if self._card:
+            self._push()                 # its first picture is on the layers before they show: never an empty frame
+        if self._card:
+            self._layers.show()
+        else:
+            user32.InvalidateRect(self.hwnd, None, False)
         user32.ShowWindow(self.hwnd, SW_SHOW if activate else SW_SHOWNOACTIVATE)
         if activate:
             user32.SetForegroundWindow(self.hwnd)
             user32.SetFocus(self.hwnd)
         user32.SetTimer(self.hwnd, TIMER_TICK, 1000, None)
         self._sync_frames()
-        user32.UpdateWindow(self.hwnd)
+        if not self._card:
+            user32.UpdateWindow(self.hwnd)
         self._speak()
 
     def _move(self, plan, origin=None):
+        """Where it opens: beside the icon, SPACING m from the taskbar and the work area's edges. Since v0.6.24 that is
+        the card's own edge - the visible popup keeps the gap the grey window kept, as the notification card keeps it
+        from the taskbar (ui/card/stack.py) and as Windows' own flyouts stand - with its shadow reaching into the gap;
+        `origin`, and `_home`, are then the card's corner. A plain window is placed by its whole canvas, as before."""
         width, height = plan["size"]
+        if self._card:
+            card = plan["card"]
+            width, height = card[2] - card[0], card[3] - card[1]
         screen = self._screen
         if origin is not None:
             x, y = origin
@@ -437,6 +429,10 @@ class Popup(PopupMessages):
             x, y, _ = place((width, height), screen["work"], screen["monitor"], screen["icon"],
                             screen["cursor"], gap=gap)
         self._origin, self._home = origin, (x, y)
+        if self._card:
+            if self.visible:
+                self._push()                     # its new size, and place, at once
+            return
         with _PerMonitorDpi():
             _dll("user32").SetWindowPos(self.hwnd, C.c_void_p(HWND_TOPMOST), x, y + self._below, width, height,
                                         SWP_NOACTIVATE)
@@ -511,7 +507,7 @@ class Popup(PopupMessages):
         if self.visible:
             self._frame_theme()
         self._sync_frames()
-        _dll("user32").InvalidateRect(self.hwnd, None, False)
+        self._redraw()
         self._speak()
 
     def _speak(self):
@@ -567,19 +563,24 @@ class Popup(PopupMessages):
         faces = self._face_glides()
         self.step_hidden()
         if self._static_dirty or self._renderer.halo_plan is not self._plan:
-            self._static_dirty = False
+            self._static_dirty, self._rows = False, None           # a whole frame
             return self._renderer.draw(self._vm, self._plan, frame=self.frame(), hover=self.hover,
                                        pressed=self.pressed, focus=self.focus if self.keyboard else None,
                                        glides=self._glide_amounts(), scene_ms=scene_ms(self._holds(), self._scene_since),
                                        faces=faces)
         canvas = self._renderer.draw_halo(self._plan, self.frame())
-        return self._renderer.draw_scene(self._plan, scene_ms(False, self._scene_since)) if self._vm.get("scene") and not self._holds() else canvas
+        self._rows = self._renderer.halo_rows                     # v0.6.24: all a frame of the light changes
+        scene = next((item for item in self._plan["items"] if item["kind"] == "scene"), None)
+        if scene is None or not self._vm.get("scene") or self._holds():
+            return canvas
+        top, bottom = int(scene["rect"][1]), int(math.ceil(scene["rect"][3]))
+        self._rows = (min(self._rows[0], top), max(self._rows[1], bottom)) if self._rows else (top, bottom)
+        return self._renderer.draw_scene(self._plan, scene_ms(False, self._scene_since))
 
     def _invalidate(self):
         """Something other than the halo changed: the next frame is drawn whole."""
         self._static_dirty = True
-        if self.hwnd:
-            _dll("user32").InvalidateRect(self.hwnd, None, False)
+        self._redraw()
 
     # ------------------------------------------------------------ a row's own menu (v0.6.11)
     def _context_menu(self, lparam):
@@ -597,13 +598,16 @@ class Popup(PopupMessages):
             rect = dict(plan.get("rows") or ()).get(key)
             if rect is None:
                 return
-            point.x, point.y = rect[2] if plan.get("rtl") else rect[0], rect[1]
+            dx, dy = self._client_offset()
+            point.x, point.y = (rect[2] if plan.get("rtl") else rect[0]) - dx, rect[1] - dy
             user32.ClientToScreen(self.hwnd, C.byref(point))
         else:
             point.x = C.c_short(lparam & 0xFFFF).value
             point.y = C.c_short((lparam >> 16) & 0xFFFF).value
             inside = W.POINT(point.x, point.y)
             user32.ScreenToClient(self.hwnd, C.byref(inside))
+            dx, dy = self._client_offset()
+            inside.x, inside.y = inside.x + dx, inside.y + dy
             key = next((key for key, (left, top, right, bottom) in plan.get("rows") or ()
                         if left <= inside.x < right and top <= inside.y < bottom), None)
         entries = self.model.menu_for(key) if key else []

@@ -6,6 +6,8 @@ bootstrap run themselves (or the installation's setup) again outside an MSIX app
 run with every path and value spliced in as a quoted literal (the 2026-11-12 standards audit, S3); now
 Get-OutsideSource is constant and Get-OutsideVariables puts what the run is to do into the environment block of the
 Win32_ProcessStartup, as CODEX_AUTO_RESUME_RELAY_* variables the run outside reads and takes out of its environment.
+From v0.6.24 (issue #65) the constant is not on the command line at all, as base64 or otherwise: it is written to
+outside.ps1 in the run's own folder and started with -File, and the folder goes when the run ends.
 
 The whole gate is lifted from each script and Resolve-OutsideRun runs twice with different values - quotes of every
 kind PowerShell ends a string at, `$`, a backtick, a path with spaces and non-ASCII letters - its process table
@@ -55,6 +57,11 @@ function Invoke-CimMethod {
     param([string]$ClassName, [string]$MethodName, [hashtable]$Arguments)
     $line = [string]$Arguments.CommandLine
     $script:lineSeen = $line
+    $at = $line.IndexOf(' -File "')
+    if ($at -ge 0) {
+        $script:fileSeen = $line.Substring($at + 8, $line.Length - $at - 9)
+        $script:sourceSeen = [IO.File]::ReadAllText($script:fileSeen)
+    }
     $close = $line.IndexOf('"', 1)
     $info = New-Object System.Diagnostics.ProcessStartInfo($line.Substring(1, $close - 1), $line.Substring($close + 2))
     $info.UseShellExecute = $false
@@ -75,9 +82,12 @@ $answers = @()
 foreach ($run in $v) {
     $script:lineSeen = $null
     $script:startupSeen = $null
+    $script:fileSeen = $null
+    $script:sourceSeen = $null
     $code = Resolve-OutsideRun -Script $run.script -Switches @('Uninstall') -Values @{ PluginName = $run.plugin } `
                                -Arguments @($run.argument) -Environment @{ CAR_QUOTED = $run.variable }
-    $answers += ,([ordered]@{ code = $code; line = $script:lineSeen
+    $answers += ,([ordered]@{ code = $code; line = $script:lineSeen; file = $script:fileSeen; source = $script:sourceSeen
+                             left = (Test-Path -LiteralPath ([string]$script:fileSeen))
                              relay = @(@($script:startupSeen.EnvironmentVariables) | Where-Object { $_ -like 'CODEX_AUTO_RESUME_RELAY_*' }) })
 }
 'SOURCE ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-OutsideSource)))
@@ -133,16 +143,30 @@ class ConstantOutsideScriptTests(unittest.TestCase):
         answers = json.loads(next(line[5:] for line in done.stdout.splitlines() if line.startswith("JSON ")))
         source = base64.b64decode(next(line[7:] for line in done.stdout.splitlines() if line.startswith("SOURCE ")))
         seen = [json.loads((folder / "seen.json").read_text(encoding="utf-8-sig")) for folder in folders]
+        self.temp_folder = temp_folder
         return runs, answers, source.decode("utf-8"), seen, done.stdout
 
     def check(self, name: str):
         runs, answers, source, seen, said = self.runs(name)
         self.assertEqual([answer["code"] for answer in answers], [3, 3], said)
         self.assertIn("the stand-in ran", said, "what the run outside printed is passed on")
-        first, second = (answer["line"] for answer in answers)
-        self.assertEqual(first, second, "the encoded script differs between two runs with different values")
-        encoded = first.rsplit(" ", 1)[1]
-        self.assertEqual(base64.b64decode(encoded).decode("utf-16-le"), source)
+        for answer in answers:
+            line, file = answer["line"], answer["file"]
+            self.assertTrue(line.endswith(' -File "%s"' % file), line)
+            self.assertEqual(Path(file).name, "outside.ps1")
+            # By the folder itself, not its spelling: a CI runner's TEMP is an 8.3 short path (RUNNER~1) that the
+            # installer's own folder names in its long form.
+            self.assertTrue(os.path.samefile(Path(file).parent.parent, self.temp_folder),
+                            "the run's own folder in TEMP: %s, not under %s" % (file, self.temp_folder))
+            self.assertTrue(Path(file).parent.name.startswith("CodexAutoResume-Outside-"), file)
+            self.assertFalse(answer["left"], "the file goes with the run's folder")
+            self.assertEqual(answer["source"], source, "the file holds the constant, unformatted")
+            self.assertNotIn("EncodedCommand", line)
+            self.assertNotIn(base64.b64encode(source.encode("utf-16-le")).decode("ascii")[:40], line)
+            self.assertNotIn("relay", line.lower())
+        first, second = (answer["line"].replace(answer["file"], "<file>") for answer in answers)
+        self.assertEqual(first, second, "the command line differs, but for the run's own folder, between two runs")
+        self.assertEqual(list(self.temp_folder.iterdir()), [], "nothing of either run is left in TEMP")
         for run in runs:
             for value in run.values():
                 self.assertNotIn(value, source)

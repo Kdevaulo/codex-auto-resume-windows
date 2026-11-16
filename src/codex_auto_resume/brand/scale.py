@@ -11,6 +11,14 @@ from __future__ import annotations
 # multiplies by its own scale factor; the panel writes these as CSS pixels. One table,
 # so a card in the window and a card in Codex round their corners by the same amount.
 RADII = {"card": 16, "control": 11, "chip": 999, "small": 7, "check": 5}
+# v0.6.24: how far a corner eases into its sides - Figma's corner smoothing, 60 % (brand/shape.py). A
+# corner of radius R begins (1 + this) * R from its vertex instead of R; the radii above are unchanged.
+CORNER_SMOOTHING = 0.6
+# v0.6.24 (stage 1, surface E): whether the Dashboard window cuts its own outer corner - the card's radius, smoothed as
+# the cards are - instead of Windows' round one (gui/SoftWindowShape.cs). On from v0.6.24-beta at the owner's word
+# (2026-11-16), before the live measurement M-CORNER (plans/v0624-stage1-design.md 5.4), which still runs before the
+# final. Off, the window is exactly as without it.
+WINDOW_SQUIRCLE = True
 SPACING = {"xs": 4, "s": 8, "m": 12, "l": 16, "xl": 24, "xxl": 32}
 # The notification-area popup's type sizes. The panel sets its own (TYPE_SCALE, below) and
 # the settings window keeps the system message font, so this table is the popup's alone.
@@ -93,7 +101,21 @@ LAYOUT = {
     "focus_width": 2,
     "focus_offset": 2,
     "hairline": 1,
+    # v0.6.24: the window's own caption buttons - minimise, maximise, close - in its first card, where Windows' title bar
+    # was (gui/SoftChrome.cs): each a body this big, this far apart, its glyph in a box this big with corners this round,
+    # the group this far in from the card's top and outer edge. The glyph's stroke is CAPTION_STROKE.
+    "caption_button_w": 34,
+    "caption_button_h": 26,
+    "caption_gap": 4,
+    "caption_glyph": 10,
+    "caption_glyph_corner": 2,
+    "caption_inset_top": 10,
+    "caption_inset_end": 10,
 }
+
+# v0.6.24: the caption buttons' glyph stroke, in CSS px - never thinner than one device pixel where it is drawn. Not in
+# LAYOUT, whose every size is a whole pixel.
+CAPTION_STROKE = 1.3
 
 
 

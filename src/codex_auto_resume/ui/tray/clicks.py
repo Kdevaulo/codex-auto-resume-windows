@@ -39,6 +39,7 @@ class ClicksMixin:
                 pass
 
     def _select(self, keyboard=False):
+        self._hide_tip()                         # v0.6.24: the icon's tooltip card goes as the popup comes
         self._adopt_settings()
         popup = self._popup_for_click()
         if popup is None:
@@ -60,6 +61,7 @@ class ClicksMixin:
         way the click makes and places it, and what it shows marked seen as the click marks it. The right click that
         opened the menu closed the popup (icon.py), so here it opens - never the click's toggle, whose closing would
         undo the choice; one already open, or about to be, is shown and brought forward."""
+        self._hide_tip()
         self._adopt_settings()
         popup = self._popup_for_click()
         if popup is None:
@@ -104,6 +106,7 @@ class ClicksMixin:
         self._refresh()
 
     def _double_click(self):
+        self._hide_tip()
         self._adopt_settings()
         popup = self._popup_for_click()
         if popup is None:

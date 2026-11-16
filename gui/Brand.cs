@@ -80,6 +80,9 @@ namespace CodexAutoResume
         internal const double TransitionEaseX2 = 0.68;
         internal const double TransitionEaseY2 = 1;
         internal const int AccentBar = 3;
+        internal const double CornerSmoothing = 0.6;
+        internal const double CaptionStroke = 1.3;
+        internal const bool WindowSquircle = true;
 
         internal const string HexAccent = "#1257B8";
         internal const string HexBrand = "#1257B8";
@@ -173,6 +176,13 @@ namespace CodexAutoResume
         internal const int FocusWidth = 2;
         internal const int FocusOffset = 2;
         internal const int Hairline = 1;
+        internal const int CaptionButtonW = 34;
+        internal const int CaptionButtonH = 26;
+        internal const int CaptionGap = 4;
+        internal const int CaptionGlyph = 10;
+        internal const int CaptionGlyphCorner = 2;
+        internal const int CaptionInsetTop = 10;
+        internal const int CaptionInsetEnd = 10;
 
         // The panel's light elevation (brand.SHADOWS): one shadow in ShadowDark and one highlight in
         // ShadowLight per recipe, in CSS px, and how far each recipe reaches past its box. A blur
@@ -595,6 +605,15 @@ namespace CodexAutoResume
             if (role == "small") return 7;
             if (role == "check") return 5;
             return 0;
+        }
+
+        /// v0.6.24: how much a design smooths its corners (brand/shape.py's DESIGN_SMOOTHING): Figma's corner
+        /// smoothing, a share of the radius; 0 is the circular corner.
+        internal static double DesignSmoothing(string design)
+        {
+            if (design == "classic") return 0;
+            if (design == "plain") return 0;
+            return 0.6;
         }
 
         /// One design in one theme (Brand.Look): `design` as DesignOf reads it, dark or light. What the window

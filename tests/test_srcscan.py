@@ -60,9 +60,10 @@ class ListingTests(unittest.TestCase):
                          [srcscan.modules()["codex_auto_resume.machine"]])
         # A package gives every file in it: since v0.6.10-alpha the popup is thirteen - fourteen
         # since v0.6.10 took the window's messages out of window.py, fifteen since v0.6.11 told a
-        # screen reader what is in it, seventeen since v0.6.20 drew the icon's right-click menu there -
+        # screen reader what is in it, seventeen since v0.6.20 drew the icon's right-click menu there,
+        # nineteen with `__init__` since v0.6.24 made its window the card (layers.py), twenty with the light (light.py) -
         # and a rule written about `tray_popup` covers all of them without naming one.
-        self.assertEqual(len(srcscan.files_of("codex_auto_resume.ui.popup")), 18)
+        self.assertEqual(len(srcscan.files_of("codex_auto_resume.ui.popup")), 20)
         self.assertIn(srcscan.modules()["codex_auto_resume.ui.popup.window"],
                       srcscan.files_of("codex_auto_resume.ui.popup"))
 

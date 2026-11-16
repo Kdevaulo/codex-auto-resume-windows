@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 from ... import brand
+from ...brand import shape
 
 
 # v0.6.5: depth inside the card (requirement 11). Until then everything on the popup's card was
@@ -93,8 +94,8 @@ def _remember(key, mask):
     return mask
 
 
-def lift_coverage(width, height, radius, blur) -> dict:
-    """An outer shadow's shape: a rounded rectangle blurred by `blur`, in device pixels.
+def _lift_round(width, height, radius, blur) -> dict:
+    """A circular-cornered body's outer shadow (see lift_coverage): v0.6.5's mask, byte for byte.
 
     The image is the body - never wider or taller than its two corners and one straight pixel
     between them - with `extent` pixels of blur on every side, so its middle row and column
@@ -124,8 +125,8 @@ def lift_coverage(width, height, radius, blur) -> dict:
                            "coverage": b"".join(rows)})
 
 
-def well_coverage(width, height, radius, blur, dx, dy) -> dict:
-    """An inset shadow inside a box of `width` x `height`: how much of it shows at each pixel.
+def _well_round(width, height, radius, blur, dx, dy) -> dict:
+    """A circular-cornered box's inset shadow (see well_coverage): v0.6.5's mask, byte for byte.
 
     CSS draws an inset shadow as everything outside the box, moved by (dx, dy) and blurred, cut
     to the box. The cut is in the coverage here, antialiased, so nothing has to be clipped. The
@@ -154,6 +155,150 @@ def well_coverage(width, height, radius, blur, dx, dy) -> dict:
             if inside > 0:
                 hole = _blurred(_rounded_distance(x - dx, y - dy, half_w, half_h, radius), sigma)
                 data[j * box_w + i] = int((1.0 - hole) * inside * 255 + 0.5)
+    return _remember(key, {"key": key, "width": box_w, "height": box_h, "centre": (box_w // 2, box_h // 2),
+                           "extent": 0, "coverage": bytes(data)})
+
+
+# v0.6.24: the corners are Figma's squircle (brand/shape.py), so a shadow is the squircle's, blurred. The
+# distance is the one brand.shape gives - along the ray from the corner's centre, leant onto the outline's
+# normal - which is the circle's exactly and, against a true blur of the squircle, within the two and a half
+# levels the comment above accepts (tests/test_squircle_shadows.py). A corner the budget left circular - a
+# pill, a short control - is made exactly as before. Each mask is kept by its box as before, with the
+# smoothing in its key, and its box is two corners as the squircle measures them (p, not the radius).
+_SOFT = shape.design_smoothing("soft")
+
+
+def _level_of(sigma):
+    """A blurred edge's coverage at a distance, as a byte, as _blurred rounds it."""
+    if sigma <= 0:
+        return lambda distance: int(max(0.0, min(1.0, 0.5 - distance)) * 255 + 0.5)
+    factor = 1.0 / (sigma * math.sqrt(2.0))
+    erfc = math.erfc
+    return lambda distance: int(127.5 * erfc(distance * factor) + 0.5)
+
+
+def lift_coverage(width, height, radius, blur, smoothing=None) -> dict:
+    """An outer shadow's shape: a rounded rectangle blurred by `blur`, in device pixels.
+
+    The image is the body - never wider or taller than its two corners and one straight pixel
+    between them - with `extent` pixels of blur on every side, so its middle row and column
+    stand for a straight edge of any length and one image serves every body of its kind. It is
+    symmetric: a quarter is worked out and the rest is its mirror. It is kept by the box it is
+    made from, not the body, so a taller card or a wider button finds the image already made.
+    `smoothing` is the corners' (brand/shape.py), Soft's unless said: only Soft draws depth.
+    """
+    found = shape.corner(radius, _SOFT if smoothing is None else smoothing, min(width, height) / 2.0)
+    if not shape.smoothed(found):
+        return _lift_round(width, height, radius, blur)
+    core = 2 * int(math.ceil(found.p)) + 1
+    box_w, box_h = min(width, core), min(height, core)
+    radius, smoothing = found.radius, found.smoothing
+    key = ("lift", box_w, box_h, round(radius, 3), round(blur, 3), round(smoothing, 3))
+    if key in _MASKS:
+        return _MASKS[key]
+    sigma = blur / 2.0
+    extent = int(math.ceil(3 * sigma)) + 1
+    image_w, image_h = box_w + 2 * extent, box_h + 2 * extent
+    made = shape.profile(radius, smoothing, min(box_w, box_h) / 2.0)
+    p, rho, lean, steps = made.p, made.rho, made.lean, shape.RHO_STEPS
+    level = _level_of(sigma)
+    erfc, factor = math.erfc, (1.0 / (sigma * math.sqrt(2.0)) if sigma > 0 else 0.0)
+    across, down = (image_w + 1) // 2, (image_h + 1) // 2
+    qxs = [abs(i + 0.5 - image_w / 2.0) - (box_w / 2.0 - p) for i in range(across)]
+    qys = [abs(j + 0.5 - image_h / 2.0) - (box_h / 2.0 - p) for j in range(down)]
+    # Along a side the distance is max(qx, qy) - p, and a blurred edge only falls with distance, so a
+    # pixel there is the lesser of its column's and its row's level: no erfc of its own.
+    columns = [level(qx - p) for qx in qxs]
+    lines = [level(qy - p) for qy in qys]
+    square = image_w == image_h
+    hypot = math.hypot
+    rows = [b""] * image_h
+    made_rows = []
+    for j in range(down):
+        qy, line = qys[j], lines[j]
+        row = bytearray(image_w)
+        for i in range(across):
+            if square and i < j:
+                value = made_rows[i][j]
+            else:
+                qx = qxs[i]
+                if qx > 0.0 and qy > 0.0:
+                    k = int(qy / (qx + qy) * steps + 0.5)
+                    distance = (hypot(qx, qy) - rho[k]) * lean[k]
+                    value = int(127.5 * erfc(distance * factor) + 0.5) if factor else level(distance)
+                else:
+                    value = columns[i] if columns[i] < line else line
+            row[i] = row[image_w - 1 - i] = value
+        made_rows.append(row)
+        rows[j] = rows[image_h - 1 - j] = bytes(row)
+    return _remember(key, {"key": key, "width": image_w, "height": image_h,
+                           "centre": (image_w // 2, image_h // 2), "extent": extent,
+                           "coverage": b"".join(rows)})
+
+
+def well_coverage(width, height, radius, blur, dx, dy, smoothing=None) -> dict:
+    """An inset shadow inside a box of `width` x `height`: how much of it shows at each pixel.
+
+    CSS draws an inset shadow as everything outside the box, moved by (dx, dy) and blurred, cut
+    to the box. The cut is in the coverage here, antialiased, so nothing has to be clipped. The
+    middle row and column stand for a straight edge as in `lift_coverage`, with room for the
+    offset and the blur; a well's light and dark shadows are one image turned round. Like a
+    lift, it is kept by the box it is made from, which is the same box turned round.
+    `smoothing` is the corners' (brand/shape.py), Soft's unless said: only Soft draws depth.
+    """
+    found = shape.corner(radius, _SOFT if smoothing is None else smoothing, min(width, height) / 2.0)
+    if not shape.smoothed(found):
+        return _well_round(width, height, radius, blur, dx, dy)
+    sigma = blur / 2.0
+    reach = int(math.ceil(found.p)) + int(math.ceil(3 * sigma))
+    box_w = min(width, 2 * (reach + int(math.ceil(abs(dx)))) + 1)
+    box_h = min(height, 2 * (reach + int(math.ceil(abs(dy)))) + 1)
+    radius, smoothing = found.radius, found.smoothing
+    key = ("well", box_w, box_h, round(radius, 3), round(blur, 3), round(smoothing, 3), round(dx, 3), round(dy, 3))
+    if key in _MASKS:
+        return _MASKS[key]
+    turned = _MASKS.get(key[:6] + (round(-dx, 3), round(-dy, 3)))
+    if turned is not None:
+        return _remember(key, dict(turned, key=key, coverage=turned["coverage"][::-1]))
+    half_w, half_h = box_w / 2.0, box_h / 2.0
+    made = shape.profile(radius, smoothing, min(half_w, half_h))
+    p, rho, lean, steps = made.p, made.rho, made.lean, shape.RHO_STEPS
+    level = _level_of(sigma)
+    erfc, factor = math.erfc, (1.0 / (sigma * math.sqrt(2.0)) if sigma > 0 else 0.0)
+    hypot = math.hypot
+    xs = [i + 0.5 - half_w for i in range(box_w)]
+    ys = [j + 0.5 - half_h for j in range(box_h)]
+    # The box's own edge (its cut) and the moved edge (the hole), per column and per row; along a side
+    # each is the lesser of the two (as in lift_coverage), so only a corner asks for a distance.
+    cut_x = [abs(x) - (half_w - p) for x in xs]
+    cut_y = [abs(y) - (half_h - p) for y in ys]
+    hole_x = [abs(x - dx) - (half_w - p) for x in xs]
+    hole_y = [abs(y - dy) - (half_h - p) for y in ys]
+    hole_columns = [level(q - p) for q in hole_x]
+    hole_lines = [level(q - p) for q in hole_y]
+    data = bytearray(box_w * box_h)
+    for j in range(box_h):
+        cy, hy, hole_line = cut_y[j], hole_y[j], hole_lines[j]
+        base = j * box_w
+        for i in range(box_w):
+            cx = cut_x[i]
+            if cx > 0.0 and cy > 0.0:
+                k = int(cy / (cx + cy) * steps + 0.5)
+                cut = 0.5 - (hypot(cx, cy) - rho[k]) * lean[k]
+            else:
+                cut = 0.5 - ((cx if cx > cy else cy) - p)
+            if cut <= 0.0:
+                continue
+            if cut > 1.0:
+                cut = 1.0
+            hx = hole_x[i]
+            if hx > 0.0 and hy > 0.0:
+                k = int(hy / (hx + hy) * steps + 0.5)
+                distance = (hypot(hx, hy) - rho[k]) * lean[k]
+                hole = int(127.5 * erfc(distance * factor) + 0.5) if factor else level(distance)
+            else:
+                hole = hole_columns[i] if hole_columns[i] < hole_line else hole_line
+            data[base + i] = int((255 - hole) * cut + 0.5)
     return _remember(key, {"key": key, "width": box_w, "height": box_h, "centre": (box_w // 2, box_h // 2),
                            "extent": 0, "coverage": bytes(data)})
 

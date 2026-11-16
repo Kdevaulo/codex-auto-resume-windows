@@ -352,6 +352,17 @@ namespace CodexAutoResume
         {
             int radius = 2 * Math.Max(1, Soft.Px(Palette.RadiusCard) - Soft.Hairline);
             bool mirrored = Mirror.Of(this);
+            // v0.6.24: the card's outer two corners as the card draws them - the squircle (Shape) where the design
+            // smooths its corners, still a Region; the arcs below where it does not.
+            double smoothing = Shape.Smoothing;
+            if (Shape.Of(radius / 2.0, smoothing, Math.Min(Width, Height) / 2.0).Smoothed)
+            {
+                Shape.Corners outer = mirrored ? Shape.Corners.TopLeft | Shape.Corners.BottomLeft
+                                               : Shape.Corners.TopRight | Shape.Corners.BottomRight;
+                using (GraphicsPath squircle = Shape.Squircle(new RectangleF(0, 0, Width, Height), radius / 2f, smoothing, outer))
+                    Region = new Region(squircle);
+                return;
+            }
             using (var path = new GraphicsPath())
             {
                 int w = Width, h = Height;

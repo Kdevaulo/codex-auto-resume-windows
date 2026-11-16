@@ -111,7 +111,7 @@ namespace CodexAutoResume
         private Form BuildFollow(string conversation)
         {
             ForgetFollow();
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = Word("page.follow.title", "Follow-through") + " - " + conversation;
             dialog.Font = Font;
             dialog.BackColor = Canvas;

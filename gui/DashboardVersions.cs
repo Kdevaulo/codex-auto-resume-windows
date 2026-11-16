@@ -89,7 +89,7 @@ namespace CodexAutoResume
         /// greyed. It starts no process and no timer; StartVersionsListing does, from OpenVersions alone.
         private Form BuildVersions()
         {
-            var dialog = new Form();
+            var dialog = new SoftDialog();
             dialog.Text = S("pick.title", "Install another version");
             dialog.Font = Font;
             dialog.BackColor = Canvas;

@@ -477,7 +477,8 @@ class PopupAccessible:
                 left[0] = top[0] = width[0] = height[0] = 0
                 return S_FALSE
             else:
-                corner = W.POINT(item["rect"][0], item["rect"][1])
+                dx, dy = _offset(self.popup)                    # the popup's window is its card (v0.6.24)
+                corner = W.POINT(item["rect"][0] - dx, item["rect"][1] - dy)
                 _com("user32").ClientToScreen(hwnd, C.byref(corner))
                 box = (corner.x, corner.y, corner.x + item["rect"][2] - item["rect"][0],
                        corner.y + item["rect"][3] - item["rect"][1])
@@ -508,7 +509,8 @@ class PopupAccessible:
                 return self._empty(out)
             point = W.POINT(x, y)
             _com("user32").ScreenToClient(hwnd, C.byref(point))
-        return self._number(out, pick(self.items(), point.x, point.y))
+        dx, dy = _offset(self.popup)
+        return self._number(out, pick(self.items(), point.x + dx, point.y + dy))
 
     def _do_default_action(self, this, *variant):
         child, item = self._item(variant)
@@ -518,6 +520,13 @@ class PopupAccessible:
             return S_OK
         self.popup._activate(item["target"])
         return S_OK
+
+
+def _offset(window) -> tuple:
+    """Where `window`'s (0, 0) is on its plan: the card's corner for the popup, which is its card (v0.6.24); a drawn menu's
+    plan is its window's own."""
+    offset = getattr(window, "_client_offset", None)
+    return offset() if offset is not None else (0, 0)
 
 
 # ------------------------------------------------------------------------------------ the window

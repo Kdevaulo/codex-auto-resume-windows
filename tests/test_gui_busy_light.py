@@ -89,7 +89,7 @@ class SourceTests(unittest.TestCase):
 
     def test_the_header_is_told_when_the_count_changes_and_the_rule_is_applied_where_the_light_is_set(self):
         self.assertIn("UpdateCountdowns();", self.body("SetBusy"))
-        self.assertIn("BusyLight(HeaderLight(status, pending, word), busy > 0)", self.body("Hero"))
+        self.assertIn("BusyLight(HeaderLight(status, pending, word), busy > 0 || cardReads > 0)", self.body("Hero"))
 
     def test_retry_now_and_rescan_are_counted_in_busy(self):
         self.assertIn("SetBusy(true)", self.body("CallAsync"))

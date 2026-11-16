@@ -1207,9 +1207,10 @@ class SafetyTests(unittest.TestCase):
         # v0.6.10-alpha: `win` holds the Win32 handles and window declarations that used to be
         # the icon's, and `ui.words` the countdown both surfaces write - neither can act. v0.6.11:
         # `win.textsize` reads Windows' text size, one registry value, and acts on nothing; `win.typeface`
-        # asks which face Windows' interface is set in and which glyphs a face has, and draws nothing.
+        # asks which face Windows' interface is set in and which glyphs a face has, and draws nothing. v0.6.24:
+        # `brand.shape`, the squircle the popup's paths and masks are made of - geometry, and nothing else.
         self.assertLessEqual(package, {"codex_auto_resume"} | {"codex_auto_resume." + name
-                                       for name in ("brand", "l10n", "machine", "reasons", "tray",
+                                       for name in ("brand", "brand.shape", "l10n", "machine", "reasons", "tray",
                                                     "ui", "ui.words", "win", "win.dll", "win.textsize",
                                                     "win.typeface")})
         for forbidden in ("engine", "backend", "windows", "store", "source", "app", "continuation",
@@ -1688,15 +1689,17 @@ class WindowsTests(unittest.TestCase):
             target, (left, top, right, bottom) = painted["targets"][0]
             self.assertEqual(target[0], "check")
             x, y = (left + right) // 2, (top + bottom) // 2
+            # v0.6.24: the window is the card, so a click's point is the card's own; on the plan it is that far further in.
+            dx, dy = window._client_offset()
             # A read takes that task away and the layout is rebuilt, but not yet painted.
             window.model.rows = [item for item in window.model.rows if item["interruption_id"] != target[1]]
             window._rebuild(time.time())
             self.assertNotEqual(popup.hit_test(window._plan["targets"], x, y), target)
-            self.assertEqual(window._hit((y << 16) | x), target)
+            self.assertEqual(window._hit(((y - dy) << 16) | (x - dx)), target)
             window._invalidate()
             self.pump(0.2)
             self.assertIs(window._painted_plan, window._plan)
-            self.assertEqual(window._hit((y << 16) | x), popup.hit_test(window._plan["targets"], x, y))
+            self.assertEqual(window._hit(((y - dy) << 16) | (x - dx)), popup.hit_test(window._plan["targets"], x, y))
         finally:
             window.destroy()
 

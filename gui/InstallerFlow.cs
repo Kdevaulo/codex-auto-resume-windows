@@ -194,6 +194,11 @@ namespace CodexAutoResume
         /// stopped (plugin_setup.py's EXIT_LEFT_STOPPED, v0.6.23 acceptance G1): the Finish page then says so.
         internal const string LeftStoppedLine = "The watcher was not running before this ";
 
+        /// The start of install.ps1's line for a watcher that had ended unexpectedly before an update or a repair and was
+        /// started again and seen running (plugin_setup.py's EXIT_STARTED_AGAIN, v0.6.24): the Finish page then says so.
+        /// Not LeftStoppedLine's start, so the two never read each other's line.
+        internal const string StartedAgainLine = "The watcher had ended unexpectedly before this ";
+
         /// The status light for each phase the window shows, in one place (the owner, 2026-10-20: the light is the state
         /// that is true there, in every phase). Only the Dashboard's own states, by its rule (DashboardActions.HeaderLight):
         /// grey "idle" for a watcher not known to be running, a lit state only for one that is.

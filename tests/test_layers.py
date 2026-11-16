@@ -210,8 +210,9 @@ LAYER = {_q(name): layer for layer, names in {
               "runtime.afterwork",
               # v0.6.15-beta: and the other Codex homes it holds, each with an engine of its own.
               "runtime.homes",
-              # v0.6.18: and what an update set aside and could not delete, swept as it starts.
-              "runtime.setaside",
+              # v0.6.18: and what an update set aside and could not delete, swept as it starts - and, v0.6.24, from
+              # the Dashboard's bridge, beside the package so the bridge loads no watcher with it.
+              "setaside",
               # v0.6.16-beta.3: and its own decisions asked on request, for Diagnostics' check (issue #27).
               "checkup",
               # v0.6.16: and its own rules asked again of every waiting recovery, for Rescan and reconcile (issue #39).
@@ -233,11 +234,15 @@ LAYER = {_q(name): layer for layer, names in {
               "brand.mark", "brand.motion", "brand.scale", "brand.tokens",
               # v0.6.10: the four designs, a tenth file.
               "brand.design",
+              # v0.6.24: the corner every rounded thing is drawn with (Figma's squircle).
+              "brand.shape",
               # v0.6.10-alpha: tray.py became tray/ - the same icon in eleven files, all of
               # them the front. `UI` below covers them by prefix.
               "ui.tray.animation", "ui.tray.cards", "ui.tray.clicks", "ui.tray.dashboard", "ui.tray.icon",
               "ui.tray.menu", "ui.tray.model", "ui.tray.motion", "ui.tray.stored", "ui.tray.win32",
               "ui.tray.words",
+              # v0.6.24: the icon's own tooltip card - its plan and its window.
+              "ui.tray.tipplan", "ui.tray.tipcard",
               # v0.6.10-alpha: what every surface writes the same way.
               "ui", "ui.words",
               # v0.6.10-alpha: tray_popup.py became tray_popup/ - the same popup in twelve
@@ -251,7 +256,11 @@ LAYER = {_q(name): layer for layer, names in {
               # v0.6.11: what a screen reader is told of the popup, and asks of it.
               "ui.popup.access",
               # v0.6.20: the icon's right-click menu, drawn by the popup's renderer.
-              "ui.popup.menuplan", "ui.popup.menuwindow", "ui.popup.hidden"),
+              "ui.popup.menuplan", "ui.popup.menuwindow", "ui.popup.hidden",
+              # v0.6.24: the window that is the card, and its shadow below it.
+              "ui.popup.layers",
+              # v0.6.24: the status light, out of the renderer.
+              "ui.popup.light"),
 }.items() for name in names}
 
 # The roles the target rules speak of: today's modules, and the packages the split moves them
@@ -338,6 +347,8 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     ("ownreport.reading", "settings"): ("cost", "the settings that report is read with, only when a report is written"),
     # v0.6.16: Rescan and reconcile, which builds an engine for each Codex home, only when a person asks for it.
     ("controlcli", "rescan"): ("cost", "Rescan and reconcile and the engines it asks, only when it runs"),
+    # v0.6.24: what an update set aside, swept by the long-lived bridge on a thread of its own.
+    ("controlcli", "setaside"): ("cost", "the set-aside sweep, only in the long-lived bridge, on its own thread"),
     # v0.6.15-beta: the Codex version in force, read only while another Codex home is added (homes.unmeasured).
     ("control.watcher", "compatio"): ("cost", "the compatibility report's Codex version, read only while another "
                                               "Codex home is added"),
@@ -378,6 +389,8 @@ LAZY_IMPORTS = {(_q(importer), _q(imported)): (kind, reason) for (importer, impo
     ("ui.tray.menu", "ui.popup"): ("cost", "the theme the menu is drawn in, only when it opens"),
     ("ui.tray.motion", "ui.popup"): ("cost", "whether the popup asks for attention"),
     ("ui.tray.stored", "ui.popup"): ("cost", "the popup's theme and motion, adopted with the settings"),
+    ("ui.tray.icon", "ui.tray.tipcard"): ("cost", "the icon's tooltip card, made the first time the pointer rests on it"),
+    ("ui.tray.icon", "ui.popup"): ("cost", "where the icon is, only as its tooltip card is shown"),
     ("codex.transport", "compat.files"): ("cost", "the versions the bundled registry verifies, "
                                                      "read once from the bundled baseline"),
     ("codex.transport", "compat"): ("cost", "the package compat/files.py is in, which Python loads "

@@ -272,11 +272,16 @@ function Invoke-Outside {
         with this run's environment, $Variables (Get-OutsideVariables) and CODEX_AUTO_RESUME_OUTSIDE=1, its console
         hidden (SW_HIDE: WMI refuses CREATE_NO_WINDOW), in this run's folder. Passes on what it writes to $Log as it
         writes it, and returns its exit code once it has ended - or $null where it could not be started.
+        $Source goes to it as a file, outside.ps1 beside $Log in this run's own folder (removed with that folder),
+        written afresh from the constant each run and started with -File: never as base64 on the command line, the
+        hidden encoded shape antivirus heuristics block (issue #65). -ExecutionPolicy Bypass lets the unsigned file
+        run where it was already on this command line; the values stay in the environment block alone.
     #>
     param([string]$Source, [string[]]$Variables, [string]$Log, [string]$CodeFile)
     $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($Source))
-    $line = '"' + $powershell + '" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + $encoded
+    $sourceFile = Join-Path (Split-Path -Parent $Log) 'outside.ps1'
+    [System.IO.File]::WriteAllText($sourceFile, $Source, (New-Object System.Text.UTF8Encoding $true))
+    $line = '"' + $powershell + '" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $sourceFile + '"'
     # This run's own CODEX_AUTO_RESUME_RELAY_* variables, if it has any, are not the run outside's: $Variables are.
     $environment = @(foreach ($variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
         $name = [string]$variable.Key
@@ -1091,6 +1096,96 @@ function Get-PayloadTree {
         @{ From = $item.FullName
            To = (Join-Path $Destination $item.FullName.Substring($base.Length + 1))
            Folder = [bool]$item.PSIsContainer }
+    }
+}
+
+function Get-ChosenPython {
+    <#
+        python.exe of the Python a person chose in the advanced edition, or $null: runtimes\chosen.json names a version
+        of 3.N.M's shape whose folder holds python.exe, neither folder a link (src/codex_auto_resume/chosen_runtime.py
+        reads the same record). For the compile below alone: a Python named here that cannot run is a compile that
+        fails, and nothing else.
+    #>
+    # Read through Get-Variable, as Progress reads its own (Set-StrictMode 2.0 throws on a variable never set).
+    $runtimes = Get-Variable -Name ChosenRuntimes -ValueOnly -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrEmpty($runtimes)) { return $null }
+    $item = Get-Item -LiteralPath (Join-Path $runtimes 'chosen.json') -Force -ErrorAction SilentlyContinue
+    if (-not $item -or $item.PSIsContainer -or $item.Length -gt 4096) { return $null }
+    try { $version = [string](([IO.File]::ReadAllText($item.FullName) | ConvertFrom-Json).version) } catch { return $null }
+    if ($version -cnotmatch '^3\.[1-9][0-9]\.(0|[1-9][0-9]{0,2})$') { return $null }
+    $folder = Join-Path $runtimes $version
+    foreach ($dir in @($runtimes, $folder)) {
+        $seen = Get-Item -LiteralPath $dir -Force -ErrorAction SilentlyContinue
+        if (-not $seen -or -not $seen.PSIsContainer -or ($seen.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $null }
+    }
+    $exe = Join-Path $folder 'python.exe'
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { return $null }
+    return $exe
+}
+
+function Get-CompilePythons {
+    <#
+        Every Python that will import the program just copied, each once: the bundled one (setup, the launcher, the
+        Dashboard's bridge where nothing is chosen) and, in the advanced edition, the chosen one (the bridge and the
+        watcher's child). Each keeps its own compiled files (__pycache__\<module>.cpython-3NN.pyc).
+    #>
+    param([string]$Edition)
+    $bundled = [string](Get-Variable -Name Python -ValueOnly -ErrorAction SilentlyContinue)
+    $found = @()
+    if ($bundled) { $found += $bundled }
+    if ($Edition -eq 'advanced') {
+        $chosen = Get-ChosenPython
+        if ($chosen -and -not [string]::Equals($chosen, $bundled, [StringComparison]::OrdinalIgnoreCase)) { $found += $chosen }
+    }
+    return ,$found
+}
+
+function Invoke-Precompile {
+    <#
+        Compiles every module under Source once for each of Pythons, counted in the setup window's bar as the rest of the
+        "files" step (Progress): `Before` of `Total` are done already, and each Python adds Sources.
+
+        v0.6.24: the archive carries no compiled files (build/make_release.py), so the first process to import the
+        program after an update compiled every module it imported before it could answer. Measured on a scratch copy
+        of the advanced edition: the Dashboard's first answer 9 to 10 s from its bridge's start, 2 to 3 s once its
+        Python had compiled the tree; the v0.6.23 final's acceptance saw the reopened Dashboard on Loading... for
+        13.7 s after an update over a stopped watcher, whose chosen Python had compiled nothing yet. Done here, once,
+        while the person is watching a step that counts it, the Dashboard and the watcher start on compiled files.
+
+        Only speed rides on it: a Python that cannot be started, a module that does not compile, a run cut short - each
+        leaves those modules to be compiled by whoever imports them first, as before, and the count goes on to that
+        Python's share. Nothing it prints is read but its count: one line a module.
+    #>
+    param([string[]]$Pythons, [string]$Source, [int]$Sources, [int]$Before, [int]$Total)
+    # One line, with no quote marks: Windows PowerShell 5.1 passes a native program's argument's inner quotes on
+    # unescaped. chr(42)+chr(46)+chr(112)+chr(121) is *.py. Eight at a time: most of a module's time is writing its
+    # compiled file (measured: 2 s of compiling and 4 s of writing for the advanced tree's 394 modules), which another
+    # thread's compile waits for no longer - 3.3 s in place of 5 to 6.6 s. Each module is said once it is written, in
+    # order.
+    $code = 'import sys,pathlib,compileall,concurrent.futures as c;[print(r,flush=True) for r in ' +
+            'c.ThreadPoolExecutor(8).map(lambda f:compileall.compile_file(str(f),quiet=2),' +
+            'sorted(pathlib.Path(sys.argv[1]).rglob(chr(42)+chr(46)+chr(112)+chr(121))))]'
+    $done = $Before
+    foreach ($interpreter in @($Pythons)) {
+        $start = $done
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        if (Test-Path -LiteralPath $interpreter -PathType Leaf) {
+            try {
+                & {
+                    # A line the interpreter writes to stderr is never a terminating error here (v0.6.23 audit, N4).
+                    $ErrorActionPreference = 'Continue'
+                    & $interpreter -X disable-remote-debug -I -c $code $Source 2>$null | ForEach-Object {
+                        # $done here is this block's own copy, from the count so far.
+                        if ($done -lt $start + $Sources) { $done++; Progress 'files' $done $Total }
+                    }
+                }
+            } catch { $null = $_ }
+        }
+        $done = $start + $Sources
+        Progress 'files' $done $Total
+        # The folder's name alone - runtime, or the chosen version - never the path with the person's name in it.
+        Write-Host ('  Compiled the program for ' + (Split-Path -Leaf (Split-Path -Parent $interpreter)) + ' (' +
+                    $clock.Elapsed.TotalSeconds.ToString('0.0', [Globalization.CultureInfo]::InvariantCulture) + ' s)')
     }
 }
 
@@ -2102,7 +2197,14 @@ try {
             # parameter-binding error, not a longer path.
             $copying += @(Get-PayloadTree -Source (Join-Path $Payload $pair.src) -Destination $pair.dst)
         }
-        $copyFiles = @($copying | Where-Object { -not $_.Folder }).Count
+        # v0.6.24: and the modules the copy brings compiled once for each Python that will run them (Invoke-Precompile),
+        # after the copy, as the same step's count: the bar's one total for the step is both.
+        $compileSource = (Join-Path @($pairs | Where-Object { $_.src -eq 'app' })[0].dst 'src')
+        $compileSources = @($copying | Where-Object {
+            -not $_.Folder -and $_.To.EndsWith('.py', [StringComparison]::OrdinalIgnoreCase) -and
+            $_.To.StartsWith($compileSource + '', [StringComparison]::OrdinalIgnoreCase) }).Count
+        $compilePythons = Get-CompilePythons -Edition ([string](Get-Variable -Name edition -ValueOnly -ErrorAction SilentlyContinue))
+        $copyFiles = @($copying | Where-Object { -not $_.Folder }).Count + $compileSources * $compilePythons.Count
         $copied = 0
         foreach ($payloadItem in @($copying | Where-Object { $_.Folder })) {
             New-Item -ItemType Directory -Force -Path $payloadItem.To | Out-Null
@@ -2169,6 +2271,8 @@ try {
         $null = Remove-OwnedItem $stale.FullName
     }
     if (-not (Test-Path -LiteralPath $Python)) { Fail 'The bundled Python runtime is missing from the payload.'; exit 1 }
+    Invoke-Precompile -Pythons $compilePythons -Source $compileSource -Sources $compileSources -Before $copied `
+                      -Total $copyFiles
     # Under 'Stop' a line the interpreter writes to stderr is, run outside another app (streams merged, `*>&1`), a
     # terminating NativeCommandError that ended the update after the program trees were replaced (v0.6.23 audit, N4).
     # For this call alone it is only written, and the version is the text it printed.
@@ -2305,16 +2409,27 @@ try {
     # G1). Setup says it only when asked (CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED), so a caller that does not ask -
     # an older installer, the bootstrap - still hears 0.
     $SETUP_LEFT_STOPPED = 4
+    # 5 means everything was done and the watcher, which was not running before this update because it had ended
+    # unexpectedly in this sign-in - a crash, not a stop, a restart, a shutdown or a sign-out - was started again and
+    # seen running (plugin_setup.py ended_by_itself, v0.6.24): a success, whose last word says why a watcher that was not running runs now. Said only
+    # when asked (CODEX_AUTO_RESUME_SETUP_SAYS_STARTED_AGAIN), as 4 is.
+    $SETUP_STARTED_AGAIN = 5
     # This run looks at the watcher again after the health check (watcher-running, below) and says the last word, so a
     # watcher setup could not confirm within its wait is "not confirmed yet" in setup's own line, not a verdict
     # the last word then contradicts (v0.6.17, the live acceptance's second round). Said as a variable for this one
     # call, the way the bootstrap says it to an installed setup that may be older.
     $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = '1'
     $env:CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED = '1'
+    $env:CODEX_AUTO_RESUME_SETUP_SAYS_STARTED_AGAIN = '1'
     try { $code = Invoke-Setup $setupArgs }
-    finally { $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null; $env:CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED = $null }
+    finally {
+        $env:CODEX_AUTO_RESUME_SETUP_WILL_LOOK_AGAIN = $null; $env:CODEX_AUTO_RESUME_SETUP_SAYS_LEFT_STOPPED = $null
+        $env:CODEX_AUTO_RESUME_SETUP_SAYS_STARTED_AGAIN = $null
+    }
     $watcherUnconfirmed = $code -eq $SETUP_UNCONFIRMED
     $watcherLeftStopped = $code -eq $SETUP_LEFT_STOPPED
+    $watcherStartedAgain = $code -eq $SETUP_STARTED_AGAIN
+    if ($watcherStartedAgain) { $code = 0 }
     if ($code -ne 0 -and -not $watcherUnconfirmed -and -not $watcherLeftStopped) {
         Fail 'Setup did not complete. Nothing was removed; read the message above.'
         # A watcher stopped for this update that the failed setup did not start again is said, not left unsaid.
@@ -2368,7 +2483,16 @@ try {
         Write-Host $keptLine
         $what = if ($repair) { 'repair' } else { 'update' }
         Write-Host ('The watcher was not running before this ' + $what + ', so it was left stopped; nothing is being watched yet.')
+        # v0.6.24: which - a watcher that ended by itself is started again ($watcherStartedAgain, below).
+        Write-Host 'It had been stopped, or had ended with a restart, a shutdown or a sign-out, or had never started.'
         Write-Host 'Open Start Menu > Codex Auto Resume and use Start watcher, or use Start watcher on the Dashboard.'
+    } elseif ($watcherStartedAgain) {
+        Write-Host $keptLine
+        $what = if ($repair) { 'repair' } else { 'update' }
+        # Not InstallerFlow.LeftStoppedLine's start: the Finish page's left-stopped box is not this one's.
+        Write-Host ('The watcher had ended unexpectedly before this ' + $what + ' (in this sign-in, not by a stop or ' +
+                    'a restart), so it was started again and is running.')
+        Write-Host 'Recommended settings are already on. Nothing else to do.'
     } else {
         if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed and running.' }

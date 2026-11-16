@@ -164,6 +164,16 @@ def chrome(plan: dict) -> dict:
     return {"caption": list(bar), "ink": [0, 0, 0], "line": [int(channel * 0.65) for channel in bar]}
 
 
+def frame_edge() -> dict:
+    """What a render job adds so its frames carry the window's own outer edge (gui/WindowRender.cs CornerStill): while
+    the Dashboard cuts its own squircle corner (brand.WINDOW_SQUIRCLE, v0.6.24), the stills are cut with its corner and
+    hairline (make_screenshots.still_job), so every frame drawn to be held to them, or laid in their chrome, is cut the
+    same way at the stills' pinned resolution. Otherwise nothing: the frames are the bare client area, as before."""
+    from codex_auto_resume import brand
+    import make_screenshots
+    return {"edge_dpi": make_screenshots.PINNED_DPI} if brand.WINDOW_SQUIRCLE else {}
+
+
 def job(plan: dict, frames: list, out: Path, forms: dict | None = None) -> dict:
     """The render job for `frames` of `plan`: one entry per frame that needs the window drawn, in order."""
     targets = sorted(name for name in motion_plan.pointer_targets(frames) if not name.startswith("card."))
@@ -176,7 +186,7 @@ def job(plan: dict, frames: list, out: Path, forms: dict | None = None) -> dict:
     # as big, motion_compose.WindowChrome).
     import make_screenshots
     return {"out": str(out), "theme": canvas.get("theme", "light"), "design": canvas.get("design", "soft"),
-            "scale": make_screenshots.PINNED_SCALE,
+            "scale": make_screenshots.PINNED_SCALE, **frame_edge(),
             "forms": forms, "targets": targets, "outer": list(canvas.get("size") or []), "chrome": chrome(plan),
             "frames": [frame_state(frame, index, int(plan.get("light_step_ms") or 0), int(plan.get("clock_step_ms") or 0))
                        for index, frame in enumerate(frames)]}

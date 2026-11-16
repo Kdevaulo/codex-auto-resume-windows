@@ -70,7 +70,7 @@ class PopupPlanTests(unittest.TestCase):
                 self.assertEqual(plan["popup"], {"scale": shots.POPUP_SCALE, "locale": locale, "still": still})
                 for absent in ("window", "taskbar", "card"):
                     self.assertNotIn(absent, plan)
-                self.assertEqual(plan["pointer"], {"rest": [800, 560], "scale": shots.POPUP_SCALE},
+                self.assertEqual(plan["pointer"], {"rest": [856, 588], "scale": shots.POPUP_SCALE},
                                  "a pointer of the picture's own size, resting right of the popup, off the canvas")
                 self.assertLessEqual(plan["ripple_step"], POINTER_STEP)
                 self.assertNotIn("transparent", plan["canvas"])
@@ -159,13 +159,13 @@ class PopupPlanTests(unittest.TestCase):
                 for frame in frames:
                     if frame.pointer[0] == "at" and (not rests or rests[-1] != frame.pointer[1]):
                         rests.append(frame.pointer[1])
-                self.assertEqual(rests, [(("at", (800, 560)),), "popup.switch.1", "popup.switch.2",
-                                         (("at", (800, 700)),)])
+                self.assertEqual(rests, [(("at", (856, 588)),), "popup.switch.1", "popup.switch.2",
+                                         (("at", (856, 728)),)])
                 moves = [frame.pointer for frame in frames if frame.pointer[0] == "move"]
                 self.assertTrue(moves)
-                self.assertEqual({move[1:3] for move in moves}, {((("at", (800, 560)),), "popup.switch.1"),
+                self.assertEqual({move[1:3] for move in moves}, {((("at", (856, 588)),), "popup.switch.1"),
                                                                  ("popup.switch.1", "popup.switch.2"),
-                                                                 ("popup.switch.2", (("at", (800, 700)),))})
+                                                                 ("popup.switch.2", (("at", (856, 728)),))})
 
     def test_the_pointer_moves_on_brand_s_curve_at_the_pointer_s_cadence(self):
         for name, *_rest in PLANS:
@@ -177,7 +177,7 @@ class PopupPlanTests(unittest.TestCase):
                             self.assertLessEqual(step["step"], POINTER_STEP)
                 frames = motion_plan.expand(plan)
                 first = [frame.pointer for frame in frames if frame.pointer[0] == "move"
-                         and frame.pointer[1:3] == ((("at", (800, 560)),), "popup.switch.1")]
+                         and frame.pointer[1:3] == ((("at", (856, 588)),), "popup.switch.1")]
                 count = len(first)
                 self.assertEqual([move[3] for move in first],
                                  [round(1.0 if count == 1 else motion_plan.ease(index / float(count - 1)), 6)
@@ -383,7 +383,7 @@ class PopupDrawnTests(unittest.TestCase):
         bounds = self.popup.bounds()
         gone = len(self.frames)
         leaves = self.first(lambda frame: frame.pointer[0] == "at" and isinstance(frame.pointer[1], tuple)
-                            and dict(frame.pointer[1]).get("at") == (800, 700))
+                            and dict(frame.pointer[1]).get("at") == (856, 728))
         for index in [0] + list(range(leaves, gone)):
             frame = self.frames[index]
             x, y = motion_compose.pointer_at(frame, bounds, (0, 0))

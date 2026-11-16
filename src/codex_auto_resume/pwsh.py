@@ -17,12 +17,20 @@ The fix is not a longer escape list. Values never become script text at all. Eac
 travels as an environment variable of the child process, and the script - a constant,
 reviewed in this repository - reads it with `$env:NAME`. PowerShell does not parse an
 environment variable's value as code under any circumstances, so there is no character a
-value could contain that changes what runs. The script itself is still sent with
--EncodedCommand, so no command-line quoting applies to it either.
+value could contain that changes what runs.
+
+The script itself travels as one plain argument after -Command, quoted by subprocess's
+list2cmdline - never as base64 after PowerShell's encoded-command switch, as it was until
+v0.6.23 (issue #65: Avast's Behavior Shield blocked powershell.exe on that shape,
+IDP.HELU.PSE96; tests/test_no_encoded_powershell.py keeps it out). Quoting is safe here
+because the script is a constant: no value is ever in it, so the only text the quoting
+carries is text reviewed in this repository, and tests/test_pwsh_command_line.py proves
+the real interpreter receives every constant - double quotes, backslashes, here-strings
+and all - exactly as written. Not stdin (`-Command -`), which Windows PowerShell 5.1 reads
+line by line and so breaks a statement that spans lines.
 """
 from __future__ import annotations
 
-import base64
 import os
 import re
 import subprocess
@@ -78,6 +86,11 @@ def reference(name: str) -> str:
     return "$env:" + PREFIX + name
 
 
+def script_argv(shell: str, script: str) -> list:
+    """The argv that runs the constant `script`: the script whole, as the one argument after -Command."""
+    return [shell, "-NoProfile", "-NonInteractive", "-Command", script]
+
+
 def run(script: str, values: dict, *, timeout: float) -> int:
     """Run `script` with `values` available as environment variables. Returns the exit code.
 
@@ -87,9 +100,8 @@ def run(script: str, values: dict, *, timeout: float) -> int:
     shell = executable()
     if shell is None:
         raise PowerShellError("PowerShell is unavailable")
-    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     completed = subprocess.run(
-        [shell, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+        script_argv(shell, script),
         env=environment(values), stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         timeout=timeout, shell=False,

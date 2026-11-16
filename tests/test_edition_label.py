@@ -147,7 +147,9 @@ class TooltipTests(unittest.TestCase):
         app = (ROOT / "src" / "codex_auto_resume" / "runtime" / "app.py").read_text(encoding="utf-8")
         self.assertIn("edition=edition.shown(self.plug)", app)
         icon = (ROOT / "src" / "codex_auto_resume" / "ui" / "tray" / "icon.py").read_text(encoding="utf-8")
-        self.assertEqual(icon.count("tooltip("), icon.count("time.time(), self.edition)"))
+        # v0.6.24: and every tooltip_parts call, which the icon's own card is drawn from - each hands the edition.
+        self.assertEqual(icon.count("tooltip(") + icon.count("tooltip_parts("), icon.count("time.time(), self.edition)"))
+        self.assertEqual(icon.count("tooltip_parts("), 1)
 
 
 class PanelTests(unittest.TestCase):

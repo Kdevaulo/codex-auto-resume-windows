@@ -979,9 +979,71 @@ namespace CodexAutoResume
         /// resize, a scroll bar coming or going, and every paint, which follows all of those.
         internal event EventHandler ScrollChanged;
 
+        // v0.6.24 (the v0.6.23 final's live acceptance, I3): how deep the list is in its own messages, whether one of them
+        // resized it, and whether DropKeptBar is at work.
+        private int messageDepth;
+        private bool resizedWithin, droppingBar;
+        private const int GWL_STYLE = -16;
+        private const int WS_HSCROLL = 0x00100000;
+
+        [DllImport("user32.dll")]
+        private static extern int GetWindowLong(IntPtr window, int index);
+
+        /// Whether Windows shows its bar across the list's bottom under columns that fit it: the bar it turned on for
+        /// columns wider than the list, and kept once they were fitted to it from inside its own handling of the size
+        /// that made them too wide (DropKeptBar).
+        internal bool KeptBar
+        {
+            get
+            {
+                if (!IsHandleCreated || View != View.Details || Columns.Count == 0 ||
+                    (GetWindowLong(Handle, GWL_STYLE) & WS_HSCROLL) == 0) return false;
+                int columns = 0;
+                foreach (ColumnHeader column in Columns) columns += column.Width;
+                return columns <= ClientSize.Width;
+            }
+        }
+
+        /// v0.6.24 (the v0.6.23 final's live acceptance, I3: History's first fill showed a horizontal scroll bar under its
+        /// rows for one frame). Rows put into a list whose columns were fitted to its whole width brought Windows' bar
+        /// beside them, which narrowed the list by the bar's width; the columns, wider than the list by that much, brought
+        /// Windows' bar across its bottom in the same step. The window fits them to the narrower list as it takes its width
+        /// (SettingsForm.FitColumns, on ClientSizeChanged, inside Windows' own handling of the size), and Windows, which
+        /// does not look at its bars again from inside that handling, kept the bar across under columns that fit. The
+        /// list's host read it a turn later and laid its soft bar out along the bottom (SoftListHost.OverflowingAcross),
+        /// until the list, laid out for that bar, made Windows look again and take it away, and the host laid itself out
+        /// once more. Any narrowing that refits the columns did the same: the host given another size, the window made
+        /// narrower. Now, once the list's outermost message is over - all of Windows' handling of the size, and the fit
+        /// inside it - a bar kept under columns that fit is taken away at once, before anything is painted and before the
+        /// host reads the list: its last column is set a pixel narrower and back, and Windows, told of a column's width
+        /// from outside its handling of a size, looks at its bars again (a WM_SIZE of the same size does not make it look:
+        /// measured 2026-11-16). Columns really wider than the list keep their bar.
+        private void DropKeptBar()
+        {
+            if (droppingBar || IsDisposed || RecreatingHandle || !KeptBar) return;
+            droppingBar = true;
+            try
+            {
+                ColumnHeader last = Columns[Columns.Count - 1];
+                int width = last.Width;
+                if (width < 1) return;
+                last.Width = width - 1;
+                last.Width = width;
+            }
+            finally { droppingBar = false; }
+        }
+
         protected override void WndProc(ref Message m)
         {
-            base.WndProc(ref m);
+            messageDepth++;
+            try { base.WndProc(ref m); }
+            finally { messageDepth--; }
+            if (m.Msg == WM_SIZE) resizedWithin = true;
+            if (messageDepth == 0 && resizedWithin)
+            {
+                resizedWithin = false;
+                DropKeptBar();
+            }
             if (ScrollChanged != null && (m.Msg == WM_PAINT || m.Msg == WM_VSCROLL || m.Msg == WM_HSCROLL ||
                                           m.Msg == WM_MOUSEWHEEL || m.Msg == WM_MOUSEHWHEEL ||
                                           m.Msg == WM_KEYDOWN || m.Msg == WM_SIZE || m.Msg == WM_STYLECHANGED))

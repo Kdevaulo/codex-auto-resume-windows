@@ -128,6 +128,7 @@ class MenuMixin:
 
 
     def _menu(self):
+        self._hide_tip()                        # v0.6.24: the icon's tooltip card goes as the menu comes
         self._adopt_settings()                  # the menu speaks the language stored now
         self._theme_menu()                      # and Windows' own is drawn in the theme the popup is
         snapshot = self._shown()

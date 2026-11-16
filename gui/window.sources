@@ -66,14 +66,18 @@ gui/HostApp.cs
 [controls]
 gui/SoftTheme.cs
 gui/SoftDepth.cs
+gui/SoftShape.cs
 gui/SoftLayout.cs
 gui/SoftFields.cs
 gui/SoftCombo.cs
 gui/SoftList.cs
 gui/SoftMenu.cs
+gui/SoftEdit.cs
 gui/SoftCallout.cs
 gui/SoftDays.cs
 gui/SoftMirror.cs
+gui/SoftChrome.cs
+gui/SoftWindowShape.cs
 gui/Marks.cs
 
 [generated]

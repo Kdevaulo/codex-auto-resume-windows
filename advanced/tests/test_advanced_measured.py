@@ -196,7 +196,10 @@ class TableTests(unittest.TestCase):
         has reset credits), so their older records stay; MK stayed blocked (Codex offered no plan to read), and so did
         MGAVE (every rollout of a capacity-failed turn is gone). Not made again, each for what it needs: MA, MAL and MALR
         (a sign-out and a browser sign-in), MH (a browser sign-in on a second home), MR (a credit), MU, MANCHOR, ME and MS
-        (a condition that was not there), MQ and MT (the product's own sender), M4B (M4 did not pass)."""
+        (a condition that was not there), MQ and MT (the product's own sender), M4B (M4 did not pass).
+        2026-11-15, on codex-cli 0.167.0-alpha.4.1, the measurement session made MANCHOR again (v0.6.24's sitting 2) with
+        the switch that keeps the person's MCP servers, hooks, plugins, apps and notify program out of the anchor's
+        request: the window started, its reset fixed five hours after the request, and only conhost.exe ran under it."""
         passed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.PASS}
         failed = {m for m, (verdict, _v) in measured.MEASURED.items() if verdict == Verdict.FAIL}
         self.assertEqual(passed, {Measurement.MW, Measurement.M1, Measurement.M2B, Measurement.M5,
@@ -226,12 +229,13 @@ class TableTests(unittest.TestCase):
                           Measurement.MHK, Measurement.MAUTO, Measurement.MB2, Measurement.MPROFILE,
                           Measurement.MSWAP, Measurement.MTOK, Measurement.MWAKE})
         # What was not made again stays on the engine it was made on: M5 and MO (their re-runs came back blocked) on 0.163,
-        # the five that need a sign-in, a credit or a reset on 0.162, MANCHOR on 0.165, MAL and MALR on 0.166.
+        # the five that need a sign-in, a credit or a reset on 0.162, MAL and MALR on 0.166 - and MANCHOR, made again with
+        # v0.6.24's switch, on 0.167.0-alpha.4.1.
         self.assertEqual(by_engine, {
             "codex-cli 0.163.0-alpha.10.2": {Measurement.M5, Measurement.MO},
             "codex-cli 0.162.0-alpha.17.2": {Measurement.MA, Measurement.MH, Measurement.MR, Measurement.MN,
                                              Measurement.MU},
-            "codex-cli 0.165.0-alpha.1.2": {Measurement.MANCHOR},
+            "codex-cli 0.167.0-alpha.4.1": {Measurement.MANCHOR},
             "codex-cli 0.166.0-alpha.5.1": {Measurement.MAL, Measurement.MALR}})
         self.assertEqual(set(Measurement) - passed - failed,
                          # v0.6.15-beta's own, for several conversations at once: not made yet.

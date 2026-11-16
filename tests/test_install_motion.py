@@ -522,6 +522,21 @@ class FrameTests(unittest.TestCase):
         self.assertEqual(alpha[:-4], b"\xff" * 28)
         self.assertEqual(motion.corner_rows(self.still()), 1)
 
+    def test_with_no_caption_rows_the_top_corners_are_cut_as_the_still_s_are(self):
+        # v0.6.24: the setup window's caption is its own, so the still is the client area alone and its top corners
+        # are rounded too; the motion's window had square top corners when only the bottom ones were carried over.
+        width, height = 4, 3
+        alpha = bytearray(b"\xff" * (width * height))
+        alpha[0] = alpha[width - 1] = 0                                             # the top corners
+        alpha[(height - 1) * width] = alpha[(height - 1) * width + width - 1] = 0   # the bottom corners
+        still = (width, height, bytes((7,)) * (width * height * 3), bytes(alpha))
+        self.assertEqual(motion.corner_rows(still, top=True), 1)
+        _width, framed_height, _rgb, framed = motion.framed_still(still, 0, (4, 6))
+        self.assertEqual(framed_height, 6)
+        self.assertEqual(framed[:4], b"\x00\xff\xff\x00", "the top corners are cut")
+        self.assertEqual(framed[-4:], b"\x00\xff\xff\x00", "the bottom corners are cut")
+        self.assertEqual(framed[4:-4], b"\xff" * 16)
+
     def test_a_still_of_another_width_is_not_the_window(self):
         with self.assertRaises(ValueError):
             motion.framed_still(self.still(), 2, (5, 3))

@@ -1,5 +1,79 @@
 # Changelog
 
+## v0.6.24-beta — A window without Windows' title bar, squircle corners, the tray icon's card, a text box's own right-click menu, a Dashboard that answers in seconds after an update, and the advanced edition's quieter 5-hour window start
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.23...v0.6.24-beta)
+
+**A pre-release: the first of v0.6.24.** It is a GitHub pre-release, so `releases/latest` stays v0.6.23. An installation is offered it
+by *Check for updates* where pre-releases are offered - the check asks first and says it is tested less - and *Install another
+version...* lists it, in the edition you pick. It is a beta because it carries things you can notice: the window's new top edge, its
+corners, the tray icon's card and a Dashboard that comes back fast after an update. Both editions change in the first group; the second
+is the advanced edition's alone.
+
+**Going back.** Nothing that an earlier version reads changes: the watcher's state stays schema 5, the settings file gains no key and
+the advanced edition's own file stays version 9. An earlier version has Windows' title bar, its own corners and its own popup, as it
+always had them, and leaves the previous version's `.old-` file where an update put it.
+
+### Both editions
+
+- **The window has no Windows title bar.** Its minimise, maximise and close buttons are line glyphs inside the first card, at its top
+  corner (mirrored where the window is written right to left). The close button turns red under the pointer, and the maximise button
+  keeps Windows 11's snap layouts. Every dialog has its title and its close button in a card of its own at its top, in the same way.
+  The window is a little shorter outside - Windows' title bar and top frame are gone - and every page keeps the height it had, because
+  the window opens taller by exactly what the header grew for the buttons. Where a day's own picture lies under a button, the glyph is
+  kept readable against it.
+  A dialog with its title in a card of its own is a little taller than it was under Windows' title bar, so on a small
+  screen the largest text size the window uses is one step lower (a 1920 x 1080 screen at 100 %: 1.68 instead of 1.83).
+  A window restored from maximised or minimised comes back at exactly its size, and a maximised window leaves the edge
+  of an auto-hide taskbar free so the taskbar still slides out.
+- **Soft corners are squircles.** In the Soft design every rounded thing - cards, buttons, menus, the popup and the
+  notification card - is drawn with one smoothed corner (Figma's 60 % smoothing, capped where a side is short; pills stay
+  pills), and its shadows follow it. Classic and Plain keep their round arcs, as before. The Dashboard window's own outer
+  corner is now drawn the same way - its design's card corner, with the hairline and the shadow round it - in place of
+  Windows' round corner. Windows' corner comes back while the window is maximised or snapped, in High Contrast, in a
+  remote session and without desktop composition; Windows 10 keeps its square corner.
+- **Known in this pre-release: the Dashboard's own corner still has rough edges**, found by a check on real screens and
+  being fixed for the next pre-release. A faint fill can show outside the squircle, out to where Windows' corner would
+  be; at 150 % a one-pixel line can show inside the edge; Windows' own title bar and frame can flash for a moment when
+  the window is activated or resized; restoring the window from maximised or minimised can make it larger each time;
+  and the left and right edges resize only beside the header and the footer.
+- **The tray icon's popup is its card alone.** No grey ground lies round it any more, and a float shadow lies under it that only ever
+  darkens. It opens a little faster than the plain window did, and a frame of its status light costs well under a millisecond. Where
+  Windows refuses a window of this kind, the popup is the plain window it was, with its own drop shadow.
+- **Hovering the tray icon shows a card** with the state and the usage bars, in the window's design, instead of Windows' plain tooltip.
+  Screen readers still get the tooltip's text.
+- **A text box's right-click menu is drawn in the window's design.** Every box you can type in opens a menu of the same look as the
+  others - Undo, Cut, Copy, Paste, Delete, Select all - with Windows' own words and access keys, in the language Windows shows;
+  Shift+F10 and the menu key open it at the caret, and a command is offered only where it can work, as in Windows' menu.
+- **A notification card that fades in or out shows no dark band inside its edge.** Its shadow reached under its body and showed
+  through it while the card was half clear; nothing of the shadow lies under the card now, and a still of the card looks as it did.
+- **After an update the Dashboard answers within a few seconds** instead of about 13 s. The first process to import the program after an
+  update used to compile every module it needed before it could answer; the update now compiles the program it copies, for the Python
+  that will run it, as part of the files step. The previous version's leftover `.exe.old-*` file, which an in-app update renames aside
+  while that window runs it, is removed once nothing runs from it - and a folder that something still runs from is left alone.
+- **An update starts the watcher again only if it ended unexpectedly in this sign-in.** A watcher the person stopped, or that ended
+  with a restart, a shutdown or a sign-out, stays stopped, as it was; one that was left running when something outside ended it is started
+  again. Setup's Finish page and its log say which happened and how to start the watcher yourself where it stays stopped.
+- **No flicker where History and Settings first fill.** History's list showed a horizontal scroll bar for one frame the first time it
+  filled, and Settings showed *Restore defaults* and *Save* greyed for one frame; both are gone.
+- **No encoded PowerShell command lines any more** (reported by [@cervinho](https://github.com/cervinho),
+  [#65](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/65)). Antivirus behaviour shields (Avast's
+  `IDP.HELU.PSE96`) blocked `powershell.exe` when the app raised a Windows notification or checked its Start menu shortcut,
+  and when the setup program ran itself again outside another app's view, because each handed PowerShell its fixed script
+  encoded on the command line. The notifications and the shortcut now pass the same fixed script as plain text, and the
+  setup program writes it to a file in its own run folder and runs that file. Every value still travels only in the
+  environment, never inside the script, so nothing a conversation title or a path holds can become code. A test keeps an
+  encoded command line out of every shipped script.
+- **Two window tests that failed now and then on slow CI runners are fixed at their cause**, not retried.
+
+### Advanced edition
+
+- **The 5-hour window's one near-zero request starts none of your programs.** To start the 5-hour window early the advanced edition
+  sends one request that costs almost nothing; it now starts none of your MCP servers, hooks, plugins, apps or notify program, as
+  measured on codex-cli 0.167.0-alpha.4.1. Where a Codex refuses that switch, the request is sent once more as it was before, and the
+  watcher's log says that your programs ran.
+- **The Korean wording of the advanced pages was read key by key**, and 59 values read better.
+
 ## v0.6.23 — Archives more than a quarter smaller, controls that glide between their states, room for longer messages and waits, twenty-two languages, pages that open quickly the first time, menus that offer more, the code made ready for Python 3.15, and the advanced edition's choice of another Python
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.22...v0.6.23)

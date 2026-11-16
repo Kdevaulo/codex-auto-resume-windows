@@ -126,13 +126,14 @@ def compare_dialog(picture: bytes, bounds: dict, client: tuple, still: tuple) ->
 
     window = bounds["dialog.window"]
     close = bounds["dialog.close"]
-    retry = bounds["pending.retry"]
+    # v0.6.24: no Windows title bar - the dialog's title and its close sit in a card of its own at its top (SoftDialog),
+    # and its close is a caption button whose face at rest is that card's ground. Both are made of what the window's own
+    # header card is made of, so both are held to the still's header card, at a spot of its ground above its words.
+    header = colour(rgb, width // 2, top + 40, width)
     probes = (
         ("ground", colour(picture, window[0] + 1 + 4, window[1] + top + 4, client_w), colour(rgb, 8, top + 200, width)),
-        ("close", colour(picture, close[0] + 10, close[1] + close[3] // 2, client_w),
-         colour(rgb, retry[0] + 10, top + retry[1] + retry[3] // 2, width)),
-        ("title bar", colour(picture, window[0] + window[2] // 2, window[1] + 6, client_w),
-         colour(rgb, width // 2, 8, width)),
+        ("close", colour(picture, close[0] + 3, close[1] + 3, client_w), header),
+        ("title card", colour(picture, window[0] + window[2] // 2, close[1] + 3, client_w), header),
     )
     worst = 0
     wrong = []
@@ -158,7 +159,7 @@ def check(exe: Path, work: Path, locales=("en", "ko"), forms=None) -> dict:
         overview = still_path("overview", locale)
         frame = make_screenshots.read_png(overview)
         job = {"out": str(out / "frames"), "theme": "light", "design": "soft", "forms": {locale: answers},
-               "scale": make_screenshots.PINNED_SCALE,
+               "scale": make_screenshots.PINNED_SCALE, **motion_window.frame_edge(),
                "targets": ["dialog.window", "dialog.close", "pending.retry"], "outer": [frame[0], frame[1]],
                "chrome": motion_window.chrome({"window": {"still": str(overview.relative_to(make_screenshots.ROOT))}}),
                "frames": pages_at_rest(locale) + [dialog_frame(locale)]}

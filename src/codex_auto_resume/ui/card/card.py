@@ -6,6 +6,7 @@ import ctypes as C
 
 from ... import brand
 from ... import notice_card
+from ...brand import shape
 from ...win import textsize
 from .. import popup
 from . import win32
@@ -85,6 +86,12 @@ class Card:
         """The card's corner in device px: the design's, or Soft's in High Contrast, as its renderer draws it."""
         return brand.design_radii(brand.DEFAULT_DESIGN if self.contrast else self.design)["card"] * self.scale
 
+    @property
+    def smoothing(self):
+        """v0.6.24: how much the card's corners are smoothed (brand/shape.py) - the design's, or Soft's in High
+        Contrast, as its radius is - for its cut, its shadow and every rounded thing drawn on it."""
+        return shape.design_smoothing(brand.DEFAULT_DESIGN if self.contrast else self.design)
+
     def _glow(self, now_ms):
         """The light for `now_ms`: its own moment, counted from when the card came."""
         age = 0.0 if now_ms is None else now_ms - self.born
@@ -95,12 +102,13 @@ class Card:
         if self.renderer is None:
             self.renderer = _CardRenderer()
             self.renderer.theme, self.renderer.design, self.renderer.contrast = self.theme, self.design, self.contrast
+            self.renderer.canvas.smoothing = self.smoothing
         self.renderer.use(self.vm["locale"], self.scale)
         self.plan = notice_card.layout(self.vm, self.scale, self.renderer.measure)
         canvas = self.renderer.draw(self.vm, self.plan, frame=self._glow(now_ms), hover=self.hover,
                                     pressed=self.pressed)
         width, height = self.plan["size"]
-        pixels = notice_card.premultiply(canvas.pixels(), width, height, self.radius)
+        pixels = notice_card.premultiply(canvas.pixels(), width, height, self.radius, smoothing=self.smoothing)
         if self.image is not None:
             self.image.close()
         self.image = _Image(pixels, width, height)
@@ -117,7 +125,7 @@ class Card:
         row = width * 4
         win32._dll("gdi32").GdiFlush()
         band = notice_card.premultiply(C.string_at(canvas.bits.value + top * row, (bottom - top) * row),
-                                       width, height, self.radius, top)
+                                       width, height, self.radius, top, self.smoothing)
         self.image._pixels[top * row:bottom * row] = band
         layer = self.body
         if (self._drawn_scale is not None and self._drawn_scale >= 0.9999 and layer is not None
@@ -200,7 +208,7 @@ class Card:
         if images is None:
             images = []
             for shadow in placed:
-                mask = popup.lift_coverage(width, height, radius, shadow.blur * self.scale)
+                mask = popup.lift_coverage(width, height, radius, shadow.blur * self.scale, self.smoothing)
                 images.append(popup._ShadowImage(mask, brand.rgb(shadow.colour), shadow.alpha))
             self._shadow_images[level] = images
         with _Surface(layer) as surface:
@@ -210,7 +218,26 @@ class Card:
                 image.stamp(surface, self.margin - extent + popup.shadow_step(shadow.dx * self.scale),
                             self.margin - extent + popup.shadow_step(shadow.dy * self.scale),
                             width + 2 * extent, height + 2 * extent, middle=False)
+        self._cut_under_body(layer)
         self._drawn_level = level
+
+    def _cut_under_body(self, layer):
+        """v0.6.24: nothing of the shadow lies under the card. The two layers are shown at one alpha, so a shadow that
+        reaches under the body shows through it in a fade as a dark frame inside the card's edge. Every pixel the body
+        covers wholly (its own alpha 255, whatever corner it is drawn with) is made clear in the shadow; the shadow
+        outside the card and under its antialiased corner pixels is kept as it was, so the still looks exactly as it
+        did."""
+        width, height = self.size
+        win32._dll("gdi32").GdiFlush()
+        pixels = self.image._pixels
+        wide = layer.width
+        memory = memoryview((C.c_ubyte * (wide * layer.height * 4)).from_address(layer.bits.value)).cast("B")
+        for row in range(height):
+            alpha = bytes(pixels[row * width * 4 + 3:(row + 1) * width * 4:4])
+            first, last = alpha.find(b"\xff"), alpha.rfind(b"\xff")
+            if first >= 0:
+                at = (wide * (self.margin + row) + self.margin + first) * 4
+                memory[at:at + (last - first + 1) * 4] = bytes((last - first + 1) * 4)
 
     def paint(self, now_ms) -> dict:
         """Draw both layers for `now_ms`: the frame, where the card goes, and a key for the frame."""

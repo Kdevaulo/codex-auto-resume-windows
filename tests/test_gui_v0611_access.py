@@ -220,11 +220,12 @@ class WindowTests(unittest.TestCase):
 
     def test_the_window_opens_at_the_text_size_its_screen_holds(self):
         """At its narrowest the window is 816 by 468 logical pixels with its frame, and its tallest dialog 520 high
-        with one: a 1920 by 1040 work area holds the window whole at 1.8 times, and at 150% at 1.2 times."""
+        with one - v0.6.24: 619 with its body card, its title card's strip and its frame (TextScale.NarrowestHeight): a
+        1920 by 1040 work area holds the window whole at 1.68 times, and at 150% at 1.12 times."""
         fitting = self.answer["fitting"]
         self.assertEqual(fitting[0], 2.25)
-        self.assertAlmostEqual(fitting[1], 1040 / 568, places=6)
-        self.assertAlmostEqual(fitting[2], 1040 / (1.5 * 568), places=6)
+        self.assertAlmostEqual(fitting[1], 1040 / 619, places=6)
+        self.assertAlmostEqual(fitting[2], 1040 / (1.5 * 619), places=6)
         self.assertEqual(fitting[3:], [1.0, 1.0, 1.0])
 
     def test_the_font_is_the_text_size_and_never_made_larger_twice(self):

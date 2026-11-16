@@ -100,6 +100,16 @@ TIME_OPTIONS = (OptionKey.ANCHOR_AT_1, OptionKey.ANCHOR_AT_2, OptionKey.ANCHOR_A
 PROMPT = "Reply with OK"
 EXEC_ARGUMENTS = ("exec", "--skip-git-repo-check", "--ephemeral", "--json", "-s", "read-only",
                   "-c", 'model_reasoning_effort="low"', PROMPT)
+# v0.6.24 (the owner's choice of 2026-11-15): the request starts none of the person's own programs - no MCP server, hook,
+# plugin, app or `notify` program. MANCHOR made again on codex-cli 0.167.0-alpha.4.1 (plans/v0624-measure-2-result.md, T1-T3):
+# these, right after `exec` and in this order, then - where the home's config.toml declares servers - ONE `-c
+# mcp_servers={"<name>"={enabled=false},...}` (`servers_off`), then the rest of EXEC_ARGUMENTS. With them the window starts,
+# the person's model and provider are kept, and only conhost.exe runs under the request.
+QUIET_ARGUMENTS = ("-c", "notify=[]", "--disable", "hooks", "--disable", "plugins", "--disable", "apps")
+# What Codex says on stderr when that switch breaks the whole request - a name config.toml does not declare as a server, or
+# a feature a later engine does not know - before any `thread.started`: the request is then sent once more as it was
+# before v0.6.24 (`plain`), and the watcher's log says the person's programs ran for it. The window matters more.
+REFUSALS = ("Error loading config.toml: invalid transport", "Error: Unknown feature flag")
 # The folder the request runs in, under this edition's own state directory.
 FOLDER = "anchor-cwd"
 # What two reads may come to (`judge`).
@@ -279,11 +289,75 @@ def tokens_of(printed) -> dict:
     return found
 
 
+def thread_started(printed) -> bool:
+    """Whether what `codex exec --json` printed holds a `thread.started` event: Codex took the request. Nothing else read."""
+    if isinstance(printed, bytes):
+        printed = printed.decode("utf-8", "replace")
+    for line in str(printed or "").splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(event, dict) and event.get("type") == "thread.started":
+            return True
+    return False
+
+
+def refused(errors) -> bool:
+    """Whether stderr carries one of REFUSALS. Only that is asked of it; nothing of it is kept."""
+    if isinstance(errors, bytes):
+        errors = errors.decode("utf-8", "replace")
+    return isinstance(errors, str) and any(words in errors for words in REFUSALS)
+
+
 # ---------------------------------------------------------------------------- the request
-def argv_for(backend) -> list:
+def declared_servers(codex_home) -> tuple:
+    """The names of the MCP servers `codex_home`'s config.toml declares: the keys of its `mcp_servers` table whose value is
+    a table with `command` or `url`, in the file's order. () where there is no such file or table, or it cannot be read or
+    parsed. Held in memory only - never logged, printed or stored - and never asked of `codex mcp list` (it adds plugins'
+    servers, and naming one of those breaks the request: T1 P5)."""
+    import tomllib
+    try:
+        with open(Path(codex_home) / "config.toml", "rb") as handle:
+            config = tomllib.load(handle)
+    except Exception:
+        return ()
+    servers = config.get("mcp_servers") if isinstance(config, dict) else None
+    if not isinstance(servers, dict):
+        return ()
+    return tuple(name for name, value in servers.items()
+                 if isinstance(name, str) and isinstance(value, dict) and ("command" in value or "url" in value))
+
+
+def _toml_key(name) -> str:
+    """A name as a TOML basic string: json.dumps quotes and escapes it (a quote, a backslash, control characters); DEL,
+    which JSON leaves bare and TOML refuses there, is escaped too."""
+    return json.dumps(name, ensure_ascii=False).replace("\x7f", "\\u007f")
+
+
+def servers_off(names):
+    """The one `-c` value that turns each named server off - an inline table, every name quoted, so a name with a dot is
+    one key (the dotted path `mcp_servers.a.b.enabled` breaks the whole request: T1 P13) - or None for no names. `-c`
+    merges tables, so each server keeps its transport (T1 note 2)."""
+    names = tuple(names or ())
+    if not names:
+        return None
+    return "mcp_servers={%s}" % ",".join("%s={enabled=false}" % _toml_key(name) for name in names)
+
+
+def argv_for(backend, plain=False) -> list:
     """The request's argument list: the product's own `codex` prefix (C10: analytics off, OTel exporters none,
-    log_user_prompt off, chatgpt_base_url pinned - Backend._argv) and the measured `exec` arguments, exactly."""
-    return [*backend._argv(), *EXEC_ARGUMENTS]
+    log_user_prompt off, chatgpt_base_url pinned - Backend._argv), `exec`, the switch that keeps the person's programs out
+    (QUIET_ARGUMENTS, and `servers_off` for the servers of the Codex home the request uses - Backend._environment's), and
+    the rest of the measured `exec` arguments, exactly. `plain`: as before v0.6.24, the fallback's (REFUSALS)."""
+    if plain:
+        return [*backend._argv(), *EXEC_ARGUMENTS]
+    off = servers_off(declared_servers(backend._environment().get("CODEX_HOME") or ""))
+    switch = [*QUIET_ARGUMENTS, *(("-c", off) if off is not None else ())]
+    return [*backend._argv(), EXEC_ARGUMENTS[0], *switch, *EXEC_ARGUMENTS[1:]]
 
 
 def folder_of(paths) -> Path:
@@ -300,26 +374,29 @@ def ready_folder(folder) -> bool:
         return False
 
 
-def start_request(backend, folder):
+def start_request(backend, folder, plain=False):
     """The request started: the codex.exe and the Codex home of `backend` (Backend's environment), in `folder`,
-    windowless, no shell, no input. The process."""
-    return subprocess.Popen(argv_for(backend), cwd=str(folder), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                 stderr=subprocess.DEVNULL, env=backend._environment(), creationflags=NO_WINDOW, shell=False)
+    windowless, no shell, no input. The process. `plain`: argv_for's."""
+    return subprocess.Popen(argv_for(backend, plain), cwd=str(folder), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                 stderr=subprocess.PIPE, env=backend._environment(), creationflags=NO_WINDOW, shell=False)
 
 
 def finish_request(process, timeout=TIMEOUT) -> dict:
     """The request waited for, at most `timeout`, and killed after it: {"end": "exited" or "timed_out", "code",
-    "input", "cached", "output"} - the exit code and the token counts, never what it printed."""
+    "input", "cached", "output", "refused"} - the exit code, the token counts, and whether Codex refused the switch
+    (exited non-zero before `thread.started`, stderr saying one of REFUSALS) - never what it printed."""
     try:
-        printed, _errors = process.communicate(timeout=timeout)
+        printed, errors = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         try:
             process.kill()
             process.communicate(timeout=KILL_WAIT)
         except Exception:
             pass
-        return {"end": "timed_out", "code": None, "input": None, "cached": None, "output": None}
-    return dict(tokens_of(printed), end="exited", code=process.returncode)
+        return {"end": "timed_out", "code": None, "input": None, "cached": None, "output": None, "refused": False}
+    code = process.returncode
+    said = code != 0 and not thread_started(printed) and refused(errors)
+    return dict(tokens_of(printed), end="exited", code=code, refused=said)
 
 
 # ---------------------------------------------------------------------------- the capability
@@ -441,7 +518,7 @@ class WindowAnchor:
 
     # ------------------------------------------------------------------ the errand
     def look(self, view, guard):
-        if self._settle():
+        if self._settle(guard):
             return None
         now = self._scoped.now()
         if self._pending is not None:
@@ -567,7 +644,10 @@ class WindowAnchor:
         self._done(why, occurrence)
         self._unstamp(OptionKey.ANCHOR_STOPPED_AT)
         self._count("started")
-        occasion = {"why": why, "occurrence": occurrence, "at": int(now)}
+        self._wait({"why": why, "occurrence": occurrence, "at": int(now)}, process)
+
+    def _wait(self, occasion, process) -> None:
+        """The request's waiting thread begun: what finish_request answers is the next tick's to settle."""
         with self._lock:
             self._running = occasion
 
@@ -583,14 +663,44 @@ class WindowAnchor:
         except Exception:
             wait()
 
-    def _settle(self) -> bool:
+    def _again(self, occasion, guard) -> bool:
+        """v0.6.24, measure first and never drop the window: Codex refused the switch that keeps the person's programs out
+        (REFUSALS) before any thread started, so nothing was sent - the request is sent ONCE more as it was before
+        (`plain`), inside core's errand guard, the occasion's start already stamped and counted. Whether it was; a plain
+        one is never sent again, so there is never a third request."""
+        if occasion.get("plain"):
+            return False
+        folder = folder_of(self.paths)
+        if not ready_folder(folder):
+            return False
+        try:
+            backend = self._backend()
+        except Exception:
+            return False
+        process = None
+        try:
+            with guard() as permitted:
+                if permitted is True:
+                    process = start_request(backend, folder, plain=True)
+        except Exception:
+            process = None
+        if process is None:
+            return False
+        self._say("warning: this Codex refused the switch that keeps your MCP servers, hooks, plugins, apps and notify "
+                  "program out of the request, so it was sent once more without it - they ran for this request")
+        self._wait(dict(occasion, plain=True), process)
+        return True
+
+    def _settle(self, guard=None) -> bool:
         """A request that ended: its counts kept, its word counted, and - exited 0 - two reads begun that say whether
-        the window now runs. Whether there was one."""
+        the window now runs; refused for its switch, sent once more as before (`_again`). Whether there was one."""
         with self._lock:
             ended, self._ended = self._ended, None
         if ended is None:
             return False
         occasion, answered = ended
+        if answered.get("refused") is True and guard is not None and self._again(occasion, guard):
+            return True
         scoped = self._scoped
         for key, name in ((OptionKey.ANCHOR_INPUT_TOKENS, "input"), (OptionKey.ANCHOR_OUTPUT_TOKENS, "output")):
             value = answered.get(name)
