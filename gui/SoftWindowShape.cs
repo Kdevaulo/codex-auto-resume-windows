@@ -5,12 +5,13 @@
 // window's own corner is two pieces (plans/v0624-stage1-design.md, section 5):
 //
 // - a window region: the pixels the card's corner (Palette.RadiusCard at the window's scale, smoothed as the cards are -
-//   Figma's 60 % for Soft, circular arcs for Classic and Plain) covers fully, less the hairline round its edge. Hard-edged,
-//   as a region is: "The system does not display any portion of a window that lies outside of the window region";
+//   Figma's 60 % for Soft, circular arcs for Classic and Plain) covers fully, the hairline round its edge too, so the
+//   window's outermost pixel is the window's and resizes it. Hard-edged, as a region is: "The system does not display any
+//   portion of a window that lies outside of the window region";
 // - a companion: one layered popup owned by the window - above it, hidden while it is minimised, gone with it - that lets
 //   the mouse through (WS_EX_TRANSPARENT) and paints everything round the region: the hairline and the anti-aliased edge,
 //   every pixel the corner covers partly at its coverage, and the window's shadow (the one a still draws round a dialog:
-//   14 px, 6 px lower, about 0.17 of the light) onto the desktop. Nothing it paints lies inside the region.
+//   14 px, 6 px lower, about 0.17 of the light) onto the desktop. Inside the region it paints the hairline alone, opaque.
 //
 // The window's whole rectangle is its client area then (WM_NCCALCSIZE answered with the window itself), so no invisible
 // frame is cut off by the region; the resize bands lie inside the visible edge (Chrome.Hit, ChromeLayout.Edges).
@@ -168,10 +169,13 @@ namespace CodexAutoResume
                 return xx >= Hair && yy >= Hair ? 1.0 : 0.0;
             }
 
-            /// Whether the pixel is the window's own - inside its region.
+            /// Whether the pixel is the window's own - inside its region: every pixel the corner covers fully, the hairline's
+            /// too. The companion paints the hairline over the window there, opaque, so it looks as it did; but a pointer on
+            /// the window's outermost pixel is over the window, and resizes it (M-CORNER 2026-11-16, item 3: it clicked
+            /// through to what lay behind). The edge's partly covered pixels are the companion's alone, as before.
             internal bool Own(int x, int y)
             {
-                return CoverInner(x, y) >= 1.0;
+                return CoverOuter(x, y) >= 1.0;
             }
 
             /// The shadow's light at the window's pixel (x, y): the stacked layers of PaintDialog's shadow - each
@@ -365,14 +369,13 @@ namespace CodexAutoResume
             return rects;
         }
 
-        // The first pixel of row y the window owns, or -1.
+        // The first pixel of row y the window owns (Edge.Own), or -1.
         private static int FirstOwn(Edge edge, int y)
         {
             int yy = Math.Min(y, edge.Height - 1 - y);
-            if (yy < edge.Hair) return -1;
-            if (yy >= edge.Tile) return edge.Hair;
+            if (yy >= edge.Tile) return 0;
             for (int x = 0; x < edge.Tile; x++)
-                if (edge.InnerTile[yy * edge.Tile + x] >= 1.0) return x;
+                if (edge.OuterTile[yy * edge.Tile + x] >= 1.0) return x;
             return edge.Tile;
         }
 
@@ -666,12 +669,27 @@ namespace CodexAutoResume
             now = Want();
         }
 
+        // The windows that have a corner of their own, so Soft.TitleBar - which asks DWM for its round corner as every window
+        // and dialog is made, after this is attached on the Dashboard - asks for this one's preference instead (Of).
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Form, WindowCorner> attached =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<Form, WindowCorner>();
+
         /// The corner of `form`, a top-level window that asked for its own (WindowShape.Wanted).
         internal static WindowCorner Attach(Form form)
         {
             var corner = new WindowCorner(form);
             form.BackColorChanged += delegate { corner.Refresh(); };
+            form.HandleCreated += delegate { corner.Prefer(); };
+            attached.Remove(form);
+            attached.Add(form, corner);
             return corner;
+        }
+
+        /// The corner `form` has of its own, or null.
+        internal static WindowCorner Of(Form form)
+        {
+            WindowCorner corner;
+            return form != null && attached.TryGetValue(form, out corner) ? corner : null;
         }
 
         /// The corner the window has now.
@@ -721,9 +739,19 @@ namespace CodexAutoResume
             return dpi > 0 ? dpi / 96.0 : SettingsForm.DpiScale;
         }
 
+        internal const int WM_NCPAINT = 0x0085, WM_NCACTIVATE = 0x0086, WM_NCUAHDRAWCAPTION = 0x00AE, WM_NCUAHDRAWFRAME = 0x00AF;
+
         /// Handles `m` before the window's caption does: true when it is answered here. WM_NCCALCSIZE while the corner is
         /// ours: the whole window is the client (nothing of the rectangle given is taken off). WM_WINDOWPOSCHANGED: the
         /// region and the companion follow the window at once, and the message goes on to the window.
+        ///
+        /// And nothing of Windows' frame is ever painted while the corner is ours. A window with a region has no frame from
+        /// DWM (DWMWA_NCRENDERING_ENABLED reads 0), so Windows' own handling paints the classic one - a light-blue caption
+        /// with its title, icon and buttons, a thick grey frame - straight over the window, whatever its client area: as it
+        /// is activated (the owner's resize, M-CORNER 2026-11-16), as its frame is asked to paint (each region set while it
+        /// is resized), and as its title or icon changes (ChromeHost.Unframed). WM_NCPAINT and the theme's own caption and
+        /// frame messages are answered with nothing; WM_NCACTIVATE goes on with -1, which tells Windows to keep its
+        /// activation and repaint no frame for it.
         internal bool Intercept(ref Message m)
         {
             if (m.Msg == Chrome.WM_NCCALCSIZE)
@@ -733,6 +761,18 @@ namespace CodexAutoResume
                 return true;
             }
             if (m.Msg == WM_WINDOWPOSCHANGED) Sync();
+            if (!Shaped) return false;
+            switch (m.Msg)
+            {
+                case WM_NCPAINT:
+                case WM_NCUAHDRAWCAPTION:
+                case WM_NCUAHDRAWFRAME:
+                    m.Result = IntPtr.Zero;
+                    return true;
+                case WM_NCACTIVATE:
+                    m.LParam = new IntPtr(-1);
+                    return false;
+            }
             return false;
         }
 
@@ -884,8 +924,11 @@ namespace CodexAutoResume
             if (layer != null) ShowWindow(layer.Handle, SW_HIDE);
         }
 
-        // Asks DWM for no corner of its own under ours, and for its round one otherwise (as Soft.TitleBar does).
-        private void Prefer()
+        /// Asks DWM for no corner of its own under ours, and for its round one otherwise (as Soft.TitleBar does) - also as
+        /// the window is made, after Soft.TitleBar, which asks this for a window with a corner of its own (Of): its round
+        /// one asked last left DWM rounding a window whose region was already cut, a ghost of its small round corner
+        /// beyond ours (M-CORNER 2026-11-16: DWMWA_WINDOW_CORNER_PREFERENCE read 2 on the Dashboard with its corner on).
+        internal void Prefer()
         {
             if (!form.IsHandleCreated) return;
             preferred = true;

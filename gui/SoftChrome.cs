@@ -407,8 +407,76 @@ namespace CodexAutoResume
         {
             if (corner != null || !form.TopLevel || !WindowShape.Wanted()) return;
             corner = WindowCorner.Attach(form);
-            corner.Changed += delegate { dirty = true; };
+            corner.Changed += delegate { dirty = true; Grip(); };
+            form.Layout += delegate { Grip(); };
             if (form.IsHandleCreated) Created();
+            Grip();
+        }
+
+        // ------------------------------------------------------------------ the grip band, given by what lies in it
+
+        // The controls that reach into the grip band (GripThrough), and the containers looked into for them.
+        private readonly Dictionary<Control, GripThrough> grips = new Dictionary<Control, GripThrough>();
+        private readonly HashSet<Control> watched = new HashSet<Control>();
+        private bool gripping;
+
+        /// v0.6.24 W5: with its own corner the window resizes from a band inside its edge (Chrome.Hit, ChromeLayout.Edges),
+        /// but Windows asks the control under the pointer first, and a control that reaches into the band - the page
+        /// under the tabs, the full width of the window (M-CORNER 2026-11-16, item 3: the left and right edges did not
+        /// resize along the pages) - answered for it. Every control that reaches into the band, at any depth, gives the
+        /// band to the window (HTTRANSPARENT there); the rest of it stays its own. Looked at again as anything that holds
+        /// one is laid out, so a page built later, a control added and the mirrored window all give it too. Only controls
+        /// that reach the band are looked into: nothing inside one that does not can reach it.
+        private void Grip()
+        {
+            if (corner == null || gripping || form.IsDisposed) return;
+            gripping = true;
+            try { GripIn(form, Math.Max(1, TopBand())); }
+            finally { gripping = false; }
+        }
+
+        private void GripIn(Control parent, int band)
+        {
+            Size client = form.ClientSize;
+            foreach (Control child in parent.Controls)
+            {
+                if (child is CaptionButton || child.IsDisposed) continue;
+                Rectangle at = InForm(child);
+                bool reaches = at.Left < band || at.Top < band || at.Right > client.Width - band || at.Bottom > client.Height - band;
+                if (!reaches) continue;
+                if (!drag.Contains(child) && !grips.ContainsKey(child)) grips[child] = new GripThrough(child, this);
+                if (watched.Add(child))
+                {
+                    child.Layout += delegate { Grip(); };
+                    child.Disposed += delegate { Forget(child); };
+                }
+                if (child.Controls.Count > 0) GripIn(child, band);
+            }
+        }
+
+        private void Forget(Control child)
+        {
+            GripThrough hook;
+            if (grips.TryGetValue(child, out hook)) hook.Let();
+            grips.Remove(child);
+            watched.Remove(child);
+        }
+
+        /// Whether the pointer at `screen` is in the band the window is resized from (Chrome.Hit's edges), the window's own
+        /// corner on.
+        internal bool InGrip(Point screen)
+        {
+            if (corner == null || !form.IsHandleCreated || !form.TopLevel) return false;
+            ChromeLayout l = Layout();
+            if (!l.Edges || !l.Sizable || l.Maximized) return false;
+            int hit = Chrome.Hit(form.PointToClient(screen), l);
+            return hit >= Chrome.HTLEFT && hit <= Chrome.HTBOTTOMRIGHT;
+        }
+
+        /// The controls that give the grip band to the window now, for the tests.
+        internal int Gripping
+        {
+            get { return grips.Count; }
         }
 
         /// The window's outer corner now: its own, or Windows' - round on Windows 11, square before.
@@ -719,6 +787,11 @@ namespace CodexAutoResume
         {
             // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
             if (corner != null && corner.Intercept(ref m)) return true;
+            if (corner != null && corner.Shaped && (m.Msg == WM_SETTEXT || m.Msg == WM_SETICON) && form.IsHandleCreated)
+            {
+                Unframed(ref m, pass);
+                return true;
+            }
             switch (m.Msg)
             {
                 case Chrome.WM_NCCALCSIZE:
@@ -776,6 +849,34 @@ namespace CodexAutoResume
                 }
             }
             return false;
+        }
+
+        private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, GWL_STYLE = -16, WS_VISIBLE = 0x10000000;
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+
+        // v0.6.24 W5: a new title or icon, taken by Windows' own handling with the window marked hidden for that moment.
+        // Windows paints the caption it keeps for those straight onto the window, and while the window's corner is its own
+        // that caption is the classic one (WindowCorner.Intercept); marked hidden, it paints nothing. Nothing is shown or
+        // hidden: the style bit alone, put back at once.
+        private void Unframed(ref Message m, Pass pass)
+        {
+            IntPtr handle = form.Handle;
+            long style = GetWindowLongPtr(handle, GWL_STYLE).ToInt64();
+            bool visible = (style & WS_VISIBLE) != 0;
+            if (visible) SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(style & ~(long)WS_VISIBLE));
+            try { pass(ref m); }
+            finally
+            {
+                if (visible)
+                {
+                    long now = GetWindowLongPtr(handle, GWL_STYLE).ToInt64();
+                    SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(now | WS_VISIBLE));
+                }
+            }
         }
 
         private static bool IsButton(int code)
@@ -837,9 +938,31 @@ namespace CodexAutoResume
             try { pass(ref m); }
             finally { restoring = outer; }
             FormWindowState after = form.WindowState;
-            if (before == FormWindowState.Normal && after != FormWindowState.Normal) restoreClient = client;
+            if (before == FormWindowState.Normal && after != FormWindowState.Normal)
+            {
+                restoreClient = client;
+                ForgetRestoredSize();
+            }
             else if (after == FormWindowState.Normal) restoreClient = Size.Empty;
             return true;
+        }
+
+        private static readonly System.Reflection.FieldInfo RestoredSpecified = typeof(Form).GetField("restoredWindowBoundsSpecified",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        /// v0.6.24 W5: the window has just left its normal state, and WinForms has kept its client size to give back on the
+        /// way to normal (Form.UpdateWindowState, RestoreWindowBoundsIfNecessary) - as a window size worked out with
+        /// Windows' caption, which Restoring takes back off only where it can tell that is what it is. On the real 150 %
+        /// monitor it could not (M-CORNER 2026-11-16: every restore, from the button, a double-click, Win+Down, the taskbar
+        /// or Win+D, grew the window by Windows' frame and caption at the system's scale, 26 x 71 px; an unsnap, which
+        /// WinForms remembers nothing for, did not). So nothing is kept: the window comes back where Windows keeps it,
+        /// its normal position, exactly as it left - as every other window does. A size the program sets while the window
+        /// is maximised is still kept by WinForms (Form.SetBoundsCore) and given back.
+        private void ForgetRestoredSize()
+        {
+            if (RestoredSpecified == null) return;
+            try { RestoredSpecified.SetValue(form, BoundsSpecified.None); }
+            catch (Exception) { /* Restoring answers what WinForms asks, as before */ }
         }
 
         /// The size the form's SetBoundsCore is asked for (`created` its CreateParams): on the way back from maximised or
@@ -945,6 +1068,53 @@ namespace CodexAutoResume
             tipWait.Dispose();
             foreach (DragThrough hook in hooks) hook.Let();
             hooks.Clear();
+            foreach (GripThrough grip in grips.Values) grip.Let();
+            grips.Clear();
+        }
+    }
+
+    /// A control that reaches into the window's grip band, giving that band to the window (ChromeHost.Grip): its answer
+    /// to what the pointer is over is the window's there (HTTRANSPARENT), its own everywhere else.
+    internal sealed class GripThrough : NativeWindow
+    {
+        private readonly Control control;
+        private readonly ChromeHost host;
+        private bool let;
+
+        internal GripThrough(Control control, ChromeHost host)
+        {
+            this.control = control;
+            this.host = host;
+            control.HandleCreated += delegate { Take(); };
+            control.HandleDestroyed += delegate { if (Handle != IntPtr.Zero) ReleaseHandle(); };
+            Take();
+        }
+
+        private void Take()
+        {
+            if (let || !control.IsHandleCreated || Handle == control.Handle) return;
+            if (Handle != IntPtr.Zero) ReleaseHandle();
+            AssignHandle(control.Handle);
+        }
+
+        internal void Let()
+        {
+            let = true;
+            if (Handle != IntPtr.Zero) ReleaseHandle();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == Chrome.WM_NCHITTEST && !let)
+            {
+                long at = m.LParam.ToInt64();
+                if (host.InGrip(new Point((short)(at & 0xFFFF), (short)((at >> 16) & 0xFFFF))))
+                {
+                    m.Result = (IntPtr)Chrome.HTTRANSPARENT;
+                    return;
+                }
+            }
+            base.WndProc(ref m);
         }
     }
 
