@@ -1,4 +1,8 @@
-r"""v0.6.23: the days with a look of their own, and the seven presses (both only by the owner's word).
+r"""v0.6.23: the days with a look of their own, and the egg on the version (both only by the owner's word).
+
+v0.6.24-beta.2 (the owner, 2026-11-16, "이스터에그 버전 알약 한번만 눌러도 뜨게 하자" - let one press on the version pill show
+the easter egg): the window counts no presses any more - its run of seven, each within 1.8 s (PressRun), is gone; every press
+is the egg (test_gui_v0624_dashboard). The tray card's title and the panel keep brand's run (test_gui_v0623_surfaces).
 
 The table is brand's and is generated into the window; nothing here reads today's date, so no test can fail because of the day
 it runs on or the years that have passed. Part GUI (it compiles the window): run on its own, through gui_lock.sh.
@@ -420,21 +424,6 @@ class PopupSceneTests(unittest.TestCase):
 
 
 PROBE = r"""
-$run = Make 'PressRun'
-$at = 0.0
-$said = @()
-foreach ($gap in 0, 1800, 1800, 1800, 1800, 1800) { $at += $gap; $said += [bool](Call $run 'Press' @([double]$at)) }
-$out.six = $said
-$at += 1800
-$out.seventh = [bool](Call $run 'Press' @([double]$at))
-$at += 1800
-$out.eighth = [bool](Call $run 'Press' @([double]$at))
-$late = Make 'PressRun'
-$at = 0.0
-$said = @()
-foreach ($gap in 0, 1000, 1000, 1801, 1000, 1000, 1000, 1000, 1000) { $at += $gap; $said += [bool](Call $late 'Press' @([double]$at)) }
-$out.broken = $said
-
 function ArcAt([double]$ms) {
     $call = [object[]]@($ms, [double]0, [double]0)
     $null = (T 'HaloDot').GetMethod('ArcAt', $static).Invoke($null, $call)
@@ -518,13 +507,14 @@ class PressAndLightTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.folder.cleanup()
 
-    def test_seven_presses_each_within_the_gap_say_so_once(self):
-        self.assertEqual(self.answer["six"], [False] * 6)
-        self.assertTrue(self.answer["seventh"])
-        self.assertFalse(self.answer["eighth"], "and it starts again")
-
-    def test_a_press_too_late_starts_the_count_again(self):
-        self.assertEqual(self.answer["broken"], [False] * 9)
+    def test_one_press_on_the_version_is_the_egg(self):
+        """The owner, 2026-11-16: "이스터에그 버전 알약 한번만 눌러도 뜨게 하자". No run of presses is counted: the version's
+        press goes straight to the sweep and the sentence, every time."""
+        egg = guiscan.member_body("SettingsForm", "VersionPressed")
+        self.assertNotIn("Press(", egg)
+        self.assertNotIn("return", egg)
+        self.assertIn("stateDot.Sweep();", egg)
+        self.assertNotIn("class PressRun", guiscan.window())
 
     def test_the_arc_sweeps_once_in_the_mocks_time_and_fades(self):
         start, end, fading, gone = self.answer["arc"]

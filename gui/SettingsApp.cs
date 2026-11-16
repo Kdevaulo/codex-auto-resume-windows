@@ -440,8 +440,6 @@ namespace CodexAutoResume
         private readonly HaloDot stateDot = new HaloDot();
         private readonly SoftDayScene dayScene = new SoftDayScene();
         private string dayLook;
-        private readonly System.Diagnostics.Stopwatch versionClock = System.Diagnostics.Stopwatch.StartNew();
-        private readonly PressRun versionPresses = new PressRun();
 
         // The sentence comes in as the sweep ends, and goes 4 s after it has come in.
         internal const int AsideAfterMs = 850, AsideMs = 4150;
@@ -513,9 +511,12 @@ namespace CodexAutoResume
             if (stateDot.Sweeping) detail.Arrive(AsideAfterMs);
         }
 
+        /// The easter egg: the light's sweep and the sentence coming in as it ends. v0.6.24-beta.2 (the owner, 2026-11-16,
+        /// "이스터에그 버전 알약 한번만 눌러도 뜨게 하자" - let one press on the version pill show the easter egg): every press,
+        /// where seven within 1.8 s each were asked before (v0.6.23). A press while it plays starts it again from its start - the
+        /// sweep from the top (HaloDot.Sweep), the sentence again as that ends (AsideLabel.Aside) - and nothing stacks.
         private void VersionPressed()
         {
-            if (!versionPresses.Press(versionClock.Elapsed.TotalMilliseconds)) return;
             stateDot.Sweep();
             detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
         }

@@ -118,6 +118,20 @@ namespace CodexAutoResume
             return said;
         }
 
+        /// Where the line under the headline is with the egg's sentence: what it will say, whether that is on its way or said,
+        /// the words it shows now and its own words behind the sentence.
+        private Dictionary<string, object> ProportionsAside()
+        {
+            var said = new Dictionary<string, object>();
+            BindingFlags hidden = BindingFlags.Instance | BindingFlags.NonPublic;
+            said["words"] = (string)typeof(AsideLabel).GetField("words", hidden).GetValue(detail) ?? "";
+            said["waiting"] = (bool)typeof(AsideLabel).GetField("waiting", hidden).GetValue(detail);
+            said["saying"] = detail.Saying;
+            said["shows"] = detail.Text ?? "";
+            said["behind"] = (string)typeof(AsideLabel).GetField("behind", hidden).GetValue(detail) ?? "";
+            return said;
+        }
+
         internal static void ProportionsRun(string dir, Dictionary<string, object> said)
         {
             Application.EnableVisualStyles();
@@ -206,13 +220,20 @@ namespace CodexAutoResume
                     grown["findings"] = string.Join(" | ", findings.ToArray());
                     answer["grown"] = grown;
                     form.ClientSize = opening;
-                    // A press on the pill is a press on the version (VersionPressed): one press of the run it counts.
-                    FieldInfo count = typeof(PressRun).GetField("count", BindingFlags.Instance | BindingFlags.NonPublic);
+                    // A press on the pill is a press on the version (VersionPressed), and one press is the egg (the owner,
+                    // 2026-11-16): the sentence on its way or said. Then, as if the sweep had ended, the sentence said, and a
+                    // press on the version's words starts it again from its start - nothing stacked on the line's own words.
                     MethodInfo down = typeof(Control).GetMethod("OnMouseDown", BindingFlags.Instance | BindingFlags.NonPublic);
+                    form.detail.Text = "The line's own words";
                     down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
-                    answer["pillPress"] = (double)(int)count.GetValue(form.versionPresses);
+                    var first = form.ProportionsAside();
+                    answer["pillPress"] = first;
+                    if ((bool)first["waiting"])
+                        typeof(AsideLabel).GetMethod("Speak", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form.detail, null);
+                    answer["said"] = form.ProportionsAside();
                     down.Invoke(form.versionText, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
-                    answer["labelPress"] = (double)(int)count.GetValue(form.versionPresses);
+                    answer["labelPress"] = form.ProportionsAside();
+                    answer["sentence"] = form.S("status.aside", "It's okay if it stops. I'll pick it up.");
                 }
                 said[locale] = answer;
             }
@@ -345,12 +366,32 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertEqual(grown["cut"], "", "no tab cut off at the strip's end")
                 self.assertEqual(grown["findings"], "")
 
-    def test_a_press_on_the_pill_is_a_press_on_the_version(self):
+    def test_one_press_on_the_pill_is_the_easter_egg(self):
+        """The owner, 2026-11-16: "이스터에그 버전 알약 한번만 눌러도 뜨게 하자" - let one press on the version pill show the
+        easter egg (seven presses, each within 1.8 s, were asked before). Every press shows it; a press while it shows starts
+        it again from its start, and nothing stacks: the line's own words stay behind the sentence."""
         for locale in LOCALES:
             said = self.answer[locale]
+            sentence = said["sentence"]
             with self.subTest(locale=locale):
-                self.assertEqual(said["pillPress"], 1)
-                self.assertEqual(said["labelPress"], 2)
+                first = said["pillPress"]
+                self.assertEqual(first["words"], sentence, "one press on the pill shows the egg's sentence")
+                self.assertTrue(first["waiting"] or first["saying"])
+                self.assertEqual(first["behind"], "The line's own words")
+                self.assertTrue(said["said"]["saying"])
+                self.assertEqual(said["said"]["shows"], sentence)
+                again = said["labelPress"]
+                self.assertEqual(again["words"], sentence, "a press on the version's words is a press on the version")
+                self.assertTrue(again["waiting"] or again["saying"])
+                self.assertEqual(again["behind"], "The line's own words", "the sentence is never taken for the line's own words")
+                if again["waiting"]:
+                    self.assertEqual(again["shows"], "The line's own words",
+                                     "from its start: the line's own words while the sweep plays again, never the sentence held")
+
+    def test_the_window_counts_no_presses(self):
+        egg = guiscan.member_body("SettingsForm", "VersionPressed")
+        self.assertEqual(egg[egg.index("{") + 1:egg.index("stateDot.Sweep();")].strip(), "", "nothing before the sweep: " + egg)
+        self.assertNotIn("PressRun", guiscan.window())
 
 
 class DashboardProportionsSourceTests(unittest.TestCase):

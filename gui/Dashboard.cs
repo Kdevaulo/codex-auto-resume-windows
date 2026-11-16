@@ -326,25 +326,6 @@ namespace CodexAutoResume
         }
     }
 
-    /// Presses one after another: seven, each within 1.8 s of the last, and it says so once and starts again.
-    internal sealed class PressRun
-    {
-        internal const int Wanted = 7;
-        internal const double Gap = 1800.0;
-
-        private double last = double.NegativeInfinity;
-        private int count;
-
-        internal bool Press(double milliseconds)
-        {
-            count = milliseconds - last <= Gap ? count + 1 : 1;
-            last = milliseconds;
-            if (count < Wanted) return false;
-            count = 0;
-            return true;
-        }
-    }
-
     /// A line that can say something else for a moment, coming in and leaving by a fade and a small rise (paint only, in its own
     /// rectangle; immediate with motion reduced). What it is told meanwhile is what it says afterwards.
     internal sealed class AsideLabel : Label
@@ -411,6 +392,7 @@ namespace CodexAutoResume
         /// In `delayMs` it says `said`, for `heldMs`.
         internal void Aside(string said, int delayMs, int heldMs)
         {
+            bool saying = aside;
             if (!aside && !waiting) behind = base.Text;
             // Its own words, if they were still to come in, come back after the aside as they always do.
             arriving = false;
@@ -423,6 +405,13 @@ namespace CodexAutoResume
             {
                 Speak();
                 return;
+            }
+            // Asked again while it says `said` (v0.6.24-beta.2: each press on the version): from its start, as the first time -
+            // its own words back now, the sentence again in `delayMs` - never the sentence held on until then.
+            if (saying)
+            {
+                base.Text = behind;
+                Glide(OutMs);
             }
             timer.Interval = delayMs;
             timer.Start();
@@ -1829,7 +1818,7 @@ namespace CodexAutoResume
 
         /// v0.6.23 (F2): whether this idle turn takes no step, of the pages made ready ahead or of the Settings editors: a
         /// glide is on its way on the window's thread (Transition.Moving - a button's or a tab's hover and press, the
-        /// light's colour, the Statistics bars, the seven-press sweep), or a key or the mouse came within
+        /// light's colour, the Statistics bars, the version's sweep), or a key or the mouse came within
         /// PrepareAfterInputMilliseconds. A step taken between two frames of a glide held the glide for the step's length:
         /// a hover's 160 ms came in one jump to its end. The light's breath is no glide (its own timer, never still for
         /// long): it is kept moving by steps that each end within about PrepareSliceMilliseconds.
