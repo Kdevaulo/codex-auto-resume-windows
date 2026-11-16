@@ -132,10 +132,11 @@ namespace CodexAutoResume
             Palette.AdoptDesign(null);
             Palette.Adopt("light");
             var snapshot = Json.Parse(File.ReadAllText(Path.Combine(dir, "snapshot.json"), Encoding.UTF8)) as Dictionary<string, object>;
-            // The conversation's dialog is 611 logical px tall with its body card and title card; at 200% and the largest
-            // text size (4.5) the CI's screen held it to 780 of its 2750. Here: four and a half times what this screen holds.
+            // The conversation's dialog is 591 logical px tall with its body card and title row (611 with the beta's title
+            // card); at 200% and the largest text size (4.5) the CI's screen held the beta's to 780 of its 2750. Here: four
+            // and a half times what this screen holds.
             Size most = SystemInformation.MaxWindowTrackSize;
-            double held = Math.Max(2.0, 4.5 * most.Height / 611.0);
+            double held = Math.Max(2.0, 4.5 * most.Height / 591.0);
             said["most"] = new List<object> { (double)most.Width, (double)most.Height };
             said["heldScale"] = held;
             said["held"] = HeldAt(dir, held, snapshot);

@@ -464,7 +464,7 @@ class TopLevelChromeTests(unittest.TestCase):
         for border in ("FixedDialog", "Sizable"):
             said = self.answer["opened-" + border]
             with self.subTest(border=border):
-                self.assertGreater(said["reserve"], 26 + 20)
+                self.assertGreaterEqual(said["reserve"], 8 + 26 + 8, "v0.6.24-beta.2: the title row on the ground")
                 self.assertEqual(said["clientSize"], [600, 400 + said["reserve"]])
                 self.assertEqual(said["client"][2:], [600, 400 + said["reserve"]], "Windows' client rectangle")
                 self.assertEqual(said["window"][2:], said["expectedWindow"], "no Windows caption in the window's height")

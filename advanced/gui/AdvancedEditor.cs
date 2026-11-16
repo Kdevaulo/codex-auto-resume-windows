@@ -421,7 +421,7 @@ namespace CodexAutoResume
             editorBody.PerformLayout();
             int tall = Math.Max(editorBody.Height, editorBody.GetPreferredSize(new Size(width, 0)).Height);
             int buttonsTall = editorButtons.GetPreferredSize(new Size(width, 0)).Height;
-            // v0.6.24: and the dialog's title card above it, once it has one (SoftDialog.TitleRoom).
+            // v0.6.24: and the dialog's title row above it, once it has one (SoftDialog.TitleRoom).
             int want = Math.Max(Px(240), Math.Min(tall + buttonsTall + SoftDialog.TitleRoom(editorDialog), EditorMost()));
             if (editorDialog.ClientSize.Height != want) editorDialog.ClientSize = new Size(width, want);
         }

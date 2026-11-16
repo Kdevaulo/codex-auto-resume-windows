@@ -462,7 +462,7 @@ namespace CodexAutoResume
             ownFit = delegate
             {
                 int tall = bodyCard.GetPreferredSize(new Size(across, 0)).Height;
-                // v0.6.24: and the dialog's title card above it, once it has one (SoftDialog.TitleRoom).
+                // v0.6.24: and the dialog's title row above it, once it has one (SoftDialog.TitleRoom).
                 dialog.ClientSize = new Size(across, tall + buttons.GetPreferredSize(new Size(across, 0)).Height + SoftDialog.TitleRoom(dialog));
             };
             ownFit();
@@ -499,7 +499,7 @@ namespace CodexAutoResume
             // window the screen allows (SystemInformation.MaxWindowTrackSize), so Windows has made it smaller than
             // what it holds was laid out for - 1980 wide at 200% and the largest text size, on a screen 1024 wide.
             // The window opens only at a text size whose dialogs its screen holds (TextScale.Fitting).
-            // v0.6.24: asked once the dialog has its title card (Materialise makes it, SoftDialog), which makes it taller.
+            // v0.6.24: asked once the dialog has its title row (Materialise makes it, SoftDialog), which makes it taller.
             Materialise(dialog);
             bool whole = !HeldByScreen(dialog);
             dialog.PerformLayout();
@@ -508,7 +508,7 @@ namespace CodexAutoResume
                 Walk(dialog, where, findings);
                 // No empty band above the buttons at its opening size (the owner, 2026-10-25).
                 int opening = dialog.Controls[0].GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height;
-                // v0.6.24: below the dialog's title card (SoftDialog.TitleRoom).
+                // v0.6.24: below the dialog's title row (SoftDialog.TitleRoom).
                 int held = dialog.ClientSize.Height - SoftDialog.TitleRoom(dialog) - dialog.Controls[1].Height;
                 if (held - opening > Px(2)) findings.Add(where + " :: " + (held - opening) + " px empty above the buttons");
                 // And with the refusal said above it, the longest the line gets, fitted as a refusal fits it.
@@ -524,8 +524,8 @@ namespace CodexAutoResume
             try
             {
                 AuditSpoken(where, dialog, findings);
-                // v0.6.24: its title card (SoftDialog).
-                AuditTitleCard(where, dialog, findings);
+                // v0.6.24: its title row (SoftDialog).
+                AuditTitleRow(where, dialog, findings);
             }
             finally
             {
