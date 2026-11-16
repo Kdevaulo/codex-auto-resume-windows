@@ -30,6 +30,8 @@ namespace CodexAutoResume
         internal delegate InstallerWords Speaker(string language);
 
         internal const int OpeningWidth = 600;
+        /// v0.6.24: the window's opening height at text size 1; Fit keeps what the pages need where that is more.
+        internal const int OpeningHeight = 600;
 
         private readonly InstallerFlow flow;
         private readonly Runner runner;
@@ -239,8 +241,11 @@ namespace CodexAutoResume
                 tallest = Math.Max(tallest, Arrange(inner));
             }
             page = showing;
-            ClientSize = new Size(width, Px(16) + HeaderHeight() + Px(16) + tallest + Px(32) + Px(16) +
-                                         Px(Brand.ButtonHeight) + Px(16));
+            // v0.6.24: 600 x 600 at text size 1 (the owner's choice of 2026-11-16): the pages need less than that, and the
+            // content card takes the rest (OnLayout fills it down to the buttons, its page's rows kept at its top). A page
+            // that needs more - a larger text size - keeps the height it needs, never cut.
+            int needed = Px(16) + HeaderHeight() + Px(16) + tallest + Px(32) + Px(16) + Px(Brand.ButtonHeight) + Px(16);
+            ClientSize = new Size(width, Math.Max(Px(OpeningHeight), needed));
             if (StartPosition == FormStartPosition.Manual)
             {
                 Rectangle primary = Screen.PrimaryScreen.WorkingArea;
