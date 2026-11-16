@@ -229,6 +229,8 @@ namespace CodexAutoResume
                     form.AuditCaption("header", findings);
                     // v0.6.24-beta.2: the version's pill at the end of the tabs, clear of every tab (FitVersionPill).
                     form.AuditPill(findings);
+                    // v0.6.24-beta.2: as much room above the tab row as below it, on every page (AuditTabRow).
+                    form.AuditTabRow(findings);
                     // The reopen note, beside every button of the Settings page's save card, at the opening width
                     // and at the narrowest the window goes: 800 wide, less a sizable frame's 8 px on each side -
                     // each in both orders a window comes to a width in (AuditReopenNote).
@@ -850,6 +852,74 @@ namespace CodexAutoResume
             int words = versionText.GetPreferredSize(Size.Empty).Width;
             if (versionText.Width < words)
                 findings.Add("tabs :: the version's pill cuts its words: " + versionText.Width + " of " + words);
+        }
+
+        /// How the last LayoutAudit found the room round the tab row, `page:above/below;` for each page (for the tests).
+        internal static string AuditedTabRow = "";
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, "촘촘하게"): on every page, from the header card's foot to the chosen tab's
+        /// face and from the face to the top of the page's first card, TabRowGap each, within a pixel - so the same above
+        /// and below. The page shown before is shown again after.
+        private void AuditTabRow(List<string> findings)
+        {
+            var found = new StringBuilder();
+            string before = currentPage;
+            foreach (string page in PageOrder)
+            {
+                ShowPage(page);
+                Materialise(this);
+                PerformLayout();
+                int above, below;
+                if (!TabRowRoom(page, out above, out below))
+                {
+                    findings.Add("tabs :: " + page + " has no card under the tab row");
+                    continue;
+                }
+                found.Append(page + ":" + above + "/" + below + ";");
+                int gap = Px(TabRowGap);
+                if (Math.Abs(above - gap) > 1 || Math.Abs(below - gap) > 1)
+                    findings.Add("tabs :: " + page + ": " + above + " px above the tab row and " + below + " below it, not " + gap + " each");
+            }
+            AuditedTabRow = found.ToString();
+            if (before != null) ShowPage(before);
+        }
+
+        /// The room above the tab row - the header card's foot to the chosen tab's face - and below it - the face to the
+        /// highest card of `page` on the screen, or whatever stands above its cards - in this window's pixels.
+        internal bool TabRowRoom(string page, out int above, out int below)
+        {
+            above = below = 0;
+            NavButton tab;
+            Control shown;
+            if (!navButtons.TryGetValue(page, out tab) || !pages.TryGetValue(page, out shown)) return false;
+            Rectangle face = tab.Face;
+            face.Offset(InWindow(tab));
+            int top = int.MaxValue;
+            HighestCard(shown, ref top);
+            if (top == int.MaxValue) return false;
+            above = face.Top - (InWindow(hero).Y + hero.Height);
+            below = top - face.Bottom;
+            return true;
+        }
+
+        private void HighestCard(Control within, ref int top)
+        {
+            foreach (Control child in within.Controls)
+            {
+                if (!Soft.OwnVisible(child) || child.Width <= 0 || child.Height <= 0) continue;
+                // A card, or what stands on the page itself above the cards - a field kept off them, or Settings' first
+                // section, by its face as a tab is measured.
+                if (child is NavButton) top = Math.Min(top, InWindow(child).Y + ((NavButton)child).Face.Top);
+                else if (child is SoftCard || child.Controls.Count == 0) top = Math.Min(top, InWindow(child).Y);
+                else HighestCard(child, ref top);
+            }
+        }
+
+        private Point InWindow(Control control)
+        {
+            var at = Point.Empty;
+            for (Control c = control; c != null && c != this; c = c.Parent) at.Offset(c.Left, c.Top);
+            return at;
         }
 
         internal static int AuditedCaption, AuditedTitleRows;

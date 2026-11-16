@@ -88,6 +88,8 @@ namespace CodexAutoResume
             said["save"] = Soft.OwnVisible(saveButton) && saveButton.Parent != null && saveButton.Parent.Parent == savebar;
             said["restore"] = Soft.OwnVisible(restoreButton) && restoreButton.Parent != null && restoreButton.Parent.Parent == savebar;
             said["note"] = reopenNote.Parent == savebar;
+            int above, below;
+            said["tabRow"] = TabRowRoom(page, out above, out below) ? new List<object> { (double)above, (double)below } : null;
             return said;
         }
 
@@ -492,6 +494,18 @@ class DashboardProportionsTests(unittest.TestCase):
                 if again["waiting"]:
                     self.assertEqual(again["shows"], "The line's own words",
                                      "from its start: the line's own words while the sweep plays again, never the sentence held")
+
+    def test_as_much_room_above_the_tab_row_as_below_it(self):
+        """The owner, 2026-11-17 (the design canvas's row 15, option C, "촘촘하게"): 10 px from the header card's foot to the
+        tabs' faces and 10 px from them to the top of the page's cards, on every page - it was 6 above and 20 below."""
+        for locale in LOCALES:
+            for page, at in self.answer[locale]["pages"].items():
+                with self.subTest(locale=locale, page=page):
+                    self.assertIsNotNone(at["tabRow"], "something under the tab row")
+                    above, below = at["tabRow"]
+                    self.assertLessEqual(abs(above - 10), 1, "above: %s" % above)
+                    self.assertLessEqual(abs(below - 10), 1, "below: %s" % below)
+                    self.assertLessEqual(abs(above - below), 1)
 
     def test_the_sixth_press_in_a_row_plays_a_special_egg(self):
         """The owner, 2026-11-16: "여러번 누를때의 이스터에그도 별도로 만들자" - a separate egg for many presses - "3개 중

@@ -652,6 +652,8 @@ namespace CodexAutoResume
             // replace (docs/GUIDE.md, Values of your own).
             period = new SoftCombo();
             period.Width = Px(180);
+            // Level with the page's top, as a card is (PageRoom): the tab row's gap above it, and the label on its centre line.
+            period.Margin = new Padding(period.Margin.Left, 0, period.Margin.Right, period.Margin.Bottom);
             IgnoreWheel(period);
             period.Items.Add(new Choice("7", S("stats.days7", "Last 7 days")));
             period.Items.Add(new Choice("30", S("stats.days30", "Last 30 days")));

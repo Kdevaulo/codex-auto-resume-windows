@@ -677,7 +677,11 @@ class WindowCompositionTests(unittest.TestCase):
                 self.assertGreaterEqual(top, need[1])
                 self.assertGreaterEqual(right, need[2])
                 self.assertGreaterEqual(bottom, need[3])
-        self.assertIn("page.Padding = CardRoom();", self.method(self.dashboard, "private Panel Page("))
+        # v0.6.24-beta.2 (the owner, 2026-11-17, "촘촘하게"): at its top a page keeps the tab row's gap instead (PageRoom) -
+        # as much room below the tabs as above them (AuditTabRow) - and its first card's lift runs on onto the tabs' ground.
+        self.assertIn("page.Padding = PageRoom();", self.method(self.dashboard, "private Panel Page("))
+        room = self.method(self.window, "private Padding PageRoom(")
+        self.assertIn("return new Padding(room.Left, Px(PageTop), room.Right, room.Bottom);", room)
         controls = guiscan.controls()
         see_through = self.method(controls, "internal static bool SeeThrough(")
         self.assertIn("if (Scrolling(control)) return false;", see_through,

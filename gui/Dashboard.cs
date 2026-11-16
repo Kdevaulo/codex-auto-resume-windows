@@ -1608,7 +1608,8 @@ namespace CodexAutoResume
             if (request.RowDialog != null) rowAsked = request.RowDialog;
 
             nav.Dock = DockStyle.Top;
-            nav.Padding = Pad(12, 0, 14, 0);
+            // NavTop above the tabs: TabRowGap from the header card's foot to their faces (PageRoom).
+            nav.Padding = Pad(12, NavTop, 14, 0);
             var strip = new SoftFlow();
             strip.Dock = DockStyle.Fill;
             strip.FlowDirection = FlowDirection.LeftToRight;
@@ -2557,7 +2558,7 @@ namespace CodexAutoResume
             page.Dock = DockStyle.Fill;
             // A page may scroll, and while it does it is the edge of the shadows on it (see Ground):
             // the cards' lift is kept inside its padding.
-            page.Padding = CardRoom();
+            page.Padding = PageRoom();
             page.Scrolls = true;
             return page;
         }

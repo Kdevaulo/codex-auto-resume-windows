@@ -1315,7 +1315,8 @@ namespace CodexAutoResume
             list.Dock = DockStyle.Fill;
             list.FlowDirection = FlowDirection.TopDown;
             list.WrapContents = false;
-            list.Margin = Pad(0, 10, 2, 0);
+            // The first section's face level with the first card's top (PageRoom), its ring's room above it.
+            list.Margin = Pad(0, PageTop - TabRing, 2, 0);
             list.AccessibleRole = AccessibleRole.PageTabList;
             list.AccessibleName = S("nav.settings", "Settings");
             // v0.6.23 (perffix): laid out once its sections' buttons are all in it (the strip of tabs says why).
@@ -1349,7 +1350,7 @@ namespace CodexAutoResume
                 stack.Font = Font;
                 // The cards' lift is kept inside the scrolling page, which is its edge (see Ground).
                 // Each card already keeps a gap below it.
-                Padding room = CardRoom();
+                Padding room = PageRoom();
                 stack.Padding = new Padding(room.Left, room.Top, room.Right, Math.Max(0, room.Bottom - Px(Brand.PageGap)));
                 // Every section stays on the page and only the one shown is visible (ShowSection).
                 stack.Visible = false;
@@ -1407,6 +1408,22 @@ namespace CodexAutoResume
         private Padding CardRoom()
         {
             return Pad(16, 16, 17, 17);
+        }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, the design canvas's row 15, "촘촘하게"): as much room above the tab row as
+        /// below it - TabRowGap from the header card's foot to the tabs' faces, and TabRowGap from the faces to the top of the
+        /// page's cards (AuditTabRow). Above: the header's own padding (2), the tab strip's (NavTop) and the room a tab keeps
+        /// round its face for its focus ring (TabRing); below: the ring's room again and the page's top (PageTop).
+        internal const int TabRowGap = 10, HeaderBelow = 2;
+        internal const int TabRing = Brand.FocusOffset + Brand.FocusWidth;
+        internal const int NavTop = TabRowGap - HeaderBelow - TabRing, PageTop = TabRowGap - TabRing;
+
+        /// The room a page keeps for its cards' lift (CardRoom), but at its top PageTop: under the tab row its first card's
+        /// lift runs on onto the tabs' ground, as the header card's runs on under the tabs.
+        private Padding PageRoom()
+        {
+            Padding room = CardRoom();
+            return new Padding(room.Left, Px(PageTop), room.Right, room.Bottom);
         }
 
         private string SectionTitle(string name)
@@ -1496,7 +1513,7 @@ namespace CodexAutoResume
             //
             // A card on the canvas, as the panel's hero is. The card is the grid.
             header.Dock = DockStyle.Top;
-            header.Padding = Pad(14, 12, 14, 2);
+            header.Padding = Pad(14, 12, 14, HeaderBelow);
             hero.Dock = DockStyle.Fill;
             hero.Margin = new Padding(0);
             // v0.6.24-beta.2: two lines in HeroHeight - the brand's padding at the sides, HeroPadY above and below.
