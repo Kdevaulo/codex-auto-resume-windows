@@ -272,11 +272,16 @@ function Invoke-Outside {
         with this run's environment, $Variables (Get-OutsideVariables) and CODEX_AUTO_RESUME_OUTSIDE=1, its console
         hidden (SW_HIDE: WMI refuses CREATE_NO_WINDOW), in this run's folder. Passes on what it writes to $Log as it
         writes it, and returns its exit code once it has ended - or $null where it could not be started.
+        $Source goes to it as a file, outside.ps1 beside $Log in this run's own folder (removed with that folder),
+        written afresh from the constant each run and started with -File: never as base64 on the command line, the
+        hidden encoded shape antivirus heuristics block (issue #65). -ExecutionPolicy Bypass lets the unsigned file
+        run where it was already on this command line; the values stay in the environment block alone.
     #>
     param([string]$Source, [string[]]$Variables, [string]$Log, [string]$CodeFile)
     $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($Source))
-    $line = '"' + $powershell + '" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + $encoded
+    $sourceFile = Join-Path (Split-Path -Parent $Log) 'outside.ps1'
+    [System.IO.File]::WriteAllText($sourceFile, $Source, (New-Object System.Text.UTF8Encoding $true))
+    $line = '"' + $powershell + '" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $sourceFile + '"'
     # This run's own CODEX_AUTO_RESUME_RELAY_* variables, if it has any, are not the run outside's: $Variables are.
     $environment = @(foreach ($variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
         $name = [string]$variable.Key

@@ -141,12 +141,15 @@ class ToastPayloadTests(unittest.TestCase):
         self.assertNotIn("<actions>", notify._toast_xml("t", "b", None, None))
         self.assertNotIn("<actions>", notify._toast_xml("t", "b", "press me", None))
 
-    def test_command_is_passed_as_encoded_base64_never_as_shell_text(self):
+    def test_command_is_the_constant_script_plain_never_encoded_never_shell_text(self):
+        """Issue #65: the constant script whole, as the one argument after -Command - never base64 after
+        -EncodedCommand, the shape Avast's Behavior Shield blocked - and never through a shell."""
         with patch.object(pwsh, "executable", return_value="powershell.exe"), \
              patch.object(subprocess, "run", return_value=MagicMock(returncode=0)) as run:
             self.assertTrue(notify.show("t", "'; Remove-Item C:\\ -Recurse #", button=None, uri=None))
         argv = run.call_args.args[0]
-        self.assertIn("-EncodedCommand", argv)
+        self.assertEqual(argv, ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", notify._SCRIPT])
+        self.assertFalse(any(part.lower() in ("-encodedcommand", "-enc", "-e", "-ec") for part in argv))
         self.assertIs(run.call_args.kwargs["shell"], False)
         # Nothing user-influenced may appear literally on the command line.
         self.assertFalse(any("Remove-Item" in part for part in argv))
@@ -236,12 +239,11 @@ class ToastPayloadTests(unittest.TestCase):
 
     def test_the_script_sent_to_powershell_contains_no_value(self):
         """The toast text is data. It must never reach PowerShell as source code."""
-        import base64
         title = "Bob’s project"
         with patch.object(pwsh, "executable", return_value="powershell.exe"),              patch.object(subprocess, "run", return_value=MagicMock(returncode=0)) as run:
             notify.show(title, "body text")
         argv = run.call_args.args[0]
-        script = base64.b64decode(argv[argv.index("-EncodedCommand") + 1]).decode("utf-16-le")
+        script = argv[argv.index("-Command") + 1]
         self.assertEqual(script, notify._SCRIPT, "the script must be the constant, unformatted")
         self.assertNotIn("Bob", script)
         self.assertIn(title, self._embedded_xml(run.call_args))
@@ -361,7 +363,7 @@ class NotificationIdentityTests(unittest.TestCase):
         self.assertIsNone(startup.aumid_registration())
         with patch.object(pwsh, "executable", return_value="powershell.exe"),              patch.object(subprocess, "run", return_value=MagicMock(returncode=0)) as run:
             self.assertTrue(notify.show("t", "b"))
-        self.assertIn("-EncodedCommand", run.call_args.args[0])
+        self.assertEqual(run.call_args.args[0][-2:], ["-Command", notify._SCRIPT])
 
 
 class ProtocolRegistrationTests(unittest.TestCase):
