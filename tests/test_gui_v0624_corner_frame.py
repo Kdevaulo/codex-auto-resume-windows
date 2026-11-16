@@ -74,6 +74,15 @@ namespace CodexAutoResume
         internal const int Away = -30000, GWL_STYLE = -16, WS_MAXIMIZE = 0x01000000, WS_VISIBLE = 0x10000000;
         internal const uint SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010;
 
+        [DllImport("user32.dll")] internal static extern bool GetWindowRect(IntPtr h, out Chrome.RECT r);
+
+        internal static List<object> Box(IntPtr h)
+        {
+            Chrome.RECT r;
+            GetWindowRect(h, out r);
+            return new List<object> { (double)r.Left, (double)r.Top, (double)(r.Right - r.Left), (double)(r.Bottom - r.Top) };
+        }
+
         internal static double Attribute(IntPtr h, int attribute)
         {
             int value;
@@ -94,6 +103,7 @@ namespace CodexAutoResume
     {
         internal ChromeHost Caption;
         internal readonly List<object> Reached = new List<object>();
+        internal readonly List<object> Commands = new List<object>();
         internal bool Recording;
 
         protected override bool ShowWithoutActivation { get { return true; } }
@@ -107,6 +117,7 @@ namespace CodexAutoResume
         private void PassOn(ref Message m)
         {
             int msg = m.Msg;
+            if (msg == 0x0112) Commands.Add((double)(m.WParam.ToInt64() & 0xFFF0));
             if (Recording && (msg == 0x85 || msg == 0x86 || msg == 0xAE || msg == 0xAF || msg == 0x0C || msg == 0x80))
             {
                 long style = IsHandleCreated ? FrameNative.GetWindowLongPtr(Handle, FrameNative.GWL_STYLE).ToInt64() : 0;
@@ -181,6 +192,15 @@ namespace CodexAutoResume
             said["own"] = Round(form, "own");
             FrameNative.Maximised(h, true, FrameNative.Away + 10, 900, 700);
             said["maximised"] = Round(form, "maximised");
+            // The restore button pressed and let go over it, as a person's click comes (HTMAXBUTTON, WM_NCLBUTTONDOWN/UP).
+            Rectangle button = caption.MaximizeButton.RectangleToScreen(caption.MaximizeButton.ClientRectangle);
+            int mid = ((button.Top + button.Height / 2) << 16) | ((button.Left + button.Width / 2) & 0xFFFF);
+            said["maximisedHit"] = (double)FrameNative.SendMessage(h, 0x84, IntPtr.Zero, new IntPtr(mid)).ToInt64();
+            form.Commands.Clear();
+            FrameNative.SendMessage(h, 0xA1, new IntPtr(9), new IntPtr(mid));
+            FrameNative.SendMessage(h, 0xA2, new IntPtr(9), new IntPtr(mid));
+            Application.DoEvents();
+            said["restoreClick"] = new List<object>(form.Commands);
             FrameNative.Maximised(h, false, FrameNative.Away + 20, 640, 480);
             said["restored"] = Round(form, "restored");
             form.Close();
@@ -197,7 +217,10 @@ namespace CodexAutoResume
             return new Dictionary<string, object> {
                 { "preference", FrameNative.Attribute(h, Soft.CornerPreferenceAttribute) },
                 { "dwmFrame", FrameNative.Attribute(h, 1) },
-                { "corner", form.CaptionHost.OuterCorner.ToString() } };
+                { "corner", form.CaptionHost.OuterCorner.ToString() },
+                { "kept", typeof(Form).GetField("restoredWindowBoundsSpecified",
+                      BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form).ToString() },
+                { "window", FrameNative.Box(h) } };
         }
 
         internal static Dictionary<string, object> CornerFrameDashboard(string dir)
@@ -215,9 +238,10 @@ namespace CodexAutoResume
             form.Show();
             Application.DoEvents();
             said["shown"] = CornerFrameState(form);
+            List<object> made = FrameNative.Box(h);
             FrameNative.Maximised(h, true, FrameNative.Away + 10, 1400, 900);
             said["maximised"] = CornerFrameState(form);
-            FrameNative.Maximised(h, false, FrameNative.Away + 20, 1100, 760);
+            FrameNative.Maximised(h, false, (int)(double)made[0], (int)(double)made[2], (int)(double)made[3]);
             said["restored"] = CornerFrameState(form);
             form.Close();
             form.Dispose();
@@ -276,6 +300,17 @@ class CornerFrameTests(unittest.TestCase):
                     self.assertEqual(said[step]["dwmFrame"], 0, "a window with a region has no frame from DWM")
                 else:
                     self.assertEqual(said[step]["preference"], 2, "DWMWCP_ROUND: Windows' round corner")
+
+    def test_winforms_keeps_no_size_of_its_own_to_give_back_and_the_window_comes_back_exactly(self):
+        said = self.answer["dashboard"]
+        self.assertEqual(said["maximised"]["kept"], "None",
+                         "WinForms gives back no client size worked out with Windows' caption: Windows' normal position does")
+        self.assertEqual(said["restored"]["window"], said["shown"]["window"])
+
+    def test_while_maximised_a_click_on_the_restore_button_restores(self):
+        said = self.answer["messages"]
+        self.assertEqual(said["maximisedHit"], 9, "HTMAXBUTTON")
+        self.assertEqual(said["restoreClick"], [0xF120], "SC_RESTORE, once")
 
     def test_with_its_own_corner_nothing_of_windows_frame_is_painted(self):
         reached, title, visible, corner = self.answer["messages"]["own"]

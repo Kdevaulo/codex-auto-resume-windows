@@ -849,9 +849,31 @@ namespace CodexAutoResume
             try { pass(ref m); }
             finally { restoring = outer; }
             FormWindowState after = form.WindowState;
-            if (before == FormWindowState.Normal && after != FormWindowState.Normal) restoreClient = client;
+            if (before == FormWindowState.Normal && after != FormWindowState.Normal)
+            {
+                restoreClient = client;
+                ForgetRestoredSize();
+            }
             else if (after == FormWindowState.Normal) restoreClient = Size.Empty;
             return true;
+        }
+
+        private static readonly System.Reflection.FieldInfo RestoredSpecified = typeof(Form).GetField("restoredWindowBoundsSpecified",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        /// v0.6.24 W5: the window has just left its normal state, and WinForms has kept its client size to give back on the
+        /// way to normal (Form.UpdateWindowState, RestoreWindowBoundsIfNecessary) - as a window size worked out with
+        /// Windows' caption, which Restoring takes back off only where it can tell that is what it is. On the real 150 %
+        /// monitor it could not (M-CORNER 2026-11-16: every restore, from the button, a double-click, Win+Down, the taskbar
+        /// or Win+D, grew the window by Windows' frame and caption at the system's scale, 26 x 71 px; an unsnap, which
+        /// WinForms remembers nothing for, did not). So nothing is kept: the window comes back where Windows keeps it,
+        /// its normal position, exactly as it left - as every other window does. A size the program sets while the window
+        /// is maximised is still kept by WinForms (Form.SetBoundsCore) and given back.
+        private void ForgetRestoredSize()
+        {
+            if (RestoredSpecified == null) return;
+            try { RestoredSpecified.SetValue(form, BoundsSpecified.None); }
+            catch (Exception) { /* Restoring answers what WinForms asks, as before */ }
         }
 
         /// The size the form's SetBoundsCore is asked for (`created` its CreateParams): on the way back from maximised or
