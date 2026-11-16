@@ -51,7 +51,8 @@ class PopupFrames:
         self.renderer.theme = theme
         self.renderer.design = self.design
         # v0.6.24: the popup is its card alone, with a float shadow under it (the card window and the shadow window);
-        # a picture of it is that card over the theme's canvas, `pad` round it, as the stills are (popup_picture).
+        # a picture of it is that card and its shadow on a clear ground, `pad` round it, as the stills are
+        # (popup_picture): RGBA, so the plan's canvas is a transparent one.
         self.renderer.lone = True
         self.theme = theme
         self.pad = tray_popup.layers.still_pad(scale)
@@ -94,7 +95,7 @@ class PopupFrames:
                 for index, rect in enumerate(rects)}
 
     def drawn(self, frame, closed: bytes) -> bytes:
-        """The RGB picture at `frame`: `closed` while no popup is open."""
+        """The RGBA picture (straight alpha) at `frame`: `closed`, a clear canvas, while no popup is open."""
         if not frame.popup:
             self._held = None
             return closed
@@ -118,16 +119,20 @@ class PopupFrames:
             self.renderer.draw(vm, plan, frame=light)
             self._held = key
         _w, _h, bgra = self.shots.popup_picture(self.renderer, plan, self.pad, self.theme, self.design)
-        return self.shots.bgra_rgb(bgra)
+        return self.shots.clear_rgba(bgra)
 
     def is_the_still(self, frame, closed: bytes, still: Path) -> bool:
         """Whether the picture at `frame` is, pixel for pixel, the first frame of the committed `still`: the popup the
         README's other pictures and the guide show, made by make_screenshots.render_popup. The motion's first frame is
         what a viewer that does not animate shows, so it must be that one."""
-        width, height, rgb = self.shots.read_png_rgb(still)
+        width, height, rgb, alpha = self.shots.read_png(still)
         picture = self.drawn(frame, closed)
         self._held = None
-        return (width, height) == tuple(self.size) and bytes(rgb) == picture
+        if (width, height) != tuple(self.size) or alpha is None:
+            return False
+        rgba = bytearray(width * height * 4)
+        rgba[0::4], rgba[1::4], rgba[2::4], rgba[3::4] = rgb[0::3], rgb[1::3], rgb[2::3], alpha
+        return bytes(rgba) == picture
 
     def close(self) -> None:
         if self.renderer is not None:

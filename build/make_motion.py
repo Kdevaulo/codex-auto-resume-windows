@@ -235,6 +235,10 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
     popup_plan, popup = plan.get("popup"), None
     if popup_plan:
         import motion_popup
+        if not clear:
+            # The popup's picture is its card and its float shadow on a clear ground (the owner, 2026-11-16), as its
+            # stills are: there is no ground of the theme's canvas to lay it on.
+            raise SystemExit("the popup's canvas must be a transparent one: %r" % (canvas,))
         popup = motion_popup.PopupFrames(popup_plan.get("locale", plan["locale"]), scale=popup_plan["scale"],
                                          theme=theme, design=design)
         if tuple(popup.size) != (width, height):

@@ -1,15 +1,18 @@
 """The notification card in the README's motion picture (build/motion_card.py): the card's own paint, offscreen.
 
 The settled card on the canvas must be the README card's own picture byte for byte (make_screenshots._SettledCard),
-its entrance and exit the card's own motion (notice_card.entrance, leaving), its light the card's own breath and its
+on a clear ground - RGBA, the card opaque, its float shadow with its own alpha, everything else alpha 0 (the owner,
+2026-11-16: on a desktop it floats with only its own shadow) - its entrance and exit the card's own motion (notice_card.entrance, leaving), its light the card's own breath and its
 hover the card's own face. Drawn with Windows' GDI+, as the card always is; nothing is put on the screen.
 """
 from __future__ import annotations
 
 import os
 from pathlib import Path
+import struct
 import sys
 import unittest
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 for _path in (str(ROOT / "src"), str(ROOT / "build"), str(ROOT / "tests")):
@@ -24,9 +27,31 @@ WORK = (0, 0, 1100, 820)
 BORN = 1000
 
 
-def canvas_colour():
-    from codex_auto_resume import brand
-    return bytes(brand.rgb(brand.palette("light", brand.DEFAULT_DESIGN)["canvas"]))
+def read_rgba_apng(raw: bytes) -> list:
+    """Each frame of an 8-bit RGBA APNG as the picture a viewer shows (every rectangle replaces what is under it)."""
+    from test_social_motion import chunks, unfilter
+    parts = chunks(raw)
+    width, height, depth, colour = struct.unpack(">IIBB", dict(parts)[b"IHDR"][:10])
+    assert (depth, colour) == (8, 6), "8-bit RGBA"
+    frames, current = [], None
+    for kind, data in parts:
+        if kind == b"fcTL":
+            current = {"control": struct.unpack(">IIIIIHHBB", data), "data": bytearray()}
+            frames.append(current)
+        elif kind == b"IDAT":
+            current["data"] += data
+        elif kind == b"fdAT":
+            current["data"] += data[4:]
+    canvas, shown = bytearray(width * height * 4), []
+    for frame in frames:
+        _n, w, h, x, y, _num, _den, dispose, blend = frame["control"]
+        assert (dispose, blend) == (0, 0), "kept, and laid as the source, never over"
+        pixels = unfilter(zlib.decompress(bytes(frame["data"])), w, h, 4)
+        for row in range(h):
+            at = ((y + row) * width + x) * 4
+            canvas[at:at + w * 4] = pixels[row * w * 4:(row + 1) * w * 4]
+        shown.append(bytes(canvas))
+    return shown
 
 
 @unittest.skipUnless(os.name == "nt", "the card is drawn with Windows' GDI+")
@@ -41,7 +66,7 @@ class CardFramesTests(unittest.TestCase):
 
     def canvas_with(self, drawn) -> bytearray:
         width, height = CANVAS
-        canvas = bytearray(canvas_colour() * (width * height))
+        canvas = bytearray(width * height * 4)                  # a clear canvas
         self.frames.lay_on(canvas, width, height, drawn)
         return canvas
 
@@ -50,7 +75,7 @@ class CardFramesTests(unittest.TestCase):
         from codex_auto_resume import brand, notice_card
         settled = make_screenshots._SettledCard("en", "light", brand.DEFAULT_DESIGN, 1.5, None)
         try:
-            want, width, height, pad = (make_screenshots.bgra_rgb(settled.at(0)), settled.width, settled.height,
+            want, width, height, pad = (make_screenshots.clear_rgba(settled.at(0)), settled.width, settled.height,
                                         settled.pad)
         finally:
             settled.close()
@@ -58,10 +83,19 @@ class CardFramesTests(unittest.TestCase):
         self.assertEqual(drawn.alpha, 1.0)
         canvas = self.canvas_with(drawn)
         left, top = self.frames.place[0] - pad, self.frames.place[1] - pad
-        got = b"".join(bytes(canvas[((top + y) * CANVAS[0] + left) * 3:((top + y) * CANVAS[0] + left + width) * 3])
+        got = b"".join(bytes(canvas[((top + y) * CANVAS[0] + left) * 4:((top + y) * CANVAS[0] + left + width) * 4])
                        for y in range(height))
         self.assertEqual(len(got), len(want))
         self.assertTrue(got == want, "the settled card differs from the README card's own picture")
+        # ... which is the card opaque on a clear ground, its shadow between, and nothing elsewhere.
+        alpha = got[3::4]
+        self.assertEqual((alpha[0], alpha[width - 1], alpha[-1], alpha[-width]), (0, 0, 0, 0), "the corners are clear")
+        self.assertEqual(alpha[(height // 2) * width + width // 2], 255, "the card is opaque")
+        self.assertTrue(any(0 < value < 255 for value in alpha), "the shadow keeps its own alpha")
+        outside = [(x, y) for y in range(CANVAS[1]) for x in (0, CANVAS[0] - 1)] + [
+            (x, y) for y in (0, CANVAS[1] - 1) for x in range(CANVAS[0])]
+        self.assertTrue(all(canvas[(y * CANVAS[0] + x) * 4 + 3] == 0 for x, y in outside),
+                        "everything away from the card is wholly transparent")
 
     def test_the_entrance_is_the_card_s_own_motion(self):
         from codex_auto_resume import notice_card
@@ -87,12 +121,12 @@ class CardFramesTests(unittest.TestCase):
     def test_a_fading_card_is_laid_at_its_alpha(self):
         drawn = self.frames.drawn(BORN + 2100, BORN, leave=BORN + 2000)
         faded, whole = self.canvas_with(drawn), self.canvas_with(drawn._replace(alpha=1.0))
-        ground = canvas_colour()
         cx, cy = self.frames.place[0] + 30, self.frames.place[1] + 30
-        at = (cy * CANVAS[0] + cx) * 3
+        at = (cy * CANVAS[0] + cx) * 4
+        self.assertEqual(whole[at + 3], 255)
+        self.assertLessEqual(abs(faded[at + 3] - round(drawn.alpha * 255)), 1, "its coverage is scaled by the alpha")
         for channel in range(3):
-            expected = (whole[at + channel] * round(drawn.alpha * 255) + ground[channel] * (255 - round(drawn.alpha * 255)))
-            self.assertLessEqual(abs(faded[at + channel] - expected / 255.0), 1.0)
+            self.assertLessEqual(abs(faded[at + channel] - whole[at + channel]), 2, "the colour is the card's own")
 
     def test_the_light_breathes_on_the_picture_s_clock_and_nothing_else_moves(self):
         from codex_auto_resume import notice_card
@@ -145,15 +179,14 @@ class CardFramesTests(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "nt", "the card is drawn with Windows' GDI+")
 class CardPictureTests(unittest.TestCase):
-    """make_motion draws a plan with no window - the card on its own - on the plain canvas."""
+    """make_motion draws a plan with no window - the card on its own - on a clear canvas."""
 
-    def test_the_card_rises_rests_and_leaves_on_the_plain_canvas(self):
+    def test_the_card_rises_rests_and_leaves_on_a_clear_canvas(self):
         import tempfile
         import make_motion
         import motion_plan
-        from test_social_motion import composite, read_apng
         plan = {"format": motion_plan.FORMAT, "name": "card-test", "locale": "en",
-                "canvas": {"size": [776, 540], "ground": "canvas", "theme": "light", "design": "soft"},
+                "canvas": {"size": [776, 540], "transparent": True, "theme": "light", "design": "soft"},
                 "card": {"scale": 2.0, "locale": "en", "at": [52, 52]}, "pointer": {"rest": [820, 660]},
                 "scenes": [{"id": "A", "steps": [{"card": "enter", "frames": 3, "step": 120}, {"hold": 200},
                                                  {"card": "leave", "frames": 2, "step": 120}, {"hold": 100}]}]}
@@ -161,13 +194,14 @@ class CardPictureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             plan["output"] = str(Path(name) / "card.png")
             report = make_motion.make(plan, None, Path(name) / "work")
-            shown = list(composite(read_apng(Path(plan["output"]).read_bytes())))
-        ground = canvas_colour()
-        self.assertEqual(shown[0], ground * (776 * 540), "frame 1 is the empty canvas the card rises onto")
-        self.assertEqual(shown[-1], ground * (776 * 540), "it ends where it loops back to")
+            shown = read_rgba_apng(Path(plan["output"]).read_bytes())
+        clear = bytes(776 * 540 * 4)
+        self.assertEqual(shown[0], clear, "frame 1 is the empty canvas the card rises onto: wholly transparent")
+        self.assertEqual(shown[-1], clear, "it ends where it loops back to")
         middle = shown[len(shown) // 2]
-        at = ((52 + 60) * 776 + 52 + 60) * 3
-        self.assertNotEqual(middle[at:at + 3], ground, "the card stands at its place")
+        at = ((52 + 60) * 776 + 52 + 60) * 4
+        self.assertEqual(middle[at + 3], 255, "the card stands at its place, opaque")
+        self.assertEqual(middle[3], 0, "and its corner of the picture is clear")
         self.assertEqual(report.ms, motion_plan.plan_end(plan))
 
 
@@ -193,7 +227,8 @@ class CardMarginsTests(unittest.TestCase):
                     self.assertEqual(plan["card"]["at"], [still.pad, still.pad])
                 finally:
                     still.close()
-                self.assertNotIn("transparent", plan["canvas"], "the background stays as it is, not clear")
+                self.assertIs(plan["canvas"].get("transparent"), True, "the background is clear (2026-11-16)")
+                self.assertNotIn("ground", plan["canvas"], "no canvas colour is laid under the card")
 
 
 class LayTests(unittest.TestCase):
