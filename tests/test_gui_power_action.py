@@ -456,15 +456,21 @@ $watch.Add_Tick({
   foreach ($open in @([Windows.Forms.Application]::OpenForms)) {
     if ([object]::ReferenceEquals($open, $form) -or -not $open.Modal -or -not $open.Visible) { continue }
     try {
-      $words = ''
-      $buttons = @()
-      foreach ($c in $open.Controls) {
-        foreach ($k in $c.Controls) {
-          if ($k -is [Windows.Forms.Label]) { $words = [string]$k.Text }
-          if ($k.GetType().Name -eq 'SoftTextArea') { $words = [string]$k.GetType().GetField('Box', $flags).GetValue($k).Text }
-          if ($k -is [Windows.Forms.Button]) { $buttons += ,$k }
+      $script:words = ''
+      $script:buttons = @()
+      # v0.6.24-beta.2: the words and the buttons are in the dialog's one card (SoftDialog.Gather), its title row above it.
+      function Look($parent) {
+        foreach ($k in $parent.Controls) {
+          if ($k.GetType().Name -eq 'TitleRowPanel') { continue }
+          if ($k -is [Windows.Forms.Label]) { $script:words = [string]$k.Text }
+          if ($k.GetType().Name -eq 'SoftTextArea') { $script:words = [string]$k.GetType().GetField('Box', $flags).GetValue($k).Text; continue }
+          if ($k -is [Windows.Forms.Button]) { $script:buttons += ,$k }
+          Look $k
         }
       }
+      Look $open
+      $words = $script:words
+      $buttons = $script:buttons
       $press = if ($script:plan.Count -gt 0) { [string]$script:plan.Dequeue() } else { 'escape' }
       $target = $open.CancelButton
       if ($press -eq 'enter') { $target = $open.AcceptButton }
@@ -472,8 +478,10 @@ $watch.Add_Tick({
       $focused = $open.ActiveControl
       [void]$script:asked.Add(@{ words = $words; enter = [string]$open.AcceptButton.Text; escape = [string]$open.CancelButton.Text
                                  focus = $(if ($focused -eq $null) { '' } else { [string]$focused.Text })
-                                 on = [bool](Field 'powerSwitch').Checked; press = $press; pressed = [string]$target.Text })
-      $target.PerformClick()
+                                 on = [bool](Field 'powerSwitch').Checked; press = $press; pressed = [string]$target.Text
+                                 buttons = $buttons.Count })
+      # A notice has no button of its own (v0.6.24-beta.2): Escape closes it, as below.
+      if ($target -ne $null) { $target.PerformClick() }
     } catch { [void]$script:asked.Add(@{ failed = [string]$_ }) }
     if (-not $open.IsDisposed -and $open.Visible) { $open.Close() }
   }
@@ -558,7 +566,8 @@ class BuiltCardTests(unittest.TestCase):
 
     def refusal(self, asked: dict) -> None:
         self.assertTrue(asked["words"].startswith(self.english["action.failed"]), asked)
-        self.assertEqual(asked["escape"], self.english["action.close"])
+        # v0.6.24-beta.2: a notice has nothing to answer - no Close of its own; Esc and the title row's X close it.
+        self.assertEqual((asked["escape"], asked["buttons"]), ("", 0))
 
     def test_its_controls_are_not_editors_and_save_sends_the_same_whatever_they_show(self):
         self.assertEqual(self.answer["editors"], 0)

@@ -1771,41 +1771,26 @@ namespace CodexAutoResume
             bodyCard.SuspendLayout();
             try
             {
-                // In the card's one cell the rows dock as they did in the dialog - the lines and buttons at the foot keep their
-                // height and the body gives way first, as it did where the screen holds the dialog smaller than it was laid
-                // out (WindowAudit.HeldByScreen) - inside a ground of the card's colour (CardInside).
-                if (inside == null)
-                {
-                    inside = new CardInside();
-                    inside.BackColor = bodyCard.BackColor;
-                    inside.Dock = DockStyle.Fill;
-                    inside.Margin = new Padding(0);
-                    inside.Padding = new Padding(0);
-                    bodyCard.Controls.Remove(cardContent);
-                    cardContent.Dock = DockStyle.Fill;
-                    inside.Controls.Add(cardContent);
-                    bodyCard.Controls.Add(inside, 0, 0);
-                }
+                // Rows of the card's own table, each as tall as it asks, the body's row taking what is left: the body stays
+                // in the card's cell, measured as it always was (two tables deep, SoftStack.Measured).
                 foreach (Control row in above)
                 {
                     Controls.Remove(row);
                     Seat(row, false);
                     heads.Add(row);
-                    inside.Controls.Add(row);
                 }
                 foreach (Control row in below)
                 {
                     Controls.Remove(row);
                     Seat(row, true);
                     foots.Add(row);
-                    inside.Controls.Add(row);
                 }
-                // Docked from the last control inward: the topmost line above the body the last, the lowest row under it
-                // the last of the foot, the body first, filling what is left.
-                int at = inside.Controls.Count - 1;
-                foreach (Control row in heads) inside.Controls.SetChildIndex(row, at--);
-                for (int i = foots.Count - 1; i >= 0; i--) inside.Controls.SetChildIndex(foots[i], at--);
-                inside.Controls.SetChildIndex(cardContent, 0);
+                bodyCard.RowStyles.Clear();
+                bodyCard.RowCount = heads.Count + 1 + foots.Count;
+                int at = 0;
+                foreach (Control row in heads) Place(row, at++, new RowStyle(SizeType.AutoSize));
+                Place(cardContent, at++, new RowStyle(SizeType.Percent, 100f));
+                foreach (Control row in foots) Place(row, at++, new RowStyle(SizeType.AutoSize));
                 var stack = ground as SoftStack;
                 if (stack != null)
                 {
@@ -1821,29 +1806,18 @@ namespace CodexAutoResume
             ResumeLayout(true);
         }
 
-        private CardInside inside;
-
-        /// The card's one cell once rows join its body: a plain docking ground of the card's colour, which draws the lifts of
-        /// what stands on it as every ground does (Ground.Paint).
-        internal sealed class CardInside : Panel, ISoftGround
+        private void Place(Control row, int at, RowStyle style)
         {
-            internal CardInside()
-            {
-                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
-                         ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
-            }
-
-            protected override void OnPaintBackground(PaintEventArgs e)
-            {
-                Ground.Paint(this, e);
-            }
+            bodyCard.RowStyles.Add(style);
+            if (row.Parent == bodyCard) bodyCard.SetCellPosition(row, new TableLayoutPanelCellPosition(0, at));
+            else bodyCard.Controls.Add(row, 0, at);
         }
 
         // A row as it stands in the card: across the card's width inside its padding, no inset of its own at the sides, the
         // gap to the body on the side it faces, on the card's colour.
         private void Seat(Control row, bool foot)
         {
-            row.Dock = foot ? DockStyle.Bottom : DockStyle.Top;
+            row.Dock = DockStyle.Fill;
             row.Margin = new Padding(0);
             int gap = Soft.Px(foot && Holds<ButtonBase>(row) ? ButtonsAbove : LineGap);
             row.Padding = foot ? new Padding(0, gap, 0, 0) : new Padding(0, 0, 0, gap);
