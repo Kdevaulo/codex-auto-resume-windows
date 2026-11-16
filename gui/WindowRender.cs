@@ -830,10 +830,10 @@ namespace CodexAutoResume
 
         /// A dialog the window opens, over the picture: built by the very method the click builds it with (BuildTimeline,
         /// which OpenTimeline shows) from the reply the bridge gives for the chosen row, its controls laid out and drawn as
-        /// the window's own are (a top-level window in a picture would need the screen) - its title card and caption
+        /// the window's own are (a top-level window in a picture would need the screen) - its title row and caption
         /// buttons among them (v0.6.24: no window has Windows' title bar) - within the border Windows draws round it, and
         /// centred on the window (RenderDialogPlace) over a soft shadow. `hover` or `pressed` naming `dialog.close` gives
-        /// the title card's Close button that face.
+        /// the title row's Close button that face.
         private void RenderDialog(Bitmap picture, Dictionary<string, object> dialog, string hover, string pressed,
                                   RenderWriter writer)
         {
@@ -856,7 +856,7 @@ namespace CodexAutoResume
                 // of the window: the grounds in it would stamp the window's own lifts into the dialog.
                 form.CreateControl();
                 IntPtr made = form.Handle;
-                // v0.6.24: as it is once made - its title card at its top (SoftDialog), as a person's opens.
+                // v0.6.24: as it is once made - its title row at its top (SoftDialog), as a person's opens.
                 client = form.ClientSize;
                 form.Visible = true;
                 for (int turn = 0; turn < 20; turn++)
@@ -867,7 +867,7 @@ namespace CodexAutoResume
                     form.PerformLayout();
                     System.Threading.Thread.Sleep(10);
                 }
-                // v0.6.24: the title card's Close (SoftDialog's caption), where Windows' title bar had its own.
+                // v0.6.24: the title row's Close (SoftDialog's caption), where Windows' title bar had its own.
                 var soft = form as SoftDialog;
                 Control close = soft != null && soft.CaptionHost != null ? soft.CaptionHost.CloseButton : null;
                 if (close != null) SetRenderFace(close, hover == "dialog.close" || pressed == "dialog.close", pressed == "dialog.close");
@@ -942,7 +942,7 @@ namespace CodexAutoResume
             using (var scaled = new Icon(icon, new Size(size, size))) return scaled.ToBitmap();
         }
 
-        /// The dialog's window over `picture`: a soft shadow, the border and the drawn client area - its title card and caption
+        /// The dialog's window over `picture`: a soft shadow, the border and the drawn client area - its title row and caption
         /// buttons in it (v0.6.24).
         private void PaintDialog(Bitmap picture, Bitmap body, Point place, Size outer, int border, Color ground)
         {

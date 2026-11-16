@@ -703,7 +703,7 @@ namespace CodexAutoResume
             int buttonsTall = exampleButtons.GetPreferredSize(new Size(width, 0)).Height;
             int frame = dialog.Height - dialog.ClientSize.Height;
             int most = Math.Min(area.Height, SystemInformation.MaxWindowTrackSize.Height) - frame - Px(48);
-            // v0.6.24: and the dialog's title card above it, once it has one (SoftDialog.TitleRoom).
+            // v0.6.24: and the dialog's title row above it, once it has one (SoftDialog.TitleRoom).
             int want = Math.Max(Math.Min(Px(240), most), Math.Min(tall + buttonsTall + SoftDialog.TitleRoom(dialog), most));
             if (dialog.ClientSize.Height != want) dialog.ClientSize = new Size(width, want);
         }

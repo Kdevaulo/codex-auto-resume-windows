@@ -1,8 +1,8 @@
 // Codex Auto Resume - the window's own caption: no title bar from Windows (v0.6.24, stage 1 surface A).
 //
 // The owner, 2026-11-13: no Windows title bar on any window or dialog of ours; the minimise, maximise and close buttons
-// stand in the window's first card instead - the Dashboard's hero, the setup window's header card, and a title card
-// every dialog is given (Soft.DialogBar) - drawn in the house's material, close red under the pointer (board TitleB,
+// stand in the window's first card instead - the Dashboard's hero, the setup window's header card - and, on a dialog,
+// a title row on its own ground (Soft.DialogBar; the owner's choice B, 2026-11-16) - drawn in the house's material, close red under the pointer (board TitleB,
 // option B, 2026-11-15).
 //
 // Every window style Windows has today is kept - WS_CAPTION, WS_SYSMENU, WS_THICKFRAME for a sizable window, the boxes
@@ -358,6 +358,8 @@ namespace CodexAutoResume
         private readonly LayoutEventHandler dirtied;
         // v0.6.24 W5: the window's own outer corner (gui/SoftWindowShape.cs), only where it asked for one and the switch is on.
         private WindowCorner corner;
+        // v0.6.24-beta.2: the buttons stand in a row on the window's own ground (a dialog's title), not in a card's corner.
+        private bool ground;
 
         private ChromeHost(Form form, Control card, Control holder)
         {
@@ -491,7 +493,8 @@ namespace CodexAutoResume
             bool mirrored = Mirror.Of(form);
             int width = Soft.Px(Brand.CaptionButtonW), height = Soft.Px(Brand.CaptionButtonH), gap = Soft.Px(Brand.CaptionGap);
             int x = mirrored ? face.Left + Soft.Px(Brand.CaptionInsetEnd) : face.Right - Soft.Px(Brand.CaptionInsetEnd) - GroupWidth;
-            int y = face.Top + Soft.Px(Brand.CaptionInsetTop);
+            // In a card, CaptionInsetTop below its top; in a row on the ground (OnGround), centred in the row.
+            int y = ground ? face.Top + (face.Height - height) / 2 : face.Top + Soft.Px(Brand.CaptionInsetTop);
             foreach (CaptionButton button in Shown())
             {
                 button.SetBounds(x, y, width, height);
@@ -552,10 +555,28 @@ namespace CodexAutoResume
                 if (button.Visible && button.Bounds.IntersectsWith(under)) button.Invalidate();
         }
 
-        /// The card's own colour, which a button shows at rest.
+        /// The card's own colour, which a button shows at rest - in High Contrast the person's Window colour, a card's; on
+        /// the ground (OnGround) the ground's own colour in both, the system colour the ground is drawn in there.
         internal Color Face
         {
-            get { return Palette.Contrast ? SystemColors.Window : card.BackColor.A == 255 ? card.BackColor : Palette.Card; }
+            get
+            {
+                if (Palette.Contrast && !ground) return SystemColors.Window;
+                return card.BackColor.A == 255 ? card.BackColor : Palette.Card;
+            }
+        }
+
+        /// v0.6.24-beta.2 (the owner's choice B, 2026-11-16): `card` is no card but a row on the window's own ground - a
+        /// dialog's title - and the buttons stand at its end, centred in its height, CaptionInsetEnd in from its edge.
+        internal bool OnGround
+        {
+            get { return ground; }
+            set
+            {
+                if (ground == value) return;
+                ground = value;
+                Place();
+            }
         }
 
         /// `control` (and what Windows asks about the points over it) is one the window may be dragged by: the card, its words
@@ -1303,25 +1324,31 @@ namespace CodexAutoResume
     }
 
     /// A dialog of the window's (v0.6.24): a Form whose caption is ours. Its ClientSize means what it says - a Form works
-    /// its window out from its styles, which still count WS_CAPTION - and Soft.DialogBar gives it its title card and the
+    /// its window out from its styles, which still count WS_CAPTION - and Soft.DialogBar gives it its title row and the
     /// caption buttons in it (BuildTitle) as its window is made, once its own code has laid it out: a strip docked at its top, the
-    /// last control it holds and so the first docked (Windows' docking goes from the last-added control inward), the card
-    /// in it 16 px in from the dialog's edges, as its body card is. The dialog grows once by the strip; everything it laid
-    /// out stands below it as it stood, and its own controls keep their places in Controls.
+    /// last control it holds and so the first docked (Windows' docking goes from the last-added control inward). Since
+    /// v0.6.24-beta.2 (the owner's choice B, 2026-11-16) the title is no card: its words and buttons stand on the dialog's own
+    /// ground, in one row 8 px below its top and 8 px above its first card, 16 px in from its edges as its body card is - 42
+    /// logical px where the title card took 62. The dialog grows once by the strip; everything it laid out stands below it as
+    /// it stood, and its own controls keep their places in Controls.
     internal sealed class SoftDialog : Form
     {
         private ChromeHost chrome;
         private Panel titleGround;
-        private SoftCard titleCard;
+        private TitleRowPanel titleRow;
         private Label titleWords;
         internal bool Titled;
 
-        /// The title card, its words, the strip it stands in and the caption it holds (null until the dialog is made): for
+        /// The title row, its words, the strip it stands in and the caption it holds (null until the dialog is made): for
         /// the tests and the audit.
-        internal SoftCard TitleCard { get { return titleCard; } }
+        internal Panel TitleRow { get { return titleRow; } }
         internal Label TitleWords { get { return titleWords; } }
         internal Panel TitleGround { get { return titleGround; } }
         internal ChromeHost CaptionHost { get { return chrome; } }
+
+        /// The title row's measures in logical px: the ground above and below it, and how far in from the side gap its words
+        /// start (the mockup the owner chose).
+        internal const int TitleAbove = 8, TitleWordsInset = 6;
 
         /// How much of the dialog's height its title takes once it is made: 0 before.
         internal int TitleReserve { get { return titleGround == null ? 0 : titleGround.Height; } }
@@ -1341,11 +1368,11 @@ namespace CodexAutoResume
             base.CreateHandle();
         }
 
-        /// Its title card now, if Soft.DialogBar asked for one and it has none yet: for what lays a dialog out without making
+        /// Its title row now, if Soft.DialogBar asked for one and it has none yet: for what lays a dialog out without making
         /// its window (the layout audit's Materialise makes its controls' windows alone).
         internal void MakeTitle()
         {
-            if (Titled && titleCard == null) BuildTitle();
+            if (Titled && titleRow == null) BuildTitle();
         }
 
         // A control the dialog's code adds after the title (one that needed a window early): the strip stays the last, the
@@ -1359,42 +1386,41 @@ namespace CodexAutoResume
 
         private void BuildTitle()
         {
-            int gap = Soft.Px(16);
+            int gap = Soft.Px(16), above = Soft.Px(TitleAbove);
             titleGround = new Panel();
             titleGround.BackColor = BackColor;
             titleGround.Margin = new Padding(0);
-            titleCard = new SoftCard();
-            titleCard.ColumnCount = 1;
-            titleCard.RowCount = 1;
-            titleCard.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            titleCard.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-            titleCard.Margin = new Padding(0);
+            // The row and its words take the ground's colour from what they stand in: no card of their own.
+            titleRow = new TitleRowPanel();
+            titleRow.Margin = new Padding(0);
             titleWords = new Label();
             titleWords.AutoSize = false;
             titleWords.Dock = DockStyle.Fill;
             titleWords.Margin = new Padding(0);
-            titleWords.Font = Soft.RoleFont("title");
+            // One step under a card's title (RoleFont "title", 1.5 pt larger): the window's font at 600, a heading's.
+            titleWords.Font = Soft.RoleFont("heading");
             titleWords.ForeColor = Palette.Ink;
-            titleWords.BackColor = Palette.Card;
             titleWords.TextAlign = ContentAlignment.MiddleLeft;
             titleWords.AutoEllipsis = true;
             titleWords.UseMnemonic = false;
             titleWords.Text = Text;
             TextChanged += delegate { if (titleWords != null) titleWords.Text = Text; };
-            titleCard.Controls.Add(titleWords, 0, 0);
+            titleRow.Controls.Add(titleWords);
             int line = Math.Max(titleWords.Font.Height,
                                 TextRenderer.MeasureText("Ag", titleWords.Font, new Size(int.MaxValue, 0), TextFormatFlags.NoPrefix).Height);
-            int height = Math.Max(line, Soft.Px(Brand.CaptionButtonH)) + 2 * Soft.Px(Brand.CaptionInsetTop);
-            titleGround.Height = gap + height;
+            int height = Math.Max(line, Soft.Px(Brand.CaptionButtonH));
+            titleGround.Height = above + height + above;
             titleGround.Width = ClientSize.Width;
-            titleCard.SetBounds(gap, gap, Math.Max(1, ClientSize.Width - 2 * gap), height);
-            titleCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            titleGround.Controls.Add(titleCard);
-            chrome = ChromeHost.Install(this, titleCard, titleGround);
+            titleRow.SetBounds(gap, above, Math.Max(1, ClientSize.Width - 2 * gap), height);
+            titleRow.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            titleGround.Controls.Add(titleRow);
+            chrome = ChromeHost.Install(this, titleRow, titleGround);
+            chrome.OnGround = true;
             chrome.Drag(titleWords);
-            // The words start where a card's do and stop short of the buttons; the card mirrors its own padding (Mirror.Display).
+            // The words start TitleWordsInset in from the side gap and stop short of the buttons; the row mirrors its own
+            // padding (Mirror.Display).
             int end = Soft.Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Soft.Px(8);
-            titleCard.Padding = new Padding(Soft.Px(20), Soft.Px(Brand.CaptionInsetTop), end, Soft.Px(Brand.CaptionInsetTop));
+            titleRow.Padding = new Padding(Soft.Px(TitleWordsInset), 0, end, 0);
             int grown = titleGround.Height;
             SuspendLayout();
             titleGround.Dock = DockStyle.Top;
@@ -1404,6 +1430,15 @@ namespace CodexAutoResume
             chrome.Place();
         }
 
+        /// The title row: a plain panel on the dialog's ground whose padding is mirrored in a mirrored dialog, as a card's is.
+        internal sealed class TitleRowPanel : Panel
+        {
+            public override Rectangle DisplayRectangle
+            {
+                get { return Mirror.Display(this, base.DisplayRectangle); }
+            }
+        }
+
         protected override void WndProc(ref Message m)
         {
             if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
@@ -1411,7 +1446,7 @@ namespace CodexAutoResume
             base.WndProc(ref m);
         }
 
-        // The client calculation before the title card exists (the window is being made): the caption is ours from the
+        // The client calculation before the title row exists (the window is being made): the caption is ours from the
         // first one, so the window is never laid out with Windows' caption.
         private bool CalcSizeEarly(ref Message m)
         {
