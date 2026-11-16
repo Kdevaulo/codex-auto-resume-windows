@@ -15,9 +15,11 @@ from __future__ import annotations
 from ... import brand
 
 
-# The card, in device-independent pixels at 96 DPI (the mockup's Tray board; the owner's O16): as wide as its words
-# need between these two, never wider - a longer line wraps - and padded 13 above and below, 16 at the sides.
-TIP_WIDTH = (280, 360)
+# The card, in device-independent pixels at 96 DPI (the mockup's Tray board; the owner's O16): as wide as its widest
+# row needs, never wider than this - a longer line wraps, and the card is then as wide as the widest line it wrapped
+# into - and padded 13 above and below, 16 at the sides. No least width: the owner, 2026-11-16, of the card with no
+# usage rows - "우측이 빈공간이 큰게 아쉬워" (the 280 it had left the right side wider than the left).
+TIP_MOST = 360
 TIP_PAD_Y, TIP_PAD_X = 13, 16
 # From the card to the taskbar, and to the icon it stands by (O16).
 TIP_GAP = 8
@@ -61,16 +63,33 @@ def tip_layout(parts, light, scale, measure) -> dict:
         chip_w = chip_text_w + 2 * chip_pad
         chip_h = max(px(brand.LAYOUT["chip_height"]), chip_text_h)
     head_need = mark + gap + title_w + (gap + chip_w if chip else 0)
+    most = px(TIP_MOST)
     pieces = list(parts.get("line") or ())
     join_w, line_h = measure(roles["line"], TIP_JOIN, wide, False)
     widths = [measure(roles["line"], text, wide, False)[0] for text, _ in pieces]
-    line_need = mark + gap + sum(widths) + join_w * max(0, len(widths) - 1)
+    # The state line, broken where the widest card breaks it: a piece that does not fit what is left of a line starts
+    # the next one (the join is not carried over), and one wider than a whole line wraps. The card then takes the
+    # widest line it broke into, so no line leaves the right side emptier than the left.
+    line_room = most - 2 * pad_x - mark - gap
+    lines = []
+    if pieces:
+        current, used = [], 0
+        for (value, counts), piece_w in zip(pieces, widths):
+            if current and used + join_w + piece_w > line_room:
+                lines.append(current)
+                current, used = [], 0
+            if current:
+                current.append((TIP_JOIN, "ink", join_w))
+                used += join_w
+            current.append((value, "accent" if counts else "ink", piece_w))
+            used += piece_w
+        lines.append(current)
+    line_need = mark + gap + max([min(line_room, sum(run[2] for run in runs)) for runs in lines] or [0])
     rows = list(parts.get("meter") or ())
     label_w = max([measure(roles["meter"], row["label"], wide, False)[0] for row in rows] or [0])
     share_w = max([measure(roles["meter"], row["percent"], wide, False)[0] for row in rows] or [0])
     meter_need = (label_w + gap + px(TIP_BAR_LEAST) + gap + share_w) if rows else 0
-    least, most = px(TIP_WIDTH[0]), px(TIP_WIDTH[1])
-    width = max(least, min(most, max(head_need, line_need, meter_need) + 2 * pad_x))
+    width = min(most, max(head_need, line_need, meter_need) + 2 * pad_x)
     left, right = pad_x, width - pad_x
     inner = right - left
     items = []
@@ -99,22 +118,10 @@ def tip_layout(parts, light, scale, measure) -> dict:
         text((rect[0] + chip_pad, rect[1], rect[2] - chip_pad, rect[3]), roles["chip"], chip, "accent", align="center")
     y += head_h
 
-    # Row 2: the state line under the name, piece by piece, the countdown in the accent. A piece that does not fit
-    # what is left of a line starts the next one (the join is not carried over), and one wider than a whole line wraps.
-    if pieces:
+    # Row 2: the state line under the name, as it was broken above, piece by piece, the countdown in the accent.
+    if lines:
         y += px(space["xs"])
         room = right - text_left
-        lines, current, used = [], [], 0
-        for (value, counts), piece_w in zip(pieces, widths):
-            if current and used + join_w + piece_w > room:
-                lines.append(current)
-                current, used = [], 0
-            if current:
-                current.append((TIP_JOIN, "ink", join_w))
-                used += join_w
-            current.append((value, "accent" if counts else "ink", piece_w))
-            used += piece_w
-        lines.append(current)
         for runs in lines:
             if len(runs) == 1 and runs[0][2] > room:
                 value, colour, _ = runs[0]
