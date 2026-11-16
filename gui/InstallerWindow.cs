@@ -164,6 +164,9 @@ namespace CodexAutoResume
             // v0.6.24: the window's caption buttons in the header card's top outer corner (gui/SoftChrome.cs); the ground,
             // the card, its light and its two lines drag the window.
             chrome = ChromeHost.Install(this, header, ground);
+            // v0.6.24-beta.2: and the Dashboard's own outer corner (the owner, 2026-11-16), through the same call - only where
+            // Brand.WindowSquircle and WindowShape.Wanted give one. A fixed window: its corner never adds a resize band.
+            chrome.OwnCorner();
             chrome.Drag(head);
             chrome.Drag(light);
             chrome.Drag(title);
@@ -1038,8 +1041,9 @@ namespace CodexAutoResume
             {
                 CreateParams created = base.CreateParams;
                 if (Soft.StillReady != null) created.ExStyle |= 0x08000000;          // WS_EX_NOACTIVATE
-                // v0.6.24: made at the size its ClientSize says, with no Windows caption (Chrome.Uncaption).
-                Chrome.Uncaption(created, ClientSize);
+                // v0.6.24: made at the size its ClientSize says, with no Windows caption (Chrome.Uncaption) - and no frame
+                // at all while its outer corner is its own (v0.6.24-beta.2).
+                Chrome.Uncaption(created, ClientSize, chrome != null && chrome.Frameless);
                 return created;
             }
         }
@@ -1060,6 +1064,8 @@ namespace CodexAutoResume
 
         private Padding OwnFrame()
         {
+            // v0.6.24-beta.2: no frame at all while the window's outer corner is its own (gui/SoftWindowShape.cs).
+            if (chrome != null && chrome.Frameless) return Padding.Empty;
             CreateParams created = CreateParams;
             return Chrome.Frame(created.Style, created.ExStyle);
         }

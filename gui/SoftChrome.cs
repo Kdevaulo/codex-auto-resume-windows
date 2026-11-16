@@ -168,9 +168,17 @@ namespace CodexAutoResume
         /// window is made at the size its ClientSize says and not one Windows caption taller.
         internal static void Uncaption(CreateParams created, Size client)
         {
+            Uncaption(created, client, false);
+        }
+
+        /// v0.6.24-beta.2: and, `frameless` (ChromeHost.Frameless: the window's outer corner is its own), with no frame at
+        /// all - the window is that client, as its SizeFromClientSize says - or it is made a frame bigger than its ClientSize
+        /// and the whole of it becomes its client (the setup window opened 906 x 903 for its 900 x 900 at 150 %).
+        internal static void Uncaption(CreateParams created, Size client, bool frameless)
+        {
             int style = created.Style & ~(WS_MAXIMIZE | WS_MINIMIZE);
-            Size outer = Uncaptioned(new Size(created.Width, created.Height), client, Frame(style, created.ExStyle),
-                                     CaptionedFrame(style, created.ExStyle));
+            Size outer = Uncaptioned(new Size(created.Width, created.Height), client,
+                                     frameless ? Padding.Empty : Frame(style, created.ExStyle), CaptionedFrame(style, created.ExStyle));
             created.Width = outer.Width;
             created.Height = outer.Height;
         }
