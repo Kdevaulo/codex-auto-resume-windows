@@ -51,6 +51,14 @@ always had them, and leaves the previous version's `.old-` file where an update 
   again. Setup's Finish page and its log say which happened and how to start the watcher yourself where it stays stopped.
 - **No flicker where History and Settings first fill.** History's list showed a horizontal scroll bar for one frame the first time it
   filled, and Settings showed *Restore defaults* and *Save* greyed for one frame; both are gone.
+- **No encoded PowerShell command lines any more** (reported by [@cervinho](https://github.com/cervinho),
+  [#65](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/65)). Antivirus behaviour shields (Avast's
+  `IDP.HELU.PSE96`) blocked `powershell.exe` when the app raised a Windows notification or checked its Start menu shortcut,
+  and when the setup program ran itself again outside another app's view, because each handed PowerShell its fixed script
+  encoded on the command line. The notifications and the shortcut now pass the same fixed script as plain text, and the
+  setup program writes it to a file in its own run folder and runs that file. Every value still travels only in the
+  environment, never inside the script, so nothing a conversation title or a path holds can become code. A test keeps an
+  encoded command line out of every shipped script.
 - **Two window tests that failed now and then on slow CI runners are fixed at their cause**, not retried.
 
 ### Advanced edition

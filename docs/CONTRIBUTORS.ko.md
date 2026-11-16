@@ -48,7 +48,9 @@
 
 - [@cervinho](https://github.com/cervinho) 님은 모든 복구가 끝나면 컴퓨터를 종료하거나 절전 상태로 두는 기능을
   요청했고([토론 #22](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/22)), 뒤에는 직접 고른 작업이 끝나면 같은 동작을 하는
-  기능을 요청해 고급판에 들어갔습니다([토론 #57](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/57)).
+  기능을 요청해 고급판에 들어갔습니다([토론 #57](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/57)). 이어서
+  앱이 알림을 띄울 때 백신이 PowerShell을 막는 것을 찾아 주어, 앱이 PowerShell에 인코딩된 명령줄을 더는 넘기지 않게
+  되었습니다([#65](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/65)).
 - [@barkshah2002-pixel](https://github.com/barkshah2002-pixel) 님은 감지되지 않은 사용량 한도 중단을
   알렸고([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)), 워처가 이어 가지 않은 실패한 턴을 이유와 함께 기록하자고 제안했습니다.
 - [@ZionZhang42](https://github.com/ZionZhang42) 님은 그 감지 누락의 원인을 증명했습니다([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).

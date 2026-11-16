@@ -50,7 +50,9 @@ Everyone below is a person outside the project who helped it, in the order they 
 - [@cervinho](https://github.com/cervinho) asked for the computer to shut down or sleep once every recovery has
   finished ([discussion #22](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/22)), and later for the
   same once tasks they picked have finished, which v0.6.20 brought to the advanced edition
-  ([discussion #57](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/57)).
+  ([discussion #57](https://github.com/songyb111-gachon/codex-auto-resume-windows/discussions/57)). They then found their
+  antivirus blocking PowerShell when the app raised notifications, which led to the app no longer handing PowerShell encoded
+  command lines ([#65](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/65)).
 - [@barkshah2002-pixel](https://github.com/barkshah2002-pixel) reported a usage-limit interruption that was not
   detected ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)) and suggested logging every failed turn the watcher does not take up, with why.
 - [@ZionZhang42](https://github.com/ZionZhang42) proved the cause of that missed detection ([#27](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/27)).
