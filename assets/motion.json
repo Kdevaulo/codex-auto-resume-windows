@@ -110,7 +110,7 @@
       "passed": true,
       "worst": 0
     },
-    "window": "392f4deedce93f65241ab7f9005a89e988b01d17e11e1c2b064b493973c70f69"
+    "window": "ff4562cb542e6f49aa04c36b7d2e9be1025e4181ba78ec9b0a2a1f51d200baaa"
   },
   "images": {
     "assets/logo-motion-dark.png": {
@@ -164,36 +164,36 @@
       "size": "776x540"
     },
     "docs/images/readme-motion-ko.png": {
-      "bytes": 6555833,
+      "bytes": 6582903,
       "frames": 1642,
       "ms": 45697,
       "scenes": {
         "S0": 109657,
-        "S1": 211004,
+        "S1": 212602,
         "S10": 174946,
         "S11": 616062,
         "S12": 41864,
-        "S12b": 713083,
+        "S12b": 723931,
         "S13": 69787,
         "S14": 20529,
-        "S15": 281557,
-        "S15b": 230701,
+        "S15": 284086,
+        "S15b": 233691,
         "S16": 75916,
         "S1m": 441925,
-        "S2a": 258380,
+        "S2a": 258362,
         "S2b": 620597,
         "S2c": 653253,
-        "S5": 202161,
-        "S6": 146321,
-        "S7": 189970,
-        "S8": 192535,
+        "S5": 202157,
+        "S6": 149366,
+        "S7": 194180,
+        "S8": 194407,
         "S9": 1305482
       },
-      "sha256": "9f3e37ef102b81a6726c08e7d341f7ad2714d3ae342744e70c432c9a169e4f4b",
+      "sha256": "788de096803231876a22e64d2627eecd1f489a559f8e5f9a4938ac7f302fa37b",
       "size": "1500x1021"
     },
     "docs/images/readme-motion.png": {
-      "bytes": 7081809,
+      "bytes": 7099337,
       "frames": 1648,
       "ms": 45917,
       "scenes": {
@@ -206,19 +206,19 @@
         "S13": 58182,
         "S14": 19631,
         "S15": 243809,
-        "S15b": 200046,
+        "S15b": 197576,
         "S16": 70151,
         "S1m": 502556,
-        "S2a": 271931,
+        "S2a": 282341,
         "S2b": 686903,
-        "S2c": 702752,
-        "S5": 222071,
-        "S6": 167617,
+        "S2c": 706015,
+        "S5": 222068,
+        "S6": 170076,
         "S7": 225457,
-        "S8": 237019,
+        "S8": 240888,
         "S9": 1341644
       },
-      "sha256": "cd1259f03f901326e0dcaedda80524644b31b445721d2dc50a00411bcf234109",
+      "sha256": "5fad8e93e71e25f3f33fed731e6ee43311443a0e3808f6907784a7f8c5b96c71",
       "size": "1500x1021"
     },
     "docs/images/tray-popup-motion-ko.png": {
@@ -259,7 +259,7 @@
     "<motion:logo-light>": "415252d0f16fb2bbb73d57919364cc76ba3a112be9454d7d64dac19781314a9e",
     "<motion:popup-en>": "3aea301bcf58c68ed2ca94d6358907148e9662af5b827ed14b2b44fdaa472043",
     "<motion:popup-ko>": "062a447e99e41212bc39155fecfa0599a31e3830a3d3b4557650e8455e9e7b00",
-    "<motion:readme-en>": "949e5364662bdd456f85671c754501edadf899335df95021f27afa7e8269895a",
-    "<motion:readme-ko>": "0b94f59780f03397a5f368935cef3ceeb8b216412e7b650f2cdcbd4403283fb6"
+    "<motion:readme-en>": "deace089a21aa8937e487362d65d84274cd6fb2e04da586f384a85095403ccf5",
+    "<motion:readme-ko>": "cb54d25044769f3aad029c525af21dc0ea5eb16ffa125ef04a794567c18b00d6"
   }
 }
