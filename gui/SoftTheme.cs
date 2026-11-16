@@ -871,6 +871,13 @@ namespace CodexAutoResume
             {
                 EventHandler round = delegate
                 {
+                    // v0.6.24 W5: a window with a corner of its own asks DWM for what that corner needs (WindowCorner.Prefer).
+                    WindowCorner own = WindowCorner.Of(form);
+                    if (own != null)
+                    {
+                        own.Prefer();
+                        return;
+                    }
                     int corner = CornerRound;
                     try { DwmSetWindowAttribute(form.Handle, CornerPreferenceAttribute, ref corner, 4); }
                     catch (Exception) { /* no dwmapi, or no such attribute: Windows' own corners */ }

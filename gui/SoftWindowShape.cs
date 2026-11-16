@@ -666,12 +666,27 @@ namespace CodexAutoResume
             now = Want();
         }
 
+        // The windows that have a corner of their own, so Soft.TitleBar - which asks DWM for its round corner as every window
+        // and dialog is made, after this is attached on the Dashboard - asks for this one's preference instead (Of).
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Form, WindowCorner> attached =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<Form, WindowCorner>();
+
         /// The corner of `form`, a top-level window that asked for its own (WindowShape.Wanted).
         internal static WindowCorner Attach(Form form)
         {
             var corner = new WindowCorner(form);
             form.BackColorChanged += delegate { corner.Refresh(); };
+            form.HandleCreated += delegate { corner.Prefer(); };
+            attached.Remove(form);
+            attached.Add(form, corner);
             return corner;
+        }
+
+        /// The corner `form` has of its own, or null.
+        internal static WindowCorner Of(Form form)
+        {
+            WindowCorner corner;
+            return form != null && attached.TryGetValue(form, out corner) ? corner : null;
         }
 
         /// The corner the window has now.
@@ -884,8 +899,11 @@ namespace CodexAutoResume
             if (layer != null) ShowWindow(layer.Handle, SW_HIDE);
         }
 
-        // Asks DWM for no corner of its own under ours, and for its round one otherwise (as Soft.TitleBar does).
-        private void Prefer()
+        /// Asks DWM for no corner of its own under ours, and for its round one otherwise (as Soft.TitleBar does) - also as
+        /// the window is made, after Soft.TitleBar, which asks this for a window with a corner of its own (Of): its round
+        /// one asked last left DWM rounding a window whose region was already cut, a ghost of its small round corner
+        /// beyond ours (M-CORNER 2026-11-16: DWMWA_WINDOW_CORNER_PREFERENCE read 2 on the Dashboard with its corner on).
+        internal void Prefer()
         {
             if (!form.IsHandleCreated) return;
             preferred = true;
