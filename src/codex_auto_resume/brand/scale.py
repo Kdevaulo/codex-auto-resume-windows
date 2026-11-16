@@ -111,6 +111,11 @@ LAYOUT = {
     "caption_glyph_corner": 2,
     "caption_inset_top": 10,
     "caption_inset_end": 10,
+    # v0.6.24-beta.2 (the owner, 2026-11-17, the design canvas's row 18): a round end lined up on a straight edge looks as
+    # if it sticks out past it - its curve and its shadow down and to the right - so a pill or a round button at the end of
+    # a row stands this far inside the card or window edge it lines up with: the version's pill at the tab row's end, the
+    # first tab at its start.
+    "pill_inset": 4,
 }
 
 # v0.6.24: the caption buttons' glyph stroke, in CSS px - never thinner than one device pixel where it is drawn. Not in

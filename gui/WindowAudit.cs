@@ -856,6 +856,33 @@ namespace CodexAutoResume
             int words = versionText.GetPreferredSize(Size.Empty).Width;
             if (versionText.Width < words)
                 findings.Add("tabs :: the version's pill cuts its words: " + versionText.Width + " of " + words);
+            AuditPillInset(findings);
+        }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, row 18): the tab row's ends Brand.PillInset inside the header card's edges -
+        /// the version's pill at its outer end and the first tab's face at its start - within a pixel; mirrored, the other way.
+        private void AuditPillInset(List<string> findings)
+        {
+            int outer, start;
+            PillInsets(out outer, out start);
+            int inset = Px(Brand.PillInset);
+            if (PillFit != "none" && Math.Abs(outer - inset) > 1)
+                findings.Add("tabs :: the version's pill stands " + outer + " px inside the header card's edge, not " + inset);
+            if (Math.Abs(start - inset) > 1)
+                findings.Add("tabs :: the first tab stands " + start + " px inside the header card's edge, not " + inset);
+        }
+
+        /// How far inside the header card's edges the version's pill ends and the first tab's face starts, in this window's pixels.
+        internal void PillInsets(out int outer, out int start)
+        {
+            bool mirrored = Mirror.Of(nav);
+            Point card = InWindow(hero);
+            Point pill = InWindow(versionPill);
+            outer = mirrored ? pill.X - card.X : (card.X + hero.Width) - (pill.X + versionPill.Width);
+            NavButton first = navButtons[PageOrder[0]];
+            Rectangle face = first.Face;
+            face.Offset(InWindow(first));
+            start = mirrored ? (card.X + hero.Width) - face.Right : face.Left - card.X;
         }
 
         /// How the last LayoutAudit found the room round the tab row, `page:above/below;` for each page (for the tests).

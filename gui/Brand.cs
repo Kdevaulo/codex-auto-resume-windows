@@ -183,6 +183,7 @@ namespace CodexAutoResume
         internal const int CaptionGlyphCorner = 2;
         internal const int CaptionInsetTop = 10;
         internal const int CaptionInsetEnd = 10;
+        internal const int PillInset = 4;
 
         // The panel's light elevation (brand.SHADOWS): one shadow in ShadowDark and one highlight in
         // ShadowLight per recipe, in CSS px, and how far each recipe reaches past its box. A blur

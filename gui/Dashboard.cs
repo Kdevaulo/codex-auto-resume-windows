@@ -1608,8 +1608,9 @@ namespace CodexAutoResume
             if (request.RowDialog != null) rowAsked = request.RowDialog;
 
             nav.Dock = DockStyle.Top;
-            // NavTop above the tabs: TabRowGap from the header card's foot to their faces (PageRoom).
-            nav.Padding = Pad(12, NavTop, 14, 0);
+            // NavTop above the tabs: TabRowGap from the header card's foot to their faces (PageRoom); at either end Brand.PillInset
+            // inside the header card's edges (NavStart, NavEnd; mirrored, SoftPage mirrors its padding).
+            nav.Padding = Pad(NavStart, NavTop, NavEnd, 0);
             var strip = new SoftFlow();
             strip.Dock = DockStyle.Fill;
             strip.FlowDirection = FlowDirection.LeftToRight;

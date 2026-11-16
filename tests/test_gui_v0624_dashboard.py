@@ -114,6 +114,10 @@ namespace CodexAutoResume
             }
             said["tabs"] = ProportionsBox(tabs);
             said["room"] = ProportionsBox(nav.DisplayRectangle);
+            int outer, start;
+            PillInsets(out outer, out start);
+            said["insets"] = new List<object> { (double)outer, (double)start };
+            said["pillInset"] = (double)Px(Brand.PillInset);
             var findings = new List<string>();
             AuditPill(findings);
             said["findings"] = string.Join("\n", findings.ToArray());
@@ -470,6 +474,18 @@ class DashboardProportionsTests(unittest.TestCase):
                 standard = said["standard"]
                 self.assertEqual(standard["fit"], "whole")
                 self.assertEqual(standard["text"], "v0.6.24-beta.2", "the standard edition is named nowhere (2026-10-05)")
+
+    def test_the_tab_row_s_ends_stand_inside_the_header_card_s_edges(self):
+        """The owner, 2026-11-17 (the design canvas's row 18): a round end lined up on a straight edge looks as if it sticks
+        out, so the version's pill at the tab row's end and the first tab at its start stand Brand.PillInset inside the
+        header card's edges - mirrored, the other way round. The value is the constant's, not a number written here."""
+        for locale in LOCALES:
+            pill = self.answer[locale]["opening1000"]
+            outer, start = pill["insets"]
+            with self.subTest(locale=locale):
+                self.assertGreater(pill["pillInset"], 0)
+                self.assertLessEqual(abs(outer - pill["pillInset"]), 1, "the pill: %s" % outer)
+                self.assertLessEqual(abs(start - pill["pillInset"]), 1, "the first tab: %s" % start)
 
     def test_where_the_tabs_need_the_width_the_pill_shortens_then_goes(self):
         for locale in LOCALES:

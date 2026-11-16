@@ -1305,7 +1305,8 @@ namespace CodexAutoResume
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Px(244)));
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
             columns.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-            columns.Padding = Pad(12, 0, 0, 0);
+            // The section list's faces in line with the tabs' (NavStart): Brand.PillInset inside the header card's edge.
+            columns.Padding = Pad(NavStart, 0, 0, 0);
 
             var list = new SoftFlow();
             list.Dock = DockStyle.Fill;
@@ -1411,6 +1412,12 @@ namespace CodexAutoResume
         /// page's cards (AuditTabRow). Above: the header's own padding (2), the tab strip's (NavTop) and the room a tab keeps
         /// round its face for its focus ring (TabRing); below: the ring's room again and the page's top (PageTop).
         internal const int TabRowGap = 10, HeaderBelow = 2;
+        /// The header's ground at either side of its card: the header card's outer edges, which the tab row lines up with.
+        internal const int HeaderSide = 14;
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, row 18): the tab row's ends Brand.PillInset inside the header card's edges -
+        /// the first tab's face at its start, the version's pill at its end (mirrored, the other way round); a tab keeps its
+        /// ring's room round its face, so the strip starts that much sooner.
+        internal const int NavStart = HeaderSide + Brand.PillInset - TabRing, NavEnd = HeaderSide + Brand.PillInset;
         internal const int TabRing = Brand.FocusOffset + Brand.FocusWidth;
         internal const int NavTop = TabRowGap - HeaderBelow - TabRing, PageTop = TabRowGap - TabRing;
 
@@ -1509,7 +1516,7 @@ namespace CodexAutoResume
             //
             // A card on the canvas, as the panel's hero is. The card is the grid.
             header.Dock = DockStyle.Top;
-            header.Padding = Pad(14, 12, 14, HeaderBelow);
+            header.Padding = Pad(HeaderSide, 12, HeaderSide, HeaderBelow);
             hero.Dock = DockStyle.Fill;
             hero.Margin = new Padding(0);
             // v0.6.24-beta.2: two lines in HeroHeight - the brand's padding at the sides, HeroPadY above and below.
