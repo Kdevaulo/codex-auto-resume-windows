@@ -431,7 +431,7 @@ class StillTests(unittest.TestCase):
         self.assertIn('renderStill.TryGetValue("corner", out value) && value as string == "squircle"',
                       guiscan.member_body("SettingsForm", "StillSquircle"))
         still = guiscan.member_body("SettingsForm", "CornerStill")
-        self.assertIn("new WindowShape.Edge(width, height, Palette.RadiusCard, Shape.Smoothing,", still)
+        self.assertIn("new WindowShape.Edge(width, height, Palette.RadiusCard, global::CodexAutoResume.Shape.Smoothing,", still)
         self.assertIn("WindowShape.CutStill(pixels, edge, Palette.Line);", still)
         script = (ROOT / "build" / "capture_window.ps1").read_text(encoding="utf-8")
         for step in ("GetWindowRgn($handle, $own) -gt 1", "[System.Drawing.Region]::FromHrgn($own)",
