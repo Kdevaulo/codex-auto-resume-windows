@@ -1109,7 +1109,6 @@ namespace CodexAutoResume
             {
                 if (control == saveButton) return "save";
                 if (control == restoreButton) return "restore";
-                if (control == closeButton) return "close";
                 if (control == startButton) return "start";
                 foreach (KeyValuePair<string, NavButton> pair in navButtons)
                     if (pair.Value == control) return "page." + pair.Key;
@@ -1128,7 +1127,9 @@ namespace CodexAutoResume
             if (!IsFocusName(name)) return null;
             if (name == "save") return saveButton;
             if (name == "restore") return restoreButton;
-            if (name == "close") return closeButton;
+            // v0.6.24-beta.2: the save card's Close is gone (the header's X closes the window); a reopen from a window before
+            // it that had the keyboard there starts at the page's tab.
+            if (name == "close") return null;
             if (name == "start") return startButton;
             NavButton tab;
             Control editor;

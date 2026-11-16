@@ -729,6 +729,7 @@ namespace CodexAutoResume
             snapshot = null;
             shownEnabled = null;
             stateDot.State = "idle";
+            lightBefore = "idle";
             TellTaskbar(null, null, 0);
             headline.Text = S("status.unavailable", "Status unavailable");
             detail.Text = S("status.unavailable_detail", "Settings can still be changed and saved");

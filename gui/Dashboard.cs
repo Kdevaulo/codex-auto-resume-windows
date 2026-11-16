@@ -354,7 +354,7 @@ namespace CodexAutoResume
         private readonly Timer timer = new Timer();
         private readonly Transition fade;
         private string behind, words;
-        private bool waiting, aside;
+        private bool waiting, aside, arriving;
         private int holdMs;
 
         internal AsideLabel()
@@ -364,12 +364,36 @@ namespace CodexAutoResume
             timer.Tick += delegate
             {
                 timer.Stop();
-                if (waiting) Speak();
+                if (arriving) Arrived();
+                else if (waiting) Speak();
                 else Return();
             };
         }
 
         internal bool Saying { get { return aside; } }
+
+        /// Whether its own words are held back until they come in (Arrive), for the tests.
+        internal bool Arriving { get { return arriving; } }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-16): its own words - whatever it is told meanwhile - held back for `delayMs`
+        /// and then coming in exactly as they come back after an aside (Return: OutMs, the same fade and rise), as the status
+        /// light's sweep ends. Nothing while an aside is on its way or being said, and nothing where it may not move
+        /// (Motion.Allowed): there the line is simply there.
+        internal void Arrive(int delayMs)
+        {
+            if (aside || waiting || arriving || !Motion.Allowed(this)) return;
+            arriving = true;
+            Invalidate();
+            timer.Stop();
+            timer.Interval = Math.Max(1, delayMs);
+            timer.Start();
+        }
+
+        private void Arrived()
+        {
+            arriving = false;
+            Glide(OutMs);
+        }
 
         /// Whether it is fading in or out (for the tests).
         internal bool Fading { get { return fade.Running; } }
@@ -388,6 +412,8 @@ namespace CodexAutoResume
         internal void Aside(string said, int delayMs, int heldMs)
         {
             if (!aside && !waiting) behind = base.Text;
+            // Its own words, if they were still to come in, come back after the aside as they always do.
+            arriving = false;
             words = said;
             holdMs = heldMs;
             timer.Stop();
@@ -427,6 +453,8 @@ namespace CodexAutoResume
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            // Its words still to come in (Arrive): the ground alone, which Label's background already painted.
+            if (arriving) return;
             if (!aside && !fade.Running)
             {
                 base.OnPaint(e);
@@ -1434,6 +1462,7 @@ namespace CodexAutoResume
             }
             strip.ResumeLayout(true);
             nav.Controls.Add(strip);
+            BuildVersionPill(strip);
             // As tall as the tabs, measured, and again whenever the window's font changes - with the room the chosen
             // tab's heavier words take (ShowPage sets it in nav_current): in Microsoft YaHei UI the bold is a face of
             // its own, a pixel taller than the regular, and the chosen tab was cut off at the strip's foot (v0.6.17).
@@ -1500,6 +1529,9 @@ namespace CodexAutoResume
                 Control page = PageFor(name);
                 // v0.6.23: what came while it was out of sight, written before it shows (Writes).
                 WriteIfStale(name);
+                // v0.6.24-beta.2: the save bar on Settings alone, inside the height every page has - set before the page is
+                // laid out, so it is laid out once in the room it has.
+                if (Soft.OwnVisible(footer) != settings) footer.Visible = settings;
                 // Every page stays in the host once built and only the one shown is visible: taking a
                 // page off and putting the next on moved every native control in it to Windows'
                 // parking window and back.

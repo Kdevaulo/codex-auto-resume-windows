@@ -41,7 +41,6 @@ namespace CodexAutoResume
             // What a card filling the strip is given: the width docked children are laid out in, less the
             // strip's padding. The strip is docked across the window, so nothing else takes from it.
             return DisplayRectangle.Width - footer.Padding.Horizontal - savebar.Padding.Horizontal
-                 - (versionText.PreferredSize.Width + versionText.Margin.Horizontal)
                  - (row.PreferredSize.Width + row.Margin.Horizontal)
                  - reopenNote.Margin.Horizontal - reopenNote.Padding.Horizontal;
         }
@@ -1543,6 +1542,7 @@ namespace CodexAutoResume
             // word back within a second, beside words that say the state cannot be read.
             heroHeld = true;
             stateDot.State = "idle";
+            lightBefore = "idle";
             TellTaskbar(null, null, 0);
             headline.Text = S("status.unavailable", "Status unavailable");
             detail.Text = S("status.unavailable_detail", "Settings can still be changed and saved");
@@ -1617,7 +1617,7 @@ namespace CodexAutoResume
             header.Invalidate(true);
         }
 
-        /// The version as the save bar and Diagnostics show it, with the edition that runs after it (v0.6.11) in the
+        /// The version as the tabs' pill (v0.6.24-beta.2; the save bar until then) and Diagnostics show it, with the edition that runs after it (v0.6.11) in the
         /// catalog's word (edition.shown) - since the owner's decision of 2026-10-02 as quiet secondary text, smaller and
         /// in the secondary colour, on the version's baseline, with no separator (VersionLabel). A status that names no
         /// edition shows the version alone, as it did before - and since v0.6.14 so does the standard edition, which is
@@ -1659,6 +1659,9 @@ namespace CodexAutoResume
             string head = Headline(strings, status, pending);
             HeroTold(ref light, ref head);
             stateDot.State = light;
+            // v0.6.24-beta.2: the light's sweep as the window opens and as the light turns on (LightRead), from the light the
+            // watcher's state gives - not an action's working light over it (BusyLight).
+            LightRead(HeaderLight(status, pending, word));
             string facts = string.Join("   ·   ", HeroFacts(strings, status, pending).ToArray());
             if (head == heroHead && facts == heroDetail) return;
             if (head != heroHead) headline.Text = heroHead = head;

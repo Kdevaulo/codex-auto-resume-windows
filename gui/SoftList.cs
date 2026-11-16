@@ -233,9 +233,49 @@ namespace CodexAutoResume
         {
             version = versionText ?? "";
             edition = string.IsNullOrEmpty(editionText) ? null : editionText;
-            string text = edition == null ? version : version + " " + edition;
+            ShowRuns();
+        }
+
+        private void ShowRuns()
+        {
+            string text = edition == null || shortened ? version : version + " " + edition;
             if (Text != text) Text = text;
             else Invalidate();
+        }
+
+        private bool shortened;
+
+        /// v0.6.24-beta.2: the version alone, the edition kept for when there is room again (VersionPill, where the page
+        /// tabs need the width). False everywhere else.
+        internal bool Shortened
+        {
+            get { return shortened; }
+            set
+            {
+                if (shortened == value) return;
+                shortened = value;
+                ShowRuns();
+            }
+        }
+
+        /// The width it takes on one line with the edition, and with the version alone, its padding included.
+        internal int WholeWidth
+        {
+            get
+            {
+                Rectangle versionBox, editionBox;
+                bool below;
+                return Arrange(int.MaxValue, out versionBox, out editionBox, out below).Width + Padding.Horizontal;
+            }
+        }
+
+        internal int VersionWidth
+        {
+            get
+            {
+                Measure();
+                return TextRenderer.MeasureText(version, Font, new Size(int.MaxValue, int.MaxValue), LineFormat).Width + Padding.Horizontal;
+            }
         }
 
         internal string Version { get { return version; } }
@@ -489,6 +529,87 @@ namespace CodexAutoResume
                 return found;
             }
         }
+    }
+
+    /// v0.6.24-beta.2 (the owner's decision of 2026-11-16): the version and the edition's word in a small raised pill at
+    /// the end of the page tabs, where the footer that held them is gone - quieter than a tab, the window's own text size,
+    /// in the secondary colour, the raised controls' lift and a pill's radius. Not a tab and never reached by the Tab key;
+    /// a press on it is a press on the version (SettingsForm.VersionPressed), and a screen reader is told the version and
+    /// the edition whether or not the edition fits beside it (VersionLabel.Shortened).
+    internal sealed class VersionPill : Panel, ISoftLifted
+    {
+        private readonly VersionLabel label;
+        private readonly LiftTracker tracker;
+
+        internal VersionPill(VersionLabel label)
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            SetStyle(ControlStyles.Selectable, false);
+            TabStop = false;
+            BackColor = Palette.Raised;
+            this.label = label;
+            // As wide as its words, in the middle of the pill (OnLayout): the layout audit holds it to what it asks for.
+            label.AutoSize = true;
+            label.Dock = DockStyle.None;
+            label.TextAlign = ContentAlignment.MiddleLeft;
+            label.Margin = new Padding(0);
+            label.Padding = new Padding(0);
+            label.BackColor = Palette.Raised;
+            label.TabStop = false;
+            Controls.Add(label);
+            AccessibleRole = AccessibleRole.StaticText;
+            label.TextChanged += delegate { Tell(); };
+            tracker = new LiftTracker(this, "control");
+            Tell();
+        }
+
+        /// The room inside it round the words: 4 by 11 px, as the decision's pill has it.
+        internal static Padding Inner { get { return new Padding(Soft.Px(11), Soft.Px(4), Soft.Px(11), Soft.Px(4)); } }
+
+        /// How wide it is with the edition, and with the version alone.
+        internal int WholeWidth { get { return label.WholeWidth + Inner.Horizontal; } }
+        internal int VersionWidth { get { return label.VersionWidth + Inner.Horizontal; } }
+
+        /// As tall as its words' line and its inner room.
+        internal int PillHeight
+        {
+            get { return label.GetPreferredSize(Size.Empty).Height + Inner.Vertical; }
+        }
+
+        protected override void OnLayout(LayoutEventArgs levent)
+        {
+            base.OnLayout(levent);
+            Size words = label.GetPreferredSize(Size.Empty);
+            if (label.Size != words) label.Size = words;
+            var at = new Point(Math.Max(0, (ClientSize.Width - words.Width) / 2), Math.Max(0, (ClientSize.Height - words.Height) / 2));
+            if (label.Location != at) label.Location = at;
+        }
+
+        internal VersionLabel Label { get { return label; } }
+
+        /// Its name and its label's: the version and the edition, shortened or not.
+        internal void Tell()
+        {
+            string said = label.Edition == null ? label.Version : label.Version + " " + label.Edition;
+            if (AccessibleName != said) AccessibleName = said;
+            if (label.AccessibleName != said) label.AccessibleName = said;
+        }
+
+        string ISoftLifted.Lift { get { return "control"; } }
+        float ISoftLifted.Radius { get { return Height / 2f; } }
+        Rectangle ISoftLifted.Face { get { return ClientRectangle; } }
+        bool ISoftLifted.Ring { get { return false; } }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            float radius = Height / 2f;
+            Ground.PaintBehind(this, e.Graphics, ClientRectangle, radius);
+            Soft.Body(e.Graphics, ClientRectangle, radius, Palette.Raised, Palette.Line, (string)null);
+        }
+
+        /// What it holds lifted again where it moves or shows (LiftTracker).
+        internal void Lifted() { tracker.Update(); }
     }
 
     /// A list whose rows are drawn by the page that owns it, double-buffered so a five-second
