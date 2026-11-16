@@ -506,9 +506,9 @@ class SwitchTests(unittest.TestCase):
         wanted = guiscan.member_body("WindowShape", "Wanted")
         self.assertIn("Switch && Windows11", wanted)
         self.assertIn("internal static readonly bool Switch = Brand.WindowSquircle;", guiscan.read("gui/SoftWindowShape.cs"))
-        # Only the Dashboard asks, and only after its caption is installed.
-        askers = [path.name for path in (ROOT / "gui").glob("*.cs") if ".OwnCorner()" in path.read_text(encoding="utf-8")]
-        self.assertEqual(askers, ["SettingsApp.cs"])
+        # Only the Dashboard and the setup window ask (owner 2026-11-16), each after its caption is installed.
+        askers = sorted(path.name for path in (ROOT / "gui").glob("*.cs") if ".OwnCorner()" in path.read_text(encoding="utf-8"))
+        self.assertEqual(askers, ["InstallerWindow.cs", "SettingsApp.cs"])
         self.assertIn("chrome.OwnCorner();", guiscan.read("gui/SettingsApp.cs"))
         self.assertIn("if (chrome != null && chrome.Frameless) return Padding.Empty;",
                       guiscan.member_body("SettingsForm", "OwnFrame"))
