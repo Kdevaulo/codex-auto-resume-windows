@@ -1016,15 +1016,16 @@ namespace CodexAutoResume
             Shown += delegate
             {
                 shown = true;
-                // v0.6.24-beta.2: the opening sweep a read before this asked for (SweepLight).
+                // v0.6.20: the watcher's request to come forward is heard even when this window runs elevated.
+                AcceptOpenRequests();
+                // v0.6.24-beta.2: the opening sweep a read before this asked for (SweepLight) - after the open requests,
+                // which the window takes before anything else it does once shown.
                 if (sweepOnShown)
                 {
                     sweepOnShown = false;
                     stateDot.Sweep();
                     if (stateDot.Sweeping) detail.Arrive(AsideAfterMs);
                 }
-                // v0.6.20: the watcher's request to come forward is heard even when this window runs elevated.
-                AcceptOpenRequests();
                 // v0.6.18 B3: a window that replaces another is the size it was placed at once it is on screen, whatever
                 // creating it on a monitor of another scale than Windows' own did to that size on the way.
                 KeepPlacedBounds();
