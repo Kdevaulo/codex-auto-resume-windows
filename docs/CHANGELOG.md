@@ -32,6 +32,11 @@ always had them, and leaves the previous version's `.old-` file where an update 
   corner is now drawn the same way - its design's card corner, with the hairline and the shadow round it - in place of
   Windows' round corner. Windows' corner comes back while the window is maximised or snapped, in High Contrast, in a
   remote session and without desktop composition; Windows 10 keeps its square corner.
+- **Known in this pre-release: the Dashboard's own corner still has rough edges**, found by a check on real screens and
+  being fixed for the next pre-release. A faint fill can show outside the squircle, out to where Windows' corner would
+  be; at 150 % a one-pixel line can show inside the edge; Windows' own title bar and frame can flash for a moment when
+  the window is activated or resized; restoring the window from maximised or minimised can make it larger each time;
+  and the left and right edges resize only beside the header and the footer.
 - **The tray icon's popup is its card alone.** No grey ground lies round it any more, and a float shadow lies under it that only ever
   darkens. It opens a little faster than the plain window did, and a frame of its status light costs well under a millisecond. Where
   Windows refuses a window of this kind, the popup is the plain window it was, with its own drop shadow.
