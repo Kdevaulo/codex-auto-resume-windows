@@ -161,13 +161,12 @@ class PlanTests(unittest.TestCase):
                 card = plan["card"]
                 self.assertGreaterEqual(min(halo["cx"] - card[0], halo["cy"] - card[1]), halo["radius"])
 
-    def test_the_card_is_280_to_360_wide_and_a_long_line_wraps(self):
+    def test_the_card_is_at_most_360_wide_and_a_long_line_wraps(self):
         for scale in (1.0, 1.25, 1.5, 2.0):
             for locale, strings in interface.STRINGS.items():
                 with self.subTest(scale=scale, locale=locale):
                     _, plan = plan_for("metered", "advanced", strings, scale)
                     width = plan["size"][0]
-                    self.assertGreaterEqual(width, int(round(280 * scale)))
                     self.assertLessEqual(width, int(round(360 * scale)))
                     for item in plan["items"]:
                         if "rect" in item and item["kind"] != "card":
@@ -176,6 +175,31 @@ class PlanTests(unittest.TestCase):
         _, plan = plan_for("waiting", strings=long)
         self.assertEqual(plan["size"][0], 360)
         self.assertTrue(any(item["wrap"] for item in texts(plan, "body")))
+
+    def test_no_row_leaves_the_right_side_emptier_than_the_left(self):
+        # The owner, 2026-11-16, of the card with no usage rows: "우측이 빈공간이 큰게 아쉬워" - the 280 least width it
+        # had left the right side wider than the left. The card is as wide as its widest row: that row ends one side
+        # padding from the right edge, in every state, edition, language and scale.
+        for name in FIXTURES:
+            for edition in (None, "advanced"):
+                for scale in (1.0, 1.5, 2.0):
+                    for locale, strings in interface.STRINGS.items():
+                        with self.subTest(name=name, edition=edition, scale=scale, locale=locale):
+                            _, plan = plan_for(name, edition, strings, scale)
+                            rights = [item["rect"][2] for item in plan["items"]
+                                      if "rect" in item and item["kind"] != "card"]
+                            pad = int(round(tipplan.TIP_PAD_X * scale))
+                            self.assertEqual(max(rights), plan["size"][0] - pad)
+
+    def test_a_line_broken_in_two_takes_its_widest_line_not_the_whole_width(self):
+        # Broken where the widest card breaks it, then the card shrinks to the widest line it broke into (the stand-in
+        # measure breaks the English waiting line in two at 100 %).
+        _, plan = plan_for("waiting")
+        lines = sorted({item["rect"][1] for item in texts(plan, "body")})
+        self.assertEqual(len(lines), 2)
+        self.assertLess(plan["size"][0], 360)
+        widest = max(item["rect"][2] for item in texts(plan, "body"))
+        self.assertEqual(widest, plan["size"][0] - tipplan.TIP_PAD_X)
 
     def test_mirrored_the_light_is_at_the_right_and_every_line_aligned_right(self):
         parts, plan = plan_for("metered", "advanced")
