@@ -659,6 +659,7 @@ namespace CodexAutoResume
         private WindowShape.Corner now;
         private bool busy, again, preferred, failed, cloaked, revealing;
         private Size shapedSize;
+        private int span;
         private int shapedDpi;
         private Color shapedGround, shapedLine;
         private IntPtr memory, bitmap, kept;
@@ -704,6 +705,10 @@ namespace CodexAutoResume
 
         /// The companion, for the tests; IntPtr.Zero before it is made.
         internal IntPtr Companion { get { return layer == null ? IntPtr.Zero : layer.Handle; } }
+
+        /// How far along each edge from a corner the cut-away corner reaches now, in device px (the corner's tile): the
+        /// corner's resize target runs from there (Chrome.Hit, ChromeLayout.CornerSpan). 0 while the corner is Windows'.
+        internal int Span { get { return Shaped ? span : 0; } }
 
         /// How far the companion reaches past the window on every side now.
         internal int Margin { get { return WindowShape.Margin(Scale()); } }
@@ -921,6 +926,7 @@ namespace CodexAutoResume
             shapedDpi = dpi;
             shapedGround = ground;
             shapedLine = line;
+            span = edge.Fits ? edge.Tile : 0;
             if (!edge.Fits)
             {
                 SetWindowRgn(form.Handle, IntPtr.Zero, true);

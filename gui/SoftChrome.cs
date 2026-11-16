@@ -44,6 +44,9 @@ namespace CodexAutoResume
         internal bool Edges;
         /// The top resize band, in device px: the frame Windows had at the top, now inside the client area.
         internal int Band;
+        /// v0.6.24: how far along each edge from the window's corner its own cut-away corner reaches (WindowCorner.Span),
+        /// in device px; 0 with Windows' corner.
+        internal int CornerSpan;
         /// The three buttons, Empty where the window has none.
         internal Rectangle Minimize, Maximize, Close;
         internal bool MinimizeOn, MaximizeOn;
@@ -82,10 +85,14 @@ namespace CodexAutoResume
         internal static int Hit(Point p, ChromeLayout l)
         {
             if (p.X < 0 || p.Y < 0 || p.X >= l.Client.Width || p.Y >= l.Client.Height) return HTNOWHERE;
+            // The length along each edge that resizes from the corner: twice the band, as Windows' own; with the window's own
+            // corner, from the corner to a band past where its cut-away curve ends (CornerSpan) - re-check 5 found the
+            // diagonal target only ~3 px at 150 %, the cut corner itself taking nothing (its clicks go to the window behind).
+            int reach = Math.Max(2 * l.Band, l.Edges ? l.CornerSpan + l.Band : 0);
             if (l.Edges && l.Sizable && !l.Maximized)
             {
                 // No frame round the window (its own outer corner): its bottom, left and right bands as its top one.
-                int corner = 2 * l.Band;
+                int corner = reach;
                 if (p.Y >= l.Client.Height - l.Band)
                 {
                     if (p.X < corner) return HTBOTTOMLEFT;
@@ -97,7 +104,7 @@ namespace CodexAutoResume
             }
             if (l.Sizable && !l.Maximized && p.Y < l.Band)
             {
-                int corner = 2 * l.Band;
+                int corner = reach;
                 if (p.X < corner) return HTTOPLEFT;
                 if (p.X >= l.Client.Width - corner) return HTTOPRIGHT;
                 return HTTOP;
@@ -747,6 +754,7 @@ namespace CodexAutoResume
             layout.Maximized = Zoomed;
             layout.Mirrored = Mirror.Of(form);
             layout.Edges = Frameless;
+            layout.CornerSpan = Frameless ? corner.Span : 0;
             layout.Band = layout.Sizable ? TopBand() : 0;
             layout.Minimize = Showing(MinimizeButton) ? InForm(MinimizeButton) : Rectangle.Empty;
             layout.Maximize = Showing(MaximizeButton) ? InForm(MaximizeButton) : Rectangle.Empty;
