@@ -5,7 +5,9 @@ premultiplied bitmaps (`_Layer(None)`) and `paint(now_ms)` fills them for any mo
 rise toward the taskbar, the scale and the shadow's depth all from notice_card's own motion. What a layered window
 does with them on a real desktop - UpdateLayeredWindow, each layer at the frame's alpha over whatever is beneath - is
 `lay` here, in integers, so that at full alpha it is exactly make_screenshots' `_over`: the settled card on the
-canvas is the README card's own picture (`_SettledCard.at(0)`), byte for byte.
+canvas is the README card's own picture (`_SettledCard.at(0)`), byte for byte. On a clear canvas (RGBA, straight
+alpha: the owner, 2026-11-16 - on a desktop the card floats with only its own shadow) the two layers are laid over
+nothing in premultiplied BGRA, as the still does, and that is what is put on the canvas (`lay_clear`).
 
 The card is placed as the stack places it (`notice_card.stack_positions`): above the taskbar strip, beside the tray
 icon, the gap the stack keeps. Its light breathes on the picture's clock as it does on a desktop: held at the moment
@@ -83,6 +85,59 @@ def lay(canvas: bytearray, canvas_width: int, canvas_height: int, layer: Layer, 
             canvas[target] = min(255, red + (canvas[target] * keep + 127) // 255)
             canvas[target + 1] = min(255, green + (canvas[target + 1] * keep + 127) // 255)
             canvas[target + 2] = min(255, blue + (canvas[target + 2] * keep + 127) // 255)
+
+
+def lay_clear(canvas: bytearray, canvas_width: int, canvas_height: int, layers, alpha: float = 1.0) -> None:
+    """`layers` (shadow first, then body) laid over the RGBA `canvas` with straight alpha, each at `alpha`.
+
+    They are laid on each other first, in premultiplied BGRA over nothing, exactly as make_screenshots' `_over` lays
+    the still's - so the settled card on a clear canvas is the clear still's pixels to the byte - and the result is
+    then laid over the canvas: wholly clear where the canvas is, the straight colour of the card and of the shadow's
+    soft edge where it is."""
+    import make_screenshots
+    level = max(0, min(255, int(round(alpha * 255))))
+    if level == 0:
+        return
+    stack = bytearray(canvas_width * canvas_height * 4)
+    left, top, right, bottom = canvas_width, canvas_height, 0, 0
+    for layer in layers:
+        pixels, width = layer.pixels, layer.width
+        if level != 255:
+            pixels = pixels.translate(bytes((value * level + 127) // 255 for value in range(256)))
+        x0, y0 = max(0, layer.left), max(0, layer.top)
+        x1, y1 = min(canvas_width, layer.left + width), min(canvas_height, layer.top + layer.height)
+        if x0 >= x1 or y0 >= y1:
+            continue
+        cut = pixels
+        if (x0, y0, x1, y1) != (layer.left, layer.top, layer.left + width, layer.top + layer.height):
+            cut = b"".join(pixels[((y - layer.top) * width + x0 - layer.left) * 4:
+                                  ((y - layer.top) * width + x1 - layer.left) * 4] for y in range(y0, y1))
+        make_screenshots._over(stack, canvas_width, cut, x1 - x0, y1 - y0, x0, y0)
+        left, top, right, bottom = min(left, x0), min(top, y0), max(right, x1), max(bottom, y1)
+    for y in range(top, bottom):
+        start = (y * canvas_width + left) * 4
+        source = stack[start:start + (right - left) * 4]
+        if source[3::4].count(0) == right - left:
+            continue
+        under = canvas[start:start + (right - left) * 4]
+        if under[3::4].count(0) == right - left:
+            rgb, cover = make_screenshots.unpremultiply(bytes(source))
+            row = bytearray(len(source))
+            row[0::4], row[1::4], row[2::4], row[3::4] = rgb[0::3], rgb[1::3], rgb[2::3], cover
+            canvas[start:start + len(row)] = row
+            continue
+        for x in range(right - left):
+            at = x * 4
+            blue, green, red, cover = source[at:at + 4]
+            if cover == 0:
+                continue
+            keep = 255 - cover
+            held = under[at + 3]
+            total = cover + (held * keep + 127) // 255
+            for channel, colour in enumerate((red, green, blue)):
+                laid = colour + ((under[at + channel] * held + 127) // 255 * keep + 127) // 255
+                canvas[start + at + channel] = min(255, (laid * 255 + total // 2) // total)
+            canvas[start + at + 3] = total
 
 
 class CardFrames:
@@ -180,8 +235,12 @@ class CardFrames:
 
     def lay_on(self, canvas: bytearray, width: int, height: int, drawn: Drawn) -> None:
         """The card's two layers over `canvas`, as the stack shows them: the shadow, then the body, each at the
-        frame's alpha."""
+        frame's alpha. A canvas of four bytes a pixel is a clear one (`lay_clear`)."""
         if drawn is None:
+            return
+        if len(canvas) == width * height * 4:
+            lay_clear(canvas, width, height, (drawn.shadow, drawn.body) if self.card.margin else (drawn.body,),
+                      drawn.alpha)
             return
         if self.card.margin:
             lay(canvas, width, height, drawn.shadow, drawn.alpha)
