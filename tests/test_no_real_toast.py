@@ -35,6 +35,14 @@ NOWHERE = str(ROOT / "no-such-folder" / "powershell.exe")
 
 
 def toast_command():
+    """The toast as the product starts it now: the script, plain, after -Command (pwsh.command_line)."""
+    from codex_auto_resume import notify, pwsh
+    return pwsh.command_line(NOWHERE, notify._SCRIPT)
+
+
+def encoded_toast_command():
+    """The toast as a release before v0.6.24 started it - base64 after -EncodedCommand - which a tagged release's
+    own package still builds when a test runs it (tests/released.py), so the guard still knows it."""
     from codex_auto_resume import notify
     encoded = base64.b64encode(notify._SCRIPT.encode("utf-16-le")).decode("ascii")
     return [NOWHERE, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
@@ -54,6 +62,9 @@ class GuardTests(unittest.TestCase):
         from codex_auto_resume import notify
         self.assertIn(no_real_toast.TOAST_MARK, notify._SCRIPT)
         self.assertTrue(no_real_toast.is_toast(toast_command()))
+        self.assertIn("-Command", toast_command())
+        self.assertNotIn("-EncodedCommand", toast_command())
+        self.assertTrue(no_real_toast.is_toast(encoded_toast_command()))
         self.assertFalse(no_real_toast.is_toast([sys.executable, "-c", "pass"]))
         self.assertFalse(no_real_toast.is_toast([NOWHERE, "-EncodedCommand", "bm90IGEgdG9hc3Q="]))
 

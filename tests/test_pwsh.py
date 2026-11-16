@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -171,9 +172,19 @@ class NoValueInScriptTests(unittest.TestCase):
                          ["codex_auto_resume_advanced/codex/wmi_escape.py",
                           "codex_auto_resume_advanced/control/codexstart.py"])
 
-    def test_nothing_else_builds_an_encoded_powershell_command(self):
-        """One place encodes scripts; a second would be a second place to get it wrong."""
-        self.assertEqual(srcscan.holders("-EncodedCommand"), {"codex_auto_resume/pwsh.py"})
+    def test_nothing_builds_an_encoded_powershell_command(self):
+        """Issue #65: no script goes to PowerShell as base64 after the encoded-command switch, the shape Avast's
+        Behavior Shield blocked (IDP.HELU.PSE96) - not even from pwsh.py, which used to be the one place that did."""
+        self.assertEqual(srcscan.holders(re.compile(r"(?i)-EncodedCommand")), set())
+
+    def test_nothing_else_hands_powershell_a_script_for_values(self):
+        """One place hands PowerShell a constant script with values beside it; a second would be a second place to
+        get it wrong. codex/pairing.py's process inventory is the one other -Command: a constant that takes no value
+        at all and is read for what it prints."""
+        self.assertEqual(srcscan.holders('"-Command"'),
+                         {"codex_auto_resume/pwsh.py", "codex_auto_resume/codex/pairing.py"})
+        self.assertEqual(pwsh.command_line("powershell.exe", ECHO),
+                         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ECHO])
 
     def test_the_shortcut_values_travel_out_of_band(self):
         with patch.object(pwsh, "executable", return_value="powershell.exe"), \
@@ -183,10 +194,8 @@ class NoValueInScriptTests(unittest.TestCase):
             shortcut.install("C:\\Users\\O\u2019Brien\\app\\CodexAutoResumeSettings.exe", description="d")
         env = run.call_args.kwargs["env"]
         self.assertIn("O\u2019Brien", env[pwsh.PREFIX + "TARGET"])
-        import base64
         argv = run.call_args.args[0]
-        script = base64.b64decode(argv[argv.index("-EncodedCommand") + 1]).decode("utf-16-le")
-        self.assertEqual(script, shortcut._MAKER)
+        self.assertEqual(argv[1:], ["-NoProfile", "-NonInteractive", "-Command", shortcut._MAKER])
 
 
 if __name__ == "__main__":

@@ -1092,12 +1092,11 @@ class OutputEncodingTests(unittest.TestCase):
     def through(self, setting):
         """What PowerShell writes, as UTF-8, for a UTF-8 line a Python program printed - piped through
         Write-Host as install.ps1's Invoke-Setup does, after `setting`."""
-        import base64
         command = (setting + "\n& '%s' -c \"import sys; sys.stdout.reconfigure(encoding='utf-8'); "
                    "print(chr(0xD55C) + chr(0xAD6D) + chr(0xC5B4))\" | ForEach-Object { Write-Host ('    ' + $_) }\n"
                    % sys.executable)
-        done = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand",
-                               base64.b64encode(command.encode("utf-16-le")).decode("ascii")],
+        # The script plain after -Command, as pwsh.run hands one over (issue #65: never base64 on a command line).
+        done = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
                               capture_output=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.assertEqual(done.returncode, 0, done.stderr.decode("utf-8", "replace"))
         return done.stdout.decode("utf-8", "replace")
