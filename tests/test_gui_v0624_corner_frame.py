@@ -67,6 +67,7 @@ namespace CodexAutoResume
         [DllImport("user32.dll")] internal static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int cy, uint flags);
         [DllImport("user32.dll")] internal static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
         [DllImport("user32.dll")] internal static extern bool IsWindowVisible(IntPtr h);
+        [DllImport("user32.dll")] internal static extern bool ShowWindow(IntPtr h, int command);
         [DllImport("user32.dll")] internal static extern bool IsZoomed(IntPtr h);
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] internal static extern IntPtr GetWindowLongPtr(IntPtr h, int i);
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] internal static extern IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);
@@ -148,7 +149,12 @@ namespace CodexAutoResume
         private void PassOn(ref Message m)
         {
             int msg = m.Msg;
-            if (msg == 0x0112) Commands.Add((double)(m.WParam.ToInt64() & 0xFFF0));
+            if (msg == 0x0112)
+            {
+                // Recorded and not carried out: a restore would make the window the foreground one.
+                Commands.Add((double)(m.WParam.ToInt64() & 0xFFF0));
+                return;
+            }
             if (Recording && (msg == 0x85 || msg == 0x86 || msg == 0xAE || msg == 0xAF || msg == 0x0C || msg == 0x80))
             {
                 long style = IsHandleCreated ? FrameNative.GetWindowLongPtr(Handle, FrameNative.GWL_STYLE).ToInt64() : 0;
@@ -270,7 +276,7 @@ namespace CodexAutoResume
             form.Location = new Point(FrameNative.Away, FrameNative.Away);
             form.ShowInTaskbar = false;
             IntPtr h = form.Handle;
-            form.Show();
+            FrameNative.ShowWindow(h, 4);   // SW_SHOWNOACTIVATE: never made the foreground window
             Application.DoEvents();
             Chrome.RECT whole;
             FrameNative.GetWindowRect(h, out whole);
@@ -316,7 +322,7 @@ namespace CodexAutoResume
             form.ShowInTaskbar = false;
             IntPtr h = form.Handle;
             said["made"] = CornerFrameState(form);
-            form.Show();
+            FrameNative.ShowWindow(h, 4);   // SW_SHOWNOACTIVATE: never made the foreground window
             Application.DoEvents();
             said["shown"] = CornerFrameState(form);
             List<object> made = FrameNative.Box(h);
