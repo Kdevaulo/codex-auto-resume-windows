@@ -736,9 +736,19 @@ namespace CodexAutoResume
             return dpi > 0 ? dpi / 96.0 : SettingsForm.DpiScale;
         }
 
+        internal const int WM_NCPAINT = 0x0085, WM_NCACTIVATE = 0x0086, WM_NCUAHDRAWCAPTION = 0x00AE, WM_NCUAHDRAWFRAME = 0x00AF;
+
         /// Handles `m` before the window's caption does: true when it is answered here. WM_NCCALCSIZE while the corner is
         /// ours: the whole window is the client (nothing of the rectangle given is taken off). WM_WINDOWPOSCHANGED: the
         /// region and the companion follow the window at once, and the message goes on to the window.
+        ///
+        /// And nothing of Windows' frame is ever painted while the corner is ours. A window with a region has no frame from
+        /// DWM (DWMWA_NCRENDERING_ENABLED reads 0), so Windows' own handling paints the classic one - a light-blue caption
+        /// with its title, icon and buttons, a thick grey frame - straight over the window, whatever its client area: as it
+        /// is activated (the owner's resize, M-CORNER 2026-11-16), as its frame is asked to paint (each region set while it
+        /// is resized), and as its title or icon changes (ChromeHost.Unframed). WM_NCPAINT and the theme's own caption and
+        /// frame messages are answered with nothing; WM_NCACTIVATE goes on with -1, which tells Windows to keep its
+        /// activation and repaint no frame for it.
         internal bool Intercept(ref Message m)
         {
             if (m.Msg == Chrome.WM_NCCALCSIZE)
@@ -748,6 +758,18 @@ namespace CodexAutoResume
                 return true;
             }
             if (m.Msg == WM_WINDOWPOSCHANGED) Sync();
+            if (!Shaped) return false;
+            switch (m.Msg)
+            {
+                case WM_NCPAINT:
+                case WM_NCUAHDRAWCAPTION:
+                case WM_NCUAHDRAWFRAME:
+                    m.Result = IntPtr.Zero;
+                    return true;
+                case WM_NCACTIVATE:
+                    m.LParam = new IntPtr(-1);
+                    return false;
+            }
             return false;
         }
 

@@ -67,6 +67,7 @@ namespace CodexAutoResume
         [DllImport("user32.dll")] internal static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int cy, uint flags);
         [DllImport("user32.dll")] internal static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
         [DllImport("user32.dll")] internal static extern bool IsWindowVisible(IntPtr h);
+        [DllImport("user32.dll")] internal static extern bool IsZoomed(IntPtr h);
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] internal static extern IntPtr GetWindowLongPtr(IntPtr h, int i);
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] internal static extern IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetWindowText(IntPtr h, StringBuilder text, int most);
@@ -109,7 +110,8 @@ namespace CodexAutoResume
             if (Recording && (msg == 0x85 || msg == 0x86 || msg == 0xAE || msg == 0xAF || msg == 0x0C || msg == 0x80))
             {
                 long style = IsHandleCreated ? FrameNative.GetWindowLongPtr(Handle, FrameNative.GWL_STYLE).ToInt64() : 0;
-                Reached.Add(new List<object> { (double)msg, (double)m.LParam.ToInt64(), (style & FrameNative.WS_VISIBLE) != 0 });
+                Reached.Add(new List<object> { (double)msg, (double)m.LParam.ToInt64(), (style & FrameNative.WS_VISIBLE) != 0,
+                                                Caption.Corner.Now.ToString(), FrameNative.IsZoomed(Handle) });
             }
             base.WndProc(ref m);
         }
@@ -151,7 +153,7 @@ namespace CodexAutoResume
             form.Recording = false;
             var text = new StringBuilder(64);
             FrameNative.GetWindowText(h, text, text.Capacity);
-            return new List<object> { form.Reached, text.ToString(), FrameNative.IsWindowVisible(h),
+            return new List<object> { new List<object>(form.Reached), text.ToString(), FrameNative.IsWindowVisible(h),
                                       form.Caption.Corner.Now.ToString() };
         }
 
@@ -274,6 +276,52 @@ class CornerFrameTests(unittest.TestCase):
                     self.assertEqual(said[step]["dwmFrame"], 0, "a window with a region has no frame from DWM")
                 else:
                     self.assertEqual(said[step]["preference"], 2, "DWMWCP_ROUND: Windows' round corner")
+
+    def test_with_its_own_corner_nothing_of_windows_frame_is_painted(self):
+        reached, title, visible, corner = self.answer["messages"]["own"]
+        self.assertEqual(corner, "Squircle" if self.answer["wanted"] else "Round")
+        if corner != "Squircle":
+            self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+        codes = [int(message[0]) for message in reached]
+        for code in (WM_NCPAINT, WM_NCUAHDRAWCAPTION, WM_NCUAHDRAWFRAME):
+            self.assertNotIn(code, codes, "answered with nothing: %#x" % code)
+        activate = [message for message in reached if message[0] == WM_NCACTIVATE]
+        self.assertTrue(activate, "WM_NCACTIVATE still reaches Windows' handling, for its activation")
+        self.assertTrue(all(message[1] == -1 for message in activate), "with -1: no frame repainted for it")
+        for code in (WM_SETTEXT, WM_SETICON):
+            taken = [message for message in reached if message[0] == code]
+            with self.subTest(code=code):
+                self.assertTrue(taken)
+                self.assertTrue(all(message[2] is False for message in taken), "taken while marked hidden")
+        self.assertEqual(title, "A title own")
+        self.assertTrue(visible, "shown again after")
+
+    def test_with_windows_corner_back_every_message_reaches_windows_as_before(self):
+        for step in ("maximised",):
+            reached, title, visible, corner = self.answer["messages"][step]
+            with self.subTest(step=step):
+                self.assertEqual(corner, "Round")
+                codes = [int(message[0]) for message in reached]
+                for code in (WM_NCPAINT, WM_NCACTIVATE, WM_NCUAHDRAWCAPTION, WM_NCUAHDRAWFRAME, WM_SETTEXT, WM_SETICON):
+                    self.assertIn(code, codes)
+                for message in reached:
+                    if message[0] == WM_NCACTIVATE:
+                        self.assertEqual(message[1], 0)
+                    if message[0] in (WM_SETTEXT, WM_SETICON):
+                        self.assertIs(message[2], True)
+                self.assertEqual(title, "A title " + step)
+                self.assertTrue(visible)
+
+    def test_restored_its_own_corner_again_paints_nothing_of_windows_frame(self):
+        reached, title, visible, corner = self.answer["messages"]["restored"]
+        if not self.answer["wanted"]:
+            self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+        self.assertEqual(corner, "Squircle")
+        codes = [int(message[0]) for message in reached]
+        self.assertNotIn(WM_NCPAINT, codes)
+        self.assertEqual(title, "A title restored")
+        self.assertTrue(visible)
+
 
 if __name__ == "__main__":
     unittest.main()

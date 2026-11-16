@@ -698,6 +698,11 @@ namespace CodexAutoResume
         {
             // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
             if (corner != null && corner.Intercept(ref m)) return true;
+            if (corner != null && corner.Shaped && (m.Msg == WM_SETTEXT || m.Msg == WM_SETICON) && form.IsHandleCreated)
+            {
+                Unframed(ref m, pass);
+                return true;
+            }
             switch (m.Msg)
             {
                 case Chrome.WM_NCCALCSIZE:
@@ -755,6 +760,34 @@ namespace CodexAutoResume
                 }
             }
             return false;
+        }
+
+        private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, GWL_STYLE = -16, WS_VISIBLE = 0x10000000;
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+
+        // v0.6.24 W5: a new title or icon, taken by Windows' own handling with the window marked hidden for that moment.
+        // Windows paints the caption it keeps for those straight onto the window, and while the window's corner is its own
+        // that caption is the classic one (WindowCorner.Intercept); marked hidden, it paints nothing. Nothing is shown or
+        // hidden: the style bit alone, put back at once.
+        private void Unframed(ref Message m, Pass pass)
+        {
+            IntPtr handle = form.Handle;
+            long style = GetWindowLongPtr(handle, GWL_STYLE).ToInt64();
+            bool visible = (style & WS_VISIBLE) != 0;
+            if (visible) SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(style & ~(long)WS_VISIBLE));
+            try { pass(ref m); }
+            finally
+            {
+                if (visible)
+                {
+                    long now = GetWindowLongPtr(handle, GWL_STYLE).ToInt64();
+                    SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(now | WS_VISIBLE));
+                }
+            }
         }
 
         private static bool IsButton(int code)
