@@ -99,8 +99,12 @@ namespace CodexAutoResume
                     if (p.X >= l.Client.Width - corner) return HTBOTTOMRIGHT;
                     return HTBOTTOM;
                 }
-                if (p.Y >= l.Band && p.X < l.Band) return p.Y >= l.Client.Height - corner ? HTBOTTOMLEFT : HTLEFT;
-                if (p.Y >= l.Band && p.X >= l.Client.Width - l.Band) return p.Y >= l.Client.Height - corner ? HTBOTTOMRIGHT : HTRIGHT;
+                // Each side resizes from the corner it meets for `corner` along it - the top corners too (re-check 6: down
+                // the sides they gave only HTLEFT and HTRIGHT, so a drag 30 px below the top-left corner went sideways).
+                if (p.Y >= l.Band && p.X < l.Band)
+                    return p.Y >= l.Client.Height - corner ? HTBOTTOMLEFT : p.Y < corner ? HTTOPLEFT : HTLEFT;
+                if (p.Y >= l.Band && p.X >= l.Client.Width - l.Band)
+                    return p.Y >= l.Client.Height - corner ? HTBOTTOMRIGHT : p.Y < corner ? HTTOPRIGHT : HTRIGHT;
             }
             if (l.Sizable && !l.Maximized && p.Y < l.Band)
             {
