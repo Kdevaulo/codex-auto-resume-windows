@@ -345,14 +345,14 @@ def pictures(result: dict, folder: Path):
 
 
 # ---------------------------------------------------------------------------------------------------- the frame
-def corner_rows(still: tuple) -> int:
-    """How many rows at the bottom of a captured still hold a pixel that is not wholly opaque: the corners Windows
-    rounds."""
+def corner_rows(still: tuple, top: bool = False) -> int:
+    """How many rows at the bottom (or, with `top`, at the top) of a captured still hold a pixel that is not wholly
+    opaque: the corners Windows rounds."""
     width, height, _rgb, alpha = still
     if alpha is None:
         return 0
     rows = 0
-    for y in range(height - 1, -1, -1):
+    for y in (range(height) if top else range(height - 1, -1, -1)):
         if min(alpha[y * width:(y + 1) * width]) == 255:
             break
         rows += 1
@@ -372,6 +372,13 @@ def framed_still(still: tuple, caption: int, client: tuple) -> tuple:
     if alpha is None:
         return width, caption + client_h, bytes(out_rgb), None
     out_alpha = bytearray(alpha[:caption * width]) + bytearray(b"\xff" * (width * client_h))
+    if not caption:
+        # v0.6.24: no title bar above the client area - the window's caption is its own - so the still's top rows are
+        # the window's own too, its top corners cut as its bottom ones are. Before, they came with the caption rows;
+        # without this the motion's window had square top corners (the owner saw it on the README, 2026-11-16).
+        top = min(corner_rows(still, top=True), client_h)
+        if top:
+            out_alpha[:top * width] = alpha[:top * width]
     if corners:
         out_alpha[-corners * width:] = alpha[(height - corners) * width:]
     return width, caption + client_h, bytes(out_rgb), bytes(out_alpha)
