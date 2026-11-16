@@ -1610,7 +1610,9 @@ namespace CodexAutoResume
             // The taskbar button likewise, by the notification-area icon's rule (TrayActivity).
             if (snapshot == null) TellTaskbar(status, null, Now());
             ShowVersion(versionText, status);
-            if (startButton != null) startButton.Visible = Equals(running, false);
+            // v0.6.24-beta.2: Start watcher in the Right now card in Pause's place, while the watcher is off (ShowWatcherAction).
+            watcherOff = Equals(running, false);
+            ShowWatcherAction();
             FollowWatcher(running);
             ApplyPowerStatus(status);
             ApplyHomesStatus(status);

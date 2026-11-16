@@ -633,6 +633,8 @@ namespace CodexAutoResume
         // without the product's own icon.
         private TaskbarMark taskbar;
         private Button startButton;
+        // Whether the last status read said the watcher is not running (ApplyStatus): Start watcher then, not Pause.
+        private bool watcherOff;
         // v0.6.12: while Start watcher's own start is in flight (StartWatcher), apart from the actions SetBusy counts.
         private bool starting;
 
@@ -1276,21 +1278,15 @@ namespace CodexAutoResume
             if (client != ClientSize) UpdateBounds(Left, Top, Width, Height, client.Width, client.Height);
         }
 
-        /// The headline ends at least 8 px before the caption buttons (Brand.CaptionInsetEnd from the card's edge): with the
-        /// Start button shown its column keeps it clear, and hidden - its column then gone - the headline's own margin does.
-        /// v0.6.24-beta.2: the card is two lines tall (HeroHeight), too short for the Start button under the caption buttons,
-        /// so it stands before them, 8 px clear, centred on the two lines as the light is. The line under the headline
-        /// starts below the caption buttons (BuildHeader's fit).
+        /// The headline ends at least 8 px before the caption buttons (Brand.CaptionInsetEnd from the card's edge), by its own
+        /// margin. The line under the headline starts below the caption buttons (BuildHeader's fit). v0.6.24-beta.2 (the owner,
+        /// 2026-11-17, the design canvas's row 17, option C): the header holds no button - Start watcher is the Overview's
+        /// Right now card's, in place of Pause (PlaceStartButton).
         private void KeepHeadlineClear()
         {
             if (chrome == null) return;
             int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - Math.Max(hero.Padding.Left, hero.Padding.Right);
-            var before = new Padding(Px(16), 0, Math.Max(0, reach), 0);
-            if (startButton.Margin != before) startButton.Margin = before;
-            int column = Soft.OwnVisible(startButton)
-                ? Math.Max(startButton.Width, startButton.PreferredSize.Width) + startButton.Margin.Horizontal : 0;
-            int margin = Math.Max(0, reach - column);
-            var wanted = new Padding(0, 0, margin, 0);
+            var wanted = new Padding(0, 0, Math.Max(0, reach), 0);
             if (headline.Margin != wanted) headline.Margin = wanted;
         }
 
@@ -1556,25 +1552,17 @@ namespace CodexAutoResume
             detail.AutoEllipsis = true;   // narrow gracefully instead of wrapping
             detail.Margin = Pad(0, 2, 0, 0);
 
-            // Shown only while the watcher is stopped. Nothing is recovered then, so a
-            // window that reports the fact and offers no way out is a dead end - and the
-            // watcher is the part nobody should have to think about. It sits beside the
-            // sentence that explains why it is there rather than down among Save and
-            // Restore defaults, which are about settings and not about the watcher.
+            // Shown only while the watcher is stopped. Nothing is recovered then, so a window that reports the fact and offers
+            // no way out is a dead end - and the watcher is the part nobody should have to think about. v0.6.24-beta.2 (the
+            // owner, 2026-11-17, the design canvas's row 17, option C): no longer in the header, which shows the state only, but
+            // in the Overview's Right now card in place of Pause recovery - the two never stand together (PlaceStartButton).
             startButton = MakeButton(S("action.start", "Start watcher"), true, delegate { StartWatcher(); });
             startButton.Visible = false;
-            // At the card's right, before the caption buttons and centred on the two lines (KeepHeadlineClear, v0.6.24-beta.2;
-            // pinned to the card's bottom right from v0.6.4 until the card became two lines tall). Its column is its own, so
-            // neither line of the headline ever runs under it.
-            startButton.Anchor = AnchorStyles.Right;
-            startButton.Margin = Pad(16, 0, 0, 0);
 
             hero.Controls.Add(dot, 0, 0);
             hero.SetRowSpan(dot, 2);
             hero.Controls.Add(headline, 1, 0);
             hero.Controls.Add(detail, 1, 1);
-            hero.Controls.Add(startButton, 2, 0);
-            hero.SetRowSpan(startButton, 2);
             header.Controls.Add(hero);
             // v0.6.24: the window's caption buttons in the hero's top outer corner, over the card and its day's scene
             // (gui/SoftChrome.cs) - the window's own children, as the header (a SoftPage) moves what it holds of its own to
@@ -1586,13 +1574,11 @@ namespace CodexAutoResume
             chrome.Drag(headline);
             chrome.Drag(detail);
             chrome.Drag(stateDot);
-            startButton.VisibleChanged += delegate { KeepHeadlineClear(); };
-            startButton.SizeChanged += delegate { KeepHeadlineClear(); };
             hero.Layout += delegate { KeepHeadlineClear(); };
             KeepHeadlineClear();
             // Measured, not a formula of the font: two lines of the taller of the two, each row
             // half the card so the pair stays centred on the dot, and never less than the dot's
-            // glow or the Start button need. Again whenever the window's font changes.
+            // glow needs. Again whenever the window's font changes.
             EventHandler fit = delegate
             {
                 // In the window's own font: the header joins the window after this, and until it does the line under
@@ -1602,8 +1588,7 @@ namespace CodexAutoResume
                 int line = Math.Max(headline.PreferredSize.Height, detail.PreferredSize.Height + detail.Margin.Vertical);
                 // v0.6.24-beta.2: the line under the headline starts below the caption buttons, in the card's top corner.
                 line = Math.Max(line, Px(Brand.CaptionInsetTop + Brand.CaptionButtonH) - hero.Padding.Top);
-                int body = Math.Max(2 * line, Math.Max(2 * HaloDot.Extent + Px(2),
-                                                      startButton.PreferredSize.Height + startButton.Margin.Vertical));
+                int body = Math.Max(2 * line, 2 * HaloDot.Extent + Px(2));
                 // Never shorter than HeroHeight, whose two lines a face with shorter lines centres in it.
                 body = Math.Max(body, Px(HeroHeight) - hero.Padding.Vertical);
                 // What the card is taller than HeroHeight the window opens taller by (OpeningClient), so the pages keep theirs.
@@ -1631,7 +1616,6 @@ namespace CodexAutoResume
             hero.SizeChanged += place;
             headline.TextChanged += place;
             detail.TextChanged += place;
-            startButton.VisibleChanged += place;
             Resize += place;
             Shown += place;
         }
@@ -1662,7 +1646,6 @@ namespace CodexAutoResume
             if (dayLook == null) return;
             bool mirrored = Mirror.Of(hero);
             int width = hero.Width, hair = Soft.Hairline, outer = width - hair;
-            if (Soft.OwnVisible(startButton)) outer = (mirrored ? width - startButton.Left : startButton.Left) - Px(8);
             int end = Math.Max(WordsEnd(headline, mirrored, width), WordsEnd(detail, mirrored, width)), left, fade;
             double unit;
             bool fits = DayArt.Fit(dayLook, end, 0, width, outer, hair, hero.Height - hair, out left, out unit, out fade);

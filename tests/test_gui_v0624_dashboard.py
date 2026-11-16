@@ -228,6 +228,29 @@ namespace CodexAutoResume
                     var pages = new Dictionary<string, object>();
                     foreach (string page in PageOrder) pages[page] = form.ProportionsPage(page);
                     answer["pages"] = pages;
+                    // v0.6.24-beta.2 (the owner, 2026-11-17, row 17, option C): with the watcher off, Start watcher in the Right
+                    // now card in Pause's place and nothing in the header; once it runs, Pause and no Start watcher.
+                    form.ShowPage("overview");
+                    var actions = new Dictionary<string, object>();
+                    foreach (bool off in new[] { true, false })
+                    {
+                        form.watcherOff = off;
+                        form.ShowWatcherAction();
+                        Materialise(form);
+                        form.PerformLayout();
+                        var at = new Dictionary<string, object>();
+                        at["start"] = Soft.OwnVisible(form.startButton);
+                        at["pause"] = Soft.OwnVisible(form.toggleButton);
+                        at["sameCard"] = form.startButton.Parent != null && form.startButton.Parent == form.toggleButton.Parent;
+                        bool inHeader = false;
+                        for (Control c = form.startButton.Parent; c != null; c = c.Parent) if (c == form.header) inHeader = true;
+                        at["inHeader"] = inHeader;
+                        at["warning"] = form.nowWatcher.ForeColor.ToArgb() == Palette.Warning.ToArgb();
+                        if (off) at["startBox"] = ProportionsBox(ProportionsIn(form.startButton, form));
+                        else at["pauseBox"] = ProportionsBox(ProportionsIn(form.toggleButton, form));
+                        actions[off ? "off" : "on"] = at;
+                    }
+                    answer["watcherActions"] = actions;
                     answer["closeField"] = typeof(SettingsForm).GetField("closeButton", BindingFlags.Instance | BindingFlags.NonPublic) != null;
                     // The pill, with an advanced edition's word and with the standard edition's none.
                     form.ShowVersion(form.versionText, new Dictionary<string, object> { { "version", "0.6.24-beta.2" }, { "edition", "advanced" } });
@@ -506,6 +529,29 @@ class DashboardProportionsTests(unittest.TestCase):
                     self.assertLessEqual(abs(above - 10), 1, "above: %s" % above)
                     self.assertLessEqual(abs(below - 10), 1, "below: %s" % below)
                     self.assertLessEqual(abs(above - below), 1)
+
+    def test_with_the_watcher_off_start_watcher_stands_in_pause_s_place(self):
+        """The owner, 2026-11-17 (the design canvas's row 17, option C): with the watcher off the header shows the state
+        only, and the Right now card's button is Start watcher in place of Pause recovery - the two never stand together."""
+        for locale in LOCALES:
+            actions = self.answer[locale]["watcherActions"]
+            off, on = actions["off"], actions["on"]
+            with self.subTest(locale=locale):
+                self.assertTrue(off["start"])
+                self.assertFalse(off["pause"], "no Pause while the watcher is off")
+                self.assertTrue(off["sameCard"])
+                self.assertFalse(off["inHeader"])
+                self.assertTrue(off["warning"], "the watcher row in the warning colour")
+                self.assertFalse(on["start"])
+                self.assertTrue(on["pause"])
+                self.assertFalse(on["warning"])
+                sx, sy, sw, sh = off["startBox"]
+                px, py, pw, ph = on["pauseBox"]
+                self.assertEqual(sy + sh, py + ph, "in Pause's corner: the same foot")
+                if locale == "ar":
+                    self.assertEqual(sx + sw, px + pw, "mirrored: the same right edge")
+                else:
+                    self.assertEqual(sx, px, "the same left edge")
 
     def test_the_sixth_press_in_a_row_plays_a_special_egg(self):
         """The owner, 2026-11-16: "여러번 누를때의 이스터에그도 별도로 만들자" - a separate egg for many presses - "3개 중

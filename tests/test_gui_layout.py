@@ -857,10 +857,14 @@ class WindowCompositionTests(unittest.TestCase):
         tall (76 px at 100 %) with the caption buttons in its top corner: there is no bottom right under them for it, so it
         stands before them, centred on the two lines as the light is (KeepHeadlineClear; LayoutAudit's AuditCaption holds
         it clear of them)."""
+        # v0.6.24-beta.2 (the owner, 2026-11-17, the design canvas's row 17, option C): Start watcher is no longer the
+        # header's but the Right now card's, in Pause's cell and corner (PlaceStartButton) - led as Pause is.
         header = self.method(self.window, "private void BuildHeader(")
-        self.assertIn("startButton.Anchor = AnchorStyles.Right;", header)
-        self.assertNotIn("Pinned(startButton, hero);", header)
-        self.assertIn("startButton.Margin = before;", self.method(self.window, "private void KeepHeadlineClear("))
+        self.assertNotIn("hero.Controls.Add(startButton", header)
+        self.assertNotIn("startButton", self.method(self.window, "private void KeepHeadlineClear("))
+        place = guiscan.member_body("SettingsForm", "PlaceStartButton")
+        self.assertIn("startButton.Anchor = toggleButton.Anchor;", place)
+        self.assertIn("led[startButton] = card;", place)
         footer = self.method(self.window, "private Control TextFooter(")
         self.assertIn("clear.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;", footer)
         self.assertIn("Pinned(clear, row);", footer)
@@ -1624,14 +1628,14 @@ class LayoutAuditTests(unittest.TestCase):
     def test_every_button_is_in_its_corner_and_over_no_text(self):
         """The Overview's three card buttons at their cards' bottom LEFT, clear of the text above them (AuditLead), and
         the Custom messages' two Clear buttons at their row's bottom right (AuditPin), in every language at every scaling
-        (their findings are in the first test's reports). This holds the audit to having looked at all five. v0.6.24-beta.2:
-        six until then, with the header's Start button, which stands before the caption buttons in a header card two lines
-        tall (AuditCaption holds it clear of them)."""
+        (their findings are in the first test's reports). This holds the audit to having looked at all six: v0.6.24-beta.2
+        (the owner, 2026-11-17, row 17, option C) Start watcher is the Right now card's, at its bottom left in Pause's
+        place, and audited there with the watcher off; it had been the header's, before the caption buttons, and five."""
         self.assertEqual(sorted(self.answer["pins"]), sorted(l10n.LOCALES))
         for locale in l10n.LOCALES:
             for scale in SCALES:
                 with self.subTest(locale=locale, scale=scale):
-                    self.assertEqual(self.answer["pins"][locale]["%.2f" % scale], 5)
+                    self.assertEqual(self.answer["pins"][locale]["%.2f" % scale], 6)
 
     def test_the_audit_finds_a_button_out_of_its_corner_or_over_text(self):
         canary = self.answer["pinCanary"]

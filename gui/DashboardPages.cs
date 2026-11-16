@@ -52,6 +52,7 @@ namespace CodexAutoResume
             nowFacts = facts;
             toggleButton = MakeButton(S("action.pause", "Pause recovery"), false, delegate { TogglePause(); });
             Lead(now, toggleButton);
+            PlaceStartButton(now);
 
             TableLayoutPanel waiting = MakeCard(S("overview.waiting", "Waiting"));
             waiting.Margin = RowGap(1, 0);
@@ -152,6 +153,29 @@ namespace CodexAutoResume
         /// v0.6.4 pinned the button to the bottom RIGHT, beside the last lines where they left room (SoftPin); the
         /// person found the first screen better with v0.6.2's buttons at the left, where the eye comes down the card
         /// and finds them - and a button under the content never makes a name wrap for its sake.
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, the design canvas's row 17, option C): Start watcher in the Right now card,
+        /// in Pause recovery's place - its cell, its corner, its gap - shown while the watcher is off and Pause is not: the
+        /// two never stand together (ShowWatcherAction). A table lays out only what is shown, so the one cell holds either.
+        private void PlaceStartButton(TableLayoutPanel card)
+        {
+            int row = card.Controls.Count - 1;
+            card.SetCellPosition(toggleButton, new TableLayoutPanelCellPosition(0, row));
+            startButton.Anchor = toggleButton.Anchor;
+            startButton.Margin = toggleButton.Margin;
+            card.Controls.Add(startButton, 0, row);
+            led[startButton] = card;
+            ShowWatcherAction();
+        }
+
+        /// While the watcher is off, Start watcher and no Pause; once it runs, Pause and no Start watcher - and the Right now
+        /// card's watcher row in the warning colour while it is off.
+        private void ShowWatcherAction()
+        {
+            if (startButton != null && Soft.OwnVisible(startButton) != watcherOff) startButton.Visible = watcherOff;
+            if (toggleButton != null && Soft.OwnVisible(toggleButton) == watcherOff) toggleButton.Visible = !watcherOff;
+            if (nowWatcher != null) nowWatcher.ForeColor = watcherOff ? Palette.Warning : Ink;
+        }
+
         private void Lead(TableLayoutPanel card, Button button)
         {
             Control heading = card.Controls[0];

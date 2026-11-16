@@ -215,15 +215,19 @@ namespace CodexAutoResume
                     }
                     // v0.6.11: the dialog of a value of the person's own, of each kind the schema offers (SettingsOwn.cs).
                     form.AuditOwnValues(schema, findings);
-                    // The Start button shows only while the watcher is stopped: shown for this, and hidden again.
-                    form.startButton.Visible = true;
+                    // Start watcher shows only while the watcher is stopped, in the Right now card in Pause's place
+                    // (v0.6.24-beta.2, PlaceStartButton): shown for this, and the watcher's state put back.
+                    bool wasOff = form.watcherOff;
+                    form.ShowPage("overview");
+                    form.watcherOff = true;
+                    form.ShowWatcherAction();
                     Materialise(form);
                     form.PerformLayout();
-                    form.AuditPins("header", findings);
-                    AuditSpoken("header with Start", form, findings);
-                    form.AuditHero("header with Start", findings);
-                    form.AuditCaption("header with Start", findings);
-                    form.startButton.Visible = false;
+                    form.AuditPins("overview with Start", findings);
+                    AuditSpoken("overview with Start", form, findings);
+                    form.AuditWatcherAction(findings);
+                    form.watcherOff = wasOff;
+                    form.ShowWatcherAction();
                     form.PerformLayout();
                     form.AuditHero("header", findings);
                     form.AuditCaption("header", findings);
@@ -922,6 +926,18 @@ namespace CodexAutoResume
             return at;
         }
 
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, row 17, option C): with the watcher off, Start watcher in the Right now
+        /// card where Pause stands - and Pause not shown - and nothing in the header but the state.
+        private void AuditWatcherAction(List<string> findings)
+        {
+            if (startButton.Parent == null || startButton.Parent != toggleButton.Parent)
+                findings.Add("overview with Start :: Start watcher is not in the Right now card");
+            if (!Showing(startButton)) findings.Add("overview with Start :: Start watcher is not shown");
+            if (Showing(toggleButton)) findings.Add("overview with Start :: Pause stands beside Start watcher");
+            for (Control c = startButton.Parent; c != null; c = c.Parent)
+                if (c == header) findings.Add("overview with Start :: Start watcher is in the header");
+        }
+
         internal static int AuditedCaption, AuditedTitleRows;
         /// Each header the caption was audited in: `where:x,y,width,height;clear;inset` - the buttons' group in the header,
         /// how far the headline ends before it, and how far the group stands in from the hero's outer edge (for the tests).
@@ -971,8 +987,6 @@ namespace CodexAutoResume
             Rectangle words = chrome.InHolder(headline);
             int clear = mirrored ? words.Left - group.Right : group.Left - words.Right;
             if (clear < Px(8)) findings.Add(where + " :: the headline ends " + clear + " px from the caption buttons");
-            if (Soft.OwnVisible(startButton) && chrome.InHolder(startButton).IntersectsWith(group))
-                findings.Add(where + " :: the Start button lies under the caption buttons");
             // v0.6.24-beta.2: in a card two lines tall, the line under the headline starts below the caption buttons.
             if (chrome.InHolder(detail).IntersectsWith(group))
                 findings.Add(where + " :: the line under the headline lies under the caption buttons");
