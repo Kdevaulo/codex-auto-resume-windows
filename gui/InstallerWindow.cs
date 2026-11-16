@@ -30,6 +30,15 @@ namespace CodexAutoResume
         internal delegate InstallerWords Speaker(string language);
 
         internal const int OpeningWidth = 600;
+        /// v0.6.24: the window's opening height at text size 1; Fit keeps what the pages need where that is more.
+        internal const int OpeningHeight = 600;
+        /// The work area's height the window is held to, for the layout audit and its tests; 0 where the primary screen's is read.
+        internal static int WorkHeightStandIn;
+
+        private static int WorkHeight()
+        {
+            return WorkHeightStandIn > 0 ? WorkHeightStandIn : Screen.PrimaryScreen.WorkingArea.Height;
+        }
 
         private readonly InstallerFlow flow;
         private readonly Runner runner;
@@ -239,14 +248,25 @@ namespace CodexAutoResume
                 tallest = Math.Max(tallest, Arrange(inner));
             }
             page = showing;
-            ClientSize = new Size(width, Px(16) + HeaderHeight() + Px(16) + tallest + Px(32) + Px(16) +
-                                         Px(Brand.ButtonHeight) + Px(16));
+            // v0.6.24: 600 x 600 at text size 1 (the owner's choice of 2026-11-16): the pages need less than that, and the
+            // content card takes the rest (OnLayout fills it down to the buttons, its page's rows kept at its top). A page
+            // that needs more - a larger text size - keeps the height it needs, never cut.
+            int needed = Px(16) + HeaderHeight() + Px(16) + tallest + Px(32) + Px(16) + Px(Brand.ButtonHeight) + Px(16);
+            ClientSize = new Size(width, HeightFor(needed, WorkHeight()));
             if (StartPosition == FormStartPosition.Manual)
             {
                 Rectangle primary = Screen.PrimaryScreen.WorkingArea;
                 Location = new Point(primary.Left + (primary.Width - Width) / 2, primary.Top + (primary.Height - Height) / 2);
             }
             if (showing != null) ShowPage(showing);
+        }
+
+        /// The window's height: its 600 logical px, but never more than the work area it opens on holds (the 600 is for looks)
+        /// - and always what the pages need, which is never cut. Pure.
+        internal static int HeightFor(int needed, int workHeight)
+        {
+            int floor = workHeight > 0 ? Math.Min(Px(OpeningHeight), workHeight) : Px(OpeningHeight);
+            return Math.Max(floor, needed);
         }
 
         private static int Inner(int width) { return width - Px(16) * 2 - Px(16) * 2; }
