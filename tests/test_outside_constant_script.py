@@ -154,7 +154,10 @@ class ConstantOutsideScriptTests(unittest.TestCase):
             line, file = answer["line"], answer["file"]
             self.assertTrue(line.endswith(' -File "%s"' % file), line)
             self.assertEqual(Path(file).name, "outside.ps1")
-            self.assertEqual(Path(file).parent.parent, self.temp_folder, "the run's own folder in TEMP")
+            # By the folder itself, not its spelling: a CI runner's TEMP is an 8.3 short path (RUNNER~1) that the
+            # installer's own folder names in its long form.
+            self.assertTrue(os.path.samefile(Path(file).parent.parent, self.temp_folder),
+                            "the run's own folder in TEMP: %s, not under %s" % (file, self.temp_folder))
             self.assertTrue(Path(file).parent.name.startswith("CodexAutoResume-Outside-"), file)
             self.assertFalse(answer["left"], "the file goes with the run's folder")
             self.assertEqual(answer["source"], source, "the file holds the constant, unformatted")
