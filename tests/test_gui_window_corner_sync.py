@@ -3,8 +3,10 @@ r"""v0.6.24 (stage 1, surface E): the window's own outer corner on a live window
 A window of the window's own code - its caption (ChromeHost) installed as the Dashboard's is - shown 30000 px off the
 desktop, never activated, nothing captured:
 
-* the switch off, as it is in this commit: ChromeHost.OwnCorner makes nothing - no region, no companion, no window owned
-  by it at all, Windows' round corner, its frame as W1 left it (ClientSize inside the left, right and bottom frames);
+* the switch as it is (on from v0.6.24-beta, the owner's word): where WindowShape.Wanted() holds (Windows 11, composition,
+  no remote session, no High Contrast - a CI runner and this PC alike) ChromeHost.OwnCorner makes the corner - a region, its
+  companion owned by the window, the window its own client area; where it does not, it makes nothing - no region, no
+  companion, Windows' round corner, its frame as W1 left it (ClientSize inside the left, right and bottom frames);
 * the corner on (the same WindowCorner the switch would make, put on that caption by hand): after each of a sequence of
   moves and resizes, in the same message turn - nothing pumped between SetWindowPos and the reads - the companion's rect
   is the window's rect grown by the shadow's reach on every side, the window's region is the one WindowShape works out
@@ -192,14 +194,15 @@ namespace CodexAutoResume
                 Palette.AdoptDesign("soft");
                 Palette.Adopt("light");
 
-                // The switch as it is: OwnCorner makes nothing.
+                // The switch as it is: OwnCorner makes the corner exactly where WindowShape.Wanted() holds.
                 ChromeHost plain;
                 CornerProbeForm off = Make(out plain);
                 plain.OwnCorner();
                 off.Show();
                 Move(off.Handle, Away, Away, 700, 500);
                 Rectangle offRect = Rect(off.Handle);
-                parts.Add("\"off\":{\"corner\":" + Q(plain.OuterCorner.ToString()) + ",\"has\":" + (plain.Corner != null ? "true" : "false") +
+                parts.Add("\"off\":{\"wanted\":" + (WindowShape.Wanted() ? "true" : "false") +
+                          ",\"corner\":" + Q(plain.OuterCorner.ToString()) + ",\"has\":" + (plain.Corner != null ? "true" : "false") +
                           ",\"region\":" + (Region(off.Handle) == null ? "false" : "true") + ",\"owned\":" + Owned(off.Handle) +
                           ",\"frameless\":" + (plain.Frameless ? "true" : "false") +
                           ",\"window\":[" + offRect.Width + "," + offRect.Height + "],\"client\":[" + off.ClientSize.Width + "," + off.ClientSize.Height + "]}");
@@ -293,16 +296,26 @@ class CornerSyncTests(unittest.TestCase):
     def steps(self):
         return {step["step"]: step for step in self.answer["steps"]}
 
-    def test_with_the_switch_off_the_window_is_as_it_was(self):
-        off = self.answer["off"]
-        self.assertFalse(off["has"], "OwnCorner made a corner with the switch off")
-        self.assertEqual(off["corner"], "Round")
-        self.assertFalse(off["region"])
-        self.assertEqual(off["owned"], 0, "a window owned by it: a companion")
-        self.assertFalse(off["frameless"])
-        # The frame W1 left: Windows' left, right and bottom frames round the client area, none at the top.
-        self.assertLess(off["client"][0], off["window"][0])
-        self.assertLess(off["client"][1], off["window"][1])
+    def test_the_switch_as_it_is_makes_the_corner_exactly_where_it_is_wanted(self):
+        # The switch is on from v0.6.24-beta (brand.WINDOW_SQUIRCLE, the owner's word): OwnCorner makes the corner where
+        # WindowShape.Wanted() holds, and where it does not (Windows 10, no composition, a remote session, High
+        # Contrast) the window is as it was. tests/test_gui_window_corner.py holds the decision table itself.
+        made = self.answer["off"]
+        self.assertEqual(made["has"], made["wanted"], "OwnCorner did not follow WindowShape.Wanted()")
+        if made["wanted"]:
+            self.assertEqual(made["corner"], "Squircle")
+            self.assertTrue(made["region"])
+            self.assertEqual(made["owned"], 1, "its companion, owned by the window")
+            self.assertTrue(made["frameless"])
+            self.assertEqual(made["client"], made["window"], "the window is not its own client area")
+        else:
+            self.assertEqual(made["corner"], "Round")
+            self.assertFalse(made["region"])
+            self.assertEqual(made["owned"], 0, "a window owned by it: a companion")
+            self.assertFalse(made["frameless"])
+            # The frame W1 left: Windows' left, right and bottom frames round the client area, none at the top.
+            self.assertLess(made["client"][0], made["window"][0])
+            self.assertLess(made["client"][1], made["window"][1])
 
     def test_the_companion_follows_in_the_same_turn(self):
         moved = [step for step in self.answer["steps"] if step["step"] == "shown" or step["step"].startswith("move ")]

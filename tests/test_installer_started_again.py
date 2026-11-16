@@ -33,7 +33,8 @@ import tempfile
 import unittest
 
 from test_installer import block
-from test_installer_left_stopped import INSTALL, LastWordTests, left_stopped_line
+import test_installer_left_stopped as left_stopped  # the module, not its TestCase: a TestCase named here is
+from test_installer_left_stopped import INSTALL, left_stopped_line  # discovered again under this module's name
 from test_installer_window import CSC, PAIRS, POWERSHELL, _build, _powershell
 
 from codex_auto_resume import l10n
@@ -62,8 +63,8 @@ class LastWords:
     """install.ps1's last word as it prints, for a watcher in each state. A plain class borrowing LastWordTests' script
     runner: none of its tests run again here."""
 
-    run_script = LastWordTests.run_script
-    WORD = LastWordTests.WORD
+    run_script = left_stopped.LastWordTests.run_script
+    WORD = left_stopped.LastWordTests.WORD
 
     def last_word(self, *, again=False, left=False, repair=False):
         text = INSTALL.read_text(encoding="utf-8")

@@ -124,7 +124,12 @@ class SwitchTests(unittest.TestCase):
         whole = guiscan.whole()
         self.assertNotRegex(whole, r"powerSwitch\.(?:CheckedChanged|CheckStateChanged)\b",
                             "a handler on its state would act when a status sets it")
-        self.assertEqual(len(re.findall(r"\bPowerSwitched\(\)", whole)), 2, "the click, and the declaration")
+        # The click, the click held while the card was being read and taken at its answer (TakeHeldPowerClick, v0.6.24:
+        # a click is never dropped silently), and the declaration - still only ever a click acts.
+        self.assertEqual(len(re.findall(r"\bPowerSwitched\(\)", whole)), 3, "the click, the held click, and the declaration")
+        held = body("TakeHeldPowerClick")
+        self.assertIn("if (!powerClickHeld) return;", held)
+        self.assertIn("powerClickHeld = false;", held)
 
     def test_every_time_it_is_drawn_it_is_on_exactly_while_something_is_armed(self):
         show = body("ShowPower")

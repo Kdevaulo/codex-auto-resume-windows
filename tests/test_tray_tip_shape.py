@@ -49,7 +49,7 @@ class TipShapeTests(unittest.TestCase):
         self.assertEqual(users, [PACKAGE + ".icon"])
         code = ("import sys; import codex_auto_resume.ui.tray as t; "
                 "print(sorted(m for m in sys.modules if m.endswith(('.tipcard', '.tipplan'))))")
-        loaded = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60,
+        loaded = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8", timeout=60,
                                 env={"PYTHONPATH": _SRC, "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")},
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.assertEqual(loaded.returncode, 0, loaded.stderr)

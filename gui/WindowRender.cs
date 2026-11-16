@@ -1055,7 +1055,9 @@ namespace CodexAutoResume
         internal static Bitmap CornerStill(Bitmap square, int dpi)
         {
             int width = square.Width, height = square.Height;
-            var edge = new WindowShape.Edge(width, height, Palette.RadiusCard, Shape.Smoothing, (dpi > 0 ? dpi : 96) / 96.0);
+            // The class by its full name: inside SettingsForm a member named Shape (a test probe's helper) would hide it.
+            var edge = new WindowShape.Edge(width, height, Palette.RadiusCard, global::CodexAutoResume.Shape.Smoothing,
+                                            (dpi > 0 ? dpi : 96) / 96.0);
             int[] pixels = Argb(square);
             WindowShape.CutStill(pixels, edge, Palette.Line);
             var cut = new Bitmap(width, height, PixelFormat.Format32bppArgb);

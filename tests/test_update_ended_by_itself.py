@@ -32,7 +32,8 @@ from unittest.mock import patch
 
 import test_plugin
 from test_installer import block
-from test_installer_left_stopped import INSTALL, LastWordTests, left_stopped_line
+import test_installer_left_stopped as left_stopped  # the module, not its TestCase: a TestCase named here is
+from test_installer_left_stopped import INSTALL, left_stopped_line  # discovered again under this module's name
 from test_installer_window import POWERSHELL
 
 from codex_auto_resume import config, l10n
@@ -182,9 +183,9 @@ class SetupStartsAgainTests(unittest.TestCase):
 
 @unittest.skipUnless(POWERSHELL.is_file(), "Windows PowerShell")
 class InstallerWordTests(unittest.TestCase):
-    run_script = LastWordTests.run_script
-    CALL = LastWordTests.CALL
-    WORD = LastWordTests.WORD
+    run_script = left_stopped.LastWordTests.run_script
+    CALL = left_stopped.LastWordTests.CALL
+    WORD = left_stopped.LastWordTests.WORD
 
     def call(self, setup_code):
         text = INSTALL.read_text(encoding="utf-8")
