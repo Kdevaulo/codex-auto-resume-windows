@@ -209,8 +209,8 @@ def sections():
     scale.append(("CornerSmoothing", "double", float(shape.DESIGN_SMOOTHING[brand.DEFAULT_DESIGN])))
     # v0.6.24: the caption buttons' glyph stroke (brand.CAPTION_STROKE; the buttons' sizes are LAYOUT's caption_*).
     scale.append(("CaptionStroke", "double", float(brand.CAPTION_STROKE)))
-    # v0.6.24: whether the Dashboard cuts its own outer corner (brand.WINDOW_SQUIRCLE; gui/SoftWindowShape.cs) - off until
-    # the measurement M-CORNER passes.
+    # v0.6.24: whether the Dashboard cuts its own outer corner (brand.WINDOW_SQUIRCLE; gui/SoftWindowShape.cs) - on from
+    # v0.6.24-beta at the owner's word; the measurement M-CORNER still runs before the final.
     scale.append(("WindowSquircle", "bool", bool(brand.WINDOW_SQUIRCLE)))
 
     layout = []

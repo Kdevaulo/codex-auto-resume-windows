@@ -29,8 +29,9 @@ always had them, and leaves the previous version's `.old-` file where an update 
 - **Soft corners are squircles.** In the Soft design every rounded thing - cards, buttons, menus, the popup and the
   notification card - is drawn with one smoothed corner (Figma's 60 % smoothing, capped where a side is short; pills stay
   pills), and its shadows follow it. Classic and Plain keep their round arcs, as before. The Dashboard window's own outer
-  corner can be drawn the same way, but stays Windows' round corner in this pre-release until it has been checked on real
-  screens.
+  corner is now drawn the same way - its design's card corner, with the hairline and the shadow round it - in place of
+  Windows' round corner. Windows' corner comes back while the window is maximised or snapped, in High Contrast, in a
+  remote session and without desktop composition; Windows 10 keeps its square corner.
 - **The tray icon's popup is its card alone.** No grey ground lies round it any more, and a float shadow lies under it that only ever
   darkens. It opens a little faster than the plain window did, and a frame of its status light costs well under a millisecond. Where
   Windows refuses a window of this kind, the popup is the plain window it was, with its own drop shadow.

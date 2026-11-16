@@ -12,8 +12,8 @@ the corner sampled 16 x 16 per pixel, the same hairline, the same shadow (plans/
 * the region GDI makes from the rectangles is exactly the window's own pixels;
 * the fast composition (corner blocks, straight edges repeated) is the per-pixel one, pixel for pixel.
 
-And the switch (5.4): Brand.WindowSquircle is brand.WINDOW_SQUIRCLE, off in this commit, so no window wants a corner of
-its own and every hook into the window's caption is behind one; the decision table of 5.2 item 6; and the cost of making
+And the switch (5.4): Brand.WindowSquircle is brand.WINDOW_SQUIRCLE, on from v0.6.24-beta (the owner, 2026-11-16), and
+every hook into the window's caption is behind the corner it makes; the decision table of 5.2 item 6; and the cost of making
 the companion's picture at 1500 x 1000 device px at 150 %, printed (the budget is 4 ms on the owner's PC).
 
 The live half - the companion following the window in the very message that moves it - is
@@ -396,9 +396,9 @@ class StillTests(unittest.TestCase):
             import make_screenshots as shots
         finally:
             sys.path.remove(str(ROOT / "build"))
-        self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI})
-        with mock.patch.object(brand, "WINDOW_SQUIRCLE", True):
-            self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI, "corner": "squircle"})
+        self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI, "corner": "squircle"})
+        with mock.patch.object(brand, "WINDOW_SQUIRCLE", False):
+            self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI})
 
     def test_the_render_and_the_capture_cut_by_the_same_decision(self):
         frames = guiscan.member_body("SettingsForm", "RenderFrames")
@@ -444,13 +444,16 @@ class StillTests(unittest.TestCase):
 
 @unittest.skipUnless(CSC.is_file(), "needs the in-box C# compiler")
 class SwitchTests(unittest.TestCase):
-    """5.4: the switch, off in this commit, and the decision of 5.2 item 6."""
+    """5.4: the switch, on from v0.6.24-beta (the owner, 2026-11-16), and the decision of 5.2 item 6."""
 
-    def test_the_switch_is_brand_s_and_off(self):
-        self.assertIs(brand.WINDOW_SQUIRCLE, False, "M-CORNER has not passed: the window keeps Windows' round corner")
-        self.assertIn("internal const bool WindowSquircle = false;", guiscan.read("gui/Brand.cs"))
+    def test_the_switch_is_brand_s_and_on(self):
+        self.assertIs(brand.WINDOW_SQUIRCLE, True, "the owner turned the window's own corner on for v0.6.24-beta")
+        self.assertIn("internal const bool WindowSquircle = true;", guiscan.read("gui/Brand.cs"))
         answer = ask(["switch"])[0]
-        self.assertEqual(answer, {"brand": False, "switch": False, "wanted": False})
+        # `wanted` is the switch and this machine (Windows 11, composition, no remote session, no High Contrast): the
+        # decision table below holds it; here only that the switch reaches the window's code.
+        self.assertEqual((answer["brand"], answer["switch"]), (True, True))
+        self.assertIsInstance(answer["wanted"], bool)
 
     def test_windows_round_corner_unless_every_condition_holds(self):
         rows = ask(["decide"])[0]

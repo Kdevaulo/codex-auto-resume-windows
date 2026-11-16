@@ -21,7 +21,8 @@
 //
 // Windows' round corner is kept - the region removed, the companion hidden, DWMWCP_ROUND - while the window is maximised
 // or arranged (snapped), in High Contrast, in a remote session, without desktop composition, on Windows 10 (square), and
-// whenever the switch is off: Brand.WindowSquircle, false until the measurement M-CORNER passes on a real screen. With it
+// whenever the switch is off: Brand.WindowSquircle, on from v0.6.24-beta at the owner's word (M-CORNER still runs on real
+// screens before the final). With it
 // off, nothing here is made at all (ChromeHost.OwnCorner) and the window is exactly what it was.
 
 using System;

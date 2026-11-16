@@ -1364,7 +1364,7 @@ namespace CodexAutoResume
             // (gui/SoftChrome.cs) - the window's own children, as the header (a SoftPage) moves what it holds of its own to
             // its right when mirrored; the ground, the card, its words and its light drag the window.
             chrome = ChromeHost.Install(this, hero, this);
-            // v0.6.24 W5: and the window's own outer corner, where Brand.WindowSquircle turns it on (off until M-CORNER).
+            // v0.6.24 W5: and the window's own outer corner, where Brand.WindowSquircle turns it on (on from v0.6.24-beta).
             chrome.OwnCorner();
             chrome.Drag(header);
             chrome.Drag(headline);

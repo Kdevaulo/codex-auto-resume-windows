@@ -15,9 +15,10 @@ RADII = {"card": 16, "control": 11, "chip": 999, "small": 7, "check": 5}
 # corner of radius R begins (1 + this) * R from its vertex instead of R; the radii above are unchanged.
 CORNER_SMOOTHING = 0.6
 # v0.6.24 (stage 1, surface E): whether the Dashboard window cuts its own outer corner - the card's radius, smoothed as
-# the cards are - instead of Windows' round one (gui/SoftWindowShape.cs). Off until the live measurement M-CORNER passes
-# (plans/v0624-stage1-design.md 5.4); one commit turns it on. Off, the window is exactly as without it.
-WINDOW_SQUIRCLE = False
+# the cards are - instead of Windows' round one (gui/SoftWindowShape.cs). On from v0.6.24-beta at the owner's word
+# (2026-11-16), before the live measurement M-CORNER (plans/v0624-stage1-design.md 5.4), which still runs before the
+# final. Off, the window is exactly as without it.
+WINDOW_SQUIRCLE = True
 SPACING = {"xs": 4, "s": 8, "m": 12, "l": 16, "xl": 24, "xxl": 32}
 # The notification-area popup's type sizes. The panel sets its own (TYPE_SCALE, below) and
 # the settings window keeps the system message font, so this table is the popup's alone.
