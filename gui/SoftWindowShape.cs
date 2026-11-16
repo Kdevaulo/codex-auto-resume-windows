@@ -639,7 +639,7 @@ namespace CodexAutoResume
         [DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
         private static extern IntPtr GetProcAddress(IntPtr module, string name);
 
-        internal const int WM_WINDOWPOSCHANGED = 0x0047;
+        internal const int WM_WINDOWPOSCHANGED = 0x0047, WM_WINDOWPOSCHANGING = 0x0046;
         private const int SW_HIDE = 0, SW_SHOWNOACTIVATE = 4;
         private const int ULW_ALPHA = 2;
         private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010,
@@ -767,6 +767,9 @@ namespace CodexAutoResume
                 return true;
             }
             if (m.Msg == WM_WINDOWPOSCHANGED) Sync();
+            // On its way to maximised or minimised (Windows sets that state before it moves the window): the companion goes
+            // now, not once the window has got there.
+            if (m.Msg == WM_WINDOWPOSCHANGING && layer != null && !MayShow()) ShowWindow(layer.Handle, SW_HIDE);
             if (!Shaped) return false;
             switch (m.Msg)
             {
@@ -780,6 +783,18 @@ namespace CodexAutoResume
                     return false;
             }
             return false;
+        }
+
+        /// Whether the companion may be on the screen now: the window shown, neither minimised nor maximised, its corner its
+        /// own and the companion's picture made. Every way the companion could come on the screen asks this first
+        /// (CornerLayer) - Windows' own too: it shows an owned window again as its owner comes back from minimised
+        /// (WM_SHOWWINDOW, SW_PARENTOPENING), maximised or not, and after a Win+D return that left the shadow over the
+        /// middle of the maximised window (M-CORNER re-check 4).
+        internal bool MayShow()
+        {
+            if (!form.IsHandleCreated || failed || now != WindowShape.Corner.Squircle || bitmap == IntPtr.Zero) return false;
+            IntPtr handle = form.Handle;
+            return IsWindowVisible(handle) && !IsIconic(handle) && !IsZoomed(handle);
         }
 
         /// The region and the companion as the window is now - in the message that moved it, so the companion is never a
@@ -836,8 +851,7 @@ namespace CodexAutoResume
                     Reshape(size, dpi, at);
                 else if (layer != null)
                     MoveLayeredWindow(layer.Handle, IntPtr.Zero, ref at, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero, 0);
-                bool visible = IsWindowVisible(handle) && !IsIconic(handle);
-                if (layer != null) ShowWindow(layer.Handle, visible && bitmap != IntPtr.Zero ? SW_SHOWNOACTIVATE : SW_HIDE);
+                if (layer != null) ShowWindow(layer.Handle, MayShow() ? SW_SHOWNOACTIVATE : SW_HIDE);
             }
             catch (Exception)
             {
@@ -893,7 +907,7 @@ namespace CodexAutoResume
                 DeleteObject(region);
                 throw new InvalidOperationException("the region was not taken");
             }
-            if (layer == null) layer = new CornerLayer(form.Handle);
+            if (layer == null) layer = new CornerLayer(form.Handle, this);
             Size whole = WindowShape.CompanionSize(edge);
             FreeBitmap();
             var info = new BITMAPINFOHEADER();
@@ -979,8 +993,17 @@ namespace CodexAutoResume
                               WS_EX_NOACTIVATE = 0x08000000;
             private const int WM_NCHITTEST = 0x0084, WM_MOUSEACTIVATE = 0x0021, MA_NOACTIVATE = 3;
 
-            internal CornerLayer(IntPtr owner)
+            private const int WM_SHOWWINDOW = 0x0018, WM_WINDOWPOSCHANGING = 0x0046;
+            private const uint SWP_SHOWWINDOW = 0x0040;
+            private static readonly int FlagsAt = Marshal.OffsetOf(typeof(WINDOWPOS), "Flags").ToInt32();
+            private readonly WindowCorner corner;
+
+            [StructLayout(LayoutKind.Sequential)]
+            private struct WINDOWPOS { public IntPtr Window, After; public int X, Y, Width, Height; public uint Flags; }
+
+            internal CornerLayer(IntPtr owner, WindowCorner corner)
             {
+                this.corner = corner;
                 var made = new CreateParams();
                 made.Caption = "";
                 made.Style = WS_POPUP;
@@ -1000,6 +1023,18 @@ namespace CodexAutoResume
                 {
                     m.Result = (IntPtr)MA_NOACTIVATE;
                     return;
+                }
+                // Never shown while the window may not show it (WindowCorner.MayShow): not by Windows bringing back an owned
+                // window with its owner, and not by a show of ours that comes late.
+                if (m.Msg == WM_SHOWWINDOW && m.WParam != IntPtr.Zero && !corner.MayShow())
+                {
+                    m.Result = IntPtr.Zero;
+                    return;
+                }
+                if (m.Msg == WM_WINDOWPOSCHANGING && m.LParam != IntPtr.Zero && !corner.MayShow())
+                {
+                    uint flags = (uint)Marshal.ReadInt32(m.LParam, FlagsAt);
+                    if ((flags & SWP_SHOWWINDOW) != 0) Marshal.WriteInt32(m.LParam, FlagsAt, (int)(flags & ~SWP_SHOWWINDOW));
                 }
                 base.WndProc(ref m);
             }

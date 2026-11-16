@@ -396,9 +396,26 @@ namespace CodexAutoResume
             FrameNative.ShowWindow(h, 4);   // SW_SHOWNOACTIVATE: never made the foreground window
             Application.DoEvents();
             said["shown"] = CornerFrameState(form);
+            IntPtr companion = form.CaptionHost.Corner == null ? IntPtr.Zero : form.CaptionHost.Corner.Companion;
+            said["companionShown"] = companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion);
             List<object> made = FrameNative.Box(h);
             FrameNative.Maximised(h, true, FrameNative.Away + 10, 1400, 900);
             said["maximised"] = CornerFrameState(form);
+            // While maximised, every way the companion could come back on: a show of ours come late, Windows bringing an
+            // owned window back with its owner (SW_PARENTOPENING), a position change that shows it.
+            var tries = new List<object> { companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion) };
+            if (companion != IntPtr.Zero)
+            {
+                FrameNative.ShowWindow(companion, 4);   // SW_SHOWNOACTIVATE
+                tries.Add(FrameNative.IsWindowVisible(companion));
+                FrameNative.SendMessage(companion, 0x0018, new IntPtr(1), new IntPtr(3));   // WM_SHOWWINDOW, SW_PARENTOPENING
+                tries.Add(FrameNative.IsWindowVisible(companion));
+                FrameNative.SetWindowPos(companion, IntPtr.Zero, 0, 0, 0, 0, 0x0040 | 0x0001 | 0x0002 | 0x0004 | 0x0010);
+                tries.Add(FrameNative.IsWindowVisible(companion));
+                Application.DoEvents();
+                tries.Add(FrameNative.IsWindowVisible(companion));
+            }
+            said["companionMaximised"] = tries;
             // What WinForms keeps to give back, as it keeps it while the window is maximised on a 1024 by 768 screen (dev CI
             // read All there) and on the owner's monitors: a size Windows' frame and caption bigger than the window's.
             BindingFlags inside = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -408,6 +425,7 @@ namespace CodexAutoResume
             said["planted"] = typeof(Form).GetField("restoredWindowBoundsSpecified", inside).GetValue(form).ToString();
             FrameNative.Maximised(h, false, (int)(double)made[0], (int)(double)made[2], (int)(double)made[3]);
             said["restored"] = CornerFrameState(form);
+            said["companionRestored"] = companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion);
             form.Close();
             form.Dispose();
             return said;
@@ -483,6 +501,15 @@ class CornerFrameTests(unittest.TestCase):
         self.assertEqual([region, dwm_frame], [0, 1], "no region and DWM's frame: Windows clips a classic window it maximises "
                          "with a region of its own and paints its basic caption across the top")
         self.assertEqual(said["minimised"][:2], ["Minimized", "Round"], "Windows' corner while minimised: no region cut")
+
+    def test_the_shadow_is_never_on_the_screen_while_the_window_is_maximised(self):
+        said = self.answer["dashboard"]
+        if said["shown"]["corner"] != "Squircle":
+            self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+        self.assertTrue(said["companionShown"], "shown with the window while its corner is its own")
+        self.assertEqual(said["companionMaximised"], [False] * 5,
+                         "hidden maximised, and kept hidden: a late show, Windows' SW_PARENTOPENING, SWP_SHOWWINDOW, a pump")
+        self.assertTrue(said["companionRestored"], "back with the window's own corner")
 
     def test_while_maximised_a_click_on_the_restore_button_restores(self):
         said = self.answer["messages"]
