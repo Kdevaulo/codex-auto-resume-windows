@@ -2,7 +2,7 @@
   "fidelity": {
     "en/diagnostics": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
@@ -15,49 +15,49 @@
       "probes": [
         "ground",
         "close",
-        "title bar"
+        "title card"
       ],
       "worst": 0,
       "wrong": []
     },
     "en/history": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "en/overview": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "en/pending": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "en/settings": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "en/statistics": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "ko/diagnostics": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
@@ -70,47 +70,47 @@
       "probes": [
         "ground",
         "close",
-        "title bar"
+        "title card"
       ],
       "worst": 0,
       "wrong": []
     },
     "ko/history": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "ko/overview": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "ko/pending": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "ko/settings": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
     "ko/statistics": {
       "exact": 1.0,
-      "light": 388,
+      "light": 391,
       "outside": 0,
       "passed": true,
       "worst": 0
     },
-    "window": "5ce4cfef7a3fd932abc91e7bd8dd954b2e04f46db5ae00211f51f09f6d74489f"
+    "window": "392f4deedce93f65241ab7f9005a89e988b01d17e11e1c2b064b493973c70f69"
   },
   "images": {
     "assets/logo-motion-dark.png": {
@@ -136,130 +136,130 @@
       "size": "192x192"
     },
     "docs/images/notification-card-motion-ko.png": {
-      "bytes": 1585598,
+      "bytes": 1592374,
       "frames": 240,
       "ms": 8424,
       "scenes": {
-        "C0": 106810,
-        "C1": 295997,
+        "C0": 107713,
+        "C1": 285105,
         "C2": 1685,
-        "C3": 1162422,
+        "C3": 1179187,
         "C4": 18581
       },
-      "sha256": "9e6f2d90215e5486abdde6aa21b86e561acb7447eef6f808186a122620e20152",
+      "sha256": "3e33fe898a26ab341d351586113b5f95dd89534209dff2ea503a1c6103de2b22",
       "size": "776x524"
     },
     "docs/images/notification-card-motion.png": {
-      "bytes": 1516255,
+      "bytes": 1522853,
       "frames": 240,
       "ms": 8424,
       "scenes": {
-        "C0": 106879,
-        "C1": 296458,
+        "C0": 107782,
+        "C1": 285707,
         "C2": 1740,
-        "C3": 1092494,
+        "C3": 1108940,
         "C4": 18581
       },
-      "sha256": "a3a0ec7f86b5fb41e78b17133bab2fea2e35cd8177e601826c35f69e75856f14",
+      "sha256": "a97b2dc28815fe619c17823c8c446cfd4f6f02858f0b83f83ae3fe3ca784320f",
       "size": "776x540"
     },
     "docs/images/readme-motion-ko.png": {
-      "bytes": 6648096,
+      "bytes": 6555833,
       "frames": 1642,
       "ms": 45697,
       "scenes": {
-        "S0": 108568,
-        "S1": 208056,
-        "S10": 172904,
-        "S11": 608880,
-        "S12": 41633,
-        "S12b": 706562,
-        "S13": 68948,
-        "S14": 20660,
-        "S15": 278160,
-        "S15b": 234352,
+        "S0": 109657,
+        "S1": 211004,
+        "S10": 174946,
+        "S11": 616062,
+        "S12": 41864,
+        "S12b": 713083,
+        "S13": 69787,
+        "S14": 20529,
+        "S15": 281557,
+        "S15b": 230701,
         "S16": 75916,
-        "S1m": 437746,
-        "S2a": 245627,
-        "S2b": 617212,
-        "S2c": 763665,
-        "S5": 238735,
-        "S6": 144749,
-        "S7": 191764,
-        "S8": 191726,
-        "S9": 1292130
+        "S1m": 441925,
+        "S2a": 258380,
+        "S2b": 620597,
+        "S2c": 653253,
+        "S5": 202161,
+        "S6": 146321,
+        "S7": 189970,
+        "S8": 192535,
+        "S9": 1305482
       },
-      "sha256": "dbcb505ab2f8c6adc6fa01be235cacc4b9f0ad4b9c758ffa4ef6b04de4fcff41",
-      "size": "1500x1041"
+      "sha256": "9f3e37ef102b81a6726c08e7d341f7ad2714d3ae342744e70c432c9a169e4f4b",
+      "size": "1500x1021"
     },
     "docs/images/readme-motion.png": {
-      "bytes": 7209567,
+      "bytes": 7081809,
       "frames": 1648,
       "ms": 45917,
       "scenes": {
-        "S0": 114128,
-        "S1": 236365,
-        "S10": 202238,
-        "S11": 656295,
-        "S12": 49218,
-        "S12b": 851626,
-        "S13": 57484,
-        "S14": 19806,
-        "S15": 241498,
-        "S15b": 200031,
-        "S16": 70206,
-        "S1m": 499009,
-        "S2a": 269595,
-        "S2b": 683803,
-        "S2c": 821810,
-        "S5": 271242,
-        "S6": 168698,
-        "S7": 228503,
-        "S8": 239171,
-        "S9": 1328738
+        "S0": 115189,
+        "S1": 241130,
+        "S10": 204201,
+        "S11": 663136,
+        "S12": 49543,
+        "S12b": 858738,
+        "S13": 58182,
+        "S14": 19631,
+        "S15": 243809,
+        "S15b": 200046,
+        "S16": 70151,
+        "S1m": 502556,
+        "S2a": 271931,
+        "S2b": 686903,
+        "S2c": 702752,
+        "S5": 222071,
+        "S6": 167617,
+        "S7": 225457,
+        "S8": 237019,
+        "S9": 1341644
       },
-      "sha256": "b01ebb73f59863466c7acae8c0f262adb9a23c6681db41fef79706c04d147f71",
-      "size": "1500x1041"
+      "sha256": "cd1259f03f901326e0dcaedda80524644b31b445721d2dc50a00411bcf234109",
+      "size": "1500x1021"
     },
     "docs/images/tray-popup-motion-ko.png": {
-      "bytes": 1463148,
+      "bytes": 1507232,
       "frames": 342,
       "ms": 8800,
       "scenes": {
-        "P0": 69340,
-        "P1": 363930,
-        "P2": 140854,
-        "P3": 549096,
-        "P4": 89098,
-        "P5": 250727
+        "P0": 68703,
+        "P1": 373382,
+        "P2": 141484,
+        "P3": 550977,
+        "P4": 89382,
+        "P5": 283201
       },
-      "sha256": "365f24065d9562dc231773e98f1b4207730fe9951a1d36893ffdee035262ab49",
-      "size": "752x883"
+      "sha256": "23132ba553e6d770e299a240eb032789198573058a49dd070de02b16a4d8e7b4",
+      "size": "808x939"
     },
     "docs/images/tray-popup-motion.png": {
-      "bytes": 1608076,
+      "bytes": 1655121,
       "frames": 342,
       "ms": 8800,
       "scenes": {
-        "P0": 72051,
-        "P1": 410023,
-        "P2": 157721,
-        "P3": 602365,
-        "P4": 93873,
-        "P5": 271940
+        "P0": 71402,
+        "P1": 420163,
+        "P2": 158351,
+        "P3": 604160,
+        "P4": 94099,
+        "P5": 306843
       },
-      "sha256": "fe4620b124a4ae68243538889571559f52a5634cec942298379725e6669a88ad",
-      "size": "752x873"
+      "sha256": "849d6d83bc4381c095cacc9b76ead1b2bebc837b640e542873eeb338fcf3e5a0",
+      "size": "808x929"
     }
   },
   "inputs": {
-    "<motion:card-en>": "01a41b60bfd2606151451741e5e6222fb1070862ae517689269144f38f52a6b4",
-    "<motion:card-ko>": "3e5927afda45546244720245830d4bb63ca17a48dffc55290d2f8269b710bd36",
+    "<motion:card-en>": "908e8da22616a3b856fdab183d39610de55cc29a9c5026767260e63faacf3a64",
+    "<motion:card-ko>": "09a49239fb69ddf8c6c31c774f6ca96684567528b92e20f7348bd4cf155f4301",
     "<motion:logo-dark>": "5aeb49f26d268159d57646004912d7c23bb07f35262d41592979663117cb7b47",
     "<motion:logo-light>": "415252d0f16fb2bbb73d57919364cc76ba3a112be9454d7d64dac19781314a9e",
-    "<motion:popup-en>": "35442f9d99c43daf12c1c31e7b4126cc5e4a1cc4ba3585275fd1780352fa8a01",
-    "<motion:popup-ko>": "a76f33c9e7d9c3087886c0df563d7e304d02ee953dff725bea3a053bac28b06e",
-    "<motion:readme-en>": "0e1bd083d9145576ac93378b303554f01db35fb241e1e422203d7c5d73a42b01",
-    "<motion:readme-ko>": "d8fbfb4842f3bd7fb7fe67fb9c45fc2c1e777d43aa9b2f74d1f14dccc3cd14d7"
+    "<motion:popup-en>": "3aea301bcf58c68ed2ca94d6358907148e9662af5b827ed14b2b44fdaa472043",
+    "<motion:popup-ko>": "062a447e99e41212bc39155fecfa0599a31e3830a3d3b4557650e8455e9e7b00",
+    "<motion:readme-en>": "949e5364662bdd456f85671c754501edadf899335df95021f27afa7e8269895a",
+    "<motion:readme-ko>": "0b94f59780f03397a5f368935cef3ceeb8b216412e7b650f2cdcbd4403283fb6"
   }
 }
