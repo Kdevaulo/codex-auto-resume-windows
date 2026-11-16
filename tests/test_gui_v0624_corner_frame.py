@@ -115,6 +115,11 @@ namespace CodexAutoResume
             return SendMessage(parent.Handle, Chrome.WM_NCHITTEST, IntPtr.Zero, at).ToInt32();
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct WINDOWPLACEMENT { public int Length, Flags, ShowCmd; public Point Min, Max; public Chrome.RECT Normal; }
+        [DllImport("user32.dll")] internal static extern bool GetWindowPlacement(IntPtr h, ref WINDOWPLACEMENT placement);
+        [DllImport("user32.dll")] internal static extern bool SetWindowPlacement(IntPtr h, ref WINDOWPLACEMENT placement);
+
         internal static double Attribute(IntPtr h, int attribute)
         {
             int value;
@@ -127,6 +132,31 @@ namespace CodexAutoResume
             SetWindowLongPtr(h, GWL_STYLE, new IntPtr(on ? style | WS_MAXIMIZE : style & ~(long)WS_MAXIMIZE));
             SetWindowPos(h, IntPtr.Zero, x, Away, w, cy, SWP_NOZORDER | SWP_NOACTIVATE);
             Application.DoEvents();
+        }
+    }
+
+    // Where a maximised window goes: 30000 px off the desktop, at a size of its own (WM_GETMINMAXINFO), so a window
+    // maximised for real - its placement, not only its style - never comes on a monitor.
+    internal sealed class OffScreenMaximise : NativeWindow
+    {
+        [StructLayout(LayoutKind.Sequential)] struct POINT { public int X, Y; }
+        [StructLayout(LayoutKind.Sequential)] struct MINMAXINFO { public POINT Reserved, MaxSize, MaxPosition, MinTrack, MaxTrack; }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == 0x0024)
+            {
+                base.WndProc(ref m);
+                var info = (MINMAXINFO)Marshal.PtrToStructure(m.LParam, typeof(MINMAXINFO));
+                Rectangle monitor = Screen.FromHandle(Handle).Bounds;
+                info.MaxPosition.X = FrameNative.Away - monitor.Left;
+                info.MaxPosition.Y = FrameNative.Away - monitor.Top;
+                info.MaxSize.X = 1400;
+                info.MaxSize.Y = 900;
+                Marshal.StructureToPtr(info, m.LParam, false);
+                return;
+            }
+            base.WndProc(ref m);
         }
     }
 
@@ -181,6 +211,7 @@ namespace CodexAutoResume
                 said["wanted"] = WindowShape.Wanted();
                 said["dashboard"] = SettingsForm.CornerFrameDashboard(argv[1]);
                 said["messages"] = Messages();
+                said["minimisedToMaximised"] = SettingsForm.CornerFrameMinimisedToMaximised(argv[1]);
                 said["edges-en"] = SettingsForm.CornerFrameEdges(argv[1], "en");
                 said["edges-ar"] = SettingsForm.CornerFrameEdges(argv[1], "ar");
                 Mirror.Window = false;
@@ -310,6 +341,46 @@ namespace CodexAutoResume
             return said;
         }
 
+        // Minimised with its corner cut, then back maximised - as the minimise button or Win+D and the taskbar bring it:
+        // minimised without being activated, to come back maximised (WPF_RESTORETOMAXIMIZED), and shown again.
+        internal static Dictionary<string, object> CornerFrameMinimisedToMaximised(string dir)
+        {
+            var said = new Dictionary<string, object>();
+            var strings = Json.Parse(File.ReadAllText(Path.Combine(dir, "strings-en.json"), Encoding.UTF8)) as Dictionary<string, object>;
+            string nowhere = Path.Combine(dir, "nowhere-min");
+            var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, null);
+            form.auditing = true;
+            form.StartPosition = FormStartPosition.Manual;
+            form.Location = new Point(FrameNative.Away, FrameNative.Away);
+            form.ShowInTaskbar = false;
+            IntPtr h = form.Handle;
+            var away = new OffScreenMaximise();
+            away.AssignHandle(h);
+            FrameNative.ShowWindow(h, 4);   // SW_SHOWNOACTIVATE
+            Application.DoEvents();
+            said["normal"] = form.CaptionHost.OuterCorner.ToString();
+            var placement = new FrameNative.WINDOWPLACEMENT();
+            placement.Length = Marshal.SizeOf(typeof(FrameNative.WINDOWPLACEMENT));
+            FrameNative.GetWindowPlacement(h, ref placement);
+            placement.Flags = 2;      // WPF_RESTORETOMAXIMIZED
+            placement.ShowCmd = 7;    // SW_SHOWMINNOACTIVE
+            FrameNative.SetWindowPlacement(h, ref placement);
+            Application.DoEvents();
+            said["minimised"] = new List<object> { form.WindowState.ToString(), form.CaptionHost.OuterCorner.ToString(),
+                                                   (double)FrameNative.GetWindowRgn(h, IntPtr.Zero) };
+            FrameNative.ShowWindow(h, 4);   // back, as it was to come back: maximised
+            Application.DoEvents();
+            IntPtr region = FrameNative.CreateRectRgn(0, 0, 0, 0);
+            int kind = FrameNative.GetWindowRgn(h, region);
+            FrameNative.DeleteObject(region);
+            said["back"] = new List<object> { form.WindowState.ToString(), form.CaptionHost.OuterCorner.ToString(), (double)kind,
+                                              FrameNative.Attribute(h, 1) };
+            away.ReleaseHandle();
+            form.Close();
+            form.Dispose();
+            return said;
+        }
+
         internal static Dictionary<string, object> CornerFrameDashboard(string dir)
         {
             var said = new Dictionary<string, object>();
@@ -402,6 +473,16 @@ class CornerFrameTests(unittest.TestCase):
         self.assertEqual(said["restored"]["window"], said["shown"]["window"],
                          "Windows' normal position, not the size WinForms kept: nothing grows")
         self.assertEqual(said["restored"]["kept"], "None")
+
+    def test_back_maximised_from_minimised_it_has_dwm_s_frame_and_no_region(self):
+        said = self.answer["minimisedToMaximised"]
+        if said["normal"] != "Squircle":
+            self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+        state, corner, region, dwm_frame = said["back"]
+        self.assertEqual((state, corner), ("Maximized", "Round"))
+        self.assertEqual([region, dwm_frame], [0, 1], "no region and DWM's frame: Windows clips a classic window it maximises "
+                         "with a region of its own and paints its basic caption across the top")
+        self.assertEqual(said["minimised"][:2], ["Minimized", "Round"], "Windows' corner while minimised: no region cut")
 
     def test_while_maximised_a_click_on_the_restore_button_restores(self):
         said = self.answer["messages"]

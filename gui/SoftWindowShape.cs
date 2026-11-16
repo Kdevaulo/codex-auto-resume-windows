@@ -705,10 +705,16 @@ namespace CodexAutoResume
         internal int Margin { get { return WindowShape.Margin(Scale()); } }
 
         /// The corner the window should have in the state it is in (WindowShape.Decide).
+        ///
+        /// Minimised counts as maximised (v0.6.24, M-CORNER re-check 3): a window whose region was still cut while it was
+        /// minimised came back maximised with that region in place, and Windows - which gives a window with a region no
+        /// frame from DWM - maximised it as a window of the classic kind, clipped it with a region of its own and painted
+        /// its basic caption across the top, which stayed. With Windows' corner while minimised there is no region to come
+        /// back with, maximised or not; restored to normal the corner is cut again in the same message.
         internal WindowShape.Corner Want()
         {
             IntPtr handle = form.IsHandleCreated ? form.Handle : IntPtr.Zero;
-            bool zoomed = handle != IntPtr.Zero && IsZoomed(handle);
+            bool zoomed = handle != IntPtr.Zero && (IsZoomed(handle) || IsIconic(handle));
             return WindowShape.Decide(!failed, WindowShape.Windows11, WindowShape.Composition(), WindowShape.RemoteSession(),
                                       Palette.Contrast, zoomed, Arranged(handle));
         }
