@@ -1767,6 +1767,8 @@ namespace CodexAutoResume
             int was = 0, now = 0;
             foreach (Control row in above) was += RowHeight(row, width);
             foreach (Control row in below) was += RowHeight(row, width);
+            // Where the keyboard starts, as the dialog's code chose it: taking a row out of the dialog takes the choice with it.
+            Control active = ActiveControl;
             SuspendLayout();
             bodyCard.SuspendLayout();
             try
@@ -1804,6 +1806,7 @@ namespace CodexAutoResume
             finally { bodyCard.ResumeLayout(false); }
             ClientSize = new Size(width, Math.Max(1, ClientSize.Height - was + now));
             ResumeLayout(true);
+            if (active != null && !active.IsDisposed && active != ActiveControl && Contains(active)) ActiveControl = active;
         }
 
         private void Place(Control row, int at, RowStyle style)
