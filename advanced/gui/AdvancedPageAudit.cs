@@ -477,9 +477,12 @@ namespace CodexAutoResume
             record["columns"] = columns;
             record["rows"] = ListCells(followList);
             record["list_card"] = ListOffCard(followList) ?? "";
-            record["buttons"] = new List<object> { followClose.Text };
-            record["accept"] = dialog.AcceptButton == followClose && dialog.CancelButton == followClose;
-            Pressed.Invoke(followClose, new object[] { EventArgs.Empty });
+            // v0.6.24-beta.2: no button of its own (nothing to answer); Esc and the title row's X close it (SoftDialog).
+            var buttons = new List<object>();
+            foreach (Button button in DialogButtons(dialog)) buttons.Add(button.Text);
+            record["buttons"] = buttons;
+            record["accept"] = dialog.AcceptButton == null && dialog.CancelButton == null && dialog is SoftDialog;
+            dialog.Close();
         }
 
         /// Pending's one list with a row of each kind chosen in turn - a recovery, a reset rule, a queued message - the standard

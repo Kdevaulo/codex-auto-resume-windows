@@ -462,8 +462,11 @@ namespace CodexAutoResume
             ownFit = delegate
             {
                 int tall = bodyCard.GetPreferredSize(new Size(across, 0)).Height;
-                // v0.6.24: and the dialog's title row above it, once it has one (SoftDialog.TitleRoom).
-                dialog.ClientSize = new Size(across, tall + buttons.GetPreferredSize(new Size(across, 0)).Height + SoftDialog.TitleRoom(dialog));
+                // v0.6.24: and the dialog's title row above it, once it has one (SoftDialog.TitleRoom). v0.6.24-beta.2: and the
+                // buttons under the card until the dialog is made - in the card from then on, where it counts them itself
+                // (SoftDialog.Gather, SoftStack.MeasuredRows).
+                int foot = buttons.Parent == dialog ? buttons.GetPreferredSize(new Size(across, 0)).Height : 0;
+                dialog.ClientSize = new Size(across, tall + foot + SoftDialog.TitleRoom(dialog));
             };
             ownFit();
             return dialog;
@@ -489,6 +492,16 @@ namespace CodexAutoResume
             }
         }
 
+        /// What a dialog keeps under its body on its own ground: the rows docked at its foot (none once the dialog is made,
+        /// SoftDialog.Gather having moved them into its card).
+        private static int FootOf(Form dialog)
+        {
+            int foot = 0;
+            foreach (Control child in dialog.Controls)
+                if (child.Dock == DockStyle.Bottom && Soft.OwnVisible(child)) foot += child.Height;
+            return foot;
+        }
+
         /// One dialog for a value of the person's own, built and never shown, held to the audit's checks at its opening
         /// size - and with the refusal said above its editor, `hintText` in it, the longest that line gets - and every
         /// control in it asked its name. The Settings page's (AuditOwnValues) and, v0.6.16, the Advanced features page's.
@@ -508,15 +521,16 @@ namespace CodexAutoResume
                 Walk(dialog, where, findings);
                 // No empty band above the buttons at its opening size (the owner, 2026-10-25).
                 int opening = dialog.Controls[0].GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height;
-                // v0.6.24: below the dialog's title row (SoftDialog.TitleRoom).
-                int held = dialog.ClientSize.Height - SoftDialog.TitleRoom(dialog) - dialog.Controls[1].Height;
+                // v0.6.24: below the dialog's title row (SoftDialog.TitleRoom). v0.6.24-beta.2: the buttons are in the card
+                // (SoftDialog.Gather), which is all the dialog holds under its title.
+                int held = dialog.ClientSize.Height - SoftDialog.TitleRoom(dialog) - FootOf(dialog);
                 if (held - opening > Px(2)) findings.Add(where + " :: " + (held - opening) + " px empty above the buttons");
                 // And with the refusal said above it, the longest the line gets, fitted as a refusal fits it.
                 ownHint.Text = S("own.refused", "This value can't be used. {hint}", "hint", hintText);
                 if (ownFit != null) ownFit();
                 dialog.PerformLayout();
                 int needs = dialog.Controls[0].GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height;
-                int room = dialog.ClientSize.Height - SoftDialog.TitleRoom(dialog) - dialog.Controls[1].Height;
+                int room = dialog.ClientSize.Height - SoftDialog.TitleRoom(dialog) - FootOf(dialog);
                 if (needs > room) findings.Add(where + " :: the refusal needs " + needs + " high, the dialog gives " + room);
             }
             // Every name is asked either way; a whole line in each box only where the dialog is whole, as its layout is.
@@ -524,8 +538,9 @@ namespace CodexAutoResume
             try
             {
                 AuditSpoken(where, dialog, findings);
-                // v0.6.24: its title row (SoftDialog).
+                // v0.6.24: its title row (SoftDialog), and under it the one card (v0.6.24-beta.2).
                 AuditTitleRow(where, dialog, findings);
+                AuditDialogCard(where, dialog, findings);
             }
             finally
             {

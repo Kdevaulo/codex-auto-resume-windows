@@ -533,13 +533,13 @@ namespace CodexAutoResume
         // ---------------------------------------------------------------- the view
         // The open dialog's parts while it is built - null while none is - and what a test reads of it.
         private Form exampleDialog;
-        private Button exampleButton, exampleClose;
+        private Button exampleButton;
         private Label exampleNote;
         private TableLayoutPanel examplePanes;
         private readonly List<Control> examplePaneControls = new List<Control>();
         private readonly List<KeyValuePair<Control, ExamplePart>> exampleParts = new List<KeyValuePair<Control, ExamplePart>>();
         private readonly List<ListView> exampleLists = new List<ListView>();
-        private Control exampleBody, exampleButtons;
+        private Control exampleBody;
         // While an example is built: what this edition says of its rows (CellsWritten) and its conversations' names
         // (ConversationOf). Null at every other moment.
         private Dictionary<string, object> exampleSaid;
@@ -581,10 +581,9 @@ namespace CodexAutoResume
             exampleParts.Clear();
             examplePaneControls.Clear();
             exampleDialog = null;
-            exampleClose = null;
             exampleNote = null;
             examplePanes = null;
-            exampleBody = exampleButtons = null;
+            exampleBody = null;
             exampleSaid = null;
             exampleNames = null;
         }
@@ -627,7 +626,8 @@ namespace CodexAutoResume
             body.ColumnCount = 1;
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
             body.GrowStyle = TableLayoutPanelGrowStyle.AddRows;
-            body.Padding = Pad(16, 16, 16, 0);
+            // v0.6.24-beta.2: the ground's room under the panes too, with no buttons below them.
+            body.Padding = Pad(16, 16, 16, 17);
             body.BackColor = Canvas;
             int inner = across - body.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth;
             exampleNote = HelpText(Word("page.example.note", "Made-up sample data: nothing here is read from this PC or sent anywhere."));
@@ -673,18 +673,10 @@ namespace CodexAutoResume
             host.Scrolls = true;
             dialog.Controls.Add(host);
 
-            FlowLayoutPanel buttons = ButtonRow();
-            buttons.FlowDirection = FlowDirection.RightToLeft;
-            buttons.Padding = Pad(0, 12, 16, 16);
-            exampleClose = MakeButton(S("action.close", "Close"), true, delegate { dialog.Close(); });
-            buttons.Controls.Add(exampleClose);
-            dialog.Controls.Add(buttons);
-            dialog.AcceptButton = exampleClose;
-            dialog.CancelButton = exampleClose;
-            dialog.ActiveControl = exampleClose;
+            // v0.6.24-beta.2: nothing to answer, so no Close of its own (the owner, 2026-11-16) - the title row's X closes it,
+            // and Escape does (SoftDialog).
             exampleDialog = dialog;
             exampleBody = body;
-            exampleButtons = buttons;
             exampleSaid = null;
             dialog.ClientSize = new Size(across, Px(400));
             ExampleHeights();
@@ -700,11 +692,10 @@ namespace CodexAutoResume
             exampleBody.Parent.PerformLayout();
             exampleBody.PerformLayout();
             int tall = Math.Max(exampleBody.Height, exampleBody.GetPreferredSize(new Size(width, 0)).Height);
-            int buttonsTall = exampleButtons.GetPreferredSize(new Size(width, 0)).Height;
             int frame = dialog.Height - dialog.ClientSize.Height;
             int most = Math.Min(area.Height, SystemInformation.MaxWindowTrackSize.Height) - frame - Px(48);
             // v0.6.24: and the dialog's title row above it, once it has one (SoftDialog.TitleRoom).
-            int want = Math.Max(Math.Min(Px(240), most), Math.Min(tall + buttonsTall + SoftDialog.TitleRoom(dialog), most));
+            int want = Math.Max(Math.Min(Px(240), most), Math.Min(tall + SoftDialog.TitleRoom(dialog), most));
             if (dialog.ClientSize.Height != want) dialog.ClientSize = new Size(width, want);
         }
 
@@ -901,16 +892,18 @@ namespace CodexAutoResume
             record["pressed"] = true;
             record["title"] = dialog.Text;
             record["note"] = exampleNote.Text;
-            record["close"] = exampleClose.Text;
-            record["accept"] = dialog.AcceptButton == exampleClose && dialog.CancelButton == exampleClose;
+            // v0.6.24-beta.2: no button of its own (nothing to answer); Esc and the title row's X close it (SoftDialog).
+            var buttons = new List<object>();
+            foreach (Button button in DialogButtons(dialog)) buttons.Add(button.Text);
+            record["buttons"] = buttons;
+            record["accept"] = dialog.AcceptButton == null && dialog.CancelButton == null && dialog is SoftDialog;
             record["beside"] = examplePanes.ColumnCount == 2;
             // Drawn as the render mode draws the window: a child of Windows' parking window, which is never on the screen, as
             // tall as all it shows so that nothing is scrolled out of the picture - then drawn into one bitmap.
             dialog.TopLevel = false;
             dialog.Visible = true;
             Materialise(dialog);
-            int full = exampleBody.GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height + exampleButtons.Height +
-                       SoftDialog.TitleRoom(dialog);
+            int full = exampleBody.GetPreferredSize(new Size(dialog.ClientSize.Width, 0)).Height + SoftDialog.TitleRoom(dialog);
             if (full > dialog.ClientSize.Height) dialog.ClientSize = new Size(dialog.ClientSize.Width, full);
             dialog.PerformLayout();
             Application.DoEvents();

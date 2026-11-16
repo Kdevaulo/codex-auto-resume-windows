@@ -203,7 +203,9 @@ namespace CodexAutoResume
             body.ColumnCount = 1;
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
             body.GrowStyle = TableLayoutPanelGrowStyle.AddRows;
-            body.Padding = Pad(16, 16, 16, 0);
+            // v0.6.24-beta.2 (the owner's layout A, 2026-11-16): one card holds it all, the refusal and the buttons at its foot
+            // too, with the ground's room under it.
+            body.Padding = Pad(16, 16, 16, 17);
             body.BackColor = Canvas;
             TableLayoutPanel card = MakeCard(title);
             card.Margin = new Padding(0);
@@ -350,7 +352,7 @@ namespace CodexAutoResume
             // Where a refusal is said, above the buttons.
             editorSaid = HelpText("");
             editorSaid.ForeColor = Palette.Danger;
-            body.Controls.Add(editorSaid);
+            card.Controls.Add(editorSaid);
             // On a page of its own that scrolls up and down: at 200% on a screen smaller than it, Windows holds the dialog
             // to the screen, and what does not fit is scrolled to rather than cut off.
             var host = new SoftPage();
@@ -362,14 +364,18 @@ namespace CodexAutoResume
             host.Scrolls = true;
             dialog.Controls.Add(host);
 
+            // In the card, at its foot, right-aligned (SoftDialog.ButtonsAbove over them, as the dialogs' cards keep).
             FlowLayoutPanel buttons = ButtonRow();
             buttons.FlowDirection = FlowDirection.RightToLeft;
-            buttons.Padding = Pad(0, 12, 16, 16);
+            buttons.Dock = DockStyle.Fill;
+            buttons.Margin = new Padding(0);
+            buttons.Padding = Pad(0, SoftDialog.ButtonsAbove, 0, 0);
+            buttons.BackColor = Card;
             editorSave = MakeButton(Word("page.editor.save", "Save and return"), true, delegate { SaveEditor(dialog); });
             editorCancel = MakeButton(S("action.cancel", "Cancel"), false, delegate { dialog.Close(); });
             buttons.Controls.Add(editorSave);
             buttons.Controls.Add(editorCancel);
-            dialog.Controls.Add(buttons);
+            card.Controls.Add(buttons);
             dialog.AcceptButton = editorSave;
             dialog.CancelButton = editorCancel;
             dialog.ActiveControl = editing ? (Control)editorWords.Box : editorConversation;
@@ -394,7 +400,7 @@ namespace CodexAutoResume
             foreach (Control control in card.Controls)
                 if (control is WrapLabel) control.MaximumSize = new Size(lines, 0);
             editorThumbs.MaximumSize = new Size(lines, 0);
-            editorSaid.MaximumSize = new Size(inner, 0);
+            editorSaid.MaximumSize = new Size(lines, 0);
             dialog.ClientSize = new Size(width, Px(400));
             editorBody = body;
             editorButtons = buttons;
@@ -420,7 +426,8 @@ namespace CodexAutoResume
             editorBody.Parent.PerformLayout();
             editorBody.PerformLayout();
             int tall = Math.Max(editorBody.Height, editorBody.GetPreferredSize(new Size(width, 0)).Height);
-            int buttonsTall = editorButtons.GetPreferredSize(new Size(width, 0)).Height;
+            // v0.6.24-beta.2: the buttons are in the body's card, measured with it.
+            int buttonsTall = editorButtons.Parent == editorDialog ? editorButtons.GetPreferredSize(new Size(width, 0)).Height : 0;
             // v0.6.24: and the dialog's title row above it, once it has one (SoftDialog.TitleRoom).
             int want = Math.Max(Px(240), Math.Min(tall + buttonsTall + SoftDialog.TitleRoom(editorDialog), EditorMost()));
             if (editorDialog.ClientSize.Height != want) editorDialog.ClientSize = new Size(width, want);

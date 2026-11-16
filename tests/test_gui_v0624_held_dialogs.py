@@ -83,6 +83,10 @@ namespace CodexAutoResume
             var said = new Dictionary<string, object>();
             dialog.TopLevel = false;
             Materialise(dialog);
+            // v0.6.24-beta.2: its own window made, as a dialog a person opens has one, so the screen holds it as it holds
+            // theirs. Its buttons stood under its card on its ground until they joined the card (SoftDialog.Gather), and
+            // making theirs made the dialog's; laid out without a window of its own, it was never held.
+            IntPtr made = dialog.Handle;
             dialog.PerformLayout();
             Size most = SystemInformation.MaxWindowTrackSize;
             said["held"] = dialog.Width >= most.Width || dialog.Height >= most.Height;

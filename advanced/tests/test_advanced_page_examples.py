@@ -74,8 +74,10 @@ class PageTests(PageCase):
                 self.assertEqual(look["note"], words["page.example.note"])
                 self.assertEqual([pane["caption"] for pane in look["panes"]],
                                  [words["page.example.before"], words["page.example.after"]])
-                self.assertEqual(look["close"], "Close")
-                self.assertTrue(look["accept"], "Enter and Esc both close it")
+                # v0.6.24-beta.2: nothing to answer, so no Close of its own - the title row's X and Esc close it (the
+                # owner, 2026-11-16).
+                self.assertEqual(look["buttons"], [])
+                self.assertTrue(look["accept"], "Esc closes it, with no button for it to press")
 
     def test_both_panes_are_drawn_for_every_capability(self):
         """Each pane has its parts, each list its rows with every cell written, each line its words - and each part drew
@@ -182,7 +184,7 @@ class PageTests(PageCase):
         for look in looks.values():
             self.assertEqual([pane["caption"] for pane in look["panes"]],
                              [words["page.example.before"], words["page.example.after"]])
-            self.assertEqual(look["close"], ko["action.close"])
+            self.assertEqual(look["buttons"], [], "no Close of its own (v0.6.24-beta.2)")
         (others,) = self.parts(looks["other_sessions"], 1, "history")
         self.assertEqual(others["rows"][1][0], "example-service · " + words["page.row.kind.cli"])
         self.assertEqual([part["text"] for part in self.parts(looks["keep_going"], 1, "sent")], [words["continue.keep_going"]])

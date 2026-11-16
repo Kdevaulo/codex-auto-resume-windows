@@ -16,7 +16,8 @@ a body docked to fill and a row docked at its foot - at 100 % and at 150 %, left
 - nothing in the title is a card: the row and its words are on the ground's own colour, and the caption buttons show
   the ground at rest - in High Contrast too, where a card's buttons show the person's Window colour;
 - the row's words are the heading role, start 6 px in from the row (from its right, mirrored) and end before the
-  buttons; the buttons stand centred in the row, 10 px in from its end (its left, mirrored);
+  buttons; the buttons stand centred in the row, and (the owner, 2026-11-16, canvas row 16) the Close cross's far end as
+  far in from the dialog's end edge as the title's first letter is from its start edge, within a pixel, mirrored too;
 - the row's ground, the strip above it and the words drag the dialog (HTCAPTION); its own body is the client's;
 - the title audit (WindowAudit.AuditTitleRow) finds nothing in each.
 
@@ -135,6 +136,9 @@ namespace CodexAutoResume
                     said["wordsGround"] = words.BackColor.ToArgb() == d.BackColor.ToArgb();
                     said["face"] = caption.Face.ToArgb() == d.BackColor.ToArgb();
                     said["heading"] = words.Font.Equals(Soft.RoleFont("heading"));
+                    // What Windows' text drawing keeps before the first letter: half of what its padding adds.
+                    said["lead"] = (double)((TextRenderer.MeasureText("Ag", words.Font, new Size(int.MaxValue, 0), TextFormatFlags.SingleLine).Width -
+                        TextRenderer.MeasureText("Ag", words.Font, new Size(int.MaxValue, 0), TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width) / 2);
                     said["line"] = (double)Math.Max(words.Font.Height,
                         TextRenderer.MeasureText("Ag", words.Font, new Size(int.MaxValue, 0), TextFormatFlags.NoPrefix).Height);
                     said["mirrored"] = Mirror.Of(row);
@@ -266,15 +270,25 @@ class DialogTitleRowTests(unittest.TestCase):
                 for name, box in buttons.items():
                     self.assertEqual(box[1], y + (height - box[3]) // 2, name + " centred in the row")
                     self.assertEqual(box[3], px(26))
+                # The Close cross's ink across its button (CaptionButton.Glyph): strokes from 1 to 9 of a 10 px box centred
+                # in it, with round caps half the 1.3 px stroke past their ends.
+                close = buttons["close"]
+                ox = round((close[2] - 10 * scale) / 2)
+                cap = max(1.0, 1.3 * scale) / 2
+                ink_left, ink_right = close[0] + ox + scale - cap, close[0] + ox + 9 * scale + cap
                 if kind == "rtl":
                     self.assertTrue(said["mirrored"])
-                    self.assertEqual(buttons["close"][0], x + px(10), "mirrored: close at the row's left")
+                    letter = 600 - (words[0] + words[2] - said["lead"])
+                    self.assertLessEqual(abs(ink_left - letter), 1.5,
+                                         "mirrored: the cross's left end as far from the left edge as the title from the right")
                     self.assertLess(buttons["close"][0], buttons["maximize"][0])
                     self.assertEqual(x + width - (words[0] + words[2]), px(6), "the words start 6 px in from the right")
                     self.assertGreaterEqual(words[0] - (buttons["minimize"][0] + buttons["minimize"][2]), px(8))
                 else:
                     self.assertFalse(said["mirrored"])
-                    self.assertEqual(buttons["close"][0] + buttons["close"][2], x + width - px(10), "close 10 in from the end")
+                    letter = words[0] + said["lead"]
+                    self.assertLessEqual(abs((600 - ink_right) - letter), 1.5,
+                                         "the cross's right end as far from the right edge as the title's first letter from the left")
                     self.assertLess(buttons["minimize"][0], buttons["close"][0])
                     self.assertEqual(words[0] - x, px(6), "the words start 6 px in")
                     self.assertGreaterEqual(buttons["minimize"][0] - (words[0] + words[2]), px(8))

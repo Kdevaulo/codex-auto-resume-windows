@@ -80,11 +80,9 @@ namespace CodexAutoResume
                 bool scrolls = measured.Height > tallest;
                 int room = scrolls ? tallest : measured.Height;
 
-                var padding = new Panel();
-                padding.BackColor = Canvas;
-                padding.Dock = DockStyle.Fill;
-                padding.Padding = Pad(16, 16, 16, 0);
-                Control scrolled = null;
+                // v0.6.24-beta.2 (the owner's layout A, 2026-11-16): the words on the dialog's one card, which holds its
+                // buttons too (SoftDialog.Gather) - in a well where they scroll.
+                Control body;
                 if (scrolls)
                 {
                     var well = new SoftTextArea();
@@ -99,53 +97,45 @@ namespace CodexAutoResume
                     // ring while the button that closes it has none.
                     dialog.Shown += delegate { well.Box.Select(0, 0); };
                     well.Box.AccessibleName = "Codex Auto Resume";
-                    scrolled = DialogBodyCard(well);
+                    body = well;
                 }
                 else
                 {
                     var words = new Label();
                     words.Text = text ?? "";
                     words.ForeColor = Ink;
-                    words.BackColor = Canvas;
                     words.UseMnemonic = false;     // an ampersand in a conversation's name is a letter
                     words.AutoSize = false;
                     words.Dock = DockStyle.Fill;
-                    padding.Controls.Add(words);
+                    body = words;
                 }
-                dialog.Controls.Add(scrolled ?? padding);
-                // Docked under the words, above the buttons (added after it, so docked first), inset as they are.
+                dialog.Controls.Add(DialogBodyCard(body));
+                // Docked under the words, above the buttons (added after it, so docked first): in the card under the words,
+                // SoftDialog.LineGap below them.
                 int chosen = 0;
                 if (choice != null)
                 {
                     var row = new Panel();
-                    row.BackColor = Canvas;
+                    row.BackColor = Card;
                     row.Dock = DockStyle.Bottom;
-                    row.Padding = Pad(16, 12, 16, 0);
                     choice.Dock = DockStyle.Top;
                     row.Controls.Add(choice);
-                    chosen = row.Padding.Vertical + choice.PreferredSize.Height + choice.Margin.Vertical;
+                    chosen = Px(SoftDialog.LineGap) + choice.PreferredSize.Height + choice.Margin.Vertical;
                     row.Height = chosen;
                     width = Math.Max(width, choice.PreferredSize.Width);
                     dialog.Controls.Add(row);
                 }
 
                 bool said = false;
-                FlowLayoutPanel buttons = ButtonRow();
-                buttons.FlowDirection = FlowDirection.RightToLeft;
-                // A right-to-left flow lays its first control out from its own width less both sides
-                // of its padding, so what stands between the rightmost button and the edge is the two
-                // added together. All of it is put on the right, where it is the gap, and the row is
-                // then inset by the same 16 as the sentence above it.
-                buttons.Padding = Pad(0, scrolls ? 0 : 12, 16, 16);
-                Button accept, dismiss;
+                FlowLayoutPanel buttons = null;
+                Button accept = null, dismiss = null;
                 bool careful = affirm != null && away != null;
-                if (affirm == null)
+                // A notice has nothing to answer (the owner, 2026-11-16): no button of its own - the title row's X closes it,
+                // and so does Esc (SoftDialog).
+                if (affirm != null)
                 {
-                    accept = dismiss = MakeButton(S("action.close", "Close"), true, delegate { dialog.Close(); });
-                    buttons.Controls.Add(accept);
-                }
-                else
-                {
+                    buttons = ButtonRow();
+                    buttons.FlowDirection = FlowDirection.RightToLeft;
                     accept = MakeButton(affirm, !careful, delegate { said = true; dialog.Close(); });
                     if (!careful)
                     {
@@ -157,20 +147,22 @@ namespace CodexAutoResume
                     // Right to left, so the button that does the thing is the rightmost.
                     buttons.Controls.Add(accept);
                     buttons.Controls.Add(dismiss);
+                    dialog.Controls.Add(buttons);
+                    // Enter presses the accent button: the one that acts, or where the safe answer is the
+                    // default, the one that does not.
+                    Button first = careful ? dismiss : accept;
+                    dialog.AcceptButton = first;
+                    dialog.CancelButton = dismiss;     // which is also what Escape presses
+                    // The keyboard starts on that button, not on the words: a dialog hands the focus to its
+                    // first control, and where the words are in a well that is the well.
+                    dialog.ActiveControl = first;
                 }
-                dialog.Controls.Add(buttons);
-                // Enter presses the accent button: the one that acts, or where the safe answer is the
-                // default, the one that does not.
-                Button first = careful ? dismiss : accept;
-                dialog.AcceptButton = first;
-                dialog.CancelButton = dismiss;     // which is also what Escape presses
-                // The keyboard starts on that button, not on the words: a dialog hands the focus to its
-                // first control, and where the words are in a well that is the well.
-                dialog.ActiveControl = first;
 
-                dialog.ClientSize = new Size(width + 2 * pad, room + pad + chosen + buttons.PreferredSize.Height);
-                // The button row's 12 px have gone from its own height already, so they are not taken off again.
-                if (scrolls) dialog.ClientSize += DialogCardGrowth() + new Size(0, Px(12));
+                // The words, the card round them and its lift's room, the choice, and the buttons as they stand in the card
+                // (SoftDialog.ButtonsAbove over them) - ButtonRow's own 12 px over them on the ground are that gap.
+                int across = width + 2 * pad + Px(24);
+                int foot = buttons == null ? 0 : buttons.GetPreferredSize(new Size(width, 0)).Height;
+                dialog.ClientSize = new Size(across, Px(16) + Px(12) + room + chosen + Px(12) + Px(17) + foot);
                 dialog.ShowDialog(this);
                 return said;
             }
@@ -1417,16 +1409,9 @@ namespace CodexAutoResume
                 MeasureCells(view);
                 // On History's card, on the soft scroll bar, as the lists in the window are (DialogListCard).
                 dialog.Controls.Add(DialogListCard(view));
-                var close = MakeButton(S("action.close", "Close"), true, delegate { dialog.Close(); });
-                var buttons = ButtonRow();
-                buttons.FlowDirection = FlowDirection.RightToLeft;
-                buttons.Padding = Pad(16, 0, 17, 12);
-                buttons.Controls.Add(close);
-                dialog.Controls.Add(buttons);
-                dialog.AcceptButton = close;
-                dialog.CancelButton = close;
-                // Escape closes it whatever has the focus, the list included, which is where
-                // the focus is when the dialog opens.
+                // v0.6.24-beta.2: nothing to answer, so no Close of its own (the owner, 2026-11-16) - the title row's X
+                // closes it, and Escape does whatever has the focus, the list included, which is where the focus is when
+                // the dialog opens.
                 dialog.KeyPreview = true;
                 dialog.KeyDown += delegate(object sender, KeyEventArgs e)
                 {

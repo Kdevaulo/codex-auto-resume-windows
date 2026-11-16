@@ -82,7 +82,8 @@ namespace CodexAutoResume
             FlowLayoutPanel buttons = ButtonRow();
             buttons.FlowDirection = FlowDirection.RightToLeft;
             buttons.Padding = Pad(12, 8, 12, 12);
-            var close = MakeButton(S("action.close", "Close"), false, delegate { dialog.Close(); });
+            // v0.6.24-beta.2: no Close (the owner, 2026-11-16): nothing here is answered - the title row's X closes it, and
+            // Escape does (SoftDialog).
             Button copy = MakeButton(S("ownreport.copy", "Copy report"), true, null);
             Button again = MakeButton(S("ownreport.again", "Write again"), false, null);
             copy.Enabled = false;
@@ -97,14 +98,12 @@ namespace CodexAutoResume
                 }
                 catch (Exception) { }
             };
-            buttons.Controls.Add(close);
             buttons.Controls.Add(copy);
             buttons.Controls.Add(again);
 
             dialog.Controls.Add(wellCard);
             dialog.Controls.Add(footer);
             dialog.Controls.Add(buttons);
-            dialog.CancelButton = close;
 
             Dictionary<string, string> words = OwnReportWords();
             Action ask = delegate
