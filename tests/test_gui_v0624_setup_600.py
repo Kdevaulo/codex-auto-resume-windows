@@ -71,7 +71,8 @@ function Measured($window, $name) {
 $notes = "v0.6.24 - something new`n`n**Both editions.** A line of what is new, long enough to take a second line in a window of this width, and one more after it.`n- A line.`n- Another line.`n"
 $out = @{}
 foreach ($case in (ConvertFrom-Json $env:CAR_CASES)) {
-    $display = [double]$case[0]; $text = [double]$case[1]; $english = WordsOf ([string]$case[2])
+    $display = [double]$case[0]; $text = [double]$case[1]; $work = [int]$case[3];
+    $WindowType.GetField('WorkHeightStandIn', $any).SetValue($null, $work); $english = WordsOf ([string]$case[2])
     $FormType.GetMethod('StandIn', $any).Invoke($null, [object[]]@($display, $text)) | Out-Null
     $box = [System.Drawing.SystemFonts]::MessageBoxFont
     $system = [double]$FormType.GetField('SystemScale', $any).GetValue($null)
@@ -93,14 +94,21 @@ foreach ($case in (ConvertFrom-Json $env:CAR_CASES)) {
         $rows += ,(Measured $window ($way + '/finished'))
         $window.Dispose()
     }
-    $out[('{0:F2}/{1:F2}/{2}' -f $display, $text, [string]$case[2])] = $rows
+    $out[('{0:F2}/{1:F2}/{2}/{3}' -f $display, $text, [string]$case[2], $work)] = $rows
 }
 $FormType.GetMethod('StandIn', $any).Invoke($null, [object[]]@([double]$FormType.GetField('SystemScale', $any).GetValue($null), 1.0)) | Out-Null
+$WindowType.GetField('WorkHeightStandIn', $any).SetValue($null, 0)
 [IO.File]::WriteAllText($env:CAR_RESULT, ($out | ConvertTo-Json -Depth 6 -Compress), (New-Object Text.UTF8Encoding $false))
 """
 
 # The third is a catalog whose first page's words are far longer than any language's: a page that needs more than 600.
-CASES = [(1.0, 1.0, ""), (1.5, 1.0, ""), (1.0, 2.25, ""), (1.0, 1.0, "canary"), (1.0, 2.25, "canary")]
+# (display scale, text size, catalog, the work area's height in device px: a tall screen, or the stood-in one)
+CASES = [(1.0, 1.0, "", 5000), (1.5, 1.0, "", 5000), (1.0, 2.25, "", 5000), (1.0, 1.0, "canary", 5000),
+         (1.0, 2.25, "canary", 5000),
+         # 1280 x 720 at 125 % (a work area of about 544 logical px), 1366 x 768 at 125 % (about 582), and a screen with room
+         (1.25, 1.0, "", 680), (1.25, 1.0, "", 728), (1.25, 1.0, "", 5000),
+         # a work area of 1 px: the height the pages need alone
+         (1.25, 1.0, "", 1), (1.25, 2.25, "canary", 1), (1.25, 2.25, "canary", 680)]
 
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
@@ -126,8 +134,8 @@ class SetupWindowSizeTests(unittest.TestCase):
         if not self.answer:
             self.fail("the probe did not run: " + (self.probe.stderr or self.probe.stdout)[-3000:])
 
-    def rows(self, display, text, locale=""):
-        rows = self.answer["%.2f/%.2f/%s" % (display, text, locale)]
+    def rows(self, display, text, locale="", work=5000):
+        rows = self.answer["%.2f/%.2f/%s/%d" % (display, text, locale, work)]
         self.assertGreater(len(rows), 8, "every way's pages and its finish were measured")
         return rows
 
@@ -193,11 +201,40 @@ class SetupWindowSizeTests(unittest.TestCase):
             self.assertGreaterEqual(row["client"][1], row["px600"])
 
 
+    def test_the_600_never_makes_the_window_taller_than_its_work_area_but_the_pages_still_get_what_they_need(self):
+        """On a work area shorter than 600 logical px (1280 x 720 at 125 % holds about 544, 1366 x 768 about 582) the
+        floor is the work area's height; what the pages need is what it was, and never cut."""
+        room = self.rows(1.25, 1.0, "", 5000)
+        self.assertEqual({row["client"][1] for row in room}, {750}, "with room it is 600 logical px at 125 %")
+        needs = {row["page"]: row["client"][1] for row in self.rows(1.25, 1.0, "", 1)}
+        held = 0
+        for work in (680, 728):
+            for row in self.rows(1.25, 1.0, "", work):
+                need = needs[row["page"]]
+                with self.subTest(work=work, page=row["page"]):
+                    self.assertEqual(row["client"][1], max(work, need), "the work area's height, or what the page needs")
+                    self.assertLessEqual(row["used"], row["cardInner"])
+                    for button in row["buttons"]:
+                        self.assertEqual(row["client"][1] - (button[1] + button[3]), row["px16"])
+                    held += row["client"][1] == work and work < 750
+        self.assertGreater(held, 0, "some window was held to a work area shorter than 600 logical px")
+        # A page that needs more than the work area holds keeps what it needs.
+        tall = {row["page"]: row["client"][1] for row in self.rows(1.25, 2.25, "canary", 1)}
+        self.assertGreater(max(tall.values()), 680)
+        for row in self.rows(1.25, 2.25, "canary", 680):
+            with self.subTest(page=row["page"]):
+                self.assertEqual(row["client"][1], max(680, tall[row["page"]]))
+                self.assertLessEqual(row["used"], row["cardInner"])
+
+
 class SourceTests(unittest.TestCase):
     def test_the_height_is_the_larger_of_600_and_what_the_pages_need(self):
         fit = WINDOW[WINDOW.index("private void Fit()"):]
         fit = fit[:fit.index("private static int Inner")]
-        self.assertRegex(fit, r"Math\.Max\(Px\(OpeningHeight\), needed\)")
+        self.assertIn("HeightFor(needed, WorkHeight())", fit)
+        pure = WINDOW[WINDOW.index("internal static int HeightFor"):]
+        self.assertIn("Math.Max(floor, needed)", pure[:pure.index("private static int Inner")])
+        self.assertIn("Math.Min(Px(OpeningHeight), workHeight)", pure[:pure.index("private static int Inner")])
         self.assertIn("Px(16) + HeaderHeight() + Px(16) + tallest + Px(32) + Px(16) + Px(Brand.ButtonHeight) + Px(16)", fit,
                       "what the pages need is what it was")
         self.assertEqual(re.search(r"internal const int OpeningWidth = (\d+);", WINDOW).group(1), "600")
