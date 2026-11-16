@@ -759,7 +759,6 @@ try {
     $cases = @(
         @('save', (Get-Field $window 'saveButton'), (Get-Field $window 'saveButton')),
         @('restore', (Get-Field $window 'restoreButton'), (Get-Field $window 'restoreButton')),
-        @('close', (Get-Field $window 'closeButton'), (Get-Field $window 'closeButton')),
         @('page.history', $nav['history'], $nav['history']),
         @('section.appearance', $tabs['appearance'], $tabs['appearance']),
         @('setting.theme', $editors['theme'], $editors['theme']),
@@ -767,6 +766,9 @@ try {
         @('setting.__startup', $editors['__startup'], $editors['__startup']),
         @(('setting.' + $spinName), $edit, $spin)
     )
+    # v0.6.24-beta.2: the save card's Close is gone (the header's X closes the window): a reopen from an older window that
+    # had the keyboard there names no control here, and starts at the page's tab.
+    $out.focus.closeTarget = [bool]($null -eq (Invoke-Window $window 'FocusTarget' @('close')))
     $out.focus.names = @()
     foreach ($case in $cases) {
         $window.ActiveControl = $case[1]
@@ -1510,6 +1512,7 @@ class WindowThemeTests(unittest.TestCase):
             with self.subTest(case["expected"]):
                 self.assertEqual(case["name"], case["expected"])
                 self.assertTrue(case["target"], "the name leads back to the same control")
+        self.assertTrue(focus["closeTarget"], "Close is gone: an older window's --focus=close names nothing")
         self.assertEqual(focus["nothingOnSettings"], "section.appearance")
         self.assertEqual(focus["nothingOnPending"], "page.pending")
         restored = focus["restored"]
@@ -1795,7 +1798,8 @@ class ThemeSourceRuleTests(unittest.TestCase):
 
     def test_the_note_about_a_pending_reopen_sits_in_the_save_card(self):
         footer = self.block(guiscan.settings(), "private void BuildFooter()", "\n        }\n")
-        self.assertIn("savebar.Controls.Add(reopenNote, 1, 0);", footer)
+        # v0.6.24-beta.2: its first column, where the version stood before it moved to the tabs' pill.
+        self.assertIn("savebar.Controls.Add(reopenNote, 0, 0);", footer)
         self.assertIn("reopenNote.LiveSetting = AutomationLiveSetting.Polite;", footer)
         english = json.loads((ROOT / "src" / "codex_auto_resume" / "locales" / "en.json").read_text(encoding="utf-8"))
         note = self.block(guiscan.settings(), "private void ShowReopenNote(bool show)", "\n        }\n")

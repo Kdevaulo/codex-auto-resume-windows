@@ -158,7 +158,8 @@ class WindowSourceTests(unittest.TestCase):
     def test_nothing_a_person_acts_on_drags_the_window(self):
         sources = guiscan.read("gui/SettingsApp.cs") + guiscan.read("gui/InstallerWindow.cs") + guiscan.read("gui/SoftChrome.cs")
         dragged = set(re.findall(r"\b(?:chrome|host)\.Drag\((\w+)\);", sources))
-        for never in ("startButton", "pageHost", "savebar", "forward", "back", "cancel", "body", "sheet"):
+        # v0.6.24-beta.2: and the version's pill at the end of the tabs, which is pressed (VersionPressed).
+        for never in ("startButton", "pageHost", "savebar", "versionPill", "versionText", "forward", "back", "cancel", "body", "sheet"):
             self.assertNotIn(never, dragged)
         through = guiscan.member_body("DragThrough", "WndProc")
         self.assertIn("Chrome.HTTRANSPARENT", through)

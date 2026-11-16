@@ -572,21 +572,20 @@ class WindowCompositionTests(unittest.TestCase):
         return source[start:source.index("\n        }\n", start)]
 
     def test_the_window_opens_at_a_size_the_overview_fits_and_does_not_grow(self):
-        """1000 by 664 (v0.6.5): the Overview whole in every language at every scaling, each card a little
-        taller than what it holds and the page's rhythm under the last row (LayoutAuditTests holds the page to
-        it). With the buttons at the cards' bottom left, in rows of their own, the rows need a window of 624 to
-        635 px; 664 is 626 - what they need at 100% - with the scale's medium step in every card and the page's
-        gap under them. It is taller than a 1920 by 1080 screen at 150% has room for, where KeepOnScreen makes it
-        as tall as the work area and the Overview still fits (LayoutAuditTests measures the shortest window)."""
+        """1000 by 588 (v0.6.24-beta.2, the owner's decision of 2026-11-16; 664 from v0.6.5): the Overview whole in every
+        language at every scaling, each card a little taller than what it holds and the page's rhythm under the last row
+        (LayoutAuditTests holds the page to it) - the pages as tall as in the beta's 1000 by 681, which had a footer card
+        under every page and a header card 14 px taller. It now fits a 1920 by 1080 screen at 150% whole; on a shorter
+        one KeepOnScreen makes it as tall as the work area and the Overview still fits (LayoutAuditTests measures the
+        shortest window)."""
         self.assertIn("ClientSize = new Size(Px(OpeningWidth), Px(OpeningHeight));", self.window)
         width = int(re.search(r"internal const int OpeningWidth = (\d+);", self.window).group(1))
         height = int(re.search(r"internal const int OpeningHeight = (\d+);", self.window).group(1))
-        self.assertEqual((width, height), (1000, 664))
-        # The work area of 1920 by 1080 at 150% with the taskbar (72 device pixels), and the frame Windows
-        # 11 gives the window there, in device pixels: 22 across, 56 down (measured with GetWindowRect,
-        # and AdjustWindowRectExForDpi at 144 DPI answers the same).
+        self.assertEqual((width, height), (1000, 588))
+        # The work area of 1920 by 1080 at 150% with the taskbar (72 device pixels), and the frame the window keeps there
+        # with no title bar of Windows' (v0.6.24): 11 px below its client area at 144 DPI (SHORTEST_AT_150).
         self.assertLessEqual(round(width * 1.5) + 22, 1920)
-        self.assertGreater(round(height * 1.5) + 56, 1080 - 72, "it fits there now; the reasoning above is out of date")
+        self.assertLessEqual(round(height * 1.5), SHORTEST_AT_150, "it no longer fits there; the reasoning above is out of date")
         self.assertIn("ClientSize = new Size(Math.Max(Px(340), Math.Min(ClientSize.Width, screen.Width - frameWidth)),",
                       self.method(self.window, "private void KeepOnScreen("), "a smaller screen makes the window smaller")
         self.assertIn("MinimumSize = new Size(Px(800), Px(420));", self.window)
@@ -849,11 +848,15 @@ class WindowCompositionTests(unittest.TestCase):
         self.assertIn("finally { moving = false; }", move)
 
     def test_every_button_at_the_right_of_a_card_or_row_is_pinned_to_its_bottom_right(self):
-        """The header's Start button and the Clear buttons under the Custom messages are at the right of a card
-        and of a row, and are held to the bottom of it as the Overview's are."""
+        """The Clear buttons under the Custom messages are at the right of a row, and are held to the bottom of it as
+        the Overview's are. v0.6.24-beta.2: the header's Start button was too, until the header card became two lines
+        tall (76 px at 100 %) with the caption buttons in its top corner: there is no bottom right under them for it, so it
+        stands before them, centred on the two lines as the light is (KeepHeadlineClear; LayoutAudit's AuditCaption holds
+        it clear of them)."""
         header = self.method(self.window, "private void BuildHeader(")
-        self.assertIn("startButton.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;", header)
-        self.assertIn("Pinned(startButton, hero);", header)
+        self.assertIn("startButton.Anchor = AnchorStyles.Right;", header)
+        self.assertNotIn("Pinned(startButton, hero);", header)
+        self.assertIn("startButton.Margin = before;", self.method(self.window, "private void KeepHeadlineClear("))
         footer = self.method(self.window, "private Control TextFooter(")
         self.assertIn("clear.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;", footer)
         self.assertIn("Pinned(clear, row);", footer)
@@ -1616,14 +1619,15 @@ class LayoutAuditTests(unittest.TestCase):
 
     def test_every_button_is_in_its_corner_and_over_no_text(self):
         """The Overview's three card buttons at their cards' bottom LEFT, clear of the text above them (AuditLead), and
-        the header's Start button and the Custom messages' two Clear buttons at their card's or row's bottom right
-        (AuditPin), in every language at every scaling (their findings are in the first test's reports). This holds the
-        audit to having looked at all six."""
+        the Custom messages' two Clear buttons at their row's bottom right (AuditPin), in every language at every scaling
+        (their findings are in the first test's reports). This holds the audit to having looked at all five. v0.6.24-beta.2:
+        six until then, with the header's Start button, which stands before the caption buttons in a header card two lines
+        tall (AuditCaption holds it clear of them)."""
         self.assertEqual(sorted(self.answer["pins"]), sorted(l10n.LOCALES))
         for locale in l10n.LOCALES:
             for scale in SCALES:
                 with self.subTest(locale=locale, scale=scale):
-                    self.assertEqual(self.answer["pins"][locale]["%.2f" % scale], 6)
+                    self.assertEqual(self.answer["pins"][locale]["%.2f" % scale], 5)
 
     def test_the_audit_finds_a_button_out_of_its_corner_or_over_text(self):
         canary = self.answer["pinCanary"]

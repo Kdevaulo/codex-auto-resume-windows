@@ -27,7 +27,7 @@ if str(ROOT / "build") not in sys.path:
 
 import motion_window  # noqa: E402
 
-OPENING = (1000, 664)    # SettingsForm.OpeningWidth / OpeningHeight, at 96 dpi
+OPENING = (1000, 588)    # SettingsForm.OpeningWidth / OpeningHeight, at 96 dpi (664 until v0.6.24-beta.2)
 PER_MONITOR = -4         # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2: the window's own awareness (its manifest)
 
 
@@ -75,13 +75,14 @@ class PinnedSizeTests(unittest.TestCase):
         self.assertGreater(wanted[0], largest[0])
         said = "at scale %s on a machine whose largest window is %dx%d" % (scale, largest[0], largest[1])
         self.assertEqual(result["client"][0], wanted[0], said)
-        # v0.6.24: the window opens taller by what its header grew for the caption buttons (SettingsForm.OpeningClient:
-        # 16 px at 100 % in English, never past Windows' title bar and top frame, 31) - so its pages keep their height.
+        # v0.6.24: the window opens taller by what its header card grew past its 76 px (SettingsForm.OpeningClient: none in
+        # English), never past Windows' title bar and top frame, 31 - so its pages keep their height.
         self.assertGreaterEqual(result["client"][1], wanted[1], said)
         self.assertLessEqual(result["client"][1], wanted[1] + int(round(31 * scale)), said)
 
     def test_the_scale_outgrows_a_ci_runner_and_a_large_monitor(self):
-        self.assertEqual(scale_beyond((1044, 788)), 1.5)
+        # v0.6.24-beta.2: 1.75 for the window of 1000 by 588 (1.5 for 1000 by 664 until then).
+        self.assertEqual(scale_beyond((1044, 788)), 1.75)
         self.assertGreater(OPENING[0] * scale_beyond((3860, 2180)), 3860)
 
 

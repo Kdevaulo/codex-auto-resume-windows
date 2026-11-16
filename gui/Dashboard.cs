@@ -1434,6 +1434,7 @@ namespace CodexAutoResume
             }
             strip.ResumeLayout(true);
             nav.Controls.Add(strip);
+            BuildVersionPill(strip);
             // As tall as the tabs, measured, and again whenever the window's font changes - with the room the chosen
             // tab's heavier words take (ShowPage sets it in nav_current): in Microsoft YaHei UI the bold is a face of
             // its own, a pixel taller than the regular, and the chosen tab was cut off at the strip's foot (v0.6.17).
@@ -1500,6 +1501,9 @@ namespace CodexAutoResume
                 Control page = PageFor(name);
                 // v0.6.23: what came while it was out of sight, written before it shows (Writes).
                 WriteIfStale(name);
+                // v0.6.24-beta.2: the save bar on Settings alone, inside the height every page has - set before the page is
+                // laid out, so it is laid out once in the room it has.
+                if (Soft.OwnVisible(footer) != settings) footer.Visible = settings;
                 // Every page stays in the host once built and only the one shown is visible: taking a
                 // page off and putting the next on moved every native control in it to Windows'
                 // parking window and back.

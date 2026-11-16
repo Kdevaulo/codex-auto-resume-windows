@@ -41,7 +41,6 @@ namespace CodexAutoResume
             // What a card filling the strip is given: the width docked children are laid out in, less the
             // strip's padding. The strip is docked across the window, so nothing else takes from it.
             return DisplayRectangle.Width - footer.Padding.Horizontal - savebar.Padding.Horizontal
-                 - (versionText.PreferredSize.Width + versionText.Margin.Horizontal)
                  - (row.PreferredSize.Width + row.Margin.Horizontal)
                  - reopenNote.Margin.Horizontal - reopenNote.Padding.Horizontal;
         }
@@ -1617,7 +1616,7 @@ namespace CodexAutoResume
             header.Invalidate(true);
         }
 
-        /// The version as the save bar and Diagnostics show it, with the edition that runs after it (v0.6.11) in the
+        /// The version as the tabs' pill (v0.6.24-beta.2; the save bar until then) and Diagnostics show it, with the edition that runs after it (v0.6.11) in the
         /// catalog's word (edition.shown) - since the owner's decision of 2026-10-02 as quiet secondary text, smaller and
         /// in the secondary colour, on the version's baseline, with no separator (VersionLabel). A status that names no
         /// edition shows the version alone, as it did before - and since v0.6.14 so does the standard edition, which is

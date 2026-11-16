@@ -227,6 +227,8 @@ namespace CodexAutoResume
                     form.PerformLayout();
                     form.AuditHero("header", findings);
                     form.AuditCaption("header", findings);
+                    // v0.6.24-beta.2: the version's pill at the end of the tabs, clear of every tab (FitVersionPill).
+                    form.AuditPill(findings);
                     // The reopen note, beside every button of the Settings page's save card, at the opening width
                     // and at the narrowest the window goes: 800 wide, less a sizable frame's 8 px on each side -
                     // each in both orders a window comes to a width in (AuditReopenNote).
@@ -743,8 +745,15 @@ namespace CodexAutoResume
         /// other width the audit measures, so the card is always laid out at a width that is not the one measured.
         private void AuditReopenNote(int width, List<string> findings)
         {
-            AuditReopenNote(width, false, findings);
-            AuditReopenNote(width, true, findings);
+            // v0.6.24-beta.2: the save card is on the Settings page alone (ShowPage), where the note is said.
+            bool footerShown = Soft.OwnVisible(footer);
+            footer.Visible = true;
+            try
+            {
+                AuditReopenNote(width, false, findings);
+                AuditReopenNote(width, true, findings);
+            }
+            finally { footer.Visible = footerShown; }
         }
 
         private void AuditReopenNote(int width, bool beforeTheLayout, List<string> findings)
@@ -813,6 +822,36 @@ namespace CodexAutoResume
                 findings.Add(where + " :: the light's box is " + stateDot.Size + ", too small for its glow");
         }
 
+        /// How the last LayoutAudit found the version's pill: "whole", "version" or "none" (FitVersionPill), for the tests.
+        internal static string AuditedPill = "";
+
+        /// v0.6.24-beta.2: the version's pill (VersionPill) clear of every page tab and inside the tab strip's row, its words
+        /// whole in it, centred on the tabs within a pixel, at the strip's outer end (the left, mirrored); or not shown.
+        private void AuditPill(List<string> findings)
+        {
+            AuditedPill = PillFit;
+            if (AuditedPill == "none") return;
+            var pill = new Rectangle(versionPill.Left + pillSlot.Left, versionPill.Top + pillSlot.Top, versionPill.Width, versionPill.Height);
+            foreach (NavButton tab in navButtons.Values)
+            {
+                var face = new Rectangle(tab.Left + tab.Parent.Left, tab.Top + tab.Parent.Top, tab.Width, tab.Height);
+                if (face.IntersectsWith(pill))
+                    findings.Add("tabs :: the version's pill " + pill + " lies over the tab " + tab.Text + " " + face);
+                float middle = face.Top + face.Height / 2f, centre = pill.Top + pill.Height / 2f;
+                if (Math.Abs(middle - centre) > 1)
+                    findings.Add("tabs :: the version's pill is centred at " + centre + ", the tabs at " + middle);
+            }
+            if (pill.Left < 0 || pill.Right > nav.ClientSize.Width || pill.Top < 0 || pill.Bottom > nav.ClientSize.Height)
+                findings.Add("tabs :: the version's pill " + pill + " is not inside the tabs' row " + nav.ClientSize);
+            Rectangle room = nav.DisplayRectangle;
+            int outer = Mirror.Of(nav) ? pill.Left - room.Left : room.Right - pill.Right;
+            if (Math.Abs(outer) > 1)
+                findings.Add("tabs :: the version's pill stands " + outer + " px from the tabs' outer end");
+            int words = versionText.GetPreferredSize(Size.Empty).Width;
+            if (versionText.Width < words)
+                findings.Add("tabs :: the version's pill cuts its words: " + versionText.Width + " of " + words);
+        }
+
         internal static int AuditedCaption, AuditedTitleCards;
         /// Each header the caption was audited in: `where:x,y,width,height;clear;inset` - the buttons' group in the header,
         /// how far the headline ends before it, and how far the group stands in from the hero's outer edge (for the tests).
@@ -864,6 +903,9 @@ namespace CodexAutoResume
             if (clear < Px(8)) findings.Add(where + " :: the headline ends " + clear + " px from the caption buttons");
             if (Soft.OwnVisible(startButton) && chrome.InHolder(startButton).IntersectsWith(group))
                 findings.Add(where + " :: the Start button lies under the caption buttons");
+            // v0.6.24-beta.2: in a card two lines tall, the line under the headline starts below the caption buttons.
+            if (chrome.InHolder(detail).IntersectsWith(group))
+                findings.Add(where + " :: the line under the headline lies under the caption buttons");
             AuditedCaptionGeometry += where + ":" + group.X + "," + group.Y + "," + group.Width + "," + group.Height + ";" + clear + ";" +
                                       inset + "\n";
         }
