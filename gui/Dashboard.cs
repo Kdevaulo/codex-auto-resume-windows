@@ -354,7 +354,7 @@ namespace CodexAutoResume
         private readonly Timer timer = new Timer();
         private readonly Transition fade;
         private string behind, words;
-        private bool waiting, aside;
+        private bool waiting, aside, arriving;
         private int holdMs;
 
         internal AsideLabel()
@@ -364,12 +364,36 @@ namespace CodexAutoResume
             timer.Tick += delegate
             {
                 timer.Stop();
-                if (waiting) Speak();
+                if (arriving) Arrived();
+                else if (waiting) Speak();
                 else Return();
             };
         }
 
         internal bool Saying { get { return aside; } }
+
+        /// Whether its own words are held back until they come in (Arrive), for the tests.
+        internal bool Arriving { get { return arriving; } }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-16): its own words - whatever it is told meanwhile - held back for `delayMs`
+        /// and then coming in exactly as they come back after an aside (Return: OutMs, the same fade and rise), as the status
+        /// light's sweep ends. Nothing while an aside is on its way or being said, and nothing where it may not move
+        /// (Motion.Allowed): there the line is simply there.
+        internal void Arrive(int delayMs)
+        {
+            if (aside || waiting || arriving || !Motion.Allowed(this)) return;
+            arriving = true;
+            Invalidate();
+            timer.Stop();
+            timer.Interval = Math.Max(1, delayMs);
+            timer.Start();
+        }
+
+        private void Arrived()
+        {
+            arriving = false;
+            Glide(OutMs);
+        }
 
         /// Whether it is fading in or out (for the tests).
         internal bool Fading { get { return fade.Running; } }
@@ -388,6 +412,8 @@ namespace CodexAutoResume
         internal void Aside(string said, int delayMs, int heldMs)
         {
             if (!aside && !waiting) behind = base.Text;
+            // Its own words, if they were still to come in, come back after the aside as they always do.
+            arriving = false;
             words = said;
             holdMs = heldMs;
             timer.Stop();
@@ -427,6 +453,8 @@ namespace CodexAutoResume
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            // Its words still to come in (Arrive): the ground alone, which Label's background already painted.
+            if (arriving) return;
             if (!aside && !fade.Running)
             {
                 base.OnPaint(e);

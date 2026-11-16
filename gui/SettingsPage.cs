@@ -1542,6 +1542,7 @@ namespace CodexAutoResume
             // word back within a second, beside words that say the state cannot be read.
             heroHeld = true;
             stateDot.State = "idle";
+            lightBefore = "idle";
             TellTaskbar(null, null, 0);
             headline.Text = S("status.unavailable", "Status unavailable");
             detail.Text = S("status.unavailable_detail", "Settings can still be changed and saved");
@@ -1658,6 +1659,9 @@ namespace CodexAutoResume
             string head = Headline(strings, status, pending);
             HeroTold(ref light, ref head);
             stateDot.State = light;
+            // v0.6.24-beta.2: the light's sweep as the window opens and as the light turns on (LightRead), from the light the
+            // watcher's state gives - not an action's working light over it (BusyLight).
+            LightRead(HeaderLight(status, pending, word));
             string facts = string.Join("   ·   ", HeroFacts(strings, status, pending).ToArray());
             if (head == heroHead && facts == heroDetail) return;
             if (head != heroHead) headline.Text = heroHead = head;

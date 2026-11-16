@@ -446,6 +446,73 @@ namespace CodexAutoResume
         // The sentence comes in as the sweep ends, and goes 4 s after it has come in.
         internal const int AsideAfterMs = 850, AsideMs = 4150;
 
+        // v0.6.24-beta.2 (the owner, 2026-11-16): the egg's light, without its sentence, as the window opens and as the light
+        // turns on. The light the watcher's state last gave (Hero, before an action's working light: BusyLight) - null until
+        // the first read; whether the window's opening sweep has been decided; and whether it waits for the window to show.
+        private string lightBefore;
+        private bool lightOpened, sweepOnShown;
+
+        /// What the light's sweep was asked for, in order - "open" and "on" - for the tests; whether each played is the
+        /// sweep's own (Motion.Allowed).
+        internal readonly List<string> LightSweepsAsked = new List<string>();
+
+        /// Whether the light is off: the watcher not running or not known to (idle), or recovery paused.
+        internal static bool LightOff(string light)
+        {
+            return light == null || light == "idle" || light == "paused";
+        }
+
+        /// Whether the light says the watcher is watching: its running colours.
+        internal static bool LightWatching(string light)
+        {
+            return light == "monitoring" || light == "waiting" || light == "checking" || light == "recovering";
+        }
+
+        /// Whether the light turns on from `before` to `after`: from off to watching; never between two watching states,
+        /// from the amber of a watcher that needs a person, or as it turns off.
+        internal static bool LightTurnsOn(string before, string after)
+        {
+            return before != null && LightOff(before) && LightWatching(after);
+        }
+
+        /// No sweep in a picture: a render job, a capture or the layout audit draws the light still, the same every time.
+        private bool LightSweepsShown
+        {
+            get { return !auditing && !RenderPinned && Soft.StillLightMs < 0 && Soft.StillReady == null && Soft.StillNow < 0; }
+        }
+
+        /// The light the watcher's state gives, as a read writes it (Hero): the first in a window a person opened - not one that
+        /// reopened itself for a language, a theme or a monitor's scale, the same open going on - sweeps once; after that, a
+        /// light that turns on does.
+        private void LightRead(string light)
+        {
+            string before = lightBefore;
+            lightBefore = light;
+            if (!lightOpened)
+            {
+                lightOpened = true;
+                if (request.Generation == 0) SweepLight("open");
+                return;
+            }
+            if (LightTurnsOn(before, light)) SweepLight("on");
+        }
+
+        /// The egg's sweep, and the line under the headline coming in as it ends (AsideLabel.Arrive), at the egg's pace
+        /// (AsideAfterMs) - never its sentence. Once at a time: asked while one is on its way, nothing. A window not yet on
+        /// screen sweeps as it is shown.
+        private void SweepLight(string why)
+        {
+            if (!LightSweepsShown || stateDot.Sweeping) return;
+            LightSweepsAsked.Add(why);
+            if (!shown)
+            {
+                sweepOnShown = true;
+                return;
+            }
+            stateDot.Sweep();
+            if (stateDot.Sweeping) detail.Arrive(AsideAfterMs);
+        }
+
         private void VersionPressed()
         {
             if (!versionPresses.Press(versionClock.Elapsed.TotalMilliseconds)) return;
@@ -949,6 +1016,13 @@ namespace CodexAutoResume
             Shown += delegate
             {
                 shown = true;
+                // v0.6.24-beta.2: the opening sweep a read before this asked for (SweepLight).
+                if (sweepOnShown)
+                {
+                    sweepOnShown = false;
+                    stateDot.Sweep();
+                    if (stateDot.Sweeping) detail.Arrive(AsideAfterMs);
+                }
                 // v0.6.20: the watcher's request to come forward is heard even when this window runs elevated.
                 AcceptOpenRequests();
                 // v0.6.18 B3: a window that replaces another is the size it was placed at once it is on screen, whatever
