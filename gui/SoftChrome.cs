@@ -382,6 +382,8 @@ namespace CodexAutoResume
         internal static ChromeHost Install(Form form, Control card, Control holder)
         {
             var host = new ChromeHost(form, card, holder);
+            // Focus rings for the keyboard only, the mouse hiding them again (FocusCues; the owner, 2026-11-16).
+            FocusCues.Watch(form);
             foreach (CaptionButton button in host.Buttons()) holder.Controls.Add(button);
             host.Raise();
             EventHandler place = delegate { host.Place(); };
@@ -1078,6 +1080,129 @@ namespace CodexAutoResume
         }
     }
 
+    /// v0.6.24 (the owner, 2026-11-16: a page tab clicked with the mouse kept its blue keyboard ring): focus rings while a
+    /// person moves by keyboard, never after the mouse - "focus-visible". Every control already draws its ring only as
+    /// `Focused && ShowFocusCues`, which follows the top-level window's UISF_HIDEFOCUS; Windows and WinForms clear that
+    /// bit on keyboard input (Tab, Alt, F10) and nothing ever set it again, so once cleared a click left a ring behind.
+    ///
+    /// One filter on the window thread's message loop, for every window of ours with this chrome (ChromeHost.Install) and
+    /// every SoftDialog: a mouse press (left, right, middle or X, in the client area or on the frame) inside one of them -
+    /// or in a popup it owns, a drop-down's list or a menu - sets UISF_HIDEFOCUS on that top-level window again
+    /// (WM_CHANGEUISTATE UIS_SET, which Windows hands down to every control in it) before the press reaches the control,
+    /// so the control it focuses and every other shows no ring. A key after which the focus stands on another control of
+    /// the same window - Tab and Shift+Tab, an arrow along the page tabs or a group, an access key - clears it again
+    /// (UIS_CLEAR), as WinForms does for Tab only: the arrows moved the focus with no ring. A key that moves no focus
+    /// (typing, a drop-down's arrows) changes nothing. Where Windows' own setting shows keyboard cues always
+    /// (SPI_GETKEYBOARDCUES) it ignores the set, and every ring stays: that person's choice. A picture (Soft.StillReady)
+    /// is never given a ring here; the render mode hides them as it always did (WindowRender).
+    internal static class FocusCues
+    {
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr window, int flags);
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr window, int command);
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetFocus();
+        [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+        private const int GA_ROOT = 2, GW_OWNER = 4;
+        internal const int WM_CHANGEUISTATE = 0x0127, WM_QUERYUISTATE = 0x0129;
+        internal const int UIS_SET = 1, UIS_CLEAR = 2, UISF_HIDEFOCUS = 0x1;
+        private const int WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104;
+
+        // The windows watched, by the thread whose loop the filter is on: a window and its dialogs share one.
+        [ThreadStatic] private static HashSet<Form> watched;
+        [ThreadStatic] private static Filter filter;
+
+        /// Watches `form` (idempotent) from the thread it is made on, for as long as it lives.
+        internal static void Watch(Form form)
+        {
+            if (form == null) return;
+            if (watched == null) watched = new HashSet<Form>();
+            if (!watched.Add(form)) return;
+            HashSet<Form> set = watched;
+            form.Disposed += delegate { set.Remove(form); };
+            if (filter == null)
+            {
+                filter = new Filter();
+                Application.AddMessageFilter(filter);
+            }
+        }
+
+        /// Whether a mouse message is a button going down: WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_XBUTTONDOWN,
+        /// their double-clicks, and the same on the frame (WM_NCLBUTTONDOWN ... WM_NCXBUTTONDBLCLK), the caption included.
+        internal static bool Press(int message)
+        {
+            switch (message)
+            {
+                case 0x0201: case 0x0203: case 0x0204: case 0x0206: case 0x0207: case 0x0209: case 0x020B: case 0x020D:
+                case 0x00A1: case 0x00A3: case 0x00A4: case 0x00A6: case 0x00A7: case 0x00A9: case 0x00AB: case 0x00AD:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// The watched window `window` is in - its top-level window, or the nearest watched owner of a popup it is in.
+        internal static Form Of(IntPtr window)
+        {
+            if (watched == null || watched.Count == 0 || window == IntPtr.Zero) return null;
+            IntPtr root = GetAncestor(window, GA_ROOT);
+            for (int depth = 0; root != IntPtr.Zero && depth < 8; depth++)
+            {
+                var form = Control.FromHandle(root) as Form;
+                if (form != null && watched.Contains(form) && !form.IsDisposed) return form;
+                IntPtr owner = GetWindow(root, GW_OWNER);
+                root = owner == IntPtr.Zero ? IntPtr.Zero : GetAncestor(owner, GA_ROOT);
+            }
+            return null;
+        }
+
+        /// Sets (hidden) or clears the focus rings of `form` and every control in it.
+        internal static void Hide(Form form, bool hidden)
+        {
+            if (form == null || form.IsDisposed || !form.IsHandleCreated || !form.TopLevel) return;
+            int action = (hidden ? UIS_SET : UIS_CLEAR) | (UISF_HIDEFOCUS << 16);
+            SendMessage(form.Handle, WM_CHANGEUISTATE, (IntPtr)action, IntPtr.Zero);
+        }
+
+        private sealed class Filter : IMessageFilter
+        {
+            public bool PreFilterMessage(ref Message m)
+            {
+                try
+                {
+                    int message = m.Msg;
+                    if (Press(message))
+                    {
+                        Hide(Of(m.HWnd), true);
+                    }
+                    else if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN) && Soft.StillReady == null)
+                    {
+                        Form form = Of(m.HWnd);
+                        if (form == null || !form.IsHandleCreated || !form.TopLevel || GetAncestor(m.HWnd, GA_ROOT) != form.Handle)
+                            return false;
+                        IntPtr before = GetFocus();
+                        // Looked at once the key has been handled: the focus moves while it is (ProcessDialogKey).
+                        form.BeginInvoke((MethodInvoker)delegate
+                        {
+                            try
+                            {
+                                if (form.IsDisposed || !form.IsHandleCreated) return;
+                                IntPtr now = GetFocus();
+                                if (now != before && now != IntPtr.Zero && GetAncestor(now, GA_ROOT) == form.Handle) Hide(form, false);
+                            }
+                            catch (Exception) { }
+                        });
+                    }
+                }
+                catch (Exception) { }
+                return false;
+            }
+        }
+    }
+
     /// A control that reaches into the window's grip band, giving that band to the window (ChromeHost.Grip): its answer
     /// to what the pointer is over is the window's there (HTTRANSPARENT), its own everywhere else.
     internal sealed class GripThrough : NativeWindow
@@ -1524,6 +1649,12 @@ namespace CodexAutoResume
         /// The title row's measures in logical px: the ground above and below it, and how far in from the side gap its words
         /// start (the mockup the owner chose).
         internal const int TitleAbove = 8, TitleWordsInset = 6;
+
+        /// Every dialog of ours, titled or not, shows focus rings for the keyboard only (FocusCues; the owner, 2026-11-16).
+        internal SoftDialog()
+        {
+            FocusCues.Watch(this);
+        }
 
         /// How much of the dialog's height its title takes once it is made: 0 before.
         internal int TitleReserve { get { return titleGround == null ? 0 : titleGround.Height; } }
