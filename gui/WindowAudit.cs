@@ -884,11 +884,10 @@ namespace CodexAutoResume
             SoftCard card = soft.TitleCard;
             int gap = Soft.Px(16);
             // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller than what it laid
-            // out (SystemInformation.MaxWindowTrackSize): every dialog audit leaves such a one's geometry alone, as the
-            // window opens only at a text size whose dialogs its screen holds (TextScale.Fitting). Its title is still asked
-            // to be there, last and below nothing of its own.
-            Size most = SystemInformation.MaxWindowTrackSize;
-            if (dialog.Width >= most.Width || dialog.Height >= most.Height)
+            // out (HeldByScreen): every dialog audit leaves such a one's geometry alone, as the window opens only at a text
+            // size whose dialogs its screen holds (TextScale.Fitting). Its title is still asked to be there, last and below
+            // nothing of its own.
+            if (HeldByScreen(dialog))
             {
                 if (dialog.Controls.GetChildIndex(strip) != dialog.Controls.Count - 1)
                     findings.Add(where + " :: the title's strip is not the last control the dialog holds");
@@ -1407,14 +1406,26 @@ namespace CodexAutoResume
                 dialog.TopLevel = false;
                 Materialise(dialog);
                 dialog.PerformLayout();
-                // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller: the window
-                // opens only at a text size whose dialogs its screen holds (TextScale.Fitting).
-                bool whole = dialog.ClientSize.Width >= Px(600);
+                // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller than it was
+                // laid out for (HeldByScreen): the window opens only at a text size whose dialogs its screen holds
+                // (TextScale.Fitting). v0.6.24: its title card's strip is in the dialog now, as large as the text, where
+                // Windows' caption was outside it - so in a dialog held to a small screen (200% at the largest text size
+                // on 1024 by 768) the text box is left less than a line: what is cut off there is the screen's, and no
+                // whole line is asked in it, as in the Settings page's own-value dialogs (AuditOwnDialog).
+                bool whole = !HeldByScreen(dialog);
                 if (whole && conversationArea != null && conversationArea.Right > dialog.ClientSize.Width)
                     findings.Add("conversation message :: its text box reaches past the dialog, " + conversationArea.Right +
                                  " in " + dialog.ClientSize.Width);
-                AuditSpoken("conversation message", dialog, findings);
-                AuditTitleCard("conversation message", dialog, findings);
+                AuditLines = whole;
+                try
+                {
+                    AuditSpoken("conversation message", dialog, findings);
+                    AuditTitleCard("conversation message", dialog, findings);
+                }
+                finally
+                {
+                    AuditLines = true;
+                }
             }
         }
 
@@ -1430,12 +1441,26 @@ namespace CodexAutoResume
                 dialog.TopLevel = false;
                 Materialise(dialog);
                 dialog.PerformLayout();
-                bool whole = dialog.ClientSize.Width >= Px(600);
+                // Unless the screen this runs on is smaller than the dialog, which Windows then makes smaller than it was
+                // laid out for (HeldByScreen): the window opens only at a text size whose dialogs its screen holds
+                // (TextScale.Fitting). v0.6.24: its title card's strip is in the dialog now, as large as the text, where
+                // Windows' caption was outside it - so in a dialog held to a small screen (200% at the largest text size
+                // on 1024 by 768) the text box is left less than a line: what is cut off there is the screen's, and no
+                // whole line is asked in it, as in the Settings page's own-value dialogs (AuditOwnDialog).
+                bool whole = !HeldByScreen(dialog);
                 if (whole && onceWordsArea != null && onceWordsArea.Right > dialog.ClientSize.Width)
                     findings.Add("words for this time :: its text box reaches past the dialog, " + onceWordsArea.Right +
                                  " in " + dialog.ClientSize.Width);
-                AuditSpoken("words for this time", dialog, findings);
-                AuditTitleCard("words for this time", dialog, findings);
+                AuditLines = whole;
+                try
+                {
+                    AuditSpoken("words for this time", dialog, findings);
+                    AuditTitleCard("words for this time", dialog, findings);
+                }
+                finally
+                {
+                    AuditLines = true;
+                }
             }
         }
 
@@ -1487,10 +1512,21 @@ namespace CodexAutoResume
 
         /// Whether AuditSpoken holds every text box it passes to a whole line (AuditTextLine). Off only while a dialog that
         /// Windows has made smaller than it was laid out for - one larger than SystemInformation.MaxWindowTrackSize, on a
-        /// small screen - is asked its names (SettingsForm.AuditOwnValues): what is cut off there is the screen's clamp, not
-        /// the layout, the reason the rest of that dialog's layout is not walked either, and the window never opens at
-        /// that text size on that screen (TextScale.Fitting).
+        /// small screen (HeldByScreen) - is asked its names (SettingsForm.AuditOwnValues, and from v0.6.24 the
+        /// conversation's message and the words for this time): what is cut off there is the screen's clamp, not the
+        /// layout, the reason the rest of that dialog's layout is not walked either, and the window never opens at that
+        /// text size on that screen (TextScale.Fitting).
         internal static bool AuditLines = true;
+
+        /// Whether Windows has made `dialog` smaller than it was laid out for: no form is larger than the largest window the
+        /// screen allows (SystemInformation.MaxWindowTrackSize), so on a screen too small for it - 200% at the largest text
+        /// size on a screen 1024 wide - it is held to that. The window opens only at a text size whose dialogs its screen
+        /// holds (TextScale.Fitting), so no person meets such a dialog: the audit leaves its layout alone.
+        internal static bool HeldByScreen(Form dialog)
+        {
+            Size most = SystemInformation.MaxWindowTrackSize;
+            return dialog.Width >= most.Width || dialog.Height >= most.Height;
+        }
 
         /// v0.6.11: every control in `parent` that is showing, that a person can act on (Actionable), and that a screen
         /// reader would announce with no name - the name it is given (AccessibleName), or else the one Windows makes of
