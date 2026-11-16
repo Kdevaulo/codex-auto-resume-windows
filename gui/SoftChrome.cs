@@ -809,9 +809,12 @@ namespace CodexAutoResume
             if (!form.TopLevel) return false;
             FormWindowState before = form.WindowState;
             Size client = form.ClientSize;
-            restoring = before != FormWindowState.Normal;
+            // v0.6.24 W5: kept through a message sent inside this one - the window's own corner cut again as it comes back
+            // (SetWindowRgn), or the restored size itself - where WinForms gives the remembered size back a second time.
+            bool outer = restoring;
+            restoring = outer || before != FormWindowState.Normal;
             try { pass(ref m); }
-            finally { restoring = false; }
+            finally { restoring = outer; }
             FormWindowState after = form.WindowState;
             if (before == FormWindowState.Normal && after != FormWindowState.Normal) restoreClient = client;
             else if (after == FormWindowState.Normal) restoreClient = Size.Empty;
@@ -820,14 +823,17 @@ namespace CodexAutoResume
 
         /// The size the form's SetBoundsCore is asked for (`created` its CreateParams): on the way back from maximised or
         /// minimised, the window of the client it had then with no caption (Chrome.Uncaptioned) - exactly the size it had -
-        /// where WinForms asks for that client's window with Windows' caption counted. Any other size, as asked.
+        /// where WinForms asks for that client's window with Windows' caption counted. Any other size, as asked. A window
+        /// whose outer corner is its own again once it is back (Frameless: its corner is decided before this, in the same
+        /// message) has no frame at all - its window is that client - or it would come back a frame bigger every time.
         internal void Restoring(ref int width, ref int height, BoundsSpecified specified, CreateParams created)
         {
             if (!restoring || restoreClient.IsEmpty || form.WindowState != FormWindowState.Normal) return;
             if ((specified & BoundsSpecified.Size) == 0) return;
             const int MaximizeOrMinimize = 0x01000000 | 0x20000000;
             int style = created.Style & ~MaximizeOrMinimize;
-            Size outer = Chrome.Uncaptioned(new Size(width, height), restoreClient, Chrome.Frame(style, created.ExStyle),
+            Padding frame = Frameless ? Padding.Empty : Chrome.Frame(style, created.ExStyle);
+            Size outer = Chrome.Uncaptioned(new Size(width, height), restoreClient, frame,
                                             Chrome.CaptionedFrame(style, created.ExStyle));
             width = outer.Width;
             height = outer.Height;
