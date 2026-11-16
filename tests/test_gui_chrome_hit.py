@@ -27,6 +27,7 @@ import unittest
 from test_gui_v0611_access import CSC, POWERSHELL, compile_window, run_probe
 
 HTCLIENT, HTCAPTION, HTMINBUTTON, HTMAXBUTTON, HTTOP, HTTOPLEFT, HTTOPRIGHT, HTCLOSE = 1, 2, 8, 9, 12, 13, 14, 20
+HTLEFT, HTRIGHT, HTBOTTOM, HTBOTTOMLEFT = 10, 11, 15, 16
 
 # A window 1000 by 700 at 100 %, its top band 8 px, the buttons 34 by 26, 4 apart, 10 in from the hero's corner -
 # the hero 14 in from the window's sides and 12 down.
@@ -78,6 +79,19 @@ CASES = {
                                                       Maximize=M_MAXIMIZE, Close=M_CLOSE), HTCLOSE),
     "mirrored_maximized_right_corner": ([999, 0], layout(Mirrored=True, Maximized=True, Minimize=M_MINIMIZE,
                                                          Maximize=M_MAXIMIZE, Close=M_CLOSE), HTCAPTION),
+    # v0.6.24: the window's own corner, cut away 24 px along each edge - its corner target runs a band past that
+    # (re-check 5: only the ~3 px diagonal between the cut and the page resized from the corner at 150 %).
+    "own_corner_bottom_edge": ([30, 699], layout(Edges=True, CornerSpan=24), HTBOTTOMLEFT),
+    "own_corner_left_edge": ([3, 669], layout(Edges=True, CornerSpan=24), HTBOTTOMLEFT),
+    "own_corner_top_edge": ([969, 3], layout(Edges=True, CornerSpan=24), HTTOPRIGHT),
+    "own_corner_past_its_reach": ([33, 699], layout(Edges=True, CornerSpan=24), HTBOTTOM),
+    "own_corner_side_past_its_reach": ([3, 667], layout(Edges=True, CornerSpan=24), HTLEFT),
+    "windows_corner_keeps_twice_the_band": ([969, 3], layout(CornerSpan=24), HTTOP),
+    # Re-check 6: the top corners as the bottom ones - down each side too, not only along the top.
+    "own_corner_left_side_from_the_top": ([3, 25], layout(Edges=True, CornerSpan=24), HTTOPLEFT),
+    "own_corner_right_side_from_the_top": ([996, 31], layout(Edges=True, CornerSpan=24), HTTOPRIGHT),
+    "own_corner_left_side_past_its_reach": ([3, 32], layout(Edges=True, CornerSpan=24), HTLEFT),
+    "own_corner_right_side_past_its_reach": ([996, 40], layout(Edges=True, CornerSpan=24), HTRIGHT),
 }
 
 # A dialog with Close alone, fixed: every point of a grid over it.
@@ -98,8 +112,9 @@ function Rect($r) { return New-Object Drawing.Rectangle ([int]$r[0]), ([int]$r[1
 function Layout($given) {
     $box = [Activator]::CreateInstance($type)
     $type.GetField('Client', $instance).SetValue($box, (New-Object Drawing.Size ([int]$given.Client[0]), ([int]$given.Client[1])))
-    foreach ($flag in 'Sizable', 'Maximized', 'Mirrored', 'MinimizeOn', 'MaximizeOn') { $type.GetField($flag, $instance).SetValue($box, [bool]$given.$flag) }
+    foreach ($flag in 'Sizable', 'Maximized', 'Mirrored', 'MinimizeOn', 'MaximizeOn', 'Edges') { $type.GetField($flag, $instance).SetValue($box, [bool]$given.$flag) }
     $type.GetField('Band', $instance).SetValue($box, [int]$given.Band)
+    $type.GetField('CornerSpan', $instance).SetValue($box, [int]$given.CornerSpan)
     foreach ($part in 'Minimize', 'Maximize', 'Close') { $type.GetField($part, $instance).SetValue($box, (Rect $given.$part)) }
     $solid = New-Object 'Drawing.Rectangle[]' (@($given.Solid).Count)
     for ($i = 0; $i -lt $solid.Length; $i++) { $solid[$i] = Rect @($given.Solid)[$i] }

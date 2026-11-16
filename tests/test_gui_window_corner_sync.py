@@ -215,6 +215,8 @@ namespace CodexAutoResume
                 WindowCorner corner = WindowCorner.Attach(form);
                 typeof(ChromeHost).GetField("corner", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(caption, corner);
                 form.Show();
+                // Its first paint: a new window and its companion come on only once it has painted (WindowCorner.Cloak).
+                Application.DoEvents();
                 IntPtr handle = form.Handle;
                 var steps = new List<string>();
                 steps.Add(State(form, corner, "shown"));

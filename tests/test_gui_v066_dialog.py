@@ -76,6 +76,8 @@ Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
 [Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
 $assembly = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
+# What a person sees of a window: DWM's frame bounds, Windows' invisible resize border not counted.
+Add-Type -Namespace DialogPlace -Name Native -MemberDefinition '[DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(System.IntPtr h, int a, int[] r, int s);'
 $static = [Reflection.BindingFlags]'Static,NonPublic,Public'
 $instance = [Reflection.BindingFlags]'Instance,NonPublic,Public'
 $formType = $assembly.GetType('CodexAutoResume.SettingsForm', $true)
@@ -143,6 +145,10 @@ function Ask([string]$text, $affirm, [string]$press, $away = $null) {
         $look.accept = [string]$dialog.AcceptButton.Text
         $look.cancel = [string]$dialog.CancelButton.Text
         $look.at = @($dialog.Bounds.Left, $dialog.Bounds.Top, $dialog.Bounds.Width, $dialog.Bounds.Height)
+        $frame = New-Object 'int[]' 4
+        if ([DialogPlace.Native]::DwmGetWindowAttribute($dialog.Handle, 9, $frame, 16) -eq 0) {
+            $look.visible = @($frame[0], $frame[1], ($frame[2] - $frame[0]), ($frame[3] - $frame[1]))
+        } else { $look.visible = $look.at }
         $look.owner = @($window.Bounds.Left, $window.Bounds.Top, $window.Bounds.Width, $window.Bounds.Height)
         $look.start = [string]$dialog.StartPosition
         $work = [Windows.Forms.Screen]::FromControl($dialog).WorkingArea
@@ -298,7 +304,10 @@ class DialogTests(unittest.TestCase):
             look = self.answer[name]
             with self.subTest(name):
                 self.assertEqual(look["start"], "CenterParent")
-                left, top, width, height = look["at"]
+                # Its visible box (DWM's frame bounds), not its window: a dialog keeps Windows' frame, whose invisible
+                # resize border lies past what a person sees, and SoftDialog holds what is seen inside the work area -
+                # its window may reach that border's width past it (CI 43895825113: left -7 against a work area at 0).
+                left, top, width, height = look["visible"]
                 work = look["work"]
                 self.assertGreaterEqual(left, work[0] - 1)
                 self.assertGreaterEqual(top, work[1] - 1)

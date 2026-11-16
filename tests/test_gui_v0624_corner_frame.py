@@ -19,8 +19,18 @@ Two probes compiled with the window, each shown 30000 px off the desktop and nev
   DWMWCP_ROUND (2) while Windows' is - and DWM's frame off while the region is cut;
 - a window with the Dashboard's caption and corner, whose own window procedure records what reaches Windows' handling:
   while its corner is its own, no WM_NCPAINT and none of the theme's caption and frame messages, WM_NCACTIVATE with -1,
-  a new title and icon taken while it is marked hidden and shown again after (the title taken); while Windows' corner is
+  a new title and icon taken with its caption style off, never marked hidden (the title taken); while Windows' corner is
   back (maximised), every one of them as before.
+
+Re-check 5 found a fresh Dashboard 22 x 11 physical px larger than it asked at 100 % and at 150 %: made as a window with
+Windows' left, right and bottom frames (at the system's scale) round the client, which a window whose corner is its own
+then took whole as its client. Chrome.Uncaption makes such a window with no frame at all; the probe makes the Dashboard at
+both scales (AdoptDisplayScale), never shown, and reads the window Windows made.
+
+A first dark open showed the companion's empty outline over the desktop for 1.2 s, then one white frame, then the
+window. A window with its own corner is now cloaked (DWMWA_CLOAK) as it is made and comes on with its companion only
+once it has painted (WindowCorner.Cloak, Painted); the probe reads DWMWA_CLOAKED and the companion as the Dashboard is
+made, shown before a message is handled, and after its first paint.
 
 What a screen shows - the cut corner clear of any ghost, no classic frame while it is resized - is the measurement
 session's to look at again (M-CORNER items 1 and 3).
@@ -189,7 +199,8 @@ namespace CodexAutoResume
             {
                 long style = IsHandleCreated ? FrameNative.GetWindowLongPtr(Handle, FrameNative.GWL_STYLE).ToInt64() : 0;
                 Reached.Add(new List<object> { (double)msg, (double)m.LParam.ToInt64(), (style & FrameNative.WS_VISIBLE) != 0,
-                                                Caption.Corner.Now.ToString(), FrameNative.IsZoomed(Handle) });
+                                                Caption.Corner.Now.ToString(), FrameNative.IsZoomed(Handle),
+                                                (style & 0x00C00000) != 0 });   // WS_CAPTION
             }
             base.WndProc(ref m);
         }
@@ -215,6 +226,9 @@ namespace CodexAutoResume
                 said["edges-en"] = SettingsForm.CornerFrameEdges(argv[1], "en");
                 said["edges-ar"] = SettingsForm.CornerFrameEdges(argv[1], "ar");
                 Mirror.Window = false;
+                // Last: the others are made at this machine's own scale.
+                said["opening"] = new List<object> { SettingsForm.CornerFrameOpening(argv[1], 1.0),
+                                                     SettingsForm.CornerFrameOpening(argv[1], 1.5) };
             }
             catch (Exception e) { said["error"] = e.ToString(); code = 3; }
             File.WriteAllText(argv[0], Json.Write(said), new UTF8Encoding(false));
@@ -381,6 +395,35 @@ namespace CodexAutoResume
             return said;
         }
 
+        // A fresh Dashboard drawn at `scale` (AdoptDisplayScale, as Program.Main adopts the monitor's), made and never shown:
+        // the scale, the client it asked for as its window was made, OpeningClient, the window Windows made, its corner, and
+        // whether the primary screen's work area holds OpeningClient (KeepOnScreen makes it smaller where it does not).
+        internal static List<object> CornerFrameOpening(string dir, double scale)
+        {
+            double before = DisplayScale;
+            AdoptDisplayScale(scale);
+            try
+            {
+                var strings = Json.Parse(File.ReadAllText(Path.Combine(dir, "strings-en.json"), Encoding.UTF8)) as Dictionary<string, object>;
+                string nowhere = Path.Combine(dir, "nowhere-opening");
+                var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, null);
+                form.auditing = true;
+                form.StartPosition = FormStartPosition.Manual;
+                form.Location = new Point(FrameNative.Away, FrameNative.Away);
+                form.ShowInTaskbar = false;
+                Size asked = form.ClientSize, opening = form.OpeningClient;
+                IntPtr h = form.Handle;
+                List<object> window = FrameNative.Box(h);
+                Rectangle work = Screen.PrimaryScreen.WorkingArea;
+                var said = new List<object> { scale, (double)asked.Width, (double)asked.Height, (double)opening.Width,
+                                              (double)opening.Height, window[2], window[3], form.CaptionHost.OuterCorner.ToString(),
+                                              opening.Width <= work.Width && opening.Height <= work.Height };
+                form.Dispose();
+                return said;
+            }
+            finally { AdoptDisplayScale(before); }
+        }
+
         internal static Dictionary<string, object> CornerFrameDashboard(string dir)
         {
             var said = new Dictionary<string, object>();
@@ -393,10 +436,16 @@ namespace CodexAutoResume
             form.ShowInTaskbar = false;
             IntPtr h = form.Handle;
             said["made"] = CornerFrameState(form);
-            FrameNative.ShowWindow(h, 4);   // SW_SHOWNOACTIVATE: never made the foreground window
-            Application.DoEvents();
-            said["shown"] = CornerFrameState(form);
             IntPtr companion = form.CaptionHost.Corner == null ? IntPtr.Zero : form.CaptionHost.Corner.Companion;
+            // DWMWA_CLOAKED (14) and the companion: as it is made, shown before its first paint, and once it has painted.
+            said["cloakMade"] = FrameNative.Attribute(h, 14);
+            FrameNative.ShowWindow(h, 4);   // SW_SHOWNOACTIVATE: never made the foreground window
+            said["beforePaint"] = new List<object> { FrameNative.Attribute(h, 14),
+                                                     companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion) };
+            Application.DoEvents();
+            said["afterPaint"] = new List<object> { FrameNative.Attribute(h, 14),
+                                                    companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion) };
+            said["shown"] = CornerFrameState(form);
             said["companionShown"] = companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion);
             List<object> made = FrameNative.Box(h);
             FrameNative.Maximised(h, true, FrameNative.Away + 10, 1400, 900);
@@ -502,6 +551,28 @@ class CornerFrameTests(unittest.TestCase):
                          "with a region of its own and paints its basic caption across the top")
         self.assertEqual(said["minimised"][:2], ["Minimized", "Round"], "Windows' corner while minimised: no region cut")
 
+    def test_a_window_with_its_own_corner_opens_at_exactly_the_size_it_asks(self):
+        # M-CORNER re-check 5: a fresh Dashboard opened 22 x 11 physical px larger than it asked at 100 % and at 150 % -
+        # Windows' left, right and bottom frames at the system's scale, which a window with no frame has none of.
+        for scale, asked_w, asked_h, opening_w, opening_h, window_w, window_h, corner, fits in self.answer["opening"]:
+            with self.subTest(scale=scale):
+                if corner != "Squircle":
+                    self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+                self.assertEqual([window_w, window_h], [asked_w, asked_h], "no frame added: its window is its client")
+                self.assertEqual(opening_w, round(1000 * scale), "OpeningWidth at this scale")
+                if fits:
+                    self.assertEqual([asked_w, asked_h], [opening_w, opening_h],
+                                     "where the screen holds it, the client asked for is OpeningClient")
+
+    def test_nothing_of_a_new_window_is_seen_before_its_first_paint(self):
+        # Re-check 5's first dark open: the companion's empty outline for 1.2 s, then a white frame, then the window.
+        said = self.answer["dashboard"]
+        if said["made"]["corner"] != "Squircle":
+            self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+        self.assertEqual(said["cloakMade"], 1, "DWM_CLOAKED_APP as it is made")
+        self.assertEqual(said["beforePaint"], [1, False], "shown but not yet painted: cloaked, and no companion")
+        self.assertEqual(said["afterPaint"], [0, True], "painted: on the screen, its companion with it")
+
     def test_the_shadow_is_never_on_the_screen_while_the_window_is_maximised(self):
         said = self.answer["dashboard"]
         if said["shown"]["corner"] != "Squircle":
@@ -556,7 +627,10 @@ class CornerFrameTests(unittest.TestCase):
             taken = [message for message in reached if message[0] == code]
             with self.subTest(code=code):
                 self.assertTrue(taken)
-                self.assertTrue(all(message[2] is False for message in taken), "taken while marked hidden")
+                # Re-check 6: marked hidden for each icon the taskbar mark set, several times a second, a click on the
+                # window went through to the one behind. Taken still visible, with no caption style for Windows to paint.
+                self.assertTrue(all(message[2] is True for message in taken), "never marked hidden: clicks fall through")
+                self.assertTrue(all(message[5] is False for message in taken), "taken with no caption style")
         self.assertEqual(title, "A title own")
         self.assertTrue(visible, "shown again after")
 
@@ -573,6 +647,7 @@ class CornerFrameTests(unittest.TestCase):
                         self.assertEqual(message[1], 0)
                     if message[0] in (WM_SETTEXT, WM_SETICON):
                         self.assertIs(message[2], True)
+                        self.assertIs(message[5], True, "Windows' corner: its caption style as it was")
                 self.assertEqual(title, "A title " + step)
                 self.assertTrue(visible)
 

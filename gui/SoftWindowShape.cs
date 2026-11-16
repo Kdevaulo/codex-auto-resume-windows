@@ -606,6 +606,10 @@ namespace CodexAutoResume
         [DllImport("user32.dll")]
         private static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);
         [DllImport("user32.dll")]
+        private static extern int GetWindowRgnBox(IntPtr window, out Chrome.RECT box);
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr window, IntPtr update, IntPtr region, uint flags);
+        [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr window, int command);
         [DllImport("user32.dll")]
         private static extern int GetDpiForWindow(IntPtr window);
@@ -653,8 +657,9 @@ namespace CodexAutoResume
         private readonly Form form;
         private CornerLayer layer;
         private WindowShape.Corner now;
-        private bool busy, again, preferred, failed;
+        private bool busy, again, preferred, failed, cloaked, revealing;
         private Size shapedSize;
+        private int span;
         private int shapedDpi;
         private Color shapedGround, shapedLine;
         private IntPtr memory, bitmap, kept;
@@ -679,7 +684,7 @@ namespace CodexAutoResume
         {
             var corner = new WindowCorner(form);
             form.BackColorChanged += delegate { corner.Refresh(); };
-            form.HandleCreated += delegate { corner.Prefer(); };
+            form.HandleCreated += delegate { corner.Prefer(); corner.Cloak(); };
             attached.Remove(form);
             attached.Add(form, corner);
             return corner;
@@ -700,6 +705,10 @@ namespace CodexAutoResume
 
         /// The companion, for the tests; IntPtr.Zero before it is made.
         internal IntPtr Companion { get { return layer == null ? IntPtr.Zero : layer.Handle; } }
+
+        /// How far along each edge from a corner the cut-away corner reaches now, in device px (the corner's tile): the
+        /// corner's resize target runs from there (Chrome.Hit, ChromeLayout.CornerSpan). 0 while the corner is Windows'.
+        internal int Span { get { return Shaped ? span : 0; } }
 
         /// How far the companion reaches past the window on every side now.
         internal int Margin { get { return WindowShape.Margin(Scale()); } }
@@ -766,7 +775,18 @@ namespace CodexAutoResume
                 m.Result = IntPtr.Zero;
                 return true;
             }
-            if (m.Msg == WM_WINDOWPOSCHANGED) Sync();
+            if (m.Msg == WM_WINDOWPOSCHANGED)
+            {
+                Sync();
+                // Shown while still cloaked: brought on once the show is done (Painted), whether or not a WM_PAINT reaches
+                // it first - a window off every monitor gets none.
+                if (cloaked && !revealing && IsWindowVisible(form.Handle))
+                {
+                    revealing = true;
+                    try { form.BeginInvoke(new MethodInvoker(Painted)); }
+                    catch (Exception) { revealing = false; }
+                }
+            }
             // On its way to maximised or minimised (Windows sets that state before it moves the window): the companion goes
             // now, not once the window has got there.
             if (m.Msg == WM_WINDOWPOSCHANGING && layer != null && !MayShow()) ShowWindow(layer.Handle, SW_HIDE);
@@ -792,7 +812,7 @@ namespace CodexAutoResume
         /// middle of the maximised window (M-CORNER re-check 4).
         internal bool MayShow()
         {
-            if (!form.IsHandleCreated || failed || now != WindowShape.Corner.Squircle || bitmap == IntPtr.Zero) return false;
+            if (!form.IsHandleCreated || failed || cloaked || now != WindowShape.Corner.Squircle || bitmap == IntPtr.Zero) return false;
             IntPtr handle = form.Handle;
             return IsWindowVisible(handle) && !IsIconic(handle) && !IsZoomed(handle);
         }
@@ -847,7 +867,7 @@ namespace CodexAutoResume
                 double scale = dpi / 96.0;
                 int margin = WindowShape.Margin(scale);
                 var at = new POINT { X = rect.Left - margin, Y = rect.Top - margin };
-                if (size != shapedSize || dpi != shapedDpi || Ground() != shapedGround || Palette.Line != shapedLine)
+                if (size != shapedSize || dpi != shapedDpi || Ground() != shapedGround || Palette.Line != shapedLine || Lost(handle))
                     Reshape(size, dpi, at);
                 else if (layer != null)
                     MoveLayeredWindow(layer.Handle, IntPtr.Zero, ref at, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero, 0);
@@ -863,6 +883,18 @@ namespace CodexAutoResume
                 EventHandler changed = Changed;
                 if (changed != null) changed(this, EventArgs.Empty);
             }
+        }
+
+        /// Whether the window has lost the region it was given (v0.6.24, M-CORNER re-check 5): a region set as the window is
+        /// made - its first one, in WM_CREATE - is not kept, and a window made at exactly its size is never resized after to
+        /// set it again. Only where one was given (a window too small for the corner has none of its own).
+        private bool Lost(IntPtr handle)
+        {
+            if (shapedSize.IsEmpty || bitmap == IntPtr.Zero) return false;
+            Chrome.RECT box;
+            const int ERROR = 0, NULLREGION = 1;
+            int kind = GetWindowRgnBox(handle, out box);
+            return kind == ERROR || kind == NULLREGION;
         }
 
         // The shadow's colour: the ink PaintDialog shades a still's dialog with in light (5.2 item 2, O12), and in dark the
@@ -894,6 +926,7 @@ namespace CodexAutoResume
             shapedDpi = dpi;
             shapedGround = ground;
             shapedLine = line;
+            span = edge.Fits ? edge.Tile : 0;
             if (!edge.Fits)
             {
                 SetWindowRgn(form.Handle, IntPtr.Zero, true);
@@ -955,6 +988,45 @@ namespace CodexAutoResume
             int corner = now == WindowShape.Corner.Squircle ? DoNotRound : Soft.CornerRound;
             try { DwmSetWindowAttribute(form.Handle, Soft.CornerPreferenceAttribute, ref corner, 4); }
             catch (Exception) { }
+        }
+
+        // DWMWA_CLOAK; RDW_UPDATENOW | RDW_ALLCHILDREN.
+        private const int Cloaking = 13;
+        private const uint PaintAllNow = 0x0100 | 0x0080;
+
+        /// Whether the window is held off the screen until its first paint (Cloak).
+        internal bool Cloaked { get { return cloaked; } }
+
+        /// v0.6.24 (M-CORNER re-check 5): a window just made is held off the screen by DWM (cloaked) until it has painted
+        /// once. A first dark open showed the companion's empty outline with the desktop through it for 1.2 s - the window
+        /// shown and its companion with it, before it had painted anything - and then one white frame inside it. Cloaked,
+        /// nothing of it is seen until Painted: then the window and its companion come on together, the window in its
+        /// theme. Not a window that is already on the screen (a handle made again), and never one a capture takes
+        /// (Soft.StillReady), which is photographed as it always was.
+        internal void Cloak()
+        {
+            if (!form.IsHandleCreated || Soft.StillReady != null) return;
+            IntPtr handle = form.Handle;
+            if (IsWindowVisible(handle)) return;
+            int on = 1;
+            try { cloaked = DwmSetWindowAttribute(handle, Cloaking, ref on, 4) == 0; }
+            catch (Exception) { cloaked = false; }
+        }
+
+        /// The window has handled its first WM_PAINT (ChromeHost.Intercept), or has been shown (posted from Intercept, after
+        /// the show): everything in it that waits to be painted painted now, then the window uncloaked and its companion
+        /// shown with it.
+        internal void Painted()
+        {
+            if (!cloaked || !form.IsHandleCreated) return;
+            IntPtr handle = form.Handle;
+            try { RedrawWindow(handle, IntPtr.Zero, IntPtr.Zero, PaintAllNow); }
+            catch (Exception) { }
+            cloaked = false;
+            int off = 0;
+            try { DwmSetWindowAttribute(handle, Cloaking, ref off, 4); }
+            catch (Exception) { }
+            Sync();
         }
 
         // The client area worked out again for the corner it has now - after this message, never inside it.

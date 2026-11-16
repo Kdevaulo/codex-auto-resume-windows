@@ -572,8 +572,10 @@ def apng_controls(data: bytes) -> list:
 
 
 def apng_frames(path) -> tuple:
-    """(width, height, [whole RGB picture after each frame]) of an RGB APNG this generator writes: its first
-    picture, then each later frame's rectangle drawn over the picture before it."""
+    """(width, height, [whole picture after each frame]) of an RGB or - the card's and the popup's, on a clear ground -
+    RGBA APNG this generator writes: its first picture, then each later frame's rectangle drawn over the picture
+    before it. In an RGBA one a frame's rectangle must hold only covered or clear pixels (a half-covered one would
+    not be what the picture before it shows through), as only the card's own light moves."""
     import zlib
     raw = Path(path).read_bytes()
     at, chunks = 8, []
@@ -582,18 +584,19 @@ def apng_frames(path) -> tuple:
         chunks.append((kind, raw[at + 8:at + 8 + length]))
         at += 12 + length
     width, height, _depth, colour = struct.unpack(">IIBB", next(body for kind, body in chunks if kind == b"IHDR")[:10])
-    if colour != 2:
-        raise ValueError("only an RGB APNG is read here")
+    if colour not in (2, 6):
+        raise ValueError("only an RGB or RGBA APNG is read here")
+    step = 3 if colour == 2 else 4
 
     def rows(data, wide, tall):
-        stride, out, previous = wide * 3, bytearray(), bytearray(wide * 3)
+        stride, out, previous = wide * step, bytearray(), bytearray(wide * step)
         for y in range(tall):
             start = y * (stride + 1)
             mode, line = data[start], bytearray(data[start + 1:start + 1 + stride])
             if mode:
                 for i in range(stride):
-                    left = line[i - 3] if i >= 3 else 0
-                    up, corner = previous[i], (previous[i - 3] if i >= 3 else 0)
+                    left = line[i - step] if i >= step else 0
+                    up, corner = previous[i], (previous[i - step] if i >= step else 0)
                     if mode == 1:
                         line[i] = (line[i] + left) & 0xFF
                     elif mode == 2:
@@ -620,8 +623,16 @@ def apng_frames(path) -> tuple:
             canvas = bytearray(pixels)
         else:
             for row in range(tall):
-                start = ((y + row) * width + x) * 3
-                canvas[start:start + wide * 3] = pixels[row * wide * 3:(row + 1) * wide * 3]
+                start = ((y + row) * width + x) * step
+                line = pixels[row * wide * step:(row + 1) * wide * step]
+                if step == 4:
+                    for column in range(wide):
+                        cover = line[column * 4 + 3]
+                        if 0 < cover < 255:
+                            raise ValueError("a half-covered pixel in a frame's rectangle")
+                        if cover == 0:
+                            line[column * 4:column * 4 + 4] = canvas[start + column * 4:start + column * 4 + 4]
+                canvas[start:start + wide * step] = line
         pictures.append(bytes(canvas))
 
     for kind, body in chunks:
@@ -879,7 +890,7 @@ class BreathingPictureTests(unittest.TestCase):
         """Frame k of the popup's picture is the popup drawn whole with its light at moment k - byte for byte - so
         the picture moves exactly as the popup's own renderer moves it: `draw_halo`, the popup's call for a frame of
         its light, over the band it keeps, is what the generator writes. Since v0.6.24 the popup is its card alone, so
-        a frame is that card and its float shadow over the theme's canvas (`popup_picture`)."""
+        a frame is that card and its float shadow on a clear ground (`popup_picture`), RGBA with straight alpha."""
         from codex_auto_resume.ui import popup as tray_popup
         g = self.generator
         with tempfile.TemporaryDirectory() as folder:
@@ -901,10 +912,85 @@ class BreathingPictureTests(unittest.TestCase):
                         renderer.draw(view, plan, frame=tray_popup.halo(view["light"], moment, moment))
                         whole = g.popup_picture(renderer, plan, pad, g.THEME, "soft")[2]
                         with self.subTest(step=step):
-                            self.assertEqual(pictures[step], g.bgra_rgb(whole))
+                            self.assertEqual(pictures[step], g.clear_rgba(whole))
                 finally:
                     renderer.close()
         self.assertEqual(record["lights"][0]["state"], view["light"])
+
+
+class ClearGroundTests(unittest.TestCase):
+    """The notification card's and the tray popup's pictures are on a clear ground (the owner, 2026-11-16: on the
+    desktop they float with only their own shadow, and the pictures laid them on the window's grey canvas colour in a
+    rectangle): RGBA, the card opaque, its float shadow with its own alpha, every other pixel alpha 0. Drawn here from
+    a stand-in layer, so no machine's fonts or GDI+ come into it."""
+
+    SIDE = 6
+    CARD, SHADOW = (30, 20, 10, 255), (4, 6, 8, 128)      # premultiplied BGRA
+
+    @classmethod
+    def setUpClass(cls):
+        cls.generator = generator()
+
+    def still(self) -> bytes:
+        """A 6 x 6 premultiplied picture: the corner clear, a ring of half-covered shadow, a 2 x 2 opaque card."""
+        out = bytearray()
+        for y in range(self.SIDE):
+            for x in range(self.SIDE):
+                edge = min(x, y, self.SIDE - 1 - x, self.SIDE - 1 - y)
+                out += bytes(self.CARD if edge >= 2 else self.SHADOW if edge == 1 else (0, 0, 0, 0))
+        return bytes(out)
+
+    def alpha_at(self, picture: bytes, x: int, y: int) -> int:
+        return picture[(y * self.SIDE + x) * 4 + 3]
+
+    @unittest.skipUnless(os.name == "nt", "the popup's layers are Windows' GDI+")
+    def test_the_popup_s_picture_is_its_card_and_shadow_over_nothing_not_over_the_canvas_colour(self):
+        from codex_auto_resume.ui import popup as tray_popup
+        g, still = self.generator, self.still()
+        with patch.object(tray_popup, "card_still", return_value=(self.SIDE, self.SIDE, still)):
+            width, height, picture = g.popup_picture(object(), {}, 2, g.THEME, "soft")
+        self.assertEqual((width, height, picture), (self.SIDE, self.SIDE, still))
+        self.assertEqual(self.alpha_at(picture, 0, 0), 0, "the corner is clear, not the canvas colour")
+        self.assertEqual(self.alpha_at(picture, 1, 1), 128, "the shadow keeps its own alpha")
+        self.assertEqual(self.alpha_at(picture, 3, 3), 255, "the card is opaque")
+
+    def test_a_layer_laid_over_a_clear_ground_is_what_is_left_and_over_an_opaque_one_stays_opaque(self):
+        g, layer = self.generator, self.still()
+        clear = bytearray(self.SIDE * self.SIDE * 4)
+        g._over(clear, self.SIDE, layer, self.SIDE, self.SIDE, 0, 0)
+        self.assertEqual(bytes(clear), layer)
+        opaque = bytearray(bytes((200, 150, 100, 255)) * (self.SIDE * self.SIDE))
+        g._over(opaque, self.SIDE, layer, self.SIDE, self.SIDE, 0, 0)
+        self.assertEqual(set(opaque[3::4]), {255})
+        self.assertEqual(bytes(opaque[:4]), bytes((200, 150, 100, 255)), "a clear pixel leaves the ground")
+
+    def test_unpremultiply_gives_the_straight_colour_and_the_coverage(self):
+        g = self.generator
+        rgb, alpha = g.unpremultiply(self.still())
+        self.assertEqual(alpha[0], 0)
+        self.assertEqual(rgb[:3], bytes(3), "a clear pixel is black")
+        shadow = (1 * self.SIDE + 1)
+        self.assertEqual(alpha[shadow], 128)
+        self.assertEqual(tuple(rgb[shadow * 3:shadow * 3 + 3]), (16, 12, 8), "(8, 6, 4) at half cover, as RGB")
+        card = 3 * self.SIDE + 3
+        self.assertEqual((tuple(rgb[card * 3:card * 3 + 3]), alpha[card]), ((10, 20, 30), 255))
+        rgba = g.clear_rgba(self.still())
+        self.assertEqual((rgba[:4], rgba[shadow * 4:shadow * 4 + 4]), (bytes(4), bytes((16, 12, 8, 128))))
+
+    def test_a_picture_on_a_clear_ground_is_written_as_rgba_with_straight_alpha(self):
+        g = self.generator
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "clear.png"
+            g.write_png(target, self.SIDE, self.SIDE, self.still(), clear=True)
+            width, height, rgb, alpha = g.read_png(target)
+            opaque = Path(folder) / "opaque.png"
+            g.write_png(opaque, 2, 1, bytes((3, 2, 1, 255, 6, 5, 4, 255)))
+            _w, _h, plain, plain_alpha = g.read_png(opaque)
+        self.assertEqual((width, height), (self.SIDE, self.SIDE))
+        self.assertIsNotNone(alpha, "a picture with a clear ground has an alpha")
+        self.assertEqual((alpha[0], alpha[self.SIDE + 1], alpha[3 * self.SIDE + 3]), (0, 128, 255))
+        self.assertEqual(tuple(rgb[(self.SIDE + 1) * 3:(self.SIDE + 1) * 3 + 3]), (16, 12, 8))
+        self.assertEqual((plain, plain_alpha), (bytes((1, 2, 3, 4, 5, 6)), None), "an opaque picture is as it was")
 
 
 def record_size(manifest, name) -> tuple:

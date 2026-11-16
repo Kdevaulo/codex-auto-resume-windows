@@ -294,8 +294,11 @@ def job(plan: dict, frames: list, out: Path, root: Path = ROOT) -> dict:
         state.update(index=index, light=frame.t)
         states.append(state)
     import make_screenshots
+    import motion_window
+    # v0.6.24-beta.2: the frames carry the window's own outer edge while the setup window cuts its own corner, as the
+    # stills do (motion_window.frame_edge): they are laid in the still's chrome and held to it.
     return {"out": str(out), "theme": canvas.get("theme", "light"), "design": canvas.get("design", "soft"),
-            "scale": make_screenshots.PINNED_SCALE,
+            "scale": make_screenshots.PINNED_SCALE, **motion_window.frame_edge(),
             "locale": plan["locale"], "locales": str(root / "src" / "codex_auto_resume" / "locales"),
             "edition": plan["edition"], "version": version(root), "home": HOME,
             "events": [{key: value for key, value in event.items() if key != "hold"} for event in plan["events"]],
@@ -403,6 +406,7 @@ def check_fidelity(exe: Path, work: Path, root: Path = ROOT, theme: str = "light
     {"<locale>": client size} as `sizes` beside them."""
     import make_screenshots
     import motion_fidelity
+    import motion_window
     results = {}
     for locale, name in FIDELITY:
         # The stills where they are: in the tree, or where a proof drew them (`stills`, --still --out DIR).
@@ -411,7 +415,7 @@ def check_fidelity(exe: Path, work: Path, root: Path = ROOT, theme: str = "light
             continue
         out = Path(work) / ("fidelity-" + locale)
         data = {"out": str(out / "frames"), "theme": theme, "design": "soft", "locale": locale,
-                "scale": make_screenshots.PINNED_SCALE,
+                "scale": make_screenshots.PINNED_SCALE, **motion_window.frame_edge(),
                 "locales": str(root / "src" / "codex_auto_resume" / "locales"), "edition": edition,
                 "version": version(root), "home": HOME, "events": [], "targets": [], "frames": [at_rest()]}
         result = render(exe, data, out)
