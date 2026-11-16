@@ -61,6 +61,13 @@ namespace CodexAutoResume
         [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(IntPtr h, int attribute, out Chrome.RECT r, int size);
         internal const int Away = -30000;
 
+        internal static List<object> Whole(IntPtr h)
+        {
+            Chrome.RECT r;
+            GetWindowRect(h, out r);
+            return new List<object> { (double)r.Left, (double)r.Top, (double)r.Right, (double)r.Bottom };
+        }
+
         // What a person sees of the window: DWM's frame bounds, or its window where DWM has none.
         internal static List<object> Visible(IntPtr h)
         {
@@ -96,6 +103,8 @@ namespace CodexAutoResume
                 cases["pastRight"] = Case(new Point(5700, 1500), true);
                 cases["pastBottom"] = Case(new Point(2500, 3800), true);
                 cases["noOwner"] = Case(new Point(2500, 1700), false);
+                // An owner wholly off the work area, as test_gui_v066_dialog holds the Dashboard off the desktop.
+                cases["ownerOffTheWorkArea"] = Case(new Point(-3000, 1500), true);
                 said["cases"] = cases;
             }
             catch (Exception e) { said["error"] = e.ToString(); code = 3; }
@@ -132,7 +141,8 @@ namespace CodexAutoResume
             OnOwnerNative.ShowWindow(d, 4);   // SW_SHOWNOACTIVATE
             Application.DoEvents();
             var said = new Dictionary<string, object> {
-                { "owner", OnOwnerNative.Visible(o) }, { "dialog", OnOwnerNative.Visible(d) }, { "parked", parked } };
+                { "owner", OnOwnerNative.Visible(o) }, { "dialog", OnOwnerNative.Visible(d) }, { "parked", parked },
+                { "window", OnOwnerNative.Whole(d) } };
             dialog.Dispose();
             owner.Dispose();
             return said;
@@ -205,6 +215,18 @@ class DialogOnOwnerTests(unittest.TestCase):
                 (ox, oy), (dx, dy) = self.centre(said["owner"]), self.centre(said["dialog"])
                 along = abs(oy - dy) if side in (0, 2) else abs(ox - dx)
                 self.assertLessEqual(along, 1.0, "centred on the owner along the other axis")
+
+    def test_an_owner_off_the_work_area_keeps_what_is_seen_of_its_dialog_inside(self):
+        # The visible box inside within a pixel, against the edge; the window may reach past it by Windows' invisible
+        # resize border, which nobody sees (CI 43895825113 read the window's left, -7, in test_gui_v066_dialog).
+        work, said = self.answer["work"], self.answer["cases"]["ownerOffTheWorkArea"]
+        dialog, window = said["dialog"], said["window"]
+        self.assertLessEqual(abs(dialog[0] - work[0]), 1.0, "against the left edge: %s" % dialog)
+        self.assertGreaterEqual(dialog[1], work[1] - 1)
+        self.assertLessEqual(dialog[2], work[2] + 1)
+        self.assertLessEqual(dialog[3], work[3] + 1)
+        self.assertLessEqual(window[0], dialog[0])
+        self.assertGreaterEqual(window[0], dialog[0] - 16, "no more than an invisible border past it")
 
     def test_a_dialog_with_no_owner_is_left_where_it_was(self):
         said = self.answer["cases"]["noOwner"]
