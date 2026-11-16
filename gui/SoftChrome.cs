@@ -935,6 +935,8 @@ namespace CodexAutoResume
             // (SetWindowRgn), or the restored size itself - where WinForms gives the remembered size back a second time.
             bool outer = restoring;
             restoring = outer || before != FormWindowState.Normal;
+            // Before WinForms handles the message - the one place it gives a kept size back (ForgetRestoredSize).
+            ForgetRestoredSize();
             try { pass(ref m); }
             finally { restoring = outer; }
             FormWindowState after = form.WindowState;
@@ -950,14 +952,17 @@ namespace CodexAutoResume
         private static readonly System.Reflection.FieldInfo RestoredSpecified = typeof(Form).GetField("restoredWindowBoundsSpecified",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
 
-        /// v0.6.24 W5: the window has just left its normal state, and WinForms has kept its client size to give back on the
+        /// v0.6.24 W5: WinForms keeps the client size a window had as it leaves its normal state, and gives it back on the
         /// way to normal (Form.UpdateWindowState, RestoreWindowBoundsIfNecessary) - as a window size worked out with
         /// Windows' caption, which Restoring takes back off only where it can tell that is what it is. On the real 150 %
-        /// monitor it could not (M-CORNER 2026-11-16: every restore, from the button, a double-click, Win+Down, the taskbar
-        /// or Win+D, grew the window by Windows' frame and caption at the system's scale, 26 x 71 px; an unsnap, which
-        /// WinForms remembers nothing for, did not). So nothing is kept: the window comes back where Windows keeps it,
-        /// its normal position, exactly as it left - as every other window does. A size the program sets while the window
-        /// is maximised is still kept by WinForms (Form.SetBoundsCore) and given back.
+        /// monitor it could not (M-CORNER 2026-11-16: every restore grew the window by Windows' frame and caption at the
+        /// system's scale; an unsnap, which WinForms remembers nothing for, did not). Forgotten as the window leaves its
+        /// normal state was not enough: WinForms kept it again while the window was maximised (dev CI read All there, on a
+        /// 1024 by 768 screen) and, from maximised, gave it back a moment after the restore (M-CORNER re-check: exact, then
+        /// 0.1 to 0.35 s later 22 x 56 px bigger, again on every round). So it is forgotten before every
+        /// WM_WINDOWPOSCHANGED WinForms handles - the one message it gives it back in - and the window comes back where
+        /// Windows keeps it, its normal position, exactly as it left, as every other window does. A size set while the
+        /// window is maximised is not given back either: Windows' normal position is the one restored.
         private void ForgetRestoredSize()
         {
             if (RestoredSpecified == null) return;

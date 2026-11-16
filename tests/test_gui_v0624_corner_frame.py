@@ -328,6 +328,13 @@ namespace CodexAutoResume
             List<object> made = FrameNative.Box(h);
             FrameNative.Maximised(h, true, FrameNative.Away + 10, 1400, 900);
             said["maximised"] = CornerFrameState(form);
+            // What WinForms keeps to give back, as it keeps it while the window is maximised on a 1024 by 768 screen (dev CI
+            // read All there) and on the owner's monitors: a size Windows' frame and caption bigger than the window's.
+            BindingFlags inside = BindingFlags.Instance | BindingFlags.NonPublic;
+            typeof(Form).GetField("restoredWindowBounds", inside).SetValue(form, new Rectangle(
+                (int)(double)made[0], (int)(double)made[1], (int)(double)made[2] + 22, (int)(double)made[3] + 56));
+            typeof(Form).GetField("restoredWindowBoundsSpecified", inside).SetValue(form, BoundsSpecified.All);
+            said["planted"] = typeof(Form).GetField("restoredWindowBoundsSpecified", inside).GetValue(form).ToString();
             FrameNative.Maximised(h, false, (int)(double)made[0], (int)(double)made[2], (int)(double)made[3]);
             said["restored"] = CornerFrameState(form);
             form.Close();
@@ -389,11 +396,12 @@ class CornerFrameTests(unittest.TestCase):
                 else:
                     self.assertEqual(said[step]["preference"], 2, "DWMWCP_ROUND: Windows' round corner")
 
-    def test_winforms_keeps_no_size_of_its_own_to_give_back_and_the_window_comes_back_exactly(self):
+    def test_whatever_winforms_kept_while_maximised_the_window_comes_back_exactly(self):
         said = self.answer["dashboard"]
-        self.assertEqual(said["maximised"]["kept"], "None",
-                         "WinForms gives back no client size worked out with Windows' caption: Windows' normal position does")
-        self.assertEqual(said["restored"]["window"], said["shown"]["window"])
+        self.assertEqual(said["planted"], "All", "WinForms holds a size to give back, as it did on CI and live")
+        self.assertEqual(said["restored"]["window"], said["shown"]["window"],
+                         "Windows' normal position, not the size WinForms kept: nothing grows")
+        self.assertEqual(said["restored"]["kept"], "None")
 
     def test_while_maximised_a_click_on_the_restore_button_restores(self):
         said = self.answer["messages"]
