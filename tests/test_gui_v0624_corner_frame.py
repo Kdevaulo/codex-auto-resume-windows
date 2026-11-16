@@ -19,7 +19,7 @@ Two probes compiled with the window, each shown 30000 px off the desktop and nev
   DWMWCP_ROUND (2) while Windows' is - and DWM's frame off while the region is cut;
 - a window with the Dashboard's caption and corner, whose own window procedure records what reaches Windows' handling:
   while its corner is its own, no WM_NCPAINT and none of the theme's caption and frame messages, WM_NCACTIVATE with -1,
-  a new title and icon taken while it is marked hidden and shown again after (the title taken); while Windows' corner is
+  a new title and icon taken with its caption style off, never marked hidden (the title taken); while Windows' corner is
   back (maximised), every one of them as before.
 
 Re-check 5 found a fresh Dashboard 22 x 11 physical px larger than it asked at 100 % and at 150 %: made as a window with
@@ -199,7 +199,8 @@ namespace CodexAutoResume
             {
                 long style = IsHandleCreated ? FrameNative.GetWindowLongPtr(Handle, FrameNative.GWL_STYLE).ToInt64() : 0;
                 Reached.Add(new List<object> { (double)msg, (double)m.LParam.ToInt64(), (style & FrameNative.WS_VISIBLE) != 0,
-                                                Caption.Corner.Now.ToString(), FrameNative.IsZoomed(Handle) });
+                                                Caption.Corner.Now.ToString(), FrameNative.IsZoomed(Handle),
+                                                (style & 0x00C00000) != 0 });   // WS_CAPTION
             }
             base.WndProc(ref m);
         }
@@ -626,7 +627,10 @@ class CornerFrameTests(unittest.TestCase):
             taken = [message for message in reached if message[0] == code]
             with self.subTest(code=code):
                 self.assertTrue(taken)
-                self.assertTrue(all(message[2] is False for message in taken), "taken while marked hidden")
+                # Re-check 6: marked hidden for each icon the taskbar mark set, several times a second, a click on the
+                # window went through to the one behind. Taken still visible, with no caption style for Windows to paint.
+                self.assertTrue(all(message[2] is True for message in taken), "never marked hidden: clicks fall through")
+                self.assertTrue(all(message[5] is False for message in taken), "taken with no caption style")
         self.assertEqual(title, "A title own")
         self.assertTrue(visible, "shown again after")
 
@@ -643,6 +647,7 @@ class CornerFrameTests(unittest.TestCase):
                         self.assertEqual(message[1], 0)
                     if message[0] in (WM_SETTEXT, WM_SETICON):
                         self.assertIs(message[2], True)
+                        self.assertIs(message[5], True, "Windows' corner: its caption style as it was")
                 self.assertEqual(title, "A title " + step)
                 self.assertTrue(visible)
 

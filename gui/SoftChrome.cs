@@ -886,30 +886,32 @@ namespace CodexAutoResume
             return false;
         }
 
-        private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, WM_PAINT = 0x000F, GWL_STYLE = -16, WS_VISIBLE = 0x10000000;
+        private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, WM_PAINT = 0x000F, GWL_STYLE = -16, WS_CAPTION = 0x00C00000;
 
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
         private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
         private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
 
-        // v0.6.24 W5: a new title or icon, taken by Windows' own handling with the window marked hidden for that moment.
-        // Windows paints the caption it keeps for those straight onto the window, and while the window's corner is its own
-        // that caption is the classic one (WindowCorner.Intercept); marked hidden, it paints nothing. Nothing is shown or
-        // hidden: the style bit alone, put back at once.
+        // v0.6.24 W5: a new title or icon, taken by Windows' own handling with the window's caption style off for that
+        // moment. Windows paints the caption it keeps for those straight onto a window that has one, and while the
+        // window's corner is its own that caption is the classic one (WindowCorner.Intercept); with no caption style it
+        // paints nothing. Never WS_VISIBLE: the taskbar mark sets the window's icon several times a second, and with the
+        // window marked hidden for each (2-37 ms, M-CORNER re-check 6) a click on it went through to the window behind.
+        // The style bits alone, put back at once; nothing is moved, shown, hidden or framed again.
         private void Unframed(ref Message m, Pass pass)
         {
             IntPtr handle = form.Handle;
             long style = GetWindowLongPtr(handle, GWL_STYLE).ToInt64();
-            bool visible = (style & WS_VISIBLE) != 0;
-            if (visible) SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(style & ~(long)WS_VISIBLE));
+            long caption = style & WS_CAPTION;
+            if (caption != 0) SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(style & ~(long)WS_CAPTION));
             try { pass(ref m); }
             finally
             {
-                if (visible)
+                if (caption != 0)
                 {
                     long now = GetWindowLongPtr(handle, GWL_STYLE).ToInt64();
-                    SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(now | WS_VISIBLE));
+                    SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(now | caption));
                 }
             }
         }
