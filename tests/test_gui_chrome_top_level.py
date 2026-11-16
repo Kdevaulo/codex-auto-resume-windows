@@ -251,7 +251,11 @@ namespace CodexAutoResume
             // Nothing at the foot of any page but Settings: the page reaches the window's bottom.
             said["footerOutsideSettings"] = Soft.OwnVisible(form.footer);
             said["pageToBottom"] = (double)(form.ClientSize.Height - form.pageHost.Bottom);
-            said["pageAtBottom"] = (double)TopLevelHit(form, form.pageHost, form.pageHost.Width / 2, form.pageHost.Height - 4);
+            // The page's foot is the page's - just above the grip band when the corner is the window's own, as that band
+            // (the corner fixer's E) gives the window's bottom pixels to resizing - and the window's last pixel resizes it.
+            said["pageAtBottom"] = (double)TopLevelHit(form, form.pageHost, form.pageHost.Width / 2,
+                                                       form.pageHost.Height - 4 - (frameless ? band : 0));
+            said["pageLastPixel"] = (double)TopLevelHit(form, form.pageHost, form.pageHost.Width / 2, form.pageHost.Height - 1);
             said["hero"] = (double)TopLevelHit(form, form.hero, form.hero.Width / 2, 6);
             // The save bar, on Settings: the footer's ground round its card, the card's own face beside its buttons, and a
             // button. 3 px in from its top left - or, with the window's own corner, just inside the grip band.
@@ -509,6 +513,8 @@ class TopLevelChromeTests(unittest.TestCase):
                     self.assertEqual(said[control], HTCLIENT, control)
                 self.assertFalse(said["footerOutsideSettings"], "a footer under a page other than Settings")
                 self.assertEqual(said["pageToBottom"], 0, "the page reaches the window's bottom")
+                if said["frameless"]:
+                    self.assertEqual(said["pageLastPixel"], 15, "the window's last pixel under a page resizes it (HTBOTTOM)")
 
     def test_with_its_own_corner_the_window_resizes_from_a_band_inside_its_edge_as_wide_as_windows_frame(self):
         HTLEFT, HTRIGHT = 10, 11
