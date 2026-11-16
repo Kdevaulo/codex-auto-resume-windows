@@ -1678,6 +1678,23 @@ namespace CodexAutoResume
                 if (versionPill.Location != at) versionPill.Location = at;
             };
             nav.Layout += delegate { FitVersionPill(strip); };
+            // And whenever the strip lays its tabs out again: a tab shown later - the advanced edition's Advanced features
+            // and Chat, once their words come (AdvancedPage.cs) - lays out the strip alone, and the pill gives way to it.
+            // Where that layout is the nav's own placing the strip, the layout the slot's change asks of the nav is dropped
+            // as the running one ends (Control.PerformLayout), and the strip would keep the width it had beside the pill -
+            // the Chat tab cut off (dev CI 43859506322): so the strip is given here the room the slot now leaves it, as the
+            // nav's next layout gives it, before it lays its tabs out in it.
+            strip.Layout += delegate
+            {
+                if (!FitVersionPill(strip) || strip.Dock != DockStyle.Fill) return;
+                Rectangle room = nav.DisplayRectangle;
+                if (Soft.OwnVisible(pillSlot))
+                {
+                    if (pillSlot.Dock == DockStyle.Left) room.X += pillSlot.Width;
+                    room.Width -= pillSlot.Width;
+                }
+                if (room.Width > 0 && strip.Bounds != room) strip.Bounds = room;
+            };
             versionText.TextChanged += delegate { if (nav.IsHandleCreated) nav.PerformLayout(); else FitVersionPill(strip); };
             FitVersionPill(strip);
         }
@@ -1686,15 +1703,22 @@ namespace CodexAutoResume
 
         /// The pill whole - the version and the edition - where the tabs leave room for it and the gap before it; the version
         /// alone where only that fits; else none. The room is the strip's less the tabs' own width (the strip lays its tabs
-        /// out in one line, never wrapped), at every text size and in every language (test_gui_v0624_dashboard).
-        private void FitVersionPill(Control strip)
+        /// out in one line; where the advanced edition's take two rows, none is left), at every text size and in every
+        /// language, and again whenever the strip lays its tabs out (test_gui_v0624_dashboard). Whether the slot was shown,
+        /// hidden or resized, which changes the strip's room.
+        private bool FitVersionPill(Control strip)
         {
-            if (fittingPill || versionPill == null) return;
+            if (fittingPill || versionPill == null) return false;
             fittingPill = true;
             try
             {
                 int gap = Px(12);
-                int room = nav.DisplayRectangle.Width - strip.PreferredSize.Width - gap;
+                // The tabs' own row, each shown tab as wide as it asks with its margins - not the strip's PreferredSize, which
+                // a tab just shown has not yet reached while the strip lays out for it (dev CI 43859506322: the Chat tab).
+                int tabs = strip.Padding.Horizontal;
+                foreach (Control tab in strip.Controls)
+                    if (Soft.OwnVisible(tab)) tabs += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+                int room = nav.DisplayRectangle.Width - tabs - gap;
                 int whole = versionPill.WholeWidth, alone = versionPill.VersionWidth;
                 bool shown = !string.IsNullOrEmpty(versionText.Version) && alone <= room;
                 bool shortened = shown && whole > room;
@@ -1704,9 +1728,19 @@ namespace CodexAutoResume
                 if (versionPill.Size != size) versionPill.Size = size;
                 pillSlot.Padding = new Padding(gap, 0, 0, 0);
                 int width = size.Width + gap;
-                if (pillSlot.Width != width) pillSlot.Width = width;
-                if (Soft.OwnVisible(pillSlot) != shown) pillSlot.Visible = shown;
+                bool changed = false;
+                if (pillSlot.Width != width)
+                {
+                    pillSlot.Width = width;
+                    changed = true;
+                }
+                if (Soft.OwnVisible(pillSlot) != shown)
+                {
+                    pillSlot.Visible = shown;
+                    changed = true;
+                }
                 versionPill.Lifted();
+                return changed;
             }
             finally { fittingPill = false; }
         }

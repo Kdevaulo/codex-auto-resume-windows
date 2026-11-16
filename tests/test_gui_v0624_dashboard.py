@@ -168,6 +168,43 @@ namespace CodexAutoResume
                     answer["tooNarrow"] = form.ProportionsPill(480);
                     form.ShowVersion(form.versionText, new Dictionary<string, object> { { "version", "0.6.24-beta.2" }, { "edition", "standard" } });
                     answer["standard"] = form.ProportionsPill(OpeningWidth);
+                    // A tab shown later, as the advanced edition shows Advanced features and Chat once their words come:
+                    // the pill gives way to it, with nothing else laid out again (dev CI 43859506322, the Chat tab cut off).
+                    NavButton settings = form.navButtons["settings"];
+                    var later = new NavButton();
+                    later.Font = settings.Font;
+                    later.AutoSize = true;
+                    later.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                    later.Padding = settings.Padding;
+                    later.Margin = settings.Margin;
+                    later.Text = "Advanced features";
+                    later.Visible = false;
+                    settings.Parent.Controls.Add(later);
+                    form.navButtons["later"] = later;
+                    var other = new NavButton();
+                    other.Font = settings.Font;
+                    other.AutoSize = true;
+                    other.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                    other.Padding = settings.Padding;
+                    other.Margin = settings.Margin;
+                    other.Text = "Chat";
+                    other.Visible = false;
+                    settings.Parent.Controls.Add(other);
+                    form.navButtons["other"] = other;
+                    var before = form.ProportionsPill(OpeningWidth);
+                    later.Visible = true;
+                    other.Visible = true;
+                    var grown = new Dictionary<string, object>();
+                    grown["before"] = before["fit"];
+                    grown["fit"] = form.PillFit;
+                    var cut = new List<string>();
+                    foreach (NavButton tab in form.navButtons.Values)
+                        if (Soft.OwnVisible(tab) && (tab.Left < 0 || tab.Right > tab.Parent.ClientSize.Width)) cut.Add(tab.Text);
+                    var findings = new List<string>();
+                    form.AuditPill(findings);
+                    grown["cut"] = string.Join(", ", cut.ToArray());
+                    grown["findings"] = string.Join(" | ", findings.ToArray());
+                    answer["grown"] = grown;
                     form.ClientSize = opening;
                     // A press on the pill is a press on the version (VersionPressed): one press of the run it counts.
                     FieldInfo count = typeof(PressRun).GetField("count", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -294,6 +331,19 @@ class DashboardProportionsTests(unittest.TestCase):
                     self.assertEqual(narrow["text"], "v0.6.24-beta.2")
                     self.assertIn(said["advancedWord"], narrow["name"], "the edition is still said to a screen reader")
                 self.assertEqual(said["tooNarrow"]["fit"], "none", "where even the version does not fit, no pill")
+
+    def test_a_tab_shown_later_takes_the_pill_s_room(self):
+        """dev CI 43859506322: the advanced edition shows its Advanced features and Chat tabs once their words come, which
+        lays out the tab strip alone - the pill kept the room it had and the Chat tab was cut off in every language."""
+        for locale in LOCALES:
+            grown = self.answer[locale]["grown"]
+            with self.subTest(locale=locale):
+                self.assertEqual(grown["before"], "whole")
+                # Where the two tabs leave it too little room, it shortens or goes (English); never over a tab.
+                if locale == "en":
+                    self.assertNotEqual(grown["fit"], "whole", "the pill gives way to the tabs")
+                self.assertEqual(grown["cut"], "", "no tab cut off at the strip's end")
+                self.assertEqual(grown["findings"], "")
 
     def test_a_press_on_the_pill_is_a_press_on_the_version(self):
         for locale in LOCALES:
