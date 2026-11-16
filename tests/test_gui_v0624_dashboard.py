@@ -132,8 +132,64 @@ namespace CodexAutoResume
             return said;
         }
 
+        /// The special eggs' parts on their own (v0.6.24-beta.2): the colour run's steps and colours, the confetti's pieces, and
+        /// the pick from a seeded random source.
+        internal static Dictionary<string, object> ProportionsEggParts()
+        {
+            var said = new Dictionary<string, object>();
+            var states = new List<object>();
+            foreach (double ms in new[] { -1.0, 0.0, 419.0, 420.0, 840.0, 1260.0, 1679.0, 1680.0, 2099.0, 2100.0 })
+                states.Add(HaloDot.ColourRunStateAt(ms) ?? "");
+            said["states"] = states;
+            said["runMs"] = (double)HaloDot.ColourRunMs;
+            Color own = Color.FromArgb(1, 2, 3);
+            Func<string, Color> fill = delegate(string state) { return HaloDot.DotColour(state, false); };
+            var colours = new List<object>();
+            foreach (double ms in new[] { 0.0, 210.0, 630.0, 1050.0, 1470.0, 1785.0, 2100.0 })
+                colours.Add(HaloDot.ColourRunAt(ms, own, fill).ToArgb() == own.ToArgb() ? "own" :
+                            Array.Find(HaloDot.ColourRunStates, delegate(string state) { return fill(state).ToArgb() == HaloDot.ColourRunAt(ms, own, fill).ToArgb(); }) ?? "between");
+            said["colours"] = colours;
+            var distinct = new List<int>();
+            foreach (string state in HaloDot.ColourRunStates) if (!distinct.Contains(fill(state).ToArgb())) distinct.Add(fill(state).ToArgb());
+            said["distinctColours"] = (double)distinct.Count;
+            var burst = new ConfettiBurst(new Random(7), new PointF(300, 140), 1f, ConfettiBurst.Colours());
+            var brand = new List<int>();
+            foreach (Color colour in ConfettiBurst.Colours()) brand.Add(colour.ToArgb());
+            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+            bool startsTogether = true, moved = false, opaqueEarly = true, goneAtEnd = true, inBrand = true;
+            for (int i = 0; i < ConfettiBurst.Pieces; i++)
+            {
+                double opacity;
+                PointF at = burst.At(i, 0, out opacity);
+                if (at.X != 300 || at.Y != 140) startsTogether = false;
+                if (!brand.Contains(burst.ColourOf(i).ToArgb())) inBrand = false;
+                for (double ms = 0; ms <= ConfettiBurst.LengthMs; ms += 25)
+                {
+                    at = burst.At(i, ms, out opacity);
+                    if (opacity > 0)
+                    {
+                        minX = Math.Min(minX, at.X); maxX = Math.Max(maxX, at.X);
+                        minY = Math.Min(minY, at.Y); maxY = Math.Max(maxY, at.Y);
+                    }
+                    if (ms == 600 && (at.X != 300 || at.Y != 140)) moved = true;
+                    if (ms <= 800 && opacity < 1.0) opaqueEarly = false;
+                    if (ms >= ConfettiBurst.LengthMs && opacity > 0.0) goneAtEnd = false;
+                }
+            }
+            said["confetti"] = new Dictionary<string, object> {
+                { "startsTogether", startsTogether }, { "moved", moved }, { "opaqueEarly", opaqueEarly }, { "goneAtEnd", goneAtEnd },
+                { "inBrand", inBrand }, { "box", new List<object> { minX - 300, maxX - 300, minY - 140, maxY - 140 } } };
+            var pick = new EggPick();
+            pick.Next = new Random(11).Next;
+            var picked = new List<object>();
+            for (int i = 0; i < 300; i++) picked.Add((double)pick.Pick());
+            said["picked"] = picked;
+            return said;
+        }
+
         internal static void ProportionsRun(string dir, Dictionary<string, object> said)
         {
+            said["eggParts"] = ProportionsEggParts();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Palette.AdoptDesign(null);
@@ -234,6 +290,55 @@ namespace CodexAutoResume
                     down.Invoke(form.versionText, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                     answer["labelPress"] = form.ProportionsAside();
                     answer["sentence"] = form.S("status.aside", "It's okay if it stops. I'll pick it up.");
+                    // The sixth press in a row plays a special egg instead (the owner, 2026-11-16, "6번", "3개 중 하나가 랜덤으로
+                    // 뜨게 하자"): four runs of six presses, the picks given (0, then 0, 0 and 1 of the two left), the count
+                    // read standing in (3, then 0). Never shown, nothing here may move: each is its sentence alone, at once.
+                    form.auditing = false;
+                    FieldInfo run = typeof(PressRun).GetField("count", BindingFlags.Instance | BindingFlags.NonPublic);
+                    var picks = new Queue<int>(new[] { 0, 0, 0, 1 });
+                    var asked = new List<object>();
+                    form.SpecialEggs.Next = delegate(int kinds) { asked.Add((double)kinds); return picks.Count > 0 ? picks.Dequeue() : 0; };
+                    int counted = 3;
+                    form.ReadRecoveredAllTime = delegate(Action<int> then) { then(counted); };
+                    var runs = new List<object>();
+                    for (int round = 0; round < 4; round++)
+                    {
+                        if (round == 3) counted = 0;
+                        run.SetValue(form.versionPresses, 0);
+                        var played = new List<object>();
+                        for (int press = 0; press < 6; press++)
+                        {
+                            form.EggsPlayed.Clear();
+                            down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
+                            played.Add(string.Join(",", form.EggsPlayed.ToArray()));
+                        }
+                        var round_ = new Dictionary<string, object>();
+                        round_["played"] = played;
+                        round_["aside"] = form.ProportionsAside();
+                        round_["colours"] = form.stateDot.ColoursRunning;
+                        round_["confetti"] = form.confetti != null;
+                        runs.Add(round_);
+                    }
+                    answer["runs"] = runs;
+                    answer["asked"] = asked;
+                    // In a picture or the layout audit the sixth press is the one-press egg.
+                    form.auditing = true;
+                    run.SetValue(form.versionPresses, 0);
+                    var audited = new List<object>();
+                    for (int press = 0; press < 6; press++)
+                    {
+                        form.EggsPlayed.Clear();
+                        down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
+                        audited.Add(string.Join(",", form.EggsPlayed.ToArray()));
+                    }
+                    answer["audited"] = audited;
+                    var words = new Dictionary<string, object>();
+                    foreach (string key in new[] { "status.aside_colours", "status.aside_confetti", "status.aside_count_many",
+                                                   "status.aside_count_none", "status.aside_count_one" })
+                        words[key] = form.S(key, "");
+                    answer["eggWords"] = words;
+                    answer["countOne"] = form.CountAside(1);
+                    answer["countUnread"] = form.CountAside(-1);
                 }
                 said[locale] = answer;
             }
@@ -388,10 +493,81 @@ class DashboardProportionsTests(unittest.TestCase):
                     self.assertEqual(again["shows"], "The line's own words",
                                      "from its start: the line's own words while the sweep plays again, never the sentence held")
 
-    def test_the_window_counts_no_presses(self):
-        egg = guiscan.member_body("SettingsForm", "VersionPressed")
-        self.assertEqual(egg[egg.index("{") + 1:egg.index("stateDot.Sweep();")].strip(), "", "nothing before the sweep: " + egg)
-        self.assertNotIn("PressRun", guiscan.window())
+    def test_the_sixth_press_in_a_row_plays_a_special_egg(self):
+        """The owner, 2026-11-16: "여러번 누를때의 이스터에그도 별도로 만들자" - a separate egg for many presses - "3개 중
+        하나가 랜덤으로 뜨게 하자" - one of three at random - and "6번": five presses are the one-press egg each, the sixth (each
+        within 1.8 s of the last) one of the three special ones instead, and the run starts again."""
+        for locale in LOCALES:
+            said = self.answer[locale]
+            with self.subTest(locale=locale):
+                played = [run["played"] for run in said["runs"]]
+                for run in played:
+                    self.assertEqual(run[:5], ["one"] * 5, "five presses never play a special egg")
+                self.assertEqual([run[5] for run in played], ["colours", "count", "confetti", "count"])
+                self.assertEqual(said["asked"], [3, 2, 2, 2], "the first of three, then one of the two not played last")
+                self.assertEqual(said["audited"], ["one"] * 6, "never in a picture or the layout audit")
+
+    def test_each_special_egg_says_its_sentence_and_nothing_moves_where_nothing_may(self):
+        for locale in LOCALES:
+            said = self.answer[locale]
+            words = said["eggWords"]
+            colours, count, confetti, none = said["runs"]
+            with self.subTest(locale=locale):
+                self.assertEqual(colours["aside"]["words"], words["status.aside_colours"])
+                self.assertEqual(confetti["aside"]["words"], words["status.aside_confetti"])
+                self.assertEqual(none["aside"]["words"], words["status.aside_count_none"], "none picked up yet at 0")
+                before, after = words["status.aside_count_many"].split("{n}")
+                self.assertTrue(count["aside"]["words"].startswith(before.rstrip()) and "3" in count["aside"]["words"],
+                                "the real figure: " + count["aside"]["words"])
+                self.assertTrue(count["aside"]["words"].endswith(after.lstrip()))
+                self.assertEqual(said["countOne"], words["status.aside_count_one"])
+                self.assertEqual(said["countUnread"], said["sentence"], "a count that cannot be read: the one-press sentence")
+                # Never shown, motion is not allowed here: no colours run, no confetti - the sentence alone, at once.
+                for run in said["runs"]:
+                    self.assertFalse(run["colours"])
+                    self.assertFalse(run["confetti"])
+                    self.assertTrue(run["aside"]["saying"])
+                    self.assertEqual(run["aside"]["behind"], "The line's own words")
+        if "en" in LOCALES:
+            self.assertEqual(self.answer["en"]["runs"][1]["aside"]["words"], "So far I have picked up 3 conversations for you.")
+
+    @property
+    def parts(self):
+        return self.answer["eggParts"]
+
+    def test_the_light_runs_through_its_four_colours_and_back(self):
+        parts = self.parts
+        self.assertEqual(parts["states"], ["", "monitoring", "monitoring", "attention", "paused", "failed", "failed", "", "", ""])
+        self.assertEqual(parts["runMs"], 2100)
+        self.assertEqual(parts["colours"], ["own", "monitoring", "attention", "paused", "failed", "between", "own"])
+        self.assertEqual(parts["distinctColours"], 4)
+
+    def test_the_confetti_bursts_from_the_pill_and_falls_within_its_box(self):
+        confetti = self.parts["confetti"]
+        for key in ("startsTogether", "moved", "opaqueEarly", "goneAtEnd", "inBrand"):
+            self.assertTrue(confetti[key], key)
+        left, right, top, bottom = confetti["box"]
+        # SettingsForm.Confetti's box at 100 %: 260 px either side of the pill, 130 above it, the window's foot below.
+        self.assertGreaterEqual(left, -260)
+        self.assertLessEqual(right, 260)
+        self.assertGreaterEqual(top, -130)
+        self.assertGreater(bottom, 0, "it falls")
+
+    def test_the_pick_is_one_of_three_never_the_same_twice_in_a_row(self):
+        picked = self.parts["picked"]
+        self.assertEqual(set(picked), {0, 1, 2})
+        self.assertFalse([i for i in range(1, len(picked)) if picked[i] == picked[i - 1]])
+        for kind in (0, 1, 2):
+            self.assertGreater(picked.count(kind), 60, "each about a third")
+
+    def test_the_confetti_takes_no_input_and_stays_with_its_window(self):
+        layer = guiscan.type_body("ConfettiLayer")
+        self.assertIn("internal const int ExStyle = 0x00080000 | 0x00000020 | 0x00000080 | 0x08000000;", layer)
+        self.assertNotIn("TOPMOST", layer)
+        self.assertIn("cp.Parent = owner.Handle;", layer)
+        egg = guiscan.member_body("SettingsForm", "Confetti")
+        self.assertIn("!Motion.Allowed(versionPill) || Palette.Contrast", egg)
+        self.assertIn("client.Bottom", egg)
 
 
 class DashboardProportionsSourceTests(unittest.TestCase):

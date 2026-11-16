@@ -440,6 +440,19 @@ namespace CodexAutoResume
         private readonly HaloDot stateDot = new HaloDot();
         private readonly SoftDayScene dayScene = new SoftDayScene();
         private string dayLook;
+        // v0.6.24-beta.2 (the owner, 2026-11-16): the run of presses on the version that plays a special egg at the sixth, which
+        // one (SpecialEggs), what each press played (for the tests), the confetti on the screen and the count read last asked.
+        private readonly System.Diagnostics.Stopwatch versionClock = System.Diagnostics.Stopwatch.StartNew();
+        private readonly PressRun versionPresses = new PressRun();
+        internal readonly EggPick SpecialEggs = new EggPick();
+        internal readonly List<string> EggsPlayed = new List<string>();
+        private ConfettiLayer confetti;
+        private int countAsked;
+
+        /// How the count egg reads how many recoveries the app has made in all - the bridge's statistics over all time, the
+        /// figure Statistics shows for "All time" - handing it, or -1 where it cannot be read, to `then` on the window's thread.
+        /// The tests give their own.
+        internal Action<Action<int>> ReadRecoveredAllTime;
 
         // The sentence comes in as the sweep ends, and goes 4 s after it has come in.
         internal const int AsideAfterMs = 850, AsideMs = 4150;
@@ -515,10 +528,105 @@ namespace CodexAutoResume
         /// "이스터에그 버전 알약 한번만 눌러도 뜨게 하자" - let one press on the version pill show the easter egg): every press,
         /// where seven within 1.8 s each were asked before (v0.6.23). A press while it plays starts it again from its start - the
         /// sweep from the top (HaloDot.Sweep), the sentence again as that ends (AsideLabel.Aside) - and nothing stacks.
+        ///
+        /// And the sixth press in a row, each within 1.8 s of the last (PressRun; the owner, the same day, "여러번 누를때의
+        /// 이스터에그도 별도로 만들자", "6번"), plays one of three special eggs instead, at random and never the same twice in a
+        /// row (EggPick) - never in a picture or the layout audit (LightSweepsShown), where it is the one-press egg.
         private void VersionPressed()
         {
+            countAsked++;
+            if (versionPresses.Press(versionClock.Elapsed.TotalMilliseconds) && LightSweepsShown)
+            {
+                PlaySpecialEgg(SpecialEggs.Pick());
+                return;
+            }
+            EggsPlayed.Add("one");
             stateDot.Sweep();
             detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+        }
+
+        /// One special egg, each with its sentence. With motion reduced or Windows' animations off, nothing moves and the
+        /// sentence comes at once, as the one-press egg's does; in High Contrast the light runs no colours and no confetti
+        /// falls, the sentence alone.
+        private void PlaySpecialEgg(int which)
+        {
+            if (which == EggPick.Colours)
+            {
+                // The light through each of its colours in turn, back to its own (HaloDot.RunColours).
+                EggsPlayed.Add("colours");
+                stateDot.RunColours();
+                detail.Aside(S("status.aside_colours", "Did you see? My light has four colours."), stateDot.ColoursRunning ? AsideAfterMs : 0, AsideMs);
+            }
+            else if (which == EggPick.Count)
+            {
+                // The sweep, and what it has picked up in all, read as the sweep plays.
+                EggsPlayed.Add("count");
+                stateDot.Sweep();
+                bool sweeping = stateDot.Sweeping;
+                var since = System.Diagnostics.Stopwatch.StartNew();
+                int asked = countAsked;
+                (ReadRecoveredAllTime ?? ReadRecovered)(delegate(int recovered)
+                {
+                    if (asked != countAsked || IsDisposed) return;
+                    int left = sweeping ? Math.Max(0, AsideAfterMs - (int)since.ElapsedMilliseconds) : 0;
+                    detail.Aside(CountAside(recovered), left, AsideMs);
+                });
+            }
+            else
+            {
+                EggsPlayed.Add("confetti");
+                bool falling = Confetti();
+                detail.Aside(S("status.aside_confetti", "You found it! Thank you for staying."), falling ? AsideAfterMs : 0, AsideMs);
+            }
+        }
+
+        /// The count egg's sentence: how many it has picked up in all, none yet, or - where that cannot be read - the
+        /// one-press egg's own.
+        internal string CountAside(int recovered)
+        {
+            if (recovered < 0) return S("status.aside", "It's okay if it stops. I'll pick it up.");
+            if (recovered == 0) return S("status.aside_count_none", "None picked up yet. If one stops, I'll take it from there.");
+            if (recovered == 1) return S("status.aside_count_one", "So far I have picked up 1 conversation for you.");
+            return S("status.aside_count_many", "So far I have picked up {n} conversations for you.", "n",
+                     recovered.ToString(CultureInfo.CurrentCulture));
+        }
+
+        /// The bridge's statistics over all time, off the window's thread - reading numbers is not an action (LoadStatistics).
+        private void ReadRecovered(Action<int> then)
+        {
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                int recovered = -1;
+                try
+                {
+                    Dictionary<string, object> reply = bridge.Call("statistics", "{}");
+                    if (Ok(reply)) recovered = (int)Number(Map(Map(reply, "result"), "outcomes"), "recovered");
+                }
+                catch (Exception) { recovered = -1; }
+                MethodInvoker tell = delegate { then(recovered); };
+                try { if (IsHandleCreated && !IsDisposed) BeginInvoke(tell); }
+                catch (Exception) { }
+            });
+        }
+
+        /// A small burst of confetti from the version's pill, falling within the window for ConfettiBurst.LengthMs, in the
+        /// brand's colours (ConfettiLayer: it takes no input and is never outside the client area). A burst on its way gives way
+        /// to the new one. Nothing where nothing may move, in High Contrast, or with no pill on the screen.
+        private bool Confetti()
+        {
+            if (versionPill == null || pillSlot == null || !Soft.OwnVisible(pillSlot) || !Motion.Allowed(versionPill) || Palette.Contrast)
+                return false;
+            Point centre = PointToClient(versionPill.PointToScreen(new Point(versionPill.Width / 2, versionPill.Height / 2)));
+            int reach = Px(260);
+            Rectangle client = ClientRectangle;
+            Rectangle area = Rectangle.FromLTRB(Math.Max(client.Left, centre.X - reach), Math.Max(client.Top, centre.Y - Px(130)),
+                                                Math.Min(client.Right, centre.X + reach), client.Bottom);
+            if (area.Width <= 0 || area.Height <= 0) return false;
+            if (confetti != null) confetti.Dispose();
+            var burst = new ConfettiBurst(new Random(), new PointF(centre.X - area.X, centre.Y - area.Y), Soft.PxF(1), ConfettiBurst.Colours());
+            confetti = new ConfettiLayer(this, area, burst);
+            confetti.Start();
+            return true;
         }
         // v0.6.5: the notification-area icon's motion on the taskbar button (TaskbarMark), told the icon's state for what
         // the window read wherever stateDot is told its own (TellTaskbar); null in a window LayoutAudit builds, and
