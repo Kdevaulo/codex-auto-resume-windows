@@ -90,6 +90,7 @@ namespace CodexAutoResume
             AuditedCaption = 0;
             AuditedCaptionGeometry = "";
             AuditedTitleRows = 0;
+            AuditedDialogCards = 0;
             AuditedAlike = 0;
             AuditedWraps = 0;
             AuditedPower = 0;
@@ -852,7 +853,7 @@ namespace CodexAutoResume
                 findings.Add("tabs :: the version's pill cuts its words: " + versionText.Width + " of " + words);
         }
 
-        internal static int AuditedCaption, AuditedTitleRows;
+        internal static int AuditedCaption, AuditedTitleRows, AuditedDialogCards;
         /// Each header the caption was audited in: `where:x,y,width,height;clear;inset` - the buttons' group in the header,
         /// how far the headline ends before it, and how far the group stands in from the hero's outer edge (for the tests).
         internal static string AuditedCaptionGeometry = "";
@@ -984,6 +985,67 @@ namespace CodexAutoResume
                     findings.Add(where + " :: " + AuditName(child) + " starts at " + child.Top + ", inside the title's strip");
             if (dialog.Controls.GetChildIndex(strip) != dialog.Controls.Count - 1)
                 findings.Add(where + " :: the title's strip is not the last control the dialog holds");
+        }
+
+        /// v0.6.24-beta.2, layout A (the owner, 2026-11-16, "한 카드에 모두"): under a dialog's title row, ONE card holding its
+        /// content and its buttons (SoftDialog.Gather). Under the title the dialog holds the card's ground alone, which
+        /// reaches the dialog's foot with nothing below the card but its own padding; every button of the dialog's own is
+        /// inside the card, and they stand at its foot. A dialog the screen holds smaller than it was laid out for keeps
+        /// only the first of these asked (HeldByScreen).
+        internal static void AuditDialogCard(string where, Form dialog, List<string> findings)
+        {
+            AuditedDialogCards++;
+            var soft = dialog as SoftDialog;
+            SoftCard card = soft == null ? null : soft.BodyCard;
+            if (card == null)
+            {
+                findings.Add(where + " :: the dialog's content is on no card of its own");
+                return;
+            }
+            Control ground = card.Parent;
+            foreach (Control child in dialog.Controls)
+                if (child != soft.TitleGround && child != ground && Soft.OwnVisible(child))
+                    findings.Add(where + " :: " + AuditName(child) + " stands on the dialog's ground, outside its card");
+            if (HeldByScreen(dialog)) return;
+            if (ground.Parent != dialog || ground.Bottom != dialog.ClientSize.Height)
+                findings.Add(where + " :: the card's ground ends at " + ground.Bottom + " in a dialog " + dialog.ClientSize.Height + " high");
+            int below = ground.ClientSize.Height - card.Bottom;
+            if (below != ground.Padding.Bottom)
+                findings.Add(where + " :: " + below + " px under the card, not its ground's " + ground.Padding.Bottom);
+            Rectangle face = InDialog(card, dialog);
+            // The buttons under the body are the dialog's answer: the lowest of them at the card's foot. A button in a line
+            // above the body or in the body itself (the log's Search) stands where it is.
+            int under = soft.CardContent == null ? int.MaxValue : InDialog(soft.CardContent, dialog).Bottom;
+            int lowest = 0;
+            foreach (Button button in DialogButtons(dialog))
+            {
+                if (!Soft.OwnVisible(button)) continue;
+                Rectangle at = InDialog(button, dialog);
+                if (!face.Contains(at))
+                    findings.Add(where + " :: the " + AuditName(button) + " button at " + at + " is outside the card at " + face);
+                if (at.Top >= under) lowest = Math.Max(lowest, at.Bottom);
+            }
+            if (lowest > 0 && face.Bottom - card.Padding.Bottom - lowest > Soft.Px(2))
+                findings.Add(where + " :: the buttons end " + (face.Bottom - card.Padding.Bottom - lowest) + " px above the card's foot");
+        }
+
+        private static List<Button> DialogButtons(Control parent)
+        {
+            var found = new List<Button>();
+            foreach (Control child in parent.Controls)
+            {
+                var button = child as Button;
+                if (button != null) found.Add(button);
+                else found.AddRange(DialogButtons(child));
+            }
+            return found;
+        }
+
+        private static Rectangle InDialog(Control control, Form dialog)
+        {
+            int x = 0, y = 0;
+            for (Control up = control; up != null && up != dialog; up = up.Parent) { x += up.Left; y += up.Top; }
+            return new Rectangle(x, y, control.Width, control.Height);
         }
 
         private readonly HashSet<Control> auditedPins = new HashSet<Control>();
@@ -1361,6 +1423,7 @@ namespace CodexAutoResume
                 if (timelineList != null) AuditList("timeline/" + AuditName(timelineList), timelineList, findings);
                 AuditSpoken("timeline", dialog, findings);
                 AuditTitleRow("timeline", dialog, findings);
+                AuditDialogCard("timeline", dialog, findings);
             }
         }
 
@@ -1394,6 +1457,7 @@ namespace CodexAutoResume
                 }
                 AuditSpoken("logs", dialog, findings);
                 AuditTitleRow("logs", dialog, findings);
+                AuditDialogCard("logs", dialog, findings);
             }
             // v0.6.16-beta.3: the check of why a failure was not taken up, as it stands before its answer.
             using (Form dialog = BuildDetectionCheck())
@@ -1403,6 +1467,7 @@ namespace CodexAutoResume
                 dialog.PerformLayout();
                 AuditSpoken("detection_check", dialog, findings);
                 AuditTitleRow("detection_check", dialog, findings);
+                AuditDialogCard("detection_check", dialog, findings);
             }
             // v0.6.19: this PC's own compatibility report, as it stands before its answer.
             using (Form dialog = BuildOwnReport())
@@ -1412,6 +1477,7 @@ namespace CodexAutoResume
                 dialog.PerformLayout();
                 AuditSpoken("own_report", dialog, findings);
                 AuditTitleRow("own_report", dialog, findings);
+                AuditDialogCard("own_report", dialog, findings);
             }
         }
 
@@ -1450,6 +1516,7 @@ namespace CodexAutoResume
                 if (versionsList != null) AuditList("versions/" + AuditName(versionsList), versionsList, findings);
                 AuditSpoken("versions", dialog, findings);
                 AuditTitleRow("versions", dialog, findings);
+                AuditDialogCard("versions", dialog, findings);
             }
         }
 
@@ -1480,6 +1547,7 @@ namespace CodexAutoResume
                 {
                     AuditSpoken("conversation message", dialog, findings);
                     AuditTitleRow("conversation message", dialog, findings);
+                    AuditDialogCard("conversation message", dialog, findings);
                 }
                 finally
                 {
@@ -1515,6 +1583,7 @@ namespace CodexAutoResume
                 {
                     AuditSpoken("words for this time", dialog, findings);
                     AuditTitleRow("words for this time", dialog, findings);
+                    AuditDialogCard("words for this time", dialog, findings);
                 }
                 finally
                 {

@@ -95,7 +95,9 @@ class PageTests(PageCase):
         self.assertTrue(by_button["title"].startswith(words["page.follow.title"]))
         self.assertEqual(by_button["said"], words["page.follow.link.exact"])
         self.assertEqual(by_button["list_card"], "", "its list is on History's card")
-        self.assertEqual((by_button["buttons"], by_button["accept"]), (["Close"], True))
+        # v0.6.24-beta.2: nothing to answer, so no Close of its own - the title row's X and Esc close it (the owner,
+        # 2026-11-16).
+        self.assertEqual((by_button["buttons"], by_button["accept"]), ([], True))
         events = [row[1] for row in by_button["rows"]]
         self.assertEqual(events, [
             words["page.follow.sent"], words["page.follow.delivered_turn"],

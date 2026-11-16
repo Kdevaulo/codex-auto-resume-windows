@@ -542,18 +542,13 @@ namespace CodexAutoResume
             note.MaximumSize = new Size(Px(720), 0);
             footer.Controls.Add(note);
 
-            FlowLayoutPanel buttons = ButtonRow();
-            buttons.FlowDirection = FlowDirection.RightToLeft;
-            buttons.Padding = Pad(16, 8, 17, 12);
-            var close = MakeButton(S("action.close", "Close"), false, delegate { dialog.Close(); });
-            buttons.Controls.Add(close);
-
+            // v0.6.24-beta.2: nothing to answer, so no Close of its own (the owner, 2026-11-16) - the title row's X closes it,
+            // and Escape does (SoftDialog). The search row above the list and the count and note under it stand in the
+            // list's card (SoftDialog.Gather).
             dialog.Controls.Add(listGround);
             dialog.Controls.Add(top);
             dialog.Controls.Add(footer);
-            dialog.Controls.Add(buttons);
             dialog.AcceptButton = search;
-            dialog.CancelButton = close;
 
             int token = 0;
             // v0.6.18: how many looks are on their way. The five-second look waits while one is, so a slow bridge does
@@ -738,7 +733,8 @@ namespace CodexAutoResume
             FlowLayoutPanel buttons = ButtonRow();
             buttons.FlowDirection = FlowDirection.RightToLeft;
             buttons.Padding = Pad(12, 8, 12, 12);
-            var close = MakeButton(S("action.close", "Close"), false, delegate { dialog.Close(); });
+            // v0.6.24-beta.2: no Close (the owner, 2026-11-16): nothing here is answered - the title row's X closes it, and
+            // Escape does (SoftDialog).
             Button copy = MakeButton(S("check.copy", "Copy"), true, null);
             copy.Enabled = false;
             copy.Click += delegate
@@ -750,13 +746,11 @@ namespace CodexAutoResume
                 }
                 catch (Exception) { }
             };
-            buttons.Controls.Add(close);
             buttons.Controls.Add(copy);
 
             dialog.Controls.Add(wellCard);
             dialog.Controls.Add(footer);
             dialog.Controls.Add(buttons);
-            dialog.CancelButton = close;
 
             dialog.Shown += delegate
             {

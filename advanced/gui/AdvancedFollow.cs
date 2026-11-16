@@ -34,7 +34,6 @@ namespace CodexAutoResume
         private Form followDialog;
         private Label followSaid;
         private ListView followList;
-        private Button followClose;
         // Null in every window a person opens. In a window AdvancedPageRun drives: what answers the dialog, never shown.
         private Action<Form> followAnswer;
 
@@ -104,7 +103,6 @@ namespace CodexAutoResume
             followDialog = null;
             followSaid = null;
             followList = null;
-            followClose = null;
         }
 
         /// The dialog, built and not shown: the line that says how it was linked, the rows empty, Close.
@@ -149,17 +147,10 @@ namespace CodexAutoResume
             // On History's card, on the soft scroll bar, as the lists in the window are (DialogListCard).
             Control listGround = DialogListCard(followList);
 
-            FlowLayoutPanel buttons = ButtonRow();
-            buttons.FlowDirection = FlowDirection.RightToLeft;
-            buttons.Padding = Pad(0, 0, 16, 16);
-            followClose = MakeButton(S("action.close", "Close"), true, delegate { dialog.Close(); });
-            buttons.Controls.Add(followClose);
-
+            // v0.6.24-beta.2: nothing to answer, so no Close of its own (the owner, 2026-11-16) - the title row's X closes it,
+            // and Escape does (SoftDialog). The line above the list stands in the list's card (SoftDialog.Gather).
             dialog.Controls.Add(listGround);
             dialog.Controls.Add(top);
-            dialog.Controls.Add(buttons);
-            dialog.AcceptButton = followClose;
-            dialog.CancelButton = followClose;
             followDialog = dialog;
             return dialog;
         }
