@@ -22,6 +22,11 @@ Two probes compiled with the window, each shown 30000 px off the desktop and nev
   a new title and icon taken while it is marked hidden and shown again after (the title taken); while Windows' corner is
   back (maximised), every one of them as before.
 
+Re-check 5 found a fresh Dashboard 22 x 11 physical px larger than it asked at 100 % and at 150 %: made as a window with
+Windows' left, right and bottom frames (at the system's scale) round the client, which a window whose corner is its own
+then took whole as its client. Chrome.Uncaption makes such a window with no frame at all; the probe makes the Dashboard at
+both scales (AdoptDisplayScale), never shown, and reads the window Windows made.
+
 What a screen shows - the cut corner clear of any ghost, no classic frame while it is resized - is the measurement
 session's to look at again (M-CORNER items 1 and 3).
 
@@ -215,6 +220,9 @@ namespace CodexAutoResume
                 said["edges-en"] = SettingsForm.CornerFrameEdges(argv[1], "en");
                 said["edges-ar"] = SettingsForm.CornerFrameEdges(argv[1], "ar");
                 Mirror.Window = false;
+                // Last: the others are made at this machine's own scale.
+                said["opening"] = new List<object> { SettingsForm.CornerFrameOpening(argv[1], 1.0),
+                                                     SettingsForm.CornerFrameOpening(argv[1], 1.5) };
             }
             catch (Exception e) { said["error"] = e.ToString(); code = 3; }
             File.WriteAllText(argv[0], Json.Write(said), new UTF8Encoding(false));
@@ -381,6 +389,35 @@ namespace CodexAutoResume
             return said;
         }
 
+        // A fresh Dashboard drawn at `scale` (AdoptDisplayScale, as Program.Main adopts the monitor's), made and never shown:
+        // the scale, the client it asked for as its window was made, OpeningClient, the window Windows made, its corner, and
+        // whether the primary screen's work area holds OpeningClient (KeepOnScreen makes it smaller where it does not).
+        internal static List<object> CornerFrameOpening(string dir, double scale)
+        {
+            double before = DisplayScale;
+            AdoptDisplayScale(scale);
+            try
+            {
+                var strings = Json.Parse(File.ReadAllText(Path.Combine(dir, "strings-en.json"), Encoding.UTF8)) as Dictionary<string, object>;
+                string nowhere = Path.Combine(dir, "nowhere-opening");
+                var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, null);
+                form.auditing = true;
+                form.StartPosition = FormStartPosition.Manual;
+                form.Location = new Point(FrameNative.Away, FrameNative.Away);
+                form.ShowInTaskbar = false;
+                Size asked = form.ClientSize, opening = form.OpeningClient;
+                IntPtr h = form.Handle;
+                List<object> window = FrameNative.Box(h);
+                Rectangle work = Screen.PrimaryScreen.WorkingArea;
+                var said = new List<object> { scale, (double)asked.Width, (double)asked.Height, (double)opening.Width,
+                                              (double)opening.Height, window[2], window[3], form.CaptionHost.OuterCorner.ToString(),
+                                              opening.Width <= work.Width && opening.Height <= work.Height };
+                form.Dispose();
+                return said;
+            }
+            finally { AdoptDisplayScale(before); }
+        }
+
         internal static Dictionary<string, object> CornerFrameDashboard(string dir)
         {
             var said = new Dictionary<string, object>();
@@ -501,6 +538,19 @@ class CornerFrameTests(unittest.TestCase):
         self.assertEqual([region, dwm_frame], [0, 1], "no region and DWM's frame: Windows clips a classic window it maximises "
                          "with a region of its own and paints its basic caption across the top")
         self.assertEqual(said["minimised"][:2], ["Minimized", "Round"], "Windows' corner while minimised: no region cut")
+
+    def test_a_window_with_its_own_corner_opens_at_exactly_the_size_it_asks(self):
+        # M-CORNER re-check 5: a fresh Dashboard opened 22 x 11 physical px larger than it asked at 100 % and at 150 % -
+        # Windows' left, right and bottom frames at the system's scale, which a window with no frame has none of.
+        for scale, asked_w, asked_h, opening_w, opening_h, window_w, window_h, corner, fits in self.answer["opening"]:
+            with self.subTest(scale=scale):
+                if corner != "Squircle":
+                    self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+                self.assertEqual([window_w, window_h], [asked_w, asked_h], "no frame added: its window is its client")
+                self.assertEqual(opening_w, round(1000 * scale), "OpeningWidth at this scale")
+                if fits:
+                    self.assertEqual([asked_w, asked_h], [opening_w, opening_h],
+                                     "where the screen holds it, the client asked for is OpeningClient")
 
     def test_the_shadow_is_never_on_the_screen_while_the_window_is_maximised(self):
         said = self.answer["dashboard"]

@@ -606,6 +606,8 @@ namespace CodexAutoResume
         [DllImport("user32.dll")]
         private static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);
         [DllImport("user32.dll")]
+        private static extern int GetWindowRgnBox(IntPtr window, out Chrome.RECT box);
+        [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr window, int command);
         [DllImport("user32.dll")]
         private static extern int GetDpiForWindow(IntPtr window);
@@ -847,7 +849,7 @@ namespace CodexAutoResume
                 double scale = dpi / 96.0;
                 int margin = WindowShape.Margin(scale);
                 var at = new POINT { X = rect.Left - margin, Y = rect.Top - margin };
-                if (size != shapedSize || dpi != shapedDpi || Ground() != shapedGround || Palette.Line != shapedLine)
+                if (size != shapedSize || dpi != shapedDpi || Ground() != shapedGround || Palette.Line != shapedLine || Lost(handle))
                     Reshape(size, dpi, at);
                 else if (layer != null)
                     MoveLayeredWindow(layer.Handle, IntPtr.Zero, ref at, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero, 0);
@@ -863,6 +865,18 @@ namespace CodexAutoResume
                 EventHandler changed = Changed;
                 if (changed != null) changed(this, EventArgs.Empty);
             }
+        }
+
+        /// Whether the window has lost the region it was given (v0.6.24, M-CORNER re-check 5): a region set as the window is
+        /// made - its first one, in WM_CREATE - is not kept, and a window made at exactly its size is never resized after to
+        /// set it again. Only where one was given (a window too small for the corner has none of its own).
+        private bool Lost(IntPtr handle)
+        {
+            if (shapedSize.IsEmpty || bitmap == IntPtr.Zero) return false;
+            Chrome.RECT box;
+            const int ERROR = 0, NULLREGION = 1;
+            int kind = GetWindowRgnBox(handle, out box);
+            return kind == ERROR || kind == NULLREGION;
         }
 
         // The shadow's colour: the ink PaintDialog shades a still's dialog with in light (5.2 item 2, O12), and in dark the
