@@ -27,6 +27,11 @@ Windows' left, right and bottom frames (at the system's scale) round the client,
 then took whole as its client. Chrome.Uncaption makes such a window with no frame at all; the probe makes the Dashboard at
 both scales (AdoptDisplayScale), never shown, and reads the window Windows made.
 
+A first dark open showed the companion's empty outline over the desktop for 1.2 s, then one white frame, then the
+window. A window with its own corner is now cloaked (DWMWA_CLOAK) as it is made and comes on with its companion only
+once it has painted (WindowCorner.Cloak, Painted); the probe reads DWMWA_CLOAKED and the companion as the Dashboard is
+made, shown before a message is handled, and after its first paint.
+
 What a screen shows - the cut corner clear of any ghost, no classic frame while it is resized - is the measurement
 session's to look at again (M-CORNER items 1 and 3).
 
@@ -430,10 +435,16 @@ namespace CodexAutoResume
             form.ShowInTaskbar = false;
             IntPtr h = form.Handle;
             said["made"] = CornerFrameState(form);
-            FrameNative.ShowWindow(h, 4);   // SW_SHOWNOACTIVATE: never made the foreground window
-            Application.DoEvents();
-            said["shown"] = CornerFrameState(form);
             IntPtr companion = form.CaptionHost.Corner == null ? IntPtr.Zero : form.CaptionHost.Corner.Companion;
+            // DWMWA_CLOAKED (14) and the companion: as it is made, shown before its first paint, and once it has painted.
+            said["cloakMade"] = FrameNative.Attribute(h, 14);
+            FrameNative.ShowWindow(h, 4);   // SW_SHOWNOACTIVATE: never made the foreground window
+            said["beforePaint"] = new List<object> { FrameNative.Attribute(h, 14),
+                                                     companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion) };
+            Application.DoEvents();
+            said["afterPaint"] = new List<object> { FrameNative.Attribute(h, 14),
+                                                    companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion) };
+            said["shown"] = CornerFrameState(form);
             said["companionShown"] = companion != IntPtr.Zero && FrameNative.IsWindowVisible(companion);
             List<object> made = FrameNative.Box(h);
             FrameNative.Maximised(h, true, FrameNative.Away + 10, 1400, 900);
@@ -551,6 +562,15 @@ class CornerFrameTests(unittest.TestCase):
                 if fits:
                     self.assertEqual([asked_w, asked_h], [opening_w, opening_h],
                                      "where the screen holds it, the client asked for is OpeningClient")
+
+    def test_nothing_of_a_new_window_is_seen_before_its_first_paint(self):
+        # Re-check 5's first dark open: the companion's empty outline for 1.2 s, then a white frame, then the window.
+        said = self.answer["dashboard"]
+        if said["made"]["corner"] != "Squircle":
+            self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+        self.assertEqual(said["cloakMade"], 1, "DWM_CLOAKED_APP as it is made")
+        self.assertEqual(said["beforePaint"], [1, False], "shown but not yet painted: cloaked, and no companion")
+        self.assertEqual(said["afterPaint"], [0, True], "painted: on the screen, its companion with it")
 
     def test_the_shadow_is_never_on_the_screen_while_the_window_is_maximised(self):
         said = self.answer["dashboard"]

@@ -793,6 +793,13 @@ namespace CodexAutoResume
         /// Handles `m` before the form does: true when it is answered here and the form must not see it again.
         internal bool Intercept(ref Message m, Pass pass)
         {
+            // v0.6.24: a window held off the screen until it has painted (WindowCorner.Cloak) comes on after its first paint.
+            if (corner != null && m.Msg == WM_PAINT && corner.Cloaked)
+            {
+                try { pass(ref m); }
+                finally { corner.Painted(); }
+                return true;
+            }
             // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
             if (corner != null && corner.Intercept(ref m)) return true;
             if (corner != null && corner.Shaped && (m.Msg == WM_SETTEXT || m.Msg == WM_SETICON) && form.IsHandleCreated)
@@ -859,7 +866,7 @@ namespace CodexAutoResume
             return false;
         }
 
-        private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, GWL_STYLE = -16, WS_VISIBLE = 0x10000000;
+        private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, WM_PAINT = 0x000F, GWL_STYLE = -16, WS_VISIBLE = 0x10000000;
 
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
         private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
