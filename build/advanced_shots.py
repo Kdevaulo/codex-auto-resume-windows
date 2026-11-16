@@ -512,8 +512,9 @@ def job(shots_of: list, locales, forms: dict, out: Path) -> tuple:
     order = [(each, locale) for locale in locales for each in sorted(shots_of, key=lambda item: item.report)]
     frames = [frame(each, locale, index) for index, (each, locale) in enumerate(order)]
     import make_screenshots as shots
+    import motion_window
     return {"out": str(out), "theme": "light", "design": "soft", "scale": shots.PINNED_SCALE, "forms": forms,
-            "targets": [], "frames": frames}, order
+            "targets": [], "frames": frames, **motion_window.frame_edge()}, order
 
 
 def render(exe: Path, job_data: dict, folder: Path) -> tuple:

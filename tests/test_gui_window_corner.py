@@ -400,6 +400,28 @@ class StillTests(unittest.TestCase):
         with mock.patch.object(brand, "WINDOW_SQUIRCLE", False):
             self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI})
 
+    def test_the_frames_held_to_the_stills_are_cut_by_the_same_edge(self):
+        # The motion, its fidelity check and the Advanced-page pictures lay the render's frames in the stills' chrome and
+        # hold them to the stills: while the stills carry the window's own edge (the squircle corner and its hairline along
+        # every side), each frame must too, or every page differs from its still by the hairline (v0.6.24: 4,882 px).
+        import sys
+        from unittest import mock
+        sys.path.insert(0, str(ROOT / "build"))
+        try:
+            import make_screenshots as shots
+            import motion_window
+        finally:
+            sys.path.remove(str(ROOT / "build"))
+        self.assertEqual(motion_window.frame_edge(), {"edge_dpi": shots.PINNED_DPI})
+        with mock.patch.object(brand, "WINDOW_SQUIRCLE", False):
+            self.assertEqual(motion_window.frame_edge(), {})
+        for name in ("motion_window.py", "motion_fidelity.py", "advanced_shots.py"):
+            self.assertIn("frame_edge()", (ROOT / "build" / name).read_text(encoding="utf-8"), name)
+        frames = guiscan.member_body("SettingsForm", "RenderFrames")
+        self.assertIn('job.TryGetValue("edge_dpi", out edgeDpi)', frames)
+        self.assertIn("using (Bitmap edged = CornerStill(picture, renderEdgeDpi))", frames)
+        self.assertIn("writer.Write(index, edged, form.RenderBounds(targets, frame));", frames)
+
     def test_the_render_and_the_capture_cut_by_the_same_decision(self):
         frames = guiscan.member_body("SettingsForm", "RenderFrames")
         self.assertIn('StillSquircle() ? SquircleStill(picture, StillNumber(renderStill, "dpi"))', frames)

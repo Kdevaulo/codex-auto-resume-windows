@@ -136,6 +136,12 @@ namespace CodexAutoResume
                 renderChrome = Map(job, "chrome");
                 // v0.6.20: each frame also as the still a capture takes of the window (FramedStill), when the job asks.
                 renderStill = Map(job, "still");
+                // v0.6.24: each frame with the window's own outer edge - its squircle corner and hairline, cut as a still is
+                // (CornerStill) - when the job asks (`edge_dpi`, motion_window.frame_edge): the motion's and the Advanced-page
+                // pictures' frames are then what the stills are, edge and all.
+                object edgeDpi;
+                renderEdgeDpi = job.TryGetValue("edge_dpi", out edgeDpi) && edgeDpi != null
+                    ? Convert.ToInt32(edgeDpi, CultureInfo.InvariantCulture) : 0;
                 // The job's command line, read as the window's own is (ParseArguments), for what a page takes from it:
                 // the advanced edition's `--capability=`. The standard window takes nothing here.
                 var arguments = new List<string>();
@@ -166,7 +172,11 @@ namespace CodexAutoResume
                     int index = Convert.ToInt32(frame["index"], CultureInfo.InvariantCulture);
                     using (Bitmap picture = form.RenderPicture(frame, writer))
                     {
-                        writer.Write(index, picture, form.RenderBounds(targets, frame));
+                        if (renderEdgeDpi > 0)
+                            using (Bitmap edged = CornerStill(picture, renderEdgeDpi))
+                                writer.Write(index, edged, form.RenderBounds(targets, frame));
+                        else
+                            writer.Write(index, picture, form.RenderBounds(targets, frame));
                         if (renderStill != null)
                             // v0.6.24 W5: cut by the same decision as the window - its own corner while the switch is on (the job
                             // says so, make_screenshots.still_job), else Windows' 8 px circle as a capture is cut.
@@ -963,6 +973,8 @@ namespace CodexAutoResume
         // The job's `still`: {"radius": the corners' in px, "dpi": the resolution a capture's bitmap has}. v0.6.24: no title
         // bar - the window's caption is its own, in its client area, so the client area is the whole window.
         private static Dictionary<string, object> renderStill;
+        // The job's `edge_dpi`: above 0, every frame is written with the window's own outer edge at that resolution.
+        private static int renderEdgeDpi;
 
         private static int StillNumber(Dictionary<string, object> still, string key)
         {
