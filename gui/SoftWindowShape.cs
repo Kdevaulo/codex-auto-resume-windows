@@ -5,12 +5,13 @@
 // window's own corner is two pieces (plans/v0624-stage1-design.md, section 5):
 //
 // - a window region: the pixels the card's corner (Palette.RadiusCard at the window's scale, smoothed as the cards are -
-//   Figma's 60 % for Soft, circular arcs for Classic and Plain) covers fully, less the hairline round its edge. Hard-edged,
-//   as a region is: "The system does not display any portion of a window that lies outside of the window region";
+//   Figma's 60 % for Soft, circular arcs for Classic and Plain) covers fully, the hairline round its edge too, so the
+//   window's outermost pixel is the window's and resizes it. Hard-edged, as a region is: "The system does not display any
+//   portion of a window that lies outside of the window region";
 // - a companion: one layered popup owned by the window - above it, hidden while it is minimised, gone with it - that lets
 //   the mouse through (WS_EX_TRANSPARENT) and paints everything round the region: the hairline and the anti-aliased edge,
 //   every pixel the corner covers partly at its coverage, and the window's shadow (the one a still draws round a dialog:
-//   14 px, 6 px lower, about 0.17 of the light) onto the desktop. Nothing it paints lies inside the region.
+//   14 px, 6 px lower, about 0.17 of the light) onto the desktop. Inside the region it paints the hairline alone, opaque.
 //
 // The window's whole rectangle is its client area then (WM_NCCALCSIZE answered with the window itself), so no invisible
 // frame is cut off by the region; the resize bands lie inside the visible edge (Chrome.Hit, ChromeLayout.Edges).
@@ -168,10 +169,13 @@ namespace CodexAutoResume
                 return xx >= Hair && yy >= Hair ? 1.0 : 0.0;
             }
 
-            /// Whether the pixel is the window's own - inside its region.
+            /// Whether the pixel is the window's own - inside its region: every pixel the corner covers fully, the hairline's
+            /// too. The companion paints the hairline over the window there, opaque, so it looks as it did; but a pointer on
+            /// the window's outermost pixel is over the window, and resizes it (M-CORNER 2026-11-16, item 3: it clicked
+            /// through to what lay behind). The edge's partly covered pixels are the companion's alone, as before.
             internal bool Own(int x, int y)
             {
-                return CoverInner(x, y) >= 1.0;
+                return CoverOuter(x, y) >= 1.0;
             }
 
             /// The shadow's light at the window's pixel (x, y): the stacked layers of PaintDialog's shadow - each
@@ -365,14 +369,13 @@ namespace CodexAutoResume
             return rects;
         }
 
-        // The first pixel of row y the window owns, or -1.
+        // The first pixel of row y the window owns (Edge.Own), or -1.
         private static int FirstOwn(Edge edge, int y)
         {
             int yy = Math.Min(y, edge.Height - 1 - y);
-            if (yy < edge.Hair) return -1;
-            if (yy >= edge.Tile) return edge.Hair;
+            if (yy >= edge.Tile) return 0;
             for (int x = 0; x < edge.Tile; x++)
-                if (edge.InnerTile[yy * edge.Tile + x] >= 1.0) return x;
+                if (edge.OuterTile[yy * edge.Tile + x] >= 1.0) return x;
             return edge.Tile;
         }
 

@@ -83,6 +83,37 @@ namespace CodexAutoResume
             return new List<object> { (double)r.Left, (double)r.Top, (double)(r.Right - r.Left), (double)(r.Bottom - r.Top) };
         }
 
+        [DllImport("user32.dll")] internal static extern int GetWindowRgn(IntPtr h, IntPtr region);
+        [DllImport("gdi32.dll")] internal static extern IntPtr CreateRectRgn(int l, int t, int r, int b);
+        [DllImport("gdi32.dll")] internal static extern bool PtInRegion(IntPtr region, int x, int y);
+        [DllImport("gdi32.dll")] internal static extern bool DeleteObject(IntPtr o);
+
+        // Whether the window's region holds the window's pixel (x, y); true where it has no region.
+        internal static bool InRegion(IntPtr h, int x, int y)
+        {
+            IntPtr region = CreateRectRgn(0, 0, 0, 0);
+            try { return GetWindowRgn(h, region) == 0 || PtInRegion(region, x, y); }
+            finally { DeleteObject(region); }
+        }
+
+        // What Windows' question of what the pointer is over gets at `screen`: asked of the deepest child window there
+        // first, and of what is under it while one answers HTTRANSPARENT, as Windows asks.
+        internal static int Route(Control parent, Point screen)
+        {
+            for (int i = 0; i < parent.Controls.Count; i++)
+            {
+                Control c = parent.Controls[i];
+                if (!Soft.OwnVisible(c) || !c.IsHandleCreated) continue;
+                Chrome.RECT r;
+                GetWindowRect(c.Handle, out r);
+                if (screen.X < r.Left || screen.X >= r.Right || screen.Y < r.Top || screen.Y >= r.Bottom) continue;
+                int code = Route(c, screen);
+                if (code != Chrome.HTTRANSPARENT) return code;
+            }
+            IntPtr at = (IntPtr)(((screen.Y & 0xFFFF) << 16) | (screen.X & 0xFFFF));
+            return SendMessage(parent.Handle, Chrome.WM_NCHITTEST, IntPtr.Zero, at).ToInt32();
+        }
+
         internal static double Attribute(IntPtr h, int attribute)
         {
             int value;
@@ -144,6 +175,9 @@ namespace CodexAutoResume
                 said["wanted"] = WindowShape.Wanted();
                 said["dashboard"] = SettingsForm.CornerFrameDashboard(argv[1]);
                 said["messages"] = Messages();
+                said["edges-en"] = SettingsForm.CornerFrameEdges(argv[1], "en");
+                said["edges-ar"] = SettingsForm.CornerFrameEdges(argv[1], "ar");
+                Mirror.Window = false;
             }
             catch (Exception e) { said["error"] = e.ToString(); code = 3; }
             File.WriteAllText(argv[0], Json.Write(said), new UTF8Encoding(false));
@@ -223,6 +257,53 @@ namespace CodexAutoResume
                 { "window", FrameNative.Box(h) } };
         }
 
+        // Along the page under the tabs, on every page: the window's outermost pixel, the band's innermost, and one pixel
+        // further in, at each side; and whether the outermost pixel is the window's (its region) or the cut corner's.
+        internal static Dictionary<string, object> CornerFrameEdges(string dir, string locale)
+        {
+            var said = new Dictionary<string, object>();
+            var strings = Json.Parse(File.ReadAllText(Path.Combine(dir, "strings-" + locale + ".json"), Encoding.UTF8)) as Dictionary<string, object>;
+            string nowhere = Path.Combine(dir, "nowhere-" + locale);
+            var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, null);
+            form.auditing = true;
+            form.StartPosition = FormStartPosition.Manual;
+            form.Location = new Point(FrameNative.Away, FrameNative.Away);
+            form.ShowInTaskbar = false;
+            IntPtr h = form.Handle;
+            form.Show();
+            Application.DoEvents();
+            Chrome.RECT whole;
+            FrameNative.GetWindowRect(h, out whole);
+            int width = whole.Right - whole.Left, height = whole.Bottom - whole.Top;
+            int band = form.CaptionHost.Layout().Band;
+            said["band"] = (double)band;
+            said["corner"] = form.CaptionHost.OuterCorner.ToString();
+            said["mirrored"] = Mirror.Of(form);
+            var pages = new Dictionary<string, object>();
+            foreach (string page in new List<string>(form.navButtons.Keys))
+            {
+                form.ShowPage(page);
+                form.PerformLayout();
+                Application.DoEvents();
+                Rectangle host = form.pageHost.RectangleToScreen(form.pageHost.ClientRectangle);
+                int y = host.Top + host.Height / 2;
+                pages[page] = new List<object> {
+                    (double)FrameNative.Route(form, new Point(whole.Left, y)),
+                    (double)FrameNative.Route(form, new Point(whole.Left + band - 1, y)),
+                    (double)FrameNative.Route(form, new Point(whole.Left + band, y)),
+                    (double)FrameNative.Route(form, new Point(whole.Right - 1, y)),
+                    (double)FrameNative.Route(form, new Point(whole.Right - band, y)),
+                    (double)FrameNative.Route(form, new Point(whole.Right - band - 1, y)) };
+            }
+            said["pages"] = pages;
+            said["outermost"] = new List<object> { FrameNative.InRegion(h, 0, height / 2), FrameNative.InRegion(h, width - 1, height / 2),
+                                                   FrameNative.InRegion(h, width / 2, 0), FrameNative.InRegion(h, width / 2, height - 1) };
+            said["cutCorner"] = FrameNative.InRegion(h, 0, 0);
+            form.Close();
+            form.Dispose();
+            return said;
+        }
+
         internal static Dictionary<string, object> CornerFrameDashboard(string dir)
         {
             var said = new Dictionary<string, object>();
@@ -258,9 +339,10 @@ class CornerFrameTests(unittest.TestCase):
     def setUpClass(cls):
         cls.folder = tempfile.TemporaryDirectory(prefix="car-corner-frame-")
         work = Path(cls.folder.name)
-        reply = {"ok": True, "language": "en", "strings": l10n.catalog("en"), "endonyms": dict(l10n.ENDONYMS),
-                 "preference": "en", "system_language": "en"}
-        (work / "strings-en.json").write_text(json.dumps(reply, ensure_ascii=False), encoding="utf-8")
+        for locale in ("en", "ar"):
+            reply = {"ok": True, "language": locale, "strings": l10n.catalog(locale), "endonyms": dict(l10n.ENDONYMS),
+                     "preference": locale, "system_language": locale}
+            (work / ("strings-%s.json" % locale)).write_text(json.dumps(reply, ensure_ascii=False), encoding="utf-8")
         probe = work / "CornerFrameProbe.cs"
         probe.write_text(PROBE, encoding="utf-8")
         exe = work / "CornerFrame.exe"
@@ -311,6 +393,31 @@ class CornerFrameTests(unittest.TestCase):
         said = self.answer["messages"]
         self.assertEqual(said["maximisedHit"], 9, "HTMAXBUTTON")
         self.assertEqual(said["restoreClick"], [0xF120], "SC_RESTORE, once")
+
+    def test_every_page_gives_its_sides_grip_band_to_the_window_mirrored_too(self):
+        HTLEFT, HTRIGHT, HTCLIENT, HTCAPTION = 10, 11, 1, 2
+        for locale in ("en", "ar"):
+            said = self.answer["edges-" + locale]
+            if said["corner"] != "Squircle":
+                self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+            self.assertEqual(said["mirrored"], locale == "ar")
+            self.assertGreater(said["band"], 0)
+            self.assertGreaterEqual(len(said["pages"]), 6)
+            for page, hits in said["pages"].items():
+                with self.subTest(locale=locale, page=page):
+                    self.assertEqual(hits[:2], [HTLEFT, HTLEFT], "the left side's outermost and innermost band pixels")
+                    self.assertIn(hits[2], (HTCLIENT, HTCAPTION), "one pixel further in is the page's")
+                    self.assertEqual(hits[3:5], [HTRIGHT, HTRIGHT], "the right side's")
+                    self.assertIn(hits[5], (HTCLIENT, HTCAPTION))
+
+    def test_the_window_s_outermost_pixel_is_its_own_and_the_cut_corner_is_not(self):
+        for locale in ("en", "ar"):
+            said = self.answer["edges-" + locale]
+            if said["corner"] != "Squircle":
+                self.skipTest("this machine gives the window no corner of its own (WindowShape.Wanted)")
+            with self.subTest(locale=locale):
+                self.assertEqual(said["outermost"], [True, True, True, True], "left, right, top, bottom, mid-side")
+                self.assertFalse(said["cutCorner"])
 
     def test_with_its_own_corner_nothing_of_windows_frame_is_painted(self):
         reached, title, visible, corner = self.answer["messages"]["own"]

@@ -405,8 +405,76 @@ namespace CodexAutoResume
         {
             if (corner != null || !form.TopLevel || !WindowShape.Wanted()) return;
             corner = WindowCorner.Attach(form);
-            corner.Changed += delegate { dirty = true; };
+            corner.Changed += delegate { dirty = true; Grip(); };
+            form.Layout += delegate { Grip(); };
             if (form.IsHandleCreated) Created();
+            Grip();
+        }
+
+        // ------------------------------------------------------------------ the grip band, given by what lies in it
+
+        // The controls that reach into the grip band (GripThrough), and the containers looked into for them.
+        private readonly Dictionary<Control, GripThrough> grips = new Dictionary<Control, GripThrough>();
+        private readonly HashSet<Control> watched = new HashSet<Control>();
+        private bool gripping;
+
+        /// v0.6.24 W5: with its own corner the window resizes from a band inside its edge (Chrome.Hit, ChromeLayout.Edges),
+        /// but Windows asks the control under the pointer first, and a control that reaches into the band - the page
+        /// under the tabs, the full width of the window (M-CORNER 2026-11-16, item 3: the left and right edges did not
+        /// resize along the pages) - answered for it. Every control that reaches into the band, at any depth, gives the
+        /// band to the window (HTTRANSPARENT there); the rest of it stays its own. Looked at again as anything that holds
+        /// one is laid out, so a page built later, a control added and the mirrored window all give it too. Only controls
+        /// that reach the band are looked into: nothing inside one that does not can reach it.
+        private void Grip()
+        {
+            if (corner == null || gripping || form.IsDisposed) return;
+            gripping = true;
+            try { GripIn(form, Math.Max(1, TopBand())); }
+            finally { gripping = false; }
+        }
+
+        private void GripIn(Control parent, int band)
+        {
+            Size client = form.ClientSize;
+            foreach (Control child in parent.Controls)
+            {
+                if (child is CaptionButton || child.IsDisposed) continue;
+                Rectangle at = InForm(child);
+                bool reaches = at.Left < band || at.Top < band || at.Right > client.Width - band || at.Bottom > client.Height - band;
+                if (!reaches) continue;
+                if (!drag.Contains(child) && !grips.ContainsKey(child)) grips[child] = new GripThrough(child, this);
+                if (watched.Add(child))
+                {
+                    child.Layout += delegate { Grip(); };
+                    child.Disposed += delegate { Forget(child); };
+                }
+                if (child.Controls.Count > 0) GripIn(child, band);
+            }
+        }
+
+        private void Forget(Control child)
+        {
+            GripThrough hook;
+            if (grips.TryGetValue(child, out hook)) hook.Let();
+            grips.Remove(child);
+            watched.Remove(child);
+        }
+
+        /// Whether the pointer at `screen` is in the band the window is resized from (Chrome.Hit's edges), the window's own
+        /// corner on.
+        internal bool InGrip(Point screen)
+        {
+            if (corner == null || !form.IsHandleCreated || !form.TopLevel) return false;
+            ChromeLayout l = Layout();
+            if (!l.Edges || !l.Sizable || l.Maximized) return false;
+            int hit = Chrome.Hit(form.PointToClient(screen), l);
+            return hit >= Chrome.HTLEFT && hit <= Chrome.HTBOTTOMRIGHT;
+        }
+
+        /// The controls that give the grip band to the window now, for the tests.
+        internal int Gripping
+        {
+            get { return grips.Count; }
         }
 
         /// The window's outer corner now: its own, or Windows' - round on Windows 11, square before.
@@ -979,6 +1047,53 @@ namespace CodexAutoResume
             tipWait.Dispose();
             foreach (DragThrough hook in hooks) hook.Let();
             hooks.Clear();
+            foreach (GripThrough grip in grips.Values) grip.Let();
+            grips.Clear();
+        }
+    }
+
+    /// A control that reaches into the window's grip band, giving that band to the window (ChromeHost.Grip): its answer
+    /// to what the pointer is over is the window's there (HTTRANSPARENT), its own everywhere else.
+    internal sealed class GripThrough : NativeWindow
+    {
+        private readonly Control control;
+        private readonly ChromeHost host;
+        private bool let;
+
+        internal GripThrough(Control control, ChromeHost host)
+        {
+            this.control = control;
+            this.host = host;
+            control.HandleCreated += delegate { Take(); };
+            control.HandleDestroyed += delegate { if (Handle != IntPtr.Zero) ReleaseHandle(); };
+            Take();
+        }
+
+        private void Take()
+        {
+            if (let || !control.IsHandleCreated || Handle == control.Handle) return;
+            if (Handle != IntPtr.Zero) ReleaseHandle();
+            AssignHandle(control.Handle);
+        }
+
+        internal void Let()
+        {
+            let = true;
+            if (Handle != IntPtr.Zero) ReleaseHandle();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == Chrome.WM_NCHITTEST && !let)
+            {
+                long at = m.LParam.ToInt64();
+                if (host.InGrip(new Point((short)(at & 0xFFFF), (short)((at >> 16) & 0xFFFF))))
+                {
+                    m.Result = (IntPtr)Chrome.HTTRANSPARENT;
+                    return;
+                }
+            }
+            base.WndProc(ref m);
         }
     }
 
