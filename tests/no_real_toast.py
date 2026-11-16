@@ -62,7 +62,7 @@ def _decoded(argument) -> str:
 def is_toast(command) -> bool:
     """Whether `command` (subprocess.run's first argument) runs a toast script, plainly or encoded.
 
-    Plainly is how the product starts it from v0.6.24 (pwsh.command_line: the script whole after -Command, issue
+    Plainly is how the product starts it from v0.6.24 (pwsh.script_argv: the script whole after -Command, issue
     #65); encoded is how every release before it did, and a tagged release's own package still does when a test
     runs it (tests/released.py)."""
     try:

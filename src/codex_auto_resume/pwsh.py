@@ -86,7 +86,7 @@ def reference(name: str) -> str:
     return "$env:" + PREFIX + name
 
 
-def command_line(shell: str, script: str) -> list:
+def script_argv(shell: str, script: str) -> list:
     """The argv that runs the constant `script`: the script whole, as the one argument after -Command."""
     return [shell, "-NoProfile", "-NonInteractive", "-Command", script]
 
@@ -101,7 +101,7 @@ def run(script: str, values: dict, *, timeout: float) -> int:
     if shell is None:
         raise PowerShellError("PowerShell is unavailable")
     completed = subprocess.run(
-        command_line(shell, script),
+        script_argv(shell, script),
         env=environment(values), stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         timeout=timeout, shell=False,

@@ -35,9 +35,9 @@ NOWHERE = str(ROOT / "no-such-folder" / "powershell.exe")
 
 
 def toast_command():
-    """The toast as the product starts it now: the script, plain, after -Command (pwsh.command_line)."""
+    """The toast as the product starts it now: the script, plain, after -Command (pwsh.script_argv)."""
     from codex_auto_resume import notify, pwsh
-    return pwsh.command_line(NOWHERE, notify._SCRIPT)
+    return pwsh.script_argv(NOWHERE, notify._SCRIPT)
 
 
 def encoded_toast_command():

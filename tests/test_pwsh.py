@@ -183,7 +183,7 @@ class NoValueInScriptTests(unittest.TestCase):
         at all and is read for what it prints."""
         self.assertEqual(srcscan.holders('"-Command"'),
                          {"codex_auto_resume/pwsh.py", "codex_auto_resume/codex/pairing.py"})
-        self.assertEqual(pwsh.command_line("powershell.exe", ECHO),
+        self.assertEqual(pwsh.script_argv("powershell.exe", ECHO),
                          ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ECHO])
 
     def test_the_shortcut_values_travel_out_of_band(self):

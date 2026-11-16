@@ -2,7 +2,7 @@
 
 Issue #65: Avast's Behavior Shield blocked powershell.exe (IDP.HELU.PSE96) on the shape the product used to start it
 with - the script as base64 after the encoded-command switch. From v0.6.24 pwsh.run hands the constant over as it is,
-quoted by subprocess's list2cmdline (pwsh.command_line). That is only safe if the real interpreter receives exactly the
+quoted by subprocess's list2cmdline (pwsh.script_argv). That is only safe if the real interpreter receives exactly the
 text written, so these tests ask it: each script starts with a line that compares the text PowerShell itself parsed
 ($MyInvocation.MyCommand.Definition) with the whole script, passed beside it as a value, parses it once more with
 PowerShell's own parser, and exits 41 only when both hold - 42, writing down what it received, otherwise. Nothing after
@@ -113,7 +113,7 @@ class ReceivedWholeTests(unittest.TestCase):
 
 class ArgvShapeTests(unittest.TestCase):
     def test_the_script_is_one_plain_argument_after_command(self):
-        argv = pwsh.command_line("powershell.exe", AWKWARD)
+        argv = pwsh.script_argv("powershell.exe", AWKWARD)
         self.assertEqual(argv, ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", AWKWARD])
         self.assertFalse(any(part.lower().startswith("-e") for part in argv), "no encoded-command switch")
 
