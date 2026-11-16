@@ -501,8 +501,7 @@ namespace CodexAutoResume
             // The window opens only at a text size whose dialogs its screen holds (TextScale.Fitting).
             // v0.6.24: asked once the dialog has its title card (Materialise makes it, SoftDialog), which makes it taller.
             Materialise(dialog);
-            Size most = SystemInformation.MaxWindowTrackSize;
-            bool whole = dialog.Width < most.Width && dialog.Height < most.Height;
+            bool whole = !HeldByScreen(dialog);
             dialog.PerformLayout();
             if (whole)
             {

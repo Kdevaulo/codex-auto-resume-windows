@@ -13,7 +13,10 @@ never shown (no WS_VISIBLE, nothing on the screen), and asks:
   style and SetWindowPos, as Windows' own maximise leaves it, so nothing is shown;
 - what the pointer is over on the Dashboard: the tab strip's ground and the save bar's ground drag the window as the hero
   does (HTCAPTION, design 3.4, O7); a tab, the save bar's card with its buttons and the version, and the page are the
-  client's (the save bar is never dragged: test_gui_chrome_sources);
+  client's (the save bar is never dragged: test_gui_chrome_sources). With the window's own outer corner (W5) it has no
+  frame and its resize grips are a band inside its edge (design 5.2 item 4), SM_CXSIZEFRAME + SM_CXPADDEDBORDER wide at
+  its DPI - the side under the pointer, mirrored too: a ground's point sits just inside that band, and the band's own
+  pixels resize;
 - maximised over a monitor with an auto-hide taskbar (the answer of SHAppBarMessage stubbed: Chrome.AppBarEdges), the client
   leaves Chrome.AutoHideRoom px at that edge, so the taskbar can still be brought out by the pointer; with none, the whole;
 - in High Contrast, a caption button the window does not offer is drawn in the system's GrayText.
@@ -81,6 +84,8 @@ namespace CodexAutoResume
             [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] internal static extern IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);
             [DllImport("user32.dll")] internal static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
             [DllImport("user32.dll")] internal static extern bool IsWindowVisible(IntPtr h);
+            [DllImport("user32.dll")] internal static extern int GetDpiForWindow(IntPtr h);
+            [DllImport("user32.dll")] internal static extern int GetSystemMetricsForDpi(int index, int dpi);
         }
 
         private const int TopLevelStyle = -16, TopLevelExStyle = -20, TopLevelMaximize = 0x01000000;
@@ -210,14 +215,35 @@ namespace CodexAutoResume
             Rectangle navFace = form.nav.RectangleToScreen(form.nav.ClientRectangle);
             Rectangle stripFace = strip.RectangleToScreen(strip.ClientRectangle);
             int middle = tabs.Top + tabs.Height / 2;
-            said["navEdge"] = (double)TopLevelRoute(form, new Point(mirrored ? navFace.Left + 3 : navFace.Right - 3, middle));
+            // With the window's own outer corner it has no frame, and its resize grips are a band inside its edge (design
+            // 5.2 item 4): SM_CXSIZEFRAME + SM_CXPADDEDBORDER at its DPI, asked of Windows here, not of the window.
+            Chrome.RECT whole;
+            TopLevelNative.GetWindowRect(form.Handle, out whole);
+            int dpi = TopLevelNative.GetDpiForWindow(form.Handle);
+            int band = TopLevelNative.GetSystemMetricsForDpi(32, dpi) + TopLevelNative.GetSystemMetricsForDpi(92, dpi);
+            bool frameless = form.CaptionHost.Frameless;
+            said["frameless"] = frameless;
+            said["wanted"] = WindowShape.Wanted();
+            said["band"] = (double)band;
+            int edge = mirrored ? navFace.Left + 3 : navFace.Right - 3;
+            if (frameless) edge = mirrored ? Math.Max(edge, whole.Left + band) : Math.Min(edge, whole.Right - 1 - band);
+            said["navEdge"] = (double)TopLevelRoute(form, new Point(edge, middle));
+            // The grip band's innermost pixel at the side under the pointer - the left one mirrored - and the strip's
+            // ground just inside it.
+            said["gripInner"] = (double)TopLevelRoute(form, new Point(mirrored ? whole.Left + band - 1 : whole.Right - band, middle));
+            said["gripOuter"] = (double)TopLevelRoute(form, new Point(mirrored ? whole.Left : whole.Right - 1, middle));
+            said["navReachesEdge"] = mirrored ? navFace.Left - whole.Left < band : whole.Right - navFace.Right < band;
             int past = mirrored ? tabs.Left - 20 : tabs.Right + 20;
             said["navPastTabs"] = (double)TopLevelRoute(form, new Point(past, middle));
             said["navPastTabsInStrip"] = stripFace.Contains(past, middle);
             said["tab"] = (double)TopLevelHit(form, form.navButtons["overview"], 12, 12);
             // The save bar: the footer's ground round its card, the card's own face between the version and the buttons, a
             // button, and the version.
-            said["footerGround"] = (double)TopLevelHit(form, form.footer, 3, 3);
+            // 3 px in from its top left - or, with the window's own corner, just inside the grip band.
+            Rectangle footerFace = form.footer.RectangleToScreen(form.footer.ClientRectangle);
+            int footerX = footerFace.Left + 3;
+            if (frameless) footerX = Math.Max(footerX, whole.Left + band);
+            said["footerGround"] = (double)TopLevelRoute(form, new Point(footerX, footerFace.Top + 3));
             Rectangle version = form.versionText.RectangleToScreen(form.versionText.ClientRectangle);
             Rectangle close = form.closeButton.RectangleToScreen(form.closeButton.ClientRectangle);
             Rectangle bar = form.savebar.RectangleToScreen(form.savebar.ClientRectangle);
@@ -463,6 +489,21 @@ class TopLevelChromeTests(unittest.TestCase):
                     self.assertEqual(said[ground], HTCAPTION, ground)
                 for control in ("tab", "savebarFace", "saveButton", "version", "page"):
                     self.assertEqual(said[control], HTCLIENT, control)
+
+    def test_with_its_own_corner_the_window_resizes_from_a_band_inside_its_edge_as_wide_as_windows_frame(self):
+        HTLEFT, HTRIGHT = 10, 11
+        for locale in LOCALES:
+            said = self.answer["grounds-" + locale]
+            with self.subTest(locale=locale):
+                self.assertEqual(said["frameless"], said["wanted"], "the corner is the window's own wherever it may be")
+                if not said["frameless"]:
+                    continue
+                self.assertTrue(said["navReachesEdge"], "the tab strip runs into the grip band")
+                side = HTLEFT if locale == "ar" else HTRIGHT
+                self.assertGreater(said["band"], 0)
+                self.assertEqual(said["gripOuter"], side, "the window's own last pixel resizes it")
+                self.assertEqual(said["gripInner"], side, "the band is SM_CXSIZEFRAME + SM_CXPADDEDBORDER wide")
+                self.assertEqual(said["navEdge"], HTCAPTION, "one pixel further in is the strip's ground")
 
     def test_maximised_over_an_auto_hide_taskbar_the_window_leaves_its_edge(self):
         said = self.answer["autohide"]
