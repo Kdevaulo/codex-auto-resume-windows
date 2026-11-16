@@ -113,7 +113,11 @@ class NoTitleBarTests(unittest.TestCase):
     """v0.6.24: a still is the window's client area - its caption buttons in it - with the corners cut, and nothing else."""
 
     def test_the_still_job_is_the_corners_and_the_resolution_alone(self):
-        self.assertEqual(shots.still_job(shots.PINNED_DPI), {"radius": 12, "dpi": shots.PINNED_DPI})
+        # And, while the Dashboard cuts its own outer corner (brand.WINDOW_SQUIRCLE, on from v0.6.24-beta), that corner's
+        # kind: tests/test_gui_window_corner.py holds both sides of the switch.
+        from codex_auto_resume import brand
+        corner = {"corner": "squircle"} if brand.WINDOW_SQUIRCLE else {}
+        self.assertEqual(shots.still_job(shots.PINNED_DPI), dict({"radius": 12, "dpi": shots.PINNED_DPI}, **corner))
 
     def test_the_render_mode_frames_no_title_bar(self):
         framed = guiscan.member_body("SettingsForm", "FramedStill")
