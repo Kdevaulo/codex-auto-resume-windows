@@ -611,7 +611,8 @@ $body = P $card 'Body'
 $image = P $card 'Image'
 $out.tip = @{ appearing = [bool](P $card 'Appearing'); alpha = [int](P $card 'Alpha'); outer = [int]$image.GetPixel(0, 0).A
               corner = [int]$image.GetPixel($body.X, $body.Y).A; ground = (Argb $image.GetPixel($body.X + 20, $body.Bottom - 6))
-              edge = (Argb $image.GetPixel($body.X + 30, $body.Y)); shadow = [int]$image.GetPixel($body.X + 30, $body.Bottom + 4).A }
+              edge = (Argb $image.GetPixel($body.X + 30, $body.Y)); image = @($image.Width, $image.Height)
+              body = @($body.X, $body.Y, $body.Width, $body.Height) }
 Pump 400
 $out.tip.after = @([bool](P $card 'Appearing'), [int](P $card 'Alpha'))
 $null = Call $label 'OnMouseLeave' @($None)
@@ -973,11 +974,13 @@ class DesignTests(Probed):
         self.assertTrue(tip["appearing"])
         self.assertLess(tip["alpha"], 255)
         self.assertEqual(tip["after"], [False, 255])
-        self.assertEqual(tip["outer"], 0, "nothing past its shadow")
+        self.assertEqual(tip["outer"], 0, "nothing past its round corner")
         self.assertLess(tip["corner"], 128, "its corners are round")
         self.assertEqual(tip["ground"], c["card"])
         self.assertEqual(tip["edge"], c["line"])
-        self.assertGreater(tip["shadow"], 0, "and it has the lift of a card")
+        # v0.6.24-beta.2, the owner (2026-11-16, "응 빼줘"): nothing drawn round it - its lit edge and pale shadow glowed
+        # over a dark desktop, as the icon's menu once did. The window is the card.
+        self.assertEqual(tip["body"], [0, 0] + tip["image"])
 
     def test_a_tooltip_closes_with_the_pointer_and_does_not_fade_when_motion_is_reduced(self):
         self.assertTrue(self.answer["tip"]["gone"])
