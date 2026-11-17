@@ -129,7 +129,9 @@ namespace CodexAutoResume
             top.Controls.Add(findSearch);
             findSaid = Value("");
             findSaid.ForeColor = Secondary;
-            findSaid.MaximumSize = new Size(Px(across - 32), 0);
+            // v0.6.24-beta.2: in the list's card (SoftDialog.Gather): the dialog less the card's ground (CardRoom, 16 and 17)
+            // and the list card's own padding (8 and 8).
+            findSaid.MaximumSize = new Size(Px(across - 33 - 16), 0);
             findSaid.Visible = false;
             top.Controls.Add(findSaid);
 

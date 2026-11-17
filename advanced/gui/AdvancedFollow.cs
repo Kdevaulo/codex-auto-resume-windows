@@ -138,7 +138,9 @@ namespace CodexAutoResume
             top.BackColor = Canvas;
             followSaid = Value("");
             followSaid.ForeColor = Secondary;
-            followSaid.MaximumSize = new Size(Px(across - 32), 0);
+            // v0.6.24-beta.2: in the list's card (SoftDialog.Gather): the dialog less the card's ground (CardRoom, 16 and 17)
+            // and the list card's own padding (8 and 8).
+            followSaid.MaximumSize = new Size(Px(across - 33 - 16), 0);
             top.Controls.Add(followSaid);
 
             // Flat hairline rows, owner-drawn as every list here is: when, and what happened - the Timeline's own columns.
