@@ -1314,7 +1314,8 @@ namespace CodexAutoResume
         private void KeepHeadlineClear()
         {
             if (chrome == null) return;
-            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - Math.Max(hero.Padding.Left, hero.Padding.Right);
+            // The card's padding at its outer side, the caption buttons': the pill's inset while it is in the card (PillToHeader).
+            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - (Mirror.Of(hero) ? hero.Padding.Left : hero.Padding.Right);
             var wanted = new Padding(0, 0, Math.Max(0, reach), 0);
             if (headline.Margin != wanted) headline.Margin = wanted;
         }
@@ -1683,6 +1684,12 @@ namespace CodexAutoResume
         private void PlaceDayScene()
         {
             if (dayLook == null) return;
+            // The version's pill at the card's outer end (PillToHeader) stands where the scene would: no scene then.
+            if (versionPill != null && versionPill.Parent == hero)
+            {
+                dayScene.Place(false, null, 0, 0, 0, 0, 0, 0);
+                return;
+            }
             bool mirrored = Mirror.Of(hero);
             int width = hero.Width, hair = Soft.Hairline, outer = width - hair;
             int end = Math.Max(WordsEnd(headline, mirrored, width), WordsEnd(detail, mirrored, width)), left, fade;
@@ -1849,11 +1856,20 @@ namespace CodexAutoResume
 
         private bool fittingPill;
 
-        /// The pill whole - the version and the edition - where the tabs leave room for it and the gap before it; the version
-        /// alone where only that fits; else none. The room is the strip's less the tabs' own width (the strip lays its tabs
-        /// out in one line; where the advanced edition's take two rows, none is left), at every text size and in every
-        /// language, and again whenever the strip lays its tabs out (test_gui_v0624_dashboard). Whether the slot was shown,
-        /// hidden or resized, which changes the strip's room.
+        /// v0.6.24 (the owner, 2026-11-18, the advanced edition's eight tabs in English, where the pill had gone): the room
+        /// a tab keeps at either side of its name - today's, and the least the tabs are drawn closer to so the pill stays,
+        /// half of it, where the names still read as separate tabs. Every tab alike, so the gaps stay equal; the chosen
+        /// tab's raised look is its face, which the ring's room (TabRing) and the margin keep off its neighbours whatever
+        /// the padding.
+        internal const int TabPadX = 18, TabPadXLeast = 9, TabPadY = 8;
+
+        /// The pill whole - the version and the edition - where the tabs leave room for it and the gap before it; else the
+        /// tabs drawn closer, every one alike and no closer than needed (TabPadX down to TabPadXLeast), so it still fits
+        /// whole; else the version alone, the tabs as close as that needs; and where even the closest tabs leave no room,
+        /// the pill at the end of the header card's second line, under the caption buttons (PillToHeader) - never hidden
+        /// (the owner, 2026-11-18). The room is the strip's less the tabs' own width, at every text size and in every
+        /// language, and again whenever the strip lays its tabs out (test_gui_v0624_dashboard, test_gui_pill_room). Whether
+        /// the slot was shown, hidden or resized, or the tabs' padding changed, which changes the strip's room.
         private bool FitVersionPill(Control strip)
         {
             if (fittingPill || versionPill == null) return false;
@@ -1861,42 +1877,125 @@ namespace CodexAutoResume
             try
             {
                 int gap = Px(12);
-                // The tabs' own row, each shown tab as wide as it asks with its margins - not the strip's PreferredSize, which
-                // a tab just shown has not yet reached while the strip lays out for it (dev CI 43859506322: the Chat tab).
-                int tabs = strip.Padding.Horizontal;
+                // The tabs' own row less the room at the sides of their names, each shown tab as wide as it asks with its
+                // margins - not the strip's PreferredSize, which a tab just shown has not yet reached while the strip lays
+                // out for it (dev CI 43859506322: the Chat tab).
+                int words = strip.Padding.Horizontal, count = 0;
                 foreach (Control tab in strip.Controls)
-                    if (Soft.OwnVisible(tab)) tabs += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
-                int room = nav.DisplayRectangle.Width - tabs - gap;
+                    if (Soft.OwnVisible(tab))
+                    {
+                        words += tab.GetPreferredSize(Size.Empty).Width - tab.Padding.Horizontal + tab.Margin.Horizontal;
+                        count++;
+                    }
+                int room = nav.DisplayRectangle.Width;
+                int full = Px(TabPadX), least = Math.Min(full, Px(TabPadXLeast));
+                // The most room at either side of every name that leaves `taken` beside the tabs, up to today's.
+                Func<int, int> sides = delegate(int taken)
+                {
+                    return count == 0 ? full : Math.Min(full, (int)Math.Floor((room - taken - words) / (2.0 * count)));
+                };
+                bool known = !string.IsNullOrEmpty(versionText.Version);
+                // Two rows of tabs (the advanced edition's on a screen too narrow for one, HoldTabs) leave the row no end.
+                var flow = strip as FlowLayoutPanel;
+                bool oneRow = flow == null || !flow.WrapContents;
                 int whole = versionPill.WholeWidth, alone = versionPill.VersionWidth;
-                bool shown = !string.IsNullOrEmpty(versionText.Version) && alone <= room;
-                bool shortened = shown && whole > room;
+                int pad = sides(whole + gap);
+                bool inRow = known && oneRow && pad >= least, shortened = false;
+                if (known && oneRow && !inRow)
+                {
+                    pad = sides(alone + gap);
+                    inRow = shortened = pad >= least;
+                }
+                if (!inRow) pad = oneRow ? Math.Max(least, sides(0)) : full;
+                bool changed = TabSides(strip, pad);
                 versionText.Shortened = shortened;
                 versionPill.Tell();
                 var size = new Size(shortened ? alone : whole, versionPill.PillHeight);
                 if (versionPill.Size != size) versionPill.Size = size;
                 pillSlot.Padding = new Padding(gap, 0, 0, 0);
                 int width = size.Width + gap;
-                bool changed = false;
                 if (pillSlot.Width != width)
                 {
                     pillSlot.Width = width;
                     changed = true;
                 }
-                if (Soft.OwnVisible(pillSlot) != shown)
+                if (Soft.OwnVisible(pillSlot) != inRow)
                 {
-                    pillSlot.Visible = shown;
+                    pillSlot.Visible = inRow;
                     changed = true;
                 }
+                PillToHeader(known && !inRow);
                 versionPill.Lifted();
                 return changed;
             }
             finally { fittingPill = false; }
         }
 
-        /// How the pill was last fitted, for the tests and the audit: "whole", "version" or "none".
+        /// Every tab of the strip with `pad` at either side of its name, shown or not (a tab shown later comes in as close
+        /// as the rest). Whether any changed.
+        private bool TabSides(Control strip, int pad)
+        {
+            bool changed = false;
+            var wanted = new Padding(pad, Px(TabPadY), pad, Px(TabPadY));
+            foreach (Control tab in strip.Controls)
+            {
+                if (!(tab is NavButton) || tab.Padding == wanted) continue;
+                tab.Padding = wanted;
+                changed = true;
+            }
+            return changed;
+        }
+
+        // The header card's padding as it was built, which the pill's room at its outer side replaces while it is there.
+        private Padding heroPadding;
+
+        /// v0.6.24 (the owner, 2026-11-18): the pill in the header card where even the closest tabs leave it no room - the
+        /// card's third column, on its second line, at its outer end under the caption buttons, Brand.PillInset from the
+        /// card's edge as at the tab row's end (the card's padding at that side is the inset while it is there; the headline
+        /// keeps clear of the caption buttons by its own margin, KeepHeadlineClear); the line under the headline ends a gap
+        /// before it. Back in its slot at the tab row's end as soon as the row has room again.
+        private void PillToHeader(bool wanted)
+        {
+            if (wanted == (versionPill.Parent == hero)) return;
+            if (heroPadding == Padding.Empty) heroPadding = hero.Padding;
+            hero.SuspendLayout();
+            try
+            {
+                if (wanted)
+                {
+                    pillSlot.Controls.Remove(versionPill);
+                    int inset = Px(Brand.PillInset);
+                    hero.Padding = Mirror.Of(hero) ? new Padding(inset, heroPadding.Top, heroPadding.Right, heroPadding.Bottom)
+                                                   : new Padding(heroPadding.Left, heroPadding.Top, inset, heroPadding.Bottom);
+                    versionPill.Anchor = AnchorStyles.None;
+                    versionPill.Margin = Mirror.Of(hero) ? new Padding(0, 0, Px(12), 0) : new Padding(Px(12), 0, 0, 0);
+                    hero.Controls.Add(versionPill, 2, 1);
+                    hero.SetColumnSpan(headline, 2);
+                }
+                else
+                {
+                    hero.Controls.Remove(versionPill);
+                    hero.SetColumnSpan(headline, 1);
+                    hero.Padding = heroPadding;
+                    versionPill.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+                    versionPill.Margin = Padding.Empty;
+                    pillSlot.Controls.Add(versionPill);
+                }
+            }
+            finally { hero.ResumeLayout(true); }
+            KeepHeadlineClear();
+            PlaceDayScene();
+        }
+
+        /// How the pill was last fitted, for the tests and the audit: "whole" or "version" at the tab row's end, "header" in
+        /// the header card, or "none" before there is a version to show.
         internal string PillFit
         {
-            get { return pillSlot == null || !Soft.OwnVisible(pillSlot) ? "none" : versionText.Shortened ? "version" : "whole"; }
+            get
+            {
+                if (versionPill != null && versionPill.Parent == hero) return "header";
+                return pillSlot == null || !Soft.OwnVisible(pillSlot) ? "none" : versionText.Shortened ? "version" : "whole";
+            }
         }
 
     }

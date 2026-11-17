@@ -638,7 +638,10 @@ class DashboardProportionsTests(unittest.TestCase):
                 if narrow["fit"] == "version":
                     self.assertEqual(narrow["text"], "v0.6.24-beta.2")
                     self.assertIn(said["advancedWord"], narrow["name"], "the edition is still said to a screen reader")
-                self.assertEqual(said["tooNarrow"]["fit"], "none", "where even the version does not fit, no pill")
+                # v0.6.24 (the owner, 2026-11-18): never hidden - where even the closest tabs leave no room, in the header
+                # card (test_gui_pill_room).
+                self.assertEqual(said["tooNarrow"]["fit"], "header", "where even the version does not fit, in the header")
+                self.assertEqual(said["tooNarrow"]["findings"], "")
 
     def test_a_tab_shown_later_takes_the_pill_s_room(self):
         """dev CI 43859506322: the advanced edition shows its Advanced features and Chat tabs once their words come, which
@@ -648,9 +651,10 @@ class DashboardProportionsTests(unittest.TestCase):
             with self.subTest(locale=locale):
                 self.assertEqual(grown["before"], "whole")
                 # The tabs grown until the whole pill no longer fits beside them, on any screen and in any font (dev CI
-                # 44034443580: the runners' narrower fonts left room for it): it shortens or goes, never over a tab.
+                # 44034443580: the runners' narrower fonts left room for it): the tabs drawn closer, then the pill shortened
+                # or in the header card (v0.6.24, the owner, 2026-11-18: never hidden), never over a tab.
                 self.assertTrue(grown["grew"], "the tabs came to need the pill's room")
-                self.assertNotEqual(grown["fit"], "whole", "the pill gives way to the tabs")
+                self.assertIn(grown["fit"], ("whole", "version", "header"), "the pill gives way to the tabs, and stays")
                 self.assertEqual(grown["cut"], "", "no tab cut off at the strip's end")
                 self.assertEqual(grown["findings"], "")
 
