@@ -61,7 +61,10 @@ class SearchOnTheDialog(unittest.TestCase):
                 self.assertNotRegex(body, r"listGround\.Controls\.Add\(top\)")
 
     def test_the_find_dialog_holds_its_status_line_to_the_dialogs_width(self):
-        self.assertIn("MaximumSize = new Size(Px(across - 32), 0);", find_body())
+        # Never wider than what it stands in: since v0.6.24-beta.2 the line above the list is in the list's card
+        # (SoftDialog.Gather) - the dialog less the card's ground (CardRoom, 16 and 17) and the list card's padding (8 and
+        # 8), where the ground's 16 and 16 had been (dev CI 43945024319, Arabic at 200 %: 559 px of words in 534).
+        self.assertIn("MaximumSize = new Size(Px(across - 33 - 16), 0);", find_body())
 
     def test_no_search_on_card_helper_exists(self):
         self.assertNotIn("SearchOnCard", guiscan.whole())
