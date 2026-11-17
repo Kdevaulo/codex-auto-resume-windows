@@ -1335,9 +1335,13 @@ Expected areas include:
 
 Right after the final v0.6.24 is published and verified, the last Python version is kept as a repository of its own, as above.
 
-### v0.6.24-beta 🚧 — The window's new look and a quicker return after an update (a pre-release)
+### v0.6.24-beta ✅ — The window's new look and a quicker return after an update (a pre-release)
 
 The first pre-release of v0.6.24. In both editions: the window and its dialogs have no Windows title bar, their minimise, maximise and close buttons are line glyphs in the first card; Soft's rounded things have squircle corners, the Dashboard window's own outer corner among them; the tray icon's popup is its card alone with a float shadow; hovering the icon shows a card with the state and the usage bars; a text box's right-click menu is drawn in the window's design; a notification card fading shows no dark band; the Dashboard answers within a few seconds after an update, and an update starts only a watcher that ended unexpectedly in this sign-in. In the advanced edition: the 5-hour window's one near-zero request starts none of the person's programs, and the Korean wording of its pages was read key by key. The third round's audits follow.
+
+### v0.6.24-beta.2 🚧 — The Dashboard's corner without its rough edges, new proportions and dialogs as one card (a pre-release)
+
+The second pre-release of v0.6.24, in both editions: the rough edges of the Dashboard's own corner the first beta listed are fixed (no faint fill outside it, no line inside it at 150 %, no flash of Windows' title bar, a restore that comes back exactly, edges and corners that resize along their length); the Dashboard is 1000 x 588 with the version in a pill at the end of its page tabs; with the watcher off, Start watcher stands where Pause stands on the Right now card; a dialog is its title row and one card, with no Close where nothing is asked, the Dashboard dimmed behind it and the dialog centred on it; focus rings show only after the keyboard is used; the tray icon's card is as wide as its widest row; and the setup window is 600 x 600 with the Dashboard's corner. The third round's audits follow.
 
 ---
 
@@ -1645,8 +1649,13 @@ The final: the Python audit in two rounds, both editions, with the code ready fo
 
         ↓
 
-v0.6.24-beta  🚧 In development
+v0.6.24-beta  ✅ Released
 The first pre-release: a window without Windows' title bar, squircle corners, the tray icon's card, a text box's own right-click menu and a Dashboard that answers in seconds after an update
+
+        ↓
+
+v0.6.24-beta.2  🚧 In development
+The second pre-release: the Dashboard's corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card and dialogs as one card
 
         ↓
 
