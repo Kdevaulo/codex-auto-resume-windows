@@ -1,5 +1,70 @@
 # Changelog
 
+## v0.6.24-beta.2 — The Dashboard's squircle corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card, dialogs as one card under their title, and a tray icon's card as wide as its widest row
+
+[The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.24-beta...v0.6.24-beta.2)
+
+**A pre-release: the second of v0.6.24.** It is a GitHub pre-release, so `releases/latest` stays v0.6.23. An installation is offered it
+by *Check for updates* where pre-releases are offered - the check asks first and says it is tested less - and *Install another
+version...* lists it, in the edition you pick. It is still a beta because it carries things you can notice: the Dashboard's new
+proportions, where Start watcher stands, the dialogs' new layout and the window's corner without the rough edges the first beta listed.
+It carries everything v0.6.24-beta carried, and adds what follows. Both editions change in the first group; the second is the advanced
+edition's alone.
+
+**Going back.** Nothing that an earlier version reads changes: the watcher's state stays schema 5, the settings file gains no key and the
+advanced edition's own file stays version 9. An earlier version has the window and the dialogs it had, as it always had them, and leaves
+the previous version's `.old-` file where an update put it.
+
+### Both editions
+
+- **The rough edges the first beta listed in the Dashboard's own corner are fixed, and that note is resolved.** No faint fill shows
+  outside the squircle any more, where Windows' corner would have been. At 150 % no one-pixel line shows inside the edge. Windows' own
+  title bar and frame no longer flash when the window is activated, resized, brought back from Task View, or given a new title or icon,
+  and the window stays visible all the while Windows takes its icon and title, so a click on it never falls through to what lies behind.
+  A window restored from maximised or minimised - by its button, a double click, Win+Down, the taskbar or Win+D - comes back exactly
+  as it left, with no growth each time, and a maximised window restored from the taskbar keeps no classic title bar across its top.
+  The left and right edges resize along their whole length, down every page, and so does the window's outermost pixel. The four
+  corners resize from where the curve ends and a little past it, the top ones down each side as the bottom ones do. The shadow is
+  never on the screen while the window is maximised or minimised.
+- **The Dashboard opens at exactly its size, and its first paint is clean.** It used to open a little larger than it asked, at
+  100 % and at 150 %. In the dark theme it no longer shows an empty outline of its corner, or one white frame, before it has painted: the
+  window and its shadow come on together once it has.
+- **The Dashboard opens at 1000 x 588 instead of about 1000 x 680, and the version stands in a pill.** The header card is two lines, and the
+  four Overview cards keep the height they had. The version - and the advanced edition's word beside it - stands in a small raised pill
+  at the end of the row of page tabs, no longer in a bar at the foot; it gives way to a tab that needs the room, shows the version
+  alone where that is all that fits, and a screen reader reads it whole. Only Settings has a bar at its foot now (the reopen note,
+  *Restore defaults* and *Save*); the Close button there is gone, and the header's close cross closes the window. The tab row has as
+  much room above it as below it, 10 px each, on every page, and the pill's rounded end and the first tab's face stand 4 px inside the
+  header card's edges so the pill does not look as if it sticks out. The status light sweeps once as the window opens and as the
+  watcher turns on, and the line under the headline glides in as the sweep ends; where animations are off, nothing moves.
+- **With the watcher off, Start watcher stands where Pause stands.** On the Overview's *Right now* card *Start watcher* takes the place
+  of *Pause recovery* while the watcher is off, and the header only says the state; once the watcher runs, *Pause* comes back and
+  *Start watcher* goes. The two never show together.
+- **A dialog is its title and one card.** The title row - its words and its close cross - stands on the dialog's own ground, one row as
+  tall as a caption button, and under it one card holds the content and the buttons, with nothing below the card but the ground. The close
+  cross stands as far in from the dialog's edge as the title's first letter from the other edge. A dialog with nothing to answer - the
+  timeline, the log, the detection check, the compatibility report, a notice - has no Close button of its own: the title row's close
+  cross and Esc close it, and a dialog with an answer keeps its Cancel and its action. While a dialog is open the Dashboard behind it is dimmed (not in High Contrast).
+  A dialog opens centred on the Dashboard that opened it wherever that is, not on the monitor's middle. Its opening motion is Windows' own, as before.
+- **Focus rings show only after the keyboard is used.** A page tab clicked with the mouse no longer keeps its blue ring, in the Dashboard
+  and in its dialogs; Tab, the arrow keys and an access key show the rings again.
+- **A tooltip has nothing drawn round its card.** The pale glow a tooltip gave a dark desktop is gone; the caption buttons' tooltips and
+  the Dashboard's line tooltips are their card alone.
+- **The tray icon's card is as wide as its widest row,** with no fixed least width: its widest row ends one side's padding from the
+  card's right edge, so a card with no usage rows is no longer emptier on its right.
+- **The setup window is 600 x 600, fixed in size, with the Dashboard's squircle corner,** and never taller than the work area of the
+  screen it opens on, with everything its pages need still whole. Every way it is shown - the first installation, an update, a repair, an
+  edition change, the Dashboard's *Install another version...*, the uninstall - is the same window.
+- **The largest text size on a small screen is 1.74 on a 1920 x 1080 screen at 100 %,** where the first beta said 1.68 (v0.6.23: 1.83).
+  A dialog's title is a row on the ground now and not a card of its own, so it is 20 px shorter than the beta's, and the window may
+  use the text size that screen holds for the tallest dialog.
+
+### Advanced edition
+
+- **The advanced edition's own dialogs are laid out as the others are.** Its editor holds its refusal and its buttons in the one card
+  under the title row, and its Follow-through and examples dialogs have no Close button of their own - the title row's close cross and
+  Esc close them.
+
 ## v0.6.24-beta — A window without Windows' title bar, squircle corners, the tray icon's card, a text box's own right-click menu, a Dashboard that answers in seconds after an update, and the advanced edition's quieter 5-hour window start
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.23...v0.6.24-beta)
