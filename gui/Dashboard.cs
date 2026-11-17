@@ -1591,7 +1591,11 @@ namespace CodexAutoResume
             // painted a control at a time between the answers that came meanwhile - the compatibility card's first answer held
             // the thread 0.7-1.5 s - and a person saw Diagnostics' top over the Overview, its Start watcher cut in half, for
             // seconds.
-            if (paused) PaintNow(this);
+            // v0.6.24-beta.3 (M-CORNER re-check 10, item 3): and put on the screen in one go. Painted a control at a time
+            // straight onto the window's surface, a first switch to Diagnostics showed its Status or Tools card over the
+            // Overview's cards for 1-2 frames (15-85 ms) in every fresh window; painted offscreen first, the surface goes
+            // from the page before to the page whole.
+            if (paused) PaintAtOnce(pageHost);
             // Coming back to Pending: the countdowns the clock did not write while it was hidden.
             if (name == "pending" && snapshot != null) WriteCountdowns(Now());
             if (auditing) return;
@@ -1615,6 +1619,34 @@ namespace CodexAutoResume
         {
             if (control.IsHandleCreated && !control.IsDisposed)
                 RedrawWindow(control.Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN);
+        }
+
+        private const int GWL_EXSTYLE = -20;
+        private const long WS_EX_COMPOSITED = 0x02000000;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+
+        /// v0.6.24-beta.3: the window painted now (PaintNow), with `host` and everything in it painted offscreen first and
+        /// put on the window's surface in one go (WS_EX_COMPOSITED, for this paint only: kept, every later paint of a
+        /// control in it - a status light's breath, a countdown - would paint the whole host again).
+        private void PaintAtOnce(Control host)
+        {
+            if (!host.IsHandleCreated || host.IsDisposed)
+            {
+                PaintNow(this);
+                return;
+            }
+            long style = GetWindowLongPtr(host.Handle, GWL_EXSTYLE).ToInt64();
+            bool already = (style & WS_EX_COMPOSITED) != 0;
+            if (!already) SetWindowLongPtr(host.Handle, GWL_EXSTYLE, new IntPtr(style | WS_EX_COMPOSITED));
+            try { PaintNow(this); }
+            finally
+            {
+                if (!already && !host.IsDisposed) SetWindowLongPtr(host.Handle, GWL_EXSTYLE, new IntPtr(style));
+            }
         }
 
         /// A page, built the first time it is shown. Building all five before the first screen

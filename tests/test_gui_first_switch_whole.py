@@ -21,6 +21,14 @@ pictures' pinned scratch installation with 40 ms a read, its idle turns never ra
 Diagnostics is built by the press, as in a fresh window. It counts the window's controls that still wait to be painted
 when the press returns, and the layouts of the page and what still waits to be painted when the card's answer is written
 into the page on screen. GUI test module (it shows a window, off the screen): run on its own, through gui_lock.sh.
+
+v0.6.24-beta.3 (M-CORNER re-check 10, item 3): the page was whole 27-282 ms after the press, but 1-2 frames (15-85 ms) in
+every fresh window showed Diagnostics' Status or Tools card over the Overview's cards: the press painted the page a
+control at a time straight onto the window's surface, and the screen was composed between two of them. Now the page host
+and everything in it is painted offscreen and put on the surface in one go (PaintAtOnce: WS_EX_COMPOSITED for that paint
+alone). The probe reads the page host's area of the window's own surface after every paint and erase the press sends -
+cloaked and moved onto a monitor for it, as a window off every monitor paints nothing onto its surface, then off again -
+and no read may hold pixels of both pages: before, 76 of the press's 118 paints did in every run; now none.
 """
 from __future__ import annotations
 
@@ -46,10 +54,14 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 class SourceTests(unittest.TestCase):
     def test_the_page_shown_is_painted_before_the_press_returns(self):
         show = guiscan.member_body("SettingsForm", "ShowPage")
-        self.assertLess(show.index("if (paused) Redraw(pageHost, true);"), show.index("if (paused) PaintNow(this);"))
-        self.assertLess(show.index("if (paused) PaintNow(this);"), show.index('if (name == "diagnostics") LoadCompatibility();'))
+        self.assertLess(show.index("if (paused) Redraw(pageHost, true);"), show.index("if (paused) PaintAtOnce(pageHost);"))
+        self.assertLess(show.index("if (paused) PaintAtOnce(pageHost);"), show.index('if (name == "diagnostics") LoadCompatibility();'))
         paint = guiscan.member_body("SettingsForm", "PaintNow")
         self.assertIn("RDW_UPDATENOW | RDW_ALLCHILDREN", paint)
+        # v0.6.24-beta.3: the page host painted offscreen and put on the surface in one go, for that paint only.
+        at_once = guiscan.member_body("SettingsForm", "PaintAtOnce")
+        self.assertLess(at_once.index("style | WS_EX_COMPOSITED"), at_once.index("try { PaintNow(this); }"))
+        self.assertLess(at_once.index("try { PaintNow(this); }"), at_once.index("new IntPtr(style)"))
 
     def test_the_card_on_screen_is_written_with_its_page_held(self):
         show = guiscan.member_body("SettingsForm", "ShowCompatibility")
@@ -68,6 +80,7 @@ PROBE = r"""
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -96,6 +109,91 @@ namespace CodexAutoResume
         [StructLayout(LayoutKind.Sequential)] private struct SwitchRect { public int Left, Top, Right, Bottom; }
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern IntPtr SwitchGetLong(IntPtr h, int index);
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] private static extern IntPtr SwitchSetLong(IntPtr h, int index, IntPtr value);
+
+
+        // v0.6.24-beta.3: what the window's surface holds after each paint of the press, read from the window itself (its
+        // device context, which reads the surface Windows composes the screen from, off the screen as on it).
+        private delegate IntPtr SwitchHookProc(int code, IntPtr w, IntPtr l);
+        [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW")] private static extern IntPtr SwitchSetHook(int id, SwitchHookProc proc, IntPtr module, uint thread);
+        [DllImport("user32.dll", EntryPoint = "UnhookWindowsHookEx")] private static extern bool SwitchUnhook(IntPtr hook);
+        [DllImport("user32.dll", EntryPoint = "CallNextHookEx")] private static extern IntPtr SwitchNextHook(IntPtr hook, int code, IntPtr w, IntPtr l);
+        [DllImport("kernel32.dll", EntryPoint = "GetCurrentThreadId")] private static extern uint SwitchThreadId();
+        [DllImport("user32.dll", EntryPoint = "GetDCEx")] private static extern IntPtr SwitchGetDC(IntPtr h, IntPtr region, int flags);
+        [DllImport("user32.dll", EntryPoint = "ReleaseDC")] private static extern int SwitchReleaseDC(IntPtr h, IntPtr dc);
+        [DllImport("gdi32.dll", EntryPoint = "BitBlt")] private static extern bool SwitchBlt(IntPtr d, int x, int y, int w, int h, IntPtr s, int sx, int sy, int rop);
+        [StructLayout(LayoutKind.Sequential)] private struct SwitchSent { public IntPtr Result, LParam, WParam; public uint Message; public IntPtr Window; }
+        [DllImport("dwmapi.dll", EntryPoint = "DwmSetWindowAttribute")] private static extern int SwitchCloak(IntPtr h, int attribute, ref int value, int size);
+        [DllImport("user32.dll", EntryPoint = "SetWindowPos")] private static extern bool SwitchPlace(IntPtr h, IntPtr after, int x, int y, int cx, int cy, int flags);
+
+        // Off every monitor a window paints nothing onto its surface, so the press is read on one, cloaked all the while:
+        // DWM shows none of it, and it is painted there as it would be on the screen.
+        private static void SwitchMove(SettingsForm form, Point to)
+        {
+            SwitchPlace(form.Handle, IntPtr.Zero, to.X, to.Y, 0, 0, 0x0001 | 0x0004 | 0x0010);   // NOSIZE NOZORDER NOACTIVATE
+            SwitchPump(5000, delegate
+            {
+                var waiting = new List<object>();
+                SwitchWaiting(form, waiting);
+                SwitchRect box;
+                return waiting.Count == 0 && !SwitchUpdateRect(form.Handle, out box, false);
+            });
+        }
+
+        private const int SwitchStride = 3;
+
+        // The page host's area of the window's surface, every third pixel each way.
+        private static int[] SwitchShot(Control form, Rectangle area)
+        {
+            using (var bitmap = new Bitmap(area.Width, area.Height, PixelFormat.Format32bppRgb))
+            {
+                using (Graphics graphics = Graphics.FromImage(bitmap))
+                {
+                    IntPtr into = graphics.GetHdc();
+                    IntPtr from = SwitchGetDC(form.Handle, IntPtr.Zero, 0x2);          // DCX_CACHE: the children not clipped
+                    SwitchBlt(into, 0, 0, area.Width, area.Height, from, area.X, area.Y, 0x00CC0020);
+                    SwitchReleaseDC(form.Handle, from);
+                    graphics.ReleaseHdc(into);
+                }
+                BitmapData data = bitmap.LockBits(new Rectangle(Point.Empty, bitmap.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
+                try
+                {
+                    int across = (area.Width + SwitchStride - 1) / SwitchStride, down = (area.Height + SwitchStride - 1) / SwitchStride;
+                    var shot = new int[across * down];
+                    for (int y = 0, i = 0; y < area.Height; y += SwitchStride)
+                        for (int x = 0; x < area.Width; x += SwitchStride, i++)
+                            shot[i] = Marshal.ReadInt32(data.Scan0, y * data.Stride + x * 4) & 0xFFFFFF;
+                    return shot;
+                }
+                finally { bitmap.UnlockBits(data); }
+            }
+        }
+
+        // Each paint's surface against the page before and the page whole: how many of the pixels the two differ in are
+        // still the page before's, and how many already the page whole's.
+        private static List<object> SwitchMixes(int[] before, int[] whole, List<int[]> shots, List<string> painted)
+        {
+            var mixes = new List<object>();
+            int differ = 0;
+            for (int i = 0; i < before.Length; i++) if (before[i] != whole[i]) differ++;
+            for (int s = 0; s < shots.Count; s++)
+            {
+                int old = 0, fresh = 0;
+                int[] shot = shots[s];
+                for (int i = 0; i < before.Length; i++)
+                {
+                    if (before[i] == whole[i]) continue;
+                    if (shot[i] == before[i]) old++;
+                    else if (shot[i] == whole[i]) fresh++;
+                }
+                var mix = new Dictionary<string, object>();
+                mix["painted"] = painted[s];
+                mix["differ"] = (double)differ;
+                mix["before"] = (double)old;
+                mix["whole"] = (double)fresh;
+                mixes.Add(mix);
+            }
+            return mixes;
+        }
 
         // Messages handled, never an idle turn raised: nothing is made ready ahead.
         private static void SwitchPump(int ms, Func<bool> until)
@@ -155,10 +253,46 @@ namespace CodexAutoResume
             said["prepared"] = new List<object>(form.preparedPages.ToArray());
             said["built_before"] = form.pages.ContainsKey("diagnostics");
 
-            // The press, as a person's: built in it, and painted whole before it returns.
+            // The press, as a person's: built in it, and painted whole before it returns - the window's surface read after
+            // every paint sent to it on the way.
+            int cloak = 1;
+            said["cloaked"] = SwitchCloak(h, 13, ref cloak, 4) == 0;                  // DWMWA_CLOAK
+            if ((bool)said["cloaked"]) SwitchMove(form, Screen.PrimaryScreen.WorkingArea.Location);
+            Rectangle area = new Rectangle(form.PointToClient(form.pageHost.PointToScreen(Point.Empty)), form.pageHost.Size);
+            int[] before = SwitchShot(form, area);
+            var shots = new List<int[]>();
+            var painted = new List<string>();
+            var reading = new System.Diagnostics.Stopwatch();
+            SwitchHookProc hook = delegate(int code, IntPtr w, IntPtr l)
+            {
+                if (code >= 0)
+                {
+                    var sent = (SwitchSent)Marshal.PtrToStructure(l, typeof(SwitchSent));
+                    if (sent.Message == 0x000F || sent.Message == 0x0014)          // WM_PAINT, WM_ERASEBKGND
+                    {
+                        Control control = Control.FromHandle(sent.Window);
+                        if (control != null && (control == form || form.Contains(control)))
+                        {
+                            reading.Start();
+                            shots.Add(SwitchShot(form, area));
+                            reading.Stop();
+                            painted.Add((sent.Message == 0x000F ? "paint " : "erase ") + control.GetType().Name + " " + control.Name);
+                        }
+                    }
+                }
+                return SwitchNextHook(IntPtr.Zero, code, w, l);
+            };
+            IntPtr hooked = SwitchSetHook(12, hook, IntPtr.Zero, SwitchThreadId());   // WH_CALLWNDPROCRET
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            form.navButtons["diagnostics"].PerformClick();
-            said["press_ms"] = clock.Elapsed.TotalMilliseconds;
+            try { form.navButtons["diagnostics"].PerformClick(); }
+            finally { SwitchUnhook(hooked); }
+            // The press itself, without the reads of its surface.
+            said["press_ms"] = clock.Elapsed.TotalMilliseconds - reading.Elapsed.TotalMilliseconds;
+            said["hooked"] = hooked != IntPtr.Zero;
+
+            said["press_paints"] = SwitchMixes(before, SwitchShot(form, area), shots, painted);
+            GC.KeepAlive(hook);
+            SwitchMove(form, new Point(-30000, -30000));
             said["shown"] = form.currentPage;
             var waiting = new List<object>();
             SwitchWaiting(form, waiting);
@@ -244,6 +378,23 @@ class FirstSwitchTests(unittest.TestCase):
     def test_nothing_waits_to_be_painted_when_the_press_returns(self):
         self.assertEqual(self.answer["waiting_after_press"], [],
                          "the page shown and its tab painted whole in the press, before any answer queued meanwhile")
+
+    def test_no_paint_of_the_press_shows_both_pages(self):
+        # v0.6.24-beta.3 (M-CORNER re-check 10, item 3): the surface after each paint the press sent, in the page host's
+        # area. A paint that leaves some of the Overview's pixels there and puts some of Diagnostics' beside them is a frame
+        # a person can be shown mixing the two pages (1-2 frames, 15-85 ms, in every fresh window of the re-check).
+        self.assertTrue(self.answer["hooked"])
+        self.assertTrue(self.answer["cloaked"], "the press read on a monitor, cloaked")
+        paints = self.answer["press_paints"]
+        self.assertTrue(paints, "the press painted the page")
+        differ = paints[0]["differ"]
+        self.assertGreater(differ, 1000, "the two pages differ on the surface read")
+        mixed = [paint for paint in paints
+                 if paint["before"] >= differ * 0.02 and paint["whole"] >= differ * 0.02]
+        self.assertEqual(mixed, [], "%d of the press's %d paints left both pages on the surface (of %d pixels that differ): %s"
+                         % (len(mixed), len(paints), differ,
+                            "; ".join("%s %d before %d whole" % (paint["painted"], paint["before"], paint["whole"])
+                                      for paint in mixed[:8])))
 
     def test_the_card_written_on_screen_lays_its_page_out_once_and_is_painted(self):
         self.assertTrue(self.answer["view"], "the compatibility card had an answer to write")
