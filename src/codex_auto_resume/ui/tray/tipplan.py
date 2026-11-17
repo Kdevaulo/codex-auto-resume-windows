@@ -3,7 +3,7 @@
 Hovering over the icon shows a card in the product's design instead of Windows' tooltip (the owner's option 2): the
 status light the popup's header has, the product's name and - in the advanced edition - its edition's chip, the state
 line with its countdown in the accent, and in the advanced edition a row per usage window, its length, a thin bar and
-its share. The same facts the tooltip has said (words.tooltip_parts), no new ones, never cut short.
+the share left of it (v0.6.24 final). The same facts the tooltip has said (words.tooltip_parts), no new ones, never cut short.
 
 Pure: a function of the parts, the light, the scale and a way to measure text, as the popup's layout is. It returns
 rectangles and paints nothing, so the card is laid out and checked at every language and scale with no screen; the
@@ -135,7 +135,9 @@ def tip_layout(parts, light, scale, measure) -> dict:
                 x += piece_w
             y += line_h
 
-    # The advanced edition's meter: a row per window - its length, a bar filled as far as it is used, its share.
+    # The advanced edition's meter: a row per window - its length, a bar filled as far as the window has LEFT, the share
+    # left (v0.6.24 final). As little left as words.LOW_LEFT or less is the warning colour, bar, well and share alike, so an
+    # empty bar never reads as nothing to worry about.
     if rows:
         y += px(space["s"])
         _, row_h = measure(roles["meter"], "Ag", wide, False)
@@ -147,9 +149,11 @@ def tip_layout(parts, light, scale, measure) -> dict:
                 y += px(space["xs"])
             text((left, y, left + label_col, y + row_h), roles["meter"], row["label"], "muted")
             bar_top = y + (row_h - bar_h) // 2
+            low = bool(row.get("low"))
             items.append({"kind": "meter", "rect": (bar_left, bar_top, bar_right, bar_top + bar_h),
-                          "fraction": row["fraction"]})
-            text((right - share_w, y, right, y + row_h), roles["meter"], row["percent"], "ink", align="right")
+                          "fraction": row["fraction"], "low": low})
+            text((right - share_w, y, right, y + row_h), roles["meter"], row["percent"], "warning" if low else "ink",
+                 align="right")
             y += row_h
 
     y += pad_y

@@ -494,8 +494,9 @@ NEAR_LIMIT_KINDS = ("not_stopped", "press_resume", "not_continued")
 
 
 def near_limit_content(minutes, percent, reset_at, kind=None) -> dict:
-    """The advanced edition's usage meter at a warning (v0.6.16-beta.3, issue #29): which window, how full and when
-    it resets - in the words the popup's usage line uses - and one button that opens the Dashboard. About no
+    """The advanced edition's usage meter at a warning (v0.6.16-beta.3, issue #29): which window, how much is left of it
+    (v0.6.24 final; how full it was before) and when it resets - in the words the popup's usage line uses - and one
+    button that opens the Dashboard. About no
     conversation. Only the meter's surface ever asks for it; the standard edition never shows one. From v0.6.16-beta.4
     a `kind` of NEAR_LIMIT_KINDS is the forced stop's: a turn it could not stop, a queue to Resume in Codex, or a
     conversation it could not continue after the reset - said in its own title and sentence."""
@@ -504,10 +505,12 @@ def near_limit_content(minutes, percent, reset_at, kind=None) -> dict:
                         more=[(l10n.message("toast_button_open"), open_uri("overview"))])
     def say(key, **fields):
         return l10n.text(key, l10n.current(), **fields)
+    # v0.6.24 final: the share LEFT, as every surface says it (ui/words.left): 100 minus the whole share used, never below
+    # 0 nor above 100. A share that cannot be read says no number at all - not a "100% left" nobody read.
     try:
-        share = max(0, min(100, int(percent)))
+        share = 100 - max(0, min(100, int(percent))) if type(percent) is not bool else None
     except (TypeError, ValueError, OverflowError):
-        share = 0
+        share = None
     # The window named as the popup's usage line names it (ui/words.window_name): weekly, in hours or minutes.
     if minutes == 7 * 24 * 60:
         window = say("usage.weekly")
@@ -515,8 +518,11 @@ def near_limit_content(minutes, percent, reset_at, kind=None) -> dict:
         window = say("usage.hours", n=minutes // 60) if minutes % 60 == 0 else say("usage.minutes", n=minutes)
     else:
         window = say("usage.limit")
-    body = (say("usage.window_resets", window=window, percent=share, time=_local_time(reset_at))
-            if type(reset_at) is int else say("usage.window", window=window, percent=share))
+    if share is None:
+        body = window
+    else:
+        body = (say("usage.window_resets", window=window, percent=share, time=_local_time(reset_at))
+                if type(reset_at) is int else say("usage.window", window=window, percent=share))
     return _content(l10n.message("toast_near_limit"), body,
                     more=[(l10n.message("toast_button_open"), open_uri("overview"))])
 

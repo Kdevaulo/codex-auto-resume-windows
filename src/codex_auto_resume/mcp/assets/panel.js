@@ -1439,17 +1439,18 @@ function windowName(minutes) {
   return fill('usage.minutes', '{n}-minute', {n: minutes});
 }
 
-// v0.6.11: the last usage reading in one line - each window's length, share and reset, and the reading's
+// v0.6.11: the last usage reading in one line - each window's length, share left and reset, and the reading's
 // age - as the popup (ui/words.usage_line) and the window say it; null until usage has been read.
 function usageLine(reading, now) {
   if (!reading || typeof reading !== 'object' || !Array.isArray(reading.windows) || !reading.windows.length ||
       typeof reading.read_at !== 'number') return null;
   var parts = reading.windows.map(function (entry) {
     var used = Number(entry.used_percent) || 0;
-    var values = {window: windowName(entry.window_minutes), percent: used >= 100 ? 100 : Math.floor(used)};
-    if (typeof entry.reset_at !== 'number') return fill('usage.window', '{window} {percent}%', values);
+    // v0.6.24 final: the share LEFT (ui/words.left): 100 minus the whole share used, 0 only when used up.
+    var values = {window: windowName(entry.window_minutes), percent: 100 - (used >= 100 ? 100 : Math.floor(Math.max(0, used)))};
+    if (typeof entry.reset_at !== 'number') return fill('usage.window', '{window} {percent}% left', values);
     values.time = clockTime(entry.reset_at);
-    return fill('usage.window_resets', '{window} {percent}%, resets {time}', values);
+    return fill('usage.window_resets', '{window} {percent}% left, resets {time}', values);
   });
   return fill('usage.line', 'Codex usage, read {age}: {windows}', {age: age(now - reading.read_at), windows: parts.join(' · ')});
 }

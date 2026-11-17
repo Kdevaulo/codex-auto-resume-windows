@@ -138,6 +138,19 @@ class FactTests(CheckupCase):
         self.assertIn("Notices are shown as Windows notifications. Do not disturb: off.", said)
         self.assertIn("compatibility:", said)
 
+    def test_the_usage_line_says_what_is_left_and_the_result_keeps_what_is_used(self):
+        """v0.6.24 final (the owner, 2026-11-18): the line says what is LEFT of each window - 100 minus the share used,
+        never below 0 - and "?" for a window not read; the result itself keeps the share used, as before."""
+        result = self.run_check()
+        result["usage"] = {"read": True, "read_at": NOW - 120, "five_hour": 37.5, "weekly": 130, "reset_at": NOW + 3600}
+        said = "\n".join(checkup.lines(result, NOW, "en"))
+        self.assertIn("5-hour 62.5% left, weekly 0% left", said)
+        result["usage"].update(five_hour=0, weekly=None)
+        said = "\n".join(checkup.lines(result, NOW, "en"))
+        self.assertIn("5-hour 100% left, weekly ?% left", said)
+        self.assertEqual(checkup._usage({"watcher": {"usage": {"read_at": NOW, "windows": [
+            {"window_minutes": checkup.FIVE_HOURS, "used_percent": 37.5}]}}}, NOW)["five_hour"], 37.5)
+
     def test_the_last_skip_lines_come_from_the_log_as_aliases(self):
         self.paths.logs_dir.mkdir(parents=True, exist_ok=True)
         line = logbook.skipped(A, B, skips.BEFORE_WINDOW)
