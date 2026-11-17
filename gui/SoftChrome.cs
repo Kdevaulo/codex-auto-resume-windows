@@ -1217,6 +1217,20 @@ namespace CodexAutoResume
             if (!watched.Add(form)) return;
             HashSet<Form> set = watched;
             form.Disposed += delegate { set.Remove(form); };
+            // v0.6.24-beta.2 (live re-check 8): a window starts with its rings hidden - Windows gives a new window the cues
+            // of the input that came last on the desktop, so a fresh Dashboard started from a script, or one reopened on
+            // another monitor's scale (--reopened=1), showed a ring on its first tab with no key pressed. Hidden as its
+            // window is made (again, when it is made anew) and as it is first shown; the first key that moves the focus
+            // shows them, as ever.
+            form.HandleCreated += delegate
+            {
+                Hide(form, true);
+                // And once what made it has finished: WinForms gives a window made anew the cues its last one had.
+                try { form.BeginInvoke((MethodInvoker)delegate { Hide(form, true); }); }
+                catch (Exception) { }
+            };
+            form.Shown += delegate { Hide(form, true); };
+            if (form.IsHandleCreated) Hide(form, true);
             if (filter == null)
             {
                 filter = new Filter();
