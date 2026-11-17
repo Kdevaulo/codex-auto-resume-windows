@@ -1263,7 +1263,7 @@ namespace CodexAutoResume
                 // v0.6.23 second round R3: its stops and continuations are not the ledger's sends, so the day's numbers
                 // never bind them; what does is said instead.
                 limits.Controls.Add(HelpText(Word("page.pause_limits",
-                    "It has no daily send limits. Each time a window reaches its stop percentage, it stops each conversation's running turn once, and continues that conversation once after the reset.")));
+                    "It has no daily send limits. Each time what is left of a window falls to its stop share, it stops each conversation's running turn once, and continues that conversation once after the reset.")));
             else
             {
                 TableLayoutPanel numbers = Facts(limits);
