@@ -42,10 +42,20 @@ the previous version's `.old-` file where an update put it.
   *Start watcher* goes. The two never show together.
 - **A dialog is its title and one card.** The title row - its words and its close cross - stands on the dialog's own ground, one row as
   tall as a caption button, and under it one card holds the content and the buttons, with nothing below the card but the ground. The close
-  cross stands as far in from the dialog's edge as the title's first letter from the other edge. A dialog with nothing to answer - the
+  cross stands as far in from the dialog's edge, as the eye sees it, as the title's first letter from the other edge. A dialog with nothing to answer - the
   timeline, the log, the detection check, the compatibility report, a notice - has no Close button of its own: the title row's close
-  cross and Esc close it, and a dialog with an answer keeps its Cancel and its action. While a dialog is open the Dashboard behind it is dimmed (not in High Contrast).
-  A dialog opens centred on the Dashboard that opened it wherever that is, not on the monitor's middle. Its opening motion is Windows' own, as before.
+  cross and Esc close it, and a dialog with an answer keeps its Cancel and its action. While a dialog is open the Dashboard behind it is dimmed (not in High Contrast):
+  the dimming is there as the dialog appears, and in the dark theme it shows as plainly as in the light. A dialog opens centred on the
+  Dashboard that opened it wherever that is, not on the monitor's middle. Its opening motion is Windows' own, as before, and in the dark
+  theme its first frame is painted in its theme - no light-grey window or white bar over its title for a moment. A dialog's title row
+  shows no greyed caption button: the timeline, the log, the detection check, the compatibility report and *Install another version...*
+  keep the maximise button they use, and every other dialog shows only its close cross.
+- **A question that takes something back starts on its dismissal.** *Clear history*, *Cancel all*, a conversation's *Cancel*, *Turn off for
+  this conversation*, *Stop watcher* and *Restore defaults* now open with the keyboard on the button that answers no, so an Enter at once
+  does nothing; every question had started on its action since v0.6.6. Each button keeps its look, and a question that takes nothing
+  back still starts on its action.
+- **A question's words wrap between words.** A question or a notice broke Korean inside a word (있/는, 그다/음); it now wraps where the
+  window's other words do, only at spaces in every language that wraps by spaces.
 - **Focus rings show only after the keyboard is used.** A page tab clicked with the mouse no longer keeps its blue ring, in the Dashboard
   and in its dialogs; Tab, the arrow keys and an access key show the rings again.
 - **A tooltip has nothing drawn round its card.** The pale glow a tooltip gave a dark desktop is gone; the caption buttons' tooltips and
