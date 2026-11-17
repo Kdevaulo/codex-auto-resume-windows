@@ -1749,8 +1749,9 @@ class LayoutAuditTests(unittest.TestCase):
     def test_the_footer_keeps_its_place_as_the_tabs_change(self):
         """The review: under the Overview's last row 41 px of canvas above the save card at 200% where Pending and History
         leave 27, and 87 on a first installation - the footer's gap jumped as the tabs changed, three times the gap between
-        the cards. Now every page leaves its own padding under its last card, the mirror of the padding over its first,
-        with the fullest reply and as a first installation shows the Overview."""
+        the cards. Now every page leaves its own padding under its last card - the room for the cards' lift - with the
+        fullest reply and as a first installation shows the Overview; over its first, since v0.6.24-beta.2 (the owner,
+        2026-11-17), the tab row's gap."""
         gaps = self.answer["gaps"]
         self.assertEqual(len(gaps), 4)
         pending = gaps["pending snapshot.json"]
@@ -1758,7 +1759,9 @@ class LayoutAuditTests(unittest.TestCase):
             with self.subTest(key):
                 self.assertFalse(overflowing, "the page scrolls")
                 self.assertLessEqual(abs(gap - bottom), 1, "under the last card, anything but the page's own padding")
-                self.assertLessEqual(abs(bottom - top), 1, "the padding under the last card mirrors the padding over the first")
+                # v0.6.24-beta.2 (the owner, 2026-11-17, "촘촘하게"): over the first card the tab row's gap (PageRoom's top,
+                # AuditTabRow holds it), under the last the room for the cards' lift, which a page that scrolls needs.
+                self.assertLess(top, bottom, "over the first card the tab row's gap, under the last the lift's room")
                 self.assertLessEqual(abs(gap - pending[0]), 1, "a gap above the footer other than Pending's")
 
     def test_the_overview_scrolls_only_in_a_window_shorter_than_its_rows_own_tallest_cards(self):

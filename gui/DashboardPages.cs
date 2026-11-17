@@ -171,9 +171,22 @@ namespace CodexAutoResume
         /// card's watcher row in the warning colour while it is off.
         private void ShowWatcherAction()
         {
-            if (startButton != null && Soft.OwnVisible(startButton) != watcherOff) startButton.Visible = watcherOff;
-            if (toggleButton != null && Soft.OwnVisible(toggleButton) == watcherOff) toggleButton.Visible = !watcherOff;
+            bool changed = false;
+            if (startButton != null && Soft.OwnVisible(startButton) != watcherOff)
+            {
+                startButton.Visible = watcherOff;
+                changed = true;
+            }
+            if (toggleButton != null && Soft.OwnVisible(toggleButton) == watcherOff)
+            {
+                toggleButton.Visible = !watcherOff;
+                changed = true;
+            }
             if (nowWatcher != null) nowWatcher.ForeColor = watcherOff ? Palette.Warning : Ink;
+            // The card laid out again with the one shown in the cell: a page held from laying itself out (hidden, or built
+            // ahead) kept the button it had there at the size the card had then - Start watcher 46 px above its corner.
+            Control card = toggleButton == null ? null : toggleButton.Parent;
+            if (changed && card != null) card.PerformLayout();
         }
 
         private void Lead(TableLayoutPanel card, Button button)

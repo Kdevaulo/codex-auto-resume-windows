@@ -3,7 +3,7 @@ r"""v0.6.24 (stage 1, surface A): the window's own caption, built and never show
 The window and its dialogs as the layout audit lays them out (SettingsForm.LayoutAudit: not even top-level windows, no
 input): the caption buttons in the hero's top outer corner, Brand.CaptionInsetTop below its top and CaptionInsetEnd in from
 its edge - the left, mirrored - the headline ending at least 8 px before them in every language tried, at every scaling,
-with the Start button shown and without (AuditCaption); every dialog's title row on its ground (v0.6.24-beta.2), 16 px in
+with the watcher off and running (AuditCaption; Start watcher is the Right now card's since v0.6.24-beta.2); every dialog's title row on its ground (v0.6.24-beta.2), 16 px in
 and 8 down from its top, its buttons centred in it, and the dialog's own layout below it (AuditTitleRow).
 
 A SoftDialog on its own: its ClientSize is what it was asked plus the title's strip, docked first, its own controls laid
@@ -205,7 +205,7 @@ class CaptionWindowTests(unittest.TestCase):
             with self.subTest(locale=locale, scale=scale):
                 found = [line for line in said["report"].splitlines() if any(word in line for word in CAPTION_WORDS)]
                 self.assertEqual(found, [])
-                self.assertEqual(said["caption"], 2, "with the Start button shown, and without")
+                self.assertEqual(said["caption"], 2, "with the watcher off, and running")
                 self.assertGreaterEqual(said["cards"], 8, "the Timeline, Log, check, report, versions, two words, own values")
 
     def test_the_buttons_stand_in_the_hero_s_corner_and_the_headline_ends_before_them(self):

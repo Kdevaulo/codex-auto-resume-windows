@@ -226,6 +226,9 @@ namespace CodexAutoResume
                     form.AuditPins("overview with Start", findings);
                     AuditSpoken("overview with Start", form, findings);
                     form.AuditWatcherAction(findings);
+                    // The header with the watcher off, its state only (and below, with it running).
+                    form.AuditHero("header with the watcher off", findings);
+                    form.AuditCaption("header with the watcher off", findings);
                     form.watcherOff = wasOff;
                     form.ShowWatcherAction();
                     form.PerformLayout();
@@ -900,6 +903,9 @@ namespace CodexAutoResume
                 ShowPage(page);
                 Materialise(this);
                 PerformLayout();
+                // The page as it is now: one laid out while hidden kept what it showed then (History's "No recoveries
+                // yet" over its list, 25 px).
+                LayOutAll(pages[page]);
                 int above, below;
                 if (!TabRowRoom(page, out above, out below))
                 {
@@ -931,6 +937,12 @@ namespace CodexAutoResume
             above = face.Top - (InWindow(hero).Y + hero.Height);
             below = top - face.Bottom;
             return true;
+        }
+
+        private static void LayOutAll(Control control)
+        {
+            control.PerformLayout();
+            foreach (Control child in control.Controls) LayOutAll(child);
         }
 
         private void HighestCard(Control within, ref int top)
