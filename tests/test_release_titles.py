@@ -167,10 +167,14 @@ class TitleCommandTests(unittest.TestCase):
                                    "[The commits in this release](https://example.invalid)\n\n"
                                    "> **Too late.** After the link.\n\n## v9.9.9-beta").replace(
             "> **A made-up title.** This one sets out to prove the line is read.\n\n", "")
-        self.assertNotEqual(self._run("9.9.9", late).returncode, 0)
+        done = self._run("9.9.9", late)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("does not open with its title line", done.stderr)
 
     def test_a_version_with_no_entry_fails(self):
-        self.assertNotEqual(self._run("1.2.3", self.SAMPLE).returncode, 0)
+        done = self._run("1.2.3", self.SAMPLE)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("has no section for v1.2.3", done.stderr)
 
     def test_the_output_option_writes_the_title_alone_with_a_line_feed(self):
         with tempfile.TemporaryDirectory() as scratch:
@@ -190,6 +194,7 @@ class TitleCommandTests(unittest.TestCase):
         text = EN.read_text(encoding="utf-8")
         for version in re.findall(r"^## v(\S+) ", text, re.MULTILINE)[:6]:
             line = _entries(EN)[version]
+            self.assertIsNotNone(notes.LEAD.match(line), version)
             body = notes.notes(text, version)
             self.assertIn("\n\n" + line + "\n", body, version)
             self.assertEqual(notes.rebase(line), line, version)
