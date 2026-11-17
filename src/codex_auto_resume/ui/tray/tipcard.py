@@ -126,14 +126,68 @@ def tip_screen(icon=None, point=None) -> dict:
 
 
 # ------------------------------------------------------------------------------ the picture
+# What the header is aligned by (v0.6.24 final): a font's ascent, and the height of its "x" over the baseline - the top
+# of the letter's ink as GDI draws it (GetGlyphOutlineW's GGO_METRICS), which no line box says.
+class _TEXTMETRICW(C.Structure):
+    _fields_ = ([(name, C.c_long) for name in ("tmHeight", "tmAscent", "tmDescent", "tmInternalLeading",
+                                               "tmExternalLeading", "tmAveCharWidth", "tmMaxCharWidth", "tmWeight",
+                                               "tmOverhang", "tmDigitizedAspectX", "tmDigitizedAspectY")]
+                + [(name, C.c_wchar) for name in ("tmFirstChar", "tmLastChar", "tmDefaultChar", "tmBreakChar")]
+                + [(name, C.c_ubyte) for name in ("tmItalic", "tmUnderlined", "tmStruckOut", "tmPitchAndFamily",
+                                                  "tmCharSet")])
+
+
+class _GLYPHMETRICS(C.Structure):
+    _fields_ = [("gmBlackBoxX", C.c_uint), ("gmBlackBoxY", C.c_uint), ("gmptGlyphOrigin", W.POINT),
+                ("gmCellIncX", C.c_short), ("gmCellIncY", C.c_short)]
+
+
+class _FIXED(C.Structure):
+    _fields_ = [("fract", C.c_ushort), ("value", C.c_short)]
+
+
+class _MAT2(C.Structure):
+    _fields_ = [("eM11", _FIXED), ("eM12", _FIXED), ("eM21", _FIXED), ("eM22", _FIXED)]
+
+
+_GGO_METRICS, _GDI_ERROR = 0, 0xFFFFFFFF
+
+
+def _metric_calls():
+    gdi32 = popup._dll("gdi32")
+    gdi32.GetTextMetricsW.restype, gdi32.GetTextMetricsW.argtypes = W.BOOL, [W.HANDLE, C.POINTER(_TEXTMETRICW)]
+    gdi32.GetGlyphOutlineW.restype = W.DWORD
+    gdi32.GetGlyphOutlineW.argtypes = [W.HANDLE, C.c_uint, C.c_uint, C.POINTER(_GLYPHMETRICS), W.DWORD, C.c_void_p,
+                                       C.POINTER(_MAT2)]
+    return gdi32
+
+
 class TipRenderer(popup.Renderer):
     """The popup's renderer, drawing the card: its ground and hairline over nothing, its chip, bars, words and light."""
 
     def tip_layout(self, parts, light, scale, locale):
         """The card's plan in `locale` at `scale`: mirrored, as the popup's is, when the language is written right to left."""
         self.use(locale, scale)
-        laid = tip_layout(parts, light, scale, self.measure)
+        laid = tip_layout(parts, light, scale, self.measure, self.metrics)
         return popup.mirror(laid) if l10n.right_to_left(locale) else laid
+
+    def metrics(self, role):
+        """(ascent, x-height) of a popup font role in device pixels, as GDI draws it: the line's top to its baseline, and
+        the baseline to the top of an "x" (tipplan aligns the header by them). Where a font gives no outline for "x",
+        half its ascent."""
+        gdi32, dc = _metric_calls(), self.canvas.dc
+        previous = gdi32.SelectObject(dc, self.fonts.handles[role])
+        try:
+            found = _TEXTMETRICW()
+            if not gdi32.GetTextMetricsW(dc, C.byref(found)):
+                raise OSError("GetTextMetricsW")
+            glyph, identity = _GLYPHMETRICS(), _MAT2()
+            identity.eM11.value = identity.eM22.value = 1
+            answer = gdi32.GetGlyphOutlineW(dc, ord("x"), _GGO_METRICS, C.byref(glyph), 0, None, C.byref(identity))
+            x_height = glyph.gmptGlyphOrigin.y if answer != _GDI_ERROR and glyph.gmptGlyphOrigin.y > 0 else found.tmAscent / 2.0
+            return float(found.tmAscent), float(x_height)
+        finally:
+            gdi32.SelectObject(dc, previous)
 
     def draw_tip(self, plan, frame=None):
         """The whole card into the canvas, premultiplied, its alpha kept: transparent but for the card. Returns the canvas."""
