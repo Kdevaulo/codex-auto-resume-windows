@@ -273,16 +273,30 @@ namespace CodexAutoResume
         {
             var said = new Dictionary<string, object>();
             bool reduce = Soft.ReduceMotionSetting;
+            Func<bool> animates = Soft.WindowsAnimates;
             try
             {
+                // Motion allowed by the probe itself, through the switch the window reads (Soft.ReduceMotion: this
+                // product's setting and Windows' animation effects): the CI's runners have Windows' animation off, and
+                // the veil (rightly) came at its fullest at once there (dev CI 43945024319).
                 Soft.ReduceMotionSetting = false;
+                Soft.WindowsAnimates = delegate { return true; };
                 said["moving"] = Scene(false, false, true);
                 said["region"] = Scene(true, false, false);
                 said["contrast"] = Scene(false, true, false);
+                // Windows' animation effects off, as on a runner: no fade.
+                Soft.WindowsAnimates = delegate { return false; };
+                said["windowsStill"] = Scene(false, false, false);
+                // This product's own setting to reduce motion: no fade.
+                Soft.WindowsAnimates = delegate { return true; };
                 Soft.ReduceMotionSetting = true;
                 said["still"] = Scene(false, false, false);
             }
-            finally { Soft.ReduceMotionSetting = reduce; }
+            finally
+            {
+                Soft.ReduceMotionSetting = reduce;
+                Soft.WindowsAnimates = animates;
+            }
             said["child"] = Child();
             said["strength"] = DialogVeil.Strength;
             return said;
@@ -533,7 +547,7 @@ class DialogCardTests(unittest.TestCase):
         self.assertEqual(said["client"][1], said["title"] + said["asked"] - said["before"] + said["above"] + button)
 
     def test_the_owner_is_veiled_while_the_dialog_is_open_and_not_after(self):
-        for scene in ("moving", "region", "still"):
+        for scene in ("moving", "region", "windowsStill", "still"):
             with self.subTest(scene=scene):
                 said = self.answer["veil"][scene]
                 veil = said["open"]
@@ -563,6 +577,8 @@ class DialogCardTests(unittest.TestCase):
         self.assertEqual(self.answer["veil"]["moving"]["first"], 0, "faded in from nothing")
         self.assertEqual(self.answer["veil"]["still"]["first"], self.answer["veil"]["still"]["open"]["full"],
                          "motion reduced: at its fullest at once")
+        self.assertEqual(self.answer["veil"]["windowsStill"]["first"], self.answer["veil"]["windowsStill"]["open"]["full"],
+                         "Windows' animation effects off (the CI's runners): at its fullest at once")
 
     def test_none_in_high_contrast_nor_for_a_dialog_laid_out_as_a_child(self):
         self.assertFalse(self.answer["veil"]["contrast"]["open"]["veiled"])
