@@ -638,6 +638,8 @@ namespace CodexAutoResume
                                                       IntPtr section, int offset);
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr GetModuleHandle(string name);
         [DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
@@ -996,6 +998,19 @@ namespace CodexAutoResume
 
         /// Whether the window is held off the screen until its first paint (Cloak).
         internal bool Cloaked { get { return cloaked; } }
+
+        // DWMWA_CLOAKED, and its DWM_CLOAKED_APP bit: cloaked by its own process (Cloak), not by the shell.
+        private const int CloakedNow = 14, CloakedByApp = 1;
+
+        /// v0.6.24-beta.2: whether `window` - of this process or another - is held off the screen by its own cloak (Cloak),
+        /// so a window that reopens itself stays until its replacement has come on (SettingsForm.OnScreen). A window that
+        /// cannot be asked is taken as on the screen, as before.
+        internal static bool HeldOff(IntPtr window)
+        {
+            int value;
+            try { return DwmGetWindowAttribute(window, CloakedNow, out value, 4) == 0 && (value & CloakedByApp) != 0; }
+            catch (Exception) { return false; }
+        }
 
         /// v0.6.24 (M-CORNER re-check 5): a window just made is held off the screen by DWM (cloaked) until it has painted
         /// once. A first dark open showed the companion's empty outline with the desktop through it for 1.2 s - the window
