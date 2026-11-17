@@ -640,7 +640,11 @@ namespace CodexAutoResume
                 // By ink (live re-check 7: the eye reads the glyph's own ink, not its box): the cross's first and last
                 // inked columns as it is drawn at this size (CaptionButton.InkColumns).
                 Point ink = CloseButton.InkColumns(new Size(width, height));
-                int close = mirrored ? GlyphEnd - ink.X : holder.ClientSize.Width - 1 - GlyphEnd - ink.Y;
+                // Mirrored, the left-to-right place mirrored (the cross's ink is symmetric in its button), from GlyphEnd as
+                // the mirrored title gives it - the ink of its rightmost letter, where left to right it is its leftmost's -
+                // so a mirrored dialog's buttons stand off their mirror by exactly that difference (MirrorCompare).
+                int close = holder.ClientSize.Width - 1 - GlyphEnd - ink.Y;
+                if (mirrored) close = holder.ClientSize.Width - width - close;
                 x = mirrored ? close : close + width - GroupWidth;
             }
             // In a card, CaptionInsetTop below its top; in a row on the ground (OnGround), centred in the row.
