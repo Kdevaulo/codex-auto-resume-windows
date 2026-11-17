@@ -2183,7 +2183,7 @@ namespace CodexAutoResume
             }
             else if (m.Msg == WM_DESTROY) Unveil();
             // Its first paint done: everything in it painted now, then it comes on the screen in its theme.
-            else if (m.Msg == WM_PAINT && cloaked) Uncloak();
+            else if (m.Msg == WM_PAINT && cloaked && !uncloaking) Uncloak();
         }
 
         // ------------------------------------------------------------------ painted before it is seen
@@ -2199,12 +2199,15 @@ namespace CodexAutoResume
         private static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
 
         private const int WM_PAINT = 0x000F, DWMWA_CLOAK = 13;
-        private const uint RDW_UPDATENOW = 0x0100, RDW_ALLCHILDREN = 0x0080;
-        private bool cloaked;
+        private const uint RDW_INVALIDATE = 0x0001, RDW_ERASE = 0x0004, RDW_UPDATENOW = 0x0100, RDW_ALLCHILDREN = 0x0080;
+        private bool cloaked, uncloaking;
         private Timer uncloak;
 
         /// Whether the dialog is held off the screen until its first paint: for the tests.
         internal bool Cloaked { get { return cloaked; } }
+
+        /// Whether it came on the screen only after the whole of it had been painted (Uncloak): for the tests.
+        internal bool PaintedBeforeSeen { get; private set; }
 
         protected override void OnHandleCreated(EventArgs e)
         {
@@ -2233,10 +2236,17 @@ namespace CodexAutoResume
                 uncloak.Dispose();
                 uncloak = null;
             }
-            if (!cloaked || !IsHandleCreated) return;
-            cloaked = false;
-            try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN); }
+            if (!cloaked || uncloaking || !IsHandleCreated) return;
+            // Everything in it painted now, whatever was painted before - re-check 9 caught one frame of the first dark
+            // Timeline unpainted (a white body, a black band with a white bar): not all of it was waiting to be painted at
+            // its first WM_PAINT. The same when the half-second fallback comes first: never an unpainted frame.
+            bool painted = false;
+            uncloaking = true;
+            try { painted = RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN); }
             catch (Exception) { }
+            finally { uncloaking = false; }
+            cloaked = false;
+            PaintedBeforeSeen = painted;
             int off = 0;
             try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
             catch (Exception) { }

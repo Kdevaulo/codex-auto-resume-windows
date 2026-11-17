@@ -235,6 +235,7 @@ namespace CodexAutoResume
                 said["cloakedFirst"] = CardNative.Cloaked(h);
                 CardNative.Pump(40);
                 said["cloakedAfter"] = CardNative.Cloaked(h);
+                said["paintedBeforeSeen"] = dialog.PaintedBeforeSeen;
                 said["open"] = Veiled(dialog, owner);
                 IntPtr veil = dialog.Veil == null ? IntPtr.Zero : dialog.Veil.Handle;
                 if (still)
@@ -605,6 +606,8 @@ class DialogCardTests(unittest.TestCase):
                 self.assertTrue(said["veilOnFirst"], "on the screen as the dialog is shown")
                 self.assertTrue(said["cloakedFirst"], "the dialog is held off the screen until it has painted")
                 self.assertFalse(said["cloakedAfter"], "and comes on once it has")
+                # Re-check 9: the whole of it painted again, invalidated and updated, before DWM lets it be seen.
+                self.assertTrue(said["paintedBeforeSeen"], "everything in it painted before it is seen")
 
     def test_the_dark_veil_dims_the_dark_window_as_the_light_one_does_the_light(self):
         """Live re-check 7: in dark, 20 % took the Dashboard's mean grey only from 37.5 to 32; in light from 234 to 192, a
