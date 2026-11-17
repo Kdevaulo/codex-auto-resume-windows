@@ -1,10 +1,11 @@
-"""The notification-area popup in the README's motion picture (build/motion_popup.py): on the canvas the whole time, used by a pointer.
+"""The notification-area popup in the README's motion picture (build/motion_popup.py): opened from the icon, used by a pointer.
 
-What the picture shows is only what the product does (ui/popup): the popup is there from the first frame to the last
-(the owner, 2026-10-30: no popup that appears and disappears); its light breathes on the clock of the state it shows, at the popup's own frame timer; its countdowns are
-drawn again each second it is open; a press on a row's switch fades the switch while the answer is awaited, and the
-answer makes it glide in brand's transition time on brand's curve. Drawn with Windows' GDI+, offscreen, in memory:
-nothing is written and nothing is put on the screen.
+What the picture shows is only what the product does (ui/popup): the popup opens from a click on the icon (the story
+before it, the hover card, is tests/test_motion_tray_story.py's) and is there until a click elsewhere closes it; its light
+breathes on the clock of the state it shows, at the popup's own frame timer; its countdowns are drawn again each second it
+is open; a press on a row's switch fades the switch while the answer is awaited, and the answer makes it glide in brand's
+transition time on brand's curve. Drawn with Windows' GDI+, offscreen, in memory: nothing is written and nothing is put on
+the screen.
 
 The pictures themselves are the main session's (build/make_motion.py popup-en popup-ko); nothing here reads them
 except for their sizes, which are the stills' - a picture drawn on one machine is not compared with another's fonts.
@@ -63,24 +64,35 @@ class PopupPlanTests(unittest.TestCase):
                 self.assertEqual(plan["output"], output)
                 self.assertNotEqual(plan["output"], still, "the still is make_screenshots', checked against its manifest")
                 self.assertEqual(plan["popup"], {"scale": shots.POPUP_SCALE, "locale": locale, "still": still})
-                for absent in ("window", "taskbar", "card"):
+                for absent in ("window", "card"):
                     self.assertNotIn(absent, plan)
-                self.assertEqual(plan["pointer"], {"rest": [856, 588], "scale": shots.POPUP_SCALE},
-                                 "a pointer of the picture's own size, resting right of the popup, off the canvas")
+                self.assertEqual(plan["pointer"], {"rest": [856, 760], "scale": shots.POPUP_SCALE},
+                                 "a pointer of the picture's own size, resting right of the picture, off the canvas")
                 self.assertLessEqual(plan["ripple_step"], POINTER_STEP)
                 self.assertIs(plan["canvas"].get("transparent"), True,
                               "the popup floats on a clear ground, with only its own shadow (the owner, 2026-11-16)")
                 self.assertNotIn("ground", plan["canvas"], "and no canvas colour is laid under it")
                 self.assertEqual(plan["canvas"].get("theme"), shots.THEME)
-                self.assertEqual(make_motion.icon_moments(plan, motion_plan.plan_end(plan)), [])
+                self.assertTrue(make_motion.icon_moments(plan, motion_plan.plan_end(plan)),
+                                "the strip's icon moves on its own timer")
 
-    def test_the_canvas_is_the_size_of_the_committed_still_and_the_budget_is_the_cards_ceiling(self):
+    def test_the_canvas_holds_the_committed_still_whole_above_the_strip_and_the_budget_is_the_cards_ceiling(self):
+        """The popup's still, card and shadow, is the picture's whole width; under it the gap the product keeps from the
+        taskbar and the strip: nothing of the card or of its shadow is cut off (the shadow reaches past the card's edge
+        the product keeps from the screen's, so the strip runs on past the screen's edge to the canvas's)."""
         import make_screenshots as shots
+        from codex_auto_resume import brand
         for name, _locale, _output, still in PLANS:
             with self.subTest(name):
                 plan = plan_of(name)
                 width, height = (int(part) for part in shots.dimensions(ROOT / still).split("x"))
-                self.assertEqual(plan["canvas"]["size"], [width, height])
+                strip = plan["taskbar"]
+                pad = 68          # still_pad at 200 %: the deepest theme's shadow reach, which the still keeps round the card
+                gap = int(round(brand.SPACING["m"] * shots.POPUP_SCALE))
+                self.assertEqual(plan["canvas"]["size"], [width, strip["top"] + strip["height"]])
+                self.assertEqual(strip["top"], height - pad + gap, "the card's bottom, the gap, then the strip")
+                self.assertEqual(strip["edge"], width - pad + gap, "the card's right edge, the gap, then the screen's edge")
+                self.assertLessEqual(strip["edge"], width)
                 self.assertEqual(plan["budget"], {"cap": 4000000}, "quality over size: a ceiling, no target")
 
     def test_the_picture_is_whole_breaths_long_so_it_loops_without_a_jump_in_the_light(self):
@@ -92,23 +104,28 @@ class PopupPlanTests(unittest.TestCase):
                 self.assertEqual(end % brand.GLOW["waiting_ms"], 0)
                 self.assertEqual(plan["length"], [end, end])
 
-    def test_the_sequence_is_each_row_off_then_on_with_the_popup_open_throughout(self):
+    def test_the_sequence_is_each_row_off_then_on_while_the_popup_is_open_and_it_is_closed_at_both_ends(self):
         for name, *_rest in PLANS:
             with self.subTest(name):
                 frames = motion_plan.expand(plan_of(name))
-                first = dict(frames[0].popup)
-                self.assertEqual((frames[0].t, first["opened"], first["off"], first["busy"]), (0, 0, (), ()),
-                                 "frame 1 is the popup open and untouched, as a viewer that does not animate shows it")
-                self.assertTrue(all(frame.popup for frame in frames), "no frame without the popup: it is never closed")
-                states = [(dict(frame.popup)["busy"], dict(frame.popup)["off"]) for frame in frames]
+                self.assertEqual((frames[0].t, frames[0].popup), (0, ()), "frame 1 is the strip alone, no popup")
+                self.assertEqual(frames[-1].popup, (), "and so is the last: the popup is closed where it loops back")
+                opened = [frame for frame in frames if frame.popup]
+                first = dict(opened[0].popup)
+                self.assertEqual((first["off"], first["busy"]), ((), ()), "it opens untouched")
+                self.assertEqual(opened[0].t, first["opened"])
+                self.assertEqual([frame.t for frame in opened], sorted(frame.t for frame in opened))
+                self.assertEqual(frames.index(opened[-1]) - frames.index(opened[0]), len(opened) - 1,
+                                 "it is open from the click to the click elsewhere, with no gap")
+                states = [(dict(frame.popup)["busy"], dict(frame.popup)["off"]) for frame in opened]
                 order = []
                 for state in states:
                     if not order or order[-1] != state:
                         order.append(state)
                 self.assertEqual(order, [((), ()), ((1,), ()), ((), (1,)), ((1,), (1,)), ((), ()),
                                          ((2,), ()), ((), (2,)), ((2,), (2,)), ((), ())])
-                self.assertEqual(states[-1], states[0], "both rows are on again where it loops back to frame 1")
-                self.assertEqual(dict(frames[-1].popup)["glides"], (), "and no glide is running")
+                self.assertEqual(states[-1], states[0], "both rows are on again when it is closed")
+                self.assertEqual(dict(opened[-1].popup)["glides"], (), "and no glide is running")
 
     def test_a_press_waits_then_the_answer_glides_the_switch_for_brand_s_transition_time(self):
         from codex_auto_resume import brand
@@ -134,7 +151,8 @@ class PopupPlanTests(unittest.TestCase):
                                  [(1, 0.0, 1.0), (1, 1.0, 0.0), (2, 0.0, 1.0), (2, 1.0, 0.0)])
 
     def test_a_frame_is_held_for_the_popup_s_own_timer_and_the_pointer_s_own_while_it_moves_or_clicks(self):
-        from codex_auto_resume.ui.popup import window
+        from codex_auto_resume import brand
+        from codex_auto_resume.ui.popup import motion, window
         for name, *_rest in PLANS:
             with self.subTest(name):
                 frames, delays, end = make_motion.schedule(plan_of(name))
@@ -143,12 +161,17 @@ class PopupPlanTests(unittest.TestCase):
                     if not frame.popup:
                         continue
                     pointing = frame.pointer[0] == "move" or motion_plan.ripple_at(frame) is not None
-                    if pointing:
+                    opening = frame.t - dict(frame.popup)["opened"] < brand.MOTION["transition_ms"]
+                    if opening:
+                        self.assertLessEqual(delay, motion.GLIDE_FRAME_MS, "its opening runs on the card's quick frames")
+                    elif pointing:
                         self.assertLessEqual(delay, window.FRAME_MS, frame.t)
                     else:
                         self.assertGreaterEqual(delay, window.FRAME_MS - 3, frame.t)
 
-    def test_the_pointer_comes_in_visits_the_top_switch_then_the_last_row_s_and_leaves(self):
+    def test_the_pointer_comes_to_the_icon_visits_the_top_switch_then_the_last_row_s_clicks_elsewhere_and_leaves(self):
+        away = (("at", (420, 933)),)
+        rest = (("at", (856, 760)),)
         for name, *_rest in PLANS:
             with self.subTest(name):
                 frames = motion_plan.expand(plan_of(name))
@@ -156,13 +179,12 @@ class PopupPlanTests(unittest.TestCase):
                 for frame in frames:
                     if frame.pointer[0] == "at" and (not rests or rests[-1] != frame.pointer[1]):
                         rests.append(frame.pointer[1])
-                self.assertEqual(rests, [(("at", (856, 588)),), "popup.switch.1", "popup.switch.2",
-                                         (("at", (856, 728)),)])
+                self.assertEqual(rests, [rest, "tray.icon", "popup.switch.1", "popup.switch.2", away, rest])
                 moves = [frame.pointer for frame in frames if frame.pointer[0] == "move"]
                 self.assertTrue(moves)
-                self.assertEqual({move[1:3] for move in moves}, {((("at", (856, 588)),), "popup.switch.1"),
+                self.assertEqual({move[1:3] for move in moves}, {(rest, "tray.icon"), ("tray.icon", "popup.switch.1"),
                                                                  ("popup.switch.1", "popup.switch.2"),
-                                                                 ("popup.switch.2", (("at", (856, 728)),))})
+                                                                 ("popup.switch.2", away), (away, rest)})
 
     def test_the_pointer_moves_on_brand_s_curve_at_the_pointer_s_cadence(self):
         for name, *_rest in PLANS:
@@ -174,7 +196,7 @@ class PopupPlanTests(unittest.TestCase):
                             self.assertLessEqual(step["step"], POINTER_STEP)
                 frames = motion_plan.expand(plan)
                 first = [frame.pointer for frame in frames if frame.pointer[0] == "move"
-                         and frame.pointer[1:3] == ((("at", (856, 588)),), "popup.switch.1")]
+                         and frame.pointer[1:3] == ((("at", (856, 760)),), "tray.icon")]
                 count = len(first)
                 self.assertEqual([move[3] for move in first],
                                  [round(1.0 if count == 1 else motion_plan.ease(index / float(count - 1)), 6)
@@ -185,9 +207,10 @@ class PopupPlanTests(unittest.TestCase):
         for name, *_rest in PLANS:
             with self.subTest(name):
                 frames = motion_plan.expand(plan_of(name))
-                presses = sorted({frame.ripple for frame in frames if frame.ripple})
+                presses = sorted({frame.ripple for frame in frames if frame.ripple}, key=lambda ripple: ripple[1])
                 self.assertEqual([target for target, _start in presses],
-                                 ["popup.switch.1"] * 2 + ["popup.switch.2"] * 2)
+                                 ["tray.icon"] + ["popup.switch.1"] * 2 + ["popup.switch.2"] * 2 + [(("at", (420, 933)),)])
+                presses = presses[1:-1]          # the click that opens the popup and the one elsewhere that closes it
                 busy = [(frame.t, dict(frame.popup)["busy"][0]) for frame in frames
                         if frame.popup and dict(frame.popup)["busy"]]
                 glides = sorted({(glide[0], row) for frame in frames if frame.popup
@@ -220,8 +243,8 @@ class PopupPlanTests(unittest.TestCase):
             self.assertEqual(make_motion.main(["popup-en", "--dry-run"]), 0)
         written.assert_not_called()
         self.assertIn("popup-en -> docs/images/tray-popup-motion.png", out.getvalue())
-        self.assertIn("324 frames, 8.80 s", out.getvalue())
-        self.assertIn("targets: popup.switch.1, popup.switch.2", out.getvalue())
+        self.assertIn("502 frames, 13.20 s", out.getvalue())
+        self.assertIn("targets: popup.switch.1, popup.switch.2, tray.icon", out.getvalue())
 
 
 class PopupStepTests(unittest.TestCase):
@@ -281,25 +304,29 @@ class PopupInputTests(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "nt", "the popup is drawn with Windows' GDI+")
 class PopupDrawnTests(unittest.TestCase):
+    """The popup's own picture (its layer: the card and its shadow, the still's size) at the frames of the plan."""
+
     @classmethod
     def setUpClass(cls):
         import motion_popup
         cls.motion_popup = motion_popup
         cls.plan = plan_of("popup-en")
         cls.frames, _delays, _end = make_motion.schedule(cls.plan)
-        cls.width, cls.height = cls.plan["canvas"]["size"]
-        cls.closed = bytes(cls.width * cls.height * 4)          # a clear canvas: RGBA, every byte 0
         cls.popup = motion_popup.PopupFrames("en", scale=2.0)
+        cls.width, cls.height = cls.popup.size              # the layer's own: the committed still's size
+        cls.closed = bytes(cls.width * cls.height * 4)      # a clear layer: RGBA, every byte 0
+        cls.opened = next(frame.t for frame in cls.frames if frame.popup)
 
     @classmethod
     def tearDownClass(cls):
         cls.popup.close()
 
-    def at(self, t):
-        return next(frame for frame in self.frames if frame.t == t)
+    def at(self, rel):
+        """The first frame `rel` ms after the popup was opened, or later."""
+        return next(frame for frame in self.frames if frame.popup and frame.t >= self.opened + rel)
 
-    def draw(self, t):
-        return self.popup.drawn(self.at(t), self.closed)
+    def draw(self, rel):
+        return self.popup.drawn(self.at(rel), self.closed)
 
     def changed(self, one, other):
         """(left, top, right, bottom) of the pixels two pictures differ in, or None."""
@@ -312,22 +339,25 @@ class PopupDrawnTests(unittest.TestCase):
                    != other[(y * width + x) * 4:(y * width + x) * 4 + 4]]
         return min(columns), rows[0], max(columns) + 1, rows[-1] + 1
 
-    def test_frame_one_is_the_popup_the_still_generator_draws(self):
-        """Drawn here by both, on this machine: whatever its fonts, the motion starts from the still's own pixels."""
+    def test_the_popup_once_opened_is_the_popup_the_still_generator_draws(self):
+        """Drawn here by both, on this machine: whatever its fonts, the popup is the still's own pixels, its light at the
+        first moment of its breath as the still draws it."""
         import make_screenshots as shots
+        arrived = self.at(160)
+        self.assertTrue(self.popup.opening(arrived)[2], "it has arrived: its fade and its rise are over")
         with tempfile.TemporaryDirectory() as name:
             still = Path(name) / "still.png"
             shots.render_popup(still, "en")
-            self.assertTrue(self.popup.is_the_still(self.frames[0], self.closed, still))
+            self.assertTrue(self.popup.is_the_still(arrived, self.closed, still))
             other = Path(name) / "other.png"
             shots.render_popup(other, "ko")
-            self.assertFalse(self.popup.is_the_still(self.frames[0], self.closed, other),
+            self.assertFalse(self.popup.is_the_still(arrived, self.closed, other),
                              "a popup of another language is not the still")
 
     def test_the_popup_is_on_a_clear_ground_its_card_opaque_and_its_shadow_with_its_own_alpha(self):
         """The owner, 2026-11-16: the picture is RGBA - nothing at the corners, the card itself opaque, the float
         shadow soft in between - not the card laid on the window's grey canvas."""
-        picture = self.draw(0)
+        picture = self.draw(160)
         self.assertEqual(len(picture), self.width * self.height * 4)
         alpha = picture[3::4]
         for x, y in ((0, 0), (self.width - 1, 0), (0, self.height - 1), (self.width - 1, self.height - 1)):
@@ -346,12 +376,15 @@ class PopupDrawnTests(unittest.TestCase):
         frame = self.frames[index]
         return (frame.t - dict(frame.popup)["opened"]) // 1000
 
-    def test_the_popup_is_on_the_canvas_in_every_frame_and_no_frame_is_empty(self):
-        for index in range(len(self.frames)):
-            self.assertNotEqual(self.picture(index), self.closed, "frame at %d ms is the empty canvas" % self.frames[index].t)
+    def test_the_popup_is_drawn_in_every_frame_it_is_open_and_no_frame_of_it_is_empty(self):
+        for index, frame in enumerate(self.frames):
+            if frame.popup:
+                self.assertNotEqual(self.picture(index), self.closed, "frame at %d ms is the empty canvas" % frame.t)
+            else:
+                self.assertEqual(self.picture(index), self.closed, "and none is drawn at %d ms, closed" % frame.t)
 
     def test_while_nothing_is_asked_only_the_light_moves_until_a_countdown_is_drawn_again(self):
-        light = self.changed(self.draw(0), self.draw(990))
+        light = self.changed(self.draw(160), self.draw(990))
         self.assertIsNotNone(light)
         left, top, right, bottom = light
         self.assertLess(right - left, 120)
@@ -389,29 +422,30 @@ class PopupDrawnTests(unittest.TestCase):
 
     def test_the_pointer_is_off_the_canvas_in_frame_one_and_after_it_leaves_and_draws_nothing_there(self):
         import motion_compose
+        width = self.plan["canvas"]["size"][0]
         bounds = self.popup.bounds()
-        gone = len(self.frames)
         leaves = self.first(lambda frame: frame.pointer[0] == "at" and isinstance(frame.pointer[1], tuple)
-                            and dict(frame.pointer[1]).get("at") == (856, 728))
+                            and dict(frame.pointer[1]).get("at") == (856, 760) and frame.t > self.opened)
+        gone = len(self.frames)
         for index in [0] + list(range(leaves, gone)):
             frame = self.frames[index]
             x, y = motion_compose.pointer_at(frame, bounds, (0, 0))
-            self.assertGreaterEqual(x - 1, self.width, "the arrow starts right of the picture: %d ms" % frame.t)
+            self.assertGreaterEqual(x - 1, width, "the arrow is right of the picture: %d ms" % frame.t)
             self.assertIsNone(motion_plan.ripple_at(frame))
-            picture = bytearray(self.picture(index))
+            picture = bytearray(self.closed)
             motion_compose.draw_pointer(picture, self.width, self.height, x, y, scale=2.0)
-            self.assertEqual(bytes(picture), self.picture(index), "nothing of it is drawn")
+            self.assertEqual(bytes(picture), self.closed, "nothing of it is drawn")
 
     def test_the_loop_is_seamless_the_pointer_gone_and_the_state_the_same_at_both_ends(self):
         import motion_compose
+        width = self.plan["canvas"]["size"][0]
         bounds = self.popup.bounds()
         first, last = self.frames[0], self.frames[-1]
         for frame in (first, last):
             x, _y = motion_compose.pointer_at(frame, bounds, (0, 0))
-            self.assertGreaterEqual(x - 1, self.width, "no pointer at either end")
+            self.assertGreaterEqual(x - 1, width, "no pointer at either end")
             self.assertIsNone(motion_plan.ripple_at(frame))
-        self.assertEqual(dict(first.popup)["off"], dict(last.popup)["off"])
-        self.assertEqual(dict(first.popup)["busy"], dict(last.popup)["busy"])
+        self.assertEqual(first.popup, last.popup)
         self.assertEqual(self.plan["length"][1] % 4400, 0, "whole breaths: the light is where it began")
 
     def test_the_pointer_arrives_on_each_switch_and_is_drawn_there_over_it(self):

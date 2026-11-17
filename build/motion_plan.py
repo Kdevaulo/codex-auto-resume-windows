@@ -31,8 +31,15 @@ is replaced by `values[name]`, so one storyboard serves both READMEs. Each step 
     {"right": "task.<n>", "frames": n, "step": ms, "hold": ms}   a right click on a Pending row: it is chosen, a
                                                    ripple where the pointer is, and the row's own menu opens there
     {"dismiss": "menu", "hold": ms}                the menu closes with nothing chosen (Escape)
-    {"popup": "open" | "close", "hold": ms}        the notification-area popup is shown at once, or hidden at once (it
-                                                   has no entrance of its own: ShowWindow, SW_HIDE)
+    {"popup": "open" | "close", "hold": ms}        the notification-area popup is shown, or hidden at once (SW_HIDE).
+    {"popup": "open", "frames": n, "step": ms}     it opens as the product opens it (v0.6.23: it fades in over brand's
+                                                   transition and rises SPACING xs into place, ui.popup.motion.opening),
+                                                   a frame every `step` ms of that; the icon's hover card, if it is on
+                                                   screen, goes at that same moment (a click hides it at once)
+    {"tip": "show" | "hide", "hold": ms}           the icon's own hover card (ui/tray/tipcard) is on screen, or gone at
+    {"tip": "show", "frames": n, "step": ms}       once; shown with frames it fades in over brand's transition, a frame
+                                                   every `step` ms (it never rises: opening(elapsed, 0)). It is never on
+                                                   screen with the popup: the product shows it only while no popup is
     {"ask": row, "frames": n, "step": ms}          the popup's row n (1 is the first) has had its switch pressed: it
                                                    is drawn half faded while the control layer's answer is awaited
     {"switch": row, "to": "off" | "on", "frames": n, "step": ms}   the answer came: the switch glides to its new place
@@ -76,9 +83,9 @@ STATE_KEYS = ("locale", "page", "section", "scroll", "hover", "pressed", "combo"
 PAGES = ("overview", "pending", "history", "statistics", "diagnostics", "settings")
 SECTIONS = ("general", "recovery", "continuation", "appearance", "advanced")
 STEPS = ("hold", "set", "move", "hover", "press", "card", "wheel", "open", "rows", "choose", "right", "dismiss",
-         "popup", "ask", "switch")
+         "popup", "ask", "switch", "tip")
 # The steps that may say how long their one frame holds.
-HOLDING = ("set", "open", "choose", "right", "dismiss", "popup")
+HOLDING = ("set", "open", "choose", "right", "dismiss", "popup", "tip")
 # The shortest a frame is held, in ms: the product's own quickest step (a scroll's glide and a drop list's fade tick
 # every 15 ms, the card's every 16). Delays are whole milliseconds, exact; browsers show 10 ms or less as 100 ms.
 SHORTEST = 15
@@ -92,7 +99,7 @@ RIPPLE_MS = 240
 # `clock_step_ms` may name.
 WINDOW_CLOCK_MS = 1000
 NAME = re.compile(r"(page\.(%s)|section\.(%s)|save|restore|start|close|setting\.[a-z_]+|row\.[A-Za-z_-]+|card\.[a-z_]+"
-                  r"|task\.[0-9]+|menu\.[0-9]+|popup\.switch\.[0-9]+|pending\.(retry|timeline|explain)|overview\.toggle"
+                  r"|task\.[0-9]+|menu\.[0-9]+|popup\.switch\.[0-9]+|tray\.icon|pending\.(retry|timeline|explain)|overview\.toggle"
                   r"|dialog\.close)\Z"
                   % ("|".join(PAGES), "|".join(SECTIONS)))
 
@@ -111,6 +118,8 @@ class Frame(NamedTuple):
     ripple: tuple          # () or (target the press was on, ms it began)
     popup: tuple = ()      # () with no popup open, else (("busy", rows), ("glides", ((row, (start, from, to)), ...)),
                            # ("off", rows), ("opened", ms)): rows are the popup's, counted from 1
+    tip: tuple = ()        # () with no hover card on screen, else (("born", ms it began to fade in), ("until", ms the
+                           # popup opened and took it away)); no "until" when nothing ever does
 
 
 def _frozen(value):
@@ -264,6 +273,7 @@ class _Run:
         self.pointer = ("at", {"at": list((plan.get("pointer") or {}).get("rest", [0, 0]))})
         self.ripple = ()
         self.popup = None
+        self.tip = None
         self.frames = []
         self.scene = ""
 
@@ -275,7 +285,8 @@ class _Run:
             self.popup["glides"] = {row: glide for row, glide in self.popup["glides"].items()
                                     if at < glide[0] + brand.MOTION["transition_ms"]}
         frame = Frame(int(at), self.scene, _frozen(self.window), _frozen(self.card) if self.card else (),
-                      _frozen(self.pointer), self.ripple, _frozen(self.popup) if self.popup else ())
+                      _frozen(self.pointer), self.ripple, _frozen(self.popup) if self.popup else (),
+                      _frozen(self.tip) if self.tip else ())
         if self.frames and self.frames[-1].t == frame.t:
             self.frames[-1] = frame              # a later state at the same moment is the one shown
         else:
@@ -478,10 +489,30 @@ def _step(run, step):
         run.emit()
         run.t += int(step.get("hold", 40))
         return
+    if "tip" in step:
+        if step["tip"] == "show":
+            if run.popup is not None or run.tip is not None:
+                raise PlanError("%s: the hover card is shown when the popup is not open, and once" % run.scene)
+            run.tip = {"born": run.t}
+        elif step["tip"] == "hide":
+            if run.tip is None:
+                raise PlanError("%s: there is no hover card to hide" % run.scene)
+            run.tip = None
+        else:
+            raise PlanError("%s: the hover card is shown or hidden, not %r" % (run.scene, step["tip"]))
+        _held_frames(run, step)
+        return
     if "popup" in step:
         if step["popup"] == "open":
             if run.popup is not None:
                 raise PlanError("%s: the popup is open already" % run.scene)
+            if run.tip is not None:
+                # A click hides the icon's card at once as the popup comes (tray/clicks.py _select): the frames it was
+                # on screen for are told when that was, which is what its countdown reads against.
+                until = run.t
+                run.frames = [frame._replace(tip=_frozen(dict(dict(frame.tip), until=until))) if frame.tip else frame
+                              for frame in run.frames]
+                run.tip = None
             run.popup = {"opened": run.t, "off": [], "busy": [], "glides": {}}
         elif step["popup"] == "close":
             if run.popup is None:
@@ -489,8 +520,7 @@ def _step(run, step):
             run.popup = None
         else:
             raise PlanError("%s: the popup opens or closes, not %r" % (run.scene, step["popup"]))
-        run.emit()
-        run.t += int(step.get("hold", 40))
+        _held_frames(run, step)
         return
     if "ask" in step or "switch" in step:
         kind = "ask" if "ask" in step else "switch"
@@ -516,6 +546,19 @@ def _step(run, step):
         run.t += count * gap
         return
     raise PlanError("%s: no step does %r" % (run.scene, step))
+
+
+def _held_frames(run, step):
+    """One frame and a hold of `hold` ms (40 without) - or, with `frames`, a frame every `step` ms for that many (an
+    opening's or a fade's own steps), then `hold` ms more (none without)."""
+    if "frames" in step:
+        count, gap = run.frames_of(step)
+        for index in range(count):
+            run.emit(run.t + index * gap)
+        run.t += count * gap + int(step.get("hold", 0))
+        return
+    run.emit()
+    run.t += int(step.get("hold", 40))
 
 
 def _settle_scroll(run):
