@@ -603,14 +603,14 @@ namespace CodexAutoResume
         /// Windows' animations on) and the pill on the screen.
         internal bool Wanted(string day)
         {
-            return day != null && !Palette.Contrast && !Soft.ReduceMotion && Motion.Allowed(pill);
+            return !string.IsNullOrEmpty(day) && !Palette.Contrast && !Soft.ReduceMotion && Motion.Allowed(pill);
         }
 
         /// The hint for `day` (null for none), started or stopped as what it may show says; again on every second of the
         /// window's clock, and whenever the pill shows or goes.
         internal void Follow(string day)
         {
-            look = day;
+            look = string.IsNullOrEmpty(day) ? null : day;
             bool wanted = Wanted(day);
             if (wanted && !timer.Enabled)
             {
