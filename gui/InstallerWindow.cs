@@ -91,6 +91,11 @@ namespace CodexAutoResume
         private double at, reached;
         private string step = "starting";
         private WrapLabel stepLabel, busyNote;
+        // v0.6.24-beta.3 (the owner's option A, 2026-11-17): rows that stand in a mark's column at the card's leading edge -
+        // the Welcome page's numbered points - each by the mark whose column it is in, and the mark beside the row it is
+        // the first of. Made again with the page (Build), as its rows are.
+        private readonly Dictionary<Control, StepMark> columns = new Dictionary<Control, StepMark>();
+        private readonly Dictionary<Control, StepMark> marks = new Dictionary<Control, StepMark>();
 
         /// The exit code of the run, or int.MinValue where none ran (the window was closed before it started).
         internal int Code { get { return code; } }
@@ -390,6 +395,8 @@ namespace CodexAutoResume
             sheet.Controls.Clear();
             LetGo(made);
             rows.Clear();
+            columns.Clear();
+            marks.Clear();
             stepLabel = null;
             busyNote = null;
             desktopBox = null;
@@ -404,7 +411,12 @@ namespace CodexAutoResume
                 case InstallerFlow.Notes: BuildNotes(); break;
                 default: BuildFinish(); break;
             }
-            foreach (KeyValuePair<Control, int> row in rows) sheet.Controls.Add(row.Key);
+            foreach (KeyValuePair<Control, int> row in rows)
+            {
+                sheet.Controls.Add(row.Key);
+                StepMark mark;
+                if (marks.TryGetValue(row.Key, out mark)) sheet.Controls.Add(mark);
+            }
             sheet.ResumeLayout(false);
         }
 
@@ -420,6 +432,14 @@ namespace CodexAutoResume
         private void Row(Control control, int gap)
         {
             rows.Add(new KeyValuePair<Control, int>(control, Px(gap)));
+        }
+
+        /// A row in `column`'s column (v0.6.24-beta.3): indented past the mark, and, where `first`, with the mark beside it.
+        private void Row(Control control, int gap, StepMark column, bool first)
+        {
+            Row(control, gap);
+            columns[control] = column;
+            if (first) marks[control] = column;
         }
 
         private WrapLabel Words(string text, string role, Color ink)
@@ -458,8 +478,16 @@ namespace CodexAutoResume
             guide.Font = Font;
             guide.Click += delegate { OpenGuide(); };
             Row(guide, 8);
+            // v0.6.24-beta.3 (the owner's option A, 2026-11-17): what it does, in three numbered points - the room the 600 x
+            // 600 window gave this page, filled with what a person installing it for the first time wants to know.
+            Point(1, words.Say("installer.welcome.notices", "It notices when one stops"),
+                  words.Say("installer.welcome.notices_help", "It finds a conversation stopped by a usage limit, a dropped connection, a server error or another temporary failure."), 12);
+            Point(2, words.Say("installer.welcome.resumes", "It carries on once it can"),
+                  words.Say("installer.welcome.resumes_help", "Once the limit resets or the connection is back, it continues the same conversation from where it stopped."), 10);
+            Point(3, words.Say("installer.welcome.message", "You choose the words it sends"),
+                  words.Say("installer.welcome.message_help", "In Settings you choose the message it sends to carry on, and its language."), 10);
             if (speaker == null) return;
-            Row(Words(words.Say("installer.language", "Language"), "label", Palette.Secondary), 20);
+            Row(Words(words.Say("installer.language", "Language"), "label", Palette.Secondary), 16);
             var picker = new SoftCombo();
             picker.Font = Font;
             picker.AccessibleName = words.Say("installer.language", "Language");
@@ -490,6 +518,16 @@ namespace CodexAutoResume
                 Process.Start(start);
             }
             catch (Exception) { /* no browser: nothing to open it in */ }
+        }
+
+        /// One of the Welcome page's points: its number in a disc at the leading edge, its title in the name's weight and
+        /// one line under it, both in the disc's column.
+        private void Point(int number, string title, string help, int gap)
+        {
+            var disc = new StepMark(StepMark.Kinds.Number, number.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            disc.Font = Soft.RoleFont("label");
+            Row(Words(title, "name", Palette.Ink), gap, disc, true);
+            Row(Words(help, null, Palette.Secondary), 0, disc, false);
         }
 
         private void BuildOptions()
@@ -750,18 +788,42 @@ namespace CodexAutoResume
         internal int Arrange(int width)
         {
             int y = 0;
+            // v0.6.24-beta.3: where the last mark beside a row ends - a row outside its column starts below it.
+            int held = 0;
+            bool mirrored = Mirror.Of(this);
             foreach (KeyValuePair<Control, int> row in rows)
             {
                 Control control = row.Key;
                 control.Visible = Wanted(control);
+                StepMark column;
+                bool inColumn = columns.TryGetValue(control, out column);
+                if (!inColumn) y = Math.Max(y, held);
                 y += row.Value;
-                int height = HeightAt(control, width);
-                int wide = control is SoftCombo ? Math.Min(width, Px(260)) : width;
+                // A row in a mark's column stands past the mark and its gap, as wide as the rest of the card.
+                int indent = inColumn ? column.Extent + column.Gap : 0;
+                int height = HeightAt(control, Math.Max(1, width - indent));
+                int wide = control is SoftCombo ? Math.Min(width, Px(260)) : width - indent;
                 // v0.6.20: a drop-down narrower than the card stands at its right when mirrored (Mirror).
-                control.SetBounds(Mirror.X(Mirror.Of(this), width, 0, wide), y, wide, height);
+                control.SetBounds(Mirror.X(mirrored, width, indent, wide), y, wide, height);
+                StepMark mark;
+                if (marks.TryGetValue(control, out mark))
+                {
+                    // Beside the row's first line, centred on it; at the card's leading edge, and on its right mirrored.
+                    int size = mark.Extent, top = y + (FirstLine(control) - size) / 2;
+                    mark.Visible = Wanted(control);
+                    mark.SetBounds(Mirror.X(mirrored, width, 0, size), top, size, size);
+                    held = Math.Max(held, top + size);
+                }
                 y += height;
             }
-            return y;
+            return Math.Max(y, held);
+        }
+
+        // The height of a row's first line, as its words are drawn.
+        private static int FirstLine(Control control)
+        {
+            return Math.Max(control.Font.Height, TextRenderer.MeasureText("Ag", control.Font, new Size(int.MaxValue, 0),
+                                                                         TextFormatFlags.NoPrefix).Height);
         }
 
         private int HeightAt(Control control, int width)
@@ -1162,6 +1224,90 @@ namespace CodexAutoResume
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             Ground.Paint(this, e);
+        }
+    }
+
+    /// The mark at the leading edge of a row in the installer window (v0.6.24-beta.3, the owner's option A): a numbered disc
+    /// - the Welcome page's points - or the state of one of the run's steps under the bar: done, a disc filled with the
+    /// accent and the check box's own check on it; under way, a ring with a dot; still to come, an empty ring. The palette's
+    /// colours on the card's ground, the check box's sizes and stroke (Brand), and nothing of its own.
+    internal sealed class StepMark : Control
+    {
+        internal enum Kinds { Number, Done, Now, Todo }
+
+        private Kinds kind;
+        private readonly string number;
+
+        internal StepMark(Kinds kind, string number)
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            TabStop = false;
+            AccessibleRole = AccessibleRole.Graphic;
+            BackColor = Palette.Card;
+            this.kind = kind;
+            this.number = number ?? "";
+        }
+
+        internal Kinds Kind { get { return kind; } }
+
+        /// How wide and tall it is: a check box for a step, and a disc that holds its number at any text size.
+        internal int Extent
+        {
+            get
+            {
+                if (kind != Kinds.Number) return Soft.Px(Brand.CheckSize);
+                return Math.Max(Soft.Px(Brand.SpaceXl), Font.Height + Soft.Px(Brand.SpaceS));
+            }
+        }
+
+        /// The gap between it and the words beside it: a check box's, or the card's own medium space beside a disc.
+        internal int Gap { get { return Soft.Px(kind == Kinds.Number ? Brand.SpaceM : Brand.CheckGap); } }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            Ground.PaintArea(this, g, ClientRectangle);
+            int size = Math.Min(Width, Height);
+            if (size <= 0) return;
+            var face = new RectangleF((Width - size) / 2f, (Height - size) / 2f, size, size);
+            float stroke = Soft.PxF(Brand.CheckStroke);
+            var state = g.Save();
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+            if (kind == Kinds.Number || kind == Kinds.Done)
+                g.FillEllipse(Soft.Fill(kind == Kinds.Number ? Palette.AccentSoft : Palette.Accent), face);
+            else
+            {
+                var ring = RectangleF.Inflate(face, -stroke / 2f, -stroke / 2f);
+                using (var pen = new Pen(kind == Kinds.Now ? Palette.Accent : Palette.Line, stroke))
+                    g.DrawEllipse(pen, ring);
+                if (kind == Kinds.Now)
+                {
+                    float dot = size * 0.22f;
+                    g.FillEllipse(Soft.Fill(Palette.Accent), face.X + size / 2f - dot, face.Y + size / 2f - dot, dot * 2f, dot * 2f);
+                }
+            }
+            if (kind == Kinds.Done)
+            {
+                // The check box's check (SoftCheck), at this mark's size.
+                float at = size / (float)Brand.CheckSize;
+                using (var pen = new Pen(Palette.OnAccent, stroke))
+                {
+                    pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Miter;
+                    g.DrawLines(pen, new[]
+                    {
+                        new PointF(face.X + Brand.CheckMarkStartX * at, face.Y + Brand.CheckMarkStartY * at),
+                        new PointF(face.X + Brand.CheckMarkCornerX * at, face.Y + Brand.CheckMarkCornerY * at),
+                        new PointF(face.X + Brand.CheckMarkEndX * at, face.Y + Brand.CheckMarkEndY * at),
+                    });
+                }
+            }
+            g.Restore(state);
+            if (kind == Kinds.Number)
+                TextRenderer.DrawText(g, number, Font, Rectangle.Round(face), Palette.Accent,
+                                      TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                                      TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
         }
     }
 
