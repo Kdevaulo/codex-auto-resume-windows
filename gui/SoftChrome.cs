@@ -545,11 +545,13 @@ namespace CodexAutoResume
         /// right-to-left Windows title bar has them.
         private CaptionButton[] Shown()
         {
-            bool pair = Soft.OwnVisible(MinimizeButton);
             if (!Soft.OwnVisible(CloseButton)) return new CaptionButton[0];
-            if (!pair) return new[] { CloseButton };
-            return Mirror.Of(form) ? new[] { CloseButton, MaximizeButton, MinimizeButton }
-                                   : new[] { MinimizeButton, MaximizeButton, CloseButton };
+            var shown = new List<CaptionButton>();
+            if (Soft.OwnVisible(MinimizeButton)) shown.Add(MinimizeButton);
+            if (Soft.OwnVisible(MaximizeButton)) shown.Add(MaximizeButton);
+            shown.Add(CloseButton);
+            if (Mirror.Of(form)) shown.Reverse();
+            return shown.ToArray();
         }
 
         /// How wide the group of buttons is, for a card that keeps its words clear of it.
@@ -587,6 +589,17 @@ namespace CodexAutoResume
             bool pair = form.ControlBox && Chrome.Pair(form.MinimizeBox, form.MaximizeBox);
             MinimizeButton.Visible = pair;
             MaximizeButton.Visible = pair;
+            // v0.6.24-beta.2 (the owner's rule, hide what cannot work; live re-check 7): a dialog's title row shows no
+            // greyed button - its minimise only where it minimises, its maximise only where it really resizes (a sizable
+            // border and MaximizeBox: the Timeline, the Log, the detection check, the compatibility report and Install
+            // another version). The window's own title keeps Windows' pair.
+            if (form is SoftDialog)
+            {
+                FormBorderStyle border = form.FormBorderStyle;
+                bool sizes = border == FormBorderStyle.Sizable || border == FormBorderStyle.SizableToolWindow;
+                MinimizeButton.Visible = form.ControlBox && form.MinimizeBox;
+                MaximizeButton.Visible = form.ControlBox && form.MaximizeBox && sizes;
+            }
             CloseButton.Visible = form.ControlBox;
             MinimizeButton.Enabled = form.MinimizeBox;
             MaximizeButton.Enabled = form.MaximizeBox;

@@ -105,8 +105,10 @@ namespace CodexAutoResume
                     d.Text = "A dialog with a title of its own";
                     d.BackColor = Palette.Canvas;
                     Soft.DialogBar(d);
+                    // v0.6.24-beta.2: it minimises, so its minimise shows; it cannot be resized, so no maximise for all
+                    // MaximizeBox asks (the owner's rule: hide what cannot work).
                     d.FormBorderStyle = FormBorderStyle.FixedDialog;
-                    d.MinimizeBox = false;
+                    d.MinimizeBox = true;
                     d.MaximizeBox = true;
                     d.ShowInTaskbar = false;
                     d.ClientSize = new Size(600, 400);
@@ -146,6 +148,8 @@ namespace CodexAutoResume
                     buttons["close"] = RowBox(RowInDialog(caption.CloseButton, d));
                     buttons["maximize"] = RowBox(RowInDialog(caption.MaximizeButton, d));
                     buttons["minimize"] = RowBox(RowInDialog(caption.MinimizeButton, d));
+                    said["minimizeShown"] = Soft.OwnVisible(caption.MinimizeButton);
+                    said["maximizeShown"] = Soft.OwnVisible(caption.MaximizeButton);
                     said["buttons"] = buttons;
                     ChromeLayout layout = caption.Layout();
                     Rectangle r = row.Bounds, w = RowInDialog(words, d);
@@ -267,7 +271,11 @@ class DialogTitleRowTests(unittest.TestCase):
                 x, y, width, height = said["row"]
                 buttons = said["buttons"]
                 words = said["words"]
+                self.assertTrue(said["minimizeShown"], "it minimises")
+                self.assertFalse(said["maximizeShown"], "no maximise where it cannot be resized (v0.6.24-beta.2)")
                 for name, box in buttons.items():
+                    if name == "maximize":
+                        continue
                     self.assertEqual(box[1], y + (height - box[3]) // 2, name + " centred in the row")
                     self.assertEqual(box[3], px(26))
                 # The Close cross's ink across its button (CaptionButton.Glyph): strokes from 1 to 9 of a 10 px box centred
@@ -281,7 +289,7 @@ class DialogTitleRowTests(unittest.TestCase):
                     letter = 600 - (words[0] + words[2] - said["lead"])
                     self.assertLessEqual(abs(ink_left - letter), 1.5,
                                          "mirrored: the cross's left end as far from the left edge as the title from the right")
-                    self.assertLess(buttons["close"][0], buttons["maximize"][0])
+                    self.assertLess(buttons["close"][0], buttons["minimize"][0])
                     self.assertEqual(x + width - (words[0] + words[2]), px(6), "the words start 6 px in from the right")
                     self.assertGreaterEqual(words[0] - (buttons["minimize"][0] + buttons["minimize"][2]), px(8))
                 else:
