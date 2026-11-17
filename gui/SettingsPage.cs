@@ -1902,7 +1902,7 @@ namespace CodexAutoResume
 
         private void RestoreDefaults()
         {
-            if (!Confirm(S("settings.confirm_restore", "Reset every setting to its recommended value?"),
+            if (!ConfirmCarefully(S("settings.confirm_restore", "Reset every setting to its recommended value?"),
                          S("action.restore", "Restore defaults"))) return;
             CallAsync("defaults", null, delegate(Dictionary<string, object> reply)
             {

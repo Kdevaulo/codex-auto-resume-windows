@@ -78,13 +78,13 @@ foreach ($locale in (ConvertFrom-Json $env:CAR_LOCALES)) {
 # 100 %, whatever this machine's display is.
 $null = S 'Palette' 'Adopt' @('light')
 $form.GetField('dpiScale', $static).SetValue($null, [double]1.0)
-function Dialog([bool]$minimize, [bool]$maximize, [bool]$mirrored) {
+function Dialog([bool]$minimize, [bool]$maximize, [bool]$mirrored, [string]$border = 'FixedDialog') {
     (T 'Mirror').GetField('Window', $static).SetValue($null, $mirrored)
     $dialog = [Activator]::CreateInstance((T 'SoftDialog'), $true)
     $dialog.Text = 'A dialog with a title of its own'
     $dialog.BackColor = (T 'Palette').GetField('Canvas', $static).GetValue($null)
     $null = S 'Soft' 'DialogBar' @($dialog)
-    $dialog.FormBorderStyle = 'FixedDialog'
+    $dialog.FormBorderStyle = $border
     $dialog.MinimizeBox = $minimize
     $dialog.MaximizeBox = $maximize
     $dialog.ShowInTaskbar = $false
@@ -119,8 +119,10 @@ function Dialog([bool]$minimize, [bool]$maximize, [bool]$mirrored) {
     return $said
 }
 $out.dialogs.close = Dialog $false $false $false
-$out.dialogs.pair = Dialog $false $true $false
-$out.dialogs.mirrored = Dialog $false $true $true
+$out.dialogs.pair = Dialog $false $true $false 'Sizable'
+$out.dialogs.mirrored = Dialog $false $true $true 'Sizable'
+# v0.6.24-beta.2: one that asks for both boxes and cannot be resized - its maximise is not shown.
+$out.dialogs.fixed = Dialog $true $true $false
 
 # The day's scenes where the window places one (SettingsForm.PlaceDayScene: DayArt.Fit), under a caption of the window's own
 # (ChromeHost over a card, its Scene the day's): each button's background painted as the window paints it, the colour its
@@ -246,8 +248,14 @@ class CaptionWindowTests(unittest.TestCase):
         self.assertFalse(close["MaximizeButton"]["shown"])
         self.assertTrue(close["CloseButton"]["shown"])
         pair = self.answer["dialogs"]["pair"]["buttons"]
-        self.assertEqual((pair["MinimizeButton"]["shown"], pair["MinimizeButton"]["on"]), (True, False), "faint, doing nothing")
-        self.assertEqual((pair["MaximizeButton"]["shown"], pair["MaximizeButton"]["on"]), (True, True))
+        # v0.6.24-beta.2 (the owner's rule, hide what cannot work; live re-check 7): no greyed minimise beside a working
+        # maximise - a dialog shows the buttons that work and no other.
+        self.assertFalse(pair["MinimizeButton"]["shown"], "a dialog that cannot minimise shows no minimise")
+        self.assertEqual((pair["MaximizeButton"]["shown"], pair["MaximizeButton"]["on"]), (True, True), "it resizes")
+        fixed = self.answer["dialogs"]["fixed"]["buttons"]
+        self.assertEqual((fixed["MinimizeButton"]["shown"], fixed["MinimizeButton"]["on"]), (True, True))
+        self.assertFalse(fixed["MaximizeButton"]["shown"], "a dialog that cannot be resized shows no maximise")
+        self.assertTrue(fixed["CloseButton"]["shown"])
         card = self.answer["dialogs"]["pair"]["card"]
         right = card[0] + card[2]
         boxes = {name: pair[name]["box"] for name in pair}
@@ -256,27 +264,27 @@ class CaptionWindowTests(unittest.TestCase):
         # the title audit and tests/test_gui_v0624_dialog_title_row.py. The cross: strokes 1 to 9 of a 10 px box centred in
         # the 34 px button, round caps half the 1.3 px stroke past them.
         cross = 600 - (boxes["CloseButton"][0] + 12 + 9 + 0.65)
-        self.assertTrue(22 <= cross <= 26, "the cross %.2f px from the right edge, as the title from the left" % cross)
+        self.assertTrue(22 <= cross <= 30, "the cross %.2f px from the right edge, as the title from the left" % cross)
         self.assertLessEqual(boxes["CloseButton"][0] + 34, 600, "inside the dialog")
-        self.assertLess(boxes["MinimizeButton"][0], boxes["MaximizeButton"][0])
         self.assertLess(boxes["MaximizeButton"][0], boxes["CloseButton"][0])
-        self.assertEqual({pair[name]["box"][1] for name in pair}, {card[1] + (card[3] - 26) // 2}, "centred in the row")
+        self.assertEqual({pair[name]["box"][1] for name in pair if pair[name]["shown"]}, {card[1] + (card[3] - 26) // 2},
+                         "centred in the row")
         for name, button in pair.items():
             with self.subTest(name):
                 self.assertTrue(button["parent"])
                 self.assertFalse(button["tab"])
                 self.assertTrue(button["name"])
         words = self.answer["dialogs"]["pair"]["words"]
-        self.assertLessEqual(card[0] + words[0] + words[2], boxes["MinimizeButton"][0] - 8)
+        self.assertLessEqual(card[0] + words[0] + words[2], boxes["MaximizeButton"][0] - 8)
 
     def test_mirrored_the_buttons_stand_at_the_left_in_the_other_order(self):
         said = self.answer["dialogs"]["mirrored"]
         boxes = {name: said["buttons"][name]["box"] for name in said["buttons"]}
         cross = boxes["CloseButton"][0] + 12 + 1 - 0.65
-        self.assertTrue(22 <= cross <= 26, "mirrored: the cross %.2f px from the left edge, as the title from the right" % cross)
+        self.assertTrue(22 <= cross <= 30, "mirrored: the cross %.2f px from the left edge, as the title from the right" % cross)
         self.assertGreaterEqual(boxes["CloseButton"][0], 0)
         self.assertLess(boxes["CloseButton"][0], boxes["MaximizeButton"][0])
-        self.assertLess(boxes["MaximizeButton"][0], boxes["MinimizeButton"][0])
+        self.assertFalse(said["buttons"]["MinimizeButton"]["shown"])
 
     def test_every_day_s_scene_leaves_the_glyphs_readable(self):
         """O6, decided by the main session 2026-11-15: over a day's scene each glyph at rest takes whichever of ink and

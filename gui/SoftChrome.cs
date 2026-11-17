@@ -258,6 +258,31 @@ namespace CodexAutoResume
         /// Where a window whose visible box is `window` big goes over a window whose visible box is `owner`: centred on it,
         /// and held inside `work` (the work area of the monitor the owner is on) against the edge it would cross - its top
         /// left kept inside where it is larger than the work area. An empty `work` holds it nowhere.
+        /// How far a pixel's colour is from its ground, in any channel, for it to be ink (a letter's or a glyph's): the
+        /// faintest anti-aliased edge is ground, as the eye takes it.
+        internal const int InkStep = 48;
+
+        /// The first and last columns within `band` of `drawn` that hold ink against `ground` (X, Y); (-1, -1) for none.
+        internal static Point InkColumns(Bitmap drawn, Color ground, Rectangle band)
+        {
+            band = Rectangle.Intersect(band, new Rectangle(0, 0, drawn.Width, drawn.Height));
+            int first = -1, last = -1;
+            for (int x = band.Left; x < band.Right; x++)
+            {
+                for (int y = band.Top; y < band.Bottom; y++)
+                {
+                    Color c = drawn.GetPixel(x, y);
+                    if (Math.Abs(c.R - ground.R) > InkStep || Math.Abs(c.G - ground.G) > InkStep || Math.Abs(c.B - ground.B) > InkStep)
+                    {
+                        if (first < 0) first = x;
+                        last = x;
+                        break;
+                    }
+                }
+            }
+            return new Point(first, last);
+        }
+
         internal static Point CentreOn(Rectangle owner, Size window, Rectangle work)
         {
             int x = owner.X + (owner.Width - window.Width) / 2, y = owner.Y + (owner.Height - window.Height) / 2;
@@ -545,11 +570,13 @@ namespace CodexAutoResume
         /// right-to-left Windows title bar has them.
         private CaptionButton[] Shown()
         {
-            bool pair = Soft.OwnVisible(MinimizeButton);
             if (!Soft.OwnVisible(CloseButton)) return new CaptionButton[0];
-            if (!pair) return new[] { CloseButton };
-            return Mirror.Of(form) ? new[] { CloseButton, MaximizeButton, MinimizeButton }
-                                   : new[] { MinimizeButton, MaximizeButton, CloseButton };
+            var shown = new List<CaptionButton>();
+            if (Soft.OwnVisible(MinimizeButton)) shown.Add(MinimizeButton);
+            if (Soft.OwnVisible(MaximizeButton)) shown.Add(MaximizeButton);
+            shown.Add(CloseButton);
+            if (Mirror.Of(form)) shown.Reverse();
+            return shown.ToArray();
         }
 
         /// How wide the group of buttons is, for a card that keeps its words clear of it.
@@ -587,6 +614,17 @@ namespace CodexAutoResume
             bool pair = form.ControlBox && Chrome.Pair(form.MinimizeBox, form.MaximizeBox);
             MinimizeButton.Visible = pair;
             MaximizeButton.Visible = pair;
+            // v0.6.24-beta.2 (the owner's rule, hide what cannot work; live re-check 7): a dialog's title row shows no
+            // greyed button - its minimise only where it minimises, its maximise only where it really resizes (a sizable
+            // border and MaximizeBox: the Timeline, the Log, the detection check, the compatibility report and Install
+            // another version). The window's own title keeps Windows' pair.
+            if (form is SoftDialog)
+            {
+                FormBorderStyle border = form.FormBorderStyle;
+                bool sizes = border == FormBorderStyle.Sizable || border == FormBorderStyle.SizableToolWindow;
+                MinimizeButton.Visible = form.ControlBox && form.MinimizeBox;
+                MaximizeButton.Visible = form.ControlBox && form.MaximizeBox && sizes;
+            }
             CloseButton.Visible = form.ControlBox;
             MinimizeButton.Enabled = form.MinimizeBox;
             MaximizeButton.Enabled = form.MaximizeBox;
@@ -599,9 +637,10 @@ namespace CodexAutoResume
             // left mirrored; the buttons' hit areas reach past it, the cross sets the look.
             if (ground && GlyphEnd >= 0 && Soft.OwnVisible(CloseButton))
             {
-                RectangleF ink = CaptionButton.CrossInk(width, height);
-                int close = mirrored ? GlyphEnd - (int)Math.Round(ink.Left)
-                                     : holder.ClientSize.Width - GlyphEnd - (int)Math.Round(ink.Right);
+                // By ink (live re-check 7: the eye reads the glyph's own ink, not its box): the cross's first and last
+                // inked columns as it is drawn at this size (CaptionButton.InkColumns).
+                Point ink = CloseButton.InkColumns(new Size(width, height));
+                int close = mirrored ? GlyphEnd - ink.X : holder.ClientSize.Width - 1 - GlyphEnd - ink.Y;
                 x = mirrored ? close : close + width - GroupWidth;
             }
             // In a card, CaptionInsetTop below its top; in a row on the ground (OnGround), centred in the row.
@@ -1596,10 +1635,38 @@ namespace CodexAutoResume
             return RectangleF.FromLTRB(ox + unit - half, oy + unit - half, ox + 9 * unit + half, oy + 9 * unit + half);
         }
 
+        /// The first and last columns the glyph inks as it is drawn at the button's size (X, Y), black on white and read
+        /// as ink past Chrome.InkStep: what the dialog's title row sets the cross's gap to its edge by (ChromeHost.GlyphEnd).
+        internal Point InkColumns(Size size)
+        {
+            if (inkFor == size && inkColumns.Y >= 0) return inkColumns;
+            int width = Math.Max(1, size.Width), height = Math.Max(1, size.Height);
+            using (var drawn = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(drawn))
+                {
+                    g.Clear(Color.White);
+                    Glyph(g, Color.Black, width, height);
+                }
+                inkColumns = Chrome.InkColumns(drawn, Color.White, new Rectangle(0, 0, width, height));
+            }
+            inkFor = size;
+            return inkColumns;
+        }
+
+        private Size inkFor;
+        private Point inkColumns = new Point(-1, -1);
+
         internal void Glyph(Graphics g, Color ink)
         {
+            Glyph(g, ink, Width, Height);
+        }
+
+        /// The glyph as the button draws it, in a button `width` by `height` (InkColumns asks it at a size it is to have).
+        private void Glyph(Graphics g, Color ink, int width, int height)
+        {
             float unit = Soft.PxF(1.0), box = Soft.PxF(Brand.CaptionGlyph);
-            float ox = (float)Math.Round((Width - box) / 2f), oy = (float)Math.Round((Height - box) / 2f);
+            float ox = (float)Math.Round((width - box) / 2f), oy = (float)Math.Round((height - box) / 2f);
             float stroke = Math.Max(1f, Soft.PxF(Brand.CaptionStroke));
             float corner = Soft.PxF(Brand.CaptionGlyphCorner);
             GraphicsState state = g.Save();
@@ -1726,7 +1793,35 @@ namespace CodexAutoResume
         /// drawing keeps before a first letter (TitleLead). The Close cross stands as far in from the end edge.
         internal int TitleStart
         {
-            get { return Soft.Px(16) + Soft.Px(TitleWordsInset) + TitleLead(titleWords == null ? Soft.RoleFont("heading") : titleWords.Font); }
+            get
+            {
+                Font font = titleWords == null ? Soft.RoleFont("heading") : titleWords.Font;
+                return Soft.Px(16) + Soft.Px(TitleWordsInset) + TitleInkInset(Text, font, Mirror.Of(this));
+            }
+        }
+
+        /// v0.6.24-beta.2 (live re-check 7: the title's first letter stood 41 px from the edge and the cross's last ink 34,
+        /// at 150 %): how far in from the title words' start edge their first ink is - the text drawing's padding and the
+        /// first letter's own bearing - as the title draws them (one line, from its left, or its right mirrored), black on
+        /// white and read as Chrome.InkStep reads ink.
+        internal static int TitleInkInset(string text, Font font, bool mirrored)
+        {
+            if (string.IsNullOrEmpty(text) || text.Trim().Length == 0) return TitleLead(font);
+            TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix;
+            flags |= mirrored ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left;
+            Size size = TextRenderer.MeasureText(text, font, new Size(int.MaxValue, 0), flags);
+            int width = Math.Min(4096, size.Width + 8), height = Math.Max(1, size.Height + 4);
+            using (var drawn = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(drawn))
+                {
+                    g.Clear(Color.White);
+                    TextRenderer.DrawText(g, text, font, new Rectangle(0, 0, width, height), Color.Black, Color.White, flags);
+                }
+                Point ink = Chrome.InkColumns(drawn, Color.White, new Rectangle(0, 0, width, height));
+                if (ink.X < 0) return TitleLead(font);
+                return mirrored ? width - 1 - ink.Y : ink.X;
+            }
         }
 
         /// What a Label's text drawing keeps before its first letter in `font`: half of what its padding adds to the
@@ -1978,7 +2073,17 @@ namespace CodexAutoResume
             titleWords.AutoEllipsis = true;
             titleWords.UseMnemonic = false;
             titleWords.Text = Text;
-            TextChanged += delegate { if (titleWords != null) titleWords.Text = Text; };
+            TextChanged += delegate
+            {
+                if (titleWords == null) return;
+                titleWords.Text = Text;
+                // The cross's gap follows the title's first letter (TitleStart).
+                if (chrome != null)
+                {
+                    chrome.GlyphEnd = TitleStart;
+                    chrome.Place();
+                }
+            };
             titleRow.Controls.Add(titleWords);
             int line = Math.Max(titleWords.Font.Height,
                                 TextRenderer.MeasureText("Ag", titleWords.Font, new Size(int.MaxValue, 0), TextFormatFlags.NoPrefix).Height);
@@ -2028,9 +2133,71 @@ namespace CodexAutoResume
             if (m.Msg == WM_SHOWWINDOW)
             {
                 if (m.WParam == IntPtr.Zero) Unveil();
-                else if (veil == null && TopLevel) veil = DialogVeil.Over(this);
+                else
+                {
+                    if (veil == null && TopLevel) veil = DialogVeil.Over(this);
+                    if (cloaked) UncloakSoon();
+                }
             }
             else if (m.Msg == WM_DESTROY) Unveil();
+            // Its first paint done: everything in it painted now, then it comes on the screen in its theme.
+            else if (m.Msg == WM_PAINT && cloaked) Uncloak();
+        }
+
+        // ------------------------------------------------------------------ painted before it is seen
+        // v0.6.24-beta.2 (live re-check 7, dark): a dialog's first frames were its unpainted window - about 120 ms of light
+        // grey, then a white bar over its title and a white square at a caption button - before its dark paint. As the
+        // Dashboard's own corner does (WindowCorner.Cloak, c199bf14c), a dialog is made cloaked by DWM and uncloaked once it
+        // and everything in it has painted, so its first visible frame is in its theme; Windows' own opening motion is
+        // left to Windows. Never for one a still takes (Soft.StillReady) nor one laid out as a child.
+
+        [DllImport("dwmapi.dll", EntryPoint = "DwmSetWindowAttribute")]
+        private static extern int DwmSetCloak(IntPtr window, int attribute, ref int value, int size);
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
+
+        private const int WM_PAINT = 0x000F, DWMWA_CLOAK = 13;
+        private const uint RDW_UPDATENOW = 0x0100, RDW_ALLCHILDREN = 0x0080;
+        private bool cloaked;
+        private Timer uncloak;
+
+        /// Whether the dialog is held off the screen until its first paint: for the tests.
+        internal bool Cloaked { get { return cloaked; } }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            if (!TopLevel || Soft.StillReady != null || IsWindowVisible(Handle)) return;
+            int on = 1;
+            try { cloaked = DwmSetCloak(Handle, DWMWA_CLOAK, ref on, 4) == 0; }
+            catch (Exception) { cloaked = false; }
+        }
+
+        // Should no paint come (a window shown and hidden at once), it comes on all the same a moment later.
+        private void UncloakSoon()
+        {
+            if (uncloak != null) return;
+            uncloak = new Timer();
+            uncloak.Interval = 500;
+            uncloak.Tick += delegate { Uncloak(); };
+            uncloak.Start();
+        }
+
+        private void Uncloak()
+        {
+            if (uncloak != null)
+            {
+                uncloak.Stop();
+                uncloak.Dispose();
+                uncloak = null;
+            }
+            if (!cloaked || !IsHandleCreated) return;
+            cloaked = false;
+            try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN); }
+            catch (Exception) { }
+            int off = 0;
+            try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
+            catch (Exception) { }
         }
 
         private const int WM_SHOWWINDOW = 0x0018, WM_DESTROY = 0x0002;
@@ -2229,17 +2396,22 @@ namespace CodexAutoResume
         private const uint SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040;
         private const int DWMWA_TRANSITIONS_FORCEDISABLED = 3, DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
-        /// How dark the veil is at its fullest, and how long it takes to get there where motion is allowed.
-        internal const double Strength = 0.20;
-        internal const int FadeMs = 120;
+        /// How dark the veil is: 20 % of the shadow's ink in light. In dark (live re-check 7, 2026-11-17, 150 %) 20 % took the
+        /// dark Dashboard's mean grey only from 37.5 to 32 and read as undimmed, where light went from 234 to 192 - a
+        /// luminance ratio of 1.56 (Y 0.823 / 0.527). The dark strength is the one that gives the dark Dashboard that ratio:
+        /// over its measured mean of 37.5 (Y 0.0191) and the dark shadow's ink (about 10, from the 20 % reading:
+        /// (32 - 0.8 x 37.5) / 0.2), a grey of 28.9 (Y 0.0122) asks (37.5 - 28.9) / (37.5 - 10) = 0.31 - so 0.32, about
+        /// 28.7 grey, a ratio of 1.57.
+        internal const double Strength = 0.20, DarkStrength = 0.32;
+
+        /// The strength in the theme the window is drawn in.
+        internal static double StrengthNow { get { return Palette.Dark ? DarkStrength : Strength; } }
 
         /// Off for every veil from here on (a probe that wants none); on in every window a person opens.
         internal static bool Enabled = true;
 
         private readonly Color colour;
         private readonly byte full;
-        private Timer fade;
-        private System.Diagnostics.Stopwatch fading;
         private byte alpha;
 
         /// The owner it dims, whether it took a shape (a region: the owner's own corner or Windows' round one), its colour
@@ -2277,7 +2449,7 @@ namespace CodexAutoResume
         {
             Owner = owner;
             colour = Ink();
-            full = (byte)Math.Round(255 * Strength);
+            full = (byte)Math.Round(255 * StrengthNow);
             Rectangle bounds;
             IntPtr region = Shape(owner, out bounds);
             Shaped = region != IntPtr.Zero;
@@ -2300,40 +2472,18 @@ namespace CodexAutoResume
                 DeleteObject(region);
                 Shaped = false;
             }
-            bool moves = !Soft.ReduceMotion;
-            alpha = moves ? (byte)0 : full;
+            // At its fullest at once and painted now, before the dialog's first frame (live re-check 7: a fade timed on
+            // the dialog's thread came on 130-283 ms after the dialog, in one step, while the dialog painted itself).
+            alpha = full;
             SetLayeredWindowAttributes(Handle, 0, alpha, LWA_ALPHA);
             // Just under the dialog, over the owner and whatever else the owner holds.
             SetWindowPos(Handle, dialog, bounds.X, bounds.Y, bounds.Width, bounds.Height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-            if (moves)
-            {
-                fading = System.Diagnostics.Stopwatch.StartNew();
-                fade = new Timer();
-                fade.Interval = Motion.Interval;
-                fade.Tick += delegate { Step(); };
-                fade.Start();
-            }
+            try { UpdateWindow(Handle); }
+            catch (Exception) { }
         }
 
-        private void Step()
-        {
-            if (Handle == IntPtr.Zero || fading == null) return;
-            double part = Math.Min(1.0, fading.Elapsed.TotalMilliseconds / FadeMs);
-            alpha = (byte)Math.Round(full * part);
-            SetLayeredWindowAttributes(Handle, 0, alpha, LWA_ALPHA);
-            if (part >= 1.0) StopFade();
-        }
-
-        private void StopFade()
-        {
-            if (fade != null)
-            {
-                fade.Stop();
-                fade.Dispose();
-            }
-            fade = null;
-            fading = null;
-        }
+        [DllImport("user32.dll")]
+        private static extern bool UpdateWindow(IntPtr window);
 
         // The owner's window on the screen and the region the veil takes over it (IntPtr.Zero: its whole rectangle).
         private static IntPtr Shape(IntPtr owner, out Rectangle bounds)
@@ -2391,7 +2541,6 @@ namespace CodexAutoResume
 
         public void Dispose()
         {
-            StopFade();
             if (Handle != IntPtr.Zero) DestroyHandle();
         }
     }

@@ -49,6 +49,33 @@ namespace CodexAutoResume
         /// the caller once the dialog has closed - the Advanced features page's Keep it on, under its Turn on.
         private bool Dialog(string text, string affirm, string away, CheckBox choice)
         {
+            return Dialog(text, affirm, away, choice, false);
+        }
+
+        /// The words of a question or a notice (Dialog), in the window's font and ink, measured and drawn in the lines a
+        /// WrapLabel draws: between words in Korean, as everywhere else in the window (Soft.Wrap).
+        private WrapLabel QuestionWords(string text)
+        {
+            var words = new WrapLabel();
+            words.Text = text ?? "";
+            words.Font = Font;
+            words.ForeColor = Ink;
+            words.UseMnemonic = false;     // an ampersand in a conversation's name is a letter
+            words.AutoSize = true;
+            return words;
+        }
+
+        /// A question whose action deletes, cancels or cannot be undone (v0.6.24-beta.2, the owner 2026-11-17): the keyboard
+        /// starts on the dismissal and Enter presses it, as the power action's question does, so an Enter at once never
+        /// does the action; each button keeps its look - the action its accent.
+        private bool ConfirmCarefully(string question, string affirm)
+        {
+            return question == null || Dialog(question, affirm, null, null, true);
+        }
+
+        /// With `startOnDismiss` (ConfirmCarefully): the keyboard starts on the dismissal, and Enter presses it.
+        private bool Dialog(string text, string affirm, string away, CheckBox choice, bool startOnDismiss)
+        {
             // The tests' answers to the window's questions, in place of the dialog (null for every window a person opens):
             // a test that drives a click through its handler must never show a dialog on anyone's desktop.
             if (DialogAnswers != null) return DialogAnswers(text, affirm);
@@ -69,8 +96,10 @@ namespace CodexAutoResume
                 // A measure a sentence is read at, not a box stretched to whatever it holds: the words
                 // wrap inside it, and a short one still gets a dialog wide enough to look deliberate.
                 int pad = Px(16);
-                Size measured = TextRenderer.MeasureText(text ?? "", Font, new Size(Px(420), 0),
-                                                         TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
+                // v0.6.24-beta.2 (live re-check 7): measured and drawn as the window's other words are (WrapLabel) -
+                // Korean wraps only between its words; Windows' own wrapping broke them inside a word (있/는, 그다/음).
+                WrapLabel words = QuestionWords(text);
+                Size measured = words.GetPreferredSize(new Size(Px(420), 0));
                 int width = Math.Max(Px(300), measured.Width);
                 // And a height a dialog can be. A refusal carries the local service's own sentence
                 // under the translated one, and that sentence is whatever was raised - a path, a stack,
@@ -101,10 +130,6 @@ namespace CodexAutoResume
                 }
                 else
                 {
-                    var words = new Label();
-                    words.Text = text ?? "";
-                    words.ForeColor = Ink;
-                    words.UseMnemonic = false;     // an ampersand in a conversation's name is a letter
                     words.AutoSize = false;
                     words.Dock = DockStyle.Fill;
                     body = words;
@@ -149,8 +174,9 @@ namespace CodexAutoResume
                     buttons.Controls.Add(dismiss);
                     dialog.Controls.Add(buttons);
                     // Enter presses the accent button: the one that acts, or where the safe answer is the
-                    // default, the one that does not.
-                    Button first = careful ? dismiss : accept;
+                    // default, the one that does not - and the dismissal wherever the action cannot be taken back
+                    // (startOnDismiss), the action keeping its accent.
+                    Button first = careful || startOnDismiss ? dismiss : accept;
                     dialog.AcceptButton = first;
                     dialog.CancelButton = dismiss;     // which is also what Escape presses
                     // The keyboard starts on that button, not on the words: a dialog hands the focus to its
@@ -491,7 +517,7 @@ namespace CodexAutoResume
         {
             var row = Selected(pendingList);
             if (row == null) return;
-            if (!Confirm(Named("confirm.cancel",
+            if (!ConfirmCarefully(Named("confirm.cancel",
                                "Stop recovering \"{name}\"? A continuation already running in Codex is not stopped.", row),
                          S("action.cancel", "Cancel")))
                 return;
@@ -532,7 +558,8 @@ namespace CodexAutoResume
             var row = Selected(list);
             if (row == null) return;
             bool on = ThreadOn(row);
-            if (!Confirm(on ? Named("confirm.thread_off",
+            // Turning it off cancels its waiting recoveries: asked carefully.
+            if (!(on ? (Func<string, string, bool>)ConfirmCarefully : Confirm)(on ? Named("confirm.thread_off",
                                     "Turn automatic recovery off for \"{name}\"? Its waiting recoveries are cancelled.", row)
                             : Named("confirm.thread_on",
                                     "Turn automatic recovery back on for \"{name}\"? Nothing is sent now; every check still applies.", row),
@@ -578,7 +605,7 @@ namespace CodexAutoResume
         private void CancelAll()
         {
             if (busy > 0 || pendingList.Items.Count == 0) return;
-            if (!Confirm(S("confirm.cancel_all",
+            if (!ConfirmCarefully(S("confirm.cancel_all",
                            "Stop every pending recovery? Anything already handed to Codex is withdrawn only if it is still queued."),
                          S("action.cancel_all", "Cancel all")))
                 return;
@@ -1200,7 +1227,7 @@ namespace CodexAutoResume
             bool handled = false;
             ClearHistoryPressed(ref handled);
             if (handled) return;
-            if (!Confirm(S("confirm.clear", "Hide finished recoveries from the history? Nothing is deleted, and recoveries that may still change stay visible."),
+            if (!ConfirmCarefully(S("confirm.clear", "Hide finished recoveries from the history? Nothing is deleted, and recoveries that may still change stay visible."),
                          S("action.clear_history", "Clear history"))) return;
             Send("clear-history", null);
         }

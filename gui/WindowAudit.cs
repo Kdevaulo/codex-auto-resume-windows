@@ -1097,19 +1097,16 @@ namespace CodexAutoResume
             if (group.Top - row.Top != (row.Height - group.Height) / 2)
                 findings.Add(where + " :: the caption buttons stand at " + group + " in the title row at " + row.Bounds);
             Rectangle shown = new Rectangle(row.Left + words.Left, row.Top + words.Top, words.Width, words.Height);
-            // v0.6.24-beta.2 (the owner, 2026-11-16): the Close cross's far end as far in from the dialog's end edge as the
-            // title's first letter from its start edge, within a pixel - each worked out from what is there, not from the
-            // constants that place them (SoftDialog.TitleStart, ChromeHost.GlyphEnd).
-            CaptionButton close = caption.CloseButton;
-            if (Soft.OwnVisible(close))
+            // v0.6.24-beta.2 (the owner, 2026-11-16; live re-check 7: by ink, as the eye reads it): the title row drawn,
+            // the ground before its first inked column and after its last within a pixel - the title's first letter from
+            // its start edge, the Close cross's last ink from the other (mirrored, the cross first and the title last).
+            if (Soft.OwnVisible(caption.CloseButton) && strip.Width > 0 && strip.Height > 0)
             {
-                RectangleF ink = CaptionButton.CrossInk(close.Width, close.Height);
-                int lead = SoftDialog.TitleLead(words.Font);
-                int letter = mirrored ? strip.Width - (shown.Right - lead) : shown.Left + lead;
-                int cross = mirrored ? (int)Math.Round(close.Left + ink.Left) : strip.Width - (int)Math.Round(close.Left + ink.Right);
-                if (Math.Abs(letter - cross) > 1)
-                    findings.Add(where + " :: the title's first letter is " + letter + " px in from its edge, the Close cross " +
-                                 cross + " px from the other");
+                Point ink = TitleRowInk(soft);
+                int before = ink.X, after = strip.Width - 1 - ink.Y;
+                if (ink.X < 0 || Math.Abs(before - after) > 1)
+                    findings.Add(where + " :: the title row's ink starts " + before + " px in from one edge and ends " + after +
+                                 " px from the other");
             }
             int start = mirrored ? row.Right - shown.Right : shown.Left - row.Left;
             if (start != Soft.Px(SoftDialog.TitleWordsInset))
@@ -1184,6 +1181,40 @@ namespace CodexAutoResume
             int x = 0, y = 0;
             for (Control up = control; up != null && up != dialog; up = up.Parent) { x += up.Left; y += up.Top; }
             return new Rectangle(x, y, control.Width, control.Height);
+        }
+
+        /// The first and last inked columns of a dialog's title row, drawn where its parts stand - its words as their label
+        /// draws them (one line, from its start, ellipsis at its end), the caption buttons' glyphs at rest - on its ground
+        /// (Chrome.InkColumns). Drawn here part by part, as a dialog the audit lays out is never shown to be drawn whole.
+        internal static Point TitleRowInk(SoftDialog dialog)
+        {
+            Panel strip = dialog.TitleGround;
+            Panel row = dialog.TitleRow;
+            Label words = dialog.TitleWords;
+            bool mirrored = Mirror.Of(dialog);
+            Color ground = strip.BackColor;
+            using (var drawn = new Bitmap(strip.Width, strip.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(drawn))
+                {
+                    g.Clear(ground);
+                    var at = new Rectangle(row.Left + words.Left, row.Top + words.Top, words.Width, words.Height);
+                    TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix |
+                                            TextFormatFlags.EndEllipsis;
+                    flags |= mirrored ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left;
+                    TextRenderer.DrawText(g, words.Text, words.Font, at, words.ForeColor, ground, flags);
+                    ChromeHost caption = dialog.CaptionHost;
+                    foreach (CaptionButton button in new[] { caption.MinimizeButton, caption.MaximizeButton, caption.CloseButton })
+                    {
+                        if (!Soft.OwnVisible(button)) continue;
+                        System.Drawing.Drawing2D.GraphicsState state = g.Save();
+                        g.TranslateTransform(button.Left, button.Top);
+                        button.Glyph(g, Palette.Ink);
+                        g.Restore(state);
+                    }
+                }
+                return Chrome.InkColumns(drawn, ground, row.Bounds);
+            }
         }
 
         private readonly HashSet<Control> auditedPins = new HashSet<Control>();

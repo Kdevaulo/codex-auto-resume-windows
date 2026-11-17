@@ -47,7 +47,7 @@ namespace CodexAutoResume
 
         private void StopWatcher()
         {
-            if (!Confirm(S("confirm.stop_watcher",
+            if (!ConfirmCarefully(S("confirm.stop_watcher",
                            "Stop the watcher? It finishes the check it is in and then stops. Nothing waiting is lost, and nothing is recovered until it runs again."),
                          S("action.stop_watcher", "Stop watcher"))) return;
             CallAsync("stop-watcher", null, delegate(Dictionary<string, object> reply)
