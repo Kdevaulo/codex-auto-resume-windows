@@ -49,8 +49,8 @@ the previous version's `.old-` file where an update put it.
   cross and Esc close it, and a dialog with an answer keeps its Cancel and its action. While a dialog is open the Dashboard behind it is dimmed (not in High Contrast):
   the dimming is there as the dialog appears, and in the dark theme it shows as plainly as in the light. A dialog opens centred on the
   Dashboard that opened it wherever that is, not on the monitor's middle. A dialog shows only once it has painted, so in the dark theme its
-  first frame is in its theme - no light-grey window or white bar over its title for a moment - and it appears at once, without
-  Windows' opening motion. A dialog's title row
+  first frame is in its theme - no light-grey window or white bar over its title for a moment - and it then fades in
+  briefly, with the Dashboard behind already dimmed (at once where animations are off) in place of Windows' opening motion. A dialog's title row
   shows no greyed caption button: the timeline, the log, the detection check, the compatibility report and *Install another version...*
   keep the maximise button they use, and every other dialog shows only its close cross.
 - **A question that takes something back starts on its dismissal.** *Clear history*, *Cancel all*, a conversation's *Cancel*, *Turn off for
@@ -59,10 +59,11 @@ the previous version's `.old-` file where an update put it.
   back still starts on its action.
 - **A question's words wrap between words.** A question or a notice broke Korean inside a word (있/는, 그다/음); it now wraps where the
   window's other words do, only at spaces in every language that wraps by spaces.
-- **Known in this pre-release**, to be fixed in the next one: a dialog appears at once with no opening motion (the next pre-release
-  fades it in briefly, after it has painted); in the dark theme a dialog's very first frame can, rarely, show unpainted for a moment;
-  the first switch to Diagnostics in a newly opened Dashboard can pause for a second or two and show the page half drawn for a few
-  seconds; and while the Dashboard reopens itself for another language or theme, no window is on the screen for up to a second.
+- **The first switch to Diagnostics shows the page whole.** In a newly opened Dashboard, a press on Diagnostics before the page was ready
+  could change only the tab for a second or more and then show the page half drawn over the Overview for a few seconds, as in earlier
+  versions; the page is now painted whole as it is shown, and its compatibility card lays the page out once.
+- **No gap while the Dashboard reopens itself.** For another language or theme the Dashboard reopens as a new window; the old one now
+  stays until the new one is on the screen, where for up to a second there was no window (or, in earlier versions, an unpainted one).
 - **Focus rings show only after the keyboard is used.** A page tab clicked with the mouse no longer keeps its blue ring, in the Dashboard
   and in its dialogs; Tab, the arrow keys and an access key show the rings again.
 - **A tooltip has nothing drawn round its card.** The pale glow a tooltip gave a dark desktop is gone; the caption buttons' tooltips and
