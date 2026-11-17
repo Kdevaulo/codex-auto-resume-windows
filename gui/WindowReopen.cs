@@ -612,6 +612,16 @@ namespace CodexAutoResume
             // v0.6.24: then the window's own caption (gui/SoftChrome.cs): its frame, what the pointer is over, its buttons -
             // before anything else the window handles. It answers none of the open request's messages.
             if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
+            // v0.6.24-beta.3 (M-CORNER re-check 10, item 4): reopening, the window takes no input (EnableWindow), so Windows
+            // asks it alone for the pointer over any part of it, as HTERROR - and .NET gives it the arrow. Windows'
+            // app-starting cursor instead, after Windows' own handling, so a press on it still sounds as before.
+            if (m.Msg == WM_SETCURSOR && reopening)
+            {
+                base.WndProc(ref m);
+                Cursor.Current = Cursors.AppStarting;
+                m.Result = (IntPtr)1;
+                return;
+            }
             if (m.Msg == WM_DPICHANGED)
             {
                 // Taken here and not handed on: the window opens again at the new scale (CheckScale), and nothing of it
@@ -658,6 +668,7 @@ namespace CodexAutoResume
         // audit's, one not yet on screen or already gone), and the watcher starts one as it always did; a capture's runs
         // from a scratch build, never the installed program the watcher asks.
         internal const int WM_COPYDATA = 0x004A;
+        private const int WM_SETCURSOR = 0x0020;
         internal const long OpenRequestMark = 0x43415250;
         internal const int OpenRequestTaken = 0x4F50454E;
         private const int MessageFilterAllow = 1;
@@ -1026,6 +1037,11 @@ namespace CodexAutoResume
             // No more input here: anything typed now would be lost with this window.
             try { EnableWindow(Handle, false); }
             catch (Exception) { }
+            // v0.6.24-beta.3 (M-CORNER re-check 10, item 4): and it says it is at work. The new window comes 1.2-2.6 s later,
+            // and this one, taking no input, showed nothing meanwhile: now its light turns to the working light, as for an
+            // action (Hero, BusyLight - the clock that writes it is stopped, so it is written now), and the pointer over it
+            // is Windows' app-starting cursor (WndProc, WM_SETCURSOR).
+            UpdateCountdowns();
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
                 bool shown = true;
@@ -1088,6 +1104,8 @@ namespace CodexAutoResume
             try { if (IsHandleCreated) EnableWindow(Handle, true); }
             catch (Exception) { }
             StartClock();
+            // The light the watcher's state gives, back at once (v0.6.24-beta.3).
+            UpdateCountdowns();
             MethodInvoker held = heldForReopen;
             heldForReopen = null;
             if (held != null) held();
