@@ -66,7 +66,8 @@ class PinTests(unittest.TestCase):
         self.assertEqual(setters, ["gui/WindowRender.cs"])
         self.assertIn("if (RenderPinned) return;", guiscan.member_body("SettingsForm", "KeepOnScreen"))
         self.assertIn("RenderPinned ? opened", guiscan.member_body("SettingsForm", "OpenForRender"))
-        self.assertIn("if (SettingsForm.RenderPinned) PinnedHeader.Attach(this);",
+        # Held by the list (v0.6.24-beta.2, test_pinned_header_held): a NativeWindow nothing refers to is collected.
+        self.assertIn("if (SettingsForm.RenderPinned) pinnedHeader = PinnedHeader.Attach(this);",
                       guiscan.member_body("SoftList", "OnHandleCreated"))
         # The setup program's stand-in: never pinned, its factor 1, but in a picture.
         setup = (ROOT / "build" / "setup" / "SetupWindow.cs").read_text(encoding="utf-8")

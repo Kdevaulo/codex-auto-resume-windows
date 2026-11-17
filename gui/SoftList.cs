@@ -982,8 +982,9 @@ namespace CodexAutoResume
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            // v0.6.20: only in a picture drawn at a scale pinned apart from this machine's (SettingsForm.RenderPinned).
-            if (SettingsForm.RenderPinned) PinnedHeader.Attach(this);
+            // v0.6.20: only in a picture drawn at a scale pinned apart from this machine's (SettingsForm.RenderPinned). Held
+            // by the list (v0.6.24-beta.2): a NativeWindow nothing refers to is collected, and its window let go with it.
+            if (SettingsForm.RenderPinned) pinnedHeader = PinnedHeader.Attach(this);
         }
 
         [DllImport("user32.dll", EntryPoint = "SendMessageW")]
@@ -1022,6 +1023,12 @@ namespace CodexAutoResume
         /// picture pinned at 150 % had its headers 2 px taller, and every row under them 2 px lower, than a window on a
         /// 150 % monitor. The header's answer to HDM_LAYOUT is taken, its margin - what it gives beyond the font's height -
         /// scaled from the monitor's DPI to the pinned scale, and the list told that height instead.
+        ///
+        /// The list holds it (pinnedHeader). Until v0.6.24-beta.2 nothing did: a garbage collection took it and let the
+        /// header go, whose next layout was Windows' own again - History's header 2 px taller in one picture than in another
+        /// of the same page, as a collection came before or after it was laid out (the beta.2 pictures' motion fidelity).
+        private PinnedHeader pinnedHeader;
+
         private sealed class PinnedHeader : NativeWindow
         {
             private const int LVM_GETHEADER = 0x101F;
@@ -1030,14 +1037,16 @@ namespace CodexAutoResume
 
             private PinnedHeader(SoftList list) { this.list = list; }
 
-            internal static void Attach(SoftList list)
+            internal static PinnedHeader Attach(SoftList list)
             {
                 IntPtr header = SendHeaderMessage(list.Handle, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
-                if (header == IntPtr.Zero) return;
-                new PinnedHeader(list).AssignHandle(header);
+                if (header == IntPtr.Zero) return null;
+                var pinned = new PinnedHeader(list);
+                pinned.AssignHandle(header);
                 // Laid out again now, with this answering (WM_SIZE, as a resize lays the header out).
                 Size client = list.ClientSize;
                 SendHeaderMessage(list.Handle, 0x0005, IntPtr.Zero, (IntPtr)(((client.Height & 0xFFFF) << 16) | (client.Width & 0xFFFF)));
+                return pinned;
             }
 
             protected override void WndProc(ref Message m)
