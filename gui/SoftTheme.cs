@@ -191,10 +191,10 @@ namespace CodexAutoResume
         internal const float NormalPoints = 9f;
         /// What the screen has to hold, in logical pixels, frames included: the window at its narrowest (SettingsForm's
         /// MinimumSize, 800 by 420) and its tallest dialog (a conversation's message, 520 high). v0.6.24: that dialog with
-        /// everything it is - 520, its body card's 29 (DialogCardGrowth), its title card's strip, 62 (16 above the card,
-        /// a caption button's 26 and 10 above and below it: SoftDialog.BuildTitle) and the frame below it, 8 - and no
-        /// title bar of Windows' (it was 568 with one).
-        internal const int NarrowestWidth = 816, NarrowestHeight = 619;
+        /// everything it is - 520, its body card's 29 (DialogCardGrowth), its title's strip, 42 (v0.6.24-beta.2: a row on
+        /// the dialog's ground as tall as a caption button, 26, with 8 above and below it: SoftDialog.BuildTitle; the title
+        /// card of the beta took 62, and 619 here) and the frame below it, 8 - and no title bar of Windows' (it was 568 with one).
+        internal const int NarrowestWidth = 816, NarrowestHeight = 599;
 
         /// Windows' text size now, as a factor (Factor).
         internal static double Read()
@@ -871,6 +871,13 @@ namespace CodexAutoResume
             {
                 EventHandler round = delegate
                 {
+                    // v0.6.24 W5: a window with a corner of its own asks DWM for what that corner needs (WindowCorner.Prefer).
+                    WindowCorner own = WindowCorner.Of(form);
+                    if (own != null)
+                    {
+                        own.Prefer();
+                        return;
+                    }
                     int corner = CornerRound;
                     try { DwmSetWindowAttribute(form.Handle, CornerPreferenceAttribute, ref corner, 4); }
                     catch (Exception) { /* no dwmapi, or no such attribute: Windows' own corners */ }
@@ -897,8 +904,8 @@ namespace CodexAutoResume
         /// itself is better with none; its own main window, the tray icon and the popup keep theirs). Every dialog the window
         /// builds calls this and not Soft.TitleBar, so one that is added has no icon without asking; a dialog is never in the
         /// taskbar (ShowInTaskbar = false), so there is no button to give an icon either. tests/test_gui_dialog_icons.py.
-        /// v0.6.24: and the caption is the dialog's own - a title card at its top with its title and the caption buttons
-        /// (SoftDialog, made as the dialog is), Windows' title bar gone.
+        /// v0.6.24: and the caption is the dialog's own - a title row on its ground at its top with its title and the
+        /// caption buttons (SoftDialog, made as the dialog is), Windows' title bar gone.
         internal static void DialogBar(Form dialog)
         {
             if (dialog != null) dialog.ShowIcon = false;

@@ -10,7 +10,7 @@
       776,
       540
     ],
-    "ground": "canvas",
+    "transparent": true,
     "theme": "light",
     "design": "soft"
   },

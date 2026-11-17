@@ -1031,7 +1031,11 @@ namespace CodexAutoResume
                 bool shown = true;
                 try
                 {
-                    shown = AwaitWindow(delegate { started.Refresh(); return started.MainWindowHandle != IntPtr.Zero; },
+                    // v0.6.24-beta.2 (M-CORNER re-check 8, item 5c): the new window on the screen, not only shown - a window
+                    // with its own corner is shown cloaked and comes on once it has painted (WindowCorner.Cloak, Painted).
+                    // Closed as soon as that one was shown, this one left no Dashboard on the screen for 0.6-1.0 s; now it
+                    // stays, taking no input (EnableWindow above), until the new one is there in its place.
+                    shown = AwaitWindow(delegate { started.Refresh(); return OnScreen(started.MainWindowHandle); },
                                         delegate { return started.HasExited; }, 10000, 50);
                 }
                 catch (Exception) { }
@@ -1039,6 +1043,14 @@ namespace CodexAutoResume
                 try { if (IsHandleCreated && !IsDisposed) BeginInvoke(new MethodInvoker(delegate { FinishReopen(shown); })); }
                 catch (Exception) { }
             });
+        }
+
+        /// Whether `window`, the main window of the process a reopen started, is on the screen: shown, and not held off it
+        /// by its own cloak until its first paint (WindowCorner.HeldOff). The shell's cloak - another virtual desktop - is
+        /// not waited for.
+        internal static bool OnScreen(IntPtr window)
+        {
+            return window != IntPtr.Zero && !WindowCorner.HeldOff(window);
         }
 
         /// Waits for the window a reopen started: true once `hasWindow` says there is one, or once `milliseconds`
@@ -1109,7 +1121,6 @@ namespace CodexAutoResume
             {
                 if (control == saveButton) return "save";
                 if (control == restoreButton) return "restore";
-                if (control == closeButton) return "close";
                 if (control == startButton) return "start";
                 foreach (KeyValuePair<string, NavButton> pair in navButtons)
                     if (pair.Value == control) return "page." + pair.Key;
@@ -1128,7 +1139,9 @@ namespace CodexAutoResume
             if (!IsFocusName(name)) return null;
             if (name == "save") return saveButton;
             if (name == "restore") return restoreButton;
-            if (name == "close") return closeButton;
+            // v0.6.24-beta.2: the save card's Close is gone (the header's X closes the window); a reopen from a window before
+            // it that had the keyboard there starts at the page's tab.
+            if (name == "close") return null;
             if (name == "start") return startButton;
             NavButton tab;
             Control editor;

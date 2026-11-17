@@ -1,11 +1,11 @@
 r"""v0.6.24 (stage 1, surface A): no Windows title bar on any window or dialog - read in the window's sources.
 
 The owner, 2026-11-13 and 2026-11-15 (board TitleB, option B): the minimise, maximise and close buttons stand in each
-window's first card - the Dashboard's hero, the setup window's header card, a title card every dialog is given - and close
-is filled red under the pointer. gui/SoftChrome.cs is the one place they are made. This holds the sources to it:
+window's first card - the Dashboard's hero, the setup window's header card - and, since v0.6.24-beta.2 (the owner's
+choice B, 2026-11-16), a dialog's title row on its own ground; close is filled red under the pointer. gui/SoftChrome.cs is the one place they are made. This holds the sources to it:
 
 * every dialog the window and the advanced page build is a SoftDialog (its ClientSize means what it says once the caption
-  is ours) and takes its title card from Soft.DialogBar; no `new Form()` is left;
+  is ours) and takes its title row from Soft.DialogBar; no `new Form()` is left;
 * the Dashboard and the setup window install the caption in their first card, and every form's window procedure hands
   the frame's messages to it first;
 * the buttons a window has are the ones Windows gave it - both of the pair when either box is on, the one that is off
@@ -97,37 +97,41 @@ class DialogSourceTests(unittest.TestCase):
                 self.assertEqual(buttons(after), TABLE[keys[0]])
         self.assertEqual(seen, set(TABLE))
 
-    def test_the_title_card_is_made_once_the_dialog_is_and_its_strip_is_docked_first(self):
+    def test_the_title_row_is_made_once_the_dialog_is_and_its_strip_is_docked_first(self):
         bar = guiscan.member_body("Soft", "DialogBar")
         self.assertIn("soft.Titled = true;", bar)
         self.assertIn("dialog.ShowIcon = false;", bar)
         made = guiscan.member_body("SoftDialog", "CreateHandle")
         self.assertLess(made.index("MakeTitle();"), made.index("base.CreateHandle();"), "the window is made with its title in it")
-        self.assertIn("if (Titled && titleCard == null) BuildTitle();", guiscan.member_body("SoftDialog", "MakeTitle"))
+        self.assertIn("if (Titled && titleRow == null) BuildTitle();", guiscan.member_body("SoftDialog", "MakeTitle"))
         self.assertIn("if (dialog != null) dialog.MakeTitle();", guiscan.member_body("SettingsForm", "Materialise"),
                       "the layout audit lays a dialog out as it is once made")
         self.assertIn("Controls.SetChildIndex(titleGround, Controls.Count - 1);", guiscan.member_body("SoftDialog", "OnControlAdded"))
         build = guiscan.member_body("SoftDialog", "BuildTitle")
         for part in ("titleGround.Dock = DockStyle.Top;", "Controls.Add(titleGround);",
                      "ClientSize = new Size(ClientSize.Width, ClientSize.Height + grown);",
-                     "ChromeHost.Install(this, titleCard, titleGround)", 'Soft.RoleFont("title")', "titleWords.AutoEllipsis = true;",
-                     "TextChanged += delegate"):
+                     "ChromeHost.Install(this, titleRow, titleGround)", "chrome.OnGround = true;",
+                     'Soft.RoleFont("heading")', "titleWords.AutoEllipsis = true;", "TextChanged += delegate"):
             self.assertIn(part, build)
-        self.assertNotIn("Padding = new Padding", build.replace("titleCard.Padding = new Padding", ""),
+        self.assertNotIn("SoftCard", build, "v0.6.24-beta.2: the title is on the dialog's ground, no card")
+        self.assertNotIn("Padding = new Padding", build.replace("titleRow.Padding = new Padding", ""),
                          "no padding of the dialog's: its anchored controls would move with it")
 
-    def test_the_text_size_the_window_opens_at_counts_the_title_card(self):
+    def test_the_text_size_the_window_opens_at_counts_the_title_row(self):
         """TextScale.Fitting offers a text size only where the tallest dialog fits the screen: that dialog's real height -
-        a conversation's message, its body card, its title card's strip and the frame below - counted, or a text size is
+        a conversation's message, its body card, its title's strip and the frame below - counted, or a text size is
         offered whose dialogs Windows then holds to the screen with the strip cutting them."""
         from codex_auto_resume import brand
         tools = guiscan.member_body("SettingsForm", "BuildConversationMessage")
         asked = int(re.search(r"dialog\.ClientSize = new Size\(Px\(\d+\), Px\((\d+)\)\);", tools).group(1))
         growth = int(re.search(r"new Size\(Px\(\d+\), Px\((\d+)\)\)", guiscan.member_body("SettingsForm", "DialogCardGrowth")).group(1))
         build = guiscan.member_body("SoftDialog", "BuildTitle")
-        self.assertIn("int gap = Soft.Px(16);", build)
-        self.assertIn("Math.Max(line, Soft.Px(Brand.CaptionButtonH)) + 2 * Soft.Px(Brand.CaptionInsetTop)", build)
-        strip = 16 + brand.LAYOUT["caption_button_h"] + 2 * brand.LAYOUT["caption_inset_top"]
+        self.assertIn("int gap = Soft.Px(16), above = Soft.Px(TitleAbove);", build)
+        self.assertIn("int height = Math.Max(line, Soft.Px(Brand.CaptionButtonH));", build)
+        self.assertIn("titleGround.Height = above + height + above;", build)
+        above = int(re.search(r"TitleAbove = (\d+)", guiscan.type_body("SoftDialog")).group(1))
+        strip = above + brand.LAYOUT["caption_button_h"] + above
+        self.assertEqual(strip, 42, "v0.6.24-beta.2: 8 above, a caption button's 26, 8 below")
         frame = 8  # SM_CYSIZEFRAME + SM_CXPADDEDBORDER at 96 DPI, below the client area; no title bar above it
         bound = int(re.search(r"NarrowestHeight = (\d+);", guiscan.controls()).group(1))
         self.assertGreaterEqual(bound, asked + growth + strip + frame)
@@ -158,7 +162,8 @@ class WindowSourceTests(unittest.TestCase):
     def test_nothing_a_person_acts_on_drags_the_window(self):
         sources = guiscan.read("gui/SettingsApp.cs") + guiscan.read("gui/InstallerWindow.cs") + guiscan.read("gui/SoftChrome.cs")
         dragged = set(re.findall(r"\b(?:chrome|host)\.Drag\((\w+)\);", sources))
-        for never in ("startButton", "pageHost", "savebar", "forward", "back", "cancel", "body", "sheet"):
+        # v0.6.24-beta.2: and the version's pill at the end of the tabs, which is pressed (VersionPressed).
+        for never in ("startButton", "pageHost", "savebar", "versionPill", "versionText", "forward", "back", "cancel", "body", "sheet"):
             self.assertNotIn(never, dragged)
         through = guiscan.member_body("DragThrough", "WndProc")
         self.assertIn("Chrome.HTTRANSPARENT", through)

@@ -77,6 +77,11 @@ namespace CodexAutoResume
             try
             {
                 driver = new Driver(job, writer);
+                // v0.6.24-beta.2: each frame with the window's own outer edge - its squircle corner and hairline, cut as a
+                // still is (StillFrame.CornerStill) - when the job asks (`edge_dpi`, motion_window.frame_edge), as the
+                // Dashboard's render mode does: the frames held to the stills and laid in their chrome are then what the
+                // stills are, edge and all.
+                int edgeDpi = job.ContainsKey("edge_dpi") && job["edge_dpi"] != null ? Int(job, "edge_dpi") : 0;
                 foreach (object item in Items(job, "frames"))
                 {
                     var frame = item as Dictionary<string, object>;
@@ -84,11 +89,18 @@ namespace CodexAutoResume
                     driver.Put(frame);
                     using (Bitmap picture = driver.Picture())
                     {
-                        writer.Write(Int(frame, "index"), picture, driver.Bounds(Items(job, "targets")));
-                        // v0.6.20: the still a capture takes of the window, when the job asks (StillFrame).
+                        if (edgeDpi > 0)
+                            using (Bitmap edged = StillFrame.CornerStill(picture, edgeDpi))
+                                writer.Write(Int(frame, "index"), edged, driver.Bounds(Items(job, "targets")));
+                        else
+                            writer.Write(Int(frame, "index"), picture, driver.Bounds(Items(job, "targets")));
+                        // v0.6.20: the still a capture takes of the window, when the job asks (StillFrame). v0.6.24-beta.2:
+                        // cut by the same decision as the window - its own corner while the switch is on (the job says so,
+                        // make_screenshots.still_job), else Windows' 8 px circle as a capture is cut.
                         var still = Map(job, "still");
                         if (still != null)
-                            using (Bitmap framed = StillFrame.FramedStill(picture, Int(still, "radius"), Int(still, "dpi")))
+                            using (Bitmap framed = StillFrame.Squircle(still) ? StillFrame.SquircleStill(picture, Int(still, "dpi"))
+                                                                              : StillFrame.FramedStill(picture, Int(still, "radius"), Int(still, "dpi")))
                                 framed.Save(Path.Combine(folder, "still-" + Int(frame, "index").ToString("D5",
                                             CultureInfo.InvariantCulture) + ".png"), ImageFormat.Png);
                     }
@@ -606,6 +618,58 @@ namespace CodexAutoResume
                 if (dpi > 0) rounded.SetResolution(dpi, dpi);
                 return rounded;
             }
+        }
+
+        /// Whether the job's still is cut by the window's own corner (its "corner": "squircle"), as WindowRender's
+        /// StillSquircle reads it.
+        internal static bool Squircle(Dictionary<string, object> still)
+        {
+            object value;
+            return still != null && still.TryGetValue("corner", out value) && value as string == "squircle";
+        }
+
+        /// v0.6.24 W5: the window as a still while it cuts its own outer corner: FramedStill's opaque client area, cut by
+        /// CornerStill, its resolution `dpi`.
+        internal static Bitmap SquircleStill(Bitmap client, int dpi)
+        {
+            int width = client.Width, height = client.Height;
+            int[] pixels = Argb(client);
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = unchecked((int)0xFF000000) | (pixels[i] & 0xFFFFFF);
+            using (var square = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+            {
+                BitmapData data = square.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                try
+                {
+                    for (int y = 0; y < height; y++)
+                        Marshal.Copy(pixels, y * width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), width);
+                }
+                finally { square.UnlockBits(data); }
+                Bitmap cut = CornerStill(square, dpi);
+                if (dpi > 0) cut.SetResolution(dpi, dpi);
+                return cut;
+            }
+        }
+
+        /// v0.6.24 W5: `square` with the window's own outer corner as the screen shows it while Brand.WindowSquircle is on -
+        /// the card's corner at the still's scale (`dpi`), the hairline and the edge its companion paints round the region,
+        /// the corners clear (WindowShape.CutStill) - so a still and the screen agree (plans/v0624-stage1-design.md 5.6).
+        internal static Bitmap CornerStill(Bitmap square, int dpi)
+        {
+            int width = square.Width, height = square.Height;
+            // The class by its full name: inside SettingsForm a member named Shape (a test probe's helper) would hide it.
+            var edge = new WindowShape.Edge(width, height, Palette.RadiusCard, global::CodexAutoResume.Shape.Smoothing,
+                                            (dpi > 0 ? dpi : 96) / 96.0);
+            int[] pixels = Argb(square);
+            WindowShape.CutStill(pixels, edge, Palette.Line);
+            var cut = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+            BitmapData data = cut.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                for (int y = 0; y < height; y++)
+                    Marshal.Copy(pixels, y * width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), width);
+            }
+            finally { cut.UnlockBits(data); }
+            return cut;
         }
 
         /// `square` with its corners cut round, `radius` px, the corners left clear: build/capture_window.ps1's own steps -

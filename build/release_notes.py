@@ -81,6 +81,27 @@ def section(text: str, version: str) -> str:
 
 REPO = "https://github.com/songyb111-gachon/codex-auto-resume-windows"
 
+# The first paragraph of every entry: `> **Short title.** One sentence on what the release set out to do.`
+# The title is what follows the version in the release's own title on GitHub.
+LEAD = re.compile(r"^> \*\*([^*\n]+?)\.\*\* \S", re.MULTILINE)
+
+
+def short_title(text: str, version: str) -> str:
+    """The short title in the first paragraph of `## v<version>`'s entry; fails when the entry does not
+    open with one - a release without its title is a mistake worth stopping the release for."""
+    first = section(text, version).lstrip("\n").split("\n", 1)[0]
+    found = LEAD.match(first)
+    if found is None:
+        raise SystemExit("the CHANGELOG.md section for v%s does not open with its title line "
+                         "(> **Short title.** One sentence.)" % str(version).lstrip("v"))
+    return found.group(1)
+
+
+def release_title(text: str, version: str) -> str:
+    """The title of the GitHub release: `v<version> — <short title>`."""
+    return "v%s — %s" % (str(version).lstrip("v"), short_title(text, version))
+
+
 
 def download_block(version: str) -> str:
     """The first lines of every release page: direct links to the tag's two setup programs, so
@@ -107,11 +128,13 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Print a version's changelog section.")
     parser.add_argument("version", help="version, with or without a leading v")
     parser.add_argument("--changelog", default=str(CHANGELOG))
+    parser.add_argument("--title", action="store_true",
+                        help="print the release's title (v<version> - short title) instead of its notes")
     parser.add_argument("--output", help="write here instead of standard output")
     args = parser.parse_args(argv)
 
     text = Path(args.changelog).read_text(encoding="utf-8")
-    body = notes(text, args.version)
+    body = release_title(text, args.version) if args.title else notes(text, args.version)
     if args.output:
         with open(args.output, "w", encoding="utf-8", newline="\n") as output:
             output.write(body + "\n")

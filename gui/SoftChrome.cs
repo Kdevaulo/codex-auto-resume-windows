@@ -1,8 +1,8 @@
 // Codex Auto Resume - the window's own caption: no title bar from Windows (v0.6.24, stage 1 surface A).
 //
 // The owner, 2026-11-13: no Windows title bar on any window or dialog of ours; the minimise, maximise and close buttons
-// stand in the window's first card instead - the Dashboard's hero, the setup window's header card, and a title card
-// every dialog is given (Soft.DialogBar) - drawn in the house's material, close red under the pointer (board TitleB,
+// stand in the window's first card instead - the Dashboard's hero, the setup window's header card - and, on a dialog,
+// a title row on its own ground (Soft.DialogBar; the owner's choice B, 2026-11-16) - drawn in the house's material, close red under the pointer (board TitleB,
 // option B, 2026-11-15).
 //
 // Every window style Windows has today is kept - WS_CAPTION, WS_SYSMENU, WS_THICKFRAME for a sizable window, the boxes
@@ -44,6 +44,9 @@ namespace CodexAutoResume
         internal bool Edges;
         /// The top resize band, in device px: the frame Windows had at the top, now inside the client area.
         internal int Band;
+        /// v0.6.24: how far along each edge from the window's corner its own cut-away corner reaches (WindowCorner.Span),
+        /// in device px; 0 with Windows' corner.
+        internal int CornerSpan;
         /// The three buttons, Empty where the window has none.
         internal Rectangle Minimize, Maximize, Close;
         internal bool MinimizeOn, MaximizeOn;
@@ -82,22 +85,30 @@ namespace CodexAutoResume
         internal static int Hit(Point p, ChromeLayout l)
         {
             if (p.X < 0 || p.Y < 0 || p.X >= l.Client.Width || p.Y >= l.Client.Height) return HTNOWHERE;
+            // The length along each edge that resizes from the corner: twice the band, as Windows' own; with the window's own
+            // corner, from the corner to a band past where its cut-away curve ends (CornerSpan) - re-check 5 found the
+            // diagonal target only ~3 px at 150 %, the cut corner itself taking nothing (its clicks go to the window behind).
+            int reach = Math.Max(2 * l.Band, l.Edges ? l.CornerSpan + l.Band : 0);
             if (l.Edges && l.Sizable && !l.Maximized)
             {
                 // No frame round the window (its own outer corner): its bottom, left and right bands as its top one.
-                int corner = 2 * l.Band;
+                int corner = reach;
                 if (p.Y >= l.Client.Height - l.Band)
                 {
                     if (p.X < corner) return HTBOTTOMLEFT;
                     if (p.X >= l.Client.Width - corner) return HTBOTTOMRIGHT;
                     return HTBOTTOM;
                 }
-                if (p.Y >= l.Band && p.X < l.Band) return p.Y >= l.Client.Height - corner ? HTBOTTOMLEFT : HTLEFT;
-                if (p.Y >= l.Band && p.X >= l.Client.Width - l.Band) return p.Y >= l.Client.Height - corner ? HTBOTTOMRIGHT : HTRIGHT;
+                // Each side resizes from the corner it meets for `corner` along it - the top corners too (re-check 6: down
+                // the sides they gave only HTLEFT and HTRIGHT, so a drag 30 px below the top-left corner went sideways).
+                if (p.Y >= l.Band && p.X < l.Band)
+                    return p.Y >= l.Client.Height - corner ? HTBOTTOMLEFT : p.Y < corner ? HTTOPLEFT : HTLEFT;
+                if (p.Y >= l.Band && p.X >= l.Client.Width - l.Band)
+                    return p.Y >= l.Client.Height - corner ? HTBOTTOMRIGHT : p.Y < corner ? HTTOPRIGHT : HTRIGHT;
             }
             if (l.Sizable && !l.Maximized && p.Y < l.Band)
             {
-                int corner = 2 * l.Band;
+                int corner = reach;
                 if (p.X < corner) return HTTOPLEFT;
                 if (p.X >= l.Client.Width - corner) return HTTOPRIGHT;
                 return HTTOP;
@@ -168,9 +179,17 @@ namespace CodexAutoResume
         /// window is made at the size its ClientSize says and not one Windows caption taller.
         internal static void Uncaption(CreateParams created, Size client)
         {
+            Uncaption(created, client, false);
+        }
+
+        /// v0.6.24-beta.2: and, `frameless` (ChromeHost.Frameless: the window's outer corner is its own), with no frame at
+        /// all - the window is that client, as its SizeFromClientSize says - or it is made a frame bigger than its ClientSize
+        /// and the whole of it becomes its client (the setup window opened 906 x 903 for its 900 x 900 at 150 %).
+        internal static void Uncaption(CreateParams created, Size client, bool frameless)
+        {
             int style = created.Style & ~(WS_MAXIMIZE | WS_MINIMIZE);
-            Size outer = Uncaptioned(new Size(created.Width, created.Height), client, Frame(style, created.ExStyle),
-                                     CaptionedFrame(style, created.ExStyle));
+            Size outer = Uncaptioned(new Size(created.Width, created.Height), client,
+                                     frameless ? Padding.Empty : Frame(style, created.ExStyle), CaptionedFrame(style, created.ExStyle));
             created.Width = outer.Width;
             created.Height = outer.Height;
         }
@@ -234,6 +253,43 @@ namespace CodexAutoResume
             if ((edges & 4) != 0 && right >= monitor.Right) right = monitor.Right - AutoHideRoom;
             if ((edges & 8) != 0 && bottom >= monitor.Bottom) bottom = monitor.Bottom - AutoHideRoom;
             return Rectangle.FromLTRB(left, top, Math.Max(left, right), Math.Max(top, bottom));
+        }
+
+        /// Where a window whose visible box is `window` big goes over a window whose visible box is `owner`: centred on it,
+        /// and held inside `work` (the work area of the monitor the owner is on) against the edge it would cross - its top
+        /// left kept inside where it is larger than the work area. An empty `work` holds it nowhere.
+        /// How far a pixel's colour is from its ground, in any channel, for it to be ink (a letter's or a glyph's): the
+        /// faintest anti-aliased edge is ground, as the eye takes it.
+        internal const int InkStep = 48;
+
+        /// The first and last columns within `band` of `drawn` that hold ink against `ground` (X, Y); (-1, -1) for none.
+        internal static Point InkColumns(Bitmap drawn, Color ground, Rectangle band)
+        {
+            band = Rectangle.Intersect(band, new Rectangle(0, 0, drawn.Width, drawn.Height));
+            int first = -1, last = -1;
+            for (int x = band.Left; x < band.Right; x++)
+            {
+                for (int y = band.Top; y < band.Bottom; y++)
+                {
+                    Color c = drawn.GetPixel(x, y);
+                    if (Math.Abs(c.R - ground.R) > InkStep || Math.Abs(c.G - ground.G) > InkStep || Math.Abs(c.B - ground.B) > InkStep)
+                    {
+                        if (first < 0) first = x;
+                        last = x;
+                        break;
+                    }
+                }
+            }
+            return new Point(first, last);
+        }
+
+        internal static Point CentreOn(Rectangle owner, Size window, Rectangle work)
+        {
+            int x = owner.X + (owner.Width - window.Width) / 2, y = owner.Y + (owner.Height - window.Height) / 2;
+            if (work.IsEmpty) return new Point(x, y);
+            x = Math.Max(work.Left, Math.Min(x, work.Right - window.Width));
+            y = Math.Max(work.Top, Math.Min(y, work.Bottom - window.Height));
+            return new Point(x, y);
         }
 
         /// The window `client` needs inside `frame` (Frame): what Form.SizeFromClientSize answers once the caption is ours, so
@@ -358,6 +414,8 @@ namespace CodexAutoResume
         private readonly LayoutEventHandler dirtied;
         // v0.6.24 W5: the window's own outer corner (gui/SoftWindowShape.cs), only where it asked for one and the switch is on.
         private WindowCorner corner;
+        // v0.6.24-beta.2: the buttons stand in a row on the window's own ground (a dialog's title), not in a card's corner.
+        private bool ground;
 
         private ChromeHost(Form form, Control card, Control holder)
         {
@@ -380,6 +438,8 @@ namespace CodexAutoResume
         internal static ChromeHost Install(Form form, Control card, Control holder)
         {
             var host = new ChromeHost(form, card, holder);
+            // Focus rings for the keyboard only, the mouse hiding them again (FocusCues; the owner, 2026-11-16).
+            FocusCues.Watch(form);
             foreach (CaptionButton button in host.Buttons()) holder.Controls.Add(button);
             host.Raise();
             EventHandler place = delegate { host.Place(); };
@@ -405,8 +465,76 @@ namespace CodexAutoResume
         {
             if (corner != null || !form.TopLevel || !WindowShape.Wanted()) return;
             corner = WindowCorner.Attach(form);
-            corner.Changed += delegate { dirty = true; };
+            corner.Changed += delegate { dirty = true; Grip(); };
+            form.Layout += delegate { Grip(); };
             if (form.IsHandleCreated) Created();
+            Grip();
+        }
+
+        // ------------------------------------------------------------------ the grip band, given by what lies in it
+
+        // The controls that reach into the grip band (GripThrough), and the containers looked into for them.
+        private readonly Dictionary<Control, GripThrough> grips = new Dictionary<Control, GripThrough>();
+        private readonly HashSet<Control> watched = new HashSet<Control>();
+        private bool gripping;
+
+        /// v0.6.24 W5: with its own corner the window resizes from a band inside its edge (Chrome.Hit, ChromeLayout.Edges),
+        /// but Windows asks the control under the pointer first, and a control that reaches into the band - the page
+        /// under the tabs, the full width of the window (M-CORNER 2026-11-16, item 3: the left and right edges did not
+        /// resize along the pages) - answered for it. Every control that reaches into the band, at any depth, gives the
+        /// band to the window (HTTRANSPARENT there); the rest of it stays its own. Looked at again as anything that holds
+        /// one is laid out, so a page built later, a control added and the mirrored window all give it too. Only controls
+        /// that reach the band are looked into: nothing inside one that does not can reach it.
+        private void Grip()
+        {
+            if (corner == null || gripping || form.IsDisposed) return;
+            gripping = true;
+            try { GripIn(form, Math.Max(1, TopBand())); }
+            finally { gripping = false; }
+        }
+
+        private void GripIn(Control parent, int band)
+        {
+            Size client = form.ClientSize;
+            foreach (Control child in parent.Controls)
+            {
+                if (child is CaptionButton || child.IsDisposed) continue;
+                Rectangle at = InForm(child);
+                bool reaches = at.Left < band || at.Top < band || at.Right > client.Width - band || at.Bottom > client.Height - band;
+                if (!reaches) continue;
+                if (!drag.Contains(child) && !grips.ContainsKey(child)) grips[child] = new GripThrough(child, this);
+                if (watched.Add(child))
+                {
+                    child.Layout += delegate { Grip(); };
+                    child.Disposed += delegate { Forget(child); };
+                }
+                if (child.Controls.Count > 0) GripIn(child, band);
+            }
+        }
+
+        private void Forget(Control child)
+        {
+            GripThrough hook;
+            if (grips.TryGetValue(child, out hook)) hook.Let();
+            grips.Remove(child);
+            watched.Remove(child);
+        }
+
+        /// Whether the pointer at `screen` is in the band the window is resized from (Chrome.Hit's edges), the window's own
+        /// corner on.
+        internal bool InGrip(Point screen)
+        {
+            if (corner == null || !form.IsHandleCreated || !form.TopLevel) return false;
+            ChromeLayout l = Layout();
+            if (!l.Edges || !l.Sizable || l.Maximized) return false;
+            int hit = Chrome.Hit(form.PointToClient(screen), l);
+            return hit >= Chrome.HTLEFT && hit <= Chrome.HTBOTTOMRIGHT;
+        }
+
+        /// The controls that give the grip band to the window now, for the tests.
+        internal int Gripping
+        {
+            get { return grips.Count; }
         }
 
         /// The window's outer corner now: its own, or Windows' - round on Windows 11, square before.
@@ -442,11 +570,13 @@ namespace CodexAutoResume
         /// right-to-left Windows title bar has them.
         private CaptionButton[] Shown()
         {
-            bool pair = Soft.OwnVisible(MinimizeButton);
             if (!Soft.OwnVisible(CloseButton)) return new CaptionButton[0];
-            if (!pair) return new[] { CloseButton };
-            return Mirror.Of(form) ? new[] { CloseButton, MaximizeButton, MinimizeButton }
-                                   : new[] { MinimizeButton, MaximizeButton, CloseButton };
+            var shown = new List<CaptionButton>();
+            if (Soft.OwnVisible(MinimizeButton)) shown.Add(MinimizeButton);
+            if (Soft.OwnVisible(MaximizeButton)) shown.Add(MaximizeButton);
+            shown.Add(CloseButton);
+            if (Mirror.Of(form)) shown.Reverse();
+            return shown.ToArray();
         }
 
         /// How wide the group of buttons is, for a card that keeps its words clear of it.
@@ -484,6 +614,17 @@ namespace CodexAutoResume
             bool pair = form.ControlBox && Chrome.Pair(form.MinimizeBox, form.MaximizeBox);
             MinimizeButton.Visible = pair;
             MaximizeButton.Visible = pair;
+            // v0.6.24-beta.2 (the owner's rule, hide what cannot work; live re-check 7): a dialog's title row shows no
+            // greyed button - its minimise only where it minimises, its maximise only where it really resizes (a sizable
+            // border and MaximizeBox: the Timeline, the Log, the detection check, the compatibility report and Install
+            // another version). The window's own title keeps Windows' pair.
+            if (form is SoftDialog)
+            {
+                FormBorderStyle border = form.FormBorderStyle;
+                bool sizes = border == FormBorderStyle.Sizable || border == FormBorderStyle.SizableToolWindow;
+                MinimizeButton.Visible = form.ControlBox && form.MinimizeBox;
+                MaximizeButton.Visible = form.ControlBox && form.MaximizeBox && sizes;
+            }
             CloseButton.Visible = form.ControlBox;
             MinimizeButton.Enabled = form.MinimizeBox;
             MaximizeButton.Enabled = form.MaximizeBox;
@@ -491,7 +632,23 @@ namespace CodexAutoResume
             bool mirrored = Mirror.Of(form);
             int width = Soft.Px(Brand.CaptionButtonW), height = Soft.Px(Brand.CaptionButtonH), gap = Soft.Px(Brand.CaptionGap);
             int x = mirrored ? face.Left + Soft.Px(Brand.CaptionInsetEnd) : face.Right - Soft.Px(Brand.CaptionInsetEnd) - GroupWidth;
-            int y = face.Top + Soft.Px(Brand.CaptionInsetTop);
+            // v0.6.24-beta.2 (the owner, 2026-11-16): a dialog's title row has its Close's cross as far in from the dialog's
+            // end edge as the title's first letter is from its start (GlyphEnd, SoftDialog.TitleStart) - the right edge, the
+            // left mirrored; the buttons' hit areas reach past it, the cross sets the look.
+            if (ground && GlyphEnd >= 0 && Soft.OwnVisible(CloseButton))
+            {
+                // By ink (live re-check 7: the eye reads the glyph's own ink, not its box): the cross's first and last
+                // inked columns as it is drawn at this size (CaptionButton.InkColumns).
+                Point ink = CloseButton.InkColumns(new Size(width, height));
+                // Mirrored, the left-to-right place mirrored (the cross's ink is symmetric in its button), from GlyphEnd as
+                // the mirrored title gives it - the ink of its rightmost letter, where left to right it is its leftmost's -
+                // so a mirrored dialog's buttons stand off their mirror by exactly that difference (MirrorCompare).
+                int close = holder.ClientSize.Width - 1 - GlyphEnd - ink.Y;
+                if (mirrored) close = holder.ClientSize.Width - width - close;
+                x = mirrored ? close : close + width - GroupWidth;
+            }
+            // In a card, CaptionInsetTop below its top; in a row on the ground (OnGround), centred in the row.
+            int y = ground ? face.Top + (face.Height - height) / 2 : face.Top + Soft.Px(Brand.CaptionInsetTop);
             foreach (CaptionButton button in Shown())
             {
                 button.SetBounds(x, y, width, height);
@@ -552,10 +709,32 @@ namespace CodexAutoResume
                 if (button.Visible && button.Bounds.IntersectsWith(under)) button.Invalidate();
         }
 
-        /// The card's own colour, which a button shows at rest.
+        /// The card's own colour, which a button shows at rest - in High Contrast the person's Window colour, a card's; on
+        /// the ground (OnGround) the ground's own colour in both, the system colour the ground is drawn in there.
         internal Color Face
         {
-            get { return Palette.Contrast ? SystemColors.Window : card.BackColor.A == 255 ? card.BackColor : Palette.Card; }
+            get
+            {
+                if (Palette.Contrast && !ground) return SystemColors.Window;
+                return card.BackColor.A == 255 ? card.BackColor : Palette.Card;
+            }
+        }
+
+        /// v0.6.24-beta.2 (the owner's choice B, 2026-11-16): `card` is no card but a row on the window's own ground - a
+        /// dialog's title - and the buttons stand at its end, centred in its height, CaptionInsetEnd in from its edge.
+        /// v0.6.24-beta.2: with OnGround, how far the Close cross's far end stands in from the holder's end edge (its right,
+        /// its left mirrored), in device px; -1: the buttons CaptionInsetEnd in from the row's end, as a card has them.
+        internal int GlyphEnd = -1;
+
+        internal bool OnGround
+        {
+            get { return ground; }
+            set
+            {
+                if (ground == value) return;
+                ground = value;
+                Place();
+            }
         }
 
         /// `control` (and what Windows asks about the points over it) is one the window may be dragged by: the card, its words
@@ -638,6 +817,7 @@ namespace CodexAutoResume
             layout.Maximized = Zoomed;
             layout.Mirrored = Mirror.Of(form);
             layout.Edges = Frameless;
+            layout.CornerSpan = Frameless ? corner.Span : 0;
             layout.Band = layout.Sizable ? TopBand() : 0;
             layout.Minimize = Showing(MinimizeButton) ? InForm(MinimizeButton) : Rectangle.Empty;
             layout.Maximize = Showing(MaximizeButton) ? InForm(MaximizeButton) : Rectangle.Empty;
@@ -696,8 +876,20 @@ namespace CodexAutoResume
         /// Handles `m` before the form does: true when it is answered here and the form must not see it again.
         internal bool Intercept(ref Message m, Pass pass)
         {
+            // v0.6.24: a window held off the screen until it has painted (WindowCorner.Cloak) comes on after its first paint.
+            if (corner != null && m.Msg == WM_PAINT && corner.Cloaked)
+            {
+                try { pass(ref m); }
+                finally { corner.Painted(); }
+                return true;
+            }
             // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
             if (corner != null && corner.Intercept(ref m)) return true;
+            if (corner != null && corner.Shaped && (m.Msg == WM_SETTEXT || m.Msg == WM_SETICON) && form.IsHandleCreated)
+            {
+                Unframed(ref m, pass);
+                return true;
+            }
             switch (m.Msg)
             {
                 case Chrome.WM_NCCALCSIZE:
@@ -757,6 +949,36 @@ namespace CodexAutoResume
             return false;
         }
 
+        private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, WM_PAINT = 0x000F, GWL_STYLE = -16, WS_CAPTION = 0x00C00000;
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+
+        // v0.6.24 W5: a new title or icon, taken by Windows' own handling with the window's caption style off for that
+        // moment. Windows paints the caption it keeps for those straight onto a window that has one, and while the
+        // window's corner is its own that caption is the classic one (WindowCorner.Intercept); with no caption style it
+        // paints nothing. Never WS_VISIBLE: the taskbar mark sets the window's icon several times a second, and with the
+        // window marked hidden for each (2-37 ms, M-CORNER re-check 6) a click on it went through to the window behind.
+        // The style bits alone, put back at once; nothing is moved, shown, hidden or framed again.
+        private void Unframed(ref Message m, Pass pass)
+        {
+            IntPtr handle = form.Handle;
+            long style = GetWindowLongPtr(handle, GWL_STYLE).ToInt64();
+            long caption = style & WS_CAPTION;
+            if (caption != 0) SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(style & ~(long)WS_CAPTION));
+            try { pass(ref m); }
+            finally
+            {
+                if (caption != 0)
+                {
+                    long now = GetWindowLongPtr(handle, GWL_STYLE).ToInt64();
+                    SetWindowLongPtr(handle, GWL_STYLE, new IntPtr(now | caption));
+                }
+            }
+        }
+
         private static bool IsButton(int code)
         {
             return code == Chrome.HTMINBUTTON || code == Chrome.HTMAXBUTTON || code == Chrome.HTCLOSE;
@@ -813,12 +1035,39 @@ namespace CodexAutoResume
             // (SetWindowRgn), or the restored size itself - where WinForms gives the remembered size back a second time.
             bool outer = restoring;
             restoring = outer || before != FormWindowState.Normal;
+            // Before WinForms handles the message - the one place it gives a kept size back (ForgetRestoredSize).
+            ForgetRestoredSize();
             try { pass(ref m); }
             finally { restoring = outer; }
             FormWindowState after = form.WindowState;
-            if (before == FormWindowState.Normal && after != FormWindowState.Normal) restoreClient = client;
+            if (before == FormWindowState.Normal && after != FormWindowState.Normal)
+            {
+                restoreClient = client;
+                ForgetRestoredSize();
+            }
             else if (after == FormWindowState.Normal) restoreClient = Size.Empty;
             return true;
+        }
+
+        private static readonly System.Reflection.FieldInfo RestoredSpecified = typeof(Form).GetField("restoredWindowBoundsSpecified",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        /// v0.6.24 W5: WinForms keeps the client size a window had as it leaves its normal state, and gives it back on the
+        /// way to normal (Form.UpdateWindowState, RestoreWindowBoundsIfNecessary) - as a window size worked out with
+        /// Windows' caption, which Restoring takes back off only where it can tell that is what it is. On the real 150 %
+        /// monitor it could not (M-CORNER 2026-11-16: every restore grew the window by Windows' frame and caption at the
+        /// system's scale; an unsnap, which WinForms remembers nothing for, did not). Forgotten as the window leaves its
+        /// normal state was not enough: WinForms kept it again while the window was maximised (dev CI read All there, on a
+        /// 1024 by 768 screen) and, from maximised, gave it back a moment after the restore (M-CORNER re-check: exact, then
+        /// 0.1 to 0.35 s later 22 x 56 px bigger, again on every round). So it is forgotten before every
+        /// WM_WINDOWPOSCHANGED WinForms handles - the one message it gives it back in - and the window comes back where
+        /// Windows keeps it, its normal position, exactly as it left, as every other window does. A size set while the
+        /// window is maximised is not given back either: Windows' normal position is the one restored.
+        private void ForgetRestoredSize()
+        {
+            if (RestoredSpecified == null) return;
+            try { RestoredSpecified.SetValue(form, BoundsSpecified.None); }
+            catch (Exception) { /* Restoring answers what WinForms asks, as before */ }
         }
 
         /// The size the form's SetBoundsCore is asked for (`created` its CreateParams): on the way back from maximised or
@@ -924,6 +1173,190 @@ namespace CodexAutoResume
             tipWait.Dispose();
             foreach (DragThrough hook in hooks) hook.Let();
             hooks.Clear();
+            foreach (GripThrough grip in grips.Values) grip.Let();
+            grips.Clear();
+        }
+    }
+
+    /// v0.6.24 (the owner, 2026-11-16: a page tab clicked with the mouse kept its blue keyboard ring): focus rings while a
+    /// person moves by keyboard, never after the mouse - "focus-visible". Every control already draws its ring only as
+    /// `Focused && ShowFocusCues`, which follows the top-level window's UISF_HIDEFOCUS; Windows and WinForms clear that
+    /// bit on keyboard input (Tab, Alt, F10) and nothing ever set it again, so once cleared a click left a ring behind.
+    ///
+    /// One filter on the window thread's message loop, for every window of ours with this chrome (ChromeHost.Install) and
+    /// every SoftDialog: a mouse press (left, right, middle or X, in the client area or on the frame) inside one of them -
+    /// or in a popup it owns, a drop-down's list or a menu - sets UISF_HIDEFOCUS on that top-level window again
+    /// (WM_CHANGEUISTATE UIS_SET, which Windows hands down to every control in it) before the press reaches the control,
+    /// so the control it focuses and every other shows no ring. A key after which the focus stands on another control of
+    /// the same window - Tab and Shift+Tab, an arrow along the page tabs or a group, an access key - clears it again
+    /// (UIS_CLEAR), as WinForms does for Tab only: the arrows moved the focus with no ring. A key that moves no focus
+    /// (typing, a drop-down's arrows) changes nothing. Where Windows' own setting shows keyboard cues always
+    /// (SPI_GETKEYBOARDCUES) it ignores the set, and every ring stays: that person's choice. A picture (Soft.StillReady)
+    /// is never given a ring here; the render mode hides them as it always did (WindowRender).
+    internal static class FocusCues
+    {
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr window, int flags);
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr window, int command);
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetFocus();
+        [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+        private const int GA_ROOT = 2, GW_OWNER = 4;
+        internal const int WM_CHANGEUISTATE = 0x0127, WM_QUERYUISTATE = 0x0129;
+        internal const int UIS_SET = 1, UIS_CLEAR = 2, UISF_HIDEFOCUS = 0x1;
+        private const int WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104;
+
+        // The windows watched, by the thread whose loop the filter is on: a window and its dialogs share one.
+        [ThreadStatic] private static HashSet<Form> watched;
+        [ThreadStatic] private static Filter filter;
+
+        /// Watches `form` (idempotent) from the thread it is made on, for as long as it lives.
+        internal static void Watch(Form form)
+        {
+            if (form == null) return;
+            if (watched == null) watched = new HashSet<Form>();
+            if (!watched.Add(form)) return;
+            HashSet<Form> set = watched;
+            form.Disposed += delegate { set.Remove(form); };
+            // v0.6.24-beta.2 (live re-check 8): a window starts with its rings hidden - Windows gives a new window the cues
+            // of the input that came last on the desktop, so a fresh Dashboard started from a script, or one reopened on
+            // another monitor's scale (--reopened=1), showed a ring on its first tab with no key pressed. Hidden as its
+            // window is made (again, when it is made anew) and as it is first shown; the first key that moves the focus
+            // shows them, as ever.
+            form.HandleCreated += delegate
+            {
+                Hide(form, true);
+                // And once what made it has finished: WinForms gives a window made anew the cues its last one had.
+                try { form.BeginInvoke((MethodInvoker)delegate { Hide(form, true); }); }
+                catch (Exception) { }
+            };
+            form.Shown += delegate { Hide(form, true); };
+            if (form.IsHandleCreated) Hide(form, true);
+            if (filter == null)
+            {
+                filter = new Filter();
+                Application.AddMessageFilter(filter);
+            }
+        }
+
+        /// Whether a mouse message is a button going down: WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_XBUTTONDOWN,
+        /// their double-clicks, and the same on the frame (WM_NCLBUTTONDOWN ... WM_NCXBUTTONDBLCLK), the caption included.
+        internal static bool Press(int message)
+        {
+            switch (message)
+            {
+                case 0x0201: case 0x0203: case 0x0204: case 0x0206: case 0x0207: case 0x0209: case 0x020B: case 0x020D:
+                case 0x00A1: case 0x00A3: case 0x00A4: case 0x00A6: case 0x00A7: case 0x00A9: case 0x00AB: case 0x00AD:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// The watched window `window` is in - its top-level window, or the nearest watched owner of a popup it is in.
+        internal static Form Of(IntPtr window)
+        {
+            if (watched == null || watched.Count == 0 || window == IntPtr.Zero) return null;
+            IntPtr root = GetAncestor(window, GA_ROOT);
+            for (int depth = 0; root != IntPtr.Zero && depth < 8; depth++)
+            {
+                var form = Control.FromHandle(root) as Form;
+                if (form != null && watched.Contains(form) && !form.IsDisposed) return form;
+                IntPtr owner = GetWindow(root, GW_OWNER);
+                root = owner == IntPtr.Zero ? IntPtr.Zero : GetAncestor(owner, GA_ROOT);
+            }
+            return null;
+        }
+
+        /// Sets (hidden) or clears the focus rings of `form` and every control in it.
+        internal static void Hide(Form form, bool hidden)
+        {
+            if (form == null || form.IsDisposed || !form.IsHandleCreated || !form.TopLevel) return;
+            int action = (hidden ? UIS_SET : UIS_CLEAR) | (UISF_HIDEFOCUS << 16);
+            SendMessage(form.Handle, WM_CHANGEUISTATE, (IntPtr)action, IntPtr.Zero);
+        }
+
+        private sealed class Filter : IMessageFilter
+        {
+            public bool PreFilterMessage(ref Message m)
+            {
+                try
+                {
+                    int message = m.Msg;
+                    if (Press(message))
+                    {
+                        Hide(Of(m.HWnd), true);
+                    }
+                    else if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN) && Soft.StillReady == null)
+                    {
+                        Form form = Of(m.HWnd);
+                        if (form == null || !form.IsHandleCreated || !form.TopLevel || GetAncestor(m.HWnd, GA_ROOT) != form.Handle)
+                            return false;
+                        IntPtr before = GetFocus();
+                        // Looked at once the key has been handled: the focus moves while it is (ProcessDialogKey).
+                        form.BeginInvoke((MethodInvoker)delegate
+                        {
+                            try
+                            {
+                                if (form.IsDisposed || !form.IsHandleCreated) return;
+                                IntPtr now = GetFocus();
+                                if (now != before && now != IntPtr.Zero && GetAncestor(now, GA_ROOT) == form.Handle) Hide(form, false);
+                            }
+                            catch (Exception) { }
+                        });
+                    }
+                }
+                catch (Exception) { }
+                return false;
+            }
+        }
+    }
+
+    /// A control that reaches into the window's grip band, giving that band to the window (ChromeHost.Grip): its answer
+    /// to what the pointer is over is the window's there (HTTRANSPARENT), its own everywhere else.
+    internal sealed class GripThrough : NativeWindow
+    {
+        private readonly Control control;
+        private readonly ChromeHost host;
+        private bool let;
+
+        internal GripThrough(Control control, ChromeHost host)
+        {
+            this.control = control;
+            this.host = host;
+            control.HandleCreated += delegate { Take(); };
+            control.HandleDestroyed += delegate { if (Handle != IntPtr.Zero) ReleaseHandle(); };
+            Take();
+        }
+
+        private void Take()
+        {
+            if (let || !control.IsHandleCreated || Handle == control.Handle) return;
+            if (Handle != IntPtr.Zero) ReleaseHandle();
+            AssignHandle(control.Handle);
+        }
+
+        internal void Let()
+        {
+            let = true;
+            if (Handle != IntPtr.Zero) ReleaseHandle();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == Chrome.WM_NCHITTEST && !let)
+            {
+                long at = m.LParam.ToInt64();
+                if (host.InGrip(new Point((short)(at & 0xFFFF), (short)((at >> 16) & 0xFFFF))))
+                {
+                    m.Result = (IntPtr)Chrome.HTTRANSPARENT;
+                    return;
+                }
+            }
+            base.WndProc(ref m);
         }
     }
 
@@ -1210,10 +1643,47 @@ namespace CodexAutoResume
         /// The glyph in a box Brand.CaptionGlyph across, centred: minimise a line, maximise a square with small round
         /// corners, restore two of them, close a cross - each in a stroke of Brand.CaptionStroke, never under a device pixel,
         /// with round ends.
-        internal void Glyph(Graphics g, Color ink)
+        /// Where the close cross's ink lies across a button `width` by `height` (Glyph): the ends of its strokes from 1 to 9 of
+        /// its box, with their round caps - the extent the dialog's title row measures its end gap by (ChromeHost.GlyphEnd).
+        internal static RectangleF CrossInk(int width, int height)
         {
             float unit = Soft.PxF(1.0), box = Soft.PxF(Brand.CaptionGlyph);
-            float ox = (float)Math.Round((Width - box) / 2f), oy = (float)Math.Round((Height - box) / 2f);
+            float ox = (float)Math.Round((width - box) / 2f), oy = (float)Math.Round((height - box) / 2f);
+            float half = Math.Max(1f, Soft.PxF(Brand.CaptionStroke)) / 2f;
+            return RectangleF.FromLTRB(ox + unit - half, oy + unit - half, ox + 9 * unit + half, oy + 9 * unit + half);
+        }
+
+        /// The first and last columns the glyph inks as it is drawn at the button's size (X, Y), in the theme's ink on its
+        /// canvas and read as ink past Chrome.InkStep: what the dialog's title row sets the cross's gap to its edge by
+        /// (ChromeHost.GlyphEnd).
+        internal Point InkColumns(Size size)
+        {
+            if (inkFor == size && inkColumns.Y >= 0) return inkColumns;
+            int width = Math.Max(1, size.Width), height = Math.Max(1, size.Height);
+            using (var drawn = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(drawn))
+                {
+                    g.Clear(Palette.Canvas);
+                    glyphAt = new Size(width, height);
+                    try { Glyph(g, Palette.Ink); }
+                    finally { glyphAt = Size.Empty; }
+                }
+                inkColumns = Chrome.InkColumns(drawn, Palette.Canvas, new Rectangle(0, 0, width, height));
+            }
+            inkFor = size;
+            return inkColumns;
+        }
+
+        private Size inkFor, glyphAt;
+        private Point inkColumns = new Point(-1, -1);
+
+        internal void Glyph(Graphics g, Color ink)
+        {
+            // At the button's size - or, read by InkColumns, at the size it is to have (glyphAt), the button untouched.
+            int width = glyphAt.IsEmpty ? Width : glyphAt.Width, height = glyphAt.IsEmpty ? Height : glyphAt.Height;
+            float unit = Soft.PxF(1.0), box = Soft.PxF(Brand.CaptionGlyph);
+            float ox = (float)Math.Round((width - box) / 2f), oy = (float)Math.Round((height - box) / 2f);
             float stroke = Math.Max(1f, Soft.PxF(Brand.CaptionStroke));
             float corner = Soft.PxF(Brand.CaptionGlyphCorner);
             GraphicsState state = g.Save();
@@ -1303,25 +1773,98 @@ namespace CodexAutoResume
     }
 
     /// A dialog of the window's (v0.6.24): a Form whose caption is ours. Its ClientSize means what it says - a Form works
-    /// its window out from its styles, which still count WS_CAPTION - and Soft.DialogBar gives it its title card and the
+    /// its window out from its styles, which still count WS_CAPTION - and Soft.DialogBar gives it its title row and the
     /// caption buttons in it (BuildTitle) as its window is made, once its own code has laid it out: a strip docked at its top, the
-    /// last control it holds and so the first docked (Windows' docking goes from the last-added control inward), the card
-    /// in it 16 px in from the dialog's edges, as its body card is. The dialog grows once by the strip; everything it laid
-    /// out stands below it as it stood, and its own controls keep their places in Controls.
+    /// last control it holds and so the first docked (Windows' docking goes from the last-added control inward). Since
+    /// v0.6.24-beta.2 (the owner's choice B, 2026-11-16) the title is no card: its words and buttons stand on the dialog's own
+    /// ground, in one row 8 px below its top and 8 px above its first card, 16 px in from its edges as its body card is - 42
+    /// logical px where the title card took 62. The dialog grows once by the strip; everything it laid out stands below it as
+    /// it stood, and its own controls keep their places in Controls.
     internal sealed class SoftDialog : Form
     {
         private ChromeHost chrome;
         private Panel titleGround;
-        private SoftCard titleCard;
+        private TitleRowPanel titleRow;
         private Label titleWords;
         internal bool Titled;
 
-        /// The title card, its words, the strip it stands in and the caption it holds (null until the dialog is made): for
+        /// The title row, its words, the strip it stands in and the caption it holds (null until the dialog is made): for
         /// the tests and the audit.
-        internal SoftCard TitleCard { get { return titleCard; } }
+        internal Panel TitleRow { get { return titleRow; } }
         internal Label TitleWords { get { return titleWords; } }
         internal Panel TitleGround { get { return titleGround; } }
         internal ChromeHost CaptionHost { get { return chrome; } }
+
+        /// The title row's measures in logical px: the ground above and below it, and how far in from the side gap its words
+        /// start (the mockup the owner chose).
+        internal const int TitleAbove = 8, TitleWordsInset = 6;
+
+        /// Every dialog of ours, titled or not, shows focus rings for the keyboard only (FocusCues; the owner, 2026-11-16).
+        internal SoftDialog()
+        {
+            FocusCues.Watch(this);
+        }
+
+        /// How far the title's first letter stands in from the dialog's start edge (its left, its right mirrored), in device
+        /// px: the side gap its card keeps (16), the words' inset in their row (TitleWordsInset), and the room Windows' text
+        /// drawing keeps before a first letter (TitleLead). The Close cross stands as far in from the end edge.
+        internal int TitleStart
+        {
+            get
+            {
+                Font font = titleWords == null ? Soft.RoleFont("heading") : titleWords.Font;
+                // In the room the words have once laid out - a long title ends in an ellipsis there, and a mirrored one
+                // drawn short of its room starts where that room says (test_gui_v0611_access, Persian at text size 2.25).
+                Size room = titleWords == null || titleWords.Width <= 1 ? Size.Empty : titleWords.Size;
+                return Soft.Px(16) + Soft.Px(TitleWordsInset) + TitleInkInset(Text, font, Mirror.Of(this), room);
+            }
+        }
+
+        /// v0.6.24-beta.2 (live re-check 7: the title's first letter stood 41 px from the edge and the cross's last ink 34,
+        /// at 150 %): how far in from the title words' start edge their first ink is - the text drawing's padding and the
+        /// first letter's own bearing - as the title draws them (one line, from its left, or its right mirrored), black on
+        /// white and read as Chrome.InkStep reads ink.
+        internal static int TitleInkInset(string text, Font font, bool mirrored)
+        {
+            return TitleInkInset(text, font, mirrored, Size.Empty);
+        }
+
+        /// The same in `room` (the words' own size once laid out; Empty: as wide as they ask), with the ellipsis the words
+        /// end in where the room is short of them.
+        internal static int TitleInkInset(string text, Font font, bool mirrored, Size room)
+        {
+            if (string.IsNullOrEmpty(text) || text.Trim().Length == 0) return TitleLead(font);
+            TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix |
+                                    TextFormatFlags.EndEllipsis;
+            flags |= mirrored ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left;
+            Size size = TextRenderer.MeasureText(text, font, new Size(int.MaxValue, 0), flags);
+            int width = Math.Min(4096, size.Width + 8), height = Math.Max(1, size.Height + 4);
+            if (!room.IsEmpty)
+            {
+                width = Math.Min(4096, Math.Max(1, room.Width));
+                height = Math.Max(1, room.Height);
+            }
+            using (var drawn = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(drawn))
+                {
+                    g.Clear(Palette.Canvas);
+                    TextRenderer.DrawText(g, text, font, new Rectangle(0, 0, width, height), Palette.Ink, Palette.Canvas, flags);
+                }
+                Point ink = Chrome.InkColumns(drawn, Palette.Canvas, new Rectangle(0, 0, width, height));
+                if (ink.X < 0) return TitleLead(font);
+                return mirrored ? width - 1 - ink.Y : ink.X;
+            }
+        }
+
+        /// What a Label's text drawing keeps before its first letter in `font`: half of what its padding adds to the
+        /// text's width (TextRenderer pads both sides alike).
+        internal static int TitleLead(Font font)
+        {
+            int padded = TextRenderer.MeasureText("Ag", font, new Size(int.MaxValue, 0), TextFormatFlags.SingleLine).Width;
+            int bare = TextRenderer.MeasureText("Ag", font, new Size(int.MaxValue, 0), TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width;
+            return Math.Max(0, (padded - bare) / 2);
+        }
 
         /// How much of the dialog's height its title takes once it is made: 0 before.
         internal int TitleReserve { get { return titleGround == null ? 0 : titleGround.Height; } }
@@ -1338,63 +1881,273 @@ namespace CodexAutoResume
         protected override void CreateHandle()
         {
             MakeTitle();
+            // Decided as its window is made: it fades in (OpensWithFade) and is made layered, clear, to do so.
+            fadeIn = TopLevel && Soft.StillReady == null && !Soft.ReduceMotion;
             base.CreateHandle();
         }
 
-        /// Its title card now, if Soft.DialogBar asked for one and it has none yet: for what lays a dialog out without making
+        /// Its title row now, if Soft.DialogBar asked for one and it has none yet: for what lays a dialog out without making
         /// its window (the layout audit's Materialise makes its controls' windows alone).
         internal void MakeTitle()
         {
-            if (Titled && titleCard == null) BuildTitle();
+            Gather();
+            if (Titled && titleRow == null) BuildTitle();
         }
 
         // A control the dialog's code adds after the title (one that needed a window early): the strip stays the last, the
-        // first docked.
+        // first docked; a row docked at its top or foot, or its body, joins the one card as the rest did (Gather).
         protected override void OnControlAdded(ControlEventArgs e)
         {
             base.OnControlAdded(e);
+            if (gathered && e.Control != titleGround && e.Control.Dock != DockStyle.None) Gather();
             if (titleGround != null && e.Control != titleGround && titleGround.Parent == this)
                 Controls.SetChildIndex(titleGround, Controls.Count - 1);
         }
 
+        // ------------------------------------------------------------------------------------------------------------------
+        // v0.6.24-beta.2, layout A (the owner, 2026-11-16, "한 카드에 모두"): under the title row, ONE card holds the dialog's
+        // content and its buttons. A dialog's code lays its body on a card (the Dashboard's DialogBodyCard or DialogListCard: a
+        // card alone on a ground docked to fill) and docks its button row - and any line it keeps above or below its body -
+        // at its top or its foot on the dialog's ground, as it always did; as the window is made those rows move into that
+        // card, in the order they stood: the lines above the body over it, the lines and the buttons below it under it, the
+        // buttons at the card's foot, right-aligned as their row flows (mirrored in a mirrored dialog), ButtonsAbove over
+        // them as the Dashboard's cards keep over theirs. Nothing is left below the card but the ground's own padding. The
+        // dialog's height changes by what the rows take less or more in the card, so its body keeps the height it was laid
+        // out at. A dialog whose body is on no such card is left as it is (the audit finds it: WindowAudit.AuditDialogCard).
+
+        private bool gathered, gathering;
+        private SoftCard bodyCard;
+        private Control cardContent;
+        private readonly List<Control> heads = new List<Control>(), foots = new List<Control>();
+
+        /// The gap over the buttons in the card, and between the body and a line above or below it, in logical px.
+        internal const int ButtonsAbove = 12, LineGap = 8;
+
+        /// The one card holding the dialog's content and its buttons (null until the dialog is made, and where its body is on
+        /// no card): for the tests and the audit.
+        internal SoftCard BodyCard { get { return bodyCard; } }
+
+        /// What the card held before the rows joined it - the body, or the list - in the row that takes the card's height.
+        internal Control CardContent { get { return cardContent; } }
+
+        /// What a row moved into the card takes of its height at `width`: its preferred height when it sizes itself, its own
+        /// height otherwise, nothing while it is hidden (SoftStack.MeasuredRows counts the card's rows by it).
+        internal static int RowHeight(Control row, int width)
+        {
+            if (!Soft.OwnVisible(row)) return 0;
+            return row.AutoSize ? row.GetPreferredSize(new Size(Math.Max(1, width), 0)).Height : row.Height;
+        }
+
+        /// The rows docked at the dialog's top and foot moved into its body's card (see above); again for one added later.
+        internal void Gather()
+        {
+            if (gathering) return;
+            gathering = true;
+            gathered = true;
+            try { GatherRows(); }
+            finally { gathering = false; }
+        }
+
+        private void GatherRows()
+        {
+            Control fill = null;
+            var above = new List<Control>();
+            var below = new List<Control>();
+            // Windows docks from the last-added control inward: of the rows at the top the last added is the topmost, of the
+            // rows at the foot the last added the lowest.
+            for (int i = Controls.Count - 1; i >= 0; i--)
+            {
+                Control child = Controls[i];
+                if (child == titleGround) continue;
+                if (child.Dock == DockStyle.Top) above.Add(child);
+                else if (child.Dock == DockStyle.Bottom) below.Insert(0, child);
+                else if (child.Dock == DockStyle.Fill && fill == null) fill = child;
+            }
+            if (bodyCard == null && fill != null && fill.Controls.Count == 1)
+            {
+                var card = fill.Controls[0] as SoftCard;
+                if (card != null && card.ColumnCount == 1 && card.Controls.Count == 1)
+                {
+                    bodyCard = card;
+                    cardContent = card.Controls[0];
+                }
+            }
+            if (bodyCard == null || (above.Count == 0 && below.Count == 0)) return;
+            Control ground = bodyCard.Parent;
+            int width = ClientSize.Width;
+            int inner = Math.Max(1, width - ground.Padding.Horizontal - bodyCard.Padding.Horizontal);
+            int was = 0, now = 0;
+            foreach (Control row in above) was += RowHeight(row, width);
+            foreach (Control row in below) was += RowHeight(row, width);
+            // Where the keyboard starts, as the dialog's code chose it: taking a row out of the dialog takes the choice with it.
+            Control active = ActiveControl;
+            SuspendLayout();
+            bodyCard.SuspendLayout();
+            try
+            {
+                // Rows of the card's own table, each as tall as it asks, the body's row taking what is left: the body stays
+                // in the card's cell, measured as it always was (two tables deep, SoftStack.Measured).
+                foreach (Control row in above)
+                {
+                    Controls.Remove(row);
+                    Seat(row, false);
+                    heads.Add(row);
+                }
+                foreach (Control row in below)
+                {
+                    Controls.Remove(row);
+                    Seat(row, true);
+                    foots.Add(row);
+                }
+                bodyCard.RowStyles.Clear();
+                bodyCard.RowCount = heads.Count + 1 + foots.Count;
+                int at = 0;
+                foreach (Control row in heads) Place(row, at++, new RowStyle(SizeType.AutoSize));
+                Place(cardContent, at++, new RowStyle(SizeType.Percent, 100f));
+                foreach (Control row in foots) Place(row, at++, new RowStyle(SizeType.AutoSize));
+                var stack = ground as SoftStack;
+                if (stack != null)
+                {
+                    stack.MeasuredRows.Clear();
+                    stack.MeasuredRows.AddRange(heads);
+                    stack.MeasuredRows.AddRange(foots);
+                }
+                foreach (Control row in above) now += RowHeight(row, inner);
+                foreach (Control row in below) now += RowHeight(row, inner);
+            }
+            finally { bodyCard.ResumeLayout(false); }
+            ClientSize = new Size(width, Math.Max(1, ClientSize.Height - was + now));
+            ResumeLayout(true);
+            if (active != null && !active.IsDisposed && active != ActiveControl && Contains(active)) ActiveControl = active;
+        }
+
+        private void Place(Control row, int at, RowStyle style)
+        {
+            bodyCard.RowStyles.Add(style);
+            if (row.Parent == bodyCard) bodyCard.SetCellPosition(row, new TableLayoutPanelCellPosition(0, at));
+            else bodyCard.Controls.Add(row, 0, at);
+        }
+
+        // A row as it stands in the card: across the card's width inside its padding, no inset of its own at the sides, the
+        // gap to the body on the side it faces, on the card's colour.
+        private void Seat(Control row, bool foot)
+        {
+            row.Dock = DockStyle.Fill;
+            row.Margin = new Padding(0);
+            int gap = Soft.Px(foot && Holds<ButtonBase>(row) ? ButtonsAbove : LineGap);
+            row.Padding = foot ? new Padding(0, gap, 0, 0) : new Padding(0, 0, 0, gap);
+            Recolour(row);
+        }
+
+        private static bool Holds<T>(Control row) where T : Control
+        {
+            foreach (Control child in row.Controls)
+                if (child is T) return true;
+            return false;
+        }
+
+        // What stood on the dialog's ground in its colour takes the card's; a text box and a button keep their own.
+        private void Recolour(Control control)
+        {
+            if (control is SoftTextArea || control is ButtonBase) return;
+            if (control.BackColor.ToArgb() == BackColor.ToArgb() || control.BackColor.ToArgb() == Palette.Canvas.ToArgb())
+                control.BackColor = bodyCard.BackColor;
+            foreach (Control child in control.Controls) Recolour(child);
+        }
+
+        /// Esc closes a dialog with nothing to answer, which has no Cancel button for it to press (the owner, 2026-11-16:
+        /// no bottom Close on such a dialog - the title row's X closes it, and Esc still does).
+        protected override bool ProcessDialogKey(Keys keyData)
+        {
+            if (keyData == Keys.Escape && CancelButton == null)
+            {
+                Close();
+                return true;
+            }
+            return base.ProcessDialogKey(keyData);
+        }
+
+        // ------------------------------------------------------------------------------------------------------------------
+        // v0.6.24-beta.2 (the owner, 2026-11-16): while the dialog is open its owner is dimmed (DialogVeil) - shown as the
+        // dialog is, gone as it closes.
+        private DialogVeil veil;
+
+        /// The veil over the owner while the dialog shows (null otherwise): for the tests.
+        internal DialogVeil Veil { get { return veil; } }
+
+        private void Unveil()
+        {
+            DialogVeil was = veil;
+            veil = null;
+            if (was != null) was.Dispose();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            StopFade();
+            Unveil();
+            base.OnFormClosed(e);
+        }
+
         private void BuildTitle()
         {
-            int gap = Soft.Px(16);
+            int gap = Soft.Px(16), above = Soft.Px(TitleAbove);
             titleGround = new Panel();
             titleGround.BackColor = BackColor;
             titleGround.Margin = new Padding(0);
-            titleCard = new SoftCard();
-            titleCard.ColumnCount = 1;
-            titleCard.RowCount = 1;
-            titleCard.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            titleCard.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-            titleCard.Margin = new Padding(0);
+            // The row and its words take the ground's colour from what they stand in: no card of their own.
+            titleRow = new TitleRowPanel();
+            titleRow.Margin = new Padding(0);
             titleWords = new Label();
             titleWords.AutoSize = false;
             titleWords.Dock = DockStyle.Fill;
             titleWords.Margin = new Padding(0);
-            titleWords.Font = Soft.RoleFont("title");
+            // One step under a card's title (RoleFont "title", 1.5 pt larger): the window's font at 600, a heading's.
+            titleWords.Font = Soft.RoleFont("heading");
             titleWords.ForeColor = Palette.Ink;
-            titleWords.BackColor = Palette.Card;
             titleWords.TextAlign = ContentAlignment.MiddleLeft;
             titleWords.AutoEllipsis = true;
             titleWords.UseMnemonic = false;
             titleWords.Text = Text;
-            TextChanged += delegate { if (titleWords != null) titleWords.Text = Text; };
-            titleCard.Controls.Add(titleWords, 0, 0);
+            // The cross follows the words' room as the dialog is laid out and resized (TitleStart).
+            titleWords.SizeChanged += delegate
+            {
+                if (chrome == null) return;
+                int start = TitleStart;
+                if (start == chrome.GlyphEnd) return;
+                chrome.GlyphEnd = start;
+                chrome.Place();
+            };
+            TextChanged += delegate
+            {
+                if (titleWords == null) return;
+                titleWords.Text = Text;
+                // The cross's gap follows the title's first letter (TitleStart).
+                if (chrome != null)
+                {
+                    chrome.GlyphEnd = TitleStart;
+                    chrome.Place();
+                }
+            };
+            titleRow.Controls.Add(titleWords);
             int line = Math.Max(titleWords.Font.Height,
                                 TextRenderer.MeasureText("Ag", titleWords.Font, new Size(int.MaxValue, 0), TextFormatFlags.NoPrefix).Height);
-            int height = Math.Max(line, Soft.Px(Brand.CaptionButtonH)) + 2 * Soft.Px(Brand.CaptionInsetTop);
-            titleGround.Height = gap + height;
+            int height = Math.Max(line, Soft.Px(Brand.CaptionButtonH));
+            titleGround.Height = above + height + above;
             titleGround.Width = ClientSize.Width;
-            titleCard.SetBounds(gap, gap, Math.Max(1, ClientSize.Width - 2 * gap), height);
-            titleCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            titleGround.Controls.Add(titleCard);
-            chrome = ChromeHost.Install(this, titleCard, titleGround);
+            titleRow.SetBounds(gap, above, Math.Max(1, ClientSize.Width - 2 * gap), height);
+            titleRow.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            titleGround.Controls.Add(titleRow);
+            chrome = ChromeHost.Install(this, titleRow, titleGround);
+            chrome.OnGround = true;
             chrome.Drag(titleWords);
-            // The words start where a card's do and stop short of the buttons; the card mirrors its own padding (Mirror.Display).
+            // The words start TitleWordsInset in from the side gap and stop short of the buttons; the row mirrors its own
+            // padding (Mirror.Display).
+            // v0.6.24-beta.2 (the owner, 2026-11-16): the Close cross as far in from the dialog's end edge as the title's
+            // first letter is from its start edge (TitleStart, ChromeHost.GlyphEnd).
+            chrome.GlyphEnd = TitleStart;
             int end = Soft.Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Soft.Px(8);
-            titleCard.Padding = new Padding(Soft.Px(20), Soft.Px(Brand.CaptionInsetTop), end, Soft.Px(Brand.CaptionInsetTop));
+            titleRow.Padding = new Padding(Soft.Px(TitleWordsInset), 0, end, 0);
             int grown = titleGround.Height;
             SuspendLayout();
             titleGround.Dock = DockStyle.Top;
@@ -1404,14 +2157,269 @@ namespace CodexAutoResume
             chrome.Place();
         }
 
+        /// The title row: a plain panel on the dialog's ground whose padding is mirrored in a mirrored dialog, as a card's is.
+        internal sealed class TitleRowPanel : Panel
+        {
+            public override Rectangle DisplayRectangle
+            {
+                get { return Mirror.Display(this, base.DisplayRectangle); }
+            }
+        }
+
         protected override void WndProc(ref Message m)
         {
             if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
+            // Centred on the window that opened it as it is first shown (OnOwner): the caption leaves this message alone.
+            if (m.Msg == WM_WINDOWPOSCHANGING && !placed) OnOwner(m.LParam);
             if (chrome == null && m.Msg == Chrome.WM_NCCALCSIZE && CalcSizeEarly(ref m)) return;
             base.WndProc(ref m);
+            // Shown: the owner dimmed under it (a top-level dialog only - never one the layout audit or a still lays out as a
+            // child); hidden or gone: the veil with it.
+            if (m.Msg == WM_SHOWWINDOW)
+            {
+                if (m.WParam == IntPtr.Zero) Unveil();
+                else
+                {
+                    if (veil == null && TopLevel) veil = DialogVeil.Over(this);
+                    if (cloaked) UncloakSoon();
+                }
+            }
+            else if (m.Msg == WM_DESTROY) Unveil();
+            // Its first paint done: everything in it painted now, then it comes on the screen in its theme.
+            else if (m.Msg == WM_PAINT && cloaked && !uncloaking) Uncloak();
         }
 
-        // The client calculation before the title card exists (the window is being made): the caption is ours from the
+        // ------------------------------------------------------------------ painted before it is seen
+        // v0.6.24-beta.2 (live re-check 7, dark): a dialog's first frames were its unpainted window - about 120 ms of light
+        // grey, then a white bar over its title and a white square at a caption button - before its dark paint. As the
+        // Dashboard's own corner does (WindowCorner.Cloak, c199bf14c), a dialog is made cloaked by DWM and uncloaked once it
+        // and everything in it has painted, so its first visible frame is in its theme; Windows' own opening motion is
+        // left to Windows. Never for one a still takes (Soft.StillReady) nor one laid out as a child.
+
+        [DllImport("dwmapi.dll", EntryPoint = "DwmSetWindowAttribute")]
+        private static extern int DwmSetCloak(IntPtr window, int attribute, ref int value, int size);
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
+
+        private const int WM_PAINT = 0x000F, DWMWA_CLOAK = 13;
+        private const uint RDW_INVALIDATE = 0x0001, RDW_ERASE = 0x0004, RDW_UPDATENOW = 0x0100, RDW_ALLCHILDREN = 0x0080;
+        private bool cloaked, uncloaking;
+        private Timer uncloak;
+
+        /// Whether the dialog is held off the screen until its first paint: for the tests.
+        internal bool Cloaked { get { return cloaked; } }
+
+        /// Whether it came on the screen only after the whole of it had been painted (Uncloak): for the tests.
+        internal bool PaintedBeforeSeen { get; private set; }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            // Clear until it fades in (OpenFade): a layered window is drawn at the alpha last asked of it.
+            if (fadeIn && TopLevel) SetFade(0);
+            if (TopLevel && Soft.StillReady == null && !IsWindowVisible(Handle))
+            {
+                int on = 1;
+                try { cloaked = DwmSetCloak(Handle, DWMWA_CLOAK, ref on, 4) == 0; }
+                catch (Exception) { cloaked = false; }
+            }
+            // Not held off the screen (DWM refused, or a window made anew while shown): no fade, opaque at once.
+            if (fadeIn && TopLevel && !cloaked) SetFade(255);
+        }
+
+        // ------------------------------------------------------------------ its own opening fade
+        // v0.6.24-beta.3 (the owner, 2026-11-17, "우리 거로 하자"): a dialog opens with a fade of ours, not Windows'
+        // transition - which the cloak above had taken away. Held off the screen until it and everything in it is painted,
+        // it comes on fully clear and fades to opaque over brand's transition (Motion.Duration, 160 ms) on brand's curve
+        // (Motion.Ease), stepped as the menus' and the tray popup's openings are (Motion.Interval); the veil over its owner
+        // is on before. With motion reduced - this product's setting, Windows' animations off, High Contrast
+        // (Soft.ReduceMotion) - it is simply there, opaque, and is never layered; never in a still, a render or the audit
+        // (Soft.StillReady, a dialog laid out as a child). Its closing is left as it was. Once opaque it is an ordinary
+        // window again (WS_EX_LAYERED taken off).
+
+        [DllImport("user32.dll")]
+        private static extern bool SetLayeredWindowAttributes(IntPtr window, int key, byte alpha, int flags);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+
+        private const int WS_EX_LAYERED = 0x00080000, GWL_EXSTYLE = -20, LWA_ALPHA = 2;
+        private const uint RDW_FRAME = 0x0400;
+        private bool fadeIn;
+        private int fadeAlpha = 255;
+        private Timer fade;
+        private System.Diagnostics.Stopwatch fading;
+
+        /// Whether it opens with its own fade, and its alpha now (255 once opaque, and for one that does not fade): for
+        /// the tests.
+        internal bool OpensWithFade { get { return fadeIn; } }
+        internal int FadeAlpha { get { return fadeAlpha; } }
+
+        private void SetFade(int alpha)
+        {
+            fadeAlpha = Math.Max(0, Math.Min(255, alpha));
+            try { SetLayeredWindowAttributes(Handle, 0, (byte)fadeAlpha, LWA_ALPHA); }
+            catch (Exception) { }
+        }
+
+        // Uncloaked, painted and clear: from here to opaque.
+        private void OpenFade()
+        {
+            if (!fadeIn || !IsHandleCreated) return;
+            fading = System.Diagnostics.Stopwatch.StartNew();
+            fade = new Timer();
+            fade.Interval = Motion.Interval;
+            fade.Tick += delegate { FadeStep(); };
+            fade.Start();
+        }
+
+        private void FadeStep()
+        {
+            if (!IsHandleCreated || fading == null) { StopFade(); return; }
+            double t = fading.Elapsed.TotalMilliseconds / Math.Max(1, Motion.Duration);
+            if (t < 1.0)
+            {
+                SetFade((int)Math.Round(255 * Motion.Ease(t)));
+                return;
+            }
+            SetFade(255);
+            StopFade();
+            // Opaque: an ordinary window again, drawn whole.
+            try
+            {
+                long style = GetWindowLongPtr(Handle, GWL_EXSTYLE).ToInt64();
+                SetWindowLongPtr(Handle, GWL_EXSTYLE, new IntPtr(style & ~(long)WS_EX_LAYERED));
+                RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+            }
+            catch (Exception) { }
+            fadeIn = false;
+        }
+
+        private void StopFade()
+        {
+            if (fade != null)
+            {
+                fade.Stop();
+                fade.Dispose();
+            }
+            fade = null;
+            fading = null;
+        }
+
+        // Should no paint come (a window shown and hidden at once), it comes on all the same a moment later.
+        private void UncloakSoon()
+        {
+            if (uncloak != null) return;
+            uncloak = new Timer();
+            uncloak.Interval = 500;
+            uncloak.Tick += delegate { Uncloak(); };
+            uncloak.Start();
+        }
+
+        private void Uncloak()
+        {
+            if (uncloak != null)
+            {
+                uncloak.Stop();
+                uncloak.Dispose();
+                uncloak = null;
+            }
+            if (!cloaked || uncloaking || !IsHandleCreated) return;
+            // Everything in it painted now, whatever was painted before - re-check 9 caught one frame of the first dark
+            // Timeline unpainted (a white body, a black band with a white bar): not all of it was waiting to be painted at
+            // its first WM_PAINT. The same when the half-second fallback comes first: never an unpainted frame.
+            bool painted = false;
+            uncloaking = true;
+            try { painted = RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN); }
+            catch (Exception) { }
+            finally { uncloaking = false; }
+            cloaked = false;
+            PaintedBeforeSeen = painted;
+            int off = 0;
+            try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
+            catch (Exception) { }
+            OpenFade();
+        }
+
+        private const int WM_SHOWWINDOW = 0x0018, WM_DESTROY = 0x0002;
+
+        // ------------------------------------------------------------------ centred on the window that opened it
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WINDOWPOS { public IntPtr Window, After; public int X, Y, Width, Height; public uint Flags; }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr window, int command);
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr window, out Chrome.RECT rect);
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out Chrome.RECT rect, int size);
+
+        private const int WM_WINDOWPOSCHANGING = 0x0046, GW_OWNER = 4, DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+        private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_SHOWWINDOW = 0x0040;
+        private bool placed;
+
+        /// The work area of the monitor the window `owner` is on, which a dialog over it is kept inside: what the tests stub.
+        internal static Func<IntPtr, Rectangle> WorkAreaOf = delegate(IntPtr owner) { return Screen.FromHandle(owner).WorkingArea; };
+
+        /// v0.6.24 (the owner, 2026-11-16: wherever the Dashboard is, its dialogs open at its middle, not the monitor's): a
+        /// dialog asked to open centred on its owner (StartPosition.CenterParent) is placed as it is first shown - the last
+        /// moment before it is on a screen, whatever moved it before - its visible box (DWM's frame bounds: Windows'
+        /// invisible borders not counted) centred on its owner's, held inside the work area of the monitor the owner is on
+        /// (Chrome.CentreOn). Only once: a dialog moved by hand stays where it is put. A dialog with no owner on the screen -
+        /// none, or only WinForms' hidden taskbar owner - is left where WinForms put it (CenterScreen).
+        private void OnOwner(IntPtr lParam)
+        {
+            if (lParam == IntPtr.Zero || !IsHandleCreated) return;
+            var pos = (WINDOWPOS)Marshal.PtrToStructure(lParam, typeof(WINDOWPOS));
+            if ((pos.Flags & SWP_SHOWWINDOW) == 0) return;
+            placed = true;
+            if (StartPosition != FormStartPosition.CenterParent || WindowState != FormWindowState.Normal || !TopLevel) return;
+            try
+            {
+                IntPtr owner = GetWindow(Handle, GW_OWNER);
+                if (owner == IntPtr.Zero || !IsWindowVisible(owner) || IsIconic(owner)) return;
+                Chrome.RECT box, ownerBox;
+                if (!GetWindowRect(Handle, out box) || !GetWindowRect(owner, out ownerBox)) return;
+                Rectangle whole = Rectangle.FromLTRB(box.Left, box.Top, box.Right, box.Bottom);
+                Rectangle seen = Seen(Handle, whole);
+                var inset = new Padding(seen.Left - whole.Left, seen.Top - whole.Top, whole.Right - seen.Right, whole.Bottom - seen.Bottom);
+                Size size = (pos.Flags & SWP_NOSIZE) != 0 ? whole.Size : new Size(pos.Width, pos.Height);
+                var visible = new Size(Math.Max(0, size.Width - inset.Horizontal), Math.Max(0, size.Height - inset.Vertical));
+                Rectangle over = Seen(owner, Rectangle.FromLTRB(ownerBox.Left, ownerBox.Top, ownerBox.Right, ownerBox.Bottom));
+                Point at = Chrome.CentreOn(over, visible, WorkAreaOf(owner));
+                pos.X = at.X - inset.Left;
+                pos.Y = at.Y - inset.Top;
+                pos.Flags &= ~SWP_NOMOVE;
+                Marshal.StructureToPtr(pos, lParam, false);
+            }
+            catch (Exception) { /* where WinForms put it */ }
+        }
+
+        // What a person sees of `window`, whose window rectangle is `whole`: DWM's frame bounds, where DWM gives sensible
+        // ones (inside `whole`, no more than 64 px in at a side); otherwise the window rectangle.
+        private static Rectangle Seen(IntPtr window, Rectangle whole)
+        {
+            try
+            {
+                Chrome.RECT r;
+                if (DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS, out r, Marshal.SizeOf(typeof(Chrome.RECT))) != 0)
+                    return whole;
+                Rectangle seen = Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
+                bool sensible = seen.Width > 0 && seen.Height > 0 && whole.Contains(seen)
+                             && seen.Left - whole.Left <= 64 && seen.Top - whole.Top <= 64
+                             && whole.Right - seen.Right <= 64 && whole.Bottom - seen.Bottom <= 64;
+                return sensible ? seen : whole;
+            }
+            catch (Exception) { return whole; }
+        }
+
+        // The client calculation before the title row exists (the window is being made): the caption is ours from the
         // first one, so the window is never laid out with Windows' caption.
         private bool CalcSizeEarly(ref Message m)
         {
@@ -1450,6 +2458,7 @@ namespace CodexAutoResume
             {
                 CreateParams created = base.CreateParams;
                 Chrome.Uncaption(created, ClientSize);
+                if (fadeIn && TopLevel) created.ExStyle |= WS_EX_LAYERED;
                 return created;
             }
         }
@@ -1478,6 +2487,204 @@ namespace CodexAutoResume
             if (IsHandleCreated) return;
             Size client = Chrome.ClientOf(Size, OwnFrame());
             if (client != ClientSize) UpdateBounds(Left, Top, Width, Height, client.Width, client.Height);
+        }
+    }
+    /// The veil over a dialog's owner while the dialog is open (v0.6.24-beta.2, the owner 2026-11-16): the dialog keeps
+    /// Windows' own opening motion, and the window it belongs to is dimmed under it - a dark veil, the shadow's ink at
+    /// about 20 % (the theme's ink in light, its all-but-black shadow in dark, as WindowCorner's shadow takes it), over the
+    /// owner's whole window in its shape: the region of its own corner where it has one (WindowCorner), Windows' round
+    /// corner on Windows 11 otherwise, square when maximised and on Windows 10. One layered popup owned by the owner, just
+    /// under the dialog, that takes no input (WS_EX_TRANSPARENT, HTTRANSPARENT) and never activates (WS_EX_NOACTIVATE,
+    /// MA_NOACTIVATE); faded in over a short while only where motion is allowed (Soft.ReduceMotion), none at all in High
+    /// Contrast, in a still (Soft.StillReady) or for a dialog laid out as a child (the layout audit, WindowRender). A dialog
+    /// opened from a dialog dims its own owner, the dialog under it.
+    internal sealed class DialogVeil : NativeWindow, IDisposable
+    {
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr window, int command);
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern bool IsZoomed(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr window, out Chrome.RECT rect);
+        [DllImport("user32.dll")]
+        private static extern int GetWindowRgn(IntPtr window, IntPtr region);
+        [DllImport("user32.dll")]
+        private static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);
+        [DllImport("user32.dll")]
+        private static extern bool SetLayeredWindowAttributes(IntPtr window, int key, byte alpha, int flags);
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
+        [DllImport("user32.dll")]
+        private static extern int GetDpiForWindow(IntPtr window);
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int width, int height);
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr item);
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out Chrome.RECT value, int size);
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+
+        private const int GW_OWNER = 4, ERROR = 0, NULLREGION = 1, LWA_ALPHA = 2;
+        private const int WS_POPUP = unchecked((int)0x80000000);
+        private const int WS_EX_LAYERED = 0x00080000, WS_EX_TRANSPARENT = 0x00000020, WS_EX_TOOLWINDOW = 0x00000080,
+                          WS_EX_NOACTIVATE = 0x08000000;
+        private const int WM_NCHITTEST = 0x0084, WM_MOUSEACTIVATE = 0x0021, MA_NOACTIVATE = 3, WM_ERASEBKGND = 0x0014;
+        private const uint SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040;
+        private const int DWMWA_TRANSITIONS_FORCEDISABLED = 3, DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+        /// How dark the veil is: 20 % of the shadow's ink in light. In dark (live re-check 7, 2026-11-17, 150 %) 20 % took the
+        /// dark Dashboard's mean grey only from 37.5 to 32 and read as undimmed, where light went from 234 to 192 - a
+        /// luminance ratio of 1.56 (Y 0.823 / 0.527). The dark strength is the one that gives the dark Dashboard that ratio:
+        /// over its measured mean of 37.5 (Y 0.0191) and the dark shadow's ink (about 10, from the 20 % reading:
+        /// (32 - 0.8 x 37.5) / 0.2), a grey of 28.9 (Y 0.0122) asks (37.5 - 28.9) / (37.5 - 10) = 0.31 - so 0.32, about
+        /// 28.7 grey, a ratio of 1.57.
+        internal const double Strength = 0.20, DarkStrength = 0.32;
+
+        /// The strength in the theme the window is drawn in.
+        internal static double StrengthNow { get { return Palette.Dark ? DarkStrength : Strength; } }
+
+        /// Off for every veil from here on (a probe that wants none); on in every window a person opens.
+        internal static bool Enabled = true;
+
+        private readonly Color colour;
+        private readonly byte full;
+        private byte alpha;
+
+        /// The owner it dims, whether it took a shape (a region: the owner's own corner or Windows' round one), its colour
+        /// and the alpha it has now and at its fullest: for the tests.
+        internal IntPtr Owner { get; private set; }
+        internal bool Shaped { get; private set; }
+        internal byte Alpha { get { return alpha; } }
+        internal byte Full { get { return full; } }
+        internal Color Colour { get { return colour; } }
+
+        /// A veil over the owner of `dialog`, which is being shown now, or null where there is to be none.
+        internal static DialogVeil Over(Form dialog)
+        {
+            try
+            {
+                if (!Enabled || dialog == null || !dialog.TopLevel || !dialog.IsHandleCreated) return null;
+                if (Palette.Contrast || Soft.StillReady != null) return null;
+                IntPtr owner = GetWindow(dialog.Handle, GW_OWNER);
+                if (owner == IntPtr.Zero || !IsWindowVisible(owner) || IsIconic(owner)) return null;
+                return new DialogVeil(owner, dialog.Handle);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// The colour of the veil: the shadow's ink (WindowCorner.Shade), never a light one that would glow.
+        internal static Color Ink()
+        {
+            return Palette.Dark ? Tokens.ShadowDark : Palette.Ink;
+        }
+
+        private DialogVeil(IntPtr owner, IntPtr dialog)
+        {
+            Owner = owner;
+            colour = Ink();
+            full = (byte)Math.Round(255 * StrengthNow);
+            Rectangle bounds;
+            IntPtr region = Shape(owner, out bounds);
+            Shaped = region != IntPtr.Zero;
+            var made = new CreateParams();
+            made.Caption = "";
+            made.Style = WS_POPUP;
+            made.ExStyle = WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+            made.Parent = owner;
+            made.X = bounds.X;
+            made.Y = bounds.Y;
+            made.Width = bounds.Width;
+            made.Height = bounds.Height;
+            CreateHandle(made);
+            // Its own fade, never Windows' opening motion for a window.
+            int off = 1;
+            try { DwmSetWindowAttribute(Handle, DWMWA_TRANSITIONS_FORCEDISABLED, ref off, 4); }
+            catch (Exception) { }
+            if (region != IntPtr.Zero && SetWindowRgn(Handle, region, false) == 0)
+            {
+                DeleteObject(region);
+                Shaped = false;
+            }
+            // At its fullest at once and painted now, before the dialog's first frame (live re-check 7: a fade timed on
+            // the dialog's thread came on 130-283 ms after the dialog, in one step, while the dialog painted itself).
+            alpha = full;
+            SetLayeredWindowAttributes(Handle, 0, alpha, LWA_ALPHA);
+            // Just under the dialog, over the owner and whatever else the owner holds.
+            SetWindowPos(Handle, dialog, bounds.X, bounds.Y, bounds.Width, bounds.Height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            try { UpdateWindow(Handle); }
+            catch (Exception) { }
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool UpdateWindow(IntPtr window);
+
+        // The owner's window on the screen and the region the veil takes over it (IntPtr.Zero: its whole rectangle).
+        private static IntPtr Shape(IntPtr owner, out Rectangle bounds)
+        {
+            Chrome.RECT rect;
+            GetWindowRect(owner, out rect);
+            bounds = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+            // A corner of its own: its region, which is in the window's own coordinates (WindowCorner).
+            IntPtr own = CreateRectRgn(0, 0, 0, 0);
+            int kind = GetWindowRgn(owner, own);
+            if (kind != ERROR && kind != NULLREGION) return own;
+            DeleteObject(own);
+            // Windows' frame: what shows of the window, without the resize border it keeps out of sight.
+            Chrome.RECT shown;
+            try
+            {
+                if (DwmGetWindowAttribute(owner, DWMWA_EXTENDED_FRAME_BOUNDS, out shown, Marshal.SizeOf(typeof(Chrome.RECT))) == 0 &&
+                    shown.Right > shown.Left && shown.Bottom > shown.Top)
+                    bounds = Rectangle.FromLTRB(shown.Left, shown.Top, shown.Right, shown.Bottom);
+            }
+            catch (Exception) { }
+            // Windows 11 rounds a window that is not maximised, 8 px at 100 % (DWMWCP_ROUND).
+            if (!WindowShape.Windows11 || IsZoomed(owner)) return IntPtr.Zero;
+            int dpi = 96;
+            try { dpi = Math.Max(96, GetDpiForWindow(owner)); }
+            catch (Exception) { }
+            int across = 2 * (int)Math.Round(8.0 * dpi / 96.0);
+            return CreateRoundRectRgn(0, 0, bounds.Width + 1, bounds.Height + 1, across, across);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_NCHITTEST)
+            {
+                m.Result = (IntPtr)Chrome.HTTRANSPARENT;
+                return;
+            }
+            if (m.Msg == WM_MOUSEACTIVATE)
+            {
+                m.Result = (IntPtr)MA_NOACTIVATE;
+                return;
+            }
+            if (m.Msg == WM_ERASEBKGND && m.WParam != IntPtr.Zero)
+            {
+                try
+                {
+                    using (Graphics g = Graphics.FromHdc(m.WParam)) g.Clear(colour);
+                }
+                catch (Exception) { }
+                m.Result = (IntPtr)1;
+                return;
+            }
+            base.WndProc(ref m);
+        }
+
+        public void Dispose()
+        {
+            if (Handle != IntPtr.Zero) DestroyHandle();
         }
     }
 }

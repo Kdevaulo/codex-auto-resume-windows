@@ -859,22 +859,57 @@ def popup_view(locale: str):
     return strings, model.view(POPUP_NOW)
 
 
-def write_png(path: Path, width: int, height: int, bgra: bytes) -> None:
+PNG_SIGNATURE = bytes((137, 80, 78, 71, 13, 10, 26, 10))
+PARTLY_COVERED = re.compile(bytes((91, 1, 45, 254, 93)))     # a byte from 1 to 254: not clear, not covered
+
+
+def write_png(path: Path, width: int, height: int, bgra: bytes, *, clear: bool = False) -> None:
+    """A PNG of BGRA pixels, as RGBA. The pixels are opaque, as the window's pictures are, or with `clear` the
+    premultiplied pixels of a picture on a clear ground (the card, the popup): written with straight alpha, so what
+    is outside the card is wholly transparent and its float shadow keeps its own alpha."""
     import zlib
+    if clear:
+        rgb, alpha = unpremultiply(bgra)
+        rgba = bytearray(width * height * 4)
+        rgba[0::4], rgba[1::4], rgba[2::4], rgba[3::4] = rgb[0::3], rgb[1::3], rgb[2::3], alpha
+    else:
+        rgba = bytearray(bgra)
+        rgba[0::4], rgba[2::4], rgba[3::4] = bgra[2::4], bgra[0::4], bytes([255]) * (width * height)
     raw = bytearray()
     for y in range(height):
         raw.append(0)
-        line = bgra[y * width * 4:(y + 1) * width * 4]
-        for x in range(width):
-            raw += bytes((line[x * 4 + 2], line[x * 4 + 1], line[x * 4], 255))
+        raw += rgba[y * width * 4:(y + 1) * width * 4]
 
     def chunk(kind, data):
         return (struct.pack(">I", len(data)) + kind + data
                 + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
 
-    write_file(path, b"\x89PNG\r\n\x1a\n"
+    write_file(path, PNG_SIGNATURE
                + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
                + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b""))
+
+
+def unpremultiply(bgra: bytes) -> tuple:
+    """(RGB bytes, alpha bytes) of premultiplied BGRA pixels: the straight colour a PNG holds, and each pixel's
+    coverage. A pixel wholly clear is black and one wholly covered is itself; only the shadow's and the card's soft
+    edges are divided by their coverage, rounded to the nearest."""
+    count = len(bgra) // 4
+    rgb, alpha = bytearray(count * 3), bytes(bgra[3::4])
+    rgb[0::3], rgb[1::3], rgb[2::3] = bgra[2::4], bgra[1::4], bgra[0::4]
+    for found in PARTLY_COVERED.finditer(alpha):
+        at = found.start()
+        cover = alpha[at]
+        for channel in range(3):
+            rgb[at * 3 + channel] = min(255, (rgb[at * 3 + channel] * 255 + cover // 2) // cover)
+    return bytes(rgb), alpha
+
+
+def clear_rgba(bgra: bytes) -> bytes:
+    """Premultiplied BGRA pixels as RGBA with straight alpha, the frames of a picture on a clear ground."""
+    rgb, alpha = unpremultiply(bgra)
+    rgba = bytearray(len(bgra))
+    rgba[0::4], rgba[1::4], rgba[2::4], rgba[3::4] = rgb[0::3], rgb[1::3], rgb[2::3], alpha
+    return bytes(rgba)
 
 
 # Windows occasionally refuses a write to a picture this generator has just written - EINVAL from a
@@ -1118,8 +1153,8 @@ def render_popup(target: Path, locale: str, *, theme: str | None = None, design:
     renderer.theme = theme                      # said, not left to the renderer's default
     renderer.design = design                    # and the design, likewise
     # v0.6.24: the popup is its card alone on the screen - no grey ground of its own, its shadow the desktop's
-    # (layers.py) - so its picture is that card and its float shadow over the theme's canvas, drawn as the screen
-    # has them (`card_still`), as the notification card's pictures are.
+    # (layers.py) - so its picture is that card and its float shadow on a clear ground, drawn as the screen has them
+    # (`card_still`), as the notification card's pictures are: RGBA, nothing but the card and its shadow opaque.
     renderer.lone = True
     try:
         plan = renderer.layout(view, scale, tray_popup.locale_of(strings))
@@ -1138,30 +1173,30 @@ def render_popup(target: Path, locale: str, *, theme: str | None = None, design:
         width, height, first = picture()
         timeline = light_timeline(record) if moving else None
         if timeline is None:
-            write_png(target, width, height, first)
+            write_png(target, width, height, first, clear=True)
             return record
+        rgb, alpha = unpremultiply(first)
 
         def frames():
-            yield timeline.delay, bgra_rgb(first)
+            yield timeline.delay, rgb
             for moment in timeline.moments[1:]:
                 renderer.draw_halo(plan, at(moment))
-                yield timeline.delay, bgra_rgb(picture()[2])
-        write_apng(target, width, height, frames())
+                yield timeline.delay, unpremultiply(picture()[2])[0]
+        write_apng(target, width, height, frames(), alpha)       # only the light moves: the ground stays clear
         return record
     finally:
         renderer.close()
 
 
-def popup_picture(renderer, plan, pad: int, theme: str, design: str) -> tuple:
-    """(width, height, BGRA): the popup's card the renderer last drew alone (`lone`) and its float shadow, as the
-    screen shows the two windows (`card_still`), over the theme's canvas, `pad` px of it round the card. The still
-    pictures and the popup's motion pictures are both this."""
+def popup_picture(renderer, plan, pad: int, theme: str | None = None, design: str | None = None) -> tuple:
+    """(width, height, premultiplied BGRA): the popup's card the renderer last drew alone (`lone`) and its float
+    shadow, as the screen shows the two windows (`card_still`), over nothing - a clear ground, `pad` px of it round
+    the card: the card opaque, its shadow with its own alpha, every other pixel alpha 0 (the owner, 2026-11-16: on
+    the desktop they float with only their own shadow, not on a grey rectangle). The still pictures and the popup's
+    motion pictures are both this; `theme` and `design` are what the renderer was drawn in, which the picture no
+    longer lays a ground of."""
     from codex_auto_resume.ui import popup as tray_popup
-    width, height, still = tray_popup.card_still(renderer, plan, pad)
-    red, green, blue = brand.rgb(brand.palette(theme, design)["canvas"])
-    ground = bytearray(bytes((blue, green, red, 255)) * (width * height))
-    _over(ground, width, still, width, height, 0, 0)
-    return width, height, bytes(ground)
+    return tray_popup.card_still(renderer, plan, pad)
 
 
 def popup_lights(plan, theme: str, design: str, shift=(0, 0)) -> list:
@@ -1175,7 +1210,7 @@ def popup_lights(plan, theme: str, design: str, shift=(0, 0)) -> list:
 
 
 def bgra_rgb(bgra: bytes) -> bytes:
-    """A canvas's BGRA bytes as the RGB an APNG frame is written from."""
+    """An opaque canvas's BGRA bytes as the RGB an APNG frame is written from (a clear one: `unpremultiply`)."""
     count = len(bgra) // 4
     rgb = bytearray(count * 3)
     rgb[0::3] = bgra[2::4]
@@ -1503,8 +1538,9 @@ def popup_render_input(locale: str, drawing: str | None = None, design: str | No
 #
 # The card is drawn here the way `tests/test_notice_card.py` draws it: a `notice_window.Card`
 # with no windows - laid out by `notice_card.layout`, painted by the popup's own renderer at the
-# popup pictures' scale, with its floating shadow - settled, and laid over the theme's canvas,
-# the ground the popup pictures stand on. No window is made and nothing reaches the screen.
+# popup pictures' scale, with its floating shadow - settled, over nothing: a clear ground, as the popup pictures
+# stand on (the owner, 2026-11-16: on the desktop the card floats with only its own shadow). No window is made and
+# nothing reaches the screen.
 #
 # What it says is what the watcher would say, built by the builder the watcher uses
 # (`notifier.build`) from the catalogs: a usage limit detected on the Dashboard sample's first
@@ -1620,7 +1656,9 @@ class _NoStack:
 
 def _over(ground: bytearray, ground_width: int, layer: bytes, width: int, height: int,
           left: int, top: int) -> None:
-    """Premultiplied BGRA `layer` over the opaque BGRA `ground`, its top-left at (left, top)."""
+    """Premultiplied BGRA `layer` over the premultiplied BGRA `ground`, its top-left at (left, top): every channel,
+    the coverage's too, as source-over does it - so over an opaque ground the ground stays opaque, and over a clear
+    one (all zero) the layer is what is left, the card's and its shadow's own alpha."""
     for y in range(height):
         row = layer[y * width * 4:(y + 1) * width * 4]
         base = ((top + y) * ground_width + left) * 4
@@ -1630,17 +1668,18 @@ def _over(ground: bytearray, ground_width: int, layer: bytes, width: int, height
                 continue
             at = base + x * 4
             if alpha == 255:
-                ground[at:at + 3] = row[x * 4:x * 4 + 3]
+                ground[at:at + 4] = row[x * 4:x * 4 + 4]
                 continue
             keep = 255 - alpha
-            for channel in range(3):
+            for channel in range(4):
                 ground[at + channel] = min(255, row[x * 4 + channel]
                                            + (ground[at + channel] * keep + 127) // 255)
 
 
 class _SettledCard:
     """The card at rest, off-screen, and its light at any moment of its breath: `at(ms)` is the whole
-    picture - the card and its floating shadow over the theme's canvas - as BGRA.
+    picture - the card and its floating shadow on a clear ground - as premultiplied BGRA: the card opaque, the
+    shadow with its own alpha, every other pixel alpha 0.
 
     The first picture is the card drawn whole (`Card._draw_card`) and settled; every later one is the
     card's own breath (`Card._draw_light`, the call a card makes for a frame of its light), which draws
@@ -1668,20 +1707,19 @@ class _SettledCard:
         except BaseException:
             self.close()
             raise
-        # The ground reaches as far as the deeper theme's shadow in both, so a light and a dark
+        # The picture reaches as far as the deeper theme's shadow in both, so a light and a dark
         # picture of the same card are the same size and can stand side by side - and as far as
         # Soft's in every design, so a design that floats no shadow (Classic, Plain) is pictured at
-        # the same size, and on the same margin of canvas, as Soft's.
+        # the same size, and on the same margin of clear ground, as Soft's.
         self.pad = pad = max(notice_card.shadow_margin(notice_card.float_shadows(each), scale)
                              for each in (themes or CARD_THEMES))
-        red, green, blue = brand.rgb(brand.palette(theme, design)["canvas"])
         self.card_width, self.card_height = width, height
         self.width, self.height = width + 2 * pad, height + 2 * pad
-        ground = bytearray(bytes((blue, green, red, 255)) * (self.width * self.height))
+        ground = bytearray(self.width * self.height * 4)          # clear: every channel and the alpha 0
         if margin:
             _over(ground, self.width, shadow, width + 2 * margin, height + 2 * margin,
                   pad - margin, pad - margin)
-        self._ground = bytes(ground)                   # the canvas and the shadow, under the card
+        self._ground = bytes(ground)                   # the shadow alone, under the card
         _over(ground, self.width, body, width, height, pad, pad)
         self._first = bytes(ground)
         self.lights = [{"x": item["cx"] + pad, "y": item["cy"] + pad,
@@ -1715,11 +1753,11 @@ class _SettledCard:
 
 def card_pixels(locale: str, theme: str, *, design: str | None = None, scale: float = CARD_SCALE,
                 themes: tuple | None = None):
-    """(width, height, BGRA): the settled card and its floating shadow over the theme's canvas, its
+    """(width, height, premultiplied BGRA): the settled card and its floating shadow on a clear ground, its
     light at the first moment of its breath.
 
-    At CARD_SCALE, on a ground as wide as the deepest shadow of CARD_THEMES; the audit sheets ask
-    for the window's scale and both themes."""
+    At CARD_SCALE, with as much clear ground as the deepest shadow of CARD_THEMES reaches; the audit sheets
+    ask for the window's scale and both themes."""
     settled = _SettledCard(locale, theme, design or brand.DEFAULT_DESIGN, scale, themes)
     try:
         return settled.width, settled.height, settled.at(0)
@@ -1738,10 +1776,12 @@ def render_card(target: Path, locale: str, theme: str, *, design: str | None = N
         record = picture_record("card", theme, design, settled.lights)
         timeline = light_timeline(record) if moving else None
         if timeline is None:
-            write_png(target, settled.width, settled.height, settled.at(0))
+            write_png(target, settled.width, settled.height, settled.at(0), clear=True)
             return record
+        alpha = unpremultiply(settled.at(0))[1]
         write_apng(target, settled.width, settled.height,
-                   ((timeline.delay, bgra_rgb(settled.at(moment))) for moment in timeline.moments))
+                   ((timeline.delay, unpremultiply(settled.at(moment))[0]) for moment in timeline.moments),
+                   alpha)                                  # only the light moves: the ground stays clear
         return record
     finally:
         settled.close()
@@ -3700,7 +3740,7 @@ def input_digest(path: Path) -> str:
 PINNED_DPI = 144
 PINNED_SCALE = PINNED_DPI / 96.0
 # The window's opening client height in logical px (gui/SettingsApp.cs OpeningHeight): a still's whole height.
-OPENING_HEIGHT = 664
+OPENING_HEIGHT = 588
 # The corners Windows rounds a window with at 96 DPI, which build/capture_window.ps1 cuts a capture's round with (8 px at
 # the window's DPI): a still drawn offscreen is cut the same.
 STILL_CORNER = 8

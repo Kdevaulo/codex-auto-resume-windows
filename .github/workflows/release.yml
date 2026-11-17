@@ -257,6 +257,14 @@ jobs:
         shell: pwsh
         run: python build/release_notes.py "$env:VERSION" --output build/dist/release-notes.md
 
+      # The release's title - "v<version> - <short title>" - is read from the first line of the entry
+      # (build/release_notes.py --title fails when the entry has none), and travels with the notes.
+      - name: Take the release title from the entry
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: python build/release_notes.py "$env:VERSION" --title --output build/dist/release-title.txt
+
       - name: Check each archive is what it claims to be
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -333,6 +341,7 @@ jobs:
             build/dist/*.exe
             build/dist/*.sha256
             build/dist/release-notes.md
+            build/dist/release-title.txt
           if-no-files-found: error
 
       - name: Say what a dry run did and did not do
@@ -474,10 +483,13 @@ jobs:
           if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease --latest=false); fi
           # Eight assets: each edition's archive and setup program, and the checksum beside each.
           # The pre-release flags above are the release's, so they apply to every file alike.
+          # The title was written by the build job from the changelog entry; it must start with this version.
+          title="$(cat dist/release-title.txt)"
+          [[ "$title" == "v$VERSION "* ]] || { echo "bad release title '$title'"; exit 1; }
           gh release create "v$VERSION" \
             "$STANDARD_ZIP" "$STANDARD_ZIP.sha256" \
             "$ADVANCED_ZIP" "$ADVANCED_ZIP.sha256" \
             "$STANDARD_SETUP" "$STANDARD_SETUP.sha256" \
             "$ADVANCED_SETUP" "$ADVANCED_SETUP.sha256" \
-            --title "v$VERSION" \
+            --title "$title" \
             --notes-file dist/release-notes.md "${prerelease[@]}"

@@ -182,7 +182,7 @@ namespace CodexAutoResume
         {
             if (chatPage != null) return chatPage;
             var page = (SoftPage)Page();
-            Padding room = CardRoom();
+            Padding room = PageRoom();
             page.Padding = new Padding(0, 0, 0, room.Bottom);
             page.Scrolls = false;
             var stack = new SoftStack();
@@ -201,6 +201,7 @@ namespace CodexAutoResume
             scroll.Margin = new Padding(0);
             scroll.Controls.Add(stack);
             scroll.Scrolls = true;
+            scroll.FadeTop = room.Top;
             scroll.SizeChanged += delegate { FitChatStack(); };
             chatScroll = scroll;
             page.Controls.Add(scroll);

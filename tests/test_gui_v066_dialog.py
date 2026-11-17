@@ -64,6 +64,28 @@ LONG = "That could not be done." + "\r\n\r\n" + "\r\n".join(
     "  at CodexAutoResume.Bridge.Call(String command, String argument) line %d" % line
     for line in range(1, 61))
 
+LOOK = r"""
+# v0.6.24-beta.2 (the owner's layout A): a dialog is its title row and one card holding its words and its buttons
+# (SoftDialog.Gather), so what it shows is looked for through the whole of it - never in the title row - and placed in
+# the dialog's own coordinates. Shared by both probes (LOOK).
+function All($c) { foreach ($k in $c.Controls) { $k; if ($k.GetType().Name -ne 'SoftTextArea') { All $k } } }
+function Within($k, $a) { for ($u = $k; $u -ne $null; $u = $u.Parent) { if ([object]::ReferenceEquals($u, $a)) { return $true } }; return $false }
+function AtX($k, $d) { $x = 0; for ($u = $k; $u -ne $null -and -not [object]::ReferenceEquals($u, $d); $u = $u.Parent) { $x += $u.Left }; return $x }
+function AtY($k, $d) { $y = 0; for ($u = $k; $u -ne $null -and -not [object]::ReferenceEquals($u, $d); $u = $u.Parent) { $y += $u.Top }; return $y }
+# The words (a Label, or the well's text box), the button row (a flow holding buttons) and the well, outside the title.
+function Parts($dialog) {
+    $script:partWords = $null; $script:partWell = $null; $script:partRow = $null
+    $strip = $dialog.GetType().GetProperty('TitleGround', $instance).GetValue($dialog, $null)
+    foreach ($k in @(All $dialog)) {
+        if ($strip -ne $null -and (Within $k $strip)) { continue }
+        if ($script:partRow -eq $null -and $k -is [Windows.Forms.FlowLayoutPanel] -and
+            @($k.Controls | Where-Object { $_ -is [Windows.Forms.Button] }).Count -gt 0) { $script:partRow = $k }
+        if ($script:partWords -eq $null -and $script:partWell -eq $null -and $k -is [Windows.Forms.Label]) { $script:partWords = $k }
+        if ($script:partWell -eq $null -and $k.GetType().Name -eq 'SoftTextArea') { $script:partWell = $k }
+    }
+}
+"""
+
 # Both probes print what the dialog showed, in every language, so they speak UTF-8 and are read
 # as UTF-8: left to the console, the child wrote in whatever code page the parent console had,
 # and the test decoded that with this machine's locale - which failed on a Korean machine whose
@@ -76,6 +98,8 @@ Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
 [Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
 $assembly = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
+# What a person sees of a window: DWM's frame bounds, Windows' invisible resize border not counted.
+Add-Type -Namespace DialogPlace -Name Native -MemberDefinition '[DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(System.IntPtr h, int a, int[] r, int s);'
 $static = [Reflection.BindingFlags]'Static,NonPublic,Public'
 $instance = [Reflection.BindingFlags]'Instance,NonPublic,Public'
 $formType = $assembly.GetType('CodexAutoResume.SettingsForm', $true)
@@ -97,6 +121,7 @@ $window.Show()
 $say = @($formType.GetMethods($instance) | Where-Object { $_.Name -eq 'Say' })[0]
 $careful = @($formType.GetMethods($instance) | Where-Object { $_.Name -eq 'Dialog' })[0]
 
+""" + LOOK + r"""
 # The dialog holds the thread in ShowDialog, so a timer looks at it and presses a button for us.
 $script:seen = $null
 function Ask([string]$text, $affirm, [string]$press, $away = $null) {
@@ -108,41 +133,39 @@ function Ask([string]$text, $affirm, [string]$press, $away = $null) {
         $dialog = [Windows.Forms.Form]::ActiveForm
         if ($dialog -eq $null -or [object]::ReferenceEquals($dialog, $window)) { return }
         try {
-        $row = $null
         $look = @{ words = ''; buttons = @(); client = @($dialog.ClientSize.Width, $dialog.ClientSize.Height)
                    title = [string]$dialog.Text; box = [bool]$dialog.ShowInTaskbar }
-        foreach ($c in $dialog.Controls) {
-            if ($c -is [Windows.Forms.FlowLayoutPanel]) { $row = $c }
-            foreach ($k in $c.Controls) {
-                if ($k -is [Windows.Forms.Label]) { $look.words = [string]$k.Text
-                                                    $look.wordsAt = @($k.Bounds.Left, $k.Bounds.Right) }
-                if ($k.GetType().Name -eq 'SoftTextArea') {
-                    $box = $k.GetType().GetField('Box', $instance).GetValue($k)
-                    $look.words = [string]$box.Text
-                    $look.wordsAt = @($k.Bounds.Left, $k.Bounds.Right)
-                    $look.well = $true
-                    $look.readonly = [bool]$box.ReadOnly
-                }
-                # v0.6.23: a well stands on the dialog's card (DialogBodyCard): the card is what is inset and ends with the buttons.
-                if ($k.GetType().Name -eq 'SoftCard') {
-                    foreach ($w in $k.Controls) {
-                        if ($w.GetType().Name -ne 'SoftTextArea') { continue }
-                        $box = $w.GetType().GetField('Box', $instance).GetValue($w)
-                        $look.words = [string]$box.Text
-                        $look.wordsAt = @(($c.Left + $k.Bounds.Left), ($c.Left + $k.Bounds.Right))
-                        $look.well = $true
-                        $look.readonly = [bool]$box.ReadOnly
-                    }
-                }
-            }
+        Parts $dialog
+        $row = $script:partRow
+        $box = $null
+        if ($script:partWords -ne $null) {
+            $x = AtX $script:partWords $dialog
+            $look.words = [string]$script:partWords.Text
+            $look.wordsAt = @($x, ($x + $script:partWords.Width))
         }
-        foreach ($k in $row.Controls) {
-            $look.buttons += ,@([string]$k.Text, [int]$k.Bounds.Left, [int]$k.Bounds.Right,
-                                [bool]$k.GetType().GetProperty('Primary', $instance).GetValue($k, $null))
+        if ($script:partWell -ne $null) {
+            # v0.6.23: a well is the card's body (DialogBodyCard): the card is what is inset and ends with the buttons.
+            $box = $script:partWell.GetType().GetField('Box', $instance).GetValue($script:partWell)
+            $x = AtX $script:partWell $dialog
+            $look.words = [string]$box.Text
+            $look.wordsAt = @($x, ($x + $script:partWell.Width))
+            $look.well = $true
+            $look.readonly = [bool]$box.ReadOnly
+        }
+        if ($row -ne $null) {
+            foreach ($k in $row.Controls) {
+                $x = AtX $k $dialog
+                $look.buttons += ,@([string]$k.Text, [int]$x, [int]($x + $k.Width),
+                                    [bool]$k.GetType().GetProperty('Primary', $instance).GetValue($k, $null))
+            }
         }
         $look.accept = [string]$dialog.AcceptButton.Text
         $look.cancel = [string]$dialog.CancelButton.Text
         $look.at = @($dialog.Bounds.Left, $dialog.Bounds.Top, $dialog.Bounds.Width, $dialog.Bounds.Height)
+        $frame = New-Object 'int[]' 4
+        if ([DialogPlace.Native]::DwmGetWindowAttribute($dialog.Handle, 9, $frame, 16) -eq 0) {
+            $look.visible = @($frame[0], $frame[1], ($frame[2] - $frame[0]), ($frame[3] - $frame[1]))
+        } else { $look.visible = $look.at }
         $look.owner = @($window.Bounds.Left, $window.Bounds.Top, $window.Bounds.Width, $window.Bounds.Height)
         $look.start = [string]$dialog.StartPosition
         $work = [Windows.Forms.Screen]::FromControl($dialog).WorkingArea
@@ -155,7 +178,11 @@ function Ask([string]$text, $affirm, [string]$press, $away = $null) {
         $script:seen = $look
         $target = if ($press -eq 'accept') { $dialog.AcceptButton } else { $dialog.CancelButton }
         if ($press -eq 'act') { $target = @($row.Controls | Where-Object { $_.Text -eq $affirm })[0] }
-        $target.PerformClick()
+        # A notice has no button of its own (v0.6.24-beta.2): Escape closes it, as SoftDialog answers it.
+        if ($target -eq $null) {
+            $escape = $dialog.GetType().GetMethod('ProcessDialogKey', $instance)
+            $look.escaped = [bool]$escape.Invoke($dialog, [object[]]@([Windows.Forms.Keys]::Escape))
+        } else { $target.PerformClick() }
         } catch { $script:seen = @{ failed = [string]$_ } }
         if (-not $dialog.IsDisposed) { $dialog.Close() }
     })
@@ -219,12 +246,16 @@ class DialogTests(unittest.TestCase):
         self.assertEqual(self.answer["named"]["cancel"], "Cancel")
         self.assertEqual(self.answer["taken"]["cancel"], "Close", "Cancel beside Cancel names nothing either")
 
-    def test_a_notice_has_one_button_and_it_closes(self):
-        notice = self.answer["notice"]
-        self.assertEqual([button[0] for button in notice["buttons"]], ["Close"])
-        self.assertEqual(notice["accept"], "Close")
-        self.assertEqual(notice["cancel"], "Close", "Escape closes it too")
-        self.assertFalse(notice["answer"], "a notice answers nothing")
+    def test_a_notice_has_no_button_and_escape_closes_it(self):
+        """v0.6.24-beta.2 (the owner, 2026-11-16): a dialog with nothing to answer has no Close of its own - the title
+        row's X closes it, and Escape does (SoftDialog.ProcessDialogKey)."""
+        for name in ("notice", "long"):
+            look = self.answer[name]
+            with self.subTest(name):
+                self.assertEqual(look["buttons"], [])
+                self.assertEqual((look["accept"], look["cancel"]), ("", ""), "no button for Enter or Escape to press")
+                self.assertTrue(look["escaped"], "Escape closes it")
+                self.assertFalse(look["answer"], "a notice answers nothing")
 
     def test_the_action_is_the_rightmost_button_and_the_only_accent_one(self):
         buttons = self.answer["named"]["buttons"]
@@ -256,8 +287,9 @@ class DialogTests(unittest.TestCase):
             with self.subTest(name):
                 left, right = look["wordsAt"]
                 self.assertEqual(left, look["client"][0] - right, "the sentence is evenly inset")
-                self.assertEqual(max(button[2] for button in look["buttons"]), right,
-                                 "and the action's button ends where the sentence does")
+                if look["buttons"]:
+                    self.assertEqual(max(button[2] for button in look["buttons"]), right,
+                                     "and the action's button ends where the sentence does")
 
     def test_a_sentence_too_tall_for_a_dialog_goes_in_a_well_and_scrolls_there(self):
         """A refusal carries the local service's own sentence under the translated one, and that is
@@ -270,8 +302,8 @@ class DialogTests(unittest.TestCase):
         self.assertTrue(long["readonly"], "and they cannot be edited")
         self.assertEqual(long["selected"], 0,
                          "a text box answers the focus by selecting everything it holds; this one does not")
-        self.assertEqual(long["focus"], "Close",
-                         "and the keyboard starts on the button, not on the words")
+        self.assertNotIn("Close", [button[0] for button in long["buttons"]],
+                         "nothing to answer: no Close of its own (v0.6.24-beta.2), Escape closes it")
         self.assertEqual(long["words"].count("\n"), LONG.count("\n"),
                          "all of them are there")
         self.assertLessEqual(long["at"][3], self.answer["work"][1], "and the dialog fits the screen")
@@ -298,7 +330,10 @@ class DialogTests(unittest.TestCase):
             look = self.answer[name]
             with self.subTest(name):
                 self.assertEqual(look["start"], "CenterParent")
-                left, top, width, height = look["at"]
+                # Its visible box (DWM's frame bounds), not its window: a dialog keeps Windows' frame, whose invisible
+                # resize border lies past what a person sees, and SoftDialog holds what is seen inside the work area -
+                # its window may reach that border's width past it (CI 43895825113: left -7 against a work area at 0).
+                left, top, width, height = look["visible"]
                 work = look["work"]
                 self.assertGreaterEqual(left, work[0] - 1)
                 self.assertGreaterEqual(top, work[1] - 1)
@@ -346,6 +381,7 @@ $nowhere = [string](Join-Path $env:CAR_WORK 'nowhere')
 $once = $bridgeType.GetConstructors($instance)[0].Invoke([object[]]@($nowhere))
 $bridge = $persistentType.GetConstructors($instance)[0].Invoke([object[]]@($nowhere, $once))
 $three = @($formType.GetConstructors($instance) | Where-Object { $_.GetParameters().Count -eq 3 })[0]
+""" + LOOK + r"""
 $result = @{}
 foreach ($tag in $cases.Keys) {
     $case = $cases[$tag]
@@ -369,25 +405,24 @@ foreach ($tag in $cases.Keys) {
         if ($dialog -eq $null -or [object]::ReferenceEquals($dialog, $window)) { return }
         try {
             $seen = @{ client = @($dialog.ClientSize.Width, $dialog.ClientSize.Height); buttons = @() }
-            foreach ($c in $dialog.Controls) {
+            Parts $dialog
+            $k = $script:partWords
+            if ($k -ne $null) {
+                $flags = [Windows.Forms.TextFormatFlags]::WordBreak -bor [Windows.Forms.TextFormatFlags]::NoPrefix
+                $needs = [Windows.Forms.TextRenderer]::MeasureText($k.Text, $k.Font, (New-Object Drawing.Size $k.Width, 0), $flags)
+                $seen.words = @((AtX $k $dialog), (AtY $k $dialog), $k.Width, $k.Height)
+                $seen.needs = @($needs.Width, $needs.Height)
+            }
+            if ($script:partWell -ne $null) { $seen.well = $true }
+            $c = $script:partRow
+            if ($c -ne $null) {
+                $x = AtX $c $dialog
                 foreach ($k in $c.Controls) {
-                    if ($k -is [Windows.Forms.Label]) {
-                        $flags = [Windows.Forms.TextFormatFlags]::WordBreak -bor [Windows.Forms.TextFormatFlags]::NoPrefix
-                        $needs = [Windows.Forms.TextRenderer]::MeasureText($k.Text, $k.Font,
-                                 (New-Object Drawing.Size $k.Width, 0), $flags)
-                        $seen.words = @($k.Bounds.Left, $k.Bounds.Top, $k.Width, $k.Height)
-                        $seen.needs = @($needs.Width, $needs.Height)
-                    }
-                    if ($k.GetType().Name -eq 'SoftTextArea') { $seen.well = $true }
-                    if ($k.GetType().Name -eq 'SoftCard') { foreach ($w in $k.Controls) { if ($w.GetType().Name -eq 'SoftTextArea') { $seen.well = $true } } }
+                    # Across: in the dialog's coordinates; up and down: in the row's, which the row's height holds.
+                    $seen.buttons += ,@([string]$k.Text, [int]($x + $k.Bounds.Left), [int]($x + $k.Bounds.Right),
+                                        [int]$k.Bounds.Top, [int]$k.Bounds.Bottom)
                 }
-                if ($c -is [Windows.Forms.FlowLayoutPanel]) {
-                    foreach ($k in $c.Controls) {
-                        $seen.buttons += ,@([string]$k.Text, [int]($c.Left + $k.Bounds.Left),
-                                            [int]($c.Left + $k.Bounds.Right), [int]$k.Bounds.Top, [int]$k.Bounds.Bottom)
-                    }
-                    $seen.row = @($c.Left, $c.Top, $c.Width, $c.Height)
-                }
+                $seen.row = @($x, (AtY $c $dialog), $c.Width, $c.Height)
             }
             $script:look = $seen
         } catch { $script:look = @{ failed = [string]$_ } }

@@ -127,7 +127,8 @@ namespace CodexAutoResume
                 CreateParams created = base.CreateParams;
                 if (Soft.StillReady != null) created.ExStyle |= 0x08000000;          // WS_EX_NOACTIVATE
                 // v0.6.24: made at the size its ClientSize says, with no Windows caption (Chrome.Uncaption).
-                Chrome.Uncaption(created, ClientSize);
+                // v0.6.24 W5: with no frame at all while its outer corner is its own.
+                Chrome.Uncaption(created, ClientSize, chrome != null && chrome.Frameless);
                 return created;
             }
         }
@@ -729,6 +730,7 @@ namespace CodexAutoResume
             snapshot = null;
             shownEnabled = null;
             stateDot.State = "idle";
+            lightBefore = "idle";
             TellTaskbar(null, null, 0);
             headline.Text = S("status.unavailable", "Status unavailable");
             detail.Text = S("status.unavailable_detail", "Settings can still be changed and saved");

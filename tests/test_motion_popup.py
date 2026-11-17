@@ -48,11 +48,6 @@ def _by_row(pairs):
     return groups
 
 
-def canvas_colour():
-    from codex_auto_resume import brand
-    return bytes(brand.rgb(brand.palette("light", brand.DEFAULT_DESIGN)["canvas"]))
-
-
 class PopupPlanTests(unittest.TestCase):
     def test_the_popup_is_planned_in_both_languages_and_drawn_only_when_named_or_with_all(self):
         self.assertEqual(make_motion.POPUP_PLANS, ("popup-en", "popup-ko"))
@@ -73,7 +68,9 @@ class PopupPlanTests(unittest.TestCase):
                 self.assertEqual(plan["pointer"], {"rest": [856, 588], "scale": shots.POPUP_SCALE},
                                  "a pointer of the picture's own size, resting right of the popup, off the canvas")
                 self.assertLessEqual(plan["ripple_step"], POINTER_STEP)
-                self.assertNotIn("transparent", plan["canvas"])
+                self.assertIs(plan["canvas"].get("transparent"), True,
+                              "the popup floats on a clear ground, with only its own shadow (the owner, 2026-11-16)")
+                self.assertNotIn("ground", plan["canvas"], "and no canvas colour is laid under it")
                 self.assertEqual(plan["canvas"].get("theme"), shots.THEME)
                 self.assertEqual(make_motion.icon_moments(plan, motion_plan.plan_end(plan)), [])
 
@@ -291,7 +288,7 @@ class PopupDrawnTests(unittest.TestCase):
         cls.plan = plan_of("popup-en")
         cls.frames, _delays, _end = make_motion.schedule(cls.plan)
         cls.width, cls.height = cls.plan["canvas"]["size"]
-        cls.closed = canvas_colour() * (cls.width * cls.height)
+        cls.closed = bytes(cls.width * cls.height * 4)          # a clear canvas: RGBA, every byte 0
         cls.popup = motion_popup.PopupFrames("en", scale=2.0)
 
     @classmethod
@@ -307,12 +304,12 @@ class PopupDrawnTests(unittest.TestCase):
     def changed(self, one, other):
         """(left, top, right, bottom) of the pixels two pictures differ in, or None."""
         width = self.width
-        rows = [y for y in range(self.height) if one[y * width * 3:(y + 1) * width * 3]
-                != other[y * width * 3:(y + 1) * width * 3]]
+        rows = [y for y in range(self.height) if one[y * width * 4:(y + 1) * width * 4]
+                != other[y * width * 4:(y + 1) * width * 4]]
         if not rows:
             return None
-        columns = [x for y in rows for x in range(width) if one[(y * width + x) * 3:(y * width + x) * 3 + 3]
-                   != other[(y * width + x) * 3:(y * width + x) * 3 + 3]]
+        columns = [x for y in rows for x in range(width) if one[(y * width + x) * 4:(y * width + x) * 4 + 4]
+                   != other[(y * width + x) * 4:(y * width + x) * 4 + 4]]
         return min(columns), rows[0], max(columns) + 1, rows[-1] + 1
 
     def test_frame_one_is_the_popup_the_still_generator_draws(self):
@@ -326,6 +323,18 @@ class PopupDrawnTests(unittest.TestCase):
             shots.render_popup(other, "ko")
             self.assertFalse(self.popup.is_the_still(self.frames[0], self.closed, other),
                              "a popup of another language is not the still")
+
+    def test_the_popup_is_on_a_clear_ground_its_card_opaque_and_its_shadow_with_its_own_alpha(self):
+        """The owner, 2026-11-16: the picture is RGBA - nothing at the corners, the card itself opaque, the float
+        shadow soft in between - not the card laid on the window's grey canvas."""
+        picture = self.draw(0)
+        self.assertEqual(len(picture), self.width * self.height * 4)
+        alpha = picture[3::4]
+        for x, y in ((0, 0), (self.width - 1, 0), (0, self.height - 1), (self.width - 1, self.height - 1)):
+            self.assertEqual(alpha[y * self.width + x], 0, "the corner (%d, %d) is clear" % (x, y))
+        self.assertEqual(alpha[(self.height // 2) * self.width + self.width // 2], 255, "the card is opaque")
+        self.assertTrue(any(0 < value < 255 for value in alpha), "and the shadow keeps its own alpha")
+        self.assertEqual(max(alpha), 255)
 
     def first(self, test):
         return next(index for index, frame in enumerate(self.frames) if test(frame))

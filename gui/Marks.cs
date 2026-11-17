@@ -66,6 +66,58 @@ namespace CodexAutoResume
         /// Whether it is on its way (for the tests, and the second line's moment).
         internal bool Sweeping { get { return sweep != null && sweep.Running; } }
 
+        /// The sweep gone at once, nothing of it left (a special egg takes the light: SettingsForm.VersionPressed).
+        internal void StopSweep()
+        {
+            if (sweep == null || !sweep.Running) return;
+            sweep.Jump(0.0);
+            Invalidate();
+        }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-16): the egg of all its colours, at the sixth press on the version - the light
+        /// through each colour it has, in turn, and back to its own. Watching and waiting share the brand's cyan, so the four
+        /// are the four fills it has for a running watcher: watching, needing a person, paused and failed (brand.STATUS_FILL).
+        internal static readonly string[] ColourRunStates = { "monitoring", "attention", "paused", "failed" };
+        internal const int ColourStepMs = 420;
+        private Transition colourRun;
+
+        /// How long the run lasts: each colour's step, and one more back to its own.
+        internal static int ColourRunMs { get { return ColourStepMs * (ColourRunStates.Length + 1); } }
+
+        /// Each colour in turn, once. Nothing with motion reduced or out of sight, and nothing in High Contrast, where the
+        /// light is a system colour.
+        internal void RunColours()
+        {
+            if (!Motion.Allowed(this) || Palette.Contrast) return;
+            if (colourRun == null) colourRun = new Transition(this, 0.0);
+            colourRun.Jump(0.0);
+            colourRun.To(1.0, true, ColourRunMs);
+        }
+
+        /// Whether the colours are on their way (for the tests, and the window's sentence).
+        internal bool ColoursRunning { get { return colourRun != null && colourRun.Running; } }
+
+        /// The run's state `ms` after it began: the colour it is gliding to, or null before it starts and after it ends.
+        internal static string ColourRunStateAt(double ms)
+        {
+            if (ms < 0.0) return null;
+            int index = (int)Math.Floor(ms / ColourStepMs);
+            return index < ColourRunStates.Length ? ColourRunStates[index] : null;
+        }
+
+        /// The colour the run shows `ms` after it began, over the light's own colour `own`: each step glides from the colour
+        /// before into its own in its first half and holds it, and the last glides back to `own`.
+        internal static Color ColourRunAt(double ms, Color own, Func<string, Color> fill)
+        {
+            int steps = ColourRunStates.Length;
+            if (ms <= 0.0 || ms >= ColourRunMs) return own;
+            int index = Math.Min(steps, (int)Math.Floor(ms / ColourStepMs));
+            Color from = index == 0 ? own : fill(ColourRunStates[index - 1]);
+            Color to = index < steps ? fill(ColourRunStates[index]) : own;
+            double t = Math.Min(1.0, (ms - index * ColourStepMs) / (ColourStepMs / 2.0));
+            return Soft.Mix(from, to, Motion.Ease(t));
+        }
+
         /// The arc at `ms`: how much of the circle it covers (clockwise from the top) and how opaque arc and head are.
         internal static void ArcAt(double ms, out double covered, out double opacity)
         {
@@ -237,7 +289,7 @@ namespace CodexAutoResume
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { timer.Stop(); timer.Dispose(); colourGlide.Dispose(); if (sweep != null) sweep.Dispose(); }
+            if (disposing) { timer.Stop(); timer.Dispose(); colourGlide.Dispose(); if (sweep != null) sweep.Dispose(); if (colourRun != null) colourRun.Dispose(); }
             base.Dispose(disposing);
         }
 
@@ -245,7 +297,8 @@ namespace CodexAutoResume
         private Color Shown()
         {
             Color colour = DotColour(state);
-            return colourGlide.Running ? Soft.Mix(colourFrom, colour, colourGlide.Value) : colour;
+            Color own = colourGlide.Running ? Soft.Mix(colourFrom, colour, colourGlide.Value) : colour;
+            return ColoursRunning ? ColourRunAt(colourRun.ElapsedMs, own, DotColour) : own;
         }
 
         protected override void OnPaint(PaintEventArgs e)

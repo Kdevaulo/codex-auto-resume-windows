@@ -939,8 +939,10 @@ namespace CodexAutoResume
     }
 
     /// A tooltip's card (v0.6.23, the design audit's D1): a card of the cards' own material on a layered window - their ground,
-    /// radius, hairline, top light and shadow, as the drop-down's list and the menus are - its words as the window draws them,
-    /// fading in over brand's transition. It takes no input. Windows' tooltip says when (SoftTip).
+    /// radius, hairline and top light - its words as the window draws them, fading in over brand's transition. It takes no
+    /// input. Windows' tooltip says when (SoftTip). Nothing is drawn round it (v0.6.24-beta.2, the owner, 2026-11-16: a
+    /// caption button's tooltip over a dark desktop glowed - the card's lit edge and its pale shadow, the same halo the
+    /// owner had taken off the icon's menu and card on 2026-11-01/02): the window is the card, as theirs are.
     internal sealed class SoftTipWindow : NativeWindow, IDisposable
     {
         [DllImport("user32.dll")]
@@ -951,7 +953,7 @@ namespace CodexAutoResume
                           WS_EX_TOPMOST = 0x00000008;
         private const int SW_SHOWNOACTIVATE = 4;
 
-        private readonly Padding margin = Elevation.Reach("card");
+        private readonly Padding margin = Padding.Empty;
         private readonly Rectangle body;
         private readonly Timer timer = new Timer();
         private readonly System.Diagnostics.Stopwatch clock = new System.Diagnostics.Stopwatch();
@@ -976,7 +978,6 @@ namespace CodexAutoResume
             using (Graphics g = Graphics.FromImage(image))
             {
                 g.Clear(Color.Transparent);
-                Elevation.StampOuter(g, body, "card", radius, new Rectangle(Point.Empty, image.Size));
                 Soft.Body(g, body, radius, Palette.Card, Palette.Line, "card");
             }
             // The words go in as Windows draws them, in the part of the card that is whole, as the list's do (SoftDropList.Face).

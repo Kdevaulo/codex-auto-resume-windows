@@ -326,25 +326,6 @@ namespace CodexAutoResume
         }
     }
 
-    /// Presses one after another: seven, each within 1.8 s of the last, and it says so once and starts again.
-    internal sealed class PressRun
-    {
-        internal const int Wanted = 7;
-        internal const double Gap = 1800.0;
-
-        private double last = double.NegativeInfinity;
-        private int count;
-
-        internal bool Press(double milliseconds)
-        {
-            count = milliseconds - last <= Gap ? count + 1 : 1;
-            last = milliseconds;
-            if (count < Wanted) return false;
-            count = 0;
-            return true;
-        }
-    }
-
     /// A line that can say something else for a moment, coming in and leaving by a fade and a small rise (paint only, in its own
     /// rectangle; immediate with motion reduced). What it is told meanwhile is what it says afterwards.
     internal sealed class AsideLabel : Label
@@ -354,7 +335,7 @@ namespace CodexAutoResume
         private readonly Timer timer = new Timer();
         private readonly Transition fade;
         private string behind, words;
-        private bool waiting, aside;
+        private bool waiting, aside, arriving;
         private int holdMs;
 
         internal AsideLabel()
@@ -364,12 +345,36 @@ namespace CodexAutoResume
             timer.Tick += delegate
             {
                 timer.Stop();
-                if (waiting) Speak();
+                if (arriving) Arrived();
+                else if (waiting) Speak();
                 else Return();
             };
         }
 
         internal bool Saying { get { return aside; } }
+
+        /// Whether its own words are held back until they come in (Arrive), for the tests.
+        internal bool Arriving { get { return arriving; } }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-16): its own words - whatever it is told meanwhile - held back for `delayMs`
+        /// and then coming in exactly as they come back after an aside (Return: OutMs, the same fade and rise), as the status
+        /// light's sweep ends. Nothing while an aside is on its way or being said, and nothing where it may not move
+        /// (Motion.Allowed): there the line is simply there.
+        internal void Arrive(int delayMs)
+        {
+            if (aside || waiting || arriving || !Motion.Allowed(this)) return;
+            arriving = true;
+            Invalidate();
+            timer.Stop();
+            timer.Interval = Math.Max(1, delayMs);
+            timer.Start();
+        }
+
+        private void Arrived()
+        {
+            arriving = false;
+            Glide(OutMs);
+        }
 
         /// Whether it is fading in or out (for the tests).
         internal bool Fading { get { return fade.Running; } }
@@ -384,10 +389,27 @@ namespace CodexAutoResume
             }
         }
 
+        /// Its own words back at once, with no fade: an aside on its way or being said is gone, and nothing of it is left
+        /// (a special egg clears the one-press egg's sentence before its own: SettingsForm.VersionPressed).
+        internal void Unsay()
+        {
+            if (!aside && !waiting) return;
+            timer.Stop();
+            aside = false;
+            waiting = false;
+            arriving = false;
+            base.Text = behind;
+            fade.Jump(1.0);
+            Invalidate();
+        }
+
         /// In `delayMs` it says `said`, for `heldMs`.
         internal void Aside(string said, int delayMs, int heldMs)
         {
+            bool saying = aside;
             if (!aside && !waiting) behind = base.Text;
+            // Its own words, if they were still to come in, come back after the aside as they always do.
+            arriving = false;
             words = said;
             holdMs = heldMs;
             timer.Stop();
@@ -397,6 +419,13 @@ namespace CodexAutoResume
             {
                 Speak();
                 return;
+            }
+            // Asked again while it says `said` (v0.6.24-beta.2: each press on the version): from its start, as the first time -
+            // its own words back now, the sentence again in `delayMs` - never the sentence held on until then.
+            if (saying)
+            {
+                base.Text = behind;
+                Glide(OutMs);
             }
             timer.Interval = delayMs;
             timer.Start();
@@ -427,6 +456,8 @@ namespace CodexAutoResume
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            // Its words still to come in (Arrive): the ground alone, which Label's background already painted.
+            if (arriving) return;
             if (!aside && !fade.Running)
             {
                 base.OnPaint(e);
@@ -1399,7 +1430,9 @@ namespace CodexAutoResume
             if (request.RowDialog != null) rowAsked = request.RowDialog;
 
             nav.Dock = DockStyle.Top;
-            nav.Padding = Pad(12, 0, 14, 0);
+            // NavTop above the tabs: TabRowGap from the header card's foot to their faces (PageRoom); at either end Brand.PillInset
+            // inside the header card's edges (NavStart, NavEnd; mirrored, SoftPage mirrors its padding).
+            nav.Padding = Pad(NavStart, NavTop, NavEnd, 0);
             var strip = new SoftFlow();
             strip.Dock = DockStyle.Fill;
             strip.FlowDirection = FlowDirection.LeftToRight;
@@ -1434,6 +1467,7 @@ namespace CodexAutoResume
             }
             strip.ResumeLayout(true);
             nav.Controls.Add(strip);
+            BuildVersionPill(strip);
             // As tall as the tabs, measured, and again whenever the window's font changes - with the room the chosen
             // tab's heavier words take (ShowPage sets it in nav_current): in Microsoft YaHei UI the bold is a face of
             // its own, a pixel taller than the regular, and the chosen tab was cut off at the strip's foot (v0.6.17).
@@ -1500,6 +1534,9 @@ namespace CodexAutoResume
                 Control page = PageFor(name);
                 // v0.6.23: what came while it was out of sight, written before it shows (Writes).
                 WriteIfStale(name);
+                // v0.6.24-beta.2: the save bar on Settings alone, inside the height every page has - set before the page is
+                // laid out, so it is laid out once in the room it has.
+                if (Soft.OwnVisible(footer) != settings) footer.Visible = settings;
                 // Every page stays in the host once built and only the one shown is visible: taking a
                 // page off and putting the next on moved every native control in it to Windows'
                 // parking window and back.
@@ -1549,6 +1586,12 @@ namespace CodexAutoResume
                 if (hostHeld) pageHost.ResumeLayout(false);
                 if (paused) Redraw(pageHost, true);
             }
+            // v0.6.24-beta.2 (M-CORNER re-check 8, odd item 1): the page shown painted whole now, with its tab, before anything
+            // queued for the window runs. A paint is the last thing a window's thread takes, so a first switch to Diagnostics
+            // painted a control at a time between the answers that came meanwhile - the compatibility card's first answer held
+            // the thread 0.7-1.5 s - and a person saw Diagnostics' top over the Overview, its Start watcher cut in half, for
+            // seconds.
+            if (paused) PaintNow(this);
             // Coming back to Pending: the countdowns the clock did not write while it was hidden.
             if (name == "pending" && snapshot != null) WriteCountdowns(Now());
             if (auditing) return;
@@ -1562,6 +1605,16 @@ namespace CodexAutoResume
             // after a read asked for the same answer again - 17-87 ms of Python and up to 45 ms of
             // redrawing, for nothing new.
             if (!settings && (snapshot == null || snapshotAge.ElapsedMilliseconds >= FreshMilliseconds)) RefreshNow();
+        }
+
+        private const int RDW_UPDATENOW = 0x0100;
+
+        /// v0.6.24-beta.2: everything in `control` that waits to be painted, painted now (RDW_UPDATENOW), not once the thread
+        /// has nothing else to do.
+        private static void PaintNow(Control control)
+        {
+            if (control.IsHandleCreated && !control.IsDisposed)
+                RedrawWindow(control.Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN);
         }
 
         /// A page, built the first time it is shown. Building all five before the first screen
@@ -1797,7 +1850,7 @@ namespace CodexAutoResume
 
         /// v0.6.23 (F2): whether this idle turn takes no step, of the pages made ready ahead or of the Settings editors: a
         /// glide is on its way on the window's thread (Transition.Moving - a button's or a tab's hover and press, the
-        /// light's colour, the Statistics bars, the seven-press sweep), or a key or the mouse came within
+        /// light's colour, the Statistics bars, the version's sweep and its colours), or a key or the mouse came within
         /// PrepareAfterInputMilliseconds. A step taken between two frames of a glide held the glide for the step's length:
         /// a hover's 160 ms came in one jump to its end. The light's breath is no glide (its own timer, never still for
         /// long): it is kept moving by steps that each end within about PrepareSliceMilliseconds.
@@ -2344,7 +2397,8 @@ namespace CodexAutoResume
             page.Dock = DockStyle.Fill;
             // A page may scroll, and while it does it is the edge of the shadows on it (see Ground):
             // the cards' lift is kept inside its padding.
-            page.Padding = CardRoom();
+            page.Padding = PageRoom();
+            page.FadeTop = page.Padding.Top;
             page.Scrolls = true;
             return page;
         }

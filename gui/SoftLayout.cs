@@ -21,12 +21,18 @@ namespace CodexAutoResume
         /// When set, its preferred size is this control's at the width left inside, and Around (a dialog's card, DialogBodyCard).
         internal Control Measured;
         internal Size Around;
+        /// v0.6.24-beta.2: the rows its dialog moved into the card beside Measured - the dialog's buttons and the lines above
+        /// and below its body (SoftDialog.Gather) - each measured at the same width and counted while it shows.
+        internal readonly List<Control> MeasuredRows = new List<Control>();
 
         public override Size GetPreferredSize(Size proposedSize)
         {
             if (Measured == null) return base.GetPreferredSize(proposedSize);
             int width = proposedSize.Width > 1 && proposedSize.Width < 0x100000 ? proposedSize.Width : Width;
-            return new Size(width, Measured.GetPreferredSize(new Size(Math.Max(1, width - Around.Width), 0)).Height + Around.Height);
+            int inner = Math.Max(1, width - Around.Width);
+            int tall = Measured.GetPreferredSize(new Size(inner, 0)).Height + Around.Height;
+            foreach (Control row in MeasuredRows) tall += SoftDialog.RowHeight(row, inner);
+            return new Size(width, tall);
         }
 
         internal SoftStack()
@@ -247,6 +253,12 @@ namespace CodexAutoResume
 
         /// Whether it holds more than fits, so the bar is showing.
         internal bool Overflowing { get { return scrolls && overflow; } }
+
+        /// v0.6.24-beta.2 (the live re-check 8, 2026-11-17): how tall a band at its top fades what is stamped on its ground -
+        /// its cards' lift - into the ground while it scrolls, so the shadow over its first card ends in nothing rather than
+        /// in a straight line where the page begins (Ground.Stamps). The tab row's gap leaves a page too little room above
+        /// its first card for the whole of a card's lift. 0: none.
+        internal int FadeTop;
 
         /// Asks for what it holds to be laid out once more before its layout ends: something in it (SoftPin)
         /// was laid out with less room than it needs, measured before what it holds changed under it.

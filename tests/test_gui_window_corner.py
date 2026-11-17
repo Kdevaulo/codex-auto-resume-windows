@@ -7,7 +7,8 @@ a console probe (no window, nothing on the screen) and composited over white, bl
 the corner sampled 16 x 16 per pixel, the same hairline, the same shadow (plans/v0624-stage1-design.md 5.3):
 
 * every channel within 2 levels of the ideal;
-* no double cover - no pixel inside the region the companion also paints;
+* no double cover - no pixel inside the region the companion also paints, but the hairline, opaque over the window
+  (v0.6.24 M-CORNER: the window's outermost pixel is its own, to resize it by);
 * no gap - no pixel the corner covers by more than 1/255 that neither paints;
 * the region GDI makes from the rectangles is exactly the window's own pixels;
 * the fast composition (corner blocks, straight edges repeated) is the per-pixel one, pixel for pixel.
@@ -365,7 +366,9 @@ class CompositeTests(unittest.TestCase):
                 value = pixels[cy * across + cx]
                 alpha = value >> 24
                 mine = 0 <= x < width and 0 <= y < height and own[y * width + x]
-                if mine and value:
+                # Inside the region the companion paints only the hairline, opaque, over the window (Edge.Own: the
+                # window's outermost pixel is the window's, to resize it by).
+                if mine and value and alpha != 255:
                     double.append((x, y))
                 outer, inner = ideal.covers(x, y)
                 if outer > 1 / 255.0 and not mine and alpha == 0:
@@ -376,9 +379,9 @@ class CompositeTests(unittest.TestCase):
                     under = _background(name, cx, cy)
                     for c in range(3):
                         want = GROUND[c] * inner + LINE[c] * (outer - inner) + (1.0 - outer) * under[c] * (1.0 - shadow)
-                        got = GROUND[c] if mine else painted[c] + under[c] * (255 - alpha) / 255.0
+                        got = (painted[c] if alpha == 255 else GROUND[c]) if mine else painted[c] + under[c] * (255 - alpha) / 255.0
                         worst = max(worst, abs(round(got) - want))
-        self.assertEqual(double[:5], [], "the companion paints inside the region")
+        self.assertEqual(double[:5], [], "the companion paints inside the region other than the opaque hairline")
         self.assertEqual(gaps[:5], [], "a pixel the corner covers that neither paints")
         self.assertLessEqual(worst, 2.0, "a channel further than 2 levels from the ideal")
 
@@ -503,9 +506,9 @@ class SwitchTests(unittest.TestCase):
         wanted = guiscan.member_body("WindowShape", "Wanted")
         self.assertIn("Switch && Windows11", wanted)
         self.assertIn("internal static readonly bool Switch = Brand.WindowSquircle;", guiscan.read("gui/SoftWindowShape.cs"))
-        # Only the Dashboard asks, and only after its caption is installed.
-        askers = [path.name for path in (ROOT / "gui").glob("*.cs") if ".OwnCorner()" in path.read_text(encoding="utf-8")]
-        self.assertEqual(askers, ["SettingsApp.cs"])
+        # Only the Dashboard and the setup window ask (owner 2026-11-16), each after its caption is installed.
+        askers = sorted(path.name for path in (ROOT / "gui").glob("*.cs") if ".OwnCorner()" in path.read_text(encoding="utf-8"))
+        self.assertEqual(askers, ["InstallerWindow.cs", "SettingsApp.cs"])
         self.assertIn("chrome.OwnCorner();", guiscan.read("gui/SettingsApp.cs"))
         self.assertIn("if (chrome != null && chrome.Frameless) return Padding.Empty;",
                       guiscan.member_body("SettingsForm", "OwnFrame"))

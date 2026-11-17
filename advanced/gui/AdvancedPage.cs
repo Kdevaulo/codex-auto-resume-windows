@@ -571,7 +571,7 @@ namespace CodexAutoResume
             // The list's card on the page, and the open capability's cards in a column that scrolls, which keeps the
             // room for their lift itself, as a Settings section does: so the page keeps it only where the list's card
             // is, and the two cards' tops are level.
-            Padding room = CardRoom();
+            Padding room = PageRoom();
             page.Padding = new Padding(room.Left, 0, 0, room.Bottom);
 
             advancedList = List(Word("page.nav", "Advanced features"),
@@ -613,6 +613,7 @@ namespace CodexAutoResume
             scroll.Margin = new Padding(0);
             scroll.Controls.Add(stack);
             scroll.Scrolls = true;
+            scroll.FadeTop = room.Top;
             scroll.SizeChanged += delegate { FitAdvancedStack(); };
             advancedScroll = scroll;
 

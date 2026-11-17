@@ -12,8 +12,9 @@ never shown (no WS_VISIBLE, nothing on the screen), and asks:
   counts WS_CAPTION (Form.RestoreWindowBoundsIfNecessary); ChromeHost.Restoring answers it without. Maximised by its
   style and SetWindowPos, as Windows' own maximise leaves it, so nothing is shown;
 - what the pointer is over on the Dashboard: the tab strip's ground and the save bar's ground drag the window as the hero
-  does (HTCAPTION, design 3.4, O7); a tab, the save bar's card with its buttons and the version, and the page are the
-  client's (the save bar is never dragged: test_gui_chrome_sources). With the window's own outer corner (W5) it has no
+  does (HTCAPTION, design 3.4, O7); a tab, the save bar's card with its buttons, and the page are the client's (the save
+  bar is never dragged: test_gui_chrome_sources). v0.6.24-beta.2: the save bar is on Settings alone, and the version is a
+  pill at the end of the tabs - pressed, so the client's, while the ground of its slot drags as the strip's does. With the window's own outer corner (W5) it has no
   frame and its resize grips are a band inside its edge (design 5.2 item 4), SM_CXSIZEFRAME + SM_CXPADDEDBORDER wide at
   its DPI - the side under the pointer, mirrored too: a ground's point sits just inside that band, and the band's own
   pixels resize;
@@ -190,6 +191,8 @@ namespace CodexAutoResume
             var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, null);
             form.auditing = true;
             form.ClientSize = form.OpeningClient;
+            // A version and an advanced edition's word, so the tabs' pill shows (FitVersionPill).
+            form.ShowVersion(form.versionText, new Dictionary<string, object> { { "version", "0.6.24-beta.2" }, { "edition", "advanced" } });
             form.StartPosition = FormStartPosition.Manual;
             form.Location = new Point(60, 40);
             IntPtr h = form.Handle;
@@ -237,22 +240,40 @@ namespace CodexAutoResume
             said["navPastTabs"] = (double)TopLevelRoute(form, new Point(past, middle));
             said["navPastTabsInStrip"] = stripFace.Contains(past, middle);
             said["tab"] = (double)TopLevelHit(form, form.navButtons["overview"], 12, 12);
-            // The save bar: the footer's ground round its card, the card's own face between the version and the buttons, a
-            // button, and the version.
-            // 3 px in from its top left - or, with the window's own corner, just inside the grip band.
+            // v0.6.24-beta.2: the version's pill at the end of the tabs, its words and its own padding, and the ground of the
+            // slot it stands in, between it and the tabs.
+            said["pillFit"] = form.PillFit;
+            said["version"] = (double)TopLevelHit(form, form.versionText, form.versionText.Width / 2, form.versionText.Height / 2);
+            said["pill"] = (double)TopLevelHit(form, form.versionPill, 2, form.versionPill.Height / 2);
+            Rectangle slot = form.pillSlot.RectangleToScreen(form.pillSlot.ClientRectangle);
+            said["pillSlot"] = (double)TopLevelRoute(form, new Point(mirrored ? slot.Right - 3 : slot.Left + 3, middle));
+            said["page"] = (double)TopLevelHit(form, form.pageHost, form.pageHost.Width / 2, form.pageHost.Height / 2);
+            // Nothing at the foot of any page but Settings: the page reaches the window's bottom.
+            said["footerOutsideSettings"] = Soft.OwnVisible(form.footer);
+            said["pageToBottom"] = (double)(form.ClientSize.Height - form.pageHost.Bottom);
+            // The page's foot is the page's - just above the grip band when the corner is the window's own, as that band
+            // (the corner fixer's E) gives the window's bottom pixels to resizing - and the window's last pixel resizes it.
+            said["pageAtBottom"] = (double)TopLevelHit(form, form.pageHost, form.pageHost.Width / 2,
+                                                       form.pageHost.Height - 4 - (frameless ? band : 0));
+            said["pageLastPixel"] = (double)TopLevelHit(form, form.pageHost, form.pageHost.Width / 2, form.pageHost.Height - 1);
+            said["hero"] = (double)TopLevelHit(form, form.hero, form.hero.Width / 2, 6);
+            // The save bar, on Settings: the footer's ground round its card, the card's own face beside its buttons, and a
+            // button. 3 px in from its top left - or, with the window's own corner, just inside the grip band.
+            form.footer.Visible = true;
+            form.PerformLayout();
+            Application.DoEvents();
             Rectangle footerFace = form.footer.RectangleToScreen(form.footer.ClientRectangle);
             int footerX = footerFace.Left + 3;
             if (frameless) footerX = Math.Max(footerX, whole.Left + band);
             said["footerGround"] = (double)TopLevelRoute(form, new Point(footerX, footerFace.Top + 3));
-            Rectangle version = form.versionText.RectangleToScreen(form.versionText.ClientRectangle);
-            Rectangle close = form.closeButton.RectangleToScreen(form.closeButton.ClientRectangle);
             Rectangle bar = form.savebar.RectangleToScreen(form.savebar.ClientRectangle);
-            int between = mirrored ? (close.Right + version.Left) / 2 : (version.Right + close.Left) / 2;
-            said["savebarFace"] = (double)TopLevelRoute(form, new Point(between, bar.Top + bar.Height / 2));
-            said["saveButton"] = (double)TopLevelHit(form, form.closeButton, form.closeButton.Width / 2, form.closeButton.Height / 2);
-            said["version"] = (double)TopLevelHit(form, form.versionText, form.versionText.Width / 2, form.versionText.Height / 2);
-            said["page"] = (double)TopLevelHit(form, form.pageHost, form.pageHost.Width / 2, form.pageHost.Height / 2);
-            said["hero"] = (double)TopLevelHit(form, form.hero, form.hero.Width / 2, 6);
+            Rectangle restore = form.restoreButton.RectangleToScreen(form.restoreButton.ClientRectangle);
+            int beside = mirrored ? (restore.Right + bar.Right) / 2 : (bar.Left + restore.Left) / 2;
+            said["savebarFace"] = (double)TopLevelRoute(form, new Point(beside, bar.Top + bar.Height / 2));
+            said["saveButton"] = (double)TopLevelHit(form, form.restoreButton, form.restoreButton.Width / 2, form.restoreButton.Height / 2);
+            form.footer.Visible = false;
+            form.PerformLayout();
+            Application.DoEvents();
             return said;
         }
 
@@ -464,7 +485,7 @@ class TopLevelChromeTests(unittest.TestCase):
         for border in ("FixedDialog", "Sizable"):
             said = self.answer["opened-" + border]
             with self.subTest(border=border):
-                self.assertGreater(said["reserve"], 26 + 20)
+                self.assertGreaterEqual(said["reserve"], 8 + 26 + 8, "v0.6.24-beta.2: the title row on the ground")
                 self.assertEqual(said["clientSize"], [600, 400 + said["reserve"]])
                 self.assertEqual(said["client"][2:], [600, 400 + said["reserve"]], "Windows' client rectangle")
                 self.assertEqual(said["window"][2:], said["expectedWindow"], "no Windows caption in the window's height")
@@ -485,10 +506,15 @@ class TopLevelChromeTests(unittest.TestCase):
             said = self.answer["grounds-" + locale]
             with self.subTest(locale=locale):
                 self.assertTrue(said["navPastTabsInStrip"], "the point past the last tab is on the strip")
-                for ground in ("navEdge", "navPastTabs", "footerGround", "hero"):
+                self.assertEqual(said["pillFit"], "whole", "the version's pill shows, with the edition")
+                for ground in ("navEdge", "navPastTabs", "pillSlot", "footerGround", "hero"):
                     self.assertEqual(said[ground], HTCAPTION, ground)
-                for control in ("tab", "savebarFace", "saveButton", "version", "page"):
+                for control in ("tab", "savebarFace", "saveButton", "version", "pill", "page", "pageAtBottom"):
                     self.assertEqual(said[control], HTCLIENT, control)
+                self.assertFalse(said["footerOutsideSettings"], "a footer under a page other than Settings")
+                self.assertEqual(said["pageToBottom"], 0, "the page reaches the window's bottom")
+                if said["frameless"]:
+                    self.assertEqual(said["pageLastPixel"], 15, "the window's last pixel under a page resizes it (HTBOTTOM)")
 
     def test_with_its_own_corner_the_window_resizes_from_a_band_inside_its_edge_as_wide_as_windows_frame(self):
         HTLEFT, HTRIGHT = 10, 11

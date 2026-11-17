@@ -212,11 +212,11 @@ class RenderTests(unittest.TestCase):
         width, height = self.result["client"]
         scale = self.result["dpi_scale"]
         self.assertEqual(width, round(1000 * scale))
-        # v0.6.24: the window opens taller by what its header grew for the caption buttons (SettingsForm.OpeningClient:
-        # 16 px at 100 % in English), never past Windows' title bar and top frame it no longer has (31 px at 100 %), as
-        # test_pinned_render_size holds it.
-        self.assertGreaterEqual(height, round(664 * scale))
-        self.assertLessEqual(height, round(664 * scale) + int(round(31 * scale)))
+        # v0.6.24: the window opens taller by what its header card grew past its 76 px (SettingsForm.OpeningClient: none in
+        # English), never past Windows' title bar and top frame it no longer has (31 px at 100 %), as
+        # test_pinned_render_size holds it. 1000 by 588 from v0.6.24-beta.2 (664 until then).
+        self.assertGreaterEqual(height, round(588 * scale))
+        self.assertLessEqual(height, round(588 * scale) + int(round(31 * scale)))
 
     def test_a_hover_changes_only_the_control_hovered(self):
         box = self.changed(self.pictures[0][1], self.pictures[1][1])
