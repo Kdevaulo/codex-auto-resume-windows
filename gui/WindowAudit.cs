@@ -216,20 +216,29 @@ namespace CodexAutoResume
                     }
                     // v0.6.11: the dialog of a value of the person's own, of each kind the schema offers (SettingsOwn.cs).
                     form.AuditOwnValues(schema, findings);
-                    // The Start button shows only while the watcher is stopped: shown for this, and hidden again.
-                    form.startButton.Visible = true;
+                    // Start watcher shows only while the watcher is stopped, in the Right now card in Pause's place
+                    // (v0.6.24-beta.2, PlaceStartButton): shown for this, and the watcher's state put back.
+                    bool wasOff = form.watcherOff;
+                    form.ShowPage("overview");
+                    form.watcherOff = true;
+                    form.ShowWatcherAction();
                     Materialise(form);
                     form.PerformLayout();
-                    form.AuditPins("header", findings);
-                    AuditSpoken("header with Start", form, findings);
-                    form.AuditHero("header with Start", findings);
-                    form.AuditCaption("header with Start", findings);
-                    form.startButton.Visible = false;
+                    form.AuditPins("overview with Start", findings);
+                    AuditSpoken("overview with Start", form, findings);
+                    form.AuditWatcherAction(findings);
+                    // The header with the watcher off, its state only (and below, with it running).
+                    form.AuditHero("header with the watcher off", findings);
+                    form.AuditCaption("header with the watcher off", findings);
+                    form.watcherOff = wasOff;
+                    form.ShowWatcherAction();
                     form.PerformLayout();
                     form.AuditHero("header", findings);
                     form.AuditCaption("header", findings);
                     // v0.6.24-beta.2: the version's pill at the end of the tabs, clear of every tab (FitVersionPill).
                     form.AuditPill(findings);
+                    // v0.6.24-beta.2: as much room above the tab row as below it, on every page (AuditTabRow).
+                    form.AuditTabRow(findings);
                     // The reopen note, beside every button of the Settings page's save card, at the opening width
                     // and at the narrowest the window goes: 800 wide, less a sizable frame's 8 px on each side -
                     // each in both orders a window comes to a width in (AuditReopenNote).
@@ -851,6 +860,122 @@ namespace CodexAutoResume
             int words = versionText.GetPreferredSize(Size.Empty).Width;
             if (versionText.Width < words)
                 findings.Add("tabs :: the version's pill cuts its words: " + versionText.Width + " of " + words);
+            AuditPillInset(findings);
+        }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, row 18): the tab row's ends Brand.PillInset inside the header card's edges -
+        /// the version's pill at its outer end and the first tab's face at its start - within a pixel; mirrored, the other way.
+        private void AuditPillInset(List<string> findings)
+        {
+            int outer, start;
+            PillInsets(out outer, out start);
+            int inset = Px(Brand.PillInset);
+            if (PillFit != "none" && Math.Abs(outer - inset) > 1)
+                findings.Add("tabs :: the version's pill stands " + outer + " px inside the header card's edge, not " + inset);
+            if (Math.Abs(start - inset) > 1)
+                findings.Add("tabs :: the first tab stands " + start + " px inside the header card's edge, not " + inset);
+        }
+
+        /// How far inside the header card's edges the version's pill ends and the first tab's face starts, in this window's pixels.
+        internal void PillInsets(out int outer, out int start)
+        {
+            bool mirrored = Mirror.Of(nav);
+            Point card = InWindow(hero);
+            Point pill = InWindow(versionPill);
+            outer = mirrored ? pill.X - card.X : (card.X + hero.Width) - (pill.X + versionPill.Width);
+            NavButton first = navButtons[PageOrder[0]];
+            Rectangle face = first.Face;
+            face.Offset(InWindow(first));
+            start = mirrored ? (card.X + hero.Width) - face.Right : face.Left - card.X;
+        }
+
+        /// How the last LayoutAudit found the room round the tab row, `page:above/below;` for each page (for the tests).
+        internal static string AuditedTabRow = "";
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, "촘촘하게"): on every page, from the header card's foot to the chosen tab's
+        /// face and from the face to the top of the page's first card, TabRowGap each, within a pixel - so the same above
+        /// and below. The page shown before is shown again after.
+        private void AuditTabRow(List<string> findings)
+        {
+            var found = new StringBuilder();
+            string before = currentPage;
+            foreach (string page in PageOrder)
+            {
+                ShowPage(page);
+                Materialise(this);
+                PerformLayout();
+                // The page as it is now: one laid out while hidden kept what it showed then (History's "No recoveries
+                // yet" over its list, 25 px).
+                LayOutAll(pages[page]);
+                int above, below;
+                if (!TabRowRoom(page, out above, out below))
+                {
+                    findings.Add("tabs :: " + page + " has no card under the tab row");
+                    continue;
+                }
+                found.Append(page + ":" + above + "/" + below + ";");
+                int gap = Px(TabRowGap);
+                if (Math.Abs(above - gap) > 1 || Math.Abs(below - gap) > 1)
+                    findings.Add("tabs :: " + page + ": " + above + " px above the tab row and " + below + " below it, not " + gap + " each");
+            }
+            AuditedTabRow = found.ToString();
+            if (before != null) ShowPage(before);
+        }
+
+        /// The room above the tab row - the header card's foot to the chosen tab's face - and below it - the face to the
+        /// highest card of `page` on the screen, or whatever stands above its cards - in this window's pixels.
+        internal bool TabRowRoom(string page, out int above, out int below)
+        {
+            above = below = 0;
+            NavButton tab;
+            Control shown;
+            if (!navButtons.TryGetValue(page, out tab) || !pages.TryGetValue(page, out shown)) return false;
+            Rectangle face = tab.Face;
+            face.Offset(InWindow(tab));
+            int top = int.MaxValue;
+            HighestCard(shown, ref top);
+            if (top == int.MaxValue) return false;
+            above = face.Top - (InWindow(hero).Y + hero.Height);
+            below = top - face.Bottom;
+            return true;
+        }
+
+        private static void LayOutAll(Control control)
+        {
+            control.PerformLayout();
+            foreach (Control child in control.Controls) LayOutAll(child);
+        }
+
+        private void HighestCard(Control within, ref int top)
+        {
+            foreach (Control child in within.Controls)
+            {
+                if (!Soft.OwnVisible(child) || child.Width <= 0 || child.Height <= 0) continue;
+                // A card, or what stands on the page itself above the cards - a field kept off them, or Settings' first
+                // section, by its face as a tab is measured.
+                if (child is NavButton) top = Math.Min(top, InWindow(child).Y + ((NavButton)child).Face.Top);
+                else if (child is SoftCard || child.Controls.Count == 0) top = Math.Min(top, InWindow(child).Y);
+                else HighestCard(child, ref top);
+            }
+        }
+
+        private Point InWindow(Control control)
+        {
+            var at = Point.Empty;
+            for (Control c = control; c != null && c != this; c = c.Parent) at.Offset(c.Left, c.Top);
+            return at;
+        }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, row 17, option C): with the watcher off, Start watcher in the Right now
+        /// card where Pause stands - and Pause not shown - and nothing in the header but the state.
+        private void AuditWatcherAction(List<string> findings)
+        {
+            if (startButton.Parent == null || startButton.Parent != toggleButton.Parent)
+                findings.Add("overview with Start :: Start watcher is not in the Right now card");
+            if (!Showing(startButton)) findings.Add("overview with Start :: Start watcher is not shown");
+            if (Showing(toggleButton)) findings.Add("overview with Start :: Pause stands beside Start watcher");
+            for (Control c = startButton.Parent; c != null; c = c.Parent)
+                if (c == header) findings.Add("overview with Start :: Start watcher is in the header");
         }
 
         internal static int AuditedCaption, AuditedTitleRows, AuditedDialogCards;
@@ -902,8 +1027,6 @@ namespace CodexAutoResume
             Rectangle words = chrome.InHolder(headline);
             int clear = mirrored ? words.Left - group.Right : group.Left - words.Right;
             if (clear < Px(8)) findings.Add(where + " :: the headline ends " + clear + " px from the caption buttons");
-            if (Soft.OwnVisible(startButton) && chrome.InHolder(startButton).IntersectsWith(group))
-                findings.Add(where + " :: the Start button lies under the caption buttons");
             // v0.6.24-beta.2: in a card two lines tall, the line under the headline starts below the caption buttons.
             if (chrome.InHolder(detail).IntersectsWith(group))
                 findings.Add(where + " :: the line under the headline lies under the caption buttons");

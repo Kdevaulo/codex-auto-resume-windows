@@ -243,8 +243,12 @@ class SourceTests(unittest.TestCase):
         self.assertNotIn("delegate { StopWatcher(); }", page)
 
     def test_it_is_set_where_the_header_s_start_is(self):
+        # v0.6.24-beta.2 (the owner, 2026-11-17, row 17): Start watcher is the Right now card's, shown in Pause's place by
+        # ShowWatcherAction from the state ApplyStatus reads - still before FollowWatcher.
         body = guiscan.member_body("SettingsForm", "ApplyStatus")
-        self.assertLess(body.index("startButton.Visible = Equals(running, false);"), body.index("FollowWatcher(running);"))
+        self.assertLess(body.index("watcherOff = Equals(running, false);"), body.index("ShowWatcherAction();"))
+        self.assertLess(body.index("ShowWatcherAction();"), body.index("FollowWatcher(running);"))
+        self.assertIn("startButton.Visible = watcherOff;", guiscan.member_body("SettingsForm", "ShowWatcherAction"))
 
     def test_the_start_and_every_counted_action_grey_it(self):
         self.assertIn("stopButton.Enabled = busy == 0 && !starting;", guiscan.member_body("SettingsForm", "UpdateWatcherButton"))

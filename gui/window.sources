@@ -79,6 +79,7 @@ gui/SoftMirror.cs
 gui/SoftChrome.cs
 gui/SoftWindowShape.cs
 gui/Marks.cs
+gui/SoftEggs.cs
 
 [generated]
 gui/Brand.cs

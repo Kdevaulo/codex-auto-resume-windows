@@ -440,8 +440,19 @@ namespace CodexAutoResume
         private readonly HaloDot stateDot = new HaloDot();
         private readonly SoftDayScene dayScene = new SoftDayScene();
         private string dayLook;
+        // v0.6.24-beta.2 (the owner, 2026-11-16): the run of presses on the version that plays a special egg at the sixth, which
+        // one (SpecialEggs), what each press played (for the tests), the confetti on the screen and the count read last asked.
         private readonly System.Diagnostics.Stopwatch versionClock = System.Diagnostics.Stopwatch.StartNew();
         private readonly PressRun versionPresses = new PressRun();
+        internal readonly EggPick SpecialEggs = new EggPick();
+        internal readonly List<string> EggsPlayed = new List<string>();
+        private ConfettiLayer confetti;
+        private int countAsked;
+
+        /// How the count egg reads how many recoveries the app has made in all - the bridge's statistics over all time, the
+        /// figure Statistics shows for "All time" - handing it, or -1 where it cannot be read, to `then` on the window's thread.
+        /// The tests give their own.
+        internal Action<Action<int>> ReadRecoveredAllTime;
 
         // The sentence comes in as the sweep ends, and goes 4 s after it has come in.
         internal const int AsideAfterMs = 850, AsideMs = 4150;
@@ -513,17 +524,117 @@ namespace CodexAutoResume
             if (stateDot.Sweeping) detail.Arrive(AsideAfterMs);
         }
 
+        /// The easter egg: the light's sweep and the sentence coming in as it ends. v0.6.24-beta.2 (the owner, 2026-11-16,
+        /// "이스터에그 버전 알약 한번만 눌러도 뜨게 하자" - let one press on the version pill show the easter egg): every press,
+        /// where seven within 1.8 s each were asked before (v0.6.23). A press while it plays starts it again from its start - the
+        /// sweep from the top (HaloDot.Sweep), the sentence again as that ends (AsideLabel.Aside) - and nothing stacks.
+        ///
+        /// And the sixth press in a row, each within 1.8 s of the last (PressRun; the owner, the same day, "여러번 누를때의
+        /// 이스터에그도 별도로 만들자", "6번"), plays one of three special eggs instead, at random and never the same twice in a
+        /// row (EggPick) - never in a picture or the layout audit (LightSweepsShown), where it is the one-press egg.
         private void VersionPressed()
         {
-            if (!versionPresses.Press(versionClock.Elapsed.TotalMilliseconds)) return;
+            countAsked++;
+            if (versionPresses.Press(versionClock.Elapsed.TotalMilliseconds) && LightSweepsShown)
+            {
+                PlaySpecialEgg(SpecialEggs.Pick());
+                return;
+            }
+            EggsPlayed.Add("one");
             stateDot.Sweep();
             detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+        }
+
+        /// One special egg, each with its sentence. With motion reduced or Windows' animations off, nothing moves and the
+        /// sentence comes at once, as the one-press egg's does; in High Contrast the light runs no colours and no confetti
+        /// falls, the sentence alone.
+        private void PlaySpecialEgg(int which)
+        {
+            if (which == EggPick.Colours)
+            {
+                // The light through each of its colours in turn, back to its own (HaloDot.RunColours).
+                EggsPlayed.Add("colours");
+                stateDot.RunColours();
+                detail.Aside(S("status.aside_colours", "Did you see? My light has four colours."), stateDot.ColoursRunning ? AsideAfterMs : 0, AsideMs);
+            }
+            else if (which == EggPick.Count)
+            {
+                // The sweep, and what it has picked up in all, read as the sweep plays.
+                EggsPlayed.Add("count");
+                stateDot.Sweep();
+                bool sweeping = stateDot.Sweeping;
+                var since = System.Diagnostics.Stopwatch.StartNew();
+                int asked = countAsked;
+                (ReadRecoveredAllTime ?? ReadRecovered)(delegate(int recovered)
+                {
+                    if (asked != countAsked || IsDisposed) return;
+                    int left = sweeping ? Math.Max(0, AsideAfterMs - (int)since.ElapsedMilliseconds) : 0;
+                    detail.Aside(CountAside(recovered), left, AsideMs);
+                });
+            }
+            else
+            {
+                EggsPlayed.Add("confetti");
+                bool falling = Confetti();
+                detail.Aside(S("status.aside_confetti", "You found it! Thank you for staying."), falling ? AsideAfterMs : 0, AsideMs);
+            }
+        }
+
+        /// The count egg's sentence: how many it has picked up in all, none yet, or - where that cannot be read - the
+        /// one-press egg's own.
+        internal string CountAside(int recovered)
+        {
+            if (recovered < 0) return S("status.aside", "It's okay if it stops. I'll pick it up.");
+            if (recovered == 0) return S("status.aside_count_none", "None picked up yet. If one stops, I'll take it from there.");
+            if (recovered == 1) return S("status.aside_count_one", "So far I have picked up 1 conversation for you.");
+            return S("status.aside_count_many", "So far I have picked up {n} conversations for you.", "n",
+                     recovered.ToString(CultureInfo.CurrentCulture));
+        }
+
+        /// The bridge's statistics over all time, off the window's thread - reading numbers is not an action (LoadStatistics).
+        private void ReadRecovered(Action<int> then)
+        {
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                int recovered = -1;
+                try
+                {
+                    Dictionary<string, object> reply = bridge.Call("statistics", "{}");
+                    if (Ok(reply)) recovered = (int)Number(Map(Map(reply, "result"), "outcomes"), "recovered");
+                }
+                catch (Exception) { recovered = -1; }
+                MethodInvoker tell = delegate { then(recovered); };
+                try { if (IsHandleCreated && !IsDisposed) BeginInvoke(tell); }
+                catch (Exception) { }
+            });
+        }
+
+        /// A small burst of confetti from the version's pill, falling within the window for ConfettiBurst.LengthMs, in the
+        /// brand's colours (ConfettiLayer: it takes no input and is never outside the client area). A burst on its way gives way
+        /// to the new one. Nothing where nothing may move, in High Contrast, or with no pill on the screen.
+        private bool Confetti()
+        {
+            if (versionPill == null || pillSlot == null || !Soft.OwnVisible(pillSlot) || !Motion.Allowed(versionPill) || Palette.Contrast)
+                return false;
+            Point centre = PointToClient(versionPill.PointToScreen(new Point(versionPill.Width / 2, versionPill.Height / 2)));
+            int reach = Px(260);
+            Rectangle client = ClientRectangle;
+            Rectangle area = Rectangle.FromLTRB(Math.Max(client.Left, centre.X - reach), Math.Max(client.Top, centre.Y - Px(130)),
+                                                Math.Min(client.Right, centre.X + reach), client.Bottom);
+            if (area.Width <= 0 || area.Height <= 0) return false;
+            if (confetti != null) confetti.Dispose();
+            var burst = new ConfettiBurst(new Random(), new PointF(centre.X - area.X, centre.Y - area.Y), Soft.PxF(1), ConfettiBurst.Colours());
+            confetti = new ConfettiLayer(this, area, burst);
+            confetti.Start();
+            return true;
         }
         // v0.6.5: the notification-area icon's motion on the taskbar button (TaskbarMark), told the icon's state for what
         // the window read wherever stateDot is told its own (TellTaskbar); null in a window LayoutAudit builds, and
         // without the product's own icon.
         private TaskbarMark taskbar;
         private Button startButton;
+        // Whether the last status read said the watcher is not running (ApplyStatus): Start watcher then, not Pause.
+        private bool watcherOff;
         // v0.6.12: while Start watcher's own start is in flight (StartWatcher), apart from the actions SetBusy counts.
         private bool starting;
 
@@ -1016,15 +1127,16 @@ namespace CodexAutoResume
             Shown += delegate
             {
                 shown = true;
-                // v0.6.24-beta.2: the opening sweep a read before this asked for (SweepLight).
+                // v0.6.20: the watcher's request to come forward is heard even when this window runs elevated.
+                AcceptOpenRequests();
+                // v0.6.24-beta.2: the opening sweep a read before this asked for (SweepLight) - after the open requests,
+                // which the window takes before anything else it does once shown.
                 if (sweepOnShown)
                 {
                     sweepOnShown = false;
                     stateDot.Sweep();
                     if (stateDot.Sweeping) detail.Arrive(AsideAfterMs);
                 }
-                // v0.6.20: the watcher's request to come forward is heard even when this window runs elevated.
-                AcceptOpenRequests();
                 // v0.6.18 B3: a window that replaces another is the size it was placed at once it is on screen, whatever
                 // creating it on a monitor of another scale than Windows' own did to that size on the way.
                 KeepPlacedBounds();
@@ -1166,21 +1278,15 @@ namespace CodexAutoResume
             if (client != ClientSize) UpdateBounds(Left, Top, Width, Height, client.Width, client.Height);
         }
 
-        /// The headline ends at least 8 px before the caption buttons (Brand.CaptionInsetEnd from the card's edge): with the
-        /// Start button shown its column keeps it clear, and hidden - its column then gone - the headline's own margin does.
-        /// v0.6.24-beta.2: the card is two lines tall (HeroHeight), too short for the Start button under the caption buttons,
-        /// so it stands before them, 8 px clear, centred on the two lines as the light is. The line under the headline
-        /// starts below the caption buttons (BuildHeader's fit).
+        /// The headline ends at least 8 px before the caption buttons (Brand.CaptionInsetEnd from the card's edge), by its own
+        /// margin. The line under the headline starts below the caption buttons (BuildHeader's fit). v0.6.24-beta.2 (the owner,
+        /// 2026-11-17, the design canvas's row 17, option C): the header holds no button - Start watcher is the Overview's
+        /// Right now card's, in place of Pause (PlaceStartButton).
         private void KeepHeadlineClear()
         {
             if (chrome == null) return;
             int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - Math.Max(hero.Padding.Left, hero.Padding.Right);
-            var before = new Padding(Px(16), 0, Math.Max(0, reach), 0);
-            if (startButton.Margin != before) startButton.Margin = before;
-            int column = Soft.OwnVisible(startButton)
-                ? Math.Max(startButton.Width, startButton.PreferredSize.Width) + startButton.Margin.Horizontal : 0;
-            int margin = Math.Max(0, reach - column);
-            var wanted = new Padding(0, 0, margin, 0);
+            var wanted = new Padding(0, 0, Math.Max(0, reach), 0);
             if (headline.Margin != wanted) headline.Margin = wanted;
         }
 
@@ -1199,13 +1305,15 @@ namespace CodexAutoResume
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Px(244)));
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
             columns.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-            columns.Padding = Pad(12, 0, 0, 0);
+            // The section list's faces in line with the tabs' (NavStart): Brand.PillInset inside the header card's edge.
+            columns.Padding = Pad(NavStart, 0, 0, 0);
 
             var list = new SoftFlow();
             list.Dock = DockStyle.Fill;
             list.FlowDirection = FlowDirection.TopDown;
             list.WrapContents = false;
-            list.Margin = Pad(0, 10, 2, 0);
+            // The first section's face level with the first card's top (PageRoom), its ring's room above it.
+            list.Margin = Pad(0, PageTop - TabRing, 2, 0);
             list.AccessibleRole = AccessibleRole.PageTabList;
             list.AccessibleName = S("nav.settings", "Settings");
             // v0.6.23 (perffix): laid out once its sections' buttons are all in it (the strip of tabs says why).
@@ -1239,7 +1347,7 @@ namespace CodexAutoResume
                 stack.Font = Font;
                 // The cards' lift is kept inside the scrolling page, which is its edge (see Ground).
                 // Each card already keeps a gap below it.
-                Padding room = CardRoom();
+                Padding room = PageRoom();
                 stack.Padding = new Padding(room.Left, room.Top, room.Right, Math.Max(0, room.Bottom - Px(Brand.PageGap)));
                 // Every section stays on the page and only the one shown is visible (ShowSection).
                 stack.Visible = false;
@@ -1297,6 +1405,29 @@ namespace CodexAutoResume
         private Padding CardRoom()
         {
             return Pad(16, 16, 17, 17);
+        }
+
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, the design canvas's row 15, "촘촘하게"): as much room above the tab row as
+        /// below it - TabRowGap from the header card's foot to the tabs' faces, and TabRowGap from the faces to the top of the
+        /// page's cards (AuditTabRow). Above: the header's own padding (2), the tab strip's (NavTop) and the room a tab keeps
+        /// round its face for its focus ring (TabRing); below: the ring's room again and the page's top (PageTop).
+        internal const int TabRowGap = 10, HeaderBelow = 2;
+        /// The header's ground at either side of its card: the header card's outer edges, which the tab row lines up with.
+        internal const int HeaderSide = 14;
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, row 18): the tab row's ends Brand.PillInset inside the header card's edges -
+        /// the first tab's face at its start, the version's pill at its end (mirrored, the other way round); a tab keeps its
+        /// ring's room round its face, so the strip starts that much sooner.
+        internal const int NavStart = HeaderSide + Brand.PillInset - TabRing, NavEnd = HeaderSide + Brand.PillInset;
+        internal const int TabRing = Brand.FocusOffset + Brand.FocusWidth;
+        internal const int NavTop = TabRowGap - HeaderBelow - TabRing, PageTop = TabRowGap - TabRing;
+
+        /// The room a page keeps for its cards' lift (CardRoom), but at its top PageTop: under the tab row its first card's
+        /// lift runs on onto the tabs' ground, as the header card's runs on under the tabs.
+        private Padding PageRoom()
+        {
+            Padding room = CardRoom();
+            // In device pixels, the gap's less the ring's: each rounded alone, 7.5 and 5 at 125 % made 13 under the tabs.
+            return new Padding(room.Left, Math.Max(0, Px(TabRowGap) - Px(TabRing)), room.Right, room.Bottom);
         }
 
         private string SectionTitle(string name)
@@ -1386,7 +1517,7 @@ namespace CodexAutoResume
             //
             // A card on the canvas, as the panel's hero is. The card is the grid.
             header.Dock = DockStyle.Top;
-            header.Padding = Pad(14, 12, 14, 2);
+            header.Padding = Pad(HeaderSide, 12, HeaderSide, HeaderBelow);
             hero.Dock = DockStyle.Fill;
             hero.Margin = new Padding(0);
             // v0.6.24-beta.2: two lines in HeroHeight - the brand's padding at the sides, HeroPadY above and below.
@@ -1429,25 +1560,17 @@ namespace CodexAutoResume
             detail.AutoEllipsis = true;   // narrow gracefully instead of wrapping
             detail.Margin = Pad(0, 2, 0, 0);
 
-            // Shown only while the watcher is stopped. Nothing is recovered then, so a
-            // window that reports the fact and offers no way out is a dead end - and the
-            // watcher is the part nobody should have to think about. It sits beside the
-            // sentence that explains why it is there rather than down among Save and
-            // Restore defaults, which are about settings and not about the watcher.
+            // Shown only while the watcher is stopped. Nothing is recovered then, so a window that reports the fact and offers
+            // no way out is a dead end - and the watcher is the part nobody should have to think about. v0.6.24-beta.2 (the
+            // owner, 2026-11-17, the design canvas's row 17, option C): no longer in the header, which shows the state only, but
+            // in the Overview's Right now card in place of Pause recovery - the two never stand together (PlaceStartButton).
             startButton = MakeButton(S("action.start", "Start watcher"), true, delegate { StartWatcher(); });
             startButton.Visible = false;
-            // At the card's right, before the caption buttons and centred on the two lines (KeepHeadlineClear, v0.6.24-beta.2;
-            // pinned to the card's bottom right from v0.6.4 until the card became two lines tall). Its column is its own, so
-            // neither line of the headline ever runs under it.
-            startButton.Anchor = AnchorStyles.Right;
-            startButton.Margin = Pad(16, 0, 0, 0);
 
             hero.Controls.Add(dot, 0, 0);
             hero.SetRowSpan(dot, 2);
             hero.Controls.Add(headline, 1, 0);
             hero.Controls.Add(detail, 1, 1);
-            hero.Controls.Add(startButton, 2, 0);
-            hero.SetRowSpan(startButton, 2);
             header.Controls.Add(hero);
             // v0.6.24: the window's caption buttons in the hero's top outer corner, over the card and its day's scene
             // (gui/SoftChrome.cs) - the window's own children, as the header (a SoftPage) moves what it holds of its own to
@@ -1459,13 +1582,11 @@ namespace CodexAutoResume
             chrome.Drag(headline);
             chrome.Drag(detail);
             chrome.Drag(stateDot);
-            startButton.VisibleChanged += delegate { KeepHeadlineClear(); };
-            startButton.SizeChanged += delegate { KeepHeadlineClear(); };
             hero.Layout += delegate { KeepHeadlineClear(); };
             KeepHeadlineClear();
             // Measured, not a formula of the font: two lines of the taller of the two, each row
             // half the card so the pair stays centred on the dot, and never less than the dot's
-            // glow or the Start button need. Again whenever the window's font changes.
+            // glow needs. Again whenever the window's font changes.
             EventHandler fit = delegate
             {
                 // In the window's own font: the header joins the window after this, and until it does the line under
@@ -1475,8 +1596,7 @@ namespace CodexAutoResume
                 int line = Math.Max(headline.PreferredSize.Height, detail.PreferredSize.Height + detail.Margin.Vertical);
                 // v0.6.24-beta.2: the line under the headline starts below the caption buttons, in the card's top corner.
                 line = Math.Max(line, Px(Brand.CaptionInsetTop + Brand.CaptionButtonH) - hero.Padding.Top);
-                int body = Math.Max(2 * line, Math.Max(2 * HaloDot.Extent + Px(2),
-                                                      startButton.PreferredSize.Height + startButton.Margin.Vertical));
+                int body = Math.Max(2 * line, 2 * HaloDot.Extent + Px(2));
                 // Never shorter than HeroHeight, whose two lines a face with shorter lines centres in it.
                 body = Math.Max(body, Px(HeroHeight) - hero.Padding.Vertical);
                 // What the card is taller than HeroHeight the window opens taller by (OpeningClient), so the pages keep theirs.
@@ -1504,7 +1624,6 @@ namespace CodexAutoResume
             hero.SizeChanged += place;
             headline.TextChanged += place;
             detail.TextChanged += place;
-            startButton.VisibleChanged += place;
             Resize += place;
             Shown += place;
         }
@@ -1535,7 +1654,6 @@ namespace CodexAutoResume
             if (dayLook == null) return;
             bool mirrored = Mirror.Of(hero);
             int width = hero.Width, hair = Soft.Hairline, outer = width - hair;
-            if (Soft.OwnVisible(startButton)) outer = (mirrored ? width - startButton.Left : startButton.Left) - Px(8);
             int end = Math.Max(WordsEnd(headline, mirrored, width), WordsEnd(detail, mirrored, width)), left, fade;
             double unit;
             bool fits = DayArt.Fit(dayLook, end, 0, width, outer, hair, hero.Height - hair, out left, out unit, out fade);
@@ -1677,6 +1795,23 @@ namespace CodexAutoResume
                 if (versionPill.Location != at) versionPill.Location = at;
             };
             nav.Layout += delegate { FitVersionPill(strip); };
+            // And whenever the strip lays its tabs out again: a tab shown later - the advanced edition's Advanced features
+            // and Chat, once their words come (AdvancedPage.cs) - lays out the strip alone, and the pill gives way to it.
+            // Where that layout is the nav's own placing the strip, the layout the slot's change asks of the nav is dropped
+            // as the running one ends (Control.PerformLayout), and the strip would keep the width it had beside the pill -
+            // the Chat tab cut off (dev CI 43859506322): so the strip is given here the room the slot now leaves it, as the
+            // nav's next layout gives it, before it lays its tabs out in it.
+            strip.Layout += delegate
+            {
+                if (!FitVersionPill(strip) || strip.Dock != DockStyle.Fill) return;
+                Rectangle room = nav.DisplayRectangle;
+                if (Soft.OwnVisible(pillSlot))
+                {
+                    if (pillSlot.Dock == DockStyle.Left) room.X += pillSlot.Width;
+                    room.Width -= pillSlot.Width;
+                }
+                if (room.Width > 0 && strip.Bounds != room) strip.Bounds = room;
+            };
             versionText.TextChanged += delegate { if (nav.IsHandleCreated) nav.PerformLayout(); else FitVersionPill(strip); };
             FitVersionPill(strip);
         }
@@ -1685,15 +1820,22 @@ namespace CodexAutoResume
 
         /// The pill whole - the version and the edition - where the tabs leave room for it and the gap before it; the version
         /// alone where only that fits; else none. The room is the strip's less the tabs' own width (the strip lays its tabs
-        /// out in one line, never wrapped), at every text size and in every language (test_gui_v0624_dashboard).
-        private void FitVersionPill(Control strip)
+        /// out in one line; where the advanced edition's take two rows, none is left), at every text size and in every
+        /// language, and again whenever the strip lays its tabs out (test_gui_v0624_dashboard). Whether the slot was shown,
+        /// hidden or resized, which changes the strip's room.
+        private bool FitVersionPill(Control strip)
         {
-            if (fittingPill || versionPill == null) return;
+            if (fittingPill || versionPill == null) return false;
             fittingPill = true;
             try
             {
                 int gap = Px(12);
-                int room = nav.DisplayRectangle.Width - strip.PreferredSize.Width - gap;
+                // The tabs' own row, each shown tab as wide as it asks with its margins - not the strip's PreferredSize, which
+                // a tab just shown has not yet reached while the strip lays out for it (dev CI 43859506322: the Chat tab).
+                int tabs = strip.Padding.Horizontal;
+                foreach (Control tab in strip.Controls)
+                    if (Soft.OwnVisible(tab)) tabs += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+                int room = nav.DisplayRectangle.Width - tabs - gap;
                 int whole = versionPill.WholeWidth, alone = versionPill.VersionWidth;
                 bool shown = !string.IsNullOrEmpty(versionText.Version) && alone <= room;
                 bool shortened = shown && whole > room;
@@ -1703,9 +1845,19 @@ namespace CodexAutoResume
                 if (versionPill.Size != size) versionPill.Size = size;
                 pillSlot.Padding = new Padding(gap, 0, 0, 0);
                 int width = size.Width + gap;
-                if (pillSlot.Width != width) pillSlot.Width = width;
-                if (Soft.OwnVisible(pillSlot) != shown) pillSlot.Visible = shown;
+                bool changed = false;
+                if (pillSlot.Width != width)
+                {
+                    pillSlot.Width = width;
+                    changed = true;
+                }
+                if (Soft.OwnVisible(pillSlot) != shown)
+                {
+                    pillSlot.Visible = shown;
+                    changed = true;
+                }
                 versionPill.Lifted();
+                return changed;
             }
             finally { fittingPill = false; }
         }

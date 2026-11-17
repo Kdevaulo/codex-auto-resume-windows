@@ -1,4 +1,10 @@
-r"""v0.6.23: the days with a look of their own, and the seven presses (both only by the owner's word).
+r"""v0.6.23: the days with a look of their own, and the egg on the version (both only by the owner's word).
+
+v0.6.24-beta.2 (the owner, 2026-11-16, "이스터에그 버전 알약 한번만 눌러도 뜨게 하자" - let one press on the version pill show
+the easter egg): every press on the version is the egg, where seven each within 1.8 s were asked before; and ("여러번 누를때의
+이스터에그도 별도로 만들자", "6번") the sixth press in a row, each within 1.8 s of the last (PressRun), plays one of three special
+eggs instead - among them the light through all its colours (HaloDot.RunColours), tried here on a light on the screen
+(test_gui_v0624_dashboard has the rest). The tray card's title and the panel keep brand's run of seven (test_gui_v0623_surfaces).
 
 The table is brand's and is generated into the window; nothing here reads today's date, so no test can fail because of the day
 it runs on or the years that have passed. Part GUI (it compiles the window): run on its own, through gui_lock.sh.
@@ -423,16 +429,16 @@ PROBE = r"""
 $run = Make 'PressRun'
 $at = 0.0
 $said = @()
-foreach ($gap in 0, 1800, 1800, 1800, 1800, 1800) { $at += $gap; $said += [bool](Call $run 'Press' @([double]$at)) }
-$out.six = $said
+foreach ($gap in 0, 1800, 1800, 1800, 1800) { $at += $gap; $said += [bool](Call $run 'Press' @([double]$at)) }
+$out.five = $said
+$at += 1800
+$out.sixth = [bool](Call $run 'Press' @([double]$at))
 $at += 1800
 $out.seventh = [bool](Call $run 'Press' @([double]$at))
-$at += 1800
-$out.eighth = [bool](Call $run 'Press' @([double]$at))
 $late = Make 'PressRun'
 $at = 0.0
 $said = @()
-foreach ($gap in 0, 1000, 1000, 1801, 1000, 1000, 1000, 1000, 1000) { $at += $gap; $said += [bool](Call $late 'Press' @([double]$at)) }
+foreach ($gap in 0, 1000, 1000, 1801, 1000, 1000, 1000, 1000) { $at += $gap; $said += [bool](Call $late 'Press' @([double]$at)) }
 $out.broken = $said
 
 function ArcAt([double]$ms) {
@@ -471,6 +477,22 @@ $out.sweep.stateAfter = (P $dot 'State')
 Reduce $true
 $null = Call $dot 'Sweep' @()
 $out.sweep.reduced = [bool](P $dot 'Sweeping')
+Reduce $false
+
+# A light that holds still (idle), so what is shown before and after is one colour.
+$dot.GetType().GetProperty('State', [Reflection.BindingFlags]'Instance,NonPublic').SetValue($dot, 'idle', $null)
+Pump 400
+$own = Centre
+$null = Call $dot 'RunColours' @()
+$out.colours = @{ running = [bool](P $dot 'ColoursRunning'); before = $own }
+Pump 600
+$out.colours.during = Centre
+Pump 2200
+$out.colours.after = [bool](P $dot 'ColoursRunning')
+$out.colours.back = Centre
+Reduce $true
+$null = Call $dot 'RunColours' @()
+$out.colours.reduced = [bool](P $dot 'ColoursRunning')
 Reduce $false
 
 $line = Make 'AsideLabel'; $line.Text = 'What it said'; Place $line 20 100 300 24; Pump 20
@@ -518,13 +540,23 @@ class PressAndLightTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.folder.cleanup()
 
-    def test_seven_presses_each_within_the_gap_say_so_once(self):
-        self.assertEqual(self.answer["six"], [False] * 6)
-        self.assertTrue(self.answer["seventh"])
-        self.assertFalse(self.answer["eighth"], "and it starts again")
+    def test_six_presses_each_within_the_gap_say_so_once(self):
+        """The owner, 2026-11-16: "6번" - the sixth press in a row plays a special egg (one press: "이스터에그 버전 알약 한번만
+        눌러도 뜨게 하자", the one-press egg, every time)."""
+        self.assertEqual(self.answer["five"], [False] * 5, "five presses never play a special egg")
+        self.assertTrue(self.answer["sixth"])
+        self.assertFalse(self.answer["seventh"], "and it starts again")
 
     def test_a_press_too_late_starts_the_count_again(self):
-        self.assertEqual(self.answer["broken"], [False] * 9)
+        self.assertEqual(self.answer["broken"], [False] * 8)
+
+    def test_the_light_runs_its_colours_once_and_comes_back(self):
+        colours = self.answer["colours"]
+        self.assertTrue(colours["running"])
+        self.assertNotEqual(colours["during"], colours["before"], "another colour on its way")
+        self.assertFalse(colours["after"])
+        self.assertEqual(colours["back"], colours["before"], "back to its own")
+        self.assertFalse(colours["reduced"], "with motion reduced, no colours")
 
     def test_the_arc_sweeps_once_in_the_mocks_time_and_fades(self):
         start, end, fading, gone = self.answer["arc"]
