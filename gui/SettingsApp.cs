@@ -1029,6 +1029,9 @@ namespace CodexAutoResume
             // The type roles (Soft.RoleFont) are variants of the window's own font.
             Soft.BaseFont = Font;
             ForeColor = Ink;
+            // v0.6.24-beta.3 (W2): on a special day the window's ground faintly takes the day's (DayGround), before anything is
+            // made in it - and as it was everywhere else, a picture's or a probe's window included, which look at no date.
+            DayGround.Adopt(Palette.AccentBar ? null : DayArt.Today(), this);
             BackColor = Canvas;
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.Font;
@@ -1183,6 +1186,8 @@ namespace CodexAutoResume
                 WatchForUpdate();
             };
             FormClosed += delegate { StopClock(); bridge.Stop(); };
+            // W2: the controls made as the window's fields were, before the day's tint was adopted above, take it too.
+            if (DayGround.Look != null) DayGround.Repaint(this, DayGround.Untinted, Palette.Canvas);
         }
 
         /// The window within the screen it opens on. Its sizes are scaled, so on a small screen at
@@ -1664,6 +1669,10 @@ namespace CodexAutoResume
         private void FollowDayScene()
         {
             if (!dayScene.Follow(ref dayLook)) return;
+            // W2: the window's ground follows the date too - every ground in the old day's colour takes the new one.
+            Color was = Palette.Canvas;
+            DayGround.Adopt(dayLook, this);
+            if (Palette.Canvas.ToArgb() != was.ToArgb()) DayGround.Repaint(this, was, Palette.Canvas);
             if (dayLook == null)
             {
                 dayScene.Place(false, null, 0, 0, 0, 0, 0, 0);
@@ -1679,16 +1688,41 @@ namespace CodexAutoResume
             return (mirrored ? width - label.Right : label.Left) + Math.Min(words.Width, label.Width);
         }
 
-        /// The day's scene in what the header's words leave at the card's outer side: no word on it, or no scene.
+        /// The day in what the header's words leave of the card (W2, the owner's pick of 2026-11-17): from past the last word to
+        /// the card's outer edge, under the caption buttons too, its scene as tall as the card left of them (DayArt.Fit, Band).
+        /// No word on it; where the words leave it no room, none of it - and so no slice behind the buttons either. This is the
+        /// one place that decides its rectangle; the buttons paint what it puts under them (ChromeHost.Scene).
         private void PlaceDayScene()
         {
             if (dayLook == null) return;
             bool mirrored = Mirror.Of(hero);
             int width = hero.Width, hair = Soft.Hairline, outer = width - hair;
             int end = Math.Max(WordsEnd(headline, mirrored, width), WordsEnd(detail, mirrored, width)), left, fade;
+            int room = CaptionRoom(mirrored, width, outer);
             double unit;
-            bool fits = DayArt.Fit(dayLook, end, 0, width, outer, hair, hero.Height - hair, out left, out unit, out fade);
-            dayScene.Place(fits, dayLook, hero.Left + (mirrored ? width - outer : left), hero.Top + hair, outer - left, hero.Height - 2 * hair, unit, fade);
+            bool scene = DayArt.Fit(dayLook, end, 0, width, outer - room, hair, hero.Height - hair, out left, out unit, out fade);
+            dayScene.Keep(room, scene);
+            dayScene.Place(DayArt.Band(left, outer), dayLook, hero.Left + (mirrored ? width - outer : left), hero.Top + hair, outer - left,
+                           hero.Height - 2 * hair, unit, fade);
+        }
+
+        /// How far in from the card's outer edge (`outer`, measured from its inner side as the words are) the caption buttons
+        /// reach, and a gap past them: the room the day's scene keeps clear. None where no button is shown.
+        private int CaptionRoom(bool mirrored, int width, int outer)
+        {
+            if (chrome == null) return 0;
+            Point card = Point.Empty;
+            for (Control c = hero; c != null && c != this; c = c.Parent) card.Offset(c.Left, c.Top);
+            int reach = 0;
+            foreach (CaptionButton button in new[] { chrome.MinimizeButton, chrome.MaximizeButton, chrome.CloseButton })
+            {
+                if (button == null || !Soft.OwnVisible(button)) continue;
+                Point at = Point.Empty;
+                for (Control c = button; c != null && c != this; c = c.Parent) at.Offset(c.Left, c.Top);
+                int inner = mirrored ? at.X + button.Width - card.X : width - (at.X - card.X);
+                reach = Math.Max(reach, inner - (width - outer));
+            }
+            return reach > 0 ? reach + Px(Brand.DayWideGap) : 0;
         }
 
         private void BuildFooter()

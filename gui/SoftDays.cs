@@ -243,20 +243,34 @@ namespace CodexAutoResume
             }
         }
 
-        /// Where a scene stands in a card: past the last word (`wordsEnd`), at most two thirds of it, its main piece whole; false when
-        /// the words leave too little room for that. popup/layout.py's _scene_item, in the window's pixels.
+        /// The day spread wide over a card (W2, the owner's pick of 2026-11-17; popup/layout.py's day_band, in the window's
+        /// pixels): the day begins brand's gap past the last word (`left`), as tall as the card from `top` to `bottom` (`unit`,
+        /// the scene's to the pixel), the card's colour fading into it over at most brand's fade (`fade`). True when the scene's
+        /// main piece is whole between there and `right`, where the scene's outer end stands (the caption buttons' inner edge
+        /// in the Dashboard's header); false when it is not drawn - never half a scene. Whether there is a day at all is Band's.
         internal static bool Fit(string look, int wordsEnd, int cardLeft, int cardWidth, int right, int top, int bottom,
                                  out int left, out double unit, out int fade)
         {
-            left = Math.Max(wordsEnd + Soft.Px(8), cardLeft + cardWidth * 34 / 100);
-            double whole = (bottom - top) / Brand.DaySceneHeight, focal = Brand.DaySceneWidth - Brand.DayFocus(look);
-            unit = Math.Min(whole, (right - left - Soft.Px(28)) / focal);
-            fade = Math.Min(Soft.Px(72), (int)(right - left - Soft.Px(2) - focal * unit));
-            return unit >= whole * 0.75;
+            left = Math.Max(cardLeft, wordsEnd + Soft.Px(Brand.DayWideGap));
+            unit = (bottom - top) / Brand.DaySceneHeight;
+            double focal = Brand.DaySceneWidth - Brand.DayFocus(look);
+            int room = (int)(right - left - Soft.Px(2) - focal * unit);
+            bool scene = room >= Soft.Px(28);
+            fade = Math.Max(Soft.Px(2), Math.Min(Soft.Px(Brand.DayWideFade), scene ? room : right - left - Soft.Px(2) - Soft.Px(24)));
+            return scene;
+        }
+
+        /// Whether the words leave the day any room at all between `left` (Fit's) and the card's outer side `outer`: the fade's
+        /// first half and a little of the day past it. popup/layout.py's day_band.
+        internal static bool Band(int left, int outer)
+        {
+            return outer - left >= Soft.Px(Brand.DayWideFade) / 2 + Soft.Px(24);
         }
     }
 
-    /// The day's scene on the Dashboard's status card: its own control over the card, in what the words leave at its outer side.
+    /// The day on the Dashboard's status card: its own control over the card, in what the words leave at its outer side - since
+    /// v0.6.24-beta.3 (W2) all of it from past the words to the card's edge, the day's ground and specks across it and its scene
+    /// as tall as the card left of the caption buttons, the card's colour fading into it past the words.
     /// A timer only while it can be seen and motion is allowed; a frame repaints this control and nothing is laid out. While
     /// battery saver or a locked session holds what moves by itself (Motion.Ambient, standard H13) it stands where it was and
     /// asks once a second whether that is over, as the status light does (HaloDot.Beat).
@@ -269,6 +283,8 @@ namespace CodexAutoResume
         private string look;
         private double unit;
         private int fade;
+        private int clear;                       // the room at its outer side the scene keeps clear (Keep)
+        private bool scene = true;               // whether the scene is drawn, or the day's ground and specks alone (Keep)
         private DateTime day;                    // the date its look was last chosen for (Follow)
 
         internal SoftDayScene()
@@ -324,6 +340,19 @@ namespace CodexAutoResume
         }
 
         private void clockAtRest() { clock.Reset(); }
+
+        /// W2: the room at its outer side the scene keeps clear (the caption buttons' in the Dashboard's header, which stand
+        /// over the day's ground and specks), and whether the scene is drawn at all (DayArt.Fit) - before Place.
+        internal void Keep(int room, bool drawn)
+        {
+            if (room == clear && drawn == scene) return;
+            clear = room;
+            scene = drawn;
+            Invalidate();
+        }
+
+        /// Whether the scene itself is drawn, past the day's ground and specks (for the tests).
+        internal bool SceneDrawn { get { return scene; } }
 
         /// Stands it where `left` to `right` of its parent says, or hides it (`on` false).
         internal void Place(bool on, string day, int left, int top, int width, int height, double size, int faded)
@@ -414,10 +443,24 @@ namespace CodexAutoResume
             bool mirrored = Mirror.Of(this);
             double seconds = timer.Enabled ? clock.Elapsed.TotalSeconds : 0.0;
             double u = unit, width = Width, origin = Brand.DayFromTop(look) ? 0.0 : Height - Brand.DaySceneHeight * u;
-            DayArt.Draw(g, DayArt.Parse(Brand.DayScene(look)), seconds, u, delegate(double x, double y)
+            // W2: the day's specks across all of it, band after band from its outer side (brand.speck_elements), under
+            // the caption buttons too; then the scene, its outer end where the buttons' room ends (Keep).
+            DayElement[] specks = DayArt.Parse(Brand.DaySpecks(look));
+            double band = Brand.DaySpeckBand * u;
+            for (double offset = 0; offset < width && band > 0; offset += band)
             {
-                return new PointF((float)(mirrored ? (Brand.DaySceneWidth - x) * u : width - (Brand.DaySceneWidth - x) * u), (float)(origin + y * u));
-            });
+                double at = offset;
+                DayArt.Draw(g, specks, seconds, u, delegate(double x, double y)
+                {
+                    return new PointF((float)(mirrored ? at + (Brand.DaySpeckBand - x) * u : width - at - (Brand.DaySpeckBand - x) * u), (float)(y * u));
+                });
+            }
+            double end = clear;
+            if (scene)
+                DayArt.Draw(g, DayArt.Parse(Brand.DayScene(look)), seconds, u, delegate(double x, double y)
+                {
+                    return new PointF((float)(mirrored ? end + (Brand.DaySceneWidth - x) * u : width - end - (Brand.DaySceneWidth - x) * u), (float)(origin + y * u));
+                });
             Color card = Parent != null ? Palette.Card : Palette.Card;
             int solid = Soft.Px(2);
             int from = mirrored ? Width - solid : solid, to = mirrored ? Width - solid - fade : solid + fade;
@@ -433,6 +476,106 @@ namespace CodexAutoResume
         {
             if (disposing) timer.Dispose();
             base.Dispose(disposing);
+        }
+    }
+
+    /// The Dashboard's ground on a special day (W2, the owner's pick of 2026-11-17): the window's canvas takes brand's tint of the
+    /// day's ground (Palette.Canvas, before anything is made in it), and every ground of that window shows the day's specks
+    /// where they fall in the window, faint and still, behind the cards - painted with the ground (Ground.Paint), so they
+    /// cost nothing a frame. The cards keep their own colour, so the pages read as always. Never in a picture, a probe or an
+    /// audit without its own date (DayArt.Today), nor in High Contrast or Classic.
+    internal static class DayGround
+    {
+        // How much of each speck's own opacity a speck on the ground keeps: it lies behind the words of the tabs and pages.
+        private const double FaintShare = 0.45;
+        private static readonly Dictionary<string, DayElement[]> faint = new Dictionary<string, DayElement[]>();
+        private static WeakReference owner;
+
+        /// The day the window's ground is in, or null.
+        internal static string Look;
+
+        /// The specks' unit, the scene's to the pixel: as on the header card, so a speck is the same size on both.
+        internal static double Unit = 1.0;
+
+        /// The window's ground in `look`'s tint, or as the palette has it on any other day; `window` the one window whose
+        /// grounds show its specks.
+        internal static void Adopt(string look, Form window)
+        {
+            Look = look;
+            owner = look == null ? null : new WeakReference(window);
+            Palette.Canvas = look == null ? Untinted : Tinted(Untinted, look);
+            Unit = Soft.PxF(Brand.DaySceneHeight) / Brand.DaySceneHeight * 1.2;
+        }
+
+        /// The window's ground on any other day: the palette's canvas.
+        internal static Color Untinted { get { return Palette.Contrast ? SystemColors.Control : Tokens.Canvas; } }
+
+        /// `canvas` with brand's tint of `look`'s ground in it.
+        internal static Color Tinted(Color canvas, string look)
+        {
+            string ground, top, bottom;
+            Brand.DayGround(look, out ground, out top, out bottom);
+            return ground == null ? canvas : Soft.Mix(canvas, ColorTranslator.FromHtml(ground), Brand.DayGroundTint);
+        }
+
+        /// Every control of `window` in the ground's old colour `from` takes the new `to` (a window left open past midnight).
+        internal static void Repaint(Control window, Color from, Color to)
+        {
+            var walk = new Stack<Control>();
+            walk.Push(window);
+            while (walk.Count > 0)
+            {
+                Control control = walk.Pop();
+                if (control.BackColor.ToArgb() == from.ToArgb()) control.BackColor = to;
+                foreach (Control child in control.Controls) walk.Push(child);
+            }
+            window.Invalidate(true);
+        }
+
+        private static DayElement[] Faint(string look)
+        {
+            DayElement[] found;
+            if (faint.TryGetValue(look, out found)) return found;
+            // The moving ones alone: what stands still in the band (seollal's stripes) belongs to a card's header, not to a ground.
+            var moving = new List<DayElement>();
+            foreach (DayElement one in DayArt.Parse(Brand.DaySpecks(look)))
+                if (!string.IsNullOrEmpty(one.Motion))
+                    moving.Add(new DayElement { Kind = one.Kind, Numbers = one.Numbers, Colour = one.Colour,
+                                                Opacity = one.Opacity * FaintShare, Motion = one.Motion, Values = one.Values });
+            found = moving.ToArray();
+            faint[look] = found;
+            return found;
+        }
+
+        /// The day's specks on `ground`'s background where they fall in its window, within `clip`: only on the window's own
+        /// ground (the tinted canvas), never on a card.
+        internal static void Paint(Control ground, Graphics g, Rectangle clip)
+        {
+            if (Look == null || owner == null || Palette.Contrast) return;
+            if (Ground.Colour(ground).ToArgb() != Palette.Canvas.ToArgb()) return;
+            Point at = Point.Empty;
+            Control c = ground;
+            for (; c != null && !(c is Form); c = c.Parent) at.Offset(c.Left, c.Top);
+            if (c == null || !ReferenceEquals(c, owner.Target)) return;
+            double u = Unit, wide = Brand.DaySpeckBand * u, tall = Brand.DaySceneHeight * u;
+            if (wide <= 0 || tall <= 0) return;
+            DayElement[] specks = Faint(Look);
+            Rectangle shown = new Rectangle(clip.X + at.X, clip.Y + at.Y, clip.Width, clip.Height);
+            int firstColumn = (int)Math.Floor((shown.Left - 8 * u) / wide), lastColumn = (int)Math.Floor((shown.Right + 8 * u) / wide);
+            int firstRow = (int)Math.Floor((shown.Top - 8 * u) / tall), lastRow = (int)Math.Floor((shown.Bottom + 8 * u) / tall);
+            GraphicsState state = g.Save();
+            g.SetClip(clip, CombineMode.Intersect);
+            for (int row = Math.Max(0, firstRow); row <= lastRow; row++)
+                for (int column = Math.Max(0, firstColumn); column <= lastColumn; column++)
+                {
+                    double x0 = column * wide - at.X, y0 = row * tall - at.Y;
+                    // Each row a half band along from the one above, so the specks do not stand in columns.
+                    if (row % 2 == 1) x0 -= wide / 2;
+                    DayArt.Draw(g, specks, 0.0, u, delegate(double x, double y) { return new PointF((float)(x0 + x * u), (float)(y0 + y * u)); });
+                    if (row % 2 == 1 && column == lastColumn)
+                        DayArt.Draw(g, specks, 0.0, u, delegate(double x, double y) { return new PointF((float)(x0 + wide + x * u), (float)(y0 + y * u)); });
+                }
+            g.Restore(state);
         }
     }
 

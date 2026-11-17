@@ -310,8 +310,96 @@ def mark_text(look):
 
 def scene_text(look):
     """The same list as one line per element, for the window (Brand.DayScene): kind;numbers;colour;opacity;motion;numbers."""
+    return _as_text(scene_elements(look))
+
+
+def _as_text(elements):
     return "\n".join(";".join((element[0], " ".join("%g" % value for value in element[1]), element[2], "%g" % element[3], element[4],
-                               " ".join("%g" % value for value in element[5]))) for element in scene_elements(look))
+                               " ".join("%g" % value for value in element[5]))) for element in elements)
+
+
+# ------------------------------------------------------------------ the day spread wide (W2, the owner's pick of 2026-11-17)
+# On a special day a surface takes the day over its whole header, not a corner of it: the day's ground under all of it, the
+# scene as tall as the band at its outer end, and the day's specks - the scene's own moving pieces - across the whole of it.
+# The specks are one band SPECK_BAND wide and the scene's 66 high, laid side by side as far as a surface is wide (and, on a
+# window's ground, row under row), each surface drawing them in its scene's unit from this one list. The words keep the
+# card's own colour under them: from WIDE["gap"] past the last word the card's colour fades into the day over WIDE["fade"]
+# (device-independent pixels), so they read as on any other day. A window's ground takes WIDE["ground_tint"] of the day's
+# ground, and its specks, behind the cards. A look whose scene has a part that runs its whole width (seollal's stripes) has
+# it among its specks too, so that it runs the band's whole width.
+SPECK_BAND = 300.0
+WIDE = {"gap": 8, "fade": 96, "ground_tint": 0.10}
+
+
+def _specks_falling(seeded, count, sizes, durations, colours, opacity, make):
+    made = []
+    for index in range(count):
+        x, size = seeded(4, SPECK_BAND - 4), seeded(*sizes)
+        duration = seeded(*durations)
+        delay = seeded(-duration, 0.0)
+        made.append(make(round(x, 3), round(size, 3), colours[index % len(colours)], opacity, [round(duration, 3), round(delay, 3)]))
+    return made
+
+
+def _confetti(x, size, colour, opacity, timing):
+    return ["poly", _flat(_box(x, -4.0, size * 0.62, size)), colour, opacity, "fall", timing + [320.0]]
+
+
+def _flake(x, size, colour, opacity, timing):
+    return ["circle", [x, -4.0, size], colour, opacity, "fall", timing + [0.0]]
+
+
+_SPECK_MAKERS = {
+    "birthday": lambda: _specks_falling(_Seeded(9061), 14, (4.2, 6.8), (4.0, 7.5), _CONFETTI_COLOURS, 0.9, _confetti),
+    "new_year": lambda: _stars(_Seeded(1011), 12, (4, SPECK_BAND - 4), (6, 60), (1.8, 3.6), "#FFE9A8"),
+    "christmas": lambda: _specks_falling(_Seeded(12251), 18, (0.8, 1.8), (5.0, 9.0), ("#FFFFFF",), 0.9, _flake),
+    # Seollal's stripes (saekdong) run along the top of the whole band, as they do across its scene, with its coins under them.
+    "seollal": lambda: ([_round(0, index * 3.4, SPECK_BAND, 3.4, 0, colour)
+                         for index, colour in enumerate(("#D9463E", "#F2C230", "#3FA86B", "#3B6FC9", "#E88BB0"))]
+                        + _specks_falling(_Seeded(2027), 10, (1.5, 2.4), (6.0, 10.0), ("#F2C230", "#E25B4F"), 0.9, _flake)),
+    "chuseok": lambda: _stars(_Seeded(8151), 10, (4, SPECK_BAND - 4), (6, 60), (1.4, 2.8), "#FFF4D0"),
+}
+_kept_specks = {}
+
+
+def speck_elements(look):
+    """`look`'s specks in one band SPECK_BAND by 66, as scene_elements' list: what every surface lays across its width."""
+    if look not in _kept_specks:
+        _kept_specks[look] = _SPECK_MAKERS[look]()
+    return _kept_specks[look]
+
+
+def speck_frame(look, milliseconds):
+    """`look`'s specks `milliseconds` in, in their band: pure, and the same every time."""
+    return [element_at(element, milliseconds / 1000.0) for element in speck_elements(look)]
+
+
+def day_band(look, px, band, words_end):
+    """The day spread wide over a card's header (W2, the owner's pick of 2026-11-17): `band` is the header's inside (left, top,
+    right, bottom), the words ending at `words_end`. From WIDE's gap past the last word to the card's outer side it is
+    the day's - its ground, its specks across all of it (speck_frame) and its scene as tall as the band at the outer
+    end - the card's own colour fading into it over WIDE's fade, so the words stand on the card's colour as on any other
+    day. The scene is drawn with its main piece whole (`scene` true), or not at all where the words leave too little room for
+    that; and where they leave too little even for the fade and a little of the day, there is no band (None). Every surface
+    the tray draws asks this - the popup, the icon's card, the notification card - in device pixels (`px`); the window's
+    DayArt.Fit and Band and the panel's placeDayScene are the same rule in theirs."""
+    left, top, right, bottom = band
+    left = max(left, words_end + px(WIDE["gap"]))
+    fade = px(WIDE["fade"])
+    if right - left < fade // 2 + px(24) or bottom <= top:
+        return None
+    unit = (bottom - top) / SCENE_HEIGHT
+    focal = SCENE_WIDTH - SCENE_FOCUS[look]
+    solid = left + px(2)
+    room = int(right - solid - focal * unit)
+    scene = room >= px(28)
+    return {"kind": "scene", "scene": look, "rect": (left, top, right, bottom), "unit": unit, "scene_shown": scene,
+            "fade": (solid, solid + max(px(2), min(fade, room if scene else right - solid - px(24))))}
+
+
+def speck_text(look):
+    """The specks as scene_text's lines, for the window (Brand.DaySpecks)."""
+    return _as_text(speck_elements(look))
 
 
 def _wave(seconds, duration, delay=0.0):

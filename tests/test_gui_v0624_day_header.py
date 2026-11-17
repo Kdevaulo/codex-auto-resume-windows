@@ -131,6 +131,31 @@ namespace CodexAutoResume
                     said["clipsSiblings"] = (DayHeaderStyle(form.dayScene.Handle, -16).ToInt64() & clip) != 0 &&
                                             (DayHeaderStyle(form.hero.Handle, -16).ToInt64() & clip) != 0;
                 }
+                // W2: where the band of the day begins, the ground the window's ground was given, a page card to hold unchanged.
+                said["band"] = DayHeaderBox(DayHeaderIn(form.dayScene, form));
+                said["canvas"] = (double)Palette.Canvas.ToArgb();
+                string dayGround, dayTop, dayBottom;
+                Brand.DayGround(form.dayLook ?? "seollal", out dayGround, out dayTop, out dayBottom);
+                said["dayGround"] = (double)ColorTranslator.FromHtml(dayGround).ToArgb();
+                SoftCard page = null;
+                var walk = new Stack<Control>();
+                walk.Push(form.pageHost);
+                while (walk.Count > 0 && page == null)
+                {
+                    Control c = walk.Pop();
+                    if (c is SoftCard && c != form.hero && Soft.OwnVisible(c) && c.Width > 200 && c.Height > 80) page = (SoftCard)c;
+                    foreach (Control child in c.Controls) walk.Push(child);
+                }
+                if (page != null) said["pageCard"] = DayHeaderBox(Rectangle.Inflate(DayHeaderIn(page, form), -Soft.Px(20), -Soft.Px(20)));
+                // A frame of the day: what the header's band costs to draw, as its timer draws it thirty times a second.
+                if (Soft.OwnVisible(form.dayScene) && form.dayScene.Width > 0)
+                    using (var frame = new Bitmap(form.dayScene.Width, form.dayScene.Height))
+                    {
+                        form.dayScene.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        for (int i = 0; i < 30; i++) form.dayScene.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
+                        said["frameMs"] = clock.Elapsed.TotalMilliseconds / 30.0;
+                    }
                 return form.RenderPicture(new Dictionary<string, object>(), writer);
             }
             finally
@@ -158,7 +183,42 @@ namespace CodexAutoResume
                 var left = new Rectangle(card.Left, card.Top, Math.Max(0, buttons.Left - card.Left), card.Height);
                 said["leftOfButtons"] = (double)DayHeaderDiffer(a, b, left);
                 said["behindButtons"] = (double)DayHeaderDiffer(a, b, buttons);
-                said["card"] = (double)DayHeaderDiffer(a, b, card);
+                // The card's inside, its round corners left out: they show the window's ground, which a day tints.
+                said["card"] = (double)DayHeaderDiffer(a, b, Rectangle.Inflate(card, -Soft.Px(24), 0));
+                // The band: how much of it between the fade and the scene is the day's ground (the rest its specks).
+                var band = (List<object>)one["band"];
+                var inside = new Rectangle((int)(double)band[0], card.Top + Soft.Px(2), (int)(double)band[2], card.Height - Soft.Px(4));
+                said["bandBox"] = DayHeaderBox(inside);
+                said["leftOfBand"] = (double)DayHeaderDiffer(a, b, new Rectangle(card.Left + Soft.Px(24), card.Top + Soft.Px(2),
+                                                                                    Math.Max(0, inside.Left - card.Left - Soft.Px(24)), card.Height - Soft.Px(4)));
+                int dayGround = (int)(double)one["dayGround"], grounds = 0, all = 0;
+                for (int y = inside.Top; y < inside.Bottom; y++)
+                    for (int x = inside.Left + Soft.Px(100); x < inside.Left + inside.Width / 2; x++)
+                    {
+                        all++;
+                        if (a.GetPixel(x, y).ToArgb() == dayGround) grounds++;
+                    }
+                said["dayGroundShare"] = all == 0 ? 0.0 : grounds / (double)all;
+                // The window's ground: every pixel of an ordinary day's ground, on the day the tint - or near it, where a card's
+                // lit edge, which an ordinary day's ground hides, lies on it - or one of the day's specks.
+                int canvas = (int)(double)other["canvas"], ground = 0, tint = 0, specks = 0;
+                Color tinted = Color.FromArgb((int)(double)one["canvas"]);
+                for (int y = 0; y < a.Height; y += 2)
+                    for (int x = 0; x < a.Width; x += 2)
+                    {
+                        if (b.GetPixel(x, y).ToArgb() != canvas) continue;
+                        ground++;
+                        Color day = a.GetPixel(x, y);
+                        int far = Math.Max(Math.Abs(day.R - tinted.R), Math.Max(Math.Abs(day.G - tinted.G), Math.Abs(day.B - tinted.B)));
+                        if (far <= 24) tint++;
+                        else specks++;
+                    }
+                said["ground"] = new List<object> { (double)ground, (double)tint, (double)specks };
+                if (one.ContainsKey("pageCard"))
+                {
+                    var box2 = (List<object>)one["pageCard"];
+                    said["pageCard"] = (double)DayHeaderDiffer(a, b, new Rectangle((int)(double)box2[0], (int)(double)box2[1], (int)(double)box2[2], (int)(double)box2[3]));
+                }
             }
             return said;
         }
@@ -257,6 +317,30 @@ class DayHeaderTests(unittest.TestCase):
 
     def test_and_behind_the_caption_buttons_as_well(self):
         self.assertGreater(self.answer["room"]["behindButtons"], 0)
+
+    def test_w2_the_card_is_in_the_day_past_the_words(self):
+        room = self.answer["room"]
+        band, hero, buttons = room["special"]["band"], room["special"]["hero"], room["special"]["buttons"]
+        self.assertLess(band[0], hero[0] + hero[2] * 0.5, "the day begins past the words, not in a corner")
+        self.assertEqual(band[0] + band[2], hero[0] + hero[2] - 1, "and reaches the card's outer side, under the buttons")
+        self.assertGreater(room["dayGroundShare"], 0.3, "the day's own ground")
+        self.assertEqual(room["leftOfBand"], 0, "the words and the light stand as on any other day")
+
+    def test_w2_the_window_s_ground_takes_the_day_faintly_with_its_specks_and_the_cards_stay(self):
+        room = self.answer["room"]
+        ground, tint, specks = room["ground"]
+        self.assertGreater(ground, 1000)
+        self.assertGreater(tint / ground, 0.9, "the tint")
+        self.assertGreater(specks, 0, "and the day's specks on it")
+        canvas, tinted, day = room["plain"]["canvas"], room["special"]["canvas"], room["special"]["dayGround"]
+        mix = [round(((int(canvas) >> shift) & 255) * 0.9 + ((int(day) >> shift) & 255) * 0.1) for shift in (16, 8, 0)]
+        got = [(int(tinted) >> shift) & 255 for shift in (16, 8, 0)]
+        for one, other in zip(mix, got):
+            self.assertLessEqual(abs(one - other), 1)
+        self.assertEqual(room.get("pageCard"), 0, "a page's card is as on any other day")
+
+    def test_w2_a_frame_of_the_band_costs_little(self):
+        self.assertLess(self.answer["room"]["special"]["frameMs"], 12.0)
 
     def test_with_no_room_there_is_no_scene_and_no_slice_of_it(self):
         no_room = self.answer["noRoom"]
