@@ -398,7 +398,9 @@ class PanelTests(unittest.TestCase):
     def test_the_scene_stands_past_the_words_and_is_absent_where_it_must_be(self):
         body = self.body("placeDayScene")
         self.assertIn("range.selectNodeContents(child);", body)
-        self.assertIn("if (unit < whole * 0.75) return;", body)
+        # v0.6.24-beta.3 (W2): no day where the words leave it no room, and no scene where its main piece is not whole.
+        self.assertIn("if (right - left < fadeMost / 2 + 24) return;", body)
+        self.assertIn("shown = room >= 28", body)
         self.assertIn("pageHighContrast() || document.documentElement.getAttribute('data-design') === 'classic'", body)
         self.assertIn("var(--card-ground) 2px, transparent", body, "the first pixels are the card's own")
         self.assertIn("still ? [element[0], dayElementAt(element, 0)[1]", self.body("dayNode"), "held still, the scene's first instant")
