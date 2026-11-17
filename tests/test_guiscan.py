@@ -177,7 +177,10 @@ class SliceTests(unittest.TestCase):
         # 113 with DialogVeil (the owner, 2026-11-16): the veil over a dialog's owner while it is open (gui/SoftChrome.cs).
         # 116 with the special eggs at the sixth press on the version (v0.6.24-beta.2, the owner, 2026-11-16): EggPick, which
         # one, ConfettiBurst, the confetti's pieces, and ConfettiLayer, the window they fall in (gui/SoftEggs.cs).
-        self.assertEqual(len(set(declared)), 116, "the window's types")
+        # 118 with the setup window's filled pages (v0.6.24-beta.3, the owner's option A): StepMark, the mark beside a
+        # numbered point or a listed step, and InstallerRule, the hairline under each row of what is installed
+        # (gui/InstallerWindow.cs).
+        self.assertEqual(len(set(declared)), 118, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,

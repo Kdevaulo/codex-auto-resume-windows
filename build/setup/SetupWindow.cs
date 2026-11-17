@@ -95,6 +95,8 @@ namespace CodexAutoResumeSetup
             flow.DeleteSavedAccounts = InstallerFlow.Has(arguments, "-DeleteSavedAccounts");
             flow.Purge = InstallerFlow.Has(arguments, "-Purge");
             flow.From = from ?? "";
+            // A setup program unpacks its archive first, whatever it then runs (v0.6.24-beta.3: the step list's first step).
+            flow.Unpacks = true;
             flow.Maintaining = mode == InstallerFlow.Install && flow.Upgrade && !flow.EditionChange &&
                                flow.From.Length > 0 && flow.From == flow.Version;
             return flow;
