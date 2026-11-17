@@ -129,7 +129,7 @@ def kinds(text: str, version: str) -> list:
     word that is not in KINDS (or one of the other language's), or names one twice - a release without its
     kind is a mistake worth stopping for."""
     number = str(version).lstrip("v")
-    paragraphs = re.split(r"\n\s*\n", section(text, version).replace("\r\n", "\n"))
+    paragraphs = re.split(r"\n\s*\n", section(text, version))
     found = KIND_LINE.match(paragraphs[1].strip()) if len(paragraphs) > 1 else None
     if found is None:
         raise SystemExit("the CHANGELOG.md section for v%s has no kind line as its second paragraph "
