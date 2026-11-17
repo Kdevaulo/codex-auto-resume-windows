@@ -29,7 +29,7 @@ the previous version's `.old-` file where an update put it.
 - **The Dashboard opens at exactly its size, and its first paint is clean.** It used to open a little larger than it asked, at
   100 % and at 150 %. In the dark theme it no longer shows an empty outline of its corner, or one white frame, before it has painted: the
   window and its shadow come on together once it has.
-- **The Dashboard is 1000 x 588 instead of 1000 x 681, and the version stands in a pill.** The header card is two lines, and the
+- **The Dashboard opens at 1000 x 588 instead of about 1000 x 680, and the version stands in a pill.** The header card is two lines, and the
   four Overview cards keep the height they had. The version - and the advanced edition's word beside it - stands in a small raised pill
   at the end of the row of page tabs, no longer in a bar at the foot; it gives way to a tab that needs the room, shows the version
   alone where that is all that fits, and a screen reader reads it whole. Only Settings has a bar at its foot now (the reopen note,
