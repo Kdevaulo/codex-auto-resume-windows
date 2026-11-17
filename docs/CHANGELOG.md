@@ -1201,7 +1201,7 @@ own file are as v0.6.20 left them - so going back to v0.6.20 needs no care.
 
 ## v0.6.20 — A status light for every state, Arabic and Hebrew with the window mirrored, a conversation an agent made recovered when you started the turn, the open Dashboard brought forward, and the advanced edition's analytics, push notices, early 5-hour window, account switch, compatibility data and the rest of issue 50
 
-> **A status light for every state.** This release gives every state its own status light, offers Arabic and Hebrew with the window mirrored, recovers conversations an agent made and brings the open Dashboard forward.
+> **A status light for every state.** This release gives every state its own status light, offers Arabic and Hebrew with the window mirrored, recovers conversations an agent made and adds advanced analytics and an account switch.
 
 **Kind:** New features · Design changes · Languages · Bug fixes · Feature changes
 
@@ -2803,7 +2803,7 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
 
 ## v0.6.16 — Rescan and reconcile, a setup program that is an installer, notices that stay until clicked, and most of the advanced edition
 
-> **Rescan, a real installer and lasting notices.** This release adds Rescan and reconcile, turns the setup program into an installer, keeps notices until clicked and brings most of the advanced edition.
+> **Rescan, a real installer and lasting notices.** This release adds Rescan and reconcile, turns the setup program into an installer, keeps notices until clicked, watches up to three more Codex homes and brings most of the advanced edition.
 
 **Kind:** New features · Feature changes · Bug fixes · Design changes
 
@@ -4399,7 +4399,7 @@ the change above closes.
 
 ## v0.6.11 — Two editions, and the advanced edition's first capabilities
 
-> **Two editions and the first advanced features.** This release splits the program into a standard and an advanced edition and brings the advanced edition's first capabilities, off until you turn them on.
+> **Two editions and the first advanced features.** This release splits the program into a standard and an advanced edition, brings the standard one quiet hours, observe-only mode and sixteen languages, and the advanced one its first features, off until turned on.
 
 **Kind:** New features · Feature changes · Languages · Bug fixes · Under the hood
 
@@ -5212,7 +5212,7 @@ only turn capabilities off. [EDITIONS.md](EDITIONS.md) says what each capability
 
 ## v0.6.11-beta.2 — The advanced edition's first capabilities, before the page that turns them on
 
-> **The advanced edition's first capabilities.** This beta brings the advanced edition's first capabilities, before the page that turns them on exists.
+> **First advanced capabilities and pre-release updates.** This beta brings the advanced edition's first three capabilities, makes Check for updates offer a newer pre-release, adds a setup program for each edition and publishes the standards.
 
 **Kind:** New features · Feature changes · Bug fixes
 
@@ -5953,7 +5953,7 @@ off - and a second pass found 10 more; each is fixed, with a test that failed be
 
 ## v0.6.10 — The design settled, and what others report
 
-> **One settled design across the product.** This release settles the look of the whole product as one design, gathers the fixes people reported and tidies the repository's front page.
+> **One settled look, and four designs to choose.** This release settles the look of the Dashboard, popup, card and panel, adds a Design setting with four designs, shows how many people reported a Codex version works and tidies the repository's front page.
 
 **Kind:** Design changes · New design · New features · Under the hood
 
@@ -7210,7 +7210,7 @@ this one, and any scaling but 150 per cent.
 
 ## v0.6.4 — One look in light and dark, a quieter status light, and a window that arrives ready
 
-> **One look in light and dark.** This release gives the product one look in light and dark, quiets the status light and opens the window ready.
+> **One look in light and dark.** This release gives the Dashboard, the popup and the panel one neumorphic look in light and dark, quiets the status light and opens the window ready.
 
 **Kind:** New design · Design changes · Performance · Bug fixes
 
@@ -7405,9 +7405,9 @@ Not verified, and not claimed: High Contrast on a real system (it is rendered an
 switched on here), a real Codex interruption recovered by this build, any machine but this one, and
 any scaling but 150 per cent.
 
-## v0.6.3 — Nine languages, your own words, and a window that shows it is alive
+## v0.6.3 — Nine languages, a neumorphic look, your own words, and a window that shows it is alive
 
-> **Nine languages and your own words.** This release speaks nine languages, lets you write the continuation message yourself and gives the window a sign that it is alive.
+> **Nine languages and a new neumorphic look.** This release speaks nine languages, gives the product a new neumorphic look, lets you write the continuation message yourself and gives the window a sign that it is alive.
 
 **Kind:** New design · Languages · New features · Bug fixes
 
@@ -7600,7 +7600,7 @@ One fix, in the step that decides whether anything gets installed.
 
 ## v0.6.1 — What running it for real found
 
-> **What the first live run found.** This release carries the changes the first live acceptance of v0.6.0 turned up, on a machine somebody really uses.
+> **Worked recoveries no longer count as failures.** This release records a recovery that made progress as recovered whatever ended its turn, and carries the other fixes the live acceptance of v0.6.0 turned up.
 
 **Kind:** Bug fixes
 
@@ -7644,7 +7644,7 @@ argument for running the procedure. No real Codex visual recovery is claimed.
 
 ## v0.6.0 — It follows its own turn, and it shows you the work
 
-> **A recovery that follows its own turn.** This release follows the exact Codex turn a continuation started and reads the outcome from that turn alone, and shows you the work it did.
+> **A Dashboard, and recoveries that follow their turn.** This release replaces the settings page with a six-page Dashboard, follows the exact Codex turn a continuation started, reads the outcome from that turn alone and adds an icon in the notification area.
 
 **Kind:** New features · Bug fixes · Security
 
@@ -8901,7 +8901,7 @@ the code. The watcher was not running, and the settings panel was the only thing
 
 ## v0.3.1 — Keep the state out of somebody else's sandbox
 
-> **State kept out of a sandbox.** This release moves the runtime state to the user's profile folder, because a packaged host's AppData writes are silently redirected into a private cache.
+> **State moved out of AppData.** This release moves the runtime state from AppData to the user's profile folder, because a packaged host's AppData writes are silently redirected into a private cache.
 
 **Kind:** Bug fixes
 
