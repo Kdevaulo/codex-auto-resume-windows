@@ -70,6 +70,14 @@ namespace CodexAutoResume
         [DllImport("user32.dll")] internal static extern bool GetLayeredWindowAttributes(IntPtr window, out int key, out byte alpha, out int flags);
         [DllImport("gdi32.dll")] internal static extern IntPtr CreateRectRgn(int l, int t, int r, int b);
         [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out Chrome.RECT value, int size);
+        [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")] internal static extern int DwmCloaked(IntPtr window, int attribute, out int value, int size);
+
+        // DWMWA_CLOAKED: nonzero while DWM holds the window off the screen.
+        internal static bool Cloaked(IntPtr h)
+        {
+            int value;
+            return DwmCloaked(h, 14, out value, 4) == 0 && value != 0;
+        }
         [DllImport("gdi32.dll")] internal static extern bool DeleteObject(IntPtr o);
         internal const int Away = -30000, SW_SHOWNOACTIVATE = 4, GW_OWNER = 4, GW_HWNDNEXT = 2, GWL_EXSTYLE = -20;
 
@@ -220,7 +228,10 @@ namespace CodexAutoResume
                 dialog.Owner = owner;
                 IntPtr h = dialog.Handle;
                 CardNative.ShowWindow(h, CardNative.SW_SHOWNOACTIVATE);
+                // As it is shown, before any message is handed out: the veil on and painted at its fullest, the dialog
+                // still held off the screen until it has painted.
                 said["first"] = (double)(dialog.Veil == null ? -1 : dialog.Veil.Alpha);
+                said["veilOnFirst"] = dialog.Veil != null && CardNative.IsWindowVisible(dialog.Veil.Handle);
                 CardNative.Pump(40);
                 said["open"] = Veiled(dialog, owner);
                 IntPtr veil = dialog.Veil == null ? IntPtr.Zero : dialog.Veil.Handle;
@@ -291,6 +302,12 @@ namespace CodexAutoResume
                 Soft.WindowsAnimates = delegate { return true; };
                 Soft.ReduceMotionSetting = true;
                 said["still"] = Scene(false, false, false);
+                // The dark theme: a stronger veil (DialogVeil.DarkStrength), of the dark shadow's ink.
+                Soft.ReduceMotionSetting = false;
+                Palette.Adopt("dark");
+                said["dark"] = Scene(false, false, false);
+                said["darkInk"] = DialogVeil.Ink().ToArgb() == Tokens.ShadowDark.ToArgb();
+                Palette.Adopt("light");
             }
             finally
             {
@@ -299,6 +316,7 @@ namespace CodexAutoResume
             }
             said["child"] = Child();
             said["strength"] = DialogVeil.Strength;
+            said["darkStrength"] = DialogVeil.DarkStrength;
             return said;
         }
     }
@@ -547,7 +565,7 @@ class DialogCardTests(unittest.TestCase):
         self.assertEqual(said["client"][1], said["title"] + said["asked"] - said["before"] + said["above"] + button)
 
     def test_the_owner_is_veiled_while_the_dialog_is_open_and_not_after(self):
-        for scene in ("moving", "region", "windowsStill", "still"):
+        for scene in ("moving", "region", "windowsStill", "still", "dark"):
             with self.subTest(scene=scene):
                 said = self.answer["veil"][scene]
                 veil = said["open"]
@@ -562,7 +580,8 @@ class DialogCardTests(unittest.TestCase):
                 self.assertTrue(veil["underDialog"], "just under the dialog")
                 self.assertTrue(veil["overOwner"], "over its owner")
                 self.assertTrue(veil["colour"], "the shadow's ink")
-                self.assertEqual(veil["full"], round(255 * self.answer["veil"]["strength"]))
+                key = "darkStrength" if scene == "dark" else "strength"
+                self.assertEqual(veil["full"], round(255 * self.answer["veil"][key]))
                 self.assertAlmostEqual(self.answer["veil"]["strength"], 0.20, delta=0.05)
                 self.assertEqual(veil["alpha"], veil["full"], "at its fullest once open")
                 self.assertTrue(said["gone"], "gone as the dialog closes")
@@ -573,12 +592,29 @@ class DialogCardTests(unittest.TestCase):
         self.assertTrue(said["ownerRegion"])
         self.assertTrue(said["open"]["shaped"] and said["open"]["region"], "the owner's own region")
 
-    def test_a_fade_only_where_motion_is_allowed(self):
-        self.assertEqual(self.answer["veil"]["moving"]["first"], 0, "faded in from nothing")
-        self.assertEqual(self.answer["veil"]["still"]["first"], self.answer["veil"]["still"]["open"]["full"],
-                         "motion reduced: at its fullest at once")
-        self.assertEqual(self.answer["veil"]["windowsStill"]["first"], self.answer["veil"]["windowsStill"]["open"]["full"],
-                         "Windows' animation effects off (the CI's runners): at its fullest at once")
+    def test_the_veil_is_on_at_its_fullest_before_the_dialog_is_seen(self):
+        """Live re-check 7: a fade timed on the dialog's thread came on 130-283 ms after the dialog's first frame, in one
+        step. The veil is on, painted, at its fullest as the dialog is shown - motion allowed or not, Windows' animation on
+        (Soft.WindowsAnimates, as the probe sets it) or off - and the dialog is held off the screen until it has painted."""
+        for scene in ("moving", "windowsStill", "still", "dark"):
+            with self.subTest(scene=scene):
+                said = self.answer["veil"][scene]
+                self.assertEqual(said["first"], said["open"]["full"], "at its fullest at once")
+                self.assertTrue(said["veilOnFirst"], "on the screen as the dialog is shown")
+
+    def test_the_dark_veil_dims_the_dark_window_as_the_light_one_does_the_light(self):
+        """Live re-check 7: in dark, 20 % took the Dashboard's mean grey only from 37.5 to 32; in light from 234 to 192, a
+        luminance ratio of 1.56. DarkStrength gives the dark Dashboard (37.5 over the dark shadow's ink, about 10) that ratio."""
+        def lum(grey):
+            c = grey / 255.0
+            return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+        light = lum(234) / lum(192)
+        strength = self.answer["veil"]["darkStrength"]
+        dark = lum(37.5) / lum(37.5 * (1 - strength) + 10 * strength)
+        self.assertAlmostEqual(dark, light, delta=0.05, msg="the dark ratio %.3f against the light %.3f" % (dark, light))
+        said = self.answer["veil"]["dark"]["open"]
+        self.assertEqual(said["full"], round(255 * strength))
+        self.assertTrue(said["colour"] and self.answer["veil"]["darkInk"], "the dark shadow's ink")
 
     def test_none_in_high_contrast_nor_for_a_dialog_laid_out_as_a_child(self):
         self.assertFalse(self.answer["veil"]["contrast"]["open"]["veiled"])

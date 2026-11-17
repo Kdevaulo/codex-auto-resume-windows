@@ -2242,17 +2242,22 @@ namespace CodexAutoResume
         private const uint SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040;
         private const int DWMWA_TRANSITIONS_FORCEDISABLED = 3, DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
-        /// How dark the veil is at its fullest, and how long it takes to get there where motion is allowed.
-        internal const double Strength = 0.20;
-        internal const int FadeMs = 120;
+        /// How dark the veil is: 20 % of the shadow's ink in light. In dark (live re-check 7, 2026-11-17, 150 %) 20 % took the
+        /// dark Dashboard's mean grey only from 37.5 to 32 and read as undimmed, where light went from 234 to 192 - a
+        /// luminance ratio of 1.56 (Y 0.823 / 0.527). The dark strength is the one that gives the dark Dashboard that ratio:
+        /// over its measured mean of 37.5 (Y 0.0191) and the dark shadow's ink (about 10, from the 20 % reading:
+        /// (32 - 0.8 x 37.5) / 0.2), a grey of 28.9 (Y 0.0122) asks (37.5 - 28.9) / (37.5 - 10) = 0.31 - so 0.32, about
+        /// 28.7 grey, a ratio of 1.57.
+        internal const double Strength = 0.20, DarkStrength = 0.32;
+
+        /// The strength in the theme the window is drawn in.
+        internal static double StrengthNow { get { return Palette.Dark ? DarkStrength : Strength; } }
 
         /// Off for every veil from here on (a probe that wants none); on in every window a person opens.
         internal static bool Enabled = true;
 
         private readonly Color colour;
         private readonly byte full;
-        private Timer fade;
-        private System.Diagnostics.Stopwatch fading;
         private byte alpha;
 
         /// The owner it dims, whether it took a shape (a region: the owner's own corner or Windows' round one), its colour
@@ -2290,7 +2295,7 @@ namespace CodexAutoResume
         {
             Owner = owner;
             colour = Ink();
-            full = (byte)Math.Round(255 * Strength);
+            full = (byte)Math.Round(255 * StrengthNow);
             Rectangle bounds;
             IntPtr region = Shape(owner, out bounds);
             Shaped = region != IntPtr.Zero;
@@ -2313,40 +2318,18 @@ namespace CodexAutoResume
                 DeleteObject(region);
                 Shaped = false;
             }
-            bool moves = !Soft.ReduceMotion;
-            alpha = moves ? (byte)0 : full;
+            // At its fullest at once and painted now, before the dialog's first frame (live re-check 7: a fade timed on
+            // the dialog's thread came on 130-283 ms after the dialog, in one step, while the dialog painted itself).
+            alpha = full;
             SetLayeredWindowAttributes(Handle, 0, alpha, LWA_ALPHA);
             // Just under the dialog, over the owner and whatever else the owner holds.
             SetWindowPos(Handle, dialog, bounds.X, bounds.Y, bounds.Width, bounds.Height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-            if (moves)
-            {
-                fading = System.Diagnostics.Stopwatch.StartNew();
-                fade = new Timer();
-                fade.Interval = Motion.Interval;
-                fade.Tick += delegate { Step(); };
-                fade.Start();
-            }
+            try { UpdateWindow(Handle); }
+            catch (Exception) { }
         }
 
-        private void Step()
-        {
-            if (Handle == IntPtr.Zero || fading == null) return;
-            double part = Math.Min(1.0, fading.Elapsed.TotalMilliseconds / FadeMs);
-            alpha = (byte)Math.Round(full * part);
-            SetLayeredWindowAttributes(Handle, 0, alpha, LWA_ALPHA);
-            if (part >= 1.0) StopFade();
-        }
-
-        private void StopFade()
-        {
-            if (fade != null)
-            {
-                fade.Stop();
-                fade.Dispose();
-            }
-            fade = null;
-            fading = null;
-        }
+        [DllImport("user32.dll")]
+        private static extern bool UpdateWindow(IntPtr window);
 
         // The owner's window on the screen and the region the veil takes over it (IntPtr.Zero: its whole rectangle).
         private static IntPtr Shape(IntPtr owner, out Rectangle bounds)
@@ -2404,7 +2387,6 @@ namespace CodexAutoResume
 
         public void Dispose()
         {
-            StopFade();
             if (Handle != IntPtr.Zero) DestroyHandle();
         }
     }
