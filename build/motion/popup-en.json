@@ -8,11 +8,26 @@
   "canvas": {
     "size": [
       808,
-      929
+      981
     ],
     "transparent": true,
     "theme": "light",
     "design": "soft"
+  },
+  "taskbar": {
+    "top": 885,
+    "height": 96,
+    "colour": "#EEF0F3",
+    "edge": 764,
+    "icon": {
+      "size": 32,
+      "right": 48,
+      "state": "watching"
+    }
+  },
+  "tip": {
+    "scale": 2.0,
+    "locale": "en"
   },
   "popup": {
     "scale": 2.0,
@@ -22,13 +37,13 @@
   "pointer": {
     "rest": [
       856,
-      588
+      760
     ],
     "scale": 2.0
   },
   "length": [
-    8800,
-    8800
+    13200,
+    13200
   ],
   "budget": {
     "cap": 4000000
