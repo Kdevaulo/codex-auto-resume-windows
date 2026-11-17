@@ -1217,6 +1217,20 @@ namespace CodexAutoResume
             if (!watched.Add(form)) return;
             HashSet<Form> set = watched;
             form.Disposed += delegate { set.Remove(form); };
+            // v0.6.24-beta.2 (live re-check 8): a window starts with its rings hidden - Windows gives a new window the cues
+            // of the input that came last on the desktop, so a fresh Dashboard started from a script, or one reopened on
+            // another monitor's scale (--reopened=1), showed a ring on its first tab with no key pressed. Hidden as its
+            // window is made (again, when it is made anew) and as it is first shown; the first key that moves the focus
+            // shows them, as ever.
+            form.HandleCreated += delegate
+            {
+                Hide(form, true);
+                // And once what made it has finished: WinForms gives a window made anew the cues its last one had.
+                try { form.BeginInvoke((MethodInvoker)delegate { Hide(form, true); }); }
+                catch (Exception) { }
+            };
+            form.Shown += delegate { Hide(form, true); };
+            if (form.IsHandleCreated) Hide(form, true);
             if (filter == null)
             {
                 filter = new Filter();
@@ -1796,7 +1810,10 @@ namespace CodexAutoResume
             get
             {
                 Font font = titleWords == null ? Soft.RoleFont("heading") : titleWords.Font;
-                return Soft.Px(16) + Soft.Px(TitleWordsInset) + TitleInkInset(Text, font, Mirror.Of(this));
+                // In the room the words have once laid out - a long title ends in an ellipsis there, and a mirrored one
+                // drawn short of its room starts where that room says (test_gui_v0611_access, Persian at text size 2.25).
+                Size room = titleWords == null || titleWords.Width <= 1 ? Size.Empty : titleWords.Size;
+                return Soft.Px(16) + Soft.Px(TitleWordsInset) + TitleInkInset(Text, font, Mirror.Of(this), room);
             }
         }
 
@@ -1806,11 +1823,24 @@ namespace CodexAutoResume
         /// white and read as Chrome.InkStep reads ink.
         internal static int TitleInkInset(string text, Font font, bool mirrored)
         {
+            return TitleInkInset(text, font, mirrored, Size.Empty);
+        }
+
+        /// The same in `room` (the words' own size once laid out; Empty: as wide as they ask), with the ellipsis the words
+        /// end in where the room is short of them.
+        internal static int TitleInkInset(string text, Font font, bool mirrored, Size room)
+        {
             if (string.IsNullOrEmpty(text) || text.Trim().Length == 0) return TitleLead(font);
-            TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix;
+            TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix |
+                                    TextFormatFlags.EndEllipsis;
             flags |= mirrored ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left;
             Size size = TextRenderer.MeasureText(text, font, new Size(int.MaxValue, 0), flags);
             int width = Math.Min(4096, size.Width + 8), height = Math.Max(1, size.Height + 4);
+            if (!room.IsEmpty)
+            {
+                width = Math.Min(4096, Math.Max(1, room.Width));
+                height = Math.Max(1, room.Height);
+            }
             using (var drawn = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
             {
                 using (Graphics g = Graphics.FromImage(drawn))
@@ -2073,6 +2103,15 @@ namespace CodexAutoResume
             titleWords.AutoEllipsis = true;
             titleWords.UseMnemonic = false;
             titleWords.Text = Text;
+            // The cross follows the words' room as the dialog is laid out and resized (TitleStart).
+            titleWords.SizeChanged += delegate
+            {
+                if (chrome == null) return;
+                int start = TitleStart;
+                if (start == chrome.GlyphEnd) return;
+                chrome.GlyphEnd = start;
+                chrome.Place();
+            };
             TextChanged += delegate
             {
                 if (titleWords == null) return;
