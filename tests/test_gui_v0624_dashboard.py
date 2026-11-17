@@ -378,11 +378,11 @@ namespace CodexAutoResume
                     {
                         clock += 300;
                         bool playing = clock < form.SpecialUntil;
-                        int before = form.EggsPlayed.Count;
+                        int countBefore = form.EggsPlayed.Count;
                         string saidBefore = (string)form.ProportionsAside()["words"];
                         down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                         if (playing)
-                            during.Add(form.EggsPlayed.Count == before && (string)form.ProportionsAside()["words"] == saidBefore &&
+                            during.Add(form.EggsPlayed.Count == countBefore && (string)form.ProportionsAside()["words"] == saidBefore &&
                                        (int)run.GetValue(form.versionPresses) == 0);
                     }
                     answer["pressingOn"] = string.Join(",", form.EggsPlayed.ToArray());
