@@ -619,10 +619,11 @@ namespace CodexAutoResume
                      recovered.ToString(CultureInfo.CurrentCulture));
         }
 
-        /// The bridge's statistics over all time, off the window's thread - reading numbers is not an action (LoadStatistics).
+        /// The bridge's statistics over all time, off the window's thread - reading numbers is not an action (LoadStatistics) -
+        /// through PersistentBridge.Queue, which counts it from the moment it is queued, as the window's other reads are.
         private void ReadRecovered(Action<int> then)
         {
-            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            bridge.Queue(delegate
             {
                 int recovered = -1;
                 try
