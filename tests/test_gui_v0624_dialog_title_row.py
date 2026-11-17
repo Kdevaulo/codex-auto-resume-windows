@@ -149,6 +149,45 @@ namespace CodexAutoResume
                     buttons["maximize"] = RowBox(RowInDialog(caption.MaximizeButton, d));
                     buttons["minimize"] = RowBox(RowInDialog(caption.MinimizeButton, d));
                     said["minimizeShown"] = Soft.OwnVisible(caption.MinimizeButton);
+                    // The title row as it is drawn: its first and last inked columns in the row's band, a pixel ink where a
+                    // channel stands more than 48 from the ground (the faintest anti-aliased edge is ground, as the eye takes
+                    // it) - read here, not by the product's own helpers.
+                    using (var drawn = new Bitmap(d.TitleGround.Width, d.TitleGround.Height))
+                    {
+                        Color ground = d.TitleGround.BackColor;
+                        using (Graphics g = Graphics.FromImage(drawn))
+                        {
+                            // Drawn where its parts stand (the dialog is laid out, never shown): the words as their label
+                            // draws them, the shown caption buttons' glyphs.
+                            g.Clear(ground);
+                            Rectangle at = RowInDialog(words, d);
+                            TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter |
+                                                    TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis |
+                                                    (mirrored ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left);
+                            TextRenderer.DrawText(g, words.Text, words.Font, at, words.ForeColor, ground, flags);
+                            foreach (CaptionButton b in new[] { caption.MinimizeButton, caption.MaximizeButton, caption.CloseButton })
+                            {
+                                if (!Soft.OwnVisible(b)) continue;
+                                Rectangle box = RowInDialog(b, d);
+                                g.TranslateTransform(box.Left, box.Top);
+                                b.Glyph(g, Palette.Ink);
+                                g.ResetTransform();
+                            }
+                        }
+                        int first = -1, last = -1;
+                        for (int x = 0; x < drawn.Width; x++)
+                            for (int y = row.Top; y < row.Bottom; y++)
+                            {
+                                Color c = drawn.GetPixel(x, y);
+                                if (Math.Abs(c.R - ground.R) > 48 || Math.Abs(c.G - ground.G) > 48 || Math.Abs(c.B - ground.B) > 48)
+                                {
+                                    if (first < 0) first = x;
+                                    last = x;
+                                    break;
+                                }
+                            }
+                        said["ink"] = new List<object> { (double)first, (double)last, (double)drawn.Width };
+                    }
                     said["maximizeShown"] = Soft.OwnVisible(caption.MaximizeButton);
                     said["buttons"] = buttons;
                     ChromeLayout layout = caption.Layout();
@@ -278,25 +317,19 @@ class DialogTitleRowTests(unittest.TestCase):
                         continue
                     self.assertEqual(box[1], y + (height - box[3]) // 2, name + " centred in the row")
                     self.assertEqual(box[3], px(26))
-                # The Close cross's ink across its button (CaptionButton.Glyph): strokes from 1 to 9 of a 10 px box centred
-                # in it, with round caps half the 1.3 px stroke past their ends.
-                close = buttons["close"]
-                ox = round((close[2] - 10 * scale) / 2)
-                cap = max(1.0, 1.3 * scale) / 2
-                ink_left, ink_right = close[0] + ox + scale - cap, close[0] + ox + 9 * scale + cap
+                # By ink (the owner's rule, live re-check 7): the ground before the row's first inked column - the title's
+                # first letter, mirrored the cross - as wide as after its last, within a pixel.
+                first, last, across = said["ink"]
+                self.assertGreaterEqual(first, 0, "the row has ink")
+                self.assertLessEqual(abs(first - (across - 1 - last)), 1,
+                                     "%d px of ground before the first ink, %d after the last" % (first, across - 1 - last))
                 if kind == "rtl":
                     self.assertTrue(said["mirrored"])
-                    letter = 600 - (words[0] + words[2] - said["lead"])
-                    self.assertLessEqual(abs(ink_left - letter), 1.5,
-                                         "mirrored: the cross's left end as far from the left edge as the title from the right")
                     self.assertLess(buttons["close"][0], buttons["minimize"][0])
                     self.assertEqual(x + width - (words[0] + words[2]), px(6), "the words start 6 px in from the right")
                     self.assertGreaterEqual(words[0] - (buttons["minimize"][0] + buttons["minimize"][2]), px(8))
                 else:
                     self.assertFalse(said["mirrored"])
-                    letter = words[0] + said["lead"]
-                    self.assertLessEqual(abs((600 - ink_right) - letter), 1.5,
-                                         "the cross's right end as far from the right edge as the title's first letter from the left")
                     self.assertLess(buttons["minimize"][0], buttons["close"][0])
                     self.assertEqual(words[0] - x, px(6), "the words start 6 px in")
                     self.assertGreaterEqual(buttons["minimize"][0] - (words[0] + words[2]), px(8))

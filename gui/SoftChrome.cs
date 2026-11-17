@@ -258,6 +258,31 @@ namespace CodexAutoResume
         /// Where a window whose visible box is `window` big goes over a window whose visible box is `owner`: centred on it,
         /// and held inside `work` (the work area of the monitor the owner is on) against the edge it would cross - its top
         /// left kept inside where it is larger than the work area. An empty `work` holds it nowhere.
+        /// How far a pixel's colour is from its ground, in any channel, for it to be ink (a letter's or a glyph's): the
+        /// faintest anti-aliased edge is ground, as the eye takes it.
+        internal const int InkStep = 48;
+
+        /// The first and last columns within `band` of `drawn` that hold ink against `ground` (X, Y); (-1, -1) for none.
+        internal static Point InkColumns(Bitmap drawn, Color ground, Rectangle band)
+        {
+            band = Rectangle.Intersect(band, new Rectangle(0, 0, drawn.Width, drawn.Height));
+            int first = -1, last = -1;
+            for (int x = band.Left; x < band.Right; x++)
+            {
+                for (int y = band.Top; y < band.Bottom; y++)
+                {
+                    Color c = drawn.GetPixel(x, y);
+                    if (Math.Abs(c.R - ground.R) > InkStep || Math.Abs(c.G - ground.G) > InkStep || Math.Abs(c.B - ground.B) > InkStep)
+                    {
+                        if (first < 0) first = x;
+                        last = x;
+                        break;
+                    }
+                }
+            }
+            return new Point(first, last);
+        }
+
         internal static Point CentreOn(Rectangle owner, Size window, Rectangle work)
         {
             int x = owner.X + (owner.Width - window.Width) / 2, y = owner.Y + (owner.Height - window.Height) / 2;
@@ -612,9 +637,11 @@ namespace CodexAutoResume
             // left mirrored; the buttons' hit areas reach past it, the cross sets the look.
             if (ground && GlyphEnd >= 0 && Soft.OwnVisible(CloseButton))
             {
-                RectangleF ink = CaptionButton.CrossInk(width, height);
-                int close = mirrored ? GlyphEnd - (int)Math.Round(ink.Left)
-                                     : holder.ClientSize.Width - GlyphEnd - (int)Math.Round(ink.Right);
+                // By ink (live re-check 7: the eye reads the glyph's own ink, not its box): the cross's first and last
+                // inked columns as it is drawn at this size (CaptionButton.InkColumns).
+                if (CloseButton.Size != new Size(width, height)) CloseButton.Size = new Size(width, height);
+                Point ink = CloseButton.InkColumns();
+                int close = mirrored ? GlyphEnd - ink.X : holder.ClientSize.Width - 1 - GlyphEnd - ink.Y;
                 x = mirrored ? close : close + width - GroupWidth;
             }
             // In a card, CaptionInsetTop below its top; in a row on the ground (OnGround), centred in the row.
@@ -1609,6 +1636,28 @@ namespace CodexAutoResume
             return RectangleF.FromLTRB(ox + unit - half, oy + unit - half, ox + 9 * unit + half, oy + 9 * unit + half);
         }
 
+        /// The first and last columns the glyph inks as it is drawn at the button's size (X, Y), black on white and read
+        /// as ink past Chrome.InkStep: what the dialog's title row sets the cross's gap to its edge by (ChromeHost.GlyphEnd).
+        internal Point InkColumns()
+        {
+            if (inkFor == Size && inkColumns.Y >= 0) return inkColumns;
+            int width = Math.Max(1, Width), height = Math.Max(1, Height);
+            using (var drawn = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(drawn))
+                {
+                    g.Clear(Color.White);
+                    Glyph(g, Color.Black);
+                }
+                inkColumns = Chrome.InkColumns(drawn, Color.White, new Rectangle(0, 0, width, height));
+            }
+            inkFor = Size;
+            return inkColumns;
+        }
+
+        private Size inkFor;
+        private Point inkColumns = new Point(-1, -1);
+
         internal void Glyph(Graphics g, Color ink)
         {
             float unit = Soft.PxF(1.0), box = Soft.PxF(Brand.CaptionGlyph);
@@ -1739,7 +1788,35 @@ namespace CodexAutoResume
         /// drawing keeps before a first letter (TitleLead). The Close cross stands as far in from the end edge.
         internal int TitleStart
         {
-            get { return Soft.Px(16) + Soft.Px(TitleWordsInset) + TitleLead(titleWords == null ? Soft.RoleFont("heading") : titleWords.Font); }
+            get
+            {
+                Font font = titleWords == null ? Soft.RoleFont("heading") : titleWords.Font;
+                return Soft.Px(16) + Soft.Px(TitleWordsInset) + TitleInkInset(Text, font, Mirror.Of(this));
+            }
+        }
+
+        /// v0.6.24-beta.2 (live re-check 7: the title's first letter stood 41 px from the edge and the cross's last ink 34,
+        /// at 150 %): how far in from the title words' start edge their first ink is - the text drawing's padding and the
+        /// first letter's own bearing - as the title draws them (one line, from its left, or its right mirrored), black on
+        /// white and read as Chrome.InkStep reads ink.
+        internal static int TitleInkInset(string text, Font font, bool mirrored)
+        {
+            if (string.IsNullOrEmpty(text) || text.Trim().Length == 0) return TitleLead(font);
+            TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix;
+            flags |= mirrored ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left;
+            Size size = TextRenderer.MeasureText(text, font, new Size(int.MaxValue, 0), flags);
+            int width = Math.Min(4096, size.Width + 8), height = Math.Max(1, size.Height + 4);
+            using (var drawn = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            {
+                using (Graphics g = Graphics.FromImage(drawn))
+                {
+                    g.Clear(Color.White);
+                    TextRenderer.DrawText(g, text, font, new Rectangle(0, 0, width, height), Color.Black, Color.White, flags);
+                }
+                Point ink = Chrome.InkColumns(drawn, Color.White, new Rectangle(0, 0, width, height));
+                if (ink.X < 0) return TitleLead(font);
+                return mirrored ? width - 1 - ink.Y : ink.X;
+            }
         }
 
         /// What a Label's text drawing keeps before its first letter in `font`: half of what its padding adds to the
@@ -1991,7 +2068,17 @@ namespace CodexAutoResume
             titleWords.AutoEllipsis = true;
             titleWords.UseMnemonic = false;
             titleWords.Text = Text;
-            TextChanged += delegate { if (titleWords != null) titleWords.Text = Text; };
+            TextChanged += delegate
+            {
+                if (titleWords == null) return;
+                titleWords.Text = Text;
+                // The cross's gap follows the title's first letter (TitleStart).
+                if (chrome != null)
+                {
+                    chrome.GlyphEnd = TitleStart;
+                    chrome.Place();
+                }
+            };
             titleRow.Controls.Add(titleWords);
             int line = Math.Max(titleWords.Font.Height,
                                 TextRenderer.MeasureText("Ag", titleWords.Font, new Size(int.MaxValue, 0), TextFormatFlags.NoPrefix).Height);

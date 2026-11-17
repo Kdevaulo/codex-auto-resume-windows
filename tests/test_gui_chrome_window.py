@@ -264,7 +264,7 @@ class CaptionWindowTests(unittest.TestCase):
         # the title audit and tests/test_gui_v0624_dialog_title_row.py. The cross: strokes 1 to 9 of a 10 px box centred in
         # the 34 px button, round caps half the 1.3 px stroke past them.
         cross = 600 - (boxes["CloseButton"][0] + 12 + 9 + 0.65)
-        self.assertTrue(22 <= cross <= 26, "the cross %.2f px from the right edge, as the title from the left" % cross)
+        self.assertTrue(22 <= cross <= 30, "the cross %.2f px from the right edge, as the title from the left" % cross)
         self.assertLessEqual(boxes["CloseButton"][0] + 34, 600, "inside the dialog")
         self.assertLess(boxes["MaximizeButton"][0], boxes["CloseButton"][0])
         self.assertEqual({pair[name]["box"][1] for name in pair if pair[name]["shown"]}, {card[1] + (card[3] - 26) // 2},
@@ -281,7 +281,7 @@ class CaptionWindowTests(unittest.TestCase):
         said = self.answer["dialogs"]["mirrored"]
         boxes = {name: said["buttons"][name]["box"] for name in said["buttons"]}
         cross = boxes["CloseButton"][0] + 12 + 1 - 0.65
-        self.assertTrue(22 <= cross <= 26, "mirrored: the cross %.2f px from the left edge, as the title from the right" % cross)
+        self.assertTrue(22 <= cross <= 30, "mirrored: the cross %.2f px from the left edge, as the title from the right" % cross)
         self.assertGreaterEqual(boxes["CloseButton"][0], 0)
         self.assertLess(boxes["CloseButton"][0], boxes["MaximizeButton"][0])
         self.assertFalse(said["buttons"]["MinimizeButton"]["shown"])
