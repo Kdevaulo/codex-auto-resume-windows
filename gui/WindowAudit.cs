@@ -1937,6 +1937,9 @@ namespace CodexAutoResume
                 // either direction: the same place. (A dialog the screen made narrower than it was laid out for keeps its docked
                 // children at their first width, wider than it, left to right and right to left alike - CI's 1024-px screen.)
                 int expected = rtl[9] != 0 ? ltr[0] : ltr[4] - ltr[0] - ltr[2];
+                // A dialog's caption buttons follow the title's ink, which right to left is its rightmost letter's: mirrored,
+                // they stand off by exactly what that ink differs by (ChromeHost.Place) - nothing more is let through.
+                if (ltr.Length > 10 && rtl.Length > 10 && ltr[10] > 0 && rtl[10] > 0) expected += rtl[10] - ltr[10];
                 // A line of words measured right to left can come out a few pixels narrower or wider than the same words
                 // measured left to right: such a label is held to its leading edge - its right edge where its left was.
                 bool words = rtl[8] != 0 && Math.Abs(rtl[2] - ltr[2]) > 1;
@@ -1970,17 +1973,26 @@ namespace CodexAutoResume
                 Rectangle bounds = child.Bounds;
                 var host = child as SoftListHost;
                 // [x, y, width, height, the parent's width, a list?, its columns mirrored?, a row whose first button is wrong?,
-                //  a line of words?, docked across its parent?]
+                //  a line of words?, docked across its parent?, where a dialog's caption buttons are held from (GlyphEnd)]
                 var record = new[] { bounds.X, bounds.Y, bounds.Width, bounds.Height, parent.ClientSize.Width,
                                      host != null ? 1 : 0, host != null && host.ColumnsMirrored ? 1 : 0,
                                      FirstOutOfPlace(child as FlowLayoutPanel) ? 1 : 0, child is Label ? 1 : 0,
-                                     Docked(child, parent) ? 1 : 0 };
+                                     Docked(child, parent) ? 1 : 0, CaptionAnchor(child) };
                 if (!mirrored.ContainsKey(here)) mirroredOrder.Add(here);
                 mirrored[here] = record;
                 // A list's clip holds the list, which Windows does not mirror; a number's parts are Windows' own.
                 if (host != null || child is UpDownBase || child is ListClip) continue;
                 MirrorRecordOf(here, child);
             }
+        }
+
+        /// v0.6.24-beta.2: for a caption button of a dialog's title row, how far in its Close cross is held (ChromeHost.GlyphEnd:
+        /// the title's first letter's ink - right to left that of its rightmost letter); 0 for anything else.
+        private static int CaptionAnchor(Control child)
+        {
+            var button = child as CaptionButton;
+            var dialog = button == null ? null : button.FindForm() as SoftDialog;
+            return dialog == null || dialog.CaptionHost == null ? 0 : Math.Max(0, dialog.CaptionHost.GlyphEnd);
         }
 
         /// Whether `child` is docked across a window - a dialog's band or body: to its top, its bottom or filling it, with the

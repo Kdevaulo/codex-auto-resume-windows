@@ -640,7 +640,11 @@ namespace CodexAutoResume
                 // By ink (live re-check 7: the eye reads the glyph's own ink, not its box): the cross's first and last
                 // inked columns as it is drawn at this size (CaptionButton.InkColumns).
                 Point ink = CloseButton.InkColumns(new Size(width, height));
-                int close = mirrored ? GlyphEnd - ink.X : holder.ClientSize.Width - 1 - GlyphEnd - ink.Y;
+                // Mirrored, the left-to-right place mirrored (the cross's ink is symmetric in its button), from GlyphEnd as
+                // the mirrored title gives it - the ink of its rightmost letter, where left to right it is its leftmost's -
+                // so a mirrored dialog's buttons stand off their mirror by exactly that difference (MirrorCompare).
+                int close = holder.ClientSize.Width - 1 - GlyphEnd - ink.Y;
+                if (mirrored) close = holder.ClientSize.Width - width - close;
                 x = mirrored ? close : close + width - GroupWidth;
             }
             // In a card, CaptionInsetTop below its top; in a row on the ground (OnGround), centred in the row.
@@ -1649,8 +1653,9 @@ namespace CodexAutoResume
             return RectangleF.FromLTRB(ox + unit - half, oy + unit - half, ox + 9 * unit + half, oy + 9 * unit + half);
         }
 
-        /// The first and last columns the glyph inks as it is drawn at the button's size (X, Y), black on white and read
-        /// as ink past Chrome.InkStep: what the dialog's title row sets the cross's gap to its edge by (ChromeHost.GlyphEnd).
+        /// The first and last columns the glyph inks as it is drawn at the button's size (X, Y), in the theme's ink on its
+        /// canvas and read as ink past Chrome.InkStep: what the dialog's title row sets the cross's gap to its edge by
+        /// (ChromeHost.GlyphEnd).
         internal Point InkColumns(Size size)
         {
             if (inkFor == size && inkColumns.Y >= 0) return inkColumns;
@@ -1659,26 +1664,24 @@ namespace CodexAutoResume
             {
                 using (Graphics g = Graphics.FromImage(drawn))
                 {
-                    g.Clear(Color.White);
-                    Glyph(g, Color.Black, width, height);
+                    g.Clear(Palette.Canvas);
+                    glyphAt = new Size(width, height);
+                    try { Glyph(g, Palette.Ink); }
+                    finally { glyphAt = Size.Empty; }
                 }
-                inkColumns = Chrome.InkColumns(drawn, Color.White, new Rectangle(0, 0, width, height));
+                inkColumns = Chrome.InkColumns(drawn, Palette.Canvas, new Rectangle(0, 0, width, height));
             }
             inkFor = size;
             return inkColumns;
         }
 
-        private Size inkFor;
+        private Size inkFor, glyphAt;
         private Point inkColumns = new Point(-1, -1);
 
         internal void Glyph(Graphics g, Color ink)
         {
-            Glyph(g, ink, Width, Height);
-        }
-
-        /// The glyph as the button draws it, in a button `width` by `height` (InkColumns asks it at a size it is to have).
-        private void Glyph(Graphics g, Color ink, int width, int height)
-        {
+            // At the button's size - or, read by InkColumns, at the size it is to have (glyphAt), the button untouched.
+            int width = glyphAt.IsEmpty ? Width : glyphAt.Width, height = glyphAt.IsEmpty ? Height : glyphAt.Height;
             float unit = Soft.PxF(1.0), box = Soft.PxF(Brand.CaptionGlyph);
             float ox = (float)Math.Round((width - box) / 2f), oy = (float)Math.Round((height - box) / 2f);
             float stroke = Math.Max(1f, Soft.PxF(Brand.CaptionStroke));
@@ -1845,10 +1848,10 @@ namespace CodexAutoResume
             {
                 using (Graphics g = Graphics.FromImage(drawn))
                 {
-                    g.Clear(Color.White);
-                    TextRenderer.DrawText(g, text, font, new Rectangle(0, 0, width, height), Color.Black, Color.White, flags);
+                    g.Clear(Palette.Canvas);
+                    TextRenderer.DrawText(g, text, font, new Rectangle(0, 0, width, height), Palette.Ink, Palette.Canvas, flags);
                 }
-                Point ink = Chrome.InkColumns(drawn, Color.White, new Rectangle(0, 0, width, height));
+                Point ink = Chrome.InkColumns(drawn, Palette.Canvas, new Rectangle(0, 0, width, height));
                 if (ink.X < 0) return TitleLead(font);
                 return mirrored ? width - 1 - ink.Y : ink.X;
             }
