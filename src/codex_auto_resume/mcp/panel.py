@@ -264,7 +264,8 @@ def day_data(look) -> dict:
     return {"look": look, "ground": brand.DAY_LOOKS[look][2], "focus": brand.SCENE_FOCUS[look], "width": brand.SCENE_WIDTH,
             "height": brand.SCENE_HEIGHT, "fromTop": look in brand.SCENE_FROM_TOP, "elements": brand.scene_elements(look),
             # W2 (2026-11-17): the day across the header - its specks, band after band, and where the card's colour fades in.
-            "specks": brand.speck_elements(look), "speckBand": brand.SPECK_BAND,
+            "specks": brand.speck_elements(look), "speckReach": [list(reach) for reach in brand.speck_reach(look)],
+            "speckBand": brand.SPECK_BAND,
             "wide": {"gap": brand.WIDE["gap"], "fade": brand.WIDE["fade"]}}
 
 

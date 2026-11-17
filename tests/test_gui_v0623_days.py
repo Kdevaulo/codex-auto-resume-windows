@@ -370,7 +370,7 @@ class PopupSceneTests(unittest.TestCase):
         self.assertEqual([item for item in plan["items"] if item["kind"] == "scene"], [])
 
     def test_the_lights_fall_off_softly(self):
-        with mock.patch.object(brand, "speck_frame", lambda look, ms: []):     # the light alone, no speck in its way
+        with mock.patch.object(brand, "speck_frame", lambda look, ms, within=None: []):     # the light alone, no speck in its way
             plan, pixels = self.draw("chuseok", 0.0, theme="dark")
         item = self.scene_item(plan)
         unit = item["unit"]

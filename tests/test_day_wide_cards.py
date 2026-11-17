@@ -116,7 +116,7 @@ class PopupTests(_Surface, unittest.TestCase):
 
     def test_the_specks_are_across_the_band(self):
         plan, pixels = self.draw("christmas", ms=1300.0)
-        with mock.patch.object(brand, "speck_frame", lambda look, ms: []):
+        with mock.patch.object(brand, "speck_frame", lambda look, ms, within=None: []):
             _, bare = self.draw("christmas", ms=1300.0)
         band = band_of(plan)
         size = plan["size"]

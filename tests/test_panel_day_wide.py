@@ -109,7 +109,15 @@ class PanelDayTests(unittest.TestCase):
                 found = self.day(look)
                 width = found["day"][2]
                 count, first, last = found["specks"]
-                self.assertGreaterEqual(count, len(brand.speck_elements(look)))
+                # Band after band from the outer side, every speck that can reach into the band and none that cannot.
+                units = width / (found["day"][3] / brand.SCENE_HEIGHT)
+                seen, start = 0, units
+                while start > 0:
+                    shift = start - brand.SPECK_BAND
+                    seen += sum(1 for low, high in brand.speck_reach(look) if shift + high >= 0 and shift + low <= units)
+                    start -= brand.SPECK_BAND
+                self.assertAlmostEqual(count, seen, delta=2)
+                self.assertGreater(count, 0)
                 self.assertGreater(last - first, width * 0.5, "across the band, not in a corner")
                 picture = found.get("picture")
                 self.assertIsNotNone(picture, "a scene where its main piece is whole")

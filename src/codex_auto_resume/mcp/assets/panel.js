@@ -1631,9 +1631,16 @@ function placeDayScene() {
   specks.style.top = '0';
   specks.appendChild(defs);
   // Laid from the outer side inward, as the scene is, so the words moving never moves them.
+  // A speck that can never reach into the band's picture (brand.speck_reach) is never made: as many moving pieces as
+  // can be seen, so a frame costs what the scene's did before the day spread wide.
   for (var from = units; from > 0; from -= DAY.speckBand) {
-    var band = svg('g', {transform: 'translate(' + (rtl ? units - from : from - DAY.speckBand) + ' 0)'});
-    DAY.specks.forEach(function (one, index) { band.appendChild(dayNode(one, defs, 'speck-' + index)); });
+    var shift = rtl ? units - from : from - DAY.speckBand;
+    var band = svg('g', {transform: 'translate(' + shift + ' 0)'});
+    DAY.specks.forEach(function (one, index) {
+      var reach = DAY.speckReach[index];
+      if (shift + reach[1] < 0 || shift + reach[0] > units) return;
+      band.appendChild(dayNode(one, defs, 'speck-' + index));
+    });
     specks.appendChild(band);
   }
   holder.appendChild(specks);

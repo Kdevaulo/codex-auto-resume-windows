@@ -369,9 +369,61 @@ def speck_elements(look):
     return _kept_specks[look]
 
 
-def speck_frame(look, milliseconds):
-    """`look`'s specks `milliseconds` in, in their band: pure, and the same every time."""
-    return [element_at(element, milliseconds / 1000.0) for element in speck_elements(look)]
+def _reach(element):
+    """How far along its band an element can ever reach, (from, to): its outline, turned or swelled as its motion turns
+    or swells it about its centre (a fall turns a piece, a twinkle swells a star to 1.1)."""
+    kind, numbers = element[0], element[1]
+    if kind == "round":
+        return numbers[0], numbers[0] + numbers[2]
+    if kind == "poly":
+        centre_x, centre_y = _centre(kind, numbers)
+        far = max(math.hypot(x - centre_x, y - centre_y) for x, y in zip(numbers[0::2], numbers[1::2]))
+    else:
+        centre_x, far = numbers[0], numbers[2]
+    far *= 1.1
+    return centre_x - far, centre_x + far
+
+
+_kept_reach = {}
+
+
+def speck_reach(look):
+    """For each of `look`'s specks, how far along the band it can ever reach (_reach): what lies wholly out of sight is
+    never drawn (speck_frame's `within`)."""
+    if look not in _kept_reach:
+        _kept_reach[look] = [_reach(element) for element in speck_elements(look)]
+    return _kept_reach[look]
+
+
+def speck_frame(look, milliseconds, within=None):
+    """`look`'s specks `milliseconds` in, in their band: pure, and the same every time. `within` (from, to), along the
+    band in its own units: only the specks that can reach into it - a surface asks for what it shows of a band, so a
+    frame costs no more than its scene did before the day spread wide (W2)."""
+    seconds = milliseconds / 1000.0
+    if within is None:
+        return [element_at(element, seconds) for element in speck_elements(look)]
+    least, most = within
+    shown = []
+    for element, (start, end) in zip(speck_elements(look), speck_reach(look)):
+        if end < least or start > most:
+            continue
+        shape = element_at(element, seconds)
+        # A piece that has fallen past the band's foot, or not yet into its top, is out of sight too.
+        top, bottom = _height(shape)
+        if bottom >= 0.0 and top <= SCENE_HEIGHT:
+            shown.append(shape)
+    return shown
+
+
+def _height(shape):
+    """A shape's (top, bottom), for speck_frame."""
+    kind, numbers = shape[0], shape[1]
+    if kind == "poly":
+        ys = numbers[1::2]
+        return min(ys), max(ys)
+    if kind == "round":
+        return numbers[1], numbers[1] + numbers[3]
+    return numbers[1] - numbers[2], numbers[1] + numbers[2]
 
 
 def day_band(look, px, band, words_end):

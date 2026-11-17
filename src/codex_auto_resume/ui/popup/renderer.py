@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from ctypes import wintypes as W
 import ctypes as C
+import functools
 from ... import brand, l10n
 from ...brand import shape
 from .elevation import lift_coverage, recipe_shadows, shadow_step, tile_ground, well_coverage
@@ -39,6 +40,12 @@ CHIP_ALPHA = 0.12
 
 # Languages whose lines break between words only, where GDI would break inside a word.
 _BREAK_AT_SPACES = frozenset({"ko"})
+
+
+@functools.lru_cache(maxsize=1024)
+def _piece_colour(colour, alpha):
+    """A day's piece's colour and opacity as GDI+ takes it: the same few, a frame after a frame."""
+    return _pack(brand.rgb(colour), alpha)
 
 
 class Renderer(StatusLight):
@@ -337,7 +344,18 @@ class Renderer(StatusLight):
             return (x, origin_y + point[1] * unit)
 
         band = brand.SPECK_BAND * unit
-        specks = brand.speck_frame(item["scene"], milliseconds)
+        # What the day shows of the header, from where the card's colour gives way (the fade's start) to its outer side:
+        # each band draws only the specks that can reach into it (speck_frame's `within`), so a frame costs what the
+        # scene alone cost before the day spread wide.
+        solid_x = item["fade"][0]
+        shown = (left, plan["size"][0] - solid_x) if mirrored else (solid_x, right)
+
+        def specks_of(offset):
+            if mirrored:
+                within = ((shown[0] - left - offset) / unit, (shown[1] - left - offset) / unit)
+            else:
+                within = (brand.SPECK_BAND - (right - offset - shown[0]) / unit, brand.SPECK_BAND - (right - offset - shown[1]) / unit)
+            return brand.speck_frame(item["scene"], milliseconds, within)
 
         def speck_at(offset):
             def place(point):
@@ -350,11 +368,13 @@ class Renderer(StatusLight):
         paint.clip_round((card[0] + hairline, card[1] + hairline, card[2] - hairline, card[3] - hairline),
                          self._corner({"corner": "card", "radius": 0}, plan["scale"]) - hairline)
         paint.clip_rect(item["rect"])
+        # The day's pieces come in a handful of colours: each colour's brush is made once a frame (keep_solids).
+        paint.keep_solids()
         try:
             paint.fill_round(item["rect"], 0, _pack(brand.rgb(brand.DAY_LOOKS[item["scene"]][2])))
             offset = 0.0
             while offset < right - left:
-                for shape in specks:
+                for shape in specks_of(offset):
                     self._scene_shape(paint, shape, speck_at(offset), unit)
                 offset += band
             if item.get("scene_shown", True):
@@ -387,7 +407,7 @@ class Renderer(StatusLight):
             stops = [(0.0, 1.0), (whole, 1.0), (whole + (1.0 - whole) * 0.3, 0.55), (whole + (1.0 - whole) * 0.65, 0.16), (1.0, 0.0)]
             paint.glow(cx, cy, shape[3] * scale, stops, brand.rgb(colour), alpha)
             return
-        argb = _pack(brand.rgb(colour), alpha)
+        argb = _piece_colour(colour, alpha)
         if kind == "poly":
             paint.fill_polygon([at(point) for point in points], argb)
         elif kind == "circle":
