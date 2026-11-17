@@ -237,8 +237,8 @@ namespace CodexAutoResume
                 // Its opening, sampled every few milliseconds: when it is first seen (uncloaked), at what alpha, with the
                 // veil on or not, and how its alpha goes from there.
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                double seenAt = -1, opaqueAt = -1, alphaSeen = -1, last = -1;
-                bool rising = true, veilAtSeen = false;
+                double seenAt = -1, opaqueAt = -1, alphaSeen = -1, last = -1, visibleAt = -1, alphaVisible = -1;
+                bool rising = true, veilAtSeen = false, paintedAtVisible = false;
                 while (clock.ElapsedMilliseconds < 700)
                 {
                     Application.DoEvents();
@@ -251,6 +251,13 @@ namespace CodexAutoResume
                         alphaSeen = alpha;
                         veilAtSeen = dialog.Veil != null && CardNative.IsWindowVisible(dialog.Veil.Handle);
                     }
+                    if (seenAt >= 0 && alpha > 0 && visibleAt < 0)
+                    {
+                        // Its first alpha above zero: the first frame of it anyone can see.
+                        visibleAt = now;
+                        alphaVisible = alpha;
+                        paintedAtVisible = dialog.RepaintedBeforeVisible;
+                    }
                     if (seenAt >= 0)
                     {
                         if (alpha < last) rising = false;
@@ -260,6 +267,9 @@ namespace CodexAutoResume
                     Thread.Sleep(3);
                 }
                 said["alphaSeen"] = alphaSeen;
+                said["alphaVisible"] = alphaVisible;
+                said["visibleToOpaque"] = opaqueAt < 0 || visibleAt < 0 ? -1 : opaqueAt - visibleAt;
+                said["paintedAtVisible"] = paintedAtVisible;
                 said["seenToOpaque"] = opaqueAt < 0 || seenAt < 0 ? -1 : opaqueAt - seenAt;
                 said["rising"] = rising;
                 said["veilAtSeen"] = veilAtSeen;
@@ -656,6 +666,9 @@ class DialogCardTests(unittest.TestCase):
                 self.assertTrue(transition * 0.5 <= said["seenToOpaque"] <= transition + 300,
                                 "opaque %.0f ms after it is first seen" % said["seenToOpaque"])
                 self.assertFalse(said["layeredAfter"], "an ordinary window once opaque")
+                # Re-check 10: never seen at any alpha before its whole paint - painted whole again, and that picture
+                # handed to DWM, before its first alpha above zero.
+                self.assertTrue(said["paintedAtVisible"], "painted whole before its first visible frame")
         for scene in ("windowsStill", "still"):
             with self.subTest(scene=scene):
                 said = self.answer["veil"][scene]

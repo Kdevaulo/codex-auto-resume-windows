@@ -2277,6 +2277,24 @@ namespace CodexAutoResume
         private void FadeStep()
         {
             if (!IsHandleCreated || fading == null) { StopFade(); return; }
+            // Re-check 10 (1 of 25, the dark Detection check's 2nd open): one frame of it unpainted - its title row and
+            // caption buttons light grey, grey bands at its card's foot - at its first alpha above zero. Clear (alpha 0)
+            // nothing of it shows; so before its first visible step it is painted whole once more, and DWM given that
+            // picture (DwmFlush), and before every step what is waiting to be painted is painted first: it is never seen,
+            // at any alpha, before its whole paint.
+            if (!RepaintedBeforeVisible)
+            {
+                try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN); }
+                catch (Exception) { }
+                try { DwmFlush(); }
+                catch (Exception) { }
+                RepaintedBeforeVisible = true;
+            }
+            else
+            {
+                try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN); }
+                catch (Exception) { }
+            }
             double t = fading.Elapsed.TotalMilliseconds / Math.Max(1, Motion.Duration);
             if (t < 1.0)
             {
@@ -2285,16 +2303,24 @@ namespace CodexAutoResume
             }
             SetFade(255);
             StopFade();
-            // Opaque: an ordinary window again, drawn whole.
+            // Opaque: an ordinary window again, drawn whole in the same message - a window no longer layered is drawn
+            // anew, and an asked-for paint would leave a frame of it unpainted.
             try
             {
                 long style = GetWindowLongPtr(Handle, GWL_EXSTYLE).ToInt64();
                 SetWindowLongPtr(Handle, GWL_EXSTYLE, new IntPtr(style & ~(long)WS_EX_LAYERED));
-                RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+                RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_UPDATENOW | RDW_ALLCHILDREN);
             }
             catch (Exception) { }
             fadeIn = false;
         }
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmFlush();
+
+        /// Whether it was painted whole again, and that picture handed to DWM, before its first alpha above zero: for the
+        /// tests.
+        internal bool RepaintedBeforeVisible { get; private set; }
 
         private void StopFade()
         {
