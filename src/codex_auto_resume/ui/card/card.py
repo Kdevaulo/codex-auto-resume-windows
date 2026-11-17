@@ -21,6 +21,10 @@ class Card:
         self.stack = stack
         self.notice = notice
         self.vm = notice_card.view(notice)
+        # W2: the day the hosting icon saw (CardsMixin._card_look) - never in High Contrast or Classic, as the popup's.
+        day = drawn.get("day")
+        if day and not drawn.get("contrast") and popup.design_choice(drawn.get("design")) != "classic":
+            self.vm["scene"] = day
         self.edge, self.born, self._breathed = "bottom", now_ms, now_ms
         self.scale = where["dpi"] / 96.0 * self.fitting(where, drawn)
         self.theme, self.contrast = drawn["theme"], drawn["contrast"]

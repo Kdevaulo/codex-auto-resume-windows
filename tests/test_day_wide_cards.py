@@ -164,5 +164,53 @@ class TipCardTests(_Surface, unittest.TestCase):
         self.assertIn("log=self.log, days=self.days)", source)
 
 
+class _Notice:
+    locale, status, chip, chip_tone = "en", "monitoring", "Usage limit", "waiting"
+    title, line, origin, actions, click = "example-project", "Resumed where it stopped", "Conversation example", [], ""
+
+
+class NotificationCardTests(_Surface, unittest.TestCase):
+    def setUp(self):
+        self.renderer = tray_popup.Renderer()
+        self.addCleanup(self.renderer.close)
+
+    def draw(self, look, theme="light", chip=True):
+        notice = _Notice()
+        if not chip:
+            notice.chip = None
+        vm = notice_card.view(notice)
+        vm["scene"] = look
+        self.renderer.theme = theme
+        self.renderer.use("en", 1.0)
+        plan = notice_card.layout(vm, 1.0, self.renderer.measure)
+        return plan, bytes(self.renderer.draw(vm, plan).pixels())
+
+    def test_the_header_takes_the_day_past_the_name_and_the_chip_stands_over_it(self):
+        for theme in ("light", "dark"):
+            for chip in (True, False):
+                plain_plan, plain = self.draw(None, theme, chip)
+                for look in LOOKS:
+                    with self.subTest(theme=theme, chip=chip, look=look):
+                        plan, pixels = self.draw(look, theme, chip)
+                        band = self.check_band(plan, pixels, look)
+                        self.check_outside(plain_plan, plain, plan, pixels, band)
+                        self.check_words_stand_on_the_card(plan, band, theme)
+                        # The chip stands over the day: the middle of its pill and its words as on any other day.
+                        chips = [item["rect"] for item in plan["items"] if item["kind"] == "chip"]
+                        for rect in chips:
+                            size, inset = plan["size"], int(rect[3] - rect[1]) // 2
+                            for y in range(int(rect[1]) + 2, int(rect[3]) - 2):
+                                for x in range(int(rect[0]) + inset, int(rect[2]) - inset):
+                                    self.assertEqual(at(size, pixels, x, y), at(plain_plan["size"], plain, x, y), (x, y))
+
+    def test_the_card_s_host_gives_the_day_only_from_the_watcher_s_icon(self):
+        from pathlib import Path
+        root = Path(notice_card.__file__).resolve().parent
+        cards = (root / "ui/tray/cards.py").read_text(encoding="utf-8")
+        self.assertIn('drawn["day"] = brand.day_look_at(time.time()) if getattr(self, "days", False) else None', cards)
+        card = (root / "ui/card/card.py").read_text(encoding="utf-8")
+        self.assertIn('if day and not drawn.get("contrast") and popup.design_choice(drawn.get("design")) != "classic":', card)
+
+
 if __name__ == "__main__":
     unittest.main()
