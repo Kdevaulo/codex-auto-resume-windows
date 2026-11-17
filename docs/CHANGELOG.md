@@ -4399,7 +4399,7 @@ the change above closes.
 
 ## v0.6.11 — Two editions, and the advanced edition's first capabilities
 
-> **Two editions and the first advanced features.** This release splits the program into a standard and an advanced edition, brings the standard one quiet hours, observe-only mode and sixteen languages, and the advanced one its first features, off until turned on.
+> **Two editions, with advanced features to turn on.** This release splits the program into a standard and an advanced edition, brings the standard one quiet hours, observe-only mode and sixteen languages, and the advanced one features of its own, off until turned on.
 
 **Kind:** New features · Feature changes · Languages · Bug fixes · Under the hood
 
@@ -5212,7 +5212,7 @@ only turn capabilities off. [EDITIONS.md](EDITIONS.md) says what each capability
 
 ## v0.6.11-beta.2 — The advanced edition's first capabilities, before the page that turns them on
 
-> **First advanced capabilities and pre-release updates.** This beta brings the advanced edition's first three capabilities, makes Check for updates offer a newer pre-release, adds a setup program for each edition and publishes the standards.
+> **Advanced capabilities and pre-release updates.** This beta brings the advanced edition three capabilities, makes Check for updates offer a newer pre-release, adds a setup program for each edition and publishes the standards.
 
 **Kind:** New features · Feature changes · Bug fixes
 
