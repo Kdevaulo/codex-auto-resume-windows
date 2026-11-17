@@ -1961,19 +1961,16 @@ namespace CodexAutoResume
                 // The tabs' own row less the room at the sides of their names, each shown tab as wide as it asks with its
                 // margins - not the strip's PreferredSize, which a tab just shown has not yet reached while the strip lays
                 // out for it (dev CI 43859506322: the Chat tab).
-                int words = strip.Padding.Horizontal, count = 0;
-                foreach (Control tab in strip.Controls)
-                    if (Soft.OwnVisible(tab))
-                    {
-                        words += tab.GetPreferredSize(Size.Empty).Width - tab.Padding.Horizontal + tab.Margin.Horizontal;
-                        count++;
-                    }
                 int room = nav.DisplayRectangle.Width;
                 int full = Px(TabPadX), least = Math.Min(full, Px(TabPadXLeast));
-                // The most room at either side of every name that leaves `taken` beside the tabs, up to today's.
+                // The most room at either side of every name, from today's down, that leaves `taken` beside the tabs; or
+                // less than the least where none does. Each tab as wide as it would ask with that room (TabRowAt), measured
+                // rather than reckoned: a short name's tab has a floor of its own (NavButton's measure of its other weight).
                 Func<int, int> sides = delegate(int taken)
                 {
-                    return count == 0 ? full : Math.Min(full, (int)Math.Floor((room - taken - words) / (2.0 * count)));
+                    for (int each = full; each >= least; each--)
+                        if (TabRowAt(strip, each) + taken <= room) return each;
+                    return least - 1;
                 };
                 bool known = !string.IsNullOrEmpty(versionText.Version);
                 // Two rows of tabs (the advanced edition's on a screen too narrow for one, HoldTabs) leave the row no end.
@@ -2010,6 +2007,34 @@ namespace CodexAutoResume
                 return changed;
             }
             finally { fittingPill = false; }
+        }
+
+        // A tab of its own, never shown, that a tab's words, weight and room are set on to ask how wide it would be (TabRowAt).
+        private NavButton tabMeasure;
+
+        /// How wide the strip's row of shown tabs would be with `pad` at either side of every name, margins included: each
+        /// tab as it asks now where it has that room already, else as a tab of its own set as it is but for the room asks.
+        private int TabRowAt(Control strip, int pad)
+        {
+            int width = strip.Padding.Horizontal;
+            foreach (Control tab in strip.Controls)
+            {
+                if (!Soft.OwnVisible(tab)) continue;
+                var button = tab as NavButton;
+                if (button == null || (button.Padding.Left == pad && button.Padding.Right == pad))
+                {
+                    width += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+                    continue;
+                }
+                if (tabMeasure == null) tabMeasure = new NavButton();
+                tabMeasure.AutoSize = button.AutoSize;
+                tabMeasure.AutoSizeMode = button.AutoSizeMode;
+                tabMeasure.Font = button.Font;
+                tabMeasure.Text = button.Text;
+                tabMeasure.Padding = new Padding(pad, button.Padding.Top, pad, button.Padding.Bottom);
+                width += tabMeasure.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+            }
+            return width;
         }
 
         /// Every tab of the strip with `pad` at either side of its name, shown or not (a tab shown later comes in as close
