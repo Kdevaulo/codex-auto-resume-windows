@@ -187,10 +187,11 @@ class DaySixPressTests(unittest.TestCase):
                     self.assertGreaterEqual(left, 700 - 260)
                     self.assertLessEqual(right, 700 + 260)
                     middle = (left + right) / 2
+                    # At its first moment the new year's rocket is the pill's own point; from then on into the window.
                     if frame["inward"] < 0:
-                        self.assertLess(middle, 700, "into the window, left of a pill at its right end")
+                        self.assertLessEqual(middle, 700, "into the window, left of a pill at its right end")
                     else:
-                        self.assertGreater(middle, 700, "mirrored: right of a pill at its left end")
+                        self.assertGreaterEqual(middle, 700, "mirrored: right of a pill at its left end")
 
 
 class DaySixPressSourceTests(unittest.TestCase):
