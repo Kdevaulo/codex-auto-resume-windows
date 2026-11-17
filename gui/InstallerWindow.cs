@@ -98,6 +98,13 @@ namespace CodexAutoResume
         private readonly Dictionary<Control, StepMark> marks = new Dictionary<Control, StepMark>();
         // The Ready page's rows of what is installed: the line said of each, by the name it stands beside (Beside).
         private readonly Dictionary<Control, Control> besides = new Dictionary<Control, Control>();
+        // The Progress page's list of the run's steps (ListSteps): its rows, where they begin among the page's rows, what
+        // they last said (so a progress line that changes nothing makes nothing again), and every step that has been under
+        // way in this run - kept for the window's life, as the run's own record, whatever page shows.
+        private readonly List<Control> stepRows = new List<Control>();
+        private int stepsAt;
+        private string listed;
+        private readonly List<string> under = new List<string>();
 
         /// The exit code of the run, or int.MinValue where none ran (the window was closed before it started).
         internal int Code { get { return code; } }
@@ -249,6 +256,9 @@ namespace CodexAutoResume
             int inner = Inner(width);
             int tallest = 0;
             string showing = page;
+            // v0.6.24-beta.3: measuring the Finish page of a run that has not ended (BuildFinish: a failure shows its log)
+            // left the log shown on the Progress page from the start, over the step list; the log is as it was after it.
+            bool shown = logShown;
             foreach (string each in flow.Pages())
             {
                 // Each page measured as it is shown: what a page holds can depend on which page is showing (WhatsNew,
@@ -257,6 +267,7 @@ namespace CodexAutoResume
                 Build(each);
                 tallest = Math.Max(tallest, Arrange(inner));
             }
+            logShown = shown;
             page = showing;
             // v0.6.24: 600 x 600 at text size 1 (the owner's choice of 2026-11-16): the pages need less than that, and the
             // content card takes the rest (OnLayout fills it down to the buttons, its page's rows kept at its top). A page
@@ -400,6 +411,8 @@ namespace CodexAutoResume
             columns.Clear();
             marks.Clear();
             besides.Clear();
+            stepRows.Clear();
+            listed = null;
             stepLabel = null;
             busyNote = null;
             desktopBox = null;
@@ -420,6 +433,8 @@ namespace CodexAutoResume
                 StepMark mark;
                 if (marks.TryGetValue(row.Key, out mark)) sheet.Controls.Add(mark);
             }
+            // On the Progress page the log is no row of its own: it takes the step list's room (Arrange).
+            if (stepRows.Count > 0) sheet.Controls.Add(logArea);
             sheet.ResumeLayout(false);
         }
 
@@ -692,11 +707,62 @@ namespace CodexAutoResume
             bar.Value = at;
             bar.AccessibleName = heading;
             Row(bar, 10);
+            // v0.6.24-beta.3 (the owner's option A): the steps this run goes through, under the bar (ListSteps). The log,
+            // shown, takes their room, so the page is as tall with it as without it; the toggle and the note stay below.
+            stepsAt = rows.Count;
+            ListSteps(false);
+            if (stepRows.Count == 0) Row(logArea, 12);
+            Row(LogToggle(), 12);
             busyNote = Words(words.Say("installer.progress.busy", "It is still working. Closing now could leave half an installation, so the window stays until it has finished."), null, Palette.Secondary);
             busyNote.Visible = closingAsked;
-            Row(busyNote, 10);
-            Row(LogToggle(), 12);
-            Row(logArea, 6);
+            Row(busyNote, 8);
+        }
+
+        /// The list under the bar (v0.6.24-beta.3): every step of this run (InstallerProgress.Listed) - done, a filled
+        /// disc with a check; under way, a ring with a dot and its name in the name's weight; still to come, an empty
+        /// ring - as far as the installer's own lines have taken `step`, and never further. Made again only when what it
+        /// says changes; `live`, on the page on show, it changes the page's rows in place.
+        private void ListSteps(bool live)
+        {
+            List<string[]> now = InstallerProgress.Listed(flow.Mode, flow.Upgrade, flow.Unpacks, step, under);
+            var said = new StringBuilder();
+            foreach (string[] each in now) said.Append(each[0]).Append('=').Append(each[1]).Append(';');
+            if (said.ToString() == listed) return;
+            listed = said.ToString();
+            var gone = new List<Control>();
+            foreach (Control row in stepRows)
+            {
+                gone.Add(row);
+                StepMark mark;
+                if (marks.TryGetValue(row, out mark)) gone.Add(mark);
+                marks.Remove(row);
+                columns.Remove(row);
+            }
+            rows.RemoveRange(stepsAt, stepRows.Count);
+            stepRows.Clear();
+            foreach (string[] each in now)
+            {
+                bool done = each[1] == InstallerProgress.Done, going = each[1] == InstallerProgress.Now;
+                var mark = new StepMark(done ? StepMark.Kinds.Done : going ? StepMark.Kinds.Now : StepMark.Kinds.Todo, null);
+                mark.AccessibleName = done ? words.Say("installer.progress.done", "Done")
+                                    : going ? words.Say("installer.progress.now", "Under way")
+                                    : words.Say("installer.progress.todo", "Still to come");
+                WrapLabel name = Words(words.StepName(each[0]), going ? "name" : null,
+                                       going ? Palette.Ink : done ? Palette.Secondary : Palette.Muted);
+                name.AccessibleDescription = mark.AccessibleName;
+                rows.Insert(stepsAt + stepRows.Count, new KeyValuePair<Control, int>(name, Px(stepRows.Count == 0 ? 12 : 2)));
+                columns[name] = mark;
+                marks[name] = mark;
+                stepRows.Add(name);
+                if (live)
+                {
+                    sheet.Controls.Add(name);
+                    sheet.Controls.Add(mark);
+                }
+            }
+            if (!live) return;
+            foreach (Control control in gone) sheet.Controls.Remove(control);
+            LetGo(gone);
         }
 
         /// The update's own page (v0.6.16, the owner: an update should show itself): the version it goes from and to,
@@ -826,8 +892,9 @@ namespace CodexAutoResume
         internal int Arrange(int width)
         {
             int y = 0;
-            // v0.6.24-beta.3: where the last mark beside a row ends - a row outside its column starts below it.
-            int held = 0;
+            // v0.6.24-beta.3: where the last mark beside a row ends - a row outside its column starts below it - and where
+            // the step list begins, whose room the log takes.
+            int held = 0, slot = 0;
             bool mirrored = Mirror.Of(this);
             foreach (KeyValuePair<Control, int> row in rows)
             {
@@ -854,7 +921,18 @@ namespace CodexAutoResume
                     mark.SetBounds(Mirror.X(mirrored, width, 0, size), top, size, size);
                     held = Math.Max(held, top + size);
                 }
+                if (stepRows.Count > 0 && control == stepRows[0]) slot = y;
                 y += height;
+                // A row beside a mark taller than its words is as tall as the mark, so two marks never touch.
+                if (mark != null) y = Math.Max(y, mark.Bottom);
+                if (stepRows.Count > 0 && control == stepRows[stepRows.Count - 1])
+                {
+                    // The log stands where the steps do, as tall as ever; the room is the taller of the two.
+                    int log = HeightAt(logArea, width);
+                    logArea.Visible = logShown;
+                    logArea.SetBounds(Mirror.X(mirrored, width, 0, width), slot, width, log);
+                    y = Math.Max(Math.Max(y, held), slot + log);
+                }
             }
             return Math.Max(y, held);
         }
@@ -1014,8 +1092,10 @@ namespace CodexAutoResume
         private void ShowStep()
         {
             bar.Value = at;
+            if (!under.Contains(step)) under.Add(step);
             if (stepLabel == null) return;
             stepLabel.Text = words.Step(step);
+            if (page == InstallerFlow.Progress) ListSteps(true);
             Arrange(Inner(ClientSize.Width));
         }
 
@@ -1222,6 +1302,8 @@ namespace CodexAutoResume
         internal IEnumerable<Control> ShownRows()
         {
             foreach (KeyValuePair<Control, int> row in rows) if (Wanted(row.Key)) yield return row.Key;
+            // The Progress page's log, which stands in the step list's room, not in a row of its own.
+            if (stepRows.Count > 0 && logShown) yield return logArea;
         }
 
         // Whether a row is shown: every row but the log, while it is folded away, and the note that the window stays
@@ -1230,6 +1312,8 @@ namespace CodexAutoResume
         {
             if (control == logArea) return logShown;
             if (control == busyNote) return closingAsked;
+            // The steps under the bar give their room to the log while it is shown.
+            if (stepRows.Contains(control)) return !logShown;
             return true;
         }
 
