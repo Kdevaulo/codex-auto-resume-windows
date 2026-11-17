@@ -2250,6 +2250,7 @@ namespace CodexAutoResume
         private int fadeAlpha = 255;
         private Timer fade;
         private System.Diagnostics.Stopwatch fading;
+        private double fadeMs = -1, lastStep;
 
         /// Whether it opens with its own fade, and its alpha now (255 once opaque, and for one that does not fade): for
         /// the tests.
@@ -2268,6 +2269,7 @@ namespace CodexAutoResume
         {
             if (!fadeIn || !IsHandleCreated) return;
             fading = System.Diagnostics.Stopwatch.StartNew();
+            fadeMs = -1;
             fade = new Timer();
             fade.Interval = Motion.Interval;
             fade.Tick += delegate { FadeStep(); };
@@ -2277,7 +2279,32 @@ namespace CodexAutoResume
         private void FadeStep()
         {
             if (!IsHandleCreated || fading == null) { StopFade(); return; }
-            double t = fading.Elapsed.TotalMilliseconds / Math.Max(1, Motion.Duration);
+            // Re-check 10 (1 of 25, the dark Detection check's 2nd open): one frame of it unpainted - its title row and
+            // caption buttons light grey, grey bands at its card's foot - at its first alpha above zero. Clear (alpha 0)
+            // nothing of it shows; so before its first visible step it is painted whole once more, and DWM given that
+            // picture (DwmFlush), and before every step what is waiting to be painted is painted first: it is never seen,
+            // at any alpha, before its whole paint.
+            if (!RepaintedBeforeVisible)
+            {
+                try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN); }
+                catch (Exception) { }
+                try { DwmFlush(); }
+                catch (Exception) { }
+                RepaintedBeforeVisible = true;
+            }
+            else
+            {
+                try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN); }
+                catch (Exception) { }
+            }
+            // Re-check 10: the Timeline's first visible frame was already at 63-98 % - its repaint took most of the fade's
+            // time. The fade's own time starts here, once it is painted, and a step that comes late (a long paint, a busy
+            // moment) moves it on by two frames at the most: it always fades from near clear.
+            double now = fading.Elapsed.TotalMilliseconds;
+            if (fadeMs < 0) fadeMs = 0;
+            else fadeMs += Math.Min(now - lastStep, 2.0 * Motion.Interval);
+            lastStep = now;
+            double t = fadeMs / Math.Max(1, Motion.Duration);
             if (t < 1.0)
             {
                 SetFade((int)Math.Round(255 * Motion.Ease(t)));
@@ -2285,16 +2312,24 @@ namespace CodexAutoResume
             }
             SetFade(255);
             StopFade();
-            // Opaque: an ordinary window again, drawn whole.
+            // Opaque: an ordinary window again, drawn whole in the same message - a window no longer layered is drawn
+            // anew, and an asked-for paint would leave a frame of it unpainted.
             try
             {
                 long style = GetWindowLongPtr(Handle, GWL_EXSTYLE).ToInt64();
                 SetWindowLongPtr(Handle, GWL_EXSTYLE, new IntPtr(style & ~(long)WS_EX_LAYERED));
-                RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+                RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_UPDATENOW | RDW_ALLCHILDREN);
             }
             catch (Exception) { }
             fadeIn = false;
         }
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmFlush();
+
+        /// Whether it was painted whole again, and that picture handed to DWM, before its first alpha above zero: for the
+        /// tests.
+        internal bool RepaintedBeforeVisible { get; private set; }
 
         private void StopFade()
         {
