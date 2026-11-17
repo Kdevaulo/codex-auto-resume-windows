@@ -4,6 +4,10 @@ what a person installing it wants to know:
 
 * the Welcome page - three numbered points under the guide's link and before the language picker: it notices a
   conversation that stopped, it carries on once it can, and the words it sends are the person's to choose;
+* the Ready page of a first installation - after what it showed before, what is installed (the watcher, the
+  Dashboard and the Codex plugin, and the advanced edition's own features in that edition), one hairline row each with
+  what it is beside its name, and that no administrator rights are needed. An update and a change of edition keep the
+  room for what they keep, change and bring;
 
 What is held here, on the window built and never shown (the probe pattern of tests/test_installer_window.py and
 tests/test_gui_v0624_setup_600.py, the scaling and text size stood in as InstallerAudit stands them in), in every
@@ -216,6 +220,61 @@ class PageFillTests(unittest.TestCase):
                 with self.subTest(snap["page"]):
                     self.assertNotIn("It notices when one stops", [row["text"] for row in snap["rows"]])
                     self.assertFalse([mark for mark in snap["marks"] if mark["kind"] == "Number"])
+
+    # ------------------------------------------------------------------ the Ready page
+
+    INSTALLED = [("installer.options.watcher", "installer.options.watcher_help"),
+                 ("installer.options.dashboard", "installer.options.dashboard_help"),
+                 ("installer.options.plugin_name", "installer.options.plugin_help")]
+    ADVANCED = ("installer.options.advanced", "installer.options.advanced_help")
+
+    def test_a_first_installation_says_what_is_installed_and_that_no_administrator_rights_are_needed(self):
+        for case in CASES:
+            locale = case[0]
+            words = _words(locale)
+            for way, items in (("first", self.INSTALLED), ("advanced", self.INSTALLED + [self.ADVANCED])):
+                with self.subTest(case=case, way=way):
+                    snap = self.page(locale, way + "/options", case[1], case[2])
+                    rows = snap["rows"]
+                    texts = [row["text"] for row in rows]
+                    # After what the page showed before - the plugin's line - and in this order: the heading, a name, what
+                    # it is and a hairline for each, and the line about administrator rights last.
+                    start = texts.index(words["installer.options.installed"])
+                    self.assertEqual(texts[start - 1], words["installer.options.plugin"])
+                    listed = rows[start + 1:start + 1 + 3 * len(items)]
+                    self.assertEqual([row["text"] for row in listed],
+                                     [text for name, what in items for text in (words[name], words[what], "")])
+                    self.assertEqual([row["type"] for row in listed[2::3]], ["InstallerRule"] * len(items))
+                    self.assertEqual(texts[start + 1 + 3 * len(items)], words["installer.options.no_admin"])
+                    self.assertEqual(texts[-1], words["installer.options.no_admin"])
+                    width = snap["width"]
+                    for name, what, rule in zip(listed[0::3], listed[1::3], listed[2::3]):
+                        self.assertNotEqual(name["font"], what["font"], "the name in the name's weight")
+                        # Beside each other on one line: the name at the leading edge, what it is at the other end - or,
+                        # where the two do not fit on one line, what it is under the name.
+                        beside = name["box"][1] == what["box"][1]
+                        mirrored = locale in RIGHT_TO_LEFT
+                        if beside:
+                            self.assertEqual(name["box"][0] + name["box"][2] if mirrored else name["box"][0],
+                                             width if mirrored else 0)
+                            self.assertEqual(what["box"][0] if mirrored else what["box"][0] + what["box"][2],
+                                             0 if mirrored else width)
+                        else:
+                            self.assertGreaterEqual(what["box"][1], name["box"][1] + name["box"][3])
+                        self.assertGreater(rule["box"][1], max(name["box"][1] + name["box"][3], what["box"][1] + what["box"][3]))
+                        self.assertEqual([rule["box"][0], rule["box"][2]], [0, width], "the hairline runs across the card")
+                    if case == ["en", 1.0, 1.0]:
+                        self.assertTrue(all(name["box"][1] == what["box"][1] for name, what in zip(listed[0::3], listed[1::3])),
+                                        "in English each fits beside its name")
+
+    def test_an_update_and_a_change_of_edition_say_what_they_keep_instead(self):
+        for case in CASES:
+            words = _words(case[0])
+            for way in ("update", "change"):
+                with self.subTest(case=case, way=way):
+                    texts = [row["text"] for row in self.page(case[0], way + "/options", case[1], case[2])["rows"]]
+                    self.assertNotIn(words["installer.options.installed"], texts)
+                    self.assertNotIn(words["installer.options.no_admin"], texts)
 
     # ------------------------------------------------------------------ every page
 

@@ -96,6 +96,8 @@ namespace CodexAutoResume
         // the first of. Made again with the page (Build), as its rows are.
         private readonly Dictionary<Control, StepMark> columns = new Dictionary<Control, StepMark>();
         private readonly Dictionary<Control, StepMark> marks = new Dictionary<Control, StepMark>();
+        // The Ready page's rows of what is installed: the line said of each, by the name it stands beside (Beside).
+        private readonly Dictionary<Control, Control> besides = new Dictionary<Control, Control>();
 
         /// The exit code of the run, or int.MinValue where none ran (the window was closed before it started).
         internal int Code { get { return code; } }
@@ -397,6 +399,7 @@ namespace CodexAutoResume
             rows.Clear();
             columns.Clear();
             marks.Clear();
+            besides.Clear();
             stepLabel = null;
             busyNote = null;
             desktopBox = null;
@@ -562,7 +565,42 @@ namespace CodexAutoResume
             Row(Words(words.Say("installer.options.plugin", "The plugin - its panel and its skill - is added to Codex as part of every installation."), null, Palette.Secondary), 16);
             // An update says what it updates to, as the Dashboard's does (BuildNotes).
             if (flow.Upgrade && !flow.EditionChange && flow.NotesText != null) WhatsNew(16);
+            // v0.6.24-beta.3 (the owner's option A): a first installation says what it puts on this PC. An update and a change
+            // of edition already say what they keep and change, and what is new - the room is theirs.
+            if (!flow.Upgrade) WhatIsInstalled(16);
             InsideNote(16);
+        }
+
+        /// What a first installation puts on this PC, one hairline row each - its name, and what it is beside it - and for the
+        /// advanced edition what it adds (its Dashboard page and its skill, every feature off until it is turned on:
+        /// installer.options.to_advanced). Then that no administrator rights are needed: the setup program asks for none
+        /// (build/setup/setup.manifest, asInvoker) and install.ps1 needs none - it writes under the person's own profile and
+        /// registers nothing outside the current user.
+        private void WhatIsInstalled(int gap)
+        {
+            Row(Words(words.Say("installer.options.installed", "What is installed"), "label", Palette.Secondary), gap);
+            Installed(words.Say("installer.options.watcher", "Watcher"),
+                      words.Say("installer.options.watcher_help", "Watches for stopped conversations in the background"));
+            Installed(words.Say("installer.options.dashboard", "Dashboard"),
+                      words.Say("installer.options.dashboard_help", "Status, pending recoveries, history and settings"));
+            Installed(words.Say("installer.options.plugin_name", "Codex plugin"),
+                      words.Say("installer.options.plugin_help", "A panel and a skill inside Codex"));
+            if (flow.Edition == InstallerFlow.Advanced)
+                Installed(words.Say("installer.options.advanced", "Advanced features"),
+                          words.Say("installer.options.advanced_help", "A Dashboard page and a skill; each feature starts off"));
+            Row(Words(words.Say("installer.options.no_admin", "No administrator rights are needed"), null, Palette.Secondary), 8);
+        }
+
+        // One of them: its name in the name's weight, what it is beside it at the row's other end where both fit on one line
+        // (below it otherwise), and a hairline under it.
+        private void Installed(string name, string what)
+        {
+            var title = Words(name, "name", Palette.Ink);
+            var line = Words(what, null, Palette.Secondary);
+            Row(title, 8);
+            Row(line, 2);
+            besides[line] = title;
+            Row(new InstallerRule(), 8);
         }
 
         /// The Finish page's box for a shortcut on the Desktop (v0.6.22, the owner: it comes last, as in an ordinary
@@ -798,6 +836,8 @@ namespace CodexAutoResume
                 StepMark column;
                 bool inColumn = columns.TryGetValue(control, out column);
                 if (!inColumn) y = Math.Max(y, held);
+                Control name;
+                if (besides.TryGetValue(control, out name) && Beside(control, name, width, mirrored, ref y)) continue;
                 y += row.Value;
                 // A row in a mark's column stands past the mark and its gap, as wide as the rest of the card.
                 int indent = inColumn ? column.Extent + column.Gap : 0;
@@ -819,6 +859,20 @@ namespace CodexAutoResume
             return Math.Max(y, held);
         }
 
+        /// A line beside the name it is said of, at the row's other end - where the two fit on one line with a medium space
+        /// between them; false, and nothing moved, where they do not, and the line is a row of its own under the name. The
+        /// name is then only as wide as its words, so the two never overlap.
+        private bool Beside(Control line, Control name, int width, bool mirrored, ref int y)
+        {
+            Size own = name.GetPreferredSize(Size.Empty), said = line.GetPreferredSize(Size.Empty);
+            if (own.Width + Px(Brand.SpaceM) + said.Width > width) return false;
+            int top = name.Top, height = Math.Max(name.Height, said.Height);
+            name.SetBounds(Mirror.X(mirrored, width, 0, own.Width), top, own.Width, name.Height);
+            line.SetBounds(Mirror.X(mirrored, width, width - said.Width, said.Width), top, said.Width, said.Height);
+            y = top + height;
+            return true;
+        }
+
         // The height of a row's first line, as its words are drawn.
         private static int FirstLine(Control control)
         {
@@ -831,6 +885,7 @@ namespace CodexAutoResume
             if (control == logArea) return Px(150);
             if (control == notesArea) return Px(page == InstallerFlow.Notes ? 220 : 140);
             if (control == bar) return Px(10);
+            if (control is InstallerRule) return Soft.Hairline;
             if (control is SoftCombo) return SoftCombo.FieldHeight;
             if (control is ChoiceCard) return ((ChoiceCard)control).HeightFor(width);
             if (control is SoftLink) return control.GetPreferredSize(new Size(width, 0)).Height;
@@ -1224,6 +1279,25 @@ namespace CodexAutoResume
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             Ground.Paint(this, e);
+        }
+    }
+
+    /// A hairline across the card, under each row of what is installed (v0.6.24-beta.3): the palette's line, a hairline
+    /// thick, as the Dashboard's flat lists draw theirs.
+    internal sealed class InstallerRule : Control
+    {
+        internal InstallerRule()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            TabStop = false;
+            AccessibleRole = AccessibleRole.Separator;
+            BackColor = Palette.Line;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.FillRectangle(Soft.Fill(Palette.Line), ClientRectangle);
         }
     }
 
