@@ -102,6 +102,50 @@ def release_title(text: str, version: str) -> str:
     return "v%s — %s" % (str(version).lstrip("v"), short_title(text, version))
 
 
+# The second paragraph of every entry, right under the title line: what kind of release it is, every kind that
+# applies, biggest first - `**Kind:** New features · Design changes · Bug fixes`, and in the Korean changelog
+# `**성격:** 기능 추가 · 디자인 수정 · 버그 수정`. This table is the one vocabulary: English word -> its Korean
+# twin. A word that is not in it is a mistake, not a new kind.
+KINDS = {
+    "New features": "기능 추가",
+    "Feature changes": "기능 수정",
+    "Bug fixes": "버그 수정",
+    "New design": "디자인 추가",
+    "Design changes": "디자인 수정",
+    "Performance": "성능 개선",
+    "Security": "보안 수정",
+    "Languages": "언어·번역",
+    "Under the hood": "내부 정리",
+}
+KIND_SEPARATOR = " · "
+KIND_LINE = re.compile(r"^\*\*(Kind|성격):\*\* (\S.*)$")
+
+
+def kinds(text: str, version: str) -> list:
+    """The kinds in the second paragraph of `## v<version>`'s entry, as English words in the order written.
+
+    The line is `**Kind:** A · B` in the English changelog and `**성격:** 가 · 나` in the Korean one; either is read
+    and a Korean word is given back as its English twin. Fails when the entry has no such paragraph, names a
+    word that is not in KINDS (or one of the other language's), or names one twice - a release without its
+    kind is a mistake worth stopping for."""
+    number = str(version).lstrip("v")
+    paragraphs = re.split(r"\n\s*\n", section(text, version))
+    found = KIND_LINE.match(paragraphs[1].strip()) if len(paragraphs) > 1 else None
+    if found is None:
+        raise SystemExit("the CHANGELOG.md section for v%s has no kind line as its second paragraph "
+                         "(**Kind:** New features · Bug fixes)" % number)
+    table = KINDS if found.group(1) == "Kind" else {twin: english for english, twin in KINDS.items()}
+    names = []
+    for word in found.group(2).split(KIND_SEPARATOR):
+        if word not in table:
+            raise SystemExit("the CHANGELOG.md section for v%s names the kind %r, which is not one of: %s"
+                             % (number, word, ", ".join(table)))
+        name = word if found.group(1) == "Kind" else table[word]
+        if name in names:
+            raise SystemExit("the CHANGELOG.md section for v%s names the kind %r twice" % (number, word))
+        names.append(name)
+    return names
+
 
 def download_block(version: str) -> str:
     """The first lines of every release page: direct links to the tag's two setup programs, so
