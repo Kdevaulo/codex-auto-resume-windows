@@ -66,6 +66,14 @@ namespace CodexAutoResume
         /// Whether it is on its way (for the tests, and the second line's moment).
         internal bool Sweeping { get { return sweep != null && sweep.Running; } }
 
+        /// The sweep gone at once, nothing of it left (a special egg takes the light: SettingsForm.VersionPressed).
+        internal void StopSweep()
+        {
+            if (sweep == null || !sweep.Running) return;
+            sweep.Jump(0.0);
+            Invalidate();
+        }
+
         /// v0.6.24-beta.2 (the owner, 2026-11-16): the egg of all its colours, at the sixth press on the version - the light
         /// through each colour it has, in turn, and back to its own. Watching and waiting share the brand's cyan, so the four
         /// are the four fills it has for a running watcher: watching, needing a person, paused and failed (brand.STATUS_FILL).

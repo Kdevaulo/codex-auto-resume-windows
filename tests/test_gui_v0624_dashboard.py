@@ -193,12 +193,102 @@ namespace CodexAutoResume
             return said;
         }
 
+        /// v0.6.24-beta.2 (the live re-check 8): a scrolling page with a card under the tab row's gap, its background drawn as
+        /// the window draws it (Ground.Paint), in light and dark, at 100, 150 and 200 %, at rest and scrolled - with the top
+        /// band's fade and without it. Per case: how far the page's top row is from its ground at most, across the card's top
+        /// and its left lift; and how much steeper than the lift's own any column's steepest step is, in colour levels.
+        /// The tabs' own row as FitVersionPill reckons it: each shown tab as wide as it asks, with its margins.
+        private static int ProportionsTabsWidth(Control strip)
+        {
+            int width = strip.Padding.Horizontal;
+            foreach (Control tab in strip.Controls)
+                if (Soft.OwnVisible(tab)) width += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+            return width;
+        }
+
+        internal static Dictionary<string, object> ProportionsFade()
+        {
+            var said = new Dictionary<string, object>();
+            foreach (string theme in new[] { "light", "dark" })
+                foreach (double scale in new[] { 1.0, 1.5, 2.0 })
+                    foreach (int scrolled in new[] { 0, 30 })
+                    {
+                        Palette.Adopt(theme);
+                        AdoptDisplayScale(scale);
+                        bool overflowing;
+                        Rectangle card;
+                        Color ground;
+                        int band;
+                        using (Bitmap faded = FadeRender(true, scrolled, out overflowing, out card, out ground, out band))
+                        using (Bitmap cut = FadeRender(false, scrolled, out overflowing, out card, out ground, out band))
+                        {
+                            int top = 0, cutTop = 0, excess = int.MinValue;
+                            int rows = Math.Min(faded.Height, band + Soft.Px(4));
+                            for (int x = Math.Max(0, card.Left - Soft.Px(14)); x < Math.Min(faded.Width, card.Left + Soft.Px(60)); x++)
+                            {
+                                top = Math.Max(top, Levels(faded.GetPixel(x, 0), ground));
+                                cutTop = Math.Max(cutTop, Levels(cut.GetPixel(x, 0), ground));
+                                int steepest = 0, own = 0;
+                                for (int y = 1; y < rows; y++)
+                                {
+                                    if (card.Contains(x, y) || card.Contains(x, y - 1)) continue;
+                                    steepest = Math.Max(steepest, Levels(faded.GetPixel(x, y), faded.GetPixel(x, y - 1)));
+                                    own = Math.Max(own, Levels(cut.GetPixel(x, y), cut.GetPixel(x, y - 1)));
+                                }
+                                excess = Math.Max(excess, steepest - own);
+                            }
+                            var at = new Dictionary<string, object>();
+                            at["overflowing"] = overflowing;
+                            at["top"] = (double)top;
+                            at["cutTop"] = (double)cutTop;
+                            at["excess"] = (double)excess;
+                            said[theme + " " + scale.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " " + scrolled] = at;
+                        }
+                    }
+            return said;
+        }
+
+        private static int Levels(Color one, Color other)
+        {
+            return Math.Max(Math.Abs(one.R - other.R), Math.Max(Math.Abs(one.G - other.G), Math.Abs(one.B - other.B)));
+        }
+
+        private static Bitmap FadeRender(bool fade, int scrolled, out bool overflowing, out Rectangle card, out Color ground, out int band)
+        {
+            var page = new SoftPage();
+            page.Size = new Size(Soft.Px(500), Soft.Px(300));
+            page.Padding = new Padding(Soft.Px(16), Soft.Px(TabRowGap) - Soft.Px(TabRing), Soft.Px(17), Soft.Px(17));
+            var spacer = new Panel();
+            spacer.Dock = DockStyle.Top;
+            spacer.Height = Soft.Px(2000);
+            var body = new SoftCard();
+            body.Dock = DockStyle.Top;
+            body.Height = Soft.Px(120);
+            page.Controls.Add(spacer);
+            page.Controls.Add(body);
+            page.Scrolls = true;
+            if (fade) page.FadeTop = page.Padding.Top;
+            page.PerformLayout();
+            if (scrolled > 0) page.ScrollTo(Soft.Px(scrolled), false);
+            overflowing = page.Overflowing;
+            card = body.Bounds;
+            ground = Ground.Colour(page);
+            band = page.Padding.Top;
+            var image = new Bitmap(page.Width, page.Height);
+            using (Graphics g = Graphics.FromImage(image))
+            using (var e = new PaintEventArgs(g, new Rectangle(Point.Empty, page.Size)))
+                Ground.Paint(page, e);
+            page.Dispose();
+            return image;
+        }
+
         internal static void ProportionsRun(string dir, Dictionary<string, object> said)
         {
             said["eggParts"] = ProportionsEggParts();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Palette.AdoptDesign(null);
+            said["fade"] = ProportionsFade();
             Palette.Adopt("light");
             AdoptDisplayScale(1.0);
             foreach (string locale in new[] { "en", "ar" })
@@ -295,6 +385,14 @@ namespace CodexAutoResume
                     other.Visible = true;
                     var grown = new Dictionary<string, object>();
                     grown["before"] = before["fit"];
+                    grown["shown"] = form.PillFit;
+                    // On any screen and in any font the tabs come to need the pill's room: the Chat tab's words grow, which
+                    // lays out the strip alone, until the tabs, the gap and the whole pill no longer fit in the row (GitHub's
+                    // runners' fonts are narrower than this PC's, and the two tabs alone left the pill whole there).
+                    Control row = settings.Parent;
+                    for (int grow = 0; grow < 60 && ProportionsTabsWidth(row) + form.Px(12) + form.versionPill.WholeWidth <= form.nav.DisplayRectangle.Width; grow++)
+                        other.Text += " Chat";
+                    grown["grew"] = ProportionsTabsWidth(row) + form.Px(12) + form.versionPill.WholeWidth > form.nav.DisplayRectangle.Width;
                     grown["fit"] = form.PillFit;
                     var cut = new List<string>();
                     foreach (NavButton tab in form.navButtons.Values)
@@ -307,17 +405,23 @@ namespace CodexAutoResume
                     form.ClientSize = opening;
                     // A press on the pill is a press on the version (VersionPressed), and one press is the egg (the owner,
                     // 2026-11-16): the sentence on its way or said. Then, as if the sweep had ended, the sentence said, and a
-                    // press on the version's words starts it again from its start - nothing stacked on the line's own words.
+                    // press on the version's words 2 s later - a new run - starts it again from its start, nothing stacked on the
+                    // line's own words. The presses' clock is the probe's.
+                    double clock = 0.0;
+                    form.PressNow = delegate { return clock; };
                     MethodInfo down = typeof(Control).GetMethod("OnMouseDown", BindingFlags.Instance | BindingFlags.NonPublic);
                     form.detail.Text = "The line's own words";
+                    form.EggsPlayed.Clear();
                     down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                     var first = form.ProportionsAside();
                     answer["pillPress"] = first;
                     if ((bool)first["waiting"])
                         typeof(AsideLabel).GetMethod("Speak", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form.detail, null);
                     answer["said"] = form.ProportionsAside();
+                    clock = Math.Max(clock, form.SpecialUntil) + 2000;
                     down.Invoke(form.versionText, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                     answer["labelPress"] = form.ProportionsAside();
+                    answer["twoRuns"] = string.Join(",", form.EggsPlayed.ToArray());
                     answer["sentence"] = form.S("status.aside", "It's okay if it stops. I'll pick it up.");
                     // The sixth press in a row plays a special egg instead (the owner, 2026-11-16, "6번", "3개 중 하나가 랜덤으로
                     // 뜨게 하자"): four runs of six presses, the picks given (0, then 0, 0 and 1 of the two left), the count
@@ -333,10 +437,11 @@ namespace CodexAutoResume
                     for (int round = 0; round < 4; round++)
                     {
                         if (round == 3) counted = 0;
-                        run.SetValue(form.versionPresses, 0);
+                        clock = Math.Max(clock, form.SpecialUntil) + 2000;
                         var played = new List<object>();
                         for (int press = 0; press < 6; press++)
                         {
+                            clock += 100;
                             form.EggsPlayed.Clear();
                             down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                             played.Add(string.Join(",", form.EggsPlayed.ToArray()));
@@ -349,13 +454,49 @@ namespace CodexAutoResume
                         runs.Add(round_);
                     }
                     answer["runs"] = runs;
-                    answer["asked"] = asked;
-                    // In a picture or the layout audit the sixth press is the one-press egg.
+                    answer["asked"] = new List<object>(asked);   // the four rounds' picks, before the runs below
+                    // The owner, 2026-11-17: one run of six, 0.3 s apart, plays the one-press egg once and the special one
+                    // alone - what the run played, in order, and the line as the special egg starts on it.
+                    clock = Math.Max(clock, form.SpecialUntil) + 2000;
+                    form.EggsPlayed.Clear();
+                    for (int press = 0; press < 6; press++)
+                    {
+                        clock += 300;
+                        down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
+                    }
+                    answer["oneRun"] = string.Join(",", form.EggsPlayed.ToArray());
+                    answer["oneRunAside"] = form.ProportionsAside();
+                    answer["oneRunSweeping"] = form.stateDot.Sweeping;
+                    // The owner, 2026-11-17, pressing on past six: thirty presses 0.3 s apart. A special egg ignores every press
+                    // while it plays (its sentence's whole time, SpecialUntil); the next press after it begins a new run.
+                    clock = form.SpecialUntil + 2000;
+                    form.EggsPlayed.Clear();
+                    var during = new List<object>();
+                    for (int press = 0; press < 30; press++)
+                    {
+                        clock += 300;
+                        bool playing = clock < form.SpecialUntil;
+                        int countBefore = form.EggsPlayed.Count;
+                        string saidBefore = (string)form.ProportionsAside()["words"];
+                        down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
+                        if (playing)
+                            during.Add(form.EggsPlayed.Count == countBefore && (string)form.ProportionsAside()["words"] == saidBefore &&
+                                       (int)run.GetValue(form.versionPresses) == 0);
+                    }
+                    answer["pressingOn"] = string.Join(",", form.EggsPlayed.ToArray());
+                    answer["pressesDuring"] = during;
+                    // Unsay on its own: an aside on its way gone at once, its own words back with no fade.
+                    form.detail.Aside("Something to say", 500, 1000);
+                    form.detail.Unsay();
+                    answer["unsaid"] = form.ProportionsAside();
+                    answer["unsaidFading"] = form.detail.Fading;
+                    // In a picture or the layout audit the sixth press is no special egg.
                     form.auditing = true;
-                    run.SetValue(form.versionPresses, 0);
+                    clock = Math.Max(clock, form.SpecialUntil) + 2000;
                     var audited = new List<object>();
                     for (int press = 0; press < 6; press++)
                     {
+                        clock += 100;
                         form.EggsPlayed.Clear();
                         down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                         audited.Add(string.Join(",", form.EggsPlayed.ToArray()));
@@ -506,9 +647,10 @@ class DashboardProportionsTests(unittest.TestCase):
             grown = self.answer[locale]["grown"]
             with self.subTest(locale=locale):
                 self.assertEqual(grown["before"], "whole")
-                # Where the two tabs leave it too little room, it shortens or goes (English); never over a tab.
-                if locale == "en":
-                    self.assertNotEqual(grown["fit"], "whole", "the pill gives way to the tabs")
+                # The tabs grown until the whole pill no longer fits beside them, on any screen and in any font (dev CI
+                # 44034443580: the runners' narrower fonts left room for it): it shortens or goes, never over a tab.
+                self.assertTrue(grown["grew"], "the tabs came to need the pill's room")
+                self.assertNotEqual(grown["fit"], "whole", "the pill gives way to the tabs")
                 self.assertEqual(grown["cut"], "", "no tab cut off at the strip's end")
                 self.assertEqual(grown["findings"], "")
 
@@ -569,6 +711,57 @@ class DashboardProportionsTests(unittest.TestCase):
                 else:
                     self.assertEqual(sx, px, "the same left edge")
 
+    def test_a_run_plays_the_one_press_egg_once_and_the_special_one_alone(self):
+        """The owner, 2026-11-17: "6번 눌러야 뜨는 이스터에그를 보기 위해 여러번 클릭할 때, 1번 누르면 뜨는 이스터에그 시작이
+        계속 반복해 / 둘이 중첩되어있네" - pressing towards the sixth restarted the one-press egg at every press, and the two
+        overlapped. Within a run only its first press plays the one-press egg; the sixth clears it, nothing of it left, and
+        plays the special egg alone; a press after 1.8 s of quiet is a new run."""
+        for locale in LOCALES:
+            said = self.answer[locale]
+            with self.subTest(locale=locale):
+                self.assertEqual(said["oneRun"], "one,confetti", "one one-press egg, then the special one (the pick after count)")
+                self.assertEqual(said["twoRuns"], "one,one", "two presses 2 s apart: two runs, two one-press eggs")
+                aside = said["oneRunAside"]
+                self.assertNotEqual(aside["words"], said["sentence"], "the one-press sentence gone")
+                self.assertEqual(aside["behind"], "The line's own words")
+                self.assertFalse(said["oneRunSweeping"])
+                unsaid = said["unsaid"]
+                self.assertFalse(unsaid["waiting"] or unsaid["saying"])
+                self.assertEqual(unsaid["shows"], "The line's own words")
+                self.assertFalse(said["unsaidFading"], "no fade")
+
+    def test_a_scrolling_page_fades_its_first_card_s_lift_instead_of_cutting_it(self):
+        """The live re-check 8 (2026-11-17): on Settings and Diagnostics, which scroll, a straight line at the page's top cut
+        the first card's lift - 237 above, 242 below, in one step - since the tab row's gap left too little room over the
+        card. The page's top band now fades what is stamped there into its ground (SoftPage.FadeTop): its top row is the
+        ground, and no column steps more than the lift's own gradient does - light and dark, at 100, 150 and 200 %, at rest
+        and scrolled."""
+        fade = self.answer["fade"]
+        self.assertEqual(len(fade), 12)
+        for key, at in sorted(fade.items()):
+            with self.subTest(case=key):
+                self.assertTrue(at["overflowing"], "the page scrolls")
+                self.assertLessEqual(at["top"], 2, "the page's top row is its ground")
+                self.assertLessEqual(at["excess"], 2, "a step steeper than the lift's own")
+        self.assertGreater(max(at["cutTop"] for at in fade.values()), 2,
+                           "without the band the line is there: the case reproduces the re-check's")
+
+    def test_pressing_on_past_six_shows_one_egg_at_a_time(self):
+        """The owner, 2026-11-17: "여섯번보다 더 계속 누를 경우는? 정확히 6번만 누르진 않을거잖아". Thirty presses 0.3 s apart:
+        the one-press egg, a special one, the one-press egg again, another special one - never the same twice - each alone;
+        a press while a special egg plays neither counts nor starts anything."""
+        for locale in LOCALES:
+            said = self.answer[locale]
+            with self.subTest(locale=locale):
+                played = said["pressingOn"].split(",")
+                self.assertEqual(played[0::2], ["one"] * (len(played) // 2), played)
+                self.assertGreaterEqual(len(played), 4, played)
+                specials = played[1::2]
+                self.assertNotIn("one", specials)
+                self.assertFalse([i for i in range(1, len(specials)) if specials[i] == specials[i - 1]], specials)
+                self.assertTrue(said["pressesDuring"], "some presses fell while a special egg played")
+                self.assertTrue(all(said["pressesDuring"]), "a press during a special egg changed something")
+
     def test_the_sixth_press_in_a_row_plays_a_special_egg(self):
         """The owner, 2026-11-16: "여러번 누를때의 이스터에그도 별도로 만들자" - a separate egg for many presses - "3개 중
         하나가 랜덤으로 뜨게 하자" - one of three at random - and "6번": five presses are the one-press egg each, the sixth (each
@@ -578,10 +771,11 @@ class DashboardProportionsTests(unittest.TestCase):
             with self.subTest(locale=locale):
                 played = [run["played"] for run in said["runs"]]
                 for run in played:
-                    self.assertEqual(run[:5], ["one"] * 5, "five presses never play a special egg")
+                    self.assertEqual(run[:5], ["one", "", "", "", ""],
+                                     "five presses never play a special egg, and only the first plays the one-press egg")
                 self.assertEqual([run[5] for run in played], ["colours", "count", "confetti", "count"])
                 self.assertEqual(said["asked"], [3, 2, 2, 2], "the first of three, then one of the two not played last")
-                self.assertEqual(said["audited"], ["one"] * 6, "never in a picture or the layout audit")
+                self.assertEqual(said["audited"], ["one", "", "", "", "", ""], "never in a picture or the layout audit")
 
     def test_each_special_egg_says_its_sentence_and_nothing_moves_where_nothing_may(self):
         for locale in LOCALES:

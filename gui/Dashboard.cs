@@ -389,6 +389,20 @@ namespace CodexAutoResume
             }
         }
 
+        /// Its own words back at once, with no fade: an aside on its way or being said is gone, and nothing of it is left
+        /// (a special egg clears the one-press egg's sentence before its own: SettingsForm.VersionPressed).
+        internal void Unsay()
+        {
+            if (!aside && !waiting) return;
+            timer.Stop();
+            aside = false;
+            waiting = false;
+            arriving = false;
+            base.Text = behind;
+            fade.Jump(1.0);
+            Invalidate();
+        }
+
         /// In `delayMs` it says `said`, for `heldMs`.
         internal void Aside(string said, int delayMs, int heldMs)
         {
@@ -2368,6 +2382,7 @@ namespace CodexAutoResume
             // A page may scroll, and while it does it is the edge of the shadows on it (see Ground):
             // the cards' lift is kept inside its padding.
             page.Padding = PageRoom();
+            page.FadeTop = page.Padding.Top;
             page.Scrolls = true;
             return page;
         }

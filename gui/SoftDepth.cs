@@ -703,6 +703,7 @@ namespace CodexAutoResume
                 face.Offset(entry.Value);
                 Elevation.StampOuter(g, face, lift, item.Radius, clip);
             }
+            FadeTopBand(top, -x, -y, g, clip);
             foreach (KeyValuePair<Control, Point> entry in lifted)
             {
                 var item = (ISoftLifted)entry.Key;
@@ -712,6 +713,21 @@ namespace CodexAutoResume
                 int ring = Soft.Px(Brand.FocusOffset + Brand.FocusWidth) + 1;
                 if (Rectangle.Inflate(face, ring, ring).IntersectsWith(clip)) Soft.Ring(g, face, item.Radius);
             }
+        }
+
+        /// A scrolling page's top band (SoftPage.FadeTop): its ground over what was stamped there, opaque at the page's top
+        /// and gone at the band's foot, so the lift over its first card fades out instead of ending in a line - at rest and
+        /// while it scrolls, in every theme, at every scaling. `x`, `y`: the page's corner in the painter's coordinates.
+        internal static void FadeTopBand(Control top, int x, int y, Graphics g, Rectangle clip)
+        {
+            var page = top as SoftPage;
+            if (page == null || page.FadeTop <= 0 || !page.Overflowing) return;
+            var band = new Rectangle(x, y, page.Width, page.FadeTop);
+            if (!band.IntersectsWith(clip)) return;
+            Color ground = Colour(page);
+            using (var brush = new LinearGradientBrush(new Rectangle(band.X, band.Y - 1, band.Width, band.Height + 1),
+                                                       ground, Color.FromArgb(0, ground), LinearGradientMode.Vertical))
+                g.FillRectangle(brush, band);
         }
 
         private static void Collect(Control container, int x, int y, List<KeyValuePair<Control, Point>> lifted, int depth)

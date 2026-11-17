@@ -254,6 +254,12 @@ namespace CodexAutoResume
         /// Whether it holds more than fits, so the bar is showing.
         internal bool Overflowing { get { return scrolls && overflow; } }
 
+        /// v0.6.24-beta.2 (the live re-check 8, 2026-11-17): how tall a band at its top fades what is stamped on its ground -
+        /// its cards' lift - into the ground while it scrolls, so the shadow over its first card ends in nothing rather than
+        /// in a straight line where the page begins (Ground.Stamps). The tab row's gap leaves a page too little room above
+        /// its first card for the whole of a card's lift. 0: none.
+        internal int FadeTop;
+
         /// Asks for what it holds to be laid out once more before its layout ends: something in it (SoftPin)
         /// was laid out with less room than it needs, measured before what it holds changed under it.
         internal void Unsettle()

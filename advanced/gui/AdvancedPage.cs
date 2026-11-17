@@ -613,6 +613,7 @@ namespace CodexAutoResume
             scroll.Margin = new Padding(0);
             scroll.Controls.Add(stack);
             scroll.Scrolls = true;
+            scroll.FadeTop = room.Top;
             scroll.SizeChanged += delegate { FitAdvancedStack(); };
             advancedScroll = scroll;
 

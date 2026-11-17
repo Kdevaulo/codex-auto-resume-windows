@@ -1205,7 +1205,7 @@
   "status.aside_confetti": "پیدایش کردی! ممنون که همراهم هستی.",
   "status.aside_count_many": "تا حالا {n} گفتگو را برایت ادامه داده‌ام.",
   "status.aside_count_none": "هنوز گفتگویی را ادامه نداده‌ام. اگر یکی متوقف شود، من ادامه‌اش می‌دهم.",
-  "status.aside_count_one": "تا حالا ۱ گفتگو را برایت ادامه داده‌ام.",
+  "status.aside_count_one": "تا حالا 1 گفتگو را برایت ادامه داده‌ام.",
   "status.loading": "در حال بارگذاری...",
   "status.next_check": "بررسی بعدی: {time}",
   "status.not_responding": "ناظر پاسخ نمی‌دهد",
