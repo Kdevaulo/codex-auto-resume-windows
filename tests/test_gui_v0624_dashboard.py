@@ -307,17 +307,23 @@ namespace CodexAutoResume
                     form.ClientSize = opening;
                     // A press on the pill is a press on the version (VersionPressed), and one press is the egg (the owner,
                     // 2026-11-16): the sentence on its way or said. Then, as if the sweep had ended, the sentence said, and a
-                    // press on the version's words starts it again from its start - nothing stacked on the line's own words.
+                    // press on the version's words 2 s later - a new run - starts it again from its start, nothing stacked on the
+                    // line's own words. The presses' clock is the probe's.
+                    double clock = 0.0;
+                    form.PressNow = delegate { return clock; };
                     MethodInfo down = typeof(Control).GetMethod("OnMouseDown", BindingFlags.Instance | BindingFlags.NonPublic);
                     form.detail.Text = "The line's own words";
+                    form.EggsPlayed.Clear();
                     down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                     var first = form.ProportionsAside();
                     answer["pillPress"] = first;
                     if ((bool)first["waiting"])
                         typeof(AsideLabel).GetMethod("Speak", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form.detail, null);
                     answer["said"] = form.ProportionsAside();
+                    clock = Math.Max(clock, form.SpecialUntil) + 2000;
                     down.Invoke(form.versionText, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                     answer["labelPress"] = form.ProportionsAside();
+                    answer["twoRuns"] = string.Join(",", form.EggsPlayed.ToArray());
                     answer["sentence"] = form.S("status.aside", "It's okay if it stops. I'll pick it up.");
                     // The sixth press in a row plays a special egg instead (the owner, 2026-11-16, "6번", "3개 중 하나가 랜덤으로
                     // 뜨게 하자"): four runs of six presses, the picks given (0, then 0, 0 and 1 of the two left), the count
@@ -333,10 +339,11 @@ namespace CodexAutoResume
                     for (int round = 0; round < 4; round++)
                     {
                         if (round == 3) counted = 0;
-                        run.SetValue(form.versionPresses, 0);
+                        clock = Math.Max(clock, form.SpecialUntil) + 2000;
                         var played = new List<object>();
                         for (int press = 0; press < 6; press++)
                         {
+                            clock += 100;
                             form.EggsPlayed.Clear();
                             down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                             played.Add(string.Join(",", form.EggsPlayed.ToArray()));
@@ -349,13 +356,49 @@ namespace CodexAutoResume
                         runs.Add(round_);
                     }
                     answer["runs"] = runs;
-                    answer["asked"] = asked;
-                    // In a picture or the layout audit the sixth press is the one-press egg.
+                    answer["asked"] = new List<object>(asked);   // the four rounds' picks, before the runs below
+                    // The owner, 2026-11-17: one run of six, 0.3 s apart, plays the one-press egg once and the special one
+                    // alone - what the run played, in order, and the line as the special egg starts on it.
+                    clock = Math.Max(clock, form.SpecialUntil) + 2000;
+                    form.EggsPlayed.Clear();
+                    for (int press = 0; press < 6; press++)
+                    {
+                        clock += 300;
+                        down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
+                    }
+                    answer["oneRun"] = string.Join(",", form.EggsPlayed.ToArray());
+                    answer["oneRunAside"] = form.ProportionsAside();
+                    answer["oneRunSweeping"] = form.stateDot.Sweeping;
+                    // The owner, 2026-11-17, pressing on past six: thirty presses 0.3 s apart. A special egg ignores every press
+                    // while it plays (its sentence's whole time, SpecialUntil); the next press after it begins a new run.
+                    clock = form.SpecialUntil + 2000;
+                    form.EggsPlayed.Clear();
+                    var during = new List<object>();
+                    for (int press = 0; press < 30; press++)
+                    {
+                        clock += 300;
+                        bool playing = clock < form.SpecialUntil;
+                        int before = form.EggsPlayed.Count;
+                        string saidBefore = (string)form.ProportionsAside()["words"];
+                        down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
+                        if (playing)
+                            during.Add(form.EggsPlayed.Count == before && (string)form.ProportionsAside()["words"] == saidBefore &&
+                                       (int)run.GetValue(form.versionPresses) == 0);
+                    }
+                    answer["pressingOn"] = string.Join(",", form.EggsPlayed.ToArray());
+                    answer["pressesDuring"] = during;
+                    // Unsay on its own: an aside on its way gone at once, its own words back with no fade.
+                    form.detail.Aside("Something to say", 500, 1000);
+                    form.detail.Unsay();
+                    answer["unsaid"] = form.ProportionsAside();
+                    answer["unsaidFading"] = form.detail.Fading;
+                    // In a picture or the layout audit the sixth press is no special egg.
                     form.auditing = true;
-                    run.SetValue(form.versionPresses, 0);
+                    clock = Math.Max(clock, form.SpecialUntil) + 2000;
                     var audited = new List<object>();
                     for (int press = 0; press < 6; press++)
                     {
+                        clock += 100;
                         form.EggsPlayed.Clear();
                         down.Invoke(form.versionPill, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 4, 4, 0) });
                         audited.Add(string.Join(",", form.EggsPlayed.ToArray()));
@@ -569,6 +612,41 @@ class DashboardProportionsTests(unittest.TestCase):
                 else:
                     self.assertEqual(sx, px, "the same left edge")
 
+    def test_a_run_plays_the_one_press_egg_once_and_the_special_one_alone(self):
+        """The owner, 2026-11-17: "6번 눌러야 뜨는 이스터에그를 보기 위해 여러번 클릭할 때, 1번 누르면 뜨는 이스터에그 시작이
+        계속 반복해 / 둘이 중첩되어있네" - pressing towards the sixth restarted the one-press egg at every press, and the two
+        overlapped. Within a run only its first press plays the one-press egg; the sixth clears it, nothing of it left, and
+        plays the special egg alone; a press after 1.8 s of quiet is a new run."""
+        for locale in LOCALES:
+            said = self.answer[locale]
+            with self.subTest(locale=locale):
+                self.assertEqual(said["oneRun"], "one,confetti", "one one-press egg, then the special one (the pick after count)")
+                self.assertEqual(said["twoRuns"], "one,one", "two presses 2 s apart: two runs, two one-press eggs")
+                aside = said["oneRunAside"]
+                self.assertNotEqual(aside["words"], said["sentence"], "the one-press sentence gone")
+                self.assertEqual(aside["behind"], "The line's own words")
+                self.assertFalse(said["oneRunSweeping"])
+                unsaid = said["unsaid"]
+                self.assertFalse(unsaid["waiting"] or unsaid["saying"])
+                self.assertEqual(unsaid["shows"], "The line's own words")
+                self.assertFalse(said["unsaidFading"], "no fade")
+
+    def test_pressing_on_past_six_shows_one_egg_at_a_time(self):
+        """The owner, 2026-11-17: "여섯번보다 더 계속 누를 경우는? 정확히 6번만 누르진 않을거잖아". Thirty presses 0.3 s apart:
+        the one-press egg, a special one, the one-press egg again, another special one - never the same twice - each alone;
+        a press while a special egg plays neither counts nor starts anything."""
+        for locale in LOCALES:
+            said = self.answer[locale]
+            with self.subTest(locale=locale):
+                played = said["pressingOn"].split(",")
+                self.assertEqual(played[0::2], ["one"] * (len(played) // 2), played)
+                self.assertGreaterEqual(len(played), 4, played)
+                specials = played[1::2]
+                self.assertNotIn("one", specials)
+                self.assertFalse([i for i in range(1, len(specials)) if specials[i] == specials[i - 1]], specials)
+                self.assertTrue(said["pressesDuring"], "some presses fell while a special egg played")
+                self.assertTrue(all(said["pressesDuring"]), "a press during a special egg changed something")
+
     def test_the_sixth_press_in_a_row_plays_a_special_egg(self):
         """The owner, 2026-11-16: "여러번 누를때의 이스터에그도 별도로 만들자" - a separate egg for many presses - "3개 중
         하나가 랜덤으로 뜨게 하자" - one of three at random - and "6번": five presses are the one-press egg each, the sixth (each
@@ -578,10 +656,11 @@ class DashboardProportionsTests(unittest.TestCase):
             with self.subTest(locale=locale):
                 played = [run["played"] for run in said["runs"]]
                 for run in played:
-                    self.assertEqual(run[:5], ["one"] * 5, "five presses never play a special egg")
+                    self.assertEqual(run[:5], ["one", "", "", "", ""],
+                                     "five presses never play a special egg, and only the first plays the one-press egg")
                 self.assertEqual([run[5] for run in played], ["colours", "count", "confetti", "count"])
                 self.assertEqual(said["asked"], [3, 2, 2, 2], "the first of three, then one of the two not played last")
-                self.assertEqual(said["audited"], ["one"] * 6, "never in a picture or the layout audit")
+                self.assertEqual(said["audited"], ["one", "", "", "", "", ""], "never in a picture or the layout audit")
 
     def test_each_special_egg_says_its_sentence_and_nothing_moves_where_nothing_may(self):
         for locale in LOCALES:

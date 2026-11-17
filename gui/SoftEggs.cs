@@ -22,10 +22,14 @@ namespace CodexAutoResume
         private double last = double.NegativeInfinity;
         private int count;
 
+        /// Whether the press just counted began a run (the one-press egg plays at it, and at no other press of the run).
+        internal bool First { get; private set; }
+
         internal bool Press(double milliseconds)
         {
             count = milliseconds - last <= Gap ? count + 1 : 1;
             last = milliseconds;
+            First = count == 1;
             if (count < Wanted) return false;
             count = 0;
             return true;

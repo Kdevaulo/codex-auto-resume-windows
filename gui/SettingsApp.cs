@@ -454,6 +454,15 @@ namespace CodexAutoResume
         /// The tests give their own.
         internal Action<Action<int>> ReadRecoveredAllTime;
 
+        /// The presses' clock, in milliseconds (the tests give their own; the window's stopwatch otherwise).
+        internal Func<double> PressNow;
+
+        // Until when, on the presses' clock, the special egg that last played is still on the screen (VersionPressed).
+        private double specialUntil = double.NegativeInfinity;
+
+        /// Until when the special egg that last played is on the screen, on the presses' clock (for the tests).
+        internal double SpecialUntil { get { return specialUntil; } }
+
         // The sentence comes in as the sweep ends, and goes 4 s after it has come in.
         internal const int AsideAfterMs = 850, AsideMs = 4150;
 
@@ -525,21 +534,40 @@ namespace CodexAutoResume
         }
 
         /// The easter egg: the light's sweep and the sentence coming in as it ends. v0.6.24-beta.2 (the owner, 2026-11-16,
-        /// "이스터에그 버전 알약 한번만 눌러도 뜨게 하자" - let one press on the version pill show the easter egg): every press,
-        /// where seven within 1.8 s each were asked before (v0.6.23). A press while it plays starts it again from its start - the
+        /// "이스터에그 버전 알약 한번만 눌러도 뜨게 하자" - let one press on the version pill show the easter egg): one press, where
+        /// seven within 1.8 s each were asked before (v0.6.23); a new run's first press starts it again from its start - the
         /// sweep from the top (HaloDot.Sweep), the sentence again as that ends (AsideLabel.Aside) - and nothing stacks.
         ///
         /// And the sixth press in a row, each within 1.8 s of the last (PressRun; the owner, the same day, "여러번 누를때의
         /// 이스터에그도 별도로 만들자", "6번"), plays one of three special eggs instead, at random and never the same twice in a
-        /// row (EggPick) - never in a picture or the layout audit (LightSweepsShown), where it is the one-press egg.
+        /// row (EggPick) - never in a picture or the layout audit (LightSweepsShown).
+        ///
+        /// v0.6.24-beta.2 (the owner, 2026-11-17, "6번 눌러야 뜨는 이스터에그를 보기 위해 여러번 클릭할 때, 1번 누르면 뜨는
+        /// 이스터에그 시작이 계속 반복해 / 둘이 중첩되어있네" - pressing towards the sixth restarted the one-press egg at every
+        /// press, and the two overlapped): within a run only its first press plays the one-press egg, at once; the next four
+        /// play nothing new; the sixth clears it - no sweep, no sentence, no fade - and plays the special one alone. A press
+        /// after 1.8 s of quiet begins a new run.
+        ///
+        /// And ("여섯번보다 더 계속 누를 경우는? 정확히 6번만 누르진 않을거잖아" - nobody presses exactly six times): while a special
+        /// egg plays, a press is not counted and starts nothing (SpecialUntil); once it has ended the next press begins a run,
+        /// so pressing on shows one, then a special one, then one again - never two at once.
         private void VersionPressed()
         {
+            double now = PressNow != null ? PressNow() : versionClock.Elapsed.TotalMilliseconds;
+            if (now < specialUntil) return;
             countAsked++;
-            if (versionPresses.Press(versionClock.Elapsed.TotalMilliseconds) && LightSweepsShown)
+            bool sixth = versionPresses.Press(now);
+            if (sixth && LightSweepsShown)
             {
+                stateDot.StopSweep();
+                detail.Unsay();
                 PlaySpecialEgg(SpecialEggs.Pick());
+                // Until its sentence has come, been said and gone: the sweep's or the colours' time first, where they play.
+                bool moving = stateDot.Sweeping || stateDot.ColoursRunning || (confetti != null && confetti.Running);
+                specialUntil = now + (moving ? AsideAfterMs : 0) + AsideMs + AsideLabel.OutMs;
                 return;
             }
+            if (!versionPresses.First) return;
             EggsPlayed.Add("one");
             stateDot.Sweep();
             detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
