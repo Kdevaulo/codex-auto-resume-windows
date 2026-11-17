@@ -207,7 +207,8 @@ class NotificationCardTests(_Surface, unittest.TestCase):
         from pathlib import Path
         root = Path(notice_card.__file__).resolve().parent
         cards = (root / "ui/tray/cards.py").read_text(encoding="utf-8")
-        self.assertIn('drawn["day"] = brand.day_look_at(time.time()) if getattr(self, "days", False) else None', cards)
+        self.assertIn('day = brand.day_look_at(time.time()) if getattr(self, "days", False) else None', cards)
+        self.assertIn('drawn["day"] = day', cards)
         card = (root / "ui/card/card.py").read_text(encoding="utf-8")
         self.assertIn('if day and not drawn.get("contrast") and popup.design_choice(drawn.get("design")) != "classic":', card)
 

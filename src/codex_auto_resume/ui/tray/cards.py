@@ -39,8 +39,11 @@ class CardsMixin:
         from ... import notice_window
         self._adopt_settings()
         drawn = notice_window.look()
-        # W2: only the watcher's own icon looks at the date (`days`), as for its popup and its own card.
-        drawn["day"] = brand.day_look_at(time.time()) if getattr(self, "days", False) else None
+        # W2: only the watcher's own icon looks at the date (`days`), as for its popup and its own card - and says a day
+        # only when there is one.
+        day = brand.day_look_at(time.time()) if getattr(self, "days", False) else None
+        if day:
+            drawn["day"] = day
         return drawn
 
     def _drop_cards(self):
