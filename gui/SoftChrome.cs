@@ -2041,9 +2041,71 @@ namespace CodexAutoResume
             if (m.Msg == WM_SHOWWINDOW)
             {
                 if (m.WParam == IntPtr.Zero) Unveil();
-                else if (veil == null && TopLevel) veil = DialogVeil.Over(this);
+                else
+                {
+                    if (veil == null && TopLevel) veil = DialogVeil.Over(this);
+                    if (cloaked) UncloakSoon();
+                }
             }
             else if (m.Msg == WM_DESTROY) Unveil();
+            // Its first paint done: everything in it painted now, then it comes on the screen in its theme.
+            else if (m.Msg == WM_PAINT && cloaked) Uncloak();
+        }
+
+        // ------------------------------------------------------------------ painted before it is seen
+        // v0.6.24-beta.2 (live re-check 7, dark): a dialog's first frames were its unpainted window - about 120 ms of light
+        // grey, then a white bar over its title and a white square at a caption button - before its dark paint. As the
+        // Dashboard's own corner does (WindowCorner.Cloak, c199bf14c), a dialog is made cloaked by DWM and uncloaked once it
+        // and everything in it has painted, so its first visible frame is in its theme; Windows' own opening motion is
+        // left to Windows. Never for one a still takes (Soft.StillReady) nor one laid out as a child.
+
+        [DllImport("dwmapi.dll", EntryPoint = "DwmSetWindowAttribute")]
+        private static extern int DwmSetCloak(IntPtr window, int attribute, ref int value, int size);
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
+
+        private const int WM_PAINT = 0x000F, DWMWA_CLOAK = 13;
+        private const uint RDW_UPDATENOW = 0x0100, RDW_ALLCHILDREN = 0x0080;
+        private bool cloaked;
+        private Timer uncloak;
+
+        /// Whether the dialog is held off the screen until its first paint: for the tests.
+        internal bool Cloaked { get { return cloaked; } }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            if (!TopLevel || Soft.StillReady != null || IsWindowVisible(Handle)) return;
+            int on = 1;
+            try { cloaked = DwmSetCloak(Handle, DWMWA_CLOAK, ref on, 4) == 0; }
+            catch (Exception) { cloaked = false; }
+        }
+
+        // Should no paint come (a window shown and hidden at once), it comes on all the same a moment later.
+        private void UncloakSoon()
+        {
+            if (uncloak != null) return;
+            uncloak = new Timer();
+            uncloak.Interval = 500;
+            uncloak.Tick += delegate { Uncloak(); };
+            uncloak.Start();
+        }
+
+        private void Uncloak()
+        {
+            if (uncloak != null)
+            {
+                uncloak.Stop();
+                uncloak.Dispose();
+                uncloak = null;
+            }
+            if (!cloaked || !IsHandleCreated) return;
+            cloaked = false;
+            try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN); }
+            catch (Exception) { }
+            int off = 0;
+            try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
+            catch (Exception) { }
         }
 
         private const int WM_SHOWWINDOW = 0x0018, WM_DESTROY = 0x0002;
