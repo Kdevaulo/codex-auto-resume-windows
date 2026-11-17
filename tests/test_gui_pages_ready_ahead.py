@@ -116,7 +116,9 @@ class SourceTests(unittest.TestCase):
         self.assertLess(applied.index("SnapshotApplied(reply);"), applied.index("finally { LayOutHeld(held); }"))
         compat = guiscan.member_body("SettingsForm", "ShowCompatibility")
         self.assertLess(compat.index("HoldPages();"), compat.index("WriteCompatibility();"))
-        self.assertIn("finally { LayOutHeld(held); }", compat)
+        # v0.6.24-beta.2: let go in the finally, beside the page on screen held as ShowPage holds it (ShowCompatibility).
+        self.assertLess(compat.index("finally"), compat.index("LayOutHeld(held);"))
+        self.assertLess(compat.index("WriteCompatibility();"), compat.index("LayOutHeld(held);"))
         actions = guiscan.read("gui/DashboardActions.cs")
         statistics = guiscan._block(actions, actions.index("private void LoadStatistics(bool afterChange)"))
         self.assertLess(statistics.index("HoldPages();"), statistics.index("ApplyStatistics(Map(reply, \"result\"));"))
