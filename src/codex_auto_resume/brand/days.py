@@ -435,3 +435,22 @@ def sweep_at(milliseconds, ease):
         spread = ease(since / numbers["ring_ms"])
         rings.append((spread, 0.0 if since < 0 or since >= numbers["ring_ms"] else numbers["ring_opacity"] * (1.0 - spread)))
     return covered, opacity, rings
+
+
+# ------------------------------------------------------------------ the version pill's eggs on the special days (v0.6.24)
+# The hint (the owner, 2026-11-18, H3): the pill's ring glows slowly in the day's colour.
+DAY_RINGS = {"new_year": "#F2C230", "seollal": "#D2453E", "birthday": "#EE8468", "chuseok": "#E0B44C", "christmas": "#2E8B5E"}
+# Each day's own egg at the sixth press, its parts' colours by name (the window's DayEgg draws them, Brand.DayEggColour).
+DAY_EGG_COLOURS = {
+    "new_year": {"trail": "#FFE9A8", "spark0": "#FFD76A", "spark1": "#E8735A", "spark2": "#5BB8C4", "spark3": "#B98AD9",
+                 "star": "#FFE9A8"},
+    "seollal": {"pouch": "#C93B3B", "mouth": "#E25B4F", "band": "#F2C230", "knot": "#F6D76B", "coin": "#E2B13C",
+                "stripe0": "#D9463E", "stripe1": "#F2C230", "stripe2": "#3FA86B", "stripe3": "#3B6FC9", "stripe4": "#E88BB0"},
+    "birthday": {"cake": "#FFF6EE", "edge": "#E9B8A8", "frosting": "#F4A7B5", "candle": "#5BB8C4", "flame": "#F6B73C",
+                 "smoke": "#AEB4BE", "confetti0": "#F2A33A", "confetti1": "#E8735A", "confetti2": "#5BB8C4",
+                 "confetti3": "#F6C945", "confetti4": "#B98AD9"},
+    "chuseok": {"moon": "#F6E7B4", "glow": "#FFEBB8", "rabbit": "#D2BC82", "cake0": "#F4F0E4", "cake1": "#F2B8C6",
+                "cake2": "#A8D08D", "cake3": "#E6D39B"},
+    "christmas": {"snow": "#FFFFFF", "snowEdge": "#C9D4E0", "tree": "#2B8660", "trunk": "#7A4B2A", "red": "#D9463E",
+                  "green": "#3FA86B", "star": "#FFD76A", "pile": "#F4F8FB"},
+}

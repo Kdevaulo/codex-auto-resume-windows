@@ -601,11 +601,22 @@ namespace CodexAutoResume
         Rectangle ISoftLifted.Face { get { return ClientRectangle; } }
         bool ISoftLifted.Ring { get { return false; } }
 
+        /// v0.6.24: its hint on a special day (PillHint), whose ring it draws just inside its edge; null in a window built for
+        /// nothing but its looks.
+        internal PillHint Hint;
+
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             float radius = Height / 2f;
             Ground.PaintBehind(this, e.Graphics, ClientRectangle, radius);
             Soft.Body(e.Graphics, ClientRectangle, radius, Palette.Raised, Palette.Line, (string)null);
+            if (Hint != null) Hint.PaintRing(e.Graphics, ClientRectangle, radius);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && Hint != null) Hint.Dispose();
+            base.Dispose(disposing);
         }
 
         /// What it holds lifted again where it moves or shows (LiftTracker).

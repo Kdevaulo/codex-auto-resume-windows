@@ -442,6 +442,80 @@ namespace CodexAutoResume
             return "";
         }
 
+        /// brand.days.DAY_RINGS: the hint's ring round the version's pill on a special day.
+        internal static Color DayRing(string look)
+        {
+            if (look == "new_year") return Color.FromArgb(0xF2, 0xC2, 0x30);
+            if (look == "seollal") return Color.FromArgb(0xD2, 0x45, 0x3E);
+            if (look == "birthday") return Color.FromArgb(0xEE, 0x84, 0x68);
+            if (look == "chuseok") return Color.FromArgb(0xE0, 0xB4, 0x4C);
+            if (look == "christmas") return Color.FromArgb(0x2E, 0x8B, 0x5E);
+            return Color.Empty;
+        }
+
+        /// brand.days.DAY_EGG_COLOURS: a part of a special day's own egg, by its name.
+        internal static Color DayEggColour(string look, string part)
+        {
+            if (look == "new_year")
+            {
+                if (part == "trail") return Color.FromArgb(0xFF, 0xE9, 0xA8);
+                if (part == "spark0") return Color.FromArgb(0xFF, 0xD7, 0x6A);
+                if (part == "spark1") return Color.FromArgb(0xE8, 0x73, 0x5A);
+                if (part == "spark2") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "spark3") return Color.FromArgb(0xB9, 0x8A, 0xD9);
+                if (part == "star") return Color.FromArgb(0xFF, 0xE9, 0xA8);
+            }
+            if (look == "seollal")
+            {
+                if (part == "pouch") return Color.FromArgb(0xC9, 0x3B, 0x3B);
+                if (part == "mouth") return Color.FromArgb(0xE2, 0x5B, 0x4F);
+                if (part == "band") return Color.FromArgb(0xF2, 0xC2, 0x30);
+                if (part == "knot") return Color.FromArgb(0xF6, 0xD7, 0x6B);
+                if (part == "coin") return Color.FromArgb(0xE2, 0xB1, 0x3C);
+                if (part == "stripe0") return Color.FromArgb(0xD9, 0x46, 0x3E);
+                if (part == "stripe1") return Color.FromArgb(0xF2, 0xC2, 0x30);
+                if (part == "stripe2") return Color.FromArgb(0x3F, 0xA8, 0x6B);
+                if (part == "stripe3") return Color.FromArgb(0x3B, 0x6F, 0xC9);
+                if (part == "stripe4") return Color.FromArgb(0xE8, 0x8B, 0xB0);
+            }
+            if (look == "birthday")
+            {
+                if (part == "cake") return Color.FromArgb(0xFF, 0xF6, 0xEE);
+                if (part == "edge") return Color.FromArgb(0xE9, 0xB8, 0xA8);
+                if (part == "frosting") return Color.FromArgb(0xF4, 0xA7, 0xB5);
+                if (part == "candle") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "flame") return Color.FromArgb(0xF6, 0xB7, 0x3C);
+                if (part == "smoke") return Color.FromArgb(0xAE, 0xB4, 0xBE);
+                if (part == "confetti0") return Color.FromArgb(0xF2, 0xA3, 0x3A);
+                if (part == "confetti1") return Color.FromArgb(0xE8, 0x73, 0x5A);
+                if (part == "confetti2") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "confetti3") return Color.FromArgb(0xF6, 0xC9, 0x45);
+                if (part == "confetti4") return Color.FromArgb(0xB9, 0x8A, 0xD9);
+            }
+            if (look == "chuseok")
+            {
+                if (part == "moon") return Color.FromArgb(0xF6, 0xE7, 0xB4);
+                if (part == "glow") return Color.FromArgb(0xFF, 0xEB, 0xB8);
+                if (part == "rabbit") return Color.FromArgb(0xD2, 0xBC, 0x82);
+                if (part == "cake0") return Color.FromArgb(0xF4, 0xF0, 0xE4);
+                if (part == "cake1") return Color.FromArgb(0xF2, 0xB8, 0xC6);
+                if (part == "cake2") return Color.FromArgb(0xA8, 0xD0, 0x8D);
+                if (part == "cake3") return Color.FromArgb(0xE6, 0xD3, 0x9B);
+            }
+            if (look == "christmas")
+            {
+                if (part == "snow") return Color.FromArgb(0xFF, 0xFF, 0xFF);
+                if (part == "snowEdge") return Color.FromArgb(0xC9, 0xD4, 0xE0);
+                if (part == "tree") return Color.FromArgb(0x2B, 0x86, 0x60);
+                if (part == "trunk") return Color.FromArgb(0x7A, 0x4B, 0x2A);
+                if (part == "red") return Color.FromArgb(0xD9, 0x46, 0x3E);
+                if (part == "green") return Color.FromArgb(0x3F, 0xA8, 0x6B);
+                if (part == "star") return Color.FromArgb(0xFF, 0xD7, 0x6A);
+                if (part == "pile") return Color.FromArgb(0xF4, 0xF8, 0xFB);
+            }
+            return Color.Empty;
+        }
+
         /// The check box's fill (brand.CHECKBOX): the well unchecked, the accent checked, the surface
         /// when disabled. `on` is checked; draw the inset elevation inside the border when CheckWell.
         internal static Color CheckFill(bool on, bool enabled)

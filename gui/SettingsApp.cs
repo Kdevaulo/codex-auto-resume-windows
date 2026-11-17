@@ -437,6 +437,8 @@ namespace CodexAutoResume
         // stands on, docked at the tabs' outer end.
         private VersionPill versionPill;
         private SoftPage pillSlot;
+        // v0.6.24: its hint on a special day, that it can be pressed (FollowPillHint).
+        private PillHint pillHint;
         private readonly HaloDot stateDot = new HaloDot();
         private readonly SoftDayScene dayScene = new SoftDayScene();
         private string dayLook;
@@ -557,11 +559,14 @@ namespace CodexAutoResume
             if (now < specialUntil) return;
             countAsked++;
             bool sixth = versionPresses.Press(now);
+            // v0.6.24 (the owner, 2026-11-17/18): a special day's own egg and sentences, the date the window's (EggDay).
+            string day = EggDay();
             if (sixth && LightSweepsShown)
             {
                 stateDot.StopSweep();
                 detail.Unsay();
-                PlaySpecialEgg(SpecialEggs.Pick());
+                if (day != null) PlayDayEgg(day);
+                else PlaySpecialEgg(SpecialEggs.Pick());
                 // Until its sentence has come, been said and gone: the sweep's or the colours' time first, where they play.
                 bool moving = stateDot.Sweeping || stateDot.ColoursRunning || (confetti != null && confetti.Running);
                 specialUntil = now + (moving ? AsideAfterMs : 0) + AsideMs + AsideLabel.OutMs;
@@ -570,7 +575,64 @@ namespace CodexAutoResume
             if (!versionPresses.First) return;
             EggsPlayed.Add("one");
             stateDot.Sweep();
-            detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+            if (day != null)
+                detail.Aside(S("status.aside_day_" + day, S("status.aside", "It's okay if it stops. I'll pick it up.")),
+                             stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+            else detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+        }
+
+        /// v0.6.24: the special day the version's eggs speak of - the window's date (DayArt.Clock), or null for an ordinary day
+        /// and for a window that is no person's (DayArt.On off: a picture, a probe without a probe date). In High Contrast too,
+        /// unlike the day's look: these are words, and there nothing of the egg moves (PlayDayEgg, PillHint).
+        internal string EggDay()
+        {
+            if (!DayArt.On) return null;
+            DateTime now = DayArt.Clock();
+            string look, top, bottom;
+            return Brand.DayLook(now.Year, now.Month, now.Day, out look, out top, out bottom) ? look : null;
+        }
+
+        /// v0.6.24 (the owner, 2026-11-17/18, the Special board): the sixth press on a special day plays that day's own egg in
+        /// place of the three ordinary ones - from the pill, in a layer over the window (DayEggPlay) - and says its sentence,
+        /// as the confetti egg does. With motion reduced, Windows' animations off or in High Contrast, the sentence alone.
+        private void PlayDayEgg(string day)
+        {
+            EggsPlayed.Add("day:" + day);
+            bool moving = DayEggPlay(day);
+            detail.Aside(S("status.aside_egg_" + day, S("status.aside", "It's okay if it stops. I'll pick it up.")),
+                         moving ? AsideAfterMs : 0, AsideMs);
+        }
+
+        /// The day's egg on the screen: the confetti's layer and box (Confetti) round the pill, drawing DayEgg into the window
+        /// from the pill's side. Nothing where nothing may move, in High Contrast, or with no pill on the screen.
+        private bool DayEggPlay(string day)
+        {
+            if (versionPill == null || !Soft.OwnVisible(versionPill) || !Motion.Allowed(versionPill) || Palette.Contrast)
+                return false;
+            Point centre = PointToClient(versionPill.PointToScreen(new Point(versionPill.Width / 2, versionPill.Height / 2)));
+            int reach = Px(260);
+            Rectangle client = ClientRectangle;
+            Rectangle area = Rectangle.FromLTRB(Math.Max(client.Left, centre.X - reach), Math.Max(client.Top, centre.Y - Px(130)),
+                                                Math.Min(client.Right, centre.X + reach), client.Bottom);
+            if (area.Width <= 0 || area.Height <= 0) return false;
+            if (confetti != null) confetti.Dispose();
+            var egg = new DayEgg(day, new PointF(centre.X - area.X, centre.Y - area.Y), Soft.PxF(1), Mirror.Of(this) ? 1 : -1);
+            confetti = new ConfettiLayer(this, area, egg);
+            confetti.Start();
+            return true;
+        }
+
+        /// v0.6.24 (the owner, 2026-11-18, the Hint board's H2 and H3): the pill's hint on a special day (PillHint) and a hand
+        /// over it - none in a picture or the layout audit (LightSweepsShown). Asked by the window's clock every second
+        /// (FollowDayScene), as the window shows, and as the pill shows or goes.
+        internal void FollowPillHint()
+        {
+            if (pillHint == null) return;
+            string day = LightSweepsShown ? EggDay() : null;
+            Cursor hand = day != null ? Cursors.Hand : Cursors.Default;
+            if (versionPill.Cursor != hand) versionPill.Cursor = hand;
+            if (versionText.Cursor != hand) versionText.Cursor = hand;
+            pillHint.Follow(day);
         }
 
         /// One special egg, each with its sentence. With motion reduced or Windows' animations off, nothing moves and the
@@ -1665,6 +1727,8 @@ namespace CodexAutoResume
         /// taskbar and title-bar icons follow the date (TaskbarMark.FollowTheDay).
         private void FollowDayScene()
         {
+            // v0.6.24: and the version pill's hint, which starts once the pill is on the screen and follows the date too.
+            FollowPillHint();
             if (!dayScene.Follow(ref dayLook)) return;
             if (dayLook == null)
             {
@@ -1821,17 +1885,33 @@ namespace CodexAutoResume
             pillSlot.TabStop = false;
             pillSlot.Controls.Add(versionPill);
             nav.Controls.Add(pillSlot);
+            // v0.6.24: its hint on a special day - the nudge moves it up in its slot, the ring is drawn on it (FollowPillHint).
+            pillHint = new PillHint(versionPill);
+            versionPill.Hint = pillHint;
+            pillHint.Changed = delegate(bool moved)
+            {
+                if (moved && versionPill.Parent == pillSlot) pillSlot.PerformLayout();
+                versionPill.Invalidate();
+            };
+            Shown += delegate { FollowPillHint(); };
+            versionPill.VisibleChanged += delegate { FollowPillHint(); };
             // Where the pill stands in its slot: at its outer end, the gap to the tabs at its inner (the slot's padding,
-            // which a mirrored slot mirrors), and centred on the tabs' line.
+            // which a mirrored slot mirrors), and centred on the tabs' line - less the hint's nudge. Not while it stands in
+            // the header card (PillToHeader), whose table places it.
             pillSlot.Layout += delegate
             {
+                if (versionPill.Parent != pillSlot) return;
                 Rectangle room = pillSlot.DisplayRectangle;
                 int tabs = 0;
                 foreach (Control tab in strip.Controls) tabs = Math.Max(tabs, tab.Height);
                 if (tabs == 0) tabs = pillSlot.Height;
                 var at = new Point(Mirror.Of(pillSlot) ? room.Right - versionPill.Width : room.X,
-                                   Math.Max(0, (tabs - versionPill.Height) / 2));
-                if (versionPill.Location != at) versionPill.Location = at;
+                                   Math.Max(0, (tabs - versionPill.Height) / 2 - pillHint.Nudge));
+                if (versionPill.Location != at)
+                {
+                    versionPill.Location = at;
+                    versionPill.Lifted();
+                }
             };
             nav.Layout += delegate { FitVersionPill(strip); };
             // And whenever the strip lays its tabs out again: a tab shown later - the advanced edition's Advanced features
