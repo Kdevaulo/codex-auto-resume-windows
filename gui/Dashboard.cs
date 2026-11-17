@@ -2382,6 +2382,7 @@ namespace CodexAutoResume
             // A page may scroll, and while it does it is the edge of the shadows on it (see Ground):
             // the cards' lift is kept inside its padding.
             page.Padding = PageRoom();
+            page.FadeTop = page.Padding.Top;
             page.Scrolls = true;
             return page;
         }

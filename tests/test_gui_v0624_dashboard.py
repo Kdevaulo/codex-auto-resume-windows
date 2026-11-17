@@ -193,12 +193,102 @@ namespace CodexAutoResume
             return said;
         }
 
+        /// v0.6.24-beta.2 (the live re-check 8): a scrolling page with a card under the tab row's gap, its background drawn as
+        /// the window draws it (Ground.Paint), in light and dark, at 100, 150 and 200 %, at rest and scrolled - with the top
+        /// band's fade and without it. Per case: how far the page's top row is from its ground at most, across the card's top
+        /// and its left lift; and how much steeper than the lift's own any column's steepest step is, in colour levels.
+        /// The tabs' own row as FitVersionPill reckons it: each shown tab as wide as it asks, with its margins.
+        private static int ProportionsTabsWidth(Control strip)
+        {
+            int width = strip.Padding.Horizontal;
+            foreach (Control tab in strip.Controls)
+                if (Soft.OwnVisible(tab)) width += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+            return width;
+        }
+
+        internal static Dictionary<string, object> ProportionsFade()
+        {
+            var said = new Dictionary<string, object>();
+            foreach (string theme in new[] { "light", "dark" })
+                foreach (double scale in new[] { 1.0, 1.5, 2.0 })
+                    foreach (int scrolled in new[] { 0, 30 })
+                    {
+                        Palette.Adopt(theme);
+                        AdoptDisplayScale(scale);
+                        bool overflowing;
+                        Rectangle card;
+                        Color ground;
+                        int band;
+                        using (Bitmap faded = FadeRender(true, scrolled, out overflowing, out card, out ground, out band))
+                        using (Bitmap cut = FadeRender(false, scrolled, out overflowing, out card, out ground, out band))
+                        {
+                            int top = 0, cutTop = 0, excess = int.MinValue;
+                            int rows = Math.Min(faded.Height, band + Soft.Px(4));
+                            for (int x = Math.Max(0, card.Left - Soft.Px(14)); x < Math.Min(faded.Width, card.Left + Soft.Px(60)); x++)
+                            {
+                                top = Math.Max(top, Levels(faded.GetPixel(x, 0), ground));
+                                cutTop = Math.Max(cutTop, Levels(cut.GetPixel(x, 0), ground));
+                                int steepest = 0, own = 0;
+                                for (int y = 1; y < rows; y++)
+                                {
+                                    if (card.Contains(x, y) || card.Contains(x, y - 1)) continue;
+                                    steepest = Math.Max(steepest, Levels(faded.GetPixel(x, y), faded.GetPixel(x, y - 1)));
+                                    own = Math.Max(own, Levels(cut.GetPixel(x, y), cut.GetPixel(x, y - 1)));
+                                }
+                                excess = Math.Max(excess, steepest - own);
+                            }
+                            var at = new Dictionary<string, object>();
+                            at["overflowing"] = overflowing;
+                            at["top"] = (double)top;
+                            at["cutTop"] = (double)cutTop;
+                            at["excess"] = (double)excess;
+                            said[theme + " " + scale.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " " + scrolled] = at;
+                        }
+                    }
+            return said;
+        }
+
+        private static int Levels(Color one, Color other)
+        {
+            return Math.Max(Math.Abs(one.R - other.R), Math.Max(Math.Abs(one.G - other.G), Math.Abs(one.B - other.B)));
+        }
+
+        private static Bitmap FadeRender(bool fade, int scrolled, out bool overflowing, out Rectangle card, out Color ground, out int band)
+        {
+            var page = new SoftPage();
+            page.Size = new Size(Soft.Px(500), Soft.Px(300));
+            page.Padding = new Padding(Soft.Px(16), Soft.Px(TabRowGap) - Soft.Px(TabRing), Soft.Px(17), Soft.Px(17));
+            var spacer = new Panel();
+            spacer.Dock = DockStyle.Top;
+            spacer.Height = Soft.Px(2000);
+            var body = new SoftCard();
+            body.Dock = DockStyle.Top;
+            body.Height = Soft.Px(120);
+            page.Controls.Add(spacer);
+            page.Controls.Add(body);
+            page.Scrolls = true;
+            if (fade) page.FadeTop = page.Padding.Top;
+            page.PerformLayout();
+            if (scrolled > 0) page.ScrollTo(Soft.Px(scrolled), false);
+            overflowing = page.Overflowing;
+            card = body.Bounds;
+            ground = Ground.Colour(page);
+            band = page.Padding.Top;
+            var image = new Bitmap(page.Width, page.Height);
+            using (Graphics g = Graphics.FromImage(image))
+            using (var e = new PaintEventArgs(g, new Rectangle(Point.Empty, page.Size)))
+                Ground.Paint(page, e);
+            page.Dispose();
+            return image;
+        }
+
         internal static void ProportionsRun(string dir, Dictionary<string, object> said)
         {
             said["eggParts"] = ProportionsEggParts();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Palette.AdoptDesign(null);
+            said["fade"] = ProportionsFade();
             Palette.Adopt("light");
             AdoptDisplayScale(1.0);
             foreach (string locale in new[] { "en", "ar" })
@@ -630,6 +720,22 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertFalse(unsaid["waiting"] or unsaid["saying"])
                 self.assertEqual(unsaid["shows"], "The line's own words")
                 self.assertFalse(said["unsaidFading"], "no fade")
+
+    def test_a_scrolling_page_fades_its_first_card_s_lift_instead_of_cutting_it(self):
+        """The live re-check 8 (2026-11-17): on Settings and Diagnostics, which scroll, a straight line at the page's top cut
+        the first card's lift - 237 above, 242 below, in one step - since the tab row's gap left too little room over the
+        card. The page's top band now fades what is stamped there into its ground (SoftPage.FadeTop): its top row is the
+        ground, and no column steps more than the lift's own gradient does - light and dark, at 100, 150 and 200 %, at rest
+        and scrolled."""
+        fade = self.answer["fade"]
+        self.assertEqual(len(fade), 12)
+        for key, at in sorted(fade.items()):
+            with self.subTest(case=key):
+                self.assertTrue(at["overflowing"], "the page scrolls")
+                self.assertLessEqual(at["top"], 2, "the page's top row is its ground")
+                self.assertLessEqual(at["excess"], 2, "a step steeper than the lift's own")
+        self.assertGreater(max(at["cutTop"] for at in fade.values()), 2,
+                           "without the band the line is there: the case reproduces the re-check's")
 
     def test_pressing_on_past_six_shows_one_egg_at_a_time(self):
         """The owner, 2026-11-17: "여섯번보다 더 계속 누를 경우는? 정확히 6번만 누르진 않을거잖아". Thirty presses 0.3 s apart:

@@ -1387,6 +1387,8 @@ namespace CodexAutoResume
             sectionScroll.Dock = DockStyle.Fill;
             // On the soft scroll bar (see SoftPage), which keeps the section's own cards' material.
             sectionScroll.Scrolls = true;
+            // Its sections keep the tab row's gap over their first card (PageRoom), where a scrolling page fades its lift.
+            sectionScroll.FadeTop = PageRoom().Top;
             sectionScroll.Margin = new Padding(0);
             sectionScroll.SizeChanged += delegate { FitSections(); };
             columns.Controls.Add(list, 0, 0);
