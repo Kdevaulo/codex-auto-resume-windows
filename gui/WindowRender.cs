@@ -541,6 +541,43 @@ namespace CodexAutoResume
             if (control.Parent != null) control.Parent.Invalidate(true);
         }
 
+        /// v0.6.24-beta.3: the day's scene under `root` (SoftDayScene, the header's child above its card) laid down over the
+        /// picture of it, where it stands and in its own outline (its Region), as the screen stacks it: higher in the
+        /// header's z-order than the card, so over it. DrawToBitmap prints the children from the top of the z-order down,
+        /// each over the one before, and the card was printed over the scene - on a special day the header showed none of
+        /// it, only the caption buttons (PaintCaptionOver, after this) drew it under them (found 2026-11-17).
+        private static void PaintSceneOver(Bitmap picture, Control root)
+        {
+            var found = new List<SoftDayScene>();
+            var walk = new Stack<Control>();
+            walk.Push(root);
+            while (walk.Count > 0)
+            {
+                Control parent = walk.Pop();
+                foreach (Control child in parent.Controls)
+                {
+                    if (!OwnVisible(child)) continue;
+                    var scene = child as SoftDayScene;
+                    if (scene != null) { if (scene.Look != null) found.Add(scene); }
+                    else walk.Push(child);
+                }
+            }
+            foreach (SoftDayScene scene in found)
+            {
+                if (scene.Width <= 0 || scene.Height <= 0) continue;
+                Point at = Point.Empty;
+                for (Control c = scene; c != null && c != root; c = c.Parent) at.Offset(c.Left, c.Top);
+                using (var face = new Bitmap(scene.Width, scene.Height, PixelFormat.Format32bppArgb))
+                using (Graphics g = Graphics.FromImage(picture))
+                {
+                    scene.DrawToBitmap(face, new Rectangle(Point.Empty, scene.Size));
+                    g.TranslateTransform(at.X, at.Y);
+                    if (scene.Region != null) g.SetClip(scene.Region, System.Drawing.Drawing2D.CombineMode.Replace);
+                    g.DrawImageUnscaled(face, 0, 0);
+                }
+            }
+        }
+
         /// v0.6.24: the caption buttons under `root` (gui/SoftChrome.cs) drawn again over the picture of it, where they stand.
         /// DrawToBitmap prints a window's children from the top of the z-order down, so the card the buttons stand over -
         /// lower in the z-order, as on the screen - was printed over them and they were in no picture.
@@ -621,6 +658,7 @@ namespace CodexAutoResume
             var picture = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppArgb);
             Invalidate(true);
             DrawToBitmap(picture, new Rectangle(Point.Empty, ClientSize));
+            PaintSceneOver(picture, this);
             PaintCaptionOver(picture, this);
             PaintListGutters(picture);
             renderRows = null;
