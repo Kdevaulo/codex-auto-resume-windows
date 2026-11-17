@@ -173,7 +173,9 @@ class SliceTests(unittest.TestCase):
         # 109 with the window's own outer corner (gui/SoftWindowShape.cs): WindowShape and WindowCorner.
         # 110 with GripThrough, a control giving that corner's resize band to the window (gui/SoftChrome.cs).
         # 111 with VersionPill (v0.6.24-beta.2), the version's raised pill at the end of the page tabs (gui/SoftList.cs).
-        self.assertEqual(len(set(declared)), 111, "the window's types")
+        # 114 with the special eggs at the sixth press on the version (v0.6.24-beta.2, the owner, 2026-11-16): EggPick, which
+        # one, ConfettiBurst, the confetti's pieces, and ConfettiLayer, the window they fall in (gui/Dashboard.cs).
+        self.assertEqual(len(set(declared)), 114, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,

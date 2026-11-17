@@ -681,7 +681,7 @@ class WindowCompositionTests(unittest.TestCase):
         # as much room below the tabs as above them (AuditTabRow) - and its first card's lift runs on onto the tabs' ground.
         self.assertIn("page.Padding = PageRoom();", self.method(self.dashboard, "private Panel Page("))
         room = self.method(self.window, "private Padding PageRoom(")
-        self.assertIn("return new Padding(room.Left, Px(PageTop), room.Right, room.Bottom);", room)
+        self.assertIn("return new Padding(room.Left, Math.Max(0, Px(TabRowGap) - Px(TabRing)), room.Right, room.Bottom);", room)
         controls = guiscan.controls()
         see_through = self.method(controls, "internal static bool SeeThrough(")
         self.assertIn("if (Scrolling(control)) return false;", see_through,
@@ -1711,7 +1711,8 @@ class LayoutAuditTests(unittest.TestCase):
         height, extent, overflowing = self.answer["liftsAt"]
         self.assertEqual((height, overflowing), (extent, False), "the window is not as tall as the page needs")
         lifts = self.answer["lifts"]
-        self.assertEqual(sorted(lift["text"] for lift in lifts), ["History", "Pause recovery", "Pending"])
+        # v0.6.24-beta.2 (the owner, 2026-11-17, row 17): and Start watcher, the Right now card's in Pause's place.
+        self.assertEqual(sorted(lift["text"] for lift in lifts), ["History", "Pause recovery", "Pending", "Start watcher"])
         for lift in lifts:
             with self.subTest(lift["text"]):
                 self.assertEqual(lift["parent"], "SoftCard", "the button stands in its card, not in a block beside the content")

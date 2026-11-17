@@ -497,7 +497,8 @@ namespace CodexAutoResume
             {
                 using (Graphics g = Graphics.FromImage(image))
                 {
-                    g.Clear(Color.Transparent);
+                    // Nothing but the pieces: every other pixel of the layer clear, so the window under it shows.
+                    g.Clear(Color.FromArgb(0, 0, 0, 0));
                     burst.Paint(g, ms);
                 }
                 IntPtr oldMemory = memory, oldDib = dib, oldPrevious = previous;

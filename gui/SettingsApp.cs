@@ -1426,7 +1426,8 @@ namespace CodexAutoResume
         private Padding PageRoom()
         {
             Padding room = CardRoom();
-            return new Padding(room.Left, Px(PageTop), room.Right, room.Bottom);
+            // In device pixels, the gap's less the ring's: each rounded alone, 7.5 and 5 at 125 % made 13 under the tabs.
+            return new Padding(room.Left, Math.Max(0, Px(TabRowGap) - Px(TabRing)), room.Right, room.Bottom);
         }
 
         private string SectionTitle(string name)
