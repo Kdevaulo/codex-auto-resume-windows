@@ -126,14 +126,16 @@ def compare_dialog(picture: bytes, bounds: dict, client: tuple, still: tuple) ->
 
     window = bounds["dialog.window"]
     close = bounds["dialog.close"]
-    # v0.6.24: no Windows title bar - the dialog's title and its close sit in a card of its own at its top (SoftDialog),
-    # and its close is a caption button whose face at rest is that card's ground. Both are made of what the window's own
-    # header card is made of, so both are held to the still's header card, at a spot of its ground above its words.
-    header = colour(rgb, width // 2, top + 40, width)
+    # v0.6.24-beta.2: no Windows title bar, and the dialog's title row - its words and its close - stands on the dialog's
+    # own ground (the owner's option B), its close a caption button whose face at rest is that ground. So all three are
+    # held to the still's page ground, at a spot beside the tab row (x 8, 150 px down) that no card, shadow or fade
+    # reaches: since beta.2 a scrolling page fades its first card's lift into the ground at its top (SoftPage.FadeTop),
+    # so the spot the probe once read (200 px down) is a level off the ground on Pending.
+    ground = colour(rgb, 8, top + 150, width)
     probes = (
-        ("ground", colour(picture, window[0] + 1 + 4, window[1] + top + 4, client_w), colour(rgb, 8, top + 200, width)),
-        ("close", colour(picture, close[0] + 3, close[1] + 3, client_w), header),
-        ("title card", colour(picture, window[0] + window[2] // 2, close[1] + 3, client_w), header),
+        ("ground", colour(picture, window[0] + 1 + 4, window[1] + top + 4, client_w), ground),
+        ("close", colour(picture, close[0] + 3, close[1] + 3, client_w), ground),
+        ("title row", colour(picture, window[0] + window[2] // 2, close[1] + 3, client_w), ground),
     )
     worst = 0
     wrong = []
