@@ -162,6 +162,21 @@ namespace CodexAutoResume
                                  delegate(string value, Action<string> answer) { answer(AnchorValue(value)); }, taken);
             }
             custom["kind"] = "number";
+            // v0.6.24 final: a stage's percentage is typed as the share left, and sent as the share used (ThresholdKey).
+            if (ThresholdKey(pick.Key))
+            {
+                int least = ThresholdLeft(range[1]), most = ThresholdLeft(range[0]), held;
+                custom["min"] = (double)least;
+                custom["max"] = (double)most;
+                string shown = current != null && int.TryParse(current, NumberStyles.Integer, CultureInfo.InvariantCulture, out held)
+                    ? ThresholdLeft(held).ToString(CultureInfo.InvariantCulture) : current;
+                return OwnDialog(pick.Label, custom, CustomHint(pick), shown, delegate(string value, Action<string> answer)
+                {
+                    int typed;
+                    answer(int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out typed) &&
+                           typed >= least && typed <= most ? ThresholdUsed(typed).ToString(CultureInfo.InvariantCulture) : null);
+                }, taken);
+            }
             custom["min"] = (double)range[0];
             custom["max"] = (double)range[1];
             return OwnDialog(pick.Label, custom, CustomHint(pick), current, delegate(string value, Action<string> answer)
@@ -179,8 +194,10 @@ namespace CodexAutoResume
             if (IsAnchorTime(pick.Key))
                 return S("own.range", "From {low} to {high}.").Replace("{low}", AnchorTimeText(AnchorShift))
                                                             .Replace("{high}", AnchorTimeText(1439 + AnchorShift));
-            return S("own.range", "From {low} to {high}.").Replace("{low}", OptionText(pick.Key, pick.Range[0]))
-                                                        .Replace("{high}", OptionText(pick.Key, pick.Range[1]));
+            // A stage's percentage is said as the share left, so its ends turn round: the most used is the least left.
+            bool left = ThresholdKey(pick.Key);
+            return S("own.range", "From {low} to {high}.").Replace("{low}", OptionText(pick.Key, pick.Range[left ? 1 : 0]))
+                                                        .Replace("{high}", OptionText(pick.Key, pick.Range[left ? 0 : 1]));
         }
 
         /// Shows `value` in `combo`: the preset it is, or the one item of one's own before Custom..., in place of the one

@@ -1386,8 +1386,8 @@ It rests on no measurement.
 ### Usage meter
 
 **What it does.** While the Codex app runs, reads your Codex usage on its own every 5 to 60 minutes, as you
-choose or type in - 15 by default - and shows it in the icon's tooltip and the popup. When a window reaches
-the percentage you set for a warning (85% by default, each window its own), it shows a notice, once for that
+choose or type in - 15 by default - and shows it in the icon's tooltip and the popup. When what is left of a
+window falls to the share you set for a warning (15% left by default, each window its own), it shows a notice, once for that
 window. Each window - the five-hour and the weekly - can be switched off on its own (*Act on the five-hour
 window*, *Act on the weekly window*): it is still read and shown, and no warning is shown for it. These two
 switches decide only the warnings: Wrap up near a limit and Stop near a limit each have a pair of their own.
@@ -1413,8 +1413,8 @@ reading that cannot be read is shown as nothing and warns of nothing.
 
 **What it does.** Needs the usage meter, which turns on with it. Its own switches, *Act on the five-hour
 window* and *Act on the weekly window* (both on by default), say which windows it acts on - apart from the
-meter's, which decide only the warnings; with both off it acts on neither, and the page says so. When a window
-it may act on reaches the percentage you set (90% by default, each window its own), each conversation that is switched on and has a
+meter's, which decide only the warnings; with both off it acts on neither, and the page says so. When what is left
+of a window it may act on falls to the share you set (10% left by default, each window its own), each conversation that is switched on and has a
 turn running is sent one message, once for that window, in the wording you pick: the standard "Please finish
 the current step, then stop.", the short "Please stop now.", the detailed "Commit what is pending, write down
 where you are and what is left, then stop.", one with the numbers - "You have used 90% of the five-hour limit.
@@ -1446,7 +1446,7 @@ Its own switches, *Act on the five-hour window* and *Act on the weekly window* (
 windows it acts on, as the wrap-up's do; with both off it acts on neither, and the page says so. A window
 switched off in the meter's choices before this version is switched off here and in Wrap up near a limit too,
 once, when the program first opens its state after the update - so nothing starts acting on a window you had
-off. When a window it may act on reaches the stop percentage you set (97% by default, each window its own), each
+off. When what is left of a window it may act on falls to the stop share you set (3% left by default, each window its own), each
 conversation that is switched on and has a turn running is stopped, as the Stop button in the Codex app
 stops one - through the app's own internal channel, the `\\.\pipe\codex-ipc` pipe, once for that window -
 and the program sends no further continuation until that window resets: recoveries wait, and the advanced
@@ -1486,9 +1486,9 @@ paused, it reads what Codex added to its conversations' rollout files (under eac
 folder) since it last looked - only each model call's token counts (input, cached input, output and reasoning) and
 when each turn began, nothing else of any line - at most 2 MiB of a file and 8 MiB in one look, and adds them up by
 day for each project. While it is on, each reading of the usage meter is kept as well. Its cards on the Advanced
-features page show, for the five-hour and the weekly window, how full it is, the change over the last hour and -
-with three readings over fifteen minutes at least, and only when the window would fill before it resets - around
-when it would be full at that pace, beside the reset time. A flat list shows each project's input, cached input,
+features page show, for the five-hour and the weekly window, how much of it is left, how far that moved over the last
+hour and - with three readings over fifteen minutes at least, and only when the window would fill before it resets -
+around when none would be left at that pace, beside the reset time. A flat list shows each project's input, cached input,
 output, reasoning and turns over the last 7, 30 or 90 days (**Days shown**; 7 by default), a total line, and each
 project's conversations on demand; a project is named as Codex names it, else by its folder's name, read when the
 page is shown and never kept. **Save as CSV...** writes the numbers - day, project, the five counts, and lifetime
@@ -1703,7 +1703,8 @@ it is hidden because its measurement failed - and never turns the switch off.
 product never sees a password; **Save the account in use** keeps the one signed in now. Each is a copy of Codex's
 sign-in file, encrypted with Windows' data protection for your Windows user (`<home>\accounts\`), never in the
 settings, a log, the journal, diagnostics or a report; the card shows a masked address and the plan. Under each account
-it shows two meters, the 5-hour and the weekly usage as last read - by the switch itself, or by **Read usage** at the
+it shows two meters, the 5-hour and the weekly usage as last read - each a bar as full as what is left of that window
+and its share left beside it, both in the warning colour with 10% or less left - by the switch itself, or by **Read usage** at the
 card's top right, which reads every saved account but the one in use in a private folder, one at a time, at most once
 every 10 minutes, and sends nothing and switches nothing; the account in use shows the usage the watcher already read -
 and under the rows when they were read and the account the switch would pick next. When a recovery

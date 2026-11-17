@@ -1263,7 +1263,7 @@ namespace CodexAutoResume
                 // v0.6.23 second round R3: its stops and continuations are not the ledger's sends, so the day's numbers
                 // never bind them; what does is said instead.
                 limits.Controls.Add(HelpText(Word("page.pause_limits",
-                    "It has no daily send limits. Each time a window reaches its stop percentage, it stops each conversation's running turn once, and continues that conversation once after the reset.")));
+                    "It has no daily send limits. Each time what is left of a window falls to its stop share, it stops each conversation's running turn once, and continues that conversation once after the reset.")));
             else
             {
                 TableLayoutPanel numbers = Facts(limits);
@@ -1421,6 +1421,29 @@ namespace CodexAutoResume
             SetAdvancedOptionValue(id, key, other.ToString(CultureInfo.InvariantCulture));
         }
 
+        /// v0.6.24 final (the owner, 2026-11-18: what is left, everywhere - "다 바꾸자"): a stage's percentage - the warning,
+        /// the wrap-up, the stop and the stop the wrap-up's words ask for, each window's - is stored and sent as the share
+        /// used it acts at, as the engine reads it, and shown and typed as the share LEFT then: 85 used is "15% left".
+        internal static bool ThresholdKey(string key)
+        {
+            if (key == null || !(key.EndsWith("_five_hour", StringComparison.Ordinal) || key.EndsWith("_weekly", StringComparison.Ordinal)))
+                return false;
+            return key.StartsWith("warn_", StringComparison.Ordinal) || key.StartsWith("wrap_", StringComparison.Ordinal) ||
+                   key.StartsWith("pause_", StringComparison.Ordinal) || key.StartsWith("stop_words_", StringComparison.Ordinal);
+        }
+
+        /// A stored threshold (a share used) as the share left it is shown as.
+        internal static int ThresholdLeft(int used)
+        {
+            return 100 - used;
+        }
+
+        /// A share left typed in as the threshold it is stored and sent as (a share used).
+        internal static int ThresholdUsed(int left)
+        {
+            return 100 - left;
+        }
+
         /// One value of a choice as the drop-down shows it: hours with their unit, a count as a number.
         private string OptionText(string key, int value)
         {
@@ -1433,9 +1456,7 @@ namespace CodexAutoResume
                 return Word("page.option.style." + value.ToString(CultureInfo.InvariantCulture),
                             value == 1 ? "Short" : value == 3 ? "Detailed" : value == 4 ? "With the numbers" :
                             value == 5 ? "Custom" : "Standard");
-            if (key.StartsWith("warn_", StringComparison.Ordinal) || key.StartsWith("wrap_", StringComparison.Ordinal) ||
-                key.StartsWith("pause_", StringComparison.Ordinal) || key.StartsWith("stop_words_", StringComparison.Ordinal))
-                return Word("page.option.percent", "{n}%", "n", value);
+            if (ThresholdKey(key)) return Word("page.option.percent", "{n}% left", "n", ThresholdLeft(value));
             return value.ToString(CultureInfo.CurrentCulture);
         }
 
@@ -1467,7 +1488,7 @@ namespace CodexAutoResume
                 if (AdvancedDone(result))
                     SetNote(advancedNote, Str(result, "warning") == "stop_before_words"
                         // v0.6.16-beta.4 (j): taken, and said what it may do - never refused.
-                        ? Word("page.warn.stop_before_words", "Saved. The forced stop is below the stop the wrap-up's words ask for, so it may stop Codex before Codex stops itself.")
+                        ? Word("page.warn.stop_before_words", "Saved. The forced stop comes with more left than the stop the wrap-up's words ask for, so it may stop Codex before Codex stops itself.")
                         : Word("page.done.option", "{name} uses this from now on.", "name", name));
                 ReadAdvanced(null);
                 if (!AdvancedDone(result)) TellAdvanced(KeptRefusal(Str(result, "refusal")));
@@ -1672,7 +1693,7 @@ namespace CodexAutoResume
             if (refusal == "rules_full")
                 return Word("page.rules.full", "There are ten rules. Remove one to add another.");
             if (refusal == "option_order")
-                return Word("page.refused.option_order", "For each window, the warning must be at or below the wrap-up, and the wrap-up below the stop its words ask for. Nothing was changed.");
+                return Word("page.refused.option_order", "For each window, the warning must come with as much left as the wrap-up or more, and the wrap-up with more left than the stop its words ask for. Nothing was changed.");
             if (refusal == "option_invalid")
                 return Word("page.refused.option", "That choice is not one this feature offers. Nothing was changed.");
             if (refusal == "stale_generation" || refusal == "unknown_rule")

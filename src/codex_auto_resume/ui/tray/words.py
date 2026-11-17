@@ -5,7 +5,7 @@ the notification card, so that "3m 20s" is spelled one way wherever this product
 """
 from __future__ import annotations
 
-from ..words import countdown, share, window_name  # noqa: F401
+from ..words import LOW_LEFT, countdown, left, share, window_name  # noqa: F401
 
 
 TIP_CHARS = 128
@@ -83,15 +83,17 @@ def tooltip_joined(parts) -> str:
 # tests/test_usage_surfaces.py holds this to: the icon reads that one key and imports nothing of the plug's.
 EXTRA = "advanced"
 # The words a meter line is said in where the catalog has none (the catalog's own English).
-_USAGE_WORDS = {"usage.window": "{window} {percent}%", "usage.weekly": "weekly", "usage.days": "{n}-day",
+_USAGE_WORDS = {"usage.window": "{window} {percent}% left", "usage.weekly": "weekly", "usage.days": "{n}-day",
                 "usage.hours": "{n}-hour", "usage.minutes": "{n}-minute", "usage.limit": "limit"}
 
 
 def meter_rows(snapshot, strings) -> list:
     """The advanced edition's usage meter, a row per window it last read (v0.6.24, from what was meter_line's): each
-    {"label": its length (window_name), "percent": its share in the catalog's own words, "fraction": how much is used,
-    0 to 1, "text": the two as the catalog says them together - "5-hour 87%"}. Only from what the edition's plug added
-    under its one key; the standard edition adds nothing there, so it has none."""
+    {"label": its length (window_name), "percent": the share left in the catalog's own words, "fraction": how much is
+    left, 0 to 1 - a full bar is plenty left, and it empties as the window is used (v0.6.24 final) - "low": whether as
+    little is left as LOW_LEFT or less, the warning, and "text": the two as the catalog says them together - "5-hour 13%
+    left"}. Only from what the edition's plug added under its one key; the standard edition adds nothing there, so it
+    has none."""
     added = snapshot.get(EXTRA) if isinstance(snapshot, dict) else None
     meter = added.get("meter") if isinstance(added, dict) else None
     windows = meter.get("windows") if isinstance(meter, dict) else None
@@ -107,11 +109,13 @@ def meter_rows(snapshot, strings) -> list:
     for window in windows:
         if not isinstance(window, dict) or type(window.get("used_percent")) not in (int, float):
             continue
-        label, percent = window_name(window.get("window_minutes"), say), share(window)
-        # The share in the catalog's own words - "87%", "87 %", "%87": its sentence with the name taken out.
+        label, percent = window_name(window.get("window_minutes"), say), left(window)
+        # The share left in the catalog's own words - "13% left", "13 % übrig", "%13 kaldı": its sentence with the name
+        # taken out.
         alone = say("usage.window", window=_NAME_HELD, percent=percent).replace(_NAME_HELD, "").strip(_ROUND_THE_NAME)
         rows.append({"label": label, "percent": alone, "text": say("usage.window", window=label, percent=percent),
-                     "fraction": max(0.0, min(1.0, float(window["used_percent"]) / 100.0))})
+                     "fraction": max(0.0, min(1.0, 1.0 - float(window["used_percent"]) / 100.0)),
+                     "low": percent <= LOW_LEFT})
     return rows
 
 
@@ -121,6 +125,6 @@ _NAME_HELD, _ROUND_THE_NAME = "\x00", " :  "
 
 def meter_line(snapshot, strings) -> str | None:
     """The advanced edition's usage meter as one line (v0.6.16-beta.3, issue #29): each window it last read, its
-    length and its share - "5-hour 87% · weekly 40%". Only from what the edition's plug added under its one key; the
+    length and its share - "5-hour 87% · weekly 40%", since v0.6.24 final the share left: "5-hour 13% left · weekly 60% left". Only from what the edition's plug added under its one key; the
     standard edition adds nothing there, so its tooltip is what it always was. None where there is nothing to say."""
     return " · ".join(row["text"] for row in meter_rows(snapshot, strings)) or None

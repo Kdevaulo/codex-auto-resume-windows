@@ -4,10 +4,13 @@
 // mock of 2026-11-08).
 //
 // Each meter is a groove in the Soft design's inset look - the scroll bar's well (SoftBar.TrackFill, its hairline and the
-// inset recipe's depth, Soft.Body), a step deeper than the card it lies on - with the share used as a bar inside it: the
-// accent below WarnAt per cent, the warning colour at WarnAt or more, and nothing at all where no reading was made. The bar
-// grows from the left, and from the right where the page is mirrored right to left. In High Contrast the groove is
-// Window with a WindowFrame edge, as the scroll bar's is, and the bar the theme's accent or warning colour.
+// inset recipe's depth, Soft.Body), a step deeper than the card it lies on - with the share LEFT as a bar inside it (v0.6.24
+// final, the owner, 2026-11-18: a full bar is plenty left, and it empties as the window is used): the accent while more is
+// left than LowLeft per cent, the warning colour at LowLeft or less - the share used of WarnAt or more, as it warned before -
+// with the groove's edge in the warning colour too, so an empty groove with nothing left still says so; and nothing at all
+// where no reading was made. The bar grows from the left, and from the right where the page is mirrored right to left. In
+// High Contrast the groove is Window with a WindowFrame edge, as the scroll bar's is, and the bar the theme's accent or
+// warning colour.
 //
 // The card's own pieces stand here too, so AdvancedAccounts.cs keeps to the page's: the heading with Read usage at its
 // right (AccountsHeading), a saved account's row with "in use" beside it in the accent (AccountsRow), under it the two
@@ -24,11 +27,13 @@ using System.Windows.Forms;
 
 namespace CodexAutoResume
 {
-    /// One usage meter: a groove, and the share used inside it. `Used` is the percentage, or below zero for no reading.
+    /// One usage meter: a groove, and the share left inside it. `Used` is the percentage used, as the bridge says it, or
+    /// below zero for no reading; what is drawn is what is left of it (Left).
     internal sealed class AccountMeter : Control
     {
-        /// The percentage used from which the bar is the warning colour rather than the accent.
+        /// The percentage used from which the bar is the warning colour rather than the accent: LowLeft or less left.
         internal const double WarnAt = 90.0;
+        internal const double LowLeft = 100.0 - WarnAt;
         internal const int GrooveWidth = 120;
         internal const int GrooveHeight = 8;
 
@@ -36,7 +41,7 @@ namespace CodexAutoResume
 
         // v0.6.23 (the second round's F11): a new reading glides from the share the meter showed before, as the Statistics bars
         // do (OutcomeChart.Changed): one Transition, paint only, with motion allowed. `from` is where the glide left; `follow`,
-        // the share it starts from at its first frame on screen, or NaN for none.
+        // the share it starts from at its first frame on screen, or NaN for none - both the share left (v0.6.24 final).
         private readonly Transition grow;
         private double from, follow = double.NaN;
 
@@ -52,18 +57,37 @@ namespace CodexAutoResume
         }
 
         /// The share used the same meter showed before its card was made again, below zero for none: its new reading glides
-        /// from there once it is on screen. A meter with no reading now, or the same one, is simply drawn.
+        /// from what was left of it then - from an empty bar where there was no reading - once it is on screen. A meter with
+        /// no reading now, or the same one, is simply drawn.
         internal void From(double shown)
         {
             if (used < 0 || shown == used) return;
-            follow = Math.Max(0.0, shown);
+            follow = shown < 0 ? 0.0 : LeftOf(shown);
         }
 
         /// Whether its bar is on its way to a new reading; its timer runs only then.
         internal bool Growing { get { return grow.Running; } }
 
-        /// The share drawn now: the reading, or part of the way to it while it glides.
-        internal double Drawn { get { return grow.Running ? from + (used - from) * grow.Value : used; } }
+        /// The share left drawn now: the reading's, or part of the way to it while it glides.
+        internal double Drawn { get { return grow.Running ? from + (Left - from) * grow.Value : Left; } }
+
+        /// The share left of the reading, 0 to 100, or below zero where no reading was made.
+        internal double Left { get { return LeftOf(used); } }
+
+        /// What is left of a share used: 100 minus it, 0 at 100 or more, below zero for no reading.
+        internal static double LeftOf(double share)
+        {
+            if (share < 0 || double.IsNaN(share)) return -1;
+            return Math.Max(0.0, 100.0 - Math.Min(100.0, share));
+        }
+
+        /// The share left as the words beside the meter say it, a whole number: 100 minus the whole share used, so 0 only
+        /// where the window is used up (99.6 used leaves 1), as every surface says it (ui/words.left); below zero for none.
+        internal static int LeftWords(double share)
+        {
+            if (share < 0 || double.IsNaN(share)) return -1;
+            return 100 - (share >= 100 ? 100 : (int)Math.Floor(share));
+        }
 
         protected override void Dispose(bool disposing)
         {
@@ -71,7 +95,7 @@ namespace CodexAutoResume
             base.Dispose(disposing);
         }
 
-        /// The percentage used, 0 to 100 drawn (more is a full bar), or below zero where no reading was made.
+        /// The percentage used, as the bridge says it (more than 100 leaves nothing), or below zero where no reading was made.
         internal double Used
         {
             get { return used; }
@@ -90,8 +114,8 @@ namespace CodexAutoResume
             return Warns(share) ? Palette.Warning : Palette.Accent;
         }
 
-        /// The bar's width inside a groove `inner` wide: none without a reading, at least its own height above zero, and
-        /// never past the groove.
+        /// The bar's width for a share LEFT inside a groove `inner` wide: none without a reading or with nothing left, at
+        /// least its own height above zero, and never past the groove.
         internal static int BarWidth(double share, int inner, int height)
         {
             if (share <= 0 || inner <= 0) return 0;
@@ -107,7 +131,9 @@ namespace CodexAutoResume
             if (track.Width <= 0 || track.Height <= 0) return;
             bool contrast = Palette.Contrast;
             float radius = track.Height / 2f;
-            Soft.Body(g, track, radius, SoftBar.TrackFill(contrast, Palette.Card), SoftBar.TrackEdge(contrast), Palette.Depth);
+            bool low = used >= 0 && Warns(used);
+            Soft.Body(g, track, radius, SoftBar.TrackFill(contrast, Palette.Card), low ? Palette.Warning : SoftBar.TrackEdge(contrast),
+                      Palette.Depth);
             if (used < 0) return;                                  // no reading: the groove empty
             // Its first frame on screen starts the glide from what it showed before (From).
             if (!double.IsNaN(follow))
@@ -232,7 +258,8 @@ namespace CodexAutoResume
             var said = new Label();
             said.AutoSize = true;
             said.Text = AccountsMeterWords(window);
-            said.ForeColor = Secondary;
+            // Little left is said in the warning colour, as its bar is drawn (v0.6.24 final).
+            said.ForeColor = meter.Used >= 0 && AccountMeter.Warns(meter.Used) ? Palette.Warning : Secondary;
             said.Anchor = AnchorStyles.Left;
             said.Margin = Pad(0, 1, 0, 1);
             meter.AccessibleName = name + " " + said.Text;
