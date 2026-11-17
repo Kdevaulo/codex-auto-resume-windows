@@ -229,10 +229,10 @@ PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in (
     "refused.option_order", "warn.stop_before_words"))
 # usage_analytics (v0.6.20): how many days its card shows (OptionKey.ANALYTICS_DAYS).
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + name for name in ("option.analytics_days",))
-# Its cards (advanced/gui/AdvancedAnalytics.cs): the pace of each window, the tokens of each project and the total, the
-# conversations under a project, the narrower route's note, and Save as CSV....
+# Its cards (advanced/gui/AdvancedAnalytics.cs): the pace of each window (since v0.6.24 final what is left of it), the
+# tokens of each project and the total, the conversations under a project, the narrower route's note, and Save as CSV....
 PAGE_KEYS = PAGE_KEYS + tuple(PAGE_PREFIX + "analytics." + name for name in (
-    "pace", "used", "change", "eta", "not_enough", "resets", "no_reading", "tokens", "lifetime_only", "behind",
+    "pace", "left", "change", "eta", "not_enough", "resets", "no_reading", "tokens", "lifetime_only", "behind",
     "other", "hide", "show", "none", "total", "save", "numbers", "lifetime"))
 # v0.6.19 (wake_for_reset): its one choice's label, how many minutes before a reset the PC is woken.
 PAGE_KEYS = PAGE_KEYS + (PAGE_PREFIX + "option.wake_lead_minutes",)

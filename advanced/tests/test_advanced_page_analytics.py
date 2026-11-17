@@ -1,7 +1,8 @@
 """The usage and token analytics' cards on the Advanced features page (v0.6.20, advanced/gui/AdvancedAnalytics.cs).
 
-While usage_analytics is on, its column has a Pace card - each window the meter reads, how full it is, the change over
-the last hour and, where the bridge gives one, around when it would be full beside its reset - and a Tokens card: one
+While usage_analytics is on, its column has a Pace card - each window the meter reads, how much is left of it (v0.6.24
+final; how full it was before), how far that moved over the last hour and, where the bridge gives one, around when none
+would be left beside its reset - and a Tokens card: one
 flat line a project with its five numbers, its conversations under it on demand, a total line, and Save as CSV...,
 which sends the path the save dialog answered (never a file there already unless the dialog asked). Where MTOK failed,
 the list says it shows lifetime totals. Off, there is no card. The window is driven as the other page modules drive it
@@ -101,8 +102,11 @@ class PageTests(PageCase):
         pace = self.card(shown, words["page.analytics.pace"])
         self.assertIsNotNone(pace, "the pace card is shown while the capability is on")
         text = "\n".join(pace)
-        self.assertIn("87.5", text)
-        self.assertIn("+12.5", text)
+        # v0.6.24 final: 87.5% used is said as 12.5% left, and 12.5 more used in the hour as 12.5 less left.
+        self.assertIn(words["page.analytics.left"].replace("{window}: ", "").replace("{percent}", "12.5"), text)
+        self.assertIn("-12.5", text)
+        self.assertNotIn("87.5", text)
+        self.assertNotIn("+12.5", text)
         self.assertIn(words["page.analytics.eta"].split("{time}")[0].strip(), text)
         self.assertIn(words["page.analytics.not_enough"], text, "the weekly window has too few readings")
         tokens = self.card(shown, self.tokens_title(words))
