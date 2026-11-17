@@ -350,7 +350,10 @@ namespace CodexAutoResume
             {
                 scratch.Font = font;
                 scratch.Text = tab.Text;
-                scratch.Padding = tab.Padding;
+                // At the room a tab keeps at either side of its name (TabPadX), not the room it has now: where the version's
+                // pill needs the room the tabs are drawn closer (FitVersionPill, v0.6.24), and the window is held no
+                // narrower for that - its pages keep the width they had.
+                scratch.Padding = new Padding(Soft.Px(TabPadX), tab.Padding.Top, Soft.Px(TabPadX), tab.Padding.Bottom);
                 scratch.AutoSize = true;
                 scratch.AutoSizeMode = AutoSizeMode.GrowAndShrink;
                 scratch.FlatStyle = FlatStyle.Flat;
