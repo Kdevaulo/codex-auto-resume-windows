@@ -321,7 +321,9 @@ class Renderer(StatusLight):
         self._ground_key = key
 
     def _scene(self, paint, plan, milliseconds):
-        """The day's scene, anchored to the card's outer side at the size the plan worked out, its inner side faded from the card."""
+        """The day across the band the plan worked out (brand.day_band, W2): its ground, its specks laid band after band from
+        the card's outer side, its scene anchored to that side - when its main piece is whole there - and the card's colour
+        at its inner side, fading into the day."""
         item = next((entry for entry in plan["items"] if entry["kind"] == "scene"), None)
         if item is None:
             return
@@ -334,6 +336,15 @@ class Renderer(StatusLight):
             x = left + (brand.SCENE_WIDTH - point[0]) * unit if mirrored else right - (brand.SCENE_WIDTH - point[0]) * unit
             return (x, origin_y + point[1] * unit)
 
+        band = brand.SPECK_BAND * unit
+        specks = brand.speck_frame(item["scene"], milliseconds)
+
+        def speck_at(offset):
+            def place(point):
+                x = left + offset + point[0] * unit if mirrored else right - offset - (brand.SPECK_BAND - point[0]) * unit
+                return (x, top + point[1] * unit)
+            return place
+
         hairline = max(1.0, round(plan["scale"]))
         card = plan["card"]
         paint.clip_round((card[0] + hairline, card[1] + hairline, card[2] - hairline, card[3] - hairline),
@@ -341,8 +352,14 @@ class Renderer(StatusLight):
         paint.clip_rect(item["rect"])
         try:
             paint.fill_round(item["rect"], 0, _pack(brand.rgb(brand.DAY_LOOKS[item["scene"]][2])))
-            for shape in brand.scene_frame(item["scene"], milliseconds):
-                self._scene_shape(paint, shape, at, unit)
+            offset = 0.0
+            while offset < right - left:
+                for shape in specks:
+                    self._scene_shape(paint, shape, speck_at(offset), unit)
+                offset += band
+            if item.get("scene_shown", True):
+                for shape in brand.scene_frame(item["scene"], milliseconds):
+                    self._scene_shape(paint, shape, at, unit)
             ground = brand.rgb(brand.card_ground(self._theme(), self._design()))
             solid, clear = item["fade"]
             inner = left
@@ -354,6 +371,10 @@ class Renderer(StatusLight):
             paint.fade((min(solid, clear), top, max(solid, clear), bottom), solid, clear, ground)
         finally:
             paint.clip_none()
+        # A chip that stands in the band (the notification card's reason) stands over the day, its words drawn after it.
+        for chip in plan["items"]:
+            if chip["kind"] == "chip" and chip["rect"][0] < right and chip["rect"][2] > left and chip["rect"][1] < bottom:
+                self._ground_item(paint, chip, plan["scale"], None)
 
     @staticmethod
     def _scene_shape(paint, shape, at, scale):
