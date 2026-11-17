@@ -2009,11 +2009,14 @@ namespace CodexAutoResume
             finally { fittingPill = false; }
         }
 
-        // A tab of its own, never shown, that a tab's words, weight and room are set on to ask how wide it would be (TabRowAt).
+        // A tab of its own, never shown, that a tab's words, weight and room are set on to ask how wide it would be (TabRowAt),
+        // and what it answered, by the font, the words and the room.
         private NavButton tabMeasure;
+        private readonly Dictionary<string, int> tabWidths = new Dictionary<string, int>();
 
         /// How wide the strip's row of shown tabs would be with `pad` at either side of every name, margins included: each
-        /// tab as it asks now where it has that room already, else as a tab of its own set as it is but for the room asks.
+        /// tab as a tab of its own set as it is but for the room asks - for every room alike, the room the tabs have now
+        /// too, so the answer never depends on which room that is and a fitting never undoes the one before it.
         private int TabRowAt(Control strip, int pad)
         {
             int width = strip.Padding.Horizontal;
@@ -2021,18 +2024,27 @@ namespace CodexAutoResume
             {
                 if (!Soft.OwnVisible(tab)) continue;
                 var button = tab as NavButton;
-                if (button == null || (button.Padding.Left == pad && button.Padding.Right == pad))
+                if (button == null)
                 {
                     width += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
                     continue;
                 }
-                if (tabMeasure == null) tabMeasure = new NavButton();
-                tabMeasure.AutoSize = button.AutoSize;
-                tabMeasure.AutoSizeMode = button.AutoSizeMode;
-                tabMeasure.Font = button.Font;
-                tabMeasure.Text = button.Text;
-                tabMeasure.Padding = new Padding(pad, button.Padding.Top, pad, button.Padding.Bottom);
-                width += tabMeasure.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+                var room = new Padding(pad, button.Padding.Top, pad, button.Padding.Bottom);
+                string key = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(button.Font).ToString(CultureInfo.InvariantCulture) +
+                             "|" + room + "|" + button.AutoSizeMode + "|" + button.Text;
+                int asked;
+                if (!tabWidths.TryGetValue(key, out asked))
+                {
+                    if (tabMeasure == null) tabMeasure = new NavButton();
+                    tabMeasure.AutoSize = button.AutoSize;
+                    tabMeasure.AutoSizeMode = button.AutoSizeMode;
+                    tabMeasure.Font = button.Font;
+                    tabMeasure.Text = button.Text;
+                    tabMeasure.Padding = room;
+                    asked = tabMeasure.GetPreferredSize(Size.Empty).Width;
+                    tabWidths[key] = asked;
+                }
+                width += asked + tab.Margin.Horizontal;
             }
             return width;
         }
