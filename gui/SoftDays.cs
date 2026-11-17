@@ -170,12 +170,17 @@ namespace CodexAutoResume
         }
 
         /// Every shape of `elements`, `seconds` in, each point of its 190 by 66 (or a mark's 32 by 32) put where `at` says, `unit` to the pixel.
+        /// A shape wholly outside what `g` may draw on (its clip) is not filled at all (W2: the day's specks laid band after
+        /// band, and the caption buttons that paint the day under them, each its own small clip, so a frame costs no more
+        /// than the scene alone did).
         internal static void Draw(Graphics g, DayElement[] elements, double seconds, double unit, Func<double, double, PointF> at)
         {
             GraphicsState state = g.Save();
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.PixelOffsetMode = PixelOffsetMode.Half;
             float u = (float)unit;
+            RectangleF sight = g.VisibleClipBounds;
+            sight.Inflate(2f, 2f);                       // antialiasing reaches a pixel past a shape's outline
             foreach (DayElement e in elements)
             {
                 double[] n;
@@ -183,17 +188,26 @@ namespace CodexAutoResume
                 At(e, seconds, out n, out opacity);
                 Color colour = Soft.WithAlpha(e.Colour, opacity);
                 if (e.Kind == "poly")
-                    using (var brush = new SolidBrush(colour)) g.FillPolygon(brush, Points(n, 0, at));
+                {
+                    PointF[] points = Points(n, 0, at);
+                    if (!InSight(points, sight)) continue;
+                    Filled++;
+                    using (var brush = new SolidBrush(colour)) g.FillPolygon(brush, points);
+                }
                 else if (e.Kind == "circle" || e.Kind == "ellipse")
                 {
                     PointF c = at(n[0], n[1]);
                     float rx = (float)n[2] * u, ry = (e.Kind == "circle" ? (float)n[2] : (float)n[3]) * u;
+                    if (!sight.IntersectsWith(new RectangleF(c.X - rx, c.Y - ry, rx * 2, ry * 2))) continue;
+                    Filled++;
                     using (var brush = new SolidBrush(colour)) g.FillEllipse(brush, c.X - rx, c.Y - ry, rx * 2, ry * 2);
                 }
                 else if (e.Kind == "round")
                 {
                     PointF one = at(n[0], n[1]), other = at(n[0] + n[2], n[1]);
                     var body = new RectangleF(Math.Min(one.X, other.X), one.Y, (float)n[2] * u, (float)n[3] * u);
+                    if (!sight.IntersectsWith(body)) continue;
+                    Filled++;
                     using (GraphicsPath path = Soft.Rounded(body, (float)n[4] * u))
                     using (var brush = new SolidBrush(colour)) g.FillPath(brush, path);
                 }
@@ -214,6 +228,24 @@ namespace CodexAutoResume
                 else if (e.Kind == "glow") Light(g, at(n[0], n[1]), (float)n[2] * u, (float)n[3], e.Colour, opacity);
             }
             g.Restore(state);
+        }
+
+        /// How many circles, ellipses, polygons and rounds Draw has filled (for the tests: what a clip saves).
+        internal static long Filled;
+
+        // Whether any of a polygon's outline lies in `sight`.
+        private static bool InSight(PointF[] points, RectangleF sight)
+        {
+            if (points.Length == 0) return false;
+            float left = points[0].X, right = left, top = points[0].Y, bottom = top;
+            foreach (PointF p in points)
+            {
+                if (p.X < left) left = p.X;
+                if (p.X > right) right = p.X;
+                if (p.Y < top) top = p.Y;
+                if (p.Y > bottom) bottom = p.Y;
+            }
+            return sight.IntersectsWith(RectangleF.FromLTRB(left, top, right, bottom));
         }
 
         private static void Light(Graphics g, PointF c, float radius, float whole, Color colour, double opacity)
@@ -510,12 +542,28 @@ namespace CodexAutoResume
         /// The window's ground on any other day: the palette's canvas.
         internal static Color Untinted { get { return Palette.Contrast ? SystemColors.Control : Tokens.Canvas; } }
 
-        /// `canvas` with brand's tint of `look`'s ground in it.
+        /// `canvas` with brand's tint of `look`'s ground in it - or less of it, as much as leaves the words on the ground (the
+        /// palette's ink, its secondary words and its accent) at WCAG's 4.5:1, or where one was below that on any other day,
+        /// no lower than it was. A dark day's ground took a light window's secondary words to 4.3:1 at the whole tint.
         internal static Color Tinted(Color canvas, string look)
         {
             string ground, top, bottom;
             Brand.DayGround(look, out ground, out top, out bottom);
-            return ground == null ? canvas : Soft.Mix(canvas, ColorTranslator.FromHtml(ground), Brand.DayGroundTint);
+            if (ground == null) return canvas;
+            Color day = ColorTranslator.FromHtml(ground);
+            for (double share = Brand.DayGroundTint; share > 0.0; share -= 0.005)
+            {
+                Color tinted = Soft.Mix(canvas, day, share);
+                if (Readable(Palette.Ink, canvas, tinted) && Readable(Palette.Muted, canvas, tinted) && Readable(Palette.Accent, canvas, tinted))
+                    return tinted;
+            }
+            return canvas;
+        }
+
+        // Whether words in `words` stand out from `tinted` as WCAG asks (4.5:1), or as much as they did from `canvas`.
+        private static bool Readable(Color words, Color canvas, Color tinted)
+        {
+            return Chrome.Contrast(words, tinted) >= Math.Min(4.5, Chrome.Contrast(words, canvas));
         }
 
         /// Every control of `window` in the ground's old colour `from` takes the new `to` (a window left open past midnight).

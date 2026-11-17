@@ -30,7 +30,7 @@ for _path in (str(ROOT / "src"), str(ROOT / "tests")):
         sys.path.insert(0, _path)
 
 import guiscan  # noqa: E402
-from codex_auto_resume import l10n  # noqa: E402
+from codex_auto_resume import brand, l10n  # noqa: E402
 
 CSC = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Microsoft.NET" / "Framework64" / "v4.0.30319" / "csc.exe"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -134,6 +134,8 @@ namespace CodexAutoResume
                 // W2: where the band of the day begins, the ground the window's ground was given, a page card to hold unchanged.
                 said["band"] = DayHeaderBox(DayHeaderIn(form.dayScene, form));
                 said["canvas"] = (double)Palette.Canvas.ToArgb();
+                said["words"] = new List<object> { (double)Palette.Ink.ToArgb(), (double)Palette.Muted.ToArgb(), (double)Palette.Accent.ToArgb() };
+                said["tint"] = Brand.DayGroundTint;
                 string dayGround, dayTop, dayBottom;
                 Brand.DayGround(form.dayLook ?? "seollal", out dayGround, out dayTop, out dayBottom);
                 said["dayGround"] = (double)ColorTranslator.FromHtml(dayGround).ToArgb();
@@ -147,6 +149,8 @@ namespace CodexAutoResume
                     foreach (Control child in c.Controls) walk.Push(child);
                 }
                 if (page != null) said["pageCard"] = DayHeaderBox(Rectangle.Inflate(DayHeaderIn(page, form), -Soft.Px(20), -Soft.Px(20)));
+                said["groundWords"] = DayHeaderGroundWords(form);
+                said["tinted"] = (double)DayHeaderTinted(form, Palette.Canvas);
                 // A frame of the day: what the header's band costs to draw, as its timer draws it thirty times a second.
                 if (Soft.OwnVisible(form.dayScene) && form.dayScene.Width > 0)
                     using (var frame = new Bitmap(form.dayScene.Width, form.dayScene.Height))
@@ -155,6 +159,18 @@ namespace CodexAutoResume
                         var clock = System.Diagnostics.Stopwatch.StartNew();
                         for (int i = 0; i < 30; i++) form.dayScene.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
                         said["frameMs"] = clock.Elapsed.TotalMilliseconds / 30.0;
+                        // What a frame fills: the day's whole band, and what the close button, which paints the day under it
+                        // each frame, fills of it - only what lies under it.
+                        DayArt.Filled = 0;
+                        form.dayScene.DrawToBitmap(frame, new Rectangle(Point.Empty, frame.Size));
+                        said["sceneFilled"] = (double)DayArt.Filled;
+                        CaptionButton close = form.chrome.CloseButton;
+                        using (var under = new Bitmap(close.Width, close.Height))
+                        {
+                            DayArt.Filled = 0;
+                            close.DrawToBitmap(under, new Rectangle(Point.Empty, under.Size));
+                            said["buttonFilled"] = (double)DayArt.Filled;
+                        }
                     }
                 return form.RenderPicture(new Dictionary<string, object>(), writer);
             }
@@ -163,6 +179,73 @@ namespace CodexAutoResume
                 form.Dispose();
                 DayArt.On = false;
             }
+        }
+
+        // Every word the window shows on its own ground (a label whose ground is the window's canvas): its words' colour and
+        // their contrast with that ground, as the window has it now.
+        private static List<object> DayHeaderGroundWords(SettingsForm form)
+        {
+            var found = new List<object>();
+            var walk = new Stack<Control>();
+            walk.Push(form);
+            while (walk.Count > 0)
+            {
+                Control c = walk.Pop();
+                foreach (Control child in c.Controls) walk.Push(child);
+                // Every page's, shown or not yet: a page off the card's words (the Statistics period) stand on the ground.
+                if (!(c is Label) || string.IsNullOrEmpty(c.Text)) continue;
+                if (Ground.Colour(c).ToArgb() != Palette.Canvas.ToArgb()) continue;
+                found.Add(new List<object> { c.GetType().Name, c.Text, (double)c.ForeColor.ToArgb(), Chrome.Contrast(c.ForeColor, Palette.Canvas) });
+            }
+            return found;
+        }
+
+        // How many of the window's controls are in `colour`.
+        private static int DayHeaderTinted(Control form, Color colour)
+        {
+            int count = 0;
+            var walk = new Stack<Control>();
+            walk.Push(form);
+            while (walk.Count > 0)
+            {
+                Control c = walk.Pop();
+                if (c.BackColor.ToArgb() == colour.ToArgb()) count++;
+                foreach (Control child in c.Controls) walk.Push(child);
+            }
+            return count;
+        }
+
+        // A window opened on `from` and left open past midnight into `to` (the window's clock asks FollowDayScene each second).
+        private static Dictionary<string, object> DayHeaderFollow(DateTime from, DateTime to, string work)
+        {
+            var said = new Dictionary<string, object>();
+            DateTime now = from;
+            DayArt.On = true;
+            DayArt.Clock = delegate { return now; };
+            var writer = new RenderWriter(Path.Combine(work, "frames-follow-" + from.ToString("yyyyMMdd")));
+            SettingsForm form = OpenForRender(writer);
+            try
+            {
+                form.FollowDayScene();
+                Color before = Palette.Canvas;
+                said["lookBefore"] = form.dayLook;
+                now = to;
+                form.FollowDayScene();
+                Application.DoEvents();
+                said["look"] = form.dayLook;
+                said["canvas"] = (double)Palette.Canvas.ToArgb();
+                said["formGround"] = (double)form.BackColor.ToArgb();
+                said["inOldColour"] = (double)DayHeaderTinted(form, before);
+                said["inNewColour"] = (double)DayHeaderTinted(form, Palette.Canvas);
+                said["sceneShown"] = Soft.OwnVisible(form.dayScene) && form.dayScene.Look != null;
+                said["groundLook"] = DayGround.Look;
+            }
+            finally
+            {
+                form.Dispose();
+                DayArt.On = false;
+            }
+            return said;
         }
 
         private static Dictionary<string, object> DayHeaderCompare(DateTime special, DateTime plain, string headlineText, string work)
@@ -252,12 +335,69 @@ namespace CodexAutoResume
             // them, the card's edge, and leave the scene no room (a long language at a large text size).
             string words = "Watching for interruptions in every conversation of every project on this computer, day and night";
             said["noRoom"] = DayHeaderCompare(special, plain, words + " " + words, work);
+            // Past midnight, both ways (the window's clock): into an ordinary day and into a special one.
+            said["intoPlain"] = DayHeaderFollow(special, plain, work);
+            said["intoSpecial"] = DayHeaderFollow(plain, special, work);
+            // The words on the window's ground on each day's look, in both themes of each design that shows a day.
+            var words2 = new Dictionary<string, object>();
+            foreach (string design in new[] { "soft", "plain" })
+                foreach (string theme in new[] { "light", "dark" })
+                    for (DateTime day = new DateTime(2027, 1, 1); day.Year == 2027; day = day.AddDays(1))
+                    {
+                        if (!Brand.DayLook(day.Year, day.Month, day.Day, out look, out top, out bottom)) continue;
+                        string key = design + "/" + theme + "/" + look;
+                        if (words2.ContainsKey(key)) continue;
+                        Palette.AdoptDesign(design);
+                        Palette.Adopt(theme);
+                        DateTime noon = day.AddHours(12);
+                        DayArt.On = true;
+                        DayArt.Clock = delegate { return noon; };
+                        SettingsForm form = OpenForRender(new RenderWriter(Path.Combine(work, "frames-words-" + design + "-" + theme)));
+                        try
+                        {
+                            words2[key] = new Dictionary<string, object> { { "look", form.dayLook }, { "words", DayHeaderGroundWords(form) },
+                                                                            { "design", Palette.Design },
+                                                                            { "canvas", (double)Palette.Canvas.ToArgb() },
+                                                                            { "untinted", (double)DayGround.Untinted.ToArgb() },
+                                                                            { "colours", new List<object> { (double)Palette.Ink.ToArgb(),
+                                                                                (double)Palette.Muted.ToArgb(), (double)Palette.Accent.ToArgb() } } };
+                        }
+                        finally
+                        {
+                            form.Dispose();
+                            DayArt.On = false;
+                        }
+                    }
+            said["groundWords"] = words2;
+            Palette.AdoptDesign(null);
+            Palette.Adopt("light");
             PersistentBridge.Answers = null;
         }
     }
 }
 """
 
+
+
+def _hex(argb):
+    return "#%06X" % (int(argb) & 0xFFFFFF)
+
+
+def _mixed(canvas, day, share):
+    return "#" + "".join("%02X" % int(round(((int(canvas) >> shift) & 255) + (((int(day) >> shift) & 255) - ((int(canvas) >> shift) & 255)) * share))
+                         for shift in (16, 8, 0))
+
+
+def expected_share(canvas, day, words, tint):
+    """The share of the day's ground the window's canvas takes: brand's, stepped down by half a percent until every
+    colour of the ground's words stands out from it by 4.5:1 - or by what it did on any other day, where that was less."""
+    share = tint
+    while share > 0.0:
+        tinted = _mixed(canvas, day, share)
+        if all(brand.contrast(_hex(word), tinted) >= min(4.5, brand.contrast(_hex(word), _hex(canvas))) - 1e-9 for word in words):
+            return share
+        share -= 0.005
+    return 0.0
 
 @unittest.skipUnless(CSC.is_file(), "needs the in-box C# compiler")
 class DayHeaderTests(unittest.TestCase):
@@ -282,7 +422,7 @@ class DayHeaderTests(unittest.TestCase):
             out = work / "out.json"
             environment = dict(os.environ, CODEX_HOME=str(work / "no-codex"), LOCALAPPDATA=str(work / "no-local"),
                                TEMP=str(work), TMP=str(work))
-            done = subprocess.run([str(exe), str(out), str(work)], capture_output=True, timeout=300,
+            done = subprocess.run([str(exe), str(out), str(work)], capture_output=True, timeout=900,
                                   creationflags=NO_WINDOW, env=environment)
             cls.answer = json.loads(out.read_text(encoding="utf-8")) if out.is_file() else {}
             if done.returncode != 0 or "error" in cls.answer or not cls.answer:
@@ -333,11 +473,54 @@ class DayHeaderTests(unittest.TestCase):
         self.assertGreater(tint / ground, 0.9, "the tint")
         self.assertGreater(specks, 0, "and the day's specks on it")
         canvas, tinted, day = room["plain"]["canvas"], room["special"]["canvas"], room["special"]["dayGround"]
-        mix = [round(((int(canvas) >> shift) & 255) * 0.9 + ((int(day) >> shift) & 255) * 0.1) for shift in (16, 8, 0)]
+        # Brand's share of the day's ground, or less, as much as keeps the words on the ground at 4.5:1 (DayGround.Tinted).
+        share = expected_share(canvas, day, room["special"]["words"], room["special"]["tint"])
+        self.assertGreater(share, 0.0)
+        mix = [round(((int(canvas) >> shift) & 255) * (1 - share) + ((int(day) >> shift) & 255) * share) for shift in (16, 8, 0)]
         got = [(int(tinted) >> shift) & 255 for shift in (16, 8, 0)]
         for one, other in zip(mix, got):
             self.assertLessEqual(abs(one - other), 1)
         self.assertEqual(room.get("pageCard"), 0, "a page's card is as on any other day")
+
+    def test_w2_the_words_on_the_window_s_ground_keep_4_5_to_1_on_every_day(self):
+        """The ground's tint is faint, but a dark day's whole tint took a light window's secondary words to 4.3:1: the
+        window's ink, secondary words and accent stand out from its ground by 4.5:1 (or as on any other day, where less)."""
+        self.assertEqual(len(self.answer["groundWords"]), 2 * 2 * len(brand.DAY_LOOKS))
+        for key, found in sorted(self.answer["groundWords"].items()):
+            self.assertTrue(found["look"], key)
+            self.assertNotEqual(found["canvas"], found["untinted"], key + ": the ground takes the day")
+            for colour in found["colours"]:
+                ordinary = brand.contrast(_hex(colour), _hex(found["untinted"]))
+                self.assertGreaterEqual(brand.contrast(_hex(colour), _hex(found["canvas"])), min(4.5, ordinary) - 1e-9,
+                                        "%s: %s" % (key, _hex(colour)))
+            for kind, text, _, contrast in found["words"]:
+                self.assertGreaterEqual(contrast, 4.5, "%s: %s %r" % (key, kind, text))
+
+    def test_w2_the_ground_follows_midnight_into_an_ordinary_day(self):
+        into, room = self.answer["intoPlain"], self.answer["room"]
+        self.assertTrue(into["lookBefore"])
+        self.assertIsNone(into["look"])
+        self.assertIsNone(into["groundLook"])
+        self.assertEqual(into["canvas"], room["plain"]["canvas"])
+        self.assertEqual(into["formGround"], room["plain"]["canvas"])
+        self.assertEqual(into["inOldColour"], 0, "nothing left in the day's tint")
+        self.assertFalse(into["sceneShown"])
+
+    def test_w2_the_ground_follows_midnight_into_a_special_day(self):
+        into, room = self.answer["intoSpecial"], self.answer["room"]
+        self.assertIsNone(into["lookBefore"])
+        self.assertEqual(into["look"], room["special"]["look"])
+        self.assertEqual(into["groundLook"], room["special"]["look"])
+        self.assertEqual(into["canvas"], room["special"]["canvas"])
+        self.assertEqual(into["inOldColour"], 0, "nothing left in an ordinary day's ground")
+        self.assertEqual(into["inNewColour"], room["special"]["tinted"], "as many grounds tinted as a window opened that day")
+        self.assertTrue(into["sceneShown"])
+
+    def test_w2_a_caption_button_fills_only_the_day_under_it(self):
+        """Each button paints the day under it every frame: it filled every speck and the whole scene, clipped away."""
+        special = self.answer["room"]["special"]
+        self.assertGreater(special["sceneFilled"], 10)
+        self.assertLess(special["buttonFilled"], special["sceneFilled"] / 3, special)
 
     def test_w2_a_frame_of_the_band_costs_little(self):
         self.assertLess(self.answer["room"]["special"]["frameMs"], 12.0)
