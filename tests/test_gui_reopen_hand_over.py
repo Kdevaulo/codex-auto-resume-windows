@@ -97,6 +97,10 @@ namespace CodexAutoResume
         [DllImport("user32.dll", EntryPoint = "ShowWindow")] private static extern bool HandShowWindow(IntPtr h, int cmd);
         [DllImport("user32.dll", EntryPoint = "IsWindowEnabled")] private static extern bool HandEnabled(IntPtr h);
         [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")] private static extern int HandDwmGet(IntPtr h, int attribute, out int value, int size);
+        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")] private static extern int HandFineSleep(int ms);
+
+        // When the window was about to be shown: no read of it can find it shown before this.
+        private static double handShowing = -1;
 
         private static double HandNow() { return Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency; }
 
@@ -133,6 +137,7 @@ namespace CodexAutoResume
             // The new window's thread busy before its first paint, as the real one is with its first answers and a whole
             // window to paint at 150 %: what it does in that time is taken before the show's own messages.
             if (busyMs > 0) form.BeginInvoke(new MethodInvoker(delegate { Thread.Sleep(busyMs); }));
+            handShowing = HandNow();
             HandShowWindow(h, 4);
             form.BeginInvoke(new MethodInvoker(delegate { form.placedBounds = Rectangle.Empty; form.OnShown(EventArgs.Empty); }));
         }
@@ -150,13 +155,22 @@ namespace CodexAutoResume
                 return HandDwmGet(h, 14, out value, 4) == 0 && value != 0;
             };
             said["cloaked_as_made"] = cloaked();
-            double[] at = { -1, -1 };
+            // The reads a millisecond apart, not the 15.6 a sleep can take: a read late by that much put the new window's
+            // coming on after the old one had gone (CI, 1 of 7 lanes: 9 ms).
+            HandFineSleep(1);
+            // [shown, the first read that found it on the screen, the start of the last read that found it still cloaked]
+            double[] at = { -1, -1, -1 };
             var spy = new Thread(delegate()
             {
                 var until = Stopwatch.StartNew();
                 while (until.ElapsedMilliseconds < 8000)
                 {
-                    if (at[0] >= 0 && !cloaked()) { at[1] = HandNow(); return; }
+                    if (at[0] >= 0)
+                    {
+                        double asked = HandNow();
+                        if (!cloaked()) { at[1] = HandNow(); return; }
+                        at[2] = asked;
+                    }
                     Thread.Sleep(1);
                 }
             });
@@ -171,7 +185,9 @@ namespace CodexAutoResume
             {
                 end.Stop();
                 said["shown"] = at[0];
+                said["showing"] = handShowing;
                 said["on_screen"] = at[1];
+                said["last_cloaked"] = at[2];
                 File.WriteAllText(outPath, Json.Write(said), new UTF8Encoding(false));
                 form.Close();
                 context.ExitThread();
@@ -289,13 +305,24 @@ class HandOverTests(unittest.TestCase):
                 self.assertGreater(said["gone"], said["reopen"], "the old window closed once the new one came")
 
     def test_the_old_window_goes_only_once_the_new_one_is_on_the_screen(self):
+        # v0.6.24-beta.3: against what the reads know for certain. The new window came on between the start of the last
+        # read that found it cloaked and the first that found it on the screen, so the old one has gone too soon only if
+        # it went before that start - a read late by a sleep's 15.6 ms once put the coming on 9 ms after the old window
+        # had gone (CI, 1 of 7 lanes), the hand-over itself right. Uncloaked from the start (no DWM cloak), the new window
+        # was on the screen from its show, which no read can find before the moment it was about to be shown.
         for i, said in enumerate(self.runs):
             new = said["new"]
             with self.subTest(run=i, cloaked=new["cloaked_as_made"]):
-                came = new["on_screen"] if new["cloaked_as_made"] else new["shown"]
-                self.assertGreater(came, 0, "the new window came on the screen")
+                if new["cloaked_as_made"]:
+                    self.assertGreater(new["on_screen"], 0, "the new window came on the screen")
+                    self.assertGreater(new["last_cloaked"], 0, "the new window was read cloaked after its show")
+                    came = new["last_cloaked"]
+                else:
+                    self.assertGreater(new["shown"], 0, "the new window was shown")
+                    came = new["showing"]
                 self.assertGreaterEqual(said["gone"], came,
-                                        "the old window went %.0f ms before the new one came on" % (came - said["gone"]))
+                                        "the old window went %.0f ms before the new one came on (read %.1f ms apart)"
+                                        % (came - said["gone"], new["on_screen"] - new["last_cloaked"]))
 
 
 if __name__ == "__main__":
