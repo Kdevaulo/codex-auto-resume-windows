@@ -385,6 +385,14 @@ namespace CodexAutoResume
                     other.Visible = true;
                     var grown = new Dictionary<string, object>();
                     grown["before"] = before["fit"];
+                    grown["shown"] = form.PillFit;
+                    // On any screen and in any font the tabs come to need the pill's room: the Chat tab's words grow, which
+                    // lays out the strip alone, until the tabs, the gap and the whole pill no longer fit in the row (GitHub's
+                    // runners' fonts are narrower than this PC's, and the two tabs alone left the pill whole there).
+                    Control row = settings.Parent;
+                    for (int grow = 0; grow < 60 && ProportionsTabsWidth(row) + form.Px(12) + form.versionPill.WholeWidth <= form.nav.DisplayRectangle.Width; grow++)
+                        other.Text += " Chat";
+                    grown["grew"] = ProportionsTabsWidth(row) + form.Px(12) + form.versionPill.WholeWidth > form.nav.DisplayRectangle.Width;
                     grown["fit"] = form.PillFit;
                     var cut = new List<string>();
                     foreach (NavButton tab in form.navButtons.Values)
@@ -639,9 +647,10 @@ class DashboardProportionsTests(unittest.TestCase):
             grown = self.answer[locale]["grown"]
             with self.subTest(locale=locale):
                 self.assertEqual(grown["before"], "whole")
-                # Where the two tabs leave it too little room, it shortens or goes (English); never over a tab.
-                if locale == "en":
-                    self.assertNotEqual(grown["fit"], "whole", "the pill gives way to the tabs")
+                # The tabs grown until the whole pill no longer fits beside them, on any screen and in any font (dev CI
+                # 44034443580: the runners' narrower fonts left room for it): it shortens or goes, never over a tab.
+                self.assertTrue(grown["grew"], "the tabs came to need the pill's room")
+                self.assertNotEqual(grown["fit"], "whole", "the pill gives way to the tabs")
                 self.assertEqual(grown["cut"], "", "no tab cut off at the strip's end")
                 self.assertEqual(grown["findings"], "")
 
