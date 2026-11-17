@@ -1322,6 +1322,8 @@ $out.lifts = @()
 foreach ($pair in (Get-Field $window 'led').GetEnumerator()) {
     $button = $pair.Key
     $card = $pair.Value
+    # Only a button shown: Start watcher shares Pause's cell and shows while the watcher is off (v0.6.24-beta.2).
+    if (-not (Test-Own $button)) { continue }
     $band = [Drawing.Rectangle]$bandOf.Invoke($null, [object[]]@($button, 'control'))
     $under = New-Object Collections.ArrayList
     Get-Under $card 0 0 $band $button $under
@@ -1711,8 +1713,9 @@ class LayoutAuditTests(unittest.TestCase):
         height, extent, overflowing = self.answer["liftsAt"]
         self.assertEqual((height, overflowing), (extent, False), "the window is not as tall as the page needs")
         lifts = self.answer["lifts"]
-        # v0.6.24-beta.2 (the owner, 2026-11-17, row 17): and Start watcher, the Right now card's in Pause's place.
-        self.assertEqual(sorted(lift["text"] for lift in lifts), ["History", "Pause recovery", "Pending", "Start watcher"])
+        # v0.6.24-beta.2 (the owner, 2026-11-17, row 17): Start watcher stands in Pause's cell while the watcher is off; the
+        # snapshot's watcher runs, so Pause is the one shown (AuditPins holds Start watcher's corner with the watcher off).
+        self.assertEqual(sorted(lift["text"] for lift in lifts), ["History", "Pause recovery", "Pending"])
         for lift in lifts:
             with self.subTest(lift["text"]):
                 self.assertEqual(lift["parent"], "SoftCard", "the button stands in its card, not in a block beside the content")
