@@ -2250,6 +2250,7 @@ namespace CodexAutoResume
         private int fadeAlpha = 255;
         private Timer fade;
         private System.Diagnostics.Stopwatch fading;
+        private double fadeMs = -1, lastStep;
 
         /// Whether it opens with its own fade, and its alpha now (255 once opaque, and for one that does not fade): for
         /// the tests.
@@ -2268,6 +2269,7 @@ namespace CodexAutoResume
         {
             if (!fadeIn || !IsHandleCreated) return;
             fading = System.Diagnostics.Stopwatch.StartNew();
+            fadeMs = -1;
             fade = new Timer();
             fade.Interval = Motion.Interval;
             fade.Tick += delegate { FadeStep(); };
@@ -2295,7 +2297,14 @@ namespace CodexAutoResume
                 try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN); }
                 catch (Exception) { }
             }
-            double t = fading.Elapsed.TotalMilliseconds / Math.Max(1, Motion.Duration);
+            // Re-check 10: the Timeline's first visible frame was already at 63-98 % - its repaint took most of the fade's
+            // time. The fade's own time starts here, once it is painted, and a step that comes late (a long paint, a busy
+            // moment) moves it on by two frames at the most: it always fades from near clear.
+            double now = fading.Elapsed.TotalMilliseconds;
+            if (fadeMs < 0) fadeMs = 0;
+            else fadeMs += Math.Min(now - lastStep, 2.0 * Motion.Interval);
+            lastStep = now;
+            double t = fadeMs / Math.Max(1, Motion.Duration);
             if (t < 1.0)
             {
                 SetFade((int)Math.Round(255 * Motion.Ease(t)));
