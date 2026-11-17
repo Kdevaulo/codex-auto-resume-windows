@@ -186,8 +186,9 @@ namespace CodexAutoResume
             {
                 using (Graphics g = Graphics.FromImage(image))
                 {
-                    // Nothing but the pieces: every other pixel of the layer clear, so the window under it shows.
-                    g.Clear(Color.FromArgb(0, 0, 0, 0));
+                    // Nothing but the pieces: every other pixel of the layer clear, so the window under it shows. A layered
+                    // window's own picture, not a control's background, so nothing here is see-through (test_gui_layout).
+                    g.Clear(Color.Transparent);
                     burst.Paint(g, ms);
                 }
                 IntPtr oldMemory = memory, oldDib = dib, oldPrevious = previous;
