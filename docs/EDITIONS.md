@@ -1486,9 +1486,9 @@ paused, it reads what Codex added to its conversations' rollout files (under eac
 folder) since it last looked - only each model call's token counts (input, cached input, output and reasoning) and
 when each turn began, nothing else of any line - at most 2 MiB of a file and 8 MiB in one look, and adds them up by
 day for each project. While it is on, each reading of the usage meter is kept as well. Its cards on the Advanced
-features page show, for the five-hour and the weekly window, how full it is, the change over the last hour and -
-with three readings over fifteen minutes at least, and only when the window would fill before it resets - around
-when it would be full at that pace, beside the reset time. A flat list shows each project's input, cached input,
+features page show, for the five-hour and the weekly window, how much of it is left, how far that moved over the last
+hour and - with three readings over fifteen minutes at least, and only when the window would fill before it resets -
+around when none would be left at that pace, beside the reset time. A flat list shows each project's input, cached input,
 output, reasoning and turns over the last 7, 30 or 90 days (**Days shown**; 7 by default), a total line, and each
 project's conversations on demand; a project is named as Codex names it, else by its folder's name, read when the
 page is shown and never kept. **Save as CSV...** writes the numbers - day, project, the five counts, and lifetime
@@ -1703,7 +1703,8 @@ it is hidden because its measurement failed - and never turns the switch off.
 product never sees a password; **Save the account in use** keeps the one signed in now. Each is a copy of Codex's
 sign-in file, encrypted with Windows' data protection for your Windows user (`<home>\accounts\`), never in the
 settings, a log, the journal, diagnostics or a report; the card shows a masked address and the plan. Under each account
-it shows two meters, the 5-hour and the weekly usage as last read - by the switch itself, or by **Read usage** at the
+it shows two meters, the 5-hour and the weekly usage as last read - each a bar as full as what is left of that window
+and its share left beside it, both in the warning colour with 10% or less left - by the switch itself, or by **Read usage** at the
 card's top right, which reads every saved account but the one in use in a private folder, one at a time, at most once
 every 10 minutes, and sends nothing and switches nothing; the account in use shows the usage the watcher already read -
 and under the rows when they were read and the account the switch would pick next. When a recovery
