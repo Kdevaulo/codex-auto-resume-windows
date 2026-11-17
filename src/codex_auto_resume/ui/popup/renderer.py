@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from ctypes import wintypes as W
 import ctypes as C
-import functools
 from ... import brand, l10n
 from ...brand import shape
 from .elevation import lift_coverage, recipe_shadows, shadow_step, tile_ground, well_coverage
@@ -42,10 +41,19 @@ CHIP_ALPHA = 0.12
 _BREAK_AT_SPACES = frozenset({"ko"})
 
 
-@functools.lru_cache(maxsize=1024)
+_piece_colours = {}
+
+
 def _piece_colour(colour, alpha):
-    """A day's piece's colour and opacity as GDI+ takes it: the same few, a frame after a frame."""
-    return _pack(brand.rgb(colour), alpha)
+    """A day's piece's colour and opacity as GDI+ takes it: the same few, a frame after a frame (kept, a few hundred at
+    most - a twinkle's opacity is rounded to the 256 GDI+ takes)."""
+    key = (colour, int(round(alpha * 255)))
+    found = _piece_colours.get(key)
+    if found is None:
+        if len(_piece_colours) > 4096:
+            _piece_colours.clear()
+        found = _piece_colours[key] = _pack(brand.rgb(colour), alpha)
+    return found
 
 
 class Renderer(StatusLight):
