@@ -639,8 +639,7 @@ namespace CodexAutoResume
             {
                 // By ink (live re-check 7: the eye reads the glyph's own ink, not its box): the cross's first and last
                 // inked columns as it is drawn at this size (CaptionButton.InkColumns).
-                if (CloseButton.Size != new Size(width, height)) CloseButton.Size = new Size(width, height);
-                Point ink = CloseButton.InkColumns();
+                Point ink = CloseButton.InkColumns(new Size(width, height));
                 int close = mirrored ? GlyphEnd - ink.X : holder.ClientSize.Width - 1 - GlyphEnd - ink.Y;
                 x = mirrored ? close : close + width - GroupWidth;
             }
@@ -1638,20 +1637,20 @@ namespace CodexAutoResume
 
         /// The first and last columns the glyph inks as it is drawn at the button's size (X, Y), black on white and read
         /// as ink past Chrome.InkStep: what the dialog's title row sets the cross's gap to its edge by (ChromeHost.GlyphEnd).
-        internal Point InkColumns()
+        internal Point InkColumns(Size size)
         {
-            if (inkFor == Size && inkColumns.Y >= 0) return inkColumns;
-            int width = Math.Max(1, Width), height = Math.Max(1, Height);
+            if (inkFor == size && inkColumns.Y >= 0) return inkColumns;
+            int width = Math.Max(1, size.Width), height = Math.Max(1, size.Height);
             using (var drawn = new Bitmap(width, height, PixelFormat.Format32bppArgb))
             {
                 using (Graphics g = Graphics.FromImage(drawn))
                 {
                     g.Clear(Color.White);
-                    Glyph(g, Color.Black);
+                    Glyph(g, Color.Black, width, height);
                 }
                 inkColumns = Chrome.InkColumns(drawn, Color.White, new Rectangle(0, 0, width, height));
             }
-            inkFor = Size;
+            inkFor = size;
             return inkColumns;
         }
 
@@ -1660,8 +1659,14 @@ namespace CodexAutoResume
 
         internal void Glyph(Graphics g, Color ink)
         {
+            Glyph(g, ink, Width, Height);
+        }
+
+        /// The glyph as the button draws it, in a button `width` by `height` (InkColumns asks it at a size it is to have).
+        private void Glyph(Graphics g, Color ink, int width, int height)
+        {
             float unit = Soft.PxF(1.0), box = Soft.PxF(Brand.CaptionGlyph);
-            float ox = (float)Math.Round((Width - box) / 2f), oy = (float)Math.Round((Height - box) / 2f);
+            float ox = (float)Math.Round((width - box) / 2f), oy = (float)Math.Round((height - box) / 2f);
             float stroke = Math.Max(1f, Soft.PxF(Brand.CaptionStroke));
             float corner = Soft.PxF(Brand.CaptionGlyphCorner);
             GraphicsState state = g.Save();
