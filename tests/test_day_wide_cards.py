@@ -20,6 +20,7 @@ from unittest import mock
 from codex_auto_resume import brand, notice_card
 from codex_auto_resume.brand.colour import contrast
 from codex_auto_resume.ui import popup as tray_popup
+from codex_auto_resume.ui.tray import tipcard
 
 LOOKS = ("birthday", "new_year", "christmas", "seollal", "chuseok")
 
@@ -128,6 +129,39 @@ class PopupTests(_Surface, unittest.TestCase):
         plan, _ = self.draw("new_year", locale="ar")
         band = band_of(plan)
         self.assertEqual(band["rect"][0], plan["card"][0] + 1)
+
+
+class TipCardTests(_Surface, unittest.TestCase):
+    PARTS = {"title": "Codex Auto Resume", "line": [("Watching for interruptions", False), ("1:20", True)],
+             "meter": [{"label": "5h", "fraction": 0.42, "percent": "42%"}]}
+
+    def draw(self, look, theme="light", contrast=False, design=brand.DEFAULT_DESIGN):
+        plan, pixels = tipcard.draw_offscreen(self.PARTS, "monitoring", theme=theme, day=look, contrast=contrast, design=design)
+        return plan, pixels
+
+    def test_the_card_takes_the_day_at_its_outer_side(self):
+        for theme in ("light", "dark"):
+            plain_plan, plain = self.draw(None, theme)
+            for look in LOOKS:
+                with self.subTest(theme=theme, look=look):
+                    plan, pixels = self.draw(look, theme)
+                    band = self.check_band(plan, pixels, look)
+                    self.assertTrue(band["scene_shown"])
+                    self.check_outside(plain_plan, plain, plan, pixels, band)
+                    self.check_words_stand_on_the_card(plan, band, theme)
+                    self.assertEqual(plan["size"][1], plain_plan["size"][1], "as tall as on any other day")
+                    self.assertGreater(plan["size"][0], plain_plan["size"][0])
+
+    def test_none_in_high_contrast_or_classic(self):
+        for kwargs in ({"contrast": True}, {"design": "classic"}):
+            plan, _ = self.draw("christmas", **kwargs)
+            self.assertIsNone(band_of(plan), kwargs)
+
+    def test_only_the_watcher_s_own_icon_reads_the_date(self):
+        self.assertFalse(tipcard.TipCard(content=lambda: None).days)
+        from pathlib import Path
+        source = (Path(tipcard.__file__).resolve().parent / "icon.py").read_text(encoding="utf-8")
+        self.assertIn("log=self.log, days=self.days)", source)
 
 
 if __name__ == "__main__":
