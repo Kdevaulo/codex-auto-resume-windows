@@ -233,8 +233,40 @@ namespace CodexAutoResume
                 said["first"] = (double)(dialog.Veil == null ? -1 : dialog.Veil.Alpha);
                 said["veilOnFirst"] = dialog.Veil != null && CardNative.IsWindowVisible(dialog.Veil.Handle);
                 said["cloakedFirst"] = CardNative.Cloaked(h);
-                CardNative.Pump(40);
+                said["opensWithFade"] = dialog.OpensWithFade;
+                // Its opening, sampled every few milliseconds: when it is first seen (uncloaked), at what alpha, with the
+                // veil on or not, and how its alpha goes from there.
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                double seenAt = -1, opaqueAt = -1, alphaSeen = -1, last = -1;
+                bool rising = true, veilAtSeen = false;
+                while (clock.ElapsedMilliseconds < 700)
+                {
+                    Application.DoEvents();
+                    bool cloaked = CardNative.Cloaked(h);
+                    int alpha = dialog.FadeAlpha;
+                    double now = clock.Elapsed.TotalMilliseconds;
+                    if (!cloaked && seenAt < 0)
+                    {
+                        seenAt = now;
+                        alphaSeen = alpha;
+                        veilAtSeen = dialog.Veil != null && CardNative.IsWindowVisible(dialog.Veil.Handle);
+                    }
+                    if (seenAt >= 0)
+                    {
+                        if (alpha < last) rising = false;
+                        last = alpha;
+                        if (alpha >= 255 && opaqueAt < 0) opaqueAt = now;
+                    }
+                    Thread.Sleep(3);
+                }
+                said["alphaSeen"] = alphaSeen;
+                said["seenToOpaque"] = opaqueAt < 0 || seenAt < 0 ? -1 : opaqueAt - seenAt;
+                said["rising"] = rising;
+                said["veilAtSeen"] = veilAtSeen;
+                said["layeredAfter"] = (CardNative.GetWindowLong(h, CardNative.GWL_EXSTYLE) & 0x00080000) != 0;
+                CardNative.Pump(5);
                 said["cloakedAfter"] = CardNative.Cloaked(h);
+                said["paintedBeforeSeen"] = dialog.PaintedBeforeSeen;
                 said["open"] = Veiled(dialog, owner);
                 IntPtr veil = dialog.Veil == null ? IntPtr.Zero : dialog.Veil.Handle;
                 if (still)
@@ -605,6 +637,31 @@ class DialogCardTests(unittest.TestCase):
                 self.assertTrue(said["veilOnFirst"], "on the screen as the dialog is shown")
                 self.assertTrue(said["cloakedFirst"], "the dialog is held off the screen until it has painted")
                 self.assertFalse(said["cloakedAfter"], "and comes on once it has")
+                # Re-check 9: the whole of it painted again, invalidated and updated, before DWM lets it be seen.
+                self.assertTrue(said["paintedBeforeSeen"], "everything in it painted before it is seen")
+
+    def test_a_dialog_fades_in_from_clear_once_painted_and_only_where_motion_is_allowed(self):
+        """v0.6.24-beta.3 (the owner, 2026-11-17, "우리 거로 하자"): its own fade in, not Windows' transition. Painted while
+        held off the screen, it is first seen at (near) zero alpha with the veil already on, and rises - never falling - to
+        opaque over brand's transition (160 ms); then it is an ordinary window again. With motion reduced (this product's
+        setting, Windows' animations off) it is opaque as it is first seen, and never layered."""
+        transition = 160
+        for scene in ("moving", "region", "dark"):
+            with self.subTest(scene=scene):
+                said = self.answer["veil"][scene]
+                self.assertTrue(said["opensWithFade"])
+                self.assertTrue(0 <= said["alphaSeen"] <= 40, "first seen nearly clear, at %s" % said["alphaSeen"])
+                self.assertTrue(said["veilAtSeen"], "the veil on no later than its first frame")
+                self.assertTrue(said["rising"], "its alpha only rises")
+                self.assertTrue(transition * 0.5 <= said["seenToOpaque"] <= transition + 300,
+                                "opaque %.0f ms after it is first seen" % said["seenToOpaque"])
+                self.assertFalse(said["layeredAfter"], "an ordinary window once opaque")
+        for scene in ("windowsStill", "still"):
+            with self.subTest(scene=scene):
+                said = self.answer["veil"][scene]
+                self.assertFalse(said["opensWithFade"])
+                self.assertEqual(said["alphaSeen"], 255, "no fade with motion off: opaque at once")
+                self.assertFalse(said["layeredAfter"])
 
     def test_the_dark_veil_dims_the_dark_window_as_the_light_one_does_the_light(self):
         """Live re-check 7: in dark, 20 % took the Dashboard's mean grey only from 37.5 to 32; in light from 234 to 192, a
