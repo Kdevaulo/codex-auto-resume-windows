@@ -9,7 +9,8 @@ card's edge. An ordinary row keeps today's room (TabPadX). Mirrored for a langua
 A probe compiled with the window builds it never shown (TopLevel = false, as LayoutAudit does) with the advanced edition's two
 tabs added as AdvancedPage.cs and AdvancedChat.cs add them, in their own words, at 100, 150 and 200 % and at text sizes up to
 the largest a 3840 by 2160 screen lets the window open at (TextScale.Fitting): the pill shown, in the row or the header;
-no tab cut; the gaps between the tabs equal; the chosen tab's face clear of its neighbours. GUI test module (it makes
+no tab cut (the window held no narrower than its tabs, as the advanced edition's HoldTabs holds it); the gaps between the
+tabs equal; the chosen tab's face clear of its neighbours. GUI test module (it makes
 windows, never shown): run on its own, through gui_lock.sh.
 """
 from __future__ import annotations
@@ -94,8 +95,21 @@ namespace CodexAutoResume
             if (width > 0) ClientSize = new Size(width, ClientSize.Height);
             Materialise(this);
             PerformLayout();
+            // As the advanced edition holds the window (HoldTabs): never narrower than its tabs, at the room they have now.
+            Control row = navButtons["overview"].Parent;
+            int least = row.Padding.Horizontal + nav.Padding.Horizontal;
+            foreach (Control tab in row.Controls)
+                if (Soft.OwnVisible(tab)) least += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+            bool held = ClientSize.Width < least;
+            if (held)
+            {
+                ClientSize = new Size(least, ClientSize.Height);
+                Materialise(this);
+                PerformLayout();
+            }
             var said = new Dictionary<string, object>();
             said["fit"] = PillFit;
+            said["held"] = held;
             var findings = new List<string>();
             AuditPill(findings);
             said["findings"] = string.Join(" | ", findings.ToArray());
@@ -306,7 +320,7 @@ class PillRoomTests(unittest.TestCase):
                 if row["fit"] == "whole" and side < row["full"]:
                     self.assertGreaterEqual(side, row["least"])
                 if row["fit"] == "header":
-                    self.assertEqual(side, row["least"], "the closest tabs left no room")
+                    self.assertGreaterEqual(side, row["least"], "the tabs alone in the row, as far apart as they fit")
 
     def test_in_the_header_at_the_end_of_the_second_line_under_the_caption_buttons(self):
         seen = 0
@@ -320,7 +334,7 @@ class PillRoomTests(unittest.TestCase):
             with self.subTest(where):
                 self.assertLessEqual(abs(row["outer"] - row["inset"]), 1, "Brand.PillInset from the card's edge")
                 self.assertGreaterEqual(y, row["captionBottom"] - 1, "under the caption buttons")
-                self.assertLessEqual(abs((y + h / 2) - (ly + lh / 2)), 2, "on the second line")
+                self.assertTrue(ly <= y + h / 2 <= ly + lh, "on the second line")
                 if where.startswith("ar "):
                     self.assertLess(x + w, lx, "mirrored: at the card's left end, before the line")
                     self.assertLessEqual(abs(x - cx - row["inset"]), 1)

@@ -1314,8 +1314,9 @@ namespace CodexAutoResume
         private void KeepHeadlineClear()
         {
             if (chrome == null) return;
-            // The card's padding at its outer side, the caption buttons': the pill's inset while it is in the card (PillToHeader).
-            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - (Mirror.Of(hero) ? hero.Padding.Left : hero.Padding.Right);
+            // The card's padding at its outer side, the caption buttons' - its right, which the card mirrors for a language
+            // written right to left: the pill's inset while it is in the card (PillToHeader).
+            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - hero.Padding.Right;
             var wanted = new Padding(0, 0, Math.Max(0, reach), 0);
             if (headline.Margin != wanted) headline.Margin = wanted;
         }
@@ -1965,10 +1966,11 @@ namespace CodexAutoResume
                 {
                     pillSlot.Controls.Remove(versionPill);
                     int inset = Px(Brand.PillInset);
-                    hero.Padding = Mirror.Of(hero) ? new Padding(inset, heroPadding.Top, heroPadding.Right, heroPadding.Bottom)
-                                                   : new Padding(heroPadding.Left, heroPadding.Top, inset, heroPadding.Bottom);
+                    // The card's right and the pill's left as a language written left to right has them: the card mirrors both
+                    // for one written right to left (measured: swapped here as well, the pill stood 32 px in, 2026-11-18).
+                    hero.Padding = new Padding(heroPadding.Left, heroPadding.Top, inset, heroPadding.Bottom);
                     versionPill.Anchor = AnchorStyles.None;
-                    versionPill.Margin = Mirror.Of(hero) ? new Padding(0, 0, Px(12), 0) : new Padding(Px(12), 0, 0, 0);
+                    versionPill.Margin = new Padding(Px(12), 0, 0, 0);
                     hero.Controls.Add(versionPill, 2, 1);
                     hero.SetColumnSpan(headline, 2);
                 }
