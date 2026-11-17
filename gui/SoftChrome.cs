@@ -1881,6 +1881,8 @@ namespace CodexAutoResume
         protected override void CreateHandle()
         {
             MakeTitle();
+            // Decided as its window is made: it fades in (OpensWithFade) and is made layered, clear, to do so.
+            fadeIn = TopLevel && Soft.StillReady == null && !Soft.ReduceMotion;
             base.CreateHandle();
         }
 
@@ -2082,6 +2084,7 @@ namespace CodexAutoResume
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
+            StopFade();
             Unveil();
             base.OnFormClosed(e);
         }
@@ -2212,10 +2215,96 @@ namespace CodexAutoResume
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            if (!TopLevel || Soft.StillReady != null || IsWindowVisible(Handle)) return;
-            int on = 1;
-            try { cloaked = DwmSetCloak(Handle, DWMWA_CLOAK, ref on, 4) == 0; }
-            catch (Exception) { cloaked = false; }
+            // Clear until it fades in (OpenFade): a layered window is drawn at the alpha last asked of it.
+            if (fadeIn && TopLevel) SetFade(0);
+            if (TopLevel && Soft.StillReady == null && !IsWindowVisible(Handle))
+            {
+                int on = 1;
+                try { cloaked = DwmSetCloak(Handle, DWMWA_CLOAK, ref on, 4) == 0; }
+                catch (Exception) { cloaked = false; }
+            }
+            // Not held off the screen (DWM refused, or a window made anew while shown): no fade, opaque at once.
+            if (fadeIn && TopLevel && !cloaked) SetFade(255);
+        }
+
+        // ------------------------------------------------------------------ its own opening fade
+        // v0.6.24-beta.3 (the owner, 2026-11-17, "우리 거로 하자"): a dialog opens with a fade of ours, not Windows'
+        // transition - which the cloak above had taken away. Held off the screen until it and everything in it is painted,
+        // it comes on fully clear and fades to opaque over brand's transition (Motion.Duration, 160 ms) on brand's curve
+        // (Motion.Ease), stepped as the menus' and the tray popup's openings are (Motion.Interval); the veil over its owner
+        // is on before. With motion reduced - this product's setting, Windows' animations off, High Contrast
+        // (Soft.ReduceMotion) - it is simply there, opaque, and is never layered; never in a still, a render or the audit
+        // (Soft.StillReady, a dialog laid out as a child). Its closing is left as it was. Once opaque it is an ordinary
+        // window again (WS_EX_LAYERED taken off).
+
+        [DllImport("user32.dll")]
+        private static extern bool SetLayeredWindowAttributes(IntPtr window, int key, byte alpha, int flags);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+
+        private const int WS_EX_LAYERED = 0x00080000, GWL_EXSTYLE = -20, LWA_ALPHA = 2;
+        private const uint RDW_FRAME = 0x0400;
+        private bool fadeIn;
+        private int fadeAlpha = 255;
+        private Timer fade;
+        private System.Diagnostics.Stopwatch fading;
+
+        /// Whether it opens with its own fade, and its alpha now (255 once opaque, and for one that does not fade): for
+        /// the tests.
+        internal bool OpensWithFade { get { return fadeIn; } }
+        internal int FadeAlpha { get { return fadeAlpha; } }
+
+        private void SetFade(int alpha)
+        {
+            fadeAlpha = Math.Max(0, Math.Min(255, alpha));
+            try { SetLayeredWindowAttributes(Handle, 0, (byte)fadeAlpha, LWA_ALPHA); }
+            catch (Exception) { }
+        }
+
+        // Uncloaked, painted and clear: from here to opaque.
+        private void OpenFade()
+        {
+            if (!fadeIn || !IsHandleCreated) return;
+            fading = System.Diagnostics.Stopwatch.StartNew();
+            fade = new Timer();
+            fade.Interval = Motion.Interval;
+            fade.Tick += delegate { FadeStep(); };
+            fade.Start();
+        }
+
+        private void FadeStep()
+        {
+            if (!IsHandleCreated || fading == null) { StopFade(); return; }
+            double t = fading.Elapsed.TotalMilliseconds / Math.Max(1, Motion.Duration);
+            if (t < 1.0)
+            {
+                SetFade((int)Math.Round(255 * Motion.Ease(t)));
+                return;
+            }
+            SetFade(255);
+            StopFade();
+            // Opaque: an ordinary window again, drawn whole.
+            try
+            {
+                long style = GetWindowLongPtr(Handle, GWL_EXSTYLE).ToInt64();
+                SetWindowLongPtr(Handle, GWL_EXSTYLE, new IntPtr(style & ~(long)WS_EX_LAYERED));
+                RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+            }
+            catch (Exception) { }
+            fadeIn = false;
+        }
+
+        private void StopFade()
+        {
+            if (fade != null)
+            {
+                fade.Stop();
+                fade.Dispose();
+            }
+            fade = null;
+            fading = null;
         }
 
         // Should no paint come (a window shown and hidden at once), it comes on all the same a moment later.
@@ -2250,6 +2339,7 @@ namespace CodexAutoResume
             int off = 0;
             try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
             catch (Exception) { }
+            OpenFade();
         }
 
         private const int WM_SHOWWINDOW = 0x0018, WM_DESTROY = 0x0002;
@@ -2368,6 +2458,7 @@ namespace CodexAutoResume
             {
                 CreateParams created = base.CreateParams;
                 Chrome.Uncaption(created, ClientSize);
+                if (fadeIn && TopLevel) created.ExStyle |= WS_EX_LAYERED;
                 return created;
             }
         }
