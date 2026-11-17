@@ -1760,7 +1760,8 @@ class ThemeSourceRuleTests(unittest.TestCase):
                         "the new window is started before this one gives up")
         # The wait asks the new process for its window first and whether it ended second, and its answer alone
         # decides the ending (FinishReopen, driven both ways by the probe).
-        self.assertLess(reopen.index("started.MainWindowHandle != IntPtr.Zero"), reopen.index("started.HasExited"))
+        # v0.6.24-beta.2: its window on the screen - shown, and no longer cloaked until its first paint (OnScreen).
+        self.assertLess(reopen.index("OnScreen(started.MainWindowHandle)"), reopen.index("started.HasExited"))
         self.assertIn("shown = AwaitWindow(", reopen)
         self.assertIn("FinishReopen(shown)", reopen)
         self.assertEqual(reopen.count("FinishReopen("), 1)

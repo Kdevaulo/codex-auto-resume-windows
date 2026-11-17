@@ -1586,6 +1586,12 @@ namespace CodexAutoResume
                 if (hostHeld) pageHost.ResumeLayout(false);
                 if (paused) Redraw(pageHost, true);
             }
+            // v0.6.24-beta.2 (M-CORNER re-check 8, odd item 1): the page shown painted whole now, with its tab, before anything
+            // queued for the window runs. A paint is the last thing a window's thread takes, so a first switch to Diagnostics
+            // painted a control at a time between the answers that came meanwhile - the compatibility card's first answer held
+            // the thread 0.7-1.5 s - and a person saw Diagnostics' top over the Overview, its Start watcher cut in half, for
+            // seconds.
+            if (paused) PaintNow(this);
             // Coming back to Pending: the countdowns the clock did not write while it was hidden.
             if (name == "pending" && snapshot != null) WriteCountdowns(Now());
             if (auditing) return;
@@ -1599,6 +1605,16 @@ namespace CodexAutoResume
             // after a read asked for the same answer again - 17-87 ms of Python and up to 45 ms of
             // redrawing, for nothing new.
             if (!settings && (snapshot == null || snapshotAge.ElapsedMilliseconds >= FreshMilliseconds)) RefreshNow();
+        }
+
+        private const int RDW_UPDATENOW = 0x0100;
+
+        /// v0.6.24-beta.2: everything in `control` that waits to be painted, painted now (RDW_UPDATENOW), not once the thread
+        /// has nothing else to do.
+        private static void PaintNow(Control control)
+        {
+            if (control.IsHandleCreated && !control.IsDisposed)
+                RedrawWindow(control.Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN);
         }
 
         /// A page, built the first time it is shown. Building all five before the first screen

@@ -189,8 +189,50 @@ namespace CodexAutoResume
             if (compatOverall == null) return;
             // v0.6.23: the page laid out once, after the card has been written (HoldPages).
             List<Control> held = HoldPages();
-            try { WriteCompatibility(); }
-            finally { LayOutHeld(held); }
+            // v0.6.24-beta.2 (M-CORNER re-check 8, odd item 1): and Diagnostics on screen too, as ShowPage shows a page -
+            // its painting paused, everything in it that lays others out held while the card is written, let go innermost
+            // first, then painted whole. Written line by line into the page on screen, each line laid the whole page out
+            // again: the first answer after a first switch to Diagnostics held the window 0.7-1.5 s (v0.6.23 too), with
+            // the page painted half between.
+            Control page = CompatPageOnScreen();
+            bool paused = page != null && Redraw(page, false);
+            List<Control> inner = null;
+            bool written = false;
+            try
+            {
+                if (page != null)
+                {
+                    page.SuspendLayout();
+                    inner = HoldWithin(page);
+                }
+                WriteCompatibility();
+                written = true;
+            }
+            finally
+            {
+                LayOutHeld(held);
+                if (page != null)
+                {
+                    // After a throw, let go without a layout, which may be what threw (as ShowPage does).
+                    if (inner != null)
+                    {
+                        if (written) LetGoWithin(inner);
+                        else for (int i = inner.Count - 1; i >= 0; i--) if (!inner[i].IsDisposed) inner[i].ResumeLayout(false);
+                    }
+                    if (!page.IsDisposed) page.ResumeLayout(written);
+                    if (paused) Redraw(page, true);
+                }
+            }
+            // The window, not the page alone: the page's redraw let on again leaves the page host under it to paint too.
+            if (paused) PaintNow(this);
+        }
+
+        /// The Diagnostics page while it is the page on screen; null otherwise.
+        private Control CompatPageOnScreen()
+        {
+            Control page;
+            if (currentPage != "diagnostics" || !pages.TryGetValue("diagnostics", out page)) return null;
+            return Soft.OwnVisible(page) && compatOverall != null && page.Contains(compatOverall) ? page : null;
         }
 
         private void WriteCompatibility()
