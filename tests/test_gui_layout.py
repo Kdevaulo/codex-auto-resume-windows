@@ -572,7 +572,7 @@ class WindowCompositionTests(unittest.TestCase):
         return source[start:source.index("\n        }\n", start)]
 
     def test_the_window_opens_at_a_size_the_overview_fits_and_does_not_grow(self):
-        """1000 by 588 (v0.6.24-beta.2, the owner's decision of 2026-11-16; 664 from v0.6.5): the Overview whole in every
+        """1000 by 618 (v0.6.24, the owner's decision of 2026-11-18; 588 in v0.6.24-beta.2, 664 from v0.6.5): the Overview whole in every
         language at every scaling, each card a little taller than what it holds and the page's rhythm under the last row
         (LayoutAuditTests holds the page to it) - the pages as tall as in the beta's 1000 by 681, which had a footer card
         under every page and a header card 14 px taller. It now fits a 1920 by 1080 screen at 150% whole; on a shorter
@@ -581,7 +581,7 @@ class WindowCompositionTests(unittest.TestCase):
         self.assertIn("ClientSize = new Size(Px(OpeningWidth), Px(OpeningHeight));", self.window)
         width = int(re.search(r"internal const int OpeningWidth = (\d+);", self.window).group(1))
         height = int(re.search(r"internal const int OpeningHeight = (\d+);", self.window).group(1))
-        self.assertEqual((width, height), (1000, 588))
+        self.assertEqual((width, height), (1000, 618))
         # The work area of 1920 by 1080 at 150% with the taskbar (72 device pixels), and the frame the window keeps there
         # with no title bar of Windows' (v0.6.24): 11 px below its client area at 144 DPI (SHORTEST_AT_150).
         self.assertLessEqual(round(width * 1.5) + 22, 1920)

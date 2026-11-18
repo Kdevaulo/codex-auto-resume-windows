@@ -80,9 +80,10 @@ class ReadmePlanTests(unittest.TestCase):
 
     def test_the_readme_pictures_are_exactly_the_bare_window(self):
         """The owner, 2026-10-19: the caption stood too far from the picture, first for an empty margin round the
-        window, then for its drop shadow, which a dark page does not show. The canvas is the window itself, 1500x882
-        like the still window pictures (1021 in v0.6.24-beta, 1041 until v0.6.24 took Windows' title bar away), with
-        no shadow, and the pointer rests on it."""
+        window, then for its drop shadow, which a dark page does not show. The canvas is the window itself, 1500x927
+        like the still window pictures (1000 by 618 at the pinned 150 %, the owner's decision of 2026-11-18; 882 in
+        v0.6.24-beta.2, 1021 in v0.6.24-beta, 1041 until v0.6.24 took Windows' title bar away), with no shadow, and
+        the pointer rests on it."""
         import make_screenshots as shots
         still = shots.read_png(ROOT / "assets" / "screenshot-dashboard.png")
         for name in make_motion.PLAN_NAMES:
