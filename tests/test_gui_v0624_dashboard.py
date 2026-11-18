@@ -601,7 +601,7 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertEqual(pill["findings"], "", "the layout audit's AuditPill")
                 self.assertIn("0.6.24-beta.2", pill["text"])
                 # v0.6.24 (the owner, 2026-11-18): the version alone, the edition told by its ink and to a screen reader.
-                self.assertEqual(pill["text"], "v0.6.24-beta.2", "the version alone, never the edition's word")
+                self.assertEqual(pill["text"], "0.6.24-beta.2", "the number alone (2026-11-19), never the edition's word")
                 self.assertEqual(pill["name"], pill["text"] + " " + said["advancedWord"], "a screen reader is told both")
                 x, y, w, h = pill["pill"]
                 tx, ty, tw, th = pill["tabs"]
@@ -616,7 +616,7 @@ class DashboardProportionsTests(unittest.TestCase):
                     self.assertGreater(x, tx + tw, "and after the last tab")
                 standard = said["standard"]
                 self.assertEqual(standard["fit"], "whole")
-                self.assertEqual(standard["text"], "v0.6.24-beta.2", "the standard edition is named nowhere (2026-10-05)")
+                self.assertEqual(standard["text"], "0.6.24-beta.2", "the standard edition is named nowhere (2026-10-05)")
 
     def test_the_tab_row_s_ends_stand_inside_the_header_card_s_edges(self):
         """The owner, 2026-11-17 (the design canvas's row 18): a round end lined up on a straight edge looks as if it sticks
@@ -638,7 +638,7 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertIn(narrow["fit"], ("whole", "version"))
                 self.assertEqual(narrow["findings"], "")
                 if narrow["fit"] == "version":
-                    self.assertEqual(narrow["text"], "v0.6.24-beta.2")
+                    self.assertEqual(narrow["text"], "0.6.24-beta.2")
                     self.assertIn(said["advancedWord"], narrow["name"], "the edition is still said to a screen reader")
                 # v0.6.24 (the owner, 2026-11-18): never hidden - where even the closest tabs leave no room, in the header
                 # card (test_gui_pill_room).

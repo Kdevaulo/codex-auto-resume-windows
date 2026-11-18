@@ -154,10 +154,11 @@ class TooltipTests(unittest.TestCase):
 
 class PanelTests(unittest.TestCase):
     def test_the_heading_names_the_edition_beside_the_version(self):
+        # v0.6.24 (the owner, 2026-11-19, "버전 표시에 v 빼고 버전 숫자만 넣자"): the version's number alone, no "v".
         script = (ROOT / "src" / "codex_auto_resume" / "mcp" / "assets" / "panel.js").read_text(encoding="utf-8")
         heading = script[script.index("function renderHero("):]
         heading = heading[:heading.index("var line = ")]
-        self.assertIn("'Codex Auto Resume · v' + (status.version || '?')", heading)
+        self.assertIn("'Codex Auto Resume · ' + (status.version || '?')", heading)
         # v0.6.14: an advanced edition's word only - the standard edition is named nowhere beside the version.
         self.assertIn("var named = status.edition && status.edition !== '%s';" % tray.UNNAMED_EDITION, heading)
         self.assertIn("if (named) eyebrow.appendChild(element('span', 'edition', "
@@ -182,20 +183,20 @@ class PanelTests(unittest.TestCase):
             })()"""), data=data, locale="ko")
             word = l10n._read("ko")["edition." + code]
             with self.subTest(code):
-                self.assertEqual(shown["own"], "Codex Auto Resume · v0.6.11-beta.2 ")
+                self.assertEqual(shown["own"], "Codex Auto Resume · 0.6.11-beta.2 ")
                 self.assertEqual(shown["spans"], [["span", "edition", word]])
-                self.assertEqual(shown["text"], "Codex Auto Resume · v0.6.11-beta.2 " + word)
+                self.assertEqual(shown["text"], "Codex Auto Resume · 0.6.11-beta.2 " + word)
         # A status that names no edition shows the version alone, as before - and since v0.6.14 so does one that
         # names the standard edition: no space after the version, nothing after it.
         shown = run_page(say("ROOT_NODE.all(function (n) { return n.className === 'eyebrow'; })"
                              ".map(function (n) { return [n.textContent, n.children.length]; })"))
-        self.assertEqual(shown, [["Codex Auto Resume · v0", 0]])
+        self.assertEqual(shown, [["Codex Auto Resume · 0", 0]])
         data = snapshot(interface_language="ko")
         data["status"].update(version="0.6.11-beta.2", edition="standard")
         shown = run_page(say("ROOT_NODE.all(function (n) { return n.className === 'eyebrow'; })"
                              ".map(function (n) { return [n.textContent, n._text, n.children.length]; })"),
                          data=data, locale="ko")
-        self.assertEqual(shown, [["Codex Auto Resume · v0.6.11-beta.2", "Codex Auto Resume · v0.6.11-beta.2", 0]])
+        self.assertEqual(shown, [["Codex Auto Resume · 0.6.11-beta.2", "Codex Auto Resume · 0.6.11-beta.2", 0]])
 
     @unittest.skipUnless(NODE, "needs Node to run the panel's own code")
     def test_the_standard_edition_is_named_nowhere_in_the_heading(self):
@@ -210,7 +211,7 @@ class PanelTests(unittest.TestCase):
                       editions: ROOT_NODE.all(function (n) { return n.className === 'edition'; }).length};
             })()"""), data=data, locale=locale)
             with self.subTest(locale):
-                self.assertEqual(shown, {"text": "Codex Auto Resume · v0.6.14", "own": "Codex Auto Resume · v0.6.14",
+                self.assertEqual(shown, {"text": "Codex Auto Resume · 0.6.14", "own": "Codex Auto Resume · 0.6.14",
                                          "children": 0, "editions": 0})
                 self.assertNotIn(l10n._read(locale)["edition.standard"], shown["text"])
 
