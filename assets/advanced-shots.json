@@ -110,99 +110,99 @@
       "passed": true,
       "worst": 0
     },
-    "window": "b16c0c143f0ce71bee27b59fc9d676406d7c9e08f272fa359c17cd4bf0b0efc4"
+    "window": "b745816d3722455160232153fa5c3cd438418a3bb3501d50fae99a3f2e8335db"
   },
   "images": {
     "docs/images/advanced-page-after-ko.png": {
-      "sha256": "30f3acc8d381952e69591e81587f928d820addda6d64b30c3b8b18ca531c71f3",
-      "size": "1500x882"
+      "sha256": "6d5df93431f0792f2ece18199d689068ce2b64888ca6c1de04b9b5fbd0743486",
+      "size": "1500x927"
     },
     "docs/images/advanced-page-after.png": {
-      "sha256": "80ef09cf2e2683de3a10b9bcaedcef1fa90bdcb4820a8d48fa2d49d68023e3a6",
-      "size": "1500x882"
+      "sha256": "a876c1c8d60c1ae5d1f8e569dfc3d45892298bf742b70426b397bc72d02a914c",
+      "size": "1500x927"
     },
     "docs/images/advanced-page-before-ko.png": {
-      "sha256": "33ff0c67d9c5c64b0f6e6331e92c388f829c9426d750f4302ac4e40f1c044116",
-      "size": "1500x882"
+      "sha256": "fdf92e2bb89b797a414c1c2038f74167b4002dafe6b261dde28f6127c361850c",
+      "size": "1500x927"
     },
     "docs/images/advanced-page-before.png": {
-      "sha256": "e16995220d8c69a341c0415f60ff5decceae814368faeb71afd896b4cb7e4e54",
-      "size": "1500x882"
+      "sha256": "9e78f9f782dd25d48dcda5cec5576544f22a7691b6e9a278e8135d9cbe855578",
+      "size": "1500x927"
     },
     "docs/images/advanced-pause-after-ko.png": {
-      "sha256": "fdd301ab0a52f863029b6ae6e6a7b045f8fa73abcaab25d5583137bae00cc6b7",
-      "size": "1500x882"
+      "sha256": "d9c8058d0792745b60f52b3b86d2b41f3fc9473d5c06fc1c191b4393a03919ca",
+      "size": "1500x927"
     },
     "docs/images/advanced-pause-after.png": {
-      "sha256": "da10f3f05a277970e812c7a058585932aff369e1e5bb884ed2f6c0a65cd17983",
-      "size": "1500x882"
+      "sha256": "45734820d47e32bc82a0ee36e016d2f6840522304ae985c469de266274665d04",
+      "size": "1500x927"
     },
     "docs/images/advanced-pause-before-ko.png": {
-      "sha256": "33ff0c67d9c5c64b0f6e6331e92c388f829c9426d750f4302ac4e40f1c044116",
-      "size": "1500x882"
+      "sha256": "fdf92e2bb89b797a414c1c2038f74167b4002dafe6b261dde28f6127c361850c",
+      "size": "1500x927"
     },
     "docs/images/advanced-pause-before.png": {
-      "sha256": "e16995220d8c69a341c0415f60ff5decceae814368faeb71afd896b4cb7e4e54",
-      "size": "1500x882"
+      "sha256": "9e78f9f782dd25d48dcda5cec5576544f22a7691b6e9a278e8135d9cbe855578",
+      "size": "1500x927"
     },
     "docs/images/advanced-report-ko.png": {
-      "sha256": "a4e9c4a0dd24b12964df5562c66fab8976462a5e8323df51b5f90ff4fe34b934",
-      "size": "1500x882"
+      "sha256": "c4f79f54459d90a0b18f051e7bf60922eb4649bdfa6185a528585ee803a1b933",
+      "size": "1500x927"
     },
     "docs/images/advanced-report.png": {
-      "sha256": "3328aea213b0a7fb648b5f3596fa1cefdc2535c7b6af9a259ffa9379f69eb9aa",
-      "size": "1500x882"
+      "sha256": "74e1d1d78e87175f2a4a632f5e7fed49b3265e5b505cdd9cf849598004aad863",
+      "size": "1500x927"
     },
     "docs/images/advanced-scheduled-after-ko.png": {
-      "sha256": "b66ede602b639808f6d290b4b241105ac250303d029b7651b3e03b9a2ca27cda",
-      "size": "1500x882"
+      "sha256": "1ae2b19948f0665fb0a3bfadedc94488ee2a1cc096aaeb8c3bd8521ead77e33c",
+      "size": "1500x927"
     },
     "docs/images/advanced-scheduled-after.png": {
-      "sha256": "0533898ab68a9719d4ff288d189c6e339d5417ee56d117f54bbc50767be59e32",
-      "size": "1500x882"
+      "sha256": "b0ed4c5fed16ba2d78faf80f1f64963bcc0fe7fdd902a521e7e4b2e71ed1bb84",
+      "size": "1500x927"
     },
     "docs/images/advanced-scheduled-before-ko.png": {
-      "sha256": "3fb2cef19fbe1f3e9f7f7e654f1a656d8e58ee2e3e239dcda4c6191958e0bc78",
-      "size": "1500x882"
+      "sha256": "c59360be3124171e113f5f5869e29d05005d509263903075e7ef69eab1c88c1c",
+      "size": "1500x927"
     },
     "docs/images/advanced-scheduled-before.png": {
-      "sha256": "fe9896264eb7409354442d9a29205e3e4249d3b0ea0053235b5f1e7352944257",
-      "size": "1500x882"
+      "sha256": "9b9b5ffebf8523adb4151b792db72b05d4a7dab57fe47a49a86bc3906e8114a0",
+      "size": "1500x927"
     },
     "docs/images/advanced-usage-numbers-ko.png": {
-      "sha256": "a109dac572e94cad6db2a9264434b048632b7dcebcec0a52882cb44994ba3f5a",
-      "size": "1500x882"
+      "sha256": "9045fe3c959d7523352674d12c7081c57a6efb7011dd1d05c1a6de2157dba656",
+      "size": "1500x927"
     },
     "docs/images/advanced-usage-numbers.png": {
-      "sha256": "e5e70cb5ab03936a23e88f261cdc5bd6cf9f091b00c3dcf802a67687ce5349ae",
-      "size": "1500x882"
+      "sha256": "f55fe741a128e0a81b856bc58af338a05cdf868a89ba4356019fb895ce3a1a9d",
+      "size": "1500x927"
     }
   },
   "inputs": {
-    "<advanced shot:P1-after:en>": "4ddfff5b6ec7a8268cc00a3556bf52bc85f2ce44232e53fd5dd8906bd85bc024",
-    "<advanced shot:P1-after:ko>": "d1ced598c8295b9cbde629f163ddf09fb3998f6a0aca9a8aec020a1b3d39c128",
-    "<advanced shot:P1-before:en>": "657856c5adfb89cf5f064d5420a0675e1a2ab42056c98cf8eb8c32292af26ff7",
-    "<advanced shot:P1-before:ko>": "10df8b007bfad454b175008f4491f7d8ca91d882d7cdea512e5d8041361c1c02",
-    "<advanced shot:P4-after:en>": "7dfbfb99f3156acc58625f3e86fb468819b8728fec1e53915684ef924d9dd07c",
-    "<advanced shot:P4-after:ko>": "4c9ca3f0bd8cae9c4abf7b01d1d32c652b2716f5990e492ee4de2d645f40af11",
-    "<advanced shot:P4-before:en>": "71d41dc4c2c9f0b68fb9e9913cd3f9f25c87a975f8b25b369d26fb6d0043a550",
-    "<advanced shot:P4-before:ko>": "3ea52be1e445e2f88b074aea608e5b4a4f01f57e799d28017b51c705a3186506",
-    "<advanced shot:P5:en>": "4ed8fefa885a49b07c9c129cc0f1b8af9f93a32eea88bb654624b2701ac0cb16",
-    "<advanced shot:P5:ko>": "1ab2ebe9e7126b3195fd9717ba90e8feecad4e05951686a0fb9a68739e85a5f1",
-    "<advanced shot:P7-after:en>": "04943b969f48334f769197e13f3201f4aedf91286679b2f99f01eed4331dbdf6",
-    "<advanced shot:P7-after:ko>": "6d1849e0fc7d5c2d371bd287ef7eedac65964478bfcb013437beef079e73e71e",
-    "<advanced shot:P7-before:en>": "04f80322f02d417f2ed2f7f7be7ff4640b0f3fc52434c646f23c9d29f36fcabe",
-    "<advanced shot:P7-before:ko>": "a817b67fa00fa1913f88818222f2b046ec0e7ec14a2e670715970caf54f4645d",
-    "<advanced shot:P8:en>": "71aa82bc5eb0a05bf9d9ccf62e21bfdce08cb89a8f6562e49a49c00c0cb11c07",
-    "<advanced shot:P8:ko>": "139711d6c32476af99c0b13e608cf94eab5224d9f34686adde042725b5d19a57"
+    "<advanced shot:P1-after:en>": "2214c627d8ad4ebf0c2c67a981b681b2c9d9ff9df7c81ac21881e6d02498ba57",
+    "<advanced shot:P1-after:ko>": "f3a89d048d3ad554275a3c190b78d3c4b6d071078f016541a96ed494ae08fcdc",
+    "<advanced shot:P1-before:en>": "b91dc210364707181845932ee6a9d96a545fed07adea81661c139ad76ead6099",
+    "<advanced shot:P1-before:ko>": "4df0dd6b4fc31ecff7eef248ccd6800707c1a3df0c739fbfb0f098514d9c8b60",
+    "<advanced shot:P4-after:en>": "f79dfdd9c53a975f161d9e80ea3e044476f0c8258f2818d5086bb10eb040f5c7",
+    "<advanced shot:P4-after:ko>": "01f3dd6e0fc7bf739af6ca56c01d984fa26cf1752d1b0bb40f8883cc605e1c5e",
+    "<advanced shot:P4-before:en>": "b49467c5eb66a754ebe70c02a8d01ffd087b533c6fc9b4a3ff0e66592b353819",
+    "<advanced shot:P4-before:ko>": "73c76c67ab0e63aa307bffa43ec0e6ce5191ecf65a40689794807e3d8deff1f1",
+    "<advanced shot:P5:en>": "cd02af55cfc5ac3f6d6693fbbaa4763c260c68c0f5a24fe9871edf3f576e502e",
+    "<advanced shot:P5:ko>": "84223beee770134089de8de678168884f1299cf99562a798b060b4df896b0408",
+    "<advanced shot:P7-after:en>": "70c104de2eb728f6c7da3aa0adb03c9f594aae0d67433b47384092a13edb8813",
+    "<advanced shot:P7-after:ko>": "469bdf87311ec9d321ce46b4fab503ae7a9947ce912b7c26355e5c91c41639dd",
+    "<advanced shot:P7-before:en>": "903d25a0d328387aaa29b57d3908c0bf238072e607f06b519eb90663c26e469e",
+    "<advanced shot:P7-before:ko>": "064556961a24014767cba4803db2c597e3f21fa1ef48b6b8a1b6b7264d24d70b",
+    "<advanced shot:P8:en>": "123870b3ea960849efd6a224ff00a2e92913108cee357eb1d1212953d21bb73e",
+    "<advanced shot:P8:ko>": "256fd0b13bc7c848365949e94e17651d9f15679fa356ad3fd7c35d3e4e3bc400"
   },
   "parts": {
     "<advanced shot:P1-after:en>": {
-      "00 strings": "17476c530ceb6fbc",
+      "00 strings": "0febff40b34b95f2",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "84ee78ed9a5564dc",
-      "04 dashboard": "0769b9d832db5a71",
+      "03 status": "6f9dd10f0c2d8cb7",
+      "04 dashboard": "722f854d34ae64b7",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -224,10 +224,10 @@
       "111 advanced-statement": "24af387c0ec717a5",
       "112 advanced-statement": "be82d5b38612f9a7",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "f29d14f139558951",
-      "115 advanced-report-check": "286a022e50b1f85e",
+      "114 advanced-report-job": "871c438dcf665334",
+      "115 advanced-report-check": "e4839d0fac81c77b",
       "116 advanced-report-job": "86c6ba3742dfe498",
-      "12 advanced-words": "abb6ab11dae83341",
+      "12 advanced-words": "87c7ebfcac06e992",
       "13 advanced-list": "480e6404465ef8aa",
       "14 advanced-rules": "36397303e9d9d8ab",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -317,11 +317,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P1-after:ko>": {
-      "00 strings": "2104840284042dfc",
+      "00 strings": "074a41448ecd6020",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "84ee78ed9a5564dc",
-      "04 dashboard": "0769b9d832db5a71",
+      "03 status": "6f9dd10f0c2d8cb7",
+      "04 dashboard": "722f854d34ae64b7",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -343,10 +343,10 @@
       "111 advanced-statement": "e61fac8a21ce4ecd",
       "112 advanced-statement": "79f230cb8c416f41",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "f29d14f139558951",
-      "115 advanced-report-check": "286a022e50b1f85e",
+      "114 advanced-report-job": "871c438dcf665334",
+      "115 advanced-report-check": "e4839d0fac81c77b",
       "116 advanced-report-job": "86c6ba3742dfe498",
-      "12 advanced-words": "5cd8ec767a0fe050",
+      "12 advanced-words": "dc5e173aa3cdd5a4",
       "13 advanced-list": "480e6404465ef8aa",
       "14 advanced-rules": "36397303e9d9d8ab",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -436,11 +436,11 @@
       "99 advanced-statement": "2ce21f1b09a8c0f8"
     },
     "<advanced shot:P1-before:en>": {
-      "00 strings": "17476c530ceb6fbc",
+      "00 strings": "0febff40b34b95f2",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "335fb81b099e14d1",
-      "04 dashboard": "3f97095039f39238",
+      "03 status": "c89bdc3067fbe929",
+      "04 dashboard": "aa3b24bb93e65cad",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -450,11 +450,11 @@
       "11 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P1-before:ko>": {
-      "00 strings": "2104840284042dfc",
+      "00 strings": "074a41448ecd6020",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "335fb81b099e14d1",
-      "04 dashboard": "3f97095039f39238",
+      "03 status": "c89bdc3067fbe929",
+      "04 dashboard": "aa3b24bb93e65cad",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -464,11 +464,11 @@
       "11 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P4-after:en>": {
-      "00 strings": "17476c530ceb6fbc",
+      "00 strings": "0febff40b34b95f2",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "84ee78ed9a5564dc",
-      "04 dashboard": "0769b9d832db5a71",
+      "03 status": "6f9dd10f0c2d8cb7",
+      "04 dashboard": "722f854d34ae64b7",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -490,10 +490,10 @@
       "111 advanced-statement": "24af387c0ec717a5",
       "112 advanced-statement": "be82d5b38612f9a7",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "f29d14f139558951",
-      "115 advanced-report-check": "286a022e50b1f85e",
+      "114 advanced-report-job": "871c438dcf665334",
+      "115 advanced-report-check": "e4839d0fac81c77b",
       "116 advanced-report-job": "86c6ba3742dfe498",
-      "12 advanced-words": "abb6ab11dae83341",
+      "12 advanced-words": "87c7ebfcac06e992",
       "13 advanced-list": "480e6404465ef8aa",
       "14 advanced-rules": "36397303e9d9d8ab",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -583,11 +583,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P4-after:ko>": {
-      "00 strings": "2104840284042dfc",
+      "00 strings": "074a41448ecd6020",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "84ee78ed9a5564dc",
-      "04 dashboard": "0769b9d832db5a71",
+      "03 status": "6f9dd10f0c2d8cb7",
+      "04 dashboard": "722f854d34ae64b7",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -609,10 +609,10 @@
       "111 advanced-statement": "e61fac8a21ce4ecd",
       "112 advanced-statement": "79f230cb8c416f41",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "f29d14f139558951",
-      "115 advanced-report-check": "286a022e50b1f85e",
+      "114 advanced-report-job": "871c438dcf665334",
+      "115 advanced-report-check": "e4839d0fac81c77b",
       "116 advanced-report-job": "86c6ba3742dfe498",
-      "12 advanced-words": "5cd8ec767a0fe050",
+      "12 advanced-words": "dc5e173aa3cdd5a4",
       "13 advanced-list": "480e6404465ef8aa",
       "14 advanced-rules": "36397303e9d9d8ab",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -702,11 +702,11 @@
       "99 advanced-statement": "2ce21f1b09a8c0f8"
     },
     "<advanced shot:P4-before:en>": {
-      "00 strings": "17476c530ceb6fbc",
+      "00 strings": "0febff40b34b95f2",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "335fb81b099e14d1",
-      "04 dashboard": "3f97095039f39238",
+      "03 status": "c89bdc3067fbe929",
+      "04 dashboard": "aa3b24bb93e65cad",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -716,11 +716,11 @@
       "11 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P4-before:ko>": {
-      "00 strings": "2104840284042dfc",
+      "00 strings": "074a41448ecd6020",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "335fb81b099e14d1",
-      "04 dashboard": "3f97095039f39238",
+      "03 status": "c89bdc3067fbe929",
+      "04 dashboard": "aa3b24bb93e65cad",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -730,11 +730,11 @@
       "11 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P5:en>": {
-      "00 strings": "17476c530ceb6fbc",
+      "00 strings": "0febff40b34b95f2",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "84ee78ed9a5564dc",
-      "04 dashboard": "0769b9d832db5a71",
+      "03 status": "6f9dd10f0c2d8cb7",
+      "04 dashboard": "722f854d34ae64b7",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -756,10 +756,10 @@
       "111 advanced-statement": "24af387c0ec717a5",
       "112 advanced-statement": "be82d5b38612f9a7",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "f29d14f139558951",
-      "115 advanced-report-check": "286a022e50b1f85e",
+      "114 advanced-report-job": "871c438dcf665334",
+      "115 advanced-report-check": "e4839d0fac81c77b",
       "116 advanced-report-job": "86c6ba3742dfe498",
-      "12 advanced-words": "abb6ab11dae83341",
+      "12 advanced-words": "87c7ebfcac06e992",
       "13 advanced-list": "480e6404465ef8aa",
       "14 advanced-rules": "36397303e9d9d8ab",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -849,11 +849,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P5:ko>": {
-      "00 strings": "2104840284042dfc",
+      "00 strings": "074a41448ecd6020",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "84ee78ed9a5564dc",
-      "04 dashboard": "0769b9d832db5a71",
+      "03 status": "6f9dd10f0c2d8cb7",
+      "04 dashboard": "722f854d34ae64b7",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -875,10 +875,10 @@
       "111 advanced-statement": "e61fac8a21ce4ecd",
       "112 advanced-statement": "79f230cb8c416f41",
       "113 advanced-report-build": "27836c45f1f1f648",
-      "114 advanced-report-job": "f29d14f139558951",
-      "115 advanced-report-check": "286a022e50b1f85e",
+      "114 advanced-report-job": "871c438dcf665334",
+      "115 advanced-report-check": "e4839d0fac81c77b",
       "116 advanced-report-job": "86c6ba3742dfe498",
-      "12 advanced-words": "5cd8ec767a0fe050",
+      "12 advanced-words": "dc5e173aa3cdd5a4",
       "13 advanced-list": "480e6404465ef8aa",
       "14 advanced-rules": "36397303e9d9d8ab",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -968,11 +968,11 @@
       "99 advanced-statement": "2ce21f1b09a8c0f8"
     },
     "<advanced shot:P7-after:en>": {
-      "00 strings": "17476c530ceb6fbc",
+      "00 strings": "0febff40b34b95f2",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "cbb030cbaff7c1d4",
-      "04 dashboard": "2073f92ef696e366",
+      "03 status": "9ee152a735793954",
+      "04 dashboard": "f6aef90866b072e8",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -993,7 +993,7 @@
       "110 advanced-watch-log": "822b1aaceded57a4",
       "111 advanced-statement": "24af387c0ec717a5",
       "112 advanced-statement": "be82d5b38612f9a7",
-      "12 advanced-words": "abb6ab11dae83341",
+      "12 advanced-words": "87c7ebfcac06e992",
       "13 advanced-list": "937528625fa447fd",
       "14 advanced-rules": "f42d062a3b95674a",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -1083,11 +1083,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P7-after:ko>": {
-      "00 strings": "2104840284042dfc",
+      "00 strings": "074a41448ecd6020",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "cbb030cbaff7c1d4",
-      "04 dashboard": "2073f92ef696e366",
+      "03 status": "9ee152a735793954",
+      "04 dashboard": "f6aef90866b072e8",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1108,7 +1108,7 @@
       "110 advanced-watch-log": "822b1aaceded57a4",
       "111 advanced-statement": "e61fac8a21ce4ecd",
       "112 advanced-statement": "79f230cb8c416f41",
-      "12 advanced-words": "5cd8ec767a0fe050",
+      "12 advanced-words": "dc5e173aa3cdd5a4",
       "13 advanced-list": "937528625fa447fd",
       "14 advanced-rules": "f42d062a3b95674a",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -1198,11 +1198,11 @@
       "99 advanced-statement": "2ce21f1b09a8c0f8"
     },
     "<advanced shot:P7-before:en>": {
-      "00 strings": "17476c530ceb6fbc",
+      "00 strings": "0febff40b34b95f2",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "335fb81b099e14d1",
-      "04 dashboard": "3f97095039f39238",
+      "03 status": "c89bdc3067fbe929",
+      "04 dashboard": "aa3b24bb93e65cad",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1212,11 +1212,11 @@
       "11 preview-continuation": "2ff79f4373bb1e4f"
     },
     "<advanced shot:P7-before:ko>": {
-      "00 strings": "2104840284042dfc",
+      "00 strings": "074a41448ecd6020",
       "01 describe": "2aa99e658a997963",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "335fb81b099e14d1",
-      "04 dashboard": "3f97095039f39238",
+      "03 status": "c89bdc3067fbe929",
+      "04 dashboard": "aa3b24bb93e65cad",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1226,11 +1226,11 @@
       "11 preview-continuation": "f44e8192af186533"
     },
     "<advanced shot:P8:en>": {
-      "00 strings": "17476c530ceb6fbc",
+      "00 strings": "0febff40b34b95f2",
       "01 describe": "204ac982851f82cf",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "cbb030cbaff7c1d4",
-      "04 dashboard": "2073f92ef696e366",
+      "03 status": "9ee152a735793954",
+      "04 dashboard": "f6aef90866b072e8",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1251,7 +1251,7 @@
       "110 advanced-watch-log": "822b1aaceded57a4",
       "111 advanced-statement": "24af387c0ec717a5",
       "112 advanced-statement": "be82d5b38612f9a7",
-      "12 advanced-words": "abb6ab11dae83341",
+      "12 advanced-words": "87c7ebfcac06e992",
       "13 advanced-list": "937528625fa447fd",
       "14 advanced-rules": "f42d062a3b95674a",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
@@ -1341,11 +1341,11 @@
       "99 advanced-statement": "8d2d3e654db9d476"
     },
     "<advanced shot:P8:ko>": {
-      "00 strings": "2104840284042dfc",
+      "00 strings": "074a41448ecd6020",
       "01 describe": "ea83b80477987986",
       "02 settings": "2ad1e1e4f4e97251",
-      "03 status": "cbb030cbaff7c1d4",
-      "04 dashboard": "2073f92ef696e366",
+      "03 status": "9ee152a735793954",
+      "04 dashboard": "f6aef90866b072e8",
       "05 statistics": "93a38ed36e778d21",
       "06 compatibility": "a73190372244cbf0",
       "07 power-action": "82c84584a922e276",
@@ -1366,7 +1366,7 @@
       "110 advanced-watch-log": "822b1aaceded57a4",
       "111 advanced-statement": "e61fac8a21ce4ecd",
       "112 advanced-statement": "79f230cb8c416f41",
-      "12 advanced-words": "5cd8ec767a0fe050",
+      "12 advanced-words": "dc5e173aa3cdd5a4",
       "13 advanced-list": "937528625fa447fd",
       "14 advanced-rules": "f42d062a3b95674a",
       "15 advanced-samples": "1bb9cbd16e5a3a5c",
