@@ -2,7 +2,7 @@ r"""v0.6.24: the version's pill shows the version alone and tells the advanced e
 picked from real renders).
 
 - The label's text is the version alone in both editions - never the edition's word, High Contrast too - and a screen
-  reader is still told both ("v0.6.24 Advanced").
+  reader is still told both ("0.6.24 Advanced"); since 2026-11-19 the number alone, no "v".
 - The advanced edition's ink is its own named colour (brand.tokens.EDITION_INK: #3F68B0 light, #9AB8EE dark, Brand.EditionInk),
   the standard edition's the secondary ink; the pill's fill and edge are the standard ones in both (Palette.Raised, Line).
 - The version is centred on the pill by its ink - digit tops to baseline - within half a device pixel, at 100, 150 and
@@ -181,11 +181,12 @@ class VersionOnlyTests(unittest.TestCase):
         for where, at in self.answer.items():
             with self.subTest(where):
                 self.assertEqual(at["fit"], "whole")
-                self.assertEqual(at["text"], "v0.6.24", "the version alone, never the edition's word")
+                # The owner, 2026-11-19 ("버전 표시에 v 빼고 버전 숫자만 넣자"): the number alone, no "v".
+                self.assertEqual(at["text"], "0.6.24", "the version's number alone, never the edition's word")
                 if where.endswith("advanced"):
-                    self.assertEqual(at["name"], "v0.6.24 " + at["edition"], "a screen reader is told both")
+                    self.assertEqual(at["name"], "0.6.24 " + at["edition"], "a screen reader is told both")
                 else:
-                    self.assertEqual(at["name"], "v0.6.24")
+                    self.assertEqual(at["name"], "0.6.24")
 
     def test_the_advanced_edition_is_told_by_its_ink_alone(self):
         for where, at in self.answer.items():

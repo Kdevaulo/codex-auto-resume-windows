@@ -1624,12 +1624,15 @@ namespace CodexAutoResume
         /// in the secondary colour, on the version's baseline, with no separator (VersionLabel). A status that names no
         /// edition shows the version alone, as it did before - and since v0.6.14 so does the standard edition, which is
         /// named nowhere beside the version (the owner, 2026-10-05); only an advanced one is.
+        ///
+        /// v0.6.24 (the owner, 2026-11-19, "버전 표시에 v 빼고 버전 숫자만 넣자"): the tabs' pill shows the number alone,
+        /// "0.6.24" - a screen reader is told "0.6.24 Advanced" (VersionPill.Tell); Diagnostics' Version row keeps its "v".
         private void ShowVersion(VersionLabel label, Dictionary<string, object> status)
         {
             string edition = Str(status, "edition");
             bool named = !string.IsNullOrEmpty(edition) && edition != UnnamedEdition;
-            label.Set("v" + Convert.ToString(Get(status, "version"), CultureInfo.InvariantCulture),
-                       named ? S("edition." + edition, edition) : null);
+            string number = Convert.ToString(Get(status, "version"), CultureInfo.InvariantCulture);
+            label.Set(label == versionText ? number : "v" + number, named ? S("edition." + edition, edition) : null);
         }
 
         /// The edition whose word stands beside the version nowhere (v0.6.14). The picker's Edition column still names

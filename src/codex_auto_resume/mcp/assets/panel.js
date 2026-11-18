@@ -1720,8 +1720,9 @@ function renderHero(status, now) {
   // names it - since the owner's decision of 2026-10-02 as quiet secondary text: a space and no separator, smaller,
   // muted, on the version's baseline (.edition; the window's VersionLabel). v0.6.14: an advanced edition only - the
   // standard edition is named nowhere beside the version (the owner, 2026-10-05), so its heading is the version alone.
+  // v0.6.24 (the owner, 2026-11-19, "버전 표시에 v 빼고 버전 숫자만 넣자"): the number alone, as the window's pill shows it.
   var named = status.edition && status.edition !== 'standard';
-  var eyebrow = hero.appendChild(element('div', 'eyebrow', 'Codex Auto Resume · v' + (status.version || '?')
+  var eyebrow = hero.appendChild(element('div', 'eyebrow', 'Codex Auto Resume · ' + (status.version || '?')
     + (named ? ' ' : '')));
   if (named) eyebrow.appendChild(element('span', 'edition', t('edition.' + status.edition, status.edition)));
   eyebrow.onclick = function () { versionPressed(); };
