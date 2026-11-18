@@ -59,11 +59,11 @@
     "CI does not translate anything. A person decides what the Korean should say."
   ],
   "reviewed": {
-    "docs/CHANGELOG.md": "e4d9b34ef99c1cb76f9d8c67731db6720e24d152eb2e64a7a6dfc3bb648e7087",
+    "docs/CHANGELOG.md": "e517385504239f5f9def14881de8e6196d161bd2f58db5a217e4b78fb990a8ad",
     "docs/CONTRIBUTING.md": "5b98fd848b1edf181a0d72018d92d9d3a3c4af5e254d4fc2dc2dc1f1c68e770a",
-    "docs/CONTRIBUTORS.md": "90242fa1f18761dcf5df4c74d78db05f5673ac50f4c4013251989944cea28e11",
+    "docs/CONTRIBUTORS.md": "b23631a5b0c4603a02446246fb9bcdaae69bd6a4d387965e8faef73ed6e8b907",
     "docs/PRIVACY.md": "aafa645ffcac514b2cbfb1eaf78dc3845303a0d39a770536a112f8b393dd7f83",
-    "README.md": "3fa9729ee4e97a531d575ebbdcd3a5c4eabc495b0bf7eb60037a9f72bdd76df2",
+    "README.md": "a8543dc1acf47aa0b43ffb27de9fc3d043d1b86c434251f29665413bc1fba306",
     "docs/SECURITY.md": "57932499b3d3e7042363f978bd7eead021c3432348f0f0527775ac24f98d5e79",
     "docs/SUPPORT.md": "3db6f1cd20e8f77ccf6fd19e2696ab7163bd5f84bfcd8d68388aadf442072815",
     "docs/BRAND.md": "e887a20945b8c5de411d463ed49f8d2b50d4418cf08af7a54b180cad5a7e3a5e",
