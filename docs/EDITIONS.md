@@ -1486,7 +1486,7 @@ paused, it reads what Codex added to its conversations' rollout files (under eac
 folder) since it last looked - only each model call's token counts (input, cached input, output and reasoning) and
 when each turn began, nothing else of any line - at most 2 MiB of a file and 8 MiB in one look, and adds them up by
 day for each project. While it is on, each reading of the usage meter is kept as well. Its cards on the Advanced
-features page show, for the five-hour and the weekly window, how much of it is left, how far that moved over the last
+features page show, for the five-hour and the weekly window, how much of it is left, the share of it used over the last
 hour and - with three readings over fifteen minutes at least, and only when the window would fill before it resets -
 around when none would be left at that pace, beside the reset time. A flat list shows each project's input, cached input,
 output, reasoning and turns over the last 7, 30 or 90 days (**Days shown**; 7 by default), a total line, and each

@@ -511,9 +511,10 @@ From v0.6.11 the Overview's **Waiting** card, **Why it is waiting** for a usage 
 notification-area popup, the panel in Codex and `get_status` also show Codex's usage as the watcher
 last read it, with how long ago: each window's length, how much of it is left and when it resets -
 "Codex usage, read 2m ago: 5-hour 0% left, resets 14:42 · weekly 38% left, resets 2027-01-18 13:00".
-Since v0.6.24 every surface says what is left - 100 minus the whole share used, so 0% only once a window is
-used up (99.6% used leaves 1%) - where it said how much was used before; a bar is as full as what is left and
-empties as the window is used. On the
+Since v0.6.24 the places you glance at to see whether you may keep going say what is left - 100 minus the whole
+share used, so 0% only once a window is used up (99.6% used leaves 1%) - where they said how much was used before; a
+bar is as full as what is left and empties as the window is used. Places about pace, history, diagnosis and the limits
+you set say what is used, with the word: the Diagnostics check, the advanced analytics' last hour, and the limits. On the
 Overview it is one line, ending in "..." where the card is too narrow; the others say it whole. When a
 weekly limit is used up, **Why it is waiting** also says the day and time it resets, and that Codex's
 `/usage` can redeem a reset credit if your account has one - this product never knows whether it does.
@@ -1510,7 +1511,7 @@ it does not recover); for one it would take up, anything else that holds it (aut
 conversation switched off, that kind switched off in Settings, a record it already has, the watcher not
 running); conversations whose turns Codex records under another id, which the watcher follows; each Codex
 home with when its databases were last written; how many cloud tasks the app knows - they run on
-OpenAI's servers and cannot be recovered yet; the last usage reading, as what is left of each window; how notices reach you; the Codex
+OpenAI's servers and cannot be recovered yet; the last usage reading, as the share of each window used, as Codex reported it; how notices reach you; the Codex
 version and its compatibility; and the watcher's last reasons from its log, which says once per turn why
 a failed turn was not taken up. It only reads: nothing of any conversation's words, and conversations
 appear as aliases valid only in that answer. Export diagnostics... includes the same check.
