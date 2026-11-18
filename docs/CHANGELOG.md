@@ -140,8 +140,10 @@ file where an update put it.
   steps under the bar, on every run the window shows - installing, updating, repairing, removing and installing another version: a filled
   disc with a check for a step that is done, a ring with a dot and the name in bold for the one under way, an empty ring for what is still to
   come. Only a line the installer prints, or the archive's own unpacking, moves a step - never a timer - and a step the run passes without
-  taking leaves the list rather than being called done; a first installation lists no watcher to stop and no Dashboard to close. The log,
-  when shown, takes the list's room, so nothing moves, and the toggle reads *Show the log* until a person shows it. The Ready page of a first
+  taking leaves the list rather than being called done; a first installation lists no watcher to stop and no Dashboard to close. The log is
+  under the steps and shown from the start, down to the buttons, never less than about four lines (the window is taller for a run that lists
+  so many steps that the card cannot hold them and four lines), and its button reads *Hide the log*: it hides only the log, the steps stay
+  where they are, and what a person hid is not remembered for the next run. The finished page keeps the log as the run left it. The Ready page of a first
   installation lists what is installed - the watcher, the Dashboard and the Codex plugin, and in the advanced edition its own features, each
   off at first - one row each, and says that no administrator rights are needed: the setup program asks for none and installs only under your
   profile and in the current user's part of the registry. An update and a change of edition keep that room for what they keep, change and
