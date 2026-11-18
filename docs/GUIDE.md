@@ -525,9 +525,8 @@ plan or credit. (The advanced edition's two reset actions read usage on their ow
 rules waits, and one of them keeps how many reset credits you have; its usage meter, when you turn it on,
 reads usage on its own at the spacing you choose, and its newest reading is what this line and the icon's
 tooltip then show - on the icon's card a bar for each window, as full as what is left of it, in the warning colour
-with 10% or less left - with a notice near the limit you set, which says what is left too; the limits you set are
-chosen and typed as what is left too ("Warn when this much is left: 15% left"), and kept as the share used at which
-each acts; [EDITIONS.md](EDITIONS.md) says so for each.)
+with 10% or less left - with a notice near the limit you set, which says what is left too; the limits you set stay
+the share used at which each acts; [EDITIONS.md](EDITIONS.md) says so for each.)
 
 <img src="images/settings-window.png" alt="The Continuation message section of the Dashboard's Settings page: the continuation language, the four message styles with Standard selected, and a Preview of the message sent for a usage limit" width="680">
 

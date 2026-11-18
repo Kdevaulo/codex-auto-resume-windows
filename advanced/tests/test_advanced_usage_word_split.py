@@ -43,5 +43,28 @@ class StatementTests(unittest.TestCase):
                     self.assertNotIn("left by default", table[key])
 
 
+class ThresholdTests(unittest.TestCase):
+    def test_the_limits_a_person_sets_are_said_as_the_share_used(self):
+        """"Warn at (5-hour window)" with "85%": the share used each acts at, in the same number the engine keeps - no
+        word for "left" in any language's labels, values or the wrap-up's preview headings."""
+        found = catalogs()
+        english = found["en"]
+        self.assertEqual(english["page.option.percent"], "{n}%")
+        self.assertEqual(english["page.option.warn_five_hour"], "Warn at (5-hour window)")
+        self.assertEqual(english["page.preview.300"], "When the five-hour window reaches it:")
+        left_words = {"en": "left", "ko": "남", "de": "übrig", "fr": "rest", "ja": "残り", "zh-CN": "剩余", "zh-TW": "剩餘",
+                      "ru": "остал", "es": "qued", "tr": "kal"}
+        keys = ["page.option.percent", "page.preview.300", "page.preview.10080"] + [
+            "page.option.%s_%s" % (name, window) for name in ("warn", "wrap", "pause", "stop_words")
+            for window in ("five_hour", "weekly")]
+        for locale, table in found.items():
+            for key in keys:
+                with self.subTest(locale=locale, key=key):
+                    if locale in left_words:
+                        self.assertNotIn(left_words[locale], table[key].lower())
+                    if key == "page.option.percent":
+                        self.assertEqual(table[key].replace("{n}", "").replace(" ", "").replace(" ", ""), "%")
+
+
 if __name__ == "__main__":
     unittest.main()
