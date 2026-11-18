@@ -68,7 +68,12 @@ namespace CodexAutoResume
         private readonly List<KeyValuePair<Control, int>> rows = new List<KeyValuePair<Control, int>>();
 
         private string page;
-        private bool running, logShown, unconfirmed, previousRunning, closingAsked;
+        private bool running, unconfirmed, previousRunning, closingAsked;
+        // v0.6.24 final (the owner, 2026-11-19): the log is shown from the start, under the Progress page's steps, and the
+        // toggle hides it. A person's choice is the run's own - a window is made again for the next run - and lives only here.
+        private bool logShown = true;
+        // The fewest lines the Progress page's log shows: the window grows (Fit) rather than leave it less.
+        private const int LogLeastLines = 4;
         // The watcher was not running before this update or repair and was left stopped (InstallerFlow.LeftStoppedLine).
         private bool leftStopped;
         // The watcher had ended unexpectedly before this update or repair and was started again (InstallerFlow.StartedAgainLine).
@@ -257,7 +262,7 @@ namespace CodexAutoResume
             int tallest = 0;
             string showing = page;
             // v0.6.24-beta.3: measuring the Finish page of a run that has not ended (BuildFinish: a failure shows its log)
-            // left the log shown on the Progress page from the start, over the step list; the log is as it was after it.
+            // left the log shown on the Progress page from the start; the log is as it was after it.
             bool shown = logShown;
             foreach (string each in flow.Pages())
             {
@@ -433,8 +438,6 @@ namespace CodexAutoResume
                 StepMark mark;
                 if (marks.TryGetValue(row.Key, out mark)) sheet.Controls.Add(mark);
             }
-            // On the Progress page the log is no row of its own: it takes the step list's room (Arrange).
-            if (stepRows.Count > 0) sheet.Controls.Add(logArea);
             sheet.ResumeLayout(false);
         }
 
@@ -707,12 +710,13 @@ namespace CodexAutoResume
             bar.Value = at;
             bar.AccessibleName = heading;
             Row(bar, 10);
-            // v0.6.24-beta.3 (the owner's option A): the steps this run goes through, under the bar (ListSteps). The log,
-            // shown, takes their room, so the page is as tall with it as without it; the toggle and the note stay below.
+            // v0.6.24-beta.3 (the owner's option A): the steps this run goes through, under the bar (ListSteps). v0.6.24 final
+            // (the owner, 2026-11-19): the log is under them, shown from the start, with its toggle above it as the Finish page
+            // has it; it takes the room down to the buttons (Arrange), and hiding it moves nothing above it.
             stepsAt = rows.Count;
             ListSteps(false);
-            if (stepRows.Count == 0) Row(logArea, 12);
             Row(LogToggle(), 12);
+            Row(logArea, 6);
             busyNote = Words(words.Say("installer.progress.busy", "It is still working. Closing now could leave half an installation, so the window stays until it has finished."), null, Palette.Secondary);
             busyNote.Visible = closingAsked;
             Row(busyNote, 8);
@@ -875,6 +879,9 @@ namespace CodexAutoResume
                 {
                     logArea.Visible = true;
                     Arrange(Inner(ClientSize.Width));
+                    // Lines that came while it was folded away are in it: it stands at its newest, as it follows them shown.
+                    logArea.Box.SelectionStart = logArea.Box.TextLength;
+                    logArea.Box.ScrollToCaret();
                     SoftReveal.Entered(logArea);
                 }
                 else SoftReveal.Leaving(logArea, delegate
@@ -886,15 +893,34 @@ namespace CodexAutoResume
             return toggle;
         }
 
-        /// Lays the page's rows out down the card at `width`; the height they take. The log is the one row whose
-        /// height is fixed, and a row that is hidden takes none - a page is measured with the log and the note
-        /// showing, so it fits when they are shown.
+        /// Lays the page's rows out down the card at `width`; the height they need at least. The log is the one row that
+        /// takes what the others leave (v0.6.24 final): never less than its own least (HeightAt), and the card's room down to
+        /// the buttons where there is more. The note that the window stays open takes room only while it is shown, out of the
+        /// log's (OnFormClosing makes the window taller where that leaves the log less than its least); a log that is folded
+        /// away keeps its room, so showing it moves nothing else.
         internal int Arrange(int width)
         {
+            int used = Lay(width, 0);
+            int room = Room();
+            if (room > used) Lay(width, room - used);
+            return used;
+        }
+
+        /// The height the page's rows have to stand in: the content card's, inside its padding, as OnLayout gives it.
+        private int Room()
+        {
+            int pad = Px(16);
+            int top = pad + HeaderHeight() + pad;
+            int buttonsTop = ClientSize.Height - pad - Px(Brand.ButtonHeight);
+            return Math.Max(0, Math.Max(1, buttonsTop - pad - top) - 2 * pad);
+        }
+
+        // One pass of Arrange: the rows laid out with `extra` more px for the log; the height they take.
+        private int Lay(int width, int extra)
+        {
             int y = 0;
-            // v0.6.24-beta.3: where the last mark beside a row ends - a row outside its column starts below it - and where
-            // the step list begins, whose room the log takes.
-            int held = 0, slot = 0;
+            // v0.6.24-beta.3: where the last mark beside a row ends - a row outside its column starts below it.
+            int held = 0;
             bool mirrored = Mirror.Of(this);
             foreach (KeyValuePair<Control, int> row in rows)
             {
@@ -905,10 +931,12 @@ namespace CodexAutoResume
                 if (!inColumn) y = Math.Max(y, held);
                 Control name;
                 if (besides.TryGetValue(control, out name) && Beside(control, name, width, mirrored, ref y)) continue;
+                // The note, until someone tries to close the window, takes no room.
+                if (control == busyNote && !closingAsked) continue;
                 y += row.Value;
                 // A row in a mark's column stands past the mark and its gap, as wide as the rest of the card.
                 int indent = inColumn ? column.Extent + column.Gap : 0;
-                int height = HeightAt(control, Math.Max(1, width - indent));
+                int height = HeightAt(control, Math.Max(1, width - indent)) + (control == logArea ? extra : 0);
                 int wide = control is SoftCombo ? Math.Min(width, Px(260)) : width - indent;
                 // v0.6.20: a drop-down narrower than the card stands at its right when mirrored (Mirror).
                 control.SetBounds(Mirror.X(mirrored, width, indent, wide), y, wide, height);
@@ -921,18 +949,9 @@ namespace CodexAutoResume
                     mark.SetBounds(Mirror.X(mirrored, width, 0, size), top, size, size);
                     held = Math.Max(held, top + size);
                 }
-                if (stepRows.Count > 0 && control == stepRows[0]) slot = y;
                 y += height;
                 // A row beside a mark taller than its words is as tall as the mark, so two marks never touch.
                 if (mark != null) y = Math.Max(y, mark.Bottom);
-                if (stepRows.Count > 0 && control == stepRows[stepRows.Count - 1])
-                {
-                    // The log stands where the steps do, as tall as ever; the room is the taller of the two.
-                    int log = HeightAt(logArea, width);
-                    logArea.Visible = logShown;
-                    logArea.SetBounds(Mirror.X(mirrored, width, 0, width), slot, width, log);
-                    y = Math.Max(Math.Max(y, held), slot + log);
-                }
             }
             return Math.Max(y, held);
         }
@@ -960,7 +979,10 @@ namespace CodexAutoResume
 
         private int HeightAt(Control control, int width)
         {
-            if (control == logArea) return Px(150);
+            // The log's least: LogLeastLines lines on the Progress page, where it takes the room the steps leave (Arrange); the
+            // Finish page's, under its summary, as it has always been.
+            if (control == logArea)
+                return page == InstallerFlow.Progress ? LogLeastLines * FirstLine(logArea) + logArea.Padding.Vertical : Px(150);
             if (control == notesArea) return Px(page == InstallerFlow.Notes ? 220 : 140);
             if (control == bar) return Px(10);
             if (control is InstallerRule) return Soft.Hairline;
@@ -1120,7 +1142,8 @@ namespace CodexAutoResume
                 log.AppendLine(ExitCode());
                 logArea.Box.AppendText(ExitCode() + Environment.NewLine);
             }
-            logShown = ended != 0;
+            // The log stays as the person left it, shown unless they hid it; a run that failed shows it (BuildFinish).
+            if (ended != 0) logShown = true;
             // A run that ended well fills the bar - a short glide where it may move, at once where it may not - and
             // the Finish page follows; any other ending leaves the bar where the work stopped.
             if (ended == 0)
@@ -1212,7 +1235,18 @@ namespace CodexAutoResume
             {
                 e.Cancel = true;
                 closingAsked = true;
-                if (busyNote != null) Arrange(Inner(ClientSize.Width));
+                if (busyNote != null)
+                {
+                    int needed = Arrange(Inner(ClientSize.Width)), room = Room();
+                    // The note takes room from the log; where that leaves the log less than its least, the window is taller by
+                    // the shortfall, as Fit makes it for a page that needs more.
+                    if (needed > room)
+                    {
+                        ClientSize = new Size(ClientSize.Width, ClientSize.Height + needed - room);
+                        PerformLayout();
+                        Arrange(Inner(ClientSize.Width));
+                    }
+                }
                 return;
             }
             base.OnFormClosing(e);
@@ -1302,18 +1336,14 @@ namespace CodexAutoResume
         internal IEnumerable<Control> ShownRows()
         {
             foreach (KeyValuePair<Control, int> row in rows) if (Wanted(row.Key)) yield return row.Key;
-            // The Progress page's log, which stands in the step list's room, not in a row of its own.
-            if (stepRows.Count > 0 && logShown) yield return logArea;
         }
 
         // Whether a row is shown: every row but the log, while it is folded away, and the note that the window stays
-        // open, until someone has tried to close it. Those two keep their room, so showing them moves nothing else.
+        // open, until someone has tried to close it. The log keeps its room, so showing it moves nothing else.
         private bool Wanted(Control control)
         {
             if (control == logArea) return logShown;
             if (control == busyNote) return closingAsked;
-            // The steps under the bar give their room to the log while it is shown.
-            if (stepRows.Contains(control)) return !logShown;
             return true;
         }
 
