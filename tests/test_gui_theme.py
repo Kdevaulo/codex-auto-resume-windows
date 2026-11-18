@@ -31,6 +31,7 @@ import unittest
 import guiscan
 
 from codex_auto_resume import brand, l10n, settings
+from codex_auto_resume.brand.tokens import EDITION_INK  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 GUI = ROOT / "gui"
@@ -1328,7 +1329,9 @@ class WindowThemeTests(unittest.TestCase):
             fore, card = hex_of(version["fore"]), hex_of(version["card"])
             with self.subTest(theme):
                 self.assertEqual(card, brand.card_ground(theme).upper())
-                self.assertEqual(fore, tokens["muted"].upper())
+                # v0.6.24 (the owner, 2026-11-18): the advanced edition's version in its own ink (brand.tokens.EDITION_INK),
+                # the standard edition's in the secondary one - text's contrast either way.
+                self.assertIn(fore, (tokens["muted"].upper(), EDITION_INK[theme].upper()))
                 self.assertGreaterEqual(brand.contrast(fore, card), 4.5, "%s on %s" % (fore, card))
 
     def test_each_outcome_s_bar_is_the_colour_of_its_part_in_the_success_rate(self):
@@ -1370,14 +1373,15 @@ class WindowThemeTests(unittest.TestCase):
     def test_nothing_in_the_dark_window_keeps_a_light_colour(self):
         """Every opaque colour on every control of every page, built and filled, is one of the dark
         palette's or the dark card's ground."""
-        allowed = {argb(value) for value in brand.DARK.values()} | {argb(brand.card_ground("dark"))}
+        allowed = ({argb(value) for value in brand.DARK.values()} | {argb(brand.card_ground("dark"))}
+                   | {argb(EDITION_INK["dark"])})
         offenders = []
         for key, where in sorted(self.answer["window"]["dark"]["colours"].items()):
             kind, prop, value = key.split("|")
             if int(value) not in allowed:
                 offenders.append("%s %s #%06X at %s" % (kind, prop, int(value) & 0xFFFFFF, where))
         self.assertEqual(offenders, [], "\n".join(offenders))
-        light = {argb(value) for value in brand.LIGHT.values()}
+        light = {argb(value) for value in brand.LIGHT.values()} | {argb(EDITION_INK["light"])}
         stray = [key for key in self.answer["window"]["light"]["colours"] if int(key.split("|")[2]) not in light]
         self.assertEqual(stray, [], "the light window keeps to the light palette too")
 
