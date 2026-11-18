@@ -1455,8 +1455,9 @@ namespace CodexAutoResume
                 button.FlatStyle = FlatStyle.Flat;
                 button.FlatAppearance.BorderSize = 0;
                 button.ForeColor = Secondary;
-                // The panel's tab padding, 7 by 14, inside the room NavButton keeps for its ring.
-                button.Padding = Pad(18, 8, 18, 8);
+                // The panel's tab padding, 7 by 14, inside the room NavButton keeps for its ring - every tab drawn closer alike
+                // where the version's pill needs the room (FitVersionPill).
+                button.Padding = Pad(TabPadX, TabPadY, TabPadX, TabPadY);
                 button.Margin = Pad(0, 0, 2, 0);
                 button.Cursor = Cursors.Hand;
                 button.UseVisualStyleBackColor = false;

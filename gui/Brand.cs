@@ -386,8 +386,8 @@ namespace CodexAutoResume
             if (yearly == 906) { look = "birthday"; top = "#EE8468"; bottom = "#9E3A4B"; return true; }
             if (yearly == 1224) { look = "christmas"; top = "#2E8B5E"; bottom = "#0F4A36"; return true; }
             if (yearly == 1225) { look = "christmas"; top = "#2E8B5E"; bottom = "#0F4A36"; return true; }
-            if (whole == 20260217 || whole == 20270207 || whole == 20280127 || whole == 20290213 || whole == 20300203 || whole == 20310123 || whole == 20320211 || whole == 20330131 || whole == 20340219 || whole == 20350208 || whole == 20360128 || whole == 20370215 || whole == 20380204 || whole == 20390124 || whole == 20400212) { look = "seollal"; top = "#D2453E"; bottom = "#7A1F2B"; return true; }
-            if (whole == 20260925 || whole == 20270915 || whole == 20281003 || whole == 20290922 || whole == 20300912 || whole == 20311001 || whole == 20320919 || whole == 20330908 || whole == 20340927 || whole == 20350916 || whole == 20361004 || whole == 20370924 || whole == 20380913 || whole == 20391002 || whole == 20400921) { look = "chuseok"; top = "#2B2F77"; bottom = "#12143F"; return true; }
+            if (whole == 20260217 || whole == 20270207 || whole == 20280127 || whole == 20290213 || whole == 20300203 || whole == 20310123 || whole == 20320211 || whole == 20330131 || whole == 20340219 || whole == 20350208 || whole == 20360128 || whole == 20370215 || whole == 20380204 || whole == 20390124 || whole == 20400212 || whole == 20410201 || whole == 20420122 || whole == 20430210 || whole == 20440130 || whole == 20450217 || whole == 20460206 || whole == 20470126 || whole == 20480214 || whole == 20490202 || whole == 20500123 || whole == 20510211 || whole == 20520201 || whole == 20530219 || whole == 20540208 || whole == 20550128 || whole == 20560215 || whole == 20570204 || whole == 20580124 || whole == 20590212 || whole == 20600202 || whole == 20610122 || whole == 20620209 || whole == 20630129 || whole == 20640217 || whole == 20650205 || whole == 20660126 || whole == 20670214 || whole == 20680203 || whole == 20690123 || whole == 20700211 || whole == 20710131 || whole == 20720219 || whole == 20730207 || whole == 20740127 || whole == 20750215 || whole == 20760205 || whole == 20770124 || whole == 20780212 || whole == 20790202 || whole == 20800122 || whole == 20810209 || whole == 20820129 || whole == 20830217 || whole == 20840206 || whole == 20850126 || whole == 20860214 || whole == 20870203 || whole == 20880124 || whole == 20890211 || whole == 20900130 || whole == 20910218 || whole == 20920208 || whole == 20930127 || whole == 20940215 || whole == 20950205 || whole == 20960125 || whole == 20970212 || whole == 20980201 || whole == 20990121 || whole == 21000209) { look = "seollal"; top = "#D2453E"; bottom = "#7A1F2B"; return true; }
+            if (whole == 20260925 || whole == 20270915 || whole == 20281003 || whole == 20290922 || whole == 20300912 || whole == 20311001 || whole == 20320919 || whole == 20330908 || whole == 20340927 || whole == 20350916 || whole == 20361004 || whole == 20370924 || whole == 20380913 || whole == 20391002 || whole == 20400921 || whole == 20410910 || whole == 20420928 || whole == 20430917 || whole == 20441005 || whole == 20450925 || whole == 20460915 || whole == 20471004 || whole == 20480922 || whole == 20490911 || whole == 20500930 || whole == 20510919 || whole == 20520907 || whole == 20530926 || whole == 20540916 || whole == 20551005 || whole == 20560924 || whole == 20570913 || whole == 20581002 || whole == 20590921 || whole == 20600909 || whole == 20610928 || whole == 20620917 || whole == 20631006 || whole == 20640925 || whole == 20650915 || whole == 20661003 || whole == 20670923 || whole == 20680911 || whole == 20690929 || whole == 20700919 || whole == 20710908 || whole == 20720926 || whole == 20730916 || whole == 20741005 || whole == 20750924 || whole == 20760912 || whole == 20771001 || whole == 20780920 || whole == 20790910 || whole == 20800928 || whole == 20810917 || whole == 20821006 || whole == 20830926 || whole == 20840914 || whole == 20851003 || whole == 20860922 || whole == 20870911 || whole == 20880929 || whole == 20890919 || whole == 20900908 || whole == 20910927 || whole == 20920916 || whole == 20931005 || whole == 20940924 || whole == 20950913 || whole == 20961001 || whole == 20970920 || whole == 20980910 || whole == 20990929 || whole == 21000918) { look = "chuseok"; top = "#2B2F77"; bottom = "#12143F"; return true; }
             look = top = bottom = null;
             return false;
         }
@@ -440,6 +440,80 @@ namespace CodexAutoResume
             if (look == "seollal") return "poly;2 23.5 30 23.5 30 25 2 25;#F2C230;1;;\npoly;2 25 30 25 30 26.5 2 26.5;#3FA86B;1;;\npoly;2 26.5 30 26.5 30 28 2 28;#3B6FC9;1;;\npoly;2 28 30 28 30 29.5 2 29.5;#E88BB0;1;;";
             if (look == "chuseok") return "circle;25.5 6.5 4;#F6E7B4;1;;\ncircle;24.2 5.6 0.8;#E2CF96;1;;";
             return "";
+        }
+
+        /// brand.days.DAY_RINGS: the hint's ring round the version's pill on a special day.
+        internal static Color DayRing(string look)
+        {
+            if (look == "new_year") return Color.FromArgb(0xF2, 0xC2, 0x30);
+            if (look == "seollal") return Color.FromArgb(0xD2, 0x45, 0x3E);
+            if (look == "birthday") return Color.FromArgb(0xEE, 0x84, 0x68);
+            if (look == "chuseok") return Color.FromArgb(0xE0, 0xB4, 0x4C);
+            if (look == "christmas") return Color.FromArgb(0x2E, 0x8B, 0x5E);
+            return Color.Empty;
+        }
+
+        /// brand.days.DAY_EGG_COLOURS: a part of a special day's own egg, by its name.
+        internal static Color DayEggColour(string look, string part)
+        {
+            if (look == "new_year")
+            {
+                if (part == "trail") return Color.FromArgb(0xFF, 0xE9, 0xA8);
+                if (part == "spark0") return Color.FromArgb(0xFF, 0xD7, 0x6A);
+                if (part == "spark1") return Color.FromArgb(0xE8, 0x73, 0x5A);
+                if (part == "spark2") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "spark3") return Color.FromArgb(0xB9, 0x8A, 0xD9);
+                if (part == "star") return Color.FromArgb(0xFF, 0xE9, 0xA8);
+            }
+            if (look == "seollal")
+            {
+                if (part == "pouch") return Color.FromArgb(0xC9, 0x3B, 0x3B);
+                if (part == "mouth") return Color.FromArgb(0xE2, 0x5B, 0x4F);
+                if (part == "band") return Color.FromArgb(0xF2, 0xC2, 0x30);
+                if (part == "knot") return Color.FromArgb(0xF6, 0xD7, 0x6B);
+                if (part == "coin") return Color.FromArgb(0xE2, 0xB1, 0x3C);
+                if (part == "stripe0") return Color.FromArgb(0xD9, 0x46, 0x3E);
+                if (part == "stripe1") return Color.FromArgb(0xF2, 0xC2, 0x30);
+                if (part == "stripe2") return Color.FromArgb(0x3F, 0xA8, 0x6B);
+                if (part == "stripe3") return Color.FromArgb(0x3B, 0x6F, 0xC9);
+                if (part == "stripe4") return Color.FromArgb(0xE8, 0x8B, 0xB0);
+            }
+            if (look == "birthday")
+            {
+                if (part == "cake") return Color.FromArgb(0xFF, 0xF6, 0xEE);
+                if (part == "edge") return Color.FromArgb(0xE9, 0xB8, 0xA8);
+                if (part == "frosting") return Color.FromArgb(0xF4, 0xA7, 0xB5);
+                if (part == "candle") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "flame") return Color.FromArgb(0xF6, 0xB7, 0x3C);
+                if (part == "smoke") return Color.FromArgb(0xAE, 0xB4, 0xBE);
+                if (part == "confetti0") return Color.FromArgb(0xF2, 0xA3, 0x3A);
+                if (part == "confetti1") return Color.FromArgb(0xE8, 0x73, 0x5A);
+                if (part == "confetti2") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "confetti3") return Color.FromArgb(0xF6, 0xC9, 0x45);
+                if (part == "confetti4") return Color.FromArgb(0xB9, 0x8A, 0xD9);
+            }
+            if (look == "chuseok")
+            {
+                if (part == "moon") return Color.FromArgb(0xF6, 0xE7, 0xB4);
+                if (part == "glow") return Color.FromArgb(0xFF, 0xEB, 0xB8);
+                if (part == "rabbit") return Color.FromArgb(0xD2, 0xBC, 0x82);
+                if (part == "cake0") return Color.FromArgb(0xF4, 0xF0, 0xE4);
+                if (part == "cake1") return Color.FromArgb(0xF2, 0xB8, 0xC6);
+                if (part == "cake2") return Color.FromArgb(0xA8, 0xD0, 0x8D);
+                if (part == "cake3") return Color.FromArgb(0xE6, 0xD3, 0x9B);
+            }
+            if (look == "christmas")
+            {
+                if (part == "snow") return Color.FromArgb(0xFF, 0xFF, 0xFF);
+                if (part == "snowEdge") return Color.FromArgb(0xC9, 0xD4, 0xE0);
+                if (part == "tree") return Color.FromArgb(0x2B, 0x86, 0x60);
+                if (part == "trunk") return Color.FromArgb(0x7A, 0x4B, 0x2A);
+                if (part == "red") return Color.FromArgb(0xD9, 0x46, 0x3E);
+                if (part == "green") return Color.FromArgb(0x3F, 0xA8, 0x6B);
+                if (part == "star") return Color.FromArgb(0xFF, 0xD7, 0x6A);
+                if (part == "pile") return Color.FromArgb(0xF4, 0xF8, 0xFB);
+            }
+            return Color.Empty;
         }
 
         /// The check box's fill (brand.CHECKBOX): the well unchecked, the accent checked, the surface

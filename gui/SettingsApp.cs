@@ -437,6 +437,8 @@ namespace CodexAutoResume
         // stands on, docked at the tabs' outer end.
         private VersionPill versionPill;
         private SoftPage pillSlot;
+        // v0.6.24: its hint on a special day, that it can be pressed (FollowPillHint).
+        private PillHint pillHint;
         private readonly HaloDot stateDot = new HaloDot();
         private readonly SoftDayScene dayScene = new SoftDayScene();
         private string dayLook;
@@ -557,11 +559,14 @@ namespace CodexAutoResume
             if (now < specialUntil) return;
             countAsked++;
             bool sixth = versionPresses.Press(now);
+            // v0.6.24 (the owner, 2026-11-17/18): a special day's own egg and sentences, the date the window's (EggDay).
+            string day = EggDay();
             if (sixth && LightSweepsShown)
             {
                 stateDot.StopSweep();
                 detail.Unsay();
-                PlaySpecialEgg(SpecialEggs.Pick());
+                if (day != null) PlayDayEgg(day);
+                else PlaySpecialEgg(SpecialEggs.Pick());
                 // Until its sentence has come, been said and gone: the sweep's or the colours' time first, where they play.
                 bool moving = stateDot.Sweeping || stateDot.ColoursRunning || (confetti != null && confetti.Running);
                 specialUntil = now + (moving ? AsideAfterMs : 0) + AsideMs + AsideLabel.OutMs;
@@ -570,7 +575,64 @@ namespace CodexAutoResume
             if (!versionPresses.First) return;
             EggsPlayed.Add("one");
             stateDot.Sweep();
-            detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+            if (day != null)
+                detail.Aside(S("status.aside_day_" + day, S("status.aside", "It's okay if it stops. I'll pick it up.")),
+                             stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+            else detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+        }
+
+        /// v0.6.24: the special day the version's eggs speak of - the window's date (DayArt.Clock), or null for an ordinary day
+        /// and for a window that is no person's (DayArt.On off: a picture, a probe without a probe date). In High Contrast too,
+        /// unlike the day's look: these are words, and there nothing of the egg moves (PlayDayEgg, PillHint).
+        internal string EggDay()
+        {
+            if (!DayArt.On) return null;
+            DateTime now = DayArt.Clock();
+            string look, top, bottom;
+            return Brand.DayLook(now.Year, now.Month, now.Day, out look, out top, out bottom) ? look : null;
+        }
+
+        /// v0.6.24 (the owner, 2026-11-17/18, the Special board): the sixth press on a special day plays that day's own egg in
+        /// place of the three ordinary ones - from the pill, in a layer over the window (DayEggPlay) - and says its sentence,
+        /// as the confetti egg does. With motion reduced, Windows' animations off or in High Contrast, the sentence alone.
+        private void PlayDayEgg(string day)
+        {
+            EggsPlayed.Add("day:" + day);
+            bool moving = DayEggPlay(day);
+            detail.Aside(S("status.aside_egg_" + day, S("status.aside", "It's okay if it stops. I'll pick it up.")),
+                         moving ? AsideAfterMs : 0, AsideMs);
+        }
+
+        /// The day's egg on the screen: the confetti's layer and box (Confetti) round the pill, drawing DayEgg into the window
+        /// from the pill's side. Nothing where nothing may move, in High Contrast, or with no pill on the screen.
+        private bool DayEggPlay(string day)
+        {
+            if (versionPill == null || !Soft.OwnVisible(versionPill) || !Motion.Allowed(versionPill) || Palette.Contrast)
+                return false;
+            Point centre = PointToClient(versionPill.PointToScreen(new Point(versionPill.Width / 2, versionPill.Height / 2)));
+            int reach = Px(260);
+            Rectangle client = ClientRectangle;
+            Rectangle area = Rectangle.FromLTRB(Math.Max(client.Left, centre.X - reach), Math.Max(client.Top, centre.Y - Px(130)),
+                                                Math.Min(client.Right, centre.X + reach), client.Bottom);
+            if (area.Width <= 0 || area.Height <= 0) return false;
+            if (confetti != null) confetti.Dispose();
+            var egg = new DayEgg(day, new PointF(centre.X - area.X, centre.Y - area.Y), Soft.PxF(1), Mirror.Of(this) ? 1 : -1);
+            confetti = new ConfettiLayer(this, area, egg);
+            confetti.Start();
+            return true;
+        }
+
+        /// v0.6.24 (the owner, 2026-11-18, the Hint board's H2 and H3): the pill's hint on a special day (PillHint) and a hand
+        /// over it - none in a picture or the layout audit (LightSweepsShown). Asked by the window's clock every second
+        /// (FollowDayScene), as the window shows, and as the pill shows or goes.
+        internal void FollowPillHint()
+        {
+            if (pillHint == null) return;
+            string day = LightSweepsShown ? EggDay() : null;
+            Cursor hand = day != null ? Cursors.Hand : Cursors.Default;
+            if (versionPill.Cursor != hand) versionPill.Cursor = hand;
+            if (versionText.Cursor != hand) versionText.Cursor = hand;
+            pillHint.Follow(day);
         }
 
         /// One special egg, each with its sentence. With motion reduced or Windows' animations off, nothing moves and the
@@ -1314,7 +1376,9 @@ namespace CodexAutoResume
         private void KeepHeadlineClear()
         {
             if (chrome == null) return;
-            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - Math.Max(hero.Padding.Left, hero.Padding.Right);
+            // The card's padding at its outer side, the caption buttons' - its right, which the card mirrors for a language
+            // written right to left: the pill's inset while it is in the card (PillToHeader).
+            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - hero.Padding.Right;
             var wanted = new Padding(0, 0, Math.Max(0, reach), 0);
             if (headline.Margin != wanted) headline.Margin = wanted;
         }
@@ -1663,6 +1727,8 @@ namespace CodexAutoResume
         /// taskbar and title-bar icons follow the date (TaskbarMark.FollowTheDay).
         private void FollowDayScene()
         {
+            // v0.6.24: and the version pill's hint, which starts once the pill is on the screen and follows the date too.
+            FollowPillHint();
             if (!dayScene.Follow(ref dayLook)) return;
             if (dayLook == null)
             {
@@ -1683,6 +1749,12 @@ namespace CodexAutoResume
         private void PlaceDayScene()
         {
             if (dayLook == null) return;
+            // The version's pill at the card's outer end (PillToHeader) stands where the scene would: no scene then.
+            if (versionPill != null && versionPill.Parent == hero)
+            {
+                dayScene.Place(false, null, 0, 0, 0, 0, 0, 0);
+                return;
+            }
             bool mirrored = Mirror.Of(hero);
             int width = hero.Width, hair = Soft.Hairline, outer = width - hair;
             int end = Math.Max(WordsEnd(headline, mirrored, width), WordsEnd(detail, mirrored, width)), left, fade;
@@ -1813,17 +1885,33 @@ namespace CodexAutoResume
             pillSlot.TabStop = false;
             pillSlot.Controls.Add(versionPill);
             nav.Controls.Add(pillSlot);
+            // v0.6.24: its hint on a special day - the nudge moves it up in its slot, the ring is drawn on it (FollowPillHint).
+            pillHint = new PillHint(versionPill);
+            versionPill.Hint = pillHint;
+            pillHint.Changed = delegate(bool moved)
+            {
+                if (moved && versionPill.Parent == pillSlot) pillSlot.PerformLayout();
+                versionPill.Invalidate();
+            };
+            Shown += delegate { FollowPillHint(); };
+            versionPill.VisibleChanged += delegate { FollowPillHint(); };
             // Where the pill stands in its slot: at its outer end, the gap to the tabs at its inner (the slot's padding,
-            // which a mirrored slot mirrors), and centred on the tabs' line.
+            // which a mirrored slot mirrors), and centred on the tabs' line - less the hint's nudge. Not while it stands in
+            // the header card (PillToHeader), whose table places it.
             pillSlot.Layout += delegate
             {
+                if (versionPill.Parent != pillSlot) return;
                 Rectangle room = pillSlot.DisplayRectangle;
                 int tabs = 0;
                 foreach (Control tab in strip.Controls) tabs = Math.Max(tabs, tab.Height);
                 if (tabs == 0) tabs = pillSlot.Height;
                 var at = new Point(Mirror.Of(pillSlot) ? room.Right - versionPill.Width : room.X,
-                                   Math.Max(0, (tabs - versionPill.Height) / 2));
-                if (versionPill.Location != at) versionPill.Location = at;
+                                   Math.Max(0, (tabs - versionPill.Height) / 2 - pillHint.Nudge));
+                if (versionPill.Location != at)
+                {
+                    versionPill.Location = at;
+                    versionPill.Lifted();
+                }
             };
             nav.Layout += delegate { FitVersionPill(strip); };
             // And whenever the strip lays its tabs out again: a tab shown later - the advanced edition's Advanced features
@@ -1849,11 +1937,20 @@ namespace CodexAutoResume
 
         private bool fittingPill;
 
-        /// The pill whole - the version and the edition - where the tabs leave room for it and the gap before it; the version
-        /// alone where only that fits; else none. The room is the strip's less the tabs' own width (the strip lays its tabs
-        /// out in one line; where the advanced edition's take two rows, none is left), at every text size and in every
-        /// language, and again whenever the strip lays its tabs out (test_gui_v0624_dashboard). Whether the slot was shown,
-        /// hidden or resized, which changes the strip's room.
+        /// v0.6.24 (the owner, 2026-11-18, the advanced edition's eight tabs in English, where the pill had gone): the room
+        /// a tab keeps at either side of its name - today's, and the least the tabs are drawn closer to so the pill stays,
+        /// half of it, where the names still read as separate tabs. Every tab alike, so the gaps stay equal; the chosen
+        /// tab's raised look is its face, which the ring's room (TabRing) and the margin keep off its neighbours whatever
+        /// the padding.
+        internal const int TabPadX = 18, TabPadXLeast = 9, TabPadY = 8;
+
+        /// The pill whole - the version and the edition - where the tabs leave room for it and the gap before it; else the
+        /// tabs drawn closer, every one alike and no closer than needed (TabPadX down to TabPadXLeast), so it still fits
+        /// whole; else the version alone, the tabs as close as that needs; and where even the closest tabs leave no room,
+        /// the pill at the end of the header card's second line, under the caption buttons (PillToHeader) - never hidden
+        /// (the owner, 2026-11-18). The room is the strip's less the tabs' own width, at every text size and in every
+        /// language, and again whenever the strip lays its tabs out (test_gui_v0624_dashboard, test_gui_pill_room). Whether
+        /// the slot was shown, hidden or resized, or the tabs' padding changed, which changes the strip's room.
         private bool FitVersionPill(Control strip)
         {
             if (fittingPill || versionPill == null) return false;
@@ -1861,42 +1958,163 @@ namespace CodexAutoResume
             try
             {
                 int gap = Px(12);
-                // The tabs' own row, each shown tab as wide as it asks with its margins - not the strip's PreferredSize, which
-                // a tab just shown has not yet reached while the strip lays out for it (dev CI 43859506322: the Chat tab).
-                int tabs = strip.Padding.Horizontal;
-                foreach (Control tab in strip.Controls)
-                    if (Soft.OwnVisible(tab)) tabs += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
-                int room = nav.DisplayRectangle.Width - tabs - gap;
+                // The tabs' own row less the room at the sides of their names, each shown tab as wide as it asks with its
+                // margins - not the strip's PreferredSize, which a tab just shown has not yet reached while the strip lays
+                // out for it (dev CI 43859506322: the Chat tab).
+                int room = nav.DisplayRectangle.Width;
+                int full = Px(TabPadX), least = Math.Min(full, Px(TabPadXLeast));
+                // The most room at either side of every name, from today's down, that leaves `taken` beside the tabs; or
+                // less than the least where none does. Each tab as wide as it would ask with that room (TabRowAt), measured
+                // rather than reckoned: a short name's tab has a floor of its own (NavButton's measure of its other weight).
+                Func<int, int> sides = delegate(int taken)
+                {
+                    for (int each = full; each >= least; each--)
+                        if (TabRowAt(strip, each) + taken <= room) return each;
+                    return least - 1;
+                };
+                bool known = !string.IsNullOrEmpty(versionText.Version);
+                // Two rows of tabs (the advanced edition's on a screen too narrow for one, HoldTabs) leave the row no end.
+                var flow = strip as FlowLayoutPanel;
+                bool oneRow = flow == null || !flow.WrapContents;
                 int whole = versionPill.WholeWidth, alone = versionPill.VersionWidth;
-                bool shown = !string.IsNullOrEmpty(versionText.Version) && alone <= room;
-                bool shortened = shown && whole > room;
+                int pad = sides(whole + gap);
+                bool inRow = known && oneRow && pad >= least, shortened = false;
+                if (known && oneRow && !inRow)
+                {
+                    pad = sides(alone + gap);
+                    inRow = shortened = pad >= least;
+                }
+                if (!inRow) pad = oneRow ? Math.Max(least, sides(0)) : full;
+                bool changed = TabSides(strip, pad);
                 versionText.Shortened = shortened;
                 versionPill.Tell();
                 var size = new Size(shortened ? alone : whole, versionPill.PillHeight);
                 if (versionPill.Size != size) versionPill.Size = size;
                 pillSlot.Padding = new Padding(gap, 0, 0, 0);
                 int width = size.Width + gap;
-                bool changed = false;
                 if (pillSlot.Width != width)
                 {
                     pillSlot.Width = width;
                     changed = true;
                 }
-                if (Soft.OwnVisible(pillSlot) != shown)
+                if (Soft.OwnVisible(pillSlot) != inRow)
                 {
-                    pillSlot.Visible = shown;
+                    pillSlot.Visible = inRow;
                     changed = true;
                 }
+                PillToHeader(known && !inRow);
                 versionPill.Lifted();
                 return changed;
             }
             finally { fittingPill = false; }
         }
 
-        /// How the pill was last fitted, for the tests and the audit: "whole", "version" or "none".
+        // A tab of its own, never shown, that a tab's words, weight and room are set on to ask how wide it would be (TabRowAt),
+        // and what it answered, by the font, the words and the room.
+        private NavButton tabMeasure;
+        private readonly Dictionary<string, int> tabWidths = new Dictionary<string, int>();
+
+        /// How wide the strip's row of shown tabs would be with `pad` at either side of every name, margins included: each
+        /// tab as a tab of its own set as it is but for the room asks - for every room alike, the room the tabs have now
+        /// too, so the answer never depends on which room that is and a fitting never undoes the one before it.
+        private int TabRowAt(Control strip, int pad)
+        {
+            int width = strip.Padding.Horizontal;
+            foreach (Control tab in strip.Controls)
+            {
+                if (!Soft.OwnVisible(tab)) continue;
+                var button = tab as NavButton;
+                if (button == null)
+                {
+                    width += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+                    continue;
+                }
+                var room = new Padding(pad, button.Padding.Top, pad, button.Padding.Bottom);
+                string key = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(button.Font).ToString(CultureInfo.InvariantCulture) +
+                             "|" + room + "|" + button.AutoSizeMode + "|" + button.Text;
+                int asked;
+                if (!tabWidths.TryGetValue(key, out asked))
+                {
+                    if (tabMeasure == null) tabMeasure = new NavButton();
+                    tabMeasure.AutoSize = button.AutoSize;
+                    tabMeasure.AutoSizeMode = button.AutoSizeMode;
+                    tabMeasure.Font = button.Font;
+                    tabMeasure.Text = button.Text;
+                    tabMeasure.Padding = room;
+                    asked = tabMeasure.GetPreferredSize(Size.Empty).Width;
+                    tabWidths[key] = asked;
+                }
+                width += asked + tab.Margin.Horizontal;
+            }
+            return width;
+        }
+
+        /// Every tab of the strip with `pad` at either side of its name, shown or not (a tab shown later comes in as close
+        /// as the rest). Whether any changed.
+        private bool TabSides(Control strip, int pad)
+        {
+            bool changed = false;
+            var wanted = new Padding(pad, Px(TabPadY), pad, Px(TabPadY));
+            foreach (Control tab in strip.Controls)
+            {
+                if (!(tab is NavButton) || tab.Padding == wanted) continue;
+                tab.Padding = wanted;
+                changed = true;
+            }
+            return changed;
+        }
+
+        // The header card's padding as it was built, which the pill's room at its outer side replaces while it is there.
+        private Padding heroPadding;
+
+        /// v0.6.24 (the owner, 2026-11-18): the pill in the header card where even the closest tabs leave it no room - the
+        /// card's third column, on its second line, at its outer end under the caption buttons, Brand.PillInset from the
+        /// card's edge as at the tab row's end (the card's padding at that side is the inset while it is there; the headline
+        /// keeps clear of the caption buttons by its own margin, KeepHeadlineClear); the line under the headline ends a gap
+        /// before it. Back in its slot at the tab row's end as soon as the row has room again.
+        private void PillToHeader(bool wanted)
+        {
+            if (wanted == (versionPill.Parent == hero)) return;
+            if (heroPadding == Padding.Empty) heroPadding = hero.Padding;
+            hero.SuspendLayout();
+            try
+            {
+                if (wanted)
+                {
+                    pillSlot.Controls.Remove(versionPill);
+                    int inset = Px(Brand.PillInset);
+                    // The card's right and the pill's left as a language written left to right has them: the card mirrors both
+                    // for one written right to left (measured: swapped here as well, the pill stood 32 px in, 2026-11-18).
+                    hero.Padding = new Padding(heroPadding.Left, heroPadding.Top, inset, heroPadding.Bottom);
+                    versionPill.Anchor = AnchorStyles.None;
+                    versionPill.Margin = new Padding(Px(12), 0, 0, 0);
+                    hero.Controls.Add(versionPill, 2, 1);
+                    hero.SetColumnSpan(headline, 2);
+                }
+                else
+                {
+                    hero.Controls.Remove(versionPill);
+                    hero.SetColumnSpan(headline, 1);
+                    hero.Padding = heroPadding;
+                    versionPill.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+                    versionPill.Margin = Padding.Empty;
+                    pillSlot.Controls.Add(versionPill);
+                }
+            }
+            finally { hero.ResumeLayout(true); }
+            KeepHeadlineClear();
+            PlaceDayScene();
+        }
+
+        /// How the pill was last fitted, for the tests and the audit: "whole" or "version" at the tab row's end, "header" in
+        /// the header card, or "none" before there is a version to show.
         internal string PillFit
         {
-            get { return pillSlot == null || !Soft.OwnVisible(pillSlot) ? "none" : versionText.Shortened ? "version" : "whole"; }
+            get
+            {
+                if (versionPill != null && versionPill.Parent == hero) return "header";
+                return pillSlot == null || !Soft.OwnVisible(pillSlot) ? "none" : versionText.Shortened ? "version" : "whole";
+            }
         }
 
     }

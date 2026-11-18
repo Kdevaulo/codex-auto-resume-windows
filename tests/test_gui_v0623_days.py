@@ -59,8 +59,9 @@ class TableTests(unittest.TestCase):
             self.assertEqual(brand.day_look(year, int(chuseok[:2]), int(chuseok[2:])), "chuseok", year)
 
     def test_past_the_tables_last_year_nothing_lunar_is_shown(self):
-        day = datetime.date(2041, 1, 2)
-        while day.year == 2041:
+        # The table runs to 2100 since v0.6.24 (test_day_lunar_table).
+        day = datetime.date(2101, 1, 2)
+        while day.year == 2101:
             if (day.month, day.day) not in ((9, 6), (12, 24), (12, 25)):
                 self.assertIsNone(brand.day_look(day.year, day.month, day.day), day)
             day += datetime.timedelta(days=1)

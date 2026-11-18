@@ -836,11 +836,30 @@ namespace CodexAutoResume
         internal static string AuditedPill = "";
 
         /// v0.6.24-beta.2: the version's pill (VersionPill) clear of every page tab and inside the tab strip's row, its words
-        /// whole in it, centred on the tabs within a pixel, at the strip's outer end (the left, mirrored); or not shown.
+        /// whole in it, centred on the tabs within a pixel, at the strip's outer end (the left, mirrored); or (v0.6.24, the
+        /// owner, 2026-11-18) in the header card, inside it, clear of its two lines and Brand.PillInset from its outer edge.
+        /// Never hidden while there is a version to show.
         private void AuditPill(List<string> findings)
         {
             AuditedPill = PillFit;
-            if (AuditedPill == "none") return;
+            if (AuditedPill == "none")
+            {
+                if (!string.IsNullOrEmpty(versionText.Version)) findings.Add("tabs :: the version is shown nowhere");
+                return;
+            }
+            if (AuditedPill == "header")
+            {
+                Rectangle at = versionPill.Bounds;
+                if (!new Rectangle(Point.Empty, hero.Size).Contains(at))
+                    findings.Add("header :: the version's pill " + at + " is not inside the header card " + hero.Size);
+                if (at.IntersectsWith(headline.Bounds) || at.IntersectsWith(detail.Bounds))
+                    findings.Add("header :: the version's pill " + at + " lies over the card's words");
+                int said = versionText.GetPreferredSize(Size.Empty).Width;
+                if (versionText.Width < said)
+                    findings.Add("header :: the version's pill cuts its words: " + versionText.Width + " of " + said);
+                AuditPillInset(findings);
+                return;
+            }
             var pill = new Rectangle(versionPill.Left + pillSlot.Left, versionPill.Top + pillSlot.Top, versionPill.Width, versionPill.Height);
             foreach (NavButton tab in navButtons.Values)
             {

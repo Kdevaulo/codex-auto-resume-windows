@@ -180,7 +180,9 @@ class SliceTests(unittest.TestCase):
         # 118 with the setup window's filled pages (v0.6.24-beta.3, the owner's option A): StepMark, the mark beside a
         # numbered point or a listed step, and InstallerRule, the hairline under each row of what is installed
         # (gui/InstallerWindow.cs).
-        self.assertEqual(len(set(declared)), 118, "the window's types")
+        # 121 with the special days' eggs on the version (v0.6.24, the owner, 2026-11-18): IEggPainting, what the confetti's
+        # layer draws, DayEgg, a special day's own egg at the sixth press, and PillHint, the pill's hint (gui/SoftEggs.cs).
+        self.assertEqual(len(set(declared)), 121, "the window's types")
         # v0.6.11: DashboardTools.cs, the Dashboard's own tools, an eleventh part in a twelfth source; and
         # SettingsOwn.cs, Custom... beside a drop-down's choices, a twelfth part in a thirteenth. v0.6.12:
         # DashboardVersions.cs, Install another version..., a thirteenth part in a fourteenth; and SettingsPower.cs,

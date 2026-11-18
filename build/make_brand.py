@@ -186,6 +186,29 @@ def day_look_method():
     return lines
 
 
+def day_egg_methods():
+    """v0.6.24: the version pill's eggs on the special days (brand.days.DAY_RINGS, DAY_EGG_COLOURS), as chains of comparisons."""
+    from codex_auto_resume.brand import days as egg_days
+
+    def colour(tone):
+        return "Color.FromArgb(0x%02X, 0x%02X, 0x%02X)" % tuple(brand.rgb(tone))
+
+    lines = ["\n", "        /// brand.days.DAY_RINGS: the hint's ring round the version's pill on a special day.\n",
+             "        internal static Color DayRing(string look)\n", "        {\n"]
+    for key, tone in egg_days.DAY_RINGS.items():
+        lines += ['            if (look == "%s") return %s;\n' % (key, colour(tone))]
+    lines += ["            return Color.Empty;\n", "        }\n\n",
+              "        /// brand.days.DAY_EGG_COLOURS: a part of a special day's own egg, by its name.\n",
+              "        internal static Color DayEggColour(string look, string part)\n", "        {\n"]
+    for key, parts in egg_days.DAY_EGG_COLOURS.items():
+        lines += ['            if (look == "%s")\n' % key, "            {\n"]
+        for name, tone in parts.items():
+            lines += ['                if (part == "%s") return %s;\n' % (name, colour(tone))]
+        lines += ["            }\n"]
+    lines += ["            return Color.Empty;\n", "        }\n"]
+    return lines
+
+
 def sections():
     """Every constant Brand.cs declares after its colours, as (comment, [(name, type, value)]).
 
@@ -398,7 +421,7 @@ def methods() -> str:
         "        }\n",
     ]
     lines += ["\n"] + ease_method()
-    lines += ["\n"] + day_look_method()
+    lines += ["\n"] + day_look_method() + day_egg_methods()
     return "".join(lines)
 
 
