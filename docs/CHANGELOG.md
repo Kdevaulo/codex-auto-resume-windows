@@ -17,8 +17,7 @@ Both editions change in the first group; the second is the advanced edition's al
 **The bundled Python stays 3.14.10.** The code is ready for Python 3.15, but the switch itself waits for CPython 3.15.3, which is not out.
 
 **Going back.** Nothing that an earlier version reads changes: the watcher's state stays schema 5, the settings file gains no key and the
-advanced edition's own file stays version 9. The limits a person sets are shown and typed as what is left now, and are still stored as the share
-used, so an earlier version reads them as they were and shows them as the share used. An earlier version has Windows' title bar, its own
+advanced edition's own file stays version 9. An earlier version has Windows' title bar, its own
 corners and popup, its own dialogs and the usage shown as the share used, as it always had them, and leaves the previous version's `.old-`
 file where an update put it.
 
@@ -104,13 +103,14 @@ file where an update put it.
   and in its dialogs; Tab, the arrow keys and an access key show the rings again.
 - **A tooltip has nothing drawn round its card.** The pale glow a tooltip gave a dark desktop is gone; the caption buttons' tooltips and
   the Dashboard's line tooltips are their card alone.
-- **Every surface says what is left of a usage window (new since beta.2).** The popup's line, the Dashboard's Overview line, the panel in
-  Codex, the tooltip, the near-limit notice and the Diagnostics check say "N% left" - "5-hour 0% left ... weekly 38% left" - in all 22
-  languages (Korean "남음"), where they said what was used. Left is 100 minus the whole share used, so 0 % shows only once a window is
-  used up (99.6 % used leaves 1 %). It is a change of display alone: the reading, what the program sends and every decision it takes still
-  use the share used. The notice says no number where the share cannot be read. The tray icon's card fills each bar by what is left and
-  empties it as the window is used; with 10 % or less left the bar, the edge of its groove and the share are the warning colour, so an empty
-  bar never reads as calm. The guide's usage line, its example and what *left* means are told the same way.
+- **The at-a-glance surfaces say what is left of a usage window (new since beta.2).** The popup's line, the hover card, the Dashboard's
+  Overview line, the panel in Codex and the near-limit notice say "N% left" - "5-hour 0% left ... weekly 38% left" - in all 22 languages
+  (Korean "남음"), where they said what was used. Left is 100 minus the whole share used, so 0 % shows only once a window is used up
+  (99.6 % used leaves 1 %). It is a change of display alone: the reading, what the program sends and every decision it takes still use the
+  share used. The notice says no number where the share cannot be read. The tray icon's card fills each bar by what is left and empties it
+  as the window is used; with 10 % or less left the bar, the edge of its groove and the share are the warning colour, so an empty bar never
+  reads as calm. The guide's usage line and its example are told the same way, and say what *left* means. The limits a person sets
+  (warn at 85 %, wrap up at 90 %, stop at 97 %), Diagnostics' usage check and the wrap-up message to Codex still say what was used, as before.
 - **The tray icon's card is as wide as its widest row,** with no fixed least width: its widest row ends one side's padding from the
   card's right edge, so a card with no usage rows is no longer emptier on its right.
 - **The icon's card's first row and the panel's first row read as one line (new since beta.2).** On the card, the light stands on the middle
@@ -188,15 +188,9 @@ file where an update put it.
   the version's pill may draw them to, so the narrowest window is what it was.
 - **The advanced pages say what is left (new since beta.2).** The saved accounts' meters draw what is left - "N% left · in <time>" - and
   with 10 % or less left the bar, the edge of its groove and the words are the warning colour, so an empty groove with nothing left still
-  says so. The analytics card's pace says "<window>: N% left", how far that moved in the last hour and "none left around <time>", and the
-  examples page's pace says it the same way. All of it is display only: the bridge still says the share used and every decision reads it.
-- **The limits you set are chosen and typed as what is left (new since beta.2).** The warning, the wrap-up, the stop, and the stop the wrap-up's
-  words ask for, each window's, read "Warn when this much is left (5-hour window): 15% left" for a stored 85: every preset and a number of your
-  own shows as what is left, and *Custom...* asks for the share left, 0 to 99 (a 0 sends 100 used, and 100 left, which would be a share used
-  of 0, is refused in the dialog with the range said). What is stored, what the bridge sends and what the engine reads are unchanged, and so is
-  the wrap-up message to Codex, which still quotes the share used. The statements that explain the near-limit features, in all 22 languages,
-  and the editions page and the privacy page say the thresholds the same way, in the defaults too: 15 % left for the warning, 10 % left for the
-  wrap-up and 3 % left for the stop, where they said 85 %, 90 % and 97 % reached.
+  says so. The analytics card's share reads "<window>: N% left" and, where the pace runs a window out, "none left around <time>"; how far
+  the share moved in the last hour is still told as what was used. All of it is display only: the bridge still says the share used and every
+  decision reads it.
 
 ## v0.6.24-beta.2 — The Dashboard's squircle corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card, dialogs as one card under their title, and a tray icon's card as wide as its widest row
 
