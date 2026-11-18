@@ -1319,19 +1319,22 @@ second round of audits, over the finished code of both editions, and that v0.6.2
 
 ---
 
-## v0.6.24 — The third round: every audit once more over the finished code
+## v0.6.24 — The window's own look, the usage shown as what is left, and a setup window with something on every page
 
 On 2026-11-11 the owner chose to release v0.6.23 once the tray's *Open the popup* and the popup's task menu were done, and to do the second round of audits in the next version; on 2026-11-12 they decided
-that v0.6.23 carries the whole second round and that v0.6.24 is a third round that checks everything again, over the finished code of both editions. It is the last Python release: what it settles is the Python reference implementation the Rust core reproduces.
+that v0.6.23 carries the whole second round and that v0.6.24 is a third round that checks everything again, over the finished code of both editions. On 2026-11-18 the owner moved that third round, the optical audit
+included, and the review of what moves from the advanced edition to the standard one on to v0.6.25, and released v0.6.24 as the line that gave both editions their window's own look.
 
-Expected areas include:
+What v0.6.24 carries, in both editions:
 
-- every kind of audit once more: all code, security, reachability, design and motion, limits, size and tests, checking that the second round's fixes hold and that nothing new broke,
-- every document, in both languages, read against the code as it is,
-- all twenty-two translations,
-- then cleanup, fixes and refactoring, with a regression test for each confirmed bug,
-- the review of which advanced capabilities the standard edition could take (not started),
-- the switch of the bundled Python to 3.15, if CPython 3.15.3 is out by then (moved out of v0.6.23 on 2026-11-10).
+- a window and dialogs with no Windows title bar, squircle corners everywhere in Soft, the Dashboard's own outer corner among them, and the Dashboard at 1000 x 588 with the version in a pill that is never hidden,
+- dialogs as one card under their title, with their own fade, and a Dashboard that shows its pages whole and says it is at work while it reopens,
+- the tray icon's hover card and popup, a text box's own right-click menu, and the popup's motion picture starting at the taskbar's end,
+- every usage window shown as what is left of it, the thresholds a person sets included,
+- a setup window of 600 x 600 with its pages filled: what the program does, the steps of the run and what is installed,
+- every release titled, with its aim and its kind.
+
+The switch of the bundled Python to 3.15 did not happen in v0.6.24: CPython 3.15.3 is not out, so the bundle stays 3.14.10 and the code stays ready for it.
 
 Right after the final v0.6.24 is published and verified, the last Python version is kept as a repository of its own, as above.
 
@@ -1339,9 +1342,15 @@ Right after the final v0.6.24 is published and verified, the last Python version
 
 The first pre-release of v0.6.24. In both editions: the window and its dialogs have no Windows title bar, their minimise, maximise and close buttons are line glyphs in the first card; Soft's rounded things have squircle corners, the Dashboard window's own outer corner among them; the tray icon's popup is its card alone with a float shadow; hovering the icon shows a card with the state and the usage bars; a text box's right-click menu is drawn in the window's design; a notification card fading shows no dark band; the Dashboard answers within a few seconds after an update, and an update starts only a watcher that ended unexpectedly in this sign-in. In the advanced edition: the 5-hour window's one near-zero request starts none of the person's programs, and the Korean wording of its pages was read key by key. The third round's audits follow.
 
-### v0.6.24-beta.2 🚧 — The Dashboard's corner without its rough edges, new proportions and dialogs as one card (a pre-release)
+### v0.6.24-beta.2 ✅ — The Dashboard's corner without its rough edges, new proportions and dialogs as one card (a pre-release)
 
 The second pre-release of v0.6.24, in both editions: the rough edges of the Dashboard's own corner the first beta listed are fixed (no faint fill outside it, no line inside it at 150 %, no flash of Windows' title bar, a restore that comes back exactly, edges and corners that resize along their length); the Dashboard is 1000 x 588 with the version in a pill at the end of its page tabs; with the watcher off, Start watcher stands where Pause stands on the Right now card; a dialog is its title row and one card, with no Close where nothing is asked, the Dashboard dimmed behind it and the dialog centred on it; focus rings show only after the keyboard is used; the tray icon's card is as wide as its widest row; and the setup window is 600 x 600 with the Dashboard's corner. The third round's audits follow.
+
+### v0.6.24 ✅ — The final: what came after the second pre-release
+
+The final of the line, in both editions: every surface says what is left of a usage window - the popup, the Dashboard, the panel, the tooltip, the notice and the check, and the icon's card fills its bars by what is left - and the limits a person sets are chosen and typed as what is left, still stored and sent as the share used; the version's pill is never hidden, because crowded tabs are drawn closer and only where even that leaves no room it stands in the header card; dialogs are painted whole before they fade in and the fade keeps its own time; a page switch puts the page on the screen in one go, so the first switch to Diagnostics never shows it over the Overview; a Dashboard waiting for its reopened self shows the working light and the app-starting pointer; the setup window's Welcome page says what the program does, its Installing page lists the run's steps and its Ready page lists what is installed and says no administrator rights are needed; the icon's card and the Codex panel start their first row on one line; and the tray popup's motion picture starts at the taskbar's end, with the hover card. In the advanced edition: the saved accounts' meters, the analytics' pace and the examples say what is left. Every release now has a short title, a line on its aim and its kind.
+
+On 2026-11-18 the owner moved two items from this release to the next one, v0.6.25: the third round of audits, the optical audit included, and the review of what moves from the advanced edition to the standard one.
 
 ---
 
@@ -1351,6 +1360,11 @@ v0.6.25 arrives in two stages too: **v0.6.25-alpha**, a pre-release, replaces th
 core with Rust as it is; the final **v0.6.25** is that core made naturally Rust-oriented. The alpha is
 a pre-release because the core swapped as it is is a stage on the way to the Rust-native one, not a
 release worth having on its own.
+
+Two items come first in v0.6.25, moved here from v0.6.24 by the owner on 2026-11-18:
+
+- the third round of audits, the optical audit included,
+- the review of what moves from the advanced edition to the standard one.
 
 ### v0.6.25-alpha — Complete Rust core replacement (a pre-release)
 
@@ -1654,18 +1668,18 @@ The first pre-release: a window without Windows' title bar, squircle corners, th
 
         ↓
 
-v0.6.24-beta.2  🚧 In development
+v0.6.24-beta.2  ✅ Released
 The second pre-release: the Dashboard's corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card and dialogs as one card
 
         ↓
 
-v0.6.24
-The third round: every audit once more over the finished code, then cleanup, fixes and refactoring; the review of the advanced capabilities the standard edition could take; the switch to Python 3.15 if 3.15.3 is out
-→ freeze Python reference behavior
+v0.6.24  ✅ Released
+The final: usage shown as what is left, the version's pill never hidden, dialogs painted whole, a setup window with something on every page, and every release titled
 
         ↓
 
 v0.6.25-alpha → v0.6.25
+First the third round of audits, the optical audit included, and the review of what moves from the advanced edition to the standard one
 Complete Rust core replacement, in a pre-release
 + Rust-native restructuring and optimization, in the final
 
