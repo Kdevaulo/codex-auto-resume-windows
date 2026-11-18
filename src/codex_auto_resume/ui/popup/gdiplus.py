@@ -101,6 +101,7 @@ class _Painter:
         # shadow are drawn over nothing (menuwindow.py); everything else draws opaque, and its alpha is not read.
         # v0.6.24: how much its rounded shapes smooth their corners (brand/shape.py) - the canvas's, which is
         # Soft's unless its owner says otherwise (_Canvas.smoothing).
+        self._solids = None                                    # keep_solids: a colour's brush, made once
         self.smoothing = getattr(canvas, "smoothing", None) if smoothing is None else smoothing
         if self.smoothing is None:
             self.smoothing = shape.design_smoothing()
@@ -128,6 +129,9 @@ class _Painter:
         return self
 
     def __exit__(self, *unused):
+        for brush in (self._solids or {}).values():
+            self._delete_brush(brush)
+        self._solids = None
         self.gp.GdipDeleteGraphics(self.graphics)
         self.gp.GdipDisposeImage(self.bitmap)
         _gdiplus_made(-2)
@@ -153,6 +157,25 @@ class _Painter:
         brush = C.c_void_p()
         self._made(self.gp.GdipCreateSolidFill(colour, C.byref(brush)), "GdipCreateSolidFill")
         return brush
+
+    def keep_solids(self):
+        """From here until it closes, the painter makes each colour's solid brush for a circle, an ellipse or a polygon once
+        and fills with it again: a frame of a special day's scene and its specks (W2) fills dozens of small pieces in a
+        handful of colours, and a brush made and deleted for each piece cost about as much as filling it."""
+        if self._solids is None:
+            self._solids = {}
+
+    def _solid(self, colour):
+        if self._solids is None:
+            return self._brush(colour)
+        brush = self._solids.get(colour)
+        if brush is None:
+            brush = self._solids[colour] = self._brush(colour)
+        return brush
+
+    def _done_with(self, brush):
+        if self._solids is None:
+            self._delete_brush(brush)
 
     def _path(self, rect, radius):
         left, top, right, bottom = (float(value) for value in rect)
@@ -216,27 +239,27 @@ class _Painter:
             self._delete_path(path)
 
     def fill_circle(self, cx, cy, radius, colour):
-        brush = self._brush(colour)
+        brush = self._solid(colour)
         try:
             self.gp.GdipFillEllipse(self.graphics, brush, float(cx - radius), float(cy - radius),
                                     float(radius * 2), float(radius * 2))
         finally:
-            self._delete_brush(brush)
+            self._done_with(brush)
 
     def fill_polygon(self, points, colour):
-        brush = self._brush(colour)
+        brush = self._solid(colour)
         try:
             flat = (C.c_float * (len(points) * 2))(*[float(value) for point in points for value in point])
             self.gp.GdipFillPolygon2(self.graphics, brush, flat, len(points))
         finally:
-            self._delete_brush(brush)
+            self._done_with(brush)
 
     def fill_ellipse(self, cx, cy, rx, ry, colour):
-        brush = self._brush(colour)
+        brush = self._solid(colour)
         try:
             self.gp.GdipFillEllipse(self.graphics, brush, float(cx - rx), float(cy - ry), float(rx * 2), float(ry * 2))
         finally:
-            self._delete_brush(brush)
+            self._done_with(brush)
 
     def stroke_lines(self, points, colour, width):
         pen = self._pen(colour, width)

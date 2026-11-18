@@ -179,6 +179,9 @@ def day_look_method():
               "        internal static string DayScene(string look)\n", "        {\n"]
     for key in brand.DAY_LOOKS:
         lines += ['            if (look == "%s") return "%s";\n' % (key, brand.scene_text(key).replace("\n", "\\n"))]
+    lines += ['            return "";\n', "        }\n\n", "        internal static string DaySpecks(string look)\n", "        {\n"]
+    for key in brand.DAY_LOOKS:
+        lines += ['            if (look == "%s") return "%s";\n' % (key, brand.speck_text(key).replace("\n", "\\n"))]
     lines += ['            return "";\n', "        }\n\n", "        internal static string DayMark(string look)\n", "        {\n"]
     for key in brand.DAY_LOOKS:
         lines += ['            if (look == "%s") return "%s";\n' % (key, brand.mark_text(key).replace("\n", "\\n"))]
@@ -224,6 +227,11 @@ def sections():
     scale.append(("DaySceneWidth", "double", float(brand.SCENE_WIDTH)))
     scale.append(("DaySceneHeight", "double", float(brand.SCENE_HEIGHT)))
     scale.append(("DayMarkLeast", "int", int(brand.MOTIF_LEAST)))
+    # v0.6.24-beta.3 (W2): the day spread wide - its specks' band, the gap past the words, the fade, the ground's tint.
+    scale.append(("DaySpeckBand", "double", float(brand.SPECK_BAND)))
+    scale.append(("DayWideGap", "int", int(brand.WIDE["gap"])))
+    scale.append(("DayWideFade", "int", int(brand.WIDE["fade"])))
+    scale.append(("DayGroundTint", "double", float(brand.WIDE["ground_tint"])))
     for part, value in zip(("X1", "Y1", "X2", "Y2"), brand.MOTION["ease"]):
         scale.append(("TransitionEase" + part, "double", value))
     # v0.6.10: Classic's accent bar inside a card's left hairline, and its current tab's underline.

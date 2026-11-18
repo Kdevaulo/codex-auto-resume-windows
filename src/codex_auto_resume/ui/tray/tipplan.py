@@ -40,7 +40,7 @@ def _line_box(height):
     return height * 3 / 4.0, height / 2.0
 
 
-def tip_layout(parts, light, scale, measure, metrics=None) -> dict:
+def tip_layout(parts, light, scale, measure, metrics=None, day=None) -> dict:
     """Every rectangle of the card in device pixels, left to right, and its size.
 
     `parts` is words.tooltip_parts' dict; `light` the status light's state (a key of brand.STATUS_FILL); `measure(role,
@@ -49,7 +49,12 @@ def tip_layout(parts, light, scale, measure, metrics=None) -> dict:
     `size`, `card`, `items`, `targets` (none: nothing on the card is pressed), `scale` - so the popup's renderer draws
     its items and its mirror turns it right to left. The card fills the window: nothing is drawn round it, as round the
     icon's menu (the owner, 2026-11-01 and 11-02: a lift's lit edge and its pale shadow shone as a halo on a dark
-    taskbar)."""
+    taskbar).
+
+    `day` (W2, the owner's pick of 2026-11-17) is a special day's look, or None: the card is then that much wider at its
+    outer side that the day stands there, past every word, as the popup's header has it (brand.day_band) - its ground, its
+    specks, its scene as tall as the card - with the card's colour fading into it; everything else is where it is on any
+    other day."""
     space = brand.SPACING
 
     def px(value):
@@ -184,6 +189,15 @@ def tip_layout(parts, light, scale, measure, metrics=None) -> dict:
             y += row_h
 
     y += pad_y
+    if day:
+        edge = max(1, px(1))
+        unit = (y - 2 * edge) / brand.SCENE_HEIGHT
+        focal = brand.SCENE_WIDTH - brand.SCENE_FOCUS[day]
+        # Room past the words for the scene's main piece, the least fade before it and half the fade's whole.
+        width = right + px(brand.WIDE["gap"]) + px(2) + px(brand.WIDE["fade"]) // 2 + -int(-focal * unit // 1) + edge
+        band = brand.day_band(day, px, (edge, edge, width - edge, y - edge), right)
+        if band is not None:
+            items.append(band)
     card = (0, 0, width, y)
     items.insert(0, {"kind": "card", "rect": card, "radius": px(brand.RADII["card"]), "corner": "card"})
     return {"size": (width, y), "card": card, "items": items, "targets": [], "scale": scale, "rows": []}

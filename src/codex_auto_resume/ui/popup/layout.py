@@ -61,20 +61,9 @@ def share_columns(available, needs) -> list:
 
 
 def _scene_item(look, px, margin, card_width, words_end, below):
-    """The day's scene in what the header's words leave at the card's top right, at most two thirds of it: beginning at exactly
-    the card's colour past the last word, and its main piece whole. None where the words leave too little room for that."""
+    """The popup's header in the day (brand.day_band): the card's inside from its top to just above the summary's well."""
     edge = max(1, px(1))
-    left = max(words_end + px(8), margin + card_width * 34 // 100)
-    right, top, bottom = margin + card_width - edge, margin + edge, min(margin + px(66), below - px(2))
-    whole = (bottom - top) / brand.SCENE_HEIGHT
-    focal = brand.SCENE_WIDTH - brand.SCENE_FOCUS[look]
-    least_fade = px(28)
-    unit = min(whole, (right - left - least_fade) / focal)
-    if unit < whole * 0.75:
-        return None
-    solid = left + px(2)
-    return {"kind": "scene", "scene": look, "rect": (left, top, right, bottom), "unit": unit,
-            "fade": (solid, solid + min(px(72), int(right - left - px(2) - focal * unit)))}
+    return brand.day_band(look, px, (margin + edge, margin + edge, margin + card_width - edge, below - px(2)), words_end)
 
 
 def layout(vm, scale, measure, width=WIDTH) -> dict:

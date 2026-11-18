@@ -77,8 +77,8 @@ class Card:
 
     made = []
 
-    def __init__(self, *, content=None, held=None, log=None, fail=None):
-        self.content, self.held, self.fail = content, held, fail
+    def __init__(self, *, content=None, held=None, log=None, fail=None, days=False):
+        self.content, self.held, self.fail, self.days = content, held, fail, days
         self.shown, self.hidden, self.destroyed = [], [], 0
         self.visible = False
 
@@ -153,6 +153,8 @@ class ShowTests(IconCase):
                          words.tooltip(snapshot, strings, time.time(), "advanced"))
         self.assertEqual(parts["edition"], "Advanced")
         self.assertIs(made[0].held.__func__, tray.Tray._popup_held)
+        # v0.6.24-beta.3 (W2): it shows the day only as the icon does - the watcher's own (`days`).
+        self.assertEqual(made[0].days, self.icon.days)
 
     def test_not_over_the_popup_or_the_menu(self):
         card = self.with_card()

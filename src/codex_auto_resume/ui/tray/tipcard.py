@@ -65,6 +65,11 @@ def tip_light(snapshot, now=None) -> str:
     return popup.snapshot_activity(snapshot, time.time() if now is None else now)
 
 
+def tip_day(look, contrast, design):
+    """The day the card shows: `look`, but never in High Contrast nor in Classic - as the popup's header (hidden.py)."""
+    return look if look and not contrast and design != "classic" else None
+
+
 def tip_place(plan, work, monitor, box) -> tuple:
     """Where the window goes, (x, y): the popup's placement for the card's size - beside `box` (tip_anchor), on the
     taskbar's side of the monitor, TIP_GAP from the taskbar and the icon, inside the work area. Physical pixels,
@@ -165,10 +170,11 @@ def _metric_calls():
 class TipRenderer(popup.Renderer):
     """The popup's renderer, drawing the card: its ground and hairline over nothing, its chip, bars, words and light."""
 
-    def tip_layout(self, parts, light, scale, locale):
-        """The card's plan in `locale` at `scale`: mirrored, as the popup's is, when the language is written right to left."""
+    def tip_layout(self, parts, light, scale, locale, day=None):
+        """The card's plan in `locale` at `scale`, on `day`'s look or none: mirrored, as the popup's is, when the language is
+        written right to left."""
         self.use(locale, scale)
-        laid = tip_layout(parts, light, scale, self.measure, self.metrics)
+        laid = tip_layout(parts, light, scale, self.measure, self.metrics, day)
         return popup.mirror(laid) if l10n.right_to_left(locale) else laid
 
     def metrics(self, role):
@@ -210,6 +216,9 @@ class TipRenderer(popup.Renderer):
             for item in plan["items"]:
                 if item["kind"] in ("chip", "meter"):
                     self._ground_item(paint, item, scale, None)
+            # A special day (W2): the day past the words, at its first instant - the card is up for moments, and only its
+            # light moves (it costs nothing a frame).
+            self._scene(paint, plan, 0.0)
         self._text(canvas.dc, plan, ())
         self._opaque_words(plan)
         self._keep_halo_band(plan)
@@ -248,13 +257,13 @@ class TipRenderer(popup.Renderer):
 
 
 def draw_offscreen(parts, light, *, scale=1.0, locale=l10n.DEFAULT, theme="light", design=brand.DEFAULT_DESIGN,
-                   contrast=False, frame=None) -> tuple:
+                   contrast=False, frame=None, day=None) -> tuple:
     """The card drawn with no window (O17): (plan, BGRA premultiplied pixels) for `parts` (words.tooltip_parts) and the
     light, at `scale`, in `locale`, the theme, the design and High Contrast or not - what a picture of it is made from."""
     renderer = TipRenderer()
     try:
         renderer.theme, renderer.design, renderer.contrast = theme, design, contrast
-        plan = renderer.tip_layout(parts, light, scale, locale)
+        plan = renderer.tip_layout(parts, light, scale, locale, tip_day(day, contrast, design))
         return plan, bytes(renderer.draw_tip(plan, frame).pixels())
     finally:
         renderer.close()
@@ -298,8 +307,10 @@ class TipCard:
     catalog it is said in - read again each second it is shown. `held()` says whether battery saver or a locked session
     holds what moves (the icon's own reading, as the popup is handed it)."""
 
-    def __init__(self, *, content, held=None, log=None):
+    def __init__(self, *, content, held=None, log=None, days=False):
         self.content, self.held = content, held
+        # Only the watcher's own icon looks at the date (the popup's `days`): nothing else may depend on it.
+        self.days = days
         self.log = log or (lambda *unused: None)
         self.hwnd = None
         self.visible = False
@@ -475,7 +486,8 @@ class TipCard:
         parts, snapshot, strings = self.content()
         light = tip_light(snapshot)
         locale = popup.locale_of(strings)
-        look = (self._theme, self._design, self.contrast, self._text_scale)
+        day = tip_day(brand.day_look_at(time.time()) if self.days else None, self.contrast, self._design)
+        look = (self._theme, self._design, self.contrast, self._text_scale, day)
         key = (repr(parts), light, locale, look)
         if not force and key == self._shown and self._plan is not None:
             return False
@@ -489,11 +501,11 @@ class TipCard:
         screen = self._screen
         scale = screen["dpi"] / 96.0
         work = screen["work"]
-        plan = self._renderer.tip_layout(parts, light, scale, locale)
+        plan = self._renderer.tip_layout(parts, light, scale, locale, day)
         fit = textsize.fitting(self._text_scale, plan["size"], (work[2] - work[0], work[3] - work[1]))
         if fit > 1.0:
             # Windows' text size draws the whole card that much larger, as it does the popup and the menu.
-            plan = self._renderer.tip_layout(parts, light, scale * fit, locale)
+            plan = self._renderer.tip_layout(parts, light, scale * fit, locale, day)
         self._plan, self._shown = plan, key
         self._origin = tip_place(plan, work, screen["monitor"], screen["box"])
         return True
