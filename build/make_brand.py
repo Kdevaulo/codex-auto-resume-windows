@@ -502,7 +502,16 @@ def ease_method() -> list:
 def theme_methods(theme: str) -> str:
     """The rules whose answers are a theme's colours - the check box and the elevation recipes -
     which Brand and Brand.Dark each declare under the same names."""
-    return check_methods() + elevation_methods(theme)
+    return check_methods() + elevation_methods(theme) + edition_ink_method(theme)
+
+
+def edition_ink_method(theme: str) -> str:
+    """v0.6.24: the advanced edition's ink on the version's pill (brand.tokens.EDITION_INK), in each theme's class."""
+    from codex_auto_resume.brand import tokens as ink_tokens
+
+    red, green, blue = brand.rgb(ink_tokens.EDITION_INK[theme])
+    return ("\n        /// brand.tokens.EDITION_INK: the advanced edition's ink on the version's pill (the owner, 2026-11-18).\n"
+            "        internal static Color EditionInk() { return Color.FromArgb(0x%02X, 0x%02X, 0x%02X); }\n" % (red, green, blue))
 
 
 def check_methods() -> str:

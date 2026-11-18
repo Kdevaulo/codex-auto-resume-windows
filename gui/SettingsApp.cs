@@ -2010,19 +2010,17 @@ namespace CodexAutoResume
                 // Two rows of tabs (the advanced edition's on a screen too narrow for one, HoldTabs) leave the row no end.
                 var flow = strip as FlowLayoutPanel;
                 bool oneRow = flow == null || !flow.WrapContents;
-                int whole = versionPill.WholeWidth, alone = versionPill.VersionWidth;
-                int pad = sides(whole + gap);
-                bool inRow = known && oneRow && pad >= least, shortened = false;
-                if (known && oneRow && !inRow)
-                {
-                    pad = sides(alone + gap);
-                    inRow = shortened = pad >= least;
-                }
+                // v0.6.24 (the owner, 2026-11-18): the version alone in both editions, never the edition's word - a screen
+                // reader is still told both (VersionPill.Tell), and the advanced edition is told by its ink (VersionInk).
+                versionText.Shortened = true;
+                VersionInk();
+                int alone = versionPill.VersionWidth;
+                int pad = sides(alone + gap);
+                bool inRow = known && oneRow && pad >= least;
                 if (!inRow) pad = oneRow ? Math.Max(least, sides(0)) : full;
                 bool changed = TabSides(strip, pad);
-                versionText.Shortened = shortened;
                 versionPill.Tell();
-                var size = new Size(shortened ? alone : whole, versionPill.PillHeight);
+                var size = new Size(alone, versionPill.PillHeight);
                 if (versionPill.Size != size) versionPill.Size = size;
                 pillSlot.Padding = new Padding(gap, 0, 0, 0);
                 int width = size.Width + gap;
@@ -2140,14 +2138,24 @@ namespace CodexAutoResume
             PlaceDayScene();
         }
 
-        /// How the pill was last fitted, for the tests and the audit: "whole" or "version" at the tab row's end, "header" in
-        /// the header card, or "none" before there is a version to show.
+        /// v0.6.24 (the owner, 2026-11-18, from real renders): the advanced edition is told on the pill by its ink alone -
+        /// Brand.EditionInk, its own blue in light and in dark - while the pill's fill and edge are the standard ones; the
+        /// standard edition keeps the secondary ink, and High Contrast the system's (Secondary there).
+        private void VersionInk()
+        {
+            Color ink = versionText.Edition == null || Palette.Contrast ? Secondary
+                      : Tokens.Dark ? Brand.Dark.EditionInk() : Brand.EditionInk();
+            if (versionText.ForeColor != ink) versionText.ForeColor = ink;
+        }
+
+        /// How the pill was last fitted, for the tests and the audit: "whole" at the tab row's end (the version, all the pill
+        /// shows since 2026-11-18), "header" in the header card, or "none" before there is a version to show.
         internal string PillFit
         {
             get
             {
                 if (versionPill != null && versionPill.Parent == hero) return "header";
-                return pillSlot == null || !Soft.OwnVisible(pillSlot) ? "none" : versionText.Shortened ? "version" : "whole";
+                return pillSlot == null || !Soft.OwnVisible(pillSlot) ? "none" : "whole";
             }
         }
 

@@ -164,3 +164,9 @@ def palette(theme, design="soft") -> dict:
     """A design's colours in a theme: LIGHT or DARK for Soft, by theme name."""
     light, dark = DESIGN_TOKENS[design_name(design)]
     return dark if theme_name(theme) == "dark" else light
+
+
+# v0.6.24 (the owner, 2026-11-18, picked from real renders): the version's pill shows the version alone in both editions,
+# and the advanced edition is told by its ink alone - the pill's fill and edge are the standard ones (raised, line). Light
+# and dark; High Contrast draws the system's text colour instead. The window's Brand.EditionInk.
+EDITION_INK = {"light": "#3F68B0", "dark": "#9AB8EE"}

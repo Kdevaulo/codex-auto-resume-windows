@@ -582,8 +582,63 @@ namespace CodexAutoResume
             base.OnLayout(levent);
             Size words = label.GetPreferredSize(Size.Empty);
             if (label.Size != words) label.Size = words;
-            var at = new Point(Math.Max(0, (ClientSize.Width - words.Width) / 2), Math.Max(0, (ClientSize.Height - words.Height) / 2));
+            // v0.6.24 (the owner, 2026-11-18): centred by its ink, not its line - the version's digit tops to its baseline
+            // (it has no descenders) on the face's middle, as measured (InkRows), at every scaling. Its line box centred
+            // left 9 px above the ink and 7 below at 150 %.
+            int top, bottom;
+            int y = InkRows(out top, out bottom) ? (int)Math.Round((ClientSize.Height - (top + bottom + 1)) / 2.0, MidpointRounding.AwayFromZero)
+                                                 : (ClientSize.Height - words.Height) / 2;
+            y = Math.Max(0, Math.Min(y, ClientSize.Height - words.Height));
+            var at = new Point(Math.Max(0, (ClientSize.Width - words.Width) / 2), y);
             if (label.Location != at) label.Location = at;
+        }
+
+        // The rows the label's words ink, measured as it draws them, kept by what decides them.
+        private string inkKey;
+        private int inkTop, inkBottom;
+        private bool inkFound;
+
+        /// The first and last rows of the label that its words ink, in the label's own pixels: its text drawn as Label draws
+        /// it (WrapLabel.Format, its padding) into a picture of the label's size, black on white, and the rows read. False
+        /// where there is nothing to draw.
+        internal bool InkRows(out int top, out int bottom)
+        {
+            Size size = label.Size;
+            string text = label.Text ?? "";
+            string key = text + "|" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(label.Font) + "|" + size + "|" +
+                         label.Padding + "|" + (int)label.Format;
+            if (key != inkKey)
+            {
+                inkKey = key;
+                inkFound = false;
+                if (text.Length > 0 && size.Width > 0 && size.Height > 0)
+                {
+                    using (var picture = new Bitmap(size.Width, size.Height))
+                    {
+                        using (Graphics g = Graphics.FromImage(picture))
+                        {
+                            g.Clear(SystemColors.Window);
+                            var face = new Rectangle(label.Padding.Left, label.Padding.Top, Math.Max(0, size.Width - label.Padding.Horizontal),
+                                                     Math.Max(0, size.Height - label.Padding.Vertical));
+                            TextRenderer.DrawText(g, text, label.Font, face, SystemColors.WindowText, SystemColors.Window, label.Format);
+                        }
+                        int ground = picture.GetPixel(0, 0).ToArgb();
+                        inkTop = -1;
+                        for (int row = 0; row < size.Height; row++)
+                            for (int column = 0; column < size.Width; column++)
+                                if (picture.GetPixel(column, row).ToArgb() != ground)
+                                {
+                                    if (inkTop < 0) inkTop = row;
+                                    inkBottom = row;
+                                    break;
+                                }
+                        inkFound = inkTop >= 0;
+                    }
+                }
+            }
+            top = inkTop;
+            bottom = inkBottom;
+            return inkFound;
         }
 
         internal VersionLabel Label { get { return label; } }

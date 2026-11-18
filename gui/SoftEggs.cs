@@ -235,7 +235,6 @@ namespace CodexAutoResume
     internal sealed class DayEgg : IEggPainting
     {
         internal const int LengthMs = 2700, FadeMs = 400;
-        internal static readonly string[] Looks = { "new_year", "seollal", "birthday", "chuseok", "christmas" };
         private readonly string look;
         private readonly PointF from;
         private readonly float unit;
@@ -310,14 +309,19 @@ namespace CodexAutoResume
         }
 
         // ---------------------------------------------------------------- new year
-        private static readonly double[] RocketX = { 64, 138, 208 }, RocketY = { -62, -82, -54 }, RocketAt = { 0, 160, 320 };
+        // The three rockets' bursts and starts, as comparisons rather than arrays: the in-box compiler keeps a constant
+        // array's values in a class it names with a fresh random GUID, which build/normalize_pe.py refuses (the setup
+        // program compiles this file too).
+        private static double RocketX(int k) { return k == 0 ? 64 : k == 1 ? 138 : 208; }
+        private static double RocketY(int k) { return k == 0 ? -62 : k == 1 ? -82 : -54; }
+        private static double RocketAt(int k) { return k * 160; }
         private const double RiseMs = 620, BurstMs = 900;
 
         private void NewYear(Graphics g, double ms, double shown)
         {
             for (int k = 0; k < 3; k++)
             {
-                double since = ms - RocketAt[k];
+                double since = ms - RocketAt(k);
                 if (since < 0) continue;
                 if (since < RiseMs)
                 {
@@ -326,7 +330,7 @@ namespace CodexAutoResume
                     {
                         double p = Ease((since - trail * 30) / RiseMs);
                         if (since - trail * 30 < 0) continue;
-                        Dot(g, At(RocketX[k] * p, RocketY[k] * p), 2.2 - trail * 0.35, C("trail", shown * (1.0 - trail * 0.18)));
+                        Dot(g, At(RocketX(k) * p, RocketY(k) * p), 2.2 - trail * 0.35, C("trail", shown * (1.0 - trail * 0.18)));
                     }
                     continue;
                 }
@@ -336,7 +340,7 @@ namespace CodexAutoResume
                 for (int i = 0; i < 14; i++)
                 {
                     double angle = 2 * Math.PI * i / 14 + k * 0.4;
-                    var at = At(RocketX[k] + 40 * spread * Math.Cos(angle), RocketY[k] + 40 * spread * Math.Sin(angle) + sag);
+                    var at = At(RocketX(k) + 40 * spread * Math.Cos(angle), RocketY(k) + 40 * spread * Math.Sin(angle) + sag);
                     Dot(g, at, 2.3 - 1.4 * burst, C("spark" + ((i + k) % 4), shown * (1.0 - burst)));
                 }
             }
