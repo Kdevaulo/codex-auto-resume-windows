@@ -14,7 +14,8 @@ Pure: nothing here reads or writes.
 from __future__ import annotations
 
 from ..domain import ids, skips
-from .values import ADOPTED_ORIGINATORS, DESKTOP_ORIGINATORS, EXEC_FORK_ORIGINATORS, taken_thread_source
+from .values import (ADOPTED_ORIGINATORS, DESKTOP_ORIGINATORS, EXEC_FORK_ORIGINATORS, NOT_DESKTOP_ORIGINATORS,
+                     taken_thread_source)
 
 ORIGINATORS_CLI = frozenset({"codex-tui"})
 ORIGINATORS_IDE = frozenset({"codex_vscode"})
@@ -46,6 +47,19 @@ def _shapes(kinds):
             if kind in APPS or kind in kinds]
 
 
+# The shape a conversation is taken up in while the plug widens to every desktop conversation (P19): the app's row, its
+# first line's source the app's too, and any originator but values.NOT_DESKTOP_ORIGINATORS (`widened_originator`).
+WIDENED = ("vscode", "vscode")
+
+
+def widened_originator(originator, widened=frozenset()) -> bool:
+    """Whether `originator` is taken up on the app's row because the plug widens to every desktop conversation (P19,
+    EVERY_DESKTOP): a word (1 to 64 characters, as a widened label is) not on the closed deny-list. Never unwidened -
+    the standard edition's `widened` is always empty - and never a first line with no originator at all."""
+    return ("every_desktop" in widened and isinstance(originator, str) and 0 < len(originator) <= 64
+            and originator not in NOT_DESKTOP_ORIGINATORS)
+
+
 def forked(first) -> bool:
     """Whether a rollout's first line (its session_meta payload) names the conversation it was forked from."""
     return isinstance(first, dict) and ids.is_uuid(first.get("forked_from_id"))
@@ -71,14 +85,16 @@ def row_problem(row, kinds=frozenset(), widened=frozenset(), composed=False):
     return None
 
 
-def originator_taken(source, first, kinds=frozenset()) -> bool:
+def originator_taken(source, first, kinds=frozenset(), widened=frozenset()) -> bool:
     """Whether a first line's (`first`, its session_meta payload) originator is one of a kind taken up whose rows have
-    `source` - for a kind of FORKS_ONLY, only where the line names the conversation it was forked from."""
+    `source` - for a kind of FORKS_ONLY, only where the line names the conversation it was forked from - or, on the app's
+    row while the plug widens to every desktop conversation, any originator but the deny-list's (`widened_originator`)."""
     if not isinstance(first, dict):
         return False
     originator = first.get("originator")
-    return any(source == shape[0] and originator in shape[2] and (kind not in FORKS_ONLY or forked(first))
-               for kind, shape in _shapes(kinds))
+    return (any(source == shape[0] and originator in shape[2] and (kind not in FORKS_ONLY or forked(first))
+                for kind, shape in _shapes(kinds))
+            or (source == WIDENED[0] and widened_originator(originator, widened)))
 
 
 def newer_than_engine(cli_version, engine_version) -> bool:
@@ -91,11 +107,15 @@ def newer_than_engine(cli_version, engine_version) -> bool:
     return written is not None and engine is not None and written > engine
 
 
-def kind_of(source, payload, kinds=frozenset()):
+def kind_of(source, payload, kinds=frozenset(), widened=frozenset()):
     """The kind - "desktop", "cli" or "ide" - a conversation is, by its row's source and its first line's
-    originator and source, of the app's and `kinds`; None for anything else."""
+    originator and source, of the app's and `kinds` - or "desktop" for the app's row and first line with any originator
+    but the deny-list's while the plug widens to every desktop conversation (P19); None for anything else."""
     if not isinstance(payload, dict):
         return None
     found = next((kind for kind, shape in _shapes(kinds) if source == shape[0] and payload.get("source") == shape[1]
                   and payload.get("originator") in shape[2] and (kind not in FORKS_ONLY or forked(payload))), None)
+    if found is None and (source, payload.get("source")) == WIDENED and widened_originator(payload.get("originator"),
+                                                                                           widened):
+        return "desktop"
     return "desktop" if found in ("adopted", "forked", "exec_forked") else found

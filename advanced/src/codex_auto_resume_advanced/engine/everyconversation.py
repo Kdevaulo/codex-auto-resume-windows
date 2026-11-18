@@ -7,13 +7,19 @@ A label Codex adds tomorrow is left alone there. With this on, core takes up eve
 Codex makes for itself - a closed deny-list, core's codex/values.INTERNAL_THREAD_SOURCES: subagent (subagent_parent
 tells the parent instead), guardian_review, memory_consolidation and agent_created_thread, the ThreadSource values
 Codex writes that are not a person's own (the survey of the owner's PC, 2026-10-13: user, chatgpt_handoff,
-agent_created_thread, none, subagent, guardian_review; and memory_consolidation from codex-rs). Everything else core
-checks stays: the app's own originator and source, not archived, paginated, the state row and the rollout's first
-line saying the same label of that very id - and every gate a recovery passes, the conversation switched on and held
-by the app before anything is sent.
+agent_created_thread, none, subagent, guardian_review; and memory_consolidation from codex-rs). v0.6.24 (the owner's word
+of 2026-11-19, "take up everything but what is confirmed"): the originator widens the same way - a conversation on the app's
+row and first line (source vscode) is taken up whatever program its first line names, but a closed deny-list of those
+confirmed not to be the app's desktop conversations (core's codex/values.NOT_DESKTOP_ORIGINATORS: codex_vscode, VS Code's
+own, which other_sessions' IDE kind names instead) - a program Codex adds later, and a codex exec line with no fork
+(issue #66), included. Everything else core checks stays: the app's source on the row and the first line (an exec or
+cli row is never taken here; a terminal's and VS Code's are other_sessions'), not archived, paginated, the state row and
+the rollout's first line saying the same label of that very id - and every gate a recovery passes, the conversation
+switched on and held by the app before anything is sent.
 
 It answers one closed word, EVERY_DESKTOP (domain/plughands.Widening), which core reads at the one place a
-conversation is judged (codex/history._eligibility) through codex/values.taken_thread_source. Its code decides nothing
+conversation is judged (codex/history._eligibility) through codex/values.taken_thread_source and
+codex/eligibility.widened_originator. Its code decides nothing
 else and reads nothing. Turned off (v0.6.20, the pair audit), core cancels the waiting records of the conversations only
 it took up (engine/kinds.py, session_kind_off), as turning other_sessions off cancels its own.
 """
