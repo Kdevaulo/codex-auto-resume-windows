@@ -119,7 +119,7 @@
   "check.unavailable": "Não foi possível executar a verificação agora.",
   "check.unchecked": "Não foi possível verificar {n} conversas a tempo.",
   "check.unknown": "desconhecido",
-  "check.usage": "Última leitura de uso {when}: 5 horas, restam {five}%; semanal, restam {weekly}%; próxima redefinição {reset}.",
+  "check.usage": "Última leitura de uso {when}: 5 horas, usado {five}%; semanal, usado {weekly}%; próxima redefinição {reset}.",
   "check.usage_none": "Nenhuma leitura de uso funcionou ainda.",
   "check.yes": "assumido",
   "choice.above_100k": "Reter acima de 100.000",

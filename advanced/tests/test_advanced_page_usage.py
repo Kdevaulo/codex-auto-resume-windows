@@ -76,8 +76,7 @@ class PageTests(PageCase):
         """(f), v0.6.16 final: Custom... opens the Settings page's dialog for a number of one's own. The five-hour
         wrap-up percentage set to 93 through the real bridge first - shown as itself, one item before Custom.... Then on
         the weekly one: Cancel; 150, refused in the dialog; 97, taken there and refused by the real bridge (above the
-        words' stop); and 88, taken and set, the page then reading the list the real bridge answers after it. From
-        v0.6.24 final each is typed and shown as the share left - 3 for 97, 12 for 88 - and sent as the share used."""
+        words' stop); and 88, taken and set, the page then reading the list the real bridge answers after it."""
         generation = bridge("advanced-list", {})["result"]["generation"]
         done = bridge("advanced-option", {"capability": WRAP, "key": "wrap_five_hour", "value": 93, "generation": generation})
         assert done["result"]["done"], done
@@ -92,9 +91,9 @@ class PageTests(PageCase):
         steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": WRAP}, {"do": "look"},
                  dict(weekly, cancel=True), {"do": "look"},
                  dict(weekly, value=150), {"do": "look"},
-                 {"do": "reply", "key": "advanced-option", "with": [refused]}, dict(weekly, value=3), {"do": "look"},
+                 {"do": "reply", "key": "advanced-option", "with": [refused]}, dict(weekly, value=97), {"do": "look"},
                  {"do": "reply", "key": "advanced-option", "with": [taken]},
-                 {"do": "reply", "key": "advanced-list", "with": [after]}, dict(weekly, value=12), {"do": "look"}]
+                 {"do": "reply", "key": "advanced-list", "with": [after]}, dict(weekly, value=88), {"do": "look"}]
         return "en", {"script": script, "steps": steps}, {
             "generation": read, "refused": refused["result"], "words": script["advanced-words"][0]["result"]["words"],
             "presets": [option for item in script["advanced-list"][0]["result"]["capabilities"] if item["id"] == WRAP
@@ -212,74 +211,38 @@ class PageTests(PageCase):
         result, expected, looks, weekly, own = self.custom_numbers()
         words = expected["words"]
         five = next(choice for choice in looks[0]["choices"] if choice["key"] == "wrap_five_hour")
-        self.assertEqual((five["value"], five["items"][-2:]), ("7% left", ["7% left", words["page.option.custom"]]))
+        self.assertEqual((five["value"], five["items"][-2:]), ("93%", ["93%", words["page.option.custom"]]))
         style = next(choice for choice in looks[0]["choices"] if choice["key"] == "wrap_style")
         self.assertNotIn(words["page.option.custom"], style["items"], "a wording is no number")
         self.assertEqual(sent(result, "advanced-option"), [
             {"capability": WRAP, "key": "wrap_weekly", "value": value, "generation": expected["generation"]}
             for value in (97, 88)])
-        self.assertEqual((weekly[-1]["value"], weekly[-1]["items"][-2:]), ("12% left", ["12% left", words["page.option.custom"]]))
+        self.assertEqual((weekly[-1]["value"], weekly[-1]["items"][-2:]), ("88%", ["88%", words["page.option.custom"]]))
         self.assertEqual(len(weekly[-1]["items"]), len(expected["presets"]) + 2, "one item of its own, and Custom...")
         dialogs = result["dialogs"]
         self.assertEqual([dialog["key"] for dialog in dialogs], ["wrap_weekly"] * 4)
-        hint = own["own.range"].replace("{low}", "0% left").replace("{high}", "99% left")
+        hint = own["own.range"].replace("{low}", "1%").replace("{high}", "100%")
         for dialog in dialogs:
             # The Settings page's dialog, in its words: titled with the choice, the range above the number, in percent.
             self.assertEqual(dialog["title"], words["page.option.wrap_weekly"])
             self.assertEqual(dialog["hint"], hint)
             self.assertEqual(dialog["buttons"], [own["own.use"], own["action.cancel"]])
             self.assertEqual(dialog["findings"], [], "nothing in it cut off, every control named")
-        self.assertEqual(dialogs[0]["opened"], 10, "the number it opens with is the one the drop-down held, as left")
+        self.assertEqual(dialogs[0]["opened"], 90, "the number it opens with is the one the drop-down held")
         self.assertIsNone(dialogs[3]["after"], "taken: the dialog closed")
-
-    @classmethod
-    def scenario_thresholds_left(cls, bridge):
-        """v0.6.24 final (the owner, 2026-11-18: "다 바꾸자"): the meter's warning, stored as the share used (85 by default),
-        shown as the share left; 15 left typed in Custom... sent as 85, 0 left as 100, and 100 left - a share used of 0,
-        below the range - refused in the dialog with nothing sent."""
-        script = cls.opening(bridge, "en")
-        read = script["advanced-list"][0]["result"]["generation"]
-        taken = bridge("advanced-option", {"capability": "usage_meter", "key": "warn_five_hour", "value": 85,
-                                           "generation": read})
-        five = {"do": "custom_option", "key": "warn_five_hour"}
-        steps = [{"do": "snapshot", "reply": snapshot()}, {"do": "show"}, {"do": "choose", "id": "usage_meter"},
-                 {"do": "look"},
-                 {"do": "reply", "key": "advanced-option", "with": [taken]}, dict(five, value=15),
-                 dict(five, value=0), dict(five, value=100), {"do": "look"}]
-        return "en", {"script": script, "steps": steps}, {
-            "generation": read, "presets": [option for item in script["advanced-list"][0]["result"]["capabilities"]
-                                            if item["id"] == "usage_meter" for option in item["options"]
-                                            if option["key"] == "warn_five_hour"][0]["choices"]}
-
-    def test_a_threshold_is_shown_and_typed_as_what_is_left_and_stored_as_what_is_used(self):
-        result, expected = self.of("scenario_thresholds_left")
-        own = l10n.catalog("en")
-        first = next(choice for choice in result["looks"][0]["choices"] if choice["key"] == "warn_five_hour")
-        self.assertEqual(first["value"], "15% left", "a stored 85 shows as 15 left")
-        presets = [int(choice["value"] if isinstance(choice, dict) else choice) for choice in expected["presets"]]
-        self.assertEqual(first["items"][:len(presets)], ["%d%% left" % (100 - used) for used in presets])
-        self.assertEqual([each["value"] for each in sent(result, "advanced-option")], [85, 100],
-                         "15 left is sent as 85 used, 0 left as 100; 100 left is never sent")
-        self.assertTrue(all(each["key"] == "warn_five_hour" for each in sent(result, "advanced-option")))
-        dialogs = result["dialogs"]
-        self.assertEqual([dialog["opened"] for dialog in dialogs][:1], [15], "the dialog opens on what the drop-down held, as left")
-        hint = own["own.range"].replace("{low}", "0% left").replace("{high}", "99% left")
-        self.assertEqual(dialogs[2]["after"], own["own.refused"].replace("{hint}", hint))
-        self.assertIsNone(dialogs[0]["after"])
-        self.assertIsNone(dialogs[1]["after"])
 
     def test_cancel_in_the_custom_dialog_changes_nothing_and_puts_back_the_item_held(self):
         """(b): fails with the drop-down left on Custom... after Cancel, or with anything sent."""
         result, _expected, looks, weekly, _own = self.custom_numbers()
         self.assertEqual(weekly[1], weekly[0])
-        self.assertEqual(weekly[1]["value"], "10% left")
+        self.assertEqual(weekly[1]["value"], "90%")
         self.assertEqual(looks[1]["requests"], looks[0]["requests"], "nothing sent")
         self.assertEqual(result["disabled"], [])
 
     def test_a_number_outside_the_range_is_refused_in_the_custom_dialog_and_nothing_is_sent(self):
         """(c): fails with the range not checked in the dialog - 150 would be sent - or the refusal not said there."""
         result, _expected, looks, weekly, own = self.custom_numbers()
-        hint = own["own.range"].replace("{low}", "0% left").replace("{high}", "99% left")
+        hint = own["own.range"].replace("{low}", "1%").replace("{high}", "100%")
         self.assertEqual(result["dialogs"][1]["after"], own["own.refused"].replace("{hint}", hint))
         self.assertEqual(weekly[2], weekly[0], "the drop-down back on the item it held")
         self.assertEqual(looks[2]["requests"], looks[1]["requests"], "nothing sent")
@@ -292,7 +255,7 @@ class PageTests(PageCase):
         self.assertEqual(expected["refused"]["refusal"], "option_order")
         self.assertIsNone(result["dialogs"][2]["after"], "taken in the dialog, which checks only the range")
         self.assertEqual(result["told"], [expected["words"]["page.refused.option_order"]])
-        self.assertEqual(weekly[3]["value"], "10% left")
+        self.assertEqual(weekly[3]["value"], "90%")
 
     def test_custom_wording_has_a_box_for_each_window_with_the_persons_words(self):
         result, expected = self.of("scenario_wordings")

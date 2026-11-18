@@ -1167,7 +1167,7 @@
           "check.settings_unreadable": "The settings file cannot be read ({reason}). The watcher keeps the settings it had and does nothing on the defaults, and no save writes over the file. Correct it, or use Restore defaults in Settings: the file is kept beside it and the defaults start again.",
           "check.cloud": "Cloud tasks the app knows: {count}. They run on OpenAI's servers, so none of them can be recovered yet.",
           "check.cloud_none": "Cloud tasks the app knows: none.",
-          "check.usage": "Last usage reading {when}: 5-hour {five}% left, weekly {weekly}% left, next reset {reset}.",
+          "check.usage": "Last usage reading {when}: 5-hour {five}% used, weekly {weekly}% used, next reset {reset}.",
           "check.usage_none": "No usage reading has worked yet.",
           "check.notices": "Notices are shown as {route}. Do not disturb: {dnd}. This app's notifications: {allowed}.",
           "check.route.card": "this product's own card",

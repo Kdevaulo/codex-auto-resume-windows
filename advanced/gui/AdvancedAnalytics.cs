@@ -3,7 +3,7 @@
 // Codex Auto Resume - the usage and token analytics on the Advanced features page (v0.6.20).
 //
 // While usage_analytics is on or watched, its column has two cards under its limits. Pace: for each window the usage
-// meter reads (the five-hour and the weekly), how much is left of it, how far that moved over the last hour and - with
+// meter reads (the five-hour and the weekly), how much is left of it, the share used over the last hour and - with
 // enough readings and only before the window resets - around when none would be left at that pace, beside the reset;
 // never a promise (v0.6.24 final: what is left, where it said how full).
 // Tokens: a flat list, one line a project (Codex's project name, else its folder's name, resolved by the bridge now and
@@ -97,15 +97,14 @@ namespace CodexAutoResume
                 var window = entry as Dictionary<string, object>;
                 if (window == null || !(Get(window, "used") is double)) continue;
                 windows++;
-                // v0.6.24 final: what is left, and how far that moved in the last hour - down as the window is used.
+                // v0.6.24 final: what is left of the window at a glance, and the share used in the last hour.
                 string line = Word("page.analytics.left", "{window}: {percent}% left", "window", WindowName(Get(window, "minutes")))
                               .Replace("{percent}", AnalyticsShare(AnalyticsLeft((double)Get(window, "used"))));
                 if (Get(window, "change_hour") is double)
-                {
-                    double moved = 0.0 - (double)Get(window, "change_hour");
-                    line += " · " + Word("page.analytics.change", "{change} in the last hour", "change",
-                                         (moved >= 0 ? "+" : "") + AnalyticsShare(moved));
-                }
+                    // The owner's refinement of 2026-11-18: the pace is history, so the hour's change is the share USED in it,
+                    // said with the word, beside the reading of what is left: "8% used in the last hour".
+                    line += " · " + Word("page.analytics.change", "{change}% used in the last hour", "change",
+                                         AnalyticsShare(Get(window, "change_hour")));
                 Label used = HelpText(line);
                 used.ForeColor = Ink;
                 used.Margin = Pad(0, 6, 0, 0);

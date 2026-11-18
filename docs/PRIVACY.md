@@ -903,7 +903,7 @@ process and only when you press its button: it reads python.org's public list of
   exception, below.
 - **What else it starts or reads near a notice or a limit.** While *Open Codex on a notice* is on, pressing *Open Codex* starts
   `explorer.exe` with the conversation's `codex:` link, and the program reads - never writes - whether Windows has
-  something registered for such links. While *Stop near a limit* is on, a window whose share left falls to its stop share
+  something registered for such links. While *Stop near a limit* is on, a window that reaches its stop percentage
   has each running turn stopped through the Codex app's own channel, the `\\.\pipe\codex-ipc` pipe, once for that window.
 - **A conversation run while Codex is closed.** With the advanced edition's feature that runs a
   conversation here while Codex is closed, and the features that build on it, a turn runs on Codex's own

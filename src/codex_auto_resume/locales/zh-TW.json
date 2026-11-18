@@ -119,7 +119,7 @@
   "check.unavailable": "目前無法執行檢查。",
   "check.unchecked": "有 {n} 個對話未能及時檢查。",
   "check.unknown": "未知",
-  "check.usage": "上次使用量讀取 {when}：5 小時剩餘 {five}%，每週剩餘 {weekly}%，下次重設 {reset}。",
+  "check.usage": "上次使用量讀取 {when}：5 小時已用 {five}%，每週已用 {weekly}%，下次重設 {reset}。",
   "check.usage_none": "尚未成功讀取過使用量。",
   "check.yes": "已接手",
   "choice.above_100k": "超過 100,000 時保留",

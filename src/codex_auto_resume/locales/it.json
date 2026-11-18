@@ -119,7 +119,7 @@
   "check.unavailable": "Al momento non è stato possibile eseguire il controllo.",
   "check.unchecked": "Non è stato possibile controllare in tempo {n} conversazioni.",
   "check.unknown": "sconosciuto",
-  "check.usage": "Ultima lettura dell'utilizzo {when}: 5 ore {five}% rimanente, settimanale {weekly}% rimanente, prossimo azzeramento {reset}.",
+  "check.usage": "Ultima lettura dell'utilizzo {when}: 5 ore {five}% usato, settimanale {weekly}% usato, prossimo azzeramento {reset}.",
   "check.usage_none": "Nessuna lettura dell'utilizzo è ancora riuscita.",
   "check.yes": "preso in carico",
   "choice.above_100k": "Trattieni oltre 100.000",
