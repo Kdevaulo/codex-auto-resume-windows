@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.6.24 — A window without Windows' title bar and with squircle corners, a Dashboard of 1000 by 588 with the version never hidden, dialogs as one card, usage shown as what is left, a setup window with something on every page, the tray icon's card, and a Dashboard that answers in seconds after an update
+## v0.6.24 — A window without Windows' title bar and with squircle corners, a Dashboard of 1000 by 618 with the version never hidden, dialogs as one card, usage shown as what is left, a setup window with something on every page, the tray icon's card, and a Dashboard that answers in seconds after an update
 
 > **The window's own look, and usage left.** This release gives both editions a window that draws its own top edge and corners, shows every usage window as what is left of it, and fills the setup window's pages.
 
@@ -44,7 +44,7 @@ file where an update put it.
 - **The Dashboard opens at exactly its size, and its first paint is clean.** It used to open a little larger than it asked, at 100 % and
   at 150 %. In the dark theme it no longer shows an empty outline of its corner, or one white frame, before it has painted: the window and
   its shadow come on together once it has.
-- **The Dashboard opens at 1000 x 588 instead of about 1000 x 680, and the version stands in a pill that is never hidden.** The header
+- **The Dashboard opens at 1000 x 618 instead of about 1000 x 680, and the version stands in a pill that is never hidden.** The header
   card is two lines, and the four Overview cards keep the height they had. The version - and the advanced edition's word beside it -
   stands in a small raised pill at the end of the row of page tabs, no longer in a bar at the foot, and a screen reader reads it whole.
   (new since beta.2) Where the tabs leave it no room - the advanced edition with Chat on has eight of them - every tab's room at either side
@@ -191,6 +191,8 @@ file where an update put it.
   says so. The analytics card's share reads "<window>: N% left" and, where the pace runs a window out, "none left around <time>"; how far
   the share moved in the last hour is still told as what was used. All of it is display only: the bridge still says the share used and every
   decision reads it.
+- **The Advanced features and Chat pages show no empty bar at the window's foot (new since beta.2).** After Settings had been open, those two
+  pages kept an empty bar under them; only Settings has a bar at its foot.
 
 ## v0.6.24-beta.2 — The Dashboard's squircle corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card, dialogs as one card under their title, and a tray icon's card as wide as its widest row
 

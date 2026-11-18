@@ -1327,7 +1327,7 @@ included, and the review of what moves from the advanced edition to the standard
 
 What v0.6.24 carries, in both editions:
 
-- a window and dialogs with no Windows title bar, squircle corners everywhere in Soft, the Dashboard's own outer corner among them, and the Dashboard at 1000 x 588 with the version in a pill that is never hidden,
+- a window and dialogs with no Windows title bar, squircle corners everywhere in Soft, the Dashboard's own outer corner among them, and the Dashboard at 1000 x 618 with the version in a pill that is never hidden,
 - dialogs as one card under their title, with their own fade, and a Dashboard that shows its pages whole and says it is at work while it reopens,
 - the tray icon's hover card and popup, a text box's own right-click menu, and the popup's motion picture starting at the taskbar's end,
 - the at-a-glance surfaces showing what is left of a usage window,
