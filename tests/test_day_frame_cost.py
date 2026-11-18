@@ -35,20 +35,28 @@ class PopupFrameTests(unittest.TestCase):
 
     def frame(self, plan, milliseconds):
         """The pieces a frame fills, and the brushes it makes."""
-        pieces, brushes = [], []
+        pieces, brushes, rounding = [], [], []
         shape = renderer.Renderer._scene_shape
         made = gdiplus._Painter._brush
+        fill_round = gdiplus._Painter.fill_round
 
         def counted(paint, piece, at, scale):
             pieces.append(piece)
             return shape(paint, piece, at, scale)
 
         def making(painter, colour):
-            brushes.append(colour)
+            if not rounding:                       # a piece's brush, not a rounded fill's (the ground, a stripe, the card)
+                brushes.append(colour)
             return made(painter, colour)
 
-        with mock.patch.object(renderer.Renderer, "_scene_shape", staticmethod(counted)), \
-                mock.patch.object(gdiplus._Painter, "_brush", making):
+        def rounded(painter, *args):
+            rounding.append(1)
+            try:
+                return fill_round(painter, *args)
+            finally:
+                rounding.pop()
+
+        with mock.patch.object(renderer.Renderer, "_scene_shape", staticmethod(counted)),                 mock.patch.object(gdiplus._Painter, "_brush", making),                 mock.patch.object(gdiplus._Painter, "fill_round", rounded):
             self.renderer.draw_scene(plan, milliseconds)
         return pieces, brushes
 
@@ -83,10 +91,10 @@ class PopupFrameTests(unittest.TestCase):
         for look in LOOKS:
             with self.subTest(look=look):
                 plan = self.plan(look, 1.5)
-                pieces, brushes = self.frame(plan, 1300.0)
-                # The ground, a round piece (seollal's stripes) and the card's colour past the words are filled as they
-                # always were; every circle, ellipse and polygon in a colour already used takes its brush again.
-                self.assertLess(len(brushes), len(pieces), "a brush for every piece")
+                _, brushes = self.frame(plan, 1300.0)
+                # Every circle, ellipse and polygon in a colour already used this frame takes its brush again (a twinkling
+                # star's opacity makes it a colour of its own).
+                self.assertEqual(len(brushes), len(set(brushes)), "a brush made again for a colour")
 
 
 if __name__ == "__main__":
