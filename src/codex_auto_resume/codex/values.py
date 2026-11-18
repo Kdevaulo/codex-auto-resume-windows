@@ -57,6 +57,12 @@ DESKTOP_ORIGINATORS = frozenset({"Codex Desktop", "codex_work_desktop"})
 # with that row (codex/eligibility.py): a TUI conversation the app never took over (threads source cli) stays the
 # edition's other_sessions' to name.
 ADOPTED_ORIGINATORS = frozenset({"codex-tui"})
+# v0.6.24 (issue #66): a conversation a person forked from a `codex exec` run into the Desktop app, and kept working in
+# there, is the app's too - its threads row is the app's (source vscode, thread_source user) while the fork's first line
+# keeps the exec run's originator, with source vscode and a forked_from_id. Only in that shape (codex/eligibility.py,
+# "exec_forked"): a vscode row whose first line says codex_exec and names no fork is not proven a person's, and a
+# standalone exec run (threads source exec) - the product's own ephemeral anchor request included - never is.
+EXEC_FORK_ORIGINATORS = frozenset({"codex_exec"})
 
 KNOWN_STATUSES = machine.TURN_STATUSES - {"other"}      # Codex's own four; "other" is ours
 
