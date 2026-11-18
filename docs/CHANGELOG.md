@@ -1,5 +1,199 @@
 # Changelog
 
+## v0.6.24 — A window without Windows' title bar and with squircle corners, a Dashboard of 1000 by 618 with the version never hidden, dialogs as one card, usage shown as what is left, a setup window with something on every page, the tray icon's card, and a Dashboard that answers in seconds after an update
+
+> **The window's own look, and usage left.** This release gives both editions a window that draws its own top edge and corners, shows every usage window as what is left of it, and fills the setup window's pages.
+
+**Kind:** New design · Design changes · Feature changes · Performance · Bug fixes · Under the hood
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.23...v0.6.24)
+
+**From v0.6.23, an ordinary update.** It is the latest release, for both editions, so v0.6.23's *Check for updates* offers it in
+the edition you have, an installation of v0.6.24-beta or v0.6.24-beta.2 is offered it the same way, and the plugin in Codex
+installs it too. It follows two pre-releases - v0.6.24-beta and -beta.2 - and this entry tells everything they carried, in the form it has now:
+where beta.2 changed something beta announced, only the final state is told, and what came after beta.2 is marked "(new since beta.2)".
+Both editions change in the first group; the second is the advanced edition's alone.
+
+**The bundled Python stays 3.14.10.** The code is ready for Python 3.15, but the switch itself waits for CPython 3.15.3, which is not out.
+
+**Going back.** Nothing that an earlier version reads changes: the watcher's state stays schema 5, the settings file gains no key and the
+advanced edition's own file stays version 9. An earlier version has Windows' title bar, its own
+corners and popup, its own dialogs and the usage shown as the share used, as it always had them, and leaves the previous version's `.old-`
+file where an update put it.
+
+### Both editions
+
+- **The window has no Windows title bar.** Its minimise, maximise and close buttons are line glyphs inside the first card, at its top
+  corner (mirrored where the window is written right to left). The close button turns red under the pointer, and the maximise button
+  keeps Windows 11's snap layouts. Every dialog has its title and its close button at its top in the same way. The window is a little
+  shorter outside - Windows' title bar and top frame are gone - and every page keeps the height it had, because the window opens taller
+  by exactly what the header grew for the buttons.
+  A window restored from maximised or minimised - by its button, a double click, Win+Down, the taskbar or Win+D - comes back exactly as
+  it left, with no growth each time, and a maximised window leaves the edge of an auto-hide taskbar free so the taskbar still slides out.
+- **Soft corners are squircles, the Dashboard's own outer corner included.** In the Soft design every rounded thing - cards, buttons,
+  menus, the popup and the notification card - is drawn with one smoothed corner (Figma's 60 % smoothing, capped where a side is short;
+  pills stay pills), and its shadows follow it. Classic and Plain keep their round arcs, as before. The Dashboard window's own outer
+  corner is drawn the same way - its design's card corner, with the hairline and the shadow round it - in place of Windows' round corner,
+  and it has no rough edges: no faint fill shows outside the squircle where Windows' corner would have been, no one-pixel line shows inside
+  the edge at 150 %, and Windows' own title bar and frame never flash when the window is activated, resized, brought back from Task View,
+  or given a new title or icon. The window stays visible all the while Windows takes its icon and title, so a click on it never falls
+  through to what lies behind. The left and right edges resize along their whole length, down every page, and so does the window's
+  outermost pixel; the four corners resize from where the curve ends and a little past it, the top ones down each side as the bottom ones
+  do. The shadow is never on the screen while the window is maximised or minimised. Windows' corner comes back while the window is
+  maximised or snapped, in High Contrast, in a remote session and without desktop composition; Windows 10 keeps its square corner.
+- **The Dashboard opens at exactly its size, and its first paint is clean.** It used to open a little larger than it asked, at 100 % and
+  at 150 %. In the dark theme it no longer shows an empty outline of its corner, or one white frame, before it has painted: the window and
+  its shadow come on together once it has.
+- **The Dashboard opens at 1000 x 618 instead of about 1000 x 680, and the version stands in a pill that is never hidden.** The header
+  card is two lines, and the four Overview cards keep the height they had. The version - and the advanced edition's word beside it -
+  stands in a small raised pill at the end of the row of page tabs, no longer in a bar at the foot, and a screen reader reads it whole.
+  (new since beta.2) Where the tabs leave it no room - the advanced edition with Chat on has eight of them - every tab's room at either side
+  of its name is narrowed alike, as little as needed, down to half of its usual room, so the gaps stay equal and the chosen tab keeps its ring;
+  then the pill shows the version alone; and only where even the closest tabs leave it no room does the pill move into the header card, at the
+  end of its second line under the caption buttons, as far from the card's edge as it stands in the row (mirrored for a language written
+  right to left), with the headline still clear of the caption buttons. An ordinary row of tabs keeps the room it had. The tabs' fitting
+  reckons the row the same way at every room, so one fitting never undoes the one before it, and a short tab's own least width no longer
+  leaves the last tab cut. Only Settings has a bar at its foot now (the reopen note, *Restore defaults* and *Save*); the Close button there
+  is gone, and the header's close cross closes the window. The tab row has as much room above it as below it, 10 px each, on every page,
+  and the pill's rounded end and the first tab's face stand 4 px inside the header card's edges so the pill does not look as if it sticks
+  out. The status light sweeps once as the window opens and as the watcher turns on, and the line under the headline glides in as the
+  sweep ends; where animations are off, nothing moves.
+- **With the watcher off, Start watcher stands where Pause stands.** On the Overview's *Right now* card *Start watcher* takes the place
+  of *Pause recovery* while the watcher is off, and the header only says the state; once the watcher runs, *Pause* comes back and
+  *Start watcher* goes. The two never show together.
+- **A dialog is its title and one card, painted whole before it fades in.** The title row - its words and its close cross - stands on the
+  dialog's own ground, one row as tall as a caption button, and under it one card holds the content and the buttons, with nothing below
+  the card but the ground. The close cross stands as far in from the dialog's edge, as the eye sees it, as the title's first letter from
+  the other edge. A dialog with nothing to answer - the timeline, the log, the detection check, the compatibility report, a notice - has no
+  Close button of its own: the title row's close cross and Esc close it, and a dialog with an answer keeps its Cancel and its action. While
+  a dialog is open the Dashboard behind it is dimmed (not in High Contrast): the dimming is there as the dialog appears, and in the dark
+  theme it shows as plainly as in the light. A dialog opens centred on the Dashboard that opened it wherever that is, not on the monitor's
+  middle. A dialog shows only once it has painted, so in the dark theme its first frame is in its theme - no light-grey window or white bar
+  over its title for a moment - and it then fades in briefly, with the Dashboard behind already dimmed (at once where animations are off),
+  in place of Windows' opening motion. (new since beta.2) The fade is the dialog's own, finished: its first step paints the dialog whole once
+  more and waits for Windows to take that picture before it shows any of it, and its time starts at that step, so a dialog that is slow to
+  paint still fades from near clear - the timeline's first visible frame used to be already 63 to 98 % opaque in six of seven openings, and a
+  dialog with a part that is slow to paint is now first seen at 65 % at the most. A dialog's title row shows no greyed caption button: the
+  timeline, the log, the detection check, the compatibility report and *Install another version...* keep the maximise button they use, and
+  every other dialog shows only its close cross.
+- **A question that takes something back starts on its dismissal.** *Clear history*, *Cancel all*, a conversation's *Cancel*, *Turn off for
+  this conversation*, *Stop watcher* and *Restore defaults* open with the keyboard on the button that answers no, so an Enter at once
+  does nothing; every question had started on its action since v0.6.6. Each button keeps its look, and a question that takes nothing
+  back still starts on its action.
+- **A question's words wrap between words.** A question or a notice broke Korean inside a word (있/는, 그다/음); it now wraps where the
+  window's other words do, only at spaces in every language that wraps by spaces.
+- **The first switch to Diagnostics shows the page whole.** In a newly opened Dashboard, a press on Diagnostics before the page was ready
+  could change only the tab for a second or more and then show the page half drawn over the Overview, as in earlier versions. The page now
+  comes up within a fraction of a second, and its compatibility card lays the page out once. (new since beta.2) A switch of page puts the page
+  on the screen in one go: the page is painted off the screen and set on the window's surface whole, where it had been painted a control at a
+  time straight onto the surface, so the screen could be taken between two of them with the Overview's pixels still showing. Measured off
+  the screen, 76 of the 118 paints of a press left pixels of both pages in all three runs; now none does.
+- **A Dashboard that is reopening itself says so, and leaves no gap.** For another language or theme the Dashboard reopens as a new window.
+  The old one now stays until the new one is on the screen, where for up to a second there was no window (or, in earlier versions, an
+  unpainted one). (new since beta.2) While it waits - the new window appears one to three seconds later - its header's light is the working
+  light, as for an action in flight, and the pointer over it is Windows' app-starting pointer; a reopening whose new window never comes puts
+  the light back at once.
+- **What the second pre-release listed as known is dealt with (new since beta.2).** It said that, rarely, in the dark theme, a dialog's first
+  frame could still show unpainted for a moment before it fades in, and that the first switch to Diagnostics could show the page half drawn
+  for a frame or two. The second is found and fixed, as the item above says, and held by a test that reads the window's surface after every
+  paint of a press. The first has a fix that shuts out the cause that was found - a dialog still unpainted when it first showed - by painting
+  it whole before the fade's first step, held by a test of that step; the rare frame itself could not be made to happen off the screen, so it
+  is not shown gone, only the way for it to show closed.
+- **Focus rings show only after the keyboard is used.** A page tab clicked with the mouse no longer keeps its blue ring, in the Dashboard
+  and in its dialogs; Tab, the arrow keys and an access key show the rings again.
+- **A tooltip has nothing drawn round its card.** The pale glow a tooltip gave a dark desktop is gone; the caption buttons' tooltips and
+  the Dashboard's line tooltips are their card alone.
+- **The at-a-glance surfaces say what is left of a usage window (new since beta.2).** The popup's line, the hover card, the Dashboard's
+  Overview line, the panel in Codex and the near-limit notice say "N% left" - "5-hour 0% left ... weekly 38% left" - in all 22 languages
+  (Korean "남음"), where they said what was used. Left is 100 minus the whole share used, so 0 % shows only once a window is used up
+  (99.6 % used leaves 1 %). It is a change of display alone: the reading, what the program sends and every decision it takes still use the
+  share used. The notice says no number where the share cannot be read. The tray icon's card fills each bar by what is left and empties it
+  as the window is used; with 10 % or less left the bar, the edge of its groove and the share are the warning colour, so an empty bar never
+  reads as calm. The guide's usage line and its example are told the same way, and say what *left* means. The limits a person sets
+  (warn at 85 %, wrap up at 90 %, stop at 97 %), Diagnostics' usage check and the wrap-up message to Codex still say what was used, as before.
+- **The tray icon's card is as wide as its widest row,** with no fixed least width: its widest row ends one side's padding from the
+  card's right edge, so a card with no usage rows is no longer emptier on its right.
+- **The icon's card's first row and the panel's first row read as one line (new since beta.2).** On the card, the light stands on the middle
+  of the name's lower-case letters rather than the middle of its box - it had stood about 4 px low at 150 and 200 % - and the edition's pill
+  and its words stand on the name's own baseline, with the same gap after the light as the pill has after the name. In the Codex panel the light
+  is centred on the state word's lower-case middle, within a pixel, and the edition's word stays on the version's baseline, at every scale in
+  the light and the dark theme.
+- **The tray icon's popup is its card alone.** No grey ground lies round it any more, and a float shadow lies under it that only ever
+  darkens. It opens a little faster than the plain window did, and a frame of its status light costs well under a millisecond. Where
+  Windows refuses a window of this kind, the popup is the plain window it was, with its own drop shadow.
+- **Hovering the tray icon shows a card** with the state and the usage bars, in the window's design, instead of Windows' plain tooltip.
+  Screen readers still get the tooltip's text.
+- **The README's motion picture of the tray popup starts at the right end of a taskbar (new since beta.2).** The pointer rests on the icon,
+  its hover card appears after Windows' own hover time, a press opens the popup above the strip and a click elsewhere closes it, on one clock
+  of about 13 seconds that loops with the light and the icon.
+- **A text box's right-click menu is drawn in the window's design.** Every box you can type in opens a menu of the same look as the
+  others - Undo, Cut, Copy, Paste, Delete, Select all - with Windows' own words and access keys, in the language Windows shows;
+  Shift+F10 and the menu key open it at the caret, and a command is offered only where it can work, as in Windows' menu.
+- **A notification card that fades in or out shows no dark band inside its edge.** Its shadow reached under its body and showed
+  through it while the card was half clear; nothing of the shadow lies under the card now, and a still of the card looks as it did.
+- **The setup window is 600 x 600, fixed in size, with the Dashboard's squircle corner,** and never taller than the work area of the
+  screen it opens on, with everything its pages need still whole. Every way it is shown - the first installation, an update, a repair, an
+  edition change, the Dashboard's *Install another version...*, the uninstall - is the same window.
+- **The setup window has something on every page (new since beta.2).** The Welcome page says in three numbered points, under the guide's
+  link, what the program does: it notices a conversation that stopped (a usage limit, a dropped connection, a server error or another
+  temporary failure), it carries on once it can, and the words it sends are yours to choose in Settings. The Installing page lists the run's
+  steps under the bar, on every run the window shows - installing, updating, repairing, removing and installing another version: a filled
+  disc with a check for a step that is done, a ring with a dot and the name in bold for the one under way, an empty ring for what is still to
+  come. Only a line the installer prints, or the archive's own unpacking, moves a step - never a timer - and a step the run passes without
+  taking leaves the list rather than being called done; a first installation lists no watcher to stop and no Dashboard to close. The log,
+  when shown, takes the list's room, so nothing moves, and the toggle reads *Show the log* until a person shows it. The Ready page of a first
+  installation lists what is installed - the watcher, the Dashboard and the Codex plugin, and in the advanced edition its own features, each
+  off at first - one row each, and says that no administrator rights are needed: the setup program asks for none and installs only under your
+  profile and in the current user's part of the registry. An update and a change of edition keep that room for what they keep, change and
+  bring. All of it is in every language, mirrored where the language is written right to left, and a screen reader says each step's state.
+- **The largest text size on a small screen is 1.74 on a 1920 x 1080 screen at 100 %,** where the first beta said 1.68 (v0.6.23: 1.83).
+  A dialog's title is a row on the ground now and not a card of its own, so it is 20 px shorter than the first beta's, and the window may
+  use the text size that screen holds for the tallest dialog.
+- **After an update the Dashboard answers within a few seconds** instead of about 13 s. The first process to import the program after an
+  update used to compile every module it needed before it could answer; the update now compiles the program it copies, for the Python
+  that will run it, as part of the files step. The previous version's leftover `.exe.old-*` file, which an in-app update renames aside
+  while that window runs it, is removed once nothing runs from it - and a folder that something still runs from is left alone.
+- **An update starts the watcher again only if it ended unexpectedly in this sign-in.** A watcher the person stopped, or that ended
+  with a restart, a shutdown or a sign-out, stays stopped, as it was; one that was left running when something outside ended it is started
+  again. Setup's Finish page and its log say which happened and how to start the watcher yourself where it stays stopped.
+- **No flicker where History and Settings first fill.** History's list showed a horizontal scroll bar for one frame the first time it
+  filled, and Settings showed *Restore defaults* and *Save* greyed for one frame; both are gone.
+- **No encoded PowerShell command lines any more** (reported by [@cervinho](https://github.com/cervinho),
+  [#65](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/65)). Antivirus behaviour shields (Avast's
+  `IDP.HELU.PSE96`) blocked `powershell.exe` when the app raised a Windows notification or checked its Start menu shortcut,
+  and when the setup program ran itself again outside another app's view, because each handed PowerShell its fixed script
+  encoded on the command line. The notifications and the shortcut now pass the same fixed script as plain text, and the
+  setup program writes it to a file in its own run folder and runs that file. Every value still travels only in the
+  environment, never inside the script, so nothing a conversation title or a path holds can become code. A test keeps an
+  encoded command line out of every shipped script.
+- **Every release has a short title, a line on its aim and its kind (new since beta.2).** A release page opens with the release's title
+  after its version, one sentence on what it set out to do, and a *Kind* line that names what sort of release it is - new features, feature
+  changes, bug fixes, new design, design changes, performance, security, languages or under the hood, the biggest first. Every entry of this
+  changelog carries them, those of earlier releases too, and ten of their titles now say what mattered at the time.
+- **Window tests that failed now and then on slow CI runners are fixed at their cause**, not retried. (new since beta.2) The test that
+  holds the reopened Dashboard's old window until the new one is on the screen read the new window's state on a sleep that can last a timer
+  tick, and so stamped "on the screen" up to about 16 ms late; the product's order was right all along, and the test now holds the old window
+  to the last read that saw the new one hidden.
+
+### Advanced edition
+
+- **The 5-hour window's one near-zero request starts none of your programs.** To start the 5-hour window early the advanced edition
+  sends one request that costs almost nothing; it now starts none of your MCP servers, hooks, plugins, apps or notify program, as
+  measured on codex-cli 0.167.0-alpha.4.1. Where a Codex refuses that switch, the request is sent once more as it was before, and the
+  watcher's log says that your programs ran.
+- **The Korean wording of the advanced pages was read key by key**, and 59 values read better.
+- **The advanced edition's own dialogs are laid out as the others are.** Its editor holds its refusal and its buttons in the one card
+  under the title row, and its Follow-through and examples dialogs have no Close button of their own - the title row's close cross and
+  Esc close them. (new since beta.2) The advanced edition keeps its window as wide as its tabs need at their usual room, not the closer room
+  the version's pill may draw them to, so the narrowest window is what it was.
+- **The advanced pages say what is left (new since beta.2).** The saved accounts' meters draw what is left - "N% left · in <time>" - and
+  with 10 % or less left the bar, the edge of its groove and the words are the warning colour, so an empty groove with nothing left still
+  says so. The analytics card's share reads "<window>: N% left" and, where the pace runs a window out, "none left around <time>"; how far
+  the share moved in the last hour is still told as what was used. All of it is display only: the bridge still says the share used and every
+  decision reads it.
+- **The Advanced features and Chat pages show no empty bar at the window's foot (new since beta.2).** After Settings had been open, those two
+  pages kept an empty bar under them; only Settings has a bar at its foot.
+
 ## v0.6.24-beta.2 — The Dashboard's squircle corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card, dialogs as one card under their title, and a tray icon's card as wide as its widest row
 
 > **Dialogs as one card and a shorter Dashboard.** This beta finishes the window's own rounded corner and reworks the Dashboard's proportions, its dialogs and the tray icon's card.
