@@ -15,8 +15,8 @@
 // with the code a run that succeeded ends with. Nothing is installed, unpacked, started or written anywhere but the
 // job's folder: the runner only hands the window the plan's lines.
 //
-// For each frame of the job the window is put in the frame's page and progress (forward only), its primary button in
-// its hover or pressed face (the button's own `hover` flag and Press, as gui/WindowRender.cs gives a face), its light
+// For each frame of the job the window is put in the frame's page and progress (forward only), its log shown or folded
+// away where the frame says (`log`, by the page's own toggle), its primary button in its hover or pressed face (the button's own `hover` flag and Press, as gui/WindowRender.cs gives a face), its light
 // held at the frame's moment of the state it is in (Soft.StillLightMs), and drawn into a bitmap, never shown: built as
 // a child of Windows' parking window, as the render mode builds the Dashboard. Only what changed since the frame
 // before is written, as raw RGB, with frames.json beside it, in the render mode's own format.
@@ -133,6 +133,8 @@ namespace CodexAutoResume
             private int delivered;
             private Control faced;
             private HaloDot light;
+            // The window's words, in its language: what the log's toggle says (ShowLog).
+            private readonly InstallerWords words;
             private string lightState;
             private double lightSince;
 
@@ -186,7 +188,8 @@ namespace CodexAutoResume
                 // A first installation of the archive's edition and version: the flow the setup program makes for it.
                 var flow = CodexAutoResumeSetup.SetupWindow.FlowFor(new string[0], Str(job, "home"), Str(job, "edition"),
                                                                     null, Str(job, "version"), "");
-                window = new InstallerWindow(flow, speaker(language), speaker, Run, new string[0], font);
+                words = speaker(language);
+                window = new InstallerWindow(flow, words, speaker, Run, new string[0], font);
                 Size client = window.ClientSize;
                 window.TopLevel = false;
                 window.FormBorderStyle = FormBorderStyle.None;
@@ -252,6 +255,10 @@ namespace CodexAutoResume
                     Settle();
                     if (window.Page == before) throw new InvalidOperationException("the window's " + ((Button)window.AcceptButton).Text + " did not leave " + before);
                 }
+                // v0.6.24 final: the Progress page lists the run's steps under the bar and keeps the log behind its toggle
+                // (the owner's option A); a frame that asks for the log (`log`) has it shown, or folded away, by that toggle,
+                // before the lines it is told - so the log, shown, follows them.
+                if (frame.ContainsKey("log")) ShowLog(Convert.ToBoolean(frame["log"], CultureInfo.InvariantCulture));
                 while (delivered < progress)
                 {
                     if (window.Page != InstallerFlow.Progress) throw new InvalidDataException("progress is told only while the window is installing");
@@ -298,6 +305,29 @@ namespace CodexAutoResume
                     if (last > area.Offset) area.ScrollTo(last);
                 }
                 Settle();
+            }
+
+            /// The page's log shown (`wanted`) or folded away, through its own toggle - the link that says Show the log or Hide
+            /// the log - pressed as a person presses it (its Click).
+            private void ShowLog(bool wanted)
+            {
+                if (LogShown() == wanted) return;
+                string show = words.Say("installer.log.show", "Show the log"), hide = words.Say("installer.log.hide", "Hide the log");
+                SoftLink toggle = null;
+                foreach (SoftLink link in All<SoftLink>(window))
+                    if (link.Visible && (link.Text == show || link.Text == hide)) toggle = link;
+                if (toggle == null) throw new InvalidDataException("the " + window.Page + " page has no toggle for its log");
+                const System.Reflection.BindingFlags own = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                typeof(Control).GetMethod("OnClick", own).Invoke(toggle, new object[] { EventArgs.Empty });
+                Settle();
+                if (LogShown() != wanted) throw new InvalidOperationException("the log's toggle did not " + (wanted ? "show" : "fold away") + " the log");
+            }
+
+            /// Whether a text area - the page's log - is shown.
+            private bool LogShown()
+            {
+                foreach (SoftTextArea area in All<SoftTextArea>(window)) if (area.Visible) return true;
+                return false;
             }
 
             /// The hover or pressed face of the control a frame names, as the pointer gives it.

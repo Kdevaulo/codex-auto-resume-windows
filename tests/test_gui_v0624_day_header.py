@@ -104,6 +104,19 @@ namespace CodexAutoResume
             {
                 if (headlineText != null)
                 {
+                    // The words held against the window's own reads: its clock reads the Dashboard every five seconds, and
+                    // nothing answers that read here, so its failure (MarkUnavailable) wrote "Status unavailable" over the
+                    // words whenever a read came back after they were set - on two slower runners of dev run 44273621705,
+                    // once before the words were read and once between the two pictures. The clock stopped, and every read
+                    // already on its way back, before the words are set.
+                    form.clock.Stop();
+                    var draining = System.Diagnostics.Stopwatch.StartNew();
+                    while ((form.refreshing || form.bridge.InFlight > 0) && draining.ElapsedMilliseconds < 20000)
+                    {
+                        Application.DoEvents();
+                        System.Threading.Thread.Sleep(10);
+                    }
+                    Application.DoEvents();
                     form.headline.Text = headlineText;
                     form.detail.Text = headlineText;
                     Application.DoEvents();

@@ -174,8 +174,15 @@ class TipRenderer(popup.Renderer):
         """The card's plan in `locale` at `scale`, on `day`'s look or none: mirrored, as the popup's is, when the language is
         written right to left."""
         self.use(locale, scale)
-        laid = tip_layout(parts, light, scale, self.measure, self.metrics, day)
-        return popup.mirror(laid) if l10n.right_to_left(locale) else laid
+        mirrored = l10n.right_to_left(locale)
+
+        def ink(role, text):
+            # Read from the light: right to left the light is at the name's last letter, and the chip at its first.
+            first, last = self.ink(role, text)
+            return (last, first) if mirrored else (first, last)
+
+        laid = tip_layout(parts, light, scale, self.measure, self.metrics, day, ink)
+        return popup.mirror(laid) if mirrored else laid
 
     def metrics(self, role):
         """(ascent, x-height) of a popup font role in device pixels, as GDI draws it: the line's top to its baseline, and
@@ -192,6 +199,28 @@ class TipRenderer(popup.Renderer):
             answer = gdi32.GetGlyphOutlineW(dc, ord("x"), _GGO_METRICS, C.byref(glyph), 0, None, C.byref(identity))
             x_height = glyph.gmptGlyphOrigin.y if answer != _GDI_ERROR and glyph.gmptGlyphOrigin.y > 0 else found.tmAscent / 2.0
             return float(found.tmAscent), float(x_height)
+        finally:
+            gdi32.SelectObject(dc, previous)
+
+    def ink(self, role, text):
+        """(first, last): how far inside its box a text's ink starts and ends in a popup font role, in device pixels, as GDI
+        draws it - its first letter's left side bearing and its last letter's right one (GetGlyphOutlineW's GGO_METRICS).
+        tipplan spaces the header's name by them, so the gaps either side of it read equal in any font. Where a letter gives
+        no outline (a space, a font without it), 0 at that end."""
+        gdi32, dc = _metric_calls(), self.canvas.dc
+        previous = gdi32.SelectObject(dc, self.fonts.handles[role])
+        try:
+            def bearings(letter):
+                glyph, identity = _GLYPHMETRICS(), _MAT2()
+                identity.eM11.value = identity.eM22.value = 1
+                if not letter or gdi32.GetGlyphOutlineW(dc, ord(letter), _GGO_METRICS, C.byref(glyph), 0, None,
+                                                        C.byref(identity)) == _GDI_ERROR or not glyph.gmBlackBoxX:
+                    return 0, 0
+                left = glyph.gmptGlyphOrigin.x
+                return left, glyph.gmCellIncX - left - glyph.gmBlackBoxX
+
+            text = (text or "").strip()
+            return (bearings(text[:1])[0], bearings(text[-1:])[1]) if text else (0, 0)
         finally:
             gdi32.SelectObject(dc, previous)
 

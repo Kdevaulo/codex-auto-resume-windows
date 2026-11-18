@@ -40,12 +40,14 @@ def _line_box(height):
     return height * 3 / 4.0, height / 2.0
 
 
-def tip_layout(parts, light, scale, measure, metrics=None, day=None) -> dict:
+def tip_layout(parts, light, scale, measure, metrics=None, day=None, ink=None) -> dict:
     """Every rectangle of the card in device pixels, left to right, and its size.
 
     `parts` is words.tooltip_parts' dict; `light` the status light's state (a key of brand.STATUS_FILL); `measure(role,
     text, width, wrap)` returns the (width, height) a text takes in a popup font role, and `metrics(role)` its font's
-    (ascent, x-height) in device pixels - what the header is aligned by (none: by the line boxes). The plan is the popup's shape -
+    (ascent, x-height) in device pixels - what the header is aligned by (none: by the line boxes) - and `ink(role, text)` how
+    far inside its box a text's ink starts and ends on the row read from the light, (near, far) in device pixels - what the
+    gaps either side of the name are spaced by (none: by the boxes). The plan is the popup's shape -
     `size`, `card`, `items`, `targets` (none: nothing on the card is pressed), `scale` - so the popup's renderer draws
     its items and its mirror turns it right to left. The card fills the window: nothing is drawn round it, as round the
     icon's menu (the owner, 2026-11-01 and 11-02: a lift's lit edge and its pale shadow shone as a halo on a dark
@@ -79,7 +81,12 @@ def tip_layout(parts, light, scale, measure, metrics=None, day=None) -> dict:
     # left 2.5 px more there than between the name and the chip - so the two gaps read equal.
     dot = brand.STATUS_DOT["popup"] * scale
     lead = int(round(mark / 2.0 + dot)) + gap
-    head_need = lead + title_w + (gap + chip_w if chip else 0)
+    # And the chip as far after the name's ink as the name's ink is after the light: the name's box holds its letters'
+    # side bearings, which differ from font to font (Segoe UI's "C" stands further in than Malgun Gothic's), so the chip's
+    # gap from the name's box is the light's, plus the name's near bearing, less its far one.
+    near, far = ink(roles["title"], parts["title"]) if ink else (0, 0)
+    after = max(0, gap + near - far)
+    head_need = lead + title_w + (after + chip_w if chip else 0)
     most = px(TIP_MOST)
     pieces = list(parts.get("line") or ())
     join_w, line_h = measure(roles["line"], TIP_JOIN, wide, False)
@@ -123,7 +130,7 @@ def tip_layout(parts, light, scale, measure, metrics=None, day=None) -> dict:
     text_left = left + lead
     if chip:
         chip_w = min(chip_w, inner // 2)
-    title_room = right - text_left - (gap + chip_w if chip else 0)
+    title_room = right - text_left - (after + chip_w if chip else 0)
     title_w = min(title_w, title_room)
     ascent, x_height = metrics(roles["title"]) if metrics else _line_box(title_h)
     baseline = ascent                                  # below the name's top
@@ -142,7 +149,7 @@ def tip_layout(parts, light, scale, measure, metrics=None, day=None) -> dict:
     top = shift
     text((text_left, top, text_left + title_w, top + title_h), roles["title"], parts["title"], "ink")
     if chip:
-        chip_left = text_left + title_w + gap
+        chip_left = text_left + title_w + after
         rect = (chip_left, shift + chip_top, chip_left + chip_w, shift + chip_top + chip_h)
         items.append({"kind": "chip", "rect": rect, "tone": "accent"})
         words_top = shift + chip_words_top

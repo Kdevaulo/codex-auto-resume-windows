@@ -17,6 +17,10 @@ card's own renderer (tipcard.draw_offscreen: no window, nothing on the screen) -
 - the pill's words end on the name's baseline: the lowest ink rows of the two are the same (neither "Codex Auto Resume"
   nor "Advanced" has a letter below the baseline);
 - the gap from the light's ink to the name's ink and from the name's ink to the pill are within 1 px.
+
+Each in this machine's own UI font and in Segoe UI, the font an English Windows answers with (the CI's runners): the
+name's letters stand inside its box by bearings of their own in each font, and the gaps were first spaced by the boxes -
+equal here in Malgun Gothic, 10 px after the light and 8 before the pill in Segoe UI (dev run 44273621705).
 """
 from __future__ import annotations
 
@@ -24,6 +28,7 @@ import os
 from pathlib import Path
 import sys
 import unittest
+from unittest import mock
 
 _HERE = str(Path(__file__).resolve().parent)
 if _HERE not in sys.path:
@@ -35,6 +40,8 @@ from codex_auto_resume.ui.tray import words  # noqa: E402
 NOW = 1_800_000_000.0
 SNAPSHOT = {"enabled": True, "waiting": 1, "next_at": NOW + 200}
 SCALES = (1.0, 1.5, 2.0)
+# The face Windows' UI font is answered with: this machine's own (None), and an English Windows' (on every Windows).
+FACES = (None, "Segoe UI")
 
 
 def far(a, b):
@@ -45,13 +52,16 @@ def far(a, b):
 class HeaderInkTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from codex_auto_resume.ui.popup import fonts
         from codex_auto_resume.ui.tray import tipcard
         cls.cards = {}
-        for scale in SCALES:
-            parts = words.tooltip_parts(SNAPSHOT, interface.STRINGS["en"], NOW, "advanced")
-            xs = dict(parts, title="x" * len(parts["title"]))
-            cls.cards[scale] = (tipcard.draw_offscreen(parts, "monitoring", scale=scale, locale="en"),
-                                tipcard.draw_offscreen(xs, "monitoring", scale=scale, locale="en"))
+        parts = words.tooltip_parts(SNAPSHOT, interface.STRINGS["en"], NOW, "advanced")
+        xs = dict(parts, title="x" * len(parts["title"]))
+        for face in FACES:
+            with mock.patch.object(fonts, "message_face", (lambda: face) if face else fonts.message_face):
+                for scale in SCALES:
+                    cls.cards[face, scale] = (tipcard.draw_offscreen(parts, "monitoring", scale=scale, locale="en"),
+                                              tipcard.draw_offscreen(xs, "monitoring", scale=scale, locale="en"))
 
     @staticmethod
     def rgb(plan, pixels, x, y):
@@ -84,9 +94,9 @@ class HeaderInkTests(unittest.TestCase):
         return self.ink(plan, pixels, rect)
 
     def test_the_light_is_centred_on_the_names_x_height_middle(self):
-        for scale in SCALES:
-            with self.subTest(scale=scale):
-                _, (plan, pixels) = self.cards[scale]
+        for face, scale in self.cards:
+            with self.subTest(face=face, scale=scale):
+                _, (plan, pixels) = self.cards[face, scale]
                 halo, title, _, _ = self.header(plan)
                 top, bottom, _, _ = self.dot_ink(plan, pixels, halo, scale)
                 x_top, x_bottom, _, _ = self.ink(plan, pixels, title["rect"])
@@ -95,9 +105,9 @@ class HeaderInkTests(unittest.TestCase):
                                      % (light, letters))
 
     def test_the_pills_words_stand_on_the_names_baseline(self):
-        for scale in SCALES:
-            with self.subTest(scale=scale):
-                (plan, pixels), (xplan, xpixels) = self.cards[scale]
+        for face, scale in self.cards:
+            with self.subTest(face=face, scale=scale):
+                (plan, pixels), (xplan, xpixels) = self.cards[face, scale]
                 _, title, chip, words_ = self.header(plan)
                 name_bottom = self.ink(plan, pixels, title["rect"])[1]
                 accent = brand.rgb(brand.palette("light", brand.DEFAULT_DESIGN)["accent"])
@@ -108,18 +118,18 @@ class HeaderInkTests(unittest.TestCase):
                                  "the x's stand where the name stands")
 
     def test_the_pill_is_centred_on_the_same_middle(self):
-        for scale in SCALES:
-            with self.subTest(scale=scale):
-                _, (plan, pixels) = self.cards[scale]
+        for face, scale in self.cards:
+            with self.subTest(face=face, scale=scale):
+                _, (plan, pixels) = self.cards[face, scale]
                 _, title, chip, _ = self.header(plan)
                 x_top, x_bottom, _, _ = self.ink(plan, pixels, title["rect"])
                 pill = (chip["rect"][1] + chip["rect"][3]) / 2.0
                 self.assertLessEqual(abs(pill - (x_top + x_bottom + 1) / 2.0), 1.0)
 
     def test_the_gaps_either_side_of_the_name_read_equal(self):
-        for scale in SCALES:
-            with self.subTest(scale=scale):
-                (plan, pixels), _ = self.cards[scale]
+        for face, scale in self.cards:
+            with self.subTest(face=face, scale=scale):
+                (plan, pixels), _ = self.cards[face, scale]
                 halo, title, chip, _ = self.header(plan)
                 dot_right = self.dot_ink(plan, pixels, halo, scale)[3]
                 _, _, name_left, name_right = self.ink(plan, pixels, title["rect"])

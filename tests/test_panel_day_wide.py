@@ -6,7 +6,8 @@ side, its specks laid band after band across all of it, its scene as tall as the
 fading into it - and the hero's words, light and buttons exactly where they are on any other day. Node checks that the page
 moves the specks as brand does (dayElementAt), and the page's data carries brand's one list of specks.
 
-Headless, nothing shown: run on its own, through gui_lock.sh.
+Headless, nothing shown: run on its own, through gui_lock.sh. Motion is allowed by Edge's own switch, not by Windows' animation
+effects, which the CI's runners have off.
 """
 from __future__ import annotations
 
@@ -57,6 +58,10 @@ document.title='%s'+JSON.stringify(out);},400);});</script>""" % PROBE
 @unittest.skipUnless(EDGE is not None, "needs Microsoft Edge to lay the page out")
 class PanelDayTests(unittest.TestCase):
     def measure(self, day, width=900, extra="", flags=()):
+        # Motion allowed unless the test holds it still: Edge takes prefers-reduced-motion from Windows' animation effects,
+        # which are off on the CI's runners - there every speck stood still and none moved (dev run 44273621705).
+        if "--force-prefers-reduced-motion" not in flags:
+            flags = ("--force-prefers-no-reduced-motion", *flags)
         page = mcpui.settings_page(snapshot(), theme="light", design="soft", text=1.0, face="Segoe UI", day=day)
         with tempfile.TemporaryDirectory() as folder:
             probe = Path(folder) / "panel.html"
