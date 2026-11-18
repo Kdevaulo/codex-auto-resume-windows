@@ -1,4 +1,4 @@
-# Codex Auto Resume roadmap: v0.6.3 → v0.6.26
+# Codex Auto Resume roadmap: v0.6.3 → v0.6.27
 
 This is the current development direction for Codex Auto Resume from v0.6.3.
 
@@ -570,7 +570,7 @@ and released at the same time, with the same version:
 
 Each has its own archive and pinned digest, and one build attestation names both. An installation
 updates within its edition only; moving between them is a deliberate reinstall, never an update.
-The Rust core carries both (v0.6.25).
+The Rust core carries both (v0.6.26).
 
 ---
 
@@ -1238,8 +1238,8 @@ v0.6.23 is the first comprehensive audit of the Python implementation, in both e
 The switch of the bundled Python to 3.15 is no longer in it. The owner moved it out on 2026-11-10, to a later version once CPython
 3.15.3 is out - to v0.6.24 if it is out by then (the owner, 2026-11-11); the code's preparation for 3.15 stays here (below), and the bundled Python stays 3.14.10 in v0.6.23.
 
-Right after the final v0.6.24 is published and verified, the last Python version is kept as a repository of its own - its
-history and tags up to v0.6.24 - before the Rust core replaces it (the owner, 2026-10-24; the number it carries has moved on with each renumber since, to v0.6.23 on 2026-11-04 and to v0.6.24 on 2026-11-11).
+Right after the final v0.6.25 is published and verified, the last Python version is kept as a repository of its own - its
+history and tags up to v0.6.25 - before the Rust core replaces it (the owner, 2026-10-24; the number it carries has moved on with each renumber since, to v0.6.23 on 2026-11-04, to v0.6.24 on 2026-11-11 and to v0.6.25 on 2026-11-18).
 
 Unlike v0.6.10-alpha's refactoring, it is intentionally a broad bug hunt.
 
@@ -1315,7 +1315,8 @@ The final of the line, in both editions: the notification-area icon's menu gains
 and the popup's menu for a waiting task offers what the Dashboard's Pending menu offers - *Message for this conversation...*, *Add words for this time...* or *Change words for this time...*
 and *Remove words for this time*, the writing ones opening the Dashboard on its Pending page with that task's own dialog. On 2026-11-11 the owner decided to release v0.6.23 at that point and to do the second
 round of audits in the next version, so the numbers after it moved on: the Rust core is v0.6.25 and its audit v0.6.26. On 2026-11-12 the owner decided that v0.6.23 carries the whole
-second round of audits, over the finished code of both editions, and that v0.6.24 is a third round that checks everything again; the numbers after it stand.
+second round of audits, over the finished code of both editions, and that v0.6.24 is a third round that checks everything again; the numbers after it stand. On 2026-11-18 the owner made the third round a release of its own, v0.6.25, and moved the
+Rust core on to v0.6.26 and its audit to v0.6.27, so the numbers in the sentences above are those of their dates: v0.6.25 is the last Python release, and the Rust core is v0.6.26.
 
 ---
 
@@ -1336,7 +1337,7 @@ What v0.6.24 carries, in both editions:
 
 The switch of the bundled Python to 3.15 did not happen in v0.6.24: CPython 3.15.3 is not out, so the bundle stays 3.14.10 and the code stays ready for it.
 
-Right after the final v0.6.24 is published and verified, the last Python version is kept as a repository of its own, as above.
+The third round is v0.6.25's now, and so is the last Python version's repository of its own, as below.
 
 ### v0.6.24-beta ✅ — The window's new look and a quicker return after an update (a pre-release)
 
@@ -1354,19 +1355,31 @@ On 2026-11-18 the owner moved two items from this release to the next one, v0.6.
 
 ---
 
-## v0.6.25 — Rust: the core replaced as it is, then made Rust-native
+## v0.6.25 — The third round: every audit once more over the finished code
 
-v0.6.25 arrives in two stages too: **v0.6.25-alpha**, a pre-release, replaces the production Python
-core with Rust as it is; the final **v0.6.25** is that core made naturally Rust-oriented. The alpha is
+On 2026-11-12 the owner made the third round of audits part of v0.6.24, a round that checks everything again over the finished code of both editions; on 2026-11-18 they released v0.6.24 as the line that gave both editions their window's own look and made the third round, with the review below, a release of its own, v0.6.25. It is the last Python release: what it settles is the Python reference implementation the Rust core reproduces.
+
+Expected areas include:
+
+- every kind of audit once more: all code, security, reachability, design and motion, the optical audit included, limits, size and tests, checking that the second round's fixes hold and that nothing new broke,
+- every document, in both languages, read against the code as it is,
+- all twenty-two translations,
+- then cleanup, fixes and refactoring, with a regression test for each confirmed bug,
+- the review of what moves from the advanced edition to the standard one (not started),
+- the switch of the bundled Python to 3.15, if CPython 3.15.3 is out by then (v0.6.24 did not make it: 3.15.3 was not out).
+
+Right after the final v0.6.25 is published and verified, the last Python version is kept as a repository of its own, as above.
+
+---
+
+## v0.6.26 — Rust: the core replaced as it is, then made Rust-native
+
+v0.6.26 arrives in two stages too: **v0.6.26-alpha**, a pre-release, replaces the production Python
+core with Rust as it is; the final **v0.6.26** is that core made naturally Rust-oriented. The alpha is
 a pre-release because the core swapped as it is is a stage on the way to the Rust-native one, not a
 release worth having on its own.
 
-Two items come first in v0.6.25, moved here from v0.6.24 by the owner on 2026-11-18:
-
-- the third round of audits, the optical audit included,
-- the review of what moves from the advanced edition to the standard one.
-
-### v0.6.25-alpha — Complete Rust core replacement (a pre-release)
+### v0.6.26-alpha — Complete Rust core replacement (a pre-release)
 
 The alpha is planned to replace the production Python core with Rust, as it is.
 
@@ -1377,7 +1390,7 @@ The rule is:
 
 > **Replace the implementation, not the behavior.**
 
-The Rust implementation should reproduce the final v0.6.24 as closely as practical.
+The Rust implementation should reproduce the final v0.6.25 as closely as practical.
 
 Goals include:
 
@@ -1419,13 +1432,13 @@ Rust
 PowerShell may remain as a thin layer for bootstrap, installation, updating, or similar Windows
 deployment work.
 
-### v0.6.25 — Rust-native restructuring and optimization
+### v0.6.26 — Rust-native restructuring and optimization
 
 The alpha prioritizes behavioral parity.
 
 That may leave some Python-shaped architecture inside the first Rust implementation.
 
-The final v0.6.25 is planned to make the codebase more naturally Rust-oriented.
+The final v0.6.26 is planned to make the codebase more naturally Rust-oriented.
 
 Potential work includes:
 
@@ -1445,9 +1458,9 @@ This is not intended to be the final full-system bug hunt.
 
 ---
 
-## v0.6.26 — Final Rust audit and stabilization: the Rust bug hunt
+## v0.6.27 — Final Rust audit and stabilization: the Rust bug hunt
 
-v0.6.26 is planned as the final comprehensive stabilization pass.
+v0.6.27 is planned as the final comprehensive stabilization pass.
 
 Expected focus includes:
 
@@ -1485,7 +1498,7 @@ The intended final stack is:
 
 There is currently **no planned v0.7.0 feature cycle**.
 
-After v0.6.26, the project is expected to move primarily into maintenance:
+After v0.6.27, the project is expected to move primarily into maintenance:
 
 - Codex compatibility updates,
 - Compatibility Registry updates,
@@ -1678,14 +1691,19 @@ The final: usage shown as what is left, the version's pill never hidden, dialogs
 
         ↓
 
-v0.6.25-alpha → v0.6.25
-First the third round of audits, the optical audit included, and the review of what moves from the advanced edition to the standard one
+v0.6.25
+The third round: every audit once more over the finished code, the optical audit included, then cleanup, fixes and refactoring; the review of what moves from the advanced edition to the standard one; the switch to Python 3.15 if 3.15.3 is out
+→ freeze Python reference behavior
+
+        ↓
+
+v0.6.26-alpha → v0.6.26
 Complete Rust core replacement, in a pre-release
 + Rust-native restructuring and optimization, in the final
 
         ↓
 
-v0.6.26
+v0.6.27
 Final Rust audit and stabilization: the Rust bug hunt
 → final stable Rust baseline
 
@@ -1714,4 +1732,4 @@ recovery waits, in both. v0.6.18 is a final on v0.6.17 with no pre-release of it
 pre-release, v0.6.19-beta: the owner moved stage 5 out of v0.6.16 on 2026-10-16, so that the v0.6.16 final came
 sooner, made v0.6.17 a final on v0.6.16 on 2026-10-19, and on 2026-10-21 put the simple parts of stage 5 into v0.6.18 and the rest into v0.6.19, and on 2026-10-26 released
 v0.6.19 with what was built and moved the rest to v0.6.20, every later release one on, and on 2026-10-31 moved the loopback API,
-remote control and the view of other PCs out of v0.6.20 into a v0.6.21 of their own, with the switch to Python 3.15, every later release one on again, and on 2026-11-04 made a hotfix final v0.6.21 of the fix for #58 and moved what had been planned as v0.6.21 on to v0.6.22, every later release one on once more. v0.6.23-beta and v0.6.23-beta.2 are out; on 2026-11-10 the owner moved the switch to Python 3.15 out of v0.6.23, to v0.6.24 if CPython 3.15.3 is out by then; on 2026-11-11 they moved the second round of audits out of v0.6.23 into a v0.6.24 and the Rust core on to v0.6.25, and on 2026-11-12 they decided that v0.6.23 carries the whole second round and that v0.6.24 is a third round of audits that checks everything again.
+remote control and the view of other PCs out of v0.6.20 into a v0.6.21 of their own, with the switch to Python 3.15, every later release one on again, and on 2026-11-04 made a hotfix final v0.6.21 of the fix for #58 and moved what had been planned as v0.6.21 on to v0.6.22, every later release one on once more. v0.6.23-beta and v0.6.23-beta.2 are out; on 2026-11-10 the owner moved the switch to Python 3.15 out of v0.6.23, to v0.6.24 if CPython 3.15.3 is out by then; on 2026-11-11 they moved the second round of audits out of v0.6.23 into a v0.6.24 and the Rust core on to v0.6.25, and on 2026-11-12 they decided that v0.6.23 carries the whole second round and that v0.6.24 is a third round of audits that checks everything again. On 2026-11-18 they made that third round a release of its own, v0.6.25, and moved the Rust core on to v0.6.26 and its audit to v0.6.27, so the numbers in the sentences above are those of their dates.
