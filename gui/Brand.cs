@@ -585,6 +585,9 @@ namespace CodexAutoResume
             return false;
         }
 
+        /// brand.tokens.EDITION_INK: the advanced edition's ink on the version's pill (the owner, 2026-11-18).
+        internal static Color EditionInk() { return Color.FromArgb(0x3F, 0x68, 0xB0); }
+
         /// Whether the check box draws the inset elevation inside its border, in either theme.
         /// Never in High Contrast.
         internal static bool CheckWell(bool on, bool enabled)
@@ -818,6 +821,9 @@ namespace CodexAutoResume
                 }
                 return false;
             }
+
+            /// brand.tokens.EDITION_INK: the advanced edition's ink on the version's pill (the owner, 2026-11-18).
+            internal static Color EditionInk() { return Color.FromArgb(0x9A, 0xB8, 0xEE); }
         }
 
         /// Classic's colours (brand.palette(theme, "classic")), under the names Brand gives Soft's: its card's ground

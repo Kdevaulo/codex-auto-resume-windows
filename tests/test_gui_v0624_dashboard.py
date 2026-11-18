@@ -599,8 +599,9 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertEqual(pill["fit"], "whole")
                 self.assertEqual(pill["findings"], "", "the layout audit's AuditPill")
                 self.assertIn("0.6.24-beta.2", pill["text"])
-                self.assertIn(said["advancedWord"], pill["text"], "an advanced edition's word beside the version")
-                self.assertEqual(pill["name"], pill["text"], "a screen reader is told the version and the edition")
+                # v0.6.24 (the owner, 2026-11-18): the version alone, the edition told by its ink and to a screen reader.
+                self.assertEqual(pill["text"], "v0.6.24-beta.2", "the version alone, never the edition's word")
+                self.assertEqual(pill["name"], pill["text"] + " " + said["advancedWord"], "a screen reader is told both")
                 x, y, w, h = pill["pill"]
                 tx, ty, tw, th = pill["tabs"]
                 rx, ry, rw, rh = pill["room"]

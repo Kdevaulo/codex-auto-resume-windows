@@ -1595,7 +1595,7 @@ class ThemeSourceRuleTests(unittest.TestCase):
     COLOURS = ("Ink", "Muted", "Line", "Surface", "Canvas", "Accent", "OnAccent", "Active", "Idle", "Raised",
                "Inset", "ShadowDark", "ShadowLight", "AccentSoft", "Focus", "Attention", "Success", "Waiting",
                "Warning", "Danger", "Paused", "AccentHover", "AccentPressed", "CardGround")
-    THEMED = ("StatusFill", "CheckFill", "CheckEdge", "CheckMark", "ElevationCount", "ElevationShadow")
+    THEMED = ("StatusFill", "CheckFill", "CheckEdge", "CheckMark", "ElevationCount", "ElevationShadow", "EditionInk")
 
     def setUp(self):
         # Every hand-written source of the window, by its repository-relative path. Named one by
