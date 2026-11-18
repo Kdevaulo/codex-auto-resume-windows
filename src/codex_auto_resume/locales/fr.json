@@ -119,7 +119,7 @@
   "check.unavailable": "La vérification n'a pas pu être lancée pour le moment.",
   "check.unchecked": "{n} conversations n'ont pas pu être vérifiées à temps.",
   "check.unknown": "inconnu",
-  "check.usage": "Dernière lecture de l'utilisation {when} : 5 heures {five} % restant, hebdomadaire {weekly} % restant, prochaine réinitialisation {reset}.",
+  "check.usage": "Dernière lecture de l'utilisation {when} : 5 heures {five} % utilisé, hebdomadaire {weekly} % utilisé, prochaine réinitialisation {reset}.",
   "check.usage_none": "Aucune lecture de l'utilisation n'a encore fonctionné.",
   "check.yes": "pris en charge",
   "choice.above_100k": "Retenir au-delà de 100 000",

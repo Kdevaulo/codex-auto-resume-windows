@@ -119,7 +119,7 @@
   "check.unavailable": "Hiện chưa thể chạy việc kiểm tra.",
   "check.unchecked": "Không thể kiểm tra kịp {n} cuộc trò chuyện.",
   "check.unknown": "không rõ",
-  "check.usage": "Lần đọc mức sử dụng gần nhất {when}: 5 giờ còn {five}%, hằng tuần còn {weekly}%, lần đặt lại tiếp theo {reset}.",
+  "check.usage": "Lần đọc mức sử dụng gần nhất {when}: 5 giờ đã dùng {five}%, hằng tuần đã dùng {weekly}%, lần đặt lại tiếp theo {reset}.",
   "check.usage_none": "Chưa có lần đọc mức sử dụng nào thành công.",
   "check.yes": "đã tiếp nhận",
   "choice.above_100k": "Giữ lại khi trên 100.000",

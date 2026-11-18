@@ -1,15 +1,17 @@
-"""v0.6.24 final: every surface says what is LEFT of a usage window, not what is used.
+"""v0.6.24 final: the at-a-glance surfaces say what is LEFT of a usage window; a diagnosis says what is used.
 
 The owner, 2026-11-18, of the icon's card showing "5시간 0% / 주간 100%" with full bars: "사용한 양보다 남은 양이 뜨는게
 자연스럽지 않나?" (wouldn't what is left be more natural than what is used?) - and of the scope, "다 바꾸자" (change all of
 it). Left is 100 minus the whole share used (ui/words.left), so 0 only where a window is used up: 99.6% used leaves 1, and
 a reading above 100 leaves 0. A bar is as full as what is left. Display only: the reading, the wire's numbers and every
-decision keep the share used.
+decision keep the share used. The owner then drew the line the same day: a place for an at-a-glance "may I keep going?"
+says what is left; pace, history, diagnosis and the limits a person sets say what is used - here, the Diagnostics
+check's line (check.usage), pinned to "used".
 
 Each surface here is held to the same table of edges - the popup's line (Python), the panel's (its own JavaScript, in
 Node), the Dashboard's (the compiled window's own UsageLeft, through reflection: no window is made or shown) and the
 catalog words they all fill in, in every language. The icon's card and its bars are tests/test_tray_tipcard.py's, the
-notice's tests/test_usage_surfaces.py's, the Diagnostics check's tests/test_checkup.py's.
+notice's tests/test_usage_surfaces.py's, the Diagnostics check's (used) tests/test_checkup.py's.
 """
 from __future__ import annotations
 
@@ -67,7 +69,7 @@ class WordsTests(unittest.TestCase):
     def test_every_language_says_left_in_a_word_of_its_own(self):
         """Each catalog's window words carry a word for "left" beside the share: none is the bare share any more."""
         for locale, strings in interface.STRINGS.items():
-            for key in ("usage.window", "usage.window_resets", "check.usage"):
+            for key in ("usage.window", "usage.window_resets"):
                 with self.subTest(locale=locale, key=key):
                     text = strings[key]
                     bare = re.sub(r"\{[a-z]+\}|[%\s:,.،、，：。—–;-]", "", text)
@@ -77,6 +79,20 @@ class WordsTests(unittest.TestCase):
                         self.assertNotEqual(text, interface.STRINGS["en"][key])
         self.assertEqual(interface.STRINGS["ko"]["usage.window"], "{window} {percent}% 남음")
         self.assertEqual(interface.STRINGS["en"]["usage.window"], "{window} {percent}% left")
+
+    def test_the_diagnostics_check_says_what_is_used_with_the_word(self):
+        """The owner's refinement (2026-11-18): a diagnosis says the share used as Codex reported it, the word "used"
+        said plainly beside each share, since the at-a-glance surfaces say what is left (tests/test_checkup.py runs it)."""
+        self.assertEqual(interface.STRINGS["en"]["check.usage"],
+                         "Last usage reading {when}: 5-hour {five}% used, weekly {weekly}% used, next reset {reset}.")
+        self.assertEqual(interface.STRINGS["ko"]["check.usage"],
+                         "마지막 사용량 확인 {when}: 5시간 {five}% 사용, 주간 {weekly}% 사용, 다음 재설정 {reset}.")
+        left = {"en": "left", "ko": "남음", "de": "übrig", "fr": "restant", "ja": "残り", "zh-CN": "剩余", "zh-TW": "剩餘",
+                "ru": "осталось", "es": "queda", "tr": "kaldı"}
+        for locale, word in left.items():
+            with self.subTest(locale=locale):
+                self.assertNotIn(word, interface.STRINGS[locale]["check.usage"])
+                self.assertIn(word, interface.STRINGS[locale]["usage.window"])
 
 
 class PanelTests(unittest.TestCase):

@@ -119,7 +119,7 @@
   "check.unavailable": "現在、確認を実行できませんでした。",
   "check.unchecked": "{n} 件の会話は時間内に確認できませんでした。",
   "check.unknown": "不明",
-  "check.usage": "最後の使用量の取得 {when}: 5 時間 残り {five}%、週 残り {weekly}%、次のリセット {reset}。",
+  "check.usage": "最後の使用量の取得 {when}: 5 時間 {five}% 使用、週 {weekly}% 使用、次のリセット {reset}。",
   "check.usage_none": "使用量の取得はまだ成功していません。",
   "check.yes": "対象",
   "choice.above_100k": "100,000 を超えたら保留",

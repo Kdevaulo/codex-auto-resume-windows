@@ -119,7 +119,7 @@
   "check.unavailable": "Nie udało się teraz uruchomić sprawdzenia.",
   "check.unchecked": "Nie udało się sprawdzić na czas {n} rozmów.",
   "check.unknown": "nieznane",
-  "check.usage": "Ostatni odczyt użycia {when}: 5 godz. – zostało {five}%, tygodniowe – zostało {weekly}%, następny reset {reset}.",
+  "check.usage": "Ostatni odczyt użycia {when}: 5 godz. – zużyto {five}%, tygodniowe – zużyto {weekly}%, następny reset {reset}.",
   "check.usage_none": "Żaden odczyt użycia jeszcze się nie udał.",
   "check.yes": "podjęta",
   "choice.above_100k": "Wstrzymaj powyżej 100 000",

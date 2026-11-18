@@ -119,7 +119,7 @@
   "check.unavailable": "Denetim şu anda çalıştırılamadı.",
   "check.unchecked": "{n} sohbet zamanında denetlenemedi.",
   "check.unknown": "bilinmiyor",
-  "check.usage": "Son kullanım okuması {when}: 5 saatlik %{five} kaldı, haftalık %{weekly} kaldı, sonraki sıfırlama {reset}.",
+  "check.usage": "Son kullanım okuması {when}: 5 saatlik %{five} kullanıldı, haftalık %{weekly} kullanıldı, sonraki sıfırlama {reset}.",
   "check.usage_none": "Henüz hiçbir kullanım okuması çalışmadı.",
   "check.yes": "ele alındı",
   "choice.above_100k": "100.000 üzerinde beklet",

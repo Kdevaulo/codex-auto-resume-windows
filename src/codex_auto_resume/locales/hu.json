@@ -119,7 +119,7 @@
   "check.unavailable": "Az ellenőrzést most nem lehetett futtatni.",
   "check.unchecked": "Időben nem ellenőrizhető beszélgetések: {n}.",
   "check.unknown": "ismeretlen",
-  "check.usage": "Legutóbbi használati adat ({when}): 5 órás {five}% maradt, heti {weekly}% maradt, következő visszaállás: {reset}.",
+  "check.usage": "Legutóbbi használati adat ({when}): 5 órás {five}% felhasználva, heti {weekly}% felhasználva, következő visszaállás: {reset}.",
   "check.usage_none": "Még egyetlen használati lekérdezés sem sikerült.",
   "check.yes": "felvéve",
   "choice.above_100k": "Visszatartás 100 000 felett",

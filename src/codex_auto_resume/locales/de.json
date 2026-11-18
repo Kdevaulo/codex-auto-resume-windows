@@ -119,7 +119,7 @@
   "check.unavailable": "Die Prüfung konnte gerade nicht ausgeführt werden.",
   "check.unchecked": "{n} Unterhaltungen konnten nicht rechtzeitig geprüft werden.",
   "check.unknown": "unbekannt",
-  "check.usage": "Letzte Nutzungsabfrage {when}: 5-Stunden-Limit {five} % übrig, Wochenlimit {weekly} % übrig, nächstes Zurücksetzen {reset}.",
+  "check.usage": "Letzte Nutzungsabfrage {when}: 5-Stunden-Limit {five} % verbraucht, Wochenlimit {weekly} % verbraucht, nächstes Zurücksetzen {reset}.",
   "check.usage_none": "Bisher hat keine Nutzungsabfrage funktioniert.",
   "check.yes": "aufgegriffen",
   "choice.above_100k": "Über 100.000 zurückhalten",
