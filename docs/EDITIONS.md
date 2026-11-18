@@ -1386,8 +1386,8 @@ It rests on no measurement.
 ### Usage meter
 
 **What it does.** While the Codex app runs, reads your Codex usage on its own every 5 to 60 minutes, as you
-choose or type in - 15 by default - and shows it in the icon's tooltip and the popup. When what is left of a
-window falls to the share you set for a warning (15% left by default, each window its own), it shows a notice, once for that
+choose or type in - 15 by default - and shows it in the icon's tooltip and the popup. When a window reaches
+the percentage you set for a warning (85% by default, each window its own), it shows a notice, once for that
 window. Each window - the five-hour and the weekly - can be switched off on its own (*Act on the five-hour
 window*, *Act on the weekly window*): it is still read and shown, and no warning is shown for it. These two
 switches decide only the warnings: Wrap up near a limit and Stop near a limit each have a pair of their own.
@@ -1413,8 +1413,8 @@ reading that cannot be read is shown as nothing and warns of nothing.
 
 **What it does.** Needs the usage meter, which turns on with it. Its own switches, *Act on the five-hour
 window* and *Act on the weekly window* (both on by default), say which windows it acts on - apart from the
-meter's, which decide only the warnings; with both off it acts on neither, and the page says so. When what is left
-of a window it may act on falls to the share you set (10% left by default, each window its own), each conversation that is switched on and has a
+meter's, which decide only the warnings; with both off it acts on neither, and the page says so. When a window
+it may act on reaches the percentage you set (90% by default, each window its own), each conversation that is switched on and has a
 turn running is sent one message, once for that window, in the wording you pick: the standard "Please finish
 the current step, then stop.", the short "Please stop now.", the detailed "Commit what is pending, write down
 where you are and what is left, then stop.", one with the numbers - "You have used 90% of the five-hour limit.
@@ -1446,7 +1446,7 @@ Its own switches, *Act on the five-hour window* and *Act on the weekly window* (
 windows it acts on, as the wrap-up's do; with both off it acts on neither, and the page says so. A window
 switched off in the meter's choices before this version is switched off here and in Wrap up near a limit too,
 once, when the program first opens its state after the update - so nothing starts acting on a window you had
-off. When what is left of a window it may act on falls to the stop share you set (3% left by default, each window its own), each
+off. When a window it may act on reaches the stop percentage you set (97% by default, each window its own), each
 conversation that is switched on and has a turn running is stopped, as the Stop button in the Codex app
 stops one - through the app's own internal channel, the `\\.\pipe\codex-ipc` pipe, once for that window -
 and the program sends no further continuation until that window resets: recoveries wait, and the advanced
