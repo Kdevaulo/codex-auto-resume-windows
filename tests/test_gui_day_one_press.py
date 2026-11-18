@@ -20,6 +20,7 @@ for _path in (str(ROOT / "src"), str(ROOT / "tests")):
 
 import dayeggprobe  # noqa: E402
 import guiscan  # noqa: E402
+import srcscan  # noqa: E402
 
 BODY = r"""
                         Wait(2000);
@@ -91,7 +92,9 @@ class DayOnePressTests(unittest.TestCase):
 
 class DayOnePressCatalogTests(unittest.TestCase):
     def test_every_catalog_has_the_five_sentences(self):
-        for path in sorted((ROOT / "src/codex_auto_resume/locales").glob("*.json")):
+        # Every tracked catalog, through the shared scanner (test_srcscan: no glob of the package).
+        for path in [srcscan.ROOT / name for name in srcscan.tracked()
+                     if name.startswith("src/%s/locales/" % srcscan.PACKAGE) and name.endswith(".json")]:
             catalog = json.loads(path.read_text(encoding="utf-8"))
             for day in KOREAN:
                 with self.subTest(path.name, day=day):
