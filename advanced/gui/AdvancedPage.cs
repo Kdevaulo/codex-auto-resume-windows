@@ -464,6 +464,9 @@ namespace CodexAutoResume
             try
             {
                 Control page = AdvancedPageBuilt();
+                // The save bar is Settings' alone, as ShowPage sets it (Dashboard.cs): hidden before the page is laid out, so the
+                // page has the room - after Settings it stood empty at the window's foot here (the owner, 2026-11-18).
+                if (Soft.OwnVisible(footer)) footer.Visible = false;
                 pageHost.SuspendLayout();
                 foreach (Control other in pageHost.Controls)
                     if (other != page) other.Visible = false;
