@@ -1,6 +1,7 @@
 r"""v0.6.24-beta.2: the Dashboard's new proportions (the owner's decision of 2026-11-16, from mockups).
 
-- The window opens 1000 by 588 at text size 1 (SettingsForm.OpeningHeight; 664 and 681 with the caption room before).
+- The window opens 1000 by 618 at text size 1 (SettingsForm.OpeningHeight; the owner's decision of 2026-11-18, from real
+  renders, the Overview's cards not growing; 588 in beta.2, 664 and 681 with the caption room before).
 - The header card stays two lines and is 76 px tall at 100 % (HeroHeight: HeroPadY above and below the two lines).
 - No footer card under any page but Settings: the save bar is Settings' alone, inside the height every page has, with the
   reopen note, Restore defaults and Save; the Close button is gone (the header's X closes the window).
@@ -556,11 +557,11 @@ class DashboardProportionsTests(unittest.TestCase):
         if self.failure:
             self.fail(self.failure)
 
-    def test_the_window_opens_1000_by_588_at_text_size_1(self):
+    def test_the_window_opens_1000_by_618_at_text_size_1(self):
         said = self.answer["en"]
         self.assertEqual(said["heroRoom"], 0, "English's two lines fit the 76 px card")
-        self.assertEqual(said["opening"], [1000, 588])
-        self.assertEqual(said["client"], [1000, 588])
+        self.assertEqual(said["opening"], [1000, 618])
+        self.assertEqual(said["client"], [1000, 618])
 
     def test_the_header_card_is_two_lines_in_76_px(self):
         for locale in LOCALES:
@@ -569,7 +570,7 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertEqual(said["heroPadding"], [15, 15])
                 # A language whose two lines are taller makes a taller card, and the window opens taller by as much.
                 self.assertEqual(said["hero"], 76 + said["heroRoom"])
-                self.assertEqual(said["opening"][1], 588 + said["heroRoom"])
+                self.assertEqual(said["opening"][1], 618 + said["heroRoom"])
 
     def test_no_footer_outside_settings_and_the_save_bar_on_settings(self):
         for locale in LOCALES:
@@ -848,7 +849,7 @@ class DashboardProportionsTests(unittest.TestCase):
 class DashboardProportionsSourceTests(unittest.TestCase):
     def test_the_numbers(self):
         window = guiscan.read("gui/SettingsApp.cs")
-        self.assertIn("internal const int OpeningHeight = 588;", window)
+        self.assertIn("internal const int OpeningHeight = 618;", window)
         self.assertIn("internal const int HeroHeight = 76;", window)
         self.assertNotIn("closeButton", guiscan.window())
         self.assertNotIn('S("action.close", "Close")', guiscan.member_body("SettingsForm", "BuildFooter"))

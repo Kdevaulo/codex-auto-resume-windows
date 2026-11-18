@@ -86,6 +86,7 @@ namespace CodexAutoResume
             AuditedCards = "";
             AuditedNotes = 0;
             AuditedShortest = 0;
+            AuditedBand = -1;
             AuditedHero = 0;
             AuditedCaption = 0;
             AuditedCaptionGeometry = "";
@@ -431,6 +432,7 @@ namespace CodexAutoResume
         {
             var findings = new List<string>();
             AuditedStates = 0;
+            AuditedBand = -1;
             System.Reflection.FieldInfo fallback = typeof(Control).GetField("defaultFont",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
             Font defaultBefore = Control.DefaultFont;
@@ -528,6 +530,22 @@ namespace CodexAutoResume
         /// table's shares round away: logical pixels.
         internal const int BandTolerance = 3;
 
+        /// The most space, in device pixels, any Overview the last LayoutAudit or OverviewStatesAudit laid out at the
+        /// opening size left under its last row past the page's own padding; -1 before one did.
+        internal static int AuditedBand;
+
+        /// The most space, in logical pixels, an Overview at the opening size may leave under its last row past the page's
+        /// own padding when its rows already have all the room OverviewComfort gives them: the 30 px the opening height adds
+        /// to v0.6.24-beta.2's 588 (OpeningHeight 618, the owner's decision of 2026-11-18), which the cards do not take,
+        /// and 6 px for a font whose lines are shorter than the ones measured. At 588 the rows left no band under them; so
+        /// at 618 the band is what those 30 px have left once the rows are at comfort - measured in every language at 100
+        /// to 200 % and at text sizes to 225 %: 12 px at 100 % in English and Korean, 28 px at 200 %, and at most 33 px in
+        /// Traditional Chinese, whose lines are the shortest (200 % at text size 225 %). It is the owner's choice (the cards
+        /// keep their comfortable height), not a defect, so it is not reported up to this number; past it, with the rows
+        /// as FitOverview laid them out, the page has a dead band, as before. A card floating, or rows short of what they
+        /// hold, are reported on their own (AuditRows).
+        internal const int OpeningBandMax = 36;
+
         /// The Overview's cards against the page they stand on (FitOverview), unless the page scrolls, which
         /// AuditScrolling reports:
         ///   * a card shorter or taller than another in its row;
@@ -580,12 +598,17 @@ namespace CodexAutoResume
             int band = page.ClientSize.Height - page.Padding.Bottom - bottom;
             if (opening)
             {
+                AuditedBand = Math.Max(AuditedBand, band);
                 if (band < -tolerance)
                     findings.Add(where + " :: leaves only " + (band + rest) + " px under its last row, where the page's rhythm is " + rest +
                                  ": its cards end at " + bottom + " in a page " + page.ClientSize.Height + " high");
                 else if (band > tolerance && !capped)
                     findings.Add(where + " :: leaves an empty band " + (band + rest) + " px high under its last row, where the page's rhythm is " +
                                  rest + " and its cards could be taller: they end at " + bottom + " in a page " + page.ClientSize.Height + " high");
+                else if (band > Px(OpeningBandMax) + tolerance)
+                    findings.Add(where + " :: leaves an empty band " + (band + rest) + " px high under its last row, where the page's rhythm is " +
+                                 rest + " and the opening height adds at most " + Px(OpeningBandMax) + " past its cards' comfort: they end at " + bottom +
+                                 " in a page " + page.ClientSize.Height + " high");
             }
             else if (band > tolerance)
                 findings.Add(where + " :: leaves " + band + " px under its last row, which its rows need: its cards end at " + bottom +

@@ -858,12 +858,15 @@ namespace CodexAutoResume
 
         /// The window's opening client size, in logical pixels.
         ///
-        /// v0.6.24-beta.2 (the owner's decision of 2026-11-16, from mockups): 1000 by 588 at text size 1. The header card is
-        /// two lines in 76 px (HeroHeight), the page tabs under it, and the pages below them as tall as they were in the
-        /// window of 1000 by 681 the beta opened at - which had a footer strip of 76 px under every page (the version and
-        /// Close) and a header card of 90: the four Overview cards are what they were, each about 205 px at 100 %, within
-        /// 2 px at every scaling. Only Settings has a footer now, its save bar, inside that height; the version is a pill
-        /// at the end of the tabs (VersionPill) and the header's X closes the window.
+        /// v0.6.24 (the owner's decision of 2026-11-18, from real renders): 1000 by 618 at text size 1, 30 px past
+        /// beta.2's 588, which the owner found too short. They compared the window at 588, 612, 625 and 645, then at 612,
+        /// 615, 618, 621 and 625 with the Overview's cards not growing, and chose 618 (1000:618): "better not to grow
+        /// the cards". So the cards keep their comfortable height (OverviewComfort, unchanged) and the page has a little
+        /// more than its own padding under the Overview's last row - the owner's choice, not a defect (WindowAudit's
+        /// OpeningBandMax holds it to what 618 adds past the rows' comfort). The header card is two lines in 76 px
+        /// (HeroHeight), the page tabs under it, and the pages below them: the four Overview cards are about 205 px at
+        /// 100 %. Only Settings has a footer, its save bar, inside that height; the version is a pill at the end of the
+        /// tabs (VersionPill) and the header's X closes the window.
         ///
         /// What the pages need (v0.6.5): the Overview's cards hold what they hold with the button each leads to at its
         /// bottom left, in a row of its own under the last line (Lead), and FitOverview gives the rows what the tallest
@@ -878,7 +881,7 @@ namespace CodexAutoResume
         /// whole beside "Why it is waiting" at its full 256 px: 933 to 946 in English, 813 to 817 in
         /// Korean.
         internal const int OpeningWidth = 1000;
-        internal const int OpeningHeight = 588;
+        internal const int OpeningHeight = 618;
 
         /// v0.6.24-beta.2: the header card's height at text size 1 in the decision's mockup, two lines and its padding
         /// (HeroPadY); a language whose lines are taller has a taller card, and the window opens that much taller (heroRoom).

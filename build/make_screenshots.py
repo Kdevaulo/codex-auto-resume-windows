@@ -3740,7 +3740,7 @@ def input_digest(path: Path) -> str:
 PINNED_DPI = 144
 PINNED_SCALE = PINNED_DPI / 96.0
 # The window's opening client height in logical px (gui/SettingsApp.cs OpeningHeight): a still's whole height.
-OPENING_HEIGHT = 588
+OPENING_HEIGHT = 618
 # The corners Windows rounds a window with at 96 DPI, which build/capture_window.ps1 cuts a capture's round with (8 px at
 # the window's DPI): a still drawn offscreen is cut the same.
 STILL_CORNER = 8

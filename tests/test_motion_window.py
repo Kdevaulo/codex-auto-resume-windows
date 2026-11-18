@@ -214,9 +214,9 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(width, round(1000 * scale))
         # v0.6.24: the window opens taller by what its header card grew past its 76 px (SettingsForm.OpeningClient: none in
         # English), never past Windows' title bar and top frame it no longer has (31 px at 100 %), as
-        # test_pinned_render_size holds it. 1000 by 588 from v0.6.24-beta.2 (664 until then).
-        self.assertGreaterEqual(height, round(588 * scale))
-        self.assertLessEqual(height, round(588 * scale) + int(round(31 * scale)))
+        # test_pinned_render_size holds it. 1000 by 618 from v0.6.24 (588 in beta.2, 664 until then).
+        self.assertGreaterEqual(height, round(618 * scale))
+        self.assertLessEqual(height, round(618 * scale) + int(round(31 * scale)))
 
     def test_a_hover_changes_only_the_control_hovered(self):
         box = self.changed(self.pictures[0][1], self.pictures[1][1])

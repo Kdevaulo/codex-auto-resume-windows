@@ -572,7 +572,7 @@ class WindowCompositionTests(unittest.TestCase):
         return source[start:source.index("\n        }\n", start)]
 
     def test_the_window_opens_at_a_size_the_overview_fits_and_does_not_grow(self):
-        """1000 by 588 (v0.6.24-beta.2, the owner's decision of 2026-11-16; 664 from v0.6.5): the Overview whole in every
+        """1000 by 618 (v0.6.24, the owner's decision of 2026-11-18; 588 in v0.6.24-beta.2, 664 from v0.6.5): the Overview whole in every
         language at every scaling, each card a little taller than what it holds and the page's rhythm under the last row
         (LayoutAuditTests holds the page to it) - the pages as tall as in the beta's 1000 by 681, which had a footer card
         under every page and a header card 14 px taller. It now fits a 1920 by 1080 screen at 150% whole; on a shorter
@@ -581,7 +581,7 @@ class WindowCompositionTests(unittest.TestCase):
         self.assertIn("ClientSize = new Size(Px(OpeningWidth), Px(OpeningHeight));", self.window)
         width = int(re.search(r"internal const int OpeningWidth = (\d+);", self.window).group(1))
         height = int(re.search(r"internal const int OpeningHeight = (\d+);", self.window).group(1))
-        self.assertEqual((width, height), (1000, 588))
+        self.assertEqual((width, height), (1000, 618))
         # The work area of 1920 by 1080 at 150% with the taskbar (72 device pixels), and the frame the window keeps there
         # with no title bar of Windows' (v0.6.24): 11 px below its client area at 144 DPI (SHORTEST_AT_150).
         self.assertLessEqual(round(width * 1.5) + 22, 1920)
@@ -1391,6 +1391,10 @@ foreach ($case in @(@('overview', 'snapshot.json'), @('overview', 'snapshot-firs
                                              [bool]$page.GetType().GetProperty('Overflowing', $instance).GetValue($page))
     $window.Dispose()
 }
+# What the opening height may leave under the Overview's last row past the page's padding (WindowAudit.OpeningBandMax, with
+# BandTolerance), in device pixels at this machine's scale (v0.6.24, the owner's decision of 2026-11-18: the cards keep their
+# comfortable height at 1000 by 618).
+$out.gapRoom = [int][Math]::Round(([int]$form.GetField('OpeningBandMax', $static).GetValue($null) + [int]$form.GetField('BandTolerance', $static).GetValue($null)) * $systemScale)
 
 # A name of Right now that wraps, so a quiet report on names is the audit measuring them.
 $window = New-Window $true
@@ -1755,18 +1759,29 @@ class LayoutAuditTests(unittest.TestCase):
         leave 27, and 87 on a first installation - the footer's gap jumped as the tabs changed, three times the gap between
         the cards. Now every page leaves its own padding under its last card - the room for the cards' lift - with the
         fullest reply and as a first installation shows the Overview; over its first, since v0.6.24-beta.2 (the owner,
-        2026-11-17), the tab row's gap."""
+        2026-11-17), the tab row's gap. The Overview, since v0.6.24 (the owner, 2026-11-18: 1000 by 618, "better not to
+        grow the cards"), has what the opening height adds past its cards' comfort under its last row as well, no more than
+        the audit allows (WindowAudit.OpeningBandMax): the other pages' gap and that band."""
         gaps = self.answer["gaps"]
         self.assertEqual(len(gaps), 4)
         pending = gaps["pending snapshot.json"]
+        room = self.answer["gapRoom"]
         for key, (gap, top, bottom, overflowing) in sorted(gaps.items()):
             with self.subTest(key):
                 self.assertFalse(overflowing, "the page scrolls")
-                self.assertLessEqual(abs(gap - bottom), 1, "under the last card, anything but the page's own padding")
+                if key.startswith("overview"):
+                    self.assertGreaterEqual(gap - bottom, -1, "the cards reach into the page's own padding")
+                    self.assertLessEqual(gap - bottom, room, "under the last card, more than the opening height adds")
+                else:
+                    self.assertLessEqual(abs(gap - bottom), 1, "under the last card, anything but the page's own padding")
                 # v0.6.24-beta.2 (the owner, 2026-11-17, "촘촘하게"): over the first card the tab row's gap (PageRoom's top,
                 # AuditTabRow holds it), under the last the room for the cards' lift, which a page that scrolls needs.
                 self.assertLess(top, bottom, "over the first card the tab row's gap, under the last the lift's room")
-                self.assertLessEqual(abs(gap - pending[0]), 1, "a gap above the footer other than Pending's")
+                if key.startswith("overview"):
+                    self.assertGreaterEqual(gap - pending[0], -1, "a gap above the footer smaller than Pending's")
+                    self.assertLessEqual(gap - pending[0], room, "a gap above the footer past what the opening height adds")
+                else:
+                    self.assertLessEqual(abs(gap - pending[0]), 1, "a gap above the footer other than Pending's")
 
     def test_the_overview_scrolls_only_in_a_window_shorter_than_its_rows_own_tallest_cards(self):
         """In a window shorter than the opening size the space under the rows goes first, then the rows' part, and the
