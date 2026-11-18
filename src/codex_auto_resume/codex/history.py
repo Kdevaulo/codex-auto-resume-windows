@@ -45,9 +45,9 @@ class HistoryMixin:
             payload = None if path is None else rollout.session_meta(path)
             if payload is None or payload.get("id") != thread_id:
                 return None, (skips.OTHER_KIND, "file")
-            if not eligibility.originator_taken(row["source"], payload.get("originator"), kinds):
+            if not eligibility.originator_taken(row["source"], payload, kinds, widened):
                 return None, (skips.OTHER_KIND, "originator " + skips.kind(payload.get("originator")))
-            if (eligibility.kind_of(row["source"], payload, kinds) is None
+            if (eligibility.kind_of(row["source"], payload, kinds, widened) is None
                     or payload.get("thread_source") != row["thread_source"]):
                 return None, (skips.OTHER_KIND, "file " + skips.kind(payload.get("thread_source")))
             return path, None

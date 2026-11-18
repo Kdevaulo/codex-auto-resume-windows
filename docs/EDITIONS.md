@@ -1367,14 +1367,18 @@ for itself: subagents (Tell a parent which of its subagents stopped handles thos
 (`agent_created_thread`) - except a failed turn in one of those that the person started from the input box,
 which is theirs and is taken up in both editions, whatever this switch says (a turn Codex queued, a goal's
 turn, or one whose start Codex did not record is not). A conversation with a label Codex adds later is taken
-up too, instead of left alone. Archived conversations, those of another Codex home, and those of a terminal or VS Code are still
-never taken up.
+up too, instead of left alone. A conversation the Codex app records as its own is taken up whichever program its
+first line names - a fork of a `codex exec` run, or a program Codex adds later - except the VS Code extension's; the
+standard edition takes up only those a program it knows wrote: the app itself, a terminal's Codex that the app took
+over or forked, and a fork of a `codex exec` run. Archived conversations, those of another Codex home, and those of a
+terminal or VS Code are still never taken up, nor is a `codex exec` run of its own.
 
 **When it helps.** When a conversation of yours carries a label the standard edition does not know, so its
 failures are left alone.
 
 **What it risks.** A conversation Codex uses for itself under a new label could be continued, which may cost
-usage or add a message where none was wanted. Every recovery gate still applies: the conversation must be
+usage or add a message where none was wanted, and so could a conversation another program writes on the app's own
+record. Every recovery gate still applies: the conversation must be
 switched on and open in the app before anything is sent.
 
 **Departs from** [A15](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (only the desktop app's own user

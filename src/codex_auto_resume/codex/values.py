@@ -57,6 +57,19 @@ DESKTOP_ORIGINATORS = frozenset({"Codex Desktop", "codex_work_desktop"})
 # with that row (codex/eligibility.py): a TUI conversation the app never took over (threads source cli) stays the
 # edition's other_sessions' to name.
 ADOPTED_ORIGINATORS = frozenset({"codex-tui"})
+# v0.6.24 (issue #66): a conversation a person forked from a `codex exec` run into the Desktop app, and kept working in
+# there, is the app's too - its threads row is the app's (source vscode, thread_source user) while the fork's first line
+# keeps the exec run's originator, with source vscode and a forked_from_id. Only in that shape (codex/eligibility.py,
+# "exec_forked"): a vscode row whose first line says codex_exec and names no fork is not proven a person's, and a
+# standalone exec run (threads source exec) - the product's own ephemeral anchor request included - never is.
+EXEC_FORK_ORIGINATORS = frozenset({"codex_exec"})
+# v0.6.24 (the owner's word of 2026-11-19, "take up everything but what is confirmed"): while the plug widens to every
+# desktop conversation (P19, EVERY_DESKTOP), a conversation on the app's row (source vscode) is taken up whatever its first
+# line's originator but these - a closed deny-list of the originators confirmed not to be the app's desktop conversations:
+# codex_vscode, the VS Code extension's own (MO, codex-cli 0.162.0-alpha.17.2), which the edition's IDE kind (P18) names
+# instead. codex-tui is not on it: on the app's row it is a conversation the app took over or forked (issue #37), the app's.
+# Nor is codex_exec: on the app's row it is a fork of an exec run (issue #66), and a standalone exec run's row says exec.
+NOT_DESKTOP_ORIGINATORS = frozenset({"codex_vscode"})
 
 KNOWN_STATUSES = machine.TURN_STATUSES - {"other"}      # Codex's own four; "other" is ours
 

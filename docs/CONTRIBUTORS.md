@@ -83,6 +83,8 @@ Everyone below is a person outside the project who helped it, in the order they 
   usual folder, with the engine path read out of the code and the diagnostics attached ([#58](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/58)).
 - [@Amin-Tgz](https://github.com/Amin-Tgz) sent Persian: the catalogs of both editions, Persian among the right-to-left
   languages on every surface, and the language lists and counts in the documents ([#63](https://github.com/songyb111-gachon/codex-auto-resume-windows/pull/63)).
+- [@7Magicbunny](https://github.com/7Magicbunny) reported that a conversation forked from a `codex exec` run into the Codex Desktop was left out of recovery,
+  with the shape of its records and a fix they had checked themselves ([#66](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/66)).
 
 ## A note on the AI contributors
 

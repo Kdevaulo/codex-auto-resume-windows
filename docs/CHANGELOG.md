@@ -168,6 +168,12 @@ file where an update put it.
   setup program writes it to a file in its own run folder and runs that file. Every value still travels only in the
   environment, never inside the script, so nothing a conversation title or a path holds can become code. A test keeps an
   encoded command line out of every shipped script.
+- **A Desktop conversation forked from a `codex exec` run is recovered (new since beta.2)** (reported by
+  [@7Magicbunny](https://github.com/7Magicbunny), [#66](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/66)). A conversation a person forks from a `codex exec` run into the
+  Codex app, and keeps working in there, is the app's: its record says so, but its first line keeps the exec run's
+  origin, so the watcher said it was "not a desktop conversation of a person's own" and left its usage limits alone. Such a
+  fork is now taken up in both editions, only where its first line names the run it was forked from; a standalone
+  `codex exec` run, a subagent and the advanced edition's own near-zero request stay out, as before.
 - **Every release has a short title, a line on its aim and its kind (new since beta.2).** A release page opens with the release's title
   after its version, one sentence on what it set out to do, and a *Kind* line that names what sort of release it is - new features, feature
   changes, bug fixes, new design, design changes, performance, security, languages or under the hood, the biggest first. Every entry of this
