@@ -247,7 +247,9 @@ class WindowTests(unittest.TestCase):
     def test_the_save_bar_and_diagnostics_show_the_version_line(self):
         window = guiscan.whole()
         method = guiscan.member_body("SettingsForm", "ShowVersion")
-        self.assertIn('"v" + Convert.ToString(Get(status, "version"), CultureInfo.InvariantCulture)', method)
+        # v0.6.24 (the owner, 2026-11-19): the tabs' pill shows the number alone, Diagnostics' row keeps its "v".
+        self.assertIn('string number = Convert.ToString(Get(status, "version"), CultureInfo.InvariantCulture);', method)
+        self.assertIn('label.Set(label == versionText ? number : "v" + number,', method)
         self.assertIn('S("edition." + edition, edition)', method)
         # v0.6.14: an advanced edition's word only (QuietEditionTests.test_the_window_names_no_standard_edition runs it).
         self.assertIn("bool named = !string.IsNullOrEmpty(edition) && edition != UnnamedEdition;", method)
