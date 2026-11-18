@@ -68,16 +68,21 @@ class ShimTests(unittest.TestCase):
         real window never shows - only the soft bar. DrawToBitmap printed that native bar anyway (the owner spotted it
         in the first pictures, 2026-10-20). Where the box keeps it, a frame holds none of its plain greys - its track and
         arrows are r = g = b, which no colour of the window's palette is - and the bar's place shows what the area
-        itself draws there."""
+        itself draws there. Since v0.6.24 the Progress page lists the run's steps and keeps the log behind its toggle (the
+        owner's option A): the frame has it shown by that toggle (`log`), and the frame before, without it, shows none."""
         plan = motion.load("install-en")
         events = len(plan["events"])
         frames = [{"index": 0, "page": "welcome", "light": 0}, {"index": 1, "page": "options", "light": 40},
-                  {"index": 2, "page": "progress", "progress": events, "light": 80}]
+                  {"index": 2, "page": "progress", "progress": 10, "light": 80},
+                  {"index": 3, "page": "progress", "progress": events, "log": True, "light": 120}]
         data = motion.job(plan, [], Path(self.work.name) / "bar" / "frames")
         data["frames"] = frames
         result = motion.render(self.exe, data, Path(self.work.name) / "bar")
-        index, (width, height), picture, bounds = list(motion.pictures(result, Path(self.work.name) / "bar" / "frames"))[-1]
-        self.assertIn("area.0", bounds, "the Progress page shows its log")
+        self.assertEqual(result["notes"], [])
+        drawn = list(motion.pictures(result, Path(self.work.name) / "bar" / "frames"))
+        self.assertNotIn("area.0", drawn[2][3], "the Progress page lists the steps, the log folded away")
+        index, (width, height), picture, bounds = drawn[-1]
+        self.assertIn("area.0", bounds, "the Progress page shows its log by its toggle")
         left, top, wide, tall = (int(value) for value in bounds["native.0"])
         greys = 0
         for y in range(max(0, top), min(height, top + tall)):
@@ -93,7 +98,8 @@ class ShimTests(unittest.TestCase):
         while its window is visible, and the shim's window stands in Windows' parking window, which never is: the shim
         puts the log where that scroll leaves it (Driver.FollowLog). The log is the page's one text area; its scroll
         record is [first line shown, lines, lines shown]. With the lines the plan prints, the log fills the box and
-        then runs past it: first at its top, then - a line at a time, never back - at its foot."""
+        then runs past it: first at its top, then - a line at a time, never back - at its foot. Shown by its toggle from the
+        Progress page's first frame (`log`), as it is folded away there since v0.6.24 (the steps' list stands in its room)."""
         plan = motion.load("install-en")
         events = len(plan["events"])
         told = [index for index, event in enumerate(plan["events"], 1) if "line" in event
@@ -102,6 +108,7 @@ class ShimTests(unittest.TestCase):
         frames = [{"index": 0, "page": "welcome", "light": 0}, {"index": 1, "page": "options", "light": 40}]
         frames += [{"index": 2 + number, "page": "progress", "progress": mark, "light": 80 + number}
                    for number, mark in enumerate(marks)]
+        frames[2]["log"] = True
         data = motion.job(plan, [], Path(self.work.name) / "follow" / "frames")
         data["frames"] = frames
         result = motion.render(self.exe, data, Path(self.work.name) / "follow")
