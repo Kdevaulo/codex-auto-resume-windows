@@ -153,7 +153,7 @@
   "page.action_limits": "ไม่ส่งสิ่งใดให้ Codex รายงานจะไปยัง GitHub เฉพาะเมื่อคุณพิมพ์ send และโปรเจกต์รับหนึ่งรายงานต่อการเข้าสู่ระบบ GitHub หนึ่งบัญชีสำหรับ Codex แต่ละเวอร์ชัน",
   "page.all_off": "ปิดฟีเจอร์ขั้นสูงทุกอย่าง",
   "page.analytics.behind": "ยังอ่านการสนทนาที่เก่ากว่าอยู่",
-  "page.analytics.change": "{change} ในชั่วโมงที่ผ่านมา",
+  "page.analytics.change": "ใช้ไป {change}% ในชั่วโมงที่ผ่านมา",
   "page.analytics.eta": "ด้วยอัตรานี้ จะหมดประมาณ {time}",
   "page.analytics.hide": "ซ่อนการสนทนา",
   "page.analytics.lifetime": "ตลอดอายุ {n}",

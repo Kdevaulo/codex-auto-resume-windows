@@ -153,7 +153,7 @@
   "page.action_limits": "היא לא שולחת דבר ל-Codex. דוח נשלח ל-GitHub רק כשמקלידים send, והפרויקט מקבל דוח אחד לכל שם משתמש ב-GitHub לכל גרסה של Codex.",
   "page.all_off": "כיבוי כל התכונות המתקדמות",
   "page.analytics.behind": "שיחות ישנות יותר עדיין נקראות.",
-  "page.analytics.change": "{change} בשעה האחרונה",
+  "page.analytics.change": "נוצלו {change}% בשעה האחרונה",
   "page.analytics.eta": "בקצב הזה, לא יישאר דבר בערך ב-{time}.",
   "page.analytics.hide": "הסתרת שיחות",
   "page.analytics.lifetime": "סך הכול {n}",

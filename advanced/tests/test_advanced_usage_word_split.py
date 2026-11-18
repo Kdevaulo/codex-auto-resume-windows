@@ -6,7 +6,7 @@ Here, in every language the advanced catalogs carry:
 
 - left: the saved accounts' meters' words, the analytics card's reading of a window and when none would be left;
 - used: the limits a person sets (Warn at, Wrap up at, Pause at, Ask to stop at, "85%"), the statements that explain
-  them (85%, 90% and 97% by default) and the analytics' change over the last hour.
+  them (85%, 90% and 97% by default) and the analytics' change over the last hour ("8% used in the last hour").
 
     CODEX_AR_EDITION=advanced PYTHONPATH="src;advanced/src;tests" python -m unittest discover -s advanced/tests -p test_advanced_usage_word_split.py
 """
@@ -64,6 +64,27 @@ class ThresholdTests(unittest.TestCase):
                         self.assertNotIn(left_words[locale], table[key].lower())
                     if key == "page.option.percent":
                         self.assertEqual(table[key].replace("{n}", "").replace(" ", "").replace(" ", ""), "%")
+
+
+class AnalyticsTests(unittest.TestCase):
+    def test_the_pace_reads_what_is_left_and_the_hour_what_was_used(self):
+        """The card's reading of a window and when none would be left are at a glance: left. The change over the last
+        hour is pace: the share used in it, said with the word for used in each language."""
+        found = catalogs()
+        english = found["en"]
+        self.assertEqual(english["page.analytics.left"], "{window}: {percent}% left")
+        self.assertEqual(english["page.analytics.eta"], "At this pace, none left around {time}.")
+        self.assertEqual(english["page.accounts.percent"], "{n}% left")
+        self.assertEqual(english["page.analytics.change"], "{change}% used in the last hour")
+        self.assertEqual(found["ko"]["page.analytics.change"], "최근 1시간 동안 {change}% 사용")
+        used_words = {"de": "verbraucht", "fr": "utilisé", "es": "usado", "ja": "使用", "zh-CN": "已用", "zh-TW": "已用",
+                      "ru": "использовано", "tr": "kullanıldı", "pt-BR": "usado", "it": "usato"}
+        for locale, word in used_words.items():
+            with self.subTest(locale=locale):
+                self.assertIn(word, found[locale]["page.analytics.change"])
+        for locale, table in found.items():
+            with self.subTest(locale=locale):
+                self.assertIn("%", table["page.analytics.change"].replace("{change}", ""))
 
 
 if __name__ == "__main__":

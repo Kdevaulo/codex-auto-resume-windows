@@ -1,7 +1,7 @@
 """The usage and token analytics' cards on the Advanced features page (v0.6.20, advanced/gui/AdvancedAnalytics.cs).
 
 While usage_analytics is on, its column has a Pace card - each window the meter reads, how much is left of it (v0.6.24
-final; how full it was before), how far that moved over the last hour and, where the bridge gives one, around when none
+final; how full it was before), the share used over the last hour and, where the bridge gives one, around when none
 would be left beside its reset - and a Tokens card: one
 flat line a project with its five numbers, its conversations under it on demand, a total line, and Save as CSV...,
 which sends the path the save dialog answered (never a file there already unless the dialog asked). Where MTOK failed,
@@ -102,9 +102,11 @@ class PageTests(PageCase):
         pace = self.card(shown, words["page.analytics.pace"])
         self.assertIsNotNone(pace, "the pace card is shown while the capability is on")
         text = "\n".join(pace)
-        # v0.6.24 final: 87.5% used is said as 12.5% left, and 12.5 more used in the hour as 12.5 less left.
+        # v0.6.24 final: 87.5% used is said as 12.5% left at a glance; the hour's change, history, as the share used in it
+        # (the owner's refinement of 2026-11-18): "12.5% used in the last hour", never a fall in what is left.
         self.assertIn(words["page.analytics.left"].replace("{window}: ", "").replace("{percent}", "12.5"), text)
-        self.assertIn("-12.5", text)
+        self.assertIn(words["page.analytics.change"].replace("{change}", "12.5"), text)
+        self.assertNotIn("-12.5", text)
         self.assertNotIn("87.5", text)
         self.assertNotIn("+12.5", text)
         self.assertIn(words["page.analytics.eta"].split("{time}")[0].strip(), text)

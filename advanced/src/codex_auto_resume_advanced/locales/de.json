@@ -153,7 +153,7 @@
   "page.action_limits": "Sie sendet nichts an Codex. Ein Bericht geht nur an GitHub, wenn Sie send eingeben, und das Projekt nimmt einen Bericht je GitHub-Anmeldename und Codex-Version an.",
   "page.all_off": "Alle erweiterten Funktionen ausschalten",
   "page.analytics.behind": "Ältere Unterhaltungen werden noch gelesen.",
-  "page.analytics.change": "{change} in der letzten Stunde",
+  "page.analytics.change": "{change} % in der letzten Stunde verbraucht",
   "page.analytics.eta": "Bei diesem Tempo etwa um {time} aufgebraucht.",
   "page.analytics.hide": "Unterhaltungen ausblenden",
   "page.analytics.lifetime": "gesamt {n}",

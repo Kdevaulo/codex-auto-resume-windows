@@ -153,7 +153,7 @@
   "page.action_limits": "Она ничего не отправляет в Codex. Отчёт уходит на GitHub, только когда вы вводите send, а проект принимает один отчёт на логин GitHub для каждой версии Codex.",
   "page.all_off": "Выключить все расширенные функции",
   "page.analytics.behind": "Более старые беседы ещё читаются.",
-  "page.analytics.change": "{change} за последний час",
+  "page.analytics.change": "использовано {change}% за последний час",
   "page.analytics.eta": "В таком темпе закончится примерно к {time}.",
   "page.analytics.hide": "Скрыть беседы",
   "page.analytics.lifetime": "всего {n}",

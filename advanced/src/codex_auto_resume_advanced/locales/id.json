@@ -153,7 +153,7 @@
   "page.action_limits": "Fitur ini tidak mengirim apa pun ke Codex. Laporan hanya pergi ke GitHub saat Anda mengetik send, dan proyek menerima satu laporan per login GitHub untuk setiap versi Codex.",
   "page.all_off": "Nonaktifkan semua fitur tingkat lanjut",
   "page.analytics.behind": "Percakapan yang lebih lama masih dibaca.",
-  "page.analytics.change": "{change} dalam satu jam terakhir",
+  "page.analytics.change": "{change}% terpakai dalam satu jam terakhir",
   "page.analytics.eta": "Dengan laju ini, habis sekitar pukul {time}.",
   "page.analytics.hide": "Sembunyikan percakapan",
   "page.analytics.lifetime": "keseluruhan {n}",

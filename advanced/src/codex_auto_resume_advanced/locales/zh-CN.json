@@ -153,7 +153,7 @@
   "page.action_limits": "它不向 Codex 发送任何东西。只有在你输入 send 时报告才会发往 GitHub，而项目对每个 Codex 版本、每个 GitHub 登录名只接收一份报告。",
   "page.all_off": "关闭所有高级功能",
   "page.analytics.behind": "仍在读取较早的对话。",
-  "page.analytics.change": "最近一小时 {change}",
+  "page.analytics.change": "最近一小时已用 {change}%",
   "page.analytics.eta": "照此速度，大约 {time} 用完。",
   "page.analytics.hide": "隐藏对话",
   "page.analytics.lifetime": "累计 {n}",

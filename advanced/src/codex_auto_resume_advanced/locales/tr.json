@@ -153,7 +153,7 @@
   "page.action_limits": "Codex'e hiçbir şey göndermez. Bir rapor yalnızca siz send yazdığınızda GitHub'a gider ve proje her Codex sürümü için GitHub kullanıcı adı başına bir rapor kabul eder.",
   "page.all_off": "Tüm gelişmiş özellikleri kapat",
   "page.analytics.behind": "Daha eski sohbetler hâlâ okunuyor.",
-  "page.analytics.change": "son bir saatte {change}",
+  "page.analytics.change": "son bir saatte %{change} kullanıldı",
   "page.analytics.eta": "Bu hızla {time} civarında biter.",
   "page.analytics.hide": "Sohbetleri gizle",
   "page.analytics.lifetime": "toplam {n}",

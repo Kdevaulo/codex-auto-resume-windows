@@ -498,7 +498,7 @@ namespace CodexAutoResume
         {
             return Word("page.analytics.left", "{window}: {percent}% left", "window", WindowName(300.0))
                        .Replace("{percent}", Mirror.Embed(AnalyticsShare(AnalyticsLeft(percent)))) + " · " +
-                   Word("page.analytics.change", "{change} in the last hour", "change", "-" + change.ToString(CultureInfo.CurrentCulture) + "%") +
+                   Word("page.analytics.change", "{change}% used in the last hour", "change", change.ToString(CultureInfo.CurrentCulture)) +
                    " · " + Word("page.analytics.eta", "At this pace, none left around {time}.", "time", ClockTime(Now() + minutes * 60.0));
         }
 

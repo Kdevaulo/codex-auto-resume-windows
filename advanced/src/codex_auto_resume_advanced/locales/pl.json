@@ -153,7 +153,7 @@
   "page.action_limits": "Nic nie wysyła do Codex. Raport trafia do GitHub tylko wtedy, gdy wpiszesz send, a projekt przyjmuje jeden raport na login GitHub dla każdej wersji Codex.",
   "page.all_off": "Wyłącz wszystkie funkcje zaawansowane",
   "page.analytics.behind": "Starsze rozmowy są jeszcze odczytywane.",
-  "page.analytics.change": "{change} w ostatniej godzinie",
+  "page.analytics.change": "zużyto {change}% w ostatniej godzinie",
   "page.analytics.eta": "W tym tempie wyczerpie się około {time}.",
   "page.analytics.hide": "Ukryj rozmowy",
   "page.analytics.lifetime": "łącznie {n}",

@@ -153,7 +153,7 @@
   "page.action_limits": "Вона нічого не надсилає в Codex. Звіт іде на GitHub, лише коли ви вводите send, а проєкт приймає один звіт на логін GitHub для кожної версії Codex.",
   "page.all_off": "Вимкнути всі розширені функції",
   "page.analytics.behind": "Давніші розмови ще читаються.",
-  "page.analytics.change": "{change} за останню годину",
+  "page.analytics.change": "використано {change}% за останню годину",
   "page.analytics.eta": "У такому темпі закінчиться приблизно до {time}.",
   "page.analytics.hide": "Сховати розмови",
   "page.analytics.lifetime": "усього {n}",

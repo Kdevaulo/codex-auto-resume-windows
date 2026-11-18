@@ -153,7 +153,7 @@
   "page.action_limits": "Codex には何も送りません。レポートが GitHub に送られるのは send と入力したときだけで、プロジェクトは Codex のバージョンごとに GitHub ログイン名 1 つにつき 1 件のレポートを受け付けます。",
   "page.all_off": "高度な機能をすべてオフにする",
   "page.analytics.behind": "古い会話をまだ読み取っています。",
-  "page.analytics.change": "直近 1 時間で {change}",
+  "page.analytics.change": "直近 1 時間で {change}% 使用",
   "page.analytics.eta": "この速さなら {time} ごろに使い切ります。",
   "page.analytics.hide": "会話を隠す",
   "page.analytics.lifetime": "累計 {n}",

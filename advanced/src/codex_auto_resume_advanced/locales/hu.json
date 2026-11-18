@@ -153,7 +153,7 @@
   "page.action_limits": "Semmit sem küld a Codexnek. Jelentés csak akkor megy a GitHubra, ha beírja a send szót, és a projekt Codex-verziónként GitHub-bejelentkezésenként egy jelentést fogad el.",
   "page.all_off": "Minden bővített funkció kikapcsolása",
   "page.analytics.behind": "Régebbi beszélgetések beolvasása még folyamatban.",
-  "page.analytics.change": "{change} az elmúlt órában",
+  "page.analytics.change": "{change}% felhasználva az elmúlt órában",
   "page.analytics.eta": "Ebben az ütemben elfogy körülbelül ekkor: {time}.",
   "page.analytics.hide": "Beszélgetések elrejtése",
   "page.analytics.lifetime": "teljes élettartam: {n}",

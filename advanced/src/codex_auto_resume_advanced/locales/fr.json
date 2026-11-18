@@ -153,7 +153,7 @@
   "page.action_limits": "Elle n'envoie rien à Codex. Un rapport ne va à GitHub que lorsque vous tapez send, et le projet accepte un rapport par identifiant GitHub pour chaque version de Codex.",
   "page.all_off": "Désactiver toutes les fonctions avancées",
   "page.analytics.behind": "Des conversations plus anciennes sont encore en cours de lecture.",
-  "page.analytics.change": "{change} sur la dernière heure",
+  "page.analytics.change": "{change} % utilisé sur la dernière heure",
   "page.analytics.eta": "À ce rythme, plus rien vers {time}.",
   "page.analytics.hide": "Masquer les conversations",
   "page.analytics.lifetime": "cumulé {n}",

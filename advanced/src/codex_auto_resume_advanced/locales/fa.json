@@ -152,7 +152,7 @@
   "page.action_limits": "چیزی به Codex ارسال نمی‌کند. گزارش فقط وقتی به GitHub فرستاده می‌شود که send را تایپ کنید؛ پروژه برای هر نسخهٔ Codex، یک گزارش از هر حساب GitHub می‌پذیرد.",
   "page.all_off": "غیرفعال کردن همهٔ قابلیت‌های پیشرفته",
   "page.analytics.behind": "خواندن گفتگوهای قدیمی‌تر همچنان ادامه دارد.",
-  "page.analytics.change": "{change} در یک ساعت گذشته",
+  "page.analytics.change": "{change}% مصرف‌شده در یک ساعت گذشته",
   "page.analytics.eta": "با این آهنگ، حدود {time} چیزی باقی نمی‌ماند.",
   "page.analytics.hide": "پنهان کردن گفتگوها",
   "page.analytics.lifetime": "کل عمر {n}",

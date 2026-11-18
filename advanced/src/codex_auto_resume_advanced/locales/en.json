@@ -878,7 +878,7 @@
   "statement.usage_analytics.stop": "Turn it off here or turn every advanced feature off: nothing more is read and no more readings are kept; what was kept stays on this PC until it is 90 days old. Turning the usage meter off turns this off too.",
   "page.analytics.pace": "Pace",
   "page.analytics.left": "{window}: {percent}% left",
-  "page.analytics.change": "{change} in the last hour",
+  "page.analytics.change": "{change}% used in the last hour",
   "page.analytics.eta": "At this pace, none left around {time}.",
   "page.analytics.not_enough": "Not enough readings yet for a pace.",
   "page.analytics.resets": "It resets at {time}.",

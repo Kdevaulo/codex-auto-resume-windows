@@ -153,7 +153,7 @@
   "page.action_limits": "Nó không gửi gì đến Codex. Một báo cáo chỉ đến GitHub khi bạn gõ send, và dự án nhận một báo cáo cho mỗi tên đăng nhập GitHub ở mỗi phiên bản Codex.",
   "page.all_off": "Tắt mọi tính năng nâng cao",
   "page.analytics.behind": "Vẫn đang đọc các cuộc trò chuyện cũ hơn.",
-  "page.analytics.change": "{change} trong giờ qua",
+  "page.analytics.change": "đã dùng {change}% trong giờ qua",
   "page.analytics.eta": "Với tốc độ này, sẽ hết vào khoảng {time}.",
   "page.analytics.hide": "Ẩn cuộc trò chuyện",
   "page.analytics.lifetime": "tích lũy {n}",
