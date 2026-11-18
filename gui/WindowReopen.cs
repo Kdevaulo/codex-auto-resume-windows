@@ -612,16 +612,6 @@ namespace CodexAutoResume
             // v0.6.24: then the window's own caption (gui/SoftChrome.cs): its frame, what the pointer is over, its buttons -
             // before anything else the window handles. It answers none of the open request's messages.
             if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
-            // v0.6.24-beta.3 (M-CORNER re-check 10, item 4): reopening, the window takes no input (EnableWindow), so Windows
-            // asks it alone for the pointer over any part of it, as HTERROR - and .NET gives it the arrow. Windows'
-            // app-starting cursor instead, after Windows' own handling, so a press on it still sounds as before.
-            if (m.Msg == WM_SETCURSOR && reopening)
-            {
-                base.WndProc(ref m);
-                Cursor.Current = Cursors.AppStarting;
-                m.Result = (IntPtr)1;
-                return;
-            }
             if (m.Msg == WM_DPICHANGED)
             {
                 // Taken here and not handed on: the window opens again at the new scale (CheckScale), and nothing of it
@@ -633,6 +623,16 @@ namespace CodexAutoResume
                 if (!scaleMoved && !sizing) drawnSize = SizeAtDrawnScale();
                 scaleMoved = true;
                 if (!sizing) BeginInvoke(new MethodInvoker(CheckScale));
+                return;
+            }
+            // v0.6.24-beta.3 (M-CORNER re-check 10, item 4): reopening, the window takes no input (EnableWindow), so Windows
+            // asks it alone for the pointer over any part of it, as HTERROR - and .NET gives it the arrow. Windows'
+            // app-starting cursor instead, after Windows' own handling, so a press on it still sounds as before.
+            if (m.Msg == WM_SETCURSOR && reopening)
+            {
+                base.WndProc(ref m);
+                Cursor.Current = Cursors.AppStarting;
+                m.Result = (IntPtr)1;
                 return;
             }
             if (m.Msg == WM_ENTERSIZEMOVE)
