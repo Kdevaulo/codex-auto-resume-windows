@@ -11,8 +11,10 @@ what a person installing it wants to know:
 * the Installing page - also updating, repairing, removing and installing another version - under the bar, the steps
   this run goes through, from the installer's own sequence for its way (InstallerProgress.Listed): done (a filled disc
   with a check), under way (a ring with a dot, its name in bold) and still to come (an empty ring), moved only by the
-  lines the installer prints, never by time; a step the run passes without taking it leaves the list. The bar, the
-  log's toggle and the busy note stay; the log, shown, takes the list's room, so nothing moves and the page is as tall.
+  lines the installer prints, never by time; a step the run passes without taking it leaves the list. The bar stays;
+  v0.6.24 final (the owner, 2026-11-19): the log is under the steps, shown from the start, with its toggle (Hide the
+  log) above it; it takes the card's room down to the buttons, never less than four lines, and hiding it moves nothing
+  above it - nor is that remembered for another run.
 
 What is held here, on the window built and never shown (the probe pattern of tests/test_installer_window.py and
 tests/test_gui_v0624_setup_600.py, the scaling and text size stood in as InstallerAudit stands them in), in every
@@ -85,8 +87,14 @@ function Snapshot($window, $name) {
     }
     $shown = @()
     foreach ($c in $sheet.Controls) { if (Own $c) { $shown += ,@{ type = $c.GetType().Name; box = (Box $c) } } }
+    # The keyboard's order among the sheet's own controls (their tab indexes), and where the log's caret stands.
+    $tabs = @()
+    foreach ($c in @($sheet.Controls | Where-Object { (Own $_) -and ($_.GetType().Name -ceq 'SoftLink' -or $_.GetType().Name -ceq 'SoftTextArea') } | Sort-Object { $_.TabIndex })) { $tabs += [string]$c.GetType().Name }
+    $area = $window.GetType().GetField('logArea', $any).GetValue($window)
+    $box = $area.GetType().GetField('Box', $any).GetValue($area)
     @{ page = $name; client = @($window.ClientSize.Width, $window.ClientSize.Height); width = $width; height = $height;
-       used = $used; rows = $rows; marks = $marks; shown = $shown }
+       used = $used; rows = $rows; marks = $marks; shown = $shown; tabs = $tabs;
+       caret = @($box.SelectionStart, $box.TextLength); logText = [string]$box.Text }
 }
 $notes = "v9.9.9 - something new`n`n**Both editions.** A line of what is new, long enough to take a second line in a window of this width.`n- A line.`n"
 $out = @{}
@@ -141,13 +149,17 @@ foreach ($case in (ConvertFrom-Json $env:CAR_CASES)) {
             $seen += ,@{ label = [string](@($snap.rows)[1].text); steps = @($steps | ForEach-Object { , @($_.text, $_.state, $_.font) });
                          marks = @(@($snap.marks | Sort-Object { $_.box[1] }) | ForEach-Object { [string]$_.kind }) }
         }
-        $snaps += ,(Snapshot $window ('run:' + $run.name + '/end'))
+        $default = Snapshot $window ('run:' + $run.name + '/end')
+        $snaps += ,$default
+        # The toggle hides the log and shows it again, the installer saying one more line while it is folded away.
         $toggle = @(@(CallOn $window 'ShownRows' @()) | Where-Object { $_.GetType().Name -ceq 'SoftLink' })[0]
+        CallOn $toggle 'OnClick' @([EventArgs]::Empty) | Out-Null
         $hidden = Snapshot $window ('run:' + $run.name + '/log hidden')
+        CallOn $window 'Heard' @('a line said while the log is folded away') | Out-Null
         CallOn $toggle 'OnClick' @([EventArgs]::Empty) | Out-Null
         $shown = Snapshot $window ('run:' + $run.name + '/log shown')
         $snaps += ,$shown
-        $runs[[string]$run.name] = @{ seen = $seen; hidden = $hidden; shown = $shown }
+        $runs[[string]$run.name] = @{ seen = $seen; default = $default; hidden = $hidden; shown = $shown }
         $window.Dispose()
     }
     $snaps += ,@{ page = 'runs'; runs = $runs }
@@ -452,29 +464,101 @@ class PageFillTests(unittest.TestCase):
         last = runs["dashboard"]["seen"][-1]["steps"]
         self.assertIn([words["installer.steps.watcher"], words[STATE["done"]]], [step[:2] for step in last])
 
-    def test_the_log_takes_the_lists_room_and_the_toggle_and_the_note_stay_where_they_are(self):
+    @staticmethod
+    def _steps(snap):
+        return [row for row in snap["rows"] if row["state"] and row["type"] == "WrapLabel"]
+
+    @staticmethod
+    def _logs(snap):
+        return [row for row in snap["rows"] if row["type"] == "SoftTextArea"]
+
+    @staticmethod
+    def _toggles(snap):
+        return [row for row in snap["rows"] if row["type"] == "SoftLink"]
+
+    def test_the_progress_page_shows_the_steps_and_the_log_at_once_by_default(self):
+        """v0.6.24 final (the owner, 2026-11-19: the log was in the steps' place; it is to be under them, and shown)."""
+        for case in CASES:
+            words = _words(case[0])
+            for run in RUNS:
+                with self.subTest(case=case, run=run["name"]):
+                    snap = self.runs(*case)[run["name"]]["default"]
+                    steps, logs, toggles = self._steps(snap), self._logs(snap), self._toggles(snap)
+                    self.assertEqual([row["text"] for row in steps],
+                                     [step[0] for step in self.runs(*case)[run["name"]]["seen"][-1]["steps"]],
+                                     "the list the run's last line left, on the page with the log")
+                    self.assertEqual(len(snap["marks"]), len(steps), "each with its mark")
+                    self.assertEqual(len(logs), 1, "the log is shown, without a press")
+                    self.assertEqual([row["text"] for row in toggles], [words["installer.log.hide"]],
+                                     "its button offers to hide it")
+                    log, last = logs[0]["box"], steps[-1]["box"]
+                    self.assertGreaterEqual(log[1], last[1] + last[3], "the log is under the steps")
+                    self.assertEqual([log[0], log[2]], [0, snap["width"]], "as wide as the card")
+                    self.assertLessEqual(log[1] + log[3], snap["height"], "inside the card")
+                    # Under them, down to the bottom bar: where the page needs less than the card holds, the log takes the rest.
+                    if snap["used"] < snap["height"]:
+                        self.assertEqual(log[1] + log[3], snap["height"], "down to the bottom bar")
+                    line = min(row["box"][3] for row in steps)
+                    self.assertGreaterEqual(log[3], 3 * line, "never less than about four lines (a line is a step row less its air)")
+
+    def test_the_toggle_hides_and_shows_only_the_log_and_the_steps_never_move(self):
         for case in CASES:
             words = _words(case[0])
             for run in RUNS:
                 with self.subTest(case=case, run=run["name"]):
                     found = self.runs(*case)[run["name"]]
-                    hidden, shown = found["hidden"], found["shown"]
-                    steps = [row for row in hidden["rows"] if row["state"] and row["type"] == "WrapLabel"]
-                    self.assertTrue(steps)
-                    self.assertFalse([row for row in shown["rows"] if row["state"] and row["type"] == "WrapLabel"], "the steps give their room to the log")
-                    self.assertFalse(shown["marks"])
-                    log = [row for row in shown["rows"] if row["type"] == "SoftTextArea"]
-                    self.assertEqual(len(log), 1, "the log is shown")
-                    self.assertFalse([row for row in hidden["rows"] if row["type"] == "SoftTextArea"])
-                    self.assertEqual(log[0]["box"][1], steps[0]["box"][1], "where the steps begin")
-                    self.assertEqual(log[0]["box"][2], hidden["width"])
-                    toggle = lambda snap: [row["box"] for row in snap["rows"] if row["type"] == "SoftLink"]
-                    self.assertEqual(len(toggle(hidden)), 1)
-                    self.assertEqual(toggle(hidden), toggle(shown), "the toggle stays where it is")
-                    self.assertEqual([row["text"] for row in shown["rows"] if row["type"] == "SoftLink"],
-                                     [words["installer.log.hide"]])
-                    self.assertGreaterEqual(toggle(shown)[0][1], log[0]["box"][1] + log[0]["box"][3], "below the log")
-                    self.assertEqual(hidden["used"], shown["used"], "the page is as tall with the log as without it")
+                    default, hidden, shown = found["default"], found["hidden"], found["shown"]
+                    self.assertEqual(self._logs(hidden), [], "hidden, the log is not there")
+                    self.assertEqual([row["text"] for row in self._toggles(hidden)], [words["installer.log.show"]])
+                    self.assertEqual([row["text"] for row in self._toggles(shown)], [words["installer.log.hide"]],
+                                     "and the button offers to hide it again")
+                    for other in (hidden, shown):
+                        self.assertEqual(self._steps(other), self._steps(default), "the steps stay as they were")
+                        self.assertEqual(other["marks"], default["marks"])
+                        self.assertEqual([row["box"] for row in self._toggles(other)],
+                                         [row["box"] for row in self._toggles(default)], "the toggle stays where it is")
+                        self.assertEqual([(row["text"], row["box"]) for row in other["rows"] if row["type"] not in ("SoftTextArea", "SoftLink")],
+                                         [(row["text"], row["box"]) for row in default["rows"] if row["type"] not in ("SoftTextArea", "SoftLink")],
+                                         "nothing but the log comes and goes")
+                    self.assertEqual(self._logs(shown), self._logs(default), "shown again, the log stands where it stood")
+                    self.assertEqual(hidden["used"], default["used"], "the page needs as much with the log as without it")
+
+    def test_the_keyboard_goes_steps_then_the_log_then_the_buttons(self):
+        """The steps are words; the toggle stands above the log, as on the Finish page, so Tab reaches it and then the log;
+        the page's card comes before the window's buttons (tests/test_gui_v0624_focus_visible.py)."""
+        for case in CASES:
+            for run in RUNS:
+                with self.subTest(case=case, run=run["name"]):
+                    snap = self.runs(*case)[run["name"]]["default"]
+                    self.assertEqual(snap["tabs"], ["SoftLink", "SoftTextArea"])
+                    rows = [row["type"] for row in snap["rows"] if row["type"] in ("SoftLink", "SoftTextArea")]
+                    self.assertEqual(rows, ["SoftLink", "SoftTextArea"])
+
+    def test_the_log_follows_its_newest_line(self):
+        for case in CASES[:len(l10n.LOCALES)]:
+            for run in RUNS:
+                with self.subTest(case=case, run=run["name"]):
+                    found = self.runs(*case)[run["name"]]
+                    default = found["default"]
+                    self.assertEqual(run["events"][-1][0], "line")
+                    self.assertTrue(default["logText"].rstrip().endswith(run["events"][-1][1].strip()), "the newest line is last")
+                    self.assertEqual(default["caret"][0], default["caret"][1], "the caret, which scrolls the log, is at the end")
+                    shown = found["shown"]
+                    self.assertTrue(shown["logText"].rstrip().endswith("a line said while the log is folded away"))
+                    self.assertEqual(shown["caret"][0], shown["caret"][1], "a line said while it was folded away is the newest")
+        self.assertIn("logArea.Box.ScrollToCaret();", guiscan.member_body("InstallerWindow", "LogToggle"))
+        self.assertIn("logArea.Box.AppendText(", guiscan.member_body("InstallerWindow", "Heard"))
+
+    def test_what_a_person_hid_is_not_remembered_between_runs(self):
+        window = (ROOT / "gui" / "InstallerWindow.cs").read_text(encoding="utf-8")
+        self.assertIn("private bool logShown = true;", window)
+        for forbidden in ("Settings", "Registry", "File.", "Properties."):
+            self.assertNotIn(forbidden, guiscan.member_body("InstallerWindow", "LogToggle"))
+
+    def test_the_finished_page_keeps_the_log_as_the_run_left_it(self):
+        ended = guiscan.member_body("InstallerWindow", "Ended")
+        self.assertIn("if (ended != 0) logShown = true;", ended)
+        self.assertNotIn("logShown = ended != 0", ended)
 
     def test_the_list_is_made_only_by_the_installers_own_lines(self):
         """Real progress only (the owner, 2026-10-21): the list moves with `step`, which only a line the installer
@@ -534,13 +618,63 @@ class PageFillTests(unittest.TestCase):
                         overlap = a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
                         self.assertFalse(overlap, "%r %s overlaps %r %s" % (one, a, other, b))
 
+    def test_the_progress_page_with_its_log_cuts_nothing_overlaps_nothing_and_leaves_no_card(self):
+        for case in CASES:
+            for run in RUNS:
+                found = self.runs(*case)[run["name"]]
+                for name in ("default", "hidden", "shown"):
+                    snap = found[name]
+                    with self.subTest(case=case, run=run["name"], snap=name):
+                        width = snap["width"]
+                        self.assertLessEqual(snap["used"], snap["height"], "the page's rows end inside the card")
+                        boxes = []
+                        for row in snap["rows"]:
+                            x, y, w, h = row["box"]
+                            self.assertGreaterEqual(x, 0, row["text"][:40])
+                            self.assertLessEqual(x + w, width, row["text"][:40])
+                            self.assertLessEqual(y + h, snap["height"], row["text"][:40])
+                            if row["type"] in ("WrapLabel", "SoftCheck", "SoftCallout"):
+                                self.assertLessEqual(row["want"][0], w, row["text"][:40])
+                                self.assertLessEqual(row["want"][1], h, row["text"][:40])
+                            boxes.append((row["text"][:40], row["box"]))
+                        for mark in snap["marks"]:
+                            boxes.append(("a %s mark" % mark["kind"], mark["box"]))
+                        for i, (one, a) in enumerate(boxes):
+                            for other, b in boxes[i + 1:]:
+                                overlap = a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
+                                self.assertFalse(overlap, "%r %s overlaps %r %s" % (one, a, other, b))
+
+    # The ways whose step list leaves the card room for the log's four lines in 600 (a way that lists more steps - an
+    # update's nine, the Dashboard's ten - needs a taller window, which Fit makes it, never cutting the log below its least).
+    FITS_600 = ("first", "advanced", "uninstall")
+
     def test_at_windows_usual_text_size_the_window_stays_600_by_600_in_every_language(self):
+        """600 x 600, where the pages fit it: a way whose Progress page lists more steps than the card holds with four lines
+        of log under them is as tall as that page needs (Fit) - the page's rows end exactly at its card - and no shorter."""
         for case, snap in self.every():
             if case[2] != 1.0:
                 continue
             size = int(round(600 * case[1]))
+            way = snap["page"].split("/")[0]
+            if way.startswith("run:"):
+                continue
             with self.subTest(case=case, page=snap["page"]):
-                self.assertEqual(snap["client"], [size, size])
+                self.assertEqual(snap["client"][0], size)
+                if way in self.FITS_600:
+                    self.assertEqual(snap["client"], [size, size])
+                else:
+                    self.assertGreaterEqual(snap["client"][1], size)
+                    if snap["client"][1] != size:
+                        needs = [other["used"] for other in self.snaps(*case) if other["page"].split("/")[0] == way]
+                        self.assertEqual(max(needs), snap["height"], "as tall as its tallest page needs")
+        for case in CASES:
+            if case[2] != 1.0:
+                continue
+            for run in RUNS:
+                with self.subTest(case=case, run=run["name"]):
+                    client = self.runs(*case)[run["name"]]["default"]["client"]
+                    self.assertEqual(client[0], int(round(600 * case[1])))
+                    self.assertGreaterEqual(client[1], client[0])
 
 
 if __name__ == "__main__":

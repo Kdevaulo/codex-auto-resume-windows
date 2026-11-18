@@ -255,9 +255,10 @@ namespace CodexAutoResume
                     Settle();
                     if (window.Page == before) throw new InvalidOperationException("the window's " + ((Button)window.AcceptButton).Text + " did not leave " + before);
                 }
-                // v0.6.24 final: the Progress page lists the run's steps under the bar and keeps the log behind its toggle
-                // (the owner's option A); a frame that asks for the log (`log`) has it shown, or folded away, by that toggle,
-                // before the lines it is told - so the log, shown, follows them.
+                // v0.6.24 final: the Progress page lists the run's steps under the bar with the log under them, shown from
+                // the start (the owner, 2026-11-19); a frame that asks for the log (`log`) has it shown, or folded away, by
+                // the page's toggle, before the lines it is told - so the log, shown, follows them. A frame that says nothing
+                // leaves it as the frames before it did: shown, in the README's plans, which name no `log`.
                 if (frame.ContainsKey("log")) ShowLog(Convert.ToBoolean(frame["log"], CultureInfo.InvariantCulture));
                 while (delivered < progress)
                 {
