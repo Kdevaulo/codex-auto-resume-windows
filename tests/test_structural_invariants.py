@@ -297,10 +297,10 @@ class ProcessTests(unittest.TestCase):
     # module that only names its exception type. A module leaving this list is a deletion to
     # make here; a module joining it is a new way to start a process, and needs a reason.
     SUBPROCESS = {
-        # v0.6.10-alpha: windows.py was these three, and the platform under them, in one file.
+        # v0.6.10-alpha: windows.py was these and codex/pairing.py, and the platform under them, in one file; the
+        # pairing's process inventory left subprocess in v0.6.24 final for one Toolhelp snapshot (win/kernel.py).
         "codex_auto_resume/codex/transport.py": "the Codex adapter: `codex --version` and `codex queue`",
         "codex_auto_resume/codex/appserver.py": "the Codex adapter: the App Server's finite stdio process",
-        "codex_auto_resume/codex/pairing.py": "the Codex adapter: the process inventory, through PowerShell",
         # compatio.py's refresh became compat/evaluator.py in v0.6.10-alpha; the front imports
         # no process module at all.
         "codex_auto_resume/compat/evaluator.py": "`codex --version`, `codex queue --help`, and the "

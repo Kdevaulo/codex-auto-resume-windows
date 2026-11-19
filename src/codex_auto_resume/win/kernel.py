@@ -196,40 +196,71 @@ def running_images():
         return None
     found = []
     for pid in pids:
-        if not pid:
-            continue
-        handle = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-        if not handle:
-            continue
-        try:
-            buffer, count = C.create_unicode_buffer(32768), W.DWORD(32768)
-            if k.QueryFullProcessImageNameW(handle, 0, buffer, C.byref(count)) and buffer.value:
-                found.append(buffer.value.lower())
-        finally:
-            k.CloseHandle(handle)
+        image = _image(k, pid) if pid else None
+        if image:
+            found.append(image.lower())
     return found
 
 
-def _toolhelp_parents(k) -> dict:
-    """Every process's parent id, from one Toolhelp snapshot."""
+def processes_named(names) -> list:
+    """Every process whose program file is called one of `names` (compared without case, as Windows compares file
+    names), each {"pid", "parent", "path"}: one Toolhelp snapshot for the ids, the parents and the file names, then
+    each such process alone opened for limited query and asked its image (QueryFullProcessImageNameW). The path is
+    None where the process cannot be opened - another account's, a protected one, or gone - as WMI leaves its
+    ExecutablePath empty. Raises AdapterError where no snapshot can be made.
+
+    v0.6.24 final: the process inventory codex/pairing.py reads. It was Get-CimInstance Win32_Process in Windows
+    PowerShell, about 10 s a call on the owner's PC; this is a few milliseconds, and starts no process."""
+    wanted = {str(name).casefold() for name in names}
+    k = _kernel()
+    entries = _toolhelp(k)
+    if not entries:
+        raise AdapterError("process_inventory_unavailable")
+    return [{"pid": pid, "parent": parent, "path": _image(k, pid)}
+            for pid, parent, exe in entries if pid and exe.casefold() in wanted]
+
+
+def _image(k, pid):
+    """The full path of the program file process `pid` runs, as Windows names it, or None where it cannot be opened
+    for limited query or will not say."""
+    handle = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return None
+    try:
+        buffer, count = C.create_unicode_buffer(32768), W.DWORD(32768)
+        if k.QueryFullProcessImageNameW(handle, 0, buffer, C.byref(count)) and buffer.value:
+            return buffer.value
+        return None
+    finally:
+        k.CloseHandle(handle)
+
+
+def _toolhelp(k) -> list:
+    """(process id, parent id, program file name) of every process, from one Toolhelp snapshot; empty where none can
+    be made."""
     k.CreateToolhelp32Snapshot.argtypes = [W.DWORD, W.DWORD]
     k.CreateToolhelp32Snapshot.restype = W.HANDLE
     k.Process32FirstW.argtypes = k.Process32NextW.argtypes = [W.HANDLE, C.POINTER(_ProcessEntry)]
     k.Process32FirstW.restype = k.Process32NextW.restype = W.BOOL
     snapshot = k.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
     if not snapshot or snapshot == W.HANDLE(-1).value:
-        return {}
-    parents = {}
+        return []
+    found = []
     try:
         entry = _ProcessEntry()
         entry.size = C.sizeof(_ProcessEntry)
         more = k.Process32FirstW(snapshot, C.byref(entry))
         while more:
-            parents[int(entry.pid)] = int(entry.parent)
+            found.append((int(entry.pid), int(entry.parent), entry.exe))
             more = k.Process32NextW(snapshot, C.byref(entry))
     finally:
         k.CloseHandle(snapshot)
-    return parents
+    return found
+
+
+def _toolhelp_parents(k) -> dict:
+    """Every process's parent id, from one Toolhelp snapshot."""
+    return {pid: parent for pid, parent, _exe in _toolhelp(k)}
 
 
 def _opened(k, pid, own) -> tuple:

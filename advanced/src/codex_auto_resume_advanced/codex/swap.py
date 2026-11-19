@@ -161,9 +161,11 @@ def save_current(paths, store, codex_home, *, read_real=None):
 
 def _inventory():
     """The Codex app's and every codex.exe's process rows, as core reads them (codex/pairing.inventory: a pid, a parent
-    and an image path - no command line, no memory); None where they cannot be read. A test replaces it."""
+    and an image path - no command line, no memory); None where they cannot be read. A test replaces it. Read afresh
+    (v0.6.24 final), never a list a status read left: what runs now decides whether an account is swapped."""
     try:
-        from codex_auto_resume.codex.pairing import inventory
+        from codex_auto_resume.codex.pairing import forget_inventory, inventory
+        forget_inventory()
         return inventory()
     except Exception:
         return None
