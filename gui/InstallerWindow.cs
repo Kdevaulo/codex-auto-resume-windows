@@ -74,6 +74,13 @@ namespace CodexAutoResume
         private bool logShown = true;
         // The fewest lines the Progress page's log shows: the window grows (Fit) rather than leave it less.
         private const int LogLeastLines = 4;
+        // Option B (the owner's second choice, 2026-11-19): the window stays 600 high for every run, and the page makes the room
+        // for the log's lines inside itself, evenly, as little as it needs (Arrange): each step's row, one line, is never
+        // less than StepRowFloor px (at 96 dpi) high - 17 with the 2 px between rows is a pitch of 19 where it was 23, the
+        // ring at its side being 18 - and the gaps above and below the list never less than StepGapFloor. Only what still does
+        // not fit after that makes the window taller (Fit).
+        private const int StepRowFloor = 17;
+        private const int StepGapFloor = 6;
         // The watcher was not running before this update or repair and was left stopped (InstallerFlow.LeftStoppedLine).
         private bool leftStopped;
         // The watcher had ended unexpectedly before this update or repair and was started again (InstallerFlow.StartedAgainLine).
@@ -270,7 +277,7 @@ namespace CodexAutoResume
                 // and the notes' own height on the Notes page).
                 page = each;
                 Build(each);
-                tallest = Math.Max(tallest, Arrange(inner));
+                tallest = Math.Max(tallest, Place(inner, true));
             }
             logShown = shown;
             page = showing;
@@ -900,10 +907,30 @@ namespace CodexAutoResume
         /// away keeps its room, so showing it moves nothing else.
         internal int Arrange(int width)
         {
-            int used = Lay(width, 0);
-            int room = Room();
-            if (room > used) Lay(width, room - used);
+            return Place(width, false);
+        }
+
+        // `least`: the height the page needs at the very least, its step list as tight as the floors allow (what Fit measures);
+        // otherwise the page as laid out in the room it has, tightened by the fewest px that make the log's least fit.
+        private int Place(int width, bool least)
+        {
+            int room = Room(), limit = Px(12), tight = least ? limit : 0;
+            int used = Lay(width, 0, tight);
+            while (!least && used > room && tight < limit) used = Lay(width, 0, ++tight);
+            if (!least && room > used) Lay(width, room - used, tight);
             return used;
+        }
+
+        /// The least height `control` needs where it is `wanted` high at its ease: a step's single line may be as short as
+        /// StepRowFloor says, which is all the line takes; anything else needs what it asks.
+        internal int Least(Control control, int wanted)
+        {
+            return stepRows.Contains(control) && wanted < 2 * FirstLine(control) ? Math.Min(wanted, StepRowLeast(control)) : wanted;
+        }
+
+        private int StepRowLeast(Control row)
+        {
+            return Math.Max(Px(StepRowFloor), FirstLine(row) + Px(1));
         }
 
         /// The height the page's rows have to stand in: the content card's, inside its padding, as OnLayout gives it.
@@ -915,10 +942,12 @@ namespace CodexAutoResume
             return Math.Max(0, Math.Max(1, buttonsTop - pad - top) - 2 * pad);
         }
 
-        // One pass of Arrange: the rows laid out with `extra` more px for the log; the height they take.
-        private int Lay(int width, int extra)
+        // One pass of Arrange: the rows laid out with `extra` more px for the log, and `tight` px less in each step's row and in
+        // each of the two gaps beside the list (never below their floors); the height they take.
+        private int Lay(int width, int extra, int tight)
         {
             int y = 0;
+            bool afterSteps = false;
             // v0.6.24-beta.3: where the last mark beside a row ends - a row outside its column starts below it.
             int held = 0;
             bool mirrored = Mirror.Of(this);
@@ -933,10 +962,17 @@ namespace CodexAutoResume
                 if (besides.TryGetValue(control, out name) && Beside(control, name, width, mirrored, ref y)) continue;
                 // The note, until someone tries to close the window, takes no room.
                 if (control == busyNote && !closingAsked) continue;
-                y += row.Value;
+                int gap = row.Value;
+                bool step = stepRows.Count > 0 && stepRows.Contains(control);
+                // The gap above the list's first step and the one above what follows its last: the toggle.
+                if ((step && control == stepRows[0]) || afterSteps) gap = Math.Max(Math.Min(gap, Px(StepGapFloor)), gap - tight);
+                afterSteps = step && control == stepRows[stepRows.Count - 1];
+                y += gap;
                 // A row in a mark's column stands past the mark and its gap, as wide as the rest of the card.
                 int indent = inColumn ? column.Extent + column.Gap : 0;
                 int height = HeightAt(control, Math.Max(1, width - indent)) + (control == logArea ? extra : 0);
+                // A step's single line is as short as it can be (Least) by `tight` px, the same in every row.
+                if (step && height < 2 * FirstLine(control)) height = Math.Max(Math.Min(height, StepRowLeast(control)), height - tight);
                 int wide = control is SoftCombo ? Math.Min(width, Px(260)) : width - indent;
                 // v0.6.20: a drop-down narrower than the card stands at its right when mirrored (Mirror).
                 control.SetBounds(Mirror.X(mirrored, width, indent, wide), y, wide, height);
