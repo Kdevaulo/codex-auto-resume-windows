@@ -8,25 +8,32 @@
   "canvas": {
     "size": [
       776,
-      524
+      592
     ],
     "transparent": true,
     "theme": "light",
     "design": "soft"
   },
+  "taskbar": {
+    "top": 496,
+    "height": 96,
+    "colour": "#EEF0F3",
+    "edge": 748,
+    "icon": {
+      "size": 32,
+      "right": 48,
+      "state": "watching"
+    }
+  },
   "card": {
     "scale": 2.0,
-    "locale": "ko",
-    "at": [
-      52,
-      52
-    ]
+    "locale": "ko"
   },
   "pointer": null,
   "ripple_step": 16,
   "length": [
-    4000,
-    12000
+    13200,
+    13200
   ],
   "budget": {
     "cap": 4000000
