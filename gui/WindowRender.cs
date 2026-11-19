@@ -8,9 +8,9 @@
 // process is started. For each frame of the job it is put in a state - a page, a Settings section, a scroll
 // offset, a control's hover or pressed face, a drop-down's value, its open list, a Pending row chosen and its own
 // menu open (v0.6.18), an action in flight (v0.6.20: SetBusy), the answers of another state of the installation
-// (paused), Why it is waiting scrolled, a dialog the window opened (Timeline) over it, the moment of its lights -
-// waits until it holds still as a capture waits (Settled), and draws itself into a bitmap; only what changed
-// since the frame before is written.
+// (paused), Why it is waiting scrolled, a dialog the window opened (Timeline) over it with the veil under it, the moment
+// of its lights and of the light's sweep (v0.6.24) - waits until it holds still as a capture waits (Settled), and draws
+// itself into a bitmap; only what changed since the frame before is written.
 
 using System;
 using System.Collections.Generic;
@@ -378,7 +378,26 @@ namespace CodexAutoResume
             // is the working one (BusyLight). After the moment of the lights, which the header reads as it follows.
             object working;
             RenderBusy(frame.TryGetValue("busy", out working) && Equals(working, true));
+            object sweeping;
+            RenderSweep(frame.TryGetValue("sweep", out sweeping) && sweeping != null
+                ? Convert.ToDouble(sweeping, CultureInfo.InvariantCulture) : -1);
             HoldStill(false);
+        }
+
+        /// v0.6.24: the light's sweep `ms` into it - as the window opens and as the light turns on (SweepLight, and Shown for
+        /// the opening's) - and the line under the headline coming in as it ends (AsideLabel.Arrive(AsideAfterMs)): each drawn
+        /// by its own painter at that moment (HaloDot.StillSweepMs, AsideLabel.ArriveAt), for a frame `sweep` ms after the
+        /// sweep began (build/motion_window.frame_state); -1 - no sweep - for every other frame. The window's own sweep never
+        /// plays in a render (LightSweepsShown).
+        private void RenderSweep(double ms)
+        {
+            if (ms >= HaloDot.SweepMs) ms = -1;
+            if (stateDot.StillSweepMs != ms)
+            {
+                stateDot.StillSweepMs = ms;
+                stateDot.Invalidate();
+            }
+            detail.ArriveAt(ms, AsideAfterMs);
         }
 
         // Whether the last frame had an action in flight (RenderBusy).
@@ -922,6 +941,8 @@ namespace CodexAutoResume
                     int border = Math.Max(1, Px(1));
                     Size outer = new Size(client.Width + 2 * border, client.Height + 2 * border);
                     Point place = RenderDialogPlace(outer, ClientSize);
+                    // v0.6.24: the window dimmed under it, as it is for as long as the dialog is open (DialogVeil).
+                    PaintVeil(picture);
                     PaintDialog(picture, body, place, outer, border, form.BackColor);
                     renderDialogBounds = new Dictionary<string, Rectangle>();
                     renderDialogBounds["dialog.window"] = new Rectangle(place.X, place.Y, outer.Width, outer.Height);
@@ -978,6 +999,42 @@ namespace CodexAutoResume
             }
             catch (Exception) { /* a picture's icon is decoration: fall back to what System.Drawing makes of it */ }
             using (var scaled = new Icon(icon, new Size(size, size))) return scaled.ToBitmap();
+        }
+
+        /// v0.6.24: the veil over the window while a dialog of its own is open (DialogVeil), over `picture` - the window's whole
+        /// client area, which its own corner cuts later as it cuts the window (CornerStill): the shadow's ink (DialogVeil.Ink)
+        /// at the veil's alpha at its fullest in the theme (DialogVeil.FullNow: 51 in light, 82 in dark), laid as a layered
+        /// window of that alpha is laid over what is under it. At its fullest from the dialog's first frame, as the veil
+        /// comes on before the dialog is seen, and gone with it; none in High Contrast nor where veils are off, as DialogVeil.Over
+        /// makes none.
+        internal static void PaintVeil(Bitmap picture)
+        {
+            if (!DialogVeil.Enabled || Palette.Contrast) return;
+            int alpha = DialogVeil.FullNow;
+            Color ink = DialogVeil.Ink();
+            int[] pixels = Argb(picture);
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                int under = pixels[i];
+                pixels[i] = (under & unchecked((int)0xFF000000)) |
+                            (Veiled((under >> 16) & 0xFF, ink.R, alpha) << 16) |
+                            (Veiled((under >> 8) & 0xFF, ink.G, alpha) << 8) |
+                            Veiled(under & 0xFF, ink.B, alpha);
+            }
+            BitmapData data = picture.LockBits(new Rectangle(0, 0, picture.Width, picture.Height), ImageLockMode.WriteOnly,
+                                               PixelFormat.Format32bppArgb);
+            try
+            {
+                for (int y = 0; y < picture.Height; y++)
+                    Marshal.Copy(pixels, y * picture.Width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), picture.Width);
+            }
+            finally { picture.UnlockBits(data); }
+        }
+
+        /// One channel `under` with the veil's `ink` laid over it at `alpha` (0 to 255), rounded to the nearest level.
+        internal static int Veiled(int under, int ink, int alpha)
+        {
+            return (ink * alpha + under * (255 - alpha) + 127) / 255;
         }
 
         /// The dialog's window over `picture`: a soft shadow, the border and the drawn client area - its title row and caption

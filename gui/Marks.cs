@@ -54,13 +54,20 @@ namespace CodexAutoResume
         private const double MockReach = 27.0, ArcRadius = 17.0, RingFrom = 15.0, HeadRadius = 3.4;
         private Transition sweep;
 
+        /// How long the sweep lasts, in ms: the arc, then the second ring's whole run from its start.
+        internal const int SweepMs = SecondRingAt + RingMs;
+
+        /// v0.6.24: the sweep drawn as it is `StillSweepMs` ms into it, for a picture (WindowRender.RenderSweep: a frame of the
+        /// README's motion), or -1 - which every window a person opens has, its sweep its own (Sweep).
+        internal double StillSweepMs = -1;
+
         /// One arc of the ring around the light, then two rings from it, once. Nothing with motion reduced or out of sight.
         internal void Sweep()
         {
             if (!Motion.Allowed(this)) return;
             if (sweep == null) sweep = new Transition(this, 0.0);
             sweep.Jump(0.0);
-            sweep.To(1.0, true, SecondRingAt + RingMs);
+            sweep.To(1.0, true, SweepMs);
         }
 
         /// Whether it is on its way (for the tests, and the second line's moment).
@@ -136,9 +143,9 @@ namespace CodexAutoResume
         /// How much bigger than the mock it is drawn: what the control holds, so nothing is ever clipped.
         internal float SweepScale { get { return (Math.Min(Width, Height) / 2f - Soft.PxF(1)) / (float)MockReach; } }
 
-        private void DrawSweep(Graphics g, float cx, float cy, Color colour)
+        private void DrawSweep(Graphics g, float cx, float cy, Color colour, double ms)
         {
-            double ms = sweep.ElapsedMs, covered, opacity, spread;
+            double covered, opacity, spread;
             float unit = SweepScale;
             RingAt(ms - FirstRingAt, out spread, out opacity);
             DrawRing(g, cx, cy, unit * (float)(RingFrom + (MockReach - RingFrom) * spread), Math.Max(1f, unit * 1.6f), colour, opacity);
@@ -321,7 +328,8 @@ namespace CodexAutoResume
             // Dimmed, the dot is its colour over the card it was cleared to: that far toward the ground.
             Color fill = lit && dim > 0 && !Palette.Contrast ? Soft.WithAlpha(colour, 1 - dim) : colour;
             using (var brush = new SolidBrush(fill)) g.FillEllipse(brush, cx - dot, cy - dot, dot * 2, dot * 2);
-            if (Sweeping) DrawSweep(g, cx, cy, colour);
+            if (Sweeping) DrawSweep(g, cx, cy, colour, sweep.ElapsedMs);
+            else if (StillSweepMs >= 0 && StillSweepMs < SweepMs) DrawSweep(g, cx, cy, colour, StillSweepMs);
             if (lit && arc >= 0)
             {
                 float radius = Soft.PxF(Brand.StatusDotRadius + Brand.GlowArcGap);
