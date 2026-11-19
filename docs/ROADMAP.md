@@ -1363,6 +1363,7 @@ Expected areas include:
 
 - every kind of audit once more: all code, security, reachability, design and motion, the optical audit included, limits, size and tests, checking that the second round's fixes hold and that nothing new broke,
 - every document, in both languages, read against the code as it is,
+- every moving picture (the README's, the cards', the tray popup's, the setup window's, the logos'), frame by frame against what the product does now: each light, sweep, glide, fade and veil it shows at its own time, and nothing it no longer does (the owner, 2026-11-19),
 - all twenty-two translations,
 - then cleanup, fixes and refactoring, with a regression test for each confirmed bug,
 - the review of what moves from the advanced edition to the standard one (not started),
