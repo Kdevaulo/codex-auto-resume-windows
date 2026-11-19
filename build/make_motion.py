@@ -98,10 +98,11 @@ def load(name) -> dict:
 
 def schedule(plan: dict, also=()) -> tuple:
     """(frames, delays in ms, end in ms): every frame the plan's steps emit, with the frames the lights, the
-    ripples and `also` (the tray icon's frame times) add, each with the delay it is held for."""
+    ripples, the light's sweep and `also` (the tray icon's frame times) add, each with the delay it is held for."""
     end = motion_plan.plan_end(plan)
     frames = motion_plan.fill(motion_plan.expand(plan), end, int(plan.get("light_step_ms") or 0), also,
-                              first_hold=int(plan.get("first_hold") or 0), ripple_step=int(plan.get("ripple_step") or 0))
+                              first_hold=int(plan.get("first_hold") or 0), ripple_step=int(plan.get("ripple_step") or 0),
+                              sweep_step=int(plan.get("sweep_step_ms") or 0))
     return frames, motion_plan.delays([frame.t for frame in frames], end), end
 
 

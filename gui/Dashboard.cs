@@ -376,6 +376,31 @@ namespace CodexAutoResume
             Glide(OutMs);
         }
 
+        // v0.6.24: a picture's moment of an arrival (ArriveAt), or -1; and the arrival's delay.
+        private double stillArriveMs = -1;
+        private int stillArriveDelay;
+
+        /// v0.6.24: its words drawn as they are `ms` after an Arrive(`delayMs`), for a picture (WindowRender.RenderSweep: a
+        /// frame of the README's motion) - held back, then coming in over OutMs on brand's curve as Arrived's glide brings
+        /// them, then simply there; -1 for none, which every window a person opens has.
+        internal void ArriveAt(double ms, int delayMs)
+        {
+            if (ms == stillArriveMs && delayMs == stillArriveDelay) return;
+            stillArriveMs = ms;
+            stillArriveDelay = delayMs;
+            Invalidate();
+        }
+
+        /// How far in its words are `ms` after an Arrive(`delayMs`): 0 while they are held back, the glide's eased share as
+        /// they come in (Glide(OutMs): Transition.Value), and -1 once they are simply there - or for no moment at all (ms < 0).
+        internal static double ArriveShown(double ms, int delayMs)
+        {
+            if (ms < 0) return -1;
+            if (ms < delayMs) return 0;
+            double t = (ms - delayMs) / OutMs;
+            return t >= 1.0 ? -1 : Motion.Ease(t);
+        }
+
         /// Whether it is fading in or out (for the tests).
         internal bool Fading { get { return fade.Running; } }
 
@@ -456,14 +481,16 @@ namespace CodexAutoResume
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            // Its words still to come in (Arrive): the ground alone, which Label's background already painted.
-            if (arriving) return;
-            if (!aside && !fade.Running)
+            // Its words still to come in (Arrive): the ground alone, which Label's background already painted. A picture's
+            // moment of an arrival (ArriveAt) likewise, and coming in as the glide brings them.
+            double still = ArriveShown(stillArriveMs, stillArriveDelay);
+            if (arriving || still == 0) return;
+            if (!aside && !fade.Running && still < 0)
             {
                 base.OnPaint(e);
                 return;
             }
-            double shown = fade.Value;
+            double shown = still > 0 ? still : fade.Value;
             Color ink = Soft.Mix(Ground.Colour(this), aside ? Palette.Ink : ForeColor, shown);
             var line = new Rectangle(0, (int)Math.Round(Soft.Px(Rise) * (1.0 - shown)), Width, Height);
             TextRenderer.DrawText(e.Graphics, Text, Font, line, ink,

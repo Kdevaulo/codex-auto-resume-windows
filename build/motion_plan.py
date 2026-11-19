@@ -62,6 +62,13 @@ before `t`, as that far past the pinned moment its answers were seeded at (make_
 (Last check, the usage reading, Why it is waiting's Last checked) is worked out by the window from that one moment, so
 they move on together and agree with each other within a frame, while a time of day a record gives (a reset, a
 Timeline entry) stays where it is. A plan without it shows the pinned moment throughout, as the stills do.
+
+The status light's sweep moves by itself too (v0.6.24): `{"set": {"sweep": "open"}}` as the window opens, `"on"` as the
+light turns on (SettingsForm.SweepLight - the read that turns it from off to watching, Resume recovery's among them),
+starts it at that step's moment; it plays for SWEEP_MS, the line under the headline coming in as it ends, and is gone
+from the window's state once over. A plan that names `"sweep_step_ms"` - the sweep's own timer (a Transition's,
+Motion.Interval) - has a frame at every step of it (`fill`), each told how far into the sweep it is
+(motion_window.frame_state).
 """
 from __future__ import annotations
 
@@ -79,7 +86,7 @@ PLANS = HERE / "motion"
 
 # The window state a frame may set (gui/WindowRender.cs reads exactly these).
 STATE_KEYS = ("locale", "page", "section", "scroll", "hover", "pressed", "combo", "droplist", "selected", "menu",
-              "busy", "variant", "explain", "dialog")
+              "busy", "variant", "explain", "dialog", "sweep")
 PAGES = ("overview", "pending", "history", "statistics", "diagnostics", "settings")
 SECTIONS = ("general", "recovery", "continuation", "appearance", "advanced")
 STEPS = ("hold", "set", "move", "hover", "press", "card", "wheel", "open", "rows", "choose", "right", "dismiss",
@@ -95,6 +102,12 @@ SHORTEST = 15
 CLOSEST = 2 * SHORTEST
 # How long a click's ripple lasts (TOOLING 2.3), in ms.
 RIPPLE_MS = 240
+# How long the status light's sweep lasts, in ms (gui/Marks.cs HaloDot.SweepMs: its arc, then the second ring's whole
+# run, SecondRingAt + RingMs); the line under the headline has come in well before it ends (SettingsForm.AsideAfterMs and
+# AsideLabel.OutMs, 850 + 400 ms).
+SWEEP_MS = 1900
+# Why the light sweeps: as the window opens, and as it turns on (SettingsForm.LightSweepsAsked).
+SWEEPS = ("open", "on")
 # How often the window's own clock ticks, in ms (DashboardData.StartClock: its Timer's Interval): the only step a plan's
 # `clock_step_ms` may name.
 WINDOW_CLOCK_MS = 1000
@@ -253,6 +266,8 @@ def _check_state(scene: str, state: dict) -> None:
                                             or state["dialog"].get("kind") != "timeline"
                                             or state["dialog"].get("list", "pending") not in ("pending", "history")):
         raise PlanError("%s: the window opens the Timeline from Pending or History: %r" % (scene, state["dialog"]))
+    if state.get("sweep") not in (None,) + SWEEPS:
+        raise PlanError("%s: the light sweeps as the window opens or as it turns on, not %r" % (scene, state["sweep"]))
     if "page" in state and state["page"] not in PAGES:
         raise PlanError("%s: the window has no page %r" % (scene, state["page"]))
     if "section" in state and state["section"] not in SECTIONS:
@@ -279,6 +294,9 @@ class _Run:
 
     def emit(self, at=None):
         at = self.t if at is None else at
+        # A sweep that is over is gone from the window's state: the window is at rest again.
+        if not _sweeping(self.window.get("sweep"), at):
+            self.window.pop("sweep", None)
         if self.popup:
             # A glide that is over is let go, as the popup lets go of its own (window._glide_amounts).
             from codex_auto_resume import brand
@@ -354,6 +372,9 @@ def _step(run, step):
                 run.window.pop(key, None)
             elif key == "scroll":
                 run.window["scroll"] = {"notches": int(value)}
+            elif key == "sweep":
+                # From this moment: how far into it each frame is follows from when it began.
+                run.window["sweep"] = {"why": value, "from": run.t}
             else:
                 run.window[key] = value
         _settle_scroll(run)
@@ -569,6 +590,25 @@ def _settle_scroll(run):
             run.window[key] = {"notches": scroll["notches"]}
 
 
+def _sweeping(sweep, at: int) -> bool:
+    """Whether a sweep (a window state's `sweep`: {"why", "from"}, or its frozen pairs) is on its way at the moment `at`."""
+    return bool(sweep) and 0 <= at - dict(sweep)["from"] < SWEEP_MS
+
+
+def sweep_ms(frame: Frame):
+    """How far, in ms, the light's sweep is at the frame's moment, or None when it is not sweeping."""
+    sweep = dict(frame.window).get("sweep")
+    return frame.t - dict(sweep)["from"] if _sweeping(sweep, frame.t) else None
+
+
+def _at(frame: Frame, t: int) -> Frame:
+    """`frame`'s state at the later moment `t`: the same, except a sweep that is over by then."""
+    window = frame.window
+    if "sweep" in dict(window) and not _sweeping(dict(window)["sweep"], t):
+        window = tuple(item for item in window if item[0] != "sweep")
+    return frame._replace(t=t, window=window)
+
+
 # ---------------------------------------------------------------------------------------------------- the clock
 def clock_at(t: int, step: int) -> int:
     """The window's clock at the picture's moment `t` (ms): the last tick of its own timer, every `step` ms from the
@@ -577,12 +617,13 @@ def clock_at(t: int, step: int) -> int:
     return (int(t) // int(step)) * int(step) if step else 0
 
 
-def fill(frames: list, end: int, light_step: int, also=(), first_hold: int = 0, ripple_step: int = 0) -> list:
+def fill(frames: list, end: int, light_step: int, also=(), first_hold: int = 0, ripple_step: int = 0,
+         sweep_step: int = 0) -> list:
     """`frames` with a frame added wherever something moves by itself between two of them: every `light_step` ms of
     the picture's clock (the lights, at their own timer's step), at each moment in `also` (the tray icon's own frame
-    times), and every
-    `ripple_step` ms while a click's ripple fades - each the state of the frame before it at its own moment. Nothing
-    is added before `first_hold` (frame 1 is the still, held), at or past `end`, or where a frame already is."""
+    times), every `ripple_step` ms while a click's ripple fades, and every `sweep_step` ms from a sweep's start while
+    the light sweeps - each the state of the frame before it at its own moment (a sweep over by then gone from it).
+    Nothing is added before `first_hold` (frame 1 is the still, held), at or past `end`, or where a frame already is."""
     if not frames:
         return []
     step = float(light_step) if light_step else None
@@ -594,8 +635,13 @@ def fill(frames: list, end: int, light_step: int, also=(), first_hold: int = 0, 
     if ripple_step:
         for start in sorted({frame.ripple[1] for frame in frames if frame.ripple}):
             ripples.update(range(start, start + RIPPLE_MS, ripple_step))
+    if sweep_step:
+        for start in sorted({dict(dict(frame.window)["sweep"])["from"] for frame in frames
+                             if "sweep" in dict(frame.window)}):
+            ripples.update(range(start, start + SWEEP_MS, sweep_step))
     have = sorted({frame.t for frame in frames} | {end})
-    # A ripple's frames are steps of their own, kept wherever a browser can show them apart from the steps' frames.
+    # A ripple's and a sweep's frames are steps of their own, kept wherever a browser can show them apart from the steps'
+    # frames.
     ripples = _apart(sorted(at for at in ripples if frames[0].t <= at < end), have, SHORTEST)
     have = sorted(set(have) | set(ripples))
     # The lights' and the icon's are kept CLOSEST from every other: of two of them, the earlier.
@@ -604,11 +650,11 @@ def fill(frames: list, end: int, light_step: int, also=(), first_hold: int = 0, 
     out, index = [], 0
     for frame in frames:
         while index < len(added) and added[index] < frame.t:
-            out.append(out[-1]._replace(t=added[index]))
+            out.append(_at(out[-1], added[index]))
             index += 1
         out.append(frame)
     while index < len(added):
-        out.append(out[-1]._replace(t=added[index]))
+        out.append(_at(out[-1], added[index]))
         index += 1
     return out
 

@@ -2585,6 +2585,10 @@ namespace CodexAutoResume
         /// The strength in the theme the window is drawn in.
         internal static double StrengthNow { get { return Palette.Dark ? DarkStrength : Strength; } }
 
+        /// Its alpha at its fullest in the theme the window is drawn in: 51 in light, 82 in dark. What a veil comes on at,
+        /// and what a picture of a dialog over the window lays (WindowRender.PaintVeil).
+        internal static byte FullNow { get { return (byte)Math.Round(255 * StrengthNow); } }
+
         /// Off for every veil from here on (a probe that wants none); on in every window a person opens.
         internal static bool Enabled = true;
 
@@ -2627,7 +2631,7 @@ namespace CodexAutoResume
         {
             Owner = owner;
             colour = Ink();
-            full = (byte)Math.Round(255 * StrengthNow);
+            full = FullNow;
             Rectangle bounds;
             IntPtr region = Shape(owner, out bounds);
             Shaped = region != IntPtr.Zero;
