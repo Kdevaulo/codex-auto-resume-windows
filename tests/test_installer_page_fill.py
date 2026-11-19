@@ -79,7 +79,8 @@ function Snapshot($window, $name) {
     foreach ($c in @(CallOn $window 'ShownRows' @())) {
         $wanted = $c.GetPreferredSize((New-Object System.Drawing.Size($c.Width, 0)))
         $rows += ,@{ type = $c.GetType().Name; text = [string]$c.Text; box = (Box $c); font = (Font $c);
-                     want = @($wanted.Width, $wanted.Height); state = [string]$c.AccessibleDescription }
+                     want = @($wanted.Width, $wanted.Height); state = [string]$c.AccessibleDescription;
+                     least = [int](CallOn $window 'Least' @($c, [int]$wanted.Height)) }
     }
     $marks = @()
     foreach ($c in $sheet.Controls) {
@@ -145,6 +146,7 @@ foreach ($case in (ConvertFrom-Json $env:CAR_CASES)) {
             if ($event[0] -ceq 'line') { CallOn $window 'Heard' @([string]$event[1]) | Out-Null }
             elseif ($event[0] -ceq 'unpack') { CallOn $window 'Unpacking' @([double]$event[1]) | Out-Null }
             $snap = Snapshot $window ('run:' + $run.name)
+            if ($event[0] -ceq 'start') { $first = $snap }
             $steps = @($snap.rows | Where-Object { $_.state -and $_.type -ceq 'WrapLabel' })
             $seen += ,@{ label = [string](@($snap.rows)[1].text); steps = @($steps | ForEach-Object { , @($_.text, $_.state, $_.font) });
                          marks = @(@($snap.marks | Sort-Object { $_.box[1] }) | ForEach-Object { [string]$_.kind }) }
@@ -159,7 +161,7 @@ foreach ($case in (ConvertFrom-Json $env:CAR_CASES)) {
         CallOn $toggle 'OnClick' @([EventArgs]::Empty) | Out-Null
         $shown = Snapshot $window ('run:' + $run.name + '/log shown')
         $snaps += ,$shown
-        $runs[[string]$run.name] = @{ seen = $seen; default = $default; hidden = $hidden; shown = $shown }
+        $runs[[string]$run.name] = @{ seen = $seen; start = $first; default = $default; hidden = $hidden; shown = $shown }
         $window.Dispose()
     }
     $snaps += ,@{ page = 'runs'; runs = $runs }
@@ -174,7 +176,7 @@ $WindowType.GetField('WorkHeightStandIn', $any).SetValue($null, 0)
 # written right to left among them.
 CASES = ([[locale, 1.0, 1.0] for locale in l10n.LOCALES] +
          [["ko", 1.5, 1.0], ["de", 1.25, 1.0], ["ar", 1.75, 1.0], ["ja", 2.0, 1.0], ["en", 1.0, 1.5], ["ru", 1.0, 2.25],
-          ["he", 1.0, 1.5]])
+          ["he", 1.0, 1.5], ["en", 1.5, 1.0], ["en", 2.0, 1.0], ["ko", 2.0, 1.0]])
 
 
 def _words(locale):
@@ -604,7 +606,7 @@ class PageFillTests(unittest.TestCase):
                     self.assertLessEqual(y + h, snap["height"], row["text"][:40])
                     if row["type"] in ("WrapLabel", "SoftCheck", "SoftCallout"):
                         self.assertLessEqual(row["want"][0], w, row["text"][:40] + ": as wide as its words need")
-                        self.assertLessEqual(row["want"][1], h, row["text"][:40] + ": as tall as its lines need")
+                        self.assertLessEqual(row["least"], h, row["text"][:40] + ": as tall as its lines need")
                     boxes.append((row["text"][:40], row["box"]))
                 for mark in snap["marks"]:
                     x, y, w, h = mark["box"]
@@ -635,7 +637,7 @@ class PageFillTests(unittest.TestCase):
                             self.assertLessEqual(y + h, snap["height"], row["text"][:40])
                             if row["type"] in ("WrapLabel", "SoftCheck", "SoftCallout"):
                                 self.assertLessEqual(row["want"][0], w, row["text"][:40])
-                                self.assertLessEqual(row["want"][1], h, row["text"][:40])
+                                self.assertLessEqual(row["least"], h, row["text"][:40])
                             boxes.append((row["text"][:40], row["box"]))
                         for mark in snap["marks"]:
                             boxes.append(("a %s mark" % mark["kind"], mark["box"]))
@@ -644,13 +646,26 @@ class PageFillTests(unittest.TestCase):
                                 overlap = a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
                                 self.assertFalse(overlap, "%r %s overlaps %r %s" % (one, a, other, b))
 
-    # The ways whose step list leaves the card room for the log's four lines in 600 (a way that lists more steps - an
-    # update's nine, the Dashboard's ten - needs a taller window, which Fit makes it, never cutting the log below its least).
-    FITS_600 = ("first", "advanced", "uninstall")
+    # Option B (the owner's second choice, 2026-11-19): the window stays 600 high for every way, the update's nine steps and
+    # the Dashboard's ten included - the step list's rows and the gaps beside it give the room (Arrange). English and Korean
+    # are held to it at 100, 150 and 200 %; a language or text size that does not fit after the floors makes the window as tall
+    # as its tallest page needs (Fit) and no taller.
+    HELD = ("en", "ko")
 
-    def test_at_windows_usual_text_size_the_window_stays_600_by_600_in_every_language(self):
-        """600 x 600, where the pages fit it: a way whose Progress page lists more steps than the card holds with four lines
-        of log under them is as tall as that page needs (Fit) - the page's rows end exactly at its card - and no shorter."""
+    def test_at_windows_usual_text_size_the_window_stays_600_by_600_in_every_way_in_english_and_korean_at_every_scaling(self):
+        held = [case for case in CASES if case[0] in self.HELD and case[2] == 1.0]
+        self.assertEqual(sorted({case[1] for case in held if case[0] == "en"}), [1.0, 1.5, 2.0])
+        self.assertEqual(sorted({case[1] for case in held if case[0] == "ko"}), [1.0, 1.5, 2.0])
+        for case in held:
+            size = int(round(600 * case[1]))
+            for snap in self.snaps(*case):
+                with self.subTest(case=case, page=snap["page"]):
+                    self.assertEqual(snap["client"], [size, size])
+            for run in RUNS:
+                with self.subTest(case=case, run=run["name"]):
+                    self.assertEqual(self.runs(*case)[run["name"]]["default"]["client"], [size, size])
+
+    def test_where_it_does_not_fit_the_window_is_as_tall_as_its_tallest_page_needs_and_never_shorter_than_600(self):
         for case, snap in self.every():
             if case[2] != 1.0:
                 continue
@@ -660,21 +675,44 @@ class PageFillTests(unittest.TestCase):
                 continue
             with self.subTest(case=case, page=snap["page"]):
                 self.assertEqual(snap["client"][0], size)
-                if way in self.FITS_600:
-                    self.assertEqual(snap["client"], [size, size])
-                else:
-                    self.assertGreaterEqual(snap["client"][1], size)
-                    if snap["client"][1] != size:
-                        needs = [other["used"] for other in self.snaps(*case) if other["page"].split("/")[0] == way]
-                        self.assertEqual(max(needs), snap["height"], "as tall as its tallest page needs")
+                self.assertGreaterEqual(snap["client"][1], size)
+                if snap["client"][1] != size:
+                    needs = [other["used"] for other in self.snaps(*case) if other["page"].split("/")[0] == way]
+                    self.assertEqual(max(needs), snap["height"], "as tall as its tallest page needs")
+
+    def test_the_step_list_gives_the_room_evenly_as_little_as_needed_and_never_below_its_floor(self):
+        source = (ROOT / "gui" / "InstallerWindow.cs").read_text(encoding="utf-8")
+        floor = int(re.search(r"private const int StepRowFloor = (\d+);", source).group(1))
+        gap = int(re.search(r"private const int StepGapFloor = (\d+);", source).group(1))
+        self.assertEqual([floor, gap], [17, 6])
         for case in CASES:
-            if case[2] != 1.0:
-                continue
+            scale = case[1]
+            pitches = {}
             for run in RUNS:
                 with self.subTest(case=case, run=run["name"]):
-                    client = self.runs(*case)[run["name"]]["default"]["client"]
-                    self.assertEqual(client[0], int(round(600 * case[1])))
-                    self.assertGreaterEqual(client[1], client[0])
+                    # As the run starts: the whole list (steps the run then passes untaken leave it).
+                    snap = self.runs(*case)[run["name"]]["start"]
+                    steps = self._steps(snap)
+                    tops = [row["box"][1] for row in steps]
+                    heights = [row["box"][3] for row in steps]
+                    # Rows of one line (the usual) stand at one pitch, whatever the run: the same in each, evenly.
+                    single = [i for i, row in enumerate(steps) if row["box"][3] == min(heights)]
+                    steps_apart = {tops[i + 1] - tops[i] for i in single if i + 1 in single}
+                    self.assertLessEqual(len(steps_apart), 1, "the same pitch in every row")
+                    if steps_apart:
+                        pitches[run["name"]] = steps_apart.pop()
+                        self.assertGreaterEqual(pitches[run["name"]], int(round((floor + 2) * scale)) - 1, "never below the floor")
+                    for row in steps:
+                        self.assertGreaterEqual(row["box"][3], row["least"])
+            # Tightened only where the page needs the room: a run with few steps keeps the pitch it has always had, and the
+            # one with the most is the tightest.
+            if case[0] == "en" and case[2] == 1.0 and case[1] == 1.0:
+                self.assertEqual(pitches["first"], pitches["uninstall"], "the same where nothing needs tightening")
+                self.assertLess(pitches["dashboard"], pitches["over"])
+                self.assertLess(pitches["over"], pitches["first"])
+                self.assertEqual(pitches["first"], 23)
+                self.assertEqual(pitches["over"], 21)
+                self.assertEqual(pitches["dashboard"], 19)
 
 
 if __name__ == "__main__":

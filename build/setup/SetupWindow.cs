@@ -475,7 +475,8 @@ namespace CodexAutoResume
                 Size wanted = control.GetPreferredSize(new Size(control.Width, 0));
                 if ((control is WrapLabel || control is SoftCheck || control is SoftCallout) && wanted.Width > control.Width)
                     findings.Add(where + " :: " + name + " needs " + wanted.Width + " px and has " + control.Width);
-                if ((control is WrapLabel || control is SoftCheck || control is SoftCallout) && wanted.Height > control.Height)
+                // A step of the Progress page's list is a line, and may be as short as that (InstallerWindow.Least).
+                if ((control is WrapLabel || control is SoftCheck || control is SoftCallout) && window.Least(control, wanted.Height) > control.Height)
                     findings.Add(where + " :: " + name + " needs " + wanted.Height + " px high and has " + control.Height);
                 if (control is LinkLabel)
                 {
