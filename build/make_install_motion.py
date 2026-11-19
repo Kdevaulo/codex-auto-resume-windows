@@ -8,6 +8,8 @@ window's own code, offscreen.
     python -X utf8 build/make_install_motion.py --still          # first draw the Welcome still(s) offscreen, then on
     python -X utf8 build/make_install_motion.py --out DIR        # the pictures into DIR; nothing else is written
     python -X utf8 build/make_install_motion.py --out DIR --client-only   # a proof with no still: the client area
+    python -X utf8 build/make_install_motion.py build/motion/update-preview-ko.json --out DIR --client-only
+                                                       # a scratch plan (`flow: update`): an update's window, never in docs/images
 
 A plan (build/motion/install-en.json, install-ko.json, their scenes and the installer's lines in
 install-scenes.json) says, on one clock, what a person does and what the installer prints: the Welcome page of a
@@ -148,6 +150,8 @@ def check(plan: dict) -> None:
             raise PlanError("an installer plan has %s" % key)
     if plan["edition"] not in EDITIONS:
         raise PlanError("no edition %r" % plan["edition"])
+    if plan.get("flow", "install") not in ("install", "update"):
+        raise PlanError("a setup program's window shows an install or an update, not %r" % plan.get("flow"))
     events = plan.get("events")
     if not isinstance(events, list) or not events:
         raise PlanError("an installer plan has the installer's events")
@@ -301,6 +305,8 @@ def job(plan: dict, frames: list, out: Path, root: Path = ROOT) -> dict:
             "scale": make_screenshots.PINNED_SCALE, **motion_window.frame_edge(),
             "locale": plan["locale"], "locales": str(root / "src" / "codex_auto_resume" / "locales"),
             "edition": plan["edition"], "version": version(root), "home": HOME,
+            # A plan may picture an update over an older installation (`flow: update`, from `from`) instead of a first one.
+            "flow": plan.get("flow", "install"), "from": plan.get("from", ""),
             "events": [{key: value for key, value in event.items() if key != "hold"} for event in plan["events"]],
             "targets": ["button.forward"], "frames": states}
 

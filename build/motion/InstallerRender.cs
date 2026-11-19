@@ -185,9 +185,14 @@ namespace CodexAutoResume
                     spoken[other] = found;
                     return found;
                 };
-                // A first installation of the archive's edition and version: the flow the setup program makes for it.
+                // A first installation of the archive's edition and version: the flow the setup program makes for it - or,
+                // where the job says `flow: update`, an update over an older installation of the same edition (`from`, its
+                // version): the setup program's FlowFor is told what it reads of an installation (its edition and version),
+                // and no installation is read or written anywhere.
+                bool update = Str(job, "flow") == "update";
                 var flow = CodexAutoResumeSetup.SetupWindow.FlowFor(new string[0], Str(job, "home"), Str(job, "edition"),
-                                                                    null, Str(job, "version"), "");
+                                                                    update ? Str(job, "edition") : null, Str(job, "version"),
+                                                                    update ? (Str(job, "from") ?? "") : "");
                 words = speaker(language);
                 window = new InstallerWindow(flow, words, speaker, Run, new string[0], font);
                 Size client = window.ClientSize;

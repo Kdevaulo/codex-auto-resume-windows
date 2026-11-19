@@ -125,6 +125,33 @@ class ShimTests(unittest.TestCase):
         self.assertEqual(first, lines - shown, "the last line stands at the foot of the log, as in a visible window")
         self.assertGreater(first, 0)
 
+    def test_a_plan_can_picture_an_update_over_an_older_installation(self):
+        """`flow: update` (with `from`, the older version) gives the shim an update's flow - FlowFor told that this edition
+        is installed already - where a plan says nothing of it: the Progress page lists the update's steps, which a first
+        installation does not (a watcher to stop, a Dashboard to close), so its list is taller and the log stands lower. Nothing
+        is read from an installation: the flow is told, not looked up. The scratch plan the owner's two renderings use is
+        a valid plan that says it."""
+        plan = motion.load("install-en")
+        frames = [{"index": 0, "page": "welcome", "light": 0}, {"index": 1, "page": "options", "light": 40},
+                  {"index": 2, "page": "progress", "progress": 0, "light": 80}]
+        made = {}
+        for flow, extra in (("install", {}), ("update", {"flow": "update", "from": "0.0.1"})):
+            data = motion.job(dict(plan, **extra), [], Path(self.work.name) / flow / "frames")
+            self.assertEqual((data["flow"], data["from"]), (flow, extra.get("from", "")))
+            data["frames"] = frames
+            result = motion.render(self.exe, data, Path(self.work.name) / flow)
+            self.assertEqual(result["notes"], [])
+            made[flow] = list(motion.pictures(result, Path(self.work.name) / flow / "frames"))
+        install_log, update_log = (int(made[flow][-1][3]["area.0"][1]) for flow in ("install", "update"))
+        self.assertGreater(update_log, install_log, "the update lists more steps: its log stands lower")
+        self.assertNotEqual(made["install"][-1][2], made["update"][-1][2])
+        preview = motion.load(ROOT / "build" / "motion" / "update-preview-ko.json")
+        self.assertEqual((preview["flow"], preview["from"], preview["locale"]), ("update", "0.6.23", "ko"))
+        self.assertNotIn("docs", preview["output"], "a scratch plan: its picture is never one of the documents'")
+        with self.assertRaises(motion.PlanError):
+            bad = dict(preview, flow="repair")
+            motion.check(bad)
+
     def test_it_refuses_to_go_back_a_page(self):
         plan = motion.load("install-en")
         data = motion.job(plan, [], Path(self.work.name) / "back" / "frames")

@@ -1,0 +1,40 @@
+{
+  "format": "car-motion/1",
+  "kind": "installer",
+  "name": "update-preview-ko",
+  "output": "update-preview-ko.png",
+  "locale": "ko",
+  "edition": "standard",
+  "flow": "update",
+  "from": "0.6.23",
+  "scenes_from": "update-preview-scenes.json",
+  "values": {
+    "edition": "standard",
+    "python": "3.14"
+  },
+  "canvas": {
+    "transparent": true,
+    "shadow": false,
+    "theme": "light",
+    "design": "soft"
+  },
+  "window": {
+    "still": "assets/screenshot-setup.png"
+  },
+  "pointer": {
+    "rest": [
+      560,
+      330
+    ],
+    "scale": 1.5
+  },
+  "ripple_step": 16,
+  "length": [
+    1000,
+    60000
+  ],
+  "budget": {
+    "cap": 9000000
+  },
+  "light_step_ms": 33
+}
