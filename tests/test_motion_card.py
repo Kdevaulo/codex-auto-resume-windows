@@ -207,13 +207,16 @@ class CardPictureTests(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "nt", "the card is drawn with Windows' GDI+")
 class CardMarginsTests(unittest.TestCase):
-    def test_the_card_picture_has_the_same_margin_on_every_side_as_the_still_below_it(self):
-        """The owner, 2026-10-19: much more background lay below the card than above it. The canvas is the card and
-        its floating shadow's reach on all four sides - the size of the README's still card - and the card enters
-        from the bottom edge."""
+    def test_the_card_picture_has_the_same_margin_on_every_side_as_the_still_above_the_strip(self):
+        """The owner, 2026-10-19: much more background lay below the card than above it. The card and its floating
+        shadow's reach on all four sides are the size of the README's still card; since 2026-11-19 the right end of a
+        taskbar lies under that (tests/test_motion_card_strip.py): the gap the product keeps from the taskbar, then the
+        strip, and the screen's edge the gap from the card's right edge - the shadow reaching past it, on the canvas."""
         import make_motion
         import make_screenshots
         import motion_plan
+        from codex_auto_resume import brand
+        gap = int(round(brand.SPACING["m"] * 2.0))
         for name, locale in (("card-en", "en"), ("card-ko", "ko")):
             with self.subTest(name):
                 plan = motion_plan.load(make_motion.plan_path(name))
@@ -221,12 +224,16 @@ class CardMarginsTests(unittest.TestCase):
                 # fonts, and the CI runner drew the English card 30 px shorter than the picture beside it.
                 asset, _copy = make_screenshots.card_paths(locale)["light"]
                 width, height = (int(part) for part in make_screenshots.dimensions(asset).split("x"))
-                self.assertEqual(plan["canvas"]["size"], [width, height])
                 still = make_screenshots._SettledCard(locale, "light", "soft", 2.0, None)
                 try:
-                    self.assertEqual(plan["card"]["at"], [still.pad, still.pad])
+                    pad = still.pad
                 finally:
                     still.close()
+                strip = plan["taskbar"]
+                self.assertEqual(plan["canvas"]["size"], [width, strip["top"] + strip["height"]])
+                self.assertEqual(strip["top"], height - pad + gap, "the still's own rows, then the gap, then the strip")
+                self.assertEqual(strip["edge"], width - pad + gap)
+                self.assertNotIn("at", plan["card"], "the product's placement puts it at the still's own margin")
                 self.assertIs(plan["canvas"].get("transparent"), True, "the background is clear (2026-11-16)")
                 self.assertNotIn("ground", plan["canvas"], "no canvas colour is laid under the card")
 
