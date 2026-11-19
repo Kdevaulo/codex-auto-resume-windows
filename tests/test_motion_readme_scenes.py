@@ -70,8 +70,10 @@ class PlacementTests(unittest.TestCase):
             with self.subTest(name):
                 plan = plan_of(name)
                 frames = motion_plan.expand(plan)
+                # v0.6.24: the window opening, its light's sweep at its start (test_motion_readme_sweep).
                 self.assertEqual(frames[0].window, motion_plan._frozen({"page": "overview", "locale": "en" if
-                                                                        name.endswith("en") else "ko"}))
+                                                                        name.endswith("en") else "ko",
+                                                                        "sweep": {"why": "open", "from": 0}}))
                 self.assertEqual(frames[0].t, 0)
                 for key in ("busy", "variant", "dialog", "explain"):
                     self.assertNotIn(key, state(frames[0]))

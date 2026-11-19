@@ -134,9 +134,16 @@ def frame_state(frame: motion_plan.Frame, index: int, light_step: int = 0, clock
     glide draws between two ticks shows the light as the last tick left it, and does not move it. Without a step the
     light is at the frame's own moment. With `clock_step` (the plan's `clock_step_ms`), also `clock`: how far, in ms,
     the window's own clock has gone on from the pinned moment (motion_plan.clock_at), which every countdown and age it
-    shows is read at (WindowRender.RenderClock)."""
+    shows is read at (WindowRender.RenderClock). While the status light sweeps (v0.6.24), also `sweep`: how far into it the
+frame is, in ms (motion_plan.sweep_ms) - the sweep and the line under the headline drawn at that moment
+(WindowRender.RenderSweep)."""
     state = motion_plan.thawed(frame.window)
     state["index"] = index
+    # The light's sweep (v0.6.24) as how far into it the frame is, in ms; gone once it is over.
+    state.pop("sweep", None)
+    swept = motion_plan.sweep_ms(frame)
+    if swept is not None:
+        state["sweep"] = swept
     state["light"] = (frame.t // light_step) * light_step if light_step else frame.t
     if clock_step:
         state["clock"] = motion_plan.clock_at(frame.t, clock_step)

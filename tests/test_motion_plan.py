@@ -45,8 +45,11 @@ class ReadmePlanTests(unittest.TestCase):
                 self.assertTrue(25000 <= end <= 48000, end)
                 frames = motion_plan.expand(plan)
                 self.assertEqual(frames[0].t, 0)
-                self.assertEqual(state(frames[0]), {"page": "overview", "locale": plan["locale"]},
-                                 "frame 1 is the Overview at rest: the still a browser without APNG shows")
+                # v0.6.24: frame 1 is the Overview as the window opens, its light's sweep at its start
+                # (test_motion_readme_sweep); nothing else of it is other than at rest.
+                self.assertEqual(state(frames[0]), {"page": "overview", "locale": plan["locale"],
+                                                    "sweep": {"why": "open", "from": 0}},
+                                 "frame 1 is the Overview opening: the still a browser without APNG shows")
                 self.assertEqual(frames[0].card, ())
 
     def test_each_readme_ends_in_the_other_language_on_the_overview(self):
