@@ -165,9 +165,10 @@ class RenderTests(unittest.TestCase):
         PaintVeil): one ink at one alpha over every pixel - the same pixel at rest is the same pixel veiled, everywhere,
         and none is lighter than it was (tests/test_motion_window_sweep holds the veil's alpha)."""
         window = self.bounds(6)["dialog.window"]
-        reach = 40
-        x, y, wide, tall = window[0] - reach, window[1] - reach, window[2] + 2 * reach, window[3] + 2 * reach
         width, height = self.result["client"]
+        # The shadow's reach and drop below (PaintDialog: Px(14) + Px(6)), at this machine's scale, and a little more.
+        reach = int(round(24 * self.result["dpi_scale"]))
+        x, y, wide, tall = window[0] - reach, window[1] - reach, window[2] + 2 * reach, window[3] + 2 * reach
         rest, veiled = self.picture(2), self.picture(6)
         seen = {}
         for row in range(height):
