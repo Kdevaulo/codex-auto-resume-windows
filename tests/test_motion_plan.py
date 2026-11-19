@@ -112,9 +112,9 @@ class CardPlanTests(unittest.TestCase):
                 plan = motion_plan.load(make_motion.plan_path(name))
                 self.assertEqual(plan["output"], output)
                 self.assertNotIn("window", plan)
-                self.assertNotIn("taskbar", plan)
+                self.assertIn("taskbar", plan, "the card stands on the right end of a taskbar (tests/test_motion_card_strip.py)")
                 self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]),
-                                 ([776, {"card-en": 540, "card-ko": 524}[name]], 2.0))
+                                 ([776, {"card-en": 608, "card-ko": 592}[name]], 2.0))
                 self.assertLessEqual(plan["budget"]["cap"], 4000000)
                 frames = motion_plan.expand(plan)
                 from codex_auto_resume import notice_card
@@ -126,7 +126,7 @@ class CardPlanTests(unittest.TestCase):
                 gone = cards.index(None)
                 self.assertTrue(any(card and card["born"] > 0 for card in cards[gone:]), "and comes again")
                 self.assertIsNotNone(cards[-1], "it ends at rest, where it loops back to")
-                self.assertEqual(make_motion.icon_moments(plan, motion_plan.plan_end(plan)), [])
+                self.assertTrue(make_motion.icon_moments(plan, motion_plan.plan_end(plan)), "the icon on the strip moves")
 
     def test_what_the_card_picture_is_made_from_is_the_card_not_the_window(self):
         import make_screenshots as shots
