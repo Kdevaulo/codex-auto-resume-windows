@@ -62,7 +62,9 @@ class Hands:
         self._read = read
 
     def inventory(self):
-        from codex_auto_resume.codex.pairing import inventory
+        """Core's process list read afresh (v0.6.24 final): a restart looks again and again for the app it closes."""
+        from codex_auto_resume.codex.pairing import forget_inventory, inventory
+        forget_inventory()
         return inventory()
 
     def created(self, pid):

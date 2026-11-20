@@ -442,8 +442,8 @@ class PowerShellTests(unittest.TestCase):
         r"powershell(\.exe)?['\"]?\s[^\n]*-WindowStyle\s+Hidden": "the window opens, then hides",
     }
 
-    # What makes a Python string constant a PowerShell script: the ones pwsh.run and the process
-    # inventory hand to powershell.exe all carry one of these.
+    # What makes a Python string constant a PowerShell script: the ones pwsh.run hands to powershell.exe all
+    # carry one of these. (The process inventory was one too, until v0.6.24 read it through Toolhelp.)
     POWERSHELL_TEXT = re.compile(r"\$env:|\$ErrorActionPreference|Add-Type|Get-CimInstance|New-Object|"
                                  r"\[Console\]|Start-Process")
 
@@ -457,8 +457,7 @@ class PowerShellTests(unittest.TestCase):
 
     def test_the_scripts_inside_the_package_are_read_too(self):
         texts = self.texts()
-        for name in ("src/codex_auto_resume/notify.py", "src/codex_auto_resume/shortcut.py",
-                     "src/codex_auto_resume/codex/pairing.py"):
+        for name in ("src/codex_auto_resume/notify.py", "src/codex_auto_resume/shortcut.py"):
             self.assertIn(name, texts)
 
     def test_the_scan_reads_the_bootstrap_and_the_installer(self):
