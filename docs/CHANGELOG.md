@@ -178,7 +178,8 @@ file where an update put it.
   came up over the Finish page and hid it whole, so that a person might wait for a window they could not see. It now opens without taking
   the activation and stands directly behind the window in front, as its window is made and again as it is shown; the Finish page keeps
   the keyboard, and when it is closed Windows gives the activation to the Dashboard. It never goes behind a window of its own process,
-  a hidden or minimised one, a topmost one, or the desktop or the taskbar, which would put it out of sight; and every other start of the
+  a hidden or minimised one, a topmost one, or the desktop or the taskbar, which would put it out of sight. A Dashboard that reopens
+  maximised still comes to the front, because Windows shows a maximised window only as the active one. Every other start of the
   Dashboard - yours, the watcher's, a reopen of its own, a picture's - opens as it always did.
 - **The largest text size on a small screen is 1.74 on a 1920 x 1080 screen at 100 %,** where the first beta said 1.68 (v0.6.23: 1.83).
   A dialog's title is a row on the ground now and not a card of its own, so it is 20 px shorter than the first beta's, and the window may
