@@ -459,7 +459,8 @@ namespace CodexAutoResume
         }
 
         /// v0.6.24 W5: the window's own outer corner - the card's, smoothed as the cards are - in place of Windows' round
-        /// one, for the window that asks (the Dashboard): only with Brand.WindowSquircle on, on Windows 11, outside High
+        /// one, for the window that asks (the Dashboard, the setup window, and from the v0.6.24 final every dialog the
+        /// Dashboard opens: SoftDialog.BuildTitle): only with Brand.WindowSquircle on, on Windows 11, outside High
         /// Contrast and a remote session (WindowShape.Wanted). Off, nothing is made and the window is as it was.
         internal void OwnCorner()
         {
@@ -2139,6 +2140,14 @@ namespace CodexAutoResume
             titleRow.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             titleGround.Controls.Add(titleRow);
             chrome = ChromeHost.Install(this, titleRow, titleGround);
+            // v0.6.24 final (the owner, 2026-11-20, "대시보드 앱 안에서 뜨는 창들은 스쿼글이 아니네"): the Dashboard's own outer
+            // corner, through its one call and with its exceptions (WindowShape.Wanted, WindowShape.Decide) - the card's
+            // corner at the design's card radius (Palette.RadiusCard: a dialog is its title row and one card on its ground,
+            // as the Dashboard is its cards on its ground, so its outer corner is the Dashboard's). Asked before the dialog
+            // grows by its strip below, so its ClientSize is then its window. Only a top-level dialog: one laid out as a
+            // child (the layout audit, the render mode) has none. The dialog keeps its own cloak and fade (HostCloaks).
+            chrome.OwnCorner();
+            if (chrome.Corner != null) chrome.Corner.HostCloaks = true;
             chrome.OnGround = true;
             chrome.Drag(titleWords);
             // The words start TitleWordsInset in from the side gap and stop short of the buttons; the row mirrors its own
@@ -2223,6 +2232,8 @@ namespace CodexAutoResume
                 try { cloaked = DwmSetCloak(Handle, DWMWA_CLOAK, ref on, 4) == 0; }
                 catch (Exception) { cloaked = false; }
             }
+            // Its own corner's companion is held off for as long as the dialog is (Uncloak lets it go).
+            if (OwnCorner != null) OwnCorner.Held = cloaked;
             // Not held off the screen (DWM refused, or a window made anew while shown): no fade, opaque at once.
             if (fadeIn && TopLevel && !cloaked) SetFade(255);
         }
@@ -2262,6 +2273,16 @@ namespace CodexAutoResume
             fadeAlpha = Math.Max(0, Math.Min(255, alpha));
             try { SetLayeredWindowAttributes(Handle, 0, (byte)fadeAlpha, LWA_ALPHA); }
             catch (Exception) { }
+            // v0.6.24 final: its own corner's edge and shadow fade with it - never round a dialog not yet seen.
+            WindowCorner own = OwnCorner;
+            if (own != null) own.Opacity(fadeAlpha);
+        }
+
+        /// v0.6.24 final: the dialog's own outer corner (WindowCorner), or null where it has Windows' (no title row, a
+        /// dialog laid out as a child, WindowShape.Wanted false).
+        internal WindowCorner OwnCorner
+        {
+            get { return chrome == null ? null : chrome.Corner; }
         }
 
         // Uncloaked, painted and clear: from here to opaque.
@@ -2374,6 +2395,8 @@ namespace CodexAutoResume
             int off = 0;
             try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
             catch (Exception) { }
+            // On the screen: its own corner's companion with it, at the alpha the fade starts from (clear where it fades).
+            if (OwnCorner != null) OwnCorner.Held = false;
             OpenFade();
         }
 
@@ -2477,6 +2500,8 @@ namespace CodexAutoResume
 
         private Padding OwnFrame()
         {
+            // v0.6.24 final: no frame at all while the dialog's outer corner is its own (gui/SoftWindowShape.cs).
+            if (chrome != null && chrome.Frameless) return Padding.Empty;
             CreateParams created = CreateParams;
             return Chrome.Frame(created.Style, created.ExStyle);
         }
@@ -2486,13 +2511,14 @@ namespace CodexAutoResume
             return Chrome.WindowSize(clientSize, OwnFrame());
         }
 
-        // The window made at the size its ClientSize says: Form fills it in with Windows' caption counted (Chrome.Uncaption).
+        // The window made at the size its ClientSize says: Form fills it in with Windows' caption counted (Chrome.Uncaption)
+        // - and with no frame at all while its outer corner is its own (v0.6.24 final).
         protected override CreateParams CreateParams
         {
             get
             {
                 CreateParams created = base.CreateParams;
-                Chrome.Uncaption(created, ClientSize);
+                Chrome.Uncaption(created, ClientSize, chrome != null && chrome.Frameless);
                 if (fadeIn && TopLevel) created.ExStyle |= WS_EX_LAYERED;
                 return created;
             }
