@@ -115,9 +115,11 @@ namespace CodexAutoResume
         /// the caption it is inactive (WM_NCACTIVATE), but its redraw of the frame paints the caption of a window
         /// that is in fact active as active again - which is what a Japanese Overview came out with when it was
         /// captured beside other windows. A person's window is never given a capture's event, and opens as always.
+        /// v0.6.24 final: nor is a window the setup opens again after an update or a Repair (OpensBehind), which stands
+        /// behind the setup's Finish page instead of hiding it.
         protected override bool ShowWithoutActivation
         {
-            get { return Soft.StillReady != null || base.ShowWithoutActivation; }
+            get { return Soft.StillReady != null || OpensBehind || base.ShowWithoutActivation; }
         }
 
         protected override CreateParams CreateParams

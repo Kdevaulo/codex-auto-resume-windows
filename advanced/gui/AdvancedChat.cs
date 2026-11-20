@@ -88,6 +88,8 @@ namespace CodexAutoResume
             tab.Cursor = Cursors.Hand;
             tab.UseVisualStyleBackColor = false;
             tab.Visible = false;
+            // v0.6.24 final (J9): in its words from the start, so the room the row keeps for it (TabsHeld) is its own.
+            tab.Text = Word("page.chat.nav", "Chat");
             tab.Click += delegate { OpenChat(); };
             advanced.Parent.Controls.Add(tab);
             chatTab = tab;
@@ -99,10 +101,24 @@ namespace CodexAutoResume
             chatTimer.Tick += delegate { ChatPoll(); };
         }
 
+        // v0.6.24 final's live acceptance (J9): whether the Chat tab shows is known only once the list is read - it is the
+        // capability's standing state, from advanced.sqlite and the engine's compatibility, nothing the window can read for
+        // itself - and the tab row gained it about a second after opening. Until then the row keeps its room (TabsHeld):
+        // the tabs are fitted as if it were there, so where chat is on it comes into room already kept and nothing moves;
+        // where it is off, the room goes and the tabs only spread back where they had been drawn closer for it.
+        private bool chatTabKnown;
+
+        partial void TabsHeld(List<NavButton> held)
+        {
+            if (chatTab != null && !chatTabKnown && !Soft.OwnVisible(chatTab)) held.Add(chatTab);
+        }
+
         /// The Chat tab shown only while chat is on, as the list last said (FillAdvancedList).
         private void UpdateChatTab()
         {
             if (chatTab == null) return;
+            bool knownBefore = chatTabKnown;
+            if (advancedListing != null) chatTabKnown = true;
             bool on = false;
             foreach (object entry in Items(advancedListing, "capabilities") ?? new List<object>())
             {
@@ -117,6 +133,8 @@ namespace CodexAutoResume
                 chatTab.Visible = on;
                 HoldTabs();
             }
+            // The room kept for it let go: the row fitted again for the tabs it has.
+            else if (!knownBefore && chatTabKnown && nav.IsHandleCreated) nav.PerformLayout();
             // Turned off while its page is on screen: the Advanced features page, where it is turned on again.
             if (!on && currentPage == ChatPageName && advancedListing != null) ShowAdvanced();
         }

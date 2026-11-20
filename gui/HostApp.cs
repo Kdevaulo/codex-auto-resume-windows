@@ -230,6 +230,51 @@ namespace CodexAutoResume
             SetWindowPos(window, HwndNoTopMost, 0, 0, 0, 0, keep);
         }
 
+        /// v0.6.24 final's live acceptance (J10): the Dashboard the setup opened again after a Repair came up over the
+        /// setup window's Finish page and hid it whole. `window` is put directly behind `front` in the order of windows,
+        /// never activated, the keyboard where it was: true once it is. Only behind a window a person can see and that
+        /// stands in the ordinary band - not one of `window`'s own process, not a hidden or minimized one, not a topmost
+        /// one (standing behind it would make `window` topmost too), and never the desktop or the taskbar, behind which
+        /// `window` would be out of sight. Anything else leaves the order as it is.
+        internal static bool StandBehind(IntPtr window, IntPtr front)
+        {
+            return StandBehind(window, front, OwnProcess.Id);
+        }
+
+        /// StandBehind, with `own` the process whose windows are never stood behind (a test's stand-ins pass none).
+        internal static bool StandBehind(IntPtr window, IntPtr front, int own)
+        {
+            try
+            {
+                if (window == IntPtr.Zero || front == IntPtr.Zero || front == window) return false;
+                int process;
+                GetWindowThreadProcessId(front, out process);
+                if (process == 0 || process == own) return false;
+                if (!IsWindowVisible(front) || IsIconic(front)) return false;
+                if ((GetWindowLongPtr(front, GwlExStyle).ToInt64() & WsExTopMost) != 0) return false;
+                var kind = new StringBuilder(64);
+                GetClassName(front, kind, kind.Capacity);
+                if (Array.IndexOf(ShellKinds, kind.ToString()) >= 0) return false;
+                return SetWindowPos(window, front, 0, 0, 0, 0, SwpNoSize | SwpNoMove | SwpNoActivate);
+            }
+            catch (Exception)
+            {
+                return false;   // it stays where Windows put it
+            }
+        }
+
+        /// StandBehind the window in the foreground now: the setup window, where the person is reading its Finish page.
+        internal static bool StandBehindFront(IntPtr window)
+        {
+            try { return StandBehind(window, GetForegroundWindow()); }
+            catch (Exception) { return false; }
+        }
+
+        /// The desktop's and the taskbar's window classes: a window put behind one of them is out of sight.
+        private static readonly string[] ShellKinds = { "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd" };
+        private const int GwlExStyle = -20;
+        private const long WsExTopMost = 0x00000008;
+
         // ------------------------------------------------------------------ the walk, live
         // This process and its ancestors, as far as the walk can go: each one's parent from one Toolhelp snapshot,
         // its creation time and package from a handle opened for limited query. One that cannot be opened is in the
@@ -449,6 +494,22 @@ namespace CodexAutoResume
         [DllImport("user32.dll", ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetForegroundWindow(IntPtr window);
+
+        [DllImport("user32.dll", ExactSpelling = true)]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll", ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindowVisible(IntPtr window);
+
+        [DllImport("user32.dll", ExactSpelling = true)]
+        private static extern int GetWindowThreadProcessId(IntPtr window, out int process);
+
+        [DllImport("user32.dll", EntryPoint = "GetClassNameW", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr window, StringBuilder name, int size);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
 
         private static readonly IntPtr HwndTopMost = new IntPtr(-1), HwndNoTopMost = new IntPtr(-2);
         private const uint SwpNoSize = 0x0001, SwpNoMove = 0x0002, SwpNoActivate = 0x0010;
