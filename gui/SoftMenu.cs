@@ -468,6 +468,10 @@ namespace CodexAutoResume
         /// Whether the menu is a card (not in High Contrast).
         internal bool On { get { return on; } }
 
+        /// v0.6.24 final: the point the menu opens at, where it is given one - a text box's menu, opened from the keyboard at
+        /// its caret as well as at the pointer (EditMenu.Open) - rather than the pointer's place.
+        internal Point? Anchor;
+
         /// The room a menu's window keeps round its card for the shadow: the cards' own reach.
         internal static Padding Reach { get { return Palette.Contrast ? Padding.Empty : Elevation.Reach("card"); } }
 
@@ -536,7 +540,7 @@ namespace CodexAutoResume
             if (parent == null || !parent.IsHandleCreated)
             {
                 // A menu of its own, at a point: its card's corner there, whichever corner Windows put at it.
-                Point at = Cursor.Position;
+                Point at = Anchor ?? Cursor.Position;
                 bool leftward = Math.Abs(wanted.Right - at.X) < Math.Abs(wanted.Left - at.X);
                 bool upward = Math.Abs(wanted.Bottom - at.Y) < Math.Abs(wanted.Top - at.Y);
                 return new Rectangle(wanted.X + (leftward ? reach.Right : -reach.Left),

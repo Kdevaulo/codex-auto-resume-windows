@@ -330,7 +330,49 @@ namespace CodexAutoResume
                 if (box.IsHandleCreated && !box.IsDisposed) box.BeginInvoke((MethodInvoker)delegate { menu.Dispose(); });
                 else menu.Dispose();
             };
-            menu.Show(box, box.PointToClient(screen));
+            Rectangle card;
+            ToolStripDropDownDirection direction = Place(box, menu, screen, out card);
+            if (menu.Layer != null) menu.Layer.Anchor = screen;
+            menu.Show(box, box.PointToClient(screen), direction);
+        }
+
+        /// v0.6.24 final's live acceptance (J12): the Custom message box sits near the Dashboard's foot, and its menu opened
+        /// below the pointer and ran past the window's bottom edge onto the desktop. Which way `menu` opens from `screen`
+        /// over `box`: below the point, as ever, where its card fits between the point and the bottom of the window's client
+        /// area; above it where it does not and it fits above, or there is more room above than below; to the right, or to
+        /// the left in a window mirrored for a language written right to left. `card` is where its card then stands on the
+        /// screen - its corner at the point, kept inside the working area of the screen the point is on, as SoftMenuLayer
+        /// places every soft menu's card (Place, Within).
+        internal static ToolStripDropDownDirection Place(TextBoxBase box, ToolStripDropDown menu, Point screen, out Rectangle card)
+        {
+            Form form = box.FindForm();
+            Rectangle window = form != null && form.IsHandleCreated ? form.RectangleToScreen(form.ClientRectangle)
+                                                                       : Screen.FromPoint(screen).WorkingArea;
+            bool soft = menu is SoftMenu && ((SoftMenu)menu).Layer != null;
+            Padding reach = soft ? SoftMenuLayer.Reach : Padding.Empty;
+            Size size = menu.GetPreferredSize(Size.Empty);
+            bool mirrored = menu.RightToLeft == RightToLeft.Yes;
+            int wide = Math.Max(0, size.Width - reach.Horizontal), tall = Math.Max(0, size.Height - reach.Vertical);
+            bool up = Upward(screen.Y, tall, window);
+            card = new Rectangle(mirrored ? screen.X - wide : screen.X, up ? screen.Y - tall : screen.Y, wide, tall);
+            Rectangle area = Screen.FromPoint(screen).WorkingArea;
+            int dx = 0, dy = 0;
+            if (card.Right > area.Right) dx = area.Right - card.Right;
+            if (card.Left + dx < area.Left) dx = area.Left - card.Left;
+            if (card.Bottom > area.Bottom) dy = area.Bottom - card.Bottom;
+            if (card.Top + dy < area.Top) dy = area.Top - card.Top;
+            card.Offset(dx, dy);
+            return up ? (mirrored ? ToolStripDropDownDirection.AboveLeft : ToolStripDropDownDirection.AboveRight)
+                      : (mirrored ? ToolStripDropDownDirection.BelowLeft : ToolStripDropDownDirection.BelowRight);
+        }
+
+        /// Whether a card `tall` high opens above a point at `y` in `window`: where it does not fit below it inside the
+        /// window, and either fits above it or has more room there. Pure.
+        internal static bool Upward(int y, int tall, Rectangle window)
+        {
+            int below = window.Bottom - y, above = y - window.Top;
+            if (tall <= below) return false;
+            return tall <= above || above > below;
         }
 
         /// Takes the box's WM_CONTEXTMENU and opens ours; Windows' menu never sees it.

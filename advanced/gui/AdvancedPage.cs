@@ -284,6 +284,8 @@ namespace CodexAutoResume
             if (advancedTab == null) return;
             advancedTab.Text = Word("page.nav", "Advanced features");
             advancedTab.AccessibleName = advancedTab.Text;
+            // v0.6.24 final (J9): the Chat tab's words too, whose room the row keeps until the list says whether it shows.
+            if (chatTab != null) chatTab.Text = Word("page.chat.nav", "Chat");
             advancedTab.Visible = true;
             HoldTabs();
             ReturnToAdvanced();
@@ -313,10 +315,13 @@ namespace CodexAutoResume
             // (TabWidth). v0.6.19: TextRenderer's widths of the words, which this was reckoned from before, were a few
             // pixels short of the buttons' own on GitHub's runner, and Spanish's Chat tab was cut off there.
             int row = 0, heaviest = 0;
+            // v0.6.24 final (J9): with the room of a tab not shown yet whose showing is not known (TabsHeld, the Chat tab).
+            var held = new List<NavButton>();
+            TabsHeld(held);
             foreach (Control control in strip.Controls)
             {
                 var tab = control as NavButton;
-                if (tab == null || !Soft.OwnVisible(tab)) continue;
+                if (tab == null || (!Soft.OwnVisible(tab) && !held.Contains(tab))) continue;
                 int regular = TabWidth(tab, Soft.RoleFont("nav"));
                 row += regular + tab.Margin.Horizontal;
                 heaviest = Math.Max(heaviest, TabWidth(tab, Soft.RoleFont("nav_current")) - regular);
