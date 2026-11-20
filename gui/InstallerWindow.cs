@@ -392,7 +392,37 @@ namespace CodexAutoResume
         internal void ShowPage(string name)
         {
             bool held = HoldPainting();
-            try { ShowPageNow(name); }
+            try
+            {
+                page = name;
+                Build(name);
+                Arrange(Inner(ClientSize.Width > 0 ? ClientSize.Width : Px(OpeningWidth)));
+                string[] pages = flow.Pages();
+                int index = Array.IndexOf(pages, name);
+                back.Visible = backShown = index > 0 && name != InstallerFlow.Progress && name != InstallerFlow.Finish &&
+                                          name != InstallerFlow.Notes;
+                cancel.Visible = cancelShown = name != InstallerFlow.Finish;
+                cancel.Enabled = name != InstallerFlow.Progress;
+                forward.Visible = forwardShown = name != InstallerFlow.Progress;
+                forward.Enabled = name != InstallerFlow.Options || flow.CanStart();
+                cancel.Text = name == InstallerFlow.Notes ? words.Say("action.not_now", "Not now")
+                            : words.Say("action.cancel", "Cancel");
+                forward.Text = name == InstallerFlow.Finish && flow.Mode == InstallerFlow.Update && code == 0
+                               ? words.Say("installer.done.open", "Open the Dashboard")
+                             : name == InstallerFlow.Notes ? words.Say("installer.update", "Update")
+                             : name == InstallerFlow.Finish ? words.Say("installer.finish", "Finish")
+                             : name == InstallerFlow.Confirm ? words.Say("installer.remove", "Remove")
+                             : name == InstallerFlow.Maintain ? (flow.Mode == InstallerFlow.Uninstall
+                                                                 ? words.Say("installer.next", "Next")
+                                                                 : words.Say("installer.maintain.repair", "Repair"))
+                             : name == InstallerFlow.Options ? (flow.Upgrade && !flow.EditionChange
+                                                                ? words.Say("installer.update", "Update")
+                                                                : words.Say("action.install", "Install"))
+                             : words.Say("installer.next", "Next");
+                light.State = InstallerFlow.Light(flow.Mode, name, code, unconfirmed || leftStopped, previousRunning);
+                PerformLayout();
+                if (forwardShown && forward.Enabled) ActiveControl = forward;
+            }
             finally { if (held) PaintWhole(); }
         }
 
@@ -404,31 +434,44 @@ namespace CodexAutoResume
         // is swapped and laid out, then paints it all offscreen and puts it on the screen at once (WS_EX_COMPOSITED for that
         // one paint, RDW_UPDATENOW): the screen goes from the page before to the page after, whole.
         private int holding;
+        // ListSteps holds the painting while it makes its rows again on the page on show; ShowStep lets it go.
+        private bool stepsHeld;
+
+        // What the hold is on: the window's ground for a page change, the page's sheet alone for its step list.
+        private Control heldOn;
 
         private bool HoldPainting()
         {
+            return HoldPainting(ground);
+        }
+
+        private bool HoldPainting(Control target)
+        {
             if (holding > 0) { holding++; return true; }
-            if (!ground.IsHandleCreated || ground.IsDisposed || !Visible || !ground.Visible) return false;
-            SendMessage(ground.Handle, WmSetRedraw, IntPtr.Zero, IntPtr.Zero);
+            if (!target.IsHandleCreated || target.IsDisposed || !Visible || !target.Visible) return false;
+            SendMessage(target.Handle, WmSetRedraw, IntPtr.Zero, IntPtr.Zero);
+            heldOn = target;
             holding = 1;
             return true;
         }
 
         private void PaintWhole()
         {
-            if (--holding > 0 || ground.IsDisposed || !ground.IsHandleCreated) return;
-            SendMessage(ground.Handle, WmSetRedraw, (IntPtr)1, IntPtr.Zero);
-            long style = GetWindowLongPtr(ground.Handle, GwlExStyle).ToInt64();
+            Control target = heldOn;
+            if (--holding > 0 || target == null || target.IsDisposed || !target.IsHandleCreated) return;
+            heldOn = null;
+            SendMessage(target.Handle, WmSetRedraw, (IntPtr)1, IntPtr.Zero);
+            long style = GetWindowLongPtr(target.Handle, GwlExStyle).ToInt64();
             bool already = (style & WsExComposited) != 0;
-            if (!already) SetWindowLongPtr(ground.Handle, GwlExStyle, new IntPtr(style | WsExComposited));
+            if (!already) SetWindowLongPtr(target.Handle, GwlExStyle, new IntPtr(style | WsExComposited));
             try
             {
-                RedrawWindow(ground.Handle, IntPtr.Zero, IntPtr.Zero,
+                RedrawWindow(target.Handle, IntPtr.Zero, IntPtr.Zero,
                              RdwInvalidate | RdwErase | RdwFrame | RdwAllChildren | RdwUpdateNow);
             }
             finally
             {
-                if (!already && !ground.IsDisposed) SetWindowLongPtr(ground.Handle, GwlExStyle, new IntPtr(style));
+                if (!already && !target.IsDisposed) SetWindowLongPtr(target.Handle, GwlExStyle, new IntPtr(style));
             }
         }
 
@@ -444,38 +487,6 @@ namespace CodexAutoResume
 
         [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
         private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
-
-        private void ShowPageNow(string name)
-        {
-            page = name;
-            Build(name);
-            Arrange(Inner(ClientSize.Width > 0 ? ClientSize.Width : Px(OpeningWidth)));
-            string[] pages = flow.Pages();
-            int index = Array.IndexOf(pages, name);
-            back.Visible = backShown = index > 0 && name != InstallerFlow.Progress && name != InstallerFlow.Finish &&
-                                      name != InstallerFlow.Notes;
-            cancel.Visible = cancelShown = name != InstallerFlow.Finish;
-            cancel.Enabled = name != InstallerFlow.Progress;
-            forward.Visible = forwardShown = name != InstallerFlow.Progress;
-            forward.Enabled = name != InstallerFlow.Options || flow.CanStart();
-            cancel.Text = name == InstallerFlow.Notes ? words.Say("action.not_now", "Not now")
-                        : words.Say("action.cancel", "Cancel");
-            forward.Text = name == InstallerFlow.Finish && flow.Mode == InstallerFlow.Update && code == 0
-                           ? words.Say("installer.done.open", "Open the Dashboard")
-                         : name == InstallerFlow.Notes ? words.Say("installer.update", "Update")
-                         : name == InstallerFlow.Finish ? words.Say("installer.finish", "Finish")
-                         : name == InstallerFlow.Confirm ? words.Say("installer.remove", "Remove")
-                         : name == InstallerFlow.Maintain ? (flow.Mode == InstallerFlow.Uninstall
-                                                             ? words.Say("installer.next", "Next")
-                                                             : words.Say("installer.maintain.repair", "Repair"))
-                         : name == InstallerFlow.Options ? (flow.Upgrade && !flow.EditionChange
-                                                            ? words.Say("installer.update", "Update")
-                                                            : words.Say("action.install", "Install"))
-                         : words.Say("installer.next", "Next");
-            light.State = InstallerFlow.Light(flow.Mode, name, code, unconfirmed || leftStopped, previousRunning);
-            PerformLayout();
-            if (forwardShown && forward.Enabled) ActiveControl = forward;
-        }
 
         private void Build(string name)
         {
@@ -803,16 +814,21 @@ namespace CodexAutoResume
         /// disc with a check; under way, a ring with a dot and its name in the name's weight; still to come, an empty
         /// ring - as far as the installer's own lines have taken `step`, and never further. Made again only when what it
         /// says changes; `live`, on the page on show, it changes the page's rows in place.
-        private void ListSteps(bool live)
+        /// True where, on the page on show, it made its rows again and so holds the window's painting (HoldPainting) for
+        /// the caller to let go once the rows are placed (PaintWhole): new rows come on the screen with the page, whole.
+        private bool ListSteps(bool live)
         {
             List<string[]> now = InstallerProgress.Listed(flow.Mode, flow.Upgrade, flow.Unpacks, step, under);
             var said = new StringBuilder();
             foreach (string[] each in now) said.Append(each[0]).Append('=').Append(each[1]).Append(';');
-            if (said.ToString() == listed) return;
+            if (said.ToString() == listed) return false;
             listed = said.ToString();
             // v0.6.24 final (re-check 2): on the page on show, the same steps - only how far each is changed - are changed
             // in place: making 18 controls again took about 100 ms of the window's thread at every step.
-            if (live && Restate(now)) return;
+            if (live && Restate(now)) return false;
+            // Only the page's sheet: the rest of the window does not change, and a paint of it all held the thread ~100 ms.
+            bool held = live && HoldPainting(sheet);
+            stepsHeld |= held;
             var gone = new List<Control>();
             foreach (Control row in stepRows)
             {
@@ -846,9 +862,10 @@ namespace CodexAutoResume
                     sheet.Controls.Add(mark);
                 }
             }
-            if (!live) return;
+            if (!live) return held;
             foreach (Control control in gone) sheet.Controls.Remove(control);
             LetGo(gone);
+            return held;
         }
 
         /// The rows of ListSteps set to say `now` where they are the same steps in the same order; false, and nothing
@@ -1372,15 +1389,22 @@ namespace CodexAutoResume
             bar.Value = at;
             if (!under.Contains(step)) under.Add(step);
             if (stepLabel == null) return;
-            // v0.6.24 final (live re-check 3): the step's words, its list and the rows moved for them on the screen at once.
-            bool held = HoldPainting();
+            // v0.6.24 final (live re-check 3): where the list's rows are made again, they come on the screen at once, placed
+            // (ListSteps holds the painting); a step that only changes how far each row is paints as it always did, and
+            // never holds the thread for a paint of the whole window.
+            stepsHeld = false;
             try
             {
                 stepLabel.Text = words.Step(step);
                 if (page == InstallerFlow.Progress) ListSteps(true);
                 Arrange(Inner(ClientSize.Width));
             }
-            finally { if (held) PaintWhole(); }
+            finally
+            {
+                // Let go even where making the rows threw: held painting would leave the window unpainted for good.
+                if (stepsHeld) PaintWhole();
+                stepsHeld = false;
+            }
         }
 
         private void Ended(int ended)

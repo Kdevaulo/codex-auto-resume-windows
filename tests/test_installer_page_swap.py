@@ -10,8 +10,9 @@ it changes.
 
 A probe compiled with the window's sources makes the real setup window of a first installation, 30000 px off the desktop
 and never activated, and goes through Welcome, Options, Progress (a stub run) and Finish, as a person's presses do. At paint
-time it watches the window's ground: every control a page change adds comes while its painting is held, and the paint after
-every change is the one asked for at once, of the whole ground composited offscreen - never a paint the thread comes to
+time it watches the window's ground and the page's sheet: every control a page change, or a change of the Progress page's
+step list, adds comes while their painting is held, and the paint after every change is the one asked for at once,
+composited offscreen - never a paint the thread comes to
 later, a control at a time, which is a frame with neither page whole. Every move or size of the window is read back from
 Windows. GUI test module (it shows a window, off the screen): run it on its own, through gui_lock.sh.
 """
@@ -59,11 +60,11 @@ namespace CodexAutoResume
 
         const int WM_PAINT = 0x000F, WM_SETREDRAW = 0x000B, WM_WINDOWPOSCHANGED = 0x0047;
 
-        static IntPtr groundHandle;
-        // Whether the ground's coming WM_PAINT came through the thread's queue - painted as the thread came to it - rather
-        // than sent by a paint asked for at once (RDW_UPDATENOW).
-        static bool groundQueued;
-        static bool held, shown, waitingForPaint;
+        // Which windows' coming WM_PAINT came through the thread's queue - painted as the thread came to it - rather than
+        // sent by a paint asked for at once (RDW_UPDATENOW).
+        static readonly HashSet<IntPtr> queued = new HashSet<IntPtr>();
+        static bool shown;
+        static Held ground, sheet;
         static string page = "";
         static int adds;
         // Every control a page change adds while the ground's painting is not held.
@@ -76,27 +77,33 @@ namespace CodexAutoResume
         {
             public bool PreFilterMessage(ref Message m)
             {
-                if (m.Msg == WM_PAINT && m.HWnd == groundHandle) groundQueued = true;
+                if (m.Msg == WM_PAINT) queued.Add(m.HWnd);
                 return false;
             }
         }
 
-        sealed class Ground : NativeWindow
+        // The window's ground, or the page's sheet: whether its painting is held, and how it was painted after.
+        sealed class Held : NativeWindow
         {
+            internal bool On, waiting;
+
             protected override void WndProc(ref Message m)
             {
                 if (m.Msg == WM_SETREDRAW)
                 {
-                    held = m.WParam == IntPtr.Zero;
-                    if (!held) waitingForPaint = true;
+                    On = m.WParam == IntPtr.Zero;
+                    if (!On) waiting = true;
                 }
-                if (m.Msg == WM_PAINT && waitingForPaint)
+                if (m.Msg == WM_PAINT)
                 {
-                    waitingForPaint = false;
-                    bool composited = (GetWindowLongPtr(Handle, -20).ToInt64() & 0x02000000) != 0;
-                    after.Add(!groundQueued && composited ? "whole" : groundQueued ? "queued" : "plain");
+                    bool came = queued.Remove(Handle);
+                    if (waiting)
+                    {
+                        waiting = false;
+                        bool composited = (GetWindowLongPtr(Handle, -20).ToInt64() & 0x02000000) != 0;
+                        after.Add(!came && composited ? "whole" : came ? "queued" : "plain");
+                    }
                 }
-                if (m.Msg == WM_PAINT) groundQueued = false;
                 base.WndProc(ref m);
             }
         }
@@ -155,15 +162,16 @@ namespace CodexAutoResume
             window.StartPosition = FormStartPosition.CenterScreen;
             Application.AddMessageFilter(new Queue());
             var moves = new Moves();
-            var ground = new Ground();
+            ground = new Held();
+            sheet = new Held();
             const BindingFlags inside = BindingFlags.NonPublic | BindingFlags.Instance;
             var groundControl = (Control)typeof(InstallerWindow).GetField("ground", inside).GetValue(window);
-            var sheet = (Control)typeof(InstallerWindow).GetField("sheet", inside).GetValue(window);
-            sheet.ControlAdded += delegate(object sender, ControlEventArgs e)
+            var sheetControl = (Control)typeof(InstallerWindow).GetField("sheet", inside).GetValue(window);
+            sheetControl.ControlAdded += delegate(object sender, ControlEventArgs e)
             {
                 if (!shown) return;
                 adds++;
-                if (!held) alone.Add(window.Page + " " + e.Control.GetType().Name + " '" + (e.Control.Text ?? "") + "'");
+                if (!ground.On && !sheet.On) alone.Add(window.Page + " " + e.Control.GetType().Name + " '" + (e.Control.Text ?? "") + "'");
             };
             MethodInfo forward = typeof(InstallerWindow).GetMethod("Forward", inside);
             var clock = Stopwatch.StartNew();
@@ -193,8 +201,8 @@ namespace CodexAutoResume
             window.Shown += delegate
             {
                 moves.AssignHandle(window.Handle);
-                groundHandle = groundControl.Handle;
-                ground.AssignHandle(groundHandle);
+                ground.AssignHandle(groundControl.Handle);
+                sheet.AssignHandle(sheetControl.Handle);
                 shown = true;
                 sizes.Add(new List<object> { "shown", (double)window.Width, (double)window.Height });
                 step.Start();
@@ -202,6 +210,7 @@ namespace CodexAutoResume
             Application.Run(window);
             moves.ReleaseHandle();
             ground.ReleaseHandle();
+            sheet.ReleaseHandle();
             said["pages"] = pages;
             said["alone"] = alone;
             said["after"] = after;
@@ -262,7 +271,7 @@ class PageSwapTests(unittest.TestCase):
         self.assertEqual(self.answer["alone"], [])
 
     def test_each_page_change_is_painted_whole_at_once(self):
-        """After every page change the ground's next paint is the one asked for at once, composited offscreen."""
+        """After every page change the next paint is the one asked for at once, composited offscreen."""
         self.assertGreaterEqual(len(self.answer["after"]), 3, "Options, Progress and Finish at least")
         self.assertEqual(set(self.answer["after"]), {"whole"}, self.answer["after"])
 
