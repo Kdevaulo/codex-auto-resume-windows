@@ -61,6 +61,9 @@ namespace CodexAutoResume
         private int editorSaved = -1;
         // Null in every window a person opens. In a window AdvancedPageRun drives: what answers the editor, never shown.
         private Action<Form> editorAnswer;
+        // How the editor is shown - ShowDialog over the window, or, in a window AdvancedPageRun drives, off every screen and
+        // timed (AdvancedPageAudit EditorShown).
+        private Action<Form> editorShow;
         // The type scale's figure step (SoftTheme.RoleFont "figure"): the editor's words are read at it.
         private const float ReadingLarger = 3f;
         // v0.6.20 (#50 item 1): the message's pictures - each a file to copy (Path) or a copy it already has (Id) - their
@@ -119,11 +122,26 @@ namespace CodexAutoResume
             if (busy > 0 || advancedListing == null || advancedPrompts == null) return;
             if (row != null && Str(row, "state") != "waiting") return;
             SweepPasted();
-            using (Form dialog = BuildEditor(row))
+            // v0.6.24 final (L5): the press is taken at once, visibly - the window's wait cursor, its busy sign - until the
+            // editor is on the screen: the window's controls are made as it is shown, and that is not instant.
+            bool waited = UseWaitCursor;
+            UseWaitCursor = true;
+            Cursor.Current = Cursors.WaitCursor;
+            try
             {
-                if (editorAnswer != null) editorAnswer(dialog);
-                else if (!auditing) dialog.ShowDialog(this);
+                using (Form dialog = BuildEditor(row))
+                {
+                    dialog.VisibleChanged += delegate { if (dialog.Visible) UseWaitCursor = waited; };
+                    if (editorAnswer != null) editorAnswer(dialog);
+                    else if (editorShow != null || !auditing)
+                    {
+                        LayoutOnceShown(dialog);
+                        if (editorShow != null) editorShow(dialog);
+                        else dialog.ShowDialog(this);
+                    }
+                }
             }
+            finally { UseWaitCursor = waited; }
             bool taken = editorTaken, steered = editorSteered;
             ForgetEditor();
             ForgetPasted();
@@ -134,6 +152,38 @@ namespace CodexAutoResume
             FillScheduled();
             ReadAdvanced(null);
             if (advancedOpen != PromptQueueId) ReadPrompts(null);
+        }
+
+        /// v0.6.24 final (L5): the editor's card, its body and the page it scrolls in hold their layout from the moment the
+        /// dialog is shown until its controls have their windows and have been told they are visible, and are laid out once
+        /// then - in the message after the show, still before its first paint, while it is held off the screen
+        /// (SoftDialog). As the dialog was shown, each control that holds others laid itself out on being made visible
+        /// (ScrollableControl.OnVisibleChanged) and, the rows sizing themselves, the whole card, its body and its page
+        /// again with it - eight times each, every line and button measured each time.
+        private void LayoutOnceShown(Form dialog)
+        {
+            if (editorBody == null) return;
+            var held = new List<Control>();
+            for (Control at = editorBody.Controls.Count > 0 ? editorBody.Controls[0] : null; at != null && at != dialog; at = at.Parent)
+                held.Add(at);
+            if (held.Count == 0) return;
+            foreach (Control control in held) control.SuspendLayout();
+            EventHandler once = null;
+            MethodInvoker resume = delegate
+            {
+                // Innermost first, each laid out as it is let go, the outermost last.
+                foreach (Control control in held)
+                    if (!control.IsDisposed) control.ResumeLayout(true);
+            };
+            once = delegate
+            {
+                if (!dialog.Visible) return;
+                dialog.VisibleChanged -= once;
+                // Raised before the controls inside are told (Control.OnVisibleChanged): let go once they have been.
+                try { dialog.BeginInvoke(resume); }
+                catch (InvalidOperationException) { resume(); }
+            };
+            dialog.VisibleChanged += once;
         }
 
         private void ForgetEditor()
@@ -210,6 +260,11 @@ namespace CodexAutoResume
             TableLayoutPanel card = MakeCard(title);
             card.Margin = new Padding(0);
             body.Controls.Add(card);
+            // v0.6.24 final (live re-check 3, L5: the editor came on 2.5 s after Schedule... was pressed): laid out once
+            // when it is all there (the end of BuildEditor), not again for every row, line and value put in it - each of
+            // which laid the whole card out anew.
+            body.SuspendLayout();
+            card.SuspendLayout();
 
             string conversation = Word("page.resets.field.conversation", "Conversation");
             editorConversation = EditorCombo(conversation, 300);
@@ -404,6 +459,8 @@ namespace CodexAutoResume
             dialog.ClientSize = new Size(width, Px(400));
             editorBody = body;
             editorButtons = buttons;
+            card.ResumeLayout(false);
+            body.ResumeLayout(true);
             ShowEditorState();
             return dialog;
         }

@@ -152,7 +152,30 @@ namespace CodexAutoResume
             if (ItemHeight != wanted) ItemHeight = wanted;
         }
 
-        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Fit(); }
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+        private const int WM_SETREDRAW = 0x000B;
+
+        /// v0.6.24 final (live re-check 3, L5): its items are handed to its window as the window is made (ComboBox adds
+        /// them one by one), with the window's redrawing off meanwhile, as BeginUpdate has it for items added later. With it
+        /// on, the editor of Schedule a message (67 conversations, 24 hours, 30 counts) took 0.5 to 2.2 s to make its five
+        /// drop-downs on this PC under load, 0.3 to 0.75 s with it off. Drawn whole after.
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            bool many = Items.Count > 1;
+            if (many) SendMessage(Handle, WM_SETREDRAW, IntPtr.Zero, IntPtr.Zero);
+            try { base.OnHandleCreated(e); }
+            finally
+            {
+                if (many)
+                {
+                    SendMessage(Handle, WM_SETREDRAW, (IntPtr)1, IntPtr.Zero);
+                    Invalidate();
+                }
+            }
+            Fit();
+        }
         protected override void OnHandleDestroyed(EventArgs e) { CloseList(false); base.OnHandleDestroyed(e); }
         protected override void OnFontChanged(EventArgs e) { base.OnFontChanged(e); Fit(); Invalidate(); }
 
