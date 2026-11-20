@@ -41,6 +41,12 @@ file where an update put it.
   outermost pixel; the four corners resize from where the curve ends and a little past it, the top ones down each side as the bottom ones
   do. The shadow is never on the screen while the window is maximised or minimised. Windows' corner comes back while the window is
   maximised or snapped, in High Contrast, in a remote session and without desktop composition; Windows 10 keeps its square corner.
+  (new since beta.2) Every dialog the Dashboard opens has the Dashboard's own outer corner too - the design's card corner, with its
+  hairline and its shadow - where it had Windows' round one, under the same switch and with the same exceptions: Windows' corner stays in
+  High Contrast, in a remote session, without desktop composition and on Windows 10, and while a dialog is minimised (its own is back when
+  it is restored). A dialog that could be resized by its edges still can be, and one of fixed size still cannot. The corner's shadow and
+  hairline are held off the screen with the dialog until it has painted and fade in with it, so nothing of them is seen round a dialog
+  that is not yet seen. The README's pictures draw a dialog the same way - they had drawn it with sharp corners - except in High Contrast.
 - **The Dashboard opens at exactly its size, and its first paint is clean.** It used to open a little larger than it asked, at 100 % and
   at 150 %. In the dark theme it no longer shows an empty outline of its corner, or one white frame, before it has painted: the window and
   its shadow come on together once it has.
@@ -57,7 +63,10 @@ file where an update put it.
   is gone, and the header's close cross closes the window. The tab row has as much room above it as below it, 10 px each, on every page,
   and the pill's rounded end and the first tab's face stand 4 px inside the header card's edges so the pill does not look as if it sticks
   out. The status light sweeps once as the window opens and as the watcher turns on, and the line under the headline glides in as the
-  sweep ends; where animations are off, nothing moves.
+  sweep ends; where animations are off, nothing moves. (new since beta.2) The pill is in the Dashboard's first paint: the window reads the
+  version from this installation's own `app\.codex-plugin\plugin.json`, and its edition from the source tree it was built from, where they
+  had come only with the first state, a moment after the window opened, and the tab row had changed once. The state still writes the same
+  over it and has the last word where they differ; a window with no such file waits for the state, as before.
 - **With the watcher off, Start watcher stands where Pause stands.** On the Overview's *Right now* card *Start watcher* takes the place
   of *Pause recovery* while the watcher is off, and the header only says the state; once the watcher runs, *Pause* comes back and
   *Start watcher* goes. The two never show together.
@@ -126,9 +135,19 @@ file where an update put it.
 - **The README's motion picture of the tray popup starts at the right end of a taskbar (new since beta.2).** The pointer rests on the icon,
   its hover card appears after Windows' own hover time, a press opens the popup above the strip and a click elsewhere closes it, on one clock
   of about 13 seconds that loops with the light and the icon.
+- **The README's other motion pictures show the window's light and the notification card on a taskbar (new since beta.2).** The Dashboard's
+  opens with the window's light sweeping and the line under the headline gliding in, as the window does when it opens; the light sweeps
+  again as Resume turns recovery on, as it does where it turns from off to watching; and the Timeline dialog is drawn over the veil the
+  window lays under a dialog, where it had been drawn without. The notification card's stands above the right end of a plain taskbar, where
+  the product's own stack places it, with the product's icon for a waiting task on the strip, breathing as the watcher does, and loops after
+  three whole breaths, so the card's light and the icon are where they began.
 - **A text box's right-click menu is drawn in the window's design.** Every box you can type in opens a menu of the same look as the
   others - Undo, Cut, Copy, Paste, Delete, Select all - with Windows' own words and access keys, in the language Windows shows;
-  Shift+F10 and the menu key open it at the caret, and a command is offered only where it can work, as in Windows' menu.
+  Shift+F10 and the menu key open it at the caret, and a command is offered only where it can work, as in Windows' menu. (new since beta.2)
+  The menu opens above the pointer where it does not fit below it inside the window - the Custom message box stands near the Dashboard's
+  foot, and its menu had run past the window's bottom edge onto the desktop - and above it too where there is more room above than below;
+  it opens to the left in a language written right to left. It is kept inside the screen's working area, as every other menu of the
+  window is, and a menu opened from the keyboard stands at the caret.
 - **A notification card that fades in or out shows no dark band inside its edge.** Its shadow reached under its body and showed
   through it while the card was half clear; nothing of the shadow lies under the card now, and a still of the card looks as it did.
 - **The setup window is 600 x 600, fixed in size, with the Dashboard's squircle corner,** and never taller than the work area of the
@@ -148,6 +167,20 @@ file where an update put it.
   off at first - one row each, and says that no administrator rights are needed: the setup program asks for none and installs only under your
   profile and in the current user's part of the registry. An update and a change of edition keep that room for what they keep, change and
   bring. All of it is in every language, mirrored where the language is written right to left, and a screen reader says each step's state.
+- **The setup window paints and answers all through a run (new since beta.2).** After Repair was pressed, the window's first page hung half
+  drawn, with grey boxes and no Cancel, taking no press for 2 to over 15 s, and the Progress page showed with 7 of its 9 steps ticked. Every
+  line the run printed and every file it unpacked had been a message of its own to the window, and Windows hands a window its messages
+  before its input and its painting. The run now writes what it says into a list, which the window takes in on a timer, in order, for no
+  more than 20 ms at a turn, its log in one append. The Progress page is drawn at once when the button is pressed, the unpacking moves the
+  bar alone within its step, and the step list changes in place instead of being made again at each step. It is the same for every run
+  the window shows: installing, updating, repairing and removing.
+- **After a Repair or an update the Dashboard reopens behind setup's Finish page (new since beta.2).** The Dashboard the setup opens again
+  came up over the Finish page and hid it whole, so that a person might wait for a window they could not see. It now opens without taking
+  the activation and stands directly behind the window in front, as its window is made and again as it is shown; the Finish page keeps
+  the keyboard, and when it is closed Windows gives the activation to the Dashboard. It never goes behind a window of its own process,
+  a hidden or minimised one, a topmost one, or the desktop or the taskbar, which would put it out of sight. A Dashboard that reopens
+  maximised still comes to the front, because Windows shows a maximised window only as the active one. Every other start of the
+  Dashboard - yours, the watcher's, a reopen of its own, a picture's - opens as it always did.
 - **The largest text size on a small screen is 1.74 on a 1920 x 1080 screen at 100 %,** where the first beta said 1.68 (v0.6.23: 1.83).
   A dialog's title is a row on the ground now and not a card of its own, so it is 20 px shorter than the first beta's, and the window may
   use the text size that screen holds for the tallest dialog.
@@ -168,6 +201,23 @@ file where an update put it.
   setup program writes it to a file in its own run folder and runs that file. Every value still travels only in the
   environment, never inside the script, so nothing a conversation title or a path holds can become code. A test keeps an
   encoded command line out of every shipped script.
+- **A status read lists the Codex processes once, through one snapshot, where each listing started PowerShell (new since beta.2).** To know
+  which Codex app and which engines run, the program listed the ChatGPT.exe and codex.exe processes with a PowerShell
+  `Get-CimInstance Win32_Process` query, about 10 s a time on the advanced installation it was measured on. It now takes one Toolhelp
+  snapshot of the processes and asks each of those two programs for its own file path - the same rows, with no process started - and one
+  list answers every caller in the program for three seconds. A caller that has just started or stopped a process, or is about to act on
+  who runs, reads afresh: the choice of a queue route before a send, and the advanced edition's restart of the app and its account swap. In the standard edition the list was asked for wherever the watcher looks at the app before it acts, by
+  `status` and the health check, and by the compatibility report wherever the engine the app runs is not in the engine folder; each was a
+  PowerShell query and is a snapshot now. What the advanced edition's far more frequent asking cost is told under that edition.
+- **The health check no longer calls an app that serves from another official Codex engine a problem (new since beta.2).** Right after a
+  restart the Codex app can run its server from its own package, signed by OpenAI, rather than the engine the program found first
+  (v0.6.21, #58); the watcher then looks for its engine again and pairs with the app's. The health check - setup's last step and `doctor` -
+  judged the first pairing alone, so after the Codex app moved its server to its own `resources\codex.exe` every install and repair ended
+  "[!] The health check reported a problem", with "running, but its Codex server could not be matched". It now takes the watcher's second
+  look first - the same rule, the same discovery and the same engine checks - and the doctor says on a second line that the app's server
+  runs from another official Codex engine, which the watcher takes up, and names it; `status` says it in one line. A server that is not
+  signed by OpenAI, is unsigned or unreadable, or fails the engine checks is still reported and the health check still ends with a
+  problem for it, and an engine you named yourself is never second-guessed.
 - **A Desktop conversation forked from a `codex exec` run is recovered (new since beta.2)** (reported by
   [@7Magicbunny](https://github.com/7Magicbunny), [#66](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/66)). A conversation a person forks from a `codex exec` run into the
   Codex app, and keeps working in there, is the app's: its record says so, but its first line keeps the exec run's
@@ -193,7 +243,10 @@ file where an update put it.
 - **The advanced edition's own dialogs are laid out as the others are.** Its editor holds its refusal and its buttons in the one card
   under the title row, and its Follow-through and examples dialogs have no Close button of their own - the title row's close cross and
   Esc close them. (new since beta.2) The advanced edition keeps its window as wide as its tabs need at their usual room, not the closer room
-  the version's pill may draw them to, so the narrowest window is what it was.
+  the version's pill may draw them to, so the narrowest window is what it was. (new since beta.2) The tab row keeps the Chat tab's room
+  until the list says whether Chat shows, in the row and in the window's least width: with Chat on it comes into room already kept and
+  neither a tab nor the pill moves, where it had come about a second after the window opened and the row had changed once; with Chat off
+  the room goes and the tabs only spread back. The tab has its words from the start, so the room kept is its own.
 - **The advanced pages say what is left (new since beta.2).** The saved accounts' meters draw what is left - "N% left · in <time>" - and
   with 10 % or less left the bar, the edge of its groove and the words are the warning colour, so an empty groove with nothing left still
   says so. The analytics card's share reads "<window>: N% left" and, where the pace runs a window out, "none left around <time>"; how far
@@ -201,6 +254,22 @@ file where an update put it.
   decision reads it.
 - **The Advanced features and Chat pages show no empty bar at the window's foot (new since beta.2).** After Settings had been open, those two
   pages kept an empty bar under them; only Settings has a bar at its foot.
+- **The advanced pages read their state in seconds, not in up to about 100 (new since beta.2).** The live check of this release, on an
+  advanced installation, found a read of the state taking up to about 100 s: each capability's view binds the compatibility report to the
+  engine the app serves, so one read listed the Codex processes nine times (eight through the arming views, one beside them), and each
+  listing was a PowerShell query of about 10 s. While it waited, the header said the state could not be read, the chat list was empty,
+  Diagnostics' *Detection check* said it could not run and the Timeline opened 3 to 10 s late; the detection check took 104.9 s and takes
+  4.3 s now. One list answers the whole read, as the item under both editions says.
+- **Recover every conversation takes up a conversation of the app's whatever program its first line names, but VS Code's own (new since
+  beta.2).** With the switch on, a conversation on the app's row was taken up only where its first line named a program the product knew; a
+  `codex exec` line with no fork (#66) or a program Codex adds later stayed out. Any program's name of 1 to 64 characters is taken up now,
+  where the state row and the rollout's first line are both the app's, except the VS Code extension's own, which the capability for a
+  terminal's and VS Code's conversations handles. What stays out as before: a `codex exec` or terminal row, a first line of another
+  source or with no program name, an archived conversation, one of another Codex home, one whose state row and first line disagree, the
+  conversations Codex makes for itself (subagents, reviews, memory passes, agent-created ones) and whatever a recovery's gates refuse.
+  Turning the switch off still cancels what only it took up. Its statement says so in all 22 languages and keeps the revision it had, so an
+  installation that had it on keeps it on after the update and reads the wider statement on its card; with it off nothing changes. The
+  standard edition still takes up only the programs it knows.
 
 ## v0.6.24-beta.2 — The Dashboard's squircle corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card, dialogs as one card under their title, and a tray icon's card as wide as its widest row
 
