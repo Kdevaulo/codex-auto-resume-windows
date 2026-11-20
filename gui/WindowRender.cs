@@ -938,7 +938,9 @@ namespace CodexAutoResume
                     PaintCaptionOver(body, form);
                     PaintListGutters(body, form);
                     // v0.6.24: no caption, the window's or the dialog's: the window's client area is the whole of it.
-                    int border = Math.Max(1, Px(1));
+                    // v0.6.24 final: and with its own outer corner (DialogSquircle) no frame either - its window is its
+                    // client area, its hairline and shadow the corner's (PaintDialog).
+                    int border = DialogSquircle() ? 0 : Math.Max(1, Px(1));
                     Size outer = new Size(client.Width + 2 * border, client.Height + 2 * border);
                     Point place = RenderDialogPlace(outer, ClientSize);
                     // v0.6.24: the window dimmed under it, as it is for as long as the dialog is open (DialogVeil).
@@ -1037,10 +1039,26 @@ namespace CodexAutoResume
             return (ink * alpha + under * (255 - alpha) + 127) / 255;
         }
 
+        /// v0.6.24 final (the owner, 2026-11-20): whether a dialog in a picture has its own outer corner, as every dialog the
+        /// Dashboard opens has on the screen (SoftDialog.BuildTitle, ChromeHost.OwnCorner): while the switch is on
+        /// (Brand.WindowSquircle) and outside High Contrast, where WindowShape.Wanted gives Windows' corner. The rest of what
+        /// Wanted asks - Windows 11, composition, not a remote session - is the machine's, never a picture's.
+        internal static bool DialogSquircle()
+        {
+            return WindowShape.Switch && !Palette.Contrast;
+        }
+
         /// The dialog's window over `picture`: a soft shadow, the border and the drawn client area - its title row and caption
-        /// buttons in it (v0.6.24).
+        /// buttons in it (v0.6.24). v0.6.24 final: with its own outer corner (DialogSquircle) the dialog is laid as the
+        /// screen composes it (LayDialog), its shadow and its body cut to the squircle; otherwise the rectangle and its
+        /// border, as before.
         private void PaintDialog(Bitmap picture, Bitmap body, Point place, Size outer, int border, Color ground)
         {
+            if (DialogSquircle())
+            {
+                LayDialog(picture, body, place, ground);
+                return;
+            }
             Color line = ChromeColour(renderChrome, "line", Soft.Mix(Canvas, Ink, 0.35));
             using (Graphics g = Graphics.FromImage(picture))
             {
@@ -1062,6 +1080,29 @@ namespace CodexAutoResume
                     g.FillRectangle(brush, place.X + border, place.Y + border, body.Width, body.Height);
                 g.DrawImageUnscaled(body, place.X + border, place.Y + border);
             }
+        }
+
+        /// v0.6.24 final: `body` - the dialog's client area, its window - laid over `picture` at `place` as the screen shows a
+        /// dialog with its own corner (WindowShape.Lay): the card's corner at the picture's display scale (DisplayScale, as
+        /// the screen takes the monitor's and not the text size; Palette.RadiusCard, the design's smoothing), its region's pixels the dialog's, the hairline (Palette.Line) and the anti-aliased edge over
+        /// them on the dialog's `ground`, and the companion's shadow (WindowCorner.Shade: the ink in light, the theme's
+        /// all-but-black shadow in dark) round it on what lies under - nothing of the dialog outside its outline.
+        internal static void LayDialog(Bitmap picture, Bitmap body, Point place, Color ground)
+        {
+            // The class by its full name: inside SettingsForm a member named Shape (a test probe's helper) would hide it.
+            var edge = new WindowShape.Edge(body.Width, body.Height, Palette.RadiusCard, global::CodexAutoResume.Shape.Smoothing,
+                                            DisplayScale);
+            int[] under = Argb(picture), drawn = Argb(body);
+            WindowShape.Lay(under, picture.Width, picture.Height, drawn, place, edge,
+                            ground.A == 255 ? ground : Palette.Canvas, Palette.Line, WindowCorner.Shade());
+            BitmapData data = picture.LockBits(new Rectangle(0, 0, picture.Width, picture.Height), ImageLockMode.WriteOnly,
+                                               PixelFormat.Format32bppArgb);
+            try
+            {
+                for (int y = 0; y < picture.Height; y++)
+                    Marshal.Copy(under, y * picture.Width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), picture.Width);
+            }
+            finally { picture.UnlockBits(data); }
         }
 
         // ------------------------------------------------------------------ the still a capture takes (v0.6.20)

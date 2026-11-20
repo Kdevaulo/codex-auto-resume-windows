@@ -132,8 +132,10 @@ def compare_dialog(picture: bytes, bounds: dict, client: tuple, still: tuple) ->
     # reaches: since beta.2 a scrolling page fades its first card's lift into the ground at its top (SoftPage.FadeTop),
     # so the spot the probe once read (200 px down) is a level off the ground on Pending.
     ground = colour(rgb, 8, top + 150, width)
+    # v0.6.24 final: the dialog's own outer corner cuts its top left (gui/WindowRender.cs LayDialog), so its ground is read
+    # at the middle of its top, inside its hairline and above its title row.
     probes = (
-        ("ground", colour(picture, window[0] + 1 + 4, window[1] + top + 4, client_w), ground),
+        ("ground", colour(picture, window[0] + window[2] // 2, window[1] + top + 4, client_w), ground),
         ("close", colour(picture, close[0] + 3, close[1] + 3, client_w), ground),
         ("title row", colour(picture, window[0] + window[2] // 2, close[1] + 3, client_w), ground),
     )
