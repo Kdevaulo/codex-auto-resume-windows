@@ -110,7 +110,7 @@
       "passed": true,
       "worst": 0
     },
-    "window": "d333ff02c7bed37ef5c7c432c443c0c9ee574fd6983978b646aa8b993ddcb5b6"
+    "window": "dcf4b37b2f665d2eff58cd04d0c64cff6b2cf17cebe62102cc2d91c5281d9be1"
   },
   "images": {
     "assets/logo-motion-dark.png": {
@@ -136,89 +136,89 @@
       "size": "192x192"
     },
     "docs/images/notification-card-motion-ko.png": {
-      "bytes": 1768954,
-      "frames": 240,
-      "ms": 8424,
+      "bytes": 1855397,
+      "frames": 461,
+      "ms": 13200,
       "scenes": {
-        "C0": 114659,
-        "C1": 311335,
-        "C2": 1355,
-        "C3": 1321898,
-        "C4": 19604
+        "C0": 125359,
+        "C1": 331023,
+        "C2": 4794,
+        "C3": 1324078,
+        "C4": 70040
       },
-      "sha256": "349ddd21ec725824211243bd940215e4a07306796c319f4c9104e60c8ecce9a2",
-      "size": "776x524"
+      "sha256": "ef65d33cba46de05f67174440c1383f3b0cecbce521bc6502f2858d5447493cd",
+      "size": "776x592"
     },
     "docs/images/notification-card-motion.png": {
-      "bytes": 1693027,
-      "frames": 240,
-      "ms": 8424,
+      "bytes": 1779415,
+      "frames": 461,
+      "ms": 13200,
       "scenes": {
-        "C0": 114657,
-        "C1": 311021,
-        "C2": 1400,
-        "C3": 1246242,
-        "C4": 19604
+        "C0": 125305,
+        "C1": 330675,
+        "C2": 4838,
+        "C3": 1248454,
+        "C4": 70040
       },
-      "sha256": "a69614da14cf77002d4c5cdbea631c0e764903c3919ce282e82cbecfa91d3d76",
-      "size": "776x540"
+      "sha256": "8ce401087e0c6b179056ceed1be42d25d67078939bab33514844b80d02b4074c",
+      "size": "776x608"
     },
     "docs/images/readme-motion-ko.png": {
-      "bytes": 6506032,
-      "frames": 1643,
-      "ms": 45697,
+      "bytes": 6932131,
+      "frames": 1828,
+      "ms": 47597,
       "scenes": {
-        "S0": 101772,
-        "S1": 224738,
-        "S10": 170323,
-        "S11": 610374,
-        "S12": 41247,
-        "S12b": 736804,
-        "S13": 67361,
-        "S14": 20660,
-        "S15": 282303,
-        "S15b": 235788,
-        "S16": 75916,
-        "S1m": 438469,
-        "S2a": 258645,
-        "S2b": 670329,
-        "S2c": 604978,
-        "S5": 205757,
-        "S6": 157496,
-        "S7": 199427,
-        "S8": 191710,
-        "S9": 1211832
+        "S0": 257625,
+        "S1": 224921,
+        "S10": 142687,
+        "S11": 573132,
+        "S12": 69812,
+        "S12b": 783700,
+        "S13": 57247,
+        "S14": 31299,
+        "S15": 264043,
+        "S15b": 401712,
+        "S16": 63464,
+        "S1m": 405916,
+        "S2a": 254067,
+        "S2b": 799425,
+        "S2c": 663425,
+        "S5": 165299,
+        "S6": 164644,
+        "S7": 196670,
+        "S8": 155925,
+        "S9": 1257015
       },
-      "sha256": "81badb57196deaba55da7262c988a0328ebee40bd5fc5fd2057e2819a604f086",
+      "sha256": "1414dee51bc94b0ed6199df3224e5272f93482d4d2e8885b178d4cac1ed77198",
       "size": "1500x927"
     },
     "docs/images/readme-motion.png": {
-      "bytes": 7042820,
-      "frames": 1648,
-      "ms": 45917,
+      "bytes": 7333757,
+      "frames": 1838,
+      "ms": 47817,
       "scenes": {
-        "S0": 107303,
-        "S1": 259021,
-        "S10": 199691,
-        "S11": 651131,
-        "S12": 48222,
-        "S12b": 876533,
-        "S13": 53568,
-        "S14": 19806,
-        "S15": 242088,
-        "S15b": 202842,
-        "S16": 70206,
-        "S1m": 502308,
-        "S2a": 273791,
-        "S2b": 740350,
-        "S2c": 656423,
-        "S5": 232015,
-        "S6": 174752,
-        "S7": 237561,
-        "S8": 232952,
-        "S9": 1262154
+        "S0": 284839,
+        "S1": 260587,
+        "S10": 165615,
+        "S11": 607926,
+        "S12": 77016,
+        "S12b": 789699,
+        "S13": 49335,
+        "S14": 32796,
+        "S15": 256514,
+        "S15b": 329055,
+        "S16": 58633,
+        "S1m": 462781,
+        "S2a": 281627,
+        "S2b": 887117,
+        "S2c": 719649,
+        "S5": 189361,
+        "S6": 186523,
+        "S7": 233740,
+        "S8": 176222,
+        "S9": 1284619
       },
-      "sha256": "50405b15e983cd2b9742e2a0e832414694e7b551da761017b91d99eda7b879f4",
+      "sha256": "ec4804928d9a63801f478e3bf821e36bc8e4d9ec142176853d57d6c2226b65c5",
       "size": "1500x927"
     },
     "docs/images/tray-popup-motion-ko.png": {
@@ -259,13 +259,13 @@
     }
   },
   "inputs": {
-    "<motion:card-en>": "3dafafd7d4131fb3edad44ce66e3d1e9494e5f4905ec2f1b4e5307e57ca924fa",
-    "<motion:card-ko>": "a4af7483e452df172e418376ff3821cc4dc234cbe473141912bc311a5f4f9ff4",
+    "<motion:card-en>": "175aeee7999cdbc26b12ee2136fc461d83a3709d72f55757e36873d4c2f6868b",
+    "<motion:card-ko>": "9be31cd023232bc127f444795f8831eaef6e29316e5d612448bd31ef349f7380",
     "<motion:logo-dark>": "5aeb49f26d268159d57646004912d7c23bb07f35262d41592979663117cb7b47",
     "<motion:logo-light>": "415252d0f16fb2bbb73d57919364cc76ba3a112be9454d7d64dac19781314a9e",
-    "<motion:popup-en>": "d3612a145470b2fad8ad0e0a7342c2bc0096572f5604b78171836d50d7bcdba8",
-    "<motion:popup-ko>": "a66121693a9264a91368f79dea8e7ad3efc5a17b3cf912b462b5a1ae84f3d0ff",
-    "<motion:readme-en>": "f5253a2878fdf997855f9d4f13649dd8e8c3c01882afe7c1f5d0cb1edad41ac7",
-    "<motion:readme-ko>": "b3c198551b58ed3ba50a5d3dd39e75573344f3c04b238a44a1b07b312613dd03"
+    "<motion:popup-en>": "2d251e2cdec5e43856a30293caa237c10b69ee0baebfb0d602bf4dfa016a5460",
+    "<motion:popup-ko>": "7d76c90b29c72f4b505ffb122ed656d199cdc8501deaaf6c15202ac172a6a64f",
+    "<motion:readme-en>": "d363dd707294d7c3391ff557d55a281e4de30a22a872f50618818ecb342119d3",
+    "<motion:readme-ko>": "9818c8a62133eed51060adf62134afac842ff59fb3f9a0e8e59b886dfc763dbd"
   }
 }
