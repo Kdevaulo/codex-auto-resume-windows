@@ -1170,6 +1170,8 @@ namespace CodexAutoResume
             if (heroRoom > 0) ClientSize = new Size(ClientSize.Width, ClientSize.Height + heroRoom);
             BuildColumns();
             BuildDashboard();
+            // v0.6.24 final (J9): the version's pill from the first paint, read from this installation's own files.
+            ShowLocalVersion(installRoot);
             // v0.6.24: the tab strip's ground and the save bar's ground drag the window as the header's does (never a tab,
             // and never the version's pill, which is pressed: only the ground of its slot drags).
             chrome.Drag(nav);
@@ -2064,24 +2066,35 @@ namespace CodexAutoResume
                     width += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
                     continue;
                 }
-                var room = new Padding(pad, button.Padding.Top, pad, button.Padding.Bottom);
-                string key = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(button.Font).ToString(CultureInfo.InvariantCulture) +
-                             "|" + room + "|" + button.AutoSizeMode + "|" + button.Text;
-                int asked;
-                if (!tabWidths.TryGetValue(key, out asked))
-                {
-                    if (tabMeasure == null) tabMeasure = new NavButton();
-                    tabMeasure.AutoSize = button.AutoSize;
-                    tabMeasure.AutoSizeMode = button.AutoSizeMode;
-                    tabMeasure.Font = button.Font;
-                    tabMeasure.Text = button.Text;
-                    tabMeasure.Padding = room;
-                    asked = tabMeasure.GetPreferredSize(Size.Empty).Width;
-                    tabWidths[key] = asked;
-                }
-                width += asked + tab.Margin.Horizontal;
+                width += TabWidthAt(button, pad) + tab.Margin.Horizontal;
             }
+            // v0.6.24 final (J9): and the room of a tab whose showing is not known yet (TabsHeld) - the advanced edition's
+            // Chat until its state is read - so the row does not move when it shows.
+            var held = new List<NavButton>();
+            TabsHeld(held);
+            foreach (NavButton button in held) width += TabWidthAt(button, pad) + button.Margin.Horizontal;
             return width;
+        }
+
+        /// The width `button` asks for with `pad` at either side of its words, measured once per font, room and words.
+        private int TabWidthAt(NavButton button, int pad)
+        {
+            var room = new Padding(pad, button.Padding.Top, pad, button.Padding.Bottom);
+            string key = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(button.Font).ToString(CultureInfo.InvariantCulture) +
+                         "|" + room + "|" + button.AutoSizeMode + "|" + button.Text;
+            int asked;
+            if (!tabWidths.TryGetValue(key, out asked))
+            {
+                if (tabMeasure == null) tabMeasure = new NavButton();
+                tabMeasure.AutoSize = button.AutoSize;
+                tabMeasure.AutoSizeMode = button.AutoSizeMode;
+                tabMeasure.Font = button.Font;
+                tabMeasure.Text = button.Text;
+                tabMeasure.Padding = room;
+                asked = tabMeasure.GetPreferredSize(Size.Empty).Width;
+                tabWidths[key] = asked;
+            }
+            return asked;
         }
 
         /// Every tab of the strip with `pad` at either side of its name, shown or not (a tab shown later comes in as close

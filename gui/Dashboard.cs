@@ -1390,6 +1390,8 @@ namespace CodexAutoResume
         // The Dashboard's pages and navigation are built, and the snapshot is shown on those
         // built so far.
         partial void DashboardBuilt();
+        // v0.6.24 final (J9): tabs not shown yet whose room the tab row keeps, while whether they show is not known (TabRowAt).
+        partial void TabsHeld(List<NavButton> held);
         // v0.6.22: how much the Overview keeps under its two rows of cards, for what the edition shows there; nothing here.
         partial void OverviewRoomAsked(ref int under);
         // v0.6.23: once the standard pages have been made ready ahead of their first visit (PrepareNext), a page of the

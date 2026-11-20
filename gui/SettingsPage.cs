@@ -1635,6 +1635,26 @@ namespace CodexAutoResume
             label.Set(label == versionText ? number : "v" + number, named ? S("edition." + edition, edition) : null);
         }
 
+        /// v0.6.24 final's live acceptance (J9): the version as this installation's own files say it, on the tabs' pill from
+        /// the window's first paint - it came only with the first state, and the tab row changed once after opening. The
+        /// version is written in one place, app\.codex-plugin\plugin.json, which config.version reads for the status too;
+        /// the edition is what the source tree under it is (InstallerFlow.EditionOfSource). The status writes the same over
+        /// it (ShowVersion), and has the last word where they differ. A window with no plugin.json beside it waits for the
+        /// status, as before.
+        private void ShowLocalVersion(string root)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(root)) return;
+                string app = Path.Combine(root, "app");
+                string number = InstallerFlow.VersionOf(ReadText(Path.Combine(Path.Combine(app, ".codex-plugin"), "plugin.json")));
+                if (string.IsNullOrEmpty(number)) return;
+                string edition = InstallerFlow.EditionOfSource(Path.Combine(app, "src")) ?? UnnamedEdition;
+                ShowVersion(versionText, new Dictionary<string, object> { { "version", number }, { "edition", edition } });
+            }
+            catch (Exception) { /* the status names it */ }
+        }
+
         /// The edition whose word stands beside the version nowhere (v0.6.14). The picker's Edition column still names
         /// it, since there the word says which edition a row installs (DashboardVersions.EditionName).
         private const string UnnamedEdition = "standard";
