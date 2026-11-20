@@ -266,6 +266,11 @@ class PageSwapTests(unittest.TestCase):
         self.assertGreaterEqual(len(self.answer["after"]), 3, "Options, Progress and Finish at least")
         self.assertEqual(set(self.answer["after"]), {"whole"}, self.answer["after"])
 
+    def test_the_window_keeps_its_size_through_every_page_change(self):
+        """Fails with Fit setting the window's size again at Finish: Windows had it 906 x 940 for a moment."""
+        sizes = {(width, height) for _, width, height in self.answer["sizes"]}
+        self.assertEqual(len(sizes), 1, self.answer["sizes"])
+
 
 class PageSwapSourceTests(unittest.TestCase):
     def test_every_page_change_holds_the_painting_and_paints_once(self):

@@ -294,7 +294,11 @@ namespace CodexAutoResume
             // content card takes the rest (OnLayout fills it down to the buttons, its page's rows kept at its top). A page
             // that needs more - a larger text size - keeps the height it needs, never cut.
             int needed = Px(16) + HeaderHeight() + Px(16) + tallest + Px(32) + Px(16) + Px(Brand.ButtonHeight) + Px(16);
-            ClientSize = new Size(width, HeightFor(needed, WorkHeight()));
+            // v0.6.24 final (live re-check 3, L1): set only where it changes. Set again to the same size at the switch to
+            // Finish, the window was 906 x 940 for a moment where it is 900 x 900 - the size worked out with a frame it
+            // does not have, until its own caption took it back.
+            var size = new Size(width, HeightFor(needed, WorkHeight()));
+            if (ClientSize != size) ClientSize = size;
             if (StartPosition == FormStartPosition.Manual)
             {
                 Rectangle primary = Screen.PrimaryScreen.WorkingArea;
