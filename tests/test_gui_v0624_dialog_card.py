@@ -287,7 +287,12 @@ namespace CodexAutoResume
                 said["alphaVisible"] = alphaVisible;
                 said["visibleToOpaque"] = opaqueAt < 0 || visibleAt < 0 ? -1 : opaqueAt - visibleAt;
                 said["paintedAtVisible"] = paintedAtVisible;
-                said["seenToOpaque"] = opaqueAt < 0 || seenAt < 0 ? -1 : opaqueAt - seenAt;
+                // v0.6.24 final: from the moment it came on the screen to the one it was opaque, as the dialog recorded
+                // them. Read from out here, on the dialog's own thread, the moment came only once the repaint after the
+                // last step had run - about 1 run in 7, 150 ms late for a slow paint (dev CI 44753147128) - kept for
+                // the record as polledSeenToOpaque.
+                said["seenToOpaque"] = dialog.SeenToOpaque;
+                said["polledSeenToOpaque"] = opaqueAt < 0 || seenAt < 0 ? -1 : opaqueAt - seenAt;
                 said["rising"] = rising;
                 said["veilAtSeen"] = veilAtSeen;
                 said["layeredAfter"] = (CardNative.GetWindowLong(h, CardNative.GWL_EXSTYLE) & 0x00080000) != 0;
