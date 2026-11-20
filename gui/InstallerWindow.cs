@@ -114,6 +114,8 @@ namespace CodexAutoResume
         // they last said (so a progress line that changes nothing makes nothing again), and every step that has been under
         // way in this run - kept for the window's life, as the run's own record, whatever page shows.
         private readonly List<Control> stepRows = new List<Control>();
+        // Which step each of those rows is (Restate).
+        private readonly List<string> stepKeys = new List<string>();
         private int stepsAt;
         private string listed;
         private readonly List<string> under = new List<string>();
@@ -424,6 +426,7 @@ namespace CodexAutoResume
             marks.Clear();
             besides.Clear();
             stepRows.Clear();
+            stepKeys.Clear();
             listed = null;
             stepLabel = null;
             busyNote = null;
@@ -740,6 +743,9 @@ namespace CodexAutoResume
             foreach (string[] each in now) said.Append(each[0]).Append('=').Append(each[1]).Append(';');
             if (said.ToString() == listed) return;
             listed = said.ToString();
+            // v0.6.24 final (re-check 2): on the page on show, the same steps - only how far each is changed - are changed
+            // in place: making 18 controls again took about 100 ms of the window's thread at every step.
+            if (live && Restate(now)) return;
             var gone = new List<Control>();
             foreach (Control row in stepRows)
             {
@@ -751,6 +757,7 @@ namespace CodexAutoResume
             }
             rows.RemoveRange(stepsAt, stepRows.Count);
             stepRows.Clear();
+            stepKeys.Clear();
             foreach (string[] each in now)
             {
                 bool done = each[1] == InstallerProgress.Done, going = each[1] == InstallerProgress.Now;
@@ -765,6 +772,7 @@ namespace CodexAutoResume
                 columns[name] = mark;
                 marks[name] = mark;
                 stepRows.Add(name);
+                stepKeys.Add(each[0]);
                 if (live)
                 {
                     sheet.Controls.Add(name);
@@ -774,6 +782,30 @@ namespace CodexAutoResume
             if (!live) return;
             foreach (Control control in gone) sheet.Controls.Remove(control);
             LetGo(gone);
+        }
+
+        /// The rows of ListSteps set to say `now` where they are the same steps in the same order; false, and nothing
+        /// changed, where they are not.
+        private bool Restate(List<string[]> now)
+        {
+            if (now.Count != stepRows.Count || stepKeys.Count != stepRows.Count) return false;
+            for (int i = 0; i < now.Count; i++)
+                if (now[i][0] != stepKeys[i] || !marks.ContainsKey(stepRows[i])) return false;
+            for (int i = 0; i < now.Count; i++)
+            {
+                bool done = now[i][1] == InstallerProgress.Done, going = now[i][1] == InstallerProgress.Now;
+                Control name = stepRows[i];
+                StepMark mark = marks[name];
+                mark.Kind = done ? StepMark.Kinds.Done : going ? StepMark.Kinds.Now : StepMark.Kinds.Todo;
+                mark.AccessibleName = done ? words.Say("installer.progress.done", "Done")
+                                    : going ? words.Say("installer.progress.now", "Under way")
+                                    : words.Say("installer.progress.todo", "Still to come");
+                Font font = going ? Soft.RoleFont("name") : Font;
+                if (!Equals(name.Font, font)) name.Font = font;
+                name.ForeColor = going ? Palette.Ink : done ? Palette.Secondary : Palette.Muted;
+                name.AccessibleDescription = mark.AccessibleName;
+            }
+            return true;
         }
 
         /// The update's own page (v0.6.16, the owner: an update should show itself): the version it goes from and to,
@@ -1036,23 +1068,139 @@ namespace CodexAutoResume
             if (running || code != int.MinValue) return;
             running = true;
             ShowPage(InstallerFlow.Progress);
+            // v0.6.24 final (re-check 2): the Progress page on the screen at once, before the run has said anything.
+            PaintNow();
+            StartHearing();
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
                 int ended;
                 try
                 {
-                    ended = runner(flow,
-                                   delegate(string line) { Post(delegate { Heard(line); }); },
-                                   delegate(double share) { Post(delegate { Unpacking(share); }); });
+                    ended = runner(flow, Tell, TellUnpacked);
                 }
                 catch (Exception error)
                 {
-                    Post(delegate { Heard(error.Message); });
+                    Tell(error.Message);
                     ended = InstallerFlow.NotStarted;
                 }
-                Post(delegate { Ended(ended); });
+                TellEnded(ended);
             });
         }
+
+        // ------------------------------------------------------------------ what the run says, as the window takes it
+        // v0.6.24 final (re-check 2 on the owner's install): after Repair the setup's first page hung half painted - two grey
+        // boxes, no Cancel, no press taken - for 2 to more than 15 s, and the Progress page showed with 7 of its 9 steps
+        // ticked; once a Show log press was not taken during the copy. The run itself was on a worker, but every line it
+        // printed and every entry it unpacked (thousands: the bundled Python) was a BeginInvoke of its own, each a posted
+        // message, and each of the unpacking's laid the page out again. Windows hands a thread its posted messages before
+        // any input and before WM_PAINT, so while they came the window neither painted nor answered. Now the worker only
+        // writes what it says into a list (Tell, TellUnpacked, TellEnded) and a timer of the window's - WM_TIMER comes after
+        // input and paint - takes it in, in order, each turn no longer than HearBudget: the window paints and answers all
+        // the way through. The steps still tick as the lines that begin them arrive, and the bar grows only with the counts
+        // they carry (real progress only).
+        private readonly object toldLock = new object();
+        private readonly List<object> told = new List<object>();
+        private Timer hearing;
+        private StringBuilder logging;
+        /// How often what the run said is taken in, and the most one turn spends on it, in ms.
+        internal const int HearInterval = 30, HearBudget = 20;
+
+        private sealed class RunEnded
+        {
+            internal readonly int Code;
+            internal RunEnded(int code) { Code = code; }
+        }
+
+        /// A line the run printed, from its worker.
+        private void Tell(string line)
+        {
+            lock (toldLock) told.Add(line ?? "");
+        }
+
+        /// How far a setup program's unpacking is, from its worker: of a row of shares only the last is kept.
+        private void TellUnpacked(double share)
+        {
+            lock (toldLock)
+            {
+                if (told.Count > 0 && told[told.Count - 1] is double) told[told.Count - 1] = share;
+                else told.Add(share);
+            }
+        }
+
+        private void TellEnded(int ended)
+        {
+            lock (toldLock) told.Add(new RunEnded(ended));
+        }
+
+        private void StartHearing()
+        {
+            if (hearing == null)
+            {
+                hearing = new Timer();
+                hearing.Interval = HearInterval;
+                hearing.Tick += delegate { Hear(); };
+            }
+            hearing.Start();
+        }
+
+        /// What the run said since the last turn, taken in order: its lines into the log in one append, the last share of
+        /// the unpacking onto the bar, its end last. Without a handle - between two showings of the window
+        /// (SettingsForm.InstallPick shows it again after WinForms ended its modal loop) - it waits, and nothing is lost.
+        private void Hear()
+        {
+            if (!IsHandleCreated || IsDisposed) return;
+            var spent = Stopwatch.StartNew();
+            var logged = new StringBuilder();
+            logging = logged;
+            try
+            {
+                while (spent.ElapsedMilliseconds < HearBudget)
+                {
+                    object next;
+                    lock (toldLock)
+                    {
+                        if (told.Count == 0) break;
+                        next = told[0];
+                        told.RemoveAt(0);
+                    }
+                    var ended = next as RunEnded;
+                    if (next is string) Heard((string)next);
+                    else if (next is double) Unpacking((double)next);
+                    else if (ended != null)
+                    {
+                        logging = null;
+                        Logged(logged);
+                        if (hearing != null) hearing.Stop();
+                        Ended(ended.Code);
+                        return;
+                    }
+                }
+            }
+            finally
+            {
+                logging = null;
+                Logged(logged);
+            }
+        }
+
+        private void Logged(StringBuilder logged)
+        {
+            if (logged.Length == 0 || logArea.IsDisposed) return;
+            logArea.Box.AppendText(logged.ToString());
+            logged.Length = 0;
+        }
+
+        /// The window drawn now, with everything in it, rather than when the thread's messages next leave room for it.
+        private void PaintNow()
+        {
+            if (!IsHandleCreated || !Visible) return;
+            try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RdwInvalidate | RdwErase | RdwAllChildren | RdwUpdateNow); }
+            catch (Exception) { /* drawn when Windows next asks */ }
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr window, IntPtr rectangle, IntPtr region, uint flags);
+        private const uint RdwInvalidate = 0x0001, RdwErase = 0x0004, RdwAllChildren = 0x0080, RdwUpdateNow = 0x0100;
 
         private void Post(MethodInvoker action)
         {
@@ -1118,7 +1266,9 @@ namespace CodexAutoResume
                 return;
             }
             log.AppendLine(line ?? "");
-            logArea.Box.AppendText((line ?? "") + Environment.NewLine);
+            // While Hear takes in what the run said, its words for the log go in one append at the end of the turn.
+            if (logging != null) logging.Append(line ?? "").Append(Environment.NewLine);
+            else logArea.Box.AppendText((line ?? "") + Environment.NewLine);
             string said = (line ?? "").Trim();
             if (said.StartsWith("The watcher could not be confirmed running", StringComparison.Ordinal)) unconfirmed = true;
             if (said.StartsWith("The previous version of the watcher was asked to stop", StringComparison.Ordinal)) previousRunning = true;
@@ -1143,7 +1293,10 @@ namespace CodexAutoResume
             double place = InstallerProgress.Unpacked((int)Math.Round(share * 1000), 1000);
             if (place <= at) return;
             at = reached = place;
-            step = share >= 1.0 ? "unpack" : share <= 0 ? "verify_setup" : "unpack";
+            string now = share >= 1.0 ? "unpack" : share <= 0 ? "verify_setup" : "unpack";
+            // v0.6.24 final (re-check 2): the page laid out again only where the step changes; within it, the bar alone.
+            if (now == step && under.Contains(step)) { bar.Value = at; return; }
+            step = now;
             ShowStep();
         }
 
@@ -1292,6 +1445,17 @@ namespace CodexAutoResume
         {
             answered.Set();
             base.OnFormClosed(e);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && hearing != null)
+            {
+                hearing.Stop();
+                hearing.Dispose();
+                hearing = null;
+            }
+            base.Dispose(disposing);
         }
 
         /// A window build/capture_window.ps1 started is never made the foreground window, as the Dashboard's is not
@@ -1473,7 +1637,17 @@ namespace CodexAutoResume
             this.number = number ?? "";
         }
 
-        internal Kinds Kind { get { return kind; } }
+        /// v0.6.24 final (re-check 2): a step's mark changes in place as the run goes on (ListSteps), never made again.
+        internal Kinds Kind
+        {
+            get { return kind; }
+            set
+            {
+                if (kind == value) return;
+                kind = value;
+                Invalidate();
+            }
+        }
 
         /// How wide and tall it is: a check box for a step, and a disc that holds its number at any text size.
         internal int Extent
