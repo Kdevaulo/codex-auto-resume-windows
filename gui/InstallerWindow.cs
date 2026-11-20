@@ -266,6 +266,13 @@ namespace CodexAutoResume
         /// The window's size: Width wide, and as tall as the tallest of its pages needs at that width.
         private void Fit()
         {
+            bool held = HoldPainting();
+            try { FitNow(); }
+            finally { if (held) PaintWhole(); }
+        }
+
+        private void FitNow()
+        {
             int width = Px(OpeningWidth);
             int inner = Inner(width);
             int tallest = 0;
@@ -377,8 +384,64 @@ namespace CodexAutoResume
 
         internal string Page { get { return page; } }
 
-        /// Builds `name` and shows it, with the buttons it has.
+        /// Builds `name` and shows it, with the buttons it has - on the screen in one go (HoldPainting, PaintWhole).
         internal void ShowPage(string name)
+        {
+            bool held = HoldPainting();
+            try { ShowPageNow(name); }
+            finally { if (held) PaintWhole(); }
+        }
+
+        // ------------------------------------------------------------------ a page change in one frame
+        // v0.6.24 final (live re-check 3, L1): after Repair two DXGI frames still showed the first page with two grey boxes
+        // over it and a third the Progress page's head over its remains: the old page's controls went and the new page's
+        // came, each painted on its own as the thread came to it. Every page change (ShowPage, and Fit, which measures every
+        // page by building it) now holds the painting of everything in the window (WM_SETREDRAW on its ground) while the page
+        // is swapped and laid out, then paints it all offscreen and puts it on the screen at once (WS_EX_COMPOSITED for that
+        // one paint, RDW_UPDATENOW): the screen goes from the page before to the page after, whole.
+        private int holding;
+
+        private bool HoldPainting()
+        {
+            if (holding > 0) { holding++; return true; }
+            if (!ground.IsHandleCreated || ground.IsDisposed || !Visible || !ground.Visible) return false;
+            SendMessage(ground.Handle, WmSetRedraw, IntPtr.Zero, IntPtr.Zero);
+            holding = 1;
+            return true;
+        }
+
+        private void PaintWhole()
+        {
+            if (--holding > 0 || ground.IsDisposed || !ground.IsHandleCreated) return;
+            SendMessage(ground.Handle, WmSetRedraw, (IntPtr)1, IntPtr.Zero);
+            long style = GetWindowLongPtr(ground.Handle, GwlExStyle).ToInt64();
+            bool already = (style & WsExComposited) != 0;
+            if (!already) SetWindowLongPtr(ground.Handle, GwlExStyle, new IntPtr(style | WsExComposited));
+            try
+            {
+                RedrawWindow(ground.Handle, IntPtr.Zero, IntPtr.Zero,
+                             RdwInvalidate | RdwErase | RdwFrame | RdwAllChildren | RdwUpdateNow);
+            }
+            finally
+            {
+                if (!already && !ground.IsDisposed) SetWindowLongPtr(ground.Handle, GwlExStyle, new IntPtr(style));
+            }
+        }
+
+        private const int WmSetRedraw = 0x000B, GwlExStyle = -20;
+        private const long WsExComposited = 0x02000000;
+        private const uint RdwFrame = 0x0400;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+
+        private void ShowPageNow(string name)
         {
             page = name;
             Build(name);
@@ -1305,9 +1368,15 @@ namespace CodexAutoResume
             bar.Value = at;
             if (!under.Contains(step)) under.Add(step);
             if (stepLabel == null) return;
-            stepLabel.Text = words.Step(step);
-            if (page == InstallerFlow.Progress) ListSteps(true);
-            Arrange(Inner(ClientSize.Width));
+            // v0.6.24 final (live re-check 3): the step's words, its list and the rows moved for them on the screen at once.
+            bool held = HoldPainting();
+            try
+            {
+                stepLabel.Text = words.Step(step);
+                if (page == InstallerFlow.Progress) ListSteps(true);
+                Arrange(Inner(ClientSize.Width));
+            }
+            finally { if (held) PaintWhole(); }
         }
 
         private void Ended(int ended)
