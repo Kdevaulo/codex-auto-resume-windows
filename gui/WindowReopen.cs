@@ -608,6 +608,8 @@ namespace CodexAutoResume
         /// is now on a monitor of another scale (WM_DPICHANGED) - moved there, or the monitor's scaling changed.
         protected override void WndProc(ref Message m)
         {
+            // v0.6.24 final (L3): the start's marks (CODEX_AR_START_MARKS) - the first message after the window came on.
+            if (StartMarks.On) MarkFirstFrame(m.Msg);
             if (m.Msg == WM_COPYDATA && TakeOpenRequest(ref m)) return;
             // v0.6.24: then the window's own caption (gui/SoftChrome.cs): its frame, what the pointer is over, its buttons -
             // before anything else the window handles. It answers none of the open request's messages.
@@ -785,6 +787,23 @@ namespace CodexAutoResume
         {
             return !capture && arguments != null && Array.IndexOf(arguments, ReopenedAfterUpdate) >= 0;
         }
+
+        // Whether the start's marks have the first frame and the first state (StartMarks).
+        private bool firstFrameMarked, firstStateMarked;
+
+        /// The first frame, for the start's marks: the first message once the window is shown and its own corner's cloak
+        /// let go of it (WindowCorner.Painted), or its first WM_PAINT where it has no corner of its own.
+        private void MarkFirstFrame(int message)
+        {
+            if (firstFrameMarked || !IsHandleCreated || !Visible) return;
+            WindowCorner corner = WindowCorner.Of(this);
+            if (corner != null ? corner.Cloaked : message != WM_PAINT) return;
+            firstFrameMarked = true;
+            StartMarks.Mark("first frame");
+            StartMarks.Write();
+        }
+
+        private const int WM_PAINT = 0x000F;
 
         protected override void OnHandleCreated(EventArgs e)
         {

@@ -1067,6 +1067,7 @@ namespace CodexAutoResume
             // language and this Windows language (see StringsCache); otherwise asked for on a
             // worker, while the fonts and the icon are made. The window used to wait 260-400 ms for
             // the interpreter to start, and then spend 130-260 ms more on the first font.
+            StartMarks.Mark("window made");
             string root = AppDomain.CurrentDomain.BaseDirectory;
             installRoot = root;
             string cacheKey = null;
@@ -1093,6 +1094,7 @@ namespace CodexAutoResume
             Font = windowFont ?? AtDisplayScale(TextScale.Apply(SystemFonts.MessageBoxFont, textRead, TextSize));
             // The type roles (Soft.RoleFont) are variants of the window's own font.
             Soft.BaseFont = Font;
+            StartMarks.Mark("font");
             ForeColor = Ink;
             // v0.6.24-beta.3 (W2): on a special day the window's ground faintly takes the day's (DayGround), before anything is
             // made in it - and as it was everywhere else, a picture's or a probe's window included, which look at no date.
@@ -1217,8 +1219,10 @@ namespace CodexAutoResume
             Load += delegate
             {
                 if (auditing) return;
+                StartMarks.Mark("load");
                 Reload();
                 ShowPage(firstPage);
+                StartMarks.Mark("first page");
                 // A window that replaces another puts the keyboard where that one had it (FocusName).
                 FocusInterim();
                 StartClock();
@@ -1226,6 +1230,7 @@ namespace CodexAutoResume
             Shown += delegate
             {
                 shown = true;
+                StartMarks.Mark("shown");
                 // v0.6.20: the watcher's request to come forward is heard even when this window runs elevated.
                 AcceptOpenRequests();
                 // v0.6.24-beta.2: the opening sweep a read before this asked for (SweepLight) - after the open requests,
@@ -1255,6 +1260,7 @@ namespace CodexAutoResume
             FormClosed += delegate { StopClock(); bridge.Stop(); };
             // W2: the controls made as the window's fields were, before the day's tint was adopted above, take it too.
             if (DayGround.Look != null) DayGround.Repaint(this, DayGround.Untinted, Palette.Canvas);
+            StartMarks.Mark("built");
         }
 
         /// The window within the screen it opens on. Its sizes are scaled, so on a small screen at
@@ -2239,6 +2245,52 @@ namespace CodexAutoResume
         }
     }
 
+    /// v0.6.24 final (the live re-check's L3): where the time goes from this process's start to the window's first frame on
+    /// the screen, written down only when CODEX_AR_START_MARKS names a file - a person's or the measurement's, never by
+    /// default. Each mark is one line, the milliseconds since the process was created and the step's name; the file is
+    /// written when the first frame is on the screen and again once the first state has been shown. With the variable
+    /// unset every mark is one test of a field that is null, and nothing is read, measured or written.
+    internal static class StartMarks
+    {
+        private static readonly string target = Environment.GetEnvironmentVariable("CODEX_AR_START_MARKS");
+        private static readonly StringBuilder said = string.IsNullOrEmpty(target) ? null : new StringBuilder();
+        private static double offset = double.NaN;
+
+        /// Whether marks are being written down.
+        internal static bool On { get { return said != null; } }
+
+        /// `step` reached now.
+        internal static void Mark(string step)
+        {
+            if (said == null) return;
+            try
+            {
+                double now = Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency;
+                lock (said)
+                {
+                    if (double.IsNaN(offset))
+                        using (Process self = Process.GetCurrentProcess())
+                            offset = (DateTime.Now - self.StartTime).TotalMilliseconds - now;
+                    said.Append((now + offset).ToString("0.0", CultureInfo.InvariantCulture)).Append(' ').Append(step).Append('\n');
+                }
+            }
+            catch (Exception) { /* a mark not written down; the window goes on */ }
+        }
+
+        /// The marks so far, written to the file named.
+        internal static void Write()
+        {
+            if (said == null) return;
+            try
+            {
+                string text;
+                lock (said) text = said.ToString();
+                File.WriteAllText(target, text, new UTF8Encoding(false));
+            }
+            catch (Exception) { /* not written: the window goes on */ }
+        }
+    }
+
     internal static class Program
     {
         [DllImport("shell32.dll", PreserveSig = false)]
@@ -2265,9 +2317,58 @@ namespace CodexAutoResume
             catch (Exception) { }           // an older shell, or a shell that refuses: the button simply stays still
         }
 
+        /// v0.6.24 final (the live re-check's L3: the Start menu's Dashboard showed its first frame 6-7 s after the click): the
+        /// first font this process makes, made on a thread of its own as the process starts. GDI+ builds the collection of
+        /// every font installed on the machine for the first font any thread asks for - measured on the owner's PC 225-260 ms
+        /// in a bare program, 230-525 ms inside the window's start, on the window's own thread, before anything of it could
+        /// be painted (SettingsForm's constructor: SystemFonts.MessageBoxFont). Asked here, it is built while that thread
+        /// does everything Main does before the window is made, and the constructor's font finds it built, or waits only
+        /// for the rest. It changes no font: this one is let go at once, and the window makes its own as it always did.
+        internal static void WarmFonts()
+        {
+            try
+            {
+                var warm = new System.Threading.Thread(delegate()
+                {
+                    try { using (Font font = SystemFonts.MessageBoxFont) { } }
+                    catch (Exception) { /* the window's own font makes the collection, as it did before */ }
+                });
+                warm.IsBackground = true;
+                warm.Start();
+            }
+            catch (Exception) { /* as before: the first font the window makes builds it */ }
+        }
+
+        /// The file the JIT keeps the window's start in (StartProfile), in the installation's config\ folder.
+        internal const string StartProfileName = "window-start.jit";
+
+        /// v0.6.24 final (L3): the window's start compiled ahead, on the machine's other cores. The window is one assembly of
+        /// some 2 MiB of IL, and every method it runs before its first frame is compiled as it is first called, on the
+        /// window's thread - the header, the tab row, the Overview, the first paint (ngen needs an administrator, so no
+        /// image of it is made ahead). .NET's multicore JIT (ProfileOptimization) writes down which methods the start
+        /// compiled, in this installation's config\ folder, and on the next start compiles them on other threads, from
+        /// the first moment, ahead of the window's own thread calling them. Only for a window that opens: never for a
+        /// start that hands over or opens again outside (which would write down a start of a few methods), nor for a
+        /// capture's or where there is no config\ folder. A profile that cannot be read or written is no profile: the
+        /// window starts as it did before.
+        internal static void StartProfile(string root)
+        {
+            try
+            {
+                string folder = Path.Combine(root, "config");
+                if (!Directory.Exists(folder)) return;
+                System.Runtime.ProfileOptimization.SetProfileRoot(folder);
+                System.Runtime.ProfileOptimization.StartProfile(StartProfileName);
+            }
+            catch (Exception) { /* compiled as it is called, as before */ }
+        }
+
         [STAThread]
         internal static int Main(string[] argv)
         {
+            // v0.6.24 final (L3): before anything else, the machine's fonts collected on a thread of their own (WarmFonts).
+            WarmFonts();
+            StartMarks.Mark("main");
             // The accessibility improvements .NET 4.8 ships but leaves off for an assembly
             // with no target-framework attribute, which is what the in-box compiler builds.
             // Without them a live region never reaches a screen reader.
@@ -2304,6 +2405,9 @@ namespace CodexAutoResume
                 HostApp.Relaunch(Application.ExecutablePath, HostApp.Arguments(argv), root))
                 return 0;
             HostApp.StuckInside = inside;
+            // v0.6.24 final (L3): from here on this process opens the window - the start compiled ahead (StartProfile).
+            if (Soft.StillReady == null) StartProfile(root);
+            StartMarks.Mark("opening");
             var bridge = new Bridge(root);
             if (!bridge.Available)
             {
