@@ -60,9 +60,11 @@ def cmd_status(args) -> int:
         backend = app.backend()
         _print("codex engine     : %s" % backend.codex_exe)
         _print("engine version   : %s  (%s)" % (backend.engine_version, _engine_words(app, backend)[0]))
-        identity = backend.app_identity()
-        _print("ChatGPT app      : %s" % ("running (pid %d, codex server pid %d)" % (identity["pid"], identity["server"]["pid"]) if identity
-                                          else UNMATCHED_APP if backend.app_look == "unmatched" else "not running / not paired"))
+        identity, looked = _app_paired(app, backend)
+        elsewhere = "; %s" % ELSEWHERE_SHORT if identity and looked.codex_exe != backend.codex_exe else ""
+        _print("ChatGPT app      : %s" % ("running (pid %d, codex server pid %d%s)"
+                                          % (identity["pid"], identity["server"]["pid"], elsewhere) if identity
+                                          else UNMATCHED_APP if looked.app_look == "unmatched" else "not running / not paired"))
     except (config.ConfigError, AdapterError) as exc:
         _print("codex engine     : unavailable (%s)" % exc)
     view = compatio.reader_view(app.paths, settings=app.settings)
@@ -78,8 +80,30 @@ def cmd_status(args) -> int:
 
 # #58's follow-up: the app runs, and the look found no server of its at the configured engine.
 UNMATCHED_APP = "running, but its Codex server could not be matched"
+# v0.6.24 final: the app serves from another official engine than the one found first, which the watcher takes up.
+ELSEWHERE_SHORT = "its server runs from another official Codex engine, which the watcher takes up"
 # The health check's checks, counted for the setup window's bar while install.ps1 runs it (progress).
 DOCTOR_CHECKS = 8
+
+
+def _app_paired(app, backend):
+    """(identity, backend): the app's pairing as the watcher reaches it, and the backend whose look that was.
+
+    v0.6.24 final: right after a restart the app can run its server from another official Codex engine (in bin, or in
+    its own package and signed by OpenAI, #58) than the one discovery found first - on the owner's PC the package's
+    0.169.1 beside bin's 0.167.0-alpha.4.1 - and the watcher then looks for its engine again (App.engine_moved) and
+    pairs with that one. A check that judged the first pairing alone said "could not be matched" after every install
+    and repair, of an app the watcher recovers with a moment later. So it takes the same look again first: the same
+    rule (official_engine; a named engine is never second-guessed), the same discovery, every engine check included.
+    A server it does not find that way - not official, unsigned, unreadable, failing its checks - stays unmatched."""
+    identity = backend.app_identity()
+    if identity or not app.engine_moved():
+        return identity, backend
+    try:
+        again = app.backend()
+    except (config.ConfigError, AdapterError):
+        return None, backend
+    return again.app_identity(), again
 
 
 def cmd_doctor(args) -> int:
@@ -114,12 +138,15 @@ def cmd_doctor(args) -> int:
     _print("reported         : %s" % _reported_words(live if live is not None else report))
     progress("check", 3, DOCTOR_CHECKS)
     _print("codex home       : %s" % app.codex_home)
-    identity = backend.app_identity()
+    identity, looked = _app_paired(app, backend)
     if identity:
         _print("ChatGPT app      : main pid %d, codex app-server pid %d" % (identity["pid"], identity["server"]["pid"]))
+        if looked.codex_exe != backend.codex_exe:
+            # Not a problem: the engine the watcher pairs with on its next look, named as codex.exe names the first.
+            _print("                   %s: %s (%s)" % (ELSEWHERE_SHORT, looked.codex_exe, looked.engine_version))
     else:
         ok = False
-        _print("ChatGPT app      : %s" % (UNMATCHED_APP if backend.app_look == "unmatched"
+        _print("ChatGPT app      : %s" % (UNMATCHED_APP if looked.app_look == "unmatched"
                                           else "not running or not paired with the configured engine"))
     progress("check", 4, DOCTOR_CHECKS)
     running = app.watcher_running()
