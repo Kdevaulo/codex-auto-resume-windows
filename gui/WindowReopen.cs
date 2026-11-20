@@ -768,6 +768,36 @@ namespace CodexAutoResume
         // wait for, so it hands over to one that is open. One that hangs is not answered for (SmtoAbortIfHung) and the start
         // goes on. Every other parser of the command line ignores it, as an unknown argument always was.
         internal const string ReopenedAfterUpdate = "--after-update";
+
+        // ------------------------------------------------------------- opened again behind the setup's Finish (v0.6.24)
+        // The v0.6.24 final's live acceptance (J10): after a Repair the setup opened the Dashboard again (ReopenedAfterUpdate)
+        // and it came up over the setup window's Finish page and hid it whole - a person might wait for a window they could
+        // not see. Such a window now opens WITHOUT taking the activation (ShowWithoutActivation) and stands directly behind
+        // the window in front, the setup's (HostApp.StandBehindFront): as its handle is made, before it is first shown, and
+        // once more when it is shown. The Finish page stays in front and keeps the keyboard; when it is closed, Windows hands
+        // the activation to the window next in the order, which is this one. An update is the same run (Open-ClosedDashboard)
+        // and does the same. Every other start - a person's, the watcher's, a reopen of its own - opens as it always did.
+        internal static bool OpensBehind;
+
+        /// Whether a start with `arguments` opens behind the window in front: the installer's reopen after an update or a
+        /// Repair (ReopenedAfterUpdate), never a capture's. Pure.
+        internal static bool OpensBehindFor(string[] arguments, bool capture)
+        {
+            return !capture && arguments != null && Array.IndexOf(arguments, ReopenedAfterUpdate) >= 0;
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            if (OpensBehind) HostApp.StandBehindFront(Handle);
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            if (OpensBehind) HostApp.StandBehindFront(Handle);
+            base.OnShown(e);
+        }
+
         private const int SmtoAbortIfHung = 0x0002;
         private const int GwOwner = 4;
         private const int QueryLimitedInformation = 0x1000;

@@ -2326,6 +2326,8 @@ namespace CodexAutoResume
             var persistent = new PersistentBridge(root, bridge);
             UiFaults.Follow(root, persistent);
             DayArt.On = Soft.StillClock < 0;
+            // v0.6.24 final (J10): opened again by the setup after an update or a Repair, behind its Finish page.
+            SettingsForm.OpensBehind = SettingsForm.OpensBehindFor(argv, Soft.StillReady != null);
             var window = new SettingsForm(persistent);
             // A window a person opened comes to the front - after Finish, and opened again outside (v0.6.17); a window
             // that reopens itself, and a capture's, keep their place.
