@@ -4,7 +4,8 @@ The layout audit and test_gui_chrome_window build their windows TopLevel = false
 never asked there. A probe compiled with the window makes the Dashboard and the dialogs as real top-level windows that are
 never shown (no WS_VISIBLE, nothing on the screen), and asks:
 
-- the opening size of a top-level dialog: what it asked plus its title's strip, not one Windows caption taller. Form fills
+- the opening size of a top-level dialog: what it asked plus its title's strip, not one Windows caption taller - and,
+  from the v0.6.24 final, with no frame at all where it has the Dashboard's own outer corner. Form fills
   the window's size in at CreateWindowEx from its client size with Windows' caption counted
   (Form.FillInCreateParamsStartPosition); SoftDialog's CreateParams answers it without (Chrome.Uncaptioned);
 - maximise, then restore: the window back at the size it had, not one caption taller. WinForms turns the client size it
@@ -369,7 +370,11 @@ namespace CodexAutoResume
             var said = TopLevelBox(d);
             int style = (int)TopLevelNative.GetWindowLongPtr(d.Handle, TopLevelStyle).ToInt64();
             int ex = (int)TopLevelNative.GetWindowLongPtr(d.Handle, TopLevelExStyle).ToInt64();
-            Size outer = Chrome.WindowSize(new Size(600, 400 + d.TitleReserve), Chrome.Frame(style, ex));
+            // v0.6.24 final: with its own outer corner (the Dashboard's, SoftDialog.BuildTitle) it has no frame at all.
+            bool frameless = d.CaptionHost.Frameless;
+            Size outer = Chrome.WindowSize(new Size(600, 400 + d.TitleReserve), frameless ? Padding.Empty : Chrome.Frame(style, ex));
+            said["frameless"] = frameless;
+            said["wanted"] = WindowShape.Wanted();
             said["reserve"] = (double)d.TitleReserve;
             said["expectedWindow"] = Numbers(outer.Width, outer.Height);
             return said;
@@ -489,6 +494,8 @@ class TopLevelChromeTests(unittest.TestCase):
                 self.assertEqual(said["clientSize"], [600, 400 + said["reserve"]])
                 self.assertEqual(said["client"][2:], [600, 400 + said["reserve"]], "Windows' client rectangle")
                 self.assertEqual(said["window"][2:], said["expectedWindow"], "no Windows caption in the window's height")
+                # v0.6.24 final: its own outer corner wherever the window may have one, and then no frame round it.
+                self.assertEqual(said["frameless"], said["wanted"])
 
     def test_maximise_then_restore_comes_back_at_the_size_it_had(self):
         for key in ("restore-en", "restore-ar", "restore-Sizable", "restore-FixedDialog"):
