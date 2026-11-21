@@ -373,7 +373,7 @@ namespace CodexAutoResume
         private readonly OpenRequest request;
         private readonly string installRoot;
         // v0.6.24 final: the key the window's words were looked up under (StringsCache.Key), or null - the advanced
-        // edition keeps its page's words under the same (AdvancedWordsCache).
+        // edition keeps its page's words under the same key.
         private string openedKey;
         // Reopening (see Reopen). What this window shows - the Interface language its words were
         // resolved for, the theme it draws and, since v0.6.10, the design it draws (Design.Drawn) - against
