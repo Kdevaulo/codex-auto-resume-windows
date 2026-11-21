@@ -110,7 +110,7 @@
       "passed": true,
       "worst": 0
     },
-    "window": "0bbf10b88f41cd37d0e19b72a19319e8cf9bf457a64c26d8491a063d24dd2989"
+    "window": "9a88b93995f54c79e6fc5d34f4a2f25fa715f58f2045fc9dbaf173d650bc4871"
   },
   "images": {
     "assets/logo-motion-dark.png": {
@@ -164,7 +164,7 @@
       "size": "776x608"
     },
     "docs/images/readme-motion-ko.png": {
-      "bytes": 6944555,
+      "bytes": 6942656,
       "frames": 1828,
       "ms": 47597,
       "scenes": {
@@ -184,16 +184,16 @@
         "S2b": 799425,
         "S2c": 681115,
         "S5": 165299,
-        "S6": 162197,
+        "S6": 160298,
         "S7": 193851,
         "S8": 155925,
         "S9": 1257015
       },
-      "sha256": "b2ccf9ecf47b9f446c50c419ccda8086a36579c740464585a9202c42f164c027",
+      "sha256": "0a468215675117e00479961b4d97ae6ebfbe7854d1b1494780b96f3103e67775",
       "size": "1500x927"
     },
     "docs/images/readme-motion.png": {
-      "bytes": 7346429,
+      "bytes": 7356816,
       "frames": 1838,
       "ms": 47817,
       "scenes": {
@@ -209,7 +209,7 @@
         "S15b": 329055,
         "S16": 58633,
         "S1m": 462781,
-        "S2a": 281627,
+        "S2a": 292014,
         "S2b": 887117,
         "S2c": 737213,
         "S5": 189361,
@@ -218,7 +218,7 @@
         "S8": 176222,
         "S9": 1284619
       },
-      "sha256": "b927b18c12cf2886debe9b52ddb4e35d33dd1739db3626968ebcb642ed7d52dd",
+      "sha256": "ef6b39df9ee9d7f58e17fabb22530dae789c90c7a3e8951bb5d8b51bdf944607",
       "size": "1500x927"
     },
     "docs/images/tray-popup-motion-ko.png": {
@@ -265,7 +265,7 @@
     "<motion:logo-light>": "415252d0f16fb2bbb73d57919364cc76ba3a112be9454d7d64dac19781314a9e",
     "<motion:popup-en>": "0234acf9522e0e451487afc427c56b1c9dfcc3a560f72b109b34a4720ea56a18",
     "<motion:popup-ko>": "4e7031777008d6f2ee577a9b6fcc7b8b2487d2da8108dc8b1600326cf695e9c7",
-    "<motion:readme-en>": "277021d764f5e27841942d158c1d2195bc493c67da49b34fe8b3fd26b9dcdc45",
-    "<motion:readme-ko>": "4d50aa18dba9b4e457f4b81dd61df9eed809b41b81ec934349d5a83a75a67175"
+    "<motion:readme-en>": "5a56dc4add0707c4581e9236b84baacaa4b4992a2b4ba02845d45633f046f990",
+    "<motion:readme-ko>": "59b98fc370a66d3dc8ca31f5c6bb3c16f209b303186675af7fe466eed3ccac02"
   }
 }
