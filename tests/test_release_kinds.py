@@ -160,7 +160,9 @@ class KindsTests(unittest.TestCase):
     def test_a_release_of_only_fixes_says_so_and_a_final_covers_its_whole_line(self):
         # Spot checks the owner can read: v0.6.15 and v0.6.2 are fixes alone; v0.6.23's final lists what its
         # betas did, a language among them; v0.6.3 brought the neumorphic design.
-        english = _text(EN) if _english_changelog_is_english() else _text(KO)
+        # docs/CHANGELOG.md on every branch: on ko it is the Korean text (no CHANGELOG.ko.md there), whose Korean kind
+        # lines the reader gives back as the same English words.
+        english = _text(EN)
         self.assertEqual(notes.kinds(english, "0.6.15"), ["Bug fixes"])
         self.assertEqual(notes.kinds(english, "0.6.2"), ["Bug fixes"])
         self.assertEqual(notes.kinds(english, "0.5.7"), ["Security"])
