@@ -1565,15 +1565,31 @@ namespace CodexAutoResume
             var soft = dialog as SoftDialog;
             record["fades"] = soft != null && soft.OpensWithFade;
             double seen = -1, opaque = -1;
+            // Live re-check 5: how often the window's wait cursor was already off while the editor, uncloaked, was still
+            // clear (its fade at alpha 0: nothing of it seen yet) - and whether it was off by its first frame above clear.
+            int arrowWhileClear = 0;
+            object waitAtFirstFrame = null;
+            double waitOffAt = -1, firstFrameAt = -1;
             while (clock.ElapsedMilliseconds < 15000 && opaque < 0)
             {
                 Application.DoEvents();
                 int cloaked;
                 bool held = DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && cloaked != 0;
+                if (waitOffAt < 0 && !UseWaitCursor) waitOffAt = clock.Elapsed.TotalMilliseconds;
+                if (!held && soft != null && (bool)record["fades"])
+                {
+                    if (soft.FadeAlpha > 0 && firstFrameAt < 0) firstFrameAt = clock.Elapsed.TotalMilliseconds;
+                    if (soft.FadeAlpha == 0 && !UseWaitCursor) arrowWhileClear++;
+                    if (soft.FadeAlpha > 0 && waitAtFirstFrame == null) waitAtFirstFrame = UseWaitCursor;
+                }
                 if (!held && seen < 0) seen = clock.Elapsed.TotalMilliseconds;
                 if (seen >= 0 && (soft == null || soft.SeenToOpaque >= 0)) opaque = seen + (soft == null ? 0 : soft.SeenToOpaque);
                 System.Threading.Thread.Sleep(1);
             }
+            record["arrowWhileClear"] = (double)arrowWhileClear;
+            record["waitAtFirstFrame"] = waitAtFirstFrame;
+            // How long before its first frame above clear the pointer was given back (negative: after it), in ms.
+            record["arrowLead"] = waitOffAt < 0 || firstFrameAt < 0 ? 0 : firstFrameAt - waitOffAt;
             record["seen"] = seen;
             // On the screen: the pointer given back.
             record["seenCursors"] = CursorsOver(h);

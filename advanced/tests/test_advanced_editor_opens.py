@@ -88,6 +88,7 @@ class EditorOpensTests(PageCase):
         for n, record in enumerate(self.opens()):
             print("\n[editor %d] built %.0f, shown %.0f, seen %.0f, opaque %.0f ms (fades: %s)"
                   % (n, record["built"], record.get("shown", -1), record["seen"], record["whole"], record["fades"]), end="")
+            print(" arrow lead %.0f ms" % record.get("arrowLead", 0), end="")
 
     def test_it_is_on_the_screen_within_its_budget_of_the_press(self):
         opens = self.opens()
@@ -108,6 +109,11 @@ class EditorOpensTests(PageCase):
                                  "the wait cursor over the window held disabled, its caption and the editor's title row "
                                  "until the editor is on the screen")
                 self.assertEqual(record["seenCursors"], [False, False, False], "and the pointer given back once it is")
+                if record["fades"]:
+                    # Live re-check 5: given back as it was uncloaked, still clear - 0.12 to 0.15 s before its first frame.
+                    self.assertEqual(record["arrowWhileClear"], 0,
+                                     "the wait cursor on while the editor, uncloaked, is still clear (alpha 0)")
+                    self.assertIs(record["waitAtFirstFrame"], False, "and given back at its first frame above clear")
 
 
 if __name__ == "__main__":

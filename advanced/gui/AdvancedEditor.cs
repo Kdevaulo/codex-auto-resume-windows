@@ -171,16 +171,34 @@ namespace CodexAutoResume
             GivePointerBack(waited);
         }
 
-        /// The window's own cursor again, at once wherever the pointer rests: the arrow for now, and the cursor of what is
-        /// under the pointer as Windows asks for it again (the pointer set where it already is).
+        /// The window's own cursor again, at once wherever the pointer rests, the pointer never moved: what is under it -
+        /// one of this window's own (the window itself while its dialog holds it, a control, the editor) - asked for its
+        /// cursor as Windows asks it (WM_NCHITTEST, then WM_SETCURSOR as for a move), or the arrow where none of ours is.
         private void GivePointerBack(bool waited)
         {
             UseWaitCursor = waited;
             if (waited) return;
             Cursor.Current = Cursors.Default;
-            try { Cursor.Position = Cursor.Position; }
+            try
+            {
+                Point at = Cursor.Position;
+                IntPtr under = PointerWindowAt(new EditorPoint { X = at.X, Y = at.Y });
+                int process;
+                if (under == IntPtr.Zero || GetWindowThreadProcessId(under, out process) != GetCurrentThreadId()) return;
+                IntPtr where = (IntPtr)((at.Y & 0xFFFF) << 16 | (at.X & 0xFFFF));
+                int hit = SendMessage(under, 0x0084, IntPtr.Zero, where).ToInt32();
+                SendMessage(under, 0x0020, under, (IntPtr)((0x0200 << 16) | (hit & 0xFFFF)));
+            }
             catch (Exception) { /* no pointer to ask about (a locked session): the next move asks */ }
         }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct EditorPoint { public int X, Y; }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "WindowFromPoint")]
+        private static extern IntPtr PointerWindowAt(EditorPoint point);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern int GetCurrentThreadId();
 
         /// v0.6.24 final (L5): the editor's card, its body and the page it scrolls in hold their layout from the moment the
         /// dialog is shown until its controls have their windows and have been told they are visible, and are laid out once

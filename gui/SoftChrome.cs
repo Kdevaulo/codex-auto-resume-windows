@@ -2286,6 +2286,8 @@ namespace CodexAutoResume
             fadeAlpha = Math.Max(0, Math.Min(255, alpha));
             try { SetLayeredWindowAttributes(Handle, 0, (byte)fadeAlpha, LWA_ALPHA); }
             catch (Exception) { }
+            // Its first frame anyone can see: uncloaked (seenAt) and above clear.
+            if (fadeAlpha > 0 && seenAt != 0) CameOnNow();
             // v0.6.24 final: its own corner's edge and shadow fade with it - never round a dialog not yet seen.
             WindowCorner own = OwnCorner;
             if (own != null) own.Opacity(fadeAlpha);
@@ -2367,8 +2369,9 @@ namespace CodexAutoResume
         // v0.6.24 final: Stopwatch timestamps of the moment it came on the screen (uncloaked) and of the one it was opaque.
         private long seenAt, opaqueAt;
 
-        /// v0.6.24 final (live re-check 4, M3): raised once, as the dialog comes on the screen - uncloaked, its first frame
-        /// - or as it is shown where it was never held off: what waits for it to be seen (the editor's wait cursor).
+        /// v0.6.24 final (live re-check 4, M3): raised once, as the dialog's first frame anyone can see comes - uncloaked and,
+        /// where it fades in, at its first alpha above zero (live re-check 5) - or as it is shown where it was never held
+        /// off: what waits for it to be seen (the editor's wait cursor).
         internal event EventHandler CameOn;
         private bool cameOn;
 
@@ -2441,9 +2444,14 @@ namespace CodexAutoResume
             try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
             catch (Exception) { }
             seenAt = System.Diagnostics.Stopwatch.GetTimestamp();
-            // With no fade it is opaque as it is seen.
-            if (!fadeIn) opaqueAt = seenAt;
-            CameOnNow();
+            // With no fade it is opaque as it is seen, and on the screen now; fading, it is on the screen at its first alpha
+            // above zero (SetFade) - uncloaked at 0 it is still not seen (live re-check 5: CameOn here gave the editor's
+            // wait cursor back 0.12 to 0.15 s before its first frame).
+            if (!fadeIn)
+            {
+                opaqueAt = seenAt;
+                CameOnNow();
+            }
             // On the screen: its own corner's companion with it, at the alpha the fade starts from (clear where it fades).
             if (OwnCorner != null) OwnCorner.Held = false;
             OpenFade();
