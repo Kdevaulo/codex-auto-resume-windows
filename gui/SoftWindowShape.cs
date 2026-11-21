@@ -678,6 +678,10 @@ namespace CodexAutoResume
         private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
         [DllImport("dwmapi.dll")]
         private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
+        [DllImport("gdi32.dll")]
+        private static extern bool GdiFlush();
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmFlush();
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr GetModuleHandle(string name);
         [DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
@@ -1120,12 +1124,24 @@ namespace CodexAutoResume
         /// The window has handled its first WM_PAINT (ChromeHost.Intercept), or has been shown (posted from Intercept, after
         /// the show): everything in it that waits to be painted painted now, then the window uncloaked and its companion
         /// shown with it.
+        ///
+        /// v0.6.24 final (the live re-check 4, M2: 3 starts of 5): and what was painted handed to DWM first. The first frame
+        /// on the screen had the header card's light, headline and line as a black strip the desktop showed through, whole
+        /// 37-64 ms later. Those three are the last windows the paint above draws (measured: 1.7-5 ms before the uncloak,
+        /// every window of the first frame had had its WM_PAINT), and GDI keeps a thread's last drawing calls in its batch
+        /// until something flushes it: uncloaked in the same message, the window could be composed before they reached its
+        /// surface. GdiFlush puts them there, and DwmFlush waits for DWM to take the surface, before the cloak is let go -
+        /// as a dialog's own cloak hands its picture to DWM before its first alpha (SoftDialog).
         internal void Painted()
         {
             if (!cloaked || !form.IsHandleCreated) return;
             IntPtr handle = form.Handle;
             try { RedrawWindow(handle, IntPtr.Zero, IntPtr.Zero, PaintAllNow); }
             catch (Exception) { }
+            try { GdiFlush(); }
+            catch (Exception) { }
+            try { DwmFlush(); }
+            catch (Exception) { /* no composition to wait for: uncloaked as before */ }
             cloaked = false;
             int off = 0;
             try { DwmSetWindowAttribute(handle, Cloaking, ref off, 4); }

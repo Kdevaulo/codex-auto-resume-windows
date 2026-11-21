@@ -165,7 +165,13 @@ namespace CodexAutoResume
             nav.SizeChanged += delegate { FitTabs(); };
             FontChanged += delegate { FitTabs(); };
             // Asked once the window opens, as its other reads are; a window the layout audit builds never opens.
-            Load += delegate { if (!auditing) ReadAdvancedWords(); };
+            // v0.6.24 final: the words this installation answered last time first, so the tab is in the first frame.
+            Load += delegate
+            {
+                if (auditing) return;
+                AdoptCachedAdvancedWords();
+                ReadAdvancedWords();
+            };
         }
 
         partial void SnapshotApplied(Dictionary<string, object> reply)
@@ -706,16 +712,87 @@ namespace CodexAutoResume
         // ---------------------------------------------------------------- reading
         private void ReadAdvancedWords()
         {
-            if (advancedAsking || advancedWords != null) return;
+            if (advancedAsking || (advancedWords != null && !advancedWordsCached)) return;
             advancedAsking = true;
             AdvancedCall("advanced-words", LocaleArgument(null), false, delegate(Dictionary<string, object> reply)
             {
                 advancedAsking = false;
                 Dictionary<string, object> result = AdvancedResult(reply);
-                if (!AdvancedDone(result)) return;
-                AdoptAdvancedWords(Map(result, "words"));
+                if (!AdvancedDone(result))
+                {
+                    // The words it opened with were the last answer's: this edition does not answer now, so its page goes,
+                    // as a window that never had them shows none, and the next read asks again (SnapshotApplied).
+                    if (advancedWordsCached) ForgetCachedAdvancedWords();
+                    return;
+                }
+                advancedWordsCached = false;
+                Dictionary<string, object> words = Map(result, "words");
+                AdoptAdvancedWords(words);
+                AdvancedWordsCache.Write(installRoot, AdvancedWordsKey(), words);
                 ReadAdvanced(null);
             });
+        }
+
+        // v0.6.24 final: whether the words the page has are the cache's, from before this edition's own answer.
+        private bool advancedWordsCached;
+
+        /// v0.6.24 final (the live re-check 4, M2: 4 starts of 5): the tab and the page's words as this installation's
+        /// edition answered them last time, before the window's first frame. The tab waited for advanced-words, which comes
+        /// with the bridge's first answers; once the window's first frame came 1.5 s after its start, sooner than those, the
+        /// tab row ended at Settings on the screen and the Advanced features tab joined it 0.24-0.55 s later. The words are
+        /// kept for exactly what they were answered for (AdvancedWordsKey); the answer that comes is taken as it always was
+        /// (ReadAdvancedWords) - its tab's words anew, the page made ready, a window reopened on it brought back to it - and
+        /// kept for the next window. Nothing kept, or kept for anything else: the tab comes with the answer, as before.
+        private void AdoptCachedAdvancedWords()
+        {
+            if (advancedWords != null || advancedTab == null) return;
+            Dictionary<string, object> words = AdvancedWordsCache.Read(installRoot, AdvancedWordsKey());
+            if (words == null) return;
+            advancedWords = words;
+            advancedWordsCached = true;
+            RewordPendingButtons();
+            advancedTab.Text = Word("page.nav", "Advanced features");
+            advancedTab.AccessibleName = advancedTab.Text;
+            if (chatTab != null) chatTab.Text = Word("page.chat.nav", "Chat");
+            advancedTab.Visible = true;
+            HoldTabs();
+        }
+
+        /// The cached words let go of: this edition did not answer for them.
+        private void ForgetCachedAdvancedWords()
+        {
+            advancedWordsCached = false;
+            advancedWords = null;
+            if (advancedTab == null) return;
+            if (currentPage == AdvancedPageName || currentPage == ChatPageName) ShowPage(PageOrder[0]);
+            advancedTab.Visible = false;
+            HoldTabs();
+        }
+
+        /// What this page's words are kept for: the window's own words' key (StringsCache.Key: this installation, its
+        /// Interface language and Windows' languages), the language the page asks in (LocaleArgument), and a digest of
+        /// every file of this edition its words are read from - its catalogs and statement.py. Null where the window's
+        /// words had no key.
+        private string AdvancedWordsKey()
+        {
+            if (openedKey == null) return null;
+            try
+            {
+                var key = new StringBuilder(openedKey).Append("|advanced-words ").Append(LocaleArgument(null));
+                string package = System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(installRoot, "app"), "src"),
+                                                        "codex_auto_resume_advanced");
+                var files = new List<string>();
+                string locales = System.IO.Path.Combine(package, "locales");
+                if (System.IO.Directory.Exists(locales)) files.AddRange(System.IO.Directory.GetFiles(locales, "*.json"));
+                files.Sort(StringComparer.OrdinalIgnoreCase);
+                files.Add(System.IO.Path.Combine(package, "statement.py"));
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                    foreach (string file in files)
+                        key.Append('|').Append(System.IO.Path.GetFileName(file)).Append(' ')
+                           .Append(System.IO.File.Exists(file) ? Convert.ToBase64String(sha.ComputeHash(System.IO.File.ReadAllBytes(file))) : "-");
+                return key.ToString();
+            }
+            catch (Exception) { return null; }
         }
 
         /// The list, and then the open capability's statement, read again; `then` once both have been shown. One read
@@ -2412,6 +2489,69 @@ namespace CodexAutoResume
         {
             try { return Json.Write(value); }
             catch (FormatException) { return ""; }
+        }
+    }
+    /// v0.6.24 final: the Advanced features page's words as this edition last answered them (advanced-words), kept so the
+    /// window's first frame has the page's tab (SettingsForm.AdoptCachedAdvancedWords). Kept beside the window's own words
+    /// (StringsCache), in the installation's config\ - the folder the product writes and uninstalling with -Purge removes -
+    /// under the key they were answered for; a key that differs, or a file that cannot be read, is no words. Written beside
+    /// the old file and moved over it, as the window's own words are.
+    internal static class AdvancedWordsCache
+    {
+        private static string PathIn(string root)
+        {
+            return System.IO.Path.Combine(System.IO.Path.Combine(root, "config"), "advanced-words-cache.json");
+        }
+
+        /// The words kept for exactly `key`, or null.
+        internal static Dictionary<string, object> Read(string root, string key)
+        {
+            if (key == null || root == null) return null;
+            try
+            {
+                string path = PathIn(root);
+                if (!System.IO.File.Exists(path)) return null;
+                var entry = Json.Parse(System.IO.File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
+                object stored, words;
+                if (entry == null || !entry.TryGetValue("key", out stored) || !(stored is string) || (string)stored != key) return null;
+                if (!entry.TryGetValue("words", out words)) return null;
+                var map = words as Dictionary<string, object>;
+                return map != null && map.Count > 0 ? map : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// Keeps `words` under `key`, in the installation's own config\ only.
+        internal static void Write(string root, string key, Dictionary<string, object> words)
+        {
+            if (key == null || root == null || words == null || words.Count == 0) return;
+            string temporary = null;
+            try
+            {
+                string path = PathIn(root);
+                string folder = System.IO.Path.GetDirectoryName(path);
+                if (!System.IO.Directory.Exists(folder)) return;
+                var entry = new Dictionary<string, object>();
+                entry["key"] = key;
+                entry["words"] = words;
+                string text = Json.Write(entry);
+                if (System.IO.File.Exists(path) && System.IO.File.ReadAllText(path, Encoding.UTF8) == text) return;
+                temporary = System.IO.Path.Combine(folder, "advanced-words-cache." +
+                                                   OwnProcess.Id.ToString(CultureInfo.InvariantCulture) + ".tmp");
+                System.IO.File.WriteAllText(temporary, text, new UTF8Encoding(false));
+                if (System.IO.File.Exists(path)) System.IO.File.Replace(temporary, path, null);
+                else System.IO.File.Move(temporary, path);
+                temporary = null;
+            }
+            catch (Exception) { }
+            finally
+            {
+                try { if (temporary != null && System.IO.File.Exists(temporary)) System.IO.File.Delete(temporary); }
+                catch (Exception) { }
+            }
         }
     }
 }
