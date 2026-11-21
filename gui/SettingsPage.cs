@@ -1594,6 +1594,13 @@ namespace CodexAutoResume
 
         private void ApplyStatus(Dictionary<string, object> status, CheckBox startup)
         {
+            // v0.6.24 final (L3): the first state the window shows, for the start's marks.
+            if (StartMarks.On && !firstStateMarked)
+            {
+                firstStateMarked = true;
+                StartMarks.Mark("first state");
+                StartMarks.Write();
+            }
             object running = status["watcher_running"];
             KnowStartup(status, startup);
 
