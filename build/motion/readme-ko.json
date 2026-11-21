@@ -27,7 +27,7 @@
   "canvas": {
     "size": [
       1500,
-      882
+      927
     ],
     "transparent": true,
     "shadow": false,
@@ -57,6 +57,7 @@
     "cap": 9000000
   },
   "light_step_ms": 33,
+  "sweep_step_ms": 15,
   "clock_step_ms": 1000,
   "variants": [
     "paused"

@@ -1,6 +1,7 @@
 r"""v0.6.24-beta.2: the Dashboard's new proportions (the owner's decision of 2026-11-16, from mockups).
 
-- The window opens 1000 by 588 at text size 1 (SettingsForm.OpeningHeight; 664 and 681 with the caption room before).
+- The window opens 1000 by 618 at text size 1 (SettingsForm.OpeningHeight; the owner's decision of 2026-11-18, from real
+  renders, the Overview's cards not growing; 588 in beta.2, 664 and 681 with the caption room before).
 - The header card stays two lines and is 76 px tall at 100 % (HeroHeight: HeroPadY above and below the two lines).
 - No footer card under any page but Settings: the save bar is Settings' alone, inside the height every page has, with the
   reopen note, Restore defaults and Save; the Close button is gone (the header's X closes the window).
@@ -556,11 +557,11 @@ class DashboardProportionsTests(unittest.TestCase):
         if self.failure:
             self.fail(self.failure)
 
-    def test_the_window_opens_1000_by_588_at_text_size_1(self):
+    def test_the_window_opens_1000_by_618_at_text_size_1(self):
         said = self.answer["en"]
         self.assertEqual(said["heroRoom"], 0, "English's two lines fit the 76 px card")
-        self.assertEqual(said["opening"], [1000, 588])
-        self.assertEqual(said["client"], [1000, 588])
+        self.assertEqual(said["opening"], [1000, 618])
+        self.assertEqual(said["client"], [1000, 618])
 
     def test_the_header_card_is_two_lines_in_76_px(self):
         for locale in LOCALES:
@@ -569,7 +570,7 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertEqual(said["heroPadding"], [15, 15])
                 # A language whose two lines are taller makes a taller card, and the window opens taller by as much.
                 self.assertEqual(said["hero"], 76 + said["heroRoom"])
-                self.assertEqual(said["opening"][1], 588 + said["heroRoom"])
+                self.assertEqual(said["opening"][1], 618 + said["heroRoom"])
 
     def test_no_footer_outside_settings_and_the_save_bar_on_settings(self):
         for locale in LOCALES:
@@ -599,8 +600,9 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertEqual(pill["fit"], "whole")
                 self.assertEqual(pill["findings"], "", "the layout audit's AuditPill")
                 self.assertIn("0.6.24-beta.2", pill["text"])
-                self.assertIn(said["advancedWord"], pill["text"], "an advanced edition's word beside the version")
-                self.assertEqual(pill["name"], pill["text"], "a screen reader is told the version and the edition")
+                # v0.6.24 (the owner, 2026-11-18): the version alone, the edition told by its ink and to a screen reader.
+                self.assertEqual(pill["text"], "0.6.24-beta.2", "the number alone (2026-11-19), never the edition's word")
+                self.assertEqual(pill["name"], pill["text"] + " " + said["advancedWord"], "a screen reader is told both")
                 x, y, w, h = pill["pill"]
                 tx, ty, tw, th = pill["tabs"]
                 rx, ry, rw, rh = pill["room"]
@@ -614,7 +616,7 @@ class DashboardProportionsTests(unittest.TestCase):
                     self.assertGreater(x, tx + tw, "and after the last tab")
                 standard = said["standard"]
                 self.assertEqual(standard["fit"], "whole")
-                self.assertEqual(standard["text"], "v0.6.24-beta.2", "the standard edition is named nowhere (2026-10-05)")
+                self.assertEqual(standard["text"], "0.6.24-beta.2", "the standard edition is named nowhere (2026-10-05)")
 
     def test_the_tab_row_s_ends_stand_inside_the_header_card_s_edges(self):
         """The owner, 2026-11-17 (the design canvas's row 18): a round end lined up on a straight edge looks as if it sticks
@@ -636,9 +638,12 @@ class DashboardProportionsTests(unittest.TestCase):
                 self.assertIn(narrow["fit"], ("whole", "version"))
                 self.assertEqual(narrow["findings"], "")
                 if narrow["fit"] == "version":
-                    self.assertEqual(narrow["text"], "v0.6.24-beta.2")
+                    self.assertEqual(narrow["text"], "0.6.24-beta.2")
                     self.assertIn(said["advancedWord"], narrow["name"], "the edition is still said to a screen reader")
-                self.assertEqual(said["tooNarrow"]["fit"], "none", "where even the version does not fit, no pill")
+                # v0.6.24 (the owner, 2026-11-18): never hidden - where even the closest tabs leave no room, in the header
+                # card (test_gui_pill_room).
+                self.assertEqual(said["tooNarrow"]["fit"], "header", "where even the version does not fit, in the header")
+                self.assertEqual(said["tooNarrow"]["findings"], "")
 
     def test_a_tab_shown_later_takes_the_pill_s_room(self):
         """dev CI 43859506322: the advanced edition shows its Advanced features and Chat tabs once their words come, which
@@ -648,9 +653,10 @@ class DashboardProportionsTests(unittest.TestCase):
             with self.subTest(locale=locale):
                 self.assertEqual(grown["before"], "whole")
                 # The tabs grown until the whole pill no longer fits beside them, on any screen and in any font (dev CI
-                # 44034443580: the runners' narrower fonts left room for it): it shortens or goes, never over a tab.
+                # 44034443580: the runners' narrower fonts left room for it): the tabs drawn closer, then the pill shortened
+                # or in the header card (v0.6.24, the owner, 2026-11-18: never hidden), never over a tab.
                 self.assertTrue(grown["grew"], "the tabs came to need the pill's room")
-                self.assertNotEqual(grown["fit"], "whole", "the pill gives way to the tabs")
+                self.assertIn(grown["fit"], ("whole", "version", "header"), "the pill gives way to the tabs, and stays")
                 self.assertEqual(grown["cut"], "", "no tab cut off at the strip's end")
                 self.assertEqual(grown["findings"], "")
 
@@ -843,7 +849,7 @@ class DashboardProportionsTests(unittest.TestCase):
 class DashboardProportionsSourceTests(unittest.TestCase):
     def test_the_numbers(self):
         window = guiscan.read("gui/SettingsApp.cs")
-        self.assertIn("internal const int OpeningHeight = 588;", window)
+        self.assertIn("internal const int OpeningHeight = 618;", window)
         self.assertIn("internal const int HeroHeight = 76;", window)
         self.assertNotIn("closeButton", guiscan.window())
         self.assertNotIn('S("action.close", "Close")', guiscan.member_body("SettingsForm", "BuildFooter"))

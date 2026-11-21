@@ -1,4 +1,4 @@
-# Codex Auto Resume roadmap: v0.6.3 → v0.6.26
+# Codex Auto Resume roadmap: v0.6.3 → v0.6.27
 
 This is the current development direction for Codex Auto Resume from v0.6.3.
 
@@ -570,7 +570,7 @@ and released at the same time, with the same version:
 
 Each has its own archive and pinned digest, and one build attestation names both. An installation
 updates within its edition only; moving between them is a deliberate reinstall, never an update.
-The Rust core carries both (v0.6.25).
+The Rust core carries both (v0.6.26).
 
 ---
 
@@ -1238,8 +1238,8 @@ v0.6.23 is the first comprehensive audit of the Python implementation, in both e
 The switch of the bundled Python to 3.15 is no longer in it. The owner moved it out on 2026-11-10, to a later version once CPython
 3.15.3 is out - to v0.6.24 if it is out by then (the owner, 2026-11-11); the code's preparation for 3.15 stays here (below), and the bundled Python stays 3.14.10 in v0.6.23.
 
-Right after the final v0.6.24 is published and verified, the last Python version is kept as a repository of its own - its
-history and tags up to v0.6.24 - before the Rust core replaces it (the owner, 2026-10-24; the number it carries has moved on with each renumber since, to v0.6.23 on 2026-11-04 and to v0.6.24 on 2026-11-11).
+Right after the final v0.6.25 is published and verified, the last Python version is kept as a repository of its own - its
+history and tags up to v0.6.25 - before the Rust core replaces it (the owner, 2026-10-24; the number it carries has moved on with each renumber since, to v0.6.23 on 2026-11-04, to v0.6.24 on 2026-11-11 and to v0.6.25 on 2026-11-18).
 
 Unlike v0.6.10-alpha's refactoring, it is intentionally a broad bug hunt.
 
@@ -1315,44 +1315,72 @@ The final of the line, in both editions: the notification-area icon's menu gains
 and the popup's menu for a waiting task offers what the Dashboard's Pending menu offers - *Message for this conversation...*, *Add words for this time...* or *Change words for this time...*
 and *Remove words for this time*, the writing ones opening the Dashboard on its Pending page with that task's own dialog. On 2026-11-11 the owner decided to release v0.6.23 at that point and to do the second
 round of audits in the next version, so the numbers after it moved on: the Rust core is v0.6.25 and its audit v0.6.26. On 2026-11-12 the owner decided that v0.6.23 carries the whole
-second round of audits, over the finished code of both editions, and that v0.6.24 is a third round that checks everything again; the numbers after it stand.
+second round of audits, over the finished code of both editions, and that v0.6.24 is a third round that checks everything again; the numbers after it stand. On 2026-11-18 the owner made the third round a release of its own, v0.6.25, and moved the
+Rust core on to v0.6.26 and its audit to v0.6.27, so the numbers in the sentences above are those of their dates: v0.6.25 is the last Python release, and the Rust core is v0.6.26.
 
 ---
 
-## v0.6.24 — The third round: every audit once more over the finished code
+## v0.6.24 — The window's own look, the usage shown as what is left, and a setup window with something on every page
 
 On 2026-11-11 the owner chose to release v0.6.23 once the tray's *Open the popup* and the popup's task menu were done, and to do the second round of audits in the next version; on 2026-11-12 they decided
-that v0.6.23 carries the whole second round and that v0.6.24 is a third round that checks everything again, over the finished code of both editions. It is the last Python release: what it settles is the Python reference implementation the Rust core reproduces.
+that v0.6.23 carries the whole second round and that v0.6.24 is a third round that checks everything again, over the finished code of both editions. On 2026-11-18 the owner moved that third round, the optical audit
+included, and the review of what moves from the advanced edition to the standard one on to v0.6.25, and released v0.6.24 as the line that gave both editions their window's own look.
 
-Expected areas include:
+What v0.6.24 carries, in both editions:
 
-- every kind of audit once more: all code, security, reachability, design and motion, limits, size and tests, checking that the second round's fixes hold and that nothing new broke,
-- every document, in both languages, read against the code as it is,
-- all twenty-two translations,
-- then cleanup, fixes and refactoring, with a regression test for each confirmed bug,
-- the review of which advanced capabilities the standard edition could take (not started),
-- the switch of the bundled Python to 3.15, if CPython 3.15.3 is out by then (moved out of v0.6.23 on 2026-11-10).
+- a window and dialogs with no Windows title bar, squircle corners everywhere in Soft, the Dashboard's own outer corner among them, and the Dashboard at 1000 x 618 with the version in a pill that is never hidden,
+- dialogs as one card under their title, with their own fade, and a Dashboard that shows its pages whole and says it is at work while it reopens,
+- the tray icon's hover card and popup, a text box's own right-click menu, and the popup's motion picture starting at the taskbar's end,
+- the at-a-glance surfaces showing what is left of a usage window,
+- a setup window of 600 x 600 with its pages filled: what the program does, the steps of the run and what is installed,
+- every release titled, with its aim and its kind.
 
-Right after the final v0.6.24 is published and verified, the last Python version is kept as a repository of its own, as above.
+The switch of the bundled Python to 3.15 did not happen in v0.6.24: CPython 3.15.3 is not out, so the bundle stays 3.14.10 and the code stays ready for it.
+
+The third round is v0.6.25's now, and so is the last Python version's repository of its own, as below.
 
 ### v0.6.24-beta ✅ — The window's new look and a quicker return after an update (a pre-release)
 
 The first pre-release of v0.6.24. In both editions: the window and its dialogs have no Windows title bar, their minimise, maximise and close buttons are line glyphs in the first card; Soft's rounded things have squircle corners, the Dashboard window's own outer corner among them; the tray icon's popup is its card alone with a float shadow; hovering the icon shows a card with the state and the usage bars; a text box's right-click menu is drawn in the window's design; a notification card fading shows no dark band; the Dashboard answers within a few seconds after an update, and an update starts only a watcher that ended unexpectedly in this sign-in. In the advanced edition: the 5-hour window's one near-zero request starts none of the person's programs, and the Korean wording of its pages was read key by key. The third round's audits follow.
 
-### v0.6.24-beta.2 🚧 — The Dashboard's corner without its rough edges, new proportions and dialogs as one card (a pre-release)
+### v0.6.24-beta.2 ✅ — The Dashboard's corner without its rough edges, new proportions and dialogs as one card (a pre-release)
 
 The second pre-release of v0.6.24, in both editions: the rough edges of the Dashboard's own corner the first beta listed are fixed (no faint fill outside it, no line inside it at 150 %, no flash of Windows' title bar, a restore that comes back exactly, edges and corners that resize along their length); the Dashboard is 1000 x 588 with the version in a pill at the end of its page tabs; with the watcher off, Start watcher stands where Pause stands on the Right now card; a dialog is its title row and one card, with no Close where nothing is asked, the Dashboard dimmed behind it and the dialog centred on it; focus rings show only after the keyboard is used; the tray icon's card is as wide as its widest row; and the setup window is 600 x 600 with the Dashboard's corner. The third round's audits follow.
 
+### v0.6.24 ✅ — The final: what came after the second pre-release
+
+The final of the line, in both editions: the at-a-glance surfaces say what is left of a usage window - the popup, the hover card, the Dashboard's line, the panel and the near-limit notification, and the icon's card fills its bars by what is left - while the limits a person sets, Diagnostics' usage check and the wrap-up message still say what was used; the version's pill is never hidden, because crowded tabs are drawn closer and only where even that leaves no room it stands in the header card; dialogs are painted whole before they fade in and the fade keeps its own time; a page switch puts the page on the screen in one go, so the first switch to Diagnostics never shows it over the Overview; a Dashboard waiting for its reopened self shows the working light and the app-starting pointer; the setup window's Welcome page says what the program does, its Installing page lists the run's steps and its Ready page lists what is installed and says no administrator rights are needed; the icon's card and the Codex panel start their first row on one line; and the tray popup's motion picture starts at the taskbar's end, with the hover card. After the live check of the final's candidate: a status read lists the Codex processes once, through one snapshot, instead of a PowerShell query each time; the health check takes the watcher's second look, so an app serving from another official Codex engine no longer ends every install with a problem; the Dashboard the setup reopens stands behind its Finish page; the setup window paints and answers all through a run; the version's pill is in the Dashboard's first paint; a text box's menu opens above the pointer where it does not fit below; every dialog the Dashboard opens has the Dashboard's own squircle corner; and the README's motion pictures show the light's sweep, the Timeline over its veil and the notification card on a taskbar. In the advanced edition: the saved accounts' meters and the analytics' share say what is left, the Chat tab's room is kept until the list says whether it shows, the pages read their state in seconds, and Recover every conversation takes up any program's conversation on the app's row but VS Code's own. Every release now has a short title, a line on its aim and its kind.
+
+On 2026-11-18 the owner moved two items from this release to the next one, v0.6.25: the third round of audits, the optical audit included, and the review of what moves from the advanced edition to the standard one.
+
 ---
 
-## v0.6.25 — Rust: the core replaced as it is, then made Rust-native
+## v0.6.25 — The third round: every audit once more over the finished code
 
-v0.6.25 arrives in two stages too: **v0.6.25-alpha**, a pre-release, replaces the production Python
-core with Rust as it is; the final **v0.6.25** is that core made naturally Rust-oriented. The alpha is
+On 2026-11-12 the owner made the third round of audits part of v0.6.24, a round that checks everything again over the finished code of both editions; on 2026-11-18 they released v0.6.24 as the line that gave both editions their window's own look and made the third round, with the review below, a release of its own, v0.6.25. It is the last Python release: what it settles is the Python reference implementation the Rust core reproduces.
+
+Expected areas include:
+
+- every kind of audit once more: all code, security, reachability, design and motion, the optical audit included, limits, size and tests, checking that the second round's fixes hold and that nothing new broke,
+- every document, in both languages, read against the code as it is,
+- every moving picture (the README's, the cards', the tray popup's, the setup window's, the logos'), frame by frame against what the product does now: each light, sweep, glide, fade and veil it shows at its own time, and nothing it no longer does (the owner, 2026-11-19),
+- all twenty-two translations,
+- then cleanup, fixes and refactoring, with a regression test for each confirmed bug,
+- the review of what moves from the advanced edition to the standard one (not started),
+- the switch of the bundled Python to 3.15, if CPython 3.15.3 is out by then (v0.6.24 did not make it: 3.15.3 was not out).
+
+Right after the final v0.6.25 is published and verified, the last Python version is kept as a repository of its own, as above.
+
+---
+
+## v0.6.26 — Rust: the core replaced as it is, then made Rust-native
+
+v0.6.26 arrives in two stages too: **v0.6.26-alpha**, a pre-release, replaces the production Python
+core with Rust as it is; the final **v0.6.26** is that core made naturally Rust-oriented. The alpha is
 a pre-release because the core swapped as it is is a stage on the way to the Rust-native one, not a
 release worth having on its own.
 
-### v0.6.25-alpha — Complete Rust core replacement (a pre-release)
+### v0.6.26-alpha — Complete Rust core replacement (a pre-release)
 
 The alpha is planned to replace the production Python core with Rust, as it is.
 
@@ -1363,7 +1391,7 @@ The rule is:
 
 > **Replace the implementation, not the behavior.**
 
-The Rust implementation should reproduce the final v0.6.24 as closely as practical.
+The Rust implementation should reproduce the final v0.6.25 as closely as practical.
 
 Goals include:
 
@@ -1405,13 +1433,13 @@ Rust
 PowerShell may remain as a thin layer for bootstrap, installation, updating, or similar Windows
 deployment work.
 
-### v0.6.25 — Rust-native restructuring and optimization
+### v0.6.26 — Rust-native restructuring and optimization
 
 The alpha prioritizes behavioral parity.
 
 That may leave some Python-shaped architecture inside the first Rust implementation.
 
-The final v0.6.25 is planned to make the codebase more naturally Rust-oriented.
+The final v0.6.26 is planned to make the codebase more naturally Rust-oriented.
 
 Potential work includes:
 
@@ -1431,9 +1459,9 @@ This is not intended to be the final full-system bug hunt.
 
 ---
 
-## v0.6.26 — Final Rust audit and stabilization: the Rust bug hunt
+## v0.6.27 — Final Rust audit and stabilization: the Rust bug hunt
 
-v0.6.26 is planned as the final comprehensive stabilization pass.
+v0.6.27 is planned as the final comprehensive stabilization pass.
 
 Expected focus includes:
 
@@ -1471,7 +1499,7 @@ The intended final stack is:
 
 There is currently **no planned v0.7.0 feature cycle**.
 
-After v0.6.26, the project is expected to move primarily into maintenance:
+After v0.6.27, the project is expected to move primarily into maintenance:
 
 - Codex compatibility updates,
 - Compatibility Registry updates,
@@ -1654,24 +1682,29 @@ The first pre-release: a window without Windows' title bar, squircle corners, th
 
         ↓
 
-v0.6.24-beta.2  🚧 In development
+v0.6.24-beta.2  ✅ Released
 The second pre-release: the Dashboard's corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card and dialogs as one card
 
         ↓
 
-v0.6.24
-The third round: every audit once more over the finished code, then cleanup, fixes and refactoring; the review of the advanced capabilities the standard edition could take; the switch to Python 3.15 if 3.15.3 is out
+v0.6.24  ✅ Released
+The final: usage shown as what is left, the version's pill never hidden, dialogs painted whole, a setup window with something on every page, and every release titled
+
+        ↓
+
+v0.6.25
+The third round: every audit once more over the finished code, the optical audit included, then cleanup, fixes and refactoring; the review of what moves from the advanced edition to the standard one; the switch to Python 3.15 if 3.15.3 is out
 → freeze Python reference behavior
 
         ↓
 
-v0.6.25-alpha → v0.6.25
+v0.6.26-alpha → v0.6.26
 Complete Rust core replacement, in a pre-release
 + Rust-native restructuring and optimization, in the final
 
         ↓
 
-v0.6.26
+v0.6.27
 Final Rust audit and stabilization: the Rust bug hunt
 → final stable Rust baseline
 
@@ -1700,4 +1733,4 @@ recovery waits, in both. v0.6.18 is a final on v0.6.17 with no pre-release of it
 pre-release, v0.6.19-beta: the owner moved stage 5 out of v0.6.16 on 2026-10-16, so that the v0.6.16 final came
 sooner, made v0.6.17 a final on v0.6.16 on 2026-10-19, and on 2026-10-21 put the simple parts of stage 5 into v0.6.18 and the rest into v0.6.19, and on 2026-10-26 released
 v0.6.19 with what was built and moved the rest to v0.6.20, every later release one on, and on 2026-10-31 moved the loopback API,
-remote control and the view of other PCs out of v0.6.20 into a v0.6.21 of their own, with the switch to Python 3.15, every later release one on again, and on 2026-11-04 made a hotfix final v0.6.21 of the fix for #58 and moved what had been planned as v0.6.21 on to v0.6.22, every later release one on once more. v0.6.23-beta and v0.6.23-beta.2 are out; on 2026-11-10 the owner moved the switch to Python 3.15 out of v0.6.23, to v0.6.24 if CPython 3.15.3 is out by then; on 2026-11-11 they moved the second round of audits out of v0.6.23 into a v0.6.24 and the Rust core on to v0.6.25, and on 2026-11-12 they decided that v0.6.23 carries the whole second round and that v0.6.24 is a third round of audits that checks everything again.
+remote control and the view of other PCs out of v0.6.20 into a v0.6.21 of their own, with the switch to Python 3.15, every later release one on again, and on 2026-11-04 made a hotfix final v0.6.21 of the fix for #58 and moved what had been planned as v0.6.21 on to v0.6.22, every later release one on once more. v0.6.23-beta and v0.6.23-beta.2 are out; on 2026-11-10 the owner moved the switch to Python 3.15 out of v0.6.23, to v0.6.24 if CPython 3.15.3 is out by then; on 2026-11-11 they moved the second round of audits out of v0.6.23 into a v0.6.24 and the Rust core on to v0.6.25, and on 2026-11-12 they decided that v0.6.23 carries the whole second round and that v0.6.24 is a third round of audits that checks everything again. On 2026-11-18 they made that third round a release of its own, v0.6.25, and moved the Rust core on to v0.6.26 and its audit to v0.6.27, so the numbers in the sentences above are those of their dates.

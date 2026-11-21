@@ -1,7 +1,7 @@
 """The saved-accounts card's usage meters (v0.6.22 final, advanced/gui/AdvancedMeter.cs and AdvancedAccounts.cs), read as
-source: a groove in the scroll bar's well, the bar in the accent below 90 per cent and the warning colour from it, an
-empty groove and "not read yet" without a reading, Read usage at the card's top right and every field the window reads
-one the bridge writes.
+source: a groove in the scroll bar's well, the bar as full as the share LEFT (v0.6.24 final) - in the accent while more
+than 10 per cent is left and the warning colour from 90 per cent used, its groove's edge too - an empty groove and "not
+read yet" without a reading, Read usage at the card's top right and every field the window reads one the bridge writes.
 
     CODEX_AR_EDITION=advanced PYTHONPATH="src;advanced/src" python -m unittest discover -s advanced/tests
 """
@@ -45,12 +45,16 @@ class MeterTests(unittest.TestCase):
         self.assertTrue(source(METER).startswith("// ADVANCED-EDITION-CODE:"))
 
     def test_the_bar_is_the_warning_colour_from_90_per_cent(self):
-        """Fails with WarnAt moved or Warns' comparison turned: the 90 % bar would be in the accent."""
+        """Fails with WarnAt moved or Warns' comparison turned: the 90 % bar would be in the accent. v0.6.24 final: 90 %
+        used is 10 % left (LowLeft), and the groove's edge takes the warning colour with it, so an empty bar says so."""
         meter = code(guiscan.type_body("AccountMeter", source(METER)))
         self.assertIn("internal const double WarnAt = 90.0;", meter)
+        self.assertIn("internal const double LowLeft = 100.0 - WarnAt;", meter)
         self.assertIn("return share >= WarnAt;", code(guiscan.type_body("AccountMeter", source(METER))))
         self.assertRegex(meter, r"return Warns\(share\) \? Palette\.Warning : Palette\.Accent;")
         self.assertIn("Color tone = BarColor(used);", meter)
+        self.assertIn("bool low = used >= 0 && Warns(used);", meter)
+        self.assertIn("low ? Palette.Warning : SoftBar.TrackEdge(contrast)", meter)
 
     def test_no_reading_leaves_the_groove_empty(self):
         """Fails if the bar were drawn without a reading, or a row without one were given a share."""
@@ -64,8 +68,8 @@ class MeterTests(unittest.TestCase):
     def test_the_groove_is_the_scroll_bar_s_well(self):
         """The design's own inset groove (SoftBar's fill and edge, the inset recipe's depth) - no colour of its own."""
         meter = code(source(METER))
-        self.assertIn("Soft.Body(g, track, radius, SoftBar.TrackFill(contrast, Palette.Card), SoftBar.TrackEdge(contrast), "
-                      "Palette.Depth);", meter)
+        self.assertRegex(meter, r"Soft\.Body\(g, track, radius, SoftBar\.TrackFill\(contrast, Palette\.Card\), "
+                                r"low \? Palette\.Warning : SoftBar\.TrackEdge\(contrast\),\s*Palette\.Depth\);")
         self.assertNotIn("FromArgb", meter)
         self.assertNotIn("Color.", meter.replace("Color tone", "").replace("static Color BarColor", ""))
 

@@ -179,10 +179,9 @@ class NoValueInScriptTests(unittest.TestCase):
 
     def test_nothing_else_hands_powershell_a_script_for_values(self):
         """One place hands PowerShell a constant script with values beside it; a second would be a second place to
-        get it wrong. codex/pairing.py's process inventory is the one other -Command: a constant that takes no value
-        at all and is read for what it prints."""
-        self.assertEqual(srcscan.holders('"-Command"'),
-                         {"codex_auto_resume/pwsh.py", "codex_auto_resume/codex/pairing.py"})
+        get it wrong. codex/pairing.py's process inventory was the one other -Command until v0.6.24 final, which reads
+        it through one Toolhelp snapshot (win/kernel.py processes_named) and starts no PowerShell for it."""
+        self.assertEqual(srcscan.holders('"-Command"'), {"codex_auto_resume/pwsh.py"})
         self.assertEqual(pwsh.script_argv("powershell.exe", ECHO),
                          ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ECHO])
 

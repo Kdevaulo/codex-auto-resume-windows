@@ -68,7 +68,19 @@ namespace CodexAutoResume
         private readonly List<KeyValuePair<Control, int>> rows = new List<KeyValuePair<Control, int>>();
 
         private string page;
-        private bool running, logShown, unconfirmed, previousRunning, closingAsked;
+        private bool running, unconfirmed, previousRunning, closingAsked;
+        // v0.6.24 final (the owner, 2026-11-19): the log is shown from the start, under the Progress page's steps, and the
+        // toggle hides it. A person's choice is the run's own - a window is made again for the next run - and lives only here.
+        private bool logShown = true;
+        // The fewest lines the Progress page's log shows: the window grows (Fit) rather than leave it less.
+        private const int LogLeastLines = 4;
+        // Option B (the owner's second choice, 2026-11-19): the window stays 600 high for every run, and the page makes the room
+        // for the log's lines inside itself, evenly, as little as it needs (Arrange): each step's row, one line, is never
+        // less than StepRowFloor px (at 96 dpi) high - 17 with the 2 px between rows is a pitch of 19 where it was 23, the
+        // ring at its side being 18 - and the gaps above and below the list never less than StepGapFloor. Only what still does
+        // not fit after that makes the window taller (Fit).
+        private const int StepRowFloor = 17;
+        private const int StepGapFloor = 6;
         // The watcher was not running before this update or repair and was left stopped (InstallerFlow.LeftStoppedLine).
         private bool leftStopped;
         // The watcher had ended unexpectedly before this update or repair and was started again (InstallerFlow.StartedAgainLine).
@@ -91,6 +103,22 @@ namespace CodexAutoResume
         private double at, reached;
         private string step = "starting";
         private WrapLabel stepLabel, busyNote;
+        // v0.6.24-beta.3 (the owner's option A, 2026-11-17): rows that stand in a mark's column at the card's leading edge -
+        // the Welcome page's numbered points - each by the mark whose column it is in, and the mark beside the row it is
+        // the first of. Made again with the page (Build), as its rows are.
+        private readonly Dictionary<Control, StepMark> columns = new Dictionary<Control, StepMark>();
+        private readonly Dictionary<Control, StepMark> marks = new Dictionary<Control, StepMark>();
+        // The Ready page's rows of what is installed: the line said of each, by the name it stands beside (Beside).
+        private readonly Dictionary<Control, Control> besides = new Dictionary<Control, Control>();
+        // The Progress page's list of the run's steps (ListSteps): its rows, where they begin among the page's rows, what
+        // they last said (so a progress line that changes nothing makes nothing again), and every step that has been under
+        // way in this run - kept for the window's life, as the run's own record, whatever page shows.
+        private readonly List<Control> stepRows = new List<Control>();
+        // Which step each of those rows is (Restate).
+        private readonly List<string> stepKeys = new List<string>();
+        private int stepsAt;
+        private string listed;
+        private readonly List<string> under = new List<string>();
 
         /// The exit code of the run, or int.MinValue where none ran (the window was closed before it started).
         internal int Code { get { return code; } }
@@ -238,24 +266,39 @@ namespace CodexAutoResume
         /// The window's size: Width wide, and as tall as the tallest of its pages needs at that width.
         private void Fit()
         {
+            bool held = HoldPainting();
+            try { FitNow(); }
+            finally { if (held) PaintWhole(); }
+        }
+
+        private void FitNow()
+        {
             int width = Px(OpeningWidth);
             int inner = Inner(width);
             int tallest = 0;
             string showing = page;
+            // v0.6.24-beta.3: measuring the Finish page of a run that has not ended (BuildFinish: a failure shows its log)
+            // left the log shown on the Progress page from the start; the log is as it was after it.
+            bool shown = logShown;
             foreach (string each in flow.Pages())
             {
                 // Each page measured as it is shown: what a page holds can depend on which page is showing (WhatsNew,
                 // and the notes' own height on the Notes page).
                 page = each;
                 Build(each);
-                tallest = Math.Max(tallest, Arrange(inner));
+                tallest = Math.Max(tallest, Place(inner, true));
             }
+            logShown = shown;
             page = showing;
             // v0.6.24: 600 x 600 at text size 1 (the owner's choice of 2026-11-16): the pages need less than that, and the
             // content card takes the rest (OnLayout fills it down to the buttons, its page's rows kept at its top). A page
             // that needs more - a larger text size - keeps the height it needs, never cut.
             int needed = Px(16) + HeaderHeight() + Px(16) + tallest + Px(32) + Px(16) + Px(Brand.ButtonHeight) + Px(16);
-            ClientSize = new Size(width, HeightFor(needed, WorkHeight()));
+            // v0.6.24 final (live re-check 3, L1): set only where it changes. Set again to the same size at the switch to
+            // Finish, the window was 906 x 940 for a moment where it is 900 x 900 - the size worked out with a frame it
+            // does not have, until its own caption took it back.
+            var size = new Size(width, HeightFor(needed, WorkHeight()));
+            if (ClientSize != size) ClientSize = size;
             if (StartPosition == FormStartPosition.Manual)
             {
                 Rectangle primary = Screen.PrimaryScreen.WorkingArea;
@@ -345,38 +388,105 @@ namespace CodexAutoResume
 
         internal string Page { get { return page; } }
 
-        /// Builds `name` and shows it, with the buttons it has.
+        /// Builds `name` and shows it, with the buttons it has - on the screen in one go (HoldPainting, PaintWhole).
         internal void ShowPage(string name)
         {
-            page = name;
-            Build(name);
-            Arrange(Inner(ClientSize.Width > 0 ? ClientSize.Width : Px(OpeningWidth)));
-            string[] pages = flow.Pages();
-            int index = Array.IndexOf(pages, name);
-            back.Visible = backShown = index > 0 && name != InstallerFlow.Progress && name != InstallerFlow.Finish &&
-                                      name != InstallerFlow.Notes;
-            cancel.Visible = cancelShown = name != InstallerFlow.Finish;
-            cancel.Enabled = name != InstallerFlow.Progress;
-            forward.Visible = forwardShown = name != InstallerFlow.Progress;
-            forward.Enabled = name != InstallerFlow.Options || flow.CanStart();
-            cancel.Text = name == InstallerFlow.Notes ? words.Say("action.not_now", "Not now")
-                        : words.Say("action.cancel", "Cancel");
-            forward.Text = name == InstallerFlow.Finish && flow.Mode == InstallerFlow.Update && code == 0
-                           ? words.Say("installer.done.open", "Open the Dashboard")
-                         : name == InstallerFlow.Notes ? words.Say("installer.update", "Update")
-                         : name == InstallerFlow.Finish ? words.Say("installer.finish", "Finish")
-                         : name == InstallerFlow.Confirm ? words.Say("installer.remove", "Remove")
-                         : name == InstallerFlow.Maintain ? (flow.Mode == InstallerFlow.Uninstall
-                                                             ? words.Say("installer.next", "Next")
-                                                             : words.Say("installer.maintain.repair", "Repair"))
-                         : name == InstallerFlow.Options ? (flow.Upgrade && !flow.EditionChange
-                                                            ? words.Say("installer.update", "Update")
-                                                            : words.Say("action.install", "Install"))
-                         : words.Say("installer.next", "Next");
-            light.State = InstallerFlow.Light(flow.Mode, name, code, unconfirmed || leftStopped, previousRunning);
-            PerformLayout();
-            if (forwardShown && forward.Enabled) ActiveControl = forward;
+            bool held = HoldPainting();
+            try
+            {
+                page = name;
+                Build(name);
+                Arrange(Inner(ClientSize.Width > 0 ? ClientSize.Width : Px(OpeningWidth)));
+                string[] pages = flow.Pages();
+                int index = Array.IndexOf(pages, name);
+                back.Visible = backShown = index > 0 && name != InstallerFlow.Progress && name != InstallerFlow.Finish &&
+                                          name != InstallerFlow.Notes;
+                cancel.Visible = cancelShown = name != InstallerFlow.Finish;
+                cancel.Enabled = name != InstallerFlow.Progress;
+                forward.Visible = forwardShown = name != InstallerFlow.Progress;
+                forward.Enabled = name != InstallerFlow.Options || flow.CanStart();
+                cancel.Text = name == InstallerFlow.Notes ? words.Say("action.not_now", "Not now")
+                            : words.Say("action.cancel", "Cancel");
+                forward.Text = name == InstallerFlow.Finish && flow.Mode == InstallerFlow.Update && code == 0
+                               ? words.Say("installer.done.open", "Open the Dashboard")
+                             : name == InstallerFlow.Notes ? words.Say("installer.update", "Update")
+                             : name == InstallerFlow.Finish ? words.Say("installer.finish", "Finish")
+                             : name == InstallerFlow.Confirm ? words.Say("installer.remove", "Remove")
+                             : name == InstallerFlow.Maintain ? (flow.Mode == InstallerFlow.Uninstall
+                                                                 ? words.Say("installer.next", "Next")
+                                                                 : words.Say("installer.maintain.repair", "Repair"))
+                             : name == InstallerFlow.Options ? (flow.Upgrade && !flow.EditionChange
+                                                                ? words.Say("installer.update", "Update")
+                                                                : words.Say("action.install", "Install"))
+                             : words.Say("installer.next", "Next");
+                light.State = InstallerFlow.Light(flow.Mode, name, code, unconfirmed || leftStopped, previousRunning);
+                PerformLayout();
+                if (forwardShown && forward.Enabled) ActiveControl = forward;
+            }
+            finally { if (held) PaintWhole(); }
         }
+
+        // ------------------------------------------------------------------ a page change in one frame
+        // v0.6.24 final (live re-check 3, L1): after Repair two DXGI frames still showed the first page with two grey boxes
+        // over it and a third the Progress page's head over its remains: the old page's controls went and the new page's
+        // came, each painted on its own as the thread came to it. Every page change (ShowPage, and Fit, which measures every
+        // page by building it) now holds the painting of everything in the window (WM_SETREDRAW on its ground) while the page
+        // is swapped and laid out, then paints it all offscreen and puts it on the screen at once (WS_EX_COMPOSITED for that
+        // one paint, RDW_UPDATENOW): the screen goes from the page before to the page after, whole.
+        private int holding;
+        // ListSteps holds the painting while it makes its rows again on the page on show; ShowStep lets it go.
+        private bool stepsHeld;
+
+        // What the hold is on: the window's ground for a page change, the page's sheet alone for its step list.
+        private Control heldOn;
+
+        private bool HoldPainting()
+        {
+            return HoldPainting(ground);
+        }
+
+        private bool HoldPainting(Control target)
+        {
+            if (holding > 0) { holding++; return true; }
+            if (!target.IsHandleCreated || target.IsDisposed || !Visible || !target.Visible) return false;
+            SendMessage(target.Handle, WmSetRedraw, IntPtr.Zero, IntPtr.Zero);
+            heldOn = target;
+            holding = 1;
+            return true;
+        }
+
+        private void PaintWhole()
+        {
+            Control target = heldOn;
+            if (--holding > 0 || target == null || target.IsDisposed || !target.IsHandleCreated) return;
+            heldOn = null;
+            SendMessage(target.Handle, WmSetRedraw, (IntPtr)1, IntPtr.Zero);
+            long style = GetWindowLongPtr(target.Handle, GwlExStyle).ToInt64();
+            bool already = (style & WsExComposited) != 0;
+            if (!already) SetWindowLongPtr(target.Handle, GwlExStyle, new IntPtr(style | WsExComposited));
+            try
+            {
+                RedrawWindow(target.Handle, IntPtr.Zero, IntPtr.Zero,
+                             RdwInvalidate | RdwErase | RdwFrame | RdwAllChildren | RdwUpdateNow);
+            }
+            finally
+            {
+                if (!already && !target.IsDisposed) SetWindowLongPtr(target.Handle, GwlExStyle, new IntPtr(style));
+            }
+        }
+
+        private const int WmSetRedraw = 0x000B, GwlExStyle = -20;
+        private const long WsExComposited = 0x02000000;
+        private const uint RdwFrame = 0x0400;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
 
         private void Build(string name)
         {
@@ -390,6 +500,12 @@ namespace CodexAutoResume
             sheet.Controls.Clear();
             LetGo(made);
             rows.Clear();
+            columns.Clear();
+            marks.Clear();
+            besides.Clear();
+            stepRows.Clear();
+            stepKeys.Clear();
+            listed = null;
             stepLabel = null;
             busyNote = null;
             desktopBox = null;
@@ -404,7 +520,12 @@ namespace CodexAutoResume
                 case InstallerFlow.Notes: BuildNotes(); break;
                 default: BuildFinish(); break;
             }
-            foreach (KeyValuePair<Control, int> row in rows) sheet.Controls.Add(row.Key);
+            foreach (KeyValuePair<Control, int> row in rows)
+            {
+                sheet.Controls.Add(row.Key);
+                StepMark mark;
+                if (marks.TryGetValue(row.Key, out mark)) sheet.Controls.Add(mark);
+            }
             sheet.ResumeLayout(false);
         }
 
@@ -420,6 +541,14 @@ namespace CodexAutoResume
         private void Row(Control control, int gap)
         {
             rows.Add(new KeyValuePair<Control, int>(control, Px(gap)));
+        }
+
+        /// A row in `column`'s column (v0.6.24-beta.3): indented past the mark, and, where `first`, with the mark beside it.
+        private void Row(Control control, int gap, StepMark column, bool first)
+        {
+            Row(control, gap);
+            columns[control] = column;
+            if (first) marks[control] = column;
         }
 
         private WrapLabel Words(string text, string role, Color ink)
@@ -458,8 +587,16 @@ namespace CodexAutoResume
             guide.Font = Font;
             guide.Click += delegate { OpenGuide(); };
             Row(guide, 8);
+            // v0.6.24-beta.3 (the owner's option A, 2026-11-17): what it does, in three numbered points - the room the 600 x
+            // 600 window gave this page, filled with what a person installing it for the first time wants to know.
+            Point(1, words.Say("installer.welcome.notices", "It notices when one stops"),
+                  words.Say("installer.welcome.notices_help", "It finds a conversation stopped by a usage limit, a dropped connection, a server error or another temporary failure."), 12);
+            Point(2, words.Say("installer.welcome.resumes", "It carries on once it can"),
+                  words.Say("installer.welcome.resumes_help", "Once the limit resets or the connection is back, it continues the same conversation from where it stopped."), 10);
+            Point(3, words.Say("installer.welcome.message", "You choose the words it sends"),
+                  words.Say("installer.welcome.message_help", "In Settings you choose the message it sends to carry on, and its language."), 10);
             if (speaker == null) return;
-            Row(Words(words.Say("installer.language", "Language"), "label", Palette.Secondary), 20);
+            Row(Words(words.Say("installer.language", "Language"), "label", Palette.Secondary), 16);
             var picker = new SoftCombo();
             picker.Font = Font;
             picker.AccessibleName = words.Say("installer.language", "Language");
@@ -490,6 +627,16 @@ namespace CodexAutoResume
                 Process.Start(start);
             }
             catch (Exception) { /* no browser: nothing to open it in */ }
+        }
+
+        /// One of the Welcome page's points: its number in a disc at the leading edge, its title in the name's weight and
+        /// one line under it, both in the disc's column.
+        private void Point(int number, string title, string help, int gap)
+        {
+            var disc = new StepMark(StepMark.Kinds.Number, number.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            disc.Font = Soft.RoleFont("label");
+            Row(Words(title, "name", Palette.Ink), gap, disc, true);
+            Row(Words(help, null, Palette.Secondary), 0, disc, false);
         }
 
         private void BuildOptions()
@@ -524,7 +671,42 @@ namespace CodexAutoResume
             Row(Words(words.Say("installer.options.plugin", "The plugin - its panel and its skill - is added to Codex as part of every installation."), null, Palette.Secondary), 16);
             // An update says what it updates to, as the Dashboard's does (BuildNotes).
             if (flow.Upgrade && !flow.EditionChange && flow.NotesText != null) WhatsNew(16);
+            // v0.6.24-beta.3 (the owner's option A): a first installation says what it puts on this PC. An update and a change
+            // of edition already say what they keep and change, and what is new - the room is theirs.
+            if (!flow.Upgrade) WhatIsInstalled(16);
             InsideNote(16);
+        }
+
+        /// What a first installation puts on this PC, one hairline row each - its name, and what it is beside it - and for the
+        /// advanced edition what it adds (its Dashboard page and its skill, every feature off until it is turned on:
+        /// installer.options.to_advanced). Then that no administrator rights are needed: the setup program asks for none
+        /// (build/setup/setup.manifest, asInvoker) and install.ps1 needs none - it writes under the person's own profile and
+        /// registers nothing outside the current user.
+        private void WhatIsInstalled(int gap)
+        {
+            Row(Words(words.Say("installer.options.installed", "What is installed"), "label", Palette.Secondary), gap);
+            Installed(words.Say("installer.options.watcher", "Watcher"),
+                      words.Say("installer.options.watcher_help", "Watches for stopped conversations in the background"));
+            Installed(words.Say("installer.options.dashboard", "Dashboard"),
+                      words.Say("installer.options.dashboard_help", "Status, pending recoveries, history and settings"));
+            Installed(words.Say("installer.options.plugin_name", "Codex plugin"),
+                      words.Say("installer.options.plugin_help", "A panel and a skill inside Codex"));
+            if (flow.Edition == InstallerFlow.Advanced)
+                Installed(words.Say("installer.options.advanced", "Advanced features"),
+                          words.Say("installer.options.advanced_help", "A Dashboard page and a skill; each feature starts off"));
+            Row(Words(words.Say("installer.options.no_admin", "No administrator rights are needed"), null, Palette.Secondary), 8);
+        }
+
+        // One of them: its name in the name's weight, what it is beside it at the row's other end where both fit on one line
+        // (below it otherwise), and a hairline under it.
+        private void Installed(string name, string what)
+        {
+            var title = Words(name, "name", Palette.Ink);
+            var line = Words(what, null, Palette.Secondary);
+            Row(title, 8);
+            Row(line, 2);
+            besides[line] = title;
+            Row(new InstallerRule(), 8);
         }
 
         /// The Finish page's box for a shortcut on the Desktop (v0.6.22, the owner: it comes last, as in an ordinary
@@ -616,11 +798,98 @@ namespace CodexAutoResume
             bar.Value = at;
             bar.AccessibleName = heading;
             Row(bar, 10);
-            busyNote = Words(words.Say("installer.progress.busy", "It is still working. Closing now could leave half an installation, so the window stays until it has finished."), null, Palette.Secondary);
-            busyNote.Visible = closingAsked;
-            Row(busyNote, 10);
+            // v0.6.24-beta.3 (the owner's option A): the steps this run goes through, under the bar (ListSteps). v0.6.24 final
+            // (the owner, 2026-11-19): the log is under them, shown from the start, with its toggle above it as the Finish page
+            // has it; it takes the room down to the buttons (Arrange), and hiding it moves nothing above it.
+            stepsAt = rows.Count;
+            ListSteps(false);
             Row(LogToggle(), 12);
             Row(logArea, 6);
+            busyNote = Words(words.Say("installer.progress.busy", "It is still working. Closing now could leave half an installation, so the window stays until it has finished."), null, Palette.Secondary);
+            busyNote.Visible = closingAsked;
+            Row(busyNote, 8);
+        }
+
+        /// The list under the bar (v0.6.24-beta.3): every step of this run (InstallerProgress.Listed) - done, a filled
+        /// disc with a check; under way, a ring with a dot and its name in the name's weight; still to come, an empty
+        /// ring - as far as the installer's own lines have taken `step`, and never further. Made again only when what it
+        /// says changes; `live`, on the page on show, it changes the page's rows in place.
+        /// True where, on the page on show, it made its rows again and so holds the window's painting (HoldPainting) for
+        /// the caller to let go once the rows are placed (PaintWhole): new rows come on the screen with the page, whole.
+        private bool ListSteps(bool live)
+        {
+            List<string[]> now = InstallerProgress.Listed(flow.Mode, flow.Upgrade, flow.Unpacks, step, under);
+            var said = new StringBuilder();
+            foreach (string[] each in now) said.Append(each[0]).Append('=').Append(each[1]).Append(';');
+            if (said.ToString() == listed) return false;
+            listed = said.ToString();
+            // v0.6.24 final (re-check 2): on the page on show, the same steps - only how far each is changed - are changed
+            // in place: making 18 controls again took about 100 ms of the window's thread at every step.
+            if (live && Restate(now)) return false;
+            // Only the page's sheet: the rest of the window does not change, and a paint of it all held the thread ~100 ms.
+            bool held = live && HoldPainting(sheet);
+            stepsHeld |= held;
+            var gone = new List<Control>();
+            foreach (Control row in stepRows)
+            {
+                gone.Add(row);
+                StepMark mark;
+                if (marks.TryGetValue(row, out mark)) gone.Add(mark);
+                marks.Remove(row);
+                columns.Remove(row);
+            }
+            rows.RemoveRange(stepsAt, stepRows.Count);
+            stepRows.Clear();
+            stepKeys.Clear();
+            foreach (string[] each in now)
+            {
+                bool done = each[1] == InstallerProgress.Done, going = each[1] == InstallerProgress.Now;
+                var mark = new StepMark(done ? StepMark.Kinds.Done : going ? StepMark.Kinds.Now : StepMark.Kinds.Todo, null);
+                mark.AccessibleName = done ? words.Say("installer.progress.done", "Done")
+                                    : going ? words.Say("installer.progress.now", "Under way")
+                                    : words.Say("installer.progress.todo", "Still to come");
+                WrapLabel name = Words(words.StepName(each[0]), going ? "name" : null,
+                                       going ? Palette.Ink : done ? Palette.Secondary : Palette.Muted);
+                name.AccessibleDescription = mark.AccessibleName;
+                rows.Insert(stepsAt + stepRows.Count, new KeyValuePair<Control, int>(name, Px(stepRows.Count == 0 ? 12 : 2)));
+                columns[name] = mark;
+                marks[name] = mark;
+                stepRows.Add(name);
+                stepKeys.Add(each[0]);
+                if (live)
+                {
+                    sheet.Controls.Add(name);
+                    sheet.Controls.Add(mark);
+                }
+            }
+            if (!live) return held;
+            foreach (Control control in gone) sheet.Controls.Remove(control);
+            LetGo(gone);
+            return held;
+        }
+
+        /// The rows of ListSteps set to say `now` where they are the same steps in the same order; false, and nothing
+        /// changed, where they are not.
+        private bool Restate(List<string[]> now)
+        {
+            if (now.Count != stepRows.Count || stepKeys.Count != stepRows.Count) return false;
+            for (int i = 0; i < now.Count; i++)
+                if (now[i][0] != stepKeys[i] || !marks.ContainsKey(stepRows[i])) return false;
+            for (int i = 0; i < now.Count; i++)
+            {
+                bool done = now[i][1] == InstallerProgress.Done, going = now[i][1] == InstallerProgress.Now;
+                Control name = stepRows[i];
+                StepMark mark = marks[name];
+                mark.Kind = done ? StepMark.Kinds.Done : going ? StepMark.Kinds.Now : StepMark.Kinds.Todo;
+                mark.AccessibleName = done ? words.Say("installer.progress.done", "Done")
+                                    : going ? words.Say("installer.progress.now", "Under way")
+                                    : words.Say("installer.progress.todo", "Still to come");
+                Font font = going ? Soft.RoleFont("name") : Font;
+                if (!Equals(name.Font, font)) name.Font = font;
+                name.ForeColor = going ? Palette.Ink : done ? Palette.Secondary : Palette.Muted;
+                name.AccessibleDescription = mark.AccessibleName;
+            }
+            return true;
         }
 
         /// The update's own page (v0.6.16, the owner: an update should show itself): the version it goes from and to,
@@ -733,6 +1002,9 @@ namespace CodexAutoResume
                 {
                     logArea.Visible = true;
                     Arrange(Inner(ClientSize.Width));
+                    // Lines that came while it was folded away are in it: it stands at its newest, as it follows them shown.
+                    logArea.Box.SelectionStart = logArea.Box.TextLength;
+                    logArea.Box.ScrollToCaret();
                     SoftReveal.Entered(logArea);
                 }
                 else SoftReveal.Leaving(logArea, delegate
@@ -744,31 +1016,128 @@ namespace CodexAutoResume
             return toggle;
         }
 
-        /// Lays the page's rows out down the card at `width`; the height they take. The log is the one row whose
-        /// height is fixed, and a row that is hidden takes none - a page is measured with the log and the note
-        /// showing, so it fits when they are shown.
+        /// Lays the page's rows out down the card at `width`; the height they need at least. The log is the one row that
+        /// takes what the others leave (v0.6.24 final): never less than its own least (HeightAt), and the card's room down to
+        /// the buttons where there is more. The note that the window stays open takes room only while it is shown, out of the
+        /// log's (OnFormClosing makes the window taller where that leaves the log less than its least); a log that is folded
+        /// away keeps its room, so showing it moves nothing else.
         internal int Arrange(int width)
         {
+            return Place(width, false);
+        }
+
+        // `least`: the height the page needs at the very least, its step list as tight as the floors allow (what Fit measures);
+        // otherwise the page as laid out in the room it has, tightened by the fewest px that make the log's least fit.
+        private int Place(int width, bool least)
+        {
+            int room = Room(), limit = Px(12), tight = least ? limit : 0;
+            int used = Lay(width, 0, tight);
+            while (!least && used > room && tight < limit) used = Lay(width, 0, ++tight);
+            if (!least && room > used) Lay(width, room - used, tight);
+            return used;
+        }
+
+        /// The least height `control` needs where it is `wanted` high at its ease: a step's single line may be as short as
+        /// StepRowFloor says, which is all the line takes; anything else needs what it asks.
+        internal int Least(Control control, int wanted)
+        {
+            return stepRows.Contains(control) && wanted < 2 * FirstLine(control) ? Math.Min(wanted, StepRowLeast(control)) : wanted;
+        }
+
+        private int StepRowLeast(Control row)
+        {
+            return Math.Max(Px(StepRowFloor), FirstLine(row) + Px(1));
+        }
+
+        /// The height the page's rows have to stand in: the content card's, inside its padding, as OnLayout gives it.
+        private int Room()
+        {
+            int pad = Px(16);
+            int top = pad + HeaderHeight() + pad;
+            int buttonsTop = ClientSize.Height - pad - Px(Brand.ButtonHeight);
+            return Math.Max(0, Math.Max(1, buttonsTop - pad - top) - 2 * pad);
+        }
+
+        // One pass of Arrange: the rows laid out with `extra` more px for the log, and `tight` px less in each step's row and in
+        // each of the two gaps beside the list (never below their floors); the height they take.
+        private int Lay(int width, int extra, int tight)
+        {
             int y = 0;
+            bool afterSteps = false;
+            // v0.6.24-beta.3: where the last mark beside a row ends - a row outside its column starts below it.
+            int held = 0;
+            bool mirrored = Mirror.Of(this);
             foreach (KeyValuePair<Control, int> row in rows)
             {
                 Control control = row.Key;
                 control.Visible = Wanted(control);
-                y += row.Value;
-                int height = HeightAt(control, width);
-                int wide = control is SoftCombo ? Math.Min(width, Px(260)) : width;
+                StepMark column;
+                bool inColumn = columns.TryGetValue(control, out column);
+                if (!inColumn) y = Math.Max(y, held);
+                Control name;
+                if (besides.TryGetValue(control, out name) && Beside(control, name, width, mirrored, ref y)) continue;
+                // The note, until someone tries to close the window, takes no room.
+                if (control == busyNote && !closingAsked) continue;
+                int gap = row.Value;
+                bool step = stepRows.Count > 0 && stepRows.Contains(control);
+                // The gap above the list's first step and the one above what follows its last: the toggle.
+                if ((step && control == stepRows[0]) || afterSteps) gap = Math.Max(Math.Min(gap, Px(StepGapFloor)), gap - tight);
+                afterSteps = step && control == stepRows[stepRows.Count - 1];
+                y += gap;
+                // A row in a mark's column stands past the mark and its gap, as wide as the rest of the card.
+                int indent = inColumn ? column.Extent + column.Gap : 0;
+                int height = HeightAt(control, Math.Max(1, width - indent)) + (control == logArea ? extra : 0);
+                // A step's single line is as short as it can be (Least) by `tight` px, the same in every row.
+                if (step && height < 2 * FirstLine(control)) height = Math.Max(Math.Min(height, StepRowLeast(control)), height - tight);
+                int wide = control is SoftCombo ? Math.Min(width, Px(260)) : width - indent;
                 // v0.6.20: a drop-down narrower than the card stands at its right when mirrored (Mirror).
-                control.SetBounds(Mirror.X(Mirror.Of(this), width, 0, wide), y, wide, height);
+                control.SetBounds(Mirror.X(mirrored, width, indent, wide), y, wide, height);
+                StepMark mark;
+                if (marks.TryGetValue(control, out mark))
+                {
+                    // Beside the row's first line, centred on it; at the card's leading edge, and on its right mirrored.
+                    int size = mark.Extent, top = y + (FirstLine(control) - size) / 2;
+                    mark.Visible = Wanted(control);
+                    mark.SetBounds(Mirror.X(mirrored, width, 0, size), top, size, size);
+                    held = Math.Max(held, top + size);
+                }
                 y += height;
+                // A row beside a mark taller than its words is as tall as the mark, so two marks never touch.
+                if (mark != null) y = Math.Max(y, mark.Bottom);
             }
-            return y;
+            return Math.Max(y, held);
+        }
+
+        /// A line beside the name it is said of, at the row's other end - where the two fit on one line with a medium space
+        /// between them; false, and nothing moved, where they do not, and the line is a row of its own under the name. The
+        /// name is then only as wide as its words, so the two never overlap.
+        private bool Beside(Control line, Control name, int width, bool mirrored, ref int y)
+        {
+            Size own = name.GetPreferredSize(Size.Empty), said = line.GetPreferredSize(Size.Empty);
+            if (own.Width + Px(Brand.SpaceM) + said.Width > width) return false;
+            int top = name.Top, height = Math.Max(name.Height, said.Height);
+            name.SetBounds(Mirror.X(mirrored, width, 0, own.Width), top, own.Width, name.Height);
+            line.SetBounds(Mirror.X(mirrored, width, width - said.Width, said.Width), top, said.Width, said.Height);
+            y = top + height;
+            return true;
+        }
+
+        // The height of a row's first line, as its words are drawn.
+        private static int FirstLine(Control control)
+        {
+            return Math.Max(control.Font.Height, TextRenderer.MeasureText("Ag", control.Font, new Size(int.MaxValue, 0),
+                                                                         TextFormatFlags.NoPrefix).Height);
         }
 
         private int HeightAt(Control control, int width)
         {
-            if (control == logArea) return Px(150);
+            // The log's least: LogLeastLines lines on the Progress page, where it takes the room the steps leave (Arrange); the
+            // Finish page's, under its summary, as it has always been.
+            if (control == logArea)
+                return page == InstallerFlow.Progress ? LogLeastLines * FirstLine(logArea) + logArea.Padding.Vertical : Px(150);
             if (control == notesArea) return Px(page == InstallerFlow.Notes ? 220 : 140);
             if (control == bar) return Px(10);
+            if (control is InstallerRule) return Soft.Hairline;
             if (control is SoftCombo) return SoftCombo.FieldHeight;
             if (control is ChoiceCard) return ((ChoiceCard)control).HeightFor(width);
             if (control is SoftLink) return control.GetPreferredSize(new Size(width, 0)).Height;
@@ -783,23 +1152,139 @@ namespace CodexAutoResume
             if (running || code != int.MinValue) return;
             running = true;
             ShowPage(InstallerFlow.Progress);
+            // v0.6.24 final (re-check 2): the Progress page on the screen at once, before the run has said anything.
+            PaintNow();
+            StartHearing();
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
                 int ended;
                 try
                 {
-                    ended = runner(flow,
-                                   delegate(string line) { Post(delegate { Heard(line); }); },
-                                   delegate(double share) { Post(delegate { Unpacking(share); }); });
+                    ended = runner(flow, Tell, TellUnpacked);
                 }
                 catch (Exception error)
                 {
-                    Post(delegate { Heard(error.Message); });
+                    Tell(error.Message);
                     ended = InstallerFlow.NotStarted;
                 }
-                Post(delegate { Ended(ended); });
+                TellEnded(ended);
             });
         }
+
+        // ------------------------------------------------------------------ what the run says, as the window takes it
+        // v0.6.24 final (re-check 2 on the owner's install): after Repair the setup's first page hung half painted - two grey
+        // boxes, no Cancel, no press taken - for 2 to more than 15 s, and the Progress page showed with 7 of its 9 steps
+        // ticked; once a Show log press was not taken during the copy. The run itself was on a worker, but every line it
+        // printed and every entry it unpacked (thousands: the bundled Python) was a BeginInvoke of its own, each a posted
+        // message, and each of the unpacking's laid the page out again. Windows hands a thread its posted messages before
+        // any input and before WM_PAINT, so while they came the window neither painted nor answered. Now the worker only
+        // writes what it says into a list (Tell, TellUnpacked, TellEnded) and a timer of the window's - WM_TIMER comes after
+        // input and paint - takes it in, in order, each turn no longer than HearBudget: the window paints and answers all
+        // the way through. The steps still tick as the lines that begin them arrive, and the bar grows only with the counts
+        // they carry (real progress only).
+        private readonly object toldLock = new object();
+        private readonly List<object> told = new List<object>();
+        private Timer hearing;
+        private StringBuilder logging;
+        /// How often what the run said is taken in, and the most one turn spends on it, in ms.
+        internal const int HearInterval = 30, HearBudget = 20;
+
+        private sealed class RunEnded
+        {
+            internal readonly int Code;
+            internal RunEnded(int code) { Code = code; }
+        }
+
+        /// A line the run printed, from its worker.
+        private void Tell(string line)
+        {
+            lock (toldLock) told.Add(line ?? "");
+        }
+
+        /// How far a setup program's unpacking is, from its worker: of a row of shares only the last is kept.
+        private void TellUnpacked(double share)
+        {
+            lock (toldLock)
+            {
+                if (told.Count > 0 && told[told.Count - 1] is double) told[told.Count - 1] = share;
+                else told.Add(share);
+            }
+        }
+
+        private void TellEnded(int ended)
+        {
+            lock (toldLock) told.Add(new RunEnded(ended));
+        }
+
+        private void StartHearing()
+        {
+            if (hearing == null)
+            {
+                hearing = new Timer();
+                hearing.Interval = HearInterval;
+                hearing.Tick += delegate { Hear(); };
+            }
+            hearing.Start();
+        }
+
+        /// What the run said since the last turn, taken in order: its lines into the log in one append, the last share of
+        /// the unpacking onto the bar, its end last. Without a handle - between two showings of the window
+        /// (SettingsForm.InstallPick shows it again after WinForms ended its modal loop) - it waits, and nothing is lost.
+        private void Hear()
+        {
+            if (!IsHandleCreated || IsDisposed) return;
+            var spent = Stopwatch.StartNew();
+            var logged = new StringBuilder();
+            logging = logged;
+            try
+            {
+                while (spent.ElapsedMilliseconds < HearBudget)
+                {
+                    object next;
+                    lock (toldLock)
+                    {
+                        if (told.Count == 0) break;
+                        next = told[0];
+                        told.RemoveAt(0);
+                    }
+                    var ended = next as RunEnded;
+                    if (next is string) Heard((string)next);
+                    else if (next is double) Unpacking((double)next);
+                    else if (ended != null)
+                    {
+                        logging = null;
+                        Logged(logged);
+                        if (hearing != null) hearing.Stop();
+                        Ended(ended.Code);
+                        return;
+                    }
+                }
+            }
+            finally
+            {
+                logging = null;
+                Logged(logged);
+            }
+        }
+
+        private void Logged(StringBuilder logged)
+        {
+            if (logged.Length == 0 || logArea.IsDisposed) return;
+            logArea.Box.AppendText(logged.ToString());
+            logged.Length = 0;
+        }
+
+        /// The window drawn now, with everything in it, rather than when the thread's messages next leave room for it.
+        private void PaintNow()
+        {
+            if (!IsHandleCreated || !Visible) return;
+            try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RdwInvalidate | RdwErase | RdwAllChildren | RdwUpdateNow); }
+            catch (Exception) { /* drawn when Windows next asks */ }
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr window, IntPtr rectangle, IntPtr region, uint flags);
+        private const uint RdwInvalidate = 0x0001, RdwErase = 0x0004, RdwAllChildren = 0x0080, RdwUpdateNow = 0x0100;
 
         private void Post(MethodInvoker action)
         {
@@ -865,7 +1350,9 @@ namespace CodexAutoResume
                 return;
             }
             log.AppendLine(line ?? "");
-            logArea.Box.AppendText((line ?? "") + Environment.NewLine);
+            // While Hear takes in what the run said, its words for the log go in one append at the end of the turn.
+            if (logging != null) logging.Append(line ?? "").Append(Environment.NewLine);
+            else logArea.Box.AppendText((line ?? "") + Environment.NewLine);
             string said = (line ?? "").Trim();
             if (said.StartsWith("The watcher could not be confirmed running", StringComparison.Ordinal)) unconfirmed = true;
             if (said.StartsWith("The previous version of the watcher was asked to stop", StringComparison.Ordinal)) previousRunning = true;
@@ -890,16 +1377,34 @@ namespace CodexAutoResume
             double place = InstallerProgress.Unpacked((int)Math.Round(share * 1000), 1000);
             if (place <= at) return;
             at = reached = place;
-            step = share >= 1.0 ? "unpack" : share <= 0 ? "verify_setup" : "unpack";
+            string now = share >= 1.0 ? "unpack" : share <= 0 ? "verify_setup" : "unpack";
+            // v0.6.24 final (re-check 2): the page laid out again only where the step changes; within it, the bar alone.
+            if (now == step && under.Contains(step)) { bar.Value = at; return; }
+            step = now;
             ShowStep();
         }
 
         private void ShowStep()
         {
             bar.Value = at;
+            if (!under.Contains(step)) under.Add(step);
             if (stepLabel == null) return;
-            stepLabel.Text = words.Step(step);
-            Arrange(Inner(ClientSize.Width));
+            // v0.6.24 final (live re-check 3): where the list's rows are made again, they come on the screen at once, placed
+            // (ListSteps holds the painting); a step that only changes how far each row is paints as it always did, and
+            // never holds the thread for a paint of the whole window.
+            stepsHeld = false;
+            try
+            {
+                stepLabel.Text = words.Step(step);
+                if (page == InstallerFlow.Progress) ListSteps(true);
+                Arrange(Inner(ClientSize.Width));
+            }
+            finally
+            {
+                // Let go even where making the rows threw: held painting would leave the window unpainted for good.
+                if (stepsHeld) PaintWhole();
+                stepsHeld = false;
+            }
         }
 
         private void Ended(int ended)
@@ -923,7 +1428,8 @@ namespace CodexAutoResume
                 log.AppendLine(ExitCode());
                 logArea.Box.AppendText(ExitCode() + Environment.NewLine);
             }
-            logShown = ended != 0;
+            // The log stays as the person left it, shown unless they hid it; a run that failed shows it (BuildFinish).
+            if (ended != 0) logShown = true;
             // A run that ended well fills the bar - a short glide where it may move, at once where it may not - and
             // the Finish page follows; any other ending leaves the bar where the work stopped.
             if (ended == 0)
@@ -1015,7 +1521,18 @@ namespace CodexAutoResume
             {
                 e.Cancel = true;
                 closingAsked = true;
-                if (busyNote != null) Arrange(Inner(ClientSize.Width));
+                if (busyNote != null)
+                {
+                    int needed = Arrange(Inner(ClientSize.Width)), room = Room();
+                    // The note takes room from the log; where that leaves the log less than its least, the window is taller by
+                    // the shortfall, as Fit makes it for a page that needs more.
+                    if (needed > room)
+                    {
+                        ClientSize = new Size(ClientSize.Width, ClientSize.Height + needed - room);
+                        PerformLayout();
+                        Arrange(Inner(ClientSize.Width));
+                    }
+                }
                 return;
             }
             base.OnFormClosing(e);
@@ -1025,6 +1542,17 @@ namespace CodexAutoResume
         {
             answered.Set();
             base.OnFormClosed(e);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && hearing != null)
+            {
+                hearing.Stop();
+                hearing.Dispose();
+                hearing = null;
+            }
+            base.Dispose(disposing);
         }
 
         /// A window build/capture_window.ps1 started is never made the foreground window, as the Dashboard's is not
@@ -1108,7 +1636,7 @@ namespace CodexAutoResume
         }
 
         // Whether a row is shown: every row but the log, while it is folded away, and the note that the window stays
-        // open, until someone has tried to close it. Those two keep their room, so showing them moves nothing else.
+        // open, until someone has tried to close it. The log keeps its room, so showing it moves nothing else.
         private bool Wanted(Control control)
         {
             if (control == logArea) return logShown;
@@ -1162,6 +1690,119 @@ namespace CodexAutoResume
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             Ground.Paint(this, e);
+        }
+    }
+
+    /// A hairline across the card, under each row of what is installed (v0.6.24-beta.3): the palette's line, a hairline
+    /// thick, as the Dashboard's flat lists draw theirs.
+    internal sealed class InstallerRule : Control
+    {
+        internal InstallerRule()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            TabStop = false;
+            AccessibleRole = AccessibleRole.Separator;
+            BackColor = Palette.Line;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.FillRectangle(Soft.Fill(Palette.Line), ClientRectangle);
+        }
+    }
+
+    /// The mark at the leading edge of a row in the installer window (v0.6.24-beta.3, the owner's option A): a numbered disc
+    /// - the Welcome page's points - or the state of one of the run's steps under the bar: done, a disc filled with the
+    /// accent and the check box's own check on it; under way, a ring with a dot; still to come, an empty ring. The palette's
+    /// colours on the card's ground, the check box's sizes and stroke (Brand), and nothing of its own.
+    internal sealed class StepMark : Control
+    {
+        internal enum Kinds { Number, Done, Now, Todo }
+
+        private Kinds kind;
+        private readonly string number;
+
+        internal StepMark(Kinds kind, string number)
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+            TabStop = false;
+            AccessibleRole = AccessibleRole.Graphic;
+            BackColor = Palette.Card;
+            this.kind = kind;
+            this.number = number ?? "";
+        }
+
+        /// v0.6.24 final (re-check 2): a step's mark changes in place as the run goes on (ListSteps), never made again.
+        internal Kinds Kind
+        {
+            get { return kind; }
+            set
+            {
+                if (kind == value) return;
+                kind = value;
+                Invalidate();
+            }
+        }
+
+        /// How wide and tall it is: a check box for a step, and a disc that holds its number at any text size.
+        internal int Extent
+        {
+            get
+            {
+                if (kind != Kinds.Number) return Soft.Px(Brand.CheckSize);
+                return Math.Max(Soft.Px(Brand.SpaceXl), Font.Height + Soft.Px(Brand.SpaceS));
+            }
+        }
+
+        /// The gap between it and the words beside it: a check box's, or the card's own medium space beside a disc.
+        internal int Gap { get { return Soft.Px(kind == Kinds.Number ? Brand.SpaceM : Brand.CheckGap); } }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            Ground.PaintArea(this, g, ClientRectangle);
+            int size = Math.Min(Width, Height);
+            if (size <= 0) return;
+            var face = new RectangleF((Width - size) / 2f, (Height - size) / 2f, size, size);
+            float stroke = Soft.PxF(Brand.CheckStroke);
+            var state = g.Save();
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+            if (kind == Kinds.Number || kind == Kinds.Done)
+                g.FillEllipse(Soft.Fill(kind == Kinds.Number ? Palette.AccentSoft : Palette.Accent), face);
+            else
+            {
+                var ring = RectangleF.Inflate(face, -stroke / 2f, -stroke / 2f);
+                using (var pen = new Pen(kind == Kinds.Now ? Palette.Accent : Palette.Line, stroke))
+                    g.DrawEllipse(pen, ring);
+                if (kind == Kinds.Now)
+                {
+                    float dot = size * 0.22f;
+                    g.FillEllipse(Soft.Fill(Palette.Accent), face.X + size / 2f - dot, face.Y + size / 2f - dot, dot * 2f, dot * 2f);
+                }
+            }
+            if (kind == Kinds.Done)
+            {
+                // The check box's check (SoftCheck), at this mark's size.
+                float at = size / (float)Brand.CheckSize;
+                using (var pen = new Pen(Palette.OnAccent, stroke))
+                {
+                    pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Miter;
+                    g.DrawLines(pen, new[]
+                    {
+                        new PointF(face.X + Brand.CheckMarkStartX * at, face.Y + Brand.CheckMarkStartY * at),
+                        new PointF(face.X + Brand.CheckMarkCornerX * at, face.Y + Brand.CheckMarkCornerY * at),
+                        new PointF(face.X + Brand.CheckMarkEndX * at, face.Y + Brand.CheckMarkEndY * at),
+                    });
+                }
+            }
+            g.Restore(state);
+            if (kind == Kinds.Number)
+                TextRenderer.DrawText(g, number, Font, Rectangle.Round(face), Palette.Accent,
+                                      TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                                      TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
         }
     }
 

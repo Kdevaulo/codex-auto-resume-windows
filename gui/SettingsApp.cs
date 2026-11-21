@@ -372,6 +372,9 @@ namespace CodexAutoResume
         // What the window was opened with (see OpenRequest), and the installation it belongs to.
         private readonly OpenRequest request;
         private readonly string installRoot;
+        // v0.6.24 final: the key the window's words were looked up under (StringsCache.Key), or null - the advanced
+        // edition keeps its page's words under the same key.
+        private string openedKey;
         // Reopening (see Reopen). What this window shows - the Interface language its words were
         // resolved for, the theme it draws and, since v0.6.10, the design it draws (Design.Drawn) - against
         // what is stored: the Interface language, Theme preference and Design as last read or saved.
@@ -437,6 +440,8 @@ namespace CodexAutoResume
         // stands on, docked at the tabs' outer end.
         private VersionPill versionPill;
         private SoftPage pillSlot;
+        // v0.6.24: its hint on a special day, that it can be pressed (FollowPillHint).
+        private PillHint pillHint;
         private readonly HaloDot stateDot = new HaloDot();
         private readonly SoftDayScene dayScene = new SoftDayScene();
         private string dayLook;
@@ -557,11 +562,14 @@ namespace CodexAutoResume
             if (now < specialUntil) return;
             countAsked++;
             bool sixth = versionPresses.Press(now);
+            // v0.6.24 (the owner, 2026-11-17/18): a special day's own egg and sentences, the date the window's (EggDay).
+            string day = EggDay();
             if (sixth && LightSweepsShown)
             {
                 stateDot.StopSweep();
                 detail.Unsay();
-                PlaySpecialEgg(SpecialEggs.Pick());
+                if (day != null) PlayDayEgg(day);
+                else PlaySpecialEgg(SpecialEggs.Pick());
                 // Until its sentence has come, been said and gone: the sweep's or the colours' time first, where they play.
                 bool moving = stateDot.Sweeping || stateDot.ColoursRunning || (confetti != null && confetti.Running);
                 specialUntil = now + (moving ? AsideAfterMs : 0) + AsideMs + AsideLabel.OutMs;
@@ -570,7 +578,64 @@ namespace CodexAutoResume
             if (!versionPresses.First) return;
             EggsPlayed.Add("one");
             stateDot.Sweep();
-            detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+            if (day != null)
+                detail.Aside(S("status.aside_day_" + day, S("status.aside", "It's okay if it stops. I'll pick it up.")),
+                             stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+            else detail.Aside(S("status.aside", "It's okay if it stops. I'll pick it up."), stateDot.Sweeping ? AsideAfterMs : 0, AsideMs);
+        }
+
+        /// v0.6.24: the special day the version's eggs speak of - the window's date (DayArt.Clock), or null for an ordinary day
+        /// and for a window that is no person's (DayArt.On off: a picture, a probe without a probe date). In High Contrast too,
+        /// unlike the day's look: these are words, and there nothing of the egg moves (PlayDayEgg, PillHint).
+        internal string EggDay()
+        {
+            if (!DayArt.On) return null;
+            DateTime now = DayArt.Clock();
+            string look, top, bottom;
+            return Brand.DayLook(now.Year, now.Month, now.Day, out look, out top, out bottom) ? look : null;
+        }
+
+        /// v0.6.24 (the owner, 2026-11-17/18, the Special board): the sixth press on a special day plays that day's own egg in
+        /// place of the three ordinary ones - from the pill, in a layer over the window (DayEggPlay) - and says its sentence,
+        /// as the confetti egg does. With motion reduced, Windows' animations off or in High Contrast, the sentence alone.
+        private void PlayDayEgg(string day)
+        {
+            EggsPlayed.Add("day:" + day);
+            bool moving = DayEggPlay(day);
+            detail.Aside(S("status.aside_egg_" + day, S("status.aside", "It's okay if it stops. I'll pick it up.")),
+                         moving ? AsideAfterMs : 0, AsideMs);
+        }
+
+        /// The day's egg on the screen: the confetti's layer and box (Confetti) round the pill, drawing DayEgg into the window
+        /// from the pill's side. Nothing where nothing may move, in High Contrast, or with no pill on the screen.
+        private bool DayEggPlay(string day)
+        {
+            if (versionPill == null || !Soft.OwnVisible(versionPill) || !Motion.Allowed(versionPill) || Palette.Contrast)
+                return false;
+            Point centre = PointToClient(versionPill.PointToScreen(new Point(versionPill.Width / 2, versionPill.Height / 2)));
+            int reach = Px(260);
+            Rectangle client = ClientRectangle;
+            Rectangle area = Rectangle.FromLTRB(Math.Max(client.Left, centre.X - reach), Math.Max(client.Top, centre.Y - Px(130)),
+                                                Math.Min(client.Right, centre.X + reach), client.Bottom);
+            if (area.Width <= 0 || area.Height <= 0) return false;
+            if (confetti != null) confetti.Dispose();
+            var egg = new DayEgg(day, new PointF(centre.X - area.X, centre.Y - area.Y), Soft.PxF(1), Mirror.Of(this) ? 1 : -1);
+            confetti = new ConfettiLayer(this, area, egg);
+            confetti.Start();
+            return true;
+        }
+
+        /// v0.6.24 (the owner, 2026-11-18, the Hint board's H2 and H3): the pill's hint on a special day (PillHint) and a hand
+        /// over it - none in a picture or the layout audit (LightSweepsShown). Asked by the window's clock every second
+        /// (FollowDayScene), as the window shows, and as the pill shows or goes.
+        internal void FollowPillHint()
+        {
+            if (pillHint == null) return;
+            string day = LightSweepsShown ? EggDay() : null;
+            Cursor hand = day != null ? Cursors.Hand : Cursors.Default;
+            if (versionPill.Cursor != hand) versionPill.Cursor = hand;
+            if (versionText.Cursor != hand) versionText.Cursor = hand;
+            pillHint.Follow(day);
         }
 
         /// One special egg, each with its sentence. With motion reduced or Windows' animations off, nothing moves and the
@@ -796,12 +861,15 @@ namespace CodexAutoResume
 
         /// The window's opening client size, in logical pixels.
         ///
-        /// v0.6.24-beta.2 (the owner's decision of 2026-11-16, from mockups): 1000 by 588 at text size 1. The header card is
-        /// two lines in 76 px (HeroHeight), the page tabs under it, and the pages below them as tall as they were in the
-        /// window of 1000 by 681 the beta opened at - which had a footer strip of 76 px under every page (the version and
-        /// Close) and a header card of 90: the four Overview cards are what they were, each about 205 px at 100 %, within
-        /// 2 px at every scaling. Only Settings has a footer now, its save bar, inside that height; the version is a pill
-        /// at the end of the tabs (VersionPill) and the header's X closes the window.
+        /// v0.6.24 (the owner's decision of 2026-11-18, from real renders): 1000 by 618 at text size 1, 30 px past
+        /// beta.2's 588, which the owner found too short. They compared the window at 588, 612, 625 and 645, then at 612,
+        /// 615, 618, 621 and 625 with the Overview's cards not growing, and chose 618 (1000:618): "better not to grow
+        /// the cards". So the cards keep their comfortable height (OverviewComfort, unchanged) and the page has a little
+        /// more than its own padding under the Overview's last row - the owner's choice, not a defect (WindowAudit's
+        /// OpeningBandMax holds it to what 618 adds past the rows' comfort). The header card is two lines in 76 px
+        /// (HeroHeight), the page tabs under it, and the pages below them: the four Overview cards are about 205 px at
+        /// 100 %. Only Settings has a footer, its save bar, inside that height; the version is a pill at the end of the
+        /// tabs (VersionPill) and the header's X closes the window.
         ///
         /// What the pages need (v0.6.5): the Overview's cards hold what they hold with the button each leads to at its
         /// bottom left, in a row of its own under the last line (Lead), and FitOverview gives the rows what the tallest
@@ -816,7 +884,7 @@ namespace CodexAutoResume
         /// whole beside "Why it is waiting" at its full 256 px: 933 to 946 in English, 813 to 817 in
         /// Korean.
         internal const int OpeningWidth = 1000;
-        internal const int OpeningHeight = 588;
+        internal const int OpeningHeight = 618;
 
         /// v0.6.24-beta.2: the header card's height at text size 1 in the decision's mockup, two lines and its padding
         /// (HeroPadY); a language whose lines are taller has a taller card, and the window opens that much taller (heroRoom).
@@ -1002,6 +1070,7 @@ namespace CodexAutoResume
             // language and this Windows language (see StringsCache); otherwise asked for on a
             // worker, while the fonts and the icon are made. The window used to wait 260-400 ms for
             // the interpreter to start, and then spend 130-260 ms more on the first font.
+            StartMarks.Mark("window made");
             string root = AppDomain.CurrentDomain.BaseDirectory;
             installRoot = root;
             string cacheKey = null;
@@ -1010,6 +1079,7 @@ namespace CodexAutoResume
             else
             {
                 cacheKey = StringsCache.Key(root);
+                openedKey = cacheKey;
                 Dictionary<string, object> cached = StringsCache.Read(root, cacheKey);
                 if (cached != null)
                 {
@@ -1028,7 +1098,11 @@ namespace CodexAutoResume
             Font = windowFont ?? AtDisplayScale(TextScale.Apply(SystemFonts.MessageBoxFont, textRead, TextSize));
             // The type roles (Soft.RoleFont) are variants of the window's own font.
             Soft.BaseFont = Font;
+            StartMarks.Mark("font");
             ForeColor = Ink;
+            // v0.6.24-beta.3 (W2): on a special day the window's ground faintly takes the day's (DayGround), before anything is
+            // made in it - and as it was everywhere else, a picture's or a probe's window included, which look at no date.
+            DayGround.Adopt(Palette.AccentBar ? null : DayArt.Today(), this);
             BackColor = Canvas;
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.Font;
@@ -1102,6 +1176,8 @@ namespace CodexAutoResume
             if (heroRoom > 0) ClientSize = new Size(ClientSize.Width, ClientSize.Height + heroRoom);
             BuildColumns();
             BuildDashboard();
+            // v0.6.24 final (J9): the version's pill from the first paint, read from this installation's own files.
+            ShowLocalVersion(installRoot);
             // v0.6.24: the tab strip's ground and the save bar's ground drag the window as the header's does (never a tab,
             // and never the version's pill, which is pressed: only the ground of its slot drags).
             chrome.Drag(nav);
@@ -1147,14 +1223,17 @@ namespace CodexAutoResume
             Load += delegate
             {
                 if (auditing) return;
+                StartMarks.Mark("load");
                 Reload();
                 ShowPage(firstPage);
+                StartMarks.Mark("first page");
                 // A window that replaces another puts the keyboard where that one had it (FocusName).
                 FocusInterim();
                 StartClock();
             };
             Shown += delegate
             {
+                StartMarks.Mark("shown");
                 shown = true;
                 // v0.6.20: the watcher's request to come forward is heard even when this window runs elevated.
                 AcceptOpenRequests();
@@ -1183,6 +1262,9 @@ namespace CodexAutoResume
                 WatchForUpdate();
             };
             FormClosed += delegate { StopClock(); bridge.Stop(); };
+            // W2: the controls made as the window's fields were, before the day's tint was adopted above, take it too.
+            if (DayGround.Look != null) DayGround.Repaint(this, DayGround.Untinted, Palette.Canvas);
+            StartMarks.Mark("built");
         }
 
         /// The window within the screen it opens on. Its sizes are scaled, so on a small screen at
@@ -1314,7 +1396,9 @@ namespace CodexAutoResume
         private void KeepHeadlineClear()
         {
             if (chrome == null) return;
-            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - Math.Max(hero.Padding.Left, hero.Padding.Right);
+            // The card's padding at its outer side, the caption buttons' - its right, which the card mirrors for a language
+            // written right to left: the pill's inset while it is in the card (PillToHeader).
+            int reach = Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - hero.Padding.Right;
             var wanted = new Padding(0, 0, Math.Max(0, reach), 0);
             if (headline.Margin != wanted) headline.Margin = wanted;
         }
@@ -1663,7 +1747,13 @@ namespace CodexAutoResume
         /// taskbar and title-bar icons follow the date (TaskbarMark.FollowTheDay).
         private void FollowDayScene()
         {
+            // v0.6.24: and the version pill's hint, which starts once the pill is on the screen and follows the date too.
+            FollowPillHint();
             if (!dayScene.Follow(ref dayLook)) return;
+            // W2: the window's ground follows the date too - every ground in the old day's colour takes the new one.
+            Color was = Palette.Canvas;
+            DayGround.Adopt(dayLook, this);
+            if (Palette.Canvas.ToArgb() != was.ToArgb()) DayGround.Repaint(this, was, Palette.Canvas);
             if (dayLook == null)
             {
                 dayScene.Place(false, null, 0, 0, 0, 0, 0, 0);
@@ -1679,16 +1769,47 @@ namespace CodexAutoResume
             return (mirrored ? width - label.Right : label.Left) + Math.Min(words.Width, label.Width);
         }
 
-        /// The day's scene in what the header's words leave at the card's outer side: no word on it, or no scene.
+        /// The day in what the header's words leave of the card (W2, the owner's pick of 2026-11-17): from past the last word to
+        /// the card's outer edge, under the caption buttons too, its scene as tall as the card left of them (DayArt.Fit, Band).
+        /// No word on it; where the words leave it no room, none of it - and so no slice behind the buttons either. This is the
+        /// one place that decides its rectangle; the buttons paint what it puts under them (ChromeHost.Scene).
         private void PlaceDayScene()
         {
             if (dayLook == null) return;
+            // The version's pill at the card's outer end (PillToHeader) stands where the scene would: no scene then.
+            if (versionPill != null && versionPill.Parent == hero)
+            {
+                dayScene.Place(false, null, 0, 0, 0, 0, 0, 0);
+                return;
+            }
             bool mirrored = Mirror.Of(hero);
             int width = hero.Width, hair = Soft.Hairline, outer = width - hair;
             int end = Math.Max(WordsEnd(headline, mirrored, width), WordsEnd(detail, mirrored, width)), left, fade;
+            int room = CaptionRoom(mirrored, width, outer);
             double unit;
-            bool fits = DayArt.Fit(dayLook, end, 0, width, outer, hair, hero.Height - hair, out left, out unit, out fade);
-            dayScene.Place(fits, dayLook, hero.Left + (mirrored ? width - outer : left), hero.Top + hair, outer - left, hero.Height - 2 * hair, unit, fade);
+            bool scene = DayArt.Fit(dayLook, end, 0, width, outer - room, hair, hero.Height - hair, out left, out unit, out fade);
+            dayScene.Keep(room, scene);
+            dayScene.Place(DayArt.Band(left, outer), dayLook, hero.Left + (mirrored ? width - outer : left), hero.Top + hair, outer - left,
+                           hero.Height - 2 * hair, unit, fade);
+        }
+
+        /// How far in from the card's outer edge (`outer`, measured from its inner side as the words are) the caption buttons
+        /// reach, and a gap past them: the room the day's scene keeps clear. None where no button is shown.
+        private int CaptionRoom(bool mirrored, int width, int outer)
+        {
+            if (chrome == null) return 0;
+            Point card = Point.Empty;
+            for (Control c = hero; c != null && c != this; c = c.Parent) card.Offset(c.Left, c.Top);
+            int reach = 0;
+            foreach (CaptionButton button in new[] { chrome.MinimizeButton, chrome.MaximizeButton, chrome.CloseButton })
+            {
+                if (button == null || !Soft.OwnVisible(button)) continue;
+                Point at = Point.Empty;
+                for (Control c = button; c != null && c != this; c = c.Parent) at.Offset(c.Left, c.Top);
+                int inner = mirrored ? at.X + button.Width - card.X : width - (at.X - card.X);
+                reach = Math.Max(reach, inner - (width - outer));
+            }
+            return reach > 0 ? reach + Px(Brand.DayWideGap) : 0;
         }
 
         private void BuildFooter()
@@ -1813,17 +1934,33 @@ namespace CodexAutoResume
             pillSlot.TabStop = false;
             pillSlot.Controls.Add(versionPill);
             nav.Controls.Add(pillSlot);
+            // v0.6.24: its hint on a special day - the nudge moves it up in its slot, the ring is drawn on it (FollowPillHint).
+            pillHint = new PillHint(versionPill);
+            versionPill.Hint = pillHint;
+            pillHint.Changed = delegate(bool moved)
+            {
+                if (moved && versionPill.Parent == pillSlot) pillSlot.PerformLayout();
+                versionPill.Invalidate();
+            };
+            Shown += delegate { FollowPillHint(); };
+            versionPill.VisibleChanged += delegate { FollowPillHint(); };
             // Where the pill stands in its slot: at its outer end, the gap to the tabs at its inner (the slot's padding,
-            // which a mirrored slot mirrors), and centred on the tabs' line.
+            // which a mirrored slot mirrors), and centred on the tabs' line - less the hint's nudge. Not while it stands in
+            // the header card (PillToHeader), whose table places it.
             pillSlot.Layout += delegate
             {
+                if (versionPill.Parent != pillSlot) return;
                 Rectangle room = pillSlot.DisplayRectangle;
                 int tabs = 0;
                 foreach (Control tab in strip.Controls) tabs = Math.Max(tabs, tab.Height);
                 if (tabs == 0) tabs = pillSlot.Height;
                 var at = new Point(Mirror.Of(pillSlot) ? room.Right - versionPill.Width : room.X,
-                                   Math.Max(0, (tabs - versionPill.Height) / 2));
-                if (versionPill.Location != at) versionPill.Location = at;
+                                   Math.Max(0, (tabs - versionPill.Height) / 2 - pillHint.Nudge));
+                if (versionPill.Location != at)
+                {
+                    versionPill.Location = at;
+                    versionPill.Lifted();
+                }
             };
             nav.Layout += delegate { FitVersionPill(strip); };
             // And whenever the strip lays its tabs out again: a tab shown later - the advanced edition's Advanced features
@@ -1849,11 +1986,20 @@ namespace CodexAutoResume
 
         private bool fittingPill;
 
-        /// The pill whole - the version and the edition - where the tabs leave room for it and the gap before it; the version
-        /// alone where only that fits; else none. The room is the strip's less the tabs' own width (the strip lays its tabs
-        /// out in one line; where the advanced edition's take two rows, none is left), at every text size and in every
-        /// language, and again whenever the strip lays its tabs out (test_gui_v0624_dashboard). Whether the slot was shown,
-        /// hidden or resized, which changes the strip's room.
+        /// v0.6.24 (the owner, 2026-11-18, the advanced edition's eight tabs in English, where the pill had gone): the room
+        /// a tab keeps at either side of its name - today's, and the least the tabs are drawn closer to so the pill stays,
+        /// half of it, where the names still read as separate tabs. Every tab alike, so the gaps stay equal; the chosen
+        /// tab's raised look is its face, which the ring's room (TabRing) and the margin keep off its neighbours whatever
+        /// the padding.
+        internal const int TabPadX = 18, TabPadXLeast = 9, TabPadY = 8;
+
+        /// The pill whole - the version and the edition - where the tabs leave room for it and the gap before it; else the
+        /// tabs drawn closer, every one alike and no closer than needed (TabPadX down to TabPadXLeast), so it still fits
+        /// whole; else the version alone, the tabs as close as that needs; and where even the closest tabs leave no room,
+        /// the pill at the end of the header card's second line, under the caption buttons (PillToHeader) - never hidden
+        /// (the owner, 2026-11-18). The room is the strip's less the tabs' own width, at every text size and in every
+        /// language, and again whenever the strip lays its tabs out (test_gui_v0624_dashboard, test_gui_pill_room). Whether
+        /// the slot was shown, hidden or resized, or the tabs' padding changed, which changes the strip's room.
         private bool FitVersionPill(Control strip)
         {
             if (fittingPill || versionPill == null) return false;
@@ -1861,42 +2007,182 @@ namespace CodexAutoResume
             try
             {
                 int gap = Px(12);
-                // The tabs' own row, each shown tab as wide as it asks with its margins - not the strip's PreferredSize, which
-                // a tab just shown has not yet reached while the strip lays out for it (dev CI 43859506322: the Chat tab).
-                int tabs = strip.Padding.Horizontal;
-                foreach (Control tab in strip.Controls)
-                    if (Soft.OwnVisible(tab)) tabs += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
-                int room = nav.DisplayRectangle.Width - tabs - gap;
-                int whole = versionPill.WholeWidth, alone = versionPill.VersionWidth;
-                bool shown = !string.IsNullOrEmpty(versionText.Version) && alone <= room;
-                bool shortened = shown && whole > room;
-                versionText.Shortened = shortened;
+                // The tabs' own row less the room at the sides of their names, each shown tab as wide as it asks with its
+                // margins - not the strip's PreferredSize, which a tab just shown has not yet reached while the strip lays
+                // out for it (dev CI 43859506322: the Chat tab).
+                int room = nav.DisplayRectangle.Width;
+                int full = Px(TabPadX), least = Math.Min(full, Px(TabPadXLeast));
+                // The most room at either side of every name, from today's down, that leaves `taken` beside the tabs; or
+                // less than the least where none does. Each tab as wide as it would ask with that room (TabRowAt), measured
+                // rather than reckoned: a short name's tab has a floor of its own (NavButton's measure of its other weight).
+                Func<int, int> sides = delegate(int taken)
+                {
+                    for (int each = full; each >= least; each--)
+                        if (TabRowAt(strip, each) + taken <= room) return each;
+                    return least - 1;
+                };
+                bool known = !string.IsNullOrEmpty(versionText.Version);
+                // Two rows of tabs (the advanced edition's on a screen too narrow for one, HoldTabs) leave the row no end.
+                var flow = strip as FlowLayoutPanel;
+                bool oneRow = flow == null || !flow.WrapContents;
+                // v0.6.24 (the owner, 2026-11-18): the version alone in both editions, never the edition's word - a screen
+                // reader is still told both (VersionPill.Tell), and the advanced edition is told by its ink (VersionInk).
+                versionText.Shortened = true;
+                VersionInk();
+                int alone = versionPill.VersionWidth;
+                int pad = sides(alone + gap);
+                bool inRow = known && oneRow && pad >= least;
+                if (!inRow) pad = oneRow ? Math.Max(least, sides(0)) : full;
+                bool changed = TabSides(strip, pad);
                 versionPill.Tell();
-                var size = new Size(shortened ? alone : whole, versionPill.PillHeight);
+                var size = new Size(alone, versionPill.PillHeight);
                 if (versionPill.Size != size) versionPill.Size = size;
                 pillSlot.Padding = new Padding(gap, 0, 0, 0);
                 int width = size.Width + gap;
-                bool changed = false;
                 if (pillSlot.Width != width)
                 {
                     pillSlot.Width = width;
                     changed = true;
                 }
-                if (Soft.OwnVisible(pillSlot) != shown)
+                if (Soft.OwnVisible(pillSlot) != inRow)
                 {
-                    pillSlot.Visible = shown;
+                    pillSlot.Visible = inRow;
                     changed = true;
                 }
+                PillToHeader(known && !inRow);
                 versionPill.Lifted();
                 return changed;
             }
             finally { fittingPill = false; }
         }
 
-        /// How the pill was last fitted, for the tests and the audit: "whole", "version" or "none".
+        // A tab of its own, never shown, that a tab's words, weight and room are set on to ask how wide it would be (TabRowAt),
+        // and what it answered, by the font, the words and the room.
+        private NavButton tabMeasure;
+        private readonly Dictionary<string, int> tabWidths = new Dictionary<string, int>();
+
+        /// How wide the strip's row of shown tabs would be with `pad` at either side of every name, margins included: each
+        /// tab as a tab of its own set as it is but for the room asks - for every room alike, the room the tabs have now
+        /// too, so the answer never depends on which room that is and a fitting never undoes the one before it.
+        private int TabRowAt(Control strip, int pad)
+        {
+            int width = strip.Padding.Horizontal;
+            foreach (Control tab in strip.Controls)
+            {
+                if (!Soft.OwnVisible(tab)) continue;
+                var button = tab as NavButton;
+                if (button == null)
+                {
+                    width += tab.GetPreferredSize(Size.Empty).Width + tab.Margin.Horizontal;
+                    continue;
+                }
+                width += TabWidthAt(button, pad) + tab.Margin.Horizontal;
+            }
+            // v0.6.24 final (J9): and the room of a tab whose showing is not known yet (TabsHeld) - the advanced edition's
+            // Chat until its state is read - so the row does not move when it shows.
+            var held = new List<NavButton>();
+            TabsHeld(held);
+            foreach (NavButton button in held) width += TabWidthAt(button, pad) + button.Margin.Horizontal;
+            return width;
+        }
+
+        /// The width `button` asks for with `pad` at either side of its words, measured once per font, room and words.
+        private int TabWidthAt(NavButton button, int pad)
+        {
+            var room = new Padding(pad, button.Padding.Top, pad, button.Padding.Bottom);
+            string key = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(button.Font).ToString(CultureInfo.InvariantCulture) +
+                         "|" + room + "|" + button.AutoSizeMode + "|" + button.Text;
+            int asked;
+            if (!tabWidths.TryGetValue(key, out asked))
+            {
+                if (tabMeasure == null) tabMeasure = new NavButton();
+                tabMeasure.AutoSize = button.AutoSize;
+                tabMeasure.AutoSizeMode = button.AutoSizeMode;
+                tabMeasure.Font = button.Font;
+                tabMeasure.Text = button.Text;
+                tabMeasure.Padding = room;
+                asked = tabMeasure.GetPreferredSize(Size.Empty).Width;
+                tabWidths[key] = asked;
+            }
+            return asked;
+        }
+
+        /// Every tab of the strip with `pad` at either side of its name, shown or not (a tab shown later comes in as close
+        /// as the rest). Whether any changed.
+        private bool TabSides(Control strip, int pad)
+        {
+            bool changed = false;
+            var wanted = new Padding(pad, Px(TabPadY), pad, Px(TabPadY));
+            foreach (Control tab in strip.Controls)
+            {
+                if (!(tab is NavButton) || tab.Padding == wanted) continue;
+                tab.Padding = wanted;
+                changed = true;
+            }
+            return changed;
+        }
+
+        // The header card's padding as it was built, which the pill's room at its outer side replaces while it is there.
+        private Padding heroPadding;
+
+        /// v0.6.24 (the owner, 2026-11-18): the pill in the header card where even the closest tabs leave it no room - the
+        /// card's third column, on its second line, at its outer end under the caption buttons, Brand.PillInset from the
+        /// card's edge as at the tab row's end (the card's padding at that side is the inset while it is there; the headline
+        /// keeps clear of the caption buttons by its own margin, KeepHeadlineClear); the line under the headline ends a gap
+        /// before it. Back in its slot at the tab row's end as soon as the row has room again.
+        private void PillToHeader(bool wanted)
+        {
+            if (wanted == (versionPill.Parent == hero)) return;
+            if (heroPadding == Padding.Empty) heroPadding = hero.Padding;
+            hero.SuspendLayout();
+            try
+            {
+                if (wanted)
+                {
+                    pillSlot.Controls.Remove(versionPill);
+                    int inset = Px(Brand.PillInset);
+                    // The card's right and the pill's left as a language written left to right has them: the card mirrors both
+                    // for one written right to left (measured: swapped here as well, the pill stood 32 px in, 2026-11-18).
+                    hero.Padding = new Padding(heroPadding.Left, heroPadding.Top, inset, heroPadding.Bottom);
+                    versionPill.Anchor = AnchorStyles.None;
+                    versionPill.Margin = new Padding(Px(12), 0, 0, 0);
+                    hero.Controls.Add(versionPill, 2, 1);
+                    hero.SetColumnSpan(headline, 2);
+                }
+                else
+                {
+                    hero.Controls.Remove(versionPill);
+                    hero.SetColumnSpan(headline, 1);
+                    hero.Padding = heroPadding;
+                    versionPill.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+                    versionPill.Margin = Padding.Empty;
+                    pillSlot.Controls.Add(versionPill);
+                }
+            }
+            finally { hero.ResumeLayout(true); }
+            KeepHeadlineClear();
+            PlaceDayScene();
+        }
+
+        /// v0.6.24 (the owner, 2026-11-18, from real renders): the advanced edition is told on the pill by its ink alone -
+        /// Brand.EditionInk, its own blue in light and in dark - while the pill's fill and edge are the standard ones; the
+        /// standard edition keeps the secondary ink, and High Contrast the system's (Secondary there).
+        private void VersionInk()
+        {
+            Color ink = versionText.Edition == null || Palette.Contrast ? Secondary
+                      : Tokens.Dark ? Brand.Dark.EditionInk() : Brand.EditionInk();
+            if (versionText.ForeColor != ink) versionText.ForeColor = ink;
+        }
+
+        /// How the pill was last fitted, for the tests and the audit: "whole" at the tab row's end (the version, all the pill
+        /// shows since 2026-11-18), "header" in the header card, or "none" before there is a version to show.
         internal string PillFit
         {
-            get { return pillSlot == null || !Soft.OwnVisible(pillSlot) ? "none" : versionText.Shortened ? "version" : "whole"; }
+            get
+            {
+                if (versionPill != null && versionPill.Parent == hero) return "header";
+                return pillSlot == null || !Soft.OwnVisible(pillSlot) ? "none" : "whole";
+            }
         }
 
     }
@@ -1963,6 +2249,62 @@ namespace CodexAutoResume
         }
     }
 
+    /// v0.6.24 final (the live re-check's L3): where the time goes from this process's start to the window's first frame on
+    /// the screen, written down only when CODEX_AR_START_MARKS names a file - a person's or the measurement's, never by
+    /// default. Each mark is one line, the milliseconds since the process was created and the step's name; the file is
+    /// written when the first frame is on the screen and again once the first state has been shown. With the variable
+    /// unset every mark is one test of a field that is null, and nothing is read, measured or written.
+    internal static class StartMarks
+    {
+        private static readonly string target = Environment.GetEnvironmentVariable("CODEX_AR_START_MARKS");
+        private static readonly StringBuilder said = string.IsNullOrEmpty(target) ? null : new StringBuilder();
+        private static double offset = double.NaN;
+
+        [DllImport("kernel32.dll", EntryPoint = "GetCurrentProcess")]
+        private static extern IntPtr ThisProcess();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetProcessTimes(IntPtr process, out long created, out long exited, out long kernel, out long user);
+
+        /// Whether marks are being written down.
+        internal static bool On { get { return said != null; } }
+
+        /// `step` reached now.
+        internal static void Mark(string step)
+        {
+            if (said == null) return;
+            try
+            {
+                double now = Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency;
+                lock (said)
+                {
+                    if (double.IsNaN(offset))
+                    {
+                        // When Windows created this process, asked without a Process object (OwnProcess holds the one).
+                        long created, exited, kernel, user;
+                        if (!GetProcessTimes(ThisProcess(), out created, out exited, out kernel, out user)) created = DateTime.UtcNow.ToFileTimeUtc();
+                        offset = (DateTime.UtcNow - DateTime.FromFileTimeUtc(created)).TotalMilliseconds - now;
+                    }
+                    said.Append((now + offset).ToString("0.0", CultureInfo.InvariantCulture)).Append(' ').Append(step).Append('\n');
+                }
+            }
+            catch (Exception) { /* a mark not written down; the window goes on */ }
+        }
+
+        /// The marks so far, written to the file named.
+        internal static void Write()
+        {
+            if (said == null) return;
+            try
+            {
+                string text;
+                lock (said) text = said.ToString();
+                File.WriteAllText(target, text, new UTF8Encoding(false));
+            }
+            catch (Exception) { /* not written: the window goes on */ }
+        }
+    }
+
     internal static class Program
     {
         [DllImport("shell32.dll", PreserveSig = false)]
@@ -1989,9 +2331,58 @@ namespace CodexAutoResume
             catch (Exception) { }           // an older shell, or a shell that refuses: the button simply stays still
         }
 
+        /// v0.6.24 final (the live re-check's L3: the Start menu's Dashboard showed its first frame 6-7 s after the click): the
+        /// first font this process makes, made on a thread of its own as the process starts. GDI+ builds the collection of
+        /// every font installed on the machine for the first font any thread asks for - measured on the owner's PC 225-260 ms
+        /// in a bare program, 230-525 ms inside the window's start, on the window's own thread, before anything of it could
+        /// be painted (SettingsForm's constructor: SystemFonts.MessageBoxFont). Asked here, it is built while that thread
+        /// does everything Main does before the window is made, and the constructor's font finds it built, or waits only
+        /// for the rest. It changes no font: this one is let go at once, and the window makes its own as it always did.
+        internal static void WarmFonts()
+        {
+            try
+            {
+                var warm = new System.Threading.Thread(delegate()
+                {
+                    try { using (Font font = SystemFonts.MessageBoxFont) { } }
+                    catch (Exception) { /* the window's own font makes the collection, as it did before */ }
+                });
+                warm.IsBackground = true;
+                warm.Start();
+            }
+            catch (Exception) { /* as before: the first font the window makes builds it */ }
+        }
+
+        /// The file the JIT keeps the window's start in (StartProfile), in the installation's config\ folder.
+        internal const string StartProfileName = "window-start.jit";
+
+        /// v0.6.24 final (L3): the window's start compiled ahead, on the machine's other cores. The window is one assembly of
+        /// some 2 MiB of IL, and every method it runs before its first frame is compiled as it is first called, on the
+        /// window's thread - the header, the tab row, the Overview, the first paint (ngen needs an administrator, so no
+        /// image of it is made ahead). .NET's multicore JIT (ProfileOptimization) writes down which methods the start
+        /// compiled, in this installation's config\ folder, and on the next start compiles them on other threads, from
+        /// the first moment, ahead of the window's own thread calling them. Only for a window that opens: never for a
+        /// start that hands over or opens again outside (which would write down a start of a few methods), nor for a
+        /// capture's or where there is no config\ folder. A profile that cannot be read or written is no profile: the
+        /// window starts as it did before.
+        internal static void StartProfile(string root)
+        {
+            try
+            {
+                string folder = Path.Combine(root, "config");
+                if (!Directory.Exists(folder)) return;
+                System.Runtime.ProfileOptimization.SetProfileRoot(folder);
+                System.Runtime.ProfileOptimization.StartProfile(StartProfileName);
+            }
+            catch (Exception) { /* compiled as it is called, as before */ }
+        }
+
         [STAThread]
         internal static int Main(string[] argv)
         {
+            // v0.6.24 final (L3): before anything else, the machine's fonts collected on a thread of their own (WarmFonts).
+            WarmFonts();
+            StartMarks.Mark("main");
             // The accessibility improvements .NET 4.8 ships but leaves off for an assembly
             // with no target-framework attribute, which is what the in-box compiler builds.
             // Without them a live region never reaches a screen reader.
@@ -2028,6 +2419,9 @@ namespace CodexAutoResume
                 HostApp.Relaunch(Application.ExecutablePath, HostApp.Arguments(argv), root))
                 return 0;
             HostApp.StuckInside = inside;
+            // v0.6.24 final (L3): from here on this process opens the window - the start compiled ahead (StartProfile).
+            if (Soft.StillReady == null) StartProfile(root);
+            StartMarks.Mark("opening");
             var bridge = new Bridge(root);
             if (!bridge.Available)
             {
@@ -2063,6 +2457,8 @@ namespace CodexAutoResume
             var persistent = new PersistentBridge(root, bridge);
             UiFaults.Follow(root, persistent);
             DayArt.On = Soft.StillClock < 0;
+            // v0.6.24 final (J10): opened again by the setup after an update or a Repair, behind its Finish page.
+            SettingsForm.OpensBehind = SettingsForm.OpensBehindFor(argv, Soft.StillReady != null);
             var window = new SettingsForm(persistent);
             // A window a person opened comes to the front - after Finish, and opened again outside (v0.6.17); a window
             // that reopens itself, and a capture's, keep their place.

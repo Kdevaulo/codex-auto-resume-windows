@@ -86,6 +86,7 @@ namespace CodexAutoResume
             AuditedCards = "";
             AuditedNotes = 0;
             AuditedShortest = 0;
+            AuditedBand = -1;
             AuditedHero = 0;
             AuditedCaption = 0;
             AuditedCaptionGeometry = "";
@@ -431,6 +432,7 @@ namespace CodexAutoResume
         {
             var findings = new List<string>();
             AuditedStates = 0;
+            AuditedBand = -1;
             System.Reflection.FieldInfo fallback = typeof(Control).GetField("defaultFont",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
             Font defaultBefore = Control.DefaultFont;
@@ -528,6 +530,22 @@ namespace CodexAutoResume
         /// table's shares round away: logical pixels.
         internal const int BandTolerance = 3;
 
+        /// The most space, in device pixels, any Overview the last LayoutAudit or OverviewStatesAudit laid out at the
+        /// opening size left under its last row past the page's own padding; -1 before one did.
+        internal static int AuditedBand;
+
+        /// The most space, in logical pixels, an Overview at the opening size may leave under its last row past the page's
+        /// own padding when its rows already have all the room OverviewComfort gives them: the 30 px the opening height adds
+        /// to v0.6.24-beta.2's 588 (OpeningHeight 618, the owner's decision of 2026-11-18), which the cards do not take,
+        /// and 6 px for a font whose lines are shorter than the ones measured. At 588 the rows left no band under them; so
+        /// at 618 the band is what those 30 px have left once the rows are at comfort - measured in every language at 100
+        /// to 200 % and at text sizes to 225 %: 12 px at 100 % in English and Korean, 28 px at 200 %, and at most 33 px in
+        /// Traditional Chinese, whose lines are the shortest (200 % at text size 225 %). It is the owner's choice (the cards
+        /// keep their comfortable height), not a defect, so it is not reported up to this number; past it, with the rows
+        /// as FitOverview laid them out, the page has a dead band, as before. A card floating, or rows short of what they
+        /// hold, are reported on their own (AuditRows).
+        internal const int OpeningBandMax = 36;
+
         /// The Overview's cards against the page they stand on (FitOverview), unless the page scrolls, which
         /// AuditScrolling reports:
         ///   * a card shorter or taller than another in its row;
@@ -580,12 +598,17 @@ namespace CodexAutoResume
             int band = page.ClientSize.Height - page.Padding.Bottom - bottom;
             if (opening)
             {
+                AuditedBand = Math.Max(AuditedBand, band);
                 if (band < -tolerance)
                     findings.Add(where + " :: leaves only " + (band + rest) + " px under its last row, where the page's rhythm is " + rest +
                                  ": its cards end at " + bottom + " in a page " + page.ClientSize.Height + " high");
                 else if (band > tolerance && !capped)
                     findings.Add(where + " :: leaves an empty band " + (band + rest) + " px high under its last row, where the page's rhythm is " +
                                  rest + " and its cards could be taller: they end at " + bottom + " in a page " + page.ClientSize.Height + " high");
+                else if (band > Px(OpeningBandMax) + tolerance)
+                    findings.Add(where + " :: leaves an empty band " + (band + rest) + " px high under its last row, where the page's rhythm is " +
+                                 rest + " and the opening height adds at most " + Px(OpeningBandMax) + " past its cards' comfort: they end at " + bottom +
+                                 " in a page " + page.ClientSize.Height + " high");
             }
             else if (band > tolerance)
                 findings.Add(where + " :: leaves " + band + " px under its last row, which its rows need: its cards end at " + bottom +
@@ -836,11 +859,30 @@ namespace CodexAutoResume
         internal static string AuditedPill = "";
 
         /// v0.6.24-beta.2: the version's pill (VersionPill) clear of every page tab and inside the tab strip's row, its words
-        /// whole in it, centred on the tabs within a pixel, at the strip's outer end (the left, mirrored); or not shown.
+        /// whole in it, centred on the tabs within a pixel, at the strip's outer end (the left, mirrored); or (v0.6.24, the
+        /// owner, 2026-11-18) in the header card, inside it, clear of its two lines and Brand.PillInset from its outer edge.
+        /// Never hidden while there is a version to show.
         private void AuditPill(List<string> findings)
         {
             AuditedPill = PillFit;
-            if (AuditedPill == "none") return;
+            if (AuditedPill == "none")
+            {
+                if (!string.IsNullOrEmpty(versionText.Version)) findings.Add("tabs :: the version is shown nowhere");
+                return;
+            }
+            if (AuditedPill == "header")
+            {
+                Rectangle at = versionPill.Bounds;
+                if (!new Rectangle(Point.Empty, hero.Size).Contains(at))
+                    findings.Add("header :: the version's pill " + at + " is not inside the header card " + hero.Size);
+                if (at.IntersectsWith(headline.Bounds) || at.IntersectsWith(detail.Bounds))
+                    findings.Add("header :: the version's pill " + at + " lies over the card's words");
+                int said = versionText.GetPreferredSize(Size.Empty).Width;
+                if (versionText.Width < said)
+                    findings.Add("header :: the version's pill cuts its words: " + versionText.Width + " of " + said);
+                AuditPillInset(findings);
+                return;
+            }
             var pill = new Rectangle(versionPill.Left + pillSlot.Left, versionPill.Top + pillSlot.Top, versionPill.Width, versionPill.Height);
             foreach (NavButton tab in navButtons.Values)
             {

@@ -323,6 +323,8 @@ def lines(result, now, locale) -> list:
     said.append(t("check.cloud", count=str(count)) if count else t("check.cloud_none"))
     usage = result["usage"]
     if usage["read"]:
+        # The share USED of each window, as Codex reported it - a diagnosis (the owner, 2026-11-18): the word "used" is
+        # in the sentence, since the at-a-glance surfaces say what is left.
         percent = lambda value: "?" if value is None else "%g" % value  # noqa: E731
         said.append(t("check.usage", when=_ago(now - usage["read_at"], locale) if usage["read_at"] else "?",
                       five=percent(usage["five_hour"]), weekly=percent(usage["weekly"]),

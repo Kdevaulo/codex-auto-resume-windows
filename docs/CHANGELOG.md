@@ -1,8 +1,294 @@
 # Changelog
 
+## v0.6.24 — A window without Windows' title bar and with squircle corners, a Dashboard of 1000 by 618 with the version never hidden, dialogs as one card, usage shown as what is left, a setup window with something on every page, the tray icon's card, and a Dashboard that answers in seconds after an update
+
+> **The window's own look, and usage left.** This release gives both editions a window that draws its own top edge and corners, shows every usage window as what is left of it, and fills the setup window's pages.
+
+**Kind:** New design · Design changes · Feature changes · Performance · Bug fixes · Under the hood
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.23...v0.6.24)
+
+**From v0.6.23, an ordinary update.** It is the latest release, for both editions, so v0.6.23's *Check for updates* offers it in
+the edition you have, an installation of v0.6.24-beta or v0.6.24-beta.2 is offered it the same way, and the plugin in Codex
+installs it too. It follows two pre-releases - v0.6.24-beta and -beta.2 - and this entry tells everything they carried, in the form it has now:
+where beta.2 changed something beta announced, only the final state is told, and what came after beta.2 is marked "(new since beta.2)".
+Both editions change in the first group; the second is the advanced edition's alone.
+
+**The bundled Python stays 3.14.10.** The code is ready for Python 3.15, but the switch itself waits for CPython 3.15.3, which is not out.
+
+**Going back.** Nothing that an earlier version reads changes: the watcher's state stays schema 5, the settings file gains no key and the
+advanced edition's own file stays version 9. An earlier version has Windows' title bar, its own
+corners and popup, its own dialogs and the usage shown as the share used, as it always had them, and leaves the previous version's `.old-`
+file where an update put it.
+
+### Both editions
+
+- **The window has no Windows title bar.** Its minimise, maximise and close buttons are line glyphs inside the first card, at its top
+  corner (mirrored where the window is written right to left). The close button turns red under the pointer, and the maximise button
+  keeps Windows 11's snap layouts. Every dialog has its title and its close button at its top in the same way. The window is a little
+  shorter outside - Windows' title bar and top frame are gone - and every page keeps the height it had, because the window opens taller
+  by exactly what the header grew for the buttons.
+  A window restored from maximised or minimised - by its button, a double click, Win+Down, the taskbar or Win+D - comes back exactly as
+  it left, with no growth each time, and a maximised window leaves the edge of an auto-hide taskbar free so the taskbar still slides out.
+- **Soft corners are squircles, the Dashboard's own outer corner included.** In the Soft design every rounded thing - cards, buttons,
+  menus, the popup and the notification card - is drawn with one smoothed corner (Figma's 60 % smoothing, capped where a side is short;
+  pills stay pills), and its shadows follow it. Classic and Plain keep their round arcs, as before. The Dashboard window's own outer
+  corner is drawn the same way - its design's card corner, with the hairline and the shadow round it - in place of Windows' round corner,
+  and it has no rough edges: no faint fill shows outside the squircle where Windows' corner would have been, no one-pixel line shows inside
+  the edge at 150 %, and Windows' own title bar and frame never flash when the window is activated, resized, brought back from Task View,
+  or given a new title or icon. The window stays visible all the while Windows takes its icon and title, so a click on it never falls
+  through to what lies behind. The left and right edges resize along their whole length, down every page, and so does the window's
+  outermost pixel; the four corners resize from where the curve ends and a little past it, the top ones down each side as the bottom ones
+  do. The shadow is never on the screen while the window is maximised or minimised. Windows' corner comes back while the window is
+  maximised or snapped, in High Contrast, in a remote session and without desktop composition; Windows 10 keeps its square corner.
+  (new since beta.2) Every dialog the Dashboard opens has the Dashboard's own outer corner too - the design's card corner, with its
+  hairline and its shadow - where it had Windows' round one, under the same switch and with the same exceptions: Windows' corner stays in
+  High Contrast, in a remote session, without desktop composition and on Windows 10, and while a dialog is minimised (its own is back when
+  it is restored). A dialog that could be resized by its edges still can be, and one of fixed size still cannot. The corner's shadow and
+  hairline are held off the screen with the dialog until it has painted and fade in with it, so nothing of them is seen round a dialog
+  that is not yet seen. The README's pictures draw a dialog the same way - they had drawn it with sharp corners - except in High Contrast.
+- **The Dashboard opens at exactly its size, and its first paint is clean.** It used to open a little larger than it asked, at 100 % and
+  at 150 %. In the dark theme it no longer shows an empty outline of its corner, or one white frame, before it has painted: the window and
+  its shadow come on together once it has.
+- **The Dashboard opens at 1000 x 618 instead of about 1000 x 680, and the version stands in a pill that is never hidden.** The header
+  card is two lines, and the four Overview cards keep the height they had. The version - and the advanced edition's word beside it -
+  stands in a small raised pill at the end of the row of page tabs, no longer in a bar at the foot, and a screen reader reads it whole.
+  (new since beta.2) Where the tabs leave it no room - the advanced edition with Chat on has eight of them - every tab's room at either side
+  of its name is narrowed alike, as little as needed, down to half of its usual room, so the gaps stay equal and the chosen tab keeps its ring;
+  then the pill shows the version alone; and only where even the closest tabs leave it no room does the pill move into the header card, at the
+  end of its second line under the caption buttons, as far from the card's edge as it stands in the row (mirrored for a language written
+  right to left), with the headline still clear of the caption buttons. An ordinary row of tabs keeps the room it had. The tabs' fitting
+  reckons the row the same way at every room, so one fitting never undoes the one before it, and a short tab's own least width no longer
+  leaves the last tab cut. Only Settings has a bar at its foot now (the reopen note, *Restore defaults* and *Save*); the Close button there
+  is gone, and the header's close cross closes the window. The tab row has as much room above it as below it, 10 px each, on every page,
+  and the pill's rounded end and the first tab's face stand 4 px inside the header card's edges so the pill does not look as if it sticks
+  out. The status light sweeps once as the window opens and as the watcher turns on, and the line under the headline glides in as the
+  sweep ends; where animations are off, nothing moves. (new since beta.2) The pill is in the Dashboard's first paint: the window reads the
+  version from this installation's own `app\.codex-plugin\plugin.json`, and its edition from the source tree it was built from, where they
+  had come only with the first state, a moment after the window opened, and the tab row had changed once. The state still writes the same
+  over it and has the last word where they differ; a window with no such file waits for the state, as before.
+- **With the watcher off, Start watcher stands where Pause stands.** On the Overview's *Right now* card *Start watcher* takes the place
+  of *Pause recovery* while the watcher is off, and the header only says the state; once the watcher runs, *Pause* comes back and
+  *Start watcher* goes. The two never show together.
+- **A dialog is its title and one card, painted whole before it fades in.** The title row - its words and its close cross - stands on the
+  dialog's own ground, one row as tall as a caption button, and under it one card holds the content and the buttons, with nothing below
+  the card but the ground. The close cross stands as far in from the dialog's edge, as the eye sees it, as the title's first letter from
+  the other edge. A dialog with nothing to answer - the timeline, the log, the detection check, the compatibility report, a notice - has no
+  Close button of its own: the title row's close cross and Esc close it, and a dialog with an answer keeps its Cancel and its action. While
+  a dialog is open the Dashboard behind it is dimmed (not in High Contrast): the dimming is there as the dialog appears, and in the dark
+  theme it shows as plainly as in the light. A dialog opens centred on the Dashboard that opened it wherever that is, not on the monitor's
+  middle. A dialog shows only once it has painted, so in the dark theme its first frame is in its theme - no light-grey window or white bar
+  over its title for a moment - and it then fades in briefly, with the Dashboard behind already dimmed (at once where animations are off),
+  in place of Windows' opening motion. (new since beta.2) The fade is the dialog's own, finished: its first step paints the dialog whole once
+  more and waits for Windows to take that picture before it shows any of it, and its time starts at that step, so a dialog that is slow to
+  paint still fades from near clear - the timeline's first visible frame used to be already 63 to 98 % opaque in six of seven openings, and a
+  dialog with a part that is slow to paint is now first seen at 65 % at the most. A dialog's title row shows no greyed caption button: the
+  timeline, the log, the detection check, the compatibility report and *Install another version...* keep the maximise button they use, and
+  every other dialog shows only its close cross.
+- **A question that takes something back starts on its dismissal.** *Clear history*, *Cancel all*, a conversation's *Cancel*, *Turn off for
+  this conversation*, *Stop watcher* and *Restore defaults* open with the keyboard on the button that answers no, so an Enter at once
+  does nothing; every question had started on its action since v0.6.6. Each button keeps its look, and a question that takes nothing
+  back still starts on its action.
+- **A question's words wrap between words.** A question or a notice broke Korean inside a word (있/는, 그다/음); it now wraps where the
+  window's other words do, only at spaces in every language that wraps by spaces.
+- **The first switch to Diagnostics shows the page whole.** In a newly opened Dashboard, a press on Diagnostics before the page was ready
+  could change only the tab for a second or more and then show the page half drawn over the Overview, as in earlier versions. The page now
+  comes up within a fraction of a second, and its compatibility card lays the page out once. (new since beta.2) A switch of page puts the page
+  on the screen in one go: the page is painted off the screen and set on the window's surface whole, where it had been painted a control at a
+  time straight onto the surface, so the screen could be taken between two of them with the Overview's pixels still showing. Measured off
+  the screen, 76 of the 118 paints of a press left pixels of both pages in all three runs; now none does.
+- **A Dashboard that is reopening itself says so, and leaves no gap.** For another language or theme the Dashboard reopens as a new window.
+  The old one now stays until the new one is on the screen, where for up to a second there was no window (or, in earlier versions, an
+  unpainted one). (new since beta.2) While it waits - the new window appears one to three seconds later - its header's light is the working
+  light, as for an action in flight, and the pointer over it is Windows' app-starting pointer; a reopening whose new window never comes puts
+  the light back at once.
+- **The Dashboard's first frame comes sooner (new since beta.2).** The window's start builds Windows' list of installed fonts on a thread
+  of its own while it makes the window, where its first font waited for that list on the window's thread for 0.23 to 0.53 s, and it
+  compiles its own code ahead on several cores from a profile its last start left in `config\window-start.jit`. Measured from the
+  process's start, five starts each, the median first frame went from 1.8 to 1.2 s in the standard edition and from 1.4 to 0.9 s in the
+  advanced. A drop-down fills its list with its drawing held, so a page or a dialog with several of them is made sooner too.
+- **What the second pre-release listed as known is dealt with (new since beta.2).** It said that, rarely, in the dark theme, a dialog's first
+  frame could still show unpainted for a moment before it fades in, and that the first switch to Diagnostics could show the page half drawn
+  for a frame or two. The second is found and fixed, as the item above says, and held by a test that reads the window's surface after every
+  paint of a press. The first has a fix that shuts out the cause that was found - a dialog still unpainted when it first showed - by painting
+  it whole before the fade's first step, held by a test of that step; the rare frame itself could not be made to happen off the screen, so it
+  is not shown gone, only the way for it to show closed.
+- **Focus rings show only after the keyboard is used.** A page tab clicked with the mouse no longer keeps its blue ring, in the Dashboard
+  and in its dialogs; Tab, the arrow keys and an access key show the rings again.
+- **A tooltip has nothing drawn round its card.** The pale glow a tooltip gave a dark desktop is gone; the caption buttons' tooltips and
+  the Dashboard's line tooltips are their card alone.
+- **The at-a-glance surfaces say what is left of a usage window (new since beta.2).** The popup's line, the hover card, the Dashboard's
+  Overview line, the panel in Codex and the near-limit notice say "N% left" - "5-hour 0% left ... weekly 38% left" - in all 22 languages
+  (Korean "남음"), where they said what was used. Left is 100 minus the whole share used, so 0 % shows only once a window is used up
+  (99.6 % used leaves 1 %). It is a change of display alone: the reading, what the program sends and every decision it takes still use the
+  share used. The notice says no number where the share cannot be read. The tray icon's card fills each bar by what is left and empties it
+  as the window is used; with 10 % or less left the bar, the edge of its groove and the share are the warning colour, so an empty bar never
+  reads as calm. The guide's usage line and its example are told the same way, and say what *left* means. The limits a person sets
+  (warn at 85 %, wrap up at 90 %, stop at 97 %), Diagnostics' usage check and the wrap-up message to Codex still say what was used, as before.
+- **The tray icon's card is as wide as its widest row,** with no fixed least width: its widest row ends one side's padding from the
+  card's right edge, so a card with no usage rows is no longer emptier on its right.
+- **The icon's card's first row and the panel's first row read as one line (new since beta.2).** On the card, the light stands on the middle
+  of the name's lower-case letters rather than the middle of its box - it had stood about 4 px low at 150 and 200 % - and the edition's pill
+  and its words stand on the name's own baseline, with the same gap after the light as the pill has after the name. In the Codex panel the light
+  is centred on the state word's lower-case middle, within a pixel, and the edition's word stays on the version's baseline, at every scale in
+  the light and the dark theme.
+- **The tray icon's popup is its card alone.** No grey ground lies round it any more, and a float shadow lies under it that only ever
+  darkens. It opens a little faster than the plain window did, and a frame of its status light costs well under a millisecond. Where
+  Windows refuses a window of this kind, the popup is the plain window it was, with its own drop shadow.
+- **Hovering the tray icon shows a card** with the state and the usage bars, in the window's design, instead of Windows' plain tooltip.
+  Screen readers still get the tooltip's text.
+- **The README's motion picture of the tray popup starts at the right end of a taskbar (new since beta.2).** The pointer rests on the icon,
+  its hover card appears after Windows' own hover time, a press opens the popup above the strip and a click elsewhere closes it, on one clock
+  of about 13 seconds that loops with the light and the icon.
+- **The README's other motion pictures show the window's light and the notification card on a taskbar (new since beta.2).** The Dashboard's
+  opens with the window's light sweeping and the line under the headline gliding in, as the window does when it opens; the light sweeps
+  again as Resume turns recovery on, as it does where it turns from off to watching; and the Timeline dialog is drawn over the veil the
+  window lays under a dialog, where it had been drawn without. The notification card's stands above the right end of a plain taskbar, where
+  the product's own stack places it, with the product's icon for a waiting task on the strip, breathing as the watcher does, and loops after
+  three whole breaths, so the card's light and the icon are where they began.
+- **A text box's right-click menu is drawn in the window's design.** Every box you can type in opens a menu of the same look as the
+  others - Undo, Cut, Copy, Paste, Delete, Select all - with Windows' own words and access keys, in the language Windows shows;
+  Shift+F10 and the menu key open it at the caret, and a command is offered only where it can work, as in Windows' menu. (new since beta.2)
+  The menu opens above the pointer where it does not fit below it inside the window - the Custom message box stands near the Dashboard's
+  foot, and its menu had run past the window's bottom edge onto the desktop - and above it too where there is more room above than below;
+  it opens to the left in a language written right to left. It is kept inside the screen's working area, as every other menu of the
+  window is, and a menu opened from the keyboard stands at the caret.
+- **A notification card that fades in or out shows no dark band inside its edge.** Its shadow reached under its body and showed
+  through it while the card was half clear; nothing of the shadow lies under the card now, and a still of the card looks as it did.
+- **The setup window is 600 x 600, fixed in size, with the Dashboard's squircle corner,** and never taller than the work area of the
+  screen it opens on, with everything its pages need still whole. Every way it is shown - the first installation, an update, a repair, an
+  edition change, the Dashboard's *Install another version...*, the uninstall - is the same window.
+- **The setup window has something on every page (new since beta.2).** The Welcome page says in three numbered points, under the guide's
+  link, what the program does: it notices a conversation that stopped (a usage limit, a dropped connection, a server error or another
+  temporary failure), it carries on once it can, and the words it sends are yours to choose in Settings. The Installing page lists the run's
+  steps under the bar, on every run the window shows - installing, updating, repairing, removing and installing another version: a filled
+  disc with a check for a step that is done, a ring with a dot and the name in bold for the one under way, an empty ring for what is still to
+  come. Only a line the installer prints, or the archive's own unpacking, moves a step - never a timer - and a step the run passes without
+  taking leaves the list rather than being called done; a first installation lists no watcher to stop and no Dashboard to close. The log is
+  under the steps and shown from the start, down to the buttons, never less than about four lines (the window is taller for a run that lists
+  so many steps that the card cannot hold them and four lines), and its button reads *Hide the log*: it hides only the log, the steps stay
+  where they are, and what a person hid is not remembered for the next run. The finished page keeps the log as the run left it. The Ready page of a first
+  installation lists what is installed - the watcher, the Dashboard and the Codex plugin, and in the advanced edition its own features, each
+  off at first - one row each, and says that no administrator rights are needed: the setup program asks for none and installs only under your
+  profile and in the current user's part of the registry. An update and a change of edition keep that room for what they keep, change and
+  bring. All of it is in every language, mirrored where the language is written right to left, and a screen reader says each step's state.
+- **The setup window paints and answers all through a run (new since beta.2).** After Repair was pressed, the window's first page hung half
+  drawn, with grey boxes and no Cancel, taking no press for 2 to over 15 s, and the Progress page showed with 7 of its 9 steps ticked. Every
+  line the run printed and every file it unpacked had been a message of its own to the window, and Windows hands a window its messages
+  before its input and its painting. The run now writes what it says into a list, which the window takes in on a timer, in order, for no
+  more than 20 ms at a turn, its log in one append. The Progress page is drawn at once when the button is pressed, the unpacking moves the
+  bar alone within its step, and the step list changes in place instead of being made again at each step. It is the same for every run
+  the window shows: installing, updating, repairing and removing.
+  (new since beta.2) A change of page is drawn in one frame: the window holds its painting while the new page is put in and then paints the
+  whole of it at once, where the new page's grey boxes showed for about a tenth of a second. The window keeps one size from Welcome to
+  Finish, where at the switch to Finish it was set to its own size again and was a few pixels larger for a moment.
+- **After a Repair or an update the Dashboard reopens behind setup's Finish page (new since beta.2).** The Dashboard the setup opens again
+  came up over the Finish page and hid it whole, so that a person might wait for a window they could not see. It now opens without taking
+  the activation and stands directly behind the window in front, as its window is made and again as it is shown; the Finish page keeps
+  the keyboard, and when it is closed Windows gives the activation to the Dashboard. It never goes behind a window of its own process,
+  a hidden or minimised one, a topmost one, or the desktop or the taskbar, which would put it out of sight. A Dashboard that reopens
+  maximised still comes to the front, because Windows shows a maximised window only as the active one. Every other start of the
+  Dashboard - yours, the watcher's, a reopen of its own, a picture's - opens as it always did.
+- **The largest text size on a small screen is 1.74 on a 1920 x 1080 screen at 100 %,** where the first beta said 1.68 (v0.6.23: 1.83).
+  A dialog's title is a row on the ground now and not a card of its own, so it is 20 px shorter than the first beta's, and the window may
+  use the text size that screen holds for the tallest dialog.
+- **After an update the Dashboard answers within a few seconds** instead of about 13 s. The first process to import the program after an
+  update used to compile every module it needed before it could answer; the update now compiles the program it copies, for the Python
+  that will run it, as part of the files step. The previous version's leftover `.exe.old-*` file, which an in-app update renames aside
+  while that window runs it, is removed once nothing runs from it - and a folder that something still runs from is left alone.
+- **An update starts the watcher again only if it ended unexpectedly in this sign-in.** A watcher the person stopped, or that ended
+  with a restart, a shutdown or a sign-out, stays stopped, as it was; one that was left running when something outside ended it is started
+  again. Setup's Finish page and its log say which happened and how to start the watcher yourself where it stays stopped.
+- **No flicker where History and Settings first fill.** History's list showed a horizontal scroll bar for one frame the first time it
+  filled, and Settings showed *Restore defaults* and *Save* greyed for one frame; both are gone.
+- **No encoded PowerShell command lines any more** (reported by [@cervinho](https://github.com/cervinho),
+  [#65](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/65)). Antivirus behaviour shields (Avast's
+  `IDP.HELU.PSE96`) blocked `powershell.exe` when the app raised a Windows notification or checked its Start menu shortcut,
+  and when the setup program ran itself again outside another app's view, because each handed PowerShell its fixed script
+  encoded on the command line. The notifications and the shortcut now pass the same fixed script as plain text, and the
+  setup program writes it to a file in its own run folder and runs that file. Every value still travels only in the
+  environment, never inside the script, so nothing a conversation title or a path holds can become code. A test keeps an
+  encoded command line out of every shipped script.
+- **A status read lists the Codex processes once, through one snapshot, where each listing started PowerShell (new since beta.2).** To know
+  which Codex app and which engines run, the program listed the ChatGPT.exe and codex.exe processes with a PowerShell
+  `Get-CimInstance Win32_Process` query, about 10 s a time on the advanced installation it was measured on. It now takes one Toolhelp
+  snapshot of the processes and asks each of those two programs for its own file path - the same rows, with no process started - and one
+  list answers every caller in the program for three seconds. A caller that has just started or stopped a process, or is about to act on
+  who runs, reads afresh: the choice of a queue route before a send, and the advanced edition's restart of the app and its account swap. In the standard edition the list was asked for wherever the watcher looks at the app before it acts, by
+  `status` and the health check, and by the compatibility report wherever the engine the app runs is not in the engine folder; each was a
+  PowerShell query and is a snapshot now. What the advanced edition's far more frequent asking cost is told under that edition.
+- **The health check no longer calls an app that serves from another official Codex engine a problem (new since beta.2).** Right after a
+  restart the Codex app can run its server from its own package, signed by OpenAI, rather than the engine the program found first
+  (v0.6.21, #58); the watcher then looks for its engine again and pairs with the app's. The health check - setup's last step and `doctor` -
+  judged the first pairing alone, so after the Codex app moved its server to its own `resources\codex.exe` every install and repair ended
+  "[!] The health check reported a problem", with "running, but its Codex server could not be matched". It now takes the watcher's second
+  look first - the same rule, the same discovery and the same engine checks - and the doctor says on a second line that the app's server
+  runs from another official Codex engine, which the watcher takes up, and names it; `status` says it in one line. A server that is not
+  signed by OpenAI, is unsigned or unreadable, or fails the engine checks is still reported and the health check still ends with a
+  problem for it, and an engine you named yourself is never second-guessed.
+- **A Desktop conversation forked from a `codex exec` run is recovered (new since beta.2)** (reported by
+  [@7Magicbunny](https://github.com/7Magicbunny), [#66](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/66)). A conversation a person forks from a `codex exec` run into the
+  Codex app, and keeps working in there, is the app's: its record says so, but its first line keeps the exec run's
+  origin, so the watcher said it was "not a desktop conversation of a person's own" and left its usage limits alone. Such a
+  fork is now taken up in both editions, only where its first line names the run it was forked from; a standalone
+  `codex exec` run, a subagent and the advanced edition's own near-zero request stay out, as before.
+- **Every release has a short title, a line on its aim and its kind (new since beta.2).** A release page opens with the release's title
+  after its version, one sentence on what it set out to do, and a *Kind* line that names what sort of release it is - new features, feature
+  changes, bug fixes, new design, design changes, performance, security, languages or under the hood, the biggest first. Every entry of this
+  changelog carries them, those of earlier releases too, and ten of their titles now say what mattered at the time.
+- **Window tests that failed now and then on slow CI runners are fixed at their cause**, not retried. (new since beta.2) The test that
+  holds the reopened Dashboard's old window until the new one is on the screen read the new window's state on a sleep that can last a timer
+  tick, and so stamped "on the screen" up to about 16 ms late; the product's order was right all along, and the test now holds the old window
+  to the last read that saw the new one hidden.
+
+### Advanced edition
+
+- **The 5-hour window's one near-zero request starts none of your programs.** To start the 5-hour window early the advanced edition
+  sends one request that costs almost nothing; it now starts none of your MCP servers, hooks, plugins, apps or notify program, as
+  measured on codex-cli 0.167.0-alpha.4.1. Where a Codex refuses that switch, the request is sent once more as it was before, and the
+  watcher's log says that your programs ran.
+- **The Korean wording of the advanced pages was read key by key**, and 59 values read better.
+- **The advanced edition's own dialogs are laid out as the others are.** Its editor holds its refusal and its buttons in the one card
+  under the title row, and its Follow-through and examples dialogs have no Close button of their own - the title row's close cross and
+  Esc close them. (new since beta.2) The advanced edition keeps its window as wide as its tabs need at their usual room, not the closer room
+  the version's pill may draw them to, so the narrowest window is what it was. (new since beta.2) The tab row keeps the Chat tab's room
+  until the list says whether Chat shows, in the row and in the window's least width: with Chat on it comes into room already kept and
+  neither a tab nor the pill moves, where it had come about a second after the window opened and the row had changed once; with Chat off
+  the room goes and the tabs only spread back. The tab has its words from the start, so the room kept is its own.
+- **The advanced pages say what is left (new since beta.2).** The saved accounts' meters draw what is left - "N% left · in <time>" - and
+  with 10 % or less left the bar, the edge of its groove and the words are the warning colour, so an empty groove with nothing left still
+  says so. The analytics card's share reads "<window>: N% left" and, where the pace runs a window out, "none left around <time>"; how far
+  the share moved in the last hour is still told as what was used. All of it is display only: the bridge still says the share used and every
+  decision reads it.
+- **The Advanced features and Chat pages show no empty bar at the window's foot (new since beta.2).** After Settings had been open, those two
+  pages kept an empty bar under them; only Settings has a bar at its foot.
+- **The advanced pages read their state in seconds, not in up to about 100 (new since beta.2).** The live check of this release, on an
+  advanced installation, found a read of the state taking up to about 100 s: each capability's view binds the compatibility report to the
+  engine the app serves, so one read listed the Codex processes nine times (eight through the arming views, one beside them), and each
+  listing was a PowerShell query of about 10 s. While it waited, the header said the state could not be read, the chat list was empty,
+  Diagnostics' *Detection check* said it could not run and the Timeline opened 3 to 10 s late; the detection check took 104.9 s and takes
+  4.3 s now. One list answers the whole read, as the item under both editions says.
+- ***Schedule a message* opens in about a third of the time (new since beta.2).** Its editor took 2.5 s and more to appear after the
+  press, with no sign that it was coming. It laid its whole card out again for every row and value, its five drop-downs redrew themselves
+  for every item they took, and each of its panels laid itself out again as it was shown; now the card is laid out once, the drop-downs
+  fill with their drawing held and the panels lay out once after the show. On a busy PC the median went from 3.5 to 1.3 s, and the
+  pointer is the wait cursor from the press until the editor is there.
+- **Recover every conversation takes up a conversation of the app's whatever program its first line names, but VS Code's own (new since
+  beta.2).** With the switch on, a conversation on the app's row was taken up only where its first line named a program the product knew; a
+  `codex exec` line with no fork (#66) or a program Codex adds later stayed out. Any program's name of 1 to 64 characters is taken up now,
+  where the state row and the rollout's first line are both the app's, except the VS Code extension's own, which the capability for a
+  terminal's and VS Code's conversations handles. What stays out as before: a `codex exec` or terminal row, a first line of another
+  source or with no program name, an archived conversation, one of another Codex home, one whose state row and first line disagree, the
+  conversations Codex makes for itself (subagents, reviews, memory passes, agent-created ones) and whatever a recovery's gates refuse.
+  Turning the switch off still cancels what only it took up. Its statement says so in all 22 languages and keeps the revision it had, so an
+  installation that had it on keeps it on after the update and reads the wider statement on its card; with it off nothing changes. The
+  standard edition still takes up only the programs it knows.
+
 ## v0.6.24-beta.2 — The Dashboard's squircle corner without its rough edges, a shorter Dashboard with the version in a pill, Start watcher on the Right now card, dialogs as one card under their title, and a tray icon's card as wide as its widest row
 
 > **Dialogs as one card and a shorter Dashboard.** This beta finishes the window's own rounded corner and reworks the Dashboard's proportions, its dialogs and the tray icon's card.
+
+**Kind:** Design changes · Bug fixes · Feature changes
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.24-beta...v0.6.24-beta.2)
 
@@ -90,6 +376,8 @@ the previous version's `.old-` file where an update put it.
 
 > **A window that draws its own top edge.** This beta replaces Windows' title bar with the window's own, rounds its corners, adds the tray icon's card and makes the Dashboard answer in seconds after an update.
 
+**Kind:** New design · Design changes · Performance · Bug fixes · Feature changes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.23...v0.6.24-beta)
 
 **A pre-release: the first of v0.6.24.** It is a GitHub pre-release, so `releases/latest` stays v0.6.23. An installation is offered it
@@ -165,6 +453,8 @@ always had them, and leaves the previous version's `.old-` file where an update 
 ## v0.6.23 — Archives more than a quarter smaller, controls that glide between their states, room for longer messages and waits, twenty-two languages, pages that open quickly the first time, menus that offer more, the code made ready for Python 3.15, and the advanced edition's choice of another Python
 
 > **Smaller downloads, smoother controls, more languages.** This release shrinks the archives by more than a quarter, makes controls glide between states, brings the interface to twenty-two languages and lets pages open quickly the first time.
+
+**Kind:** Performance · Design changes · Languages · New features · Feature changes · Bug fixes · Under the hood
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.22...v0.6.23)
 
@@ -473,6 +763,8 @@ uses, or English where that version does not ship it - and *Same as the interfac
 
 > **Four more languages and quicker first pages.** This beta adds Persian, Czech, Hungarian and Thai, makes pages open quickly the first time and keeps the shortcut you already have on the setup window's Finish page.
 
+**Kind:** Languages · Performance · Feature changes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.23-beta...v0.6.23-beta.2)
 
 **A pre-release: the second of v0.6.23.** It is a GitHub pre-release, so `releases/latest` stays v0.6.22. An installation is offered it
@@ -505,6 +797,8 @@ message.
 ## v0.6.23-beta — Archives more than a quarter smaller, controls that glide between their states, room for longer messages and waits, the code made ready for Python 3.15, and the advanced edition's choice of another Python
 
 > **Smaller downloads and controls that glide.** This beta cuts the archives by more than a quarter, animates controls between their states, raises the limits on messages and waits and readies the code for Python 3.15.
+
+**Kind:** Performance · Design changes · Feature changes · New features · Under the hood
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.22...v0.6.23-beta)
 
@@ -637,6 +931,8 @@ earlier version leaves it be.
 ## v0.6.22 — Recoveries that say when the app is open and its server cannot be matched, a Desktop shortcut on the setup window's Finish page, the core and installer audits' fixes, and the advanced edition's automatic account switch, loopback API with a web view, Telegram control, a view of your other PCs, a Turn on that keeps a capability on, and ten pictures to a scheduled message
 
 > **Clearer recoveries and a Desktop shortcut.** This release makes a recovery say when the app is open and its server cannot be matched, adds a Desktop shortcut to setup and brings the advanced edition a loopback API and Telegram control.
+
+**Kind:** New features · Bug fixes · Feature changes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.21...v0.6.22)
 
@@ -935,6 +1231,8 @@ A capability turned on with *Keep it on* is stored as a kept-on one, which versi
 
 > **A Desktop shortcut box and remote control.** This beta puts the Desktop shortcut box on the Finish page and completes v0.6.22's advanced edition with a loopback API and web view, Telegram control and a view of your other PCs.
 
+**Kind:** New features · Feature changes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.22-beta...v0.6.22-beta.2)
 
 **A pre-release: the second of v0.6.22.** It is a GitHub pre-release, so `releases/latest` stays v0.6.21. An installation is offered it
@@ -1032,6 +1330,8 @@ conversation again in an earlier version, as every continuation did, and a watch
 ## v0.6.22-beta — A recovery that says when the app is open and its server cannot be matched, a Desktop shortcut you can tick, the core and installer audits' fixes, and the advanced edition's automatic account switch, automatic compatibility check and higher ceilings
 
 > **Recoveries that explain a waiting app.** This beta makes a recovery say when the app is open and its server cannot be matched, lets you tick a Desktop shortcut and carries the audits' fixes and the advanced edition's account switch.
+
+**Kind:** New features · Bug fixes · Feature changes
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.21...v0.6.22-beta)
 
@@ -1163,6 +1463,8 @@ one more folder in the installation, the saved Codex accounts below, which an ea
 
 > **Recovery when Codex runs from its package.** This release fixes recoveries on PCs where the Codex app runs its engine from its own package, and changes nothing else.
 
+**Kind:** Bug fixes
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.20...v0.6.21)
 
 **From v0.6.20, an ordinary update.** It is the latest release, for both editions, so v0.6.20's *Check for updates* offers it in
@@ -1183,7 +1485,9 @@ own file are as v0.6.20 left them - so going back to v0.6.20 needs no care.
 
 ## v0.6.20 — A status light for every state, Arabic and Hebrew with the window mirrored, a conversation an agent made recovered when you started the turn, the open Dashboard brought forward, and the advanced edition's analytics, push notices, early 5-hour window, account switch, compatibility data and the rest of issue 50
 
-> **A status light for every state.** This release gives every state its own status light, offers Arabic and Hebrew with the window mirrored, recovers conversations an agent made and brings the open Dashboard forward.
+> **A status light for every state.** This release gives every state its own status light, offers Arabic and Hebrew with the window mirrored, recovers conversations an agent made and adds advanced analytics and an account switch.
+
+**Kind:** New features · Design changes · Languages · Bug fixes · Feature changes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.19...v0.6.20)
 
@@ -1428,6 +1732,8 @@ an older version brings the runtime that version was built with (3.14.9 for v0.6
 
 > **Python 3.14.10 and a tidier Timeline dialog.** This beta bundles Python 3.14.10, runs from source under the newest Python installed, measures the Timeline dialog's columns in the window's font and gives the advanced edition its own compatibility data.
 
+**Kind:** Under the hood · New features · Feature changes · Design changes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.20-beta.3...v0.6.20-beta.4)
 
 **A pre-release: the fourth of v0.6.20.** It is a GitHub pre-release, so `releases/latest` stays v0.6.19. An installation of
@@ -1483,6 +1789,8 @@ file of its own in the installation's config folder - its compatibility data, be
 ## v0.6.20-beta.3 — A status light for every state, Arabic and Hebrew offered with the window mirrored, and the advanced edition's analytics, push notices, early 5-hour window, account switch and the rest of issue 50
 
 > **Status lights and mirrored Arabic and Hebrew.** This beta gives every state its own status light, offers Arabic and Hebrew with the window mirrored and adds the advanced edition's analytics, push notices, early window start and account switch.
+
+**Kind:** New features · Design changes · Languages
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.20-beta.2...v0.6.20-beta.3)
 
@@ -1573,6 +1881,8 @@ of them. If you chose Arabic or Hebrew, an earlier version reads the choice as E
 
 > **The open Dashboard comes forward.** This beta brings an already open Dashboard forward from the notification area, shows work in progress in the status light and puts every dialog's lists on their own card.
 
+**Kind:** Design changes · Bug fixes · Feature changes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.20-beta...v0.6.20-beta.2)
 
 **A pre-release: the second of v0.6.20.** It is a GitHub pre-release, so `releases/latest` stays v0.6.19. An installation of
@@ -1615,6 +1925,8 @@ edition's own file stays version 8. v0.6.20-beta and v0.6.19 use everything as t
 
 > **Agent conversations and Find a conversation.** This beta recovers a conversation an agent made when you started the failed turn yourself, and adds Find a conversation; both were asked for in issues.
 
+**Kind:** Bug fixes · New features
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.19...v0.6.20-beta)
 
 **A pre-release: two small things asked for in issues, ahead of the rest of v0.6.20.** It is a GitHub pre-release, so
@@ -1653,6 +1965,8 @@ advanced edition's own file stays version 8. v0.6.19 uses everything as this pre
 ## v0.6.19 — Retry now and Rescan that read usage, Pending as one list, Chat with a conversation in the Dashboard, a watcher started again after an unexpected stop, Python 3.14.9 with remote debugging off, and a continuation that reaches Codex's managed daemon
 
 > **Chat in the Dashboard and a Pending list.** This release adds chat with a conversation in the Dashboard, makes Retry now and Rescan read usage, joins Pending into one list and restarts a watcher that stopped unexpectedly.
+
+**Kind:** New features · Feature changes · Design changes · Bug fixes · Under the hood
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.18...v0.6.19)
 
@@ -1930,6 +2244,8 @@ older version's runtime.
 
 > **Pending's buttons and dialog heights.** This beta spaces Pending's buttons evenly, draws its Next check whole and makes dialogs as tall as what they show.
 
+**Kind:** Design changes · Under the hood
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.19-beta.3...v0.6.19-beta.4)
 
 **A pre-release: the fourth of v0.6.19.** It is a GitHub pre-release, so `releases/latest` stays v0.6.18. An installation of
@@ -1986,6 +2302,8 @@ so going back to v0.6.19-beta.3 brings back its layout and nothing else.
 ## v0.6.19-beta.3 — Python 3.14.9 with remote debugging off, Retry now on the row you choose and Rescan for them all, Pending as one list, Chat as a page of its own, and Keep it on for every capability
 
 > **Pending as one list, Chat as a page.** This beta joins Pending into one list, gives Chat a page of its own, lets Retry now act on the row you choose and bundles Python 3.14.9 with remote debugging off.
+
+**Kind:** New features · Feature changes · Under the hood
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.19-beta.2...v0.6.19-beta.3)
 
@@ -2084,6 +2402,8 @@ a Retry now or a Rescan writes for the early look while it is on - and no versio
 
 > **Retry now checks usage first.** This beta makes Retry now check usage before a recovery goes on, and makes the early look at a usage limit show what it read.
 
+**Kind:** Feature changes · Under the hood
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.19-beta...v0.6.19-beta.2)
 
 **A pre-release: the second of v0.6.19, with the follow-up to issue #50.** It is a GitHub pre-release, so
@@ -2142,6 +2462,8 @@ going back to v0.6.19-beta, v0.6.18 or earlier loses nothing and shows nothing o
 ## v0.6.19-beta — Chat with a conversation in the Dashboard, the watcher started again after an unexpected stop, the PC woken for a reset, and a compatibility report from this PC
 
 > **Chat with a conversation in the Dashboard.** This beta adds chat with a conversation in the Dashboard, restarts a watcher that stopped unexpectedly, wakes the PC for a reset and sends a compatibility report from this PC.
+
+**Kind:** New features · Feature changes · Under the hood
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.18...v0.6.19-beta)
 
@@ -2262,6 +2584,8 @@ nothing, and *Install another version...* says so before it installs one of them
 ## v0.6.18 — A recovery that worked is recovered however its turn ended, a suggestion for the Codex homes this PC uses, Install another version in the setup window, a setup bar that fills by real counts, a streamed update download, and the fixes of a full audit
 
 > **A recovery counts however its turn ended.** This release counts a recovery that worked however its turn ended, suggests the Codex homes this PC uses, offers Install another version in the setup window and fills its bar by real counts.
+
+**Kind:** Bug fixes · New features · Feature changes · Under the hood
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.17...v0.6.18)
 
@@ -2646,6 +2970,8 @@ again if you come forward. Nothing else was added to either file.
 
 > **Installs from inside another app.** This release makes an install started from inside another app work, keeps the uninstaller through an update and fixes capability pairs that kept each other from working.
 
+**Kind:** Bug fixes · Feature changes · Languages
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16...v0.6.17)
 
 **From v0.6.16, an ordinary update.** It is the latest release, for both editions, so v0.6.16's *Check for updates*
@@ -2761,7 +3087,9 @@ version...* back to v0.6.16 keeps every advanced feature on there, as it was.
 
 ## v0.6.16 — Rescan and reconcile, a setup program that is an installer, notices that stay until clicked, and most of the advanced edition
 
-> **Rescan, a real installer and lasting notices.** This release adds Rescan and reconcile, turns the setup program into an installer, keeps notices until clicked and brings most of the advanced edition.
+> **Rescan, a real installer and lasting notices.** This release adds Rescan and reconcile, turns the setup program into an installer, keeps notices until clicked, watches up to three more Codex homes and brings most of the advanced edition.
+
+**Kind:** New features · Feature changes · Bug fixes · Design changes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15...v0.6.16)
 
@@ -3079,6 +3407,8 @@ capability off), and *Install another version...* says so before it installs one
 
 > **Conversations nothing holds run here.** This beta runs a conversation nothing holds on this PC, recovers other kinds of session and finishes the advanced edition's usage capabilities.
 
+**Kind:** New features · Bug fixes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta.3...v0.6.16-beta.4)
 
 **A pre-release: stage 4 of the advanced edition, the usage capabilities finished, and two fixes for both
@@ -3163,6 +3493,8 @@ installs one.
 
 > **Words for this time and a usage meter.** This beta adds a message for this time only, recovers a conversation Codex records under another id and adds a usage meter.
 
+**Kind:** New features · Bug fixes · Feature changes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta.2...v0.6.16-beta.3)
 
 **A pre-release: the standard edition's words for this time, the fixes people reported, and stage 4's first
@@ -3227,6 +3559,8 @@ there, and *Install another version...* says so before it installs one.
 
 > **Conversations ChatGPT hands over recover.** This beta carries one fix: conversations ChatGPT hands over, and ones Codex labels not at all, are now recovered.
 
+**Kind:** Bug fixes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.16-beta...v0.6.16-beta.2)
 
 **A pre-release with one fix, for both editions: v0.6.15's, on the beta line.** It is a GitHub
@@ -3277,6 +3611,8 @@ Nothing of its own: the fix above is in both editions.
 
 > **Several conversations and several Codex homes.** This beta, the v0.6.15-beta build published again under its new number, watches several conversations and Codex homes at once and adds five more ways to go on.
 
+**Kind:** New features · Feature changes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.15-beta...v0.6.16-beta)
 
 **The pre-release v0.6.15-beta, published again under the number it now has.** Nothing in it changed
@@ -3307,6 +3643,8 @@ Nothing new: see v0.6.15-beta, below.
 ## v0.6.15 — Conversations ChatGPT hands over, and the ones Codex labels not at all, are recovered
 
 > **Recovering conversations ChatGPT hands over.** This release is a fix alone on v0.6.14: conversations ChatGPT hands over, and ones Codex labels not at all, are now recovered.
+
+**Kind:** Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15)
 
@@ -3359,6 +3697,8 @@ Nothing of its own: the fix above is in both editions.
 ## v0.6.15-beta — Several conversations at once, several Codex homes, and five more ways to go on
 
 > **Several conversations and several Codex homes.** This beta, since published again as v0.6.16-beta, watches several conversations and Codex homes at once and adds five more ways to go on.
+
+**Kind:** New features · Feature changes
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.14...v0.6.15-beta)
 
@@ -3480,6 +3820,8 @@ What follows from it:
 ## v0.6.14 — The window no longer hangs while a recovery waits, eight more ways to recover, Keep it on, a compatibility report sent from the Dashboard, actions at a usage reset you pick, a watch log and the panel beside the chat
 
 > **A window that no longer hangs on waits.** This release stops the window hanging while a recovery waits and adds eight more ways to recover, Keep it on, a compatibility report from the Dashboard and actions at a usage reset you pick.
+
+**Kind:** New features · Performance · Feature changes · Under the hood
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.13...v0.6.14)
 
@@ -3763,6 +4105,8 @@ now...*. [EDITIONS.md](EDITIONS.md#use-a-reset-credit-at-the-limit-you-pick) des
 
 > **Codex's engine found after any update.** This release makes the watcher find Codex's engine again wherever a Codex update puts it; it is the one fix since v0.6.12.
 
+**Kind:** Bug fixes · Under the hood
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.12...v0.6.13)
 
 **What changed since v0.6.12, in one place.** For a person, one fix, in both editions: the watcher
@@ -3856,6 +4200,8 @@ installation for none.
 
 > **The watcher finds Codex's engine again.** This beta carries one fix for both editions: the watcher finds Codex's engine again after an update moves it.
 
+**Kind:** Bug fixes · Under the hood
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.12...v0.6.13-beta)
 
 **A pre-release with one fix, for both editions, published from `main`.** It is a GitHub
@@ -3894,6 +4240,8 @@ The final v0.6.13 follows it, improved further (owner, 2026-10-07).
 ## v0.6.12 — Another version from the Dashboard, a power action after usage limits, and recovery beside the Codex app's cloud-environment server
 
 > **Another version from the Dashboard.** This release lets the Dashboard install any version from v0.6.2 on, adds a power action after usage limits and recovers beside the Codex app's cloud-environment server.
+
+**Kind:** New features · Bug fixes · Under the hood
 
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.11...v0.6.12)
@@ -4183,6 +4531,8 @@ the change above closes.
 
 > **Evenly dealt test parts for developers.** This developer alpha deals each lane's tests into parts by its own measured times; nothing changes for a person using it.
 
+**Kind:** Under the hood
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.12-alpha...v0.6.12-alpha.2)
 
 **A pre-release for developers, published from `main`.** It is a GitHub pre-release, so
@@ -4237,6 +4587,8 @@ with a plugin at v0.6.11-beta.2 or later.
 ## v0.6.12-alpha — The tests in parts, and pictures taken when the window is ready
 
 > **Tests in parts, for developers.** This developer alpha splits the tests into parts and takes pictures when the window is ready; nothing changes for a person using it.
+
+**Kind:** Under the hood
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.11...v0.6.12-alpha)
 
@@ -4331,7 +4683,9 @@ the change above closes.
 
 ## v0.6.11 — Two editions, and the advanced edition's first capabilities
 
-> **Two editions and the first advanced features.** This release splits the program into a standard and an advanced edition and brings the advanced edition's first capabilities, off until you turn them on.
+> **Two editions, with advanced features to turn on.** This release splits the program into a standard and an advanced edition, brings the standard one quiet hours, observe-only mode and sixteen languages, and the advanced one features of its own, off until turned on.
+
+**Kind:** New features · Feature changes · Languages · Bug fixes · Under the hood
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.10...v0.6.11)
 
@@ -5018,6 +5372,8 @@ only turn capabilities off. [EDITIONS.md](EDITIONS.md) says what each capability
 
 > **The Advanced features page.** This beta adds the page where each advanced capability is turned on.
 
+**Kind:** New features
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.11-beta.2...v0.6.11-beta.3)
 
 **A pre-release, published from `main`.** It is a GitHub pre-release, so `releases/latest` never
@@ -5140,7 +5496,9 @@ only turn capabilities off. [EDITIONS.md](EDITIONS.md) says what each capability
 
 ## v0.6.11-beta.2 — The advanced edition's first capabilities, before the page that turns them on
 
-> **The advanced edition's first capabilities.** This beta brings the advanced edition's first capabilities, before the page that turns them on exists.
+> **Advanced capabilities and pre-release updates.** This beta brings the advanced edition three capabilities, makes Check for updates offer a newer pre-release, adds a setup program for each edition and publishes the standards.
+
+**Kind:** New features · Feature changes · Bug fixes
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.11-beta...v0.6.11-beta.2)
 
@@ -5364,6 +5722,8 @@ each one in full.
 ## v0.6.11-beta — The standard edition's additions, and v0.6.10's behaviour at its defaults
 
 > **The standard edition's additions.** This beta adds what the standard edition gains and keeps v0.6.10's behaviour at its defaults.
+
+**Kind:** New features · Languages · Feature changes
 
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.11-alpha...v0.6.11-beta)
 
@@ -5744,6 +6104,8 @@ recovery wait longer, stop sooner or wait for you.
 
 > **Two editions and their common ground.** This alpha is the first step of v0.6.11's two editions: it lays the ground both editions stand on.
 
+**Kind:** Under the hood · Feature changes · Bug fixes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.10...v0.6.11-alpha)
 
 **A pre-release, published from `main`.** It is a GitHub pre-release, so `releases/latest` never
@@ -5875,7 +6237,9 @@ off - and a second pass found 10 more; each is fixed, with a test that failed be
 
 ## v0.6.10 — The design settled, and what others report
 
-> **One settled design across the product.** This release settles the look of the whole product as one design, gathers the fixes people reported and tidies the repository's front page.
+> **One settled look, and four designs to choose.** This release settles the look of the Dashboard, popup, card and panel, adds a Design setting with four designs, shows how many people reported a Codex version works and tidies the repository's front page.
+
+**Kind:** Design changes · New design · New features · Under the hood
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.10-alpha...v0.6.10)
 
@@ -6153,6 +6517,8 @@ it reached anyone:
 
 > **Groundwork for a Rust core.** This alpha gathers each behaviour into one place so the core can later be rewritten in Rust; nothing a person sees changes.
 
+**Kind:** Under the hood
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.9...v0.6.10-alpha)
 
 **A pre-release, published from `main`.** It is a GitHub pre-release, so `releases/latest` never
@@ -6256,6 +6622,8 @@ the list of files above the README is thirteen instead of nineteen.
 
 > **A window that stops making you wait.** This release removes the window's lag, worst outside English, and answers a question by measuring it: starting the watcher with Codex was built and measured, and is not shipped.
 
+**Kind:** Performance · Design changes
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.8...v0.6.9)
 
 ### The window is faster, and looks exactly the same
@@ -6344,6 +6712,8 @@ picture breathes with the rest.
 
 > **Starting the watcher with Codex.** This alpha builds starting the watcher when Codex starts and measures two facts about it that only a PC running the real thing can show.
 
+**Kind:** New features · Design changes
+
 [The commits in this pre-release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.8...v0.6.9-alpha)
 
 **A pre-release, and nothing is served it.** It is published from the `dev` branch as a GitHub
@@ -6393,6 +6763,8 @@ says so.
 ## v0.6.8 — A tray icon without its badge, and lights that never stop
 
 > **A tray icon without its badge.** This release removes the status dot from the notification-area icon and makes the lights never stop, as asked in three requests about lights.
+
+**Kind:** Design changes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.7...v0.6.8)
 
@@ -6450,6 +6822,8 @@ this update never turn the icon red; PRIVACY.md lists what it holds.
 ## v0.6.7 — Compatibility in tiers, Failed here, and a notification card that breathes
 
 > **Compatibility tiers and Failed here.** This release lets the compatibility data say more, adds a Failed here state and makes the notification card's light breathe like the others.
+
+**Kind:** Feature changes · Design changes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.6...v0.6.7)
 
@@ -6541,6 +6915,8 @@ drawn off-screen and read at single moments; and the Failed here overlay asked f
 ## v0.6.6 — A status light that breathes, a taskbar button that moves where it is installed, a theme of the panel's own, and pictures that show it
 
 > **A breathing light and a movable taskbar button.** This release makes the status light breathe, lets the taskbar button move where it is installed, gives the panel a theme of its own and shows it in new pictures.
+
+**Kind:** Design changes · New design · Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.5...v0.6.6)
 
@@ -6773,6 +7149,8 @@ any scaling but 150 per cent.
 
 > **The build announced as v0.6.6.** This pre-release is the build published as v0.6.6 and renamed beta because it lacked the panel's own theme, asked for the same day.
 
+**Kind:** Design changes · Bug fixes
+
 **A pre-release, kept on [its own page](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/tag/v0.6.6-beta).** Built from `b17076d`, published and
 announced as `v0.6.6` on 2026-09-20 and renamed `v0.6.6-beta` on 2026-09-21. It went out without the panel's own
 theme, which was asked for the same day, so v0.6.6 was cut a third time. Its notes are v0.6.6's
@@ -6794,6 +7172,8 @@ window. Its evidence was measured on its own tree: 2,572 tests, and a window bui
 
 > **The first candidate, set aside.** This pre-release was tagged v0.6.6 and stopped before it was announced: its gentler light was too faint to see and some edges were unfinished.
 
+**Kind:** Design changes · Bug fixes
+
 **A pre-release, kept on [its own page](https://github.com/songyb111-gachon/codex-auto-resume-windows/releases/tag/v0.6.6-alpha).** Built from `f63d904`, tagged
 `v0.6.6` and published on 2026-09-20, then stopped before it was announced: its gentler light - a
 smaller swing - was too faint to see, and the scroll bars, the dialog and the pictures' edges had not
@@ -6807,6 +7187,8 @@ button that moves where it is installed, which v0.6.6 carries too.
 ## v0.6.5 — A light you can see, notifications in the product's own card, and a Codex Compatibility Registry
 
 > **A visible light and a Compatibility Registry.** This release makes the status light easy to see, shows notifications in the product's own card and ships a Codex Compatibility Registry.
+
+**Kind:** New design · New features · Design changes · Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.4...v0.6.5)
 
@@ -7112,7 +7494,9 @@ this one, and any scaling but 150 per cent.
 
 ## v0.6.4 — One look in light and dark, a quieter status light, and a window that arrives ready
 
-> **One look in light and dark.** This release gives the product one look in light and dark, quiets the status light and opens the window ready.
+> **One look in light and dark.** This release gives the Dashboard, the popup and the panel one neumorphic look in light and dark, quiets the status light and opens the window ready.
+
+**Kind:** New design · Design changes · Performance · Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.3...v0.6.4)
 
@@ -7305,9 +7689,11 @@ Not verified, and not claimed: High Contrast on a real system (it is rendered an
 switched on here), a real Codex interruption recovered by this build, any machine but this one, and
 any scaling but 150 per cent.
 
-## v0.6.3 — Nine languages, your own words, and a window that shows it is alive
+## v0.6.3 — Nine languages, a neumorphic look, your own words, and a window that shows it is alive
 
-> **Nine languages and your own words.** This release speaks nine languages, lets you write the continuation message yourself and gives the window a sign that it is alive.
+> **Nine languages and a new neumorphic look.** This release speaks nine languages, gives the product a new neumorphic look, lets you write the continuation message yourself and gives the window a sign that it is alive.
+
+**Kind:** New design · Languages · New features · Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.2...v0.6.3)
 
@@ -7474,6 +7860,8 @@ Korean documents where the generated `ko` branch keeps them.
 
 > **A fix for update verification.** This release fixes the Dashboard's update, which downloaded the archive and then could not verify it.
 
+**Kind:** Bug fixes
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.1...v0.6.2)
 
 One fix, in the step that decides whether anything gets installed.
@@ -7496,7 +7884,9 @@ One fix, in the step that decides whether anything gets installed.
 
 ## v0.6.1 — What running it for real found
 
-> **What the first live run found.** This release carries the changes the first live acceptance of v0.6.0 turned up, on a machine somebody really uses.
+> **Worked recoveries no longer count as failures.** This release records a recovery that made progress as recovered whatever ended its turn, and carries the other fixes the live acceptance of v0.6.0 turned up.
+
+**Kind:** Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.0...v0.6.1)
 
@@ -7538,7 +7928,9 @@ argument for running the procedure. No real Codex visual recovery is claimed.
 
 ## v0.6.0 — It follows its own turn, and it shows you the work
 
-> **A recovery that follows its own turn.** This release follows the exact Codex turn a continuation started and reads the outcome from that turn alone, and shows you the work it did.
+> **A Dashboard, and recoveries that follow their turn.** This release replaces the settings page with a six-page Dashboard, follows the exact Codex turn a continuation started, reads the outcome from that turn alone and adds an icon in the notification area.
+
+**Kind:** New features · Bug fixes · Security
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.5.7...v0.6.0)
 
@@ -7899,6 +8291,8 @@ says what works in between.
 
 > **A security fix for a code injection.** This release closes a code injection present from v0.4.0 through v0.5.6, shipped alone; recovery is unchanged.
 
+**Kind:** Security
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.5.6...v0.5.7)
 
 A security release, shipped on its own rather than held for v0.6.0, because it closes
@@ -7945,6 +8339,8 @@ release, an upgrade replaces the running watcher, which is what makes that true.
 ## v0.5.6 — Finished, not just working
 
 > **A quality pass that closes v0.5.** This release leaves recovery alone and finishes what surrounds it: settings in the user's language, pictures that show the product as it is and a real Korean branch.
+
+**Kind:** Bug fixes · Languages · Design changes · Under the hood
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.5.5...v0.5.6)
 
@@ -8087,6 +8483,8 @@ were deliberately not used to mutate a released artefact; they ship here.
 
 > **Checks where there were only claims.** This release leaves recovery alone, makes several things that only claimed something now check it and stops the Korean branch being a second copy of the product.
 
+**Kind:** Bug fixes · Under the hood
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.5.4...v0.5.5)
 
 The last corrective release before v0.6. **Recovery is untouched** again: the same failure
@@ -8196,6 +8594,8 @@ checking now check - and that the Korean branch stops being a second copy of the
 
 > **Proof before deleting anything.** This release makes installing, updating and removing act only on things they can prove belong to them; recovery is untouched.
 
+**Kind:** Bug fixes · Security
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.5.3...v0.5.4)
 
 The final v0.5 hardening release. **Recovery is untouched**: the same failure categories,
@@ -8302,6 +8702,8 @@ mistake, unreported, on the install path, where it was worse.
 ## v0.5.3 — Say what the network does, and close the v0.5 line
 
 > **Honest network wording, and a closed v0.5.** This release closes the v0.5 line by making the documentation say what the network does and match the product v0.5.2 turned it into.
+
+**Kind:** Bug fixes · Under the hood
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.5.2...v0.5.3)
 
@@ -8422,6 +8824,8 @@ phrase cannot take the history with it.
 
 > **Install from Codex, one product look.** This release lets you install it from inside Codex and makes it look like one product; recovery is unchanged.
 
+**Kind:** New features · New design · Bug fixes
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.5.1...v0.5.2)
 
 A patch release. Recovery is unchanged: the same failure categories, the same refusals, the
@@ -8505,6 +8909,8 @@ that is how a colour survives a rebrand: in a document nobody reopened.
 
 > **Documentation that says what it is.** This release corrects documentation that described a version that no longer exists and install instructions that contradicted the installer.
 
+**Kind:** Under the hood
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.5.0...v0.5.1)
 
 A patch release. No change to how recovery works, what it will retry, or what it refuses to
@@ -8566,6 +8972,8 @@ documented.
 ## v0.5.0 — Settings you can find, and a notification that says who it is from
 
 > **Findable settings and a notification with a sender.** This release adds a standalone Windows settings window on the Start Menu, settings in three places that mean one thing and a notification that says who it is from.
+
+**Kind:** New features · Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.4.1...v0.5.0)
 
@@ -8677,6 +9085,8 @@ the code. The watcher was not running, and the settings panel was the only thing
 
 > **The notification says why again.** This release fixes the notification that never said why it appeared, because Windows dropped the fourth text line of its layout.
 
+**Kind:** Bug fixes
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.4.0...v0.4.1)
 
 - **Fixed: the notification never said why it appeared.** Windows renders at most three
@@ -8691,6 +9101,8 @@ the code. The watcher was not running, and the settings panel was the only thing
 ## v0.4.0 — Recover more, guess less, install in one step
 
 > **Wider recovery and one-step install.** This release recovers clearly temporary failures as well as usage limits, guesses less about what to resume and installs in one step.
+
+**Kind:** New features · Feature changes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.3.2...v0.4.0)
 
@@ -8757,6 +9169,8 @@ the code. The watcher was not running, and the settings panel was the only thing
 
 > **A login autostart that really starts.** This release fixes the sign-in autostart, whose command ended in a doubled argument and so failed at every login.
 
+**Kind:** Bug fixes
+
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.3.1...v0.3.2)
 
 - **Fixed: the registered sign-in autostart could never run.** The Run value ended in `run`, and
@@ -8771,7 +9185,9 @@ the code. The watcher was not running, and the settings panel was the only thing
 
 ## v0.3.1 — Keep the state out of somebody else's sandbox
 
-> **State kept out of a sandbox.** This release moves the runtime state to the user's profile folder, because a packaged host's AppData writes are silently redirected into a private cache.
+> **State moved out of AppData.** This release moves the runtime state from AppData to the user's profile folder, because a packaged host's AppData writes are silently redirected into a private cache.
+
+**Kind:** Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.3.0...v0.3.1)
 
@@ -8787,6 +9203,8 @@ the code. The watcher was not running, and the settings panel was the only thing
 ## v0.3.0 — A control at the moment it matters
 
 > **A control at the moment it matters.** This release shows a Windows notification when an interruption is detected, the one moment a control can be offered in time.
+
+**Kind:** New features
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.2.0...v0.3.0)
 
@@ -8813,6 +9231,8 @@ the code. The watcher was not running, and the settings panel was the only thing
 ## v0.2.0 — Install and control it from inside Codex
 
 > **Install and control from inside Codex.** This release turns the repository into a Codex plugin you install with one command and control from inside Codex.
+
+**Kind:** New features · Bug fixes
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.1.0...v0.2.0)
 
@@ -8863,6 +9283,8 @@ the code. The watcher was not running, and the settings panel was the only thing
 ## v0.1.0 — first public release
 
 > **The first public release.** This is the first public release: a local-only Windows watcher that resumes Codex tasks interrupted by a usage limit.
+
+**Kind:** New features
 
 [The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/commits/v0.1.0)
 

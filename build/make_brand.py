@@ -179,10 +179,36 @@ def day_look_method():
               "        internal static string DayScene(string look)\n", "        {\n"]
     for key in brand.DAY_LOOKS:
         lines += ['            if (look == "%s") return "%s";\n' % (key, brand.scene_text(key).replace("\n", "\\n"))]
+    lines += ['            return "";\n', "        }\n\n", "        internal static string DaySpecks(string look)\n", "        {\n"]
+    for key in brand.DAY_LOOKS:
+        lines += ['            if (look == "%s") return "%s";\n' % (key, brand.speck_text(key).replace("\n", "\\n"))]
     lines += ['            return "";\n', "        }\n\n", "        internal static string DayMark(string look)\n", "        {\n"]
     for key in brand.DAY_LOOKS:
         lines += ['            if (look == "%s") return "%s";\n' % (key, brand.mark_text(key).replace("\n", "\\n"))]
     lines += ['            return "";\n', "        }\n"]
+    return lines
+
+
+def day_egg_methods():
+    """v0.6.24: the version pill's eggs on the special days (brand.days.DAY_RINGS, DAY_EGG_COLOURS), as chains of comparisons."""
+    from codex_auto_resume.brand import days as egg_days
+
+    def colour(tone):
+        return "Color.FromArgb(0x%02X, 0x%02X, 0x%02X)" % tuple(brand.rgb(tone))
+
+    lines = ["\n", "        /// brand.days.DAY_RINGS: the hint's ring round the version's pill on a special day.\n",
+             "        internal static Color DayRing(string look)\n", "        {\n"]
+    for key, tone in egg_days.DAY_RINGS.items():
+        lines += ['            if (look == "%s") return %s;\n' % (key, colour(tone))]
+    lines += ["            return Color.Empty;\n", "        }\n\n",
+              "        /// brand.days.DAY_EGG_COLOURS: a part of a special day's own egg, by its name.\n",
+              "        internal static Color DayEggColour(string look, string part)\n", "        {\n"]
+    for key, parts in egg_days.DAY_EGG_COLOURS.items():
+        lines += ['            if (look == "%s")\n' % key, "            {\n"]
+        for name, tone in parts.items():
+            lines += ['                if (part == "%s") return %s;\n' % (name, colour(tone))]
+        lines += ["            }\n"]
+    lines += ["            return Color.Empty;\n", "        }\n"]
     return lines
 
 
@@ -201,6 +227,11 @@ def sections():
     scale.append(("DaySceneWidth", "double", float(brand.SCENE_WIDTH)))
     scale.append(("DaySceneHeight", "double", float(brand.SCENE_HEIGHT)))
     scale.append(("DayMarkLeast", "int", int(brand.MOTIF_LEAST)))
+    # v0.6.24-beta.3 (W2): the day spread wide - its specks' band, the gap past the words, the fade, the ground's tint.
+    scale.append(("DaySpeckBand", "double", float(brand.SPECK_BAND)))
+    scale.append(("DayWideGap", "int", int(brand.WIDE["gap"])))
+    scale.append(("DayWideFade", "int", int(brand.WIDE["fade"])))
+    scale.append(("DayGroundTint", "double", float(brand.WIDE["ground_tint"])))
     for part, value in zip(("X1", "Y1", "X2", "Y2"), brand.MOTION["ease"]):
         scale.append(("TransitionEase" + part, "double", value))
     # v0.6.10: Classic's accent bar inside a card's left hairline, and its current tab's underline.
@@ -398,7 +429,7 @@ def methods() -> str:
         "        }\n",
     ]
     lines += ["\n"] + ease_method()
-    lines += ["\n"] + day_look_method()
+    lines += ["\n"] + day_look_method() + day_egg_methods()
     return "".join(lines)
 
 
@@ -471,7 +502,16 @@ def ease_method() -> list:
 def theme_methods(theme: str) -> str:
     """The rules whose answers are a theme's colours - the check box and the elevation recipes -
     which Brand and Brand.Dark each declare under the same names."""
-    return check_methods() + elevation_methods(theme)
+    return check_methods() + elevation_methods(theme) + edition_ink_method(theme)
+
+
+def edition_ink_method(theme: str) -> str:
+    """v0.6.24: the advanced edition's ink on the version's pill (brand.tokens.EDITION_INK), in each theme's class."""
+    from codex_auto_resume.brand import tokens as ink_tokens
+
+    red, green, blue = brand.rgb(ink_tokens.EDITION_INK[theme])
+    return ("\n        /// brand.tokens.EDITION_INK: the advanced edition's ink on the version's pill (the owner, 2026-11-18).\n"
+            "        internal static Color EditionInk() { return Color.FromArgb(0x%02X, 0x%02X, 0x%02X); }\n" % (red, green, blue))
 
 
 def check_methods() -> str:

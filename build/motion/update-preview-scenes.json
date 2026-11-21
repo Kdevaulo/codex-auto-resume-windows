@@ -1,0 +1,129 @@
+{
+ "events": [
+  {
+   "line": "Codex Auto Resume setup: unpacking ${archive} into C:\\Users\\ExampleUser\\AppData\\Local\\Temp\\CodexAutoResume-Setup-5f0c2a9e41b7d386",
+   "hold": 300
+  },
+  {
+   "unpacked": 0.5,
+   "hold": 300
+  },
+  {
+   "unpacked": 1.0,
+   "hold": 300
+  },
+  {
+   "line": "edition: ${edition}",
+   "hold": 300
+  },
+  {
+   "line": "  [ok] Found Codex",
+   "hold": 300
+  },
+  {
+   "line": "  Updating program files",
+   "hold": 300
+  },
+  {
+   "line": "  Stopping the running watcher so the new version takes over",
+   "hold": 300
+  },
+  {
+   "line": "  Closing the Dashboard so it opens again on the new version",
+   "hold": 300
+  },
+  {
+   "line": "  [ok] The Dashboard closed",
+   "hold": 300
+  },
+  {
+   "line": "  Copying the program files into place",
+   "hold": 300
+  },
+  {
+   "line": "  progress: files 100/333",
+   "hold": 100
+  },
+  {
+   "line": "  progress: files 200/333",
+   "hold": 100
+  },
+  {
+   "line": "  progress: files 333/333",
+   "hold": 100
+  },
+  {
+   "line": "  [ok] Bundled Python ${python} (no system Python needed)",
+   "hold": 300
+  },
+  {
+   "line": "  Registering the Codex plugin",
+   "hold": 300
+  },
+  {
+   "line": "  Setting up the watcher",
+   "hold": 300
+  },
+  {
+   "line": "  Checking the installation",
+   "hold": 1200
+  }
+ ],
+ "scenes": [
+  {
+   "id": "S1",
+   "steps": [
+    {
+     "set": {
+      "page": "welcome"
+     },
+     "hold": 600
+    }
+   ]
+  },
+  {
+   "id": "S2",
+   "steps": [
+    {
+     "set": {
+      "page": "options"
+     },
+     "hold": 600
+    }
+   ]
+  },
+  {
+   "id": "S3",
+   "steps": [
+    {
+     "set": {
+      "page": "progress"
+     },
+     "hold": 300
+    }
+   ]
+  },
+  {
+   "id": "S4",
+   "steps": [
+    {
+     "events": [
+      1,
+      17
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S5",
+   "steps": [
+    {
+     "set": {
+      "page": "finish"
+     },
+     "hold": 1500
+    }
+   ]
+  }
+ ]
+}

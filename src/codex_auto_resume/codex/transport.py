@@ -18,8 +18,8 @@ from .. import continuation, machine
 from ..domain import ids, vocabulary
 from ..win.inventory import resource_users
 from ..win.kernel import NO_WINDOW
-from .pairing import (app_running, desktop_pair, engines_instead, inventory, official_engine, own_holder,
-                      session_kind)
+from .pairing import (app_running, desktop_pair, engines_instead, forget_inventory, inventory, official_engine,
+                      own_holder, session_kind)
 from .appserver import PROTOCOL_METHODS, Protocol
 from .errors import AdapterError
 from .usage import parse_usage
@@ -144,11 +144,14 @@ class Backend:
         read raises AdapterError - the send is not started this look and tried
         again, since without --remote a running daemon refuses it after Popen.
         Never try both routes for one send, since delivery could be uncertain.
+        v0.6.24 final: asked of a fresh list, never of one a status read left (pairing.INVENTORY_SECONDS) - a
+        daemon started a moment ago decides the route.
         """
         if not self.queue_remote_supported:
             return False
         prefix = str(self.codex_home / "packages" / "app-server-daemon" / "releases").casefold() + "\\"
         try:
+            forget_inventory()
             rows = inventory()
         except (AdapterError, OSError, ValueError):
             raise AdapterError("process_inventory_unavailable") from None

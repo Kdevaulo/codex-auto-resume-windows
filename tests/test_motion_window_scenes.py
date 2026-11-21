@@ -161,11 +161,25 @@ class RenderTests(unittest.TestCase):
         self.assertGreater(close[0] + close[2] / 2.0, window[0] + window[2] / 2.0, "Close is on the right, as the dialog puts it")
 
     def test_the_dialog_changes_the_picture_only_inside_its_window_and_shadow(self):
+        """v0.6.24: beyond its window and shadow, only the veil it lays over the window (DialogVeil, WindowRender
+        PaintVeil): one ink at one alpha over every pixel - the same pixel at rest is the same pixel veiled, everywhere,
+        and none is lighter than it was (tests/test_motion_window_sweep holds the veil's alpha)."""
         window = self.bounds(6)["dialog.window"]
-        reach = 40
-        outside = (window[0] - reach, window[1] - reach, window[2] + 2 * reach, window[3] + 2 * reach)
-        box = self.box(self.picture(2), self.picture(6))
-        self.assertTrue(self.inside(box, outside), "%r is beyond the dialog %r" % (box, outside))
+        width, height = self.result["client"]
+        # The shadow's reach and drop below (PaintDialog: Px(14) + Px(6)), at this machine's scale, and a little more.
+        reach = int(round(24 * self.result["dpi_scale"]))
+        x, y, wide, tall = window[0] - reach, window[1] - reach, window[2] + 2 * reach, window[3] + 2 * reach
+        rest, veiled = self.picture(2), self.picture(6)
+        seen = {}
+        for row in range(height):
+            for column in range(width):
+                if x <= column < x + wide and y <= row < y + tall:
+                    continue
+                at = (row * width + column) * 3
+                under, over = rest[at:at + 3], veiled[at:at + 3]
+                self.assertEqual(seen.setdefault(under, over), over, "one veil at (%d, %d)" % (column, row))
+        self.assertTrue(all(sum(over) < sum(under) for under, over in seen.items() if sum(under) > 150),
+                        "the veil darkens the window beyond the dialog")
 
     def test_hovering_its_close_button_changes_only_that_button(self):
         close = self.bounds(7)["dialog.close"]

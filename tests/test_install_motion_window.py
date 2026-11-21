@@ -68,16 +68,24 @@ class ShimTests(unittest.TestCase):
         real window never shows - only the soft bar. DrawToBitmap printed that native bar anyway (the owner spotted it
         in the first pictures, 2026-10-20). Where the box keeps it, a frame holds none of its plain greys - its track and
         arrows are r = g = b, which no colour of the window's palette is - and the bar's place shows what the area
-        itself draws there."""
+        itself draws there. Since v0.6.24 final the Progress page lists the run's steps with the log under them, shown from
+        the start (the owner, 2026-11-19): a frame without `log` shows it, and one that says `log: false` has it folded
+        away by the page's own toggle."""
         plan = motion.load("install-en")
         events = len(plan["events"])
         frames = [{"index": 0, "page": "welcome", "light": 0}, {"index": 1, "page": "options", "light": 40},
-                  {"index": 2, "page": "progress", "progress": events, "light": 80}]
+                  {"index": 2, "page": "progress", "progress": 10, "log": False, "light": 80},
+                  {"index": 3, "page": "progress", "progress": events, "log": True, "light": 120},
+                  {"index": 4, "page": "progress", "progress": events, "light": 160}]
         data = motion.job(plan, [], Path(self.work.name) / "bar" / "frames")
         data["frames"] = frames
         result = motion.render(self.exe, data, Path(self.work.name) / "bar")
-        index, (width, height), picture, bounds = list(motion.pictures(result, Path(self.work.name) / "bar" / "frames"))[-1]
-        self.assertIn("area.0", bounds, "the Progress page shows its log")
+        self.assertEqual(result["notes"], [])
+        drawn = list(motion.pictures(result, Path(self.work.name) / "bar" / "frames"))
+        self.assertNotIn("area.0", drawn[2][3], "the Progress page lists the steps, the log folded away by its toggle")
+        self.assertIn("area.0", drawn[4][3], "a frame that says nothing of the log shows it, under the steps")
+        index, (width, height), picture, bounds = drawn[3]
+        self.assertIn("area.0", bounds, "the Progress page shows its log by its toggle")
         left, top, wide, tall = (int(value) for value in bounds["native.0"])
         greys = 0
         for y in range(max(0, top), min(height, top + tall)):
@@ -93,7 +101,8 @@ class ShimTests(unittest.TestCase):
         while its window is visible, and the shim's window stands in Windows' parking window, which never is: the shim
         puts the log where that scroll leaves it (Driver.FollowLog). The log is the page's one text area; its scroll
         record is [first line shown, lines, lines shown]. With the lines the plan prints, the log fills the box and
-        then runs past it: first at its top, then - a line at a time, never back - at its foot."""
+        then runs past it: first at its top, then - a line at a time, never back - at its foot. The log is shown from the
+        Progress page's first frame, as the page has it since v0.6.24 final: no frame has to ask for it."""
         plan = motion.load("install-en")
         events = len(plan["events"])
         told = [index for index, event in enumerate(plan["events"], 1) if "line" in event
@@ -115,6 +124,33 @@ class ShimTests(unittest.TestCase):
         self.assertGreater(lines, shown, "the plan's lines run past the box: there is something to follow")
         self.assertEqual(first, lines - shown, "the last line stands at the foot of the log, as in a visible window")
         self.assertGreater(first, 0)
+
+    def test_a_plan_can_picture_an_update_over_an_older_installation(self):
+        """`flow: update` (with `from`, the older version) gives the shim an update's flow - FlowFor told that this edition
+        is installed already - where a plan says nothing of it: the Progress page lists the update's steps, which a first
+        installation does not (a watcher to stop, a Dashboard to close), so its list is taller and the log stands lower. Nothing
+        is read from an installation: the flow is told, not looked up. The scratch plan the owner's two renderings use is
+        a valid plan that says it."""
+        plan = motion.load("install-en")
+        frames = [{"index": 0, "page": "welcome", "light": 0}, {"index": 1, "page": "options", "light": 40},
+                  {"index": 2, "page": "progress", "progress": 0, "light": 80}]
+        made = {}
+        for flow, extra in (("install", {}), ("update", {"flow": "update", "from": "0.0.1"})):
+            data = motion.job(dict(plan, **extra), [], Path(self.work.name) / flow / "frames")
+            self.assertEqual((data["flow"], data["from"]), (flow, extra.get("from", "")))
+            data["frames"] = frames
+            result = motion.render(self.exe, data, Path(self.work.name) / flow)
+            self.assertEqual(result["notes"], [])
+            made[flow] = list(motion.pictures(result, Path(self.work.name) / flow / "frames"))
+        install_log, update_log = (int(made[flow][-1][3]["area.0"][1]) for flow in ("install", "update"))
+        self.assertGreater(update_log, install_log, "the update lists more steps: its log stands lower")
+        self.assertNotEqual(made["install"][-1][2], made["update"][-1][2])
+        preview = motion.load(ROOT / "build" / "motion" / "update-preview-ko.json")
+        self.assertEqual((preview["flow"], preview["from"], preview["locale"]), ("update", "0.6.23", "ko"))
+        self.assertNotIn("docs", preview["output"], "a scratch plan: its picture is never one of the documents'")
+        with self.assertRaises(motion.PlanError):
+            bad = dict(preview, flow="repair")
+            motion.check(bad)
 
     def test_it_refuses_to_go_back_a_page(self):
         plan = motion.load("install-en")

@@ -104,6 +104,8 @@ def view(notice) -> dict:
         # v0.6.16: where a click on the card's face goes (notifier.click_uri), or "" for nowhere.
         "click": getattr(notice, "click", "") or "",
         "locale": notice.locale if notice.locale in l10n.LOCALES else l10n.DEFAULT,
+        # W2: a special day's look, given by the icon that hosts the card (CardsMixin._card_look), or None.
+        "scene": None,
     }
 
 
@@ -176,6 +178,15 @@ def layout(vm, scale, measure) -> dict:
         text((chip_rect[0] + chip_pad, chip_rect[1], chip_rect[2] - chip_pad, chip_rect[3]), "chip",
              vm["chip"], vm["chip_tone"], align="center")
     y += header_h + px(space["s"])
+    # A special day (W2, the owner's pick of 2026-11-17; vm["scene"], the icon's own look of the date): the header in the
+    # day past the product's name to the card's edge, as the popup's header has it (brand.day_band); the reason's chip
+    # stands over it (the renderer draws it again over the day).
+    if vm.get("scene"):
+        edge = max(1, px(1))
+        product_w, _ = measure("label", vm["product"], inner, False)
+        band = brand.day_band(vm["scene"], px, (edge, edge, width - edge, y - px(2)), text_left + product_w)
+        if band is not None:
+            items.append(band)
 
     # The notice itself, as a task tile: its name, why, and exactly which conversation.
     tile_pad = px(space["m"])

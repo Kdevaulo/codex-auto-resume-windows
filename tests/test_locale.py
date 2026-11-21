@@ -333,12 +333,12 @@ class ReachTests(unittest.TestCase):
                 if key in korean and english[key] == korean[key]]
         # `Windows` and the product's own name are names and stay. Anything else matching
         # is a missed string.
-        # Nor does a string that is only placeholders and a percent sign (usage.window, v0.6.11).
+        # (usage.window, only placeholders and a percent sign from v0.6.11, says "left" in each language since v0.6.24 final.)
         # Nor check.held, a conversation's alias and a reason (v0.6.16-beta.3).
         # Nor installer.update.heading, two version numbers and an arrow between them (v0.6.16).
         # Nor ownreport.sha, a digest's name and the digest (v0.6.19).
         self.assertEqual(sorted(same), ["check.held", "group.windows", "installer.update.heading", "ownreport.sha",
-                                        "tray.title", "usage.window"],
+                                        "tray.title"],
                          "these are identical in both languages")
 
 

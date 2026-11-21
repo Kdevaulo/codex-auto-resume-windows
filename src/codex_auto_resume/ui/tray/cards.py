@@ -5,6 +5,10 @@ the look it is given, both of which belong to whoever owns the thread.
 """
 from __future__ import annotations
 
+import time
+
+from ... import brand
+
 
 class CardsMixin:
     """The notification card, hosted on this thread."""
@@ -34,7 +38,13 @@ class CardsMixin:
         menu take them up when they open (`_adopt_settings`), then Windows' own answers."""
         from ... import notice_window
         self._adopt_settings()
-        return notice_window.look()
+        drawn = notice_window.look()
+        # W2: only the watcher's own icon looks at the date (`days`), as for its popup and its own card - and says a day
+        # only when there is one.
+        day = brand.day_look_at(time.time()) if getattr(self, "days", False) else None
+        if day:
+            drawn["day"] = day
+        return drawn
 
     def _drop_cards(self):
         """Take the cards down with the icon. The stack lets go of the inbox first, so a notice

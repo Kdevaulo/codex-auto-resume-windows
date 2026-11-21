@@ -59,8 +59,9 @@ class TableTests(unittest.TestCase):
             self.assertEqual(brand.day_look(year, int(chuseok[:2]), int(chuseok[2:])), "chuseok", year)
 
     def test_past_the_tables_last_year_nothing_lunar_is_shown(self):
-        day = datetime.date(2041, 1, 2)
-        while day.year == 2041:
+        # The table runs to 2100 since v0.6.24 (test_day_lunar_table).
+        day = datetime.date(2101, 1, 2)
+        while day.year == 2101:
             if (day.month, day.day) not in ((9, 6), (12, 24), (12, 25)):
                 self.assertIsNone(brand.day_look(day.year, day.month, day.day), day)
             day += datetime.timedelta(days=1)
@@ -291,14 +292,14 @@ class PopupSceneTests(unittest.TestCase):
         plan = self.renderer.layout(self.vm(None), 1.0, "en")
         self.assertEqual([item for item in plan["items"] if item["kind"] == "scene"], [])
 
-    def test_the_scene_is_at_most_two_thirds_of_the_card_at_its_top_right_and_touches_nothing_below(self):
+    def test_the_day_is_the_header_past_the_words_and_touches_nothing_below(self):
+        # v0.6.24-beta.3 (W2, the owner's pick of 2026-11-17): the day spread wide - from past the words to the card's outer
+        # side, the header's whole height - where it was a scene in at most two thirds of the card and 66 px tall.
         plan, _ = self.draw("seollal")
         left, top, right, bottom = self.scene_item(plan)["rect"]
         card = plan["card"]
-        self.assertLessEqual((right - left) / (card[2] - card[0]), 0.67)
         self.assertEqual(top, card[1] + 1)
         self.assertEqual(right, card[2] - 1)
-        self.assertLessEqual(bottom - top, 66)
         for item in plan["items"]:
             if item["kind"] in ("well", "panel", "button", "note"):
                 self.assertGreaterEqual(item["rect"][1], bottom, item["kind"])
@@ -334,6 +335,7 @@ class PopupSceneTests(unittest.TestCase):
         for look in LOOKS:
             plan, _ = self.draw(look)
             item = self.scene_item(plan)
+            self.assertTrue(item["scene_shown"], look)
             piece_starts = item["rect"][2] - (brand.SCENE_WIDTH - brand.SCENE_FOCUS[look]) * item["unit"]
             self.assertGreaterEqual(piece_starts, item["fade"][1] - 0.5, look)
 
@@ -369,7 +371,8 @@ class PopupSceneTests(unittest.TestCase):
         self.assertEqual([item for item in plan["items"] if item["kind"] == "scene"], [])
 
     def test_the_lights_fall_off_softly(self):
-        plan, pixels = self.draw("chuseok", 0.0, theme="dark")
+        with mock.patch.object(brand, "speck_frame", lambda look, ms, within=None: []):     # the light alone, no speck in its way
+            plan, pixels = self.draw("chuseok", 0.0, theme="dark")
         item = self.scene_item(plan)
         unit = item["unit"]
         x0 = item["rect"][2] - (brand.SCENE_WIDTH - 146) * unit

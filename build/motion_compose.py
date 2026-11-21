@@ -260,10 +260,28 @@ class WindowChrome:
 
 # ---------------------------------------------------------------------------------------------------- the taskbar
 def draw_strip(canvas: bytearray, width: int, height: int, top: int, tall: int, colour: tuple) -> None:
-    """The taskbar's strip: one colour, the whole width - nothing that pretends to be Windows' taskbar."""
-    row = bytes(colour) * width
-    for y in range(top, min(height, top + tall)):
-        canvas[y * width * 3:(y + 1) * width * 3] = row
+    """The taskbar's strip: one colour, the whole width - nothing that pretends to be Windows' taskbar. On a clear
+    (RGBA) canvas it is wholly opaque."""
+    rgba = len(canvas) == width * height * 4
+    row = (bytes(colour) + bytes((255,))) * width if rgba else bytes(colour) * width
+    pixel = 4 if rgba else 3
+    for y in range(max(0, top), min(height, top + tall)):
+        canvas[y * width * pixel:(y + 1) * width * pixel] = row
+
+
+def draw_face(canvas: bytearray, width: int, height: int, left: int, top: int, wide: int, tall: int, radius: float,
+              colour: tuple, opacity: float) -> None:
+    """A rounded rectangle of `colour` at `opacity` (0-1) over the canvas, its edge sampled by distance so it is smooth: the
+    face the strip gives the icon under the pointer and under a press - drawn by us, as the strip is."""
+    cx, cy = left + wide / 2.0, top + tall / 2.0
+    half_w, half_h = wide / 2.0 - radius, tall / 2.0 - radius
+    for y in range(max(0, top - 1), min(height, top + tall + 1)):
+        for x in range(max(0, left - 1), min(width, left + wide + 1)):
+            dx, dy = abs(x + 0.5 - cx) - half_w, abs(y + 0.5 - cy) - half_h
+            outside = math.hypot(max(dx, 0.0), max(dy, 0.0)) + min(max(dx, dy), 0.0) - radius
+            cover = max(0.0, min(1.0, 0.5 - outside))
+            if cover:
+                _blend(canvas, width, height, x, y, colour, int(round(255 * opacity * cover)))
 
 
 def draw_icon(canvas: bytearray, width: int, height: int, pixels: bytes, size: int, left: int, top: int) -> None:
@@ -272,6 +290,50 @@ def draw_icon(canvas: bytearray, width: int, height: int, pixels: bytes, size: i
         for x in range(size):
             blue, green, red, alpha = pixels[(y * size + x) * 4:(y * size + x) * 4 + 4]
             _blend(canvas, width, height, left + x, top + y, (red, green, blue), alpha)
+
+
+def lay_rgba(canvas: bytearray, width: int, height: int, layer: bytes, layer_width: int, left: int, top: int,
+             alpha: int = 255) -> None:
+    """A picture on a clear ground - RGBA, straight alpha, `layer_width` wide - over the RGBA canvas with its top-left at
+    (left, top), as a layered window is shown at `alpha` (0-255) over what is beneath it: every pixel's own alpha scaled
+    by it, then source-over. A row over nothing is copied; one over the strip is blended where the layer has coverage.
+    What falls outside the canvas is cut off."""
+    level = max(0, min(255, int(alpha)))
+    if level == 0:
+        return
+    table = bytes((value * level + 127) // 255 for value in range(256)) if level != 255 else None
+    layer_height = len(layer) // (layer_width * 4)
+    first, last = max(0, -left), min(layer_width, width - left)
+    if first >= last:
+        return
+    count = last - first
+    for y in range(layer_height):
+        if not 0 <= top + y < height:
+            continue
+        source = bytearray(layer[(y * layer_width + first) * 4:(y * layer_width + last) * 4])
+        cover = source[3::4]
+        if cover.count(0) == count:
+            continue
+        if table is not None:
+            cover = cover.translate(table)
+            source[3::4] = cover
+        start = ((top + y) * width + left + first) * 4
+        under = canvas[start:start + count * 4]
+        if under[3::4].count(0) == count:
+            canvas[start:start + count * 4] = source
+            continue
+        for x in range(count):
+            sa = cover[x]
+            if not sa:
+                continue
+            at = x * 4
+            da = under[at + 3]
+            keep = da * (255 - sa)
+            total = sa * 255 + keep
+            for channel in range(3):
+                canvas[start + at + channel] = (source[at + channel] * sa * 255 + under[at + channel] * keep
+                                                + total // 2) // total
+            canvas[start + at + 3] = (total + 127) // 255
 
 
 # ---------------------------------------------------------------------------------------------------- where things are

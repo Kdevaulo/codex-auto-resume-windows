@@ -129,7 +129,12 @@ button, select, input { font: inherit; }
    since he asked for it smaller again on 2026-10-15 - but never under those 9px, muted whichever edition it is, and
    on the version's baseline. The window's VersionLabel takes the same two numbers (Soft.AsideShare, Soft.AsideLeast). */
 .edition { font-size: var(--type-edition); color: var(--muted); vertical-align: baseline; }
-.hero-state { display: flex; align-items: center; gap: 18px; padding-block: 8px 4px; padding-inline: 9px 0; position: relative; }
+.hero-state { display: flex; align-items: baseline; gap: 18px; padding-block: 8px 4px; padding-inline: 9px 0; position: relative; }
+/* v0.6.24 final (the owner, 2026-11-18, of the headers' lights: "정렬이 안 맞아보여"): the light is centred on the state
+   word's x-height middle, not its line box, which put it 3.4 CSS px above. Its bottom edge stands on the word's baseline
+   (the row aligns by baselines), and it moves down by half its height less half the word's x-height - `ex` in the word's
+   own size, so the font says how tall its x is. */
+.hero-state > .halo { font-size: var(--type-display); top: calc(6px - .5ex); }
 .hero h1 { font-size: var(--type-display); line-height: var(--lh-display); font-weight: 600;
            letter-spacing: -.01em; }
 .facts { display: flex; flex-wrap: wrap; color: var(--muted); }
@@ -572,7 +577,7 @@ details.inner > .fold-body > .setting { border-top: 1px solid var(--line); }
   body { padding: 10px 10px 16px; }
   .card { padding: 14px; }
   .hero { padding: 14px 16px; }
-  .hero h1 { font-size: var(--type-display-narrow); }
+  .hero h1, .hero-state > .halo { font-size: var(--type-display-narrow); }
   /* One fact per line: a separator left hanging at the end of a wrapped line reads as a typo. */
   .facts { display: grid; gap: 1px; }
   .facts span:not(:last-child)::after { content: none; }

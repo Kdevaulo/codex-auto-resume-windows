@@ -612,6 +612,8 @@ namespace CodexAutoResume
             // v0.6.24: then the window's own caption (gui/SoftChrome.cs): its frame, what the pointer is over, its buttons -
             // before anything else the window handles. It answers none of the open request's messages.
             if (chrome != null && chrome.Intercept(ref m, PassOn)) return;
+            // v0.6.24 final (L3): the start's marks (CODEX_AR_START_MARKS) - the first message after the window came on.
+            if (StartMarks.On && !firstFrameMarked) MarkFirstFrame(m.Msg);
             if (m.Msg == WM_DPICHANGED)
             {
                 // Taken here and not handed on: the window opens again at the new scale (CheckScale), and nothing of it
@@ -623,6 +625,16 @@ namespace CodexAutoResume
                 if (!scaleMoved && !sizing) drawnSize = SizeAtDrawnScale();
                 scaleMoved = true;
                 if (!sizing) BeginInvoke(new MethodInvoker(CheckScale));
+                return;
+            }
+            // v0.6.24-beta.3 (M-CORNER re-check 10, item 4): reopening, the window takes no input (EnableWindow), so Windows
+            // asks it alone for the pointer over any part of it, as HTERROR - and .NET gives it the arrow. Windows'
+            // app-starting cursor instead, after Windows' own handling, so a press on it still sounds as before.
+            if (m.Msg == WM_SETCURSOR && reopening)
+            {
+                base.WndProc(ref m);
+                Cursor.Current = Cursors.AppStarting;
+                m.Result = (IntPtr)1;
                 return;
             }
             if (m.Msg == WM_ENTERSIZEMOVE)
@@ -658,6 +670,7 @@ namespace CodexAutoResume
         // audit's, one not yet on screen or already gone), and the watcher starts one as it always did; a capture's runs
         // from a scratch build, never the installed program the watcher asks.
         internal const int WM_COPYDATA = 0x004A;
+        private const int WM_SETCURSOR = 0x0020;
         internal const long OpenRequestMark = 0x43415250;
         internal const int OpenRequestTaken = 0x4F50454E;
         private const int MessageFilterAllow = 1;
@@ -757,6 +770,53 @@ namespace CodexAutoResume
         // wait for, so it hands over to one that is open. One that hangs is not answered for (SmtoAbortIfHung) and the start
         // goes on. Every other parser of the command line ignores it, as an unknown argument always was.
         internal const string ReopenedAfterUpdate = "--after-update";
+
+        // ------------------------------------------------------------- opened again behind the setup's Finish (v0.6.24)
+        // The v0.6.24 final's live acceptance (J10): after a Repair the setup opened the Dashboard again (ReopenedAfterUpdate)
+        // and it came up over the setup window's Finish page and hid it whole - a person might wait for a window they could
+        // not see. Such a window now opens WITHOUT taking the activation (ShowWithoutActivation) and stands directly behind
+        // the window in front, the setup's (HostApp.StandBehindFront): as its handle is made, before it is first shown, and
+        // once more when it is shown. The Finish page stays in front and keeps the keyboard; when it is closed, Windows hands
+        // the activation to the window next in the order, which is this one. An update is the same run (Open-ClosedDashboard)
+        // and does the same. Every other start - a person's, the watcher's, a reopen of its own - opens as it always did.
+        internal static bool OpensBehind;
+
+        /// Whether a start with `arguments` opens behind the window in front: the installer's reopen after an update or a
+        /// Repair (ReopenedAfterUpdate), never a capture's. Pure.
+        internal static bool OpensBehindFor(string[] arguments, bool capture)
+        {
+            return !capture && arguments != null && Array.IndexOf(arguments, ReopenedAfterUpdate) >= 0;
+        }
+
+        // Whether the start's marks have the first frame and the first state (StartMarks).
+        private bool firstFrameMarked, firstStateMarked;
+
+        /// The first frame, for the start's marks: the first message the window handles itself once it is shown and its own
+        /// corner's cloak has let go of it (WindowCorner.Painted), or its first WM_PAINT where it has no corner of its own.
+        private void MarkFirstFrame(int message)
+        {
+            if (firstFrameMarked || !IsHandleCreated || !Visible) return;
+            WindowCorner corner = WindowCorner.Of(this);
+            if (corner != null ? corner.Cloaked : message != WmPaint) return;
+            firstFrameMarked = true;
+            StartMarks.Mark("first frame");
+            StartMarks.Write();
+        }
+
+        private const int WmPaint = 0x000F;
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            if (OpensBehind) HostApp.StandBehindFront(Handle);
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            if (OpensBehind) HostApp.StandBehindFront(Handle);
+            base.OnShown(e);
+        }
+
         private const int SmtoAbortIfHung = 0x0002;
         private const int GwOwner = 4;
         private const int QueryLimitedInformation = 0x1000;
@@ -1026,6 +1086,11 @@ namespace CodexAutoResume
             // No more input here: anything typed now would be lost with this window.
             try { EnableWindow(Handle, false); }
             catch (Exception) { }
+            // v0.6.24-beta.3 (M-CORNER re-check 10, item 4): and it says it is at work. The new window comes 1.2-2.6 s later,
+            // and this one, taking no input, showed nothing meanwhile: now its light turns to the working light, as for an
+            // action (Hero, BusyLight - the clock that writes it is stopped, so it is written now), and the pointer over it
+            // is Windows' app-starting cursor (WndProc, WM_SETCURSOR).
+            UpdateCountdowns();
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
                 bool shown = true;
@@ -1088,6 +1153,8 @@ namespace CodexAutoResume
             try { if (IsHandleCreated) EnableWindow(Handle, true); }
             catch (Exception) { }
             StartClock();
+            // The light the watcher's state gives, back at once (v0.6.24-beta.3).
+            UpdateCountdowns();
             MethodInvoker held = heldForReopen;
             heldForReopen = null;
             if (held != null) held();

@@ -3,7 +3,7 @@
 Hovering over the icon shows a card in the product's design instead of Windows' tooltip (the owner's option 2): the
 status light the popup's header has, the product's name and - in the advanced edition - its edition's chip, the state
 line with its countdown in the accent, and in the advanced edition a row per usage window, its length, a thin bar and
-its share. The same facts the tooltip has said (words.tooltip_parts), no new ones, never cut short.
+the share left of it (v0.6.24 final). The same facts the tooltip has said (words.tooltip_parts), no new ones, never cut short.
 
 Pure: a function of the parts, the light, the scale and a way to measure text, as the popup's layout is. It returns
 rectangles and paints nothing, so the card is laid out and checked at every language and scale with no screen; the
@@ -34,15 +34,29 @@ TIP_JOIN = " · "
 TIP_ROLES = {"title": "name", "chip": "chip", "line": "body", "meter": "small"}
 
 
-def tip_layout(parts, light, scale, measure) -> dict:
+def _line_box(height):
+    """A role's (ascent, x-height) where no font answers: what puts the light and the chip where the line boxes' middles
+    are, as the card had them until the header was aligned by its ink (v0.6.24 final)."""
+    return height * 3 / 4.0, height / 2.0
+
+
+def tip_layout(parts, light, scale, measure, metrics=None, day=None, ink=None) -> dict:
     """Every rectangle of the card in device pixels, left to right, and its size.
 
     `parts` is words.tooltip_parts' dict; `light` the status light's state (a key of brand.STATUS_FILL); `measure(role,
-    text, width, wrap)` returns the (width, height) a text takes in a popup font role. The plan is the popup's shape -
+    text, width, wrap)` returns the (width, height) a text takes in a popup font role, and `metrics(role)` its font's
+    (ascent, x-height) in device pixels - what the header is aligned by (none: by the line boxes) - and `ink(role, text)` how
+    far inside its box a text's ink starts and ends on the row read from the light, (near, far) in device pixels - what the
+    gaps either side of the name are spaced by (none: by the boxes). The plan is the popup's shape -
     `size`, `card`, `items`, `targets` (none: nothing on the card is pressed), `scale` - so the popup's renderer draws
     its items and its mirror turns it right to left. The card fills the window: nothing is drawn round it, as round the
     icon's menu (the owner, 2026-11-01 and 11-02: a lift's lit edge and its pale shadow shone as a halo on a dark
-    taskbar)."""
+    taskbar).
+
+    `day` (W2, the owner's pick of 2026-11-17) is a special day's look, or None: the card is then that much wider at its
+    outer side that the day stands there, past every word, as the popup's header has it (brand.day_band) - its ground, its
+    specks, its scene as tall as the card - with the card's colour fading into it; everything else is where it is on any
+    other day."""
     space = brand.SPACING
 
     def px(value):
@@ -62,7 +76,17 @@ def tip_layout(parts, light, scale, measure) -> dict:
         chip_pad = px(brand.LAYOUT["chip_pad_x"])
         chip_w = chip_text_w + 2 * chip_pad
         chip_h = max(px(brand.LAYOUT["chip_height"]), chip_text_h)
-    head_need = mark + gap + title_w + (gap + chip_w if chip else 0)
+    # v0.6.24 final (the owner, 2026-11-18, of the card's first row: "여기도 정렬이 안 맞아보여"): aligned by what the eye
+    # sees, not by boxes. The name starts a small gap after the light's own edge - not after the box it stands in, which
+    # left 2.5 px more there than between the name and the chip - so the two gaps read equal.
+    dot = brand.STATUS_DOT["popup"] * scale
+    lead = int(round(mark / 2.0 + dot)) + gap
+    # And the chip as far after the name's ink as the name's ink is after the light: the name's box holds its letters'
+    # side bearings, which differ from font to font (Segoe UI's "C" stands further in than Malgun Gothic's), so the chip's
+    # gap from the name's box is the light's, plus the name's near bearing, less its far one.
+    near, far = ink(roles["title"], parts["title"]) if ink else (0, 0)
+    after = max(0, gap + near - far)
+    head_need = lead + title_w + (after + chip_w if chip else 0)
     most = px(TIP_MOST)
     pieces = list(parts.get("line") or ())
     join_w, line_h = measure(roles["line"], TIP_JOIN, wide, False)
@@ -70,7 +94,7 @@ def tip_layout(parts, light, scale, measure) -> dict:
     # The state line, broken where the widest card breaks it: a piece that does not fit what is left of a line starts
     # the next one (the join is not carried over), and one wider than a whole line wraps. The card then takes the
     # widest line it broke into, so no line leaves the right side emptier than the left.
-    line_room = most - 2 * pad_x - mark - gap
+    line_room = most - 2 * pad_x - lead
     lines = []
     if pieces:
         current, used = [], 0
@@ -84,7 +108,7 @@ def tip_layout(parts, light, scale, measure) -> dict:
             current.append((value, "accent" if counts else "ink", piece_w))
             used += piece_w
         lines.append(current)
-    line_need = mark + gap + max([min(line_room, sum(run[2] for run in runs)) for runs in lines] or [0])
+    line_need = lead + max([min(line_room, sum(run[2] for run in runs)) for runs in lines] or [0])
     rows = list(parts.get("meter") or ())
     label_w = max([measure(roles["meter"], row["label"], wide, False)[0] for row in rows] or [0])
     share_w = max([measure(roles["meter"], row["percent"], wide, False)[0] for row in rows] or [0])
@@ -98,24 +122,39 @@ def tip_layout(parts, light, scale, measure) -> dict:
         items.append({"kind": "text", "rect": rect, "role": role, "text": value, "colour": colour, "wrap": wrap,
                       "align": align, "target": None})
 
-    # Row 1: the light, the name, the edition's chip.
+    # Row 1: the light, the name, the edition's chip - one line to the eye (v0.6.24 final). The light is centred on the
+    # name's x-height middle, not its line box; the chip's words stand on the name's baseline, in a box of their own line's
+    # height, and the chip is centred on that same middle. Laid out from the name's top, then moved down as one so the
+    # highest of the three starts the row.
     y = pad_y
-    text_left = left + mark + gap
+    text_left = left + lead
     if chip:
         chip_w = min(chip_w, inner // 2)
-    title_room = right - text_left - (gap + chip_w if chip else 0)
+    title_room = right - text_left - (after + chip_w if chip else 0)
     title_w = min(title_w, title_room)
-    head_h = max(mark, title_h, chip_h)
-    items.append({"kind": "halo", "cx": left + mark / 2.0, "cy": y + head_h / 2.0, "state": light,
+    ascent, x_height = metrics(roles["title"]) if metrics else _line_box(title_h)
+    baseline = ascent                                  # below the name's top
+    middle = baseline - x_height / 2.0
+    chip_top = chip_words_top = 0
+    if chip:
+        chip_ascent = (metrics(roles["chip"]) if metrics else _line_box(chip_text_h))[0]
+        chip_top = int(round(middle - chip_h / 2.0))
+        chip_words_top = int(round(baseline - chip_ascent))
+    tops = [0, int(round(middle - mark / 2.0))] + ([chip_top, chip_words_top] if chip else [])
+    bottoms = [title_h, int(round(middle + mark / 2.0))] + ([chip_top + chip_h, chip_words_top + chip_text_h] if chip else [])
+    shift = y - min(tops)
+    head_h = max(bottoms) - min(tops)
+    items.append({"kind": "halo", "cx": left + mark / 2.0, "cy": shift + middle, "state": light,
                   "radius": brand.glow_extent(brand.STATUS_DOT["popup"]) * scale, "sweep_reach": 0.0})
-    top = y + (head_h - title_h) // 2
+    top = shift
     text((text_left, top, text_left + title_w, top + title_h), roles["title"], parts["title"], "ink")
     if chip:
-        chip_left = text_left + title_w + gap
-        chip_top = y + (head_h - chip_h) // 2
-        rect = (chip_left, chip_top, chip_left + chip_w, chip_top + chip_h)
+        chip_left = text_left + title_w + after
+        rect = (chip_left, shift + chip_top, chip_left + chip_w, shift + chip_top + chip_h)
         items.append({"kind": "chip", "rect": rect, "tone": "accent"})
-        text((rect[0] + chip_pad, rect[1], rect[2] - chip_pad, rect[3]), roles["chip"], chip, "accent", align="center")
+        words_top = shift + chip_words_top
+        text((rect[0] + chip_pad, words_top, rect[2] - chip_pad, words_top + chip_text_h), roles["chip"], chip, "accent",
+             align="center")
     y += head_h
 
     # Row 2: the state line under the name, as it was broken above, piece by piece, the countdown in the accent.
@@ -135,7 +174,9 @@ def tip_layout(parts, light, scale, measure) -> dict:
                 x += piece_w
             y += line_h
 
-    # The advanced edition's meter: a row per window - its length, a bar filled as far as it is used, its share.
+    # The advanced edition's meter: a row per window - its length, a bar filled as far as the window has LEFT, the share
+    # left (v0.6.24 final). As little left as words.LOW_LEFT or less is the warning colour, bar, well and share alike, so an
+    # empty bar never reads as nothing to worry about.
     if rows:
         y += px(space["s"])
         _, row_h = measure(roles["meter"], "Ag", wide, False)
@@ -147,12 +188,23 @@ def tip_layout(parts, light, scale, measure) -> dict:
                 y += px(space["xs"])
             text((left, y, left + label_col, y + row_h), roles["meter"], row["label"], "muted")
             bar_top = y + (row_h - bar_h) // 2
+            low = bool(row.get("low"))
             items.append({"kind": "meter", "rect": (bar_left, bar_top, bar_right, bar_top + bar_h),
-                          "fraction": row["fraction"]})
-            text((right - share_w, y, right, y + row_h), roles["meter"], row["percent"], "ink", align="right")
+                          "fraction": row["fraction"], "low": low})
+            text((right - share_w, y, right, y + row_h), roles["meter"], row["percent"], "warning" if low else "ink",
+                 align="right")
             y += row_h
 
     y += pad_y
+    if day:
+        edge = max(1, px(1))
+        unit = (y - 2 * edge) / brand.SCENE_HEIGHT
+        focal = brand.SCENE_WIDTH - brand.SCENE_FOCUS[day]
+        # Room past the words for the scene's main piece, the least fade before it and half the fade's whole.
+        width = right + px(brand.WIDE["gap"]) + px(2) + px(brand.WIDE["fade"]) // 2 + -int(-focal * unit // 1) + edge
+        band = brand.day_band(day, px, (edge, edge, width - edge, y - edge), right)
+        if band is not None:
+            items.append(band)
     card = (0, 0, width, y)
     items.insert(0, {"kind": "card", "rect": card, "radius": px(brand.RADII["card"]), "corner": "card"})
     return {"size": (width, y), "card": card, "items": items, "targets": [], "scale": scale, "rows": []}

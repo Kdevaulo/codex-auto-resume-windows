@@ -1087,8 +1087,11 @@ KEEP_GOING = CapabilityDef(
 
 # Recover every conversation but Codex's own (v0.6.16-beta.3; users asked, the owner's plan of 2026-10-13). At P19 it
 # answers EVERY_DESKTOP, and core takes up every desktop conversation of the app but the kinds Codex makes for itself
-# (core's codex/values.INTERNAL_THREAD_SOURCES: subagent, guardian_review, memory_consolidation, agent_created_thread)
-# - every other check of a conversation, and every gate of a recovery, standing. It departs from A15 (only the desktop
+# (core's codex/values.INTERNAL_THREAD_SOURCES: subagent, guardian_review, memory_consolidation, agent_created_thread),
+# and from v0.6.24 (the owner's word of 2026-11-19) whatever program the app's row's first line names but VS Code's own
+# (core's codex/values.NOT_DESKTOP_ORIGINATORS) - every other check of a conversation, and every gate of a recovery,
+# standing. Its statement says so at revision 1 still, after goal_continuation's precedent of 2026-11-07: one who turned
+# it on keeps it on after the update - it was asked for one who had - and reads the wider statement on its card. It departs from A15 (only the desktop
 # app's own user conversations are detected), stands on thread_eligibility - the state row and the rollout's first
 # line it is judged by - and rests on no measurement. It sends nothing itself: what it takes up is core's recovery, under
 # core's own limits, so its ceilings are the schema's floor and never bind. Turned off, the waiting records only it took

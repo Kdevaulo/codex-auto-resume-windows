@@ -3,8 +3,13 @@
 The popup is drawn as the product draws it (`ui/popup/renderer.py`), from the same sample rows the still is
 (make_screenshots.popup_view), at the stills' scale. What a person sees happen to it is only what the product does:
 
-- It has no entrance. `Popup.show` places the window and calls ShowWindow, and `hide` calls SW_HIDE: it is there at
-  once and gone at once, so a plan opens and closes it with a cut (motion_plan's `popup` step).
+- It opens as the product opens it (v0.6.23, tests/test_popup_opening_motion.py): its two layered windows, the card and
+  its shadow, fade in over brand's transition and rise `SPACING xs` into place on brand's curve (`ui.popup.motion.opening`,
+  `PopupFrames.opening`), a frame every 16 ms. It is hidden with SW_HIDE (`hide`), so it goes at once: a click anywhere else
+  closes it (WM_ACTIVATE), and a plan closes it with a cut (motion_plan's `popup` step).
+- It stands where `ui.popup.placement.place` puts it (`PopupFrames.origin`): centred on the icon, `SPACING m` above the
+  taskbar's work area and inside it, so with the icon at the taskbar's right end its card's right edge is that gap from the
+  screen's; its shadow reaches past the card, over the taskbar and past the screen's edge, which a picture keeps whole.
 - Its status light breathes on the clock of the state it shows (`ui.popup.motion.halo`), which starts when the state
   is entered and is not restarted by closing and opening again: the picture's own clock, from its first moment. A
   picture whose length is whole breaths loops without a jump.
@@ -94,8 +99,29 @@ class PopupFrames:
         return {"popup.switch.%d" % (index + 1): (rect[0] + dx, rect[1] + dy, rect[2] - rect[0], rect[3] - rect[1])
                 for index, rect in enumerate(rects)}
 
-    def drawn(self, frame, closed: bytes) -> bytes:
-        """The RGBA picture (straight alpha) at `frame`: `closed`, a clear canvas, while no popup is open."""
+    def origin(self, work, monitor, anchor) -> tuple:
+        """Where this picture's top-left goes on a canvas, so that the card stands where the product puts it: beside the
+        icon's rectangle `anchor` on the taskbar's side, `SPACING m` from the taskbar and the work area's edges
+        (`Popup._move`: the placement is the card's own, its shadow reaching into the gap)."""
+        from codex_auto_resume import brand
+        gap = int(round(brand.SPACING["m"] * self.scale))
+        card = self.view((), (), 0)[1]["card"]
+        x, y, _edge = self.tray.place((card[2] - card[0], card[3] - card[1]), tuple(work), tuple(monitor),
+                                      tuple(anchor), gap=gap)
+        return x - self.pad, y - self.pad
+
+    def opening(self, frame) -> tuple:
+        """(alpha 0-255, rows below its place, whether it has arrived) of the popup at `frame`: the opening's own
+        arithmetic (`ui.popup.motion.opening`) `elapsed` ms after it was opened, the rise being what `_start_opening`
+        asks - `SPACING xs` at the popup's scale."""
+        from codex_auto_resume import brand
+        from codex_auto_resume.ui.popup.motion import opening
+        elapsed = frame.t - dict(frame.popup)["opened"]
+        return opening(elapsed, max(1, int(round(brand.SPACING["xs"] * self.scale))))
+
+    def drawn(self, frame, closed: bytes, light_at=None) -> bytes:
+        """The RGBA picture (straight alpha) at `frame`: `closed`, a clear canvas, while no popup is open. Its light is
+        drawn at the frame's moment, or at `light_at` where that is given (the still's own: the first of its breath)."""
         if not frame.popup:
             self._held = None
             return closed
@@ -109,7 +135,8 @@ class PopupFrames:
             amount, done = self.glide_amount((started, begin, end), frame.t)
             if not done:
                 gliding[("check", tasks[row - 1])] = amount
-        light = self.tray.halo(vm["light"], frame.t, frame.t, design=self.design)
+        moment = frame.t if light_at is None else light_at
+        light = self.tray.halo(vm["light"], moment, moment, design=self.design)
         if gliding:
             self.renderer.draw(vm, plan, frame=light, glides=gliding)
             self._held = None
@@ -122,11 +149,12 @@ class PopupFrames:
         return self.shots.clear_rgba(bgra)
 
     def is_the_still(self, frame, closed: bytes, still: Path) -> bool:
-        """Whether the picture at `frame` is, pixel for pixel, the first frame of the committed `still`: the popup the
-        README's other pictures and the guide show, made by make_screenshots.render_popup. The motion's first frame is
-        what a viewer that does not animate shows, so it must be that one."""
+        """Whether the popup at `frame` - open, and arrived - is, pixel for pixel, the first frame of the committed `still`:
+        the popup the README's other pictures and the guide show, made by make_screenshots.render_popup, which draws its
+        light at the first moment of its breath: so here too, whatever moment the frame is at. What the picture's popup
+        draws is what the still draws."""
         width, height, rgb, alpha = self.shots.read_png(still)
-        picture = self.drawn(frame, closed)
+        picture = self.drawn(frame, closed, light_at=0)
         self._held = None
         if (width, height) != tuple(self.size) or alpha is None:
             return False

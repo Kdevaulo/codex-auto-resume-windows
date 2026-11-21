@@ -57,6 +57,14 @@ Reduce $true
 $r = Meter 90 10; Paint $r
 $out.meter.reduced = @([bool](P $r 'Growing'), [double](P $r 'Drawn')); $r.Dispose()
 Reduce $false
+# v0.6.24 final: what is left - the bar's share, the words', the warning's - for each share used.
+$out.left = @{}
+foreach ($used in @(-1, 0, 0.4, 37.5, 89.9, 90, 99.6, 100, 130)) {
+    $out.left["$used"] = @([double](S 'AccountMeter' 'LeftOf' @([double]$used)), [int](S 'AccountMeter' 'LeftWords' @([double]$used)),
+                          [bool](S 'AccountMeter' 'Warns' @([double]$used)), [double](S 'SettingsForm' 'AnalyticsLeft' @([double]$used)))
+}
+$out.left.width = @([int](S 'AccountMeter' 'BarWidth' @([double]0, 100, 6)), [int](S 'AccountMeter' 'BarWidth' @([double]100, 100, 6)),
+                    [int](S 'AccountMeter' 'BarWidth' @([double]1, 100, 6)))
 """
 
 
@@ -75,19 +83,34 @@ class MeterGlideTests(unittest.TestCase):
         cls.folder.cleanup()
 
     def test_a_new_reading_glides_from_what_the_meter_showed(self):
+        """v0.6.24 final: what is drawn is what is LEFT - 20 used, then 80, glides from 80 left down to 20."""
         meter = self.answer["meter"]
         growing, drawn = meter["starts"]
         self.assertTrue(growing)
-        self.assertGreaterEqual(drawn, 20.0)
-        self.assertLess(drawn, 80.0, "part of the way, not simply there")
-        self.assertEqual(meter["arrives"], [False, 80.0])
+        self.assertLessEqual(drawn, 80.0)
+        self.assertGreater(drawn, 20.0, "part of the way, not simply there")
+        self.assertEqual(meter["arrives"], [False, 20.0])
 
     def test_the_same_reading_and_no_reading_are_simply_drawn(self):
         meter = self.answer["meter"]
         self.assertEqual(meter["same"], [False, 50.0])
         self.assertFalse(meter["none"])
 
+    def test_the_meter_shows_what_is_left_and_warns_where_little_is(self):
+        """v0.6.24 final (the owner, 2026-11-18): the bar's share is 100 minus the share used, never below 0; the words
+        are the whole share left, 0 only where it is used up; the warning starts at 90 used, 10 left, as it did; the
+        analytics card says the share left to a tenth, never 0 before it is used up. No reading is none of them."""
+        left = self.answer["left"]
+        expected = {"-1": [-1.0, -1, False, 100.0], "0": [100.0, 100, False, 100.0], "0.4": [99.6, 100, False, 99.6],
+                    "37.5": [62.5, 63, False, 62.5], "89.9": [10.1, 11, False, 10.1], "90": [10.0, 10, True, 10.0],
+                    "99.6": [0.4, 1, True, 0.4], "100": [0.0, 0, True, 0.0], "130": [0.0, 0, True, 0.0]}
+        for used, row in expected.items():
+            with self.subTest(used=used):
+                self.assertEqual([round(value, 6) if isinstance(value, float) else value for value in left[used]], row)
+        self.assertEqual(left["width"], [0, 100, 6], "nothing left is no bar; all left a full one; a little a dot")
+
     def test_a_reading_after_none_grows_from_empty_and_a_first_meter_is_drawn(self):
+        """From an empty bar to what is left: 30 used, 70 left."""
         meter = self.answer["meter"]
         growing, drawn = meter["unreadBefore"]
         self.assertTrue(growing)
@@ -95,7 +118,7 @@ class MeterGlideTests(unittest.TestCase):
         self.assertFalse(meter["firstTime"], "a meter with nothing before it")
 
     def test_with_motion_reduced_it_is_at_once(self):
-        self.assertEqual(self.answer["meter"]["reduced"], [False, 90.0])
+        self.assertEqual(self.answer["meter"]["reduced"], [False, 10.0], "90 used is 10 left, at once")
 
     def test_the_card_hands_each_meter_what_its_last_one_showed(self):
         source = METER.read_text(encoding="utf-8")

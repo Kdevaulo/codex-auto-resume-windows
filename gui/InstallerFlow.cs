@@ -105,6 +105,10 @@ namespace CodexAutoResume
         /// on the bar, the Dashboard's own rules after it - but named for what it is, for an older version or the other
         /// edition is not an update. The bootstrap prints no notes for a pick, so it has no Notes page.
         internal bool Another;
+        /// A setup program's run, which unpacks the archive it carries before anything else (SetupWindow.FlowFor) - an
+        /// installation always, an uninstall when it is started with -Uninstall: its list of steps begins with that
+        /// (InstallerProgress.Listed, v0.6.24-beta.3).
+        internal bool Unpacks;
 
         internal InstallerFlow(string mode, string home, string edition, string installed, string version)
         {
@@ -834,6 +838,52 @@ namespace CodexAutoResume
             return false;
         }
 
+        // ------------------------------------------------------------------ the steps listed under the bar
+
+        /// A listed step's state (v0.6.24-beta.3, the owner's option A): done, under way, still to come.
+        internal const string Done = "done", Now = "now", Todo = "todo";
+
+        /// Every step a run of `mode` can go through, in the order it goes through them: a setup program's own unpacking
+        /// first (Unpacked), then each step of `mode`'s table once. The setup program's check of itself (verify_setup) is
+        /// done before its window opens, so it is never one. Pure.
+        internal static List<string> Steps(string mode, bool unpacks)
+        {
+            var steps = new List<string>();
+            if (unpacks || mode == InstallerFlow.Install) steps.Add("unpack");
+            foreach (Milestone milestone in Of(mode))
+                if (!steps.Contains(milestone.Step)) steps.Add(milestone.Step);
+            return steps;
+        }
+
+        /// Whether a run is known before it starts to pass `step` without taking it: a first installation has no watcher of
+        /// its own running to stop and no Dashboard of its own open to close (install.ps1 looks for a Dashboard only over
+        /// an installation, $upgrade, and a watcher runs only from one). Pure.
+        internal static bool Skipped(string mode, bool upgrade, string step)
+        {
+            return mode == InstallerFlow.Install && !upgrade && (step == "watcher" || step == "dashboard");
+        }
+
+        /// The run's steps as the window lists them under the bar, each with its state, while `step` is under way and
+        /// `under` holds every step that has been: the step under way is Now; one before it is Done where it was under
+        /// way, and leaves the list where it never was - a step this run passed without taking it, as a watcher that was
+        /// not running; one after it is Todo, unless the run is known to skip it (Skipped). Nothing is done that the
+        /// installer has not said it began, and nothing moves with time: only a line it prints moves `step`. Pure.
+        internal static List<string[]> Listed(string mode, bool upgrade, bool unpacks, string step, IList<string> under)
+        {
+            List<string> steps = Steps(mode, unpacks);
+            int at = steps.IndexOf(step ?? "");
+            var listed = new List<string[]>();
+            for (int i = 0; i < steps.Count; i++)
+            {
+                string each = steps[i];
+                bool was = under != null && under.Contains(each);
+                if (i == at) listed.Add(new[] { each, Now });
+                else if (i < at) { if (was) listed.Add(new[] { each, Done }); }
+                else if (was || !Skipped(mode, upgrade, each)) listed.Add(new[] { each, Todo });
+            }
+            return listed;
+        }
+
         /// The bar's place while a setup program unpacks entry `done` of `total`: from nothing to UnpackedAt.
         internal static double Unpacked(int done, int total)
         {
@@ -997,6 +1047,44 @@ namespace CodexAutoResume
             "remove_files", "Removing the program files",
             "finishing", "Finishing",
         };
+
+        // Each listed step's name (v0.6.24-beta.3): the step as a line of a list, done, under way or still to come - not
+        // the words under way that Steps says above the bar. A table, as Steps is.
+        private static readonly string[] StepNames =
+        {
+            "unpack", "Unpack the files",
+            "codex", "Find Codex",
+            "prepare", "Prepare the program files",
+            "watcher", "Stop the running watcher",
+            "dashboard", "Close the Dashboard",
+            "files", "Copy the program files",
+            "plugin", "Add the plugin to Codex",
+            "setup", "Set up the watcher",
+            "check", "Check the installation",
+            "ask", "Ask GitHub for the newest release",
+            "download", "Download the release",
+            "verify", "Verify the download",
+            "unregister", "Remove the watcher and what it registered",
+            "remove_plugin", "Remove the plugin from Codex",
+            "remove_files", "Remove the program files",
+            "finishing", "Finish",
+        };
+
+        /// The listed steps' keys and their English, for the tests: each is installer.steps.<key> in the catalogs.
+        internal static List<string> StepNameKeys()
+        {
+            var keys = new List<string>();
+            for (int i = 0; i < StepNames.Length; i += 2) keys.Add(StepNames[i] + "=" + StepNames[i + 1]);
+            return keys;
+        }
+
+        /// What a step is called in the list under the bar: its own name, or the words above the bar where it has none.
+        internal string StepName(string step)
+        {
+            for (int i = 0; i < StepNames.Length; i += 2)
+                if (StepNames[i] == step) return Say("installer.steps." + step, StepNames[i + 1]);
+            return Step(step);
+        }
 
         /// The steps' keys, for the tests: each is installer.step.<key> in the catalogs.
         internal static List<string> StepKeys()

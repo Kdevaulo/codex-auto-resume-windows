@@ -27,7 +27,7 @@ if str(ROOT / "build") not in sys.path:
 
 import motion_window  # noqa: E402
 
-OPENING = (1000, 588)    # SettingsForm.OpeningWidth / OpeningHeight, at 96 dpi (664 until v0.6.24-beta.2)
+OPENING = (1000, 618)    # SettingsForm.OpeningWidth / OpeningHeight, at 96 dpi (588 in v0.6.24-beta.2, 664 until then)
 PER_MONITOR = -4         # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2: the window's own awareness (its manifest)
 
 
@@ -81,7 +81,7 @@ class PinnedSizeTests(unittest.TestCase):
         self.assertLessEqual(result["client"][1], wanted[1] + int(round(31 * scale)), said)
 
     def test_the_scale_outgrows_a_ci_runner_and_a_large_monitor(self):
-        # v0.6.24-beta.2: 1.75 for the window of 1000 by 588 (1.5 for 1000 by 664 until then).
+        # v0.6.24: 1.75 for the window of 1000 by 618 (also for 588 in beta.2; 1.5 for 1000 by 664 until then).
         self.assertEqual(scale_beyond((1044, 788)), 1.75)
         self.assertGreater(OPENING[0] * scale_beyond((3860, 2180)), 3860)
 

@@ -70,8 +70,21 @@ def share(window) -> int:
     return 100 if used >= 100 else int(used // 1)
 
 
+# v0.6.24 final (the owner, 2026-11-18: "사용한 양보다 남은 양이 뜨는게 자연스럽지 않나?" - "다 바꾸자"): every surface says
+# what is LEFT of a window, not what is used. Display only: the reading, the wire and every decision keep the share used.
+# At or under this much left a window reads as a warning - the share used of 90 the saved accounts' meters warned from
+# (AccountMeter.WarnAt), mirrored - so an empty bar never looks like nothing to worry about.
+LOW_LEFT = 10
+
+
+def left(window) -> int:
+    """The share LEFT as a whole number, 0 to 100: 100 minus share() - so it is 0 only where the window is used up (99.6%
+    used leaves 1), and a reading above 100 leaves 0."""
+    return max(0, min(100, 100 - share(window)))
+
+
 def usage_windows(windows, say, now, keep=None) -> str:
-    """Each window of a reading: its length, its share, and when it resets where Codex said. `keep` (v0.6.23) is
+    """Each window of a reading: its length, the share left of it (v0.6.24 final), and when it resets where Codex said. `keep` (v0.6.23) is
     given each reset time before it goes into its sentence - the popup's keeps it one left-to-right run in a
     right-to-left language (l10n.embedded), or the bidi algorithm turned a date's parts round (Persian, 2026-11-11)."""
     keep = keep or (lambda value: value)
@@ -79,10 +92,10 @@ def usage_windows(windows, say, now, keep=None) -> str:
     for window in windows or ():
         name = window_name(window.get("window_minutes"), say)
         if window.get("reset_at"):
-            parts.append(say("usage.window_resets", window=name, percent=share(window),
+            parts.append(say("usage.window_resets", window=name, percent=left(window),
                              time=keep(clock_time(window["reset_at"], now))))
         else:
-            parts.append(say("usage.window", window=name, percent=share(window)))
+            parts.append(say("usage.window", window=name, percent=left(window)))
     return " · ".join(parts)
 
 

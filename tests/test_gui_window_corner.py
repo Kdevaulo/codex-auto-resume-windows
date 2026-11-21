@@ -506,10 +506,13 @@ class SwitchTests(unittest.TestCase):
         wanted = guiscan.member_body("WindowShape", "Wanted")
         self.assertIn("Switch && Windows11", wanted)
         self.assertIn("internal static readonly bool Switch = Brand.WindowSquircle;", guiscan.read("gui/SoftWindowShape.cs"))
-        # Only the Dashboard and the setup window ask (owner 2026-11-16), each after its caption is installed.
+        # The Dashboard and the setup window ask (owner 2026-11-16), and from the v0.6.24 final every dialog the Dashboard
+        # opens (owner 2026-11-20: SoftDialog.BuildTitle, tests/test_gui_v0624_dialog_corner.py), each after its caption
+        # is installed.
         askers = sorted(path.name for path in (ROOT / "gui").glob("*.cs") if ".OwnCorner()" in path.read_text(encoding="utf-8"))
-        self.assertEqual(askers, ["InstallerWindow.cs", "SettingsApp.cs"])
+        self.assertEqual(askers, ["InstallerWindow.cs", "SettingsApp.cs", "SoftChrome.cs"])
         self.assertIn("chrome.OwnCorner();", guiscan.read("gui/SettingsApp.cs"))
+        self.assertIn("chrome.OwnCorner();", guiscan.member_body("SoftDialog", "BuildTitle"))
         self.assertIn("if (chrome != null && chrome.Frameless) return Padding.Empty;",
                       guiscan.member_body("SettingsForm", "OwnFrame"))
 

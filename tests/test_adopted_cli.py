@@ -69,7 +69,14 @@ class AdoptedTests(EngineCase):
         self.assertIsNone(eligibility.kind_of("cli", {"source": "cli", "originator": "codex-tui"}))
         self.assertEqual(eligibility.kind_of("vscode", {"source": "vscode", "originator": "codex-tui"}), "desktop")
         self.assertIsNone(eligibility.kind_of("cli", {"source": "vscode", "originator": "codex-tui"}))
+        # v0.6.24 (issue #66): a codex_exec first line on the app's row is still no TUI conversation and, naming no
+        # fork, not taken up; only a fork a person made of an exec run is (tests/test_adopted_exec_fork.py).
         self.assertIsNone(eligibility.kind_of("vscode", {"source": "vscode", "originator": "codex_exec"}))
+        self.assertEqual(eligibility.kind_of("vscode", {"source": "vscode", "originator": "codex_exec",
+                                                        "forked_from_id": "0a1b2c3d-0001-7000-8000-0000000000f0"}),
+                         "desktop")
+        self.assertIsNone(eligibility.kind_of("vscode", {"source": "cli", "originator": "codex_exec",
+                                                         "forked_from_id": "0a1b2c3d-0001-7000-8000-0000000000f0"}))
 
 
 if __name__ == "__main__":

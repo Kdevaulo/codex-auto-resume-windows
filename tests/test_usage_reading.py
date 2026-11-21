@@ -148,15 +148,18 @@ class WordsTests(unittest.TestCase):
                          ["5-hour", "weekly", "1-day", "2-day", "45-minute", "limit", "limit"])
         self.assertEqual(words.share({"used_percent": 99.6}), 99)
         self.assertEqual(words.share({"used_percent": 130}), 100)
+        # v0.6.24 final: and what is left of it - 0 only when used up, never below 0 nor above 100.
+        self.assertEqual([words.left({"used_percent": used}) for used in (0, 0.4, 37.5, 99.6, 100, 130, None)],
+                         [100, 100, 63, 1, 0, 0, 100])
 
     def test_the_popup_says_the_reading_with_its_age(self):
         reading = {"read_at": NOW - 120, "windows": [dict(FIVE_HOURS, reset_at=None), dict(WEEK, reset_at=None)]}
         self.assertEqual(words.usage_line(reading, english, NOW),
-                         "Codex usage, read 2m ago: 5-hour 100% · weekly 62%")
+                         "Codex usage, read 2m ago: 5-hour 0% left · weekly 38% left")
         self.assertIsNone(words.usage_line(None, english, NOW))
         status = {"watcher": {"usage": reading}}
         view = model.view_model([], status, l10n.catalog("en"), NOW)
-        self.assertEqual(view["usage_note"], "Codex usage, read 2m ago: 5-hour 100% · weekly 62%")
+        self.assertEqual(view["usage_note"], "Codex usage, read 2m ago: 5-hour 0% left · weekly 38% left")
         self.assertIsNone(model.view_model([], {"watcher": {"usage": None}}, l10n.catalog("en"), NOW)["usage_note"])
 
     def test_a_reset_later_today_is_its_time_and_any_other_its_day_and_time(self):

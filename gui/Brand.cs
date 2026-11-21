@@ -75,6 +75,10 @@ namespace CodexAutoResume
         internal const double DaySceneWidth = 190;
         internal const double DaySceneHeight = 66;
         internal const int DayMarkLeast = 24;
+        internal const double DaySpeckBand = 300;
+        internal const int DayWideGap = 8;
+        internal const int DayWideFade = 96;
+        internal const double DayGroundTint = 0.1;
         internal const double TransitionEaseX1 = 0.33;
         internal const double TransitionEaseY1 = 1;
         internal const double TransitionEaseX2 = 0.68;
@@ -386,8 +390,8 @@ namespace CodexAutoResume
             if (yearly == 906) { look = "birthday"; top = "#EE8468"; bottom = "#9E3A4B"; return true; }
             if (yearly == 1224) { look = "christmas"; top = "#2E8B5E"; bottom = "#0F4A36"; return true; }
             if (yearly == 1225) { look = "christmas"; top = "#2E8B5E"; bottom = "#0F4A36"; return true; }
-            if (whole == 20260217 || whole == 20270207 || whole == 20280127 || whole == 20290213 || whole == 20300203 || whole == 20310123 || whole == 20320211 || whole == 20330131 || whole == 20340219 || whole == 20350208 || whole == 20360128 || whole == 20370215 || whole == 20380204 || whole == 20390124 || whole == 20400212) { look = "seollal"; top = "#D2453E"; bottom = "#7A1F2B"; return true; }
-            if (whole == 20260925 || whole == 20270915 || whole == 20281003 || whole == 20290922 || whole == 20300912 || whole == 20311001 || whole == 20320919 || whole == 20330908 || whole == 20340927 || whole == 20350916 || whole == 20361004 || whole == 20370924 || whole == 20380913 || whole == 20391002 || whole == 20400921) { look = "chuseok"; top = "#2B2F77"; bottom = "#12143F"; return true; }
+            if (whole == 20260217 || whole == 20270207 || whole == 20280127 || whole == 20290213 || whole == 20300203 || whole == 20310123 || whole == 20320211 || whole == 20330131 || whole == 20340219 || whole == 20350208 || whole == 20360128 || whole == 20370215 || whole == 20380204 || whole == 20390124 || whole == 20400212 || whole == 20410201 || whole == 20420122 || whole == 20430210 || whole == 20440130 || whole == 20450217 || whole == 20460206 || whole == 20470126 || whole == 20480214 || whole == 20490202 || whole == 20500123 || whole == 20510211 || whole == 20520201 || whole == 20530219 || whole == 20540208 || whole == 20550128 || whole == 20560215 || whole == 20570204 || whole == 20580124 || whole == 20590212 || whole == 20600202 || whole == 20610122 || whole == 20620209 || whole == 20630129 || whole == 20640217 || whole == 20650205 || whole == 20660126 || whole == 20670214 || whole == 20680203 || whole == 20690123 || whole == 20700211 || whole == 20710131 || whole == 20720219 || whole == 20730207 || whole == 20740127 || whole == 20750215 || whole == 20760205 || whole == 20770124 || whole == 20780212 || whole == 20790202 || whole == 20800122 || whole == 20810209 || whole == 20820129 || whole == 20830217 || whole == 20840206 || whole == 20850126 || whole == 20860214 || whole == 20870203 || whole == 20880124 || whole == 20890211 || whole == 20900130 || whole == 20910218 || whole == 20920208 || whole == 20930127 || whole == 20940215 || whole == 20950205 || whole == 20960125 || whole == 20970212 || whole == 20980201 || whole == 20990121 || whole == 21000209) { look = "seollal"; top = "#D2453E"; bottom = "#7A1F2B"; return true; }
+            if (whole == 20260925 || whole == 20270915 || whole == 20281003 || whole == 20290922 || whole == 20300912 || whole == 20311001 || whole == 20320919 || whole == 20330908 || whole == 20340927 || whole == 20350916 || whole == 20361004 || whole == 20370924 || whole == 20380913 || whole == 20391002 || whole == 20400921 || whole == 20410910 || whole == 20420928 || whole == 20430917 || whole == 20441005 || whole == 20450925 || whole == 20460915 || whole == 20471004 || whole == 20480922 || whole == 20490911 || whole == 20500930 || whole == 20510919 || whole == 20520907 || whole == 20530926 || whole == 20540916 || whole == 20551005 || whole == 20560924 || whole == 20570913 || whole == 20581002 || whole == 20590921 || whole == 20600909 || whole == 20610928 || whole == 20620917 || whole == 20631006 || whole == 20640925 || whole == 20650915 || whole == 20661003 || whole == 20670923 || whole == 20680911 || whole == 20690929 || whole == 20700919 || whole == 20710908 || whole == 20720926 || whole == 20730916 || whole == 20741005 || whole == 20750924 || whole == 20760912 || whole == 20771001 || whole == 20780920 || whole == 20790910 || whole == 20800928 || whole == 20810917 || whole == 20821006 || whole == 20830926 || whole == 20840914 || whole == 20851003 || whole == 20860922 || whole == 20870911 || whole == 20880929 || whole == 20890919 || whole == 20900908 || whole == 20910927 || whole == 20920916 || whole == 20931005 || whole == 20940924 || whole == 20950913 || whole == 20961001 || whole == 20970920 || whole == 20980910 || whole == 20990929 || whole == 21000918) { look = "chuseok"; top = "#2B2F77"; bottom = "#12143F"; return true; }
             look = top = bottom = null;
             return false;
         }
@@ -432,6 +436,16 @@ namespace CodexAutoResume
             return "";
         }
 
+        internal static string DaySpecks(string look)
+        {
+            if (look == "birthday") return "poly;40.411 -4 44.137 -4 44.137 2.01 40.411 2.01;#F2A33A;0.9;fall;4.258 -3.116 320\npoly;43.177 -4 47.293 -4 47.293 2.639 43.177 2.639;#E8735A;0.9;fall;5.889 -4.179 320\npoly;106.811 -4 110.523 -4 110.523 1.987 106.811 1.987;#5BB8C4;0.9;fall;4.407 -0.914 320\npoly;33.346 -4 37.422 -4 37.422 2.575 33.346 2.575;#F6C945;0.9;fall;5.878 -0.191 320\npoly;83.852 -4 87.296 -4 87.296 1.555 83.852 1.555;#B98AD9;0.9;fall;7.064 -4.246 320\npoly;236.566 -4 240.349 -4 240.349 2.102 236.566 2.102;#F2A33A;0.9;fall;4.767 -0.811 320\npoly;249.734 -4 253.713 -4 253.713 2.418 249.734 2.418;#E8735A;0.9;fall;6.448 -1.675 320\npoly;118.538 -4 121.397 -4 121.397 0.612 118.538 0.612;#5BB8C4;0.9;fall;4.833 -3.845 320\npoly;77.483 -4 80.231 -4 80.231 0.433 77.483 0.433;#F6C945;0.9;fall;6.947 -0.025 320\npoly;29.623 -4 33.042 -4 33.042 1.514 29.623 1.514;#B98AD9;0.9;fall;6.788 -3.991 320\npoly;181.996 -4 184.916 -4 184.916 0.709 181.996 0.709;#F2A33A;0.9;fall;6.097 -1.359 320\npoly;140.643 -4 143.852 -4 143.852 1.176 140.643 1.176;#E8735A;0.9;fall;7.412 -6.608 320\npoly;288.592 -4 291.809 -4 291.809 1.189 288.592 1.189;#5BB8C4;0.9;fall;6.876 -0.692 320\npoly;72.174 -4 75.237 -4 75.237 0.94 72.174 0.94;#F6C945;0.9;fall;5.496 -2.765 320";
+            if (look == "new_year") return "poly;154.918 56.187 155.43 57.807 157.05 58.319 155.43 58.83 154.918 60.45 154.407 58.83 152.787 58.319 154.407 57.807;#FFE9A8;1;twinkle;3.407 0.431\npoly;262.481 24.642 263.096 26.591 265.045 27.206 263.096 27.822 262.481 29.77 261.866 27.822 259.917 27.206 261.866 26.591;#FFE9A8;1;twinkle;3.123 1.717\npoly;266.118 7.699 266.907 10.2 269.408 10.99 266.907 11.78 266.118 14.281 265.328 11.78 262.827 10.99 265.328 10.2;#FFE9A8;1;twinkle;2.659 0.578\npoly;218.881 26.596 219.317 27.975 220.695 28.41 219.317 28.846 218.881 30.224 218.446 28.846 217.067 28.41 218.446 27.975;#FFE9A8;1;twinkle;3.355 0.862\npoly;78.746 9.458 79.364 11.414 81.32 12.032 79.364 12.65 78.746 14.606 78.129 12.65 76.172 12.032 78.129 11.414;#FFE9A8;1;twinkle;3.4 0.809\npoly;290.69 34.573 291.157 36.052 292.636 36.519 291.157 36.986 290.69 38.466 290.222 36.986 288.743 36.519 290.222 36.052;#FFE9A8;1;twinkle;2.278 1.071\npoly;268.898 8.115 269.519 10.083 271.487 10.704 269.519 11.325 268.898 13.293 268.277 11.325 266.309 10.704 268.277 10.083;#FFE9A8;1;twinkle;3.066 1.176\npoly;82.335 12.516 82.82 14.051 84.355 14.536 82.82 15.02 82.335 16.555 81.851 15.02 80.316 14.536 81.851 14.051;#FFE9A8;1;twinkle;3.984 1.213\npoly;228.437 36.835 229.189 39.216 231.57 39.968 229.189 40.719 228.437 43.1 227.685 40.719 225.304 39.968 227.685 39.216;#FFE9A8;1;twinkle;3.899 1.966\npoly;25.097 46.313 25.837 48.657 28.181 49.397 25.837 50.137 25.097 52.481 24.357 50.137 22.013 49.397 24.357 48.657;#FFE9A8;1;twinkle;2.255 0.708\npoly;103.345 33.489 104.035 35.674 106.22 36.364 104.035 37.054 103.345 39.24 102.655 37.054 100.469 36.364 102.655 35.674;#FFE9A8;1;twinkle;3.221 0.706\npoly;89.976 15.809 90.704 18.116 93.011 18.844 90.704 19.572 89.976 21.879 89.247 19.572 86.941 18.844 89.247 18.116;#FFE9A8;1;twinkle;3.516 1.288";
+            if (look == "christmas") return "circle;106.757 -4 1.17;#FFFFFF;0.9;fall;6.257 -4.337 0\ncircle;142.93 -4 1.704;#FFFFFF;0.9;fall;7.486 -2.112 0\ncircle;156.923 -4 1.577;#FFFFFF;0.9;fall;5.449 -4.627 0\ncircle;142.484 -4 0.839;#FFFFFF;0.9;fall;8.354 -0.936 0\ncircle;202.774 -4 1.749;#FFFFFF;0.9;fall;5.272 -0.268 0\ncircle;205.158 -4 1.721;#FFFFFF;0.9;fall;5.348 -1.445 0\ncircle;236.132 -4 0.956;#FFFFFF;0.9;fall;7.896 -2.991 0\ncircle;204.775 -4 1.229;#FFFFFF;0.9;fall;7.783 -1.316 0\ncircle;9.11 -4 1.799;#FFFFFF;0.9;fall;6.45 -5.646 0\ncircle;73.72 -4 0.913;#FFFFFF;0.9;fall;8.96 -2.64 0\ncircle;169.034 -4 0.865;#FFFFFF;0.9;fall;5.449 -0.266 0\ncircle;116.615 -4 1.089;#FFFFFF;0.9;fall;5.339 -4.123 0\ncircle;290.865 -4 1.251;#FFFFFF;0.9;fall;6.714 -3.374 0\ncircle;265.489 -4 0.8;#FFFFFF;0.9;fall;5.208 -0.307 0\ncircle;231.118 -4 0.968;#FFFFFF;0.9;fall;8.795 -6.054 0\ncircle;28.45 -4 1.658;#FFFFFF;0.9;fall;6.856 -5.204 0\ncircle;131.288 -4 1.219;#FFFFFF;0.9;fall;7.889 -6.2 0\ncircle;7.859 -4 1.556;#FFFFFF;0.9;fall;6.247 -3.535 0";
+            if (look == "seollal") return "round;0 0 300 3.4 0;#D9463E;1;;\nround;0 3.4 300 3.4 0;#F2C230;1;;\nround;0 6.8 300 3.4 0;#3FA86B;1;;\nround;0 10.2 300 3.4 0;#3B6FC9;1;;\nround;0 13.6 300 3.4 0;#E88BB0;1;;\ncircle;180.077 -4 2.297;#F2C230;0.9;fall;6.331 -6.142 0\ncircle;158.426 -4 1.977;#E25B4F;0.9;fall;7.434 -4.711 0\ncircle;114.212 -4 2.221;#F2C230;0.9;fall;9.879 -8.105 0\ncircle;5.793 -4 2.141;#E25B4F;0.9;fall;8.536 -5.029 0\ncircle;217.613 -4 1.9;#F2C230;0.9;fall;7.622 -3.59 0\ncircle;259.138 -4 1.935;#E25B4F;0.9;fall;9.057 -2.938 0\ncircle;198.444 -4 2.018;#F2C230;0.9;fall;6.226 -0.51 0\ncircle;258.828 -4 2.365;#E25B4F;0.9;fall;7.511 -1.289 0\ncircle;284.816 -4 2.269;#F2C230;0.9;fall;7.974 -7.118 0\ncircle;53.948 -4 2.073;#E25B4F;0.9;fall;9.557 -5.051 0";
+            if (look == "chuseok") return "poly;152.382 55.726 152.913 57.409 154.596 57.941 152.913 58.472 152.382 60.155 151.85 58.472 150.167 57.941 151.85 57.409;#FFF4D0;1;twinkle;2.113 1.904\npoly;220.328 9.618 220.828 11.201 222.411 11.701 220.828 12.201 220.328 13.785 219.828 12.201 218.245 11.701 219.828 11.201;#FFF4D0;1;twinkle;3.534 1.518\npoly;84.058 31.389 84.395 32.453 85.459 32.789 84.395 33.125 84.058 34.19 83.722 33.125 82.658 32.789 83.722 32.453;#FFF4D0;1;twinkle;3.956 0.443\npoly;103.686 25.755 104.274 27.617 106.136 28.205 104.274 28.793 103.686 30.655 103.098 28.793 101.236 28.205 103.098 27.617;#FFF4D0;1;twinkle;2.506 1.744\npoly;35.908 55.96 36.437 57.634 38.111 58.162 36.437 58.691 35.908 60.365 35.38 58.691 33.706 58.162 35.38 57.634;#FFF4D0;1;twinkle;2.569 1.045\npoly;181.207 8.677 181.655 10.098 183.076 10.547 181.655 10.995 181.207 12.416 180.758 10.995 179.337 10.547 180.758 10.098;#FFF4D0;1;twinkle;3.092 1.342\npoly;250.459 43.265 250.866 44.554 252.156 44.961 250.866 45.369 250.459 46.658 250.052 45.369 248.763 44.961 250.052 44.554;#FFF4D0;1;twinkle;3.879 0.565\npoly;253.125 42.796 253.648 44.453 255.306 44.976 253.648 45.5 253.125 47.157 252.601 45.5 250.944 44.976 252.601 44.453;#FFF4D0;1;twinkle;3.533 1.459\npoly;60.289 51.712 60.829 53.421 62.538 53.961 60.829 54.501 60.289 56.21 59.75 54.501 58.04 53.961 59.75 53.421;#FFF4D0;1;twinkle;2.289 1.904\npoly;184.837 8.868 185.487 10.925 187.544 11.574 185.487 12.224 184.837 14.281 184.188 12.224 182.13 11.574 184.188 10.925;#FFF4D0;1;twinkle;3.462 1.172";
+            return "";
+        }
+
         internal static string DayMark(string look)
         {
             if (look == "birthday") return "poly;22.362 2.858 25.443 4.295 22.907 9.733 19.826 8.296;#FFD76A;1;;\ncircle;27 9.5 1.7;#FFFFFF;1;;\npoly;23.884 3.335 26.482 1.835 28.982 6.165 26.384 7.665;#FFB3C0;1;;";
@@ -440,6 +454,80 @@ namespace CodexAutoResume
             if (look == "seollal") return "poly;2 23.5 30 23.5 30 25 2 25;#F2C230;1;;\npoly;2 25 30 25 30 26.5 2 26.5;#3FA86B;1;;\npoly;2 26.5 30 26.5 30 28 2 28;#3B6FC9;1;;\npoly;2 28 30 28 30 29.5 2 29.5;#E88BB0;1;;";
             if (look == "chuseok") return "circle;25.5 6.5 4;#F6E7B4;1;;\ncircle;24.2 5.6 0.8;#E2CF96;1;;";
             return "";
+        }
+
+        /// brand.days.DAY_RINGS: the hint's ring round the version's pill on a special day.
+        internal static Color DayRing(string look)
+        {
+            if (look == "new_year") return Color.FromArgb(0xF2, 0xC2, 0x30);
+            if (look == "seollal") return Color.FromArgb(0xD2, 0x45, 0x3E);
+            if (look == "birthday") return Color.FromArgb(0xEE, 0x84, 0x68);
+            if (look == "chuseok") return Color.FromArgb(0xE0, 0xB4, 0x4C);
+            if (look == "christmas") return Color.FromArgb(0x2E, 0x8B, 0x5E);
+            return Color.Empty;
+        }
+
+        /// brand.days.DAY_EGG_COLOURS: a part of a special day's own egg, by its name.
+        internal static Color DayEggColour(string look, string part)
+        {
+            if (look == "new_year")
+            {
+                if (part == "trail") return Color.FromArgb(0xFF, 0xE9, 0xA8);
+                if (part == "spark0") return Color.FromArgb(0xFF, 0xD7, 0x6A);
+                if (part == "spark1") return Color.FromArgb(0xE8, 0x73, 0x5A);
+                if (part == "spark2") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "spark3") return Color.FromArgb(0xB9, 0x8A, 0xD9);
+                if (part == "star") return Color.FromArgb(0xFF, 0xE9, 0xA8);
+            }
+            if (look == "seollal")
+            {
+                if (part == "pouch") return Color.FromArgb(0xC9, 0x3B, 0x3B);
+                if (part == "mouth") return Color.FromArgb(0xE2, 0x5B, 0x4F);
+                if (part == "band") return Color.FromArgb(0xF2, 0xC2, 0x30);
+                if (part == "knot") return Color.FromArgb(0xF6, 0xD7, 0x6B);
+                if (part == "coin") return Color.FromArgb(0xE2, 0xB1, 0x3C);
+                if (part == "stripe0") return Color.FromArgb(0xD9, 0x46, 0x3E);
+                if (part == "stripe1") return Color.FromArgb(0xF2, 0xC2, 0x30);
+                if (part == "stripe2") return Color.FromArgb(0x3F, 0xA8, 0x6B);
+                if (part == "stripe3") return Color.FromArgb(0x3B, 0x6F, 0xC9);
+                if (part == "stripe4") return Color.FromArgb(0xE8, 0x8B, 0xB0);
+            }
+            if (look == "birthday")
+            {
+                if (part == "cake") return Color.FromArgb(0xFF, 0xF6, 0xEE);
+                if (part == "edge") return Color.FromArgb(0xE9, 0xB8, 0xA8);
+                if (part == "frosting") return Color.FromArgb(0xF4, 0xA7, 0xB5);
+                if (part == "candle") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "flame") return Color.FromArgb(0xF6, 0xB7, 0x3C);
+                if (part == "smoke") return Color.FromArgb(0xAE, 0xB4, 0xBE);
+                if (part == "confetti0") return Color.FromArgb(0xF2, 0xA3, 0x3A);
+                if (part == "confetti1") return Color.FromArgb(0xE8, 0x73, 0x5A);
+                if (part == "confetti2") return Color.FromArgb(0x5B, 0xB8, 0xC4);
+                if (part == "confetti3") return Color.FromArgb(0xF6, 0xC9, 0x45);
+                if (part == "confetti4") return Color.FromArgb(0xB9, 0x8A, 0xD9);
+            }
+            if (look == "chuseok")
+            {
+                if (part == "moon") return Color.FromArgb(0xF6, 0xE7, 0xB4);
+                if (part == "glow") return Color.FromArgb(0xFF, 0xEB, 0xB8);
+                if (part == "rabbit") return Color.FromArgb(0xD2, 0xBC, 0x82);
+                if (part == "cake0") return Color.FromArgb(0xF4, 0xF0, 0xE4);
+                if (part == "cake1") return Color.FromArgb(0xF2, 0xB8, 0xC6);
+                if (part == "cake2") return Color.FromArgb(0xA8, 0xD0, 0x8D);
+                if (part == "cake3") return Color.FromArgb(0xE6, 0xD3, 0x9B);
+            }
+            if (look == "christmas")
+            {
+                if (part == "snow") return Color.FromArgb(0xFF, 0xFF, 0xFF);
+                if (part == "snowEdge") return Color.FromArgb(0xC9, 0xD4, 0xE0);
+                if (part == "tree") return Color.FromArgb(0x2B, 0x86, 0x60);
+                if (part == "trunk") return Color.FromArgb(0x7A, 0x4B, 0x2A);
+                if (part == "red") return Color.FromArgb(0xD9, 0x46, 0x3E);
+                if (part == "green") return Color.FromArgb(0x3F, 0xA8, 0x6B);
+                if (part == "star") return Color.FromArgb(0xFF, 0xD7, 0x6A);
+                if (part == "pile") return Color.FromArgb(0xF4, 0xF8, 0xFB);
+            }
+            return Color.Empty;
         }
 
         /// The check box's fill (brand.CHECKBOX): the well unchecked, the accent checked, the surface
@@ -510,6 +598,9 @@ namespace CodexAutoResume
             }
             return false;
         }
+
+        /// brand.tokens.EDITION_INK: the advanced edition's ink on the version's pill (the owner, 2026-11-18).
+        internal static Color EditionInk() { return Color.FromArgb(0x3F, 0x68, 0xB0); }
 
         /// Whether the check box draws the inset elevation inside its border, in either theme.
         /// Never in High Contrast.
@@ -744,6 +835,9 @@ namespace CodexAutoResume
                 }
                 return false;
             }
+
+            /// brand.tokens.EDITION_INK: the advanced edition's ink on the version's pill (the owner, 2026-11-18).
+            internal static Color EditionInk() { return Color.FromArgb(0x9A, 0xB8, 0xEE); }
         }
 
         /// Classic's colours (brand.palette(theme, "classic")), under the names Brand gives Soft's: its card's ground

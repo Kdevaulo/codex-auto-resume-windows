@@ -3422,6 +3422,7 @@ def _profile_read(backend, paths, home):
 
     def main():
         try:
+            pairing.forget_inventory()                  # v0.6.24 final: afresh - the app may have just restarted
             rows = pairing.inventory()
             return pairing._app_main(rows)["pid"] if pairing.app_running(rows) else None
         except Exception:

@@ -65,6 +65,11 @@ def tip_light(snapshot, now=None) -> str:
     return popup.snapshot_activity(snapshot, time.time() if now is None else now)
 
 
+def tip_day(look, contrast, design):
+    """The day the card shows: `look`, but never in High Contrast nor in Classic - as the popup's header (hidden.py)."""
+    return look if look and not contrast and design != "classic" else None
+
+
 def tip_place(plan, work, monitor, box) -> tuple:
     """Where the window goes, (x, y): the popup's placement for the card's size - beside `box` (tip_anchor), on the
     taskbar's side of the monitor, TIP_GAP from the taskbar and the icon, inside the work area. Physical pixels,
@@ -126,14 +131,98 @@ def tip_screen(icon=None, point=None) -> dict:
 
 
 # ------------------------------------------------------------------------------ the picture
+# What the header is aligned by (v0.6.24 final): a font's ascent, and the height of its "x" over the baseline - the top
+# of the letter's ink as GDI draws it (GetGlyphOutlineW's GGO_METRICS), which no line box says.
+class _TEXTMETRICW(C.Structure):
+    _fields_ = ([(name, C.c_long) for name in ("tmHeight", "tmAscent", "tmDescent", "tmInternalLeading",
+                                               "tmExternalLeading", "tmAveCharWidth", "tmMaxCharWidth", "tmWeight",
+                                               "tmOverhang", "tmDigitizedAspectX", "tmDigitizedAspectY")]
+                + [(name, C.c_wchar) for name in ("tmFirstChar", "tmLastChar", "tmDefaultChar", "tmBreakChar")]
+                + [(name, C.c_ubyte) for name in ("tmItalic", "tmUnderlined", "tmStruckOut", "tmPitchAndFamily",
+                                                  "tmCharSet")])
+
+
+class _GLYPHMETRICS(C.Structure):
+    _fields_ = [("gmBlackBoxX", C.c_uint), ("gmBlackBoxY", C.c_uint), ("gmptGlyphOrigin", W.POINT),
+                ("gmCellIncX", C.c_short), ("gmCellIncY", C.c_short)]
+
+
+class _FIXED(C.Structure):
+    _fields_ = [("fract", C.c_ushort), ("value", C.c_short)]
+
+
+class _MAT2(C.Structure):
+    _fields_ = [("eM11", _FIXED), ("eM12", _FIXED), ("eM21", _FIXED), ("eM22", _FIXED)]
+
+
+_GGO_METRICS, _GDI_ERROR = 0, 0xFFFFFFFF
+
+
+def _metric_calls():
+    gdi32 = popup._dll("gdi32")
+    gdi32.GetTextMetricsW.restype, gdi32.GetTextMetricsW.argtypes = W.BOOL, [W.HANDLE, C.POINTER(_TEXTMETRICW)]
+    gdi32.GetGlyphOutlineW.restype = W.DWORD
+    gdi32.GetGlyphOutlineW.argtypes = [W.HANDLE, C.c_uint, C.c_uint, C.POINTER(_GLYPHMETRICS), W.DWORD, C.c_void_p,
+                                       C.POINTER(_MAT2)]
+    return gdi32
+
+
 class TipRenderer(popup.Renderer):
     """The popup's renderer, drawing the card: its ground and hairline over nothing, its chip, bars, words and light."""
 
-    def tip_layout(self, parts, light, scale, locale):
-        """The card's plan in `locale` at `scale`: mirrored, as the popup's is, when the language is written right to left."""
+    def tip_layout(self, parts, light, scale, locale, day=None):
+        """The card's plan in `locale` at `scale`, on `day`'s look or none: mirrored, as the popup's is, when the language is
+        written right to left."""
         self.use(locale, scale)
-        laid = tip_layout(parts, light, scale, self.measure)
-        return popup.mirror(laid) if l10n.right_to_left(locale) else laid
+        mirrored = l10n.right_to_left(locale)
+
+        def ink(role, text):
+            # Read from the light: right to left the light is at the name's last letter, and the chip at its first.
+            first, last = self.ink(role, text)
+            return (last, first) if mirrored else (first, last)
+
+        laid = tip_layout(parts, light, scale, self.measure, self.metrics, day, ink)
+        return popup.mirror(laid) if mirrored else laid
+
+    def metrics(self, role):
+        """(ascent, x-height) of a popup font role in device pixels, as GDI draws it: the line's top to its baseline, and
+        the baseline to the top of an "x" (tipplan aligns the header by them). Where a font gives no outline for "x",
+        half its ascent."""
+        gdi32, dc = _metric_calls(), self.canvas.dc
+        previous = gdi32.SelectObject(dc, self.fonts.handles[role])
+        try:
+            found = _TEXTMETRICW()
+            if not gdi32.GetTextMetricsW(dc, C.byref(found)):
+                raise OSError("GetTextMetricsW")
+            glyph, identity = _GLYPHMETRICS(), _MAT2()
+            identity.eM11.value = identity.eM22.value = 1
+            answer = gdi32.GetGlyphOutlineW(dc, ord("x"), _GGO_METRICS, C.byref(glyph), 0, None, C.byref(identity))
+            x_height = glyph.gmptGlyphOrigin.y if answer != _GDI_ERROR and glyph.gmptGlyphOrigin.y > 0 else found.tmAscent / 2.0
+            return float(found.tmAscent), float(x_height)
+        finally:
+            gdi32.SelectObject(dc, previous)
+
+    def ink(self, role, text):
+        """(first, last): how far inside its box a text's ink starts and ends in a popup font role, in device pixels, as GDI
+        draws it - its first letter's left side bearing and its last letter's right one (GetGlyphOutlineW's GGO_METRICS).
+        tipplan spaces the header's name by them, so the gaps either side of it read equal in any font. Where a letter gives
+        no outline (a space, a font without it), 0 at that end."""
+        gdi32, dc = _metric_calls(), self.canvas.dc
+        previous = gdi32.SelectObject(dc, self.fonts.handles[role])
+        try:
+            def bearings(letter):
+                glyph, identity = _GLYPHMETRICS(), _MAT2()
+                identity.eM11.value = identity.eM22.value = 1
+                if not letter or gdi32.GetGlyphOutlineW(dc, ord(letter), _GGO_METRICS, C.byref(glyph), 0, None,
+                                                        C.byref(identity)) == _GDI_ERROR or not glyph.gmBlackBoxX:
+                    return 0, 0
+                left = glyph.gmptGlyphOrigin.x
+                return left, glyph.gmCellIncX - left - glyph.gmBlackBoxX
+
+            text = (text or "").strip()
+            return (bearings(text[:1])[0], bearings(text[-1:])[1]) if text else (0, 0)
+        finally:
+            gdi32.SelectObject(dc, previous)
 
     def draw_tip(self, plan, frame=None):
         """The whole card into the canvas, premultiplied, its alpha kept: transparent but for the card. Returns the canvas."""
@@ -156,6 +245,9 @@ class TipRenderer(popup.Renderer):
             for item in plan["items"]:
                 if item["kind"] in ("chip", "meter"):
                     self._ground_item(paint, item, scale, None)
+            # A special day (W2): the day past the words, at its first instant - the card is up for moments, and only its
+            # light moves (it costs nothing a frame).
+            self._scene(paint, plan, 0.0)
         self._text(canvas.dc, plan, ())
         self._opaque_words(plan)
         self._keep_halo_band(plan)
@@ -194,13 +286,13 @@ class TipRenderer(popup.Renderer):
 
 
 def draw_offscreen(parts, light, *, scale=1.0, locale=l10n.DEFAULT, theme="light", design=brand.DEFAULT_DESIGN,
-                   contrast=False, frame=None) -> tuple:
+                   contrast=False, frame=None, day=None) -> tuple:
     """The card drawn with no window (O17): (plan, BGRA premultiplied pixels) for `parts` (words.tooltip_parts) and the
     light, at `scale`, in `locale`, the theme, the design and High Contrast or not - what a picture of it is made from."""
     renderer = TipRenderer()
     try:
         renderer.theme, renderer.design, renderer.contrast = theme, design, contrast
-        plan = renderer.tip_layout(parts, light, scale, locale)
+        plan = renderer.tip_layout(parts, light, scale, locale, tip_day(day, contrast, design))
         return plan, bytes(renderer.draw_tip(plan, frame).pixels())
     finally:
         renderer.close()
@@ -244,8 +336,10 @@ class TipCard:
     catalog it is said in - read again each second it is shown. `held()` says whether battery saver or a locked session
     holds what moves (the icon's own reading, as the popup is handed it)."""
 
-    def __init__(self, *, content, held=None, log=None):
+    def __init__(self, *, content, held=None, log=None, days=False):
         self.content, self.held = content, held
+        # Only the watcher's own icon looks at the date (the popup's `days`): nothing else may depend on it.
+        self.days = days
         self.log = log or (lambda *unused: None)
         self.hwnd = None
         self.visible = False
@@ -421,7 +515,8 @@ class TipCard:
         parts, snapshot, strings = self.content()
         light = tip_light(snapshot)
         locale = popup.locale_of(strings)
-        look = (self._theme, self._design, self.contrast, self._text_scale)
+        day = tip_day(brand.day_look_at(time.time()) if self.days else None, self.contrast, self._design)
+        look = (self._theme, self._design, self.contrast, self._text_scale, day)
         key = (repr(parts), light, locale, look)
         if not force and key == self._shown and self._plan is not None:
             return False
@@ -435,11 +530,11 @@ class TipCard:
         screen = self._screen
         scale = screen["dpi"] / 96.0
         work = screen["work"]
-        plan = self._renderer.tip_layout(parts, light, scale, locale)
+        plan = self._renderer.tip_layout(parts, light, scale, locale, day)
         fit = textsize.fitting(self._text_scale, plan["size"], (work[2] - work[0], work[3] - work[1]))
         if fit > 1.0:
             # Windows' text size draws the whole card that much larger, as it does the popup and the menu.
-            plan = self._renderer.tip_layout(parts, light, scale * fit, locale)
+            plan = self._renderer.tip_layout(parts, light, scale * fit, locale, day)
         self._plan, self._shown = plan, key
         self._origin = tip_place(plan, work, screen["monitor"], screen["box"])
         return True

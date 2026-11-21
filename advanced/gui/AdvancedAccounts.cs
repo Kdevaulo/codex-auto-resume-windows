@@ -19,8 +19,9 @@
 // Codex's settings unreadable (the reachability audit's R4: it said "outside a file" for every one of them).
 //
 // The usage meters (v0.6.22 final, the owner's mock of 2026-11-08): under each row two grooves, "5-hour" and "7-day", each
-// with the share used inside it and "<N>% · in <time>" after it - the bar in the accent, in the warning colour from 90 per
-// cent, the groove empty and "not read yet" where no reading was made (AdvancedMeter.cs); the account signed in says "in
+// with the share LEFT inside it and "<N>% left · in <time>" after it (v0.6.24 final) - the bar in the accent, in the warning
+// colour at 10 per cent left or less (90 used, as before), the groove empty and "not read yet" where no reading was made
+// (AdvancedMeter.cs); the account signed in says "in
 // use" in the accent, and a row whose last read broke says "could not be read" and keeps its last reading. Under the rows
 // one muted line: when the readings were made and the next switch candidate, or that none has room. Read usage, at the
 // card's top right while the capability stands, reads every saved account now - one at a time, in the background, the
@@ -157,12 +158,13 @@ namespace CodexAutoResume
             return string.Join(" · ", parts.ToArray());
         }
 
-        /// A meter's words: "<N>% · in <time>" until its reset, "<N>%" without one, "not read yet" without a reading.
+        /// A meter's words: "<N>% left · in <time>" until its reset, "<N>% left" without one, "not read yet" without a
+        /// reading - what is LEFT of the window (v0.6.24 final), as every surface says it.
         private string AccountsMeterWords(Dictionary<string, object> window)
         {
             if (window == null) return Word("page.accounts.not_read", "not read yet");
-            string percent = Word("page.accounts.percent", "{n}%", "n",
-                                  Math.Round(Number(window, "used")).ToString(CultureInfo.CurrentCulture));
+            string percent = Word("page.accounts.percent", "{n}% left", "n",
+                                  AccountMeter.LeftWords(Math.Max(0.0, Number(window, "used"))).ToString(CultureInfo.CurrentCulture));
             double resets = Number(window, "resets_at");
             if (resets <= Now()) return percent;
             return Word("page.accounts.meter", "{percent} · in {time}", "percent", percent)

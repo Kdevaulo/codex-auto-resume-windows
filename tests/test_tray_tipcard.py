@@ -89,12 +89,15 @@ class PartsTests(unittest.TestCase):
     def test_the_meter_rows_say_what_the_meter_line_says(self):
         rows = words.tooltip_parts(FIXTURES["metered"], EN, NOW, "advanced")["meter"]
         self.assertEqual([(row["label"], row["percent"]) for row in rows],
-                         [("5-hour", "87%"), ("weekly", "3%"), ("1-hour", "100%"), ("limit", "0%")])
-        for row, used in zip(rows, (0.876, 0.03, 1.0, 0.0)):
-            self.assertAlmostEqual(row["fraction"], used)
+                         [("5-hour", "13% left"), ("weekly", "97% left"), ("1-hour", "0% left"), ("limit", "100% left")])
+        # v0.6.24 final: each bar is as full as the window has LEFT, and little left is the warning.
+        for row, left, low in zip(rows, (0.124, 0.97, 0.0, 1.0), (False, False, True, False)):
+            self.assertAlmostEqual(row["fraction"], left)
+            self.assertIs(row["low"], low)
         self.assertEqual(" · ".join(row["text"] for row in rows), words.meter_line(FIXTURES["metered"], EN))
         # The share in each catalog's own words, the window's name taken out of its sentence.
-        for locale, expected in (("de", "87 %"), ("tr", "%87"), ("ar", "87%")):
+        for locale, expected in (("de", "13 % übrig"), ("tr", "%13 kaldı"), ("ar", "المتبقي 13%"),
+                                 ("ko", "13% 남음")):
             with self.subTest(locale):
                 strings = interface.STRINGS[locale]
                 percent = words.tooltip_parts(FIXTURES["metered"], strings, NOW)["meter"][0]["percent"]
@@ -127,19 +130,38 @@ class PlanTests(unittest.TestCase):
         self.assertEqual([item["text"] for item in texts(plan, "body") if item["colour"] == "accent"],
                          ["next check in 1:15"])
 
-    def test_meter_rows_only_with_a_meter_and_each_bar_as_full_as_used(self):
+    def test_meter_rows_only_with_a_meter_and_each_bar_as_full_as_left(self):
+        """v0.6.24 final (the owner, 2026-11-18): a bar is as full as its window has left - full is plenty left, and it
+        empties as the window is used - and the share beside it is what is left."""
         for name in FIXTURES:
             with self.subTest(name):
                 _, plan = plan_for(name, "advanced")
                 bars = [item for item in plan["items"] if item["kind"] == "meter"]
-                self.assertEqual([round(bar["fraction"], 6) for bar in bars], [0.876, 0.03, 1.0, 0.0] if name == "metered" else [])
+                self.assertEqual([round(bar["fraction"], 6) for bar in bars], [0.124, 0.97, 0.0, 1.0] if name == "metered" else [])
         _, plan = plan_for("metered", "advanced")
         bars = [item for item in plan["items"] if item["kind"] == "meter"]
         self.assertEqual({bar["rect"][3] - bar["rect"][1] for bar in bars}, {tipplan.TIP_BAR})
         self.assertEqual(len({(bar["rect"][0], bar["rect"][2]) for bar in bars}), 1, "the bars line up")
         shares = [item for item in texts(plan, "small") if item["align"] == "right"]
-        self.assertEqual([item["text"] for item in shares], ["87%", "3%", "100%", "0%"])
-        self.assertTrue(all(item["colour"] == "ink" for item in shares))
+        self.assertEqual([item["text"] for item in shares], ["13% left", "97% left", "0% left", "100% left"])
+        # Little left (words.LOW_LEFT or less) is the warning, the share and its bar alike; the rest in ink and the accent.
+        self.assertEqual([item["colour"] for item in shares], ["ink", "ink", "warning", "ink"])
+        self.assertEqual([bar["low"] for bar in bars], [False, False, True, False])
+
+    def test_the_warning_starts_where_little_is_left_the_used_90_mirrored(self):
+        def row(used):
+            snapshot = dict(FIXTURES["idle"], advanced={"meter": {"windows": [{"window_minutes": 300, "used_percent": used}]}})
+            return words.tooltip_parts(snapshot, EN, NOW, "advanced")["meter"][0]
+        self.assertEqual(words.LOW_LEFT, 10)
+        for used, low in ((0, False), (89.9, False), (90, True), (99.6, True), (100, True), (250, True)):
+            with self.subTest(used=used):
+                self.assertIs(row(used)["low"], low)
+        self.assertEqual([row(used)["percent"] for used in (0, 89.9, 90, 99.6, 100, 250)],
+                         ["100% left", "11% left", "10% left", "1% left", "0% left", "0% left"])
+        # Unknown usage is no row at all, as before.
+        for used in (None, "87", True):
+            snapshot = dict(FIXTURES["idle"], advanced={"meter": {"windows": [{"window_minutes": 300, "used_percent": used}]}})
+            self.assertEqual(words.tooltip_parts(snapshot, EN, NOW, "advanced")["meter"], [])
 
     def test_every_word_of_the_parts_is_on_the_card_in_order(self):
         for name in FIXTURES:
@@ -328,18 +350,19 @@ class DrawTests(unittest.TestCase):
                 colour, alpha = self.pixel(plan, pixels, halo["cx"], halo["cy"])
                 self.assertEqual((colour, alpha), (brand.rgb(brand.status_colour(light, "light")), 255))
 
-    def test_a_bar_is_the_accent_as_far_as_used_and_the_well_beyond(self):
+    def test_a_bar_is_the_accent_as_far_as_left_and_the_well_beyond(self):
+        """v0.6.24 final: 87.6% used leaves 12.4%, so the accent reaches past a twentieth of the bar and not a quarter."""
         for locale in ("en", "ar"):
             with self.subTest(locale):
                 plan, pixels = self.draw(locale=locale, scale=2.0)
-                bar = next(item for item in plan["items"] if item["kind"] == "meter")      # 87.6 % used
+                bar = next(item for item in plan["items"] if item["kind"] == "meter")      # 87.6 % used, 12.4 % left
                 left, top, right, bottom = bar["rect"]
                 middle = (top + bottom) // 2
-                used = right - (right - left) // 4 if locale == "ar" else left + (right - left) // 4
-                free = left + (right - left) // 20 if locale == "ar" else right - (right - left) // 20
+                kept = right - (right - left) // 20 if locale == "ar" else left + (right - left) // 20
+                gone = right - (right - left) // 4 if locale == "ar" else left + (right - left) // 4
                 tokens = brand.palette("light", "soft")
-                self.assertEqual(self.pixel(plan, pixels, used, middle)[0], brand.rgb(tokens["accent"]))
-                self.assertNotEqual(self.pixel(plan, pixels, free, middle)[0], brand.rgb(tokens["accent"]))
+                self.assertEqual(self.pixel(plan, pixels, kept, middle)[0], brand.rgb(tokens["accent"]))
+                self.assertNotEqual(self.pixel(plan, pixels, gone, middle)[0], brand.rgb(tokens["accent"]))
 
     def test_in_high_contrast_it_is_the_systems_colours(self):
         plan, pixels = self.draw(contrast=True)
@@ -399,6 +422,28 @@ class DrawTests(unittest.TestCase):
         at = (20 * 200 + 140) * 4
         self.assertEqual(tuple(most[at:at + 3][::-1]), accent)
         self.assertNotEqual(tuple(quarter[at:at + 3][::-1]), accent)
+
+    def test_little_left_is_the_warning_and_an_empty_bar_still_says_so(self):
+        """v0.6.24 final: a window with little left fills in the warning colour, not the accent, and its well takes a
+        warning edge - so a bar with nothing left in it does not read as nothing to worry about."""
+        renderer = popup.Renderer()
+        self.addCleanup(renderer.close)
+        renderer.use("en", 1.0)
+
+        def drawn(fraction, low):
+            plan = {"size": (200, 40), "scale": 1.0, "items": [
+                {"kind": "card", "rect": (0, 0, 200, 40), "radius": 16, "corner": "card"},
+                {"kind": "meter", "rect": (20, 17, 180, 23), "fraction": fraction, "low": low}], "targets": []}
+            return bytes(renderer.draw({}, plan).pixels())
+        warning = brand.rgb(brand.palette("light", "soft")["warning"])
+        at = (20 * 200 + 22) * 4                                  # inside the bar, near its start
+        self.assertEqual(tuple(drawn(0.08, True)[at:at + 3][::-1]), warning)
+        self.assertNotEqual(tuple(drawn(0.08, False)[at:at + 3][::-1]), warning)
+        empty, calm = drawn(0.0, True), drawn(0.0, False)
+        self.assertNotEqual(empty, calm, "an empty bar with nothing left looks unlike an empty calm one")
+        edge = (17 * 200 + 100) * 4                               # the well's top edge, mid-way
+        self.assertLess(sum(abs(a - b) for a, b in zip(empty[edge:edge + 3][::-1], warning)),
+                        sum(abs(a - b) for a, b in zip(calm[edge:edge + 3][::-1], warning)))
 
     def test_every_language_draws(self):
         for locale in interface.STRINGS:

@@ -1367,14 +1367,18 @@ for itself: subagents (Tell a parent which of its subagents stopped handles thos
 (`agent_created_thread`) - except a failed turn in one of those that the person started from the input box,
 which is theirs and is taken up in both editions, whatever this switch says (a turn Codex queued, a goal's
 turn, or one whose start Codex did not record is not). A conversation with a label Codex adds later is taken
-up too, instead of left alone. Archived conversations, those of another Codex home, and those of a terminal or VS Code are still
-never taken up.
+up too, instead of left alone. A conversation the Codex app records as its own is taken up whichever program its
+first line names - a fork of a `codex exec` run, or a program Codex adds later - except the VS Code extension's; the
+standard edition takes up only those a program it knows wrote: the app itself, a terminal's Codex that the app took
+over or forked, and a fork of a `codex exec` run. Archived conversations, those of another Codex home, and those of a
+terminal or VS Code are still never taken up, nor is a `codex exec` run of its own.
 
 **When it helps.** When a conversation of yours carries a label the standard edition does not know, so its
 failures are left alone.
 
 **What it risks.** A conversation Codex uses for itself under a new label could be continued, which may cost
-usage or add a message where none was wanted. Every recovery gate still applies: the conversation must be
+usage or add a message where none was wanted, and so could a conversation another program writes on the app's own
+record. Every recovery gate still applies: the conversation must be
 switched on and open in the app before anything is sent.
 
 **Departs from** [A15](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (only the desktop app's own user
@@ -1486,9 +1490,9 @@ paused, it reads what Codex added to its conversations' rollout files (under eac
 folder) since it last looked - only each model call's token counts (input, cached input, output and reasoning) and
 when each turn began, nothing else of any line - at most 2 MiB of a file and 8 MiB in one look, and adds them up by
 day for each project. While it is on, each reading of the usage meter is kept as well. Its cards on the Advanced
-features page show, for the five-hour and the weekly window, how full it is, the change over the last hour and -
-with three readings over fifteen minutes at least, and only when the window would fill before it resets - around
-when it would be full at that pace, beside the reset time. A flat list shows each project's input, cached input,
+features page show, for the five-hour and the weekly window, how much of it is left, the share of it used over the last
+hour and - with three readings over fifteen minutes at least, and only when the window would fill before it resets -
+around when none would be left at that pace, beside the reset time. A flat list shows each project's input, cached input,
 output, reasoning and turns over the last 7, 30 or 90 days (**Days shown**; 7 by default), a total line, and each
 project's conversations on demand; a project is named as Codex names it, else by its folder's name, read when the
 page is shown and never kept. **Save as CSV...** writes the numbers - day, project, the five counts, and lifetime
@@ -1703,7 +1707,8 @@ it is hidden because its measurement failed - and never turns the switch off.
 product never sees a password; **Save the account in use** keeps the one signed in now. Each is a copy of Codex's
 sign-in file, encrypted with Windows' data protection for your Windows user (`<home>\accounts\`), never in the
 settings, a log, the journal, diagnostics or a report; the card shows a masked address and the plan. Under each account
-it shows two meters, the 5-hour and the weekly usage as last read - by the switch itself, or by **Read usage** at the
+it shows two meters, the 5-hour and the weekly usage as last read - each a bar as full as what is left of that window
+and its share left beside it, both in the warning colour with 10% or less left - by the switch itself, or by **Read usage** at the
 card's top right, which reads every saved account but the one in use in a private folder, one at a time, at most once
 every 10 minutes, and sends nothing and switches nothing; the account in use shows the usage the watcher already read -
 and under the rows when they were read and the account the switch would pick next. When a recovery

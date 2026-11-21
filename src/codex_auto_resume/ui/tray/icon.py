@@ -366,7 +366,7 @@ class Tray(MenuMixin, StoredMixin, CardsMixin, ClicksMixin, AnimationMixin):
         try:
             if self._tip is None:
                 from .tipcard import TipCard
-                self._tip = TipCard(content=self._tip_content, held=self._popup_held, log=self.log)
+                self._tip = TipCard(content=self._tip_content, held=self._popup_held, log=self.log, days=self.days)
             from .. import popup as tray_popup
             self._tip.show(icon=lambda: tray_popup.icon_rect(self._hwnd, 1), point=point)
         except Exception as exc:

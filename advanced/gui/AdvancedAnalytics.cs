@@ -3,8 +3,9 @@
 // Codex Auto Resume - the usage and token analytics on the Advanced features page (v0.6.20).
 //
 // While usage_analytics is on or watched, its column has two cards under its limits. Pace: for each window the usage
-// meter reads (the five-hour and the weekly), how full it is, the change over the last hour and - with enough readings
-// and only before the window resets - around when it would be full at that pace, beside the reset; never a promise.
+// meter reads (the five-hour and the weekly), how much is left of it, the share used over the last hour and - with
+// enough readings and only before the window resets - around when none would be left at that pace, beside the reset;
+// never a promise (v0.6.24 final: what is left, where it said how full).
 // Tokens: a flat list, one line a project (Codex's project name, else its folder's name, resolved by the bridge now and
 // never stored), input, cached input, output, reasoning and turns over the days chosen (the capability's own choice,
 // 7, 30 or 90), a total line, and each project's conversations under it on demand. Where MTOK failed on the Codex in
@@ -70,6 +71,15 @@ namespace CodexAutoResume
             return ((long)Math.Round(value is double ? (double)value : 0)).ToString("N0", CultureInfo.CurrentCulture);
         }
 
+        /// v0.6.24 final (the owner, 2026-11-18): what is LEFT of a window for its share used - 100 minus it, to a tenth, 0 only
+        /// where it is used up (99.96 used leaves 0.1, not a "0" that says used up), and 0 above 100.
+        internal static double AnalyticsLeft(double used)
+        {
+            if (double.IsNaN(used)) return 100;
+            if (used >= 100) return 0;
+            return Math.Max(0.1, Math.Round(100 - Math.Max(0, used), 1));
+        }
+
         private static string AnalyticsShare(object value)
         {
             return (value is double ? (double)value : 0).ToString("0.#", CultureInfo.CurrentCulture);
@@ -87,11 +97,14 @@ namespace CodexAutoResume
                 var window = entry as Dictionary<string, object>;
                 if (window == null || !(Get(window, "used") is double)) continue;
                 windows++;
-                string line = Word("page.analytics.used", "{window}: {percent}% used", "window", WindowName(Get(window, "minutes")))
-                              .Replace("{percent}", AnalyticsShare(Get(window, "used")));
+                // v0.6.24 final: what is left of the window at a glance, and the share used in the last hour.
+                string line = Word("page.analytics.left", "{window}: {percent}% left", "window", WindowName(Get(window, "minutes")))
+                              .Replace("{percent}", AnalyticsShare(AnalyticsLeft((double)Get(window, "used"))));
                 if (Get(window, "change_hour") is double)
-                    line += " · " + Word("page.analytics.change", "{change} in the last hour", "change",
-                                         ((double)Get(window, "change_hour") >= 0 ? "+" : "") + AnalyticsShare(Get(window, "change_hour")));
+                    // The owner's refinement of 2026-11-18: the pace is history, so the hour's change is the share USED in it,
+                    // said with the word, beside the reading of what is left: "8% used in the last hour".
+                    line += " · " + Word("page.analytics.change", "{change}% used in the last hour", "change",
+                                         AnalyticsShare(Get(window, "change_hour")));
                 Label used = HelpText(line);
                 used.ForeColor = Ink;
                 used.Margin = Pad(0, 6, 0, 0);
@@ -99,7 +112,7 @@ namespace CodexAutoResume
                 double eta = Get(window, "eta") is double ? (double)Get(window, "eta") : 0;
                 double reset = Get(window, "reset_at") is double ? (double)Get(window, "reset_at") : 0;
                 string more = eta > 0
-                    ? Word("page.analytics.eta", "At this pace, full around {time}.", "time", ClockTime(eta))
+                    ? Word("page.analytics.eta", "At this pace, none left around {time}.", "time", ClockTime(eta))
                     : Word("page.analytics.not_enough", "Not enough readings yet for a pace.");
                 if (reset > 0) more += " " + Word("page.analytics.resets", "It resets at {time}.", "time", ClockTime(reset));
                 pace.Controls.Add(HelpText(more));

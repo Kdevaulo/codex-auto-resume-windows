@@ -22,6 +22,10 @@ installation. The first reopens itself (Reopen), which starts the probe again as
 machine's one clock (Stopwatch), its window was shown, came on (DWMWA_CLOAKED read every millisecond on a thread of its
 own) and went. The new window's thread is kept busy for 400 ms before its first paint, as a real one is with its first
 answers and a whole window to paint: the old one, closed once the new one was shown, went that long before it came on. GUI test module (it shows windows, off the screen): run on its own, through gui_lock.sh.
+
+v0.6.24-beta.3 (M-CORNER re-check 10, item 4): the old window stayed 1.2-2.6 s, taking no input and showing nothing. Now
+its header's light turns to the working light, as for an action (Hero, BusyLight), and the pointer over it is Windows'
+app-starting cursor (WndProc: WM_SETCURSOR, which Windows sends a window that takes no input as HTERROR).
 """
 from __future__ import annotations
 
@@ -98,6 +102,18 @@ namespace CodexAutoResume
         [DllImport("user32.dll", EntryPoint = "IsWindowEnabled")] private static extern bool HandEnabled(IntPtr h);
         [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")] private static extern int HandDwmGet(IntPtr h, int attribute, out int value, int size);
         [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")] private static extern int HandFineSleep(int ms);
+        [DllImport("user32.dll", EntryPoint = "SendMessageW")] private static extern IntPtr HandSend(IntPtr h, int message, IntPtr w, IntPtr l);
+        [DllImport("user32.dll", EntryPoint = "GetCursor")] private static extern IntPtr HandCursor();
+
+        // The cursor the window sets for a pointer moving over it as Windows asks a window that takes no input: WM_SETCURSOR
+        // with HTERROR (-2) and WM_MOUSEMOVE.
+        private static string HandPointer(SettingsForm form)
+        {
+            Cursor.Current = Cursors.Default;
+            HandSend(form.Handle, 0x0020, form.Handle, (IntPtr)((0x0200 << 16) | 0xFFFE));
+            IntPtr now = HandCursor();
+            return now == Cursors.AppStarting.Handle ? "app_starting" : now == Cursors.Default.Handle ? "arrow" : "other";
+        }
 
         // When the window was about to be shown: no read of it can find it shown before this.
         private static double handShowing = -1;
@@ -220,10 +236,15 @@ namespace CodexAutoResume
                     if (reopenAt < 0)
                     {
                         if (since.ElapsedMilliseconds < 1500) return;
+                        said["snapshot_read"] = form.snapshot != null;
+                        said["light_before"] = form.stateDot.State;
+                        said["pointer_before"] = HandPointer(form);
                         reopenAt = HandNow();
                         form.Reopen(false);
                         said["reopening"] = form.reopening;
                         said["enabled_while_reopening"] = HandEnabled(form.Handle);
+                        said["light_reopening"] = form.stateDot.State;
+                        said["pointer_reopening"] = HandPointer(form);
                         if (!form.reopening) goneAt = 0;
                     }
                     else if ((goneAt >= 0 && File.Exists(newOut)) || since.ElapsedMilliseconds > 30000)
@@ -303,6 +324,18 @@ class HandOverTests(unittest.TestCase):
                 self.assertTrue(said["reopening"])
                 self.assertFalse(said["enabled_while_reopening"], "never two Dashboards a person can click")
                 self.assertGreater(said["gone"], said["reopen"], "the old window closed once the new one came")
+
+    def test_the_old_window_says_it_is_at_work_while_it_waits(self):
+        # v0.6.24-beta.3 (M-CORNER re-check 10, item 4): the old window stayed 1.2-2.6 s, taking no input, showing nothing.
+        # Now the header's light is the working light, as for an action (BusyLight: a watcher not known to run, or one
+        # that needs a person, keeps its own), and the pointer over it is Windows' app-starting cursor.
+        for i, said in enumerate(self.runs):
+            with self.subTest(run=i):
+                self.assertTrue(said["snapshot_read"], "the window had read its first snapshot")
+                self.assertEqual(said["pointer_before"], "arrow")
+                self.assertEqual(said["pointer_reopening"], "app_starting")
+                working = said["light_before"] if said["light_before"] in ("idle", "attention") else "checking"
+                self.assertEqual(said["light_reopening"], working, "from %s" % said["light_before"])
 
     def test_the_old_window_goes_only_once_the_new_one_is_on_the_screen(self):
         # v0.6.24-beta.3: against what the reads know for certain. The new window came on between the start of the last

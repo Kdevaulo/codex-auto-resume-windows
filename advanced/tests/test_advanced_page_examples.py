@@ -150,7 +150,12 @@ class PageTests(PageCase):
                          [words["continue.empty_response"]])
         meter = self.parts(looks["usage_meter"], 1, "line")[0]["text"]
         self.assertTrue(meter.startswith(core["usage.line"].split("{")[0]), meter)
-        self.assertIn("88%", meter)
+        # The window's own Dashboard line, which says what is LEFT (v0.6.24 final, the owner's rule): the sample's 5-hour
+        # window at 88% used and the weekly at 41% read 12% and 59% left, in the line's own words.
+        five = core["usage.window_resets"].split("{time}")[0].replace("{window}", core["usage.hours"].replace("{n}", "5"))
+        self.assertIn(five.replace("{percent}", "12"), meter)
+        self.assertIn(core["usage.window"].replace("{window}", core["usage.weekly"]).replace("{percent}", "59"), meter)
+        self.assertNotIn("88%", meter, "never the share used")
         # Where nothing on screen differs, the statement's own field, as the page shows it.
         field = self.parts(looks["idle_update_check"], 0, "line")[0]["text"]
         self.assertEqual(field, statement.CATALOGS.text("statement.idle_update_check.instead", "en"))

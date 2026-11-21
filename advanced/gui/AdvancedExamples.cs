@@ -492,14 +492,14 @@ namespace CodexAutoResume
             return Word("page.chat.click", "A click on a notice opens") + ": " + Word(key, fallback);
         }
 
-        /// Usage and token analytics' pace, as its card says it: the 5-hour window `percent` used, `change` more in the last
-        /// hour, full around `minutes` from now.
+        /// Usage and token analytics' pace, as its card says it: the 5-hour window `percent` used, `change` more used in the
+        /// last hour, used up around `minutes` from now - said as what is left (v0.6.24 final), as the card says it.
         private string ExamplePace(int percent, int change, int minutes)
         {
-            return Word("page.analytics.used", "{window}: {percent}% used", "window", WindowName(300.0))
-                       .Replace("{percent}", Mirror.Embed(percent.ToString(CultureInfo.CurrentCulture))) + " · " +
-                   Word("page.analytics.change", "{change} in the last hour", "change", "+" + change.ToString(CultureInfo.CurrentCulture) + "%") +
-                   " · " + Word("page.analytics.eta", "At this pace, full around {time}.", "time", ClockTime(Now() + minutes * 60.0));
+            return Word("page.analytics.left", "{window}: {percent}% left", "window", WindowName(300.0))
+                       .Replace("{percent}", Mirror.Embed(AnalyticsShare(AnalyticsLeft(percent)))) + " · " +
+                   Word("page.analytics.change", "{change}% used in the last hour", "change", change.ToString(CultureInfo.CurrentCulture)) +
+                   " · " + Word("page.analytics.eta", "At this pace, none left around {time}.", "time", ClockTime(Now() + minutes * 60.0));
         }
 
         /// One project's tokens of the last days, as the analytics card counts them.

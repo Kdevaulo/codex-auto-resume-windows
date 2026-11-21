@@ -45,8 +45,11 @@ class ReadmePlanTests(unittest.TestCase):
                 self.assertTrue(25000 <= end <= 48000, end)
                 frames = motion_plan.expand(plan)
                 self.assertEqual(frames[0].t, 0)
-                self.assertEqual(state(frames[0]), {"page": "overview", "locale": plan["locale"]},
-                                 "frame 1 is the Overview at rest: the still a browser without APNG shows")
+                # v0.6.24: frame 1 is the Overview as the window opens, its light's sweep at its start
+                # (test_motion_readme_sweep); nothing else of it is other than at rest.
+                self.assertEqual(state(frames[0]), {"page": "overview", "locale": plan["locale"],
+                                                    "sweep": {"why": "open", "from": 0}},
+                                 "frame 1 is the Overview opening: the still a browser without APNG shows")
                 self.assertEqual(frames[0].card, ())
 
     def test_each_readme_ends_in_the_other_language_on_the_overview(self):
@@ -80,9 +83,10 @@ class ReadmePlanTests(unittest.TestCase):
 
     def test_the_readme_pictures_are_exactly_the_bare_window(self):
         """The owner, 2026-10-19: the caption stood too far from the picture, first for an empty margin round the
-        window, then for its drop shadow, which a dark page does not show. The canvas is the window itself, 1500x882
-        like the still window pictures (1021 in v0.6.24-beta, 1041 until v0.6.24 took Windows' title bar away), with
-        no shadow, and the pointer rests on it."""
+        window, then for its drop shadow, which a dark page does not show. The canvas is the window itself, 1500x927
+        like the still window pictures (1000 by 618 at the pinned 150 %, the owner's decision of 2026-11-18; 882 in
+        v0.6.24-beta.2, 1021 in v0.6.24-beta, 1041 until v0.6.24 took Windows' title bar away), with no shadow, and
+        the pointer rests on it."""
         import make_screenshots as shots
         still = shots.read_png(ROOT / "assets" / "screenshot-dashboard.png")
         for name in make_motion.PLAN_NAMES:
@@ -111,9 +115,9 @@ class CardPlanTests(unittest.TestCase):
                 plan = motion_plan.load(make_motion.plan_path(name))
                 self.assertEqual(plan["output"], output)
                 self.assertNotIn("window", plan)
-                self.assertNotIn("taskbar", plan)
+                self.assertIn("taskbar", plan, "the card stands on the right end of a taskbar (tests/test_motion_card_strip.py)")
                 self.assertEqual((plan["canvas"]["size"], plan["card"]["scale"]),
-                                 ([776, {"card-en": 540, "card-ko": 524}[name]], 2.0))
+                                 ([776, {"card-en": 608, "card-ko": 592}[name]], 2.0))
                 self.assertLessEqual(plan["budget"]["cap"], 4000000)
                 frames = motion_plan.expand(plan)
                 from codex_auto_resume import notice_card
@@ -125,7 +129,7 @@ class CardPlanTests(unittest.TestCase):
                 gone = cards.index(None)
                 self.assertTrue(any(card and card["born"] > 0 for card in cards[gone:]), "and comes again")
                 self.assertIsNotNone(cards[-1], "it ends at rest, where it loops back to")
-                self.assertEqual(make_motion.icon_moments(plan, motion_plan.plan_end(plan)), [])
+                self.assertTrue(make_motion.icon_moments(plan, motion_plan.plan_end(plan)), "the icon on the strip moves")
 
     def test_what_the_card_picture_is_made_from_is_the_card_not_the_window(self):
         import make_screenshots as shots

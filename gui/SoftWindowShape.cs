@@ -25,6 +25,11 @@
 // whenever the switch is off: Brand.WindowSquircle, on from v0.6.24-beta at the owner's word (M-CORNER still runs on real
 // screens before the final). With it
 // off, nothing here is made at all (ChromeHost.OwnCorner) and the window is exactly what it was.
+//
+// v0.6.24 final (the owner, 2026-11-20): the windows that ask are the Dashboard, the setup window and every dialog the
+// Dashboard opens (SoftDialog, as its title row is made) - the card's corner, as the Dashboard's, under the same switch and
+// the same exceptions. A dialog holds itself off the screen and fades itself in (SoftDialog): its corner leaves the cloak
+// to it (HostCloaks), holds the companion off while it is held (Held) and fades the companion with it (Opacity).
 
 using System;
 using System.Collections.Generic;
@@ -437,6 +442,39 @@ namespace CodexAutoResume
                 }
         }
 
+        /// v0.6.24 final (the owner, 2026-11-20: the README motion drew the Timeline as a sharp-cornered rectangle): a window
+        /// with its own corner - a dialog - laid over `picture` as the screen composes it over what is behind it: its own
+        /// pixels (Edge.Own: inside its region) from `body`, everything else what was there, and over both the companion's
+        /// picture (Edge.Pixel: the hairline, the anti-aliased edge and the shadow, premultiplied) - so a picture of a
+        /// dialog and the dialog on the screen agree, pixel for pixel. `picture` is `width` by `height`, opaque ARGB, changed
+        /// in place; `body` is the window's client area, `edge.Width` by `edge.Height`, its top left at `place`. A window too
+        /// small for its corner (Edge.Fits) is laid square, as the screen has it.
+        internal static void Lay(int[] picture, int width, int height, int[] body, Point place, Edge edge, Color ground,
+                                 Color line, Color shade)
+        {
+            int m = edge.Fits ? edge.Margin : 0;
+            int left = Math.Max(0, place.X - m), top = Math.Max(0, place.Y - m);
+            int right = Math.Min(width, place.X + edge.Width + m), bottom = Math.Min(height, place.Y + edge.Height + m);
+            for (int py = top; py < bottom; py++)
+                for (int px = left; px < right; px++)
+                {
+                    int x = px - place.X, y = py - place.Y, at = py * width + px;
+                    bool inside = x >= 0 && y >= 0 && x < edge.Width && y < edge.Height;
+                    if (!edge.Fits)
+                    {
+                        if (inside) picture[at] = unchecked((int)0xFF000000) | (body[y * edge.Width + x] & 0xFFFFFF);
+                        continue;
+                    }
+                    int under = edge.Own(x, y) ? body[y * edge.Width + x] : picture[at];
+                    int over = edge.Pixel(x, y, ground, line, shade);
+                    int keep = 255 - ((over >> 24) & 255);
+                    int red = Math.Min(255, ((over >> 16) & 255) + ((((under >> 16) & 255) * keep + 127) / 255));
+                    int green = Math.Min(255, ((over >> 8) & 255) + ((((under >> 8) & 255) * keep + 127) / 255));
+                    int blue = Math.Min(255, (over & 255) + (((under & 255) * keep + 127) / 255));
+                    picture[at] = unchecked((int)(0xFF000000u | (uint)red << 16 | (uint)green << 8 | (uint)blue));
+                }
+        }
+
         // ------------------------------------------------------------------ the companion's picture
 
         /// Where the companion's picture goes, row by row: an array (the tests) or the memory of a DIB section (the window).
@@ -640,6 +678,10 @@ namespace CodexAutoResume
         private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
         [DllImport("dwmapi.dll")]
         private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
+        [DllImport("gdi32.dll")]
+        private static extern bool GdiFlush();
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmFlush();
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr GetModuleHandle(string name);
         [DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
@@ -659,7 +701,9 @@ namespace CodexAutoResume
         private readonly Form form;
         private CornerLayer layer;
         private WindowShape.Corner now;
-        private bool busy, again, preferred, failed, cloaked, revealing;
+        private bool busy, again, preferred, failed, cloaked, revealing, held;
+        // v0.6.24 final: the companion's alpha, 0 to 255 - a dialog's own opening fade takes its companion with it (Opacity).
+        private byte opacity = 255;
         private Size shapedSize;
         private int span;
         private int shapedDpi;
@@ -701,6 +745,54 @@ namespace CodexAutoResume
 
         /// The corner the window has now.
         internal WindowShape.Corner Now { get { return now; } }
+
+        /// v0.6.24 final (the owner, 2026-11-20: the Dashboard's dialogs had Windows' corner): the window holds itself off the
+        /// screen until it has painted (SoftDialog: its own cloak, then its own fade), so this corner does not cloak it
+        /// (Cloak) - two cloaks of one window, and the first paint taken by this one, left the dialog's own uncloak to its
+        /// half-second fallback. Set before the window is made.
+        internal bool HostCloaks;
+
+        /// v0.6.24 final: while the window that hosts the cloak holds itself off the screen (HostCloaks), its companion is
+        /// held off with it - never a shadow and an edge round a window not yet seen. Let go, the companion comes on at once,
+        /// at the alpha the window's fade has reached (Opacity).
+        internal bool Held
+        {
+            get { return held; }
+            set
+            {
+                if (held == value) return;
+                held = value;
+                Sync();
+            }
+        }
+
+        /// The companion's alpha now, 0 to 255: for the tests.
+        internal int CompanionAlpha { get { return opacity; } }
+
+        /// v0.6.24 final: the companion drawn at `alpha` (0 to 255) of its picture - a dialog fading in from clear takes its
+        /// edge, its hairline and its shadow with it, step for step, so nothing of it is ever seen round a window that is
+        /// not (no faint fill outside it). 255 once the window is opaque, and for every window that does not fade.
+        internal void Opacity(int alpha)
+        {
+            byte now = (byte)Math.Max(0, Math.Min(255, alpha));
+            if (now == opacity) return;
+            opacity = now;
+            if (layer == null || memory == IntPtr.Zero || bitmap == IntPtr.Zero || !form.IsHandleCreated) return;
+            try
+            {
+                Chrome.RECT rect;
+                if (!GetWindowRect(form.Handle, out rect)) return;
+                int margin = WindowShape.Margin(shapedDpi / 96.0);
+                var at = new POINT { X = rect.Left - margin, Y = rect.Top - margin };
+                var dimensions = new SIZE { Width = bitmapSize.Width, Height = bitmapSize.Height };
+                var from = new POINT();
+                var blend = new BLENDFUNCTION { Op = 0, Flags = 0, Alpha = opacity, Format = 1 };
+                IntPtr screen = GetDC(IntPtr.Zero);
+                try { UpdateLayeredWindow(layer.Handle, screen, ref at, ref dimensions, memory, ref from, 0, ref blend, ULW_ALPHA); }
+                finally { ReleaseDC(IntPtr.Zero, screen); }
+            }
+            catch (Exception) { /* the companion as it was; the next reshape draws it at this alpha */ }
+        }
 
         /// Whether it is ours now: the window's whole rectangle its client area, its region cut.
         internal bool Shaped { get { return now == WindowShape.Corner.Squircle; } }
@@ -814,7 +906,7 @@ namespace CodexAutoResume
         /// middle of the maximised window (M-CORNER re-check 4).
         internal bool MayShow()
         {
-            if (!form.IsHandleCreated || failed || cloaked || now != WindowShape.Corner.Squircle || bitmap == IntPtr.Zero) return false;
+            if (!form.IsHandleCreated || failed || cloaked || held || now != WindowShape.Corner.Squircle || bitmap == IntPtr.Zero) return false;
             IntPtr handle = form.Handle;
             return IsWindowVisible(handle) && !IsIconic(handle) && !IsZoomed(handle);
         }
@@ -899,9 +991,10 @@ namespace CodexAutoResume
             return kind == ERROR || kind == NULLREGION;
         }
 
-        // The shadow's colour: the ink PaintDialog shades a still's dialog with in light (5.2 item 2, O12), and in dark the
-        // theme's own shadow, all but black - a light ink would be a glow round the window, never a shadow.
-        private static Color Shade()
+        /// The shadow's colour: the ink PaintDialog shades a still's dialog with in light (5.2 item 2, O12), and in dark the
+        /// theme's own shadow, all but black - a light ink would be a glow round the window, never a shadow. The render
+        /// mode shades a dialog's squircle with it too (WindowRender.PaintDialog), as the screen does.
+        internal static Color Shade()
         {
             return Palette.Dark ? Tokens.ShadowDark : Palette.Ink;
         }
@@ -964,7 +1057,7 @@ namespace CodexAutoResume
                 WindowShape.Compose(edge, ground, line, Shade(), new WindowShape.MemorySink(bits, 4 * whole.Width));
                 var dimensions = new SIZE { Width = whole.Width, Height = whole.Height };
                 var from = new POINT();
-                var blend = new BLENDFUNCTION { Op = 0, Flags = 0, Alpha = 255, Format = 1 };
+                var blend = new BLENDFUNCTION { Op = 0, Flags = 0, Alpha = opacity, Format = 1 };
                 if (!UpdateLayeredWindow(layer.Handle, screen, ref at, ref dimensions, memory, ref from, 0, ref blend, ULW_ALPHA))
                     throw new InvalidOperationException("the companion was not updated");
             }
@@ -1020,7 +1113,7 @@ namespace CodexAutoResume
         /// (Soft.StillReady), which is photographed as it always was.
         internal void Cloak()
         {
-            if (!form.IsHandleCreated || Soft.StillReady != null) return;
+            if (!form.IsHandleCreated || Soft.StillReady != null || HostCloaks) return;
             IntPtr handle = form.Handle;
             if (IsWindowVisible(handle)) return;
             int on = 1;
@@ -1031,12 +1124,24 @@ namespace CodexAutoResume
         /// The window has handled its first WM_PAINT (ChromeHost.Intercept), or has been shown (posted from Intercept, after
         /// the show): everything in it that waits to be painted painted now, then the window uncloaked and its companion
         /// shown with it.
+        ///
+        /// v0.6.24 final (the live re-check 4, M2: 3 starts of 5): and what was painted handed to DWM first. The first frame
+        /// on the screen had the header card's light, headline and line as a black strip the desktop showed through, whole
+        /// 37-64 ms later. Those three are the last windows the paint above draws (measured: 1.7-5 ms before the uncloak,
+        /// every window of the first frame had had its WM_PAINT), and GDI keeps a thread's last drawing calls in its batch
+        /// until something flushes it: uncloaked in the same message, the window could be composed before they reached its
+        /// surface. GdiFlush puts them there, and DwmFlush waits for DWM to take the surface, before the cloak is let go -
+        /// as a dialog's own cloak hands its picture to DWM before its first alpha (SoftDialog).
         internal void Painted()
         {
             if (!cloaked || !form.IsHandleCreated) return;
             IntPtr handle = form.Handle;
             try { RedrawWindow(handle, IntPtr.Zero, IntPtr.Zero, PaintAllNow); }
             catch (Exception) { }
+            try { GdiFlush(); }
+            catch (Exception) { }
+            try { DwmFlush(); }
+            catch (Exception) { /* no composition to wait for: uncloaked as before */ }
             cloaked = false;
             int off = 0;
             try { DwmSetWindowAttribute(handle, Cloaking, ref off, 4); }

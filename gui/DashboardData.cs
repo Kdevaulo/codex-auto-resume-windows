@@ -115,9 +115,11 @@ namespace CodexAutoResume
         /// the caption it is inactive (WM_NCACTIVATE), but its redraw of the frame paints the caption of a window
         /// that is in fact active as active again - which is what a Japanese Overview came out with when it was
         /// captured beside other windows. A person's window is never given a capture's event, and opens as always.
+        /// v0.6.24 final: nor is a window the setup opens again after an update or a Repair (OpensBehind), which stands
+        /// behind the setup's Finish page instead of hiding it.
         protected override bool ShowWithoutActivation
         {
-            get { return Soft.StillReady != null || base.ShowWithoutActivation; }
+            get { return Soft.StillReady != null || OpensBehind || base.ShowWithoutActivation; }
         }
 
         protected override CreateParams CreateParams
@@ -370,7 +372,15 @@ namespace CodexAutoResume
             return S("usage.minutes", "{n}-minute", "n", whole);
         }
 
-        /// The last usage reading in one line - each window's length, share and reset, and how long ago it was read - as
+        /// v0.6.24 final (the owner, 2026-11-18): what is LEFT of a window, as every surface says it (ui/words.left) - 100
+        /// minus the whole share used, so 0 only where it is used up (99.6 used leaves 1), and 0 above 100.
+        internal static int UsageLeft(double used)
+        {
+            if (double.IsNaN(used)) used = 0;
+            return 100 - (used >= 100 ? 100 : (int)Math.Floor(Math.Max(0, used)));
+        }
+
+        /// The last usage reading in one line - each window's length, share left and reset, and how long ago it was read - as
         /// the popup and the panel say it; null until usage has been read.
         private string UsageLine(Dictionary<string, object> reading)
         {
@@ -383,10 +393,10 @@ namespace CodexAutoResume
                 var window = entry as Dictionary<string, object>;
                 if (window == null) continue;
                 double used = Number(window, "used_percent"), reset = Number(window, "reset_at");
-                string share = (used >= 100 ? 100 : (int)Math.Floor(used)).ToString(CultureInfo.InvariantCulture);
+                string share = UsageLeft(used).ToString(CultureInfo.InvariantCulture);
                 string text = reset > 0
-                    ? S("usage.window_resets", "{window} {percent}%, resets {time}").Replace("{time}", Mirror.Embed(ClockTime(reset)))
-                    : S("usage.window", "{window} {percent}%");
+                    ? S("usage.window_resets", "{window} {percent}% left, resets {time}").Replace("{time}", Mirror.Embed(ClockTime(reset)))
+                    : S("usage.window", "{window} {percent}% left");
                 parts.Add(text.Replace("{window}", WindowName(Get(window, "window_minutes"))).Replace("{percent}", Mirror.Embed(share)));
             }
             if (parts.Count == 0) return null;

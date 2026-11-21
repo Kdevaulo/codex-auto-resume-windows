@@ -645,6 +645,8 @@ namespace CodexAutoResume
         internal static void Paint(Control ground, PaintEventArgs e)
         {
             e.Graphics.FillRectangle(Soft.Fill(Colour(ground)), e.ClipRectangle);
+            // v0.6.24-beta.3 (W2): on a special day, the day's specks on the Dashboard's own ground.
+            DayGround.Paint(ground, e.Graphics, e.ClipRectangle);
             Stamps(ground, e.Graphics, e.ClipRectangle);
         }
 

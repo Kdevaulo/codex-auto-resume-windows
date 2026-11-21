@@ -25,14 +25,33 @@ FIXED_DAYS = (
     (12, 25, "christmas"),
 )
 
-# Lunar 1/1 and 8/15, as solar dates: KASI's calendar converter. Past the last year there is no look.
+# Lunar 1/1 and 8/15, as solar dates, 2026 to 2100: build/lunar_days.py, the rule KASI (the Korea Astronomy and Space Science
+# Institute, astro.kasi.re.kr) computes the official Korean calendar by - in Korea Standard Time, Meeus' new moons and solar
+# terms. It gives KASI's own table for 2026-2040 exactly, and in China Standard Time the Hong Kong Observatory's Chinese
+# calendar for the later years (tests/test_day_lunar_table.py). Past the last year there is no look.
 LUNAR_DAYS = (
     ("seollal", ((2026, 2, 17), (2027, 2, 7), (2028, 1, 27), (2029, 2, 13), (2030, 2, 3), (2031, 1, 23), (2032, 2, 11),
                  (2033, 1, 31), (2034, 2, 19), (2035, 2, 8), (2036, 1, 28), (2037, 2, 15), (2038, 2, 4), (2039, 1, 24),
-                 (2040, 2, 12))),
+                 (2040, 2, 12), (2041, 2, 1), (2042, 1, 22), (2043, 2, 10), (2044, 1, 30), (2045, 2, 17), (2046, 2, 6),
+                 (2047, 1, 26), (2048, 2, 14), (2049, 2, 2), (2050, 1, 23), (2051, 2, 11), (2052, 2, 1), (2053, 2, 19),
+                 (2054, 2, 8), (2055, 1, 28), (2056, 2, 15), (2057, 2, 4), (2058, 1, 24), (2059, 2, 12), (2060, 2, 2),
+                 (2061, 1, 22), (2062, 2, 9), (2063, 1, 29), (2064, 2, 17), (2065, 2, 5), (2066, 1, 26), (2067, 2, 14),
+                 (2068, 2, 3), (2069, 1, 23), (2070, 2, 11), (2071, 1, 31), (2072, 2, 19), (2073, 2, 7), (2074, 1, 27),
+                 (2075, 2, 15), (2076, 2, 5), (2077, 1, 24), (2078, 2, 12), (2079, 2, 2), (2080, 1, 22), (2081, 2, 9),
+                 (2082, 1, 29), (2083, 2, 17), (2084, 2, 6), (2085, 1, 26), (2086, 2, 14), (2087, 2, 3), (2088, 1, 24),
+                 (2089, 2, 11), (2090, 1, 30), (2091, 2, 18), (2092, 2, 8), (2093, 1, 27), (2094, 2, 15), (2095, 2, 5),
+                 (2096, 1, 25), (2097, 2, 12), (2098, 2, 1), (2099, 1, 21), (2100, 2, 9))),
     ("chuseok", ((2026, 9, 25), (2027, 9, 15), (2028, 10, 3), (2029, 9, 22), (2030, 9, 12), (2031, 10, 1), (2032, 9, 19),
                  (2033, 9, 8), (2034, 9, 27), (2035, 9, 16), (2036, 10, 4), (2037, 9, 24), (2038, 9, 13), (2039, 10, 2),
-                 (2040, 9, 21))),
+                 (2040, 9, 21), (2041, 9, 10), (2042, 9, 28), (2043, 9, 17), (2044, 10, 5), (2045, 9, 25), (2046, 9, 15),
+                 (2047, 10, 4), (2048, 9, 22), (2049, 9, 11), (2050, 9, 30), (2051, 9, 19), (2052, 9, 7), (2053, 9, 26),
+                 (2054, 9, 16), (2055, 10, 5), (2056, 9, 24), (2057, 9, 13), (2058, 10, 2), (2059, 9, 21), (2060, 9, 9),
+                 (2061, 9, 28), (2062, 9, 17), (2063, 10, 6), (2064, 9, 25), (2065, 9, 15), (2066, 10, 3), (2067, 9, 23),
+                 (2068, 9, 11), (2069, 9, 29), (2070, 9, 19), (2071, 9, 8), (2072, 9, 26), (2073, 9, 16), (2074, 10, 5),
+                 (2075, 9, 24), (2076, 9, 12), (2077, 10, 1), (2078, 9, 20), (2079, 9, 10), (2080, 9, 28), (2081, 9, 17),
+                 (2082, 10, 6), (2083, 9, 26), (2084, 9, 14), (2085, 10, 3), (2086, 9, 22), (2087, 9, 11), (2088, 9, 29),
+                 (2089, 9, 19), (2090, 9, 8), (2091, 9, 27), (2092, 9, 16), (2093, 10, 5), (2094, 9, 24), (2095, 9, 13),
+                 (2096, 10, 1), (2097, 9, 20), (2098, 9, 10), (2099, 9, 29), (2100, 9, 18))),
 )
 
 # The icon's mark shows from this size up; below it the body alone.
@@ -310,8 +329,148 @@ def mark_text(look):
 
 def scene_text(look):
     """The same list as one line per element, for the window (Brand.DayScene): kind;numbers;colour;opacity;motion;numbers."""
+    return _as_text(scene_elements(look))
+
+
+def _as_text(elements):
     return "\n".join(";".join((element[0], " ".join("%g" % value for value in element[1]), element[2], "%g" % element[3], element[4],
-                               " ".join("%g" % value for value in element[5]))) for element in scene_elements(look))
+                               " ".join("%g" % value for value in element[5]))) for element in elements)
+
+
+# ------------------------------------------------------------------ the day spread wide (W2, the owner's pick of 2026-11-17)
+# On a special day a surface takes the day over its whole header, not a corner of it: the day's ground under all of it, the
+# scene as tall as the band at its outer end, and the day's specks - the scene's own moving pieces - across the whole of it.
+# The specks are one band SPECK_BAND wide and the scene's 66 high, laid side by side as far as a surface is wide (and, on a
+# window's ground, row under row), each surface drawing them in its scene's unit from this one list. The words keep the
+# card's own colour under them: from WIDE["gap"] past the last word the card's colour fades into the day over WIDE["fade"]
+# (device-independent pixels), so they read as on any other day. A window's ground takes WIDE["ground_tint"] of the day's
+# ground, and its specks, behind the cards. A look whose scene has a part that runs its whole width (seollal's stripes) has
+# it among its specks too, so that it runs the band's whole width.
+SPECK_BAND = 300.0
+WIDE = {"gap": 8, "fade": 96, "ground_tint": 0.10}
+
+
+def _specks_falling(seeded, count, sizes, durations, colours, opacity, make):
+    made = []
+    for index in range(count):
+        x, size = seeded(4, SPECK_BAND - 4), seeded(*sizes)
+        duration = seeded(*durations)
+        delay = seeded(-duration, 0.0)
+        made.append(make(round(x, 3), round(size, 3), colours[index % len(colours)], opacity, [round(duration, 3), round(delay, 3)]))
+    return made
+
+
+def _confetti(x, size, colour, opacity, timing):
+    return ["poly", _flat(_box(x, -4.0, size * 0.62, size)), colour, opacity, "fall", timing + [320.0]]
+
+
+def _flake(x, size, colour, opacity, timing):
+    return ["circle", [x, -4.0, size], colour, opacity, "fall", timing + [0.0]]
+
+
+_SPECK_MAKERS = {
+    "birthday": lambda: _specks_falling(_Seeded(9061), 14, (4.2, 6.8), (4.0, 7.5), _CONFETTI_COLOURS, 0.9, _confetti),
+    "new_year": lambda: _stars(_Seeded(1011), 12, (4, SPECK_BAND - 4), (6, 60), (1.8, 3.6), "#FFE9A8"),
+    "christmas": lambda: _specks_falling(_Seeded(12251), 18, (0.8, 1.8), (5.0, 9.0), ("#FFFFFF",), 0.9, _flake),
+    # Seollal's stripes (saekdong) run along the top of the whole band, as they do across its scene, with its coins under them.
+    "seollal": lambda: ([_round(0, index * 3.4, SPECK_BAND, 3.4, 0, colour)
+                         for index, colour in enumerate(("#D9463E", "#F2C230", "#3FA86B", "#3B6FC9", "#E88BB0"))]
+                        + _specks_falling(_Seeded(2027), 10, (1.5, 2.4), (6.0, 10.0), ("#F2C230", "#E25B4F"), 0.9, _flake)),
+    "chuseok": lambda: _stars(_Seeded(8151), 10, (4, SPECK_BAND - 4), (6, 60), (1.4, 2.8), "#FFF4D0"),
+}
+_kept_specks = {}
+
+
+def speck_elements(look):
+    """`look`'s specks in one band SPECK_BAND by 66, as scene_elements' list: what every surface lays across its width."""
+    if look not in _kept_specks:
+        _kept_specks[look] = _SPECK_MAKERS[look]()
+    return _kept_specks[look]
+
+
+def _reach(element):
+    """How far along its band an element can ever reach, (from, to): its outline, turned or swelled as its motion turns
+    or swells it about its centre (a fall turns a piece, a twinkle swells a star to 1.1)."""
+    kind, numbers = element[0], element[1]
+    if kind == "round":
+        return numbers[0], numbers[0] + numbers[2]
+    if kind == "poly":
+        centre_x, centre_y = _centre(kind, numbers)
+        far = max(math.hypot(x - centre_x, y - centre_y) for x, y in zip(numbers[0::2], numbers[1::2]))
+    else:
+        centre_x, far = numbers[0], numbers[2]
+    far *= 1.1
+    return centre_x - far, centre_x + far
+
+
+_kept_reach = {}
+
+
+def speck_reach(look):
+    """For each of `look`'s specks, how far along the band it can ever reach (_reach): what lies wholly out of sight is
+    never drawn (speck_frame's `within`)."""
+    if look not in _kept_reach:
+        _kept_reach[look] = [_reach(element) for element in speck_elements(look)]
+    return _kept_reach[look]
+
+
+def speck_frame(look, milliseconds, within=None):
+    """`look`'s specks `milliseconds` in, in their band: pure, and the same every time. `within` (from, to), along the
+    band in its own units: only the specks that can reach into it - a surface asks for what it shows of a band, so a
+    frame costs no more than its scene did before the day spread wide (W2)."""
+    seconds = milliseconds / 1000.0
+    if within is None:
+        return [element_at(element, seconds) for element in speck_elements(look)]
+    least, most = within
+    shown = []
+    for element, (start, end) in zip(speck_elements(look), speck_reach(look)):
+        if end < least or start > most:
+            continue
+        shape = element_at(element, seconds)
+        # A piece that has fallen past the band's foot, or not yet into its top, is out of sight too.
+        top, bottom = _height(shape)
+        if bottom >= 0.0 and top <= SCENE_HEIGHT:
+            shown.append(shape)
+    return shown
+
+
+def _height(shape):
+    """A shape's (top, bottom), for speck_frame."""
+    kind, numbers = shape[0], shape[1]
+    if kind == "poly":
+        ys = numbers[1::2]
+        return min(ys), max(ys)
+    if kind == "round":
+        return numbers[1], numbers[1] + numbers[3]
+    return numbers[1] - numbers[2], numbers[1] + numbers[2]
+
+
+def day_band(look, px, band, words_end):
+    """The day spread wide over a card's header (W2, the owner's pick of 2026-11-17): `band` is the header's inside (left, top,
+    right, bottom), the words ending at `words_end`. From WIDE's gap past the last word to the card's outer side it is
+    the day's - its ground, its specks across all of it (speck_frame) and its scene as tall as the band at the outer
+    end - the card's own colour fading into it over WIDE's fade, so the words stand on the card's colour as on any other
+    day. The scene is drawn with its main piece whole (`scene` true), or not at all where the words leave too little room for
+    that; and where they leave too little even for the fade and a little of the day, there is no band (None). Every surface
+    the tray draws asks this - the popup, the icon's card, the notification card - in device pixels (`px`); the window's
+    DayArt.Fit and Band and the panel's placeDayScene are the same rule in theirs."""
+    left, top, right, bottom = band
+    left = max(left, words_end + px(WIDE["gap"]))
+    fade = px(WIDE["fade"])
+    if right - left < fade // 2 + px(24) or bottom <= top:
+        return None
+    unit = (bottom - top) / SCENE_HEIGHT
+    focal = SCENE_WIDTH - SCENE_FOCUS[look]
+    solid = left + px(2)
+    room = int(right - solid - focal * unit)
+    scene = room >= px(28)
+    return {"kind": "scene", "scene": look, "rect": (left, top, right, bottom), "unit": unit, "scene_shown": scene,
+            "fade": (solid, solid + max(px(2), min(fade, room if scene else right - solid - px(24))))}
+
+
+def speck_text(look):
+    """The specks as scene_text's lines, for the window (Brand.DaySpecks)."""
+    return _as_text(speck_elements(look))
 
 
 def _wave(seconds, duration, delay=0.0):
@@ -416,3 +575,22 @@ def sweep_at(milliseconds, ease):
         spread = ease(since / numbers["ring_ms"])
         rings.append((spread, 0.0 if since < 0 or since >= numbers["ring_ms"] else numbers["ring_opacity"] * (1.0 - spread)))
     return covered, opacity, rings
+
+
+# ------------------------------------------------------------------ the version pill's eggs on the special days (v0.6.24)
+# The hint (the owner, 2026-11-18, H3): the pill's ring glows slowly in the day's colour.
+DAY_RINGS = {"new_year": "#F2C230", "seollal": "#D2453E", "birthday": "#EE8468", "chuseok": "#E0B44C", "christmas": "#2E8B5E"}
+# Each day's own egg at the sixth press, its parts' colours by name (the window's DayEgg draws them, Brand.DayEggColour).
+DAY_EGG_COLOURS = {
+    "new_year": {"trail": "#FFE9A8", "spark0": "#FFD76A", "spark1": "#E8735A", "spark2": "#5BB8C4", "spark3": "#B98AD9",
+                 "star": "#FFE9A8"},
+    "seollal": {"pouch": "#C93B3B", "mouth": "#E25B4F", "band": "#F2C230", "knot": "#F6D76B", "coin": "#E2B13C",
+                "stripe0": "#D9463E", "stripe1": "#F2C230", "stripe2": "#3FA86B", "stripe3": "#3B6FC9", "stripe4": "#E88BB0"},
+    "birthday": {"cake": "#FFF6EE", "edge": "#E9B8A8", "frosting": "#F4A7B5", "candle": "#5BB8C4", "flame": "#F6B73C",
+                 "smoke": "#AEB4BE", "confetti0": "#F2A33A", "confetti1": "#E8735A", "confetti2": "#5BB8C4",
+                 "confetti3": "#F6C945", "confetti4": "#B98AD9"},
+    "chuseok": {"moon": "#F6E7B4", "glow": "#FFEBB8", "rabbit": "#D2BC82", "cake0": "#F4F0E4", "cake1": "#F2B8C6",
+                "cake2": "#A8D08D", "cake3": "#E6D39B"},
+    "christmas": {"snow": "#FFFFFF", "snowEdge": "#C9D4E0", "tree": "#2B8660", "trunk": "#7A4B2A", "red": "#D9463E",
+                  "green": "#3FA86B", "star": "#FFD76A", "pile": "#F4F8FB"},
+}

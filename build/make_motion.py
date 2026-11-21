@@ -6,13 +6,14 @@
     python -X utf8 build/make_motion.py --fidelity      # only the window held to today's stills, recorded
     python -X utf8 build/make_motion.py card-en card-ko # the notification card appearing, on its own
     python -X utf8 build/make_motion.py logo-light logo-dark   # the README's logo, moving (build/motion_logo.py)
-    python -X utf8 build/make_motion.py popup-en popup-ko   # the notification-area popup used by a pointer
+    python -X utf8 build/make_motion.py popup-en popup-ko   # the icon, its hover card and the popup it opens, used by a pointer
     python -X utf8 build/make_motion.py --all           # all ten: the final's picture pass
 
 The README's two show the Dashboard alone, the window bare, with no shadow (RGBA, its rounded corners clear);
-the card's two the card appearing as the product shows it, on the canvas colour; the popup's two the popup the icon
-opens, its switch turned off and on again, on the canvas colour (build/motion_popup.py); the logos the icon's own
-watching motion.
+the card's two the card appearing as the product shows it, on the canvas colour; the popup's two the right end of a
+taskbar with the tray icon: a pointer comes to it, the icon's hover card appears (build/motion_tip.py), a click opens the
+popup above the taskbar as the product places it, and two switches are turned off and on again (build/motion_popup.py), all
+on a clear ground; the logos the icon's own watching motion.
 
 A plan (build/motion_plan.py, build/motion/*.json) says what a person does, scene by scene, on one clock. Each frame
 is then drawn:
@@ -63,9 +64,16 @@ LOGO_PLANS = ("logo-light", "logo-dark")
 POPUP_PLANS = ("popup-en", "popup-ko")
 ALL_PLANS = PLAN_NAMES + CARD_PLANS + POPUP_PLANS + LOGO_PLANS
 MANIFEST = ROOT / "assets" / "motion.json"
+# The modules of the icon's hover card, which a picture of it is made from (build/motion_tip.py).
+TIP_CODE = ("ui/tray/tipcard.py", "ui/tray/tipplan.py", "ui/tray/words.py", "ui/words.py")
 # What the picture is made from, beside the window, the card and the icon: these files.
 CODE = ("build/make_motion.py", "build/motion_plan.py", "build/motion_window.py", "build/motion_card.py",
         "build/motion_compose.py", "build/motion_apng.py", "build/motion_fidelity.py", "build/motion_logo.py")
+
+
+# The face the strip gives the icon under the pointer and under a press, drawn by us (it is not Windows'): its opacity of
+# black on the light strip, how far past the icon it reaches and how round it is, in device-independent px.
+STRIP_FACE = {"hover": 0.06, "pressed": 0.12, "room": 4, "radius": 5}
 
 
 def plan_path(name) -> Path:
@@ -90,10 +98,11 @@ def load(name) -> dict:
 
 def schedule(plan: dict, also=()) -> tuple:
     """(frames, delays in ms, end in ms): every frame the plan's steps emit, with the frames the lights, the
-    ripples and `also` (the tray icon's frame times) add, each with the delay it is held for."""
+    ripples, the light's sweep and `also` (the tray icon's frame times) add, each with the delay it is held for."""
     end = motion_plan.plan_end(plan)
     frames = motion_plan.fill(motion_plan.expand(plan), end, int(plan.get("light_step_ms") or 0), also,
-                              first_hold=int(plan.get("first_hold") or 0), ripple_step=int(plan.get("ripple_step") or 0))
+                              first_hold=int(plan.get("first_hold") or 0), ripple_step=int(plan.get("ripple_step") or 0),
+                              sweep_step=int(plan.get("sweep_step_ms") or 0))
     return frames, motion_plan.delays([frame.t for frame in frames], end), end
 
 
@@ -162,6 +171,12 @@ def render_input(plan: dict) -> str:
         # The sample rows and what draws the popup (the still's own key), and the file that sequences it.
         parts += [shots.popup_render_input(plan["popup"].get("locale", plan["locale"])),
                   shots.input_digest(ROOT / "build" / "motion_popup.py")]
+    if "tip" in plan:
+        # What draws the icon's hover card and says what it says: ui/tray's tip modules and the words they use.
+        package = ROOT / "src" / "codex_auto_resume"
+        files = shots.code_files(TIP_CODE, package)
+        parts += [shots.code_digest(files, shots.imported_definitions(package, files)),
+                  shots.input_digest(ROOT / "build" / "motion_tip.py")]
     if "window" in plan:
         parts.append(shots.window_digest())
     if "taskbar" in plan:
@@ -226,13 +241,20 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
         plain = bytes(width * height * 4) if clear else bytes(ground) * (width * height)
     strip = plan.get("taskbar")
     anchor = None
+    edge = width
     if strip:
         icon = strip["icon"]
-        icon_left = width - icon["right"] - icon["size"]
+        # The screen's right edge: the canvas's own, unless the plan keeps room past it for a popup's shadow, which reaches
+        # further than the gap the popup keeps from the screen's edge (the strip runs on to the canvas's edge).
+        edge = int(strip.get("edge", width))
+        icon_left = edge - icon["right"] - icon["size"]
         icon_top = strip["top"] + (strip["height"] - icon["size"]) // 2
         icons = tray.IconFrames(icon["size"])
         anchor = (icon_left, icon_top, icon_left + icon["size"], icon_top + icon["size"])
-    popup_plan, popup = plan.get("popup"), None
+    work = (0, 0, edge, strip["top"] if strip else height)
+    monitor = (0, 0, edge, height)
+    popup_plan, popup, tip = plan.get("popup"), None, None
+    popup_at, seen_bounds_at_start = (0, 0), {}
     if popup_plan:
         import motion_popup
         if not clear:
@@ -241,44 +263,78 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
             raise SystemExit("the popup's canvas must be a transparent one: %r" % (canvas,))
         popup = motion_popup.PopupFrames(popup_plan.get("locale", plan["locale"]), scale=popup_plan["scale"],
                                          theme=theme, design=design)
-        if tuple(popup.size) != (width, height):
+        layer_width, layer_height = popup.size
+        # Where the product puts the card (placement.place, as the icon's click asks for it), the picture's shadow round it.
+        popup_at = popup.origin(work, monitor, anchor) if strip else (0, 0)
+        if (popup_at[0] < 0 or popup_at[1] < 0 or popup_at[0] + layer_width > width
+                or popup_at[1] + layer_height > height or (not strip and (layer_width, layer_height) != (width, height))):
             popup.close()
-            raise SystemExit("the popup is drawn %dx%d and the canvas is %dx%d: make the stills again, or the "
-                             "canvas the size of the popup's still" % (tuple(popup.size) + (width, height)))
-        seen_bounds_at_start = popup.bounds()
-        if not popup.is_the_still(frames[0], plain, ROOT / popup_plan["still"]):
+            raise SystemExit("the popup is drawn %dx%d at %s and the canvas is %dx%d: nothing of it, its shadow "
+                             "included, may be cut: make the stills again, or the canvas the size they need"
+                             % ((layer_width, layer_height, popup_at) + (width, height)))
+        seen_bounds_at_start = {name: (x + popup_at[0], y + popup_at[1], wide, tall)
+                                for name, (x, y, wide, tall) in popup.bounds().items()}
+        arrived = next(frame for frame in frames if frame.popup and popup.opening(frame)[2])
+        if not popup.is_the_still(arrived, bytes(layer_width * layer_height * 4), ROOT / popup_plan["still"]):
             popup.close()
-            raise SystemExit("the popup's first frame is not %s as it is committed: make the stills again first "
+            raise SystemExit("the popup, once it has opened, is not %s as it is committed: make the stills again first "
                              "(build/make_screenshots.py)" % popup_plan["still"])
+    tip_plan = plan.get("tip")
+    if tip_plan:
+        import motion_tip
+        if not strip:
+            raise SystemExit("the icon's hover card stands beside the icon: the plan needs a taskbar")
+        tip = motion_tip.TipFrames(tip_plan.get("locale", plan["locale"]), scale=tip_plan["scale"], work=work,
+                                   monitor=monitor, box=anchor, theme=theme, design=design)
     card_plan, card = plan.get("card"), None
     if card_plan:
         card = motion_card.CardFrames(card_plan.get("locale", plan["locale"]), scale=card_plan["scale"],
-                                      work=(0, 0, width, strip["top"] if strip else height),
-                                      monitor=(0, 0, width, height), anchor=anchor, theme=theme, design=design)
+                                      work=work, monitor=(0, 0, width, height), anchor=anchor, theme=theme,
+                                      design=design)
         if "at" in card_plan:
             card.place = tuple(card_plan["at"])
     accent = tuple(brand.rgb(brand.palette(theme, design)["accent"]))
     scale = float((plan.get("pointer") or {}).get("scale", 1.5))
     seen_bounds, standing = {}, {}
-    if popup is not None:
-        seen_bounds.update(seen_bounds_at_start)      # the popup's switches, where its own layout puts them
+    seen_bounds.update(seen_bounds_at_start)      # the popup's switches, where its own layout puts them
+    if strip:
+        seen_bounds["tray.icon"] = (anchor[0], anchor[1], icon["size"], icon["size"])
+    popup_clear = bytes(popup.size[0] * popup.size[1] * 4) if popup is not None else None
 
     def draw(frame):
-        if popup is not None:
-            picture = bytearray(popup.drawn(frame, plain))     # no window, strip or card
+        if popup is not None or tip is not None:
+            picture = bytearray(plain)               # no window: the strip, the hover card, the popup, in that order
         elif pictures is not None:
             _index, client, bounds = next(pictures)
             seen_bounds.update(bounds)
             picture = chrome.frame(client)
         else:
             picture = bytearray(plain)
+        window = dict(frame.window)
         if strip:
             motion_compose.draw_strip(picture, width, height, strip["top"], strip["height"],
                                       tuple(brand.rgb(strip["colour"])))
+            # The icon's face under the pointer, and under a press: the strip's own, a rounded square a little larger.
+            face = (STRIP_FACE["pressed"] if window.get("pressed") == "tray.icon"
+                    else STRIP_FACE["hover"] if frame.pointer == ("at", "tray.icon") else None)
+            if face is not None:
+                room = int(round(STRIP_FACE["room"] * scale))
+                motion_compose.draw_face(picture, width, height, anchor[0] - room, anchor[1] - room,
+                                         icon["size"] + 2 * room, icon["size"] + 2 * room,
+                                         STRIP_FACE["radius"] * scale, (0, 0, 0), face)
             position, level = tray.icon_frame(icon["state"], frame.t, frame.t)
             head = tray.icon_level_colour(tray.icon_head_colour(icon["state"]), level)
             motion_compose.draw_icon(picture, width, height, icons.compose(position, head), icon["size"],
                                      icon_left, icon_top)
+        if tip is not None:
+            shown = tip.drawn(frame)
+            if shown is not None:
+                layer, (layer_wide, _tall), (left, top), level = shown
+                motion_compose.lay_rgba(picture, width, height, layer, layer_wide, left, top, level)
+        if popup is not None and frame.popup:
+            level, below, _arrived = popup.opening(frame)
+            motion_compose.lay_rgba(picture, width, height, popup.drawn(frame, popup_clear), popup.size[0],
+                                    popup_at[0], popup_at[1] + below, level)
         state = dict(frame.card) if frame.card else None
         if state is not None and card is not None:
             card.lay_on(picture, width, height, card.drawn(frame.t, state["born"], hover=state["hover"],
@@ -293,7 +349,6 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
             standing.clear()
             if frame.pointer[0] == "at":
                 standing[frame.pointer] = (x, y)
-        window = dict(frame.window)
         pressed = window.get("pressed") is not None or bool(state and state["pressed"])
         motion_compose.draw_pointer(picture, width, height, x, y, scale=scale, pressed=pressed,
                                     ripple=motion_plan.ripple_at(frame), accent=accent)
@@ -309,6 +364,8 @@ def make(plan: dict, exe: Path | None, work: Path, forms=None) -> object:
             card.close()
         if popup is not None:
             popup.close()
+        if tip is not None:
+            tip.close()
 
 
 def main(argv=None) -> int:

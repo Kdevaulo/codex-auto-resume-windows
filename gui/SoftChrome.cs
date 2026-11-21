@@ -459,7 +459,8 @@ namespace CodexAutoResume
         }
 
         /// v0.6.24 W5: the window's own outer corner - the card's, smoothed as the cards are - in place of Windows' round
-        /// one, for the window that asks (the Dashboard): only with Brand.WindowSquircle on, on Windows 11, outside High
+        /// one, for the window that asks (the Dashboard, the setup window, and from the v0.6.24 final every dialog the
+        /// Dashboard opens: SoftDialog.BuildTitle): only with Brand.WindowSquircle on, on Windows 11, outside High
         /// Contrast and a remote session (WindowShape.Wanted). Off, nothing is made and the window is as it was.
         internal void OwnCorner()
         {
@@ -883,6 +884,16 @@ namespace CodexAutoResume
                 finally { corner.Painted(); }
                 return true;
             }
+            // v0.6.24 final (live re-check 4, M3): a window that asks for the wait cursor (UseWaitCursor) has it over every
+            // part of it. .NET gives it only over the client area a control answers HTCLIENT for: over the caption, the
+            // ground that drags the window - and over the whole window while a dialog of its own holds it disabled, which
+            // Windows asks as HTERROR - it gave the arrow, the moment a dialog that keeps its owner waiting was shown.
+            if (m.Msg == WM_SETCURSOR && form.UseWaitCursor)
+            {
+                Cursor.Current = Cursors.WaitCursor;
+                m.Result = (IntPtr)1;
+                return true;
+            }
             // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
             if (corner != null && corner.Intercept(ref m)) return true;
             if (corner != null && corner.Shaped && (m.Msg == WM_SETTEXT || m.Msg == WM_SETICON) && form.IsHandleCreated)
@@ -950,6 +961,7 @@ namespace CodexAutoResume
         }
 
         private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, WM_PAINT = 0x000F, GWL_STYLE = -16, WS_CAPTION = 0x00C00000;
+        private const int WM_SETCURSOR = 0x0020;
 
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
         private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
@@ -2139,6 +2151,14 @@ namespace CodexAutoResume
             titleRow.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             titleGround.Controls.Add(titleRow);
             chrome = ChromeHost.Install(this, titleRow, titleGround);
+            // v0.6.24 final (the owner, 2026-11-20, "대시보드 앱 안에서 뜨는 창들은 스쿼글이 아니네"): the Dashboard's own outer
+            // corner, through its one call and with its exceptions (WindowShape.Wanted, WindowShape.Decide) - the card's
+            // corner at the design's card radius (Palette.RadiusCard: a dialog is its title row and one card on its ground,
+            // as the Dashboard is its cards on its ground, so its outer corner is the Dashboard's). Asked before the dialog
+            // grows by its strip below, so its ClientSize is then its window. Only a top-level dialog: one laid out as a
+            // child (the layout audit, the render mode) has none. The dialog keeps its own cloak and fade (HostCloaks).
+            chrome.OwnCorner();
+            if (chrome.Corner != null) chrome.Corner.HostCloaks = true;
             chrome.OnGround = true;
             chrome.Drag(titleWords);
             // The words start TitleWordsInset in from the side gap and stop short of the buttons; the row mirrors its own
@@ -2182,6 +2202,8 @@ namespace CodexAutoResume
                 {
                     if (veil == null && TopLevel) veil = DialogVeil.Over(this);
                     if (cloaked) UncloakSoon();
+                    // Not held off the screen (DWM refused, a still): on the screen as it is shown.
+                    else CameOnNow();
                 }
             }
             else if (m.Msg == WM_DESTROY) Unveil();
@@ -2223,6 +2245,8 @@ namespace CodexAutoResume
                 try { cloaked = DwmSetCloak(Handle, DWMWA_CLOAK, ref on, 4) == 0; }
                 catch (Exception) { cloaked = false; }
             }
+            // Its own corner's companion is held off for as long as the dialog is (Uncloak lets it go).
+            if (OwnCorner != null) OwnCorner.Held = cloaked;
             // Not held off the screen (DWM refused, or a window made anew while shown): no fade, opaque at once.
             if (fadeIn && TopLevel && !cloaked) SetFade(255);
         }
@@ -2250,6 +2274,7 @@ namespace CodexAutoResume
         private int fadeAlpha = 255;
         private Timer fade;
         private System.Diagnostics.Stopwatch fading;
+        private double fadeMs = -1, lastStep;
 
         /// Whether it opens with its own fade, and its alpha now (255 once opaque, and for one that does not fade): for
         /// the tests.
@@ -2261,6 +2286,18 @@ namespace CodexAutoResume
             fadeAlpha = Math.Max(0, Math.Min(255, alpha));
             try { SetLayeredWindowAttributes(Handle, 0, (byte)fadeAlpha, LWA_ALPHA); }
             catch (Exception) { }
+            // Its first frame anyone can see: uncloaked (seenAt) and above clear.
+            if (fadeAlpha > 0 && seenAt != 0) CameOnNow();
+            // v0.6.24 final: its own corner's edge and shadow fade with it - never round a dialog not yet seen.
+            WindowCorner own = OwnCorner;
+            if (own != null) own.Opacity(fadeAlpha);
+        }
+
+        /// v0.6.24 final: the dialog's own outer corner (WindowCorner), or null where it has Windows' (no title row, a
+        /// dialog laid out as a child, WindowShape.Wanted false).
+        internal WindowCorner OwnCorner
+        {
+            get { return chrome == null ? null : chrome.Corner; }
         }
 
         // Uncloaked, painted and clear: from here to opaque.
@@ -2268,6 +2305,7 @@ namespace CodexAutoResume
         {
             if (!fadeIn || !IsHandleCreated) return;
             fading = System.Diagnostics.Stopwatch.StartNew();
+            fadeMs = -1;
             fade = new Timer();
             fade.Interval = Motion.Interval;
             fade.Tick += delegate { FadeStep(); };
@@ -2277,24 +2315,90 @@ namespace CodexAutoResume
         private void FadeStep()
         {
             if (!IsHandleCreated || fading == null) { StopFade(); return; }
-            double t = fading.Elapsed.TotalMilliseconds / Math.Max(1, Motion.Duration);
+            // Re-check 10 (1 of 25, the dark Detection check's 2nd open): one frame of it unpainted - its title row and
+            // caption buttons light grey, grey bands at its card's foot - at its first alpha above zero. Clear (alpha 0)
+            // nothing of it shows; so before its first visible step it is painted whole once more, and DWM given that
+            // picture (DwmFlush), and before every step what is waiting to be painted is painted first: it is never seen,
+            // at any alpha, before its whole paint.
+            if (!RepaintedBeforeVisible)
+            {
+                try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN); }
+                catch (Exception) { }
+                try { DwmFlush(); }
+                catch (Exception) { }
+                RepaintedBeforeVisible = true;
+            }
+            else
+            {
+                try { RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_UPDATENOW | RDW_ALLCHILDREN); }
+                catch (Exception) { }
+            }
+            // Re-check 10: the Timeline's first visible frame was already at 63-98 % - its repaint took most of the fade's
+            // time. The fade's own time starts here, once it is painted, and a step that comes late (a long paint, a busy
+            // moment) moves it on by two frames at the most: it always fades from near clear.
+            double now = fading.Elapsed.TotalMilliseconds;
+            if (fadeMs < 0) fadeMs = 0;
+            else fadeMs += Math.Min(now - lastStep, 2.0 * Motion.Interval);
+            lastStep = now;
+            double t = fadeMs / Math.Max(1, Motion.Duration);
             if (t < 1.0)
             {
                 SetFade((int)Math.Round(255 * Motion.Ease(t)));
                 return;
             }
             SetFade(255);
+            // v0.6.24 final: the moment it is opaque, before the repaint below - which can take as long as the dialog's
+            // paint (a slow one: 150 ms) and holds the thread, but not the screen, which has it at 255 from here.
+            opaqueAt = System.Diagnostics.Stopwatch.GetTimestamp();
             StopFade();
-            // Opaque: an ordinary window again, drawn whole.
+            // Opaque: an ordinary window again, drawn whole in the same message - a window no longer layered is drawn
+            // anew, and an asked-for paint would leave a frame of it unpainted.
             try
             {
                 long style = GetWindowLongPtr(Handle, GWL_EXSTYLE).ToInt64();
                 SetWindowLongPtr(Handle, GWL_EXSTYLE, new IntPtr(style & ~(long)WS_EX_LAYERED));
-                RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+                RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_UPDATENOW | RDW_ALLCHILDREN);
             }
             catch (Exception) { }
             fadeIn = false;
         }
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmFlush();
+
+        // v0.6.24 final: Stopwatch timestamps of the moment it came on the screen (uncloaked) and of the one it was opaque.
+        private long seenAt, opaqueAt;
+
+        /// v0.6.24 final (live re-check 4, M3): raised once, as the dialog's first frame anyone can see comes - uncloaked and,
+        /// where it fades in, at its first alpha above zero (live re-check 5) - or as it is shown where it was never held
+        /// off: what waits for it to be seen (the editor's wait cursor).
+        internal event EventHandler CameOn;
+        private bool cameOn;
+
+        private void CameOnNow()
+        {
+            if (cameOn) return;
+            cameOn = true;
+            EventHandler came = CameOn;
+            if (came != null) came(this, EventArgs.Empty);
+        }
+
+        /// v0.6.24 final: the milliseconds from the moment it came on the screen to the one its fade set it opaque, as the
+        /// dialog itself recorded them (-1 until both have happened): for the tests. A test that read it from the outside, on
+        /// the same thread, read it only once the repaint that follows the last step had run - about 1 run in 7, 150 ms
+        /// late on a slow paint (dev CI 44753147128).
+        internal double SeenToOpaque
+        {
+            get
+            {
+                if (seenAt == 0 || opaqueAt == 0 || opaqueAt < seenAt) return -1;
+                return (opaqueAt - seenAt) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            }
+        }
+
+        /// Whether it was painted whole again, and that picture handed to DWM, before its first alpha above zero: for the
+        /// tests.
+        internal bool RepaintedBeforeVisible { get; private set; }
 
         private void StopFade()
         {
@@ -2339,6 +2443,17 @@ namespace CodexAutoResume
             int off = 0;
             try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
             catch (Exception) { }
+            seenAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            // With no fade it is opaque as it is seen, and on the screen now; fading, it is on the screen at its first alpha
+            // above zero (SetFade) - uncloaked at 0 it is still not seen (live re-check 5: CameOn here gave the editor's
+            // wait cursor back 0.12 to 0.15 s before its first frame).
+            if (!fadeIn)
+            {
+                opaqueAt = seenAt;
+                CameOnNow();
+            }
+            // On the screen: its own corner's companion with it, at the alpha the fade starts from (clear where it fades).
+            if (OwnCorner != null) OwnCorner.Held = false;
             OpenFade();
         }
 
@@ -2442,6 +2557,8 @@ namespace CodexAutoResume
 
         private Padding OwnFrame()
         {
+            // v0.6.24 final: no frame at all while the dialog's outer corner is its own (gui/SoftWindowShape.cs).
+            if (chrome != null && chrome.Frameless) return Padding.Empty;
             CreateParams created = CreateParams;
             return Chrome.Frame(created.Style, created.ExStyle);
         }
@@ -2451,13 +2568,14 @@ namespace CodexAutoResume
             return Chrome.WindowSize(clientSize, OwnFrame());
         }
 
-        // The window made at the size its ClientSize says: Form fills it in with Windows' caption counted (Chrome.Uncaption).
+        // The window made at the size its ClientSize says: Form fills it in with Windows' caption counted (Chrome.Uncaption)
+        // - and with no frame at all while its outer corner is its own (v0.6.24 final).
         protected override CreateParams CreateParams
         {
             get
             {
                 CreateParams created = base.CreateParams;
-                Chrome.Uncaption(created, ClientSize);
+                Chrome.Uncaption(created, ClientSize, chrome != null && chrome.Frameless);
                 if (fadeIn && TopLevel) created.ExStyle |= WS_EX_LAYERED;
                 return created;
             }
@@ -2550,6 +2668,10 @@ namespace CodexAutoResume
         /// The strength in the theme the window is drawn in.
         internal static double StrengthNow { get { return Palette.Dark ? DarkStrength : Strength; } }
 
+        /// Its alpha at its fullest in the theme the window is drawn in: 51 in light, 82 in dark. What a veil comes on at,
+        /// and what a picture of a dialog over the window lays (WindowRender.PaintVeil).
+        internal static byte FullNow { get { return (byte)Math.Round(255 * StrengthNow); } }
+
         /// Off for every veil from here on (a probe that wants none); on in every window a person opens.
         internal static bool Enabled = true;
 
@@ -2592,7 +2714,7 @@ namespace CodexAutoResume
         {
             Owner = owner;
             colour = Ink();
-            full = (byte)Math.Round(255 * StrengthNow);
+            full = FullNow;
             Rectangle bounds;
             IntPtr region = Shape(owner, out bounds);
             Shaped = region != IntPtr.Zero;

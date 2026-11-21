@@ -1439,17 +1439,18 @@ function windowName(minutes) {
   return fill('usage.minutes', '{n}-minute', {n: minutes});
 }
 
-// v0.6.11: the last usage reading in one line - each window's length, share and reset, and the reading's
+// v0.6.11: the last usage reading in one line - each window's length, share left and reset, and the reading's
 // age - as the popup (ui/words.usage_line) and the window say it; null until usage has been read.
 function usageLine(reading, now) {
   if (!reading || typeof reading !== 'object' || !Array.isArray(reading.windows) || !reading.windows.length ||
       typeof reading.read_at !== 'number') return null;
   var parts = reading.windows.map(function (entry) {
     var used = Number(entry.used_percent) || 0;
-    var values = {window: windowName(entry.window_minutes), percent: used >= 100 ? 100 : Math.floor(used)};
-    if (typeof entry.reset_at !== 'number') return fill('usage.window', '{window} {percent}%', values);
+    // v0.6.24 final: the share LEFT (ui/words.left): 100 minus the whole share used, 0 only when used up.
+    var values = {window: windowName(entry.window_minutes), percent: 100 - (used >= 100 ? 100 : Math.floor(Math.max(0, used)))};
+    if (typeof entry.reset_at !== 'number') return fill('usage.window', '{window} {percent}% left', values);
     values.time = clockTime(entry.reset_at);
-    return fill('usage.window_resets', '{window} {percent}%, resets {time}', values);
+    return fill('usage.window_resets', '{window} {percent}% left, resets {time}', values);
   });
   return fill('usage.line', 'Codex usage, read {age}: {windows}', {age: age(now - reading.read_at), windows: parts.join(' · ')});
 }
@@ -1612,24 +1613,50 @@ function placeDayScene() {
     var rect = range.getBoundingClientRect();
     if (rect.width > 0 && rect.top - box.top < tall) end = Math.max(end, rtl ? box.right - rect.left : rect.right - box.left);
   });
-  var left = Math.max(end + 8, box.width * 0.34), right = box.width - 1, whole = tall / DAY.height;
-  var focal = DAY.width - DAY.focus, unit = Math.min(whole, (right - left - 28) / focal);
-  if (unit < whole * 0.75) return;                              // the words leave too little room: no scene rather than a squeezed one
-  var wide = right - left, fade = Math.min(72, wide - 2 - focal * unit);
+  // W2 (the owner's pick, 2026-11-17): the day across the header from the words' end to the card's outer side - its ground,
+  // its specks band after band, its scene as tall as the band when its main piece is whole there - the card's own colour
+  // fading into it past the words (brand.days.WIDE and day_band).
+  var left = end + DAY.wide.gap, right = box.width - 1, unit = tall / DAY.height, fadeMost = DAY.wide.fade;
+  if (right - left < fadeMost / 2 + 24) return;                 // the words leave the day no room at all
+  var focal = DAY.width - DAY.focus, wide = right - left, room = wide - 2 - focal * unit, shown = room >= 28;
+  var fade = Math.max(2, Math.min(fadeMost, shown ? room : wide - 2 - 24));
   var holder = element('div', 'day-scene');
   holder.setAttribute('aria-hidden', 'true');
   holder.style.width = wide + 'px';
   holder.style.height = tall + 'px';
   holder.style.background = DAY.ground;
-  var picture = svg('svg', {viewBox: '0 0 ' + DAY.width + ' ' + DAY.height, width: DAY.width * unit, height: DAY.height * unit});
-  picture.style.position = 'absolute';
-  picture.style[rtl ? 'left' : 'right'] = '0';
-  picture.style[DAY.fromTop ? 'top' : 'bottom'] = '0';
-  var defs = svg('defs', {}), group = svg('g', rtl ? {transform: 'translate(' + DAY.width + ' 0) scale(-1 1)'} : {});
-  picture.appendChild(defs);
-  DAY.elements.forEach(function (one, index) { group.appendChild(dayNode(one, defs, index)); });
-  picture.appendChild(group);
-  holder.appendChild(picture);
+  var units = wide / unit, defs = svg('defs', {});
+  var specks = svg('svg', {viewBox: '0 0 ' + units + ' ' + DAY.height, width: wide, height: tall, 'class': 'day-specks'});
+  specks.style.position = 'absolute';
+  specks.style.left = '0';
+  specks.style.top = '0';
+  specks.appendChild(defs);
+  // Laid from the outer side inward, as the scene is, so the words moving never moves them.
+  // A speck that can never reach into the band's picture (brand.speck_reach) is never made: as many moving pieces as
+  // can be seen, so a frame costs what the scene's did before the day spread wide.
+  for (var from = units; from > 0; from -= DAY.speckBand) {
+    var shift = rtl ? units - from : from - DAY.speckBand;
+    var band = svg('g', {transform: 'translate(' + shift + ' 0)'});
+    DAY.specks.forEach(function (one, index) {
+      var reach = DAY.speckReach[index];
+      if (shift + reach[1] < 0 || shift + reach[0] > units) return;
+      band.appendChild(dayNode(one, defs, 'speck-' + index));
+    });
+    specks.appendChild(band);
+  }
+  holder.appendChild(specks);
+  if (shown) {
+    var picture = svg('svg', {viewBox: '0 0 ' + DAY.width + ' ' + DAY.height, width: DAY.width * unit, height: DAY.height * unit,
+                              'class': 'day-picture'});
+    picture.style.position = 'absolute';
+    picture.style[rtl ? 'left' : 'right'] = '0';
+    picture.style[DAY.fromTop ? 'top' : 'bottom'] = '0';
+    var own = svg('defs', {}), group = svg('g', rtl ? {transform: 'translate(' + DAY.width + ' 0) scale(-1 1)'} : {});
+    picture.appendChild(own);
+    DAY.elements.forEach(function (one, index) { group.appendChild(dayNode(one, own, index)); });
+    picture.appendChild(group);
+    holder.appendChild(picture);
+  }
   var veil = element('div', 'day-veil');
   veil.style.background = 'linear-gradient(to ' + (rtl ? 'left' : 'right') + ', var(--card-ground) 2px, transparent ' + (2 + fade) + 'px)';
   holder.appendChild(veil);
@@ -1693,8 +1720,9 @@ function renderHero(status, now) {
   // names it - since the owner's decision of 2026-10-02 as quiet secondary text: a space and no separator, smaller,
   // muted, on the version's baseline (.edition; the window's VersionLabel). v0.6.14: an advanced edition only - the
   // standard edition is named nowhere beside the version (the owner, 2026-10-05), so its heading is the version alone.
+  // v0.6.24 (the owner, 2026-11-19, "버전 표시에 v 빼고 버전 숫자만 넣자"): the number alone, as the window's pill shows it.
   var named = status.edition && status.edition !== 'standard';
-  var eyebrow = hero.appendChild(element('div', 'eyebrow', 'Codex Auto Resume · v' + (status.version || '?')
+  var eyebrow = hero.appendChild(element('div', 'eyebrow', 'Codex Auto Resume · ' + (status.version || '?')
     + (named ? ' ' : '')));
   if (named) eyebrow.appendChild(element('span', 'edition', t('edition.' + status.edition, status.edition)));
   eyebrow.onclick = function () { versionPressed(); };

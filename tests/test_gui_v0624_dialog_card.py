@@ -215,7 +215,23 @@ namespace CodexAutoResume
             return said;
         }
 
+        // A part whose paint is slow after its first (the Timeline's list, measured live: re-check 10).
+        sealed class SlowPanel : Panel
+        {
+            int paints;
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                base.OnPaint(e);
+                if (paints++ >= 1) Thread.Sleep(150);
+            }
+        }
+
         static Dictionary<string, object> Scene(bool region, bool contrast, bool still)
+        {
+            return Scene(region, contrast, still, false);
+        }
+
+        static Dictionary<string, object> Scene(bool region, bool contrast, bool still, bool slow)
         {
             var said = new Dictionary<string, object>();
             bool was = Palette.Contrast;
@@ -225,6 +241,7 @@ namespace CodexAutoResume
                 Form owner = Owner(region);
                 said["ownerRegion"] = CardNative.HasRegion(owner.Handle);
                 SoftDialog dialog = Plain("A dialog over its owner");
+                if (slow) dialog.Controls.Add(new SlowPanel { Bounds = new Rectangle(16, 16, 200, 80) });
                 dialog.Owner = owner;
                 IntPtr h = dialog.Handle;
                 CardNative.ShowWindow(h, CardNative.SW_SHOWNOACTIVATE);
@@ -237,8 +254,8 @@ namespace CodexAutoResume
                 // Its opening, sampled every few milliseconds: when it is first seen (uncloaked), at what alpha, with the
                 // veil on or not, and how its alpha goes from there.
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                double seenAt = -1, opaqueAt = -1, alphaSeen = -1, last = -1;
-                bool rising = true, veilAtSeen = false;
+                double seenAt = -1, opaqueAt = -1, alphaSeen = -1, last = -1, visibleAt = -1, alphaVisible = -1;
+                bool rising = true, veilAtSeen = false, paintedAtVisible = false;
                 while (clock.ElapsedMilliseconds < 700)
                 {
                     Application.DoEvents();
@@ -251,6 +268,13 @@ namespace CodexAutoResume
                         alphaSeen = alpha;
                         veilAtSeen = dialog.Veil != null && CardNative.IsWindowVisible(dialog.Veil.Handle);
                     }
+                    if (seenAt >= 0 && alpha > 0 && visibleAt < 0)
+                    {
+                        // Its first alpha above zero: the first frame of it anyone can see.
+                        visibleAt = now;
+                        alphaVisible = alpha;
+                        paintedAtVisible = dialog.RepaintedBeforeVisible;
+                    }
                     if (seenAt >= 0)
                     {
                         if (alpha < last) rising = false;
@@ -260,7 +284,15 @@ namespace CodexAutoResume
                     Thread.Sleep(3);
                 }
                 said["alphaSeen"] = alphaSeen;
-                said["seenToOpaque"] = opaqueAt < 0 || seenAt < 0 ? -1 : opaqueAt - seenAt;
+                said["alphaVisible"] = alphaVisible;
+                said["visibleToOpaque"] = opaqueAt < 0 || visibleAt < 0 ? -1 : opaqueAt - visibleAt;
+                said["paintedAtVisible"] = paintedAtVisible;
+                // v0.6.24 final: from the moment it came on the screen to the one it was opaque, as the dialog recorded
+                // them. Read from out here, on the dialog's own thread, the moment came only once the repaint after the
+                // last step had run - about 1 run in 7, 150 ms late for a slow paint (dev CI 44753147128) - kept for
+                // the record as polledSeenToOpaque.
+                said["seenToOpaque"] = dialog.SeenToOpaque;
+                said["polledSeenToOpaque"] = opaqueAt < 0 || seenAt < 0 ? -1 : opaqueAt - seenAt;
                 said["rising"] = rising;
                 said["veilAtSeen"] = veilAtSeen;
                 said["layeredAfter"] = (CardNative.GetWindowLong(h, CardNative.GWL_EXSTYLE) & 0x00080000) != 0;
@@ -342,6 +374,7 @@ namespace CodexAutoResume
                 said["dark"] = Scene(false, false, false);
                 said["darkInk"] = DialogVeil.Ink().ToArgb() == Tokens.ShadowDark.ToArgb();
                 Palette.Adopt("light");
+                said["slow"] = Scene(false, false, false, true);
             }
             finally
             {
@@ -646,7 +679,7 @@ class DialogCardTests(unittest.TestCase):
         opaque over brand's transition (160 ms); then it is an ordinary window again. With motion reduced (this product's
         setting, Windows' animations off) it is opaque as it is first seen, and never layered."""
         transition = 160
-        for scene in ("moving", "region", "dark"):
+        for scene in ("moving", "region", "dark", "slow"):
             with self.subTest(scene=scene):
                 said = self.answer["veil"][scene]
                 self.assertTrue(said["opensWithFade"])
@@ -656,12 +689,23 @@ class DialogCardTests(unittest.TestCase):
                 self.assertTrue(transition * 0.5 <= said["seenToOpaque"] <= transition + 300,
                                 "opaque %.0f ms after it is first seen" % said["seenToOpaque"])
                 self.assertFalse(said["layeredAfter"], "an ordinary window once opaque")
+                # Re-check 10: never seen at any alpha before its whole paint - painted whole again, and that picture
+                # handed to DWM, before its first alpha above zero.
+                self.assertTrue(said["paintedAtVisible"], "painted whole before its first visible frame")
         for scene in ("windowsStill", "still"):
             with self.subTest(scene=scene):
                 said = self.answer["veil"][scene]
                 self.assertFalse(said["opensWithFade"])
                 self.assertEqual(said["alphaSeen"], 255, "no fade with motion off: opaque at once")
                 self.assertFalse(said["layeredAfter"])
+
+    def test_a_dialog_slow_to_paint_still_fades_from_near_clear(self):
+        """Re-check 10: the Timeline's first visible frame was already at 63-98 %, as its repaint took most of the fade's
+        time. The fade's clock starts once it is painted, at its first step, and a step never jumps more than two frames'
+        time: its first visible alpha is low and it takes about the transition to come."""
+        said = self.answer["veil"]["slow"]
+        self.assertTrue(0 < said["alphaVisible"] <= 0.65 * 255, "first seen at %s of 255" % said["alphaVisible"])
+        self.assertGreaterEqual(said["visibleToOpaque"], 50, "and fades, over %.0f ms" % said["visibleToOpaque"])
 
     def test_the_dark_veil_dims_the_dark_window_as_the_light_one_does_the_light(self):
         """Live re-check 7: in dark, 20 % took the Dashboard's mean grey only from 37.5 to 32; in light from 234 to 192, a

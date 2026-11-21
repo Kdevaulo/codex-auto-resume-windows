@@ -274,18 +274,22 @@ class Runner(unittest.TextTestRunner):
 def no_real_toast() -> bool:
     """Install the guard that fails a test which reaches the real Windows toast (tests/no_real_toast.py),
     which tests/sitecustomize.py installs wherever tests/ is on the path - the lanes put only src there. A
-    tree without tests/ (the release archive ships this file) has nothing to guard."""
+    tree without tests/ (the release archive ships this file) has nothing to guard. v0.6.24 final: and the guard
+    that keeps this PC's Codex processes out of every test (tests/no_real_codex.py), the same way."""
     import importlib.util
-    guard = sys.modules.get("no_real_toast")
-    if guard is None:
-        path = ROOT / "tests" / "no_real_toast.py"
-        if not path.is_file():
-            return False
-        spec = importlib.util.spec_from_file_location("no_real_toast", path)
-        guard = importlib.util.module_from_spec(spec)
-        sys.modules["no_real_toast"] = guard
-        spec.loader.exec_module(guard)
-    return guard.install()
+    installed = True
+    for name in ("no_real_toast", "no_real_codex"):
+        guard = sys.modules.get(name)
+        if guard is None:
+            path = ROOT / "tests" / (name + ".py")
+            if not path.is_file():
+                return False
+            spec = importlib.util.spec_from_file_location(name, path)
+            guard = importlib.util.module_from_spec(spec)
+            sys.modules[name] = guard
+            spec.loader.exec_module(guard)
+        installed = guard.install() and installed
+    return installed
 
 
 def work(suite: str, names: list[str], report: str, verbose: bool) -> int:

@@ -509,8 +509,12 @@ waiting there; **Remove words for this time** takes them away at once, as in the
 
 From v0.6.11 the Overview's **Waiting** card, **Why it is waiting** for a usage limit, the
 notification-area popup, the panel in Codex and `get_status` also show Codex's usage as the watcher
-last read it, with how long ago: each window's length, how much of it is used and when it resets -
-"Codex usage, read 2m ago: 5-hour 100%, resets 14:42 · weekly 62%, resets 2027-01-18 13:00". On the
+last read it, with how long ago: each window's length, how much of it is left and when it resets -
+"Codex usage, read 2m ago: 5-hour 0% left, resets 14:42 · weekly 38% left, resets 2027-01-18 13:00".
+Since v0.6.24 the places you glance at to see whether you may keep going say what is left - 100 minus the whole
+share used, so 0% only once a window is used up (99.6% used leaves 1%) - where they said how much was used before; a
+bar is as full as what is left and empties as the window is used. Places about pace, history, diagnosis and the limits
+you set say what is used, with the word: the Diagnostics check, the advanced analytics' last hour, and the limits. On the
 Overview it is one line, ending in "..." where the card is too narrow; the others say it whole. When a
 weekly limit is used up, **Why it is waiting** also says the day and time it resets, and that Codex's
 `/usage` can redeem a reset credit if your account has one - this product never knows whether it does.
@@ -521,7 +525,9 @@ time they were read: which window, how much is used, its length and its reset ti
 plan or credit. (The advanced edition's two reset actions read usage on their own while one of their
 rules waits, and one of them keeps how many reset credits you have; its usage meter, when you turn it on,
 reads usage on its own at the spacing you choose, and its newest reading is what this line and the icon's
-tooltip then show, with a notice near the limit you set; [EDITIONS.md](EDITIONS.md) says so for each.)
+tooltip then show - on the icon's card a bar for each window, as full as what is left of it, in the warning colour
+with 10% or less left - with a notice near the limit you set, which says what is left too; the limits you set stay
+the share used at which each acts; [EDITIONS.md](EDITIONS.md) says so for each.)
 
 <img src="images/settings-window.png" alt="The Continuation message section of the Dashboard's Settings page: the continuation language, the four message styles with Standard selected, and a Preview of the message sent for a usage limit" width="680">
 
@@ -1505,7 +1511,7 @@ it does not recover); for one it would take up, anything else that holds it (aut
 conversation switched off, that kind switched off in Settings, a record it already has, the watcher not
 running); conversations whose turns Codex records under another id, which the watcher follows; each Codex
 home with when its databases were last written; how many cloud tasks the app knows - they run on
-OpenAI's servers and cannot be recovered yet; the last usage reading; how notices reach you; the Codex
+OpenAI's servers and cannot be recovered yet; the last usage reading, as the share of each window used, as Codex reported it; how notices reach you; the Codex
 version and its compatibility; and the watcher's last reasons from its log, which says once per turn why
 a failed turn was not taken up. It only reads: nothing of any conversation's words, and conversations
 appear as aliases valid only in that answer. Export diagnostics... includes the same check.

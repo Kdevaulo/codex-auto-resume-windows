@@ -1091,6 +1091,46 @@ namespace CodexAutoResume
                         if (!form.OpenAskedChat()) disabled.Add("chat_argument");
                     }
                     else if (what == "scheduled_choose") form.ChooseScheduledRow(Str(step, "key"));
+                    else if (what == "editor_shown")
+                    {
+                        // v0.6.24 final (live re-check 3, L5: Schedule... showed its window 2.5 s after the press): Schedule...
+                        // pressed and its editor shown as a person's is - top level, held off the screen until painted, then
+                        // faded in - but 30000 px off every screen and never activated, timed from the press (EditorShown).
+                        var record = new Dictionary<string, object>();
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        form.editorShow = delegate(Form dialog) { form.EditorShown(dialog, clock, record); };
+                        try
+                        {
+                            if (form.scheduleAddButton == null || !form.scheduleAddButton.Enabled) disabled.Add("editor_shown");
+                            else Pressed.Invoke(form.scheduleAddButton, new object[] { EventArgs.Empty });
+                        }
+                        finally
+                        {
+                            form.editorShow = null;
+                        }
+                        record["closed"] = clock.Elapsed.TotalMilliseconds;
+                        dialogs.Add(record);
+                    }
+                    else if (what == "timeline_shown")
+                    {
+                        // v0.6.24 final (L5): the Timeline - the dialog the editor is held to - built for the first recovery
+                        // in Pending, shown and timed as the editor is (EditorShown), from the moment it is asked for.
+                        var record = new Dictionary<string, object>();
+                        record["kind"] = "timeline";
+                        Dictionary<string, object> first = null;
+                        foreach (object listed in Items(form.snapshot, "pending") ?? new List<object>())
+                            if (first == null) first = listed as Dictionary<string, object>;
+                        var events = new List<object>();
+                        var happened = new Dictionary<string, object>();
+                        happened["at"] = 1.8e9;
+                        happened["code"] = "detected";
+                        happened["to_code"] = "waiting_reset";
+                        events.Add(happened);
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        if (first == null) disabled.Add("timeline_shown");
+                        else using (Form dialog = form.BuildTimeline(first, events, null)) form.EditorShown(dialog, clock, record);
+                        dialogs.Add(record);
+                    }
                     else if (what == "scheduled_press")
                     {
                         // v0.6.19 (#50): one of the Scheduled tab's buttons pressed, if it can be - the editor it opens
@@ -1493,6 +1533,86 @@ namespace CodexAutoResume
             if (editorDialog != null) editorDialog.PerformLayout();
             editorBody.Parent.PerformLayout();
             return (int)Math.Round((editorBody.Parent.ClientSize.Height - editorBody.Height) / DpiScale);
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr window, int command);
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool PostMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+        /// The editor `dialog`, built, shown as ShowDialog shows a person's - its window made, then shown - but off every
+        /// screen and never activated (SW_SHOWNOACTIVATE), and the milliseconds from the press on `clock`: built (the
+        /// editor handed over to be shown), seen (DWM no longer holding it off: DWMWA_CLOAKED), opaque (its fade done, as
+        /// the dialog recorded it, or seen where it does not fade); whether the wait cursor was on from the press to the
+        /// show; closed after.
+        private void EditorShown(Form dialog, System.Diagnostics.Stopwatch clock, Dictionary<string, object> record)
+        {
+            record["built"] = clock.Elapsed.TotalMilliseconds;
+            record["waiting"] = UseWaitCursor;
+            dialog.StartPosition = FormStartPosition.Manual;
+            dialog.Location = new Point(-30000, -30000);
+            IntPtr h = dialog.Handle;
+            ShowWindow(h, 4);
+            record["shown"] = clock.Elapsed.TotalMilliseconds;
+            // Shown and still held off the screen: the cursor Windows would set over the window held disabled by its dialog
+            // (HTERROR, as a modal dialog leaves it), over the window's caption and over the editor's title row.
+            record["heldCursors"] = CursorsOver(h);
+            // Off every screen it is sent no WM_PAINT (nothing of it can be seen), and would come on only by the dialog's
+            // half-second fallback (SoftDialog.UncloakSoon): the first paint a screen asks for as it is shown, asked here.
+            PostMessage(h, 0x000F, IntPtr.Zero, IntPtr.Zero);
+            var soft = dialog as SoftDialog;
+            record["fades"] = soft != null && soft.OpensWithFade;
+            double seen = -1, opaque = -1;
+            // Live re-check 5: how often the window's wait cursor was already off while the editor, uncloaked, was still
+            // clear (its fade at alpha 0: nothing of it seen yet) - and whether it was off by its first frame above clear.
+            int arrowWhileClear = 0;
+            object waitAtFirstFrame = null;
+            double waitOffAt = -1, firstFrameAt = -1;
+            while (clock.ElapsedMilliseconds < 15000 && opaque < 0)
+            {
+                Application.DoEvents();
+                int cloaked;
+                bool held = DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && cloaked != 0;
+                if (waitOffAt < 0 && !UseWaitCursor) waitOffAt = clock.Elapsed.TotalMilliseconds;
+                if (!held && soft != null && (bool)record["fades"])
+                {
+                    if (soft.FadeAlpha > 0 && firstFrameAt < 0) firstFrameAt = clock.Elapsed.TotalMilliseconds;
+                    if (soft.FadeAlpha == 0 && !UseWaitCursor) arrowWhileClear++;
+                    if (soft.FadeAlpha > 0 && waitAtFirstFrame == null) waitAtFirstFrame = UseWaitCursor;
+                }
+                if (!held && seen < 0) seen = clock.Elapsed.TotalMilliseconds;
+                if (seen >= 0 && (soft == null || soft.SeenToOpaque >= 0)) opaque = seen + (soft == null ? 0 : soft.SeenToOpaque);
+                System.Threading.Thread.Sleep(1);
+            }
+            record["arrowWhileClear"] = (double)arrowWhileClear;
+            record["waitAtFirstFrame"] = waitAtFirstFrame;
+            // How long before its first frame above clear the pointer was given back (negative: after it), in ms.
+            record["arrowLead"] = waitOffAt < 0 || firstFrameAt < 0 ? 0 : firstFrameAt - waitOffAt;
+            record["seen"] = seen;
+            // On the screen: the pointer given back.
+            record["seenCursors"] = CursorsOver(h);
+            record["whole"] = opaque;  // "whole", not "opaque": the edition audit reads every advanced literal of six letters or more in the standard window, whose dialog has an opaqueAt
+            dialog.Close();
+        }
+
+        /// Whether the cursor Windows' WM_SETCURSOR sets is the wait cursor: over the window while a dialog holds it
+        /// disabled (HTERROR), over the window's caption ground (HTCAPTION) and over the editor's title row (HTCAPTION of
+        /// the dialog `dialog`) - asked of each window as Windows asks it, the answer read from the thread's cursor.
+        private List<object> CursorsOver(IntPtr dialog)
+        {
+            var said = new List<object>();
+            foreach (KeyValuePair<IntPtr, int> ask in new[] {
+                         new KeyValuePair<IntPtr, int>(Handle, 0xFFFE), new KeyValuePair<IntPtr, int>(Handle, 2),
+                         new KeyValuePair<IntPtr, int>(dialog, 2) })
+            {
+                Cursor.Current = Cursors.Default;
+                IntPtr where = (IntPtr)((0x0200 << 16) | ask.Value);
+                SendMessage(ask.Key, 0x0020, ask.Key, where);
+                said.Add(Cursor.Current == Cursors.WaitCursor);
+            }
+            return said;
         }
 
         // Control.OnClick, which raises Click as a press of the button does.

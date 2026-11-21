@@ -36,7 +36,7 @@ class KeyTests(unittest.TestCase):
 class TooltipTests(unittest.TestCase):
     def test_the_meter_is_one_line_after_what_the_tooltip_said(self):
         tip = words.tooltip({"waiting": 0, EXTRA: {"meter": METER}}, {}, NOW, "advanced")
-        self.assertEqual(tip.split("\n")[-1], "5-hour 87% · weekly 40%")
+        self.assertEqual(tip.split("\n")[-1], "5-hour 13% left · weekly 60% left")
         self.assertLess(len(tip), words.TIP_CHARS)
 
     def test_without_a_meter_the_tooltip_is_what_it_always_was(self):
@@ -70,9 +70,21 @@ class NoticeTests(unittest.TestCase):
     def test_a_near_limit_notice_names_the_window_and_its_share_and_no_conversation(self):
         notice = notifier.build("near_limit", {"minutes": 300, "percent": 87.6, "reset_at": NOW + 3600})
         self.assertEqual((notice.kind, notice.status, notice.key), ("near_limit", "attention", None))
-        self.assertIn("5-hour 87%", notice.origin)
+        self.assertIn("5-hour 13% left", notice.origin)
         weekly = notifier.build("near_limit", {"minutes": 10080, "percent": 91})
-        self.assertIn("weekly 91%", weekly.origin)
+        self.assertIn("weekly 9% left", weekly.origin)
+
+    def test_a_near_limit_notice_says_what_is_left_at_every_edge(self):
+        """v0.6.24 final: the share left - 100 minus the whole share used, 0 at and above 100 - and no number at all
+        where the share cannot be read (never a "100% left" nobody read)."""
+        for percent, said in ((0, "5-hour 100% left"), (99.6, "5-hour 1% left"), (100, "5-hour 0% left"),
+                              (130, "5-hour 0% left")):
+            with self.subTest(percent=percent):
+                self.assertEqual(notifier.build("near_limit", {"minutes": 300, "percent": percent}).origin.count(said), 1)
+        for percent in (None, "lots", float("nan"), True):
+            with self.subTest(percent=percent):
+                notice = notifier.build("near_limit", {"minutes": 300, "percent": percent})
+                self.assertNotIn("%", notice.origin)
 
 
 class WatcherNoticeTests(unittest.TestCase):

@@ -1,12 +1,10 @@
 """Binding the configured Codex to exactly one Windows Store package, and the inventory it reads."""
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path, PureWindowsPath
 import re
 import stat
-import subprocess as S
 import threading
 import time
 
@@ -14,32 +12,53 @@ from ..domain.errors import AdapterError
 from ..domain.ids import CODEX_APP_PUBLISHER
 from ..win import authenticode
 from ..win.inventory import resource_users
-from ..win.kernel import NO_WINDOW, process_identity
+from ..win.kernel import process_identity, processes_named
 from .paths import newest_generation
 
 
-_INVENTORY_PS = r"""
-$ErrorActionPreference='Stop'
-# Windows PowerShell 5.1 emits the console OEM code page by default; force UTF-8 so
-# non-ASCII executable paths (e.g. a non-ASCII user profile) survive the round-trip.
-[Console]::OutputEncoding=[System.Text.Encoding]::UTF8
-@(Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe' OR Name = 'codex.exe'" |
- ForEach-Object { [pscustomobject]@{
- pid=[int]$_.ProcessId; parent=[int]$_.ParentProcessId; path=$_.ExecutablePath
- } }) | ConvertTo-Json -Compress
-"""
+# The two program files the inventory lists: the Codex app's (ChatGPT.exe) and every Codex engine's (codex.exe).
+INVENTORY_NAMES = ("ChatGPT.exe", "codex.exe")
+# v0.6.24 final: how long, in seconds, one process list answers every caller in this process. One status read asked for
+# it nine times - each advanced capability's view binds the compatibility report to the engine the app serves - and
+# each list was a PowerShell CIM query of about 10 s on the owner's PC: 90-105 s for one read, and a Dashboard that
+# said it could not read the status. A few seconds is longer than one read and shorter than any pace that acts on what
+# the list says (the watcher looks every 5 s, and holds each process it trusts to its own identity first); a caller
+# that has just started or stopped a process, or is about to act on who runs, asks afresh (`forget_inventory`).
+INVENTORY_SECONDS = 3.0
+_LISTED = None                                  # (time.monotonic() when read, the rows), or None
+_FORGOTTEN = 0                                  # how many times the list was forgotten: a read begun before is not kept
+_LISTED_LOCK = threading.Lock()
 
 
 def inventory():
-    powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    """Every ChatGPT.exe and codex.exe running: {"pid", "parent", "path"} each - the path None where the process cannot
+    be opened. No command line, no environment and no process memory are read. One list serves every caller for
+    INVENTORY_SECONDS; each caller gets its own copy. Raises AdapterError("process_inventory_unavailable") where the
+    list cannot be made.
+
+    v0.6.24 final: read through one Toolhelp snapshot (win/kernel.py processes_named), no longer by PowerShell's
+    Get-CimInstance Win32_Process: no process is started for it."""
+    global _LISTED
+    with _LISTED_LOCK:
+        listed, forgotten = _LISTED, _FORGOTTEN
+    if listed is not None and 0 <= time.monotonic() - listed[0] <= INVENTORY_SECONDS:
+        return [dict(row) for row in listed[1]]
     try:
-        result = S.run([str(powershell), "-NoProfile", "-NonInteractive", "-Command", _INVENTORY_PS],
-                       capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       timeout=15, creationflags=NO_WINDOW, check=True, shell=False)
-        rows = json.loads(result.stdout) if result.stdout.strip() else []
-        return rows if isinstance(rows, list) else [rows]
-    except (OSError, S.SubprocessError, ValueError):
+        rows = processes_named(INVENTORY_NAMES)
+    except (AdapterError, OSError, ValueError):
         raise AdapterError("process_inventory_unavailable") from None
+    with _LISTED_LOCK:
+        if forgotten == _FORGOTTEN:
+            _LISTED = (time.monotonic(), [dict(row) for row in rows])
+    return rows
+
+
+def forget_inventory() -> None:
+    """The next `inventory` reads the processes afresh: for a caller that has just started or stopped one, or is about
+    to act on who runs."""
+    global _LISTED, _FORGOTTEN
+    with _LISTED_LOCK:
+        _LISTED, _FORGOTTEN = None, _FORGOTTEN + 1
 
 
 # v0.6.21 (#58): the one signer whose signature makes a codex.exe outside the official folder official, compared
@@ -254,6 +273,7 @@ def own_server(pid):
     mark = (held["pid"], held["created"])
     with _OWN_LOCK:
         _OWN.add(mark)
+    forget_inventory()
     return mark
 
 
@@ -261,6 +281,7 @@ def own_server_gone(mark) -> None:
     """The app server `own_server` counted, shut: it no longer counts."""
     with _OWN_LOCK:
         _OWN.discard(mark)
+    forget_inventory()
 
 
 def own_holder(user) -> bool:

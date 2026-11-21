@@ -156,7 +156,9 @@ class PointTests(unittest.TestCase):
                                  # v0.6.23: the edition's page made ready ahead of its first visit, as the standard ones.
                                  "EditionPageNamed": "gui/Dashboard.cs", "EditionPageFor": "gui/Dashboard.cs",
                                  # v0.6.23 (perffix): the steps that page is built ahead in.
-                                 "EditionPageSteps": "gui/Dashboard.cs"})
+                                 "EditionPageSteps": "gui/Dashboard.cs",
+                                 # v0.6.24 final (J9): the tabs whose room the row keeps until it is known whether they show.
+                                 "TabsHeld": "gui/Dashboard.cs"})
         # No other shape of partial method: one with a body in a standard source would be
         # compiled into the standard window, which is the whole thing this rules out.
         whole = guiscan.whole()
@@ -181,7 +183,9 @@ class PointTests(unittest.TestCase):
                                  "PendingButtonsUpdated": 1, "HistoryButtonsUpdated": 1, "EditionRowOpened": 1,
                                  "ClearHistoryPressed": 1, "HeroTold": 1, "OverviewRoomAsked": 1,
                                  # v0.6.23: the edition's page made ready ahead (NextToPrepare, PreparedPage).
-                                 "EditionPageNamed": 1, "EditionPageFor": 1, "EditionPageSteps": 1})
+                                 "EditionPageNamed": 1, "EditionPageFor": 1, "EditionPageSteps": 1,
+                                 # v0.6.24 final (J9): the Chat tab's room, held in the tab row's width (TabRowAt).
+                                 "TabsHeld": 1})
 
 
 def copy_window(target: Path) -> Path:
@@ -269,7 +273,9 @@ class WindowTests(unittest.TestCase):
         # v0.6.20: HeroTold - the header's light while a chat message is on its way - the seventeenth, called once.
         # v0.6.23: EditionPageNamed and EditionPageFor - the edition's page made ready ahead - declared and called once each;
         # and (perffix) EditionPageSteps, the steps it is built ahead in.
-        self.assertEqual(self.cut_lines, 21 + 23, "twenty-one declarations and twenty-three calls")
+        # v0.6.24 final (J9): TabsHeld - the tabs whose room the row keeps until it is known whether they show - declared and
+        # called once.
+        self.assertEqual(self.cut_lines, 22 + 24, "twenty-two declarations and twenty-four calls")
         self.assertEqual(self.standard, (self.work / "without" / WINDOW).read_bytes())
         self.assertEqual((self.work / "standard" / LAUNCHER).read_bytes(),
                          (self.work / "without" / LAUNCHER).read_bytes())

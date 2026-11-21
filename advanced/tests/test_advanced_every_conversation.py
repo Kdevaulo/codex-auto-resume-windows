@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from takingcase import TakingCase  # noqa: E402
 import codexsim  # noqa: E402
+from test_adopted_cli import conversation as shaped  # noqa: E402
+from codex_auto_resume.codex import eligibility  # noqa: E402
 from codex_auto_resume import machine  # noqa: E402
 from codex_auto_resume.domain.plug import Point  # noqa: E402
 from codex_auto_resume.domain.plughands import Widening  # noqa: E402
@@ -110,6 +112,70 @@ class TurnedOffTests(TakingCase):
         widened = self.waiting(NEW_LABEL)
         self.h.tick(advance=1)
         self.assertNotEqual(self.h.record(widened)["state"], "cancelled")
+
+
+class AnyOriginatorTests(TakingCase):
+    """v0.6.24 (the owner's word of 2026-11-19, "take up everything but what is confirmed"): on, a conversation on the app's
+    row is taken up whatever its first line's originator, but the closed deny-list's (core's
+    codex/values.NOT_DESKTOP_ORIGINATORS: codex_vscode, VS Code's own) - an originator Codex adds later, and issue #66's
+    exec line with no fork, included. The row's source, the first line's source, the thread_source deny-list and every
+    gate stand; off, it is the standard edition's allow-list, the #66 fork rule included."""
+    DEFINITION = EVERY_CONVERSATION
+    FUTURE = "codex_future"
+
+    def failing(self, originator, row_source="vscode", meta_source="vscode", thread_source="user", **more):
+        thread = codexsim.new_id()
+        shaped(self.h.home, thread, row_source=row_source, meta_source=meta_source, originator=originator,
+               thread_source=thread_source, **more)
+        self.h.backend.loaded_map[thread] = "loaded"
+        self.h.now += 1
+        self.h.home.fail_usage(thread)
+        self.h.tick()
+        return self.h.records(thread)
+
+    def test_on_an_unknown_originator_and_an_exec_line_with_no_fork_are_taken_up(self):
+        """Fails with the widening reverted: "not taken up (other_kind: originator codex_future)"."""
+        self.armed()
+        self.assertEqual(len(self.failing(self.FUTURE)), 1)
+        self.assertEqual(len(self.failing("codex_exec")), 1)
+        wide = frozenset({Widening.EVERY_DESKTOP})
+        self.assertEqual(eligibility.kind_of("vscode", {"source": "vscode", "originator": self.FUTURE}, widened=wide),
+                         "desktop")
+        self.assertTrue(eligibility.originator_taken("vscode", {"originator": self.FUTURE}, widened=wide))
+
+    def test_on_vs_codes_own_exec_and_cli_rows_and_a_subagent_are_not(self):
+        self.armed()
+        for name, shape in (("VS Code's own", dict(originator="codex_vscode")),
+                            ("a standalone exec run", dict(originator="codex_exec", row_source="exec", meta_source="exec")),
+                            ("an exec row, unknown originator", dict(originator=self.FUTURE, row_source="exec",
+                                                                     meta_source="exec")),
+                            ("a terminal's", dict(originator="codex-tui", row_source="cli", meta_source="cli")),
+                            ("a cli row, unknown originator", dict(originator=self.FUTURE, row_source="cli",
+                                                                   meta_source="cli")),
+                            ("a subagent", dict(originator=self.FUTURE, thread_source="subagent")),
+                            ("a first line of another source", dict(originator=self.FUTURE, meta_source="exec")),
+                            ("no originator", dict(originator=None))):
+            with self.subTest(name):
+                self.assertEqual(self.failing(**shape), [])
+        wide = frozenset({Widening.EVERY_DESKTOP})
+        self.assertIsNone(eligibility.kind_of("vscode", {"source": "vscode", "originator": "codex_vscode"}, widened=wide))
+        self.assertFalse(eligibility.originator_taken("exec", {"originator": self.FUTURE}, widened=wide))
+
+    def test_off_an_unknown_originator_is_refused_as_today(self):
+        self.plugged(self.advanced())
+        self.assertEqual(self.failing(self.FUTURE), [])
+        self.assertEqual(self.failing("codex_exec"), [])
+        self.assertIsNone(eligibility.kind_of("vscode", {"source": "vscode", "originator": self.FUTURE}))
+
+    def test_turned_off_the_record_only_it_took_up_is_cancelled(self):
+        plug = self.armed()
+        (row,) = self.failing(self.FUTURE)
+        self.assertIn(row["state"], machine.WAITING)
+        plug.runtime.arming.disarm(self.cap, actor=Actor.DASHBOARD)
+        plug.runtime.states(fresh=True)
+        self.h.tick(advance=1)
+        row = self.h.record(row["thread_id"])
+        self.assertEqual((row["state"], row["last_error"]), ("cancelled", "session_kind_off"))
 
 
 if __name__ == "__main__":

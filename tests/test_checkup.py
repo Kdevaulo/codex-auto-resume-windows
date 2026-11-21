@@ -138,6 +138,21 @@ class FactTests(CheckupCase):
         self.assertIn("Notices are shown as Windows notifications. Do not disturb: off.", said)
         self.assertIn("compatibility:", said)
 
+    def test_the_usage_line_says_what_is_used_as_codex_reported_it(self):
+        """The owner, 2026-11-18: a diagnosis says what is USED of each window, as Codex reported it, with the word
+        "used" said plainly - the at-a-glance surfaces say what is left - and "?" for a window not read."""
+        result = self.run_check()
+        result["usage"] = {"read": True, "read_at": NOW - 120, "five_hour": 37.5, "weekly": 130, "reset_at": NOW + 3600}
+        said = "\n".join(checkup.lines(result, NOW, "en"))
+        self.assertIn("5-hour 37.5% used, weekly 130% used", said)
+        self.assertNotIn("% left", said)
+        result["usage"].update(five_hour=42, weekly=None)
+        said = "\n".join(checkup.lines(result, NOW, "en"))
+        self.assertIn("5-hour 42% used, weekly ?% used", said)
+        self.assertIn("5시간 42% 사용", "\n".join(checkup.lines(result, NOW, "ko")))
+        self.assertEqual(checkup._usage({"watcher": {"usage": {"read_at": NOW, "windows": [
+            {"window_minutes": checkup.FIVE_HOURS, "used_percent": 37.5}]}}}, NOW)["five_hour"], 37.5)
+
     def test_the_last_skip_lines_come_from_the_log_as_aliases(self):
         self.paths.logs_dir.mkdir(parents=True, exist_ok=True)
         line = logbook.skipped(A, B, skips.BEFORE_WINDOW)

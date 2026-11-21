@@ -1594,6 +1594,13 @@ namespace CodexAutoResume
 
         private void ApplyStatus(Dictionary<string, object> status, CheckBox startup)
         {
+            // v0.6.24 final (L3): the first state the window shows, for the start's marks.
+            if (StartMarks.On && !firstStateMarked)
+            {
+                firstStateMarked = true;
+                StartMarks.Mark("first state");
+                StartMarks.Write();
+            }
             object running = status["watcher_running"];
             KnowStartup(status, startup);
 
@@ -1624,12 +1631,35 @@ namespace CodexAutoResume
         /// in the secondary colour, on the version's baseline, with no separator (VersionLabel). A status that names no
         /// edition shows the version alone, as it did before - and since v0.6.14 so does the standard edition, which is
         /// named nowhere beside the version (the owner, 2026-10-05); only an advanced one is.
+        ///
+        /// v0.6.24 (the owner, 2026-11-19, "버전 표시에 v 빼고 버전 숫자만 넣자"): the tabs' pill shows the number alone,
+        /// "0.6.24" - a screen reader is told "0.6.24 Advanced" (VersionPill.Tell); Diagnostics' Version row keeps its "v".
         private void ShowVersion(VersionLabel label, Dictionary<string, object> status)
         {
             string edition = Str(status, "edition");
             bool named = !string.IsNullOrEmpty(edition) && edition != UnnamedEdition;
-            label.Set("v" + Convert.ToString(Get(status, "version"), CultureInfo.InvariantCulture),
-                       named ? S("edition." + edition, edition) : null);
+            string number = Convert.ToString(Get(status, "version"), CultureInfo.InvariantCulture);
+            label.Set(label == versionText ? number : "v" + number, named ? S("edition." + edition, edition) : null);
+        }
+
+        /// v0.6.24 final's live acceptance (J9): the version as this installation's own files say it, on the tabs' pill from
+        /// the window's first paint - it came only with the first state, and the tab row changed once after opening. The
+        /// version is written in one place, app\.codex-plugin\plugin.json, which config.version reads for the status too;
+        /// the edition is what the source tree under it is (InstallerFlow.EditionOfSource). The status writes the same over
+        /// it (ShowVersion), and has the last word where they differ. A window with no plugin.json beside it waits for the
+        /// status, as before.
+        private void ShowLocalVersion(string root)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(root)) return;
+                string app = Path.Combine(root, "app");
+                string number = InstallerFlow.VersionOf(ReadText(Path.Combine(Path.Combine(app, ".codex-plugin"), "plugin.json")));
+                if (string.IsNullOrEmpty(number)) return;
+                string edition = InstallerFlow.EditionOfSource(Path.Combine(app, "src")) ?? UnnamedEdition;
+                ShowVersion(versionText, new Dictionary<string, object> { { "version", number }, { "edition", edition } });
+            }
+            catch (Exception) { /* the status names it */ }
         }
 
         /// The edition whose word stands beside the version nowhere (v0.6.14). The picker's Edition column still names
@@ -1656,8 +1686,8 @@ namespace CodexAutoResume
         {
             if (heroHeld) return;
             string word = ActivityWord(status, pending, now);
-            // An action in flight, or a card's read (cardReads, v0.6.24).
-            string light = BusyLight(HeaderLight(status, pending, word), busy > 0 || cardReads > 0);
+            // An action in flight, or a card's read (cardReads, v0.6.24), or the window reopening (v0.6.24-beta.3: Reopen).
+            string light = BusyLight(HeaderLight(status, pending, word), busy > 0 || cardReads > 0 || reopening);
             string head = Headline(strings, status, pending);
             HeroTold(ref light, ref head);
             stateDot.State = light;

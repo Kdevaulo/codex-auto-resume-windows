@@ -8,9 +8,9 @@
 // process is started. For each frame of the job it is put in a state - a page, a Settings section, a scroll
 // offset, a control's hover or pressed face, a drop-down's value, its open list, a Pending row chosen and its own
 // menu open (v0.6.18), an action in flight (v0.6.20: SetBusy), the answers of another state of the installation
-// (paused), Why it is waiting scrolled, a dialog the window opened (Timeline) over it, the moment of its lights -
-// waits until it holds still as a capture waits (Settled), and draws itself into a bitmap; only what changed
-// since the frame before is written.
+// (paused), Why it is waiting scrolled, a dialog the window opened (Timeline) over it with the veil under it, the moment
+// of its lights and of the light's sweep (v0.6.24) - waits until it holds still as a capture waits (Settled), and draws
+// itself into a bitmap; only what changed since the frame before is written.
 
 using System;
 using System.Collections.Generic;
@@ -378,7 +378,26 @@ namespace CodexAutoResume
             // is the working one (BusyLight). After the moment of the lights, which the header reads as it follows.
             object working;
             RenderBusy(frame.TryGetValue("busy", out working) && Equals(working, true));
+            object sweeping;
+            RenderSweep(frame.TryGetValue("sweep", out sweeping) && sweeping != null
+                ? Convert.ToDouble(sweeping, CultureInfo.InvariantCulture) : -1);
             HoldStill(false);
+        }
+
+        /// v0.6.24: the light's sweep `ms` into it - as the window opens and as the light turns on (SweepLight, and Shown for
+        /// the opening's) - and the line under the headline coming in as it ends (AsideLabel.Arrive(AsideAfterMs)): each drawn
+        /// by its own painter at that moment (HaloDot.StillSweepMs, AsideLabel.ArriveAt), for a frame `sweep` ms after the
+        /// sweep began (build/motion_window.frame_state); -1 - no sweep - for every other frame. The window's own sweep never
+        /// plays in a render (LightSweepsShown).
+        private void RenderSweep(double ms)
+        {
+            if (ms >= HaloDot.SweepMs) ms = -1;
+            if (stateDot.StillSweepMs != ms)
+            {
+                stateDot.StillSweepMs = ms;
+                stateDot.Invalidate();
+            }
+            detail.ArriveAt(ms, AsideAfterMs);
         }
 
         // Whether the last frame had an action in flight (RenderBusy).
@@ -541,6 +560,43 @@ namespace CodexAutoResume
             if (control.Parent != null) control.Parent.Invalidate(true);
         }
 
+        /// v0.6.24-beta.3: the day's scene under `root` (SoftDayScene, the header's child above its card) laid down over the
+        /// picture of it, where it stands and in its own outline (its Region), as the screen stacks it: higher in the
+        /// header's z-order than the card, so over it. DrawToBitmap prints the children from the top of the z-order down,
+        /// each over the one before, and the card was printed over the scene - on a special day the header showed none of
+        /// it, only the caption buttons (PaintCaptionOver, after this) drew it under them (found 2026-11-17).
+        private static void PaintSceneOver(Bitmap picture, Control root)
+        {
+            var found = new List<SoftDayScene>();
+            var walk = new Stack<Control>();
+            walk.Push(root);
+            while (walk.Count > 0)
+            {
+                Control parent = walk.Pop();
+                foreach (Control child in parent.Controls)
+                {
+                    if (!OwnVisible(child)) continue;
+                    var scene = child as SoftDayScene;
+                    if (scene != null) { if (scene.Look != null) found.Add(scene); }
+                    else walk.Push(child);
+                }
+            }
+            foreach (SoftDayScene scene in found)
+            {
+                if (scene.Width <= 0 || scene.Height <= 0) continue;
+                Point at = Point.Empty;
+                for (Control c = scene; c != null && c != root; c = c.Parent) at.Offset(c.Left, c.Top);
+                using (var face = new Bitmap(scene.Width, scene.Height, PixelFormat.Format32bppArgb))
+                using (Graphics g = Graphics.FromImage(picture))
+                {
+                    scene.DrawToBitmap(face, new Rectangle(Point.Empty, scene.Size));
+                    g.TranslateTransform(at.X, at.Y);
+                    if (scene.Region != null) g.SetClip(scene.Region, System.Drawing.Drawing2D.CombineMode.Replace);
+                    g.DrawImageUnscaled(face, 0, 0);
+                }
+            }
+        }
+
         /// v0.6.24: the caption buttons under `root` (gui/SoftChrome.cs) drawn again over the picture of it, where they stand.
         /// DrawToBitmap prints a window's children from the top of the z-order down, so the card the buttons stand over -
         /// lower in the z-order, as on the screen - was printed over them and they were in no picture.
@@ -621,6 +677,7 @@ namespace CodexAutoResume
             var picture = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppArgb);
             Invalidate(true);
             DrawToBitmap(picture, new Rectangle(Point.Empty, ClientSize));
+            PaintSceneOver(picture, this);
             PaintCaptionOver(picture, this);
             PaintListGutters(picture);
             renderRows = null;
@@ -881,9 +938,13 @@ namespace CodexAutoResume
                     PaintCaptionOver(body, form);
                     PaintListGutters(body, form);
                     // v0.6.24: no caption, the window's or the dialog's: the window's client area is the whole of it.
-                    int border = Math.Max(1, Px(1));
+                    // v0.6.24 final: and with its own outer corner (DialogSquircle) no frame either - its window is its
+                    // client area, its hairline and shadow the corner's (PaintDialog).
+                    int border = DialogSquircle() ? 0 : Math.Max(1, Px(1));
                     Size outer = new Size(client.Width + 2 * border, client.Height + 2 * border);
                     Point place = RenderDialogPlace(outer, ClientSize);
+                    // v0.6.24: the window dimmed under it, as it is for as long as the dialog is open (DialogVeil).
+                    PaintVeil(picture);
                     PaintDialog(picture, body, place, outer, border, form.BackColor);
                     renderDialogBounds = new Dictionary<string, Rectangle>();
                     renderDialogBounds["dialog.window"] = new Rectangle(place.X, place.Y, outer.Width, outer.Height);
@@ -942,10 +1003,62 @@ namespace CodexAutoResume
             using (var scaled = new Icon(icon, new Size(size, size))) return scaled.ToBitmap();
         }
 
+        /// v0.6.24: the veil over the window while a dialog of its own is open (DialogVeil), over `picture` - the window's whole
+        /// client area, which its own corner cuts later as it cuts the window (CornerStill): the shadow's ink (DialogVeil.Ink)
+        /// at the veil's alpha at its fullest in the theme (DialogVeil.FullNow: 51 in light, 82 in dark), laid as a layered
+        /// window of that alpha is laid over what is under it. At its fullest from the dialog's first frame, as the veil
+        /// comes on before the dialog is seen, and gone with it; none in High Contrast nor where veils are off, as DialogVeil.Over
+        /// makes none.
+        internal static void PaintVeil(Bitmap picture)
+        {
+            if (!DialogVeil.Enabled || Palette.Contrast) return;
+            int alpha = DialogVeil.FullNow;
+            Color ink = DialogVeil.Ink();
+            int[] pixels = Argb(picture);
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                int under = pixels[i];
+                pixels[i] = (under & unchecked((int)0xFF000000)) |
+                            (Veiled((under >> 16) & 0xFF, ink.R, alpha) << 16) |
+                            (Veiled((under >> 8) & 0xFF, ink.G, alpha) << 8) |
+                            Veiled(under & 0xFF, ink.B, alpha);
+            }
+            BitmapData data = picture.LockBits(new Rectangle(0, 0, picture.Width, picture.Height), ImageLockMode.WriteOnly,
+                                               PixelFormat.Format32bppArgb);
+            try
+            {
+                for (int y = 0; y < picture.Height; y++)
+                    Marshal.Copy(pixels, y * picture.Width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), picture.Width);
+            }
+            finally { picture.UnlockBits(data); }
+        }
+
+        /// One channel `under` with the veil's `ink` laid over it at `alpha` (0 to 255), rounded to the nearest level.
+        internal static int Veiled(int under, int ink, int alpha)
+        {
+            return (ink * alpha + under * (255 - alpha) + 127) / 255;
+        }
+
+        /// v0.6.24 final (the owner, 2026-11-20): whether a dialog in a picture has its own outer corner, as every dialog the
+        /// Dashboard opens has on the screen (SoftDialog.BuildTitle, ChromeHost.OwnCorner): while the switch is on
+        /// (Brand.WindowSquircle) and outside High Contrast, where WindowShape.Wanted gives Windows' corner. The rest of what
+        /// Wanted asks - Windows 11, composition, not a remote session - is the machine's, never a picture's.
+        internal static bool DialogSquircle()
+        {
+            return WindowShape.Switch && !Palette.Contrast;
+        }
+
         /// The dialog's window over `picture`: a soft shadow, the border and the drawn client area - its title row and caption
-        /// buttons in it (v0.6.24).
+        /// buttons in it (v0.6.24). v0.6.24 final: with its own outer corner (DialogSquircle) the dialog is laid as the
+        /// screen composes it (LayDialog), its shadow and its body cut to the squircle; otherwise the rectangle and its
+        /// border, as before.
         private void PaintDialog(Bitmap picture, Bitmap body, Point place, Size outer, int border, Color ground)
         {
+            if (DialogSquircle())
+            {
+                LayDialog(picture, body, place, ground);
+                return;
+            }
             Color line = ChromeColour(renderChrome, "line", Soft.Mix(Canvas, Ink, 0.35));
             using (Graphics g = Graphics.FromImage(picture))
             {
@@ -967,6 +1080,29 @@ namespace CodexAutoResume
                     g.FillRectangle(brush, place.X + border, place.Y + border, body.Width, body.Height);
                 g.DrawImageUnscaled(body, place.X + border, place.Y + border);
             }
+        }
+
+        /// v0.6.24 final: `body` - the dialog's client area, its window - laid over `picture` at `place` as the screen shows a
+        /// dialog with its own corner (WindowShape.Lay): the card's corner at the picture's display scale (DisplayScale, as
+        /// the screen takes the monitor's and not the text size; Palette.RadiusCard, the design's smoothing), its region's pixels the dialog's, the hairline (Palette.Line) and the anti-aliased edge over
+        /// them on the dialog's `ground`, and the companion's shadow (WindowCorner.Shade: the ink in light, the theme's
+        /// all-but-black shadow in dark) round it on what lies under - nothing of the dialog outside its outline.
+        internal static void LayDialog(Bitmap picture, Bitmap body, Point place, Color ground)
+        {
+            // The class by its full name: inside SettingsForm a member named Shape (a test probe's helper) would hide it.
+            var edge = new WindowShape.Edge(body.Width, body.Height, Palette.RadiusCard, global::CodexAutoResume.Shape.Smoothing,
+                                            DisplayScale);
+            int[] under = Argb(picture), drawn = Argb(body);
+            WindowShape.Lay(under, picture.Width, picture.Height, drawn, place, edge,
+                            ground.A == 255 ? ground : Palette.Canvas, Palette.Line, WindowCorner.Shade());
+            BitmapData data = picture.LockBits(new Rectangle(0, 0, picture.Width, picture.Height), ImageLockMode.WriteOnly,
+                                               PixelFormat.Format32bppArgb);
+            try
+            {
+                for (int y = 0; y < picture.Height; y++)
+                    Marshal.Copy(under, y * picture.Width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), picture.Width);
+            }
+            finally { picture.UnlockBits(data); }
         }
 
         // ------------------------------------------------------------------ the still a capture takes (v0.6.20)
