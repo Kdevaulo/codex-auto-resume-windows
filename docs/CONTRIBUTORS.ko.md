@@ -80,6 +80,8 @@
   페르시아어, 그리고 문서의 언어 목록과 개수입니다([#63](https://github.com/songyb111-gachon/codex-auto-resume-windows/pull/63)).
 - [@7Magicbunny](https://github.com/7Magicbunny) 님은 `codex exec` 실행에서 Codex Desktop으로 갈라 온 대화가 복구에서 빠지는 문제를, 그 기록의 모양과 직접 확인한
   수정과 함께 알려 주셨습니다([#66](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/66)).
+- [@a115599663322](https://github.com/a115599663322) 님은 Codex 앱이 서버를 앱 자신의 도우미 프로세스 아래에서 시작하면 모든 복구가 기다리기만 한다는 것을,
+  원인을 코드에서 읽어 내고 패치와 함께 알려 주셨습니다([#67](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/67)).
 
 ## AI 기여자에 대한 참고
 
