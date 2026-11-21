@@ -585,11 +585,18 @@ class SeveralEngineChildrenTests(unittest.TestCase):
         self.assertEqual(pair["server"]["pid"], 20)
         users.assert_not_called()
 
-    def test_a_child_of_another_app_process_is_ignored(self):
+    def test_a_child_of_a_package_process_is_a_candidate_and_of_another_program_ignored(self):
+        """v0.6.25 (#67, the owner's rule): a codex.exe under one of the package's own ChatGPT.exe processes under the
+        main is the app's - Codex desktop 26.1117 runs its app server so - and the Restart Manager chooses between it
+        and the main's own child; one under a ChatGPT.exe outside the package is ignored, as before."""
         others = ({"pid": 11, "parent": 10, "path": STORE_APP}, {"pid": 31, "parent": 11, "path": ENGINE},
                   {"pid": 40, "parent": 1, "path": r"C:\Elsewhere\ChatGPT.exe"},
                   {"pid": 41, "parent": 40, "path": ENGINE})
-        pair, users = self.pair(self.rows(*others, both=False), [])
+        pair, users = self.pair(self.rows(*others, both=False), [{"pid": 20, "created": 200}])
+        self.assertEqual(pair["server"]["pid"], 20)
+        users.assert_called_once()
+        self.assertEqual(self.pair(self.rows(*others, both=False), [])[0], "desktop_server_missing_or_ambiguous")
+        pair, users = self.pair(self.rows(*others[2:], both=False), [])
         self.assertEqual(pair["server"]["pid"], 20)
         users.assert_not_called()
 

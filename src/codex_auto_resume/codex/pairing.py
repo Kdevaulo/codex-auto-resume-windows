@@ -126,7 +126,7 @@ def official_engine(path) -> tuple:
 
 
 def _state_holder(servers, codex_home):
-    """Of several same-path Codex children of the app main, the one holding Codex's state open.
+    """Of several same-path Codex servers of the app main (`under_app`), the one holding Codex's state open.
 
     Codex 26.930's app starts a second `codex.exe` beside its app server - `exec-server` for a
     cloud environment - from the same binary under the same main, so path and parent no longer
@@ -170,13 +170,18 @@ def _windows_apps() -> Path:
     return Path(program_files) / "WindowsApps"
 
 
+def _package_app(path) -> bool:
+    """Whether `path` is a ChatGPT.exe of the Codex app's own Windows Store package: its main, or one of the package's
+    other ChatGPT.exe processes (a renderer, a utility)."""
+    app_pattern = re.compile(re.escape(str(_windows_apps())) + r"\\OpenAI\.Codex_[0-9.]+_(x64|arm64)__" +
+                             CODEX_APP_PUBLISHER + r"\\app\\ChatGPT\.exe", re.I)
+    return isinstance(path, str) and bool(app_pattern.fullmatch(path))
+
+
 def _app_main(rows):
     """The one Windows Store app main among the inventory's rows: the package's ChatGPT.exe whose
     parent is none of the package's own processes. None, or several, fails closed."""
-    app_pattern = re.compile(re.escape(str(_windows_apps())) + r"\\OpenAI\.Codex_[0-9.]+_(x64|arm64)__" +
-                             CODEX_APP_PUBLISHER + r"\\app\\ChatGPT\.exe", re.I)
-    apps = [row for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-            and app_pattern.fullmatch(row["path"])]
+    apps = [row for row in rows if isinstance(row, dict) and _package_app(row.get("path"))]
     app_ids = {row["pid"] for row in apps}
     mains = [row for row in apps if row.get("parent") not in app_ids]
     if len(mains) != 1:
@@ -184,8 +189,42 @@ def _app_main(rows):
     return mains[0]
 
 
+def under_app(rows, row, main) -> bool:
+    """v0.6.25 (#67): whether the process `row` is one the app main whose pid is `main` runs itself: every process
+    between them - none, or any number - is one of the app package's own ChatGPT.exe processes (`_package_app`), as
+    the inventory's rows list them. The one rule the pairing (`desktop_pair`), the served engines (`server_engines`)
+    and the other-session test (`session_kind`) ask, so it cannot drift between them.
+
+    Codex desktop 26.1117 starts its app server under the package's `--type=utility` ChatGPT.exe (NodeService), whose
+    parent is the main, and its exec-server under the main itself; 26.930 started both under the main. Anything else
+    in between - a terminal, a shell, another program's process, a pid the rows do not list or list twice, a loop -
+    is not the app's: a TUI started from a shell the app opened stays another session. Only ids and paths are read,
+    as `inventory` lists them; whoever acts on the answer still holds each process to its own identity."""
+    if not isinstance(row, dict):
+        return False
+    at = row.get("parent")
+    if at == main:
+        return True
+    if main is None:
+        return False
+    listed = {}
+    for each in rows:
+        if isinstance(each, dict):
+            listed[each.get("pid")] = None if each.get("pid") in listed else each    # a pid listed twice is no one
+    seen = set()
+    while at not in seen:
+        seen.add(at)
+        up = listed.get(at)
+        if up is None or not _package_app(up.get("path")):
+            return False
+        at = up.get("parent")
+        if at == main:
+            return True
+    return False
+
+
 def server_engines(rows) -> frozenset:
-    """The image path of every codex.exe the one Windows Store app main runs as a child, as the
+    """The image path of every codex.exe the one Windows Store app main runs (`under_app`), as the
     inventory read it: a path and a parent, and nothing else of those processes - no command line
     and no process memory. None, or several, mains fail closed, as the pairing does.
 
@@ -196,10 +235,13 @@ def server_engines(rows) -> frozenset:
     v0.6.21 (#58): the app can run its engine from its own package. Whoever reads these asks `official_engine` of
     each before it counts: discovery through the engine check (E1), the watcher in runtime/app.py `_served_elsewhere`
     and the compatibility readers in compat/probes.py `_served_engines`.
+
+    v0.6.25 (#67): the main's children and those of the package's own ChatGPT.exe processes under it (`under_app`):
+    Codex desktop 26.1117 runs its app server under the package's utility process.
     """
     main = _app_main(rows)
     return frozenset(row["path"] for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-                     and row.get("parent") == main["pid"]
+                     and under_app(rows, row, main["pid"])
                      and PureWindowsPath(row["path"]).name.lower() == "codex.exe")
 
 
@@ -211,7 +253,7 @@ def app_engines() -> frozenset:
 
 
 def engines_instead(rows, codex_exe) -> frozenset:
-    """The codex.exe paths the app main runs as children where none of them is `codex_exe`, and
+    """The codex.exe paths the app main runs (`server_engines`) where none of them is `codex_exe`, and
     otherwise nothing: where the main runs `codex_exe`, runs no codex.exe, or is not exactly one."""
     try:
         served = server_engines(rows)
@@ -299,7 +341,9 @@ def session_kind(rows, user, codex_exe) -> bool:
 
     Its inventory row, matched by pid, is a codex.exe that is either (a) the configured engine `codex_exe` run by
     neither the one app main nor this process (a TUI the app's bundled engine runs with --no-daemon, M5; our own
-    headless app server is this process's child and never counts), or (b) the VS Code extension's own engine
+    headless app server is this process's child and never counts; v0.6.25 #67: the main runs it where `under_app`
+    says so - a codex.exe under a shell or anything else but the package's own processes is still another
+    session), or (b) the VS Code extension's own engine
     (`_extension_engine`); and the process is still that image, created when the holder says - a reused pid fails
     closed, as the app's server does. Anything else - another install, two rows, an unreadable path or a pid gone -
     is no. Paths are compared, never kept (D2)."""
@@ -314,7 +358,7 @@ def session_kind(rows, user, codex_exe) -> bool:
         main = _app_main(rows)["pid"]
     except (AdapterError, KeyError, TypeError):
         main = None
-    configured = row["path"].lower() == str(codex_exe).lower() and row.get("parent") != main
+    configured = row["path"].lower() == str(codex_exe).lower() and not under_app(rows, row, main)
     if not (configured or _extension_engine(row["path"])):
         return False
     try:
@@ -327,15 +371,16 @@ def session_kind(rows, user, codex_exe) -> bool:
 def desktop_pair(rows, codex_exe, codex_home=None, require_holder=False):
     """Bind the configured official engine to exactly one Windows Store app main.
 
-    The app's Codex server is the one child of that main running the configured engine; where
-    the main has several such children, the one of them holding Codex's queue or state database
+    The app's Codex server is the one process of that main's running the configured engine - its
+    child, or (v0.6.25, #67) the child of a package ChatGPT.exe under it (`under_app`); where
+    the main has several such, the one of them holding Codex's queue or state database
     in `codex_home` open (`_state_holder`), and without a `codex_home` none. With `require_holder`
     (v0.6.15-beta, a Codex home other than the default), even one such child must hold that home's
     database open: an app started on another home holds none of this one's, and its recoveries wait.
     """
     mains = [_app_main(rows)]
     servers = [row for row in rows if isinstance(row, dict) and isinstance(row.get("path"), str)
-               and row["path"].lower() == str(codex_exe).lower() and row.get("parent") == mains[0]["pid"]]
+               and row["path"].lower() == str(codex_exe).lower() and under_app(rows, row, mains[0]["pid"])]
     holder = None
     if len(servers) > 1 or (require_holder and servers):
         row, holder = _state_holder(servers, codex_home)
