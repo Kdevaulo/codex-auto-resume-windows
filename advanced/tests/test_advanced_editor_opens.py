@@ -103,7 +103,11 @@ class EditorOpensTests(PageCase):
         for n, record in enumerate(self.opens()):
             with self.subTest(open=n):
                 self.assertTrue(record["waiting"], "the window's wait cursor from the press while the editor is made")
-                self.assertFalse(record["waitingAfter"], "and off once the editor is on the screen")
+                # Live re-check 4 (M3): the arrow came back as the editor was shown, still held off the screen.
+                self.assertEqual(record["heldCursors"], [True, True, True],
+                                 "the wait cursor over the window held disabled, its caption and the editor's title row "
+                                 "until the editor is on the screen")
+                self.assertEqual(record["seenCursors"], [False, False, False], "and the pointer given back once it is")
 
 
 if __name__ == "__main__":

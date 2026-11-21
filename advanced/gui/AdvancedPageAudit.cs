@@ -1556,7 +1556,9 @@ namespace CodexAutoResume
             IntPtr h = dialog.Handle;
             ShowWindow(h, 4);
             record["shown"] = clock.Elapsed.TotalMilliseconds;
-            record["waitingAfter"] = UseWaitCursor;
+            // Shown and still held off the screen: the cursor Windows would set over the window held disabled by its dialog
+            // (HTERROR, as a modal dialog leaves it), over the window's caption and over the editor's title row.
+            record["heldCursors"] = CursorsOver(h);
             // Off every screen it is sent no WM_PAINT (nothing of it can be seen), and would come on only by the dialog's
             // half-second fallback (SoftDialog.UncloakSoon): the first paint a screen asks for as it is shown, asked here.
             PostMessage(h, 0x000F, IntPtr.Zero, IntPtr.Zero);
@@ -1573,8 +1575,28 @@ namespace CodexAutoResume
                 System.Threading.Thread.Sleep(1);
             }
             record["seen"] = seen;
+            // On the screen: the pointer given back.
+            record["seenCursors"] = CursorsOver(h);
             record["whole"] = opaque;  // "whole", not "opaque": the edition audit reads every advanced literal of six letters or more in the standard window, whose dialog has an opaqueAt
             dialog.Close();
+        }
+
+        /// Whether the cursor Windows' WM_SETCURSOR sets is the wait cursor: over the window while a dialog holds it
+        /// disabled (HTERROR), over the window's caption ground (HTCAPTION) and over the editor's title row (HTCAPTION of
+        /// the dialog `dialog`) - asked of each window as Windows asks it, the answer read from the thread's cursor.
+        private List<object> CursorsOver(IntPtr dialog)
+        {
+            var said = new List<object>();
+            foreach (KeyValuePair<IntPtr, int> ask in new[] {
+                         new KeyValuePair<IntPtr, int>(Handle, 0xFFFE), new KeyValuePair<IntPtr, int>(Handle, 2),
+                         new KeyValuePair<IntPtr, int>(dialog, 2) })
+            {
+                Cursor.Current = Cursors.Default;
+                IntPtr where = (IntPtr)((0x0200 << 16) | ask.Value);
+                SendMessage(ask.Key, 0x0020, ask.Key, where);
+                said.Add(Cursor.Current == Cursors.WaitCursor);
+            }
+            return said;
         }
 
         // Control.OnClick, which raises Click as a press of the button does.

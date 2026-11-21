@@ -124,6 +124,10 @@ namespace CodexAutoResume
             SweepPasted();
             // v0.6.24 final (L5): the press is taken at once, visibly - the window's wait cursor, its busy sign - until the
             // editor is on the screen: the window's controls are made as it is shown, and that is not instant.
+            // Live re-check 4 (M3): until its first frame, not until it is shown - it is shown held off the screen
+            // (SoftDialog's cloak), and the arrow came back 0.14 to 0.26 s before it was seen. Over the window, its veil
+            // and the editor's own area alike (ChromeHost: UseWaitCursor over every part of a window), then given back
+            // where the pointer is (EditorCameOn); given back too whatever becomes of the editor (finally).
             bool waited = UseWaitCursor;
             UseWaitCursor = true;
             Cursor.Current = Cursors.WaitCursor;
@@ -131,7 +135,9 @@ namespace CodexAutoResume
             {
                 using (Form dialog = BuildEditor(row))
                 {
-                    dialog.VisibleChanged += delegate { if (dialog.Visible) UseWaitCursor = waited; };
+                    dialog.UseWaitCursor = true;
+                    var soft = dialog as SoftDialog;
+                    if (soft != null) soft.CameOn += delegate { EditorCameOn(dialog, waited); };
                     if (editorAnswer != null) editorAnswer(dialog);
                     else if (editorShow != null || !auditing)
                     {
@@ -141,7 +147,10 @@ namespace CodexAutoResume
                     }
                 }
             }
-            finally { UseWaitCursor = waited; }
+            finally
+            {
+                if (UseWaitCursor != waited) GivePointerBack(waited);
+            }
             bool taken = editorTaken, steered = editorSteered;
             ForgetEditor();
             ForgetPasted();
@@ -152,6 +161,25 @@ namespace CodexAutoResume
             FillScheduled();
             ReadAdvanced(null);
             if (advancedOpen != PromptQueueId) ReadPrompts(null);
+        }
+
+        /// v0.6.24 final (live re-check 4, M3): the editor is on the screen - its first frame: the wait cursor given back,
+        /// over the window and over the editor.
+        private void EditorCameOn(Form dialog, bool waited)
+        {
+            if (!dialog.IsDisposed) dialog.UseWaitCursor = false;
+            GivePointerBack(waited);
+        }
+
+        /// The window's own cursor again, at once wherever the pointer rests: the arrow for now, and the cursor of what is
+        /// under the pointer as Windows asks for it again (the pointer set where it already is).
+        private void GivePointerBack(bool waited)
+        {
+            UseWaitCursor = waited;
+            if (waited) return;
+            Cursor.Current = Cursors.Default;
+            try { Cursor.Position = Cursor.Position; }
+            catch (Exception) { /* no pointer to ask about (a locked session): the next move asks */ }
         }
 
         /// v0.6.24 final (L5): the editor's card, its body and the page it scrolls in hold their layout from the moment the
