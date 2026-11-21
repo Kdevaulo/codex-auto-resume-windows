@@ -1229,8 +1229,8 @@ namespace CodexAutoResume
             };
             Shown += delegate
             {
-                shown = true;
                 StartMarks.Mark("shown");
+                shown = true;
                 // v0.6.20: the watcher's request to come forward is heard even when this window runs elevated.
                 AcceptOpenRequests();
                 // v0.6.24-beta.2: the opening sweep a read before this asked for (SweepLight) - after the open requests,
@@ -2256,6 +2256,12 @@ namespace CodexAutoResume
         private static readonly StringBuilder said = string.IsNullOrEmpty(target) ? null : new StringBuilder();
         private static double offset = double.NaN;
 
+        [DllImport("kernel32.dll", EntryPoint = "GetCurrentProcess")]
+        private static extern IntPtr ThisProcess();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetProcessTimes(IntPtr process, out long created, out long exited, out long kernel, out long user);
+
         /// Whether marks are being written down.
         internal static bool On { get { return said != null; } }
 
@@ -2269,8 +2275,12 @@ namespace CodexAutoResume
                 lock (said)
                 {
                     if (double.IsNaN(offset))
-                        using (Process self = Process.GetCurrentProcess())
-                            offset = (DateTime.Now - self.StartTime).TotalMilliseconds - now;
+                    {
+                        // When Windows created this process, asked without a Process object (OwnProcess holds the one).
+                        long created, exited, kernel, user;
+                        if (!GetProcessTimes(ThisProcess(), out created, out exited, out kernel, out user)) created = DateTime.UtcNow.ToFileTimeUtc();
+                        offset = (DateTime.UtcNow - DateTime.FromFileTimeUtc(created)).TotalMilliseconds - now;
+                    }
                     said.Append((now + offset).ToString("0.0", CultureInfo.InvariantCulture)).Append(' ').Append(step).Append('\n');
                 }
             }
