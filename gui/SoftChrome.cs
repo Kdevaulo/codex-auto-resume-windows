@@ -884,6 +884,16 @@ namespace CodexAutoResume
                 finally { corner.Painted(); }
                 return true;
             }
+            // v0.6.24 final (live re-check 4, M3): a window that asks for the wait cursor (UseWaitCursor) has it over every
+            // part of it. .NET gives it only over the client area a control answers HTCLIENT for: over the caption, the
+            // ground that drags the window - and over the whole window while a dialog of its own holds it disabled, which
+            // Windows asks as HTERROR - it gave the arrow, the moment a dialog that keeps its owner waiting was shown.
+            if (m.Msg == WM_SETCURSOR && form.UseWaitCursor)
+            {
+                Cursor.Current = Cursors.WaitCursor;
+                m.Result = (IntPtr)1;
+                return true;
+            }
             // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
             if (corner != null && corner.Intercept(ref m)) return true;
             if (corner != null && corner.Shaped && (m.Msg == WM_SETTEXT || m.Msg == WM_SETICON) && form.IsHandleCreated)
@@ -951,6 +961,7 @@ namespace CodexAutoResume
         }
 
         private const int WM_SETTEXT = 0x000C, WM_SETICON = 0x0080, WM_PAINT = 0x000F, GWL_STYLE = -16, WS_CAPTION = 0x00C00000;
+        private const int WM_SETCURSOR = 0x0020;
 
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
         private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
@@ -2191,6 +2202,8 @@ namespace CodexAutoResume
                 {
                     if (veil == null && TopLevel) veil = DialogVeil.Over(this);
                     if (cloaked) UncloakSoon();
+                    // Not held off the screen (DWM refused, a still): on the screen as it is shown.
+                    else CameOnNow();
                 }
             }
             else if (m.Msg == WM_DESTROY) Unveil();
@@ -2354,6 +2367,19 @@ namespace CodexAutoResume
         // v0.6.24 final: Stopwatch timestamps of the moment it came on the screen (uncloaked) and of the one it was opaque.
         private long seenAt, opaqueAt;
 
+        /// v0.6.24 final (live re-check 4, M3): raised once, as the dialog comes on the screen - uncloaked, its first frame
+        /// - or as it is shown where it was never held off: what waits for it to be seen (the editor's wait cursor).
+        internal event EventHandler CameOn;
+        private bool cameOn;
+
+        private void CameOnNow()
+        {
+            if (cameOn) return;
+            cameOn = true;
+            EventHandler came = CameOn;
+            if (came != null) came(this, EventArgs.Empty);
+        }
+
         /// v0.6.24 final: the milliseconds from the moment it came on the screen to the one its fade set it opaque, as the
         /// dialog itself recorded them (-1 until both have happened): for the tests. A test that read it from the outside, on
         /// the same thread, read it only once the repaint that follows the last step had run - about 1 run in 7, 150 ms
@@ -2417,6 +2443,7 @@ namespace CodexAutoResume
             seenAt = System.Diagnostics.Stopwatch.GetTimestamp();
             // With no fade it is opaque as it is seen.
             if (!fadeIn) opaqueAt = seenAt;
+            CameOnNow();
             // On the screen: its own corner's companion with it, at the alpha the fade starts from (clear where it fades).
             if (OwnCorner != null) OwnCorner.Held = false;
             OpenFade();
