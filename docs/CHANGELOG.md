@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.6.25 — Recoveries on Codex 26.1117
+
+> **Recoveries on Codex 26.1117.** This release makes recovery work again with the Codex app 26.1117, which starts its server under a helper process of its own.
+
+**Kind:** Bug fixes
+
+[The commits in this release](https://github.com/songyb111-gachon/codex-auto-resume-windows/compare/v0.6.24...v0.6.25)
+
+**From v0.6.24, an ordinary update.** It is the latest release, for both editions, so v0.6.24's *Check for updates* offers it in
+the edition you have, and the plugin in Codex installs it too. It carries one fix and nothing else; what v0.6.24 left planned
+moved one release on (see the roadmap). Nothing stored changes - the watcher's state, the settings file and the advanced edition's
+own file are as v0.6.24 left them - so going back to v0.6.24 needs no care.
+
+### Both editions
+
+- **Recoveries when the Codex app runs its server under its own helper process** (reported by
+  [@a115599663322](https://github.com/a115599663322), with the cause and a patch, [#67](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/67)).
+  Codex desktop 26.1117 starts the app's `codex.exe app-server` under one of the app's own helper processes (a ChatGPT.exe of the
+  same package) instead of directly under the app. The watcher looked for the app's server only among the app's direct children.
+  It paired the app's other `codex.exe` (`exec-server`) instead, and took the real server, which holds the conversation, for
+  another Codex session. Every recovery then waited for good ("open in another Codex session"). Now a `codex.exe` counts as the
+  app's when every process between it and the app is one of the app package's own. Where that finds more than one, the one holding
+  Codex's state is chosen, as before. A terminal or any other program in between still makes it another session. Nothing was ever
+  sent to the wrong place: the watcher failed closed.
+
 ## v0.6.24 — A window without Windows' title bar and with squircle corners, a Dashboard of 1000 by 618 with the version never hidden, dialogs as one card, usage shown as what is left, a setup window with something on every page, the tray icon's card, and a Dashboard that answers in seconds after an update
 
 > **The window's own look, and usage left.** This release gives both editions a window that draws its own top edge and corners, shows every usage window as what is left of it, and fills the setup window's pages.
