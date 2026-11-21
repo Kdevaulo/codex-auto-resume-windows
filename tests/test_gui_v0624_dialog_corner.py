@@ -233,6 +233,9 @@ namespace CodexAutoResume
             said["first"] = State(window);
             // As it is shown: whether it fades in (OpensWithFade reads false again once it is opaque).
             said["opensWithFade"] = soft != null && soft.OpensWithFade;
+            // Whether motion is allowed as it opens - this product's setting, Windows' animations (a CI runner has its
+            // client-area animation off), High Contrast: Soft.ReduceMotion, which the dialog's fade itself reads.
+            said["motion"] = !Soft.ReduceMotion;
             bool shownWhileCloaked = false, shownBeforeSeen = false;
             double worst = 0, alphas = 0;
             var steps = new List<object>();
@@ -282,6 +285,10 @@ namespace CodexAutoResume
                 Application.SetCompatibleTextRenderingDefault(false);
                 Palette.AdoptDesign("soft");
                 Palette.Adopt("light");
+                // CAR_WINDOWS_ANIMATES=0 stands Windows' animations off in the switch the product reads
+                // (Soft.WindowsAnimates), as a CI runner has them; unset, the machine's own answer.
+                if (Environment.GetEnvironmentVariable("CAR_WINDOWS_ANIMATES") == "0")
+                    Soft.WindowsAnimates = delegate { return false; };
                 said["wanted"] = WindowShape.Wanted();
                 said["switch"] = WindowShape.Switch;
                 said["sizable"] = Scene(true, false);
@@ -579,11 +586,14 @@ class ScreenTests(unittest.TestCase):
         self.assertEqual(made["window"][2:], made["client"], "made at its ClientSize, with no frame round it")
 
     def test_the_companion_is_held_off_with_the_dialog_and_fades_in_with_it(self):
+        """Held off while the dialog is; then, only where motion is allowed (Soft.ReduceMotion: this product's setting,
+        Windows' animations - off on a CI runner - and High Contrast), the dialog fades in and its companion with it;
+        where it is not, both are opaque as soon as the dialog is seen."""
         self.wanted()
         for name in ("sizable", "fixed", "classic", "plain"):
             said = self.answer[name]
-            with self.subTest(name=name):
-                self.assertTrue(said["opensWithFade"], "the dialog's own fade is kept")
+            with self.subTest(name=name, motion=said["motion"]):
+                self.assertEqual(said["opensWithFade"], said["motion"], "the dialog fades only where motion is allowed")
                 self.assertTrue(said["first"]["cloaked"], "held off the screen as it is shown, as before")
                 self.assertFalse(said["first"]["companionShown"], "no edge or shadow round a dialog not yet seen")
                 self.assertFalse(said["shownWhileCloaked"])
@@ -591,6 +601,9 @@ class ScreenTests(unittest.TestCase):
                 self.assertGreater(said["samples"], 0, "the companion was seen with the dialog")
                 self.assertEqual(said["worstGap"], 0, "at the dialog's own alpha at every step")
                 steps = said["steps"]
+                if not said["motion"]:
+                    self.assertEqual(steps, [255], "no fade with motion off: opaque at once")
+                    continue
                 self.assertLess(steps[0], 128, "it fades in from near clear with the dialog: %r" % (steps,))
                 self.assertEqual(steps[-1], 255)
                 self.assertEqual(steps, sorted(steps), "never darker and lighter again")

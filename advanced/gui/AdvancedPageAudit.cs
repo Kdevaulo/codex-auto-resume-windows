@@ -1091,6 +1091,46 @@ namespace CodexAutoResume
                         if (!form.OpenAskedChat()) disabled.Add("chat_argument");
                     }
                     else if (what == "scheduled_choose") form.ChooseScheduledRow(Str(step, "key"));
+                    else if (what == "editor_shown")
+                    {
+                        // v0.6.24 final (live re-check 3, L5: Schedule... showed its window 2.5 s after the press): Schedule...
+                        // pressed and its editor shown as a person's is - top level, held off the screen until painted, then
+                        // faded in - but 30000 px off every screen and never activated, timed from the press (EditorShown).
+                        var record = new Dictionary<string, object>();
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        form.editorShow = delegate(Form dialog) { form.EditorShown(dialog, clock, record); };
+                        try
+                        {
+                            if (form.scheduleAddButton == null || !form.scheduleAddButton.Enabled) disabled.Add("editor_shown");
+                            else Pressed.Invoke(form.scheduleAddButton, new object[] { EventArgs.Empty });
+                        }
+                        finally
+                        {
+                            form.editorShow = null;
+                        }
+                        record["closed"] = clock.Elapsed.TotalMilliseconds;
+                        dialogs.Add(record);
+                    }
+                    else if (what == "timeline_shown")
+                    {
+                        // v0.6.24 final (L5): the Timeline - the dialog the editor is held to - built for the first recovery
+                        // in Pending, shown and timed as the editor is (EditorShown), from the moment it is asked for.
+                        var record = new Dictionary<string, object>();
+                        record["kind"] = "timeline";
+                        Dictionary<string, object> first = null;
+                        foreach (object listed in Items(form.snapshot, "pending") ?? new List<object>())
+                            if (first == null) first = listed as Dictionary<string, object>;
+                        var events = new List<object>();
+                        var happened = new Dictionary<string, object>();
+                        happened["at"] = 1.8e9;
+                        happened["code"] = "detected";
+                        happened["to_code"] = "waiting_reset";
+                        events.Add(happened);
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        if (first == null) disabled.Add("timeline_shown");
+                        else using (Form dialog = form.BuildTimeline(first, events, null)) form.EditorShown(dialog, clock, record);
+                        dialogs.Add(record);
+                    }
                     else if (what == "scheduled_press")
                     {
                         // v0.6.19 (#50): one of the Scheduled tab's buttons pressed, if it can be - the editor it opens
@@ -1493,6 +1533,48 @@ namespace CodexAutoResume
             if (editorDialog != null) editorDialog.PerformLayout();
             editorBody.Parent.PerformLayout();
             return (int)Math.Round((editorBody.Parent.ClientSize.Height - editorBody.Height) / DpiScale);
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr window, int command);
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool PostMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
+        /// The editor `dialog`, built, shown as ShowDialog shows a person's - its window made, then shown - but off every
+        /// screen and never activated (SW_SHOWNOACTIVATE), and the milliseconds from the press on `clock`: built (the
+        /// editor handed over to be shown), seen (DWM no longer holding it off: DWMWA_CLOAKED), opaque (its fade done, as
+        /// the dialog recorded it, or seen where it does not fade); whether the wait cursor was on from the press to the
+        /// show; closed after.
+        private void EditorShown(Form dialog, System.Diagnostics.Stopwatch clock, Dictionary<string, object> record)
+        {
+            record["built"] = clock.Elapsed.TotalMilliseconds;
+            record["waiting"] = UseWaitCursor;
+            dialog.StartPosition = FormStartPosition.Manual;
+            dialog.Location = new Point(-30000, -30000);
+            IntPtr h = dialog.Handle;
+            ShowWindow(h, 4);
+            record["shown"] = clock.Elapsed.TotalMilliseconds;
+            record["waitingAfter"] = UseWaitCursor;
+            // Off every screen it is sent no WM_PAINT (nothing of it can be seen), and would come on only by the dialog's
+            // half-second fallback (SoftDialog.UncloakSoon): the first paint a screen asks for as it is shown, asked here.
+            PostMessage(h, 0x000F, IntPtr.Zero, IntPtr.Zero);
+            var soft = dialog as SoftDialog;
+            record["fades"] = soft != null && soft.OpensWithFade;
+            double seen = -1, opaque = -1;
+            while (clock.ElapsedMilliseconds < 15000 && opaque < 0)
+            {
+                Application.DoEvents();
+                int cloaked;
+                bool held = DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && cloaked != 0;
+                if (!held && seen < 0) seen = clock.Elapsed.TotalMilliseconds;
+                if (seen >= 0 && (soft == null || soft.SeenToOpaque >= 0)) opaque = seen + (soft == null ? 0 : soft.SeenToOpaque);
+                System.Threading.Thread.Sleep(1);
+            }
+            record["seen"] = seen;
+            record["whole"] = opaque;  // "whole", not "opaque": the edition audit reads every advanced literal of six letters or more in the standard window, whose dialog has an opaqueAt
+            dialog.Close();
         }
 
         // Control.OnClick, which raises Click as a press of the button does.

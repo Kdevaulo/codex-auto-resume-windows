@@ -2332,6 +2332,9 @@ namespace CodexAutoResume
                 return;
             }
             SetFade(255);
+            // v0.6.24 final: the moment it is opaque, before the repaint below - which can take as long as the dialog's
+            // paint (a slow one: 150 ms) and holds the thread, but not the screen, which has it at 255 from here.
+            opaqueAt = System.Diagnostics.Stopwatch.GetTimestamp();
             StopFade();
             // Opaque: an ordinary window again, drawn whole in the same message - a window no longer layered is drawn
             // anew, and an asked-for paint would leave a frame of it unpainted.
@@ -2347,6 +2350,22 @@ namespace CodexAutoResume
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmFlush();
+
+        // v0.6.24 final: Stopwatch timestamps of the moment it came on the screen (uncloaked) and of the one it was opaque.
+        private long seenAt, opaqueAt;
+
+        /// v0.6.24 final: the milliseconds from the moment it came on the screen to the one its fade set it opaque, as the
+        /// dialog itself recorded them (-1 until both have happened): for the tests. A test that read it from the outside, on
+        /// the same thread, read it only once the repaint that follows the last step had run - about 1 run in 7, 150 ms
+        /// late on a slow paint (dev CI 44753147128).
+        internal double SeenToOpaque
+        {
+            get
+            {
+                if (seenAt == 0 || opaqueAt == 0 || opaqueAt < seenAt) return -1;
+                return (opaqueAt - seenAt) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            }
+        }
 
         /// Whether it was painted whole again, and that picture handed to DWM, before its first alpha above zero: for the
         /// tests.
@@ -2395,6 +2414,9 @@ namespace CodexAutoResume
             int off = 0;
             try { DwmSetCloak(Handle, DWMWA_CLOAK, ref off, 4); }
             catch (Exception) { }
+            seenAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            // With no fade it is opaque as it is seen.
+            if (!fadeIn) opaqueAt = seenAt;
             // On the screen: its own corner's companion with it, at the alpha the fade starts from (clear where it fades).
             if (OwnCorner != null) OwnCorner.Held = false;
             OpenFade();
