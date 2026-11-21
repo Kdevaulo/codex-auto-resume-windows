@@ -60,6 +60,12 @@ FIRST_FRAME_BUDGET_MS = 1300
 # GitHub's runners: two cores, a slower disk, no profile from an earlier run of the same build - a budget that still
 # catches the window waiting seconds for something before its first paint (the strings wait is 5 s).
 CI_FIRST_FRAME_BUDGET_MS = 4000
+# And against the start with neither change in the same sitting, the best of three of each: 705 against 1409, 757
+# against 1395, 797 against 1093, 1011 against 1503 ms on this PC (0.50-0.73). A quiet PC brought the old start under the
+# budget (974-1360 ms), never this close to the new one; with both changes taken back the two are one start, and the
+# best of three of either is the other's within some 15 %. Not on CI's runners, whose two cores leave the threads
+# working ahead little room.
+FIRST_FRAME_SHARE_OF_OLD = 0.8
 # The window's own wait for its first font once the font thread has made one (the constructor's "window made" to
 # "font"): 64-80 ms in this probe and medians of 90-119 ms in the real start, against 228-236 ms in this probe and
 # 230-525 ms in the real start on the window's thread alone. On a machine with fewer fonts both are smaller, and this
@@ -242,9 +248,9 @@ class FirstFrameTests(unittest.TestCase):
         cls.runs = {"warm": [], "cold": []}
         cls.profile_after_first = None
         if cls.failure is None:
-            # A start with neither change first and last, the new start four times between: the first of those writes
-            # the profile down, the three after it start from it.
-            for i, mode in enumerate(("cold", "warm", "warm", "warm", "warm", "cold")):
+            # The start with neither change three times, between the new start's four: the first of those writes the
+            # profile down, the three after it start from it (a start with neither change writes none and reads none).
+            for i, mode in enumerate(("cold", "warm", "cold", "warm", "cold", "warm", "warm")):
                 out = work / ("out-%d.json" % i)
                 marked = work / ("marks-%d.txt" % i)
                 environment = dict(os.environ, CODEX_HOME=str(work / "no-codex"), LOCALAPPDATA=str(work / "no-local"),
@@ -275,9 +281,14 @@ class FirstFrameTests(unittest.TestCase):
         """Fails with either change taken back: the window then took 1.4-1.8 s on this PC."""
         profiled = self.runs["warm"][1:]
         first = min(run["first frame"] for run in profiled)
-        budget = CI_FIRST_FRAME_BUDGET_MS if os.environ.get("GITHUB_ACTIONS") else FIRST_FRAME_BUDGET_MS
+        on_ci = bool(os.environ.get("GITHUB_ACTIONS"))
+        budget = CI_FIRST_FRAME_BUDGET_MS if on_ci else FIRST_FRAME_BUDGET_MS
         self.assertLessEqual(first, budget, "the first frame %.0f ms after the process was created: %s"
                              % (first, [round(run["first frame"]) for run in profiled]))
+        old = min(run["first frame"] for run in self.runs["cold"])
+        if not on_ci:
+            self.assertLessEqual(first, old * FIRST_FRAME_SHARE_OF_OLD,
+                                 "the first frame %.0f ms, the start with neither change %.0f ms" % (first, old))
         for run in profiled:
             self.assertLess(run["main"], run["window made"])
             self.assertLess(run["built"], run["first frame"])
