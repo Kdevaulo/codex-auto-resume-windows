@@ -102,6 +102,11 @@ file where an update put it.
   unpainted one). (new since beta.2) While it waits - the new window appears one to three seconds later - its header's light is the working
   light, as for an action in flight, and the pointer over it is Windows' app-starting pointer; a reopening whose new window never comes puts
   the light back at once.
+- **The Dashboard's first frame comes sooner (new since beta.2).** The window's start builds Windows' list of installed fonts on a thread
+  of its own while it makes the window, where its first font waited for that list on the window's thread for 0.23 to 0.53 s, and it
+  compiles its own code ahead on several cores from a profile its last start left in `config\window-start.jit`. Measured from the
+  process's start, five starts each, the median first frame went from 1.8 to 1.2 s in the standard edition and from 1.4 to 0.9 s in the
+  advanced. A drop-down fills its list with its drawing held, so a page or a dialog with several of them is made sooner too.
 - **What the second pre-release listed as known is dealt with (new since beta.2).** It said that, rarely, in the dark theme, a dialog's first
   frame could still show unpainted for a moment before it fades in, and that the first switch to Diagnostics could show the page half drawn
   for a frame or two. The second is found and fixed, as the item above says, and held by a test that reads the window's surface after every
@@ -174,6 +179,9 @@ file where an update put it.
   more than 20 ms at a turn, its log in one append. The Progress page is drawn at once when the button is pressed, the unpacking moves the
   bar alone within its step, and the step list changes in place instead of being made again at each step. It is the same for every run
   the window shows: installing, updating, repairing and removing.
+  (new since beta.2) A change of page is drawn in one frame: the window holds its painting while the new page is put in and then paints the
+  whole of it at once, where the new page's grey boxes showed for about a tenth of a second. The window keeps one size from Welcome to
+  Finish, where at the switch to Finish it was set to its own size again and was a few pixels larger for a moment.
 - **After a Repair or an update the Dashboard reopens behind setup's Finish page (new since beta.2).** The Dashboard the setup opens again
   came up over the Finish page and hid it whole, so that a person might wait for a window they could not see. It now opens without taking
   the activation and stands directly behind the window in front, as its window is made and again as it is shown; the Finish page keeps
@@ -260,6 +268,11 @@ file where an update put it.
   listing was a PowerShell query of about 10 s. While it waited, the header said the state could not be read, the chat list was empty,
   Diagnostics' *Detection check* said it could not run and the Timeline opened 3 to 10 s late; the detection check took 104.9 s and takes
   4.3 s now. One list answers the whole read, as the item under both editions says.
+- ***Schedule a message* opens in about a third of the time (new since beta.2).** Its editor took 2.5 s and more to appear after the
+  press, with no sign that it was coming. It laid its whole card out again for every row and value, its five drop-downs redrew themselves
+  for every item they took, and each of its panels laid itself out again as it was shown; now the card is laid out once, the drop-downs
+  fill with their drawing held and the panels lay out once after the show. On a busy PC the median went from 3.5 to 1.3 s, and the
+  pointer is the wait cursor from the press until the editor is there.
 - **Recover every conversation takes up a conversation of the app's whatever program its first line names, but VS Code's own (new since
   beta.2).** With the switch on, a conversation on the app's row was taken up only where its first line named a program the product knew; a
   `codex exec` line with no fork (#66) or a program Codex adds later stayed out. Any program's name of 1 to 64 characters is taken up now,

@@ -97,6 +97,10 @@ namespace CodexAutoResume
             window.StartPosition = FormStartPosition.Manual;
             window.Location = new Point(-30000, -30000);
             window.ShowInTaskbar = false;
+            IntPtr made = window.Handle;
+            // Made off the desktop; from here on as the setup program has it (CenterScreen), so Fit at Finish does not
+            // centre it on the primary screen as a Manual window's is.
+            window.StartPosition = FormStartPosition.CenterScreen;
             var answers = new List<object>();
             int late = 0;
             long longest = 0;

@@ -84,10 +84,10 @@ class EditorOpensTests(PageCase):
     def test_print_the_opening_times(self):
         for n, record in enumerate(self.timelines()):
             print("\n[timeline %d] built %.0f, shown %.0f, seen %.0f, opaque %.0f ms"
-                  % (n, record["built"], record["shown"], record["seen"], record["opaque"]), end="")
+                  % (n, record["built"], record["shown"], record["seen"], record["whole"]), end="")
         for n, record in enumerate(self.opens()):
             print("\n[editor %d] built %.0f, shown %.0f, seen %.0f, opaque %.0f ms (fades: %s)"
-                  % (n, record["built"], record.get("shown", -1), record["seen"], record["opaque"], record["fades"]), end="")
+                  % (n, record["built"], record.get("shown", -1), record["seen"], record["whole"], record["fades"]), end="")
 
     def test_it_is_on_the_screen_within_its_budget_of_the_press(self):
         opens = self.opens()

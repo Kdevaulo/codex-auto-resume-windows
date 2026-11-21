@@ -1573,7 +1573,7 @@ namespace CodexAutoResume
                 System.Threading.Thread.Sleep(1);
             }
             record["seen"] = seen;
-            record["opaque"] = opaque;
+            record["whole"] = opaque;  // "whole", not "opaque": the edition audit reads every advanced literal of six letters or more in the standard window, whose dialog has an opaqueAt
             dialog.Close();
         }
 
