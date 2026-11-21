@@ -54,9 +54,10 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 # every start is slower - the new one most, which gains by the cores that are free. Measured on the owner's PC at 150 %,
 # this probe (each run prints its marks), the machine quiet: with both changes 705-1024 ms, a start from its profile 705
 # and 880; with neither 1409 and 1740. The real start from a scratch installation: 1056-1512 ms with both, a median of
-# 1174 (standard), and 1743-2518, a median of 1819, with neither. 1300 ms holds the new start and fails the old one;
-# with other test sets running both took 1.8-2.4 s - a failure here is believed only once it fails again on a quiet PC.
-FIRST_FRAME_BUDGET_MS = 1300
+# 1174 (standard), and 1743-2518, a median of 1819, with neither. With other test sets running on the PC the new start
+# took 1.05-1.9 s and the old 1.8-2.8 s, so the budget is what no start of either should come near - the old 6-7 s, the
+# 5 s the words may be waited for - and the gain is held against the old start in the same sitting (SHARE_OF_OLD).
+FIRST_FRAME_BUDGET_MS = 2500
 # GitHub's runners: two cores, a slower disk, no profile from an earlier run of the same build - a budget that still
 # catches the window waiting seconds for something before its first paint (the strings wait is 5 s).
 CI_FIRST_FRAME_BUDGET_MS = 4000
@@ -69,8 +70,10 @@ FIRST_FRAME_SHARE_OF_OLD = 0.8
 # The window's own wait for its first font once the font thread has made one (the constructor's "window made" to
 # "font"): 64-80 ms in this probe and medians of 90-119 ms in the real start, against 228-236 ms in this probe and
 # 230-525 ms in the real start on the window's thread alone. On a machine with fewer fonts both are smaller, and this
-# still holds. The median of the four starts.
-FONT_WAIT_BUDGET_MS = 150
+# still holds. The median of the four starts, and against the old start's in the same sitting: with other test sets
+# running, 162-178 ms against 334-338 (0.49-0.53); quiet, 64-80 against 228-236 (0.3). Taken back, the two are one start.
+FONT_WAIT_BUDGET_MS = 250
+FONT_WAIT_SHARE_OF_OLD = 0.65
 
 PROBE = r"""
 using System;
@@ -476,6 +479,11 @@ class FirstFrameTests(unittest.TestCase):
         wait = statistics.median(waits)
         self.assertLessEqual(wait, FONT_WAIT_BUDGET_MS, "the window's first font took %.0f ms: %s"
                              % (wait, [round(each) for each in waits]))
+        old = statistics.median(run["font"] - run["window made"] for run in self.runs["cold"])
+        # Not on CI's runners: few fonts, so both waits are a few milliseconds there.
+        if not os.environ.get("GITHUB_ACTIONS"):
+            self.assertLessEqual(wait, old * FONT_WAIT_SHARE_OF_OLD,
+                                 "the window's first font took %.0f ms, with neither change %.0f ms" % (wait, old))
 
     def test_the_start_is_written_down_and_started_from(self):
         """Fails with StartProfile doing nothing: no profile in config\\ after the first start that opened."""
