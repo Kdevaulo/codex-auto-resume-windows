@@ -190,7 +190,8 @@ def _complain(home: Path, reason: str) -> None:
 
 
 LAUNCH_LOG = "launcher.log"
-LAUNCH_LOG_LINES = 50
+# v0.6.26: 200, not 50 - a supervised start writes about four lines, so 50 reached back two days (the third audit's O5).
+LAUNCH_LOG_LINES = 200
 
 
 def _note(home: Path, text: str) -> None:
@@ -226,7 +227,10 @@ def _since() -> str:
 
 def main(argv=None) -> int:
     here = Path(__file__).resolve().parent
-    _note(here, "launcher started (pid %d)" % os.getpid())
+    # A supervised child writes no "launcher started": its supervisor's "watcher started as a supervised child (pid N)"
+    # has named it, and every supervised start wrote the line twice (v0.6.26, the third audit's O5).
+    if [str(argument) for argument in (argv or [])] != ["run", CHILD_ARGUMENT]:
+        _note(here, "launcher started (pid %d)" % os.getpid())
     if os.environ.get(RELAUNCH_MARK):
         # Give the watcher that started this one time to release its mutex.
         time.sleep(2)
