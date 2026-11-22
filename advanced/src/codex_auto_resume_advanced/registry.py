@@ -1125,7 +1125,7 @@ USAGE_METER = CapabilityDef(
     ceilings=Ceilings(per_day=1, per_conversation=1),
     journal_prefix="meter",
     make=make_meter,
-    codes=("read", "unreadable", "warned"),
+    codes=("read", "unreadable", "warned", "app_closed", "unmatched", "no_engine"),
     measurements=(Measurement.MU,),
     options=(Option(OptionKey.POLL_MINUTES, POLL_CHOICES, DEFAULT_POLL, custom=POLL_RANGE),
              Option(OptionKey.WARN_FIVE_HOUR, PERCENTS, DEFAULT_WARN, custom=PERCENT_RANGE),
