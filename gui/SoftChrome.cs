@@ -283,6 +283,35 @@ namespace CodexAutoResume
             return new Point(first, last);
         }
 
+        /// v0.6.26 (audit G3): the first column of `drawn` from its left - or from its right, `fromEnd` - that holds ink
+        /// against `ground`, read as InkColumns reads it, the picture read at once and the reading stopped at that column;
+        /// -1 for none.
+        internal static int FirstInkColumn(Bitmap drawn, Color ground, bool fromEnd)
+        {
+            int width = drawn.Width, height = drawn.Height;
+            if (width <= 0 || height <= 0) return -1;
+            BitmapData data = drawn.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            var pixels = new int[width * height];
+            try
+            {
+                for (int y = 0; y < height; y++)
+                    Marshal.Copy(new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), pixels, y * width, width);
+            }
+            finally { drawn.UnlockBits(data); }
+            for (int i = 0; i < width; i++)
+            {
+                int x = fromEnd ? width - 1 - i : i;
+                for (int y = 0; y < height; y++)
+                {
+                    int c = pixels[y * width + x];
+                    if (Math.Abs(((c >> 16) & 0xFF) - ground.R) > InkStep || Math.Abs(((c >> 8) & 0xFF) - ground.G) > InkStep ||
+                        Math.Abs((c & 0xFF) - ground.B) > InkStep)
+                        return x;
+                }
+            }
+            return -1;
+        }
+
         internal static Point CentreOn(Rectangle owner, Size window, Rectangle work)
         {
             int x = owner.X + (owner.Width - window.Width) / 2, y = owner.Y + (owner.Height - window.Height) / 2;
@@ -1891,6 +1920,10 @@ namespace CodexAutoResume
 
         /// The same in `room` (the words' own size once laid out; Empty: as wide as they ask), with the ellipsis the words
         /// end in where the room is short of them.
+        /// v0.6.26 (audit G3: 11-43 ms on every size change of a dialog, its whole width read pixel by pixel): read once per
+        /// look - the words, their font, the direction, the theme's ink and ground, the row's height, and the room where it
+        /// is short of them. Where they fit, the room's width does not move their first letter (one line from the start
+        /// edge, Left or mirrored Right), so a dialog resized is never read again; and the reading stops at the first ink.
         internal static int TitleInkInset(string text, Font font, bool mirrored, Size room)
         {
             if (string.IsNullOrEmpty(text) || text.Trim().Length == 0) return TitleLead(font);
@@ -1901,9 +1934,16 @@ namespace CodexAutoResume
             int width = Math.Min(4096, size.Width + 8), height = Math.Max(1, size.Height + 4);
             if (!room.IsEmpty)
             {
-                width = Math.Min(4096, Math.Max(1, room.Width));
+                // Short of the words: drawn in the room, with its ellipsis; else as wide as they ask, the same first letter.
+                width = Math.Min(width, Math.Max(1, room.Width));
                 height = Math.Max(1, room.Height);
             }
+            string key = string.Join("|", new[] { text, font.Name, font.SizeInPoints.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                                  ((int)font.Style).ToString(), mirrored ? "r" : "l", width.ToString(), height.ToString(),
+                                                  Palette.Ink.ToArgb().ToString(), Palette.Canvas.ToArgb().ToString() });
+            int found;
+            if (titleInsets.TryGetValue(key, out found)) return found;
+            TitleScans++;
             using (var drawn = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
             {
                 using (Graphics g = Graphics.FromImage(drawn))
@@ -1911,11 +1951,18 @@ namespace CodexAutoResume
                     g.Clear(Palette.Canvas);
                     TextRenderer.DrawText(g, text, font, new Rectangle(0, 0, width, height), Palette.Ink, Palette.Canvas, flags);
                 }
-                Point ink = Chrome.InkColumns(drawn, Palette.Canvas, new Rectangle(0, 0, width, height));
-                if (ink.X < 0) return TitleLead(font);
-                return mirrored ? width - 1 - ink.Y : ink.X;
+                int ink = Chrome.FirstInkColumn(drawn, Palette.Canvas, mirrored);
+                found = ink < 0 ? TitleLead(font) : mirrored ? width - 1 - ink : ink;
             }
+            if (titleInsets.Count >= 256) titleInsets.Clear();
+            titleInsets[key] = found;
+            return found;
         }
+
+        private static readonly Dictionary<string, int> titleInsets = new Dictionary<string, int>();
+
+        /// How many times a title's first letter has been read from a drawing (TitleInkInset): for the tests.
+        internal static int TitleScans;
 
         /// What a Label's text drawing keeps before its first letter in `font`: half of what its padding adds to the
         /// text's width (TextRenderer pads both sides alike).

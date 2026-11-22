@@ -12,7 +12,11 @@ one call (ChromeHost.PointerBack).
 G2 (the owner, 2026-11-22, "대화상자 유지"). The window minimised under one of its dialogs - Show desktop, or another
 program - hid the dialog (WM_SHOWWINDOW, SW_PARENTCLOSING), and WinForms ended its modal loop with no close asked: the
 dialog and what was typed in it were gone. Now a modal dialog stays, as the setup window does, and is there with what
-was typed when the window comes back. Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
+was typed when the window comes back.
+
+G3. A dialog's title read its first letter from a drawing as wide as the title row, pixel by pixel, on every size change
+(11-43 ms each). Now it is read once per look and stops at the first ink: a dialog resized reads it no more, and the
+inset is the one the whole reading gave, in every room tried, mirrored too. Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
 and brings it back.
 
 The window is compiled from the shipped sources; its dialogs are made and asked, never shown. GUI test module: run on its
@@ -87,6 +91,49 @@ foreach ($hit in @(1, 2, 10, 12, 14, 17, -2)) {
     $out.cursor[[string]$hit] = $(if ($cursors.ContainsKey($now)) { $cursors[$now] } else { 'other' })
 }
 $dialog.Dispose()
+
+# G3: the title's first letter read once, not on every size change; and what it reads is what the whole reading read.
+$scans = (T 'SoftDialog').GetField('TitleScans', $static)
+$dialog = Dialog 'Timeline' 'Sizable'
+$null = $dialog.Handle
+$dialog.PerformLayout()
+$out.title_scans = -1
+if ($scans) {
+    $scans.SetValue($null, 0)
+    foreach ($width in 700, 820, 1000, 1300, 1600, 2400, 650) {
+        $dialog.ClientSize = New-Object Drawing.Size $width, 400
+        $dialog.PerformLayout()
+    }
+    $out.title_scans = [int]$scans.GetValue($null)
+}
+$out.title_words = [int](P $dialog 'TitleWords').Width
+$dialog.Dispose()
+$inset = @((T 'SoftDialog').GetMethods($static) | Where-Object { $_.Name -eq 'TitleInkInset' -and $_.GetParameters().Count -eq 4 })[0]
+$font = S 'Soft' 'RoleFont' @('heading')
+$canvas = (T 'Palette').GetField('Canvas', $static).GetValue($null)
+$ink = (T 'Palette').GetField('Ink', $static).GetValue($null)
+$out.insets = @()
+# The Persian Compatibility report, by its code points: the probe's file is read in the machine's code page.
+$persian = -join [char[]]@(0x06AF, 0x0632, 0x0627, 0x0631, 0x0634, 0x20, 0x0633, 0x0627, 0x0632, 0x06AF, 0x0627, 0x0631, 0x06CC)
+foreach ($text in 'Timeline', 'Install another version', $persian) {
+    foreach ($mirrored in $false, $true) {
+        foreach ($room in @(60, 20), @(600, 39), @(1300, 39), @(2400, 39)) {
+            $flags = [Windows.Forms.TextFormatFlags]'SingleLine, VerticalCenter, NoPrefix, EndEllipsis'
+            if ($mirrored) { $flags = $flags -bor [Windows.Forms.TextFormatFlags]'Right, RightToLeft' }
+            $drawn = New-Object Drawing.Bitmap $room[0], $room[1], ([Drawing.Imaging.PixelFormat]::Format32bppArgb)
+            $g = [Drawing.Graphics]::FromImage($drawn)
+            $g.Clear($canvas)
+            [Windows.Forms.TextRenderer]::DrawText($g, $text, $font, (New-Object Drawing.Rectangle 0, 0, $room[0], $room[1]), $ink, $canvas, $flags)
+            $g.Dispose()
+            $columns = S 'Chrome' 'InkColumns' @($drawn, $canvas, (New-Object Drawing.Rectangle 0, 0, $room[0], $room[1]))
+            $columns = $columns.PSObject.BaseObject
+            $drawn.Dispose()
+            $whole = $(if ($columns.X -lt 0) { -1 } elseif ($mirrored) { $room[0] - 1 - $columns.Y } else { $columns.X })
+            $now = [int]$inset.Invoke($null, (Bare @($text, $font, [bool]$mirrored, (New-Object Drawing.Size $room[0], $room[1]))))
+            $out.insets += ,@($text, [bool]$mirrored, $room[0], $whole, $now)
+        }
+    }
+}
 
 # G4: a wait ended gives the cursor back at once; the pointer over none of ours (every window here is off the screen),
 # the arrow.
@@ -190,6 +237,14 @@ class SourceTests(unittest.TestCase):
         self.assertNotIn("void GivePointerBack(", editor, "one way to give the pointer back: the window's")
         self.assertIn("GivePointerBack(waited);", editor)
 
+    def test_a_title_is_read_from_its_start_once_per_look(self):
+        dialog = guiscan.type_body("SoftDialog")
+        start = dialog.index("internal static int TitleInkInset(string text, Font font, bool mirrored, Size room)")
+        inset = dialog[start:dialog.index("private static readonly Dictionary<string, int> titleInsets", start)]
+        self.assertIn("if (titleInsets.TryGetValue(key, out found)) return found;", inset)
+        self.assertIn("Chrome.FirstInkColumn(drawn, Palette.Canvas, mirrored)", inset)
+        self.assertNotIn("Chrome.InkColumns(", inset)
+
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class WindowTests(unittest.TestCase):
@@ -224,6 +279,16 @@ class WindowTests(unittest.TestCase):
         self.assertTrue(seen.get("dialog_visible"), "the dialog stayed on the screen: %r" % seen)
         self.assertTrue(seen["closed_by_probe"], "the dialog's loop ended only when the probe closed it: %r" % seen)
         self.assertEqual((seen["result"], seen["typed"]), ("OK", "words typed before Show desktop"))
+
+    def test_a_dialog_resized_reads_its_title_no_more(self):
+        self.assertGreater(self.answer["title_words"], 0)
+        self.assertEqual(self.answer["title_scans"], 0, "SoftDialog.TitleScans after seven resizes")
+
+    def test_the_title_inset_is_the_one_the_whole_reading_gave(self):
+        for text, mirrored, width, whole, now in self.answer["insets"]:
+            with self.subTest(text=text, mirrored=mirrored, room=width):
+                if whole >= 0:
+                    self.assertEqual(now, whole)
 
 
 if __name__ == "__main__":
