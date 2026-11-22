@@ -499,6 +499,7 @@ class WatchLoop:
                 self._unknown_error = self._unknown_errors(engine, now)
         except Exception:
             self._record_failure("the self-check")
+            judge.look(now, None, {})
         backend = getattr(engine, "backend", None)
         # #6 (the seat that rescores the layout, v0.6.26): where the version-change look finds a layout no catalogued
         # one matches, the backend says so as `layout_untested` - True, or the Codex version it found it for.
@@ -520,8 +521,12 @@ class WatchLoop:
         """#10: the newest error code Codex reported in the last day that this version does not know, with how many of
         the conversations' latest turns failed with one ({"code", "count"}), or None - read once a minute from the
         failures' shapes alone (failures.unknown_code), never a word of a message. Nothing is recovered for them."""
-        found = [(entry.get("completed_at") or 0, code)
-                 for entry in engine.source.latest_failures(max(0.0, now - 86400.0), admissible=True, shapes=True)
+        try:
+            read = engine.source.latest_failures(max(0.0, now - 86400.0), admissible=True, shapes=True)
+        except Exception:
+            # A history that cannot be read is the detection rule's to say (history_unreadable), not a failure here.
+            return getattr(self, "_unknown_error", None)
+        found = [(entry.get("completed_at") or 0, code) for entry in read
                  for code in [failures.unknown_code(entry)] if code is not None]
         return {"code": max(found)[1], "count": len(found)} if found else None
 
@@ -555,12 +560,15 @@ class WatchLoop:
                 pass
         older = []
         for kind, path in newest.items():
-            if path is None or held is None or resource_users(path):
-                continue
-            pattern = DB_KINDS[kind][0]
-            others = [entry for entry in home.iterdir() if pattern.fullmatch(entry.name) and entry != path
-                      and entry.is_file() and not entry.is_symlink()]
-            older.append({user.get("pid") for user in resource_users(*others)} if others else set())
+            try:
+                if path is None or held is None or resource_users(path):
+                    continue
+                pattern = DB_KINDS[kind][0]
+                others = [entry for entry in home.iterdir() if pattern.fullmatch(entry.name) and entry != path
+                          and entry.is_file() and not entry.is_symlink()]
+                older.append({user.get("pid") for user in resource_users(*others)} if others else set())
+            except Exception:
+                continue                    # an older generation that cannot be asked about is not judged
         server = identity.get("server", {}).get("pid") if isinstance(identity, dict) else None
         facts.update(impossible.recovery_facts(
             matched=look == "matched" and identity is not None, server=server, reasons=reasons,

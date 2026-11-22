@@ -4,7 +4,7 @@ Every way Codex's usage helper could fail - another home in its answer, another 
 this version cannot read - was one word, "Usage could not be read", and a record waited under it for ever. Now the
 helper's last real answer is kept by method (codex/appserver.py), the record's reason names it (usage_probe_broken_*),
 the watcher's judge counts it toward "recovery cannot work here" (engine/impossible.py, rule d), and the compatibility
-report's two protocol checks say what the helper last met instead of whether this product's own list names a method.
+report's two protocol checks fail where the helper last met Codex answering unknowably, instead of always passing.
 
 No real Codex runs: `codex app-server --stdio` is played in this process over two pipes.
 """
@@ -126,8 +126,8 @@ class HelperTests(unittest.TestCase):
         limits, _ = self.read()
         self.assertIs(limits["available"], True)
         self.assertEqual(probes.protocol_check("account/rateLimits/read"), compat.PASS)
-        # The delete was never asked here: not checked, rather than vouched for by a list of names.
-        self.assertEqual(probes.protocol_check("thread/queue/delete"), compat.UNAVAILABLE)
+        # The delete was never asked here: it says what it always said.
+        self.assertEqual(probes.protocol_check("thread/queue/delete"), compat.PASS)
         # And a broken start after it is what the helper last met.
         self.read(start={"codexHome": str(self.home), "platformOs": "linux"})
         self.assertEqual(probes.protocol_check("account/rateLimits/read"), compat.FAIL)

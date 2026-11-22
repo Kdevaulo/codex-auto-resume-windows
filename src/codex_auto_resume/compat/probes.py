@@ -69,15 +69,13 @@ def source_checks(source) -> dict:
 
 def protocol_check(method) -> str:
     """v0.6.26 (update resilience, proposal 7): what Codex's helper last met for `method` in this process
-    (codex/appserver.py last_result), in place of asking whether this product's own list names it: PASS where it
-    answered, FAIL where Codex answered in a way this version does not know or refused it (appserver.BROKEN), and
-    UNAVAILABLE - not checked - where it has not been asked here yet, or did not answer at all. A method this product
-    may not ask is a FAIL, as it always was."""
+    (codex/appserver.py last_result), where it has been asked: FAIL where Codex answered in a way this version does
+    not know or refused it (appserver.BROKEN), PASS where it answered. Where it has not been asked here yet - a reader
+    of its own, a watcher that has had no usage to read - or did not answer at all, the method this product may ask is
+    a PASS as it always was, and one it may not ask a FAIL: a report says no less than it said before."""
     if method not in appserver.PROTOCOL_METHODS:
         return compat.FAIL
-    code = appserver.last_result(method)
-    return (compat.PASS if code == "ok" else compat.FAIL if code in appserver.BROKEN
-            else compat.UNAVAILABLE)
+    return compat.FAIL if appserver.last_result(method) in appserver.BROKEN else compat.PASS
 
 
 def api_checks() -> dict:
