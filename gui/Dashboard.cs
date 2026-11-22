@@ -1022,7 +1022,10 @@ namespace CodexAutoResume
             {
                 int bodyWidth = Math.Max(Px(2), Length(index, max, track));
                 int left = mirrored ? Width - labelWidth - Px(12) - bodyWidth : labelWidth + Px(12);
-                faces[index] = new Rectangle(left, y + Px(5), bodyWidth, Font.Height - Px(2));
+                // v0.6.26 (audit D6): centred on its label's x-height middle (the label's line starts at y + Px(4)), not on
+                // the line's box - which set the bar 2.7 logical px above the middle of the lowercase letters beside it.
+                int body = Font.Height - Px(2);
+                faces[index] = new Rectangle(left, y + Px(4) + (int)Math.Round(Soft.XMiddle(Font) - body / 2.0), bodyWidth, body);
             }
             return faces;
         }

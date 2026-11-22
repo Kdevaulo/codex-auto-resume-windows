@@ -1194,6 +1194,43 @@ namespace CodexAutoResume
             return Palette.Contrast ? over : Mix(over, tone, 0.12);
         }
 
+        private static readonly Dictionary<string, float> xMiddles = new Dictionary<string, float>();
+
+        /// v0.6.26 (audit D6): how far below the top of a line drawn in `font` (TextRenderer, from a point) the middle of its
+        /// x-height is, in device px - what a mark beside the words is centred on for the eye, the lowercase letters' middle,
+        /// not the line's box: an "x" drawn and its ink rows read, kept per face, size and style.
+        internal static float XMiddle(Font font)
+        {
+            string key = font.Name + "|" + font.SizeInPoints.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|" + (int)font.Style;
+            float found;
+            if (xMiddles.TryGetValue(key, out found)) return found;
+            int height = Math.Max(1, font.Height), width = Math.Max(1, 2 * font.Height);
+            found = height / 2f;
+            using (var drawn = new Bitmap(width, height))
+            {
+                using (Graphics g = Graphics.FromImage(drawn))
+                {
+                    g.Clear(Color.White);
+                    TextRenderer.DrawText(g, "x", font, new Point(0, 0), Color.Black, Color.White);
+                }
+                int top = -1, bottom = -1;
+                for (int y = 0; y < height; y++)
+                    for (int x = 0; x < width; x++)
+                    {
+                        Color c = drawn.GetPixel(x, y);
+                        if (c.R < 160 || c.G < 160 || c.B < 160)
+                        {
+                            if (top < 0) top = y;
+                            bottom = y;
+                            break;
+                        }
+                    }
+                if (top >= 0) found = (top + bottom + 1) / 2f;
+            }
+            xMiddles[key] = found;
+            return found;
+        }
+
         internal static Size ChipSize(string text, Font font)
         {
             Size measured = TextRenderer.MeasureText(text ?? "", font, new Size(int.MaxValue, int.MaxValue),
