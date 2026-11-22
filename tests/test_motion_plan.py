@@ -285,7 +285,7 @@ class RunnerTests(unittest.TestCase):
                                                                                  "hold": 200},
                        light_step_ms=100)
         drawn = list(make_motion.run(plan, lambda frame: state(frame)["page"].encode()))
-        self.assertEqual([(delay, picture) for delay, _scene, picture in drawn],
+        self.assertEqual([(delay, picture) for delay, _scene, picture, _whole in drawn],
                          [(300, b"overview"), (300, b"pending"), (200, b"overview")])
 
     def test_the_dry_run_names_every_scene(self):

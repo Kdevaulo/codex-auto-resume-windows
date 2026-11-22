@@ -687,6 +687,17 @@ def delays(moments: list, end: int) -> list:
     return out
 
 
+def is_cut(before, frame: Frame) -> bool:
+    """Whether `frame` is a cut after the frame `before` it (None: the first): a change of the state the product paints in
+    one go - the window's, the card's, the popup's or its hover card's - which the picture then writes as one rectangle
+    (motion_apng.assemble's `whole`, v0.6.26 audit M1). A frame only the clock moves on - a light, the tray icon, a
+    sweep, a fade - and one only the pointer or a ripple moves in, is not: what moves there moves by itself."""
+    if before is None:
+        return True
+    return (before.window != frame.window or before.card != frame.card or before.popup != frame.popup
+            or before.tip != frame.tip)
+
+
 def window_states(frames: list) -> list:
     """Each different (window state, moment of its lights) the frames need drawn, in the order they first appear."""
     seen, out = set(), []

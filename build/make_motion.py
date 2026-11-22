@@ -107,19 +107,22 @@ def schedule(plan: dict, also=()) -> tuple:
 
 
 def run(plan: dict, draw, also=()):
-    """(delay in ms, scene, picture) for each frame of the plan, drawn by `draw(frame)`, one at a time: a
+    """(delay in ms, scene, picture, whole) for each frame of the plan, drawn by `draw(frame)`, one at a time: a
     frame whose picture is the one before's only lengthens it, so a picture is written once however long it holds.
-    The first is always frame 1, even when the next is the same."""
+    The first is always frame 1, even when the next is the same. `whole` is whether the frame is a cut of the plan's
+    state (motion_plan.is_cut), which the assembler writes as one rectangle (v0.6.26 audit M1)."""
     frames, held, _end = schedule(plan, also)
-    previous = None
+    previous, before = None, None
     for frame, delay in zip(frames, held):
         picture = draw(frame)
+        whole = motion_plan.is_cut(before, frame)
+        before = frame
         if previous is not None and picture == previous[2]:
             previous[0] += delay
             continue
         if previous is not None:
             yield tuple(previous)
-        previous = [delay, frame.scene, picture]
+        previous = [delay, frame.scene, picture, whole]
     if previous is not None:
         yield tuple(previous)
 

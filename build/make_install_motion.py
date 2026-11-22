@@ -545,15 +545,19 @@ def make(plan: dict, exe: Path, work: Path, still: tuple | None, caption: int, o
         return bytes(picture)
 
     def run():
-        previous = None
+        # v0.6.26 (audit M1): a frame that changes the window's state - a page, a line of the run, a face - is one
+        # repaint of the window, written as one rectangle (motion_plan.is_cut, motion_apng.assemble's `whole`).
+        previous, before = None, None
         for index, (frame, delay) in enumerate(zip(frames, held)):
             picture = draw(frame, index)
+            whole = motion_plan.is_cut(before, frame)
+            before = frame
             if previous is not None and picture == previous[2]:
                 previous[0] += delay
                 continue
             if previous is not None:
                 yield tuple(previous)
-            previous = [delay, frame.scene, picture]
+            previous = [delay, frame.scene, picture, whole]
         if previous is not None:
             yield tuple(previous)
 
