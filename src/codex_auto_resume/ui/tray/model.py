@@ -30,7 +30,8 @@ def snapshot_from(store, now: float) -> dict:
             if row.get("hold") is not None:
                 held += 1
             # #58's follow-up: and how many last found the app open and no server of its matched (popup.snapshot_activity).
-            elif row.get("last_error") == "app_server_unmatched" and row["thread_id"] not in store.disabled_threads():
+            elif (row.get("last_error") in ("app_server_unmatched", "app_server_unmatched_named_engine")
+                  and row["thread_id"] not in store.disabled_threads()):
                 unmatched += 1
             at = machine.eligible_at(row)
             if at:

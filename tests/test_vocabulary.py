@@ -75,7 +75,9 @@ LISTS = {
     # off, left inProgress for good (engine/outcome.py).
     # 2026-10-22: progress_then_user_joined - a recovery turn that did work before a person's message entered it.
     # #58's follow-up: app_server_unmatched - the Codex app runs and no server of its could be matched.
-    "machine.REASONS": ("set", 82, "621ae6fdcfaa1fba"),
+    # v0.6.26: usage_probe_broken_answer, _request and _start - which way a usage read broke - and
+    # app_server_unmatched_named_engine - the engine set in Settings is not the one the app runs.
+    "machine.REASONS": ("set", 86, "a305ece9442655e3"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -104,7 +106,8 @@ LISTS = {
     # 2026-10-21: and progress_then_turn_cut_off, as every reason is.
     # 2026-10-22: and progress_then_user_joined, as every reason is.
     # #58's follow-up: and app_server_unmatched, as every reason is.
-    "machine.GATE_REASONS": ("set", 100, "5b944a9cd555cfdd"),
+    # v0.6.26: and the four of v0.6.26, as every reason is.
+    "machine.GATE_REASONS": ("set", 104, "8ae884b123722ca9"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",

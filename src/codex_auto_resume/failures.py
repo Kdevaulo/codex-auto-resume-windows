@@ -241,6 +241,18 @@ def shape(error_info, message=None) -> dict:
     return {"code": code, "status": status, "form": form, "has_message": has_message}
 
 
+def unknown_code(entry):
+    """v0.6.26 (update resilience, proposal 10): the code of a failure Codex reported that this version does not know -
+    a failed turn classified unknown whose structured error is tagged with a code outside CODES - or None. `entry` is
+    one of latest_failures' with its `shape` (codex/history.py, shapes=True). A closed-shape tag (TAG_SHAPE), never a
+    word of a message (B9); unknown is still never recovered for it (A13, A14)."""
+    facts = entry.get("shape") if isinstance(entry, dict) else None
+    if not isinstance(facts, dict) or entry.get("category") != UNKNOWN or facts.get("form") != FailureForm.TAGGED:
+        return None
+    code = facts.get("code")
+    return code if isinstance(code, str) and code not in CODES and TAG_SHAPE.fullmatch(code) else None
+
+
 def _plain_code(facts) -> bool:
     """A code of Codex's this product does not know, naming no decision, and no 4xx beside it."""
     code, status = facts.get("code"), facts.get("status")

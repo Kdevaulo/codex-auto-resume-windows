@@ -270,6 +270,19 @@ namespace CodexAutoResume
                 lines.Add(S("selfcheck.history_unreadable", "Codex's history can no longer be read, so new interruptions are not being detected. Export Diagnostics and report it."));
             else if (rule == "engine_missing")
                 lines.Add(S("selfcheck.engine_missing", "The Codex engine could not be found or checked, so nothing can be recovered."));
+            // #10: the newest error code Codex reported in the last day that this version does not know, and how many.
+            var check = Map(watcher, "self_check");
+            var unknown = Map(check, "unknown_error");
+            string code = Str(unknown, "code");
+            if (code != null)
+                lines.Add(S("selfcheck.unknown_error", "Codex reported an error this version does not know: {code} ({n} in the last day). It is not recovered.",
+                            "code", code)
+                          .Replace("{n}", Mirror.Embed(((int)Number(unknown, "count")).ToString(CultureInfo.CurrentCulture))));
+            // #6: Codex runs in a layout this version has not been tested on, found when its version changed.
+            string version = Str(check, "layout_untested");
+            if (version != null)
+                lines.Add(S("selfcheck.layout_untested", "Codex {version} runs in a layout this version has not been tested on.",
+                            "version", version));
             return string.Join(Environment.NewLine, lines.ToArray());
         }
 

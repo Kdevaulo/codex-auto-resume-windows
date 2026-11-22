@@ -20,7 +20,7 @@ import uuid
 
 from pathlib import Path
 
-from .. import compatio, config, l10n, machine, power
+from .. import compatio, config, failures, l10n, machine, power
 from ..codex.pairing import app_running_now
 from ..codex.paths import DB_KINDS, newest_generation
 from ..domain import public
@@ -496,14 +496,17 @@ class WatchLoop:
                 self._judged_at = now
                 runs, facts = self._recovery_facts(store, engine)
                 judge.look(now, runs, facts)
+                self._unknown_error = self._unknown_errors(engine, now)
         except Exception:
             self._record_failure("the self-check")
         backend = getattr(engine, "backend", None)
+        # #6 (the seat that rescores the layout, v0.6.26): where the version-change look finds a layout no catalogued
+        # one matches, the backend says so as `layout_untested` - True, or the Codex version it found it for.
         untested = getattr(backend, "layout_untested", None)
         if untested is True:
             untested = getattr(backend, "engine_version", None)
-        written = public.self_check_note(started, judge.word(now), getattr(engine, "unknown_error", None),
-                                  untested if isinstance(untested, str) else None)
+        written = public.self_check_note(started, judge.word(now), getattr(self, "_unknown_error", None),
+                                         untested if isinstance(untested, str) else None)
         if written != getattr(self, "_self_check_written", None):
             try:
                 compatio.write_json_atomic(self.paths.self_check_file, written, "selfcheck.")
@@ -512,6 +515,15 @@ class WatchLoop:
                     self.logger.info("self-check: %s", written["blocked"])
             except OSError:
                 self._record_failure("writing the self-check")
+
+    def _unknown_errors(self, engine, now):
+        """#10: the newest error code Codex reported in the last day that this version does not know, with how many of
+        the conversations' latest turns failed with one ({"code", "count"}), or None - read once a minute from the
+        failures' shapes alone (failures.unknown_code), never a word of a message. Nothing is recovered for them."""
+        found = [(entry.get("completed_at") or 0, code)
+                 for entry in engine.source.latest_failures(max(0.0, now - 86400.0), admissible=True, shapes=True)
+                 for code in [failures.unknown_code(entry)] if code is not None]
+        return {"code": max(found)[1], "count": len(found)} if found else None
 
     def _recovery_facts(self, store, engine):
         """(app runs, {rule: held}) for one look of the recovery rules (impossible.recovery_facts): asked only while a

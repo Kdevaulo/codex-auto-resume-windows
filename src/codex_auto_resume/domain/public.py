@@ -158,6 +158,8 @@ PAGES = tuple(Page)
 
 # ----------------------------------------------------------------------------- overlays
 OVERLAYS = tuple(Overlay)
+# The reasons that ask for a person because the app's server is not matched: v0.6.26's named engine among them.
+_UNMATCHED = frozenset({ReasonCode.APP_SERVER_UNMATCHED, ReasonCode.APP_SERVER_UNMATCHED_NAMED_ENGINE})
 
 
 def overlays(record: dict, *, enabled=True, thread_enabled=True, watcher=None) -> list:
@@ -184,7 +186,7 @@ def overlays(record: dict, *, enabled=True, thread_enabled=True, watcher=None) -
         found.append("held")
     # #58's follow-up: the last look found the app open and no server of its matched. Nothing goes on by itself until
     # Codex or this product changes, so it asks for a person - while the watcher would act on it at all.
-    elif record.get("last_error") == ReasonCode.APP_SERVER_UNMATCHED and enabled and thread_enabled:
+    elif record.get("last_error") in _UNMATCHED and enabled and thread_enabled:
         found.append("app_server_unmatched")
     watcher = watcher or {}
     if watcher.get("engine_state") == "incompatible":

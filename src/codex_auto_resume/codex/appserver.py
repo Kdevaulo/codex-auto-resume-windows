@@ -23,6 +23,44 @@ from .usage import parse_usage
 
 # The only App Server methods the finite helper may call.
 PROTOCOL_METHODS = ("initialize", "account/rateLimits/read", "thread/queue/delete")
+# v0.6.26 (update resilience, proposal 7): what the helper last met, by method - "ok", or the AdapterError's code - with
+# a count that orders them, in this process (RESULTS) and on the backend it served (`protocol_results`): the
+# compatibility report's protocol checks read the one (compat/probes.py), the engine's usage wait the other
+# (engine/outcome.py), so a usage read Codex answered unknowably says which way it broke.
+RESULTS = {}
+_RESULTS_LOCK = threading.Lock()
+_SEQUENCE = [0]
+# The codes that mean Codex answered, and not in a way this version knows: its home or system was another, or it
+# refused the request, or its usage answer is not one this version reads. A helper that did not answer at all is
+# "protocol_unavailable" or "protocol_timeout".
+BROKEN = frozenset({"protocol_home_mismatch", "protocol_platform_mismatch", "protocol_request_failed",
+                    "protocol_reply_unknown"})
+
+
+def _note(backend, method, code):
+    """Keep what the helper met for `method` (RESULTS, and the backend's `protocol_results`). Never raises."""
+    with _RESULTS_LOCK:
+        _SEQUENCE[0] += 1
+        entry = (code, _SEQUENCE[0])
+        RESULTS[method] = entry
+    try:
+        kept = getattr(backend, "protocol_results", None)
+        if not isinstance(kept, dict):
+            kept = {}
+            backend.protocol_results = kept
+        kept[method] = entry
+    except Exception:
+        pass
+
+
+def last_result(method, results=None):
+    """What the helper last met for `method`, in `results` (RESULTS by default): its own call's code, or the helper's
+    start's (initialize) where that came after it - "ok", a code, or None where it has not been asked here."""
+    results = RESULTS if results is None else results
+    own, start = results.get(method), results.get("initialize")
+    if start is not None and start[0] != "ok" and (own is None or start[1] > own[1]):
+        return start[0]
+    return own[0] if own is not None else None
 # The Compatibility Registry's local-check words, which the adapter's own probes answer with.
 
 # v0.6.22: a line up to LINE_LIMIT is parsed whole. A longer one - Codex echoes a message's pictures inline, and one
@@ -169,8 +207,11 @@ class Protocol:
             if response.get("platformOs") != "windows":
                 raise AdapterError("protocol_platform_mismatch")
             self._write({"method": "initialized"})
+            _note(self.backend, "initialize", "ok")
             return self
-        except BaseException:
+        except BaseException as error:
+            if isinstance(error, AdapterError) and str(error).startswith("protocol_"):
+                _note(self.backend, "initialize", str(error))
             self.__exit__()
             raise
 
@@ -200,6 +241,19 @@ class Protocol:
     def call(self, method, params=None):
         if method not in PROTOCOL_METHODS:
             raise AdapterError("protocol_method_not_allowed")
+        if method == "initialize":
+            return self._call(method, params)
+        try:
+            result = self._call(method, params)
+        except AdapterError as error:
+            _note(self.backend, method, str(error))
+            raise
+        # A usage answer this version cannot read is Codex answering in a way it does not know (codex/usage.py).
+        unread = method == "account/rateLimits/read" and parse_usage(result).get("reason") == "usage_snapshot_unknown"
+        _note(self.backend, method, "protocol_reply_unknown" if unread else "ok")
+        return result
+
+    def _call(self, method, params=None):
         self.sequence += 1
         sequence = self.sequence
         request = {"id": sequence, "method": method}

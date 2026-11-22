@@ -9,6 +9,7 @@ import time
 
 from .. import config
 from .. import compat
+from ..codex import appserver
 from .files import (path_digest)
 from .cache import (_coerce, _columns, _newest)
 
@@ -66,14 +67,25 @@ def source_checks(source) -> dict:
     return checks
 
 
+def protocol_check(method) -> str:
+    """v0.6.26 (update resilience, proposal 7): what Codex's helper last met for `method` in this process
+    (codex/appserver.py last_result), in place of asking whether this product's own list names it: PASS where it
+    answered, FAIL where Codex answered in a way this version does not know or refused it (appserver.BROKEN), and
+    UNAVAILABLE - not checked - where it has not been asked here yet, or did not answer at all. A method this product
+    may not ask is a FAIL, as it always was."""
+    if method not in appserver.PROTOCOL_METHODS:
+        return compat.FAIL
+    code = appserver.last_result(method)
+    return (compat.PASS if code == "ok" else compat.FAIL if code in appserver.BROKEN
+            else compat.UNAVAILABLE)
+
+
 def api_checks() -> dict:
     from .. import windows
     return {
         "restart_manager": compat.PASS if windows.restart_manager_available() else compat.UNAVAILABLE,
-        "protocol_usage_method": (compat.PASS if "account/rateLimits/read" in windows.PROTOCOL_METHODS
-                                  else compat.FAIL),
-        "protocol_delete_method": (compat.PASS if "thread/queue/delete" in windows.PROTOCOL_METHODS
-                                   else compat.FAIL),
+        "protocol_usage_method": protocol_check("account/rateLimits/read"),
+        "protocol_delete_method": protocol_check("thread/queue/delete"),
     }
 
 

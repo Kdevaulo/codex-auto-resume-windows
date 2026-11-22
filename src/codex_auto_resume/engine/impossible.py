@@ -51,6 +51,33 @@ USAGE_BROKEN_REASONS = frozenset({"usage_probe_broken_answer", "usage_probe_brok
                                   "usage_probe_broken_start"})
 
 
+# v0.6.26 (proposal 7): which way a usage read broke, by what the helper last met (codex/appserver.py RESULTS): Codex
+# answered for another home or system, or with a usage answer this version does not read; refused the request; or did
+# not answer at all.
+_USAGE_BROKEN = {"protocol_home_mismatch": "usage_probe_broken_answer",
+                 "protocol_platform_mismatch": "usage_probe_broken_answer",
+                 "protocol_reply_unknown": "usage_probe_broken_answer",
+                 "protocol_request_failed": "usage_probe_broken_request",
+                 "protocol_unavailable": "usage_probe_broken_start",
+                 "protocol_timeout": "usage_probe_broken_start"}
+USAGE_METHOD = "account/rateLimits/read"
+
+
+def usage_reason(limits, results):
+    """The reason a record waits on a usage read that said neither available nor not (`limits`, the backend's usage()
+    answer), given what the helper last met (`results`, the backend's protocol_results): a usage_probe_broken_* reason
+    where that names how it broke, else usage_unknown, as it always was."""
+    reason = limits.get("reason") if isinstance(limits, dict) else None
+    if reason == "usage_snapshot_unknown":
+        return "usage_probe_broken_answer"
+    if reason != "usage_probe_unavailable" or not isinstance(results, dict):
+        return "usage_unknown"
+    own, start = results.get(USAGE_METHOD), results.get("initialize")
+    if start is not None and start[0] != "ok" and (own is None or start[1] > own[1]):
+        own = start
+    return _USAGE_BROKEN.get(own[0] if isinstance(own, tuple) else None, "usage_unknown")
+
+
 def recovery_facts(*, matched, server, reasons, lock_holders, database_holders, locks_folder, older_holders):
     """{rule: True | False | None} for one look, from what was read: `matched`, whether the app's server is paired;
     `server`, its pid; `reasons`, the waiting records' reasons; `lock_holders`, the pids holding the writer lock of a

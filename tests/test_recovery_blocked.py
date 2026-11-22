@@ -150,7 +150,9 @@ class FeederTests(unittest.TestCase):
         identity = {"pid": 10, "created": 1, "server": {"pid": EXEC_SERVER, "created": 2}}
         backend = types.SimpleNamespace(codex_home=self.codex, app_look="matched", engine_version="0.170.0",
                                         app_identity=lambda: identity)
-        self.engine = types.SimpleNamespace(backend=backend, detection_failed=False)
+        self.failed_turns = []
+        source = types.SimpleNamespace(latest_failures=lambda since, **asked: [dict(row) for row in self.failed_turns])
+        self.engine = types.SimpleNamespace(backend=backend, source=source, detection_failed=False)
         self.store = Store([{"thread_id": T1, "last_error": "held_by_other_session", "state": "waiting_for_loaded_thread"}])
 
         def users(*paths):
@@ -199,6 +201,27 @@ class FeederTests(unittest.TestCase):
         with stub:
             self.run_for(11)
         self.assertIsNone(self.written()["blocked"])
+
+    def test_an_error_code_codex_reports_that_this_version_does_not_know_is_named_with_its_count(self):
+        # #10: three conversations whose latest turns failed with a tag outside CODES, one with a known kind; only the
+        # shape is read, and the newest code is the one named.
+        tagged = {"form": "tagged", "code": "somethingNewExceeded", "status": None, "has_message": True}
+        self.failed_turns = [{"category": "unknown", "completed_at": 900.0, "shape": dict(tagged, code="olderNewThing")},
+                             {"category": "unknown", "completed_at": 950.0, "shape": tagged},
+                             {"category": "usage_limit", "completed_at": 960.0,
+                              "shape": dict(tagged, code="usageLimitExceeded")},
+                             {"category": "unknown", "completed_at": 940.0,
+                              "shape": {"form": "message_only", "code": None, "status": None, "has_message": True}}]
+        self.run_for(1)
+        check = public.self_check(self.written(), 500.0)
+        self.assertEqual(check["unknown_error"], {"code": "somethingNewExceeded", "count": 2})
+        self.assertIsNone(check["blocked"])
+
+    def test_a_layout_the_version_change_look_did_not_recognise_is_named_with_the_version(self):
+        # #6: the attribute the layout seat's version-change look sets on the backend.
+        self.engine.backend.layout_untested = True
+        self.run_for(0)
+        self.assertEqual(public.self_check(self.written(), 500.0)["layout_untested"], "0.170.0")
 
     def test_with_nothing_waiting_for_it_the_restart_manager_is_not_asked(self):
         self.store.rows = [{"thread_id": T1, "last_error": "waiting_for_reset", "state": "waiting_reset"}]

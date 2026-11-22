@@ -91,6 +91,9 @@ _MESSAGES = {
     ("waiting_poll", None): "waiting (no reset timestamp; conservative polling)",
     ("waiting_for_app", "desktop_app_unavailable"): "ChatGPT app or its Codex server not running; waiting",
     ("waiting_for_app", "app_server_unmatched"): "ChatGPT app is running, but its Codex server could not be matched; waiting",
+    # v0.6.26: and the engine set in Settings is not the one the app runs (update resilience, proposal 9).
+    ("waiting_for_app", "app_server_unmatched_named_engine"):
+        "ChatGPT app is running a different Codex engine from the one set in Settings; waiting until they match",
     ("waiting_for_loaded_thread", "notLoaded"): "notLoaded\nwaiting until user opens this thread in ChatGPT app",
     ("waiting_for_loaded_thread", "loaded_state_unknown"): "loaded state unknown; waiting safely without queueing",
     ("waiting_for_loaded_thread", "held_by_other_session"):
@@ -100,6 +103,13 @@ _MESSAGES = {
     ("waiting_for_loaded_thread", "loaded_recheck_failed"): "loaded re-check failed at dispatch time; waiting",
     ("waiting_for_usage", "usage_unavailable"): "usage still unavailable; waiting for reset",
     ("waiting_for_usage", "usage_unknown"): "usage status unknown; waiting without queueing",
+    # v0.6.26: and which way the usage read broke, where Codex's helper said (engine/impossible.py usage_reason).
+    ("waiting_for_usage", "usage_probe_broken_answer"):
+        "usage could not be read: Codex answered in a way this version does not know; waiting without queueing",
+    ("waiting_for_usage", "usage_probe_broken_request"):
+        "usage could not be read: Codex refused the usage request; waiting without queueing",
+    ("waiting_for_usage", "usage_probe_broken_start"):
+        "usage could not be read: Codex's usage helper did not answer; waiting without queueing",
     ("waiting_for_usage", "usage_recheck_failed"): "usage re-check failed at dispatch time; waiting",
     # v0.6.11: Wait for an internet connection (power.py), only when it is on.
     ("waiting_for_usage", "offline"): "Windows reports no internet connection; waiting without reading usage",
