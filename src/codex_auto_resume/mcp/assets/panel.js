@@ -437,8 +437,13 @@ function attentionCause(status, rows) {
   if (watcher.ticking === false) return 'watcher_not_ticking';
   if (watcher.engine_state === 'incompatible') return 'compatibility_blocked';
   if (watcher.engine_state === 'failed_here') return 'compatibility_failed_here';
+  // v0.6.26: the watcher's own judge found that recovery cannot work here (domain/public.py self_check, its WORDS; the
+  // Dashboard's Blocked).
+  var blocked = (watcher.self_check || {}).blocked;
+  if (typeof blocked === 'string' && (blocked.indexOf('recovery_blocked:') === 0 ||
+                                      blocked.indexOf('detection_blocked:') === 0)) return 'codex_changed';
   var held = ['compatibility_blocked', 'compatibility_failed_here', 'engine_unavailable', 'watcher_not_ticking',
-              'app_server_unmatched'];
+              'app_server_unmatched', 'codex_changed'];
   var list = rows || [];
   for (var i = 0; i < list.length; i++) {
     var overlays = list[i].overlays || [];
@@ -477,7 +482,7 @@ function tone(code) {
   if (['exhausted', 'failed_terminal', 'recovery_failed'].indexOf(code) >= 0) return 'danger';
   if (['failed_retryable', 'outcome_unverified', 'submission_unknown', 'no_progress',
        'engine_unavailable', 'watcher_not_ticking', 'compatibility_blocked', 'compatibility_failed_here',
-       'app_server_unmatched']
+       'app_server_unmatched', 'codex_changed']
       .indexOf(code) >= 0) return 'warning';
   return 'paused';
 }
@@ -1345,6 +1350,7 @@ function heroFacts(status, state, rows) {
               ? t('overlay.compatibility_failed_here', 'Codex checks failed on this computer')
             : cause === 'held' ? t('popup.held', 'Waiting for you to let it continue')
             : cause === 'app_server_unmatched' ? t('overlay.app_server_unmatched', "Codex app's server not matched")
+            : cause === 'codex_changed' ? t('overlay.codex_changed', 'Codex changed; recovery cannot work here')
             : cause === 'engine_unavailable' ? t('status.not_running', 'Watcher not running')
             : t('status.not_responding', 'Watcher not responding');
     return [why, pending];

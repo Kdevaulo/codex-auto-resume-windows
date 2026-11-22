@@ -286,6 +286,13 @@ KNOWN_DRIFT = {
         "carried only when the dashboard's Pending part fails (dispatch writes `<part>_error` beside "
         "the parts that did not); no golden fails a part on purpose, and tests/test_control.py's "
         "test_a_dashboard_part_that_fails_costs_only_that_part pins that shape",
+    # v0.6.26: carried only while a running watcher's own judge names an error code Codex reported that this version does
+    # not know (domain/public.self_check); the goldens' watcher comes from the picture generator's heartbeat, which
+    # writes no self-check, and tests/test_recovery_blocked.py pins that shape (control/wire.py SelfCheck).
+    ("gui/DashboardData.cs", "CodexNote", "check", "unknown_error.code"):
+        "carried only while the watcher's judge names an unknown error code; tests/test_recovery_blocked.py pins it",
+    ("gui/DashboardData.cs", "CodexNote", "check", "unknown_error.count"):
+        "carried only while the watcher's judge names an unknown error code; tests/test_recovery_blocked.py pins it",
 }
 
 # The typed contracts (control/wire.py, v0.6.10-alpha), by the receiver they type. Every name a

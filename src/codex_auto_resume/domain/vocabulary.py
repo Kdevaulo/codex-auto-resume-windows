@@ -191,6 +191,8 @@ class Overlay(StrEnum):
     HELD = "held"
     # #58's follow-up: the Codex app runs and no server of its could be matched, the record's own reason.
     APP_SERVER_UNMATCHED = "app_server_unmatched"
+    # v0.6.26: the watcher's own judge found that recovery cannot work here (domain/public.py WORDS, engine/impossible.py).
+    CODEX_CHANGED = "codex_changed"
 
 
 class HoldKind(StrEnum):

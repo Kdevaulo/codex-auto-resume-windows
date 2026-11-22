@@ -6,10 +6,13 @@ names are drawn from, which is why nothing here reads settings or the clock.
 """
 from __future__ import annotations
 
+import re
+
 from .vocabulary import (Actor, EventCode, GateName, GateResult, HoldKind, HomeState, ImportanceTier,
                          Overlay, Page, PublicCode, ReasonCode, RecordState, TurnStatus,
                          WithdrawReason)
 from .states import CLAIMED, IN_FLIGHT, OBSERVING, TERMINAL, WAITING, waiting_state
+from ..failures import TAG_SHAPE
 # v0.6.19: whether a value is a conversation id, for a surface that puts one on a command line (ui/tray/dashboard.py).
 from .ids import is_interruption_id, is_uuid  # noqa: F401
 
@@ -159,6 +162,13 @@ PAGES = tuple(Page)
 OVERLAYS = tuple(Overlay)
 
 
+def _unmatched(reason) -> bool:
+    """Whether a reason is the app's server not matched (#58's follow-up), or one of its kinds - v0.6.26's
+    "app_server_unmatched:named_engine" (update resilience #9): each a reason this product writes (REASONS)."""
+    return (isinstance(reason, str) and reason in REASONS
+            and (reason == ReasonCode.APP_SERVER_UNMATCHED or reason.startswith(ReasonCode.APP_SERVER_UNMATCHED + ":")))
+
+
 def overlays(record: dict, *, enabled=True, thread_enabled=True, watcher=None) -> list:
     """Circumstances that change what a record will do next, without changing it.
 
@@ -183,7 +193,7 @@ def overlays(record: dict, *, enabled=True, thread_enabled=True, watcher=None) -
         found.append("held")
     # #58's follow-up: the last look found the app open and no server of its matched. Nothing goes on by itself until
     # Codex or this product changes, so it asks for a person - while the watcher would act on it at all.
-    elif record.get("last_error") == ReasonCode.APP_SERVER_UNMATCHED and enabled and thread_enabled:
+    elif _unmatched(record.get("last_error")) and enabled and thread_enabled:
         found.append("app_server_unmatched")
     watcher = watcher or {}
     if watcher.get("engine_state") == "incompatible":
@@ -195,7 +205,18 @@ def overlays(record: dict, *, enabled=True, thread_enabled=True, watcher=None) -
         found.append("engine_unavailable")
     elif watcher.get("running") is True and watcher.get("ticking") is False:
         found.append("watcher_not_ticking")
+    # v0.6.26: the watcher's own judge found that recovery cannot work here (engine/impossible.py) - Codex changed how it
+    # runs, or cannot be read - while it runs and ticks: nothing goes on by itself until Codex or this product changes.
+    elif watcher.get("running") is True and blocked(watcher) is not None:
+        found.append("codex_changed")
     return found
+
+
+def blocked(watcher):
+    """The self-check word a watcher view carries (WORDS), or None."""
+    check = (watcher or {}).get("self_check") if isinstance(watcher, dict) else None
+    word = check.get("blocked") if isinstance(check, dict) else None
+    return word if word in WORDS else None
 
 
 def describe(record: dict, **surroundings) -> dict:
@@ -210,3 +231,48 @@ def describe(record: dict, **surroundings) -> dict:
 
 
 # -------------------------------------------------------------------------------- gates
+
+
+# ----------------------------------------------------------------------- the watcher's self-check (v0.6.26)
+# Whether recovery cannot work here, as the watcher's judge of its own looks says it (engine/impossible.py):
+# "recovery_blocked:<rule>" or "detection_blocked:<rule>", in the order one is said where several hold.
+DETECTION_RULES = ("engine_missing", "history_unreadable")
+RECOVERY_RULES = ("held_elsewhere", "locks_unread", "stale_database", "usage_protocol")
+WORDS = tuple("detection_blocked:" + rule for rule in DETECTION_RULES) + tuple(
+    "recovery_blocked:" + rule for rule in RECOVERY_RULES)
+SELF_CHECK_FORMAT = "codex-auto-resume/selfcheck/1"
+# A version this product names - Codex's, where it runs in a layout this version has not been tested on, or this
+# product's own it was updated from (#6, #11): letters, digits, dots and hyphens, at most this long.
+VERSION_MAX = 32
+_VERSION = re.compile(r"[0-9A-Za-z][0-9A-Za-z.\-]{0,%d}" % (VERSION_MAX - 1))
+
+
+def self_check_note(started_at, word, unknown=None, layout=None, updated_from=None) -> dict:
+    """What the watcher writes beside its heartbeat (Paths.self_check_file): the watcher it is of, by when it started;
+    the word; the newest error code Codex reported that this version does not know, with how many in the last day
+    (#10); Codex's version where it runs in a layout this version has not been tested on (#6); and the version of this
+    product it was updated from, where no look since has paired a server and that version's did (#11). Closed words, a
+    code of failures.TAG_SHAPE's, a count and versions: nothing else."""
+    return {"format": SELF_CHECK_FORMAT, "started_at": float(started_at), "blocked": word if word in WORDS else None,
+            "unknown_error": unknown, "layout_untested": layout, "updated_from": updated_from}
+
+
+def self_check(value, started_at):
+    """The self-check a reader may show, from what the file held, or None: only of the watcher that runs now (its
+    `started_at` the heartbeat's), and only what self_check_note writes - {"blocked", "unknown_error",
+    "layout_untested", "updated_from"}, each None where it says nothing."""
+    if (not isinstance(value, dict) or value.get("format") != SELF_CHECK_FORMAT
+            or not isinstance(started_at, (int, float)) or isinstance(started_at, bool)
+            or not isinstance(value.get("started_at"), (int, float)) or value["started_at"] != float(started_at)):
+        return None
+    word = value.get("blocked") if value.get("blocked") in WORDS else None
+    unknown = value.get("unknown_error")
+    unknown = ({"code": unknown["code"], "count": unknown["count"]}
+               if isinstance(unknown, dict) and isinstance(unknown.get("code"), str)
+               and TAG_SHAPE.fullmatch(unknown["code"]) and type(unknown.get("count")) is int
+               and 0 < unknown["count"] < 10 ** 6 else None)
+    layout, updated = (found if isinstance(found, str) and _VERSION.fullmatch(found) else None
+                       for found in (value.get("layout_untested"), value.get("updated_from")))
+    if word is None and unknown is None and layout is None and updated is None:
+        return None
+    return {"blocked": word, "unknown_error": unknown, "layout_untested": layout, "updated_from": updated}

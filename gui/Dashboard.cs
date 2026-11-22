@@ -1359,6 +1359,8 @@ namespace CodexAutoResume
                       diagUpgrade, diagUpdate, diagMemory, diagPlugin, diagStateAccess, diagStateNote, diagWaiting;
         // v0.6.17: whether the watcher and this window's bridge run inside another app, and what that means.
         private Label diagHostApp, diagHostNote;
+        // v0.6.26: what the watcher's own judge says of Codex (CodexNote), only while it says something.
+        private Label diagCodexNote;
         // v0.6.11: Diagnostics' Show me what happens, which waits while an action runs.
         private Button demoButton;
         private Button exportButton, repairButton, stopButton, updateButton;

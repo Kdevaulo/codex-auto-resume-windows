@@ -801,6 +801,12 @@ namespace CodexAutoResume
             diagHostNote.ForeColor = Accent;
             diagHostNote.MaximumSize = new Size(Px(360), 0);
             health.Controls.Add(diagHostNote);
+            // v0.6.26, last, so no callout before it moves: that recovery cannot work here, an error Codex reported that
+            // this version does not know, a layout this version has not been tested on (CodexNote).
+            diagCodexNote = Value("");
+            diagCodexNote.ForeColor = Accent;
+            diagCodexNote.MaximumSize = new Size(Px(360), 0);
+            health.Controls.Add(diagCodexNote);
 
             yield return true;
             TableLayoutPanel tools = MakeCard(S("diag.tools", "Tools"));

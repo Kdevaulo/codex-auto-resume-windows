@@ -655,6 +655,9 @@ class App(WatchLoop, PlugNotices):
             if added is not DEFER:
                 snapshot[EXTRA] = added
             self._edition_notices(added)
+            # v0.6.26: and whether the watcher's own judge found that recovery cannot work here (WatchLoop._self_check),
+            # after the plug was asked, so it sees what it always saw.
+            snapshot["blocked"] = (getattr(self, "_self_check_written", None) or {}).get("blocked") is not None
             icon_tray.update(snapshot)
         except Exception:
             pass

@@ -9,6 +9,7 @@ import time
 
 from .. import config
 from .. import compat
+from ..codex import appserver
 from .files import (path_digest)
 from .cache import (_coerce, _columns, _newest)
 
@@ -66,14 +67,23 @@ def source_checks(source) -> dict:
     return checks
 
 
+def protocol_check(method) -> str:
+    """v0.6.26 (update resilience, proposal 7): what Codex's helper last met for `method` in this process
+    (codex/appserver.py last_result), where it has been asked: FAIL where Codex answered in a way this version does
+    not know or refused it (appserver.BROKEN), PASS where it answered. Where it has not been asked here yet - a reader
+    of its own, a watcher that has had no usage to read - or did not answer at all, the method this product may ask is
+    a PASS as it always was, and one it may not ask a FAIL: a report says no less than it said before."""
+    if method not in appserver.PROTOCOL_METHODS:
+        return compat.FAIL
+    return compat.FAIL if appserver.last_result(method) in appserver.BROKEN else compat.PASS
+
+
 def api_checks() -> dict:
     from .. import windows
     return {
         "restart_manager": compat.PASS if windows.restart_manager_available() else compat.UNAVAILABLE,
-        "protocol_usage_method": (compat.PASS if "account/rateLimits/read" in windows.PROTOCOL_METHODS
-                                  else compat.FAIL),
-        "protocol_delete_method": (compat.PASS if "thread/queue/delete" in windows.PROTOCOL_METHODS
-                                   else compat.FAIL),
+        "protocol_usage_method": protocol_check("account/rateLimits/read"),
+        "protocol_delete_method": protocol_check("thread/queue/delete"),
     }
 
 

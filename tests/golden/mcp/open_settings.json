@@ -53,6 +53,7 @@
                 "memory_peak": null,
                 "ended": null,
                 "ended_at": null,
+                "self_check": null,
                 "compatibility": {
                   "status": "absent",
                   "overall": "unknown",

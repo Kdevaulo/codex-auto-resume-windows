@@ -191,7 +191,9 @@ LAYER = {_q(name): layer for layer, names in {
                "engine.routes",
                # and which conversations besides the app's are watched (P18), one sent to another session (P16),
                # and a full context window's compaction turns.
-               "engine.kinds", "engine.tosession", "engine.compaction", "engine.recordchannel"),
+               "engine.kinds", "engine.tosession", "engine.compaction", "engine.recordchannel",
+               # v0.6.26: whether recovery cannot work here, judged of the watcher's own looks - pure.
+               "engine.impossible"),
     # v0.6.10-alpha: control.py became control/, ten files, `Control` composed from eight
     # mixins. `layer` is where the composition lives, so that the front holds no code.
     "control": ("control", "control.actions", "control.codexstart", "control.errors",
