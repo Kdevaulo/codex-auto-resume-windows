@@ -221,6 +221,24 @@ namespace CodexAutoResume
             AdoptTextSize(text, TextScale.Fitting(text, Screen.PrimaryScreen.WorkingArea.Size, DpiScale));
         }
 
+        /// v0.6.26 (audit-apng M2): the window's font in a render whose scale the job pinned - Windows' UI font at its size
+        /// and style, in the face an English Windows has (Segoe UI, Typeface.Segoe), whatever Windows this machine is: the
+        /// window then sets each language in the face that language's Windows sets it in, as the product does
+        /// (Typeface.ForLanguage: ko Malgun Gothic, ja Yu Gothic UI, zh-CN Microsoft YaHei UI, zh-TW Microsoft JhengHei UI,
+        /// th Leelawadee UI, the rest Segoe UI). Before, the English pictures made on a Korean Windows kept its Malgun
+        /// Gothic, which draws a backslash as a won sign. Null - the machine's own font, as before - in a render that pins
+        /// no scale.
+        private static Font RenderFont()
+        {
+            if (!RenderPinned) return null;
+            Font box = SystemFonts.MessageBoxFont;
+            Font face;
+            try { face = new Font(Typeface.Segoe, box.SizeInPoints, box.Style, GraphicsUnit.Point); }
+            catch (ArgumentException) { return null; }
+            if (!string.Equals(face.FontFamily.Name, Typeface.Segoe, StringComparison.OrdinalIgnoreCase)) return null;
+            return AtDisplayScale(TextScale.Apply(face, textRead, TextSize));
+        }
+
         /// v0.6.20: whether this is a render whose scale the job pinned (AdoptRenderScale): the window opens at its own size
         /// on no screen (KeepOnScreen), and a list's header is laid out at that scale (SoftList.PinnedHeader). False in
         /// every window a person opens.
@@ -231,7 +249,7 @@ namespace CodexAutoResume
         {
             var strings = RenderAnswer("strings", null);
             string nowhere = Path.Combine(Path.GetTempPath(), "codex-auto-resume-render-" + Guid.NewGuid().ToString("N"));
-            var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, null);
+            var form = new SettingsForm(new PersistentBridge(nowhere, new Bridge(nowhere)), strings, RenderFont());
             form.rendering = true;
             // v0.6.20: the client area the window opened with - its opening size, as a language's face scales it (Microsoft
             // YaHei UI opens it wider and shorter) - kept when its frame is taken off; it was set back to the opening
