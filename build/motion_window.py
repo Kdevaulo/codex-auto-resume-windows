@@ -239,6 +239,17 @@ def render(exe: Path, job_data: dict, folder: Path) -> dict:
     return read
 
 
+def veils(result: dict) -> dict:
+    """{frame index: (alpha, (r, g, b))} for each frame that lays a dialog's veil over the window (the render mode's
+    `veil`, v0.6.26): what the compositor dims the window's partly covered edge by (motion_compose.WindowChrome.frame)."""
+    out = {}
+    for entry in result.get("frames") or []:
+        veil = entry.get("veil")
+        if veil:
+            out[int(entry["index"])] = (int(veil[0]), tuple(int(channel) for channel in veil[1:4]))
+    return out
+
+
 def pictures(result: dict, folder: Path):
     """(frame index, client RGB, bounds) for each frame the render mode drew, the client picture rebuilt whole from
     each frame's changed rectangle."""

@@ -202,13 +202,14 @@ namespace CodexAutoResume
                     before = frame;
                     beforeLocale = locale;
                     int index = Convert.ToInt32(frame["index"], CultureInfo.InvariantCulture);
+                    // v0.6.26: a frame with the window's own edge is cut before what lies over the window is laid (EdgeFirst).
                     using (Bitmap picture = form.RenderPicture(frame, writer))
                     {
-                        if (renderEdgeDpi > 0)
+                        if (renderEdgeDpi > 0 && !EdgeFirst)
                             using (Bitmap edged = CornerStill(picture, renderEdgeDpi))
-                                writer.Write(index, edged, form.RenderBounds(targets, frame));
+                                writer.Write(index, edged, form.RenderBounds(targets, frame), form.renderVeil);
                         else
-                            writer.Write(index, picture, form.RenderBounds(targets, frame));
+                            writer.Write(index, picture, form.RenderBounds(targets, frame), form.renderVeil);
                         if (renderStill != null)
                             // v0.6.24 W5: cut by the same decision as the window - its own corner while the switch is on (the job
                             // says so, make_screenshots.still_job), else Windows' 8 px circle as a capture is cut.
@@ -913,6 +914,17 @@ namespace CodexAutoResume
             PaintSceneOver(picture, this);
             PaintCaptionOver(picture, this);
             PaintListGutters(picture);
+            // v0.6.26: the window's own outer edge - its corner and its hairline - cut now, before anything is laid over the
+            // window: what lies over it on the screen is a window of its own (the row menu, a drop-down's list, a dialog
+            // and the veil under it), never cut by the window's corner, and the veil dims the window's hairline as it dims
+            // the rest of the window (PaintVeil).
+            if (renderEdgeDpi > 0 && EdgeFirst)
+            {
+                Bitmap edged = CornerStill(picture, renderEdgeDpi);
+                picture.Dispose();
+                picture = edged;
+            }
+            renderVeil = null;
             renderRows = null;
             renderMenu = null;
             renderDialogBounds = null;
@@ -1119,6 +1131,25 @@ namespace CodexAutoResume
             return new List<object> { (double)rect.X, (double)rect.Y, (double)rect.Width, (double)rect.Height };
         }
 
+        /// v0.6.26: whether a frame with the window's own edge (`edge_dpi`) is cut before anything is laid over the window -
+        /// every frame but those of a job that also asks for a still, which is cut from the uncut picture (FramedStill,
+        /// SquircleStill) as before.
+        private static bool EdgeFirst { get { return renderStill == null; } }
+
+        /// v0.6.26: the veil the frame lays over the window - its alpha at the window's own pixels and its ink, [a, r, g, b] -
+        /// or null: written with the frame (frames.json `veil`) for the pixels at the window's edge that are only partly the
+        /// window's, which the picture's compositor dims at that share, over whatever lies under them (build/motion_compose.py
+        /// WindowChrome.frame), as the product's veil dims them (DialogVeil: each pixel at its edge coverage).
+        private List<object> renderVeil;
+
+        // The veil at `alpha` as a frame writes it, or null where none is laid (PaintVeil's own rule).
+        private static List<object> VeilOf(int alpha)
+        {
+            if (!DialogVeil.Enabled || Palette.Contrast || alpha <= 0) return null;
+            Color ink = DialogVeil.Ink();
+            return new List<object> { (double)alpha, (double)ink.R, (double)ink.G, (double)ink.B };
+        }
+
         // ------------------------------------------------------------------ a dialog the window opened (v0.6.20)
         // The colour of the border Windows draws round a dialog (the job's `chrome`, from the committed still of the window).
         private static Dictionary<string, object> renderChrome;
@@ -1208,6 +1239,7 @@ namespace CodexAutoResume
                     // the veil with it (DialogVeil at its fullest times the dialog's alpha, gui-audit D9).
                     int fade = RenderDialogAlpha(RenderMs(dialog, "appear_ms"));
                     PaintVeil(picture, (int)Math.Round(DialogVeil.FullNow * fade / 255.0));
+                    renderVeil = VeilOf((int)Math.Round(DialogVeil.FullNow * fade / 255.0));
                     if (fade >= 255) PaintDialog(picture, body, place, outer, border, form.BackColor);
                     else if (fade > 0)
                         using (var under = (Bitmap)picture.Clone())
@@ -1297,11 +1329,17 @@ namespace CodexAutoResume
         }
 
         /// v0.6.24: the veil over the window while a dialog of its own is open (DialogVeil), over `picture` - the window's whole
-        /// client area, which its own corner cuts later as it cuts the window (CornerStill): the shadow's ink (DialogVeil.Ink)
-        /// at the veil's alpha at its fullest in the theme (DialogVeil.FullNow: 51 in light, 82 in dark), laid as a layered
-        /// window of that alpha is laid over what is under it. At its fullest from the dialog's first frame, as the veil
-        /// comes on before the dialog is seen, and gone with it; none in High Contrast nor where veils are off, as DialogVeil.Over
-        /// makes none.
+        /// client area: the shadow's ink (DialogVeil.Ink) at the veil's alpha at its fullest in the theme (DialogVeil.FullNow:
+        /// 51 in light, 82 in dark), laid as a layered window of that alpha is laid over what is under it; none in High
+        /// Contrast nor where veils are off, as DialogVeil.Over makes none.
+        /// v0.6.26 (audit-apng M3, guifix D9 and D10): as the product draws it - coming in with the dialog's own fade, step for
+        /// step, at the dialog's alpha of its fullest (the other overload), clear while the dialog is, and going with the
+        /// dialog at once, as the dialog's closing is; and over each of the window's pixels at how much of it is the window's.
+        /// Every pixel here is the window's colour: the frame of a window with its own edge is cut before the veil is laid
+        /// (RenderPicture), so its hairline is dimmed with the rest, as the veil dims the companion's hairline on the screen;
+        /// a pixel the edge covers only in part is dimmed here as a whole one, and the compositor, which lays it over what is
+        /// under it at its coverage, lays it as the product does - the veil at its fullest times that coverage over the
+        /// window's edge and what shows through it alike (the frame's `veil`, build/motion_compose.py WindowChrome.frame).
         internal static void PaintVeil(Bitmap picture)
         {
             PaintVeil(picture, DialogVeil.FullNow);
@@ -1593,7 +1631,7 @@ namespace CodexAutoResume
 
             internal void Failed(string text) { Error = text; }
 
-            internal void Write(int index, Bitmap picture, Dictionary<string, object> bounds)
+            internal void Write(int index, Bitmap picture, Dictionary<string, object> bounds, List<object> veil)
             {
                 width = picture.Width;
                 height = picture.Height;
@@ -1641,6 +1679,8 @@ namespace CodexAutoResume
                 entry["box"] = new List<object> { (double)left, (double)top, (double)(right - left + 1), (double)(bottom - top + 1) };
                 entry["file"] = file;
                 entry["bounds"] = bounds;
+                // v0.6.26: the veil the frame lays over the window (renderVeil), for the compositor's edge.
+                if (veil != null) entry["veil"] = veil;
                 if (frames.Length > 0) frames.Append(",\n");
                 frames.Append(Json.Write(entry));
                 previous = pixels;
