@@ -553,7 +553,7 @@ class WatchLoop:
         waiting = [row for row in store.records_in(machine.WAITING, home_key="")]
         reasons = {row.get("last_error") for row in waiting}
         facts = {"usage_protocol": bool(reasons & impossible.USAGE_BROKEN_REASONS)}
-        wanted = impossible.ELSEWHERE_REASONS | impossible.NOT_LOADED_REASONS
+        wanted = impossible.ELSEWHERE_REASONS | impossible.LOCKS_UNREAD_REASONS
         if not reasons & wanted:
             return (_app_runs() if facts["usage_protocol"] else None), facts
         backend = engine.backend

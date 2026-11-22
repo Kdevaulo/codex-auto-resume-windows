@@ -28,6 +28,7 @@ def source_checks(source) -> dict:
             return checks
     except (AttributeError, TypeError, OSError, ValueError):
         return checks
+    threads = False
     for kind, check in (("state", "state_schema"), ("history", "history_schema"),
                         ("queue", "queue_schema")):
         connection = None
@@ -39,6 +40,14 @@ def source_checks(source) -> dict:
             missing = any(not required <= _columns(connection, table)
                           for table, required in tables.items())
             checks[check] = compat.FAIL if missing else compat.PASS
+            if kind == "state" and not missing:
+                # Whether the newest state database holds a conversation - a home that has one has opened it, so its
+                # lock folder is expected (below). Only whether a row exists is read, never a column of one; a read
+                # that fails leaves it "none", the check as it always was.
+                try:
+                    threads = connection.execute("SELECT 1 FROM threads LIMIT 1").fetchone() is not None
+                except Exception:
+                    threads = False
             if kind == "history":
                 found = connection.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' "
@@ -61,7 +70,12 @@ def source_checks(source) -> dict:
         try:
             # Absent is not a failure: a Codex that has never opened a conversation has
             # neither. It only means the capability cannot be established yet.
-            checks[name] = compat.PASS if (home / directory).is_dir() else compat.NOT_APPLICABLE
+            # v0.6.26 (update resilience #4): but a home whose newest state database holds a conversation and keeps no
+            # lock folder is one where Codex moved, renamed or dropped it, and whether a conversation is open can no
+            # longer be read there (codex/transport.py loaded answers unknown): a FAIL, not "not yet".
+            there = (home / directory).is_dir()
+            checks[name] = (compat.PASS if there else
+                            compat.FAIL if name == "lock_directory" and threads else compat.NOT_APPLICABLE)
         except OSError:
             checks[name] = compat.UNAVAILABLE
     return checks
