@@ -1355,7 +1355,7 @@ On 2026-11-18 the owner moved two items from this release to the next one, v0.6.
 
 ---
 
-## v0.6.25 — Recoveries on Codex 26.1117 🚧
+## v0.6.25 — Recoveries on Codex 26.1117 ✅
 
 A hotfix final for [#67](https://github.com/songyb111-gachon/codex-auto-resume-windows/issues/67), in both editions, and nothing else. Codex desktop 26.1117 starts the app's `codex.exe app-server` under one of the app's own helper processes instead of directly under the app, so the watcher paired the app's other `codex.exe` and every recovery waited, saying the conversation was open in another Codex session; a `codex.exe` now counts as the app's when every process between it and the app is one of the app package's own (see the changelog). On 2026-11-21 the owner chose to release it as v0.6.25 and to move what had been planned as v0.6.25 one on, every later release with it: the third round of audits and the review of what moves from the advanced edition to the standard one are v0.6.26, the Rust core v0.6.27 and its audit v0.6.28.
 
@@ -1698,7 +1698,7 @@ The final: usage shown as what is left, the version's pill never hidden, dialogs
 
         ↓
 
-v0.6.25  🚧 In development
+v0.6.25  ✅ Released
 A hotfix final for #67: recoveries on the Codex app 26.1117, whose server runs under a helper process of the app
 
         ↓
