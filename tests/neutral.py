@@ -85,6 +85,10 @@ NOT_SCENARIOS = {
                                    "third-round B1): a hold v0.6.10 never had",
     "test_plug_record_restarts": "drives the engine only to restart its watcher over a plug's record gone from a queue "
                                  "Codex paused (v0.6.26, review K3): a hold v0.6.10 never had",
+    "test_locks_unread": "drives the engine only to leave a record waiting with no lock folder, for the self-check "
+                         "(v0.6.26, review K1): a word v0.6.10 never said",
+    "test_self_check_handed": "drives the engine only to hand the self-check a plug's waiting records (v0.6.26, "
+                              "review V6): a seam v0.6.10 never had",
     "test_usage_probe_broken": "drives the engine only to break a usage read three ways (v0.6.26, update resilience 7): "
                                "reasons v0.6.10 never wrote",
     "test_app_server_unmatched_older": "drives this version's engine only to leave a record waiting, then runs tagged "
