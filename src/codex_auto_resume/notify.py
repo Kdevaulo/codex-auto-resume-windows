@@ -511,13 +511,16 @@ def near_limit_content(minutes, percent, reset_at, kind=None) -> dict:
         share = 100 - max(0, min(100, int(percent))) if type(percent) is not bool else None
     except (TypeError, ValueError, OverflowError):
         share = None
-    # The window named as the popup's usage line names it (ui/words.window_name): weekly, in hours or minutes.
-    if minutes == 7 * 24 * 60:
-        window = say("usage.weekly")
-    elif type(minutes) is int and minutes > 0:
-        window = say("usage.hours", n=minutes // 60) if minutes % 60 == 0 else say("usage.minutes", n=minutes)
-    else:
+    # The window named as every surface names it (ui/words.window_name, which an adapter does not import; tests/
+    # test_near_limit_window_name.py holds the two alike): weekly, in days, hours or minutes.
+    if type(minutes) is not int or minutes <= 0:
         window = say("usage.limit")
+    elif minutes == 7 * 24 * 60:
+        window = say("usage.weekly")
+    elif minutes % 1440 == 0:
+        window = say("usage.days", n=minutes // 1440)
+    else:
+        window = say("usage.hours", n=minutes // 60) if minutes % 60 == 0 else say("usage.minutes", n=minutes)
     if share is None:
         body = window
     else:
