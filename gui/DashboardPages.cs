@@ -107,7 +107,9 @@ namespace CodexAutoResume
             recentGrid.SizeChanged += delegate { FitRecentNames(); };
 
             // v0.6.26 (audit D8): the left column's two fact tables, one above the other, keep one value column.
-            grid.Layout += delegate { OneLabelColumn(facts, weekFacts); };
+            // At each table's own layout, its width the one it is given now (the grid's comes before its cards have theirs).
+            facts.Layout += delegate { OneLabelColumn(facts, weekFacts); };
+            weekFacts.Layout += delegate { OneLabelColumn(facts, weekFacts); };
             grid.Controls.Add(now, 0, 0);
             grid.Controls.Add(waiting, 1, 0);
             grid.Controls.Add(week, 0, 1);
