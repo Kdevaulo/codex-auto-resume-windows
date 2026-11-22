@@ -22,6 +22,8 @@ import motion_window  # noqa: E402
 OVERVIEW = {"locale": "en", "page": "overview", "light": 0}
 PENDING = {"locale": "en", "page": "pending", "light": 0, "selected": {"pending": 0}}
 TIMELINE = {"kind": "timeline"}
+SETTINGS = {"locale": "en", "page": "settings", "section": "general", "light": 0}
+LIST = {"field": "interface_language", "hover": None}
 
 
 class SwitchTests(unittest.TestCase):
@@ -56,18 +58,33 @@ class RenderClockTests(unittest.TestCase):
         dict(PENDING, moment=2400, hover="pending.retry"),                         # 6 arrived
         dict(OVERVIEW, moment=3000),                                               # 7 the Overview at rest
         dict(OVERVIEW, moment=3500, busy=True),                                    # 8 Pause's call in flight comes in
-        dict(OVERVIEW, moment=3580, busy=True),                                    # 9 half way to the busy look
-        dict(OVERVIEW, moment=3900, busy=True),                                    # 10 arrived
-        dict(OVERVIEW, moment=4500, variant="paused"),                             # 11 the call answered: paused
-        dict(OVERVIEW, moment=4580, variant="paused"),                             # 12 half way back from the busy look
-        dict(OVERVIEW, moment=4900, variant="paused"),                             # 13 arrived
-        dict(PENDING, moment=6000),                                                # 14 Pending again
-        dict(PENDING, moment=6500),                                                # 15 at rest
-        dict(PENDING, moment=7000, dialog=TIMELINE),                               # 16 the Timeline at rest
-        dict(PENDING, dialog=TIMELINE),                                            # 17 the same on the wall clock
-        dict(PENDING, moment=7500, dialog=TIMELINE, hover="dialog.close"),         # 18 onto its Close
-        dict(PENDING, moment=7580, dialog=TIMELINE, hover="dialog.close"),         # 19 half way
-        dict(PENDING, moment=7900, dialog=TIMELINE, hover="dialog.close"),         # 20 arrived
+        dict(OVERVIEW, moment=3580, busy=True),                                    # 9 its first moments held (BusyHold)
+        dict(OVERVIEW, moment=3640, busy=True),                                    # 10 still held, at 140 ms
+        dict(OVERVIEW, moment=3730, busy=True),                                    # 11 half way, 80 ms past the hold
+        dict(OVERVIEW, moment=4000, busy=True),                                    # 12 arrived
+        dict(OVERVIEW, moment=4500, variant="paused"),                             # 13 the call answered: paused
+        dict(OVERVIEW, moment=4580, variant="paused"),                             # 14 half way back from the busy look
+        dict(OVERVIEW, moment=4900, variant="paused"),                             # 15 arrived
+        dict(PENDING, moment=6000),                                                # 16 Pending again
+        dict(PENDING, moment=6500),                                                # 17 at rest
+        dict(PENDING, moment=7000, dialog=TIMELINE),                               # 18 the Timeline at rest
+        dict(PENDING, dialog=TIMELINE),                                            # 19 the same on the wall clock
+        dict(PENDING, moment=7500, dialog=TIMELINE, hover="dialog.close"),         # 20 onto its Close
+        dict(PENDING, moment=7580, dialog=TIMELINE, hover="dialog.close"),         # 21 half way
+        dict(PENDING, moment=7900, dialog=TIMELINE, hover="dialog.close"),         # 22 arrived
+        dict(PENDING, moment=8500),                                                # 23 at rest
+        dict(PENDING, moment=9000, busy=True),                                     # 24 a call that comes in...
+        dict(PENDING, moment=9100, busy=True),                                     # 25 ...held...
+        dict(PENDING, moment=9120),                                                # 26 ...and ends inside the hold
+        dict(PENDING, moment=9500),                                                # 27 nothing shown
+        dict(SETTINGS, moment=10000),                                              # 28 Settings
+        dict(SETTINGS, moment=10500),                                              # 29 at rest
+        dict(SETTINGS, moment=11000, droplist=dict(LIST, appear_ms=0)),            # 30 the list opens
+        dict(SETTINGS, moment=11080, droplist=dict(LIST, appear_ms=80)),           # 31 half way
+        dict(SETTINGS, moment=11400, droplist=dict(LIST)),                         # 32 open
+        dict(SETTINGS, moment=12000, droplist=dict(LIST, close_ms=0)),             # 33 the list closes
+        dict(SETTINGS, moment=12080, droplist=dict(LIST, close_ms=80)),            # 34 half way back
+        dict(SETTINGS, moment=12400),                                              # 35 closed
     ]
 
     @classmethod
@@ -78,7 +95,7 @@ class RenderClockTests(unittest.TestCase):
         job = {"out": str(work / "out"), "theme": "light", "design": "soft",
                "forms": {"en": {"answers": motion_window.answers("en")},
                          "en-paused": {"answers": motion_window.answers("en", paused=True)}},
-               "targets": ["page.pending", "pending.retry", "overview.toggle", "dialog.close"],
+               "targets": ["page.pending", "pending.retry", "overview.toggle", "dialog.close", "setting.interface_language"],
                "frames": [dict(frame, index=index) for index, frame in enumerate(cls.FRAMES)]}
         cls.result = motion_window.render(exe, job, work)
         cls.pictures = list(motion_window.pictures(cls.result, work / "out"))
@@ -95,10 +112,10 @@ class RenderClockTests(unittest.TestCase):
         total = sum(sum(picture[(row * width + x) * 3:(row * width + x + wide) * 3]) for row in range(y, y + tall))
         return total / float(wide * tall * 3)
 
-    def half_way(self, index, start, end, name):
-        """Frame `index` over target `name` stands strictly between frames `start` and `end` there, on average: a glide
-        part way, not a cut at either end."""
-        box = self.pictures[end][2][name]
+    def half_way(self, index, start, end, name, box=None):
+        """Frame `index` over target `name` (or `box`) stands strictly between frames `start` and `end` there, on average:
+        a glide part way, not a cut at either end."""
+        box = box or self.pictures[end][2][name]
         part, low, high = self.level(index, box), self.level(start, box), self.level(end, box)
         self.assertGreater(abs(high - low), 1, "%s changes at all (%.2f to %.2f)" % (name, low, high))
         self.assertTrue(min(low, high) + 0.2 < part < max(low, high) - 0.2,
@@ -117,16 +134,26 @@ class RenderClockTests(unittest.TestCase):
         self.assertEqual(self.pictures[4][1], self.pictures[3][1], "at its first moment it has not moved yet")
 
     def test_the_busy_look_glides(self):
-        self.half_way(9, 8, 10, "overview.toggle")
+        self.half_way(9, 8, 12, "overview.toggle")
 
     def test_a_paused_window_opened_again_glides_out_of_the_call_in_flight(self):
-        self.half_way(12, 11, 13, "overview.toggle")
+        self.half_way(14, 13, 15, "overview.toggle")
 
     def test_a_dialog_built_for_each_frame_is_drawn_at_rest(self):
-        self.assertEqual(self.pictures[16][1], self.pictures[17][1], "the Timeline at its frame's moment is the one at rest")
+        self.assertEqual(self.pictures[18][1], self.pictures[19][1], "the Timeline at its frame's moment is the one at rest")
 
     def test_the_dialog_s_close_glides_from_the_frame_the_pointer_came_onto_it(self):
-        self.half_way(19, 18, 20, "dialog.close")
+        self.half_way(21, 20, 22, "dialog.close")
+
+    def test_the_drop_down_s_open_look_glides_in_and_out(self):
+        """v0.6.26 (review P1): its edge and its chevron glide over brand's transition from the frame its list opens and
+        from the frame it closes (OpenList, CloseList), read over the field's upper half, which the list never covers."""
+        x, y, wide, tall = self.pictures[29][2]["setting.interface_language"]
+        upper = (x, y, wide, max(1, int(tall) // 2))
+        self.assertEqual(self.level(30, upper), self.level(29, upper), "at its first moment: as it was")
+        self.half_way(31, 30, 32, None, upper)
+        self.assertEqual(self.level(33, upper), self.level(32, upper), "closing, at its first moment: still open")
+        self.half_way(34, 33, 35, None, upper)
 
 
 if __name__ == "__main__":

@@ -111,7 +111,9 @@ class FadeRenderTests(unittest.TestCase):
         def field(index):
             return [self.picture(index)[(row * width + fx) * 3:(row * width + fx + fwide) * 3] for row in range(fy, fy + ftall // 2)]
         self.assertNotEqual(field(10), field(8), "open: its edge and its chevron")
-        self.assertEqual(field(11), field(12), "closing: closed at once, as CloseList leaves it")
+        # v0.6.26 (review P1): this job's frames carry no moment, so the drop-down's own glide back (CloseList) is drawn
+        # arrived; a clocked motion draws it gliding (test_motion_render_clock).
+        self.assertEqual(field(11), field(12), "closing, outside the picture's clock: its closed look arrived")
 
 
 if __name__ == "__main__":
