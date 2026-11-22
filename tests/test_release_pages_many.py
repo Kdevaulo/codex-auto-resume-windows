@@ -151,8 +151,8 @@ class ManyReleasesTests(unittest.TestCase):
         self.assertLessEqual(c["PickBudgetSeconds"] * 2, update)
 
     def test_a_page_of_thirty_is_far_inside_the_size_bound(self):
-        """Thirty releases of today's notes (about 27 KB each) are about a tenth of $ReleasesMaxChars."""
-        self.assertGreaterEqual(self.answer["constants"]["ReleasesMaxChars"], 8 * 1024 * 1024)
+        """Thirty releases of today's notes (about 27 KB each) are about a fortieth of $ReleasesMaxChars (32 MiB)."""
+        self.assertGreaterEqual(self.answer["constants"]["ReleasesMaxChars"], 32 * 1024 * 1024)
 
 
 @unittest.skipUnless(POWERSHELL.is_file(), "the bootstrap is PowerShell on Windows")
