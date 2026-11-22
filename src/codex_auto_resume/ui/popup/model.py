@@ -206,6 +206,9 @@ def task_item(row, strings, now, keep=None) -> dict:
     elif "app_server_unmatched" in overlays and is_waiting(row):
         # #58's follow-up: what it waits for, in place of a next check that would not change it.
         status, seconds = say(strings, "overlay.app_server_unmatched"), None
+    elif "codex_changed" in overlays and is_waiting(row):
+        # v0.6.26: and that recovery cannot work here, which no next check would change either.
+        status, seconds = say(strings, "overlay.codex_changed"), None
     if overlays & ATTENTION_OVERLAYS or not reasons.is_recoverable(category):
         tone = "warning"
     elif not enabled or overlays & {"paused", "thread_disabled", "held"}:

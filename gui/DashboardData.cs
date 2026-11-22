@@ -251,6 +251,28 @@ namespace CodexAutoResume
             return value is double ? (int)(double)value : 0;
         }
 
+        /// v0.6.26: what the watcher's own judge says of Codex (domain/public.py self_check), for the Diagnostics callout:
+        /// why recovery cannot work here, in the words of its rule - or "" while it says nothing.
+        private string CodexNote(Dictionary<string, object> watcher)
+        {
+            var lines = new List<string>();
+            string word = Blocked(watcher);
+            string rule = word == null ? null : word.Substring(word.IndexOf(':') + 1);
+            if (rule == "held_elsewhere")
+                lines.Add(S("selfcheck.held_elsewhere", "Codex changed how it runs, so this product cannot tell whether a conversation is open. Nothing is sent. Export Diagnostics and report it."));
+            else if (rule == "locks_unread")
+                lines.Add(S("selfcheck.locks_unread", "Codex no longer shows which conversations are open in the way this product reads. Nothing is sent. Export Diagnostics and report it."));
+            else if (rule == "stale_database")
+                lines.Add(S("selfcheck.stale_database", "Codex keeps its conversations in a database this product does not read, so recovery cannot work here. Nothing is sent. Export Diagnostics and report it."));
+            else if (rule == "usage_protocol")
+                lines.Add(S("selfcheck.usage_protocol", "For half an hour Codex has answered usage reads in a way this version does not know, so recoveries wait. Nothing is sent. Export Diagnostics and report it."));
+            else if (rule == "history_unreadable")
+                lines.Add(S("selfcheck.history_unreadable", "Codex's history can no longer be read, so new interruptions are not being detected. Export Diagnostics and report it."));
+            else if (rule == "engine_missing")
+                lines.Add(S("selfcheck.engine_missing", "The Codex engine could not be found or checked, so nothing can be recovered."));
+            return string.Join(Environment.NewLine, lines.ToArray());
+        }
+
         private static string Str(Dictionary<string, object> map, string key)
         {
             return Get(map, key) as string;
@@ -627,6 +649,7 @@ namespace CodexAutoResume
                         if (updatesManaged) diagUpdate.Text = S("diag.update_managed", "turned off by your administrator");
                         diagStartup.Text = Equals(Get(status, "startup_enabled"), true) ? S("diag.yes", "yes") : S("diag.no", "no");
                         diagUpgrade.Text = upgrade ? S("diag.upgrade_pending", "An older watcher still owns the state; finish by restarting the watcher") : "";
+                        diagCodexNote.Text = CodexNote(watcher);
                     }
                 }
                 UpdateToggle();
