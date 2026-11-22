@@ -18,7 +18,14 @@ import time
 import traceback
 import uuid
 
-from .. import compatio, config, l10n, power
+from pathlib import Path
+
+from .. import compatio, config, l10n, machine, power
+from ..codex.pairing import app_running_now
+from ..codex.paths import DB_KINDS, newest_generation
+from ..domain import public
+from ..engine import impossible
+from ..win.inventory import resource_users
 from ..settings import Unreadable
 from ..logbook import EngineLog
 from ..openstate import open_state
@@ -59,6 +66,11 @@ OPEN_RETRY_MAX_SECONDS = 60.0
 # What the log says about the engine it just accepted, in the word the gate reads for it -
 # from the registry data in force (compatio.engine_word), the bundled baseline and an
 # imported cache alike, so it never contradicts the compatibility line that follows it.
+
+
+def _app_runs():
+    """Whether a process of the Codex app's package runs now, or None where the process list cannot be read."""
+    return app_running_now()
 
 
 class WatchLoop:
@@ -414,6 +426,8 @@ class WatchLoop:
                 # v0.6.11: after the tick, never inside it - its memory, and whether the guard stops it.
                 stopping = self._memory(health, guard=not once)
                 self._heartbeat(store, session, started, ok, engine, awake, health)
+                if not once:
+                    self._self_check(store, engine, started)
                 self._status(health, store)
                 if not once:
                     self._failure_baseline()            # made good at the next tick if a write was refused
@@ -459,6 +473,87 @@ class WatchLoop:
             store.close()
             self.logger.info("watcher stopped")
         return exit_code
+
+    # ------------------------------------------------------------------ whether recovery cannot work here (v0.6.26)
+    def _self_check(self, store, engine, started):
+        """One tick of the watcher's judge of its own looks (engine/impossible.py), and what it says written beside the
+        heartbeat (impossible.NAME), only when that changed. The detection rules are counted every tick, the recovery
+        rules looked at once a minute, and only while a record waits for one of them. It asks the Restart Manager a few
+        files and the process list once: it never sends, starts or holds anything. A failure costs the look alone."""
+        judge = getattr(self, "_judge", None)
+        if judge is None:
+            judge = self._judge = impossible.Judge()
+        now = time.time()
+        try:
+            missing = engine is None
+            unreadable = getattr(engine, "detection_failed", None) is True
+            # The process list is asked only where a detection rule is met: a tick that met none counts nothing.
+            judge.tick(_app_runs() if missing or unreadable else False,
+                       {"engine_missing": missing, "history_unreadable": unreadable})
+            if missing:
+                judge.look(now, None, {})
+            elif now - getattr(self, "_judged_at", 0.0) >= impossible.LOOK_EVERY_SECONDS or now < self._judged_at:
+                self._judged_at = now
+                runs, facts = self._recovery_facts(store, engine)
+                judge.look(now, runs, facts)
+        except Exception:
+            self._record_failure("the self-check")
+        backend = getattr(engine, "backend", None)
+        untested = getattr(backend, "layout_untested", None)
+        if untested is True:
+            untested = getattr(backend, "engine_version", None)
+        written = public.self_check_note(started, judge.word(now), getattr(engine, "unknown_error", None),
+                                  untested if isinstance(untested, str) else None)
+        if written != getattr(self, "_self_check_written", None):
+            try:
+                compatio.write_json_atomic(self.paths.self_check_file, written, "selfcheck.")
+                self._self_check_written = written
+                if written["blocked"] is not None:
+                    self.logger.info("self-check: %s", written["blocked"])
+            except OSError:
+                self._record_failure("writing the self-check")
+
+    def _recovery_facts(self, store, engine):
+        """(app runs, {rule: held}) for one look of the recovery rules (impossible.recovery_facts): asked only while a
+        record of the default home waits for one of them; the app's pairing looked at again, as the engine looks at it,
+        and the Restart Manager asked who holds the newest queue and state databases, the writer locks of the records
+        waiting elsewhere or unknown (five at most) and, where nobody holds a newest one, the older ones."""
+        waiting = [row for row in store.records_in(machine.WAITING, home_key="")]
+        reasons = {row.get("last_error") for row in waiting}
+        facts = {"usage_protocol": bool(reasons & impossible.USAGE_BROKEN_REASONS)}
+        wanted = impossible.ELSEWHERE_REASONS | impossible.NOT_LOADED_REASONS
+        if not reasons & wanted:
+            return (_app_runs() if facts["usage_protocol"] else None), facts
+        backend = engine.backend
+        identity = backend.app_identity()
+        look = getattr(backend, "app_look", None)
+        runs = look in ("matched", "unmatched")
+        home = Path(backend.codex_home)
+        newest = {kind: newest_generation(home, kind) for kind in ("queue", "state")}
+        try:
+            held = {user.get("pid") for user in resource_users(*[path for path in newest.values() if path])}
+        except Exception:
+            held = None
+        locks = home / "thread-writer-locks"
+        lock_holders = set()
+        for row in [row for row in waiting if row.get("last_error") in impossible.ELSEWHERE_REASONS][:5]:
+            try:
+                lock_holders |= {user.get("pid") for user in resource_users(locks / (row["thread_id"] + ".lock"))}
+            except Exception:
+                pass
+        older = []
+        for kind, path in newest.items():
+            if path is None or held is None or resource_users(path):
+                continue
+            pattern = DB_KINDS[kind][0]
+            others = [entry for entry in home.iterdir() if pattern.fullmatch(entry.name) and entry != path
+                      and entry.is_file() and not entry.is_symlink()]
+            older.append({user.get("pid") for user in resource_users(*others)} if others else set())
+        server = identity.get("server", {}).get("pid") if isinstance(identity, dict) else None
+        facts.update(impossible.recovery_facts(
+            matched=look == "matched" and identity is not None, server=server, reasons=reasons,
+            lock_holders=lock_holders, database_holders=held, locks_folder=locks.is_dir(), older_holders=older))
+        return runs, facts
 
     def _other_homes(self, store):
         """v0.6.15-beta: the other Codex homes' tick, after the default home's. What fails there costs that

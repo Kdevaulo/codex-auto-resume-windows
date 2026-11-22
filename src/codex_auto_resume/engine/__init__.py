@@ -73,6 +73,9 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
             self._usage_checks_left(before)
 
     def _tick(self):
+        # v0.6.26: whether this tick's detection could read Codex's history - None where it did not try (recovery off,
+        # a home retiring) - which the watcher's own judge reads (engine/impossible.py, history_unreadable).
+        self.detection_failed = None
         # The watch and outcome observation continue when recovery is paused: taking
         # back a queued continuation is exactly what a Pause asks for.
         try:
@@ -111,7 +114,9 @@ class Engine(OptionsMixin, AnnounceMixin, FreshnessMixin, DetectMixin, Reconcile
         try:
             try:
                 self.collect()
+                self.detection_failed = False
             except Exception:
+                self.detection_failed = True
                 self.log(None, "detection_unavailable_no_submission", None)
                 return
             due = self._records(UNSENT)

@@ -56,7 +56,9 @@ STATES = ("monitoring", "waiting", "checking", "recovering", "paused", "attentio
 # Circumstances under which nothing will recover until a person does something.
 ATTENTION_OVERLAYS = frozenset({"compatibility_blocked", "compatibility_failed_here", "engine_unavailable", "watcher_not_ticking",
                                 # #58's follow-up: the Codex app runs and no server of its could be matched.
-                                "app_server_unmatched"})
+                                "app_server_unmatched",
+                                # v0.6.26: the watcher's own judge found that recovery cannot work here.
+                                "codex_changed"})
 
 
 # v0.6.20: and the one circumstance that waits for a person without anything being wrong: a waiting record held for them
@@ -64,6 +66,13 @@ ATTENTION_OVERLAYS = frozenset({"compatibility_blocked", "compatibility_failed_h
 # lets it continue, so every header asks for their attention (activity) - under a watcher not known to run, which is a
 # stopped watcher's grey, and over a pause. Kept apart from ATTENTION_OVERLAYS, which are about the watcher.
 HELD_OVERLAY = "held"
+
+
+def _blocked(watcher) -> bool:
+    """v0.6.26: whether the watcher's own judge found that recovery cannot work here (the status's self_check, its word
+    one of machine's self-check words): a person must act, with no record needed to say it."""
+    check = watcher.get("self_check") if isinstance(watcher, dict) else None
+    return isinstance(check, dict) and check.get("blocked") is not None
 
 
 def is_waiting(row) -> bool:
@@ -98,7 +107,7 @@ def activity(status, rows, now) -> str:
     if not watcher_known_running(status, known):
         return "attention"
     if (status.get("upgrade_pending") is True or watcher.get("ticking") is False
-            or watcher.get("engine_state") in ("incompatible", "failed_here")
+            or watcher.get("engine_state") in ("incompatible", "failed_here") or _blocked(watcher)
             or any(ATTENTION_OVERLAYS & set(row.get("overlays") or ()) for row in known)):
         return "attention"
     if any(HELD_OVERLAY in (row.get("overlays") or ()) for row in known):
@@ -141,7 +150,7 @@ def icon_attention(status, rows) -> bool:
     status = status or {}
     watcher = status.get("watcher") or {}
     return (status.get("watcher_running") is False or watcher.get("ticking") is False
-            or watcher.get("engine_state") in ("incompatible", "failed_here")
+            or watcher.get("engine_state") in ("incompatible", "failed_here") or _blocked(watcher)
             or any(ATTENTION_OVERLAYS & set(row.get("overlays") or ()) for row in rows or ()))
 
 
@@ -156,8 +165,9 @@ def snapshot_activity(snapshot, now, *, attention=False) -> str:
         return "attention"
     if snapshot and not snapshot.get("enabled", True):
         return "paused"
-    # #58's follow-up: a record whose last look found the app open and no server matched (under a pause, as its overlay).
-    if snapshot.get("unmatched"):
+    # #58's follow-up: a record whose last look found the app open and no server matched (under a pause, as its overlay);
+    # and v0.6.26, the watcher's own judge finding that recovery cannot work here (App._update_tray), under a pause too.
+    if snapshot.get("unmatched") or snapshot.get("blocked"):
         return "attention"
     if snapshot.get("running"):
         return "recovering"
