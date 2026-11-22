@@ -1372,7 +1372,7 @@ Expected areas include:
 - every moving picture (the README's, the cards', the tray popup's, the setup window's, the logos'), frame by frame against what the product does now: each light, sweep, glide, fade and veil it shows at its own time, and nothing it no longer does (the owner, 2026-11-19),
 - all twenty-two translations,
 - then cleanup, fixes and refactoring, with a regression test for each confirmed bug,
-- the review of what moves from the advanced edition to the standard one (not started),
+- the review of what moves from the advanced edition to the standard one (done on 2026-11-22: of 53 capabilities four could have moved, three of them only with a standard amended; the owner kept every one in the advanced edition),
 - the switch of the bundled Python to 3.15, if CPython 3.15.3 is out by then (v0.6.24 did not make it: 3.15.3 was not out).
 
 Right after the final v0.6.26 is published and verified, the last Python version is kept as a repository of its own, as above.
