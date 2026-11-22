@@ -76,9 +76,11 @@ class QueueHeldTests(RecordCase):
         self.assertEqual(plug.moves, [("unproven", None, None)])
         self.assertEqual(len(self.h.backend.send_calls), 1, "never sent again")
 
-    def test_after_a_restart_one_codex_took_counts_its_day_from_the_watchers_start(self):
+    def test_after_a_restart_one_codex_took_waits_an_hour_from_the_watchers_start(self):
         """Nothing of what this process saw survives a restart: one gone from the queue since may have sat there until
-        then, so its day counts from the new watcher's start - never from its send, days before."""
+        then, so it is given an hour from the new watcher's start for its marker to reach the history - never unproven
+        at once from its send, days before, and (review K3, test_plug_record_restarts) never a whole day again from
+        each start, which never ended it on a PC whose watcher starts every day."""
         plug, queue_id = self.sent()
         self.h.tick(advance=3 * DAY)
         self.h.home.remove_queued(queue_id)
@@ -86,7 +88,7 @@ class QueueHeldTests(RecordCase):
         self.plugged(plug)                                     # a new watcher: nothing of what the first one saw
         self.h.tick()
         self.assertEqual(plug.moves, [])
-        self.h.tick(advance=DAY - 120)
+        self.h.tick(advance=HOUR - 120)
         self.assertEqual(plug.moves, [])
         self.h.tick(advance=120)
         self.assertEqual(plug.moves, [("unproven", None, None)])
