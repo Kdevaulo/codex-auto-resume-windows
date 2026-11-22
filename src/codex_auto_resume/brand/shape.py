@@ -2,7 +2,7 @@
 
 A circular corner meets its straight sides with a jump in curvature - from none to 1/R at once - and
 the eye reads the jump as a slight bulge where the arc begins. Figma's construction ("Desperately
-seeking squircles", figma.com/blog) runs a circular arc in the middle of the corner and joins it to
+seeking squircles") runs a circular arc in the middle of the corner and joins it to
 each side with one cubic Bezier whose curvature is zero at the side, so the corner eases in. How far
 it eases is the smoothing: the corner then begins `(1 + smoothing) * radius` from its vertex instead
 of `radius`, and 0.6 is the shape the owner approved (the Squircle board, 2026-11-15).

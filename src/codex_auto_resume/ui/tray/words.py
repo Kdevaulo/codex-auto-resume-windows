@@ -65,7 +65,19 @@ def tooltip(snapshot: dict, strings: dict, now: float, edition: str | None = Non
     the title is the name alone (v0.6.14). Since v0.6.24 the join of `tooltip_parts`, word for word what it was."""
     parts = tooltip_parts(snapshot, strings, now, edition)
     text = tooltip_joined(parts)
-    return text[:TIP_CHARS - 1] if parts["line"] else text
+    if not parts["line"] or len(text) < TIP_CHARS:
+        return text
+    # v0.6.26 (the third audit's N1): too long for szTip, the meter's last rows are left out one at a time until the
+    # rest fits whole - then, if the title and the state line alone are too long, the state line's last pieces, the
+    # first (what needs a person, or the count that is running) staying - never a row or a piece cut half way. The
+    # drawn card (tipcard.py) shows everything; tests/test_tray_tip_whole.py holds this in every language.
+    rows, line = parts["meter"], parts["line"]
+    while rows or len(line) > 1:
+        rows, line = (rows[:-1], line) if rows else (rows, line[:-1])
+        text = tooltip_joined(dict(parts, meter=rows, line=line))
+        if len(text) < TIP_CHARS:
+            return text
+    return text[:TIP_CHARS - 1]
 
 
 def tooltip_joined(parts) -> str:

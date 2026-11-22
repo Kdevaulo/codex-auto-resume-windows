@@ -1993,7 +1993,7 @@ function renderCompatibility(status, rows) {
     data = fill('compat.source_sequence', '{source}, #{sequence}', {source: data, sequence: sequence});
   }
   var meta = element('div', 'prow-meta compat-meta');
-  [[t('compat.checked', 'Checked'), typeof view.checked_at === 'number' ? clockTime(view.checked_at) : t('time.never', 'never')],
+  [[t('compat.checked', 'Evaluated'), typeof view.checked_at === 'number' ? clockTime(view.checked_at) : t('time.never', 'never')],
    [t('compat.data', 'Data in force'), usable ? data : '-']
   ].forEach(function (pair) {
     var fact = element('span', null, pair[0] + ' ');
@@ -2338,7 +2338,7 @@ function renderContinuation(byName) {
     };
     var field = choiceField(language, (language.choices || []).map(function (choice) {
       return {value: choice, text: choice === 'follow' ? followLabel(read('interface_language')) : endonym(choice)};
-    }), t('help.continuation_language', 'The language of the message sent to Codex.'));
+    }), t('help.continuation_language', 'The language of the message sent to Codex. Unless it follows the interface, changing the interface language leaves it as it is.'));
     var follow = null;
     Array.prototype.forEach.call(field.select.options, function (option) {
       if (option.value === 'follow') follow = option;
@@ -2445,7 +2445,7 @@ function renderPreviewCard() {
   var source = element('p', 'help source');
   source.hidden = true;
   node.appendChild(source);
-  node.appendChild(element('p', 'help', t('preview.note', 'This is the text that will be sent.')));
+  node.appendChild(element('p', 'help', t('preview.note', 'This is the text that will be sent. The watcher adds one line after it to recognize the exact turn it starts.')));
   PREVIEW.nodes = {frame: frame, text: text, source: source};
   return node;
 }
