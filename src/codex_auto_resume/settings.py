@@ -421,8 +421,8 @@ def whole_text(value) -> bool:
     """Whether every text in `value` can be written as UTF-8: none holds a lone surrogate (half of a pair, which a
     person's JSON escape or an older file's holds), which would make every save raise (v0.6.26)."""
     try:
-        json.dumps(value, ensure_ascii=False).encode("utf-8")
-    except UnicodeEncodeError:
+        json.dumps(value, ensure_ascii=False, allow_nan=False).encode("utf-8")
+    except (UnicodeEncodeError, ValueError):
         return False
     return True
 

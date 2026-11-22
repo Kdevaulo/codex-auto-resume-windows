@@ -30,7 +30,7 @@ from codex_auto_resume.engine import impossible  # noqa: E402
 from codex_auto_resume.runtime import loop  # noqa: E402
 from codex_auto_resume.ui.popup import model as popup  # noqa: E402
 
-T1 = "019a0000-0000-7000-8000-000000000001"
+T1 = "0a1b2c3d-0000-7000-8000-000000000001"
 EXEC_SERVER, HELPER_SERVER, TUI = 40, 50, 60
 ELSEWHERE = "recovery_blocked:held_elsewhere"
 

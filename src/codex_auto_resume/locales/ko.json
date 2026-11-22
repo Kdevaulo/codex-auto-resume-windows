@@ -948,7 +948,7 @@
   "selfcheck.history_unreadable": "Codex의 기록을 더 이상 읽을 수 없어, 새 중단을 감지하지 못하고 있습니다. 진단 정보를 내보내 알려 주세요.",
   "selfcheck.engine_missing": "Codex 엔진을 찾거나 확인하지 못해, 아무것도 복구할 수 없습니다.",
   "selfcheck.unknown_error": "Codex가 이 버전이 모르는 오류를 보고했습니다: {code} (지난 하루 동안 {n}건). 복구하지 않습니다.",
-  "selfcheck.layout_untested": "Codex {version}이(가) 이 버전에서 시험해 보지 않은 구성으로 실행되고 있습니다.",
+  "selfcheck.layout_untested": "Codex {version}: 이 버전에서 시험해 보지 않은 구성으로 실행되고 있습니다.",
   "selfcheck.unpaired_after_update": "이 제품을 {version}에서 업데이트한 뒤로 Codex 앱의 서버를 찾지 못했습니다. 이전 버전은 찾았습니다.",
   "overview.awake": "작업이 기다리는 동안 이 PC를 깨워 두는 중, {time}부터",
   "overview.detected": "중단",

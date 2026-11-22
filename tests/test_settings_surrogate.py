@@ -24,7 +24,7 @@ for entry in (str(Path(_HERE).parent / "src"), _HERE):
 from codex_auto_resume import settings  # noqa: E402
 
 HALF = "go on \ud83d please"
-THREAD = "019a0000-0000-7000-8000-000000000001"
+THREAD = "0a1b2c3d-0000-7000-8000-000000000001"
 
 
 class LoneSurrogateTests(unittest.TestCase):
@@ -57,7 +57,7 @@ class LoneSurrogateTests(unittest.TestCase):
         self.assertEqual(kept["custom_message"], settings.DEFAULTS["custom_message"])
 
     def test_an_entry_holding_one_is_dropped_and_the_whole_ones_stay(self):
-        by_thread = {THREAD: "keep going", "019a0000-0000-7000-8000-000000000002": HALF}
+        by_thread = {THREAD: "keep going", "0a1b2c3d-0000-7000-8000-000000000002": HALF}
         self.path.write_text(json.dumps({"config_version": settings.CONFIG_VERSION,
                                          "custom_message_by_thread": by_thread}), encoding="utf-8")
         field = settings.continuation.BY_THREAD_FIELD

@@ -81,6 +81,10 @@ MODULES = ("test_compat_characterization", "test_compat_io", "test_correlation",
            # waiting record and applies what they find - an advanced installation with nothing on finds the same.
            "test_rescan")
 NOT_SCENARIOS = {
+    "test_plug_record_queue_held": "drives the engine only to hand a plug's record into a queue Codex paused (v0.6.26, "
+                                   "third-round B1): a hold v0.6.10 never had",
+    "test_usage_probe_broken": "drives the engine only to break a usage read three ways (v0.6.26, update resilience 7): "
+                               "reasons v0.6.10 never wrote",
     "test_app_server_unmatched_older": "drives this version's engine only to leave a record waiting, then runs tagged "
                                        "releases' stores and engines on it in processes of their own",
     "test_app_server_unmatched": "drives the engine through the real transport over a process list of its own, for #58's "
