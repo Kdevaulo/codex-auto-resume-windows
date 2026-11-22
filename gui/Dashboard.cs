@@ -2553,9 +2553,25 @@ namespace CodexAutoResume
             {
                 if (first[i] == null) continue;
                 Padding gap = first[i].Margin;
-                int right = Px(18) + widest - natural[i];
+                // A table whose values would wrap beside the shared column keeps its own (the layout audit: a Turkish
+                // watcher in trouble, recovery paused, grew Right now by a line) - the Overview never moves for alignment.
+                int extra = widest - natural[i];
+                if (extra > 0 && !ValuesFit(tables[i], widest)) extra = 0;
+                int right = Px(18) + extra;
                 if (gap.Right != right) first[i].Margin = new Padding(gap.Left, gap.Top, right, gap.Bottom);
             }
+        }
+
+        // Whether every value of `table` stays on its one line with its label column `column` wide.
+        private static bool ValuesFit(TableLayoutPanel table, int column)
+        {
+            int room = table.ClientSize.Width - column;
+            if (table.ClientSize.Width <= 0) return true;
+            foreach (Control cell in table.Controls)
+                if (table.GetPositionFromControl(cell).Column == 1 &&
+                    cell.GetPreferredSize(Size.Empty).Width + cell.Margin.Horizontal > room)
+                    return false;
+            return true;
         }
 
         private TableLayoutPanel Facts(TableLayoutPanel card)
