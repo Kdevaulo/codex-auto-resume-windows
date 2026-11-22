@@ -179,7 +179,7 @@
   "page.api.copy": "کپی نشانی",
   "page.api.copy_token": "کپی توکن",
   "page.api.copy_which": "نشانی برای کپی",
-  "page.api.example.cancelled": "POST /cancel/1: کار 1 لغو می‌شود.",
+  "page.api.example.cancelled": "POST /cancel/1: task 1 لغو می‌شود.",
   "page.api.example.lan": "از دستگاه دیگر: {address}",
   "page.api.lan": "دسترسی از شبکهٔ محلی شما، بدون رمزگذاری.",
   "page.api.lan_address": "در شبکهٔ محلی شما: {url}",
