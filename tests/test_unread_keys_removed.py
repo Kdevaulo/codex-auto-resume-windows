@@ -13,7 +13,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import sys
 import unittest
+
+_HERE = str(Path(__file__).resolve().parent)
+for entry in (str(Path(_HERE).parent / "src"), _HERE):
+    if entry not in sys.path:
+        sys.path.insert(0, entry)
+
+import srcscan  # noqa: E402
+from codex_auto_resume import l10n  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 GONE = ("action.refresh", "panel.col_conversation", "panel.col_state", "timeline.empty", "custom.placeholder")
@@ -22,10 +31,15 @@ KEPT = ("starter.setup", "msg.toast_button_open_codex")
 
 class UnreadKeysTests(unittest.TestCase):
     def test_no_catalog_or_basis_holds_one(self):
-        files = sorted((ROOT / "src" / "codex_auto_resume" / "locales").glob("*.json")) + sorted(
-            (ROOT / "build" / "l10n").glob("*.basis.json"))
-        self.assertGreaterEqual(len(files), 43)
-        for path in files:
+        self.assertGreaterEqual(len(l10n.LOCALES), 22)
+        for locale in l10n.LOCALES:
+            table = l10n._read(locale)
+            for key in GONE:
+                with self.subTest(locale=locale, key=key):
+                    self.assertNotIn(key, table)
+        bases = sorted((ROOT / "build" / "l10n").glob("*.basis.json"))
+        self.assertGreaterEqual(len(bases), 21)
+        for path in bases:
             table = json.loads(path.read_text(encoding="utf-8"))
             for key in GONE:
                 with self.subTest(file=path.name, key=key):
@@ -33,15 +47,16 @@ class UnreadKeysTests(unittest.TestCase):
 
     def test_nothing_in_a_shipped_source_names_one(self):
         quoted = re.compile(r"""["'](?:%s)["']""" % "|".join(re.escape(key) for key in GONE))
-        for folder in ("src", "gui", "scripts", "advanced/src", "advanced/gui"):
-            for path in sorted((ROOT / folder).rglob("*")):
-                if path.suffix not in (".py", ".cs", ".js", ".ps1") or "__pycache__" in path.parts:
-                    continue
-                with self.subTest(path=str(path.relative_to(ROOT))):
-                    self.assertIsNone(quoted.search(path.read_text(encoding="utf-8", errors="replace")))
+        files = srcscan.text_files()
+        for folder in ("gui", "scripts", "advanced/src", "advanced/gui"):
+            files += [path for path in sorted((ROOT / folder).rglob("*"))
+                      if path.suffix in (".py", ".cs", ".js", ".ps1") and "__pycache__" not in path.parts]
+        for path in files:
+            with self.subTest(path=str(path.relative_to(ROOT))):
+                self.assertIsNone(quoted.search(path.read_text(encoding="utf-8", errors="replace")))
 
     def test_the_kept_ones_are_still_in_the_english_catalog(self):
-        english = json.loads((ROOT / "src" / "codex_auto_resume" / "locales" / "en.json").read_text(encoding="utf-8"))
+        english = l10n._read("en")
         for key in KEPT:
             self.assertIn(key, english)
 
