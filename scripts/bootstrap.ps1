@@ -337,9 +337,10 @@ $AdvancedStateSince = @(@('0.6.20-beta.3', 9), @('0.6.19-beta', 8), @('0.6.16-be
 $AdvancedReadableFrom = 7
 $AdvancedMarkSince = '0.6.17'
 # The list is read page by page, $PickPageSize to a page (release_pages in release.json), at most
-# $PickMaxPages of them - a page with fewer ends it, and a full last one is no answer - and all of it
-# within $PickBudgetSeconds, each page within $PickPageTimeoutMax. The window waits longer than that
-# for the answer.
+# $PickMaxPages of them - a page with fewer ends it, and so does a full one whose last release is older
+# than $PickFloor, since the list is newest first and nothing past it is ever offered; a full last one
+# that ends neither way is no answer - and all of it within $PickBudgetSeconds, each page within
+# $PickPageTimeoutMax. The window waits longer than that for the answer.
 $PickPageSize = 30
 $PickMaxPages = 5
 $PickBudgetSeconds = 150
@@ -1166,9 +1167,11 @@ function Get-ReleasePages {
         Page 1, 2, ... of the constant `release_pages` in scripts/release.json, whose `{page}` is the
         one thing put into it, each read by Read-ReleasesPage within what is left of
         $PickBudgetSeconds, at most $PickPageTimeoutMax. A page with fewer than $PickPageSize entries
-        is the last; no more than $PickMaxPages are asked for, newest first, which is many times what
-        is published above $PickFloor - and a last one asked for that is as full as the rest is a
-        throw too, since more may follow it, and the oldest would be left out unsaid. An entry
+        is the last, and so is a full one whose last entry that counts is older than $PickFloor: the
+        list is newest first, so the pages after it hold only versions the picker never offers (an
+        old release named earlier on a page, out of its place, ends nothing). No more than
+        $PickMaxPages are asked for - and a last one asked for that is as full as the rest and ends
+        neither way is a throw, since more may follow it, and the oldest would be left out unsaid. An entry
         counts only when it is published (`draft` false), tagged `v` and a version
         Get-ChosenVersion accepts, marked a pre-release exactly when its version is one, and has a
         list of assets; of the assets only their names are kept, and only names that are text. A version the list names twice is taken where it is named first.
@@ -1186,6 +1189,7 @@ function Get-ReleasePages {
     $seen = @{}
     $ended = $false
     for ($page = 1; $page -le $PickMaxPages; $page++) {
+        $last = $null
         $left = $PickBudgetSeconds - $clock.Elapsed.TotalSeconds
         $seconds = [int][Math]::Floor([Math]::Min([double]$PickPageTimeoutMax, $left))
         if ($seconds -lt $ReleasesTimeoutMin) { throw 'Too little time was left to read the rest of the list of releases.' }
@@ -1203,6 +1207,7 @@ function Get-ReleasePages {
             try { $number = Get-ChosenVersion $tag.Substring(1) } catch { continue }
             if ($entry.prerelease -ne $number.Contains('-')) { continue }
             if ($null -eq $entry.assets -or $entry.assets -isnot [array]) { continue }
+            $last = $number
             $names = @()
             foreach ($asset in $entry.assets) {
                 if ($asset -isnot [Management.Automation.PSCustomObject]) { continue }
@@ -1214,6 +1219,7 @@ function Get-ReleasePages {
             $found += ,([pscustomobject]@{ Version = $number; Prerelease = $entry.prerelease; Assets = $names })
         }
         if ($list.Count -lt $PickPageSize) { $ended = $true; break }
+        if ($null -ne $last -and (Compare-ProductVersion -Left $last -Right $PickFloor) -lt 0) { $ended = $true; break }
     }
     if (-not $ended) {
         throw ('The list of releases goes on past the ' + $PickMaxPages + ' pages read, so none of it is shown.')
