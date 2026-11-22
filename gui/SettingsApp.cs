@@ -2132,8 +2132,10 @@ namespace CodexAutoResume
         private Padding heroPadding;
 
         /// v0.6.24 (the owner, 2026-11-18): the pill in the header card where even the closest tabs leave it no room - the
-        /// card's third column, on its second line, at its outer end under the caption buttons, Brand.PillInset from the
-        /// card's edge as at the tab row's end (the card's padding at that side is the inset while it is there; the headline
+        /// card's third column, on its second line, at its outer end under the caption buttons, Brand.CaptionInsetEnd from the
+        /// card's edge, its end under the caption group's (v0.6.26, audit D12; the owner, 2026-11-22: it stood 6 logical px
+        /// further out, Brand.PillInset as at the tab row's end, whose rule is for a pill beside a card's edge, not inside
+        /// it) (the card's padding at that side is the inset while it is there; the headline
         /// keeps clear of the caption buttons by its own margin, KeepHeadlineClear); the line under the headline ends a gap
         /// before it. Back in its slot at the tab row's end as soon as the row has room again.
         private void PillToHeader(bool wanted)
@@ -2146,7 +2148,7 @@ namespace CodexAutoResume
                 if (wanted)
                 {
                     pillSlot.Controls.Remove(versionPill);
-                    int inset = Px(Brand.PillInset);
+                    int inset = Px(Brand.CaptionInsetEnd);
                     // The card's right and the pill's left as a language written left to right has them: the card mirrors both
                     // for one written right to left (measured: swapped here as well, the pill stood 32 px in, 2026-11-18).
                     hero.Padding = new Padding(heroPadding.Left, heroPadding.Top, inset, heroPadding.Bottom);

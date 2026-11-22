@@ -860,7 +860,8 @@ namespace CodexAutoResume
 
         /// v0.6.24-beta.2: the version's pill (VersionPill) clear of every page tab and inside the tab strip's row, its words
         /// whole in it, centred on the tabs within a pixel, at the strip's outer end (the left, mirrored); or (v0.6.24, the
-        /// owner, 2026-11-18) in the header card, inside it, clear of its two lines and Brand.PillInset from its outer edge.
+        /// owner, 2026-11-18) in the header card, inside it, clear of its two lines and Brand.CaptionInsetEnd from its outer
+        /// edge, under the caption group's end (v0.6.26, audit D12; PillOuterInset).
         /// Never hidden while there is a version to show.
         private void AuditPill(List<string> findings)
         {
@@ -911,12 +912,16 @@ namespace CodexAutoResume
         {
             int outer, start;
             PillInsets(out outer, out start);
-            int inset = Px(Brand.PillInset);
-            if (PillFit != "none" && Math.Abs(outer - inset) > 1)
-                findings.Add("tabs :: the version's pill stands " + outer + " px inside the header card's edge, not " + inset);
+            int inset = Px(Brand.PillInset), end = PillOuterInset;
+            if (PillFit != "none" && Math.Abs(outer - end) > 1)
+                findings.Add("tabs :: the version's pill stands " + outer + " px inside the header card's edge, not " + end);
             if (Math.Abs(start - inset) > 1)
                 findings.Add("tabs :: the first tab stands " + start + " px inside the header card's edge, not " + inset);
         }
+
+        /// How far inside the header card's outer edge the version's pill is to end: Brand.PillInset at the tab row's end,
+        /// Brand.CaptionInsetEnd in the header card, under the caption group's end (v0.6.26, audit D12).
+        internal int PillOuterInset { get { return Px(PillFit == "header" ? Brand.CaptionInsetEnd : Brand.PillInset); } }
 
         /// How far inside the header card's edges the version's pill ends and the first tab's face starts, in this window's pixels.
         internal void PillInsets(out int outer, out int start)
