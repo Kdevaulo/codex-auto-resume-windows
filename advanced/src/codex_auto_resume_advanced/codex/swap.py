@@ -177,8 +177,13 @@ def other_engines(rows, *, app_open) -> bool:
     counts but the app main's descendants while the app is open - its app server, and an exec-server under that (they
     end with it), found by walking parents through the rows, a loop or a chain longer than the rows counting as not the
     app's - and the app servers this process started and holds (codex/pairing.own_server); rows that cannot be read
-    count as one. It ends no process. The inventory carries no creation times, so a parent id Windows reused for a
-    process under the app is not told apart: a chain is walked by ids alone."""
+    count as one. It ends no process.
+
+    v0.6.26 (review K9, audit-core C1's rule, as core's pairing.under_app holds it): the inventory carries each process's
+    creation time, and a parent created after its child is not its parent - Windows gave a dead parent's id to a later
+    process, so a terminal's engine whose shell ended is never the app's because the app later started a helper that was
+    given that id. A step whose time could not be read is not the app's either; rows that carry no time at all (as the
+    inventory read them before) are walked by ids, as ever. A pid listed twice is no one."""
     if not isinstance(rows, list):
         return True
     from codex_auto_resume.codex import pairing
@@ -190,15 +195,28 @@ def other_engines(rows, *, app_open) -> bool:
             main = pairing._app_main(rows)["pid"]
         except Exception:
             main = None
-    parents = {row.get("pid"): row.get("parent") for row in rows if isinstance(row, dict)}
+    listed = {}
+    for each in rows:
+        if isinstance(each, dict):
+            listed[each.get("pid")] = None if each.get("pid") in listed else each
+
+    def younger(parent, child) -> bool:
+        """Whether `parent` cannot have started `child`: created after it, or a time that could not be read."""
+        up, down = pairing._born(parent), pairing._born(child)
+        if up is pairing._UNTIMED or down is pairing._UNTIMED:
+            return False
+        return up is None or down is None or up > down
 
     def under_main(row) -> bool:
-        seen, at = set(), row.get("parent")
+        seen, child, at = set(), row, row.get("parent")
         while at is not None and at not in seen and len(seen) <= len(rows):
+            up = listed.get(at)
+            if up is None or younger(up, child):
+                return False
             if at == main:
                 return True
             seen.add(at)
-            at = parents.get(at)
+            child, at = up, up.get("parent")
         return False
     for row in rows:
         if not isinstance(row, dict) or not isinstance(row.get("path"), str):
