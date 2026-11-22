@@ -388,7 +388,7 @@
   "page.kept.statement_changed": "Elle est restée activée bien que ce qu'elle fait ait changé. Relisez-le et activez-la pour confirmer.",
   "page.kept.submission_unknown": "Elle est restée activée bien qu'elle n'ait pas pu prouver qu'une relance qu'elle a envoyée est arrivée.",
   "page.limits": "Limites",
-  "page.long_limits": "Elle n'envoie rien elle-même. Tant qu'elle est activée, un message à une réinitialisation peut être aussi long qu'une relance, pas seulement {n} caractères. Beaucoup de guillemets doubles ou d'emoji le raccourcissent un peu, et un message qui ne tient pas est refusé dès que vous l'écrivez.",
+  "page.long_limits": "Elle n'envoie rien elle-même. Tant qu'elle est activée, un message à une réinitialisation peut être aussi long qu'une relance, pas seulement {n} caractères. Beaucoup de guillemets doubles ou d'emoji réduisent un peu cette limite, et un message qui ne tient pas est refusé dès que vous l'écrivez.",
   "page.nav": "Fonctions avancées",
   "page.nominal": "Elle n'envoie rien elle-même : ces limites n'entrent donc jamais en jeu.",
   "page.pause_limits": "Elle n'a pas de limite d'envois par jour. Chaque fois qu'une fenêtre atteint son pourcentage d'arrêt, elle arrête une fois le tour en cours de chaque conversation et relance cette conversation une fois après la réinitialisation.",

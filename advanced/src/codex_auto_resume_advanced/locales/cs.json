@@ -388,7 +388,7 @@
   "page.kept.statement_changed": "Zůstalo zapnuté, přestože se změnilo, co dělá. Přečtěte si to znovu a potvrďte to zapnutím.",
   "page.kept.submission_unknown": "Zůstalo zapnuté, přestože nemohlo prokázat, že pokračování, které odeslalo, dorazilo.",
   "page.limits": "Limity",
-  "page.long_limits": "Samo nic neodesílá. Dokud je zapnuté, může být zpráva při obnovení limitu tak dlouhá, jak dlouhé může být jedno pokračování, nejen {n} znaků. Mnoho dvojitých uvozovek nebo emoji ji o něco zkrátí a zpráva, která se nevejde, je odmítnuta už při psaní.",
+  "page.long_limits": "Samo nic neodesílá. Dokud je zapnuté, může být zpráva při obnovení limitu tak dlouhá, jak dlouhé může být jedno pokračování, nejen {n} znaků. Mnoho dvojitých uvozovek nebo emoji tento limit o něco sníží a zpráva, která se nevejde, je odmítnuta už při psaní.",
   "page.nav": "Pokročilé funkce",
   "page.nominal": "Samo nic neodesílá, takže tyto limity nikdy nepřijdou ke slovu.",
   "page.pause_limits": "Nemá denní limity odesílání. Pokaždé, když okno dosáhne procenta zastavení, zastaví v každé konverzaci běžící kolo jednou a po obnovení v té konverzaci jednou pokračuje.",

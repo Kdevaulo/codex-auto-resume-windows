@@ -388,7 +388,7 @@
   "page.kept.statement_changed": "Ele continuou ligado embora o que ele faz tenha mudado. Leia de novo e ligue-o para confirmar.",
   "page.kept.submission_unknown": "Ele continuou ligado embora não tenha conseguido provar que uma continuação que enviou chegou.",
   "page.limits": "Limites",
-  "page.long_limits": "Ele não envia nada sozinho. Enquanto está ligado, uma mensagem em uma redefinição pode ser tão longa quanto uma continuação, não só {n} caracteres. Muitas aspas duplas ou emojis a encurtam um pouco, e uma mensagem que não cabe é recusada ao ser escrita.",
+  "page.long_limits": "Ele não envia nada sozinho. Enquanto está ligado, uma mensagem em uma redefinição pode ser tão longa quanto uma continuação, não só {n} caracteres. Muitas aspas duplas ou emojis reduzem um pouco esse limite, e uma mensagem que não cabe é recusada ao ser escrita.",
   "page.nav": "Recursos avançados",
   "page.nominal": "Ele não envia nada por conta própria, então estes limites nunca entram em jogo.",
   "page.pause_limits": "Não tem limites diários de envios. Cada vez que uma janela chega à sua porcentagem de parada, para uma vez o turno em andamento de cada conversa e continua essa conversa uma vez após a redefinição.",

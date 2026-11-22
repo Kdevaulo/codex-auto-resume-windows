@@ -388,7 +388,7 @@
   "page.kept.statement_changed": "Siguió activada aunque cambió lo que hace. Vuelve a leerlo y actívala para confirmarlo.",
   "page.kept.submission_unknown": "Siguió activada aunque no pudo demostrar que llegó una continuación que envió.",
   "page.limits": "Límites",
-  "page.long_limits": "No envía nada por sí misma. Mientras está activada, un mensaje en un restablecimiento puede ser tan largo como una continuación, no solo {n} caracteres. Muchas comillas dobles o emojis lo acortan un poco, y un mensaje que no cabe se rechaza al escribirlo.",
+  "page.long_limits": "No envía nada por sí misma. Mientras está activada, un mensaje en un restablecimiento puede ser tan largo como una continuación, no solo {n} caracteres. Muchas comillas dobles o emojis reducen un poco ese límite, y un mensaje que no cabe se rechaza al escribirlo.",
   "page.nav": "Funciones avanzadas",
   "page.nominal": "No envía nada por sí misma, así que estos límites nunca entran en juego.",
   "page.pause_limits": "No tiene límites diarios de envíos. Cada vez que una ventana llega a su porcentaje de parada, detiene una vez el turno en marcha de cada conversación y continúa esa conversación una vez tras el restablecimiento.",
