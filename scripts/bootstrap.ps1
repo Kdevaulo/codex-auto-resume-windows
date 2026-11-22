@@ -97,9 +97,9 @@
       -Versions is what the Dashboard's Install another version... asks when a person presses it,
       and at no other time. It reads the same list of this repository's releases through the one
       other address api.github.com is allowed for (`release_pages` in scripts/release.json): the
-      same host and path, one page of thirty at a time, at most five pages, whose page number is
+      same host and path, one page of thirty at a time, at most twenty pages, whose page number is
       the one thing put into it. Each page is checked as the update check's page is (Read-ReleasesPage),
-      and a page that cannot be read, or a fifth as full as the rest, lists nothing at all:
+      and a page that cannot be read, or a twentieth as full as the rest, lists nothing at all:
       `versions: unavailable`, exit 12. It downloads nothing, installs nothing and does not refresh
       the compatibility data.
 
@@ -340,11 +340,14 @@ $AdvancedMarkSince = '0.6.17'
 # $PickMaxPages of them - a page with fewer ends it, and so does a full one whose last release is older
 # than $PickFloor, since the list is newest first and nothing past it is ever offered; a full last one
 # that ends neither way is no answer - and all of it within $PickBudgetSeconds, each page within
-# $PickPageTimeoutMax. The window waits longer than that for the answer.
+# $PickPageTimeoutMax. The window waits longer than that for the answer. Twenty pages are 600
+# published releases (v0.6.26; it was five, 150, and the 150th would have come around March 2027),
+# so about 590 above the floor list in full - some years at the pace since v0.5.0. Thirty to a page
+# is the page STANDARDS.md C3 names; a page of thirty is about a tenth of $ReleasesMaxChars.
 $PickPageSize = 30
-$PickMaxPages = 5
-$PickBudgetSeconds = 150
-$PickPageTimeoutMax = 30
+$PickMaxPages = 20
+$PickBudgetSeconds = 400
+$PickPageTimeoutMax = 20
 # I12 as the owner amended it on 2026-10-03: its two pre-release clauses bind the update check's offer,
 # and a version picked by name and confirmed - a pre-release too, older or newer - follows "older only
 # with -Force", the confirmation being the yes. Both $false is I12 as it was written before: a
