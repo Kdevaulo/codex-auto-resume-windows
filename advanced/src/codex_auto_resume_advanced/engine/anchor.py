@@ -84,8 +84,10 @@ LOOK_EVERY = 15
 # woken, Codex restarting, the state busy), and each look opens a session of Codex: six tries for a time picked, sixty at
 # the very most for a reset seen. A full weekly window is no passing failure: a reset seen under it is looked at again
 # once that window resets, not every RETRY_EVERY (`_held`, the v0.6.23 second round's M6 - it was a session every five
-# minutes for up to a week, about 2,000), so its looks stay within the sixty and one more after the weekly reset. A
-# ceiling's hold looks every RETRY_EVERY too, but opens no session: its own check comes before any read (`_before`).
+# minutes for up to a week, about 2,000), so its looks stay within the sixty and sixty more after the weekly reset,
+# where it is held a window's length as any reset seen is (v0.6.26, A1), and wake_for_reset wakes the PC for the next of
+# them (ANCHOR_NEXT_LOOK, A3). A ceiling's hold looks every RETRY_EVERY too, but opens no session: its own check comes
+# before any read (`_before`).
 RETRY_EVERY = 300
 # The request's own bound, and how long a request killed at it has to end.
 TIMEOUT = 120
@@ -318,18 +320,38 @@ def declared_servers(codex_home) -> tuple:
     """The names of the MCP servers `codex_home`'s config.toml declares: the keys of its `mcp_servers` table whose value is
     a table with `command` or `url`, in the file's order. () where there is no such file or table, or it cannot be read or
     parsed. Held in memory only - never logged, printed or stored - and never asked of `codex mcp list` (it adds plugins'
-    servers, and naming one of those breaks the request: T1 P5)."""
-    import tomllib
-    try:
-        with open(Path(codex_home) / "config.toml", "rb") as handle:
-            config = tomllib.load(handle)
-    except Exception:
-        return ()
+    servers, and naming one of those breaks the request: T1 P5). v0.6.26 (audit A4): read as UTF-8 with or without a
+    byte-order mark, as Notepad saves it ("UTF-8 with BOM"); one that still cannot be read is `config_unreadable`, which
+    the request's start says in the watcher's log."""
+    config, _unreadable = _config(codex_home)
     servers = config.get("mcp_servers") if isinstance(config, dict) else None
     if not isinstance(servers, dict):
         return ()
     return tuple(name for name, value in servers.items()
                  if isinstance(name, str) and isinstance(value, dict) and ("command" in value or "url" in value))
+
+
+def _config(codex_home):
+    """(`codex_home`'s config.toml as tomllib reads it, whether it is there and could not be read): (None, False) where
+    there is no such file."""
+    import tomllib
+    path = Path(codex_home) / "config.toml"
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        return None, False
+    except Exception:
+        return None, True
+    try:
+        return tomllib.loads(data.decode("utf-8-sig")), False
+    except Exception:
+        return None, True
+
+
+def config_unreadable(codex_home) -> bool:
+    """Whether `codex_home` has a config.toml this edition cannot read (v0.6.26, audit A4): any MCP server it declares is
+    then not named off, and may start for the request - said in the watcher's log, never sent on silently."""
+    return _config(codex_home)[1]
 
 
 def _toml_key(name) -> str:
@@ -417,7 +439,8 @@ class WindowAnchor:
     starts the waiting thread (`begin(target)`), `log` writes the watcher's log line and
     `local` is the local clock (time.localtime)."""
     __slots__ = ("paths", "_scoped", "_session", "_told", "_make_backend", "_begin", "_log", "_local",
-                 "_lock", "_pending", "_running", "_ended", "_looked", "_learned", "_held_open", "_shown")
+                 "_lock", "_pending", "_running", "_ended", "_looked", "_learned", "_held_open", "_shown",
+                 "_shown_next")
 
     def __init__(self, paths, *, session=None, told=None, backend=None, begin=None, log=None, local=None):
         self.paths = paths
@@ -436,6 +459,7 @@ class WindowAnchor:
         self._learned = None
         self._held_open = {}          # {(why, occurrence): {"next", "until", "reason"}}: occasions a passing failure holds open
         self._shown = False           # the time its card was last told it tries until (False: not told yet in this process)
+        self._shown_next = False      # the next look of an occasion held open last stamped for wake_for_reset (A3)
 
     def bind(self, scoped):
         self._scoped = scoped
@@ -644,7 +668,20 @@ class WindowAnchor:
         self._done(why, occurrence)
         self._unstamp(OptionKey.ANCHOR_STOPPED_AT)
         self._count("started")
+        self._unread_config(backend)
         self._wait({"why": why, "occurrence": occurrence, "at": int(now)}, process)
+
+    def _unread_config(self, backend) -> None:
+        """A start whose Codex home's config.toml could not be read (A4): its MCP servers were not named off, so they may
+        run for this request - one line in the watcher's log, as the fallback's (`_again`) says what ran."""
+        try:
+            unreadable = config_unreadable(backend._environment().get("CODEX_HOME") or "")
+        except Exception:
+            unreadable = False
+        if unreadable:
+            self._say("warning: the Codex home's config.toml could not be read here, so the MCP servers it may declare "
+                      "were not kept out of the request and may run for it; hooks, plugins, apps and the notify program "
+                      "were kept out")
 
     def _wait(self, occasion, process) -> None:
         """The request's waiting thread begun: what finish_request answers is the next tick's to settle."""
@@ -763,12 +800,13 @@ class WindowAnchor:
             pass
 
     def _past_weekly(self, why, reading, now):
-        """When a reset seen, its window idle under a full weekly window, stops being held: a little past that weekly
-        window's own reset, so a look is made after it. None - ended at once - for a time picked, or where no reset is
-        read."""
+        """When a reset seen, its window idle under a full weekly window, stops being held: a window's length past that
+        weekly window's own reset, the span any reset seen is held for (v0.6.26, audit A1: it was ten minutes past it, so
+        a PC asleep through those minutes ended the chain unread at its first tick after waking). Its first look stays
+        RETRY_EVERY past that reset (`_held`). None - ended at once - for a time picked, or where no reset is read."""
         _five, weekly = windows_of((reading or {}).get("windows"))
         reset = (weekly or {}).get("reset_at")
-        return reset + 2 * RETRY_EVERY if why == RESET and type(reset) is int and reset > now else None
+        return reset + WINDOW_SECONDS if why == RESET and type(reset) is int and reset > now else None
 
     def _skip(self, why, occurrence, reason, until=None) -> None:
         """An occasion ends with its word - or, for a passing reason or a reset's weekly or ceiling, stays open (`_held`)."""
@@ -792,13 +830,14 @@ class WindowAnchor:
             held["until"] = longer
         weekly = reason == "weekly" and longer is not None
         if weekly:
-            # M6: the weekly window is full until its reset - nothing to look at before it. The one look is a little past
-            # that reset (`_past_weekly` holds the occasion RETRY_EVERY beyond it), and the card says no "trying again
-            # every 5 minutes" meanwhile (`_show_retry`).
-            held["next"] = max(held["next"], longer - RETRY_EVERY)
+            # M6: the weekly window is full until its reset - nothing to look at before it. The first look is RETRY_EVERY
+            # past that reset (`_past_weekly` holds the occasion a window's length beyond it, A1), and the card says no
+            # "trying again every 5 minutes" meanwhile (`_show_retry`).
+            held["next"] = max(held["next"], longer - WINDOW_SECONDS + RETRY_EVERY)
         held["weekly"] = weekly
         if now >= held["until"]:
             return self._span_ended(occasion, now)
+        self._show_next()
         if weekly and not held.get("said_weekly"):
             held["said_weekly"] = True
             self._say("the weekly limit is reached; looking again once it resets, at %s"
@@ -833,6 +872,7 @@ class WindowAnchor:
 
     def _show_retry(self) -> None:
         """Its card's "trying again until": the stamp written only when it changes, and taken away when nothing is held open."""
+        self._show_next()
         untils = [held["until"] for held in self._held_open.values()
                   if held["until"] != float("inf") and not held.get("weekly")]
         until = int(max(untils)) if untils else None
@@ -843,6 +883,21 @@ class WindowAnchor:
             self._unstamp(OptionKey.ANCHOR_RETRY_UNTIL)
         else:
             self._stamp(OptionKey.ANCHOR_RETRY_UNTIL, until)
+
+    def _show_next(self) -> None:
+        """The next look of an occasion held open, stamped for wake_for_reset (v0.6.26, audit A3): the hold lives in this
+        process's memory, and a PC asleep at that look - a full weekly window's reset above all - is woken for it as for
+        the reset it waits for (engine/wake.py, `_anchor_due`). Written only when it changes; taken away when nothing is
+        held open."""
+        nexts = [held["next"] for held in self._held_open.values() if held["next"] != float("inf")]
+        found = int(min(nexts)) if nexts else None
+        if found == self._shown_next:
+            return
+        self._shown_next = found
+        if found is None:
+            self._unstamp(OptionKey.ANCHOR_NEXT_LOOK)
+        else:
+            self._stamp(OptionKey.ANCHOR_NEXT_LOOK, found)
 
     def _stamp(self, key, value):
         """Its stamp `key` kept (Scoped.stamp): True, False where it was not kept (not on), or None where the state could

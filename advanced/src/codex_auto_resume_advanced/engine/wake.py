@@ -141,17 +141,25 @@ class WakeForReset:
         return min(later) if later else None
 
     def _anchor_due(self, now):
-        """window_anchor's next occasion while it stands on (engine/anchor.next_due), or None: off, or unreadable."""
+        """window_anchor's next occasion while it stands on (engine/anchor.next_due), or None: off, or unreadable - and
+        (v0.6.26, audit A3) the next look of an occasion it holds open, a full weekly window's reset among them, which
+        the stamps of what is done alone do not show (ANCHOR_NEXT_LOOK): the earlier of the two still ahead."""
         scoped = self._scoped
         try:
             if scoped.armed(ANCHOR) is not True:
                 return None
             from .anchor import next_due
-            return next_due(scoped.options_of(ANCHOR), now, scoped.stamped_of(ANCHOR, OptionKey.ANCHOR_SLOT_DONE),
-                            scoped.stamped_of(ANCHOR, OptionKey.ANCHOR_SEEN_RESET),
-                            scoped.stamped_of(ANCHOR, OptionKey.ANCHOR_RESET_DONE))
+            found = [next_due(scoped.options_of(ANCHOR), now, scoped.stamped_of(ANCHOR, OptionKey.ANCHOR_SLOT_DONE),
+                              scoped.stamped_of(ANCHOR, OptionKey.ANCHOR_SEEN_RESET),
+                              scoped.stamped_of(ANCHOR, OptionKey.ANCHOR_RESET_DONE))]
         except Exception:
             return None
+        try:
+            found.append(scoped.stamped_of(ANCHOR, OptionKey.ANCHOR_NEXT_LOOK))
+        except Exception:
+            pass
+        ahead = [at for at in found if isinstance(at, (int, float)) and not isinstance(at, bool) and at > now]
+        return min(ahead) if ahead else None
 
     def lead(self) -> int:
         value = (self._scoped.options() or {}).get(OptionKey.WAKE_LEAD_MINUTES, DEFAULT_LEAD)
