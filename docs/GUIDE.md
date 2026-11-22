@@ -303,14 +303,15 @@ or advanced. Two editions side by side are not possible - one watcher per Codex 
 sign-in entry - so it always replaces the installation its window belongs to. It sends nothing to
 Codex, and nothing else offers it: not the watcher, not the panel inside Codex, not Codex's tools.
 
-When you press it, it asks GitHub for this repository's whole list of releases, up to five pages of
-thirty, and asks nothing before that. It shows every version from v0.6.2 on in each edition it was
+When you press it, it asks GitHub for this repository's whole list of releases, up to twenty pages of
+thirty - it stops at the first page that is short or that reaches below v0.6.2, and the whole reading has
+400 seconds - and asks nothing before that. It shows every version from v0.6.2 on in each edition it was
 published in, newest first; the advanced edition begins with v0.6.11-alpha. A version it cannot install
 stays in the list, greyed, and says why: it is the version you have; no archive of that edition was
 published under that number; there is no checksum to check it against; its installer predates editions,
 so the edition has to be changed first; or your administrator's policy is set and that version does
-not keep it ([below](#settings-an-administrator-manages)). If GitHub cannot be asked, or its answer
-cannot be read, it says so and lists nothing. Versions before v0.6.2 are not offered: from v0.6.0 and
+not keep it ([below](#settings-an-administrator-manages)). If GitHub cannot be asked, its answer
+cannot be read, or the list goes on past the twentieth page, it says so and lists nothing. Versions before v0.6.2 are not offered: from v0.6.0 and
 v0.6.1 the Dashboard cannot check a download, and v0.5 installers do not keep a paused recovery paused,
 so from them the Dashboard could not bring you back.
 
@@ -1868,7 +1869,7 @@ to wherever your other Git marketplaces are hosted:
   release is newest, with one `HEAD` request that reads no page. From v0.6.11 it then reads
   GitHub's list of this repository's ten newest releases from api.github.com, with one `GET` that
   carries nothing about your machine, for a newer pre-release, which it only offers. *Install another
-  version...* on the same page reads that list too, all of it, with up to five `GET` requests of thirty
+  version...* on the same page reads that list too, all of it, with up to twenty `GET` requests of thirty
   releases each to one more api.github.com address, when you press it and again when you confirm a
   version; then it downloads only the archive you confirmed, and its `.sha256` where no digest is pinned.
   Whether an administrator's policy is set it reads from this PC's registry, and sends nowhere. From v0.6.5, *Refresh

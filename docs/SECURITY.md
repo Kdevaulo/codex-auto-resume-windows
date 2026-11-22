@@ -210,9 +210,10 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   *Install another version...* on the same page is the bootstrap too (`-Versions`, then `-Pick`),
   started by the window only when a person presses the button and again when they confirm a row;
   building its dialog starts nothing, so the window audit never asks GitHub. It reads the whole list
-  of releases from a second api.github.com address on the same path - thirty to a page, at most five
-  pages, the page number the one thing put in, each page under the same size, redirect and host
-  checks and a deadline inside one budget - and any page that fails lists nothing, as does a fifth
+  of releases from a second api.github.com address on the same path - thirty to a page, at most twenty
+  pages, ending at the first page that is short or that reaches below v0.6.2, the page number the one
+  thing put in, each page under the same size, redirect and host checks and a deadline of 20 seconds
+  inside one budget of 400 seconds - and any page that fails lists nothing, as does a twentieth
   page as full as the rest, which more may follow. A picked version
   never reaches a URL as typed: it is rebuilt from its integers by the version rule, the row must
   still be offered exactly as it was shown when the list is read again, and `-Force` is required for

@@ -50,7 +50,7 @@ footnote. There are four kinds, and they are genuinely different:
   nothing else in the answer.
 
   *Install another version...*, on the same page, reads that list as well, all of it, because it
-  shows every version you may pick: up to five HTTPS `GET` requests, without signing in, to
+  shows every version you may pick: up to twenty HTTPS `GET` requests, without signing in, to
   `api.github.com/repos/songyb111-gachon/codex-auto-resume-windows/releases?per_page=30&page={page}`,
   where only the page number changes, with no redirect followed. It reads them when you press the
   button and once more when you confirm a version, and at no other time; a page that cannot be read
@@ -117,7 +117,7 @@ The sections below take each in turn.
 
 Nothing, beyond the aggregate download count GitHub shows for every release (see
 [Installing it](#installing-it)) and, if you press *Check for updates* or *Refresh
-compatibility data*, up to three more anonymous requests to public GitHub addresses and, for *Install another version...*, up to five reads of the list of releases each time it is read (when you open it and again when you confirm), then the download you confirmed. There is no
+compatibility data*, up to three more anonymous requests to public GitHub addresses and, for *Install another version...*, up to twenty reads of the list of releases each time it is read (when you open it and again when you confirm), then the download you confirmed. There is no
 telemetry, no analytics, no crash reporting, no opt-in reporting, no automatic update check and
 no automatic compatibility refresh — no endpoint of any kind exists to
 receive them, because no collection service is operated for this project. Local statistics
