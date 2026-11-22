@@ -53,11 +53,12 @@ def _guard_kernel(module) -> None:
         return
 
     @functools.wraps(listed)
-    def guarded(names):
-        names = tuple(names)
+    def guarded(names, families=()):
+        names, families = tuple(names), tuple(families)
         if _state["real"] <= 0:
-            names = tuple(name for name in names if str(name).casefold() not in HIDDEN)
-        return listed(names)
+            # v0.6.26: and no process of the Codex app's package found by its family, whatever it is called.
+            names, families = tuple(name for name in names if str(name).casefold() not in HIDDEN), ()
+        return listed(names, families)
 
     setattr(guarded, MARK, True)
     module.processes_named = guarded
