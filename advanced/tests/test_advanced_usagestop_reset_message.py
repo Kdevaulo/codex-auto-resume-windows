@@ -21,6 +21,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from codex_auto_resume.domain import ids  # noqa: E402
 from codex_auto_resume_advanced.registry import RESET_MESSAGE, USAGE_METER  # noqa: E402
 from test_advanced_usagestop import StopCase  # noqa: E402
 from test_engine import T1  # noqa: E402
@@ -59,6 +60,11 @@ class MessageInstead(StopCase):
         (row,) = plug.runtime.state.continuations(capability=self.cap, pending=None)
         return row["reason"]
 
+    def carried(self):
+        """v0.6.26 (review V1): the one start after the reset, carrying the person's words and their message's marker -
+        never the continuation's, and nothing through core's queue, which the stop paused."""
+        return [(T1, "my own words\n\n" + ids.short_marker(RECORD))]
+
     def test_a_message_due_at_this_reset_goes_instead(self):
         """Fails with R2 open: the continuation is started as well, and Codex gets both."""
         plug, turn = self.stopped()
@@ -66,7 +72,8 @@ class MessageInstead(StopCase):
         self.rule(plug, state="ready", due_at=self.reset + 60)
         for _ in range(3):
             self.h.tick(advance=61)
-        self.assertEqual(self.starts, [])
+        self.assertEqual(self.starts, self.carried())
+        self.assertEqual(self.h.backend.send_calls, [])
         self.assertEqual(self.outcome(plug), "superseded")
         self.assertIn("pause.message_instead", self.journal(plug))
 
@@ -80,16 +87,16 @@ class MessageInstead(StopCase):
         self.assertEqual(self.outcome(plug), "superseded")
 
     def test_a_message_counting_for_this_reset_goes_instead(self):
-        """Its reset not counted yet when the stop's look comes: the message's occasion is still this reset. A guard in
-        this harness (it passes with R2 open: the simulated home starts a turn for the message core sends, which the
-        app's paused queue would not)."""
+        """Its reset not counted yet when the stop's look comes: the message's occasion is still this reset, and the
+        stop's turn carries it once its window has closed (v0.6.26, review V1)."""
         plug, turn = self.stopped()
         self.rule(plug, base=0)
         self.window(plug)
         self.after_reset(plug, turn)
         for _ in range(3):
             self.h.tick(advance=61)
-        self.assertEqual(self.starts, [])
+        self.assertEqual(self.starts, self.carried())
+        self.assertEqual(self.h.backend.send_calls, [])
 
     def test_a_message_for_a_later_reset_leaves_the_continuation(self):
         """A guard: a message for the third reset from now takes nothing of this one (passes with R2 open)."""

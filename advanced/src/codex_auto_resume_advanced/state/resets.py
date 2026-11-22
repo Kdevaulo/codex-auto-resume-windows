@@ -407,6 +407,54 @@ class ResetsMixin:
                                    (RecordState.WAITING, key, RecordState.IN_FLIGHT))
             return len(keys)
 
+    # ------------------------------------------------------------------ a message the forced stop's turn carries
+    def carry_message(self, rule_id, at=None) -> bool:
+        """v0.6.26 (review V1): the launch of a message that usage_pause's turn after the reset carries in place of its
+        continuation (engine/usagestop.py) - its record in flight, claimed, and its rule launching, in one transaction.
+        Written inside core's errand guard just before the one request that cannot be taken back, as the one send's
+        launch guard writes its launch (ledger.py): a Cancel is refused from here (being_sent), and a restart finds it
+        sent by its launch and never sends it again. Only a message due, waiting, with its words and no launch. Whether
+        it was."""
+        now = self._now(at)
+        with self._transaction(create=False) as connection:
+            if connection is None:
+                return False
+            row = connection.execute(
+                "SELECT r.record_id FROM reset_rules r JOIN records c ON c.record_id = r.record_id WHERE r.rule_id=? "
+                "AND r.capability=? AND r.state=? AND r.launching_at IS NULL AND r.sent_at IS NULL "
+                "AND r.words IS NOT NULL AND c.state=?",
+                (rule_id if type(rule_id) is int else -1, MESSAGE, RuleState.READY, RecordState.WAITING)).fetchone()
+            if row is None:
+                return False
+            connection.execute("UPDATE records SET state=?, claimed_at=?, claims=claims+1 WHERE record_id=? AND state=?",
+                               (RecordState.IN_FLIGHT, now, row["record_id"], RecordState.WAITING))
+            connection.execute("UPDATE reset_rules SET launching_at=? WHERE rule_id=?", (now, rule_id))
+            return True
+
+    def carried_message(self, rule_id, started, at=None) -> bool:
+        """What came of that launch (`carry_message`): `started` - the turn started, or may have - its words gone and
+        it sent at its launch, in flight for core to watch from here (its marker in Codex's history is it delivered,
+        engine/plugrecords.py); not started - the app answered no - its record waiting again with its words, its
+        launch undone. Whether it was written."""
+        now = self._now(at)
+        with self._transaction(create=False) as connection:
+            if connection is None:
+                return False
+            row = connection.execute(
+                "SELECT r.record_id FROM reset_rules r JOIN records c ON c.record_id = r.record_id WHERE r.rule_id=? "
+                "AND r.capability=? AND r.state=? AND r.launching_at IS NOT NULL AND c.state=?",
+                (rule_id if type(rule_id) is int else -1, MESSAGE, RuleState.READY, RecordState.IN_FLIGHT)).fetchone()
+            if row is None:
+                return False
+            if started:
+                connection.execute("UPDATE reset_rules SET words=NULL, sent_at=coalesce(sent_at, launching_at, ?) "
+                                   "WHERE rule_id=?", (now, rule_id))
+            else:
+                connection.execute("UPDATE records SET state=?, finished_at=NULL WHERE record_id=? AND state=?",
+                                   (RecordState.WAITING, row["record_id"], RecordState.IN_FLIGHT))
+                connection.execute("UPDATE reset_rules SET launching_at=NULL WHERE rule_id=?", (rule_id,))
+            return True
+
     def messages_in_flight(self) -> list:
         """Every message whose record is in flight, whatever its capability stands at now: core watches each to
         its end (runtime.records)."""
@@ -545,7 +593,21 @@ class ResetsHandle:
             "finish_credit_spend": writing(state.finish_credit_spend),
             "retry_credit_spend": writing(state.retry_credit_spend),
             "drop_credit_spend": writing(state.drop_credit_spend),
+            # v0.6.26 (review V1): a person's reset message that usage_pause's turn after the reset carries in place of
+            # its continuation - the launch, then what came of it, counted in reset_message's own words as core's send
+            # of it is (runtime._record_moved).
+            "carry_message": writing(state.carry_message),
+            "carried_message": writing(lambda rule_id, started: carried(rule_id, started)),
         }
+
+        def carried(rule_id, started):
+            done = state.carried_message(rule_id, started)
+            if done and started:
+                try:
+                    state.counted(MESSAGE, "sent")
+                except StateError:
+                    pass
+            return done
 
     def __getattr__(self, name):
         calls = object.__getattribute__(self, "_calls")
