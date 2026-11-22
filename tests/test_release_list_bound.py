@@ -45,7 +45,7 @@ class BoundTests(unittest.TestCase):
     @unittest.skipIf(languages.generated_ko_branch(), "the generated ko branch's SECURITY.md is the Korean one")
     def test_a_person_reads_the_same_number(self):
         security = (ROOT / "docs" / "SECURITY.md").read_text(encoding="utf-8")
-        self.assertIn("is over 8 MiB, is not a list", security)
+        self.assertIn("is over 32 MiB, is not a list", security)
 
 
 if __name__ == "__main__":
