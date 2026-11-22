@@ -57,12 +57,14 @@ USAGE_BROKEN_REASONS = frozenset({"usage_probe_broken_answer", "usage_probe_brok
 
 
 # v0.6.26 (proposal 7): which way a usage read broke, by what the helper last met (codex/appserver.py RESULTS): Codex
-# answered for another home or system, or with a usage answer this version does not read; refused the request; or did
-# not answer at all.
+# answered for another home or system, or with a usage answer this version does not read; refused the request as a
+# method it does not know; or did not answer at all. Codex refusing a method it knows for now - a signed-out account,
+# its backend failing (appserver.REFUSED, review K2) - is none of these: the record waits usage_unknown, as it always
+# did, and rule (d) does not count it toward "Codex changed".
 _USAGE_BROKEN = {"protocol_home_mismatch": "usage_probe_broken_answer",
                  "protocol_platform_mismatch": "usage_probe_broken_answer",
                  "protocol_reply_unknown": "usage_probe_broken_answer",
-                 "protocol_request_failed": "usage_probe_broken_request",
+                 "protocol_method_unknown": "usage_probe_broken_request",
                  "protocol_unavailable": "usage_probe_broken_start",
                  "protocol_timeout": "usage_probe_broken_start"}
 USAGE_METHOD = "account/rateLimits/read"
