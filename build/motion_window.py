@@ -147,9 +147,12 @@ def frame_state(frame: motion_plan.Frame, index: int, light_step: int = 0, clock
     the window's own clock has gone on from the pinned moment (motion_plan.clock_at), which every countdown and age it
     shows is read at (WindowRender.RenderClock). While the status light sweeps (v0.6.24), also `sweep`: how far into it the
 frame is, in ms (motion_plan.sweep_ms) - the sweep and the line under the headline drawn at that moment
-(WindowRender.RenderSweep)."""
+(WindowRender.RenderSweep). v0.6.26 (audit-apng M6): and `moment`, the frame's own moment on the picture's clock, in ms,
+which every glide of the window is drawn at (Transition.RenderMs): a hover, a press, the current tab, the busy look, the
+light's colour, each from the frame it began at."""
     state = motion_plan.thawed(frame.window)
     state["index"] = index
+    state["moment"] = frame.t
     # The light's sweep (v0.6.24) as how far into it the frame is, in ms; gone once it is over.
     state.pop("sweep", None)
     swept = motion_plan.sweep_ms(frame)

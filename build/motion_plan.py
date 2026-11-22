@@ -59,9 +59,11 @@ v0.6.26 (audit-apng M3-M7): what opens and closes on its own timer - the row men
 frame every FADE_STEP ms of its fade (`opening_moments`, `closing_moments`), each told how far into it it is
 (`appear_ms`, `close_ms`), the plan's hold after it shortened by nothing: the fade is in the picture's time. An
 action's answer (`answered`: "retry-now") is a state the window takes as it takes the reply, its note and all. A glide
-of a control's face - hover, press, the current tab, busy, the light's colour on Pause, the setup bar - is drawn
-arrived: the window's Transition runs on the wall clock, which a picture's frame has no moment of (the owner's to
-decide whether a render clock for it is worth having).
+of a control's face - hover, press, the current tab, busy, the light's colour on Pause, the setup bar and its closing
+fill - is drawn at each frame's moment (v0.6.26, audit-apng M6): every frame tells the window its moment on the
+picture's clock (motion_window.frame_state's `moment`), a control's change begins its glide at the frame it comes in,
+and every frame after draws it there (Transition.RenderMs, the setup bar's InstallerBar.RenderAt) - the frames the
+lights already add every `light_step_ms` show it on its way.
 
 A target is a name the window answers with bounds (`page.<name>`, `section.<name>`, `save`, `setting.<field>`,
 `row.<value>` in an open drop list, `task.<n>` - the Pending list's row n - `menu.<n>` - item n of the open row

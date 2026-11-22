@@ -1646,6 +1646,23 @@ namespace CodexAutoResume
         /// (SettingsForm.WatchForStill). Counted on the window's own thread, where every one runs.
         internal static int Moving;
 
+        /// v0.6.26 (audit-apng M6): the clock every transition runs on. Live (-1) - what every window a person opens has, and
+        /// never set by the product itself - is the wall clock: each glide its own Stopwatch and timer, as ever. Only a
+        /// picture's frames set it (gui/WindowRender.cs, build/motion/InstallerRender.cs), as HaloDot.StillSweepMs is set for
+        /// the sweep: the frame's moment on the picture's clock, in ms, so a glide begun at one frame's moment is drawn at
+        /// each later frame's, from where it was to where it goes on brand's curve - no timer, nothing counted as Moving, the
+        /// same picture on any machine. Arrived (-2): a frame being set up as it already stands (a window opened again for
+        /// a picture), where every change is there at once.
+        internal static double RenderMs = Live;
+        internal const double Live = -1, Arrived = -2;
+
+        // The picture's moment this glide began at, or -1: on the wall clock, or not on its way.
+        private double renderStart = -1;
+
+        // Under a picture's clock: how far it is on its way, in ms, and whether it is.
+        private double RenderElapsed { get { return RenderMs >= 0 && renderStart >= 0 ? Math.Max(0.0, RenderMs - renderStart) : length; } }
+        private bool RenderRunning { get { return renderStart >= 0 && RenderMs >= 0 && RenderMs - renderStart < length; } }
+
         private void Run()
         {
             if (timer.Enabled) return;
@@ -1673,6 +1690,7 @@ namespace CodexAutoResume
         {
             get
             {
+                if (RenderMs != Live) return RenderAt();
                 if (!timer.Enabled) return to;
                 double t = clock.Elapsed.TotalMilliseconds / Math.Max(1, length);
                 return t >= 1.0 ? to : from + (to - from) * Motion.Ease(t);
@@ -1680,13 +1698,21 @@ namespace CodexAutoResume
         }
 
         /// How long it has been on its way, in milliseconds.
-        internal double ElapsedMs { get { return clock.Elapsed.TotalMilliseconds; } }
+        internal double ElapsedMs { get { return RenderMs != Live ? RenderElapsed : clock.Elapsed.TotalMilliseconds; } }
+
+        // Where it is at the picture's moment: from where it was when it began, eased, and where it goes once over.
+        private double RenderAt()
+        {
+            if (!RenderRunning) return to;
+            double t = RenderElapsed / Math.Max(1, length);
+            return t >= 1.0 ? to : from + (to - from) * Motion.Ease(t);
+        }
 
         /// Where it is going.
         internal double Target { get { return to; } }
 
-        /// Whether it is on its way; its timer runs only then.
-        internal bool Running { get { return timer.Enabled; } }
+        /// Whether it is on its way; its timer runs only then (under a picture's clock, no timer: until its moment is over).
+        internal bool Running { get { return RenderMs != Live ? RenderRunning : timer.Enabled; } }
 
         /// Sends it to `target`: gliding there from wherever it is when `animate`, there at once otherwise.
         internal void To(double target, bool animate)
@@ -1697,6 +1723,7 @@ namespace CodexAutoResume
         /// The same, in `milliseconds` rather than brand's transition.
         internal void To(double target, bool animate, int milliseconds)
         {
+            if (RenderMs != Live) { RenderTo(target, animate, milliseconds); return; }
             double now = Value;
             to = target;
             length = milliseconds;
@@ -1714,11 +1741,33 @@ namespace CodexAutoResume
             Repaint();
         }
 
+        // The same under a picture's clock: begun at the frame's moment, never a timer - at once where it was not to glide,
+        // or where the frame is set up arrived.
+        private void RenderTo(double target, bool animate, int milliseconds)
+        {
+            double now = Value;
+            Halt();
+            to = target;
+            length = milliseconds;
+            if (!animate || now == target || RenderMs < 0)
+            {
+                from = target;
+                renderStart = -1;
+            }
+            else
+            {
+                from = now;
+                renderStart = RenderMs;
+            }
+            Repaint();
+        }
+
         /// Stands it at `value` without a repaint: where a glide that is about to start starts from.
         internal void Jump(double value)
         {
             Halt();
             from = to = value;
+            renderStart = -1;
         }
 
         private void Tick()
