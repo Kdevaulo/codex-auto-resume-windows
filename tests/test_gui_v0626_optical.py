@@ -4,6 +4,12 @@ the owner, 2026-11-22: "제안대로 모두 고침" - every place fixed as the r
 D7. The chart in "How recoveries ended" kept the unscaled default 3 px Margin that Facts was cured of: it stood 2-3 px in
 from its card's heading. Now it has none, and starts in the heading's column.
 
+D8. The Overview's two stacked fact tables (Right now, Last 7 days) put their values at different x - 9 px apart in
+English, 55 in German. Now they keep one value column, the wider (SettingsForm.OneLabelColumn).
+
+Of the places the audit named, the owner kept these two from real renders before and after (2026-11-23); the others keep
+v0.6.25's looks, and their tests went with them.
+
 The window is compiled from the shipped sources and laid out by its own layout audit (SettingsForm.LayoutAudit), never
 shown; what is held is where the audit wrote everything down (AuditedGeometry). GUI test module: run on its own, through
 gui_lock.sh.
@@ -118,6 +124,20 @@ class LayoutTests(unittest.TestCase):
                                and line[0] != path]
                     self.assertTrue(heading, "the chart's card has its heading beside it")
                     self.assertEqual(bounds[0], min(line[1][0] for line in heading), heading)
+
+    def test_the_overview_s_left_column_keeps_one_value_column(self):
+        for locale, scale, laid in self.each():
+            with self.subTest(locale=locale, scale=scale):
+                page = laid["overview"]
+                values = {}
+                for path, (x, _y, _w, _h), _margin, _padding in page:
+                    match = re.search(r"/(\d+):SoftCard/1:SoftStack/(\d+):\w+$", path)
+                    if match and int(match[2]) % 2 == 1:
+                        values.setdefault(int(match[1]), set()).add(x)
+                self.assertIn(0, values, "Right now's facts")
+                self.assertIn(2, values, "Last 7 days' facts")
+                self.assertEqual(len(values[0]), 1)
+                self.assertEqual(values[0], values[2], "one value column for the two tables")
 
 
 if __name__ == "__main__":
