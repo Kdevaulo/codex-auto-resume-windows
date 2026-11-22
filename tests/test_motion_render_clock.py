@@ -21,6 +21,7 @@ import motion_window  # noqa: E402
 
 OVERVIEW = {"locale": "en", "page": "overview", "light": 0}
 PENDING = {"locale": "en", "page": "pending", "light": 0, "selected": {"pending": 0}}
+TIMELINE = {"kind": "timeline"}
 
 
 class FrameMomentTests(unittest.TestCase):
@@ -48,6 +49,13 @@ class RenderClockTests(unittest.TestCase):
         dict(OVERVIEW, moment=4500, variant="paused"),                             # 11 the call answered: paused
         dict(OVERVIEW, moment=4580, variant="paused"),                             # 12 half way back from the busy look
         dict(OVERVIEW, moment=4900, variant="paused"),                             # 13 arrived
+        dict(PENDING, moment=6000),                                                # 14 Pending again
+        dict(PENDING, moment=6500),                                                # 15 at rest
+        dict(PENDING, moment=7000, dialog=TIMELINE),                               # 16 the Timeline at rest
+        dict(PENDING, dialog=TIMELINE),                                            # 17 the same on the wall clock
+        dict(PENDING, moment=7500, dialog=TIMELINE, hover="dialog.close"),         # 18 onto its Close
+        dict(PENDING, moment=7580, dialog=TIMELINE, hover="dialog.close"),         # 19 half way
+        dict(PENDING, moment=7900, dialog=TIMELINE, hover="dialog.close"),         # 20 arrived
     ]
 
     @classmethod
@@ -58,7 +66,7 @@ class RenderClockTests(unittest.TestCase):
         job = {"out": str(work / "out"), "theme": "light", "design": "soft",
                "forms": {"en": {"answers": motion_window.answers("en")},
                          "en-paused": {"answers": motion_window.answers("en", paused=True)}},
-               "targets": ["page.pending", "pending.retry", "overview.toggle"],
+               "targets": ["page.pending", "pending.retry", "overview.toggle", "dialog.close"],
                "frames": [dict(frame, index=index) for index, frame in enumerate(cls.FRAMES)]}
         cls.result = motion_window.render(exe, job, work)
         cls.pictures = list(motion_window.pictures(cls.result, work / "out"))
@@ -101,6 +109,12 @@ class RenderClockTests(unittest.TestCase):
 
     def test_a_paused_window_opened_again_glides_out_of_the_call_in_flight(self):
         self.half_way(12, 11, 13, "overview.toggle")
+
+    def test_a_dialog_built_for_each_frame_is_drawn_at_rest(self):
+        self.assertEqual(self.pictures[16][1], self.pictures[17][1], "the Timeline at its frame's moment is the one at rest")
+
+    def test_the_dialog_s_close_glides_from_the_frame_the_pointer_came_onto_it(self):
+        self.half_way(19, 18, 20, "dialog.close")
 
 
 if __name__ == "__main__":

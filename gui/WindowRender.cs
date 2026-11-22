@@ -156,12 +156,10 @@ namespace CodexAutoResume
                 ParseArguments(arguments.ToArray());
                 var forms = Map(job, "forms") ?? new Dictionary<string, object>();
                 var targets = Items(job, "targets") ?? new List<object>();
-                // v0.6.26 (audit-apng M6): a job whose frames carry their moment draws every glide on the picture's clock,
-                // as a person with Windows' animation effects on sees it (the default), whatever this machine says - so the
-                // picture is the same on any machine. A job without one (the stills, the fidelity check) is as before.
+                // v0.6.26 (audit-apng M6): a job whose frames carry their moment draws every glide on the picture's clock
+                // (Transition.RenderMs, set for each frame below); a job without one (the stills, the fidelity check) is as before.
                 Dictionary<string, object> before = null;
                 string beforeLocale = null;
-                if (Clocked(Items(job, "frames"))) Soft.WindowsAnimates = delegate { return true; };
                 foreach (object item in Items(job, "frames") ?? new List<object>())
                 {
                     var frame = item as Dictionary<string, object>;
@@ -231,18 +229,6 @@ namespace CodexAutoResume
                 lock (RenderMisses) writer.Finish(RenderMisses);
             }
             return writer.Error == null ? 0 : 2;
-        }
-
-        /// v0.6.26 (audit-apng M6): whether the job's frames carry their moment on the picture's clock (`moment`).
-        private static bool Clocked(List<object> frames)
-        {
-            if (frames == null) return false;
-            foreach (object item in frames)
-            {
-                var frame = item as Dictionary<string, object>;
-                if (frame != null && frame.ContainsKey("moment")) return true;
-            }
-            return false;
         }
 
         /// v0.6.26 (audit-apng M6): the frame before, as a window opened again is put in it: its state without the answer it
@@ -1273,6 +1259,11 @@ namespace CodexAutoResume
             renderCloseOver = !over ? -1 : renderCloseOver >= 0 ? renderCloseOver : clocked ? moment : -1;
             renderCloseDown = !down ? -1 : renderCloseDown >= 0 ? renderCloseDown : clocked ? moment : -1;
             if (!over) return;
+            // Painted once at rest first, as it has been on the screen before the pointer came: a glide starts only from a
+            // look it has shown (SoftSurfaceGlide), and a dialog built anew has shown none.
+            if (clocked && close.Width > 0 && close.Height > 0)
+                using (var seen = new Bitmap(close.Width, close.Height, PixelFormat.Format32bppArgb))
+                    close.DrawToBitmap(seen, new Rectangle(Point.Empty, close.Size));
             try
             {
                 if (clocked) Transition.RenderMs = renderCloseOver;
