@@ -483,14 +483,29 @@ namespace CodexAutoResume
         // Whether the last frame had an action in flight (RenderBusy).
         private bool renderBusy;
 
+        // v0.6.26 (review P2): the picture's moment the call in flight began at, while its first moments are held, or -1.
+        private double renderBusyAt = -1;
+
         /// The window's own count of an action in flight, raised or let go as the frame says: SetBusy, which waits on
         /// nothing - what a Retry now, a Pause or a Rescan raises for as long as the bridge's call lasts.
+        /// v0.6.26 (review P2): on the picture's clock its first moments are held as the product holds them (BusyHold): the
+        /// buttons keep their look for BusyHold.Milliseconds from the frame the call began, then glide to it - from that
+        /// moment, whichever frame comes next - and a call that ends inside the hold shows nothing. Its timer never runs
+        /// here: the hold ends on the picture's clock (RenderHoldOver). Outside it (a still, a window set up as it stands) a
+        /// picture of a call in flight is of one that has lasted.
         private void RenderBusy(bool on)
         {
+            RenderHoldOver();
             if (on == renderBusy) return;
             renderBusy = on;
+            renderBusyAt = -1;
             SetBusy(on);
-            if (on) BusyHold.Lapse();       // a picture of a call in flight is of one that has lasted, not of its first 150 ms
+            if (on && Transition.RenderMs >= 0 && BusyHold.On)
+            {
+                renderBusyAt = Transition.RenderMs;
+                StopHoldTimer();
+            }
+            else if (on) BusyHold.Lapse();       // a picture of a call in flight is of one that has lasted, not of its first 150 ms
             // Every button's look has just begun to glide: on the picture's clock (v0.6.26, audit-apng M6) drawn at each
             // frame's moment from here, nothing counted as moving; on the wall clock a picture is of where it ends.
             var waited = Stopwatch.StartNew();
@@ -499,6 +514,32 @@ namespace CodexAutoResume
                 Application.DoEvents();
                 System.Threading.Thread.Sleep(5);
             }
+        }
+
+        /// v0.6.26 (review P2): the call's held first moments over, at their own moment on the picture's clock, once a frame
+        /// is at or past it: the buttons begin their glide to the busy look from there (BusyHold.Lapse, as its timer would).
+        private void RenderHoldOver()
+        {
+            double moment = Transition.RenderMs;
+            if (renderBusyAt < 0 || moment < 0) return;
+            double over = renderBusyAt + BusyHold.Milliseconds;
+            if (moment < over) return;
+            renderBusyAt = -1;
+            if (!BusyHold.On) return;
+            try
+            {
+                Transition.RenderMs = over;
+                BusyHold.Lapse();
+            }
+            finally { Transition.RenderMs = moment; }
+        }
+
+        // BusyHold's wall-clock timer stopped: on the picture's clock the hold ends at its moment, never at a real 150 ms.
+        private static void StopHoldTimer()
+        {
+            var field = typeof(BusyHold).GetField("timer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var timer = field == null ? null : field.GetValue(null) as Timer;
+            if (timer != null) timer.Stop();
         }
 
         // The action whose answer the last frame took (RenderAnswered), or null.
@@ -573,7 +614,9 @@ namespace CodexAutoResume
         /// v0.6.26 (audit-apng M5): the drop-down whose list the frame has open (not closing) in its open look, as OpenList
         /// leaves it - its edge a step darker (FaceWanted while Open) and its chevron turned up - and the one before in its
         /// closed look again. The list itself is drawn over the picture (RenderDropList); the drop-down is only told it has
-        /// one, never shown it.
+        /// one, never shown it. v0.6.26 (review P1): each by the drop-down's own change, as OpenList and CloseList make it -
+        /// its face's glide told (faceGlide.Changed) and its chevron sent round (chevron.To, Motion.Allowed) - so on the
+        /// picture's clock both glide over brand's transition from the frame the list opens or closes; outside it, at once.
         private void RenderComboOpen(Dictionary<string, object> listed)
         {
             SoftCombo wanted = null;
@@ -599,8 +642,17 @@ namespace CodexAutoResume
                 drop.SetValue(combo, null);
                 was.Dispose();
             }
-            var chevron = turn.GetValue(combo) as Transition;
-            if (chevron != null) chevron.Jump(open ? 1.0 : 0.0);
+            double clock = Transition.RenderMs;
+            if (clock == Transition.Live) Transition.RenderMs = Transition.Arrived;
+            try
+            {
+                var face = typeof(SoftCombo).GetField("faceGlide", own) == null ? null
+                         : typeof(SoftCombo).GetField("faceGlide", own).GetValue(combo) as SoftSurfaceGlide;
+                if (face != null) face.Changed();
+                var chevron = turn.GetValue(combo) as Transition;
+                if (chevron != null) chevron.To(open ? 1.0 : 0.0, Motion.Allowed(combo));
+            }
+            finally { Transition.RenderMs = clock; }
             combo.Invalidate();
         }
 

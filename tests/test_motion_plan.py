@@ -57,7 +57,8 @@ class ReadmePlanTests(unittest.TestCase):
             with self.subTest(name):
                 plan = motion_plan.load(make_motion.plan_path(name))
                 frames = motion_plan.expand(plan)
-                self.assertEqual(state(frames[-1]), {"page": "overview", "locale": second})
+                # v0.6.26 (review P3): the last click was Resume, and the pointer still rests on it: its hover stays.
+                self.assertEqual(state(frames[-1]), {"page": "overview", "locale": second, "hover": "overview.toggle"})
                 self.assertIn(("combo", (("interface_language", second),)),
                               [item for frame in frames for item in frame.window],
                               "the language is chosen in the drop list before Save")

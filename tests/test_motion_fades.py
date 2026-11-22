@@ -109,9 +109,16 @@ class DropDownTests(unittest.TestCase):
         opened = guiscan.member_body("SettingsForm", "ComboLooksOpen")
         self.assertIn('GetField("drop", own)', opened)
         self.assertIn('GetField("chevron", own)', opened)
-        self.assertIn("chevron.Jump(open ? 1.0 : 0.0)", opened)
+        # v0.6.26 (review P1): by the drop-down's own change, as OpenList and CloseList make it - its face's glide told and
+        # its chevron sent round - so a clocked motion draws both gliding (test_motion_render_clock), not a cut.
+        self.assertIn("face.Changed();", opened)
+        self.assertIn("chevron.To(open ? 1.0 : 0.0, Motion.Allowed(combo));", opened)
+        self.assertNotIn("chevron.Jump(", opened)
+        product = guiscan.read("gui/SoftCombo.cs")
+        self.assertIn("chevron.To(1.0, Motion.Allowed(this));", product)
+        self.assertIn("chevron.To(0.0, fade);", product)
         self.assertIn('RenderMs(listed, "close_ms") < 0', guiscan.member_body("SettingsForm", "RenderComboOpen"),
-                      "a closing list leaves the drop-down closed, as CloseList does at once")
+                      "a closing list starts the drop-down back to its closed look at once, as CloseList does")
         # v0.6.26 (audit-apng M6): the render face's hover is the control's own change, found in RenderHover.
         self.assertIn('type.GetField("faceHover", RenderOwn)', guiscan.member_body("SettingsForm", "RenderHover"))
         self.assertIn("RenderComboOpen(Map(frame, \"droplist\"));", guiscan.member_body("SettingsForm", "RenderState"))
