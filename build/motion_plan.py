@@ -20,7 +20,9 @@ is replaced by `values[name]`, so one storyboard serves both READMEs. Each step 
     {"set": {...}, "hold": ms}                     a cut: the window's state changes at once
     {"move": target, "frames": n, "step": ms}      the pointer travels to `target`, eased (brand.ease)
     {"hover": target, "frames": n, "step": ms}     the target shows its hover face
-    {"press": target, "frames": n, "step": ms}     ...its pressed face, and a ripple where the pointer is
+    {"press": target, "frames": n, "step": ms}     ...its pressed face, and a ripple where the pointer is; as it goes
+                                                   down a press on `tray.icon` takes the icon's hover card away and a
+                                                   press anywhere but on the popup closes it (v0.6.26)
     {"card": "enter" | "shown" | "leave", "frames": n, "step": ms}   ("shown": already at rest)
     {"wheel": notches, "frames": n, "step": ms}    the page scrolls as SoftPage glides it
     {"wheel": 1, "on": "explain", ...}             the same turn over Pending's Why it is waiting, which scrolls its
@@ -411,6 +413,13 @@ def _step(run, step):
         if kind == "pressed":
             _set_face(run, "pressed", target)
             run.ripple = (_frozen(run.resting()[1]), run.t)
+            # v0.6.26 (audit-apng M8): as the button goes down, not as it comes up. The icon's hover card goes at once on
+            # the icon's WM_LBUTTONDOWN (ui/tray/icon.py: _hide_tip, before NIN_SELECT opens the popup); the popup goes on
+            # a press anywhere but on itself, which takes the activation from it (ui/popup/messages.py: WA_INACTIVE).
+            if target == "tray.icon" and run.tip is not None:
+                _hide_tip(run)
+            if run.popup is not None and not (isinstance(target, str) and target.startswith("popup.")):
+                run.popup = None
         for index in range(count):
             run.emit(run.t + index * gap)
         run.t += count * gap
@@ -528,12 +537,9 @@ def _step(run, step):
             if run.popup is not None:
                 raise PlanError("%s: the popup is open already" % run.scene)
             if run.tip is not None:
-                # A click hides the icon's card at once as the popup comes (tray/clicks.py _select): the frames it was
-                # on screen for are told when that was, which is what its countdown reads against.
-                until = run.t
-                run.frames = [frame._replace(tip=_frozen(dict(dict(frame.tip), until=until))) if frame.tip else frame
-                              for frame in run.frames]
-                run.tip = None
+                # A click hides the icon's card at once as the popup comes (tray/clicks.py _select) - a press on the
+                # icon already has (the `press` step) - and the frames it was on screen for are told when.
+                _hide_tip(run)
             run.popup = {"opened": run.t, "off": [], "busy": [], "glides": {}}
         elif step["popup"] == "close":
             if run.popup is None:
@@ -567,6 +573,15 @@ def _step(run, step):
         run.t += count * gap
         return
     raise PlanError("%s: no step does %r" % (run.scene, step))
+
+
+def _hide_tip(run):
+    """The icon's hover card goes at once, now: the frames it was on screen for are told when (`until`), which is what its
+    countdown reads against."""
+    until = run.t
+    run.frames = [frame._replace(tip=_frozen(dict(dict(frame.tip), until=until))) if frame.tip else frame
+                  for frame in run.frames]
+    run.tip = None
 
 
 def _held_frames(run, step):

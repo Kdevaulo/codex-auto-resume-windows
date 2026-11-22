@@ -16,7 +16,9 @@ The popup is drawn as the product draws it (`ui/popup/renderer.py`), from the sa
 - Its countdowns are drawn again every second it is open (TIMER_TICK, 1000 ms): the picture's `ticks` since it was
   opened, one more second of the sample's clock each.
 - Nothing of the popup is drawn for a pointer over a switch or a row (the renderer's hover face is a button's only,
-  and a press has none on a switch), so the pointer is all a viewer sees of it.
+  and a press has none on a switch), so the pointer is all a viewer sees of it. A pointer over one of its two buttons
+  gives it its hover face, gliding there and back as the popup glides it (v0.6.26, audit-apng M8: `messages._face_glides`
+  - from what it showed, in `motion.face_length`, on brand's curve), even as it only passes over on its way to a switch.
 - A press on a row's switch only fades the switch (PopupModel.begin: busy) while the control layer's answer is
   awaited; the answer (PopupModel.apply_outcome) changes the row and the switch then glides, knob and track, in
   brand's transition time on its curve (`glide_amount`) - at the popup's own 33 ms frame timer.
@@ -63,6 +65,9 @@ class PopupFrames:
         self.pad = tray_popup.layers.still_pad(scale)
         self._views = {}
         self._held = None             # the view whose ground the renderer's canvas holds, or None
+        # The buttons' faces (v0.6.26): what each showed at the last frame, and each glide on its way - {target: (started
+        # ms, (fill, edge) it left from, length ms)}, as messages._face_glides keeps them.
+        self._face_states, self._faces = None, {}
         card = self.view((), (), 0)[1]["card"]
         self.shift = (self.pad - card[0], self.pad - card[1])
         self.size = (card[2] - card[0] + 2 * self.pad, card[3] - card[1] + 2 * self.pad)
@@ -119,11 +124,53 @@ class PopupFrames:
         elapsed = frame.t - dict(frame.popup)["opened"]
         return opening(elapsed, max(1, int(round(brand.SPACING["xs"] * self.scale))))
 
-    def drawn(self, frame, closed: bytes, light_at=None) -> bytes:
+    def hovered(self, point, below: int = 0):
+        """The target of the button under `point` (x, y in this picture's pixels, the popup `below` its place while it
+        rises), or None: what the popup's own hit test gives a WM_MOUSEMOVE there. Only a button has a hover face."""
+        if point is None:
+            return None
+        x, y = point[0] - self.shift[0], point[1] - self.shift[1] - below
+        for item in self.view()[1]["items"]:
+            if item["kind"] != "button":
+                continue
+            left, top, right, bottom = item["rect"]
+            if left <= x < right and top <= y < bottom:
+                return item["target"]
+        return None
+
+    def faces(self, plan, hover, now) -> dict:
+        """{target: ((fill, edge) it left from, how far on)} for the buttons part way to a new face at `now` (ms):
+        messages._face_glides on the picture's clock - one starts for each button whose state changed since the frame
+        before, from what it showed, in motion.face_length; a finished one is let go. None glides on the popup's first
+        frame."""
+        from codex_auto_resume.ui.popup.motion import face_amount, face_length, face_state, mixed
+        states = {item["target"]: (item, face_state(item, hover, None)) for item in plan["items"]
+                  if item["kind"] == "button"}
+        before = self._face_states or {}
+        self._face_states = {target: state for target, (_item, state) in states.items()}
+        shown = {}
+        for target, (item, state) in states.items():
+            face, was = self._faces.get(target), before.get(target, state)
+            if was != state:
+                colours = self.renderer.face_colours(item, was)
+                if face is not None:
+                    amount = face_amount(face, now)[0]
+                    colours = tuple(mixed(one, other, amount) for one, other in zip(face[1], colours))
+                face = (now, colours, face_length(was, state))
+            amount, done = face_amount(face, now) if face is not None else (1.0, True)
+            if done:
+                self._faces.pop(target, None)
+            else:
+                self._faces[target], shown[target] = face, (face[1], amount)
+        return shown
+
+    def drawn(self, frame, closed: bytes, light_at=None, pointer=None) -> bytes:
         """The RGBA picture (straight alpha) at `frame`: `closed`, a clear canvas, while no popup is open. Its light is
-        drawn at the frame's moment, or at `light_at` where that is given (the still's own: the first of its breath)."""
+        drawn at the frame's moment, or at `light_at` where that is given (the still's own: the first of its breath).
+        `pointer` is where the pointer stands, in this picture's pixels, for a button's hover face (`hovered`)."""
         if not frame.popup:
             self._held = None
+            self._face_states, self._faces = None, {}
             return closed
         state = dict(frame.popup)
         ticks = (frame.t - state["opened"]) // 1000
@@ -137,8 +184,10 @@ class PopupFrames:
                 gliding[("check", tasks[row - 1])] = amount
         moment = frame.t if light_at is None else light_at
         light = self.tray.halo(vm["light"], moment, moment, design=self.design)
-        if gliding:
-            self.renderer.draw(vm, plan, frame=light, glides=gliding)
+        hover = self.hovered(pointer, self.opening(frame)[1])
+        faces = self.faces(plan, hover, frame.t)
+        if gliding or hover is not None or faces:
+            self.renderer.draw(vm, plan, frame=light, glides=gliding, hover=hover, faces=faces)
             self._held = None
         elif self._held == key:
             self.renderer.draw_halo(plan, light)
