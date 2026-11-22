@@ -92,7 +92,11 @@ class RenderClockTests(unittest.TestCase):
         cls.folder = tempfile.TemporaryDirectory()
         work = Path(cls.folder.name)
         exe = motion_window.compile_window(work)
-        job = {"out": str(work / "out"), "theme": "light", "design": "soft",
+        import make_screenshots
+        # At the motions' own pinned scale (make_screenshots.PINNED_SCALE, 150 %, the face Segoe UI), as every motion is
+        # drawn: unpinned, the window took this machine's scale and text size, and on CI's 96-DPI runner the busy look's
+        # change over the toggle was half what it is at 150 % (run 45075067698).
+        job = {"out": str(work / "out"), "theme": "light", "design": "soft", "scale": make_screenshots.PINNED_SCALE,
                "forms": {"en": {"answers": motion_window.answers("en")},
                          "en-paused": {"answers": motion_window.answers("en", paused=True)}},
                "targets": ["page.pending", "pending.retry", "overview.toggle", "dialog.close", "setting.interface_language"],
@@ -121,6 +125,23 @@ class RenderClockTests(unittest.TestCase):
         self.assertTrue(min(low, high) + 0.2 < part < max(low, high) - 0.2,
                         "%s half way: %.2f, between %.2f and %.2f" % (name, part, low, high))
 
+    def darkest(self, index, box):
+        """The darkest channel of frame `index` over `box`: a button's words, whose ink is what its busy look glides."""
+        width = self.result["client"][0]
+        picture = self.pictures[index][1]
+        x, y, wide, tall = (int(value) for value in box)
+        return min(min(picture[(row * width + x) * 3:(row * width + x + wide) * 3]) for row in range(y, y + tall))
+
+    def ink_half_way(self, index, start, end, name):
+        """Frame `index`'s words over target `name` stand strictly between their ink in frames `start` and `end`: the busy
+        look's glide (SoftButton.Wanted: Ink to Muted) part way. Read by the words' ink, not by the box's mean, which the
+        button's lift - swapped at once at the change, a shadow cannot fade (SoftSurfaceGlide) - all but cancels."""
+        box = self.pictures[end][2][name]
+        part, low, high = self.darkest(index, box), self.darkest(start, box), self.darkest(end, box)
+        self.assertGreater(abs(high - low), 20, "%s's words change (%d to %d)" % (name, low, high))
+        self.assertTrue(min(low, high) + 2 < part < max(low, high) - 2,
+                        "%s's words half way: %d, between %d and %d" % (name, part, low, high))
+
     def test_every_frame_was_drawn_and_every_read_answered(self):
         self.assertEqual(self.result["notes"], [])
         self.assertEqual(self.result["misses"], [])
@@ -139,7 +160,7 @@ class RenderClockTests(unittest.TestCase):
         box = self.pictures[12][2]["overview.toggle"]
         self.assertEqual(self.level(9, box), self.level(8, box), "80 ms in: held")
         self.assertEqual(self.level(10, box), self.level(8, box), "140 ms in: still held")
-        self.half_way(11, 8, 12, "overview.toggle")
+        self.ink_half_way(11, 8, 12, "overview.toggle")
 
     def test_a_call_that_ends_inside_the_hold_shows_nothing(self):
         box = self.pictures[23][2]["pending.retry"]
@@ -147,7 +168,7 @@ class RenderClockTests(unittest.TestCase):
             self.assertEqual(self.level(index, box), self.level(23, box), "frame %d" % index)
 
     def test_a_paused_window_opened_again_glides_out_of_the_call_in_flight(self):
-        self.half_way(14, 13, 15, "overview.toggle")
+        self.ink_half_way(14, 13, 15, "overview.toggle")
 
     def test_a_dialog_built_for_each_frame_is_drawn_at_rest(self):
         self.assertEqual(self.pictures[18][1], self.pictures[19][1], "the Timeline at its frame's moment is the one at rest")
