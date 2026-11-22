@@ -527,6 +527,11 @@ def _recover(paths, store, codex_home, *, read_real=None, restart=None) -> str |
         found = read_real()
         now = identity(found)
         if isinstance(to_email, str) and now is not None and now == to_email.lower():
+            if target is not None:
+                # A2: what `_switch`'s own success writes - the card's account in use (the newest seen_at) and the
+                # candidates' tie-break (used_at) - for a switch settled here, an UNVERIFIED one read at a later look.
+                stamp = int(store._clock())
+                store.update(intent["to"], used_at=stamp, seen_at=stamp)
             store.mark_switched(to_email)
             return SWITCHED
         if step != BACK and not known(found) and put_in is not None and isinstance(intent.get("from"), str):

@@ -30,7 +30,7 @@ from codex_auto_resume.domain.plughands import Widening
 from .. import statement
 from ..codex import inuse, ipc
 from ..codex.turns import Turns, booted_of
-from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState
+from ..vocabulary import ContinuationKind, ContinuationReason, OptionKey, RecordState, RuleState
 from .continued import answer_key, words_pass
 from .usage import AFTER_RESET_KEY, EVERY_CONVERSATION, NOTICE_FOR, ON, WRAP_UP, UsagePause, _reset_since
 FINAL = frozenset({"completed", "failed", "interrupted"})
@@ -40,6 +40,13 @@ NOTICES_KEPT = 16
 # every tick, each of which may wait for the app's answers.
 BACKOFF_SECONDS = 300
 BACKOFF_MOST = 3600
+# v0.6.26 (audit-advanced2 R2, the owner's answer of 2026-11-22, "the reset message only"): a person's reset message for a
+# conversation this stopped, going at the very reset its continuation waits for, goes INSTEAD of that continuation - as
+# reset_message's statement promises ("in place of a continuation waiting there for the same reset"). Its code is
+# reset_message's (engine/resetmessage.py); MESSAGE_INSTEAD is this capability's journal word for a continuation it ended
+# so.
+RESET_MESSAGE = "reset_message"
+MESSAGE_INSTEAD = "message_instead"
 
 
 class _StopErrand:
@@ -215,6 +222,13 @@ class UsageStop(UsagePause):
             if not _reset_since(rows, row["chain"], row["created_at"], now):
                 continue
             thread = row["thread_id"]
+            instead = self._message_instead(row)
+            if instead is None:
+                continue                                                # not known now: nothing sent, asked next look
+            if instead:
+                handle.end(ContinuationReason.SUPERSEDED, thread_id=thread)          # the person's message goes (R2)
+                self._count(MESSAGE_INSTEAD)
+                continue
             try:
                 if view.thread_enabled(thread) is not True:
                     continue
@@ -249,6 +263,32 @@ class UsageStop(UsagePause):
                                                    now + min(BACKOFF_SECONDS * 2 ** failures, BACKOFF_MOST))
                 self._count("not_continued")
                 self._notice("not_continued", {"minutes": row["chain"], "reset_at": None, "bucket": "codex"})
+
+    def _message_instead(self, row):
+        """Whether a reset message of the person's own takes the place of continuation `row` at the reset it waits for
+        (R2): one of reset_message's rules for that conversation and that window that is due or being sent, fell due
+        after the stop, was sent since, or counts for this very reset still (its occasion the next reset of the window
+        it counts). None where the rules cannot be read: no continuation is sent on a guess that two may go."""
+        try:
+            rules = [rule for rule in self._scoped.resets.reset_rules(capability=RESET_MESSAGE, pending=None)
+                     if rule.get("thread_id") == row["thread_id"] and rule.get("minutes") == row["chain"]]
+            windows = self._scoped.resets.windows() if rules else {}
+        except Exception:
+            return None
+        since = row["created_at"]
+        for rule in rules:
+            state, due, sent = rule.get("state"), rule.get("due_at"), rule.get("sent_at")
+            if state in (RuleState.READY, RuleState.HELD) or rule.get("record_state") == RecordState.IN_FLIGHT:
+                if not isinstance(due, (int, float)) or due >= since:
+                    return True
+            elif state == RuleState.DONE and isinstance(sent, (int, float)) and sent >= since:
+                return True
+            elif state == RuleState.COUNTING and isinstance(rule.get("base"), int):
+                window = windows.get((rule.get("bucket"), rule.get("minutes")))
+                if (window is not None and isinstance(window.get("resets"), int)
+                        and window["resets"] + 1 >= rule["base"] + (rule.get("ordinal") or 0)):
+                    return True
+        return False
 
     # ---------------------------------------------------------------- the icon's notices
     def _notice(self, kind, window) -> None:
