@@ -55,7 +55,7 @@ class InstallerAsksForEnglishTests(unittest.TestCase):
         text = INSTALL.read_text(encoding="utf-8")
         start = text.index("function Invoke-Setup")
         body = text[start:text.index("\nfunction ", start + 10)]
-        relay = body.index("ForEach-Object { Write-Host")
+        relay = body.index("$setup @Arguments | ForEach-Object {")   # the one call whose lines are relayed (and kept)
         self.assertLess(body.index("$env:CODEX_AUTO_RESUME_SETUP_ENGLISH = '1'"), relay)
         self.assertIn("$env:CODEX_AUTO_RESUME_SETUP_ENGLISH = $null", body[relay:], "and for no other call")
 
