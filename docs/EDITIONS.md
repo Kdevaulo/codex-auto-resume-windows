@@ -1559,7 +1559,8 @@ that the window starts now and its reset is fixed five hours later: at the times
 default), right after a reset it has seen (**Start right after a reset**, a switch, on by default), or both. An
 idle window still reports a reset five hours ahead, so it reads usage twice, twenty seconds apart, and takes the
 window as idle only when it is at 0% and that reset moved forward with the clock. The request is
-`codex exec --skip-git-repo-check --ephemeral --json -s read-only -c model_reasoning_effort="low" "Reply with OK"`,
+`codex exec -c notify=[] --disable hooks --disable plugins --disable apps --skip-git-repo-check --ephemeral --json -s read-only -c model_reasoning_effort="low" "Reply with OK"`
+(and, where the Codex home's `config.toml` declares MCP servers, one more `-c` that turns each of them off),
 run with no window from an empty folder of its own, on the Codex the watcher drives and its home; only its exit
 code and its token counts are read, never what it printed. Then it reads usage again, and the reset it fixed is
 shown on its card (**Next reset fixed at ...**) and said in the watcher's log. At most one start a window; never
@@ -1574,7 +1575,10 @@ journal.
 **What it risks.** Each start uses a little of your usage: about 24,000 input tokens, half of them cached, and
 five output tokens - under 1% of the 5-hour window when measured - and the weekly window counts it too. A window
 started early also ends early: if you begin late in it, less of it is left. Codex may change how an idle window
-reports itself; then nothing is started, and the journal says why.
+reports itself; then nothing is started, and the journal says why. Since v0.6.24 the request starts none of your own
+programs: no MCP server, hook, plugin, app or `notify` program runs for it. Only where Codex refuses those
+switches is the plain request sent again as it was before v0.6.24, and then your programs do run for it - the
+watcher's log says so.
 
 **Departs from** [A1 and A2](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (a request beside the one send,
 through `codex exec`), [A13 and A26](STANDARDS.md#a-what-it-may-send-to-codex-and-when) (nothing failed, and its
@@ -1585,7 +1589,7 @@ recovery is due) and [F6](STANDARDS.md#f-footprint-on-the-machine) (`codex exec`
 starts).
 
 **Ceilings.** Five starts a day, one a window. **Measurement MANCHOR: passed** (`codex-cli 0.165.0-alpha.1.2`,
-2026-10-29): on an idle window the request fixed the reset five hours after it and left no conversation, rollout
+2026-10-29, and again with the switches that keep your programs out on `codex-cli 0.167.0-alpha.4.1`): on an idle window the request fixed the reset five hours after it and left no conversation, rollout
 or history line; a second request in the running window did not move the reset.
 
 ### Continue with no words
