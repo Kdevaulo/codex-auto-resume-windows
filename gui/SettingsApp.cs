@@ -1940,6 +1940,8 @@ namespace CodexAutoResume
             pillHint.Changed = delegate(bool moved)
             {
                 if (moved && versionPill.Parent == pillSlot) pillSlot.PerformLayout();
+                // v0.6.26 (audit D11): placed in whole pixels, drawn the rest of a pixel lower - it moves smoothly.
+                versionPill.Shift(versionPill.Parent == pillSlot ? pillHint.Offset : 0f);
                 versionPill.Invalidate();
             };
             Shown += delegate { FollowPillHint(); };

@@ -24,7 +24,12 @@ Now the veil follows the dialog's own fade step for step (DialogVeil.Fade from S
 D10. The veil took the owner's hard region, which holds only the pixels wholly the window's, so the anti-aliased pixels
 round its own corner stayed undimmed. Now the veil is drawn pixel by pixel at the owner's edge coverage
 (WindowCorner.EdgeNow): none outside the curve, part of it on the curve, all of it inside. Its probe shows an owner and a
-dialog off the screen, never activated. Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
+dialog off the screen, never activated.
+
+D11. The version pill's special-day nudge moved in whole device pixels (four places 90 ms apart at 100 %), and battery
+saver starting mid-nudge dropped it up to 3 px in one frame. Now the pill is placed in whole pixels (PillHint.Nudge, the
+lift rounded up) and draws its body, ring and words the rest of a pixel lower (Offset; VersionPill.Shift), and a nudge
+under way eases to rest before the pill holds (PillHint.Settling). Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
 and brings it back.
 
 The window is compiled from the shipped sources; its dialogs are made and asked, never shown. GUI test module: run on its
@@ -142,6 +147,47 @@ foreach ($text in 'Timeline', 'Install another version', $persian) {
         }
     }
 }
+
+# D11: the pill's lift in whole pixels and the rest drawn inside it; a pill drawn half a pixel lower.
+$hint = T 'PillHint'
+$rise = $hint.GetMethod('RiseOf', $static)
+$out.lifts = @()
+if ($rise) {
+    foreach ($ms in 6020, 6053, 6086, 6119, 6152, 6185, 6218, 6251, 6284) {
+        $lift = [double](S 'PillHint' 'NudgeAt' @([double]$ms)) * 1.5
+        $out.lifts += ,@($lift, [int]$rise.Invoke($null, [object[]]@($lift)), [double](S 'PillHint' 'OffsetOf' @($lift)))
+    }
+    $out.settling = @([bool](S 'PillHint' 'Settling' @($true, [double]1.5)), [bool](S 'PillHint' 'Settling' @($true, [double]0)),
+                      [bool](S 'PillHint' 'Settling' @($false, [double]2)))
+}
+$holder = New-Object Windows.Forms.Panel
+$holder.Size = New-Object Drawing.Size 120, 40
+$holder.BackColor = (T 'Palette').GetField('Canvas', $static).GetValue($null)
+$text = [Activator]::CreateInstance((T 'VersionLabel'), $true)
+$null = $text.GetType().GetMethod('Set', $instance).Invoke($text, [object[]]@('v0.6.26', $null))
+$pill = [Activator]::CreateInstance((T 'VersionPill'), $instance, $null, [object[]]@($text), $null)
+$pill.Padding = (T 'VersionPill').GetProperty('Inner', $static).GetValue($null, $null)
+$pill.SetBounds(10, 8, 80, 24)
+$holder.Controls.Add($pill)
+$null = $holder.Handle
+$holder.PerformLayout()
+function Drawn {
+    $bitmap = New-Object Drawing.Bitmap 120, 40
+    $holder.DrawToBitmap($bitmap, (New-Object Drawing.Rectangle 0, 0, 120, 40))
+    $rows = @()
+    foreach ($y in 6..34) { $c = $bitmap.GetPixel(50, $y); $rows += [int]($c.R + $c.G + $c.B) }
+    $bitmap.Dispose()
+    return ,$rows
+}
+$out.rest = Drawn
+$shift = $pill.GetType().GetMethod('Shift', $instance)
+$out.shifted = @()
+if ($shift) {
+    $null = $shift.Invoke($pill, [object[]]@([single]0.5))
+    $out.shifted = Drawn
+    $out.shifted_by = [double]$pill.GetType().GetProperty('Shifted', $instance).GetValue($pill, $null)
+}
+$holder.Dispose()
 
 # G4: a wait ended gives the cursor back at once; the pointer over none of ours (every window here is off the screen),
 # the arrow.
@@ -320,6 +366,14 @@ class SourceTests(unittest.TestCase):
         self.assertIn("Chrome.FirstInkColumn(drawn, Palette.Canvas, mirrored)", inset)
         self.assertNotIn("Chrome.InkColumns(", inset)
 
+    def test_the_pill_hint_lifts_by_the_exact_amount_and_settles_before_it_holds(self):
+        eggs = guiscan.type_body("PillHint")
+        self.assertIn("Set(still ? 0.0 : NudgeAt(ms) * Soft.PxF(1), still || settling ? ring : RingAt(ms));", eggs)
+        self.assertNotIn("(int)Math.Round(NudgeAt(ms)", eggs)
+        self.assertIn("bool settling = Settling(Motion.Ambient, lift);", eggs)
+        self.assertIn("versionPill.Shift(versionPill.Parent == pillSlot ? pillHint.Offset : 0f);",
+                      guiscan.member_body("SettingsForm", "BuildVersionPill"))
+
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
 class WindowTests(unittest.TestCase):
@@ -391,6 +445,27 @@ class WindowTests(unittest.TestCase):
         self.assertTrue(any(0 < value < 255 for value in cover), "part of each pixel on the curve: %r" % cover)
         self.assertEqual(cover[-1], 255)
         self.assertEqual((seen["middle"], seen["edge_middle"]), (255, 255))
+
+    def test_the_pill_stands_exactly_its_lift_up_at_every_frame(self):
+        lifts = self.answer["lifts"]
+        self.assertTrue(lifts, "PillHint.RiseOf")
+        self.assertGreater(len({round(lift, 3) for lift, _rise, _offset in lifts}), 5, "more places than whole pixels")
+        for lift, rise, offset in lifts:
+            self.assertAlmostEqual(rise - offset, lift, places=3)
+            self.assertTrue(0.0 <= offset < 1.0)
+        self.assertEqual(self.answer["settling"], [True, False, False])
+
+    def test_the_pill_draws_itself_the_rest_of_a_pixel_lower(self):
+        rest, shifted = self.answer["rest"], self.answer["shifted"]
+        self.assertTrue(shifted, "VersionPill.Shift")
+        self.assertAlmostEqual(self.answer["shifted_by"], 0.5, places=3)
+        self.assertNotEqual(rest, shifted, "the body and the words moved")
+        self.assertNotEqual(shifted[1:], rest[:-1], "not a whole pixel lower")
+        # Between where it was and a whole pixel lower, row by row (the sum of a pixel's red, green and blue).
+        for row in range(1, len(rest)):
+            with self.subTest(row=row):
+                low, high = sorted((rest[row - 1], rest[row]))
+                self.assertTrue(low - 40 <= shifted[row] <= high + 40, (rest[row - 1], rest[row], shifted[row]))
 
 
 if __name__ == "__main__":
