@@ -489,12 +489,15 @@ class WatchLoop:
             judge = self._judge = impossible.Judge()
         now = time.time()
         try:
-            missing = engine is None
+            # An engine not built because the settings file cannot be read (review K5; App.engine raises Unreadable
+            # while `_settings_good` is False) is no engine missing: that file has its own word, and the engine is not
+            # looked for until it can be read.
+            missing = engine is None and getattr(self, "_settings_good", True) is not False
             unreadable = getattr(engine, "detection_failed", None) is True
             # The process list is asked only where a detection rule is met: a tick that met none counts nothing.
             judge.tick(_app_runs() if missing or unreadable else False,
                        {"engine_missing": missing, "history_unreadable": unreadable})
-            if missing:
+            if engine is None:
                 judge.look(now, None, {})
             elif now - getattr(self, "_judged_at", 0.0) >= impossible.LOOK_EVERY_SECONDS or now < self._judged_at:
                 self._judged_at = now
