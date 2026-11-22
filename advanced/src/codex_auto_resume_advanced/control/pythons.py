@@ -79,6 +79,12 @@ RETURNED = "returned.json"
 INCOMING = ".incoming-"
 # A runtime renamed aside to be deleted (`_retire`): never a version's name, so no start can take what is left of it.
 GONE = ".gone-"
+# v0.6.26 (audit A8): a Use job's mark, `.busy-<version>`, written before its download and taken away when it ends: the
+# sweep of any other process - a watcher's start (`supervised`) while the Dashboard's bridge downloads - leaves that
+# version's package and folder alone while it stands. One older than BUSY_FOR is a job that ended without taking it away
+# (its process gone), and the sweep takes it: a download, its checks and the restart take far less.
+BUSY = ".busy-"
+BUSY_FOR = 3600
 NOTICE = "python_returned"
 MEMBER = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_+-]*(?:\.[A-Za-z0-9_+-]+)+", re.ASCII)
 RESERVED = frozenset({"con", "prn", "aux", "nul"} | {"com%d" % n for n in range(1, 10)} | {"lpt%d" % n for n in range(1, 10)})
@@ -335,7 +341,12 @@ def use(runtime, argument, *, start=None, hands=Hands) -> dict:
     _count(runtime, "asked")
 
     def work():
-        _end(home, _installed(runtime, offer, hands))
+        busy = _busy(home, version)
+        try:
+            _end(home, _installed(runtime, offer, hands))
+        finally:
+            if busy is not None:
+                _unlink(busy)
     if not _run(home, work, start, "python-use"):
         return _refused(Refusal.STATE_UNAVAILABLE)
     return {"done": True, "refusal": None}
@@ -399,11 +410,17 @@ def supervised(runtime, facts):
     """P13, for the launcher (scripts/watcher_launcher.py): PHASE_RUNTIME - USE_CHOSEN where the watcher is to run under the
     Python the record names, DEFER for the bundled one, a record no longer good being taken away here: on the line of a
     version this one no longer allows (after an update), or left by a capability that is off. PHASE_RUNTIME_FAILED - it
-    did not come up: the record taken away and a person told, once. With no record nothing is read at all."""
+    did not come up: the record taken away and a person told, once. With no record only the runtimes folder is listed, for
+    the sweep (A6)."""
     home = _home(runtime)
     phase = facts.get("phase")
     named = chosen_runtime.recorded(home)
     if named is None:
+        # v0.6.26 (audit A6): with no record - the capability turned off, or Back - a runtime an earlier sweep left whole
+        # because something still ran from it is deleted at the next start, the one moment no watcher runs from it; it
+        # never came back otherwise. A directory listing, and nothing where there is no runtimes folder.
+        if phase == PHASE_RUNTIME:
+            _sweep(home, None)
         return DEFER
     if phase == PHASE_RUNTIME_FAILED:
         _taken_back(runtime, named, WHY_START)
@@ -752,9 +769,40 @@ def _retire(folder) -> None:
     _remove(aside)
 
 
+def _busy(home, version):
+    """The Use job's mark for `version` written (`BUSY`), with this process and the time; its path, or None where it could
+    not be written (the sweep then has nothing to honour, as before)."""
+    try:
+        root = chosen_runtime.root(home)
+        _ready(root)
+        mark = root / (BUSY + version)
+        _write(mark, {"pid": os.getpid()})
+        return mark
+    except Exception:
+        return None
+
+
+def _busy_versions(entries) -> set:
+    """The versions a Use job's fresh mark stands for among `entries`; a stale or unreadable mark is taken away."""
+    found = set()
+    for entry in entries:
+        if not entry.name.startswith(BUSY):
+            continue
+        version = entry.name[len(BUSY):]
+        try:
+            at = json.loads(entry.read_text(encoding="utf-8")).get("at")
+        except (OSError, ValueError, AttributeError):
+            at = None
+        if chosen_runtime.shaped(version) and type(at) is int and 0 <= time.time() - at < BUSY_FOR:
+            found.add(version)
+        else:
+            _unlink(entry)
+    return found
+
+
 def _sweep(home, keep) -> None:
     """Every runtime but `keep` and whatever was left half done. One a running program runs from stays, whole, until it has
-    ended (`_retire`)."""
+    ended (`_retire`); and so does what a Use job under way in any process downloads, checks or unpacks (`BUSY`, A8)."""
     root = chosen_runtime.root(home)
     try:
         if root.is_symlink() or root.is_junction() or not root.is_dir():
@@ -762,12 +810,14 @@ def _sweep(home, keep) -> None:
         entries = list(root.iterdir())
     except OSError:
         return
+    busy = _busy_versions(entries)
     for entry in entries:
         if entry.name.startswith(INCOMING):
-            _unlink(entry)
+            if entry.name[len(INCOMING):].removesuffix(".zip") not in busy:
+                _unlink(entry)
         elif entry.name.startswith(GONE):
             _remove(entry)
-        elif chosen_runtime.shaped(entry.name) and entry.name != keep:
+        elif chosen_runtime.shaped(entry.name) and entry.name != keep and entry.name not in busy:
             _retire(entry)
 
 

@@ -109,11 +109,16 @@ class RetireTests(Case):
         self.assertIs(pythons.supervised(self.runtime, {"phase": pythons.PHASE_RUNTIME}), pythons.USE_CHOSEN)
         self.assertEqual(self.names(), [NEW, chosen.RECORD])
 
-    def test_with_no_record_the_start_reads_nothing(self):
+    def test_with_no_record_the_start_sweeps_and_nothing_else_is_read(self):
+        """v0.6.26 (A6): the start with no record is the moment a runtime left whole goes (test_advanced_python_sweep_later);
+        a failed start's phase, with no record, reads nothing."""
         self.runtime_folder(OLD)
         with patch.object(pythons, "_sweep") as swept:
-            pythons.supervised(self.runtime, {"phase": pythons.PHASE_RUNTIME})
+            pythons.supervised(self.runtime, {"phase": pythons.PHASE_RUNTIME_FAILED})
         swept.assert_not_called()
+        with patch.object(pythons, "_sweep") as swept:
+            pythons.supervised(self.runtime, {"phase": pythons.PHASE_RUNTIME})
+        swept.assert_called_once_with(pythons._home(self.runtime), None)
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows maps a running program's files")
