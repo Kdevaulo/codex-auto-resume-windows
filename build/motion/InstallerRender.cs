@@ -86,14 +86,19 @@ namespace CodexAutoResume
                 {
                     var frame = item as Dictionary<string, object>;
                     if (frame == null) continue;
+                    // v0.6.26 (audit-apng M6): the frame's moment on the picture's clock, which every glide of the window -
+                    // the button's hover and press, the light's colour, the bar - is drawn at (Transition.RenderMs); a frame
+                    // without one on the wall clock, as before.
+                    Transition.RenderMs = frame.ContainsKey("moment") && frame["moment"] != null
+                        ? Convert.ToDouble(frame["moment"], CultureInfo.InvariantCulture) : Transition.Live;
                     driver.Put(frame);
                     using (Bitmap picture = driver.Picture())
                     {
                         if (edgeDpi > 0)
                             using (Bitmap edged = StillFrame.CornerStill(picture, edgeDpi))
-                                writer.Write(Int(frame, "index"), edged, driver.Bounds(Items(job, "targets")));
+                                writer.Write(Int(frame, "index"), edged, driver.Bounds(Items(job, "targets")), driver.Page);
                         else
-                            writer.Write(Int(frame, "index"), picture, driver.Bounds(Items(job, "targets")));
+                            writer.Write(Int(frame, "index"), picture, driver.Bounds(Items(job, "targets")), driver.Page);
                         // v0.6.20: the still a capture takes of the window, when the job asks (StillFrame). v0.6.24-beta.2:
                         // cut by the same decision as the window - its own corner while the switch is on (the job says so,
                         // make_screenshots.still_job), else Windows' 8 px circle as a capture is cut.
@@ -112,6 +117,7 @@ namespace CodexAutoResume
             }
             finally
             {
+                Transition.RenderMs = Transition.Live;
                 if (driver != null) driver.Dispose();
                 writer.Finish();
             }
@@ -132,7 +138,11 @@ namespace CodexAutoResume
             private readonly AutoResetEvent told = new AutoResetEvent(false);
             private int delivered;
             private Control faced;
+            private bool facedPressed;
             private HaloDot light;
+            private InstallerBar bar;
+            // Whether the run has been told to end (Tell(0)).
+            private bool ending;
             // The window's words, in its language: what the log's toggle says (ShowLog).
             private readonly InstallerWords words;
             private string lightState;
@@ -213,7 +223,27 @@ namespace CodexAutoResume
                 Settle();
                 light = Find<HaloDot>(window);
                 if (light == null) throw new InvalidOperationException("the window has no status light");
+                // The window's own progress bar (its field), on the page or not.
+                var field = typeof(InstallerWindow).GetField("bar", Own);
+                bar = field == null ? null : field.GetValue(window) as InstallerBar;
+                if (bar == null) throw new InvalidOperationException("the window has no progress bar");
+                // v0.6.26 (audit-apng M6): a job whose frames carry their moment draws every glide as a person with Windows'
+                // animation effects on sees it (the default), whatever this machine says.
+                if (Clocked(Items(job, "frames"))) Soft.WindowsAnimates = delegate { return true; };
             }
+
+            private static bool Clocked(List<object> frames)
+            {
+                foreach (object item in frames ?? new List<object>())
+                {
+                    var frame = item as Dictionary<string, object>;
+                    if (frame != null && frame.ContainsKey("moment")) return true;
+                }
+                return false;
+            }
+
+            /// The page the window shows now.
+            internal string Page { get { return window.Page; } }
 
             /// The run the window starts (InstallerWindow.Runner): it tells the window each event the frames ask for,
             /// one at a time, and ends with the code it is given - as Setup.cs's InstallFrom tells it what the installer
@@ -280,14 +310,25 @@ namespace CodexAutoResume
                     Settle();
                     FollowLog();
                 }
-                if (want == Array.IndexOf(Order, InstallerFlow.Finish) && window.Page != InstallerFlow.Finish)
+                // v0.6.26 (audit-apng M6): the bar at the frame's moment, on its way to where the work is.
+                double moment = Transition.RenderMs;
+                if (moment >= 0) { bar.RenderAt(moment); Settle(); }
+                if (want == Array.IndexOf(Order, InstallerFlow.Finish) && window.Page != InstallerFlow.Finish && !ending)
                 {
                     if (delivered != events.Count) throw new InvalidDataException("the run ends only after every event");
                     Tell(0);
+                    ending = true;
+                    // The run's end reaches the window, which fills the bar - on the picture's clock from this moment, for at
+                    // most its FinishSeconds - and only then shows the Finish page (InstallerBar.Finish).
                     var waited = Stopwatch.StartNew();
-                    while (window.Page != InstallerFlow.Finish && waited.ElapsedMilliseconds < StepLimit) Settle();
+                    while (window.Page != InstallerFlow.Finish && !Ended() && waited.ElapsedMilliseconds < StepLimit) Settle();
+                    if (moment >= 0) { bar.RenderAt(moment); Settle(); }
+                    else while (window.Page != InstallerFlow.Finish && waited.ElapsedMilliseconds < StepLimit) Settle();
                 }
-                if (window.Page != page) throw new InvalidOperationException("the window shows " + window.Page + ", the frame " + page);
+                // The frames of the fill, once the run has ended, show the Progress page with the bar filling; the Finish page
+                // comes at the frame the window shows it.
+                bool filling = page == InstallerFlow.Finish && window.Page == InstallerFlow.Progress && ending && bar.Moving;
+                if (window.Page != page && !filling) throw new InvalidOperationException("the window shows " + window.Page + ", the frame " + page);
                 Face(Str(frame, "hover"), Str(frame, "pressed"));
                 // The light at the frame's moment of the state it is in: its own clock starts when the state does.
                 double t = frame.ContainsKey("light") ? Convert.ToDouble(frame["light"], CultureInfo.InvariantCulture) : 0;
@@ -342,28 +383,69 @@ namespace CodexAutoResume
                 return false;
             }
 
-            /// The hover or pressed face of the control a frame names, as the pointer gives it.
-            private void Face(string hover, string pressed)
+            /// Whether the run's end has reached the window (its `running` false once the run is over).
+            private bool Ended()
             {
-                if (faced != null) SetFace(faced, false, false);
-                faced = null;
-                string name = pressed ?? hover;
-                if (name == null) return;
-                Control control = Target(name);
-                if (control == null) { writer.Note("no control is called " + name); return; }
-                SetFace(control, true, pressed != null);
-                faced = control;
+                var field = typeof(InstallerWindow).GetField("running", Own);
+                return field != null && field.FieldType == typeof(bool) && !(bool)field.GetValue(window);
             }
 
+            /// The hover or pressed face of the control a frame names, as the pointer gives it - changed only when it changes,
+            /// so a glide it starts goes on over the frames after (v0.6.26, audit-apng M6), as gui/WindowRender.cs gives one.
+            private void Face(string hover, string pressed)
+            {
+                string name = pressed ?? hover;
+                Control control = null;
+                if (name != null)
+                {
+                    control = Target(name);
+                    if (control == null) writer.Note("no control is called " + name);
+                }
+                bool down = control != null && pressed != null;
+                if (control == faced && down == facedPressed) return;
+                if (faced != null && faced != control && !faced.IsDisposed) SetFace(faced, false, false);
+                if (control != null) SetFace(control, true, down);
+                faced = control;
+                facedPressed = down;
+            }
+
+            private const System.Reflection.BindingFlags Own = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+
+            /// `control` given its face by its own change (gui/WindowRender.cs SetRenderFace): its Press, and its `hover` flag
+            /// with the glide its pointer's coming and going starts (its Hover, or its SoftSurfaceGlide's Changed) - entering,
+            /// the hover first; leaving, the press first. No event is raised. Outside a picture's clock, arrived at once.
             private static void SetFace(Control control, bool hover, bool pressed)
             {
-                const System.Reflection.BindingFlags own = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-                Type type = control.GetType();
-                System.Reflection.FieldInfo hovered = type.GetField("hover", own);
-                if (hovered != null && hovered.FieldType == typeof(bool)) hovered.SetValue(control, hover);
-                System.Reflection.MethodInfo press = type.GetMethod("Press", own, null, new[] { typeof(bool) }, null);
-                if (press != null) press.Invoke(control, new object[] { pressed });
+                double clock = Transition.RenderMs;
+                if (clock == Transition.Live) Transition.RenderMs = Transition.Arrived;
+                try
+                {
+                    if (hover) { Hover(control, true); Press(control, pressed); }
+                    else { Press(control, false); Hover(control, false); }
+                }
+                finally { Transition.RenderMs = clock; }
                 control.Invalidate();
+            }
+
+            private static void Hover(Control control, bool over)
+            {
+                Type type = control.GetType();
+                System.Reflection.FieldInfo hovered = type.GetField("hover", Own);
+                if (hovered == null || hovered.FieldType != typeof(bool) || (bool)hovered.GetValue(control) == over) return;
+                System.Reflection.MethodInfo own = type.GetMethod("Hover", Own, null, new[] { typeof(bool) }, null);
+                if (own != null) { own.Invoke(control, new object[] { over }); return; }
+                hovered.SetValue(control, over);
+                foreach (System.Reflection.FieldInfo field in type.GetFields(Own))
+                {
+                    var glide = field.FieldType == typeof(SoftSurfaceGlide) ? field.GetValue(control) as SoftSurfaceGlide : null;
+                    if (glide != null) glide.Changed(Motion.Duration);
+                }
+            }
+
+            private static void Press(Control control, bool down)
+            {
+                System.Reflection.MethodInfo press = control.GetType().GetMethod("Press", Own, null, new[] { typeof(bool) }, null);
+                if (press != null) press.Invoke(control, new object[] { down });
             }
 
             /// A control the plan names: `button.forward` is the page's primary button (Next, Install, Finish).
@@ -467,6 +549,8 @@ namespace CodexAutoResume
                     found["scroll." + number] = new List<object> { (double)area.Offset, (double)area.Extent, (double)area.Viewport };
                     number++;
                 }
+                // v0.6.26 (audit-apng M6): how far the bar is drawn, 0 to 1, while it is shown: what the tests hold its glide to.
+                if (bar.Visible && bar.Parent != null) found["bar.shown"] = new List<object> { bar.Shown };
                 return found;
             }
 
@@ -550,7 +634,7 @@ namespace CodexAutoResume
 
             internal void Failed(string text) { Error = text; }
 
-            internal void Write(int index, Bitmap picture, Dictionary<string, object> bounds)
+            internal void Write(int index, Bitmap picture, Dictionary<string, object> bounds, string page)
             {
                 bool resized = picture.Width != width || picture.Height != height;
                 width = picture.Width;
@@ -600,6 +684,8 @@ namespace CodexAutoResume
                 entry["box"] = new List<object> { (double)left, (double)top, (double)(right - left + 1), (double)(bottom - top + 1) };
                 entry["file"] = file;
                 entry["bounds"] = bounds;
+                // v0.6.26 (audit-apng M6): the page the window shows - the Finish page comes once the bar's fill is over.
+                entry["page"] = page;
                 if (frames.Length > 0) frames.Append(",\n");
                 frames.Append(Json.Write(entry));
                 previous = pixels;
