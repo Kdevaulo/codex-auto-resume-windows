@@ -130,6 +130,10 @@ REPOSITORY_URL = "https://github.com/songyb111-gachon/codex-auto-resume-windows"
 PICTURE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico")
 # Where a README names a path: a Markdown link or picture's (...), an HTML src= or href=, a reference definition.
 README_LINK = re.compile(r"""(\]\(\s*<?|\b(?:src|href)\s*=\s*["']|^\[[^\]\n]+\]:[ \t]*)([^)\s"'>]+)""", re.MULTILINE)
+# A <source>'s or <img>'s srcset=, whose value is candidates split by commas, each an address and what it is for ("2x"):
+# a browser that takes a <picture>'s <source> never falls back to its <img>, so a relative one is a broken picture.
+README_SRCSET = re.compile(r"""(\bsrcset\s*=\s*)(["'])([^"']*)\2""")
+README_CANDIDATE = re.compile(r"""(^|,)(\s*)([^,\s]+)""")
 # What stays of the bundled runtime: see trim_runtime.
 RUNTIME_KEEP = "build/runtime_keep.json"
 LAUNCHER_FILES = ("Install.cmd", "Uninstall.cmd", "README.txt", "install.ps1")
@@ -244,18 +248,26 @@ def absolute_links(text: str, release: str, carried) -> str:
     """`text`, a README at the repository's root, with each relative link or picture whose target is not in `carried` (the
     paths the archive holds, relative to its root) made absolute: a document is .../blob/v<release>/<path>, a picture
     .../raw/v<release>/<path>, both at the release's tag. What the archive carries, an address with a scheme and a link
-    inside the page (#...) stay as written; so does a fragment or query after a path that is rewritten."""
-    def each(match):
-        target = match.group(2)
+    inside the page (#...) stay as written; so does a fragment or query after a path that is rewritten. Each candidate of
+    a srcset= is one such path."""
+    def address(target):
         if not target or target.startswith(("#", "/")) or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", target):
-            return match.group(0)
+            return target
         path, mark, rest = re.match(r"([^#?]*)([#?]?)(.*)", target).groups()
         path = posixpath.normpath(path) if path else ""
         if not path or path.startswith("..") or path in carried:
-            return match.group(0)
+            return target
         kind = "raw" if path.lower().endswith(PICTURE_SUFFIXES) else "blob"
-        return "%s%s/%s/v%s/%s%s%s" % (match.group(1), REPOSITORY_URL, kind, release, path, mark, rest)
-    return README_LINK.sub(each, text)
+        return "%s/%s/v%s/%s%s%s" % (REPOSITORY_URL, kind, release, path, mark, rest)
+
+    def each(match):
+        return match.group(1) + address(match.group(2))
+
+    def candidates(match):
+        value = README_CANDIDATE.sub(lambda one: one.group(1) + one.group(2) + address(one.group(3)), match.group(3))
+        return match.group(1) + match.group(2) + value + match.group(2)
+    # A srcset's candidates after the other paths, so an address made absolute here is never rewritten twice.
+    return README_SRCSET.sub(candidates, README_LINK.sub(each, text))
 
 
 def collect_runtime(stage: Path, archive: Path) -> int:

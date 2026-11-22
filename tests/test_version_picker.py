@@ -812,9 +812,12 @@ class VersionsRunTests(PickerRun):
 
     def test_a_list_that_goes_on_past_five_pages_lists_nothing(self):
         """Five full pages may not be all of it: a sixth is never asked for, and the part read is never
-        shown as the whole list, which would leave the oldest releases out unsaid."""
+        shown as the whole list, which would leave the oldest releases out unsaid. Since v0.6.26 a full
+        page whose last release is older than $PickFloor ends the list (tests/test_release_pages_floor.py),
+        so the fifth page here stops at the floor itself, which is offered."""
         self.installation(INSTALLED)
-        self.serve(*([junk(30)] * 4 + [junk(30 - len(LISTED)) + LISTED]))
+        above = [one for one in LISTED if one["tag_name"] not in ("v0.6.1", "v0.5.7")]
+        self.serve(*([junk(30)] * 4 + [junk(30 - len(above)) + above]))
         code, output, asked = self.run_it(Versions=True)
         self.assertEqual(code, 12, output[-2000:])
         self.assertEqual(self.answer_lines(output, "versions: "), ["versions: unavailable"])
