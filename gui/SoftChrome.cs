@@ -874,6 +874,26 @@ namespace CodexAutoResume
             }
         }
 
+        /// v0.6.26 (audit G1): the wait cursor over the window, after what Windows itself does for the pointer there. Over a
+        /// window a dialog of its own holds (HTERROR), Windows' handling first - a press there brings that dialog, or the
+        /// setup window, forward, or sounds - then the wait cursor; over a resize band (HTLEFT to HTBOTTOMRIGHT) Windows'
+        /// size arrows, the drag resizing as before; everywhere else the wait cursor alone.
+        private static bool WaitCursor(ref Message m, Pass pass)
+        {
+            int hit = (short)(m.LParam.ToInt64() & 0xFFFF);
+            if (hit >= Chrome.HTLEFT && hit <= Chrome.HTBOTTOMRIGHT)
+            {
+                pass(ref m);
+                return true;
+            }
+            if (hit == HTERROR) pass(ref m);
+            Cursor.Current = Cursors.WaitCursor;
+            m.Result = (IntPtr)1;
+            return true;
+        }
+
+        private const int HTERROR = -2;
+
         /// Handles `m` before the form does: true when it is answered here and the form must not see it again.
         internal bool Intercept(ref Message m, Pass pass)
         {
@@ -888,12 +908,7 @@ namespace CodexAutoResume
             // part of it. .NET gives it only over the client area a control answers HTCLIENT for: over the caption, the
             // ground that drags the window - and over the whole window while a dialog of its own holds it disabled, which
             // Windows asks as HTERROR - it gave the arrow, the moment a dialog that keeps its owner waiting was shown.
-            if (m.Msg == WM_SETCURSOR && form.UseWaitCursor)
-            {
-                Cursor.Current = Cursors.WaitCursor;
-                m.Result = (IntPtr)1;
-                return true;
-            }
+            if (m.Msg == WM_SETCURSOR && form.UseWaitCursor) return WaitCursor(ref m, pass);
             // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
             if (corner != null && corner.Intercept(ref m)) return true;
             if (corner != null && corner.Shaped && (m.Msg == WM_SETTEXT || m.Msg == WM_SETICON) && form.IsHandleCreated)
