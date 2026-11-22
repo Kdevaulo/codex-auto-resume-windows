@@ -15,8 +15,9 @@ messages and Codex's replies, read only while the page asks (codex/conversation.
 * Its pace is its own (A20): one in flight in a conversation across both stores, thirty a conversation and sixty a
   day, never core's five a day or fifteen minutes (state/records.claim_record).
 * Its words leave the disk the moment its send begins (state/chat.py); a message Codex did not take within three
-  minutes is taken back and never sent again by itself; turned off, every message still waiting is cancelled. A Pause
-  takes back none Codex holds (v0.6.23, `pause_keeps`): its statement's H4 and H6.
+  minutes is taken back and never sent again by itself - but none in a queue the forced stop paused, which Codex runs
+  when it lets that queue go (v0.6.26); turned off, every message still waiting is cancelled. A Pause takes back none
+  Codex holds (v0.6.23, `pause_keeps`): its statement's H4 and H6.
 
 Approvals are still answered in Codex: what MC2 measured shows a turn in progress and finished, never a wait for one.
 """
@@ -25,8 +26,9 @@ from __future__ import annotations
 from codex_auto_resume.domain import ids
 from codex_auto_resume.domain.plug import DEFER, Alternative
 
-from ..vocabulary import ChatState
+from ..vocabulary import ChatState, ContinuationKind
 from .markerfree import MarkerFreeContinuation
+from .usage import PAUSE
 
 CAPABILITY = "codex_chat"
 WORDS = 2000
@@ -51,12 +53,25 @@ def handed(row) -> dict | None:
 TAKEN_WITHIN = 180
 
 
-def watched(row, now) -> dict | None:
-    """A message in flight as core watches it: asked back out of Codex's queue once TAKEN_WITHIN has passed."""
+def watched(row, now, stops=()) -> dict | None:
+    """A message in flight as core watches it: asked back out of Codex's queue once TAKEN_WITHIN has passed - but never
+    one in a queue the forced stop paused (v0.6.26, M1: `paused_by_stop`), which Codex runs once it lets that queue go:
+    taken back, its words would be gone, for the chat keeps none once it is sent."""
     record = handed(row)
-    if record is not None and record["sent_at"] is not None and now - record["sent_at"] >= TAKEN_WITHIN:
+    if (record is not None and record["sent_at"] is not None and now - record["sent_at"] >= TAKEN_WITHIN
+            and not paused_by_stop(row, stops)):
         record["withdraw"] = True
     return record
+
+
+def paused_by_stop(row, stops) -> bool:
+    """Whether a message in flight went into, or sat in, the queue of a conversation usage_pause stopped (`stops`, the
+    edition's continuations of its conversation): the stop's continuation after the reset there not yet started when it
+    was sent (engine/usagestop.py). The app pauses that queue until the turn of that continuation ends, then sends it.
+    The wrap-up's continuation after a reset is none of these: it stopped nothing."""
+    return any(stop.get("capability") == PAUSE and stop.get("kind") == ContinuationKind.AFTER_RESET
+               and stop.get("thread_id") == row["thread_id"]
+               and (stop.get("finished_at") is None or stop["finished_at"] >= row["sent_at"]) for stop in stops)
 
 
 def _ours(record) -> bool:
