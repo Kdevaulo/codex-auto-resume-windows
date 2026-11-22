@@ -115,7 +115,7 @@ foreach ($scale in 1.0, 1.5, 2.0) {
     [Windows.Forms.TextRenderer]::DrawText($g, 'x', $chart.Font, (New-Object Drawing.Point 0, 0), [Drawing.Color]::Black, [Drawing.Color]::White)
     $g.Dispose()
     $top = -1; $bottom = -1
-    for ($y = 0; $y -lt $h; $y++) { for ($x = 0; $x -lt 2 * $h; $x++) { $c = $drawn.GetPixel($x, $y); if ($c.R -lt 160) { if ($top -lt 0) { $top = $y }; $bottom = $y; break } } }
+    for ($y = 0; $y -lt $h; $y++) { for ($x = 0; $x -lt 2 * $h; $x++) { $c = $drawn.GetPixel($x, $y); if ($c.R -lt 207) { if ($top -lt 0) { $top = $y }; $bottom = $y; break } } }
     $drawn.Dispose()
     $lead = [int][Math]::Round(4 * $scale)
     $out.charts += ,@{ scale = $scale; row = $row; lead = $lead; ink = @($top, $bottom); height = $h;

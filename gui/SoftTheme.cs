@@ -1210,15 +1210,18 @@ namespace CodexAutoResume
             {
                 using (Graphics g = Graphics.FromImage(drawn))
                 {
-                    g.Clear(Color.White);
-                    TextRenderer.DrawText(g, "x", font, new Point(0, 0), Color.Black, Color.White);
+                    g.Clear(SystemColors.Window);
+                    TextRenderer.DrawText(g, "x", font, new Point(0, 0), SystemColors.WindowText, SystemColors.Window);
                 }
                 int top = -1, bottom = -1;
+                Color ground = SystemColors.Window;
                 for (int y = 0; y < height; y++)
                     for (int x = 0; x < width; x++)
                     {
+                        // Ink as the window reads ink (Chrome.InkStep): the faintest anti-aliased edge is ground.
                         Color c = drawn.GetPixel(x, y);
-                        if (c.R < 160 || c.G < 160 || c.B < 160)
+                        if (Math.Abs(c.R - ground.R) > Chrome.InkStep || Math.Abs(c.G - ground.G) > Chrome.InkStep ||
+                            Math.Abs(c.B - ground.B) > Chrome.InkStep)
                         {
                             if (top < 0) top = y;
                             bottom = y;
