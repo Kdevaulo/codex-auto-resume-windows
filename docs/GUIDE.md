@@ -543,7 +543,7 @@ From v0.6.11 every place that shows the version also names the Advanced edition 
 installed, in the interface language: the version in a pill at the end of the Dashboard's page tabs (the number
 alone, without its "v", where the Advanced edition is told by the number's blue ink instead of a word; it is
 shown only where the tabs leave it room), the Version row on its Diagnostics page, which always has
-it, and the heading of the panel in Codex, where the edition follows the version
+it, and the heading of the panel in Codex, those two with the edition after the version
 in smaller grey text (`v0.6.11` *Advanced*). The icon's tooltip names it after the product's name.
 From v0.6.14 the Standard edition shows the version alone in each of those places, and the product's
 name alone in the tooltip. Its name appears only where editions are told apart: where you choose one,
