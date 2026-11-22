@@ -227,7 +227,7 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   answers on one closed line that must agree with its exit code. A conversion that fails starts the
   installed watcher again and installs nothing. Only then does the archive's installer run, with the
   edition change passed to it only on a change and only to installers that know editions. While it
-  runs, the window greys every action button, the header's Start watcher included, so the window
+  runs, the window greys every action button, Start watcher included, so the window
   cannot start the current watcher between the conversion and the installer. Nor does reading the
   state put it back meanwhile: while an installation holds its lock, the window, the panel, Codex's
   tools and the command line - a notification's Cancel, a status from Codex's skill, an installer's
@@ -255,9 +255,10 @@ them `thread/goal/set`, `thread/queue/add` with words this product wrote, and `t
   which is described under *Compatibility data can only restrict* below. An advanced installation asks one more constant URL on the same host the same way, for the advanced edition's measurement data.
 - **No shell, and no values in script text.** No Python code uses `shell=True`, `os.system`, `eval`
   or `exec`, and every Python subprocess gets an argument list. Windows PowerShell runs the
-  installer, the uninstaller and the plugin's setup script; the Python runtime uses it to list
-  ChatGPT and Codex processes (a fixed script) and raise notifications, and at setup to create the
-  Start Menu shortcut. The last two receive their values - toast text, shortcut paths - as
+  installer, the uninstaller and the plugin's setup script; the Python runtime uses it to raise
+  notifications, and at setup to create the Start Menu shortcut (the list of running ChatGPT and Codex
+  processes is not its: since v0.6.24 it is one Toolhelp snapshot in the program's own process, of which
+  only the ChatGPT.exe and codex.exe rows are kept). Both receive their values - toast text, shortcut paths - as
   environment variables read by a constant script (`src/codex_auto_resume/pwsh.py`). PowerShell
   does not parse an environment variable's value as code, so no character in a conversation title
   or a folder name can change what runs. The Python runtime starts PowerShell by its full path under

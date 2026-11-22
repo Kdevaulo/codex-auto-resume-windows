@@ -59,23 +59,23 @@
     "CI does not translate anything. A person decides what the Korean should say."
   ],
   "reviewed": {
-    "docs/CHANGELOG.md": "02b3764f9280e8faf792cfd6ee4f7df1688bd2c8a087989f81650bee4d621302",
+    "docs/CHANGELOG.md": "83b089cfe38792ce7b9ea49d4acbe419a0be7b27a3def642626d0c595933a337",
     "docs/CONTRIBUTING.md": "5b98fd848b1edf181a0d72018d92d9d3a3c4af5e254d4fc2dc2dc1f1c68e770a",
     "docs/CONTRIBUTORS.md": "84957fc6bbb8fef7b8038001f98d2e3be2466fdf8c59706026abd893f8972fc0",
-    "docs/PRIVACY.md": "aafa645ffcac514b2cbfb1eaf78dc3845303a0d39a770536a112f8b393dd7f83",
+    "docs/PRIVACY.md": "4a58aa839756b068cb259b1e36a51f3fc31afcdb603d582243d94e5864a529f8",
     "README.md": "01436f620530bcc95c70dd42ce63deda793f0f57fcac20ca61452abe0f5c36a6",
-    "docs/SECURITY.md": "57932499b3d3e7042363f978bd7eead021c3432348f0f0527775ac24f98d5e79",
+    "docs/SECURITY.md": "8c389968c18e405e0cbda1b53ea94e49407ca88035a84072713ba98cf580615e",
     "docs/SUPPORT.md": "3db6f1cd20e8f77ccf6fd19e2696ab7163bd5f84bfcd8d68388aadf442072815",
-    "docs/BRAND.md": "e887a20945b8c5de411d463ed49f8d2b50d4418cf08af7a54b180cad5a7e3a5e",
+    "docs/BRAND.md": "8333680c50e54c9d8344821881d8a172a83fe41388580d168005af754ac85cde",
     "docs/COMPARISON.md": "6d50912e2e2ce4bd79e6fdf59e58578534635e132eac143137e009e9e23022ac",
     "docs/DEVELOPMENT.md": "90efa57e0d061301c95113c606ca6e8bcbec4773a5f50ebff431da00abb8f5f7",
     "docs/PLUGIN.md": "38d7a7ef0203a69036324fb2bd64f8e167a0140a523ac9e39fdff37a894a477d",
     "docs/VERIFY.md": "bcb0ffb56d3134dd72db1e98621d8ccc98a3d4bbea65a6ccf74b4d7ff33c6388",
-    "docs/FEATURE_MATRIX.md": "8044fe94dd01171a54efa98be7a33dfc8fd5debbd145cdee162cf712d7774869",
+    "docs/FEATURE_MATRIX.md": "09fbdf1b8d3362ecb1be5b8ef32014565b49271aa2eb3e828690055b4471d685",
     "docs/LIVE_ACCEPTANCE.md": "b646dcc7699263cf2877428a4702087087d484a6088817a1b3ef950398b03d70",
-    "docs/ROADMAP.md": "eae2c0f6cce39f33a8eb4420c31cb7500e1dc06dbc4e4072170351e4291072ff",
-    "docs/GUIDE.md": "4407146955faa148e37656ed7c09670b7eef18a5b2ca59faeaa34fa91eeab5ba",
-    "docs/STANDARDS.md": "01f4ab6dbf9080622032136370d08e508c7bb11a99a03f1e0707ab153691278d",
-    "docs/EDITIONS.md": "43e7096824ed7a4edd4a151f3fe0ca44f67c7ca68fd6cf6a258f0fd786fecc4b"
+    "docs/ROADMAP.md": "288508572e10582a93b5e39540b37e000f371dbea8f2db0fe3ffc2ea7a47134a",
+    "docs/GUIDE.md": "bd42ea6974870ae728b9f6443db544b75d56371eda7b4c37f6b89f6c03b31a90",
+    "docs/STANDARDS.md": "f947eeac96f7f046c56f2a7f3fa8a95d2a305191191808610977f2a82e489220",
+    "docs/EDITIONS.md": "402127dcd1f482d41163f05160fe4d3b9c70b41574f9eca264d05998c1bee657"
   }
 }
