@@ -82,7 +82,7 @@ def _answer(url, opener, ends=None):
             raise Refused(LIST)
         pieces.append(piece)
     try:
-        http.stream(url, take, timeout=_left(ends, LIST_TIMEOUT, LIST), opener=opener)
+        http.stream(url, take, timeout=_left(ends, LIST_TIMEOUT, LIST), opener=opener, ends=ends)
         found = json.loads(b"".join(pieces).decode("utf-8"))
     except (http.Failed, OSError, ValueError, RecursionError):
         raise Refused(LIST) from None
@@ -177,7 +177,7 @@ def download(found, target, *, progress=None, opener=None) -> int:
                 sink.write(piece)
                 if progress is not None:
                     progress(got, size)
-            http.stream(found["url"], wrote, timeout=_left(ends, DOWNLOAD_TIMEOUT, DOWNLOAD), opener=opener)
+            http.stream(found["url"], wrote, timeout=_left(ends, DOWNLOAD_TIMEOUT, DOWNLOAD), opener=opener, ends=ends)
     except (http.Failed, OSError, ValueError):
         raise Refused(DOWNLOAD) from None
     if got != size:

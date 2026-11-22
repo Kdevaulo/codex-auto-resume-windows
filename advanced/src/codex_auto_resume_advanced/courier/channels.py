@@ -119,6 +119,28 @@ def send(channel, row, secrets, *, opener=None, smtp=None, locale=None) -> str:
     raise ValueError("channel")
 
 
+# v0.6.26 (audit N2): one message's time in all over SMTP, from the connection to the last reply: smtplib's timeout is for
+# each socket operation, and a reply of many lines (a banner, EHLO's) is read a line at a time with no bound on how many,
+# so a server that answers a line inside each timeout held the courier's drain pass for as long as it went on. Four of
+# the courier's timeouts, as an HTTP request has its timeout plus WHOLE_MORE (http._Whole).
+MAIL_SECONDS = 4 * http.TIMEOUT
+
+
+class _Clocked:
+    """smtplib's SMTP and SMTP_SSL, each connection's socket held by `whole`, which closes it when the time is up - so a
+    read waiting on it returns at once and the send ends as "timeout"."""
+
+    def __init__(self, whole):
+        def held(base):
+            class Held(base):
+                def _get_socket(self, host, port, timeout):
+                    sock = super()._get_socket(host, port, timeout)
+                    whole.hold(sock)
+                    return sock
+            return Held
+        self.SMTP, self.SMTP_SSL = held(smtplib.SMTP), held(smtplib.SMTP_SSL)
+
+
 def mail(settings, event, text, *, smtp=None) -> str:
     """One plain-text message over SMTP as `settings` say (address.checked_smtp's): "2xx", or http.Failed - "4xx" for a
     refusal (a 5xx reply, the sign-in refused), "5xx" for the server's own trouble (a 4xx reply), "tls" for a server
@@ -128,7 +150,8 @@ def mail(settings, event, text, *, smtp=None) -> str:
     message["From"] = settings["from"]
     message["To"] = settings["to"]
     message.set_content(text)
-    factory = smtp or smtplib
+    whole = http._Whole(MAIL_SECONDS)
+    factory = smtp or _Clocked(whole)
     context = http.context()
     server = None
     try:
@@ -153,6 +176,7 @@ def mail(settings, event, text, *, smtp=None) -> str:
     except (smtplib.SMTPException, socket.timeout, TimeoutError, OSError):
         raise http.Failed("timeout") from None
     finally:
+        whole.cancel()
         if server is not None:
             try:
                 server.quit()
