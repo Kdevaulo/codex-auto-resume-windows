@@ -22,6 +22,7 @@ import uuid
 from .. import (compatio, config, edition, l10n, managed, needsyou, notice_kinds, notifier, notify, oncewords,
                settings as policy)
 from ..codex import LocalSource
+from ..codex import layout as codex_layout
 from ..codex.chains import memory as chain_memory
 from ..codex.pairing import app_engines, official_engine
 from ..domain.plug import DEFER, EXTRA, Surface, guard
@@ -177,6 +178,9 @@ class App(WatchLoop, PlugNotices):
                 self.logger.info("the ChatGPT app was asked which Codex server it runs; where more than one official "
                                  "Codex engine passes the engine checks, the one it runs is the one driven")
             backend = Backend(self.codex_home, exe)
+            # v0.6.26 (update resilience #9): a named engine is never second-guessed; the backend says so where the app
+            # runs another official one (Backend.app_unmatched_reason).
+            backend.named_engine = bool(self._codex_exe_override or os.environ.get(config.ENV_CODEX_EXE))
             # Discovery probed a throwaway instance; run the check on the one we keep so
             # engine_version/engine_verified are populated for status, doctor and logs.
             backend._compatible()
@@ -278,6 +282,20 @@ class App(WatchLoop, PlugNotices):
         except Exception:
             self._engine_state = "unknown"
             self._record_failure("compatibility check")
+        self._layout_look()
+
+    def _layout_look(self) -> None:
+        """v0.6.26 (update resilience #6, #11): the backend's last process layout (codex/layout.py), said and kept when
+        the engine's file stamp or the app's package version changes, and the last one that paired kept across this
+        product's own update. It decides nothing; a failure is never the watcher's."""
+        try:
+            if getattr(self, "_layout", None) is None:
+                self._layout = codex_layout.Watch(self.paths.codex_layout_file, config.version(), self.logger.info)
+            backend = self._backend
+            self._layout.look(getattr(backend, "layout", None), stamp=self._backend_stamp,
+                              engine_version=getattr(backend, "engine_version", None))
+        except Exception:
+            pass
 
     def source(self) -> LocalSource:
         return LocalSource(self.codex_home, chains=chain_memory(self.paths.split_chains_file))

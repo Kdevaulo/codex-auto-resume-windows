@@ -41,8 +41,9 @@ class Listed:
     def __init__(self, rows=(), seconds=0.0):
         self.rows, self.seconds, self.names = list(rows), seconds, []
 
-    def __call__(self, names):
+    def __call__(self, names, families=()):
         self.names.append(tuple(names))
+        self.families = tuple(families)
         if self.seconds:
             time.sleep(self.seconds)
         return [dict(row) for row in self.rows]
@@ -172,7 +173,7 @@ class CacheTests(Case):
         and the next read looks again."""
         rows = [[self.APP], [self.APP, {"pid": 11, "parent": 10, "path": "C:\\Apps\\codex.exe"}]]
 
-        def read(names):
+        def read(names, families=()):
             if len(rows) == 2:
                 pairing.forget_inventory()          # another thread started a server while this list was read
             return rows.pop(0)
@@ -251,9 +252,10 @@ class SameAsCimTests(Case):
     def test_the_inventory_lists_only_the_app_and_the_engines(self):
         with self.this_pc():
             rows = pairing.inventory()
-        self.assertTrue(all(set(row) == {"pid", "parent", "path"} for row in rows))
+        self.assertTrue(all(set(row) == {"pid", "parent", "path", "created", "family"} for row in rows))
+        # v0.6.26: and any other process of the Codex app's package, found by its family (pairing.INVENTORY_FAMILIES).
         self.assertTrue(all(row["path"] is None or Path(row["path"]).name.lower() in ("chatgpt.exe", "codex.exe")
-                            for row in rows))
+                            or str(row["family"]).casefold() == pairing.CODEX_APP_FAMILY.casefold() for row in rows))
         self.assertNotIn(os.getpid(), {row["pid"] for row in rows})
 
 

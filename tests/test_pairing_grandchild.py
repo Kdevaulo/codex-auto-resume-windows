@@ -30,11 +30,12 @@ ENGINE = r"C:\FakeLocalAppData\OpenAI\Codex\bin\abcdef0123456789\codex.exe"
 OTHER_ENGINE = r"C:\FakeLocalAppData\OpenAI\Codex\bin\fedcba9876543210\codex.exe"
 SHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 
-MAIN = {"pid": 10, "parent": 1, "path": PACKAGE}
-UTILITY = {"pid": 11, "parent": 10, "path": PACKAGE}          # --type=utility --utility-sub-type=node.mojom.NodeService
-RENDERER = {"pid": 12, "parent": 10, "path": PACKAGE}
-APP_SERVER = {"pid": 20, "parent": 11, "path": ENGINE}        # the grandchild: the one holding Codex's state
-EXEC_SERVER = {"pid": 21, "parent": 10, "path": ENGINE}       # the main's own child
+# v0.6.26: each row with its creation time, as the inventory lists it (a step through a helper needs both times).
+MAIN = {"pid": 10, "parent": 1, "path": PACKAGE, "created": 100}
+UTILITY = {"pid": 11, "parent": 10, "path": PACKAGE, "created": 110}   # --type=utility --utility-sub-type=node.mojom.NodeService
+RENDERER = {"pid": 12, "parent": 10, "path": PACKAGE, "created": 120}
+APP_SERVER = {"pid": 20, "parent": 11, "path": ENGINE, "created": 200}  # the grandchild: the one holding Codex's state
+EXEC_SERVER = {"pid": 21, "parent": 10, "path": ENGINE, "created": 210}  # the main's own child
 
 
 def layout_1117(*extra, exec_server=True):
@@ -119,7 +120,8 @@ class Layout1117Tests(Case):
             with self.subTest(options=options):
                 pair, users = self.pair(layout_1117(exec_server=False), [self.held(20)], **options)
                 self.assertEqual(pair, 20)
-                self.assertEqual(users.called, bool(options), "one candidate is asked of only where a holder is required")
+                # v0.6.26 (update resilience #2): one candidate is asked of on the default home too.
+                self.assertTrue(users.called, "one candidate was not asked of")
         self.assertFalse(pairing.session_kind(layout_1117(exec_server=False), self.held(20), ENGINE))
 
     def test_the_served_engines_see_the_grandchild(self):
@@ -138,6 +140,7 @@ class Layout1117Tests(Case):
 
     def test_the_backend_reads_the_grandchild_holding_the_lock_as_loaded(self):
         """Fails with the old rule: the app's lock holder read "elsewhere", the record waiting held_by_other_session."""
+        (self.home / "thread-writer-locks").mkdir()
         backend = w.Backend(self.home, Path(ENGINE))
         rows = [dict(row, path=str(backend.codex_exe)) if row["path"] == ENGINE else row for row in layout_1117()]
         for pid in (20, 21):
@@ -160,9 +163,11 @@ class NotTheAppsTests(Case):
         loop = [{"pid": 50, "parent": 51, "path": FOREIGN_PACKAGE}, {"pid": 51, "parent": 50, "path": FOREIGN_PACKAGE}]
         foreign = {"pid": 52, "parent": 50, "path": ENGINE}
         rows = layout_1117(*loop, foreign, exec_server=False)
-        pair, users = self.pair(rows, [self.held(52)])
+        pair, users = self.pair(rows, [self.held(20), self.held(52)])
         self.assertEqual(pair, 20)
-        users.assert_not_called()
+        # v0.6.26 (update resilience #2): where only that other engine holds Codex's databases, the one candidate
+        # holding none of them is not taken for the server.
+        self.assertEqual(self.pair(rows, [self.held(52)])[0], "desktop_server_missing_or_ambiguous")
         self.assertTrue(pairing.session_kind(rows, self.held(52), ENGINE))
         self.assertFalse(pairing.session_kind(rows, self.held(20), ENGINE))
         rows[-1]["path"] = OTHER_ENGINE
@@ -190,10 +195,11 @@ class EveryLayoutTests(Case):
     def test_each_layout_pairs_the_server_holding_codex_state(self):
         """(e) 26.930's two children and the single child pair exactly as before; 26.1117's grandchild beside them
         (fails with the old rule)."""
+        # v0.6.26 (update resilience #2): the one child is asked of the Restart Manager too.
         for name, rows, holders, asked in (("26.930 both children", layout_930(), [self.held(20)], True),
-                                           ("one child", layout_930(exec_server=False), [], False),
+                                           ("one child", layout_930(exec_server=False), [], True),
                                            ("26.1117", layout_1117(), [self.held(20)], True),
-                                           ("26.1117 server alone", layout_1117(exec_server=False), [], False)):
+                                           ("26.1117 server alone", layout_1117(exec_server=False), [], True)):
             with self.subTest(name):
                 pair, users = self.pair(rows, holders)
                 self.assertEqual(pair, 20)

@@ -20,6 +20,7 @@ from ..win.inventory import resource_users
 from ..win.kernel import NO_WINDOW
 from .pairing import (app_running, desktop_pair, engines_instead, forget_inventory, inventory, official_engine,
                       own_holder, session_kind)
+from . import layout
 from .appserver import PROTOCOL_METHODS, Protocol
 from .errors import AdapterError
 from .usage import parse_usage
@@ -43,6 +44,12 @@ def offers(help_text, flag) -> bool:
     one: `--remote-auth-token` is not --remote, `--thread-id` is not --thread."""
     return re.search(r"(?<![\w-])" + re.escape(flag) + r"(?![\w-])", help_text) is not None
 # The only App Server methods the finite helper may call.
+
+
+# Why a record waits where a process of the app runs and no server of its was matched (#58's follow-up), and (v0.6.26,
+# update resilience #9) where an engine was named and the app runs another official engine: still never second-guessed.
+UNMATCHED = "app_server_unmatched"
+UNMATCHED_NAMED_ENGINE = UNMATCHED + ":named_engine"
 
 
 # The Compatibility Registry's local-check words, which the adapter's own probes answer with.
@@ -108,6 +115,20 @@ class Backend:
         # to tell another Codex session holding a conversation from anything unknown without reading them again -
         # or None where that look could not read them.
         self._rows = None
+        # v0.6.26 (update resilience #2 iv): whether the server the last app_identity() paired held the home's newest
+        # queue or state database open (pairing.desktop_pair), or None where that look paired none. loaded() calls a
+        # conversation another session's only while it is True: the app's own server holds Codex's databases while a
+        # terminal's or VS Code's session holds a conversation; where it does not, the pairing may be the wrong one.
+        self.server_holds = None
+        # v0.6.26 (update resilience #9): whether the engine this backend drives was named - by --codex-exe, the
+        # `codex_exe` setting or the environment (runtime/app.py says so) - and so is never second-guessed; and why the
+        # last look found the app open and its server unmatched, where it can say: "named_engine" where the engine was
+        # named and the app runs another official engine (`app_unmatched_reason`); None otherwise.
+        self.named_engine = False
+        self.app_look_why = None
+        # v0.6.26 (update resilience #6): the last look's process layout, counted by role (codex/layout.py snapshot):
+        # content-free counts and words, no path; None where that look read no rows.
+        self.layout = None
 
     def _environment(self):
         env = os.environ.copy()
@@ -243,25 +264,43 @@ class Backend:
         if checks["queue_flags"] != PASS:
             raise AdapterError("unsupported_codex_version")
 
+    @property
+    def app_unmatched_reason(self) -> str:
+        """The reason code for a record that waits where the last look found the app open and no server of its matched:
+        UNMATCHED, or (v0.6.26, update resilience #9) UNMATCHED_NAMED_ENGINE where the engine was named and the app runs
+        another official engine (`app_look_why`)."""
+        return UNMATCHED_NAMED_ENGINE if self.app_look_why == "named_engine" else UNMATCHED
+
     def app_identity(self):
         self.served_elsewhere = frozenset()
         self.app_look = None
+        self.app_look_why = None
+        self.server_holds = None
+        self.layout = None
         try:
             self._compatible()
             self._rows = None
             rows = self._rows = inventory()
             self.app_look, self.app_looked_at = "unmatched" if app_running(rows) else "closed", time.monotonic()
+            seen = {}
             try:
-                if self.require_holder:
-                    paired = desktop_pair(rows, self.codex_exe, self.codex_home, require_holder=True)
-                else:
-                    paired = desktop_pair(rows, self.codex_exe, self.codex_home)
+                try:
+                    if self.require_holder:
+                        paired = desktop_pair(rows, self.codex_exe, self.codex_home, require_holder=True, seen=seen)
+                    else:
+                        paired = desktop_pair(rows, self.codex_exe, self.codex_home, seen=seen)
+                finally:
+                    self.layout = layout.snapshot(rows, self.codex_exe, seen)
                 self.app_look = "matched"
+                self.server_holds = seen.get("server_holds") is True
                 return paired
             except AdapterError:
                 # The same rows, read again for one thing: the paths the app main runs instead,
                 # which the watcher asks before its next tick (runtime/app.py, engine_moved).
                 self.served_elsewhere = engines_instead(rows, self.codex_exe)
+                if (self.named_engine and self.app_look == "unmatched"
+                        and any(official_engine(path)[0] for path in self.served_elsewhere)):
+                    self.app_look_why = "named_engine"
                 raise
         except (AdapterError, OSError, KeyError, TypeError):
             return None
@@ -273,7 +312,13 @@ class Backend:
             self._compatible()
             if not app_identity or self.app_identity() != app_identity:
                 return "unknown"
-            path = self.codex_home / "thread-writer-locks" / (thread_id + ".lock")
+            folder = self.codex_home / "thread-writer-locks"
+            # v0.6.26 (update resilience #4): the app is paired and this home keeps no lock folder - Codex moved or
+            # renamed it, or keeps none any more - so whether the conversation is open cannot be told from it: a source
+            # that is not there reads unknown (B12), never notLoaded, which would say "not open" while it may be.
+            if not folder.is_dir():
+                return "unknown"
+            path = folder / (thread_id + ".lock")
             # Identify who holds the lock file OPEN via Restart Manager first. This never
             # acquires a byte lock, so it cannot race the app's own exclusive writer lock.
             # An empty inventory (absent file, or a stale file no process holds) is notLoaded.
@@ -294,8 +339,12 @@ class Backend:
                 return "loaded"
             # v0.6.16-beta.4: one holder that is another Codex session - a terminal's TUI or VS Code's server
             # (pairing.session_kind), with the app identity still the same - is "elsewhere": it waits with its
-            # own reason, and nothing is sent. Anything else fails closed, as always.
+            # own reason, and nothing is sent. Anything else fails closed, as always. v0.6.26 (update resilience #2 iv):
+            # only while the paired server holds the home's newest queue or state database (`server_holds`) - the
+            # app's own server does while a terminal's or VS Code's session holds a conversation; where it does not,
+            # the pairing may be the wrong process (#67), and "another session" would be untrue.
             if (len(users) == 1 and users != [expected] and self.app_identity() == app_identity
+                    and self.server_holds is True
                     and session_kind(self._rows, users[0], self.codex_exe)):
                 self.session_holder = (users[0]["pid"], users[0]["created"])
                 return "elsewhere"
