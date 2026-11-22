@@ -250,15 +250,21 @@ class PromptsMixin:
         ready, its record waiting since the press - so the day after which an occurrence not sent expires
         (engine/promptqueue.could_go) counts from the person's Go on, never from when it first fell due, a day or more
         before. It keeps its due time: a series keeps its slot. One behind another waits, and its day counts from the
-        end of the one before it, as ever."""
+        end of the one before it, as ever.
+
+        v0.6.26 (review V4): a series held a period or more goes on as the tick's catch-up takes one up
+        (engine/promptqueue._catch_up): the occurrences that fell while it was held are used as missed and the latest of
+        them goes - once, for its next slot then lies ahead - or, where none is left of it, it ends missed. Kept at the
+        old slot, the held occurrence went at once and the catch-up sent the latest one too: the same words twice."""
         if type(prompt_id) is not int:
             raise StateError("invalid prompt id")
         now = self._now(at)
         with self._transaction(create=False) as connection:
             if connection is None:
                 return False
-            row = connection.execute("SELECT thread_id, position, due_at, record_id FROM prompts WHERE prompt_id=? AND "
-                                     "state=?", (prompt_id, PromptState.HELD)).fetchone()
+            row = connection.execute("SELECT thread_id, position, due_at, record_id, trigger, every, sent_count, "
+                                     "occurrences, until FROM prompts WHERE prompt_id=? AND state=?",
+                                     (prompt_id, PromptState.HELD)).fetchone()
             if row is None:
                 return False
             behind = connection.execute("SELECT 1 FROM prompts WHERE thread_id=? AND position<? AND state IN (?,?,?)",
@@ -267,6 +273,19 @@ class PromptsMixin:
             if row["due_at"] is None or row["due_at"] > now or row["record_id"] is not None or behind:
                 return connection.execute("UPDATE prompts SET state=?, reason=NULL, depends=0 WHERE prompt_id=? AND "
                                           "state=?", (PromptState.WAITING, prompt_id, PromptState.HELD)).rowcount == 1
+            if row["trigger"] == PromptTrigger.RECURRING and row["every"] is not None:
+                period = PERIODS[PromptEvery(row["every"])]
+                late = int((now - row["due_at"]) // period)
+                if late > 0:
+                    used = min(row["sent_count"] + late, row["occurrences"])
+                    latest = row["due_at"] + late * period
+                    if used >= row["occurrences"] or (row["until"] is not None and latest > row["until"]):
+                        return connection.execute(
+                            "UPDATE prompts SET state=?, reason=?, sent_count=?, words=NULL, depends=0, finished_at=? "
+                            "WHERE prompt_id=? AND state=?", (PromptState.DONE, PromptReason.MISSED, used, now,
+                                                              prompt_id, PromptState.HELD)).rowcount == 1
+                    connection.execute("UPDATE prompts SET sent_count=?, due_at=? WHERE prompt_id=?",
+                                       (used, latest, prompt_id))
             key = secrets.token_hex(32)
             connection.execute("INSERT INTO records (record_id, capability, thread_id, state, created_at, claims) "
                                "VALUES (?,?,?,?,?,0)", (key, PROMPT_QUEUE, row["thread_id"], RecordState.WAITING, now))
