@@ -18,6 +18,7 @@ from __future__ import annotations
 import ast
 import calendar
 import copy
+import datetime
 import json
 import os
 from pathlib import Path
@@ -67,20 +68,30 @@ def git(root, *args, date="2026-09-20T00:00:00Z", data=None, env=None) -> str:
 
 
 def commit(repo, parent, files, message, date="2026-09-20T00:00:00Z") -> str:
-    """A commit on `parent` with `files` ({path: bytes or None}) set or removed, made with plumbing."""
-    with tempfile.TemporaryDirectory() as folder:
-        index = {"GIT_INDEX_FILE": str(Path(folder) / "index")}
-        if parent:
-            git(repo, "read-tree", parent, env=index)
-        for path, data in files.items():
-            if data is None:
-                git(repo, "update-index", "--index-info", data=("0 %s\t%s\n" % ("0" * 40, path)).encode("utf-8"),
-                    env=index)
-                continue
-            blob = git(repo, "hash-object", "-w", "--no-filters", "--stdin", data=data)
-            git(repo, "update-index", "--add", "--cacheinfo", "100644,%s,%s" % (blob, path), env=index)
-        tree = git(repo, "write-tree", env=index)
-    return git(repo, "commit-tree", tree, *(["-p", parent] if parent else []), "-m", message, date=date)
+    """A commit on `parent` with `files` ({path: bytes or None}) set or removed, written by one git fast-import.
+
+    The same commit `git commit-tree` makes from `parent`'s tree with those files changed (author and committer
+    "t", `date` on both, the message ending in one newline), but in one process instead of two per file: 1,420 of the
+    module's 4,332 git processes were this helper's (v0.6.26 audit Z3). The branch it writes on is reset at
+    the end without a commit, so fast-import leaves no ref behind.
+    """
+    when = datetime.datetime.fromisoformat(date.replace("Z", "+00:00"))
+    offset = int(when.utcoffset().total_seconds() // 60)
+    stamp = "%d %s%02d%02d" % (int(when.timestamp()), "-" if offset < 0 else "+", abs(offset) // 60, abs(offset) % 60)
+    body = (message if message.endswith("\n") else message + "\n").encode("utf-8")     # as -m completes its line
+    stream = [b"feature done\n", b"commit refs/fast-import/scratch\n", b"mark :1\n",
+              ("author t <t@example.invalid> %s\n" % stamp).encode("utf-8"),
+              ("committer t <t@example.invalid> %s\n" % stamp).encode("utf-8"),
+              b"data %d\n" % len(body), body]
+    if parent:
+        stream.append(("from %s\n" % parent).encode("ascii"))
+    for path, data in files.items():
+        if data is None:
+            stream.append(("D %s\n" % path).encode("utf-8"))
+            continue
+        stream += [("M 100644 inline %s\n" % path).encode("utf-8"), b"data %d\n" % len(data), data, b"\n"]
+    stream += [b"\nget-mark :1\n", b"reset refs/fast-import/scratch\n", b"done\n"]
+    return git(repo, "fast-import", "--quiet", data=b"".join(stream))
 
 
 def git_bash():
