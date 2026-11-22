@@ -25,8 +25,8 @@ _HERE = str(Path(__file__).resolve().parent)
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from test_version_picker import (BOOTSTRAP, GOOD_FINAL, INSTALLED, LIFT, LISTED, PAGES, POWERSHELL,  # noqa: E402
-                                 RELEASE, ROWS, PickerRun, entry, junk, kept, listed)
+from test_version_picker import (BOOTSTRAP, GOOD_FINAL, INSTALLED, LIFT, LISTED, MAX_PAGES, PAGES,  # noqa: E402
+                                 POWERSHELL, RELEASE, ROWS, PickerRun, entry, junk, kept, listed)
 
 
 def full(*versions):
@@ -57,8 +57,9 @@ CASES = {
         [[entry("0.6.4"), entry("0.6.0")] + junk(28)], [kept("0.6.4"), kept("0.6.0")], 1),
     # A page with nothing that counts on it ends nothing either.
     "a_full_page_of_nothing_that_counts": ([junk(30), [entry("0.6.0")]], [kept("0.6.0")], 2),
-    # Five full pages still above the floor may not be all of it: never a sixth, and a throw.
-    "five_full_pages_above_the_floor": ([full("0.6.%d" % (30 - page)) for page in range(1, 7)], "THROWS", 5),
+    # $PickMaxPages full pages still above the floor may not be all of it: never one more, and a throw.
+    "five_full_pages_above_the_floor": ([full("0.6.%d" % (MAX_PAGES + 10 - page)) for page in range(1, MAX_PAGES + 2)],
+                                        "THROWS", MAX_PAGES),
 }
 
 
