@@ -159,21 +159,25 @@ def layout(vm, scale, measure) -> dict:
     chip_w = chip_h = 0
     # A chip as the window and the panel size one (v0.6.10): LAYOUT's height and padding.
     chip_pad = px(brand.LAYOUT["chip_pad_x"])
+    # v0.6.26 (audit D3; the owner, 2026-11-22, "제안대로 모두 고침"): the chip's round end brand.LAYOUT["pill_inset"] inside
+    # the card's content edge - lined up on the notice tile's straight edge under it, it looked as if it stuck out past
+    # it, the version pill's case (Brand.PillInset in the window).
+    chip_end = right - px(brand.LAYOUT["pill_inset"])
     if vm["chip"]:
         chip_text_w, chip_text_h = measure("chip", vm["chip"], inner, False)
         product_w, _ = measure("label", vm["product"], inner, False)
-        room = right - (text_left + product_w + px(space["m"]))
+        room = chip_end - (text_left + product_w + px(space["m"]))
         chip_w = max(min(chip_text_w + 2 * chip_pad, room), min(chip_text_w + 2 * chip_pad, inner // 3))
         chip_h = max(px(brand.LAYOUT["chip_height"]), chip_text_h)
     header_h = max(mark, product_h, chip_h)
     items.append({"kind": "halo", "cx": left + mark / 2.0, "cy": y + header_h / 2.0, "state": vm["status"],
                   "radius": brand.glow_extent(brand.STATUS_DOT["popup"]) * scale})
-    product_right = right - (chip_w + px(space["s"]) if chip_w else 0)
+    product_right = chip_end - (chip_w + px(space["s"])) if chip_w else right
     top = y + (header_h - product_h) // 2
     text((text_left, top, product_right, top + product_h), "label", vm["product"], "muted")
     if vm["chip"]:
         chip_top = y + (header_h - chip_h) // 2
-        chip_rect = (right - chip_w, chip_top, right, chip_top + chip_h)
+        chip_rect = (chip_end - chip_w, chip_top, chip_end, chip_top + chip_h)
         items.append({"kind": "chip", "rect": chip_rect, "tone": vm["chip_tone"]})
         text((chip_rect[0] + chip_pad, chip_rect[1], chip_rect[2] - chip_pad, chip_rect[3]), "chip",
              vm["chip"], vm["chip_tone"], align="center")
