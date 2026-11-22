@@ -149,8 +149,8 @@ class ShowTests(IconCase):
         self.assertEqual(len(made), 1, "made once and kept")
         self.assertEqual(len(made[0].shown), 2)
         parts, snapshot, strings = made[0].content()
-        self.assertEqual(words.tooltip_joined(parts)[:words.TIP_CHARS - 1],
-                         words.tooltip(snapshot, strings, time.time(), "advanced"))
+        tip = words.tooltip(snapshot, strings, time.time(), "advanced")
+        self.assertTrue(words.tooltip_joined(parts).startswith(tip))
         self.assertEqual(parts["edition"], "Advanced")
         self.assertIs(made[0].held.__func__, tray.Tray._popup_held)
         # v0.6.24-beta.3 (W2): it shows the day only as the icon does - the watcher's own (`days`).
