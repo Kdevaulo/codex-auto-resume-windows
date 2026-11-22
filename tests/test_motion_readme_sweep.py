@@ -156,9 +156,12 @@ class TheResumeSweep(unittest.TestCase):
 class TheVeil(unittest.TestCase):
     def test_every_frame_of_the_dialog_is_drawn_veiled_and_none_other(self):
         render = guiscan.member_body("SettingsForm", "RenderDialog")
-        self.assertLess(render.index("PaintVeil(picture);"), render.index("PaintDialog(picture"),
-                        "the veil under the dialog, over the window")
-        veil = guiscan.member_body("SettingsForm", "PaintVeil")
+        # v0.6.26 (audit-apng M3): the veil fades in with the dialog (gui-audit D9): its fullest times the dialog's alpha.
+        self.assertLess(render.index("PaintVeil(picture, (int)Math.Round(DialogVeil.FullNow * fade / 255.0));"),
+                        render.index("PaintDialog(picture"), "the veil under the dialog, over the window")
+        # Both of its overloads (v0.6.26: the veil at an alpha of its own while the dialog fades in).
+        source = guiscan.read("gui/WindowRender.cs")
+        veil = source[source.index("internal static void PaintVeil(Bitmap picture)"):source.index("internal static int Veiled(")]
         self.assertIn("DialogVeil.FullNow", veil, "at its fullest at once, as DialogVeil comes on")
         self.assertIn("DialogVeil.Ink()", veil)
         self.assertIn("Palette.Contrast", veil, "none in High Contrast, as DialogVeil.Over makes none")

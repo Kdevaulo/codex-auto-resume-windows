@@ -11,7 +11,9 @@ The replies are the bridge's own, asked here of the generator's pinned scratch i
 (make_screenshots.pinned_installation: the same records, the same clock, the same stand-in registry and engine the
 wire goldens and the envelope are asked of), one set per language the picture shows, with what a Save in the picture
 stored (`forms` in the plan). Every command the window sends that is not among them - each one that would change
-something - is refused, so the render mode can neither write nor start anything.
+something - is refused, so the render mode can neither write nor start anything. v0.6.26 (audit-apng M7): among them is
+what the pinned installation answers to Retry now on each waiting task, asked of it after every read, so a frame that
+says the answer came (`answered`) shows the note the window writes for that answer; the render only reads it.
 
 This compiles its own copy of the window (gui/window.sources, gui/app.manifest) into a scratch folder, and runs it
 there with CREATE_NO_WINDOW. Every job is drawn at the stills' pinned scale (make_screenshots.PINNED_SCALE, 150 %), not
@@ -117,6 +119,15 @@ def answers(locale: str, stored: dict | None = None, paused: bool = False) -> li
                                                 (replies["settings"] or {}).get("settings") or {})
                 if preview is not None:
                     out.append({"command": preview[0], "argument": None, "reply": shots.ask(surface, *preview)})
+                # v0.6.26 (audit-apng M7): what Retry now on each waiting task gets - asked last, after every read, of
+                # the scratch installation, whose watcher is not running (its wake event is its own state folder's). An
+                # answer it refuses is left out: the render then draws no note, and says so.
+                for row in (replies["dashboard"] or {}).get("pending") or []:
+                    argument = {"interruption_id": row["interruption_id"]}
+                    reply = shots.ask(surface, "retry-now", argument)
+                    if reply.get("ok"):
+                        out.append({"command": "retry-now", "argument": json.dumps(argument, separators=(",", ":")),
+                                    "reply": reply})
             finally:
                 if previous is None:
                     os.environ.pop(l10n.ENV_LANG, None)

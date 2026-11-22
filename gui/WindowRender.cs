@@ -10,7 +10,10 @@
 // menu open (v0.6.18), an action in flight (v0.6.20: SetBusy), the answers of another state of the installation
 // (paused), Why it is waiting scrolled, a dialog the window opened (Timeline) over it with the veil under it, the moment
 // of its lights and of the light's sweep (v0.6.24) - waits until it holds still as a capture waits (Settled), and draws
-// itself into a bitmap; only what changed since the frame before is written.
+// itself into a bitmap; only what changed since the frame before is written. v0.6.26 (audit-apng M3-M7): the row menu,
+// a drop-down's list and a dialog fade in at the frame's moment of their opening, the menu and the list fade out, a
+// drop-down with its list open looks open, and Retry now's answer is taken as the window takes it. A glide of a control's
+// face (hover, press, the current tab, busy, the light's colour) is drawn arrived: Transition runs on the wall clock.
 
 using System;
 using System.Collections.Generic;
@@ -388,6 +391,8 @@ namespace CodexAutoResume
             RenderSelected(Map(frame, "selected"));
             RenderScroll(page, Map(frame, "scroll"));
             RenderExplain(page, Map(frame, "explain"));
+            // v0.6.26 (audit-apng M5): a drop-down whose list is open looks open - its edge a step darker, its chevron turned.
+            RenderComboOpen(Map(frame, "droplist"));
             RenderFace(Str(frame, "hover"), Str(frame, "pressed"), writer);
             object light;
             Soft.StillLightMs = frame.TryGetValue("light", out light) && light != null
@@ -396,6 +401,8 @@ namespace CodexAutoResume
             // is the working one (BusyLight). After the moment of the lights, which the header reads as it follows.
             object working;
             RenderBusy(frame.TryGetValue("busy", out working) && Equals(working, true));
+            // v0.6.26 (audit-apng M7): the answer of an action the frame says came, taken as the window takes it.
+            RenderAnswered(Str(frame, "answered"), writer);
             object sweeping;
             RenderSweep(frame.TryGetValue("sweep", out sweeping) && sweeping != null
                 ? Convert.ToDouble(sweeping, CultureInfo.InvariantCulture) : -1);
@@ -436,6 +443,109 @@ namespace CodexAutoResume
                 Application.DoEvents();
                 System.Threading.Thread.Sleep(5);
             }
+        }
+
+        // The action whose answer the last frame took (RenderAnswered), or null.
+        private string renderAnswered;
+
+        /// v0.6.26 (audit-apng M7): an action's answer, as the window takes it - `retry-now`: the window's own Retry now
+        /// (RetryNow) on the chosen Pending row, its call answered from the job's replies (the pinned installation's own
+        /// answer, build/motion_window.py answers), so the note under the list says what the product says for that answer
+        /// (ShowPendingNote). Once, when a frame first names it; nothing again while frames go on naming it.
+        private void RenderAnswered(string command, RenderWriter writer)
+        {
+            if (command == renderAnswered) return;
+            renderAnswered = command;
+            if (command == null) return;
+            if (command != "retry-now") { writer.Note("no action is called " + command); return; }
+            var row = Selected(pendingList);
+            if (row == null) { writer.Note("Retry now is answered with no Pending row chosen"); return; }
+            // Only an answer the job gives: a refusal would have the window say so in a box of its own, never drawn here.
+            if (!Ok(RenderAnswer("retry-now", IdArgument(row)))) { writer.Note("Retry now on the chosen row was not answered"); return; }
+            RetryNow();
+            if (!HoldStill(true)) writer.Note("Retry now's answer did not hold still: " + Unsettled());
+        }
+
+        /// A frame's moment `key` (`appear_ms`, `close_ms`) of something opening or closing, in ms, or -1 when it has none.
+        private static double RenderMs(Dictionary<string, object> state, string key)
+        {
+            object given;
+            return state != null && state.TryGetValue(key, out given) && given != null
+                ? Convert.ToDouble(given, CultureInfo.InvariantCulture) : -1;
+        }
+
+        /// v0.6.26 (audit-apng M4, M5): how opaque, and how far below its place, a card that opens as the row menu and the
+        /// drop-down's list open (SoftMenuLayer.Tick, SoftDropList.PaintAt) is `appear` ms into its opening: fading in and
+        /// rising SpaceXs into place over Motion.Duration on Motion.Ease. Arrived for -1.
+        internal static void RenderOpening(double appear, out int alpha, out int rise)
+        {
+            double t = appear < 0 ? 1.0 : appear / Math.Max(1, Motion.Duration);
+            double eased = Motion.Ease(Math.Min(1.0, t));
+            alpha = t >= 1.0 ? 255 : (int)Math.Round(255 * eased);
+            rise = t >= 1.0 ? 0 : (int)Math.Round(Soft.Px(Brand.SpaceXs) * (1.0 - eased));
+        }
+
+        /// v0.6.26 (audit-apng M4, M5): how opaque the last picture of a closed menu or list is `ms` into its fade-out from
+        /// `from` (SoftLayerFade.Tick, SoftDropList.FadeFrame): over Motion.Press on Motion.Ease, then gone.
+        internal static int RenderClosing(double ms, int from)
+        {
+            double part = ms / Math.Max(1, Motion.Press);
+            return part >= 1.0 ? 0 : (int)Math.Round(from * (1.0 - Motion.Ease(Math.Max(0.0, part))));
+        }
+
+        /// `image` over `picture` at `at`, `alpha` (0 to 255) as opaque as it is drawn, as a layered window of that alpha is laid.
+        private static void LayFaded(Bitmap picture, Bitmap image, Point at, int alpha)
+        {
+            if (image == null || alpha <= 0) return;
+            using (Graphics g = Graphics.FromImage(picture))
+            {
+                if (alpha >= 255) { g.DrawImage(image, at.X, at.Y, image.Width, image.Height); return; }
+                using (var faded = new ImageAttributes())
+                {
+                    var matrix = new ColorMatrix();
+                    matrix.Matrix33 = alpha / 255f;
+                    faded.SetColorMatrix(matrix);
+                    g.DrawImage(image, new Rectangle(at.X, at.Y, image.Width, image.Height), 0, 0, image.Width, image.Height,
+                                GraphicsUnit.Pixel, faded);
+                }
+            }
+        }
+
+        // The drop-down the last frame gave its open look (RenderComboOpen), or null.
+        private SoftCombo renderOpened;
+
+        /// v0.6.26 (audit-apng M5): the drop-down whose list the frame has open (not closing) in its open look, as OpenList
+        /// leaves it - its edge a step darker (FaceWanted while Open) and its chevron turned up - and the one before in its
+        /// closed look again. The list itself is drawn over the picture (RenderDropList); the drop-down is only told it has
+        /// one, never shown it.
+        private void RenderComboOpen(Dictionary<string, object> listed)
+        {
+            SoftCombo wanted = null;
+            Control editor;
+            if (listed != null && RenderMs(listed, "close_ms") < 0 && editors.TryGetValue(Str(listed, "field") ?? "", out editor))
+                wanted = editor as SoftCombo;
+            if (wanted == renderOpened) return;
+            if (renderOpened != null && !renderOpened.IsDisposed) ComboLooksOpen(renderOpened, false);
+            renderOpened = wanted;
+            if (wanted != null) ComboLooksOpen(wanted, true);
+        }
+
+        private static void ComboLooksOpen(SoftCombo combo, bool open)
+        {
+            const System.Reflection.BindingFlags own = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            System.Reflection.FieldInfo drop = typeof(SoftCombo).GetField("drop", own);
+            System.Reflection.FieldInfo turn = typeof(SoftCombo).GetField("chevron", own);
+            if (drop == null || turn == null) return;
+            var was = drop.GetValue(combo) as SoftDropList;
+            if (open && was == null) drop.SetValue(combo, new SoftDropList(combo));
+            else if (!open && was != null)
+            {
+                drop.SetValue(combo, null);
+                was.Dispose();
+            }
+            var chevron = turn.GetValue(combo) as Transition;
+            if (chevron != null) chevron.Jump(open ? 1.0 : 0.0);
+            combo.Invalidate();
         }
 
         /// Why it is waiting scrolled `notches` turns of the wheel down, the last of them `glide_ms` into its glide: its
@@ -570,7 +680,8 @@ namespace CodexAutoResume
         {
             const System.Reflection.BindingFlags own = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             Type type = control.GetType();
-            System.Reflection.FieldInfo hovered = type.GetField("hover", own);
+            // v0.6.26 (audit-apng M5): the drop-down keeps its pointer's hover as faceHover.
+            System.Reflection.FieldInfo hovered = type.GetField("hover", own) ?? type.GetField("faceHover", own);
             if (hovered != null && hovered.FieldType == typeof(bool)) hovered.SetValue(control, hover);
             System.Reflection.MethodInfo press = type.GetMethod("Press", own, null, new[] { typeof(bool) }, null);
             if (press != null) press.Invoke(control, new object[] { pressed });
@@ -705,7 +816,7 @@ namespace CodexAutoResume
             // card where it opens.
             RenderDropList(picture, Map(frame, "droplist"), writer);
             var menu = Map(frame, "menu");
-            if (menu != null) RenderMenu(picture, Str(menu, "at"), Str(frame, "hover"), writer);
+            if (menu != null) RenderMenu(picture, menu, Str(frame, "hover"), writer);
             // v0.6.20: a dialog the window opened, centred over it: a top-level window of its own, drawn by its own
             // controls, with the title bar Windows draws round it.
             var dialog = Map(frame, "dialog");
@@ -715,6 +826,11 @@ namespace CodexAutoResume
 
         // The items of the row menu the last picture showed open, by name (`menu.<n>`), in client coordinates.
         private Dictionary<string, Rectangle> renderMenu;
+        // v0.6.26 (audit-apng M4, M5): the last picture of the row menu and of a drop-down's list, where it stood and how
+        // opaque - what the product fades out once it has closed (SoftLayerFade, SoftDropList.FadeOut).
+        private Bitmap renderMenuLast, renderListLast;
+        private Point renderMenuLastAt, renderListLastAt;
+        private int renderMenuLastAlpha, renderListLastAlpha;
 
         /// The Pending row `name` names (`task.<n>`) in client coordinates, and its index; false when it is not shown.
         private bool RenderTask(string name, out Rectangle bounds, out int index)
@@ -734,8 +850,17 @@ namespace CodexAutoResume
         /// The row menu of the Pending row `at` names, as a right click there opens it - filled by FillRowMenu as the
         /// menu's Opening fills it, the item `hover` names (`menu.<n>`) in hand - drawn by its own card (SoftMenuLayer)
         /// with the card's corner where the pointer is (RenderMenuPlace), and its items named for the pointer.
-        private void RenderMenu(Bitmap picture, string at, string hover, RenderWriter writer)
+        private void RenderMenu(Bitmap picture, Dictionary<string, object> menu, string hover, RenderWriter writer)
         {
+            // v0.6.26 (audit-apng M4): closed, its last picture fades out where it stood (SoftMenuLayer.Closed, SoftLayerFade).
+            double closing = RenderMs(menu, "close_ms");
+            if (closing >= 0)
+            {
+                if (renderMenuLast == null) { writer.Note("the row menu closes with no picture of it open"); return; }
+                LayFaded(picture, renderMenuLast, renderMenuLastAt, RenderClosing(closing, renderMenuLastAlpha));
+                return;
+            }
+            string at = Str(menu, "at");
             Rectangle row;
             int index;
             if (!RenderTask(at, out row, out index)) { writer.Note("no Pending row is called " + at); return; }
@@ -760,7 +885,14 @@ namespace CodexAutoResume
             // Where the pointer stands on the row: its centre, as the pointer is put on a target (motion_compose.locate).
             var anchor = new Point(row.X + row.Width / 2, row.Y + row.Height / 2);
             Point corner = RenderMenuPlace(anchor, image.Size, SoftMenuLayer.Reach, ClientSize);
-            using (Graphics g = Graphics.FromImage(picture)) g.DrawImage(image, corner.X, corner.Y, image.Width, image.Height);
+            // v0.6.26 (audit-apng M4): opening, it fades in and rises into place (SoftMenuLayer.Open, Tick), `appear_ms` in.
+            int alpha, rise;
+            RenderOpening(RenderMs(menu, "appear_ms"), out alpha, out rise);
+            LayFaded(picture, image, new Point(corner.X, corner.Y + rise), alpha);
+            if (renderMenuLast != null) renderMenuLast.Dispose();
+            renderMenuLast = (Bitmap)image.Clone();
+            renderMenuLastAt = new Point(corner.X, corner.Y + rise);
+            renderMenuLastAlpha = alpha;
             renderMenu = new Dictionary<string, Rectangle>();
             for (int i = 0; i < pendingMenu.Items.Count; i++)
             {
@@ -788,6 +920,14 @@ namespace CodexAutoResume
         private void RenderDropList(Bitmap picture, Dictionary<string, object> listed, RenderWriter writer)
         {
             if (listed == null) return;
+            // v0.6.26 (audit-apng M5): closed, its last picture fades out where it stood (SoftCombo.CloseList, FadeOut).
+            double closing = RenderMs(listed, "close_ms");
+            if (closing >= 0)
+            {
+                if (renderListLast == null) { writer.Note("the drop list closes with no picture of it open"); return; }
+                LayFaded(picture, renderListLast, renderListLastAt, RenderClosing(closing, renderListLastAlpha));
+                return;
+            }
             Control editor;
             var combo = editors.TryGetValue(Str(listed, "field") ?? "", out editor) ? editor as SoftCombo : null;
             if (combo == null) { writer.Note("no drop-down is called " + Str(listed, "field")); return; }
@@ -815,15 +955,11 @@ namespace CodexAutoResume
                 int rise = list.CardOnScreen.Y - card.Y;
                 int left = field.X + card.X - screenField.X - margin.Left;
                 int top = field.Y + card.Y - screenField.Y - margin.Top + rise;
-                using (Graphics g = Graphics.FromImage(picture))
-                using (var faded = new ImageAttributes())
-                {
-                    var matrix = new ColorMatrix();
-                    matrix.Matrix33 = list.Alpha / 255f;
-                    faded.SetColorMatrix(matrix);
-                    g.DrawImage(image, new Rectangle(left, top, image.Width, image.Height), 0, 0, image.Width, image.Height,
-                                GraphicsUnit.Pixel, faded);
-                }
+                LayFaded(picture, image, new Point(left, top), list.Alpha);
+                if (renderListLast != null) renderListLast.Dispose();
+                renderListLast = (Bitmap)image.Clone();
+                renderListLastAt = new Point(left, top);
+                renderListLastAlpha = list.Alpha;
                 renderRows = new Dictionary<string, Rectangle>();
                 for (int i = 0; i < combo.Items.Count; i++)
                 {
@@ -962,8 +1098,18 @@ namespace CodexAutoResume
                     Size outer = new Size(client.Width + 2 * border, client.Height + 2 * border);
                     Point place = RenderDialogPlace(outer, ClientSize);
                     // v0.6.24: the window dimmed under it, as it is for as long as the dialog is open (DialogVeil).
-                    PaintVeil(picture);
-                    PaintDialog(picture, body, place, outer, border, form.BackColor);
+                    // v0.6.26 (audit-apng M3): the dialog fades in over Motion.Duration once it is painted (SoftDialog's
+                    // OpenFade, FadeStep: 255 * Motion.Ease), `appear_ms` in, its own corner's edge and shadow with it, and
+                    // the veil with it (DialogVeil at its fullest times the dialog's alpha, gui-audit D9).
+                    int fade = RenderDialogAlpha(RenderMs(dialog, "appear_ms"));
+                    PaintVeil(picture, (int)Math.Round(DialogVeil.FullNow * fade / 255.0));
+                    if (fade >= 255) PaintDialog(picture, body, place, outer, border, form.BackColor);
+                    else if (fade > 0)
+                        using (var under = (Bitmap)picture.Clone())
+                        {
+                            PaintDialog(picture, body, place, outer, border, form.BackColor);
+                            Blend(picture, under, fade);
+                        }
                     renderDialogBounds = new Dictionary<string, Rectangle>();
                     renderDialogBounds["dialog.window"] = new Rectangle(place.X, place.Y, outer.Width, outer.Height);
                     if (close != null)
@@ -1029,8 +1175,13 @@ namespace CodexAutoResume
         /// makes none.
         internal static void PaintVeil(Bitmap picture)
         {
-            if (!DialogVeil.Enabled || Palette.Contrast) return;
-            int alpha = DialogVeil.FullNow;
+            PaintVeil(picture, DialogVeil.FullNow);
+        }
+
+        /// v0.6.26 (audit-apng M3): the veil at `alpha`, the dialog's fade times its fullest, while the dialog fades in.
+        internal static void PaintVeil(Bitmap picture, int alpha)
+        {
+            if (!DialogVeil.Enabled || Palette.Contrast || alpha <= 0) return;
             Color ink = DialogVeil.Ink();
             int[] pixels = Argb(picture);
             for (int i = 0; i < pixels.Length; i++)
@@ -1047,6 +1198,38 @@ namespace CodexAutoResume
             {
                 for (int y = 0; y < picture.Height; y++)
                     Marshal.Copy(pixels, y * picture.Width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), picture.Width);
+            }
+            finally { picture.UnlockBits(data); }
+        }
+
+        /// v0.6.26 (audit-apng M3): how opaque the dialog is `appear` ms into its fade-in (SoftDialog.FadeStep): 255 times
+        /// Motion.Ease over Motion.Duration, from clear; at rest (255) for -1.
+        internal static int RenderDialogAlpha(double appear)
+        {
+            if (appear < 0) return 255;
+            double t = appear / Math.Max(1, Motion.Duration);
+            return t >= 1.0 ? 255 : (int)Math.Round(255 * Motion.Ease(t));
+        }
+
+        /// `picture` - the dialog laid whole over `under` - as the dialog's window at `alpha` shows it over what is under:
+        /// each channel `alpha` of the way from under to it, as a layered window of that alpha is composed.
+        internal static void Blend(Bitmap picture, Bitmap under, int alpha)
+        {
+            int[] over = Argb(picture), below = Argb(under);
+            for (int i = 0; i < over.Length; i++)
+            {
+                int a = over[i], b = below[i];
+                over[i] = unchecked((int)0xFF000000) |
+                          (Veiled((b >> 16) & 0xFF, (a >> 16) & 0xFF, alpha) << 16) |
+                          (Veiled((b >> 8) & 0xFF, (a >> 8) & 0xFF, alpha) << 8) |
+                          Veiled(b & 0xFF, a & 0xFF, alpha);
+            }
+            BitmapData data = picture.LockBits(new Rectangle(0, 0, picture.Width, picture.Height), ImageLockMode.WriteOnly,
+                                               PixelFormat.Format32bppArgb);
+            try
+            {
+                for (int y = 0; y < picture.Height; y++)
+                    Marshal.Copy(over, y * picture.Width, new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), picture.Width);
             }
             finally { picture.UnlockBits(data); }
         }

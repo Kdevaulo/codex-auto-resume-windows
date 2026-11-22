@@ -158,7 +158,9 @@ class TimelineTests(unittest.TestCase):
                 self.assertTrue(opened)
                 first, last = opened[0], opened[-1]
                 self.assertEqual(opened, list(range(first, last + 1)), "one stretch, no other dialog")
-                self.assertEqual(state(frames[first])["dialog"], {"kind": "timeline"})
+                # v0.6.26 (audit-apng M3): it fades in, then stands at rest.
+                self.assertEqual(state(frames[first])["dialog"], {"kind": "timeline", "appear_ms": 0})
+                self.assertIn({"kind": "timeline"}, [state(frame)["dialog"] for frame in frames[first:last + 1]])
                 before = [state(frame) for frame in frames[:first] if state(frame).get("pressed") == "pending.timeline"]
                 self.assertTrue(before, "opened by a press on Timeline")
                 self.assertNotIn("dialog", state(frames[0]))
