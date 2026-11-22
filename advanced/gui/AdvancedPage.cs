@@ -2340,6 +2340,9 @@ namespace CodexAutoResume
                 return Word("page.policy.shadow_only", "Your administrator's Windows policy lets this feature be watched, not turned on.");
             if (StaleRefusal(refusal))
                 return Word("page.refused.changed", "It kept changing while you read it, so nothing was turned on. Try again in a moment.");
+            // v0.6.26 (audit R3): what it needs could not be turned on with it - its own sentence, not "refused".
+            if (refusal == "requirement_refused")
+                return Word("page.refused.requirement", "What this feature needs could not be turned on with it, so nothing was turned on. Try again in a moment.");
             if (refusal == "failed_here")
                 return Word("page.refused.failed_here", "A compatibility check of what it relies on failed on this computer, so it cannot be kept on. You can still turn it on.");
             if (refusal == "requirement_failed_here")
