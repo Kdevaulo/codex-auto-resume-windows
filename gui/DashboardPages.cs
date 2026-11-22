@@ -106,6 +106,8 @@ namespace CodexAutoResume
             Lead(recent, MakeButton(S("nav.history", "History"), false, delegate { ShowPage("history"); }));
             recentGrid.SizeChanged += delegate { FitRecentNames(); };
 
+            // v0.6.26 (audit D8): the left column's two fact tables, one above the other, keep one value column.
+            grid.Layout += delegate { OneLabelColumn(facts, weekFacts); };
             grid.Controls.Add(now, 0, 0);
             grid.Controls.Add(waiting, 1, 0);
             grid.Controls.Add(week, 0, 1);
