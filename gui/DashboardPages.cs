@@ -717,6 +717,9 @@ namespace CodexAutoResume
             TableLayoutPanel outcomes = MakeCard(S("stats.outcomes", "How recoveries ended"));
             outcomes.Margin = GridGap(1, true);
             chart = new OutcomeChart();
+            // v0.6.26 (audit D7): none of its own, as Facts: the default 3 px never scaled, and set the chart 2-3 px in from
+            // its card's heading.
+            chart.Margin = new Padding(0);
             chart.Dock = DockStyle.Top;
             chart.Height = Px(220);
             chart.BackColor = Card;
