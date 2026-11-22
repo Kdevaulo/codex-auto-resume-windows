@@ -71,7 +71,9 @@ class SourceTests(unittest.TestCase):
         render = guiscan.read("gui/WindowRender.cs")
         self.assertIn('listed.TryGetValue("appear_ms", out appearing)', render)
         self.assertIn("list.PaintAt(hovered, area, appear)", render)
-        self.assertIn("matrix.Matrix33 = list.Alpha / 255f;", render)
+        # v0.6.26: laid at the list's own alpha by LayFaded, which the menu and a closing list share.
+        self.assertIn("LayFaded(picture, image, new Point(left, top), list.Alpha);", render)
+        self.assertIn("matrix.Matrix33 = alpha / 255f;", guiscan.member_body("SettingsForm", "LayFaded"))
         self.assertIn("int rise = list.CardOnScreen.Y - card.Y;", render)
 
     def test_a_rendered_window_never_reopens_itself(self):
