@@ -127,6 +127,8 @@ window and a card in Codex round their corners by the same amount.
 | Table | Values | Used for |
 | --- | --- | --- |
 | `RADII` | card 16, control 11, chip 999, small 7, check 5 | Corners. A chip is a pill. |
+| `CORNER_SMOOTHING`, `DESIGN_SMOOTHING`, `WINDOW_SQUIRCLE` | corner smoothing 0.6 (Figma's 60 %): a corner of radius R begins 1.6 × R from its vertex instead of R, and the radii above stay as they are; Soft smooths its corners, Classic and Plain do not; the Dashboard window cuts its own outer corner the way its cards are cut (`WINDOW_SQUIRCLE`, on) | The curve of a corner. It is paint only, never layout: every rectangle is the same either way. |
+| `CAPTION_STROKE` | 1.3 CSS px | The stroke of the caption buttons' glyphs, never thinner than one device pixel where it is drawn. |
 | `SPACING` | 4, 8, 12, 16, 24, 32 (`xs` to `xxl`) | Padding and gaps. |
 | `TYPE` | title 20, heading 14, body 12, small 11 | The popup's and the notification card's type sizes. The Dashboard keeps Windows' message font at its own sizes. |
 | `TYPE_SCALE`, `LINE_HEIGHT`, `TYPE_ROLES` | display 21, title 15, body 14, small 12.5, mono 13 | The panel's type. The native surfaces keep `TYPE`: a notification-area popup and a fixed-size window read better with smaller text than a panel inside Codex. |
@@ -713,15 +715,16 @@ attached, every one came out 2000x1386 where the set is 1500x1041. Now the windo
 itself, offscreen, in the render mode the motion pictures use (`gui/WindowRender.cs`), at a
 pinned 150 % (`PINNED_DPI` in `build/make_screenshots.py`) and Windows' plain text size: the
 fonts at that scale's size, a list's header laid out at it, the window on no screen. Nothing
-appears on the screen. The title bar is Windows' to draw, on a monitor at that monitor's DPI, so
-it is taken once from a capture at 150 % and kept beside the generator (`build/window_frame.py`,
-`build/frame/`, with the title, the icon and the DPI it shows; a change to any of them stops the
-generator until it is taken again), and the corners are cut round as the capture cut them. Drawn
+appears on the screen. Since v0.6.24 the window has no title bar of Windows': its caption buttons
+are its own, drawn inside the first card, so nothing is taken from a capture or kept beside the
+generator (`build/window_frame.py` and `build/frame/` are gone). The corners are cut as `still_job`
+asks: the card's squircle at the pinned DPI while `WINDOW_SQUIRCLE` is on, and Windows' own round
+corner otherwise. Drawn
 on a 200 % laptop, every window still and the setup window's Welcome still
 (`build/make_install_motion.py --still`) were the committed 150 % captures byte for byte. The
 manifest records `window_dpi` and `window_drawn` where it recorded the display's `system_dpi`.
 
-`--capture` still photographs real windows, for a proof or to take the title bar again, with a
+`--capture` still photographs real windows, for a proof, with a
 monitor at 150 % as the primary. Captures are taken with `build/capture_window.ps1`, which
 declares itself DPI aware before measuring. A DPI-unaware capture is told a scaled-down window
 rectangle, allocates a bitmap that size and returns a picture of the window's top-left corner —
