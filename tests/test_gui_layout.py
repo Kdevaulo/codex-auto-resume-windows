@@ -24,6 +24,8 @@ language at five scalings, which is what a later edit would break.
 from __future__ import annotations
 
 import copy
+import importlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -972,7 +974,7 @@ $auditedHero = $form.GetField('AuditedHero', $static)
 $auditedLists = $form.GetField('AuditedLists', $static)
 $auditedNotes = $form.GetField('AuditedNotes', $static)
 $auditedShortest = @('AuditedShortest', 'AuditedAlike', 'AuditedWraps' | ForEach-Object { $form.GetField($_, $static) })
-foreach ($locale in (ConvertFrom-Json $env:CAR_LOCALES)) {
+foreach ($locale in (ConvertFrom-Json $env:CAR_AUDIT_LOCALES)) {
     $catalog = [IO.File]::ReadAllText((Join-Path $work ('strings-' + $locale + '.json')), $utf8)
     $out.audit[$locale] = @{}
     $out.pins[$locale] = @{}
@@ -1004,7 +1006,7 @@ $auditedStates = $form.GetField('AuditedStates', $static)
 $states = [IO.File]::ReadAllText((Join-Path $work 'states.json'), $utf8)
 $out.states = @{}
 $out.statesAudited = @{}
-foreach ($locale in (ConvertFrom-Json $env:CAR_LOCALES)) {
+foreach ($locale in (ConvertFrom-Json $env:CAR_AUDIT_LOCALES)) {
     $catalog = [IO.File]::ReadAllText((Join-Path $work ('strings-' + $locale + '.json')), $utf8)
     $out.states[$locale] = @{}
     $out.statesAudited[$locale] = @{}
@@ -1013,6 +1015,11 @@ foreach ($locale in (ConvertFrom-Json $env:CAR_LOCALES)) {
         $out.states[$locale][$key] = [string]$statesAudit.Invoke($null, [object[]]@($catalog, $states, [double]$scale))
         $out.statesAudited[$locale][$key] = [int]$auditedStates.GetValue($null)
     }
+}
+# A share of the languages' audits alone (test_gui_layout_audit_<n>): the two above, in its languages, and nothing else.
+if ($env:CAR_AUDIT_ONLY -eq '1') {
+    [IO.File]::WriteAllText((Join-Path $work 'result.json'), ($out | ConvertTo-Json -Depth 6 -Compress), $utf8)
+    exit 0
 }
 # An engine state the window has no word for, as long as a paragraph: Right now cannot be planned for it, so a quiet
 # report on the states is the audit measuring.
@@ -1491,19 +1498,37 @@ HEIGHTS = (
 SHORTEST_AT_150 = 1008 - 11
 
 
-@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
-class LayoutAuditTests(unittest.TestCase):
-    """Every page of the real window, in every language at five scalings, at its opening size.
+# The languages' audits at every scaling (LayoutAudit and OverviewStatesAudit, 2 x 5 a language), dealt over this module
+# and AUDIT_MODULES - 1 modules of their own, tests/test_gui_layout_audit_<n>.py: one file held all 22 languages and was the
+# slowest of every lane, 1210 s of CI's standard lane after the window chrome's audits came (2026-11-17), and
+# scripts/test_parts.py deals by file (v0.6.26 audit Z2; advanced/tests/pagecase.py layout_deal does the same for the
+# Advanced page). The modules together audit every language; this one keeps the rest of the probe as well.
+AUDIT_MODULES = 4
 
-    The window is built and laid out without being shown - it is not even a top-level window -
-    and no input is sent to it (`SettingsForm.LayoutAudit`). Other scalings are stood in for by
-    scaling the window's scale and its fonts together, which matched a real 144-DPI window to the
-    pixel when the v0.6.3 clipping was measured. The Custom message and its per-kind editor are
-    showing, so every drop-down on the Settings page is laid out.
 
-    The same probe holds the strings cache to the installation it was written for, and the window,
-    built the same way, to what its hidden pages and sections are left with.
-    """
+def audit_share(module: int) -> tuple:
+    """The languages the audit module `module` (1-based; 1 is this one) audits: every AUDIT_MODULES-th of l10n.LOCALES
+    from its own, in that order. Each language is in exactly one share, and every share audits some."""
+    return tuple(str(locale) for index, locale in enumerate(l10n.LOCALES) if index % AUDIT_MODULES == module - 1)
+
+
+# The tests that read a language's audits: each module of a share runs them over its own languages (AUDITED).
+PER_LANGUAGE = ("test_nothing_is_cut_off_on_any_page_in_any_language_at_any_scaling",
+                "test_the_header_s_light_was_held_to_its_place_in_every_language_at_every_scaling",
+                "test_the_save_card_holds_the_reopen_note_whichever_order_the_window_came_to_its_width",
+                "test_every_button_is_in_its_corner_and_over_no_text",
+                "test_no_list_scrolls_sideways_at_the_opening_size",
+                "test_the_overview_neither_scrolls_nor_moves_whatever_state_the_watcher_is_in",
+                "test_the_overview_scrolls_only_in_a_window_shorter_than_its_rows_own_tallest_cards",
+                "test_right_now_keeps_its_names_whole")
+
+
+class LayoutProbeCase(unittest.TestCase):
+    """The probe below, compiled and run once for a module: the languages' audits in AUDITED, and - unless AUDIT_ONLY -
+    the rest of what it measures. No test of its own (LayoutAuditTests, and share_case's for the other modules)."""
+
+    AUDITED: tuple = ()
+    AUDIT_ONLY = False
 
     @classmethod
     def setUpClass(cls):
@@ -1569,7 +1594,8 @@ class LayoutAuditTests(unittest.TestCase):
             [str(POWERSHELL), "-STA", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(probe)],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=200 * len(l10n.LOCALES),
             env=dict(os.environ, CAR_EXE=str(exe), CAR_WORK=str(work),
-                     CAR_LOCALES=json.dumps(list(l10n.LOCALES)), CAR_SCALES=json.dumps(SCALES)))
+                     CAR_LOCALES=json.dumps(list(l10n.LOCALES)), CAR_SCALES=json.dumps(SCALES),
+                     CAR_AUDIT_LOCALES=json.dumps(list(cls.AUDITED)), CAR_AUDIT_ONLY="1" if cls.AUDIT_ONLY else ""))
         answer = work / "result.json"
         cls.answer = (json.loads(answer.read_text(encoding="utf-8-sig"))
                       if cls.result.returncode == 0 and answer.is_file() else {})
@@ -1582,9 +1608,55 @@ class LayoutAuditTests(unittest.TestCase):
         if not self.answer:
             self.fail("the probe did not run: " + (self.result.stderr or self.result.stdout)[-3000:])
 
+
+def share_case(module: int, name: str) -> type:
+    """The tests of audit module `module`'s share of the languages (PER_LANGUAGE, over audit_share(module)), as a class of
+    the module `name`; its probe runs only those audits (AUDIT_ONLY)."""
+    tests = {test: LayoutAuditTests.__dict__[test] for test in PER_LANGUAGE}
+    made = type("LayoutAuditShareTests", (LayoutProbeCase,),
+                dict(tests, __module__=name, AUDITED=audit_share(module), AUDIT_ONLY=True,
+                     __doc__="The layout audit in share %d of %d of the languages: %s." % (
+                         module, AUDIT_MODULES, ", ".join(audit_share(module)))))
+    return unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")(made)
+
+
+@unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
+class LayoutAuditTests(LayoutProbeCase):
+    """Every page of the real window, in every language at five scalings, at its opening size.
+
+    The window is built and laid out without being shown - it is not even a top-level window -
+    and no input is sent to it (`SettingsForm.LayoutAudit`). Other scalings are stood in for by
+    scaling the window's scale and its fonts together, which matched a real 144-DPI window to the
+    pixel when the v0.6.3 clipping was measured. The Custom message and its per-kind editor are
+    showing, so every drop-down on the Settings page is laid out.
+
+    The same probe holds the strings cache to the installation it was written for, and the window,
+    built the same way, to what its hidden pages and sections are left with.
+
+    The languages' audits are this module's share (audit_share(1)); test_gui_layout_audit_<n> audit the others with the
+    tests in PER_LANGUAGE.
+    """
+
+    AUDITED = audit_share(1)
+
+    def test_the_audit_modules_together_audit_every_language_once(self):
+        """No language is left out of the deal, none is audited twice, and each share module runs the per-language tests
+        over its share alone (v0.6.26 audit Z2: the audits split over modules must still cover all 22)."""
+        shares = [audit_share(module) for module in range(1, AUDIT_MODULES + 1)]
+        self.assertEqual(sorted(locale for share in shares for locale in share), sorted(l10n.LOCALES))
+        self.assertTrue(all(shares), shares)
+        for module in range(2, AUDIT_MODULES + 1):
+            with self.subTest(module=module):
+                made = importlib.import_module("test_gui_layout_audit_%d" % module).LayoutAuditShareTests
+                self.assertEqual(made.AUDITED, shares[module - 1])
+                self.assertTrue(made.AUDIT_ONLY)
+                self.assertEqual(sorted(name for name in vars(made) if name.startswith("test_")), sorted(PER_LANGUAGE))
+        self.assertFalse(importlib.util.find_spec("test_gui_layout_audit_%d" % (AUDIT_MODULES + 1)),
+                         "an audit module past AUDIT_MODULES would audit nothing")
+
     def test_nothing_is_cut_off_on_any_page_in_any_language_at_any_scaling(self):
-        self.assertEqual(sorted(self.answer["audit"]), sorted(l10n.LOCALES))
-        for locale in l10n.LOCALES:
+        self.assertEqual(sorted(self.answer["audit"]), sorted(self.AUDITED))
+        for locale in self.AUDITED:
             for scale in SCALES:
                 report = self.answer["audit"][locale]["%.2f" % scale]
                 with self.subTest(locale=locale, scale=scale):
@@ -1595,7 +1667,7 @@ class LayoutAuditTests(unittest.TestCase):
         the pair, in its own 28 px column (AuditHero; v0.6.10 stood it on the headline's line for a while and gave
         that back). Its findings are in the first test's reports; this holds the audit to having looked, with the
         Start button shown and without."""
-        for locale in l10n.LOCALES:
+        for locale in self.AUDITED:
             for scale in SCALES:
                 with self.subTest(locale=locale, scale=scale):
                     self.assertEqual(self.answer["hero"][locale]["%.2f" % scale], 2)
@@ -1625,8 +1697,8 @@ class LayoutAuditTests(unittest.TestCase):
         lines instead of two, and the audit there reported Spanish, German and French cut off from 150% up
         (v0.6.4). The audit now measures both widths in both orders - the findings are in the first test's
         reports - and this holds it to having measured all four."""
-        self.assertEqual(sorted(self.answer["notes"]), sorted(l10n.LOCALES))
-        for locale in l10n.LOCALES:
+        self.assertEqual(sorted(self.answer["notes"]), sorted(self.AUDITED))
+        for locale in self.AUDITED:
             for scale in SCALES:
                 with self.subTest(locale=locale, scale=scale):
                     self.assertEqual(self.answer["notes"][locale]["%.2f" % scale], 4)
@@ -1637,8 +1709,8 @@ class LayoutAuditTests(unittest.TestCase):
         (their findings are in the first test's reports). This holds the audit to having looked at all six: v0.6.24-beta.2
         (the owner, 2026-11-17, row 17, option C) Start watcher is the Right now card's, at its bottom left in Pause's
         place, and audited there with the watcher off; it had been the header's, before the caption buttons, and five."""
-        self.assertEqual(sorted(self.answer["pins"]), sorted(l10n.LOCALES))
-        for locale in l10n.LOCALES:
+        self.assertEqual(sorted(self.answer["pins"]), sorted(self.AUDITED))
+        for locale in self.AUDITED:
             for scale in SCALES:
                 with self.subTest(locale=locale, scale=scale):
                     self.assertEqual(self.answer["pins"][locale]["%.2f" % scale], 6)
@@ -1660,12 +1732,13 @@ class LayoutAuditTests(unittest.TestCase):
         scaling: their columns share their width (their findings are in the first test's reports). This holds the
         audit to having looked at all five - six from v0.6.11, with the Log dialog's, seven from v0.6.12, with Install
         another version...'s - and a list whose columns are wider than it is to being reported."""
-        self.assertEqual(sorted(self.answer["lists"]), sorted(l10n.LOCALES))
-        for locale in l10n.LOCALES:
+        self.assertEqual(sorted(self.answer["lists"]), sorted(self.AUDITED))
+        for locale in self.AUDITED:
             for scale in SCALES:
                 with self.subTest(locale=locale, scale=scale):
                     self.assertEqual(self.answer["lists"][locale]["%.2f" % scale], 7)
-        self.assertIn("canary :: scrolls sideways at the opening size, its columns 400 wide in ", self.answer["listCanary"])
+        if not self.AUDIT_ONLY:     # the canary is the rest of the probe's, run in this module alone
+            self.assertIn("canary :: scrolls sideways at the opening size, its columns 400 wide in ", self.answer["listCanary"])
 
     def test_the_lists_share_their_width_in_the_narrowest_window_too(self):
         """At the window's MinimumSize, 800 wide, Pending's headings no longer fit in several languages: the widest
@@ -1683,8 +1756,8 @@ class LayoutAuditTests(unittest.TestCase):
         buttons are in their corners over no text, and Right now is laid out as it was at the first. In v0.6.4 as
         first pinned it scrolled in German at 125% and 150% and in French at every scaling, and a page the soft bar
         had narrowed kept the bar at a height that fitted."""
-        self.assertEqual(sorted(self.answer["states"]), sorted(l10n.LOCALES))
-        for locale in l10n.LOCALES:
+        self.assertEqual(sorted(self.answer["states"]), sorted(self.AUDITED))
+        for locale in self.AUDITED:
             for scale in SCALES:
                 key = "%.2f" % scale
                 report = self.answer["states"][locale][key]
@@ -1795,7 +1868,7 @@ class LayoutAuditTests(unittest.TestCase):
         window has now (gui/SoftChrome.cs). The window is shorter outside than it was: in English the shortest is 976 + 11
         = 987 px where it was 949 + 56 = 1005 - its client 27 px taller for the caption buttons in the hero, 45 less
         frame."""
-        for locale in l10n.LOCALES:
+        for locale in self.AUDITED:
             for scale in SCALES:
                 key = "%.2f" % scale
                 shortest, alike, _ = self.answer["shortest"][locale][key]
@@ -1822,7 +1895,7 @@ class LayoutAuditTests(unittest.TestCase):
         """The button stands under Right now's facts, so their names have the card's whole width and never wrap - at the
         opening size in every language at every scaling (SettingsForm.AuditNames, in the first test's reports), in every
         state (the state test's) and in the shortest window the Overview fits. The check sees a name that wraps."""
-        for locale in l10n.LOCALES:
+        for locale in self.AUDITED:
             for scale in SCALES:
                 key = "%.2f" % scale
                 with self.subTest(locale=locale, scale=scale):
@@ -1830,6 +1903,8 @@ class LayoutAuditTests(unittest.TestCase):
                              if " :: wraps, " in line]
                     self.assertEqual(lines, [], "\n" + "\n".join(lines[:20]))
                     self.assertEqual(self.answer["shortest"][locale][key][2], 0, "a name wrapped in the shortest window")
+        if self.AUDIT_ONLY:         # the canary is the rest of the probe's, run in this module alone
+            return
         # A fact's name is a WrapLabel since v0.6.5 (Value), which breaks Korean between its words.
         self.assertIn("names canary/WrapLabel", self.answer["namesCanary"])
         self.assertIn(" :: wraps, ", self.answer["namesCanary"], "a name that wraps went unreported, so a quiet report proves nothing")
