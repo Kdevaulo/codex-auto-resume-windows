@@ -29,7 +29,15 @@ dialog off the screen, never activated.
 D11. The version pill's special-day nudge moved in whole device pixels (four places 90 ms apart at 100 %), and battery
 saver starting mid-nudge dropped it up to 3 px in one frame. Now the pill is placed in whole pixels (PillHint.Nudge, the
 lift rounded up) and draws its body, ring and words the rest of a pixel lower (Offset; VersionPill.Shift), and a nudge
-under way eases to rest before the pill holds (PillHint.Settling). Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
+under way eases to rest before the pill holds (PillHint.Settling).
+
+The companion's picture (dev CI 44990528966: the Settings window's process died of an AccessViolationException in
+Marshal.Copy under WindowShape.MemorySink.Put <- WindowCorner.Reshape). Nothing in Compose writes outside the picture it
+is given, and nothing between the DIB section's making and the copy lets a message in, so the copy can only have been
+into memory let go under it - by another thread in the same corner, or a free while it was written. Now the sink knows
+the picture it owns and refuses any row outside it before writing (a refusal is Windows' corner, never a write
+elsewhere), a free asked while the picture is written waits for its end, and a corner asked from another thread hands
+the work to the window's own (WindowCorner.Sync, ForeignSyncs). Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
 and brings it back.
 
 The window is compiled from the shipped sources; its dialogs are made and asked, never shown. GUI test module: run on its
@@ -71,6 +79,30 @@ function P($target, [string]$name) { return $target.GetType().GetProperty($name,
 $utf8 = New-Object Text.UTF8Encoding $false
 $out = @{}
 $null = S 'Palette' 'Adopt' @('light')
+# The companion's sink: a picture 10 by 5 with guard bytes past it; rows outside it refused, nothing written past it.
+$sinkType = (T 'WindowShape').GetNestedType('MemorySink', $instance)
+$four = @($sinkType.GetConstructors($instance) | Where-Object { $_.GetParameters().Count -eq 4 })
+$out.sink = @{ bounded = $four.Count -eq 1 }
+if ($four.Count -eq 1) {
+    $memory = [Runtime.InteropServices.Marshal]::AllocHGlobal(200 + 64)
+    try {
+        for ($i = 0; $i -lt 264; $i++) { [Runtime.InteropServices.Marshal]::WriteByte($memory, $i, 0x5A) }
+        $sink = $four[0].Invoke((Bare @($memory, 40, 10, 5)))
+        $row = New-Object 'int[]' 12
+        for ($i = 0; $i -lt 12; $i++) { $row[$i] = 0x11223344 }
+        $put = $sinkType.GetMethod('Put')
+        $refused = @()
+        foreach ($ask in @(@(5, 0, 10), @(0, 8, 3), @(-1, 0, 2), @(4, 0, 11))) {
+            try { $null = $put.Invoke($sink, (Bare @([int]$ask[0], [int]$ask[1], $row, 0, [int]$ask[2]))); $refused += $false } catch { $refused += $true }
+        }
+        $null = $put.Invoke($sink, (Bare @(4, 0, $row, 0, 10)))
+        $guard = $true
+        for ($i = 200; $i -lt 264; $i++) { if ([Runtime.InteropServices.Marshal]::ReadByte($memory, $i) -ne 0x5A) { $guard = $false } }
+        $out.sink.refused = $refused
+        $out.sink.guard = $guard
+        $out.sink.last = [Runtime.InteropServices.Marshal]::ReadInt32($memory, 160)
+    } finally { [Runtime.InteropServices.Marshal]::FreeHGlobal($memory) }
+}
 (T 'SettingsForm').GetField('dpiScale', $static).SetValue($null, [double]1.0)
 
 function Dialog([string]$title, [string]$border) {
@@ -281,6 +313,14 @@ Add-Type -TypeDefinition @'
 using System; using System.Runtime.InteropServices;
 public static class CarVeilUser {
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+    public static void SyncElsewhere(object corner) {
+        var sync = corner.GetType().GetMethod("Sync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Exception failed = null;
+        var thread = new System.Threading.Thread(delegate () { try { sync.Invoke(corner, null); } catch (Exception e) { failed = e; } });
+        thread.Start();
+        thread.Join();
+        if (failed != null) throw failed;
+    }
 }
 '@
 $assembly = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
@@ -311,6 +351,14 @@ $null = $owner.Handle
 Pump 900
 $corner = (T 'WindowCorner').GetMethod('Of', $static).Invoke($null, [object[]]@($owner))
 $out.owner_shaped = ($null -ne $corner) -and [bool](P $corner 'Shaped')
+$foreign = $(if ($corner) { $corner.GetType().GetField('ForeignSyncs', $instance) } else { $null })
+$out.foreign = -1
+if ($foreign) {
+    [CarVeilUser]::SyncElsewhere($corner)
+    Pump 100
+    $out.foreign = [int]$foreign.GetValue($corner)
+    $out.shaped_after = [bool](P $corner 'Shaped')
+}
 $dialog = Dialog 'A dialog over it' -29000
 $dialog.Owner = $owner
 $null = $dialog.Handle
@@ -373,6 +421,12 @@ class SourceTests(unittest.TestCase):
         self.assertIn("bool settling = Settling(Motion.Ambient, lift);", eggs)
         self.assertIn("versionPill.Shift(versionPill.Parent == pillSlot ? pillHint.Offset : 0f);",
                       guiscan.member_body("SettingsForm", "BuildVersionPill"))
+
+    def test_the_companion_s_picture_is_only_ever_made_on_the_window_s_thread(self):
+        corner = guiscan.type_body("WindowCorner")
+        sync = corner[corner.index("internal void Sync()"):]
+        self.assertLess(sync.index("if (form.InvokeRequired)"), sync.index("if (busy)"))
+        self.assertIn("new WindowShape.MemorySink(bits, 4 * whole.Width, whole.Width, whole.Height)", corner)
 
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
@@ -466,6 +520,20 @@ class WindowTests(unittest.TestCase):
             with self.subTest(row=row):
                 low, high = sorted((rest[row - 1], rest[row]))
                 self.assertTrue(low - 40 <= shifted[row] <= high + 40, (rest[row - 1], rest[row], shifted[row]))
+
+    def test_the_companion_s_sink_never_writes_outside_its_picture(self):
+        sink = self.answer["sink"]
+        self.assertTrue(sink["bounded"], "WindowShape.MemorySink(bits, stride, width, height)")
+        self.assertEqual(sink["refused"], [True, True, True, True], "a row below, past the end, above, too long")
+        self.assertTrue(sink["guard"], "nothing written past the picture")
+        self.assertEqual(sink["last"], 0x11223344, "a row inside it is written")
+
+    def test_a_corner_asked_from_another_thread_is_made_on_the_window_s(self):
+        seen = self.veil
+        if not seen["owner_shaped"]:
+            self.skipTest("this machine gives the window Windows' corner")
+        self.assertEqual(seen["foreign"], 1, "handed to the window's thread")
+        self.assertTrue(seen["shaped_after"])
 
 
 if __name__ == "__main__":

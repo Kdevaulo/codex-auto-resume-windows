@@ -501,19 +501,31 @@ namespace CodexAutoResume
         }
 
         /// Rows written into memory that starts clear (a new DIB section's): only what is not clear is written.
+        /// v0.6.26 (dev CI 44990528966: the window's process died of an AccessViolationException in this copy): it knows the
+        /// picture it owns - `width` by `height` pixels, `stride` bytes a row - and refuses, before anything is written, any
+        /// row that is not inside it, so no copy can ever write outside that memory; a refusal is the corner's failure
+        /// (WindowCorner.SyncOnce: Windows' own corner), never a write elsewhere.
         internal sealed class MemorySink : Sink
         {
             private readonly IntPtr bits;
-            private readonly int stride;
+            private readonly int stride, width, height;
 
-            internal MemorySink(IntPtr bits, int stride)
+            internal MemorySink(IntPtr bits, int stride, int width, int height)
             {
+                if (bits == IntPtr.Zero || width <= 0 || height <= 0 || stride < 4L * width)
+                    throw new ArgumentException("no picture to write into");
                 this.bits = bits;
                 this.stride = stride;
+                this.width = width;
+                this.height = height;
             }
 
             public void Put(int y, int x, int[] values, int start, int count)
             {
+                if (count == 0) return;
+                if (values == null || y < 0 || y >= height || x < 0 || count < 0 || (long)x + count > width ||
+                    start < 0 || (long)start + count > values.Length)
+                    throw new ArgumentOutOfRangeException("y", "a row outside the companion's picture");
                 Marshal.Copy(values, start, new IntPtr(bits.ToInt64() + (long)y * stride + 4L * x), count);
             }
         }
@@ -766,6 +778,10 @@ namespace CodexAutoResume
             }
         }
 
+        /// How many times its picture was asked for from a thread other than the window's, and handed to the window's
+        /// (Sync): for the tests.
+        internal int ForeignSyncs;
+
         /// The companion's alpha now, 0 to 255: for the tests.
         internal int CompanionAlpha { get { return opacity; } }
 
@@ -926,6 +942,16 @@ namespace CodexAutoResume
         internal void Sync()
         {
             if (!form.IsHandleCreated) return;
+            // v0.6.26 (dev CI 44990528966): only ever on the window's own thread - asked from another (a BackColor or
+            // theme change made off it, a probe's), handed to it: two threads in one corner's picture is one freeing what
+            // the other writes into.
+            if (form.InvokeRequired)
+            {
+                ForeignSyncs++;
+                try { form.BeginInvoke(new MethodInvoker(Sync)); }
+                catch (Exception) { }
+                return;
+            }
             if (busy)
             {
                 // A change inside our own (the region's, or the window's own handling of it - a form put back to its
@@ -1064,7 +1090,17 @@ namespace CodexAutoResume
                     throw new InvalidOperationException("no bitmap for the companion");
                 kept = SelectObject(memory, bitmap);
                 bitmapSize = whole;
-                WindowShape.Compose(edge, ground, line, Shade(), new WindowShape.MemorySink(bits, 4 * whole.Width));
+                // Composed whole while nothing else can run on this thread (composing: a Free asked meanwhile waits for
+                // its end), into a sink that holds every row to this picture.
+                composing = true;
+                try { WindowShape.Compose(edge, ground, line, Shade(), new WindowShape.MemorySink(bits, 4 * whole.Width, whole.Width, whole.Height)); }
+                finally { composing = false; }
+                if (freeAfter)
+                {
+                    freeAfter = false;
+                    FreeBitmap();
+                    throw new InvalidOperationException("the companion's picture was let go while it was made");
+                }
                 var dimensions = new SIZE { Width = whole.Width, Height = whole.Height };
                 var from = new POINT();
                 var blend = new BLENDFUNCTION { Op = 0, Flags = 0, Alpha = opacity, Format = 1 };
@@ -1171,8 +1207,17 @@ namespace CodexAutoResume
             }));
         }
 
+        // Whether its picture is being written now, and whether it is to be let go once it is (FreeBitmap).
+        private bool composing, freeAfter;
+
         private void FreeBitmap()
         {
+            // Never while the picture is written: let go once it is (Reshape).
+            if (composing)
+            {
+                freeAfter = true;
+                return;
+            }
             if (memory != IntPtr.Zero && kept != IntPtr.Zero) SelectObject(memory, kept);
             if (bitmap != IntPtr.Zero) DeleteObject(bitmap);
             if (memory != IntPtr.Zero) DeleteDC(memory);
