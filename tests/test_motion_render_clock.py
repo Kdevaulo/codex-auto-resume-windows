@@ -24,6 +24,18 @@ PENDING = {"locale": "en", "page": "pending", "light": 0, "selected": {"pending"
 TIMELINE = {"kind": "timeline"}
 
 
+class SwitchTests(unittest.TestCase):
+    def test_a_clocked_render_answers_windows_animation_switch_itself(self):
+        """A motion's glides are drawn whatever this machine's animation switch says (GitHub's runner has it off): the
+        Dashboard's render and the setup window's shim each stand Windows' animations on, for a clocked job only."""
+        import guiscan
+        pinned = 'if (Clocked(Items(job, "frames"))) Soft.WindowsAnimates = delegate { return true; };'
+        self.assertIn(pinned, guiscan.member_body("SettingsForm", "RenderFrames"))
+        self.assertIn('frame.ContainsKey("moment")', guiscan.member_body("SettingsForm", "Clocked"))
+        shim = (ROOT / "build" / "motion" / "InstallerRender.cs").read_text(encoding="utf-8")
+        self.assertEqual(shim.count(pinned), 1)
+
+
 class FrameMomentTests(unittest.TestCase):
     def test_every_frame_tells_the_window_its_moment(self):
         frame = motion_plan.Frame(1234, "S1", (("page", "pending"),), (), ("at", "page.pending"), ())

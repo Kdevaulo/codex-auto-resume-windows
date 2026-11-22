@@ -157,9 +157,14 @@ namespace CodexAutoResume
                 var forms = Map(job, "forms") ?? new Dictionary<string, object>();
                 var targets = Items(job, "targets") ?? new List<object>();
                 // v0.6.26 (audit-apng M6): a job whose frames carry their moment draws every glide on the picture's clock
-                // (Transition.RenderMs, set for each frame below); a job without one (the stills, the fidelity check) is as before.
+                // (Transition.RenderMs, set for each frame below), and as a person with Windows' animation effects on sees it
+                // (the default), whatever this machine's switch says - GitHub's runner has it off (Soft.WindowsAnimates) -
+                // so the picture is the same on any machine, as the light's moment is pinned (Soft.StillLightMs). The render
+                // stands its own answer in that input as a probe does; a job without moments (the stills, the fidelity check)
+                // is as before.
                 Dictionary<string, object> before = null;
                 string beforeLocale = null;
+                if (Clocked(Items(job, "frames"))) Soft.WindowsAnimates = delegate { return true; };
                 foreach (object item in Items(job, "frames") ?? new List<object>())
                 {
                     var frame = item as Dictionary<string, object>;
@@ -229,6 +234,18 @@ namespace CodexAutoResume
                 lock (RenderMisses) writer.Finish(RenderMisses);
             }
             return writer.Error == null ? 0 : 2;
+        }
+
+        /// v0.6.26 (audit-apng M6): whether the job's frames carry their moment on the picture's clock (`moment`).
+        private static bool Clocked(List<object> frames)
+        {
+            if (frames == null) return false;
+            foreach (object item in frames)
+            {
+                var frame = item as Dictionary<string, object>;
+                if (frame != null && frame.ContainsKey("moment")) return true;
+            }
+            return false;
         }
 
         /// v0.6.26 (audit-apng M6): the frame before, as a window opened again is put in it: its state without the answer it

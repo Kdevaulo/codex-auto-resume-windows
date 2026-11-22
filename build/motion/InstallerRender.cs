@@ -227,6 +227,20 @@ namespace CodexAutoResume
                 var field = typeof(InstallerWindow).GetField("bar", Own);
                 bar = field == null ? null : field.GetValue(window) as InstallerBar;
                 if (bar == null) throw new InvalidOperationException("the window has no progress bar");
+                // v0.6.26 (audit-apng M6): a job whose frames carry their moment draws every glide as a person with Windows'
+                // animation effects on sees it (the default), whatever this machine's switch says (Soft.WindowsAnimates), as
+                // gui/WindowRender.cs does: the same picture on any machine.
+                if (Clocked(Items(job, "frames"))) Soft.WindowsAnimates = delegate { return true; };
+            }
+
+            private static bool Clocked(List<object> frames)
+            {
+                foreach (object item in frames ?? new List<object>())
+                {
+                    var frame = item as Dictionary<string, object>;
+                    if (frame != null && frame.ContainsKey("moment")) return true;
+                }
+                return false;
             }
 
             /// The page the window shows now.
