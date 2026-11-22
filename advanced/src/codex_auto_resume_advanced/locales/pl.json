@@ -388,7 +388,7 @@
   "page.kept.statement_changed": "Funkcja pozostała włączona, choć zmieniło się to, co robi. Przeczytaj opis ponownie i włącz ją, aby potwierdzić.",
   "page.kept.submission_unknown": "Funkcja pozostała włączona, choć nie mogła dowieść, że wysłana przez nią kontynuacja dotarła.",
   "page.limits": "Limity",
-  "page.long_limits": "Sama niczego nie wysyła. Gdy jest włączona, wiadomość przy resecie może być tak długa jak kontynuacja, a nie tylko {n} znaków. Wiele podwójnych cudzysłowów lub emoji nieco ją skraca, a wiadomość, która się nie mieści, jest odrzucana już przy pisaniu.",
+  "page.long_limits": "Sama niczego nie wysyła. Gdy jest włączona, wiadomość przy resecie może być tak długa jak kontynuacja, a nie tylko {n} znaków. Wiele podwójnych cudzysłowów lub emoji nieco zmniejsza ten limit, a wiadomość, która się nie mieści, jest odrzucana już przy pisaniu.",
   "page.nav": "Funkcje zaawansowane",
   "page.nominal": "Sama niczego nie wysyła, więc te limity nigdy nie mają zastosowania.",
   "page.pause_limits": "Nie ma dziennych limitów wiadomości. Za każdym razem, gdy okno dojdzie do swojego procentu zatrzymania, raz zatrzymuje trwającą turę w każdej rozmowie i raz kontynuuje tę rozmowę po odnowieniu.",
