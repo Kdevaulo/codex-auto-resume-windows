@@ -32,9 +32,14 @@ class FreshnessMixin:
     def _no_app_reason(self) -> str:
         """Why a record waits where the backend's last look paired no app (#58's follow-up): no app, as ever; or, only where
         that look found a process of the app's package running, an app whose server could not be matched. A backend that
-        cannot say - one of no such attribute, or a look that read no rows - says what it always said. Starts nothing."""
-        return ("app_server_unmatched" if getattr(self.backend, "app_look", None) == "unmatched"
-                else "desktop_app_unavailable")
+        cannot say - one of no such attribute, or a look that read no rows - says what it always said. Starts nothing.
+        v0.6.26 (update resilience #9): and which kind, where the backend names one (`app_unmatched_reason`, e.g. the
+        engine named in Settings is not the one the app runs) and it is a reason this product writes."""
+        if getattr(self.backend, "app_look", None) != "unmatched":
+            return "desktop_app_unavailable"
+        named = getattr(self.backend, "app_unmatched_reason", None)
+        return named if isinstance(named, str) and named in machine.REASONS and named.startswith(
+            "app_server_unmatched") else "app_server_unmatched"
 
     def usage(self):
         now = self.clock()

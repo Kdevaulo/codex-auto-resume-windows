@@ -283,6 +283,11 @@ namespace CodexAutoResume
             if (version != null)
                 lines.Add(S("selfcheck.layout_untested", "Codex {version} runs in a layout this version has not been tested on.",
                             "version", version));
+            // #11: since this product's own update, no look has matched the app's server, where the version before did.
+            string updated = Str(check, "updated_from");
+            if (updated != null)
+                lines.Add(S("selfcheck.unpaired_after_update", "Since this product was updated from {version}, it has not matched the Codex app's server, which that version did.",
+                            "version", updated));
             return string.Join(Environment.NewLine, lines.ToArray());
         }
 

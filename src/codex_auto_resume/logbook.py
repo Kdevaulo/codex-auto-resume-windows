@@ -92,7 +92,7 @@ _MESSAGES = {
     ("waiting_for_app", "desktop_app_unavailable"): "ChatGPT app or its Codex server not running; waiting",
     ("waiting_for_app", "app_server_unmatched"): "ChatGPT app is running, but its Codex server could not be matched; waiting",
     # v0.6.26: and the engine set in Settings is not the one the app runs (update resilience, proposal 9).
-    ("waiting_for_app", "app_server_unmatched_named_engine"):
+    ("waiting_for_app", "app_server_unmatched:named_engine"):
         "ChatGPT app is running a different Codex engine from the one set in Settings; waiting until they match",
     ("waiting_for_loaded_thread", "notLoaded"): "notLoaded\nwaiting until user opens this thread in ChatGPT app",
     ("waiting_for_loaded_thread", "loaded_state_unknown"): "loaded state unknown; waiting safely without queueing",

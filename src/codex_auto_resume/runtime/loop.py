@@ -22,6 +22,10 @@ from pathlib import Path
 
 from .. import compatio, config, failures, l10n, machine, power
 from ..codex.pairing import app_running_now
+try:
+    from ..codex import layout as codex_layout          # v0.6.26: the layout seat's (codex/layout.py)
+except ImportError:                                     # pragma: no cover - a tree without it says nothing of it
+    codex_layout = None
 from ..codex.paths import DB_KINDS, newest_generation
 from ..domain import public
 from ..engine import impossible
@@ -500,14 +504,9 @@ class WatchLoop:
         except Exception:
             self._record_failure("the self-check")
             judge.look(now, None, {})
-        backend = getattr(engine, "backend", None)
-        # #6 (the seat that rescores the layout, v0.6.26): where the version-change look finds a layout no catalogued
-        # one matches, the backend says so as `layout_untested` - True, or the Codex version it found it for.
-        untested = getattr(backend, "layout_untested", None)
-        if untested is True:
-            untested = getattr(backend, "engine_version", None)
+        untested, updated = self._layout_said()
         written = public.self_check_note(started, judge.word(now), getattr(self, "_unknown_error", None),
-                                         untested if isinstance(untested, str) else None)
+                                         untested, updated)
         if written != getattr(self, "_self_check_written", None):
             try:
                 compatio.write_json_atomic(self.paths.self_check_file, written, "selfcheck.")
@@ -516,6 +515,22 @@ class WatchLoop:
                     self.logger.info("self-check: %s", written["blocked"])
             except OSError:
                 self._record_failure("writing the self-check")
+
+    def _layout_said(self):
+        """#6 and #11: (Codex's version where the app runs in a layout this version has not been tested on, the version
+        of this product it was updated from where no look since has paired a server and that version's did), each None
+        - read from what the watcher keeps of the layout (codex/layout.py, Paths.codex_layout_file), never a path."""
+        # Paths.codex_layout_file is the layout seat's too (config/codex-layout.json).
+        path = getattr(self.paths, "codex_layout_file", self.paths.state_dir / "codex-layout.json")
+        kept = codex_layout.read(path) if codex_layout is not None else None
+        if not isinstance(kept, dict):
+            return None, None
+        found = kept.get("layout") if isinstance(kept.get("layout"), dict) else {}
+        app_open = (found.get("mains") or 0) > 0 or (found.get("helpers") or 0) > 0
+        untested = (kept.get("app_version") or kept.get("engine_version")
+                    if app_open and kept.get("catalogued") is False else None)
+        updated = kept.get("updated_from") if kept.get("unpaired_after_update") is True else None
+        return (untested if isinstance(untested, str) else None), (updated if isinstance(updated, str) else None)
 
     def _unknown_errors(self, engine, now):
         """#10: the newest error code Codex reported in the last day that this version does not know, with how many of

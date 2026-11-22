@@ -76,8 +76,8 @@ LISTS = {
     # 2026-10-22: progress_then_user_joined - a recovery turn that did work before a person's message entered it.
     # #58's follow-up: app_server_unmatched - the Codex app runs and no server of its could be matched.
     # v0.6.26: usage_probe_broken_answer, _request and _start - which way a usage read broke - and
-    # app_server_unmatched_named_engine - the engine set in Settings is not the one the app runs.
-    "machine.REASONS": ("set", 86, "a305ece9442655e3"),
+    # app_server_unmatched:named_engine - the engine set in Settings is not the one the app runs.
+    "machine.REASONS": ("set", 86, "72b0809747221b10"),
     # v0.6.11: postponed, held, hold_released and tier_set - a person's (or the objection window's)
     # later time, a hold, letting it go, and a conversation's tier - and observe only's would_send.
     # And dispatched_while_observing and unpostponed: one taken back for Observe only that ran all the
@@ -107,7 +107,7 @@ LISTS = {
     # 2026-10-22: and progress_then_user_joined, as every reason is.
     # #58's follow-up: and app_server_unmatched, as every reason is.
     # v0.6.26: and the four of v0.6.26, as every reason is.
-    "machine.GATE_REASONS": ("set", 104, "8ae884b123722ca9"),
+    "machine.GATE_REASONS": ("set", 104, "5a3874920480b3f4"),
     "machine.PASS": "PASS",
     "machine.WAIT": "WAIT",
     "machine.BLOCK": "BLOCK",
@@ -590,7 +590,8 @@ class HomeTests(unittest.TestCase):
     def test_a_members_name_is_its_value_in_capitals(self):
         for cls, member in members():
             with self.subTest(vocabulary=cls.__name__, member=member.value):
-                self.assertEqual(member.name, member.value.upper().replace("-", "_"))
+                # v0.6.26: and a colon, which names a kind of a reason ("app_server_unmatched:named_engine").
+                self.assertEqual(member.name, member.value.upper().replace("-", "_").replace(":", "_"))
 
     def test_no_word_is_two_members(self):
         for cls in enums():

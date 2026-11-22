@@ -42,8 +42,9 @@ class ReasonCode(StrEnum):
     # (ownreport/evidence.py). An older version reads it as "other", and rewrites it the next time it looks.
     APP_SERVER_UNMATCHED = "app_server_unmatched"
     # v0.6.26 (update resilience, proposal 9): and the engine set in Settings, never second-guessed, is not the one the
-    # Codex app runs - so nothing is matched until they agree. Asks for a person as app_server_unmatched does.
-    APP_SERVER_UNMATCHED_NAMED_ENGINE = "app_server_unmatched_named_engine"
+    # Codex app runs - so nothing is matched until they agree. Asks for a person as app_server_unmatched does; written
+    # as the backend names it (codex/transport.py UNMATCHED_NAMED_ENGINE), a kind of app_server_unmatched after a colon.
+    APP_SERVER_UNMATCHED_NAMED_ENGINE = "app_server_unmatched:named_engine"
     NOTLOADED = "notLoaded"
     LOADED_STATE_UNKNOWN = "loaded_state_unknown"
     # v0.6.16-beta.4: open in another Codex session - a terminal or VS Code - which the app's queue cannot reach.

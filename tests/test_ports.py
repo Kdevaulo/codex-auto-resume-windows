@@ -136,7 +136,10 @@ ENGINE_TO_BACKEND = {"app_identity", "delete_queue", "holder", "loaded", "send",
                      "concurrent",
                      # v0.6.26: what Codex's helper last met, by method (codex/appserver.py), which a usage wait reads
                      # to say which way a usage read broke (engine/outcome.py) - read, never set.
-                     "protocol_results"}
+                     "protocol_results",
+                     # v0.6.26 (update resilience #9): which kind of unmatched server the last look found (the named
+                     # engine is not the app's), read where a record waits for the app - read, never set.
+                     "app_unmatched_reason"}
 BACKEND_NAMES = ("backend", "sender")
 # What it reads out of Codex's own files, through the source: the turns, the markers that say a
 # continuation of ours is in the queue, what a recovered turn produced, and the projection's age.

@@ -272,6 +272,8 @@ class SelfCheck(TypedDict):
     blocked: str | None
     unknown_error: UnknownError | None
     layout_untested: str | None
+    # v0.6.26 (#11): the version of this product it was updated from, while no look since has paired a server.
+    updated_from: str | None
 
 
 class WatcherView(TypedDict):

@@ -179,7 +179,8 @@ class FeederTests(unittest.TestCase):
         self.assertEqual(self.watcher.failures, [])
         self.assertEqual(self.written()["blocked"], ELSEWHERE)
         check = public.self_check(self.written(), 500.0)
-        self.assertEqual(check, {"blocked": ELSEWHERE, "unknown_error": None, "layout_untested": None})
+        self.assertEqual(check, {"blocked": ELSEWHERE, "unknown_error": None, "layout_untested": None,
+                                 "updated_from": None})
         watcher = {"running": True, "ticking": True, "engine_state": "structurally_compatible", "self_check": check}
         record = {"state": "waiting_for_loaded_thread", "last_error": "held_by_other_session"}
         self.assertIn("codex_changed", public.overlays(record, watcher=watcher))
@@ -217,11 +218,41 @@ class FeederTests(unittest.TestCase):
         self.assertEqual(check["unknown_error"], {"code": "somethingNewExceeded", "count": 2})
         self.assertIsNone(check["blocked"])
 
-    def test_a_layout_the_version_change_look_did_not_recognise_is_named_with_the_version(self):
-        # #6: the attribute the layout seat's version-change look sets on the backend.
-        self.engine.backend.layout_untested = True
+    def kept_layout(self, **kept):
+        """What codex/layout.py keeps (the layout seat's file), as its `read` hands it back."""
+        value = {"format": "codex-auto-resume/codex-layout/1", "code_version": "0.6.26", "engine_version": "0.170.0",
+                 "app_version": "26.1201.1.0", "layout": {"mains": 1, "helpers": 3, "shape": None},
+                 "catalogued": False, "last_good": None, "updated_from": None, "unpaired_after_update": False}
+        value.update(kept)
+        return patch.object(loop, "codex_layout", types.SimpleNamespace(read=lambda path: dict(value)))
+
+    def test_a_layout_this_version_has_not_been_tested_on_is_named_with_codexs_version(self):
+        # #6: the layout seat's version-change look keeps whether the layout is a catalogued one (codex/layout.py).
+        with self.kept_layout():
+            self.run_for(0)
+        self.assertEqual(public.self_check(self.written(), 500.0)["layout_untested"], "26.1201.1.0")
+        with self.kept_layout(catalogued=True):
+            self.run_for(1)
+        self.assertIsNone(public.self_check(self.written(), 500.0))
+        # A closed app has no layout to be untested.
+        with self.kept_layout(layout={"mains": 0, "helpers": 0, "shape": None}):
+            self.run_for(1)
+        self.assertIsNone(public.self_check(self.written(), 500.0))
+
+    def test_an_update_after_which_nothing_pairs_names_the_version_it_came_from(self):
+        # #11: kept by the layout seat's look (unpaired_after_update), said here with the version it was updated from.
+        with self.kept_layout(catalogued=True, updated_from="0.6.25", unpaired_after_update=True):
+            self.run_for(0)
+        self.assertEqual(public.self_check(self.written(), 500.0)["updated_from"], "0.6.25")
+
+    @unittest.skipIf(loop.codex_layout is None, "codex/layout.py is the layout seat's (branch car-v0626-rescore); "
+                     "this tree does not have it yet - the main session runs this after the merge")
+    def test_the_layout_seats_own_file_is_read(self):
+        watch = loop.codex_layout.Watch(self.watcher.paths.codex_layout_file, "0.6.26")  # Paths has it there
+        watch.look({"mains": 1, "helpers": 0, "engines_under_main": 0, "engines_under_helper": 0, "engines_elsewhere": 0,
+                    "paired": False, "app_version": "26.1201.1.0", "shape": "no-such-shape"}, engine_version="0.170.0")
         self.run_for(0)
-        self.assertEqual(public.self_check(self.written(), 500.0)["layout_untested"], "0.170.0")
+        self.assertEqual(public.self_check(self.written(), 500.0)["layout_untested"], "26.1201.1.0")
 
     def test_with_nothing_waiting_for_it_the_restart_manager_is_not_asked(self):
         self.store.rows = [{"thread_id": T1, "last_error": "waiting_for_reset", "state": "waiting_reset"}]
