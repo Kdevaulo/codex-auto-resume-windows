@@ -681,7 +681,10 @@ class WindowCompositionTests(unittest.TestCase):
         # as much room below the tabs as above them (AuditTabRow) - and its first card's lift runs on onto the tabs' ground.
         self.assertIn("page.Padding = PageRoom();", self.method(self.dashboard, "private Panel Page("))
         room = self.method(self.window, "private Padding PageRoom(")
-        self.assertIn("return new Padding(room.Left, Math.Max(0, Px(TabRowGap) - Px(TabRing)), room.Right, room.Bottom);", room)
+        # v0.6.26 (audit D1; the owner, 2026-11-22): at its sides the header card's edges (HeaderSide), the page's cards flush
+        # with the header card - the owner's choice over the lift's room there.
+        self.assertIn("return new Padding(Px(HeaderSide), Math.Max(0, Px(TabRowGap) - Px(TabRing)), Px(HeaderSide), room.Bottom);",
+                      room)
         controls = guiscan.controls()
         see_through = self.method(controls, "internal static bool SeeThrough(")
         self.assertIn("if (Scrolling(control)) return false;", see_through,

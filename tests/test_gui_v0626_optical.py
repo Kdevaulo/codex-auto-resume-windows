@@ -4,6 +4,14 @@ the owner, 2026-11-22: "제안대로 모두 고침" - every place fixed as the r
 D7. The chart in "How recoveries ended" kept the unscaled default 3 px Margin that Facts was cured of: it stood 2-3 px in
 from its card's heading. Now it has none, and starts in the heading's column.
 
+D1. The page cards' outer edges stood 2 px (left) and 3 px (right) inside the header card's (CardRoom's 16 and 17
+against HeaderSide 14), the tab row's ends between them. Now the page cards are flush with the header card (PageRoom's
+sides are HeaderSide), the report's first choice.
+
+D12. The version's pill, moved into the header card, ended Brand.PillInset (4) inside the card's edge under caption
+buttons that end Brand.CaptionInsetEnd (10) inside it. Now it ends under the caption group's end (the pill room's own
+module holds it, tests/test_gui_pill_room.py).
+
 The window is compiled from the shipped sources and laid out by its own layout audit (SettingsForm.LayoutAudit), never
 shown; what is held is where the audit wrote everything down (AuditedGeometry). GUI test module: run on its own, through
 gui_lock.sh.
@@ -73,6 +81,16 @@ def pages(geometry: str) -> dict:
     return found
 
 
+def absolute(page: list) -> dict:
+    """Each control's bounds in the window, by its path."""
+    found = {}
+    for path, (x, y, w, h), _margin, _padding in page:
+        parent = path.rsplit("/", 1)[0]
+        px, py = found.get(parent, (0, 0, 0, 0))[:2]
+        found[path] = (px + x, py + y, w, h)
+    return found
+
+
 class SourceTests(unittest.TestCase):
     def test_the_chart_has_no_margin_of_its_own(self):
         self.assertIn("chart.Margin = new Padding(0);", guiscan.member_body("SettingsForm", "BuildStatistics"))
@@ -118,6 +136,24 @@ class LayoutTests(unittest.TestCase):
                                and line[0] != path]
                     self.assertTrue(heading, "the chart's card has its heading beside it")
                     self.assertEqual(bounds[0], min(line[1][0] for line in heading), heading)
+
+    def test_the_page_cards_are_flush_with_the_header_card(self):
+        for locale, scale, laid in self.each():
+            for name in ("overview", "pending", "history", "statistics"):
+                with self.subTest(locale=locale, scale=scale, page=name):
+                    page = laid[name]
+                    where = absolute(page)
+                    header = [where[path] for path, *_rest in page if re.fullmatch(r"/\d+:SoftPage/0:SoftCard", path)
+                              and where[path][1] < 40 * scale]
+                    self.assertEqual(len(header), 1, "the header card")
+                    hx, _hy, hw, _hh = header[0]
+                    body = [path for path, *_rest in page if path.endswith(":SoftPage") and path.count("/") == 1
+                            and where[path][1] > 60 * scale]
+                    cards = [where[path] for path, *_rest in page if path.endswith(":SoftCard")
+                             and any(path.startswith(top + "/") for top in body)]
+                    self.assertTrue(cards, "the page's cards")
+                    self.assertEqual(min(x for x, _y, _w, _h in cards), hx, "the left edges")
+                    self.assertEqual(max(x + w for x, _y, w, _h in cards), hx + hw, "the right edges")
 
 
 if __name__ == "__main__":

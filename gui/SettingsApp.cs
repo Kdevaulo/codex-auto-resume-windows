@@ -1538,11 +1538,15 @@ namespace CodexAutoResume
 
         /// The room a page keeps for its cards' lift (CardRoom), but at its top PageTop: under the tab row its first card's
         /// lift runs on onto the tabs' ground, as the header card's runs on under the tabs.
+        /// v0.6.26 (audit D1; the owner, 2026-11-22, "제안대로 모두 고침"): at its sides HeaderSide, the header card's - the page's
+        /// cards flush with the header card's edges, the tab row's ends PillInset inside both. CardRoom's 16 and 17 left the
+        /// three edges at each side within 6 px and none agreeing (header 14, cards 16 / 17, the tab row 18), and the cards
+        /// 1 px off the header's centre.
         private Padding PageRoom()
         {
             Padding room = CardRoom();
             // In device pixels, the gap's less the ring's: each rounded alone, 7.5 and 5 at 125 % made 13 under the tabs.
-            return new Padding(room.Left, Math.Max(0, Px(TabRowGap) - Px(TabRing)), room.Right, room.Bottom);
+            return new Padding(Px(HeaderSide), Math.Max(0, Px(TabRowGap) - Px(TabRing)), Px(HeaderSide), room.Bottom);
         }
 
         private string SectionTitle(string name)
