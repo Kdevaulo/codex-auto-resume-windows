@@ -1211,7 +1211,9 @@ function Invoke-Setup {
     $global:LASTEXITCODE = 1
     # -X disable-remote-debug, before anything else, wherever this script runs the bundled interpreter: remote debugging
     # off (PEP 768, Python 3.14; src/codex_auto_resume/startup.py, NO_REMOTE_DEBUG).
-    try { & $Python -X disable-remote-debug $setup @Arguments | ForEach-Object { Write-Host ('    ' + $_) } }
+    # v0.6.26: and its lines kept, for the last word to repeat one (the health check's problem line).
+    $script:SetupLines = New-Object System.Collections.Generic.List[string]
+    try { & $Python -X disable-remote-debug $setup @Arguments | ForEach-Object { $script:SetupLines.Add([string]$_); Write-Host ('    ' + $_) } }
     finally { if ($counted) { $env:CODEX_AUTO_RESUME_PROGRESS_LINES = $null } }
     return $LASTEXITCODE
 }
@@ -2447,7 +2449,17 @@ try {
 
     Step 'Checking the installation'
     $null = Invoke-Setup @('doctor')
-    if ($LASTEXITCODE -ne 0) { Warn 'The health check reported a problem. Recovery is installed but may not be ready.' }
+    # v0.6.26 (update resilience, proposal 8): the health check's own problem line, which the last word repeats in place
+    # of "Nothing else to do." - a ChatGPT app that is only closed is no problem there, and says so.
+    $doctorProblem = $null
+    if ($LASTEXITCODE -ne 0) {
+        Warn 'The health check reported a problem. Recovery is installed but may not be ready.'
+        $doctorProblem = @($script:SetupLines | Where-Object { $_ -like 'health check     : problem - *' }) | Select-Object -Last 1
+        if (-not $doctorProblem) { $doctorProblem = 'health check     : problem - see the lines above' }
+        $doctorProblem = $doctorProblem.Substring('health check     : problem - '.Length)
+    }
+    $nothingElse = if ($doctorProblem) { 'Recommended settings are already on. The health check found a problem: ' + $doctorProblem }
+                   else { 'Recommended settings are already on. Nothing else to do.' }
     # Setup waits for the watcher it started while its process is alive, up to 45 seconds (plugin_setup.WATCHER_WAIT;
     # v0.6.22: the launcher takes 10 to 15 seconds before it starts the supervised child). A watcher can still take its
     # mutex just after that (v0.6.17 live acceptance: 6 to 9 seconds, on the wait it had then), and this run then ended
@@ -2492,11 +2504,11 @@ try {
         # Not InstallerFlow.LeftStoppedLine's start: the Finish page's left-stopped box is not this one's.
         Write-Host ('The watcher had ended unexpectedly before this ' + $what + ' (in this sign-in, not by a stop or ' +
                     'a restart), so it was started again and is running.')
-        Write-Host 'Recommended settings are already on. Nothing else to do.'
+        Write-Host $nothingElse
     } else {
         if ($upgrade) { Write-Host $keptLine }
         else { Write-Host 'Installed and running.' }
-        Write-Host 'Recommended settings are already on. Nothing else to do.'
+        Write-Host $nothingElse
     }
     Write-Host ''
     Write-Host 'To change anything: open Codex and ask "open auto resume settings",'

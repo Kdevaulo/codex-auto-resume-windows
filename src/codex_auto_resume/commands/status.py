@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .. import compat, compatio, config, machine, startup
 from ..app import EXIT_ERROR, EXIT_OK
+from ..codex.pairing import app_running_now
 from ..domain.plug import Surface
 from ..logbook import format_local
 from ..store import StoreError
@@ -84,6 +85,35 @@ UNMATCHED_APP = "running, but its Codex server could not be matched"
 ELSEWHERE_SHORT = "its server runs from another official Codex engine, which the watcher takes up"
 # The health check's checks, counted for the setup window's bar while install.ps1 runs it (progress).
 DOCTOR_CHECKS = 8
+# v0.6.26 (update resilience, proposal 8): the app simply closed is no failure - the watcher finds its server, and an
+# engine the app carries, when it opens - and the line that says so says it is not a problem.
+CLOSED_APP = "not running (not a problem: recoveries wait until it opens)"
+CLOSED_ENGINE = "not found while the ChatGPT app is closed (not a problem: it is looked for again when the app opens)"
+# The health check's last line where a check failed, which the installer's last word repeats (install.ps1).
+PROBLEM = "health check     : problem - "
+
+
+def _app_closed():
+    """Whether no process of the Codex app's package runs now - False too where that cannot be told."""
+    return app_running_now() is False
+
+
+def _autostart_line():
+    """(ok, line) for the Run value that starts the watcher at sign-in: not registered (a choice, not a failure),
+    registered, or registered with its interpreter or its launcher gone - which starts nothing at the next sign-in."""
+    try:
+        value = startup.current_value()
+        if not value:
+            return True, "autostart        : not registered"
+        argv = startup.parse_command(value)
+        script = startup.script_index(argv)
+        missing = [part for part in (argv[:1] + argv[script:script + 1]) if not Path(part).exists()]
+        if missing:
+            return False, "autostart        : registered, but %s is missing (run install again)" % (
+                "its interpreter" if argv and missing[0] == argv[0] else "its launcher")
+        return True, "autostart        : registered"
+    except (startup.StartupError, OSError, IndexError) as exc:
+        return True, "autostart        : unavailable (%s)" % type(exc).__name__
 
 
 def _app_paired(app, backend):
@@ -108,47 +138,60 @@ def _app_paired(app, backend):
 
 def cmd_doctor(args) -> int:
     app = _app(args)
-    ok = True
+    # v0.6.26: every failing line, so the last one can name the first (PROBLEM), which the installer's last word repeats.
+    failed = []
+
+    def fail(line):
+        failed.append(line)
+        _print(line)
     try:
         backend = app.backend()
         _print("codex.exe        : %s" % backend.codex_exe)
         _print("engine version   : %s (%s)" % (backend.engine_version, _engine_words(app, backend)[1]))
     except (config.ConfigError, AdapterError) as exc:
-        _print("codex.exe        : FAIL (%s)" % exc)
-        return EXIT_ERROR
-    progress("check", 1, DOCTOR_CHECKS)
-    # Checked now, against the backend just probed; never written - the report on disk is
-    # the watcher's alone. Read-only against Codex's state, like everything here.
-    try:
-        live = compatio.live_view(app.paths, app.codex_home, backend=backend, discovery={},
-                                  source=app.source())
-    except Exception as exc:
-        live = None
-        _print("compatibility    : unavailable (%s)" % type(exc).__name__)
-    if live is not None:
-        _print("compatibility    : %s (checked now)" % live["overall"])
-        for line in _capability_lines(live, only_problems=True):
-            _print(line)
-        if live["overall"] in ("incompatible", "failed_here"):
-            ok = False
-    progress("check", 2, DOCTOR_CHECKS)
-    report = compatio.reader_view(app.paths, settings=app.settings)
-    _print("watcher's report : %s (%s)" % (report["overall"], _view_status(report)))
-    # Beside the version, and never a verdict: `ok` is not touched by it.
-    _print("reported         : %s" % _reported_words(live if live is not None else report))
-    progress("check", 3, DOCTOR_CHECKS)
-    _print("codex home       : %s" % app.codex_home)
-    identity, looked = _app_paired(app, backend)
-    if identity:
-        _print("ChatGPT app      : main pid %d, codex app-server pid %d" % (identity["pid"], identity["server"]["pid"]))
-        if looked.codex_exe != backend.codex_exe:
-            # Not a problem: the engine the watcher pairs with on its next look, named as codex.exe names the first.
-            _print("                   %s: %s (%s)" % (ELSEWHERE_SHORT, looked.codex_exe, looked.engine_version))
-    else:
-        ok = False
-        _print("ChatGPT app      : %s" % (UNMATCHED_APP if looked.app_look == "unmatched"
-                                          else "not running or not paired with the configured engine"))
-    progress("check", 4, DOCTOR_CHECKS)
+        if not _app_closed():
+            fail("codex.exe        : FAIL (%s)" % exc)
+            _print(PROBLEM + " ".join(failed[0].split()))
+            return EXIT_ERROR
+        # v0.6.26: an engine the app carries is found when the app opens (E1); the checks of an engine wait for it.
+        backend = None
+        _print("codex.exe        : " + CLOSED_ENGINE)
+    if backend is not None:
+        progress("check", 1, DOCTOR_CHECKS)
+        # Checked now, against the backend just probed; never written - the report on disk is
+        # the watcher's alone. Read-only against Codex's state, like everything here.
+        try:
+            live = compatio.live_view(app.paths, app.codex_home, backend=backend, discovery={},
+                                      source=app.source())
+        except Exception as exc:
+            live = None
+            _print("compatibility    : unavailable (%s)" % type(exc).__name__)
+        if live is not None:
+            _print("compatibility    : %s (checked now)" % live["overall"])
+            for line in _capability_lines(live, only_problems=True):
+                _print(line)
+            if live["overall"] in ("incompatible", "failed_here"):
+                failed.append("compatibility    : %s (checked now)" % live["overall"])
+        progress("check", 2, DOCTOR_CHECKS)
+        report = compatio.reader_view(app.paths, settings=app.settings)
+        _print("watcher's report : %s (%s)" % (report["overall"], _view_status(report)))
+        # Beside the version, and never a verdict: `failed` is not touched by it.
+        _print("reported         : %s" % _reported_words(live if live is not None else report))
+        progress("check", 3, DOCTOR_CHECKS)
+        _print("codex home       : %s" % app.codex_home)
+        identity, looked = _app_paired(app, backend)
+        if identity:
+            _print("ChatGPT app      : main pid %d, codex app-server pid %d" % (identity["pid"], identity["server"]["pid"]))
+            if looked.codex_exe != backend.codex_exe:
+                # Not a problem: the engine the watcher pairs with on its next look, named as codex.exe names the first.
+                _print("                   %s: %s (%s)" % (ELSEWHERE_SHORT, looked.codex_exe, looked.engine_version))
+        elif looked.app_look == "closed":
+            # v0.6.26: the look just taken found no process of the app's package at all - no failure (U4).
+            _print("ChatGPT app      : " + CLOSED_APP)
+        else:
+            fail("ChatGPT app      : %s" % (UNMATCHED_APP if looked.app_look == "unmatched"
+                                            else "not running or not paired with the configured engine"))
+        progress("check", 4, DOCTOR_CHECKS)
     running = app.watcher_running()
     _print("watcher mutex    : %s" % {True: "held by a running watcher", False: "free", None: "unavailable"}[running])
     progress("check", 5, DOCTOR_CHECKS)
@@ -161,15 +204,13 @@ def cmd_doctor(args) -> int:
         else:
             _print("restart manager  : skipped (no coordination lock file)")
     except AdapterError as exc:
-        ok = False
-        _print("restart manager  : FAIL (%s)" % exc)
+        fail("restart manager  : FAIL (%s)" % exc)
     progress("check", 6, DOCTOR_CHECKS)
     try:
         app.source().latest_failures(_now() - 60)
         _print("local history    : readable")
     except Exception as exc:
-        ok = False
-        _print("local history    : FAIL (%s)" % type(exc).__name__)
+        fail("local history    : FAIL (%s)" % type(exc).__name__)
     progress("check", 7, DOCTOR_CHECKS)
     # The notification's button goes through a registered URL protocol. If its target has
     # gone - an installation moved, or a temporary home that no longer exists - the button
@@ -183,15 +224,20 @@ def cmd_doctor(args) -> int:
             script = startup.script_index(argv)
             target = Path(argv[script]) if len(argv) > script else None
             if target is not None and not target.exists():
-                ok = False
-                _print("notification action: registered, but its target is missing")
+                fail("notification action: registered, but its target is missing")
                 _print("                     re-run install to point it at this installation")
             else:
                 _print("notification action: registered")
     except startup.StartupError as exc:
         _print("notification action: unavailable (%s)" % exc)
+    # v0.6.26, with the other registration: whether the watcher starts at the next sign-in (U5) - a Run value whose
+    # interpreter or launcher is gone starts nothing, and nothing else would say so.
+    good, line = _autostart_line()
+    (_print if good else fail)(line)
     progress("check", 8, DOCTOR_CHECKS)
-    return EXIT_OK if ok else EXIT_ERROR
+    if failed:
+        _print(PROBLEM + " ".join(failed[0].split()))
+    return EXIT_ERROR if failed else EXIT_OK
 
 
 # What `status` (short) and `doctor` (long) say about an engine that passed its local checks, in the
