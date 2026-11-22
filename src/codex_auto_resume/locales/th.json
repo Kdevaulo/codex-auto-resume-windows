@@ -705,7 +705,7 @@
   "installer.options.plugin_help": "แผงและสกิลภายใน Codex",
   "installer.options.plugin_name": "ปลั๊กอิน Codex",
   "installer.options.watcher": "ตัวเฝ้าดู",
-  "installer.options.watcher_help": "เฝ้าดูการสนทนาที่หยุดอยู่ในเบื้องหลัง",
+  "installer.options.watcher_help": "ทำงานเบื้องหลัง เฝ้าดูการสนทนาที่หยุดอยู่",
   "installer.options.saved_accounts": "บัญชี Codex ที่คุณบันทึกไว้สำหรับการสลับจะยังอยู่บนพีซีเครื่องนี้ โดยถูกปิดผนึกไว้สำหรับผู้ใช้ Windows นี้ และรุ่นมาตรฐานไม่ได้ใช้บัญชีเหล่านี้",
   "installer.options.to_advanced": "การเปลี่ยนจะเก็บการตั้งค่าและการกู้คืนที่รอดำเนินการไว้ ฟีเจอร์ขั้นสูงทุกอย่างจะเริ่มต้นแบบปิด",
   "installer.options.to_standard": "การเปลี่ยนจะเก็บการตั้งค่าและการกู้คืนที่รอดำเนินการไว้ ฟีเจอร์ขั้นสูงจะถูกลบออกไปพร้อมกับโค้ดของฟีเจอร์เหล่านั้น",
