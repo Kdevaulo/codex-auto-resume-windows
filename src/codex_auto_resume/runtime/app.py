@@ -70,11 +70,12 @@ def _file_stamp(path):
 
 
 class App(WatchLoop, PlugNotices):
-    def __init__(self, paths: config.Paths, *, codex_exe=None, codex_home=None, console=False, enable_logging=True):
+    def __init__(self, paths: config.Paths, *, codex_exe=None, codex_home=None, console=False, enable_logging=True,
+                 log_mark=""):
         self.paths = paths
         if enable_logging:
             self.paths.ensure()
-            self.logger = setup_logging(paths.log_file, console=console)
+            self.logger = setup_logging(paths.log_file, console=console, mark=log_mark)
         else:
             # Management commands (uninstall) must never create or reopen a log file.
             self.logger = logging.getLogger(LOGGER_NAME + ".silent")

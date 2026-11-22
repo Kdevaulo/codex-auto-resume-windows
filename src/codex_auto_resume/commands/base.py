@@ -51,9 +51,21 @@ def progress(step: str, done: int, total: int) -> None:
     print("progress: %s %d/%d" % (step, max(0, min(done, total)), total), flush=True)
 
 
+# v0.6.26 (the third audit's O4): the commands that look at the engine and the app without being the watcher. What they
+# log goes into the watcher's log, and an unmarked "engine ... is verified" there read as the watcher finding its engine.
+HEALTH_CHECKS = ("doctor", "status")
+
+
+def log_mark(args) -> str:
+    """What begins each log line a command other than the watcher writes: "(doctor, pid 4321) "; none for the rest."""
+    command = getattr(args, "command", None)
+    return "(%s, pid %d) " % (command, os.getpid()) if command in HEALTH_CHECKS else ""
+
+
 def _app(args) -> App:
     paths = config.Paths(args.home)
-    return App(paths, codex_exe=args.codex_exe, codex_home=args.codex_home, console=not args.quiet)
+    return App(paths, codex_exe=args.codex_exe, codex_home=args.codex_home, console=not args.quiet,
+               log_mark=log_mark(args))
 
 
 def _open_state(app):

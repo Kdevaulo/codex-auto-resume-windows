@@ -34,7 +34,9 @@ def format_local(timestamp) -> str:
     return moment.strftime("%Y-%m-%d %H:%M:%S") + " " + offset[:3] + ":" + offset[3:]
 
 
-def setup_logging(log_file: Path, *, console: bool = False, level: int = logging.INFO) -> logging.Logger:
+def setup_logging(log_file: Path, *, console: bool = False, level: int = logging.INFO, mark: str = "") -> logging.Logger:
+    """The watcher's log. `mark` (v0.6.26) begins every line a process other than the watcher writes through it - a
+    health check's engine lines are not the watcher looking for its engine again."""
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(level)
     logger.propagate = False
@@ -43,7 +45,7 @@ def setup_logging(log_file: Path, *, console: bool = False, level: int = logging
         handler.close()
     log_file = Path(log_file)
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    formatter = logging.Formatter("[%(asctime)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter("[%(asctime)s] " + mark.replace("%", "%%") + "%(message)s", "%Y-%m-%d %H:%M:%S")
     file_handler = RotatingFileHandler(log_file, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT, encoding="utf-8")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
