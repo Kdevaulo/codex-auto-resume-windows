@@ -20,6 +20,7 @@ import json
 import os
 from pathlib import Path, PureWindowsPath
 import re
+import time
 
 from . import pairing
 
@@ -30,6 +31,10 @@ FORMAT = 1
 # the app open with no engine yet (starting, or its server restarting), and the app closed.
 SHAPES = {(1, 1, 0): "single_child", (1, 2, 0): "two_children", (1, 0, 1): "helper_parented",
           (1, 1, 1): "helper_parented", (1, 0, 0): "starting", (0, 0, 0): "closed"}
+# Review K8: "starting" is a tested layout only for a while. An app whose engine is no longer a codex.exe under it - one
+# an update renamed, which the inventory does not list - looks "starting" for ever; past this many seconds of looks
+# that all found it so, it is a layout this version has not been tested on.
+STARTING_SECONDS = 600.0
 _VERSION = re.compile(r"OpenAI\.Codex_([0-9][0-9.]{0,31})_", re.I)
 _WORD = re.compile(r"[\x20-\x7e]{1,64}\Z")
 
@@ -108,8 +113,11 @@ class Watch:
     """The watcher's look at the layout: `look` at every tick with the backend's last snapshot; it writes and says
     something only when the engine's file, the app's package version, the pairing or the after-update fact changes."""
 
-    def __init__(self, path, code_version, log=None):
+    def __init__(self, path, code_version, log=None, clock=None):
         self.path, self.code_version, self.log = path, _word(code_version), log or (lambda *_: None)
+        self.clock = clock or time.monotonic
+        self._starting_since = None         # the first of the looks running that found the app "starting"
+        self._untested = None               # whether the last look was one of a layout not tested on
         before = read(path) or {}
         self._kept = before
         self._key = None
@@ -124,16 +132,27 @@ class Watch:
         if not isinstance(found, dict):
             return None
         app_open = found.get("mains", 0) > 0 or found.get("helpers", 0) > 0
+        at = self.clock()
+        if found.get("shape") == "starting":
+            if self._starting_since is None or at < self._starting_since:
+                self._starting_since = at
+        else:
+            self._starting_since = None
+        tested = catalogued(found) and not (self._starting_since is not None
+                                            and at - self._starting_since >= STARTING_SECONDS)
+        untested = app_open and not tested
         key = (stamp, found.get("app_version"))
-        if key != self._key:
+        changed, said = key != self._key, self._untested
+        self._untested = untested
+        if changed:
             self._key = key
             self.log("Codex layout: %d main, %d helper, engines %d under the main, %d under a helper, %d elsewhere; "
                      "%s" % (found.get("mains", 0), found.get("helpers", 0), found.get("engines_under_main", 0),
                              found.get("engines_under_helper", 0), found.get("engines_elsewhere", 0),
                              "paired" if found.get("paired") else "not paired"))
-            if app_open and not catalogued(found):
-                self.log("Codex %s runs in a layout this version has not been tested on"
-                         % (found.get("app_version") or "(version unknown)"))
+        if untested and (changed or said is False):
+            self.log("Codex %s runs in a layout this version has not been tested on"
+                     % (found.get("app_version") or "(version unknown)"))
         kept = dict(self._kept)
         last_good = kept.get("last_good") if isinstance(kept.get("last_good"), dict) else None
         if found.get("paired"):
@@ -148,7 +167,7 @@ class Watch:
         now = {"format": FORMAT, "code_version": self.code_version, "engine_version": _word(engine_version),
                "app_version": found.get("app_version"),
                "layout": {name: value for name, value in found.items() if name != "server_holds"},
-               "catalogued": catalogued(found),
+               "catalogued": tested,
                "last_good": last_good, "updated_from": self.updated_from, "unpaired_after_update": unpaired}
         if now != self._kept:
             self._kept = now
