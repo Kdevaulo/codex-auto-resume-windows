@@ -894,6 +894,39 @@ namespace CodexAutoResume
 
         private const int HTERROR = -2;
 
+        /// v0.6.26 (audit G4, from the editor's fix of the v0.6.24 final, live re-check 4): a wait that has ended gives the
+        /// pointer its cursor at once wherever it rests, never moved - Windows asks for a cursor only as the pointer moves,
+        /// so the hourglass stayed over a window that had answered. What is under it, where it is one of this thread's own
+        /// windows (the window itself, also while its dialog holds it, a control, a dialog), is asked for its cursor as
+        /// Windows asks it (WM_NCHITTEST, then WM_SETCURSOR as for a move); the arrow where none of ours is.
+        internal static void PointerBack()
+        {
+            Cursor.Current = Cursors.Default;
+            try
+            {
+                Point at = Cursor.Position;
+                IntPtr under = PointerWindowAt(new PointerPoint { X = at.X, Y = at.Y });
+                int process;
+                if (under == IntPtr.Zero || PointerThreadOf(under, out process) != PointerThreadNow()) return;
+                IntPtr where = (IntPtr)((at.Y & 0xFFFF) << 16 | (at.X & 0xFFFF));
+                int hit = PointerAsk(under, Chrome.WM_NCHITTEST, IntPtr.Zero, where).ToInt32();
+                PointerAsk(under, WM_SETCURSOR, under, (IntPtr)((0x0200 << 16) | (hit & 0xFFFF)));
+            }
+            catch (Exception) { /* no pointer to ask about (a locked session): the next move asks */ }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PointerPoint { public int X, Y; }
+
+        [DllImport("user32.dll", EntryPoint = "WindowFromPoint")]
+        private static extern IntPtr PointerWindowAt(PointerPoint point);
+        [DllImport("user32.dll", EntryPoint = "GetWindowThreadProcessId")]
+        private static extern int PointerThreadOf(IntPtr window, out int process);
+        [DllImport("kernel32.dll", EntryPoint = "GetCurrentThreadId")]
+        private static extern int PointerThreadNow();
+        [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        private static extern IntPtr PointerAsk(IntPtr window, int message, IntPtr w, IntPtr l);
+
         /// Handles `m` before the form does: true when it is answered here and the form must not see it again.
         internal bool Intercept(ref Message m, Pass pass)
         {

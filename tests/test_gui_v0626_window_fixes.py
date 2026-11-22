@@ -5,6 +5,10 @@ it: a press on a Dashboard a dialog or the setup window held (HTERROR) no longer
 and the resize edges showed the hourglass. Now Windows handles HTERROR first and the wait cursor comes after it, and over
 a resize band Windows' size arrows stay.
 
+G4. After a long action the hourglass stayed over a resting pointer until it moved: only the editor gave the pointer back
+(GivePointerBack). Now every wait of the window ends so - SetBusy, the version listing's dialog and the editor - through
+one call (ChromeHost.PointerBack).
+
 The window is compiled from the shipped sources; its dialogs are made and asked, never shown. GUI test module: run on its
 own, through gui_lock.sh.
 """
@@ -78,6 +82,17 @@ foreach ($hit in @(1, 2, 10, 12, 14, 17, -2)) {
 }
 $dialog.Dispose()
 
+# G4: a wait ended gives the cursor back at once; the pointer over none of ours (every window here is off the screen),
+# the arrow.
+$back = (T 'ChromeHost').GetMethod('PointerBack', $static)
+$out.pointer_back = $null -ne $back
+if ($back) {
+    [Windows.Forms.Cursor]::Current = [Windows.Forms.Cursors]::WaitCursor
+    $null = $back.Invoke($null, @())
+    $now = [string][CarFixesUser]::GetCursor()
+    $out.pointer_after = $(if ($cursors.ContainsKey($now)) { $cursors[$now] } else { 'other' })
+}
+
 [IO.File]::WriteAllText((Join-Path $env:CAR_WORK 'result.json'), ($out | ConvertTo-Json -Depth 6 -Compress), $utf8)
 """
 
@@ -88,6 +103,17 @@ class SourceTests(unittest.TestCase):
         self.assertIn("if (hit == HTERROR) pass(ref m);", wait)
         self.assertLess(wait.index("if (hit == HTERROR) pass(ref m);"), wait.index("Cursor.Current = Cursors.WaitCursor;"))
         self.assertIn("return WaitCursor(ref m, pass);", guiscan.member_body("ChromeHost", "Intercept"))
+
+    def test_every_wait_of_the_window_gives_the_pointer_back(self):
+        busy = guiscan.member_body("SettingsForm", "SetBusy")
+        self.assertIn("if (busy == 0) { if (UseWaitCursor) GivePointerBack(false); }", busy)
+        give = guiscan.member_body("SettingsForm", "GivePointerBack")
+        self.assertIn("if (!waited) ChromeHost.PointerBack();", give)
+        rows = guiscan.member_body("SettingsForm", "ShowVersionRows")
+        self.assertLess(rows.index("dialog.UseWaitCursor = false;"), rows.index("ChromeHost.PointerBack();"))
+        editor = (guiscan.ROOT / "advanced" / "gui" / "AdvancedEditor.cs").read_text(encoding="utf-8")
+        self.assertNotIn("void GivePointerBack(", editor, "one way to give the pointer back: the window's")
+        self.assertIn("GivePointerBack(waited);", editor)
 
 
 @unittest.skipUnless(CSC.is_file() and POWERSHELL.is_file(), "needs the in-box compiler and PowerShell")
@@ -109,6 +135,10 @@ class WindowTests(unittest.TestCase):
                          {"10": "SizeWE", "12": "SizeNS", "14": "SizeNESW", "17": "SizeNWSE"})
         self.assertEqual({hit: seen[hit] for hit in ("1", "2", "-2")},
                          {"1": "WaitCursor", "2": "WaitCursor", "-2": "WaitCursor"})
+
+    def test_a_wait_that_ended_gives_the_cursor_back_at_once(self):
+        self.assertTrue(self.answer["pointer_back"], "ChromeHost.PointerBack")
+        self.assertEqual(self.answer["pointer_after"], "Default")
 
 
 if __name__ == "__main__":
