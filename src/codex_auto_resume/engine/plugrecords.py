@@ -164,6 +164,9 @@ class PlugRecordsMixin:
                 self.log(record["thread_id"], "plug_record_check_failed", None)
 
     def _record_waits(self, record, gate, reason) -> None:
+        waits = getattr(self, "handed_waits", None)
+        if isinstance(waits, dict):
+            waits[record["thread_id"]] = reason          # the watcher's judge reads it (engine/__init__.py)
         self._record_told(record, RecordMove.WAITING, gate, reason)
 
     def _try_record(self, record):

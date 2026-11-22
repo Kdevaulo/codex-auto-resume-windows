@@ -10,8 +10,10 @@ The recovery rules, each judged only while a process of the Codex app runs and a
 
     held_elsewhere   (a) a record waits `held_by_other_session` or `loaded_state_unknown`, its writer lock's holder
                      holds the newest queue or state database, and the paired server holds neither - #67's signature
-    locks_unread     (b) a record waits `notLoaded`, the paired server holds the newest databases, and the
-                     thread-writer-locks folder is not there
+    locks_unread     (b) a record waits `notLoaded` or `loaded_state_unknown`, the paired server holds the newest
+                     databases, and the thread-writer-locks folder is not there - since update resilience #4 a home
+                     without that folder answers "unknown" (codex/transport.py loaded), so its records wait
+                     `loaded_state_unknown` and never `notLoaded`
     stale_database   (c) a newer database generation is held by nobody while the paired server holds an older one
     usage_protocol   (d) a record has waited 30 minutes on a usage read Codex answered in a way this version does not
                      know (engine/outcome.py, the usage_probe_broken_* reasons)
@@ -47,17 +49,22 @@ LOOK_EVERY_SECONDS = 60.0
 # The reasons each recovery rule reads on a waiting record.
 ELSEWHERE_REASONS = frozenset({"held_by_other_session", "loaded_state_unknown"})
 NOT_LOADED_REASONS = frozenset({"notLoaded"})
+# Rule (b): what a record of a home without its lock folder waits under - "unknown" since #4, "notLoaded" before it (a
+# record that waited then, or a folder that is there and empty).
+LOCKS_UNREAD_REASONS = NOT_LOADED_REASONS | frozenset({"loaded_state_unknown"})
 USAGE_BROKEN_REASONS = frozenset({"usage_probe_broken_answer", "usage_probe_broken_request",
                                   "usage_probe_broken_start"})
 
 
 # v0.6.26 (proposal 7): which way a usage read broke, by what the helper last met (codex/appserver.py RESULTS): Codex
-# answered for another home or system, or with a usage answer this version does not read; refused the request; or did
-# not answer at all.
+# answered for another home or system, or with a usage answer this version does not read; refused the request as a
+# method it does not know; or did not answer at all. Codex refusing a method it knows for now - a signed-out account,
+# its backend failing (appserver.REFUSED, review K2) - is none of these: the record waits usage_unknown, as it always
+# did, and rule (d) does not count it toward "Codex changed".
 _USAGE_BROKEN = {"protocol_home_mismatch": "usage_probe_broken_answer",
                  "protocol_platform_mismatch": "usage_probe_broken_answer",
                  "protocol_reply_unknown": "usage_probe_broken_answer",
-                 "protocol_request_failed": "usage_probe_broken_request",
+                 "protocol_method_unknown": "usage_probe_broken_request",
                  "protocol_unavailable": "usage_probe_broken_start",
                  "protocol_timeout": "usage_probe_broken_start"}
 USAGE_METHOD = "account/rateLimits/read"
@@ -89,7 +96,7 @@ def recovery_facts(*, matched, server, reasons, lock_holders, database_holders, 
     holds = server in database_holders
     elsewhere = bool(reasons & ELSEWHERE_REASONS) and not holds and any(
         pid != server and pid in database_holders for pid in lock_holders)
-    unread = bool(reasons & NOT_LOADED_REASONS) and holds and locks_folder is False
+    unread = bool(reasons & LOCKS_UNREAD_REASONS) and holds and locks_folder is False
     stale = not holds and any(server in pids for pids in older_holders)
     return {"held_elsewhere": elsewhere, "locks_unread": unread, "stale_database": stale}
 

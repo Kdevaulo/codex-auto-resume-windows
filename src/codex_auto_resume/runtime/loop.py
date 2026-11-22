@@ -489,12 +489,15 @@ class WatchLoop:
             judge = self._judge = impossible.Judge()
         now = time.time()
         try:
-            missing = engine is None
+            # An engine not built because the settings file cannot be read (review K5; App.engine raises Unreadable
+            # while `_settings_good` is False) is no engine missing: that file has its own word, and the engine is not
+            # looked for until it can be read.
+            missing = engine is None and getattr(self, "_settings_good", True) is not False
             unreadable = getattr(engine, "detection_failed", None) is True
             # The process list is asked only where a detection rule is met: a tick that met none counts nothing.
             judge.tick(_app_runs() if missing or unreadable else False,
                        {"engine_missing": missing, "history_unreadable": unreadable})
-            if missing:
+            if engine is None:
                 judge.look(now, None, {})
             elif now - getattr(self, "_judged_at", 0.0) >= impossible.LOOK_EVERY_SECONDS or now < self._judged_at:
                 self._judged_at = now
@@ -551,9 +554,15 @@ class WatchLoop:
         and the Restart Manager asked who holds the newest queue and state databases, the writer locks of the records
         waiting elsewhere or unknown (five at most) and, where nobody holds a newest one, the older ones."""
         waiting = [row for row in store.records_in(machine.WAITING, home_key="")]
+        # Review V6: and every record the running edition's plug handed over that waits now, as core told the plug its
+        # gate's reason this tick (Engine.handed_waits) - the standard edition's plug hands over none.
+        handed = getattr(engine, "handed_waits", None)
+        if isinstance(handed, dict):
+            waiting += [{"thread_id": thread, "last_error": reason} for thread, reason in sorted(handed.items())
+                        if isinstance(thread, str) and isinstance(reason, str)]
         reasons = {row.get("last_error") for row in waiting}
         facts = {"usage_protocol": bool(reasons & impossible.USAGE_BROKEN_REASONS)}
-        wanted = impossible.ELSEWHERE_REASONS | impossible.NOT_LOADED_REASONS
+        wanted = impossible.ELSEWHERE_REASONS | impossible.LOCKS_UNREAD_REASONS
         if not reasons & wanted:
             return (_app_runs() if facts["usage_protocol"] else None), facts
         backend = engine.backend

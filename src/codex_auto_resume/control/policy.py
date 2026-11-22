@@ -232,18 +232,20 @@ SET_ASIDE_KEEP = 5
 _SET_ASIDE_NAME = re.compile(re.escape(SET_ASIDE_PREFIX) + r"(\d{8}T\d{6}Z)(?:-(\d+))?\.json")
 
 
-def _prune_set_aside(folder: Path) -> None:
-    """Delete all but the newest SET_ASIDE_KEEP copies in `folder`, oldest first; one that cannot be deleted stays."""
+def _prune_set_aside(folder: Path, made: Path) -> None:
+    """Delete all but the newest SET_ASIDE_KEEP copies in `folder`, oldest first; one that cannot be deleted stays.
+    `made`, the copy just made, is always one of those kept, whatever its name's time says against the others' (review
+    K4: a clock set back after five copies stamped later would otherwise delete the person's settings at once)."""
     found = []
     try:
         for entry in folder.iterdir():
             named = _SET_ASIDE_NAME.fullmatch(entry.name)
-            if named and entry.is_file() and not config.is_link(entry):
+            if named and entry.name != made.name and entry.is_file() and not config.is_link(entry):
                 found.append((named.group(1), int(named.group(2) or 0), entry))
     except OSError:
         return
     found.sort(key=lambda item: item[:2])
-    for _stamp, _number, entry in found[:-SET_ASIDE_KEEP]:
+    for _stamp, _number, entry in found[:max(0, len(found) - (SET_ASIDE_KEEP - 1))]:
         try:
             entry.unlink()
         except OSError:
@@ -262,7 +264,7 @@ def set_aside(path) -> Path | None:
         try:
             if not aside.exists():
                 os.rename(target, aside)            # never replaces on Windows: a name taken meanwhile tries the next
-                _prune_set_aside(target.parent)
+                _prune_set_aside(target.parent, aside)
                 return aside
         except FileExistsError:
             continue

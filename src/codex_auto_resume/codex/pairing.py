@@ -213,17 +213,29 @@ def _package_file(path) -> bool:
     return bool(pattern.fullmatch(path))
 
 
+def _main_slot(path) -> bool:
+    """Whether `path` is a file directly in the package's `app` folder, where its main is (`...\\app\\ChatGPT.exe`) -
+    not in a folder below it, where the package keeps its own engine (`...\\app\\resources\\codex.exe`, #58)."""
+    if not _package_file(path):
+        return False
+    pattern = re.compile(re.escape(str(_windows_apps())) + r"\\OpenAI\.Codex_[^\\]+__" + CODEX_APP_PUBLISHER +
+                         r"\\app\\[^\\]+", re.I)
+    return bool(pattern.fullmatch(path))
+
+
 def app_process(row) -> bool:
     """Whether the inventory row `row` is a process of the Codex app's own package - a main or a helper: a ChatGPT.exe
     of the package (`_package_app`), as always, or (v0.6.26, update resilience #5) any other file of the package's
     folder (`_package_file`) whose process Windows says is of the package's family (`CODEX_APP_FAMILY`, asked as
     win/kernel.py decide_host asks it) - a main or a helper an update renamed is still the app's. A process outside
     the package's folder never counts, whatever family it carries (a shell the app started may inherit it), and a
-    file called codex.exe never does, whatever its case: an engine - the package's own among them (#58), which a
-    terminal may run - is not one of the app's own processes."""
+    file called codex.exe never does, whatever its case, but where the main is (`_main_slot`): an engine - the
+    package's own among them (#58, in a folder below), which a terminal may run - is not one of the app's own
+    processes, and a main renamed Codex.exe, the likeliest name for a package called OpenAI.Codex, still is (review
+    K7)."""
     if not isinstance(row, dict) or not isinstance(row.get("path"), str):
         return False
-    if PureWindowsPath(row["path"]).name.lower() == "codex.exe":
+    if PureWindowsPath(row["path"]).name.lower() == "codex.exe" and not _main_slot(row["path"]):
         return False
     if _package_app(row["path"]):
         return True
