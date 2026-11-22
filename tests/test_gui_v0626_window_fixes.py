@@ -16,7 +16,15 @@ was typed when the window comes back.
 
 G3. A dialog's title read its first letter from a drawing as wide as the title row, pixel by pixel, on every size change
 (11-43 ms each). Now it is read once per look and stops at the first ink: a dialog resized reads it no more, and the
-inset is the one the whole reading gave, in every room tried, mirrored too. Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
+inset is the one the whole reading gave, in every room tried, mirrored too.
+
+D9. A dialog fades in over 160 ms, but the veil over its owner came on at its fullest in one frame, before the dialog.
+Now the veil follows the dialog's own fade step for step (DialogVeil.Fade from SoftDialog.SetFade), and goes with it.
+
+D10. The veil took the owner's hard region, which holds only the pixels wholly the window's, so the anti-aliased pixels
+round its own corner stayed undimmed. Now the veil is drawn pixel by pixel at the owner's edge coverage
+(WindowCorner.EdgeNow): none outside the curve, part of it on the curve, all of it inside. Its probe shows an owner and a
+dialog off the screen, never activated. Its probe shows a stand-in owner and a dialog off the screen, minimises the owner
 and brings it back.
 
 The window is compiled from the shipped sources; its dialogs are made and asked, never shown. GUI test module: run on its
@@ -218,6 +226,73 @@ $script:owner.add_Shown({
 [IO.File]::WriteAllText((Join-Path $env:CAR_WORK 'result.json'), ($script:r | ConvertTo-Json -Compress), (New-Object Text.UTF8Encoding $false))
 """
 
+VEIL = r"""
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::ThrowException)
+Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public static class CarVeilUser {
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+}
+'@
+$assembly = [Reflection.Assembly]::LoadFile($env:CAR_EXE)
+$static = [Reflection.BindingFlags]'Static,NonPublic,Public'
+$instance = [Reflection.BindingFlags]'Instance,NonPublic,Public'
+function T([string]$name) { return $assembly.GetType('CodexAutoResume.' + $name, $true) }
+function P($target, [string]$name) { return $target.GetType().GetProperty($name, $instance).GetValue($target, $null) }
+function Pump([int]$ms) { $until = [DateTime]::Now.AddMilliseconds($ms); while ([DateTime]::Now -lt $until) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 3 } }
+$null = (T 'Palette').GetMethod('Adopt', $static, $null, [Type[]]@([string]), $null).Invoke($null, [object[]]@('light'))
+(T 'SettingsForm').GetField('dpiScale', $static).SetValue($null, [double]1.0)
+(T 'Soft').GetField('ReduceMotionSetting', $static).SetValue($null, $false)
+(T 'Soft').GetField('WindowsAnimates', $static).SetValue($null, [Func[bool]]{ $true })
+function Dialog([string]$title, [int]$x) {
+    $dialog = [Activator]::CreateInstance((T 'SoftDialog'), $true)
+    $dialog.Text = $title
+    $dialog.BackColor = (T 'Palette').GetField('Canvas', $static).GetValue($null)
+    $null = (T 'Soft').GetMethod('DialogBar', $static).Invoke($null, [object[]]@($dialog))
+    $dialog.FormBorderStyle = 'FixedDialog'; $dialog.MinimizeBox = $false; $dialog.MaximizeBox = $false
+    $dialog.ShowInTaskbar = $false
+    $dialog.StartPosition = 'Manual'; $dialog.Location = New-Object System.Drawing.Point($x, -30000)
+    $dialog.ClientSize = New-Object System.Drawing.Size 640, 420
+    return $dialog
+}
+$out = @{}
+$owner = Dialog 'The window under it' -30000
+$null = $owner.Handle
+[void][CarVeilUser]::ShowWindow($owner.Handle, 4)
+Pump 900
+$corner = (T 'WindowCorner').GetMethod('Of', $static).Invoke($null, [object[]]@($owner))
+$out.owner_shaped = ($null -ne $corner) -and [bool](P $corner 'Shaped')
+$dialog = Dialog 'A dialog over it' -29000
+$dialog.Owner = $owner
+$null = $dialog.Handle
+[void][CarVeilUser]::ShowWindow($dialog.Handle, 4)
+$veil = P $dialog 'Veil'
+$out.veiled = $null -ne $veil
+$out.steps = @()
+$out.following = $null -ne $veil -and $null -ne $veil.GetType().GetProperty('Following', $instance)
+$clock = [Diagnostics.Stopwatch]::StartNew()
+while ($clock.ElapsedMilliseconds -lt 900) {
+    [Windows.Forms.Application]::DoEvents()
+    if ($veil) { $out.steps += ,@([int](P $dialog 'FadeAlpha'), [int](P $veil 'Alpha'), [int](P $veil 'Full')) }
+    Start-Sleep -Milliseconds 3
+}
+$out.cover = @()
+$coverage = $(if ($veil) { $veil.GetType().GetMethod('Coverage', $instance) } else { $null })
+if ($coverage) {
+    $w = $owner.Width; $h = $owner.Height
+    foreach ($x in 0..40) { $out.cover += [int]$coverage.Invoke($veil, [object[]]@($x, 0)) }
+    $out.middle = [int]$coverage.Invoke($veil, [object[]]@([int]($w / 2), [int]($h / 2)))
+    $out.edge_middle = [int]$coverage.Invoke($veil, [object[]]@([int]($w / 2), 0))
+}
+$dialog.Close(); Pump 50
+$out.gone = $null -eq (P $dialog 'Veil')
+$dialog.Dispose(); $owner.Close(); $owner.Dispose()
+[IO.File]::WriteAllText((Join-Path $env:CAR_WORK 'result.json'), ($out | ConvertTo-Json -Depth 5 -Compress), (New-Object Text.UTF8Encoding $false))
+"""
+
 
 class SourceTests(unittest.TestCase):
     def test_windows_sees_the_press_on_a_held_window_before_the_wait_cursor(self):
@@ -257,6 +332,9 @@ class WindowTests(unittest.TestCase):
         kept = work / "kept"
         kept.mkdir()
         cls.kept = run_probe(KEPT, kept, 120, CAR_EXE=str(exe))
+        veil = work / "veil"
+        veil.mkdir()
+        cls.veil = run_probe(VEIL, veil, 120, CAR_EXE=str(exe))
 
     @classmethod
     def tearDownClass(cls):
@@ -289,6 +367,30 @@ class WindowTests(unittest.TestCase):
             with self.subTest(text=text, mirrored=mirrored, room=width):
                 if whole >= 0:
                     self.assertEqual(now, whole)
+
+    def test_the_veil_comes_with_the_dialog_s_own_fade(self):
+        seen = self.veil
+        self.assertTrue(seen["veiled"])
+        steps = seen["steps"]
+        self.assertTrue(steps)
+        full = steps[0][2]
+        self.assertEqual(steps[0][1], round(full * steps[0][0] / 255.0), "as the dialog is first shown: %r" % steps[:3])
+        self.assertTrue(any(0 < alpha < 255 for alpha, _veil, _full in steps), "the dialog faded in: %r" % steps)
+        for alpha, veil, _full in steps:
+            self.assertEqual(veil, round(full * alpha / 255.0), "the veil at the dialog's alpha of its fullest")
+        self.assertEqual(steps[-1][:2], [255, full], "at its fullest once the dialog is opaque")
+        self.assertTrue(seen["gone"], "and gone with it")
+
+    def test_the_veil_dims_the_owner_s_anti_aliased_corner_too(self):
+        seen = self.veil
+        if not seen["owner_shaped"]:
+            self.skipTest("this machine gives the window Windows' corner (no corner of its own to dim)")
+        cover = seen["cover"]
+        self.assertTrue(cover, "DialogVeil.Coverage")
+        self.assertEqual(cover[0], 0, "nothing outside the curve")
+        self.assertTrue(any(0 < value < 255 for value in cover), "part of each pixel on the curve: %r" % cover)
+        self.assertEqual(cover[-1], 255)
+        self.assertEqual((seen["middle"], seen["edge_middle"]), (255, 255))
 
 
 if __name__ == "__main__":

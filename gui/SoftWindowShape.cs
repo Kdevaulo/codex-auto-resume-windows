@@ -797,6 +797,16 @@ namespace CodexAutoResume
         /// Whether it is ours now: the window's whole rectangle its client area, its region cut.
         internal bool Shaped { get { return now == WindowShape.Corner.Squircle; } }
 
+        /// v0.6.26 (audit D10): the window's edge as its region and companion are cut now - each pixel's coverage, the
+        /// partly covered ones round its corners the companion's - or null where it has no corner of its own cut: what the
+        /// veil over it dims it by (DialogVeil).
+        internal WindowShape.Edge EdgeNow()
+        {
+            if (!Shaped || bitmap == IntPtr.Zero || shapedSize.IsEmpty || shapedDpi <= 0) return null;
+            var edge = new WindowShape.Edge(shapedSize.Width, shapedSize.Height, Palette.RadiusCard, Shape.Smoothing, shapedDpi / 96.0);
+            return edge.Fits ? edge : null;
+        }
+
         /// The companion, for the tests; IntPtr.Zero before it is made.
         internal IntPtr Companion { get { return layer == null ? IntPtr.Zero : layer.Handle; } }
 
