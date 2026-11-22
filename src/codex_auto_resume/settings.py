@@ -43,12 +43,9 @@ CONFIGURABLE_CATEGORIES = (
     "rate_limit_transient",
     "server_5xx",
     "stream_interrupted",
-    # Not `auth_service_transient`, from v0.6.10. v0.6.3 gave it a switch here, believing it
-    # the one recoverable category without one; but nothing in the classifier ever produced it,
-    # so the switch - and its Custom message - changed nothing and never could. It is reserved
-    # now (failures.RESERVED): no field, so describe() offers it on no surface, and a settings
-    # file that still carries `recover_auth_service_transient` or its Custom message loads as
-    # it always did, the two keys dropped on read like any key this build does not have.
+    # Not `auth_service_transient`, from v0.6.10: nothing in the classifier ever produced it, so its switch (v0.6.3)
+    # and Custom message changed nothing. It is reserved (failures.RESERVED): no field, and a file that still carries
+    # its two keys loads as it always did, them dropped on read like any key this build does not have.
 )
 
 # Notification events, each independently suppressible.
@@ -60,21 +57,16 @@ RETRY_TIMING = ladder.PRESETS
 RETRY_TIMINGS = ladder.TIMINGS
 DEFAULT_TIMING = ladder.DEFAULT_TIMING
 
-# Light or dark, for the settings window, the notification-area popup and the notification
-# card - and for the panel in Codex too while its own choice is "same". "system" is not a
-# colour: it is the standing instruction to follow the host - Windows' app mode for the
-# window and the popup, Codex's own theme for the panel - so a later change there carries
-# every surface with it. Windows High Contrast outranks every choice on every surface; that
-# is an accessibility setting, not a theme.
+# Light or dark, for the settings window, the popup and the notification card - and the panel in Codex while its own
+# choice is "same". "system" is not a colour: it is the standing instruction to follow the host (Windows' app mode,
+# Codex's own theme for the panel), so a later change there carries every surface. High Contrast outranks every choice.
 THEME_SYSTEM = "system"
 THEMES = tuple(Theme)
 DEFAULT_THEME = THEME_SYSTEM
 
-# The panel's own, from v0.6.6. Use system setting already let each surface follow its host,
-# but a Light or Dark Theme bound the panel too: nobody could keep the window dark and let the
-# panel follow Codex, or pin the panel whatever Codex does. "same" follows the Theme above,
-# which is what every panel did before this existed - so it is the default, and an upgrade
-# changes nothing anybody can see. "system" here is Codex's own theme.
+# The panel's own, from v0.6.6: a Light or Dark Theme bound the panel too, so nobody could keep the window dark and
+# let the panel follow Codex. "same" follows the Theme above (what every panel did before: the default); "system" is
+# Codex's own theme.
 PANEL_THEME_SAME = "same"
 PANEL_THEMES = (PANEL_THEME_SAME, THEME_SYSTEM, "light", "dark")
 DEFAULT_PANEL_THEME = PANEL_THEME_SAME
@@ -175,20 +167,16 @@ for _event in NOTIFICATION_EVENTS:
     # Every event on, as it always was - but the needs-you notice (v0.6.11), which v0.6.10 never raised.
     FIELDS["notify_" + _event] = (_event != NotifyEvent.NEEDS_YOU, _boolean)
 # v0.6.11: which kinds a needs-you notice is raised for, each on once the notice is (needsyou.py);
-# a turn that stops moving, told after a time chosen here - never, by default; and a sound of the
-# notice's own, which only Windows' notification can carry (notify.py). Where a kind is switched off
-# is here, in Settings - never on the notice itself (A28).
+# a turn that stops moving, told after a time chosen here (never, by default); and a sound of the notice's own, which
+# only Windows' notification can carry (notify.py). A kind is switched off here, in Settings - never on the notice (A28).
 for _field in needsyou.KIND_FIELDS.values():
     FIELDS[_field] = (True, _boolean)
 FIELDS[needsyou.STALL_FIELD] = (needsyou.DEFAULT_STALL, ownvalues.coercer(needsyou.STALL_WAITS, OWN["stall_after"]))
 FIELDS[needsyou.SOUND_FIELD] = (False, _boolean)
 
 # ------------------------------------------------------------------- language
-# Two languages, deliberately independent. One is what the product says to you; the
-# other is what it says to Codex on your behalf. A Korean interface with English
-# continuations is a real preference - the person reads Korean and the model is being
-# addressed in the language the rest of their conversation is in - and a product that
-# tied the two together would be unable to express it.
+# Two languages, deliberately independent: what the product says to you, and what it says to Codex on your behalf.
+# A Korean interface with English continuations is a real preference, which a product that tied the two could not say.
 FIELDS["interface_language"] = (l10n.SYSTEM,
                                 lambda v, d: _choice(v, d, l10n.CHOICES))
 # `follow` is not a locale: it is the standing instruction to use whatever the
@@ -232,11 +220,10 @@ CONVERSATION_MESSAGES, MAX_CONVERSATION_MESSAGES = continuation.BY_THREAD_FIELD,
 FIELDS[CONVERSATION_MESSAGES] = (None, continuation.coerce_by_thread)
 
 # ------------------------------------------------------------ quiet hours and tiers (v0.6.11)
-# Each defaults to what v0.6.10 did (tests/test_defaults_golden.py, ADDED): no quiet hours - the
-# start is `off`, and the end and the days change nothing until a start is chosen - and every
-# conversation resumed automatically. They can only hold a recovery back: quiet hours make one
-# that falls due wait until they end, and a tier that asks first holds an interruption for a
-# person, or gives them the objection window's minutes to stop it first (quiet.py).
+# Each defaults to what v0.6.10 did (tests/test_defaults_golden.py, ADDED): no quiet hours (the start is `off`; the
+# end and the days change nothing until a start is chosen), every conversation resumed automatically. They can only
+# hold a recovery back: a due one waits until quiet hours end, or a tier that asks first holds it for a person or gives
+# them the objection window's minutes to stop it (quiet.py).
 QUIET_STARTS, QUIET_TIMES, QUIET_DAYS = quiet.STARTS, quiet.TIMES, quiet.DAYS
 FIELDS["quiet_hours_start"] = (quiet.DEFAULT_START, ownvalues.coercer(QUIET_STARTS, OWN["quiet_hours_start"]))
 FIELDS["quiet_hours_end"] = (quiet.DEFAULT_END, ownvalues.coercer(QUIET_TIMES, OWN["quiet_hours_end"]))
@@ -249,15 +236,13 @@ FIELDS["default_tier"] = (DEFAULT_TIER, lambda v, d: _choice(v, d, TIERS))
 FIELDS["objection_minutes"] = (5, lambda v, d: _bounded_int(v, d, 1, 60))
 
 # ------------------------------------------------ observe only, and who may resume (v0.6.11)
-# Observe only: every check is made and when a continuation would have gone is recorded, and
-# nothing is sent - the engine refuses it, and the state's own switch, which this one is written
-# into (control/policy.py, runtime/app.py), makes the claim refuse it too. Off by default.
+# Observe only: every check is made and when a continuation would have gone is recorded, and nothing is sent - the
+# engine refuses it, and the state's own switch (control/policy.py, runtime/app.py) makes the claim refuse it. Off.
 FIELDS["observe_only"] = (False, _boolean)
-# What a conversation this product has never seen gets: the same as every other (the default), or
-# Only notify me as a tier of its own, so nothing is sent for it until a person says so. And which
-# projects may resume without a person (projects.py): every one, the default. The two lists a task
-# row's Always and Never for this project write are keys, never paths, and no editor draws them
-# (ROW_ACTION_FIELDS). Each of these can only hold a recovery back, and none does at the defaults.
+# What a conversation this product has never seen gets: the same as every other (the default), or Only notify me, so
+# nothing is sent for it until a person says so. And which projects may resume without a person (projects.py): every
+# one. The two lists a task row's Always and Never write are keys, never paths, and no editor draws them
+# (ROW_ACTION_FIELDS). Each can only hold a recovery back, and none does at the defaults.
 NEW_CONVERSATION_POLICIES = tuple(NewConversationPolicy)
 PROJECT_POLICIES = tuple(ProjectPolicy)
 FIELDS["new_conversation_policy"] = (NewConversationPolicy.RESUME.value,
@@ -267,10 +252,9 @@ FIELDS[projects.ALWAYS] = ("", projects.coerce_keys)
 FIELDS[projects.NEVER] = ("", projects.coerce_keys)
 
 # ------------------------------------------- waits, a time ceiling and two guards (v0.6.11)
-# The Custom ladder's five waits, read only while retry_timing is Custom; jitter, which only ever
-# lengthens a wait; how long a task may keep failing with a temporary error; and the task-changed
-# and context-cost guards (guards.py). Each defaults to what v0.6.10 did: the waits are inert under
-# a preset, jitter and the ceiling are off, and neither guard reads or holds anything.
+# The Custom ladder's five waits, read only while retry_timing is Custom; jitter, which only lengthens a wait; how long
+# a task may keep failing with a temporary error; and the task-changed and context-cost guards (guards.py). Each
+# defaults to what v0.6.10 did: the waits are inert under a preset, jitter and the ceiling are off, no guard holds.
 for _field, _default in zip(ladder.STEP_FIELDS, ladder.DEFAULT_STEPS):
     FIELDS[_field] = (_default, ownvalues.coercer(ladder.choices_for(_field), OWN[_field]))
 FIELDS["retry_jitter"] = (False, _boolean)
@@ -281,9 +265,8 @@ FIELDS["task_changed_guard"] = (guards.DEFAULT_TASK_GUARD, lambda v, d: _choice(
 FIELDS["context_guard"] = (guards.DEFAULT_CONTEXT_GUARD, ownvalues.coercer(CONTEXT_GUARDS, OWN["context_guard"]))
 
 # ------------------------------------------- sleep, keeping awake and the network (v0.6.11)
-# What fell due during a long sleep waits for a person; a due recovery waits while Windows reports no
-# internet; this PC is kept awake while a task waits, for at most the hours chosen (power.py). Each is
-# off by default, and then nothing is asked of Windows for it and the watcher waits as v0.6.10 did.
+# What fell due during a long sleep waits for a person; a due recovery waits while Windows reports no internet; this
+# PC is kept awake while a task waits, for at most the hours chosen (power.py). Each is off: nothing is asked of Windows.
 KEEP_AWAKE_MODES, AWAKE_CAPS, SLEEP_WAITS = power.KEEP_AWAKE_MODES, power.AWAKE_CAPS, power.SLEEP_WAITS
 FIELDS[power.SLEEP_FIELD] = (power.DEFAULT_SLEEP, ownvalues.coercer(SLEEP_WAITS, OWN[power.SLEEP_FIELD]))
 FIELDS[power.NETWORK_FIELD] = (False, _boolean)
@@ -291,9 +274,8 @@ FIELDS[power.KEEP_AWAKE_FIELD] = (power.DEFAULT_KEEP_AWAKE, lambda v, d: _choice
 FIELDS[power.AWAKE_CAP_FIELD] = (power.DEFAULT_AWAKE_CAP, ownvalues.coercer(AWAKE_CAPS, OWN[power.AWAKE_CAP_FIELD]))
 
 # ------------------------------------------------- the watcher's memory, and a status file (v0.6.11)
-# The memory guard - off, warn, or warn and stop between ticks - and its limit, which is read only while
-# it is on (memguard.py); and a status file for other tools (statusfile.py). Each is off by default, and
-# then the watcher does what v0.6.10's did: it only shows its memory's peak, which it always does now.
+# The memory guard - off, warn, or warn and stop between ticks - and its limit, read only while it is on (memguard.py);
+# and a status file for other tools (statusfile.py). Each is off: the watcher only shows its memory's peak, as before.
 MEMORY_GUARD_MODES, MEMORY_LIMITS = memguard.MODES, memguard.LIMITS
 FIELDS[memguard.GUARD_FIELD] = (memguard.DEFAULT_MODE, lambda v, d: _choice(v, d, MEMORY_GUARD_MODES))
 FIELDS[memguard.LIMIT_FIELD] = (memguard.DEFAULT_LIMIT, ownvalues.coercer(MEMORY_LIMITS, OWN[memguard.LIMIT_FIELD]))
@@ -305,10 +287,9 @@ FIELDS[homes.FIELD] = ([], homes.coerce)
 # Not now (homefind.py) - both the Dashboard's alone (DASHBOARD_ONLY): a folder is a path, which MCP is never told.
 FIELDS[homefind.SWITCH] = (True, _boolean)
 FIELDS[homefind.DISMISSED] = ([], homefind.coerce_dismissed)
-# v0.6.16: where a click on a notice's face or body goes (notifier.click_uri) - its Dashboard page, the conversation's
-# chat here, or Codex at that conversation. Read only while the in-app chat is on (notifier.click_destination), and
-# from v0.6.19 written in the advanced edition's chat card alone (DASHBOARD_ONLY); with the chat off every click opens
-# the page.
+# v0.6.16: where a click on a notice goes (notifier.click_uri) - its Dashboard page, the conversation's chat here, or
+# Codex at that conversation. Read only while the in-app chat is on, and from v0.6.19 written in the advanced edition's
+# chat card alone (DASHBOARD_ONLY); with the chat off every click opens the page.
 NOTICE_CLICKS = ("page", "chat", "codex")
 FIELDS["notice_click"] = ("page", lambda v, d: _choice(v, d, NOTICE_CLICKS))
 # v0.6.16: the kinds of notice that stay on screen until clicked (notice_kinds.py) - none by default, each going away
@@ -436,6 +417,25 @@ def defaults() -> dict:
     return dict(DEFAULTS)
 
 
+def whole_text(value) -> bool:
+    """Whether every text in `value` can be written as UTF-8: none holds a lone surrogate (half of a pair, which a
+    person's JSON escape or an older file's holds), which would make every save raise (v0.6.26)."""
+    try:
+        json.dumps(value, ensure_ascii=False).encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _storable(value, default):
+    """A stored field as it can be saved: the whole entries of a list or an object, a text its default."""
+    if whole_text(value):
+        return value
+    if isinstance(value, dict):
+        return {key: item for key, item in value.items() if whole_text([key, item])}
+    return [item for item in value if whole_text(item)] if isinstance(value, list) else default
+
+
 def coerce(raw) -> dict:
     """Validate a candidate mapping into a complete settings dict.
 
@@ -446,7 +446,7 @@ def coerce(raw) -> dict:
     if isinstance(raw, dict):
         for name, (default, coercer) in FIELDS.items():
             if name in raw:
-                values[name] = coercer(raw[name], default)
+                values[name] = _storable(coercer(raw[name], default), default)
     return values
 
 
@@ -474,6 +474,9 @@ def validate_update(changes) -> dict:
         # person's own spelled another exact way (`m60`) is taken as its one spelling (`h1`), never refused for it.
         if not _right_type(name, value):
             _refuse(name, value)
+        if not whole_text(value):
+            raise SettingsError("invalid value for %s: it holds half of a character pair, which cannot be stored"
+                                % name)
         coerced = coercer(value, default)
         if (coerced != value and not (name == "codex_exe" and value is None)
                 and not (name in OWN and ownvalues.canonical(OWN[name], value) == coerced)):
@@ -669,14 +672,11 @@ def update(path: Path, changes: dict) -> dict:
 # icon's thread hosted the card (tray.py); tests/test_notice_card.py (SettingTests) holds the name here
 # exactly while that wiring is missing.
 #
-# `start_with_codex` is here for the opposite reason: it is wired, and what it would do cannot be done.
-# v0.6.9-alpha measured Codex 26.915 on a real machine - Codex runs each plugin's MCP server in a job
-# with KILL_ON_JOB_CLOSE that forbids breakaway, and cancels the server seconds after it starts, so
-# every watcher started from there was killed within about six seconds. A switch that says the watcher
-# starts with Codex, and never leaves one running, would be a false thing to show, so no surface offers
-# it; `Control.start_for_codex` refuses for the same reason and writes what the job said to
-# logs/codex-start.log, which is how the next Codex gets measured. The advanced edition builds it
-# properly in v0.6.11, where starting a process outside the host's job is a thing a person may turn on.
+# `start_with_codex` is here for the opposite reason: it is wired, and what it would do cannot be done. v0.6.9-alpha
+# measured Codex 26.915: it runs each plugin's MCP server in a job (KILL_ON_JOB_CLOSE, no breakaway) and cancels the
+# server seconds after it starts, so every watcher started from there died within about six seconds. A switch that never
+# leaves one running would be false, so no surface offers it; `Control.start_for_codex` refuses for the same reason and
+# writes what the job said to logs/codex-start.log. The advanced edition builds it in v0.6.11, outside the host's job.
 NOT_YET_OFFERED = frozenset({"start_with_codex"})
 
 # Fields a task's row writes and no settings editor offers (v0.6.11): the projects set to Always and to
