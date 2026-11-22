@@ -49,14 +49,14 @@ class RecordChannelMixin:
         taken can be taken back out of its queue. After a restart nothing is remembered, and one Codex never takes is
         unproven a day on - never sent again (A6).
 
-        v0.6.26 (B1): and when it was last seen in Codex's queue (`seen_at`), which its day counts from - or, for one
-        Codex took into its queue that this process never saw there, this watcher's start: it may have sat there until
-        then, and nothing of what an earlier watcher saw survives it."""
+        v0.6.26 (B1): and when it was last seen in Codex's queue (`seen_at`), by its id or, with none known, by its
+        proof, which its day counts from - or, for one Codex took into its queue by an id this process never saw there,
+        this watcher's start: it may have sat there until then, and nothing of what an earlier watcher saw survives it."""
         known = self._flying().get(record["record_id"])
         known = known if isinstance(known, dict) else {}
         if record.get("queue_id") is None and known.get("queue_id") is not None:
             record = dict(record, queue_id=known["queue_id"])
-        if record.get("queue_id") is not None and record.get("sent_at") is not None:
+        if record.get("sent_at") is not None and (record.get("queue_id") is not None or known.get("seen_at")):
             record = dict(record, seen_at=max(record["sent_at"], known.get("seen_at") or self._watching_since))
         return record
 

@@ -319,10 +319,12 @@ class PlugRecordsMixin:
             return
         if queued and queued["exists"] and self._take_back(record):
             return
-        if queued and queued["exists"]:
+        if (queued and queued["exists"]) or (record["queue_id"] is None
+                                             and self.source.queued_rows(thread, self._record_proof(record))):
             # v0.6.26 (B1): Codex holds it with its marker - a queue it paused (usage_pause stopped the turn, or the
             # person pressed Stop) can hold it for days. Its fate is known, and its row says it is queued in Codex:
-            # watched, never sent again, and never unproven while it is there (`_record_queued`).
+            # watched, never sent again, and never unproven while it is there (`_record_queued`) - found by its proof
+            # where no queue id is known (a chat message after a restart), though only one by its id is taken back.
             self._flying()[record["record_id"]] = dict(record, seen_at=self.clock())
             return
         sent = record["sent_at"]

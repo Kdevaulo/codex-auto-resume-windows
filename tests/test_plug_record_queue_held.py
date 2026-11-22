@@ -91,6 +91,24 @@ class QueueHeldTests(RecordCase):
         self.h.tick(advance=120)
         self.assertEqual(plug.moves, [("unproven", None, None)])
 
+    def test_with_no_queue_id_known_it_is_found_in_the_queue_by_its_proof(self):
+        """The chat keeps no queue id, and a restart forgets the one Codex gave: one Codex still holds is found by its
+        proof and never unproven while there - and, its id unknown, never taken back by a guess. Fails without the
+        look by proof: unproven a day after its send while Codex still holds it."""
+        plug, queue_id = self.sent()
+        plug.handed = [record(state="in_flight", words=None, sent_at=self.h.now)]      # no queue id
+        self.plugged(plug)                                                             # a restarted watcher
+        for _ in range(24 * 3):
+            self.h.tick(advance=HOUR)
+        self.assertEqual(plug.moves, [])
+        self.assertEqual(self.h.home.queued(T1), [queue_id])
+        self.h.home.remove_queued(queue_id)
+        self.h.tick(advance=DAY - 60)
+        self.assertEqual(plug.moves, [], "a day from when it was last seen there")
+        self.h.tick(advance=HOUR)
+        self.assertEqual(plug.moves, [("unproven", None, None)])
+        self.assertEqual(len(self.h.backend.send_calls), 1)
+
     def test_one_whose_fate_was_never_known_is_still_unproven_a_day_after_it_was_sent(self):
         plug = self.plug(record(state="in_flight", words=None, sent_at=self.h.now - DAY + 30))
         self.h.tick()
