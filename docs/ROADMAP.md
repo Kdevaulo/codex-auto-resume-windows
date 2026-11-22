@@ -328,7 +328,7 @@ The repository's landing page on GitHub is tidied in the same stage, while paths
 anyway, so that fewer files sit at its root.
 
 Bugs discovered during this refactor will be fixed with regression tests, but the alpha is
-**not intended to be the full repository-wide bug hunt**; v0.6.23 is, in two rounds, and v0.6.24 checks it once more. It is the modularization and
+**not intended to be the full repository-wide bug hunt**; v0.6.23 is, in two rounds, and v0.6.26 checks it once more. It is the modularization and
 nothing else: no feature, and no change anybody could see.
 
 What it carries: the modules that were over their ceiling are packages in the plan's layout -
@@ -1727,7 +1727,7 @@ Maintenance
 This document records the current direction; the four pre-releases of v0.6.19, v0.6.19-beta to v0.6.19-beta.4, are out and
 the final v0.6.19, which carries all of them and what reached dev after them, is out; what it did not build is
 v0.6.20, and the four pre-releases of v0.6.20, v0.6.20-beta to v0.6.20-beta.4, are out and the final v0.6.20, which carries all of them and what
-reached dev after them, is out. The hotfix final v0.6.21 and the final v0.6.22, after v0.6.22-beta and -beta.2, are out. v0.6.18 is out: a recovery that worked is recovered however its turn ended,
+reached dev after them, is out. The hotfix final v0.6.21 and the final v0.6.22, after v0.6.22-beta and -beta.2, are out; so are the final v0.6.23, after v0.6.23-beta and -beta.2, the final v0.6.24, after v0.6.24-beta and -beta.2, and the hotfix final v0.6.25. v0.6.18 is out: a recovery that worked is recovered however its turn ended,
 the standard edition suggests the Codex homes this PC uses, Install another version runs in the setup window, the setup
 window's bar fills by real counts, the update's download is streamed, all seventeen translations were reviewed, a full
 audit's fixes landed in every layer, and the advanced edition gains Open Codex on a notice and a weekly update check while
