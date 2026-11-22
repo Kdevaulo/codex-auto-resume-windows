@@ -235,6 +235,9 @@ class Scoped:
             # v0.6.20 (the pair audit, V20-2): another capability's stamp read, never written - as `options_of` reads its
             # choices (window_anchor reads when account_switch saw another account).
             "stamped_of": lambda other, key: state.stamped(other, key),
+            # v0.6.26 (review V1): another capability's continuations still to go in one conversation, read, never
+            # written - reset_message leaves a message the forced stop's turn after the reset carries to that turn.
+            "continuations_of": lambda other, thread_id: state.continuations(capability=other, thread_id=thread_id),
             # v0.6.22: how many times one of its own codes was counted since a time (JournalMixin.counted_since) - the
             # starts window_anchor's ceiling bounds in any 24 hours.
             "counted_since": lambda code, since: state.counted_since(capability, code, since),

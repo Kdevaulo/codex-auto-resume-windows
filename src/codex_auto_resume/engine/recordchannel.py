@@ -22,6 +22,10 @@ from ..domain.plug import Alternative, RecordMove
 from ..domain.plughands import RecordPurpose
 from .plugrecords import NOTED_LIMIT
 
+# v0.6.26 (review K3): how long after a watcher's start a record of the plug's gone from Codex's queue, which this watcher
+# never saw there, waits for its marker in Codex's history before it is unproven.
+RESTART_GRACE = 3600
+
 
 class RecordChannelMixin:
     def _marker_free(self, record, sender) -> bool:
@@ -50,14 +54,20 @@ class RecordChannelMixin:
         unproven a day on - never sent again (A6).
 
         v0.6.26 (B1): and when it was last seen in Codex's queue (`seen_at`), by its id or, with none known, by its
-        proof, which its day counts from - or, for one Codex took into its queue by an id this process never saw there,
-        this watcher's start: it may have sat there until then, and nothing of what an earlier watcher saw survives it."""
+        proof, which its day counts from. Review K3: one Codex took into its queue by an id this process never saw
+        there may have sat there until this watcher's start, and nothing of what an earlier watcher saw survives it -
+        so, gone from the queue at this watcher's look, it is given RESTART_GRACE from that start for its marker to
+        reach the history, never a whole day again: a day from each start never ended it on a PC whose watcher starts
+        every day, and it held its conversation's later records for good. One this watcher found still queued counts
+        its day from when it was last seen there, as before."""
         known = self._flying().get(record["record_id"])
         known = known if isinstance(known, dict) else {}
         if record.get("queue_id") is None and known.get("queue_id") is not None:
             record = dict(record, queue_id=known["queue_id"])
         if record.get("sent_at") is not None and (record.get("queue_id") is not None or known.get("seen_at")):
-            record = dict(record, seen_at=max(record["sent_at"], known.get("seen_at") or self._watching_since))
+            seen = known.get("seen_at") or (self._watching_since + RESTART_GRACE
+                                            - self.options["unknown_reconcile_window_seconds"])
+            record = dict(record, seen_at=max(record["sent_at"], seen))
         return record
 
     @staticmethod

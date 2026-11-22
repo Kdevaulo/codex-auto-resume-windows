@@ -20,6 +20,9 @@ typed: nothing is filled in, and it is at most 2,000 characters unless Longer re
   it was written, or a day after it fell due, has expired. Either way its words go. The day counts on from the last
   time the claim's pace held it (v0.6.23, finding B2: twenty a day, four a conversation - `waiting_since`,
   state/resets.paced_wait), so all fifty that may wait are sent, twenty a day, and none expires for that pace.
+  From v0.6.26 (review V1) one due in a conversation usage_pause stopped, whose continuation after that window's reset
+  waits there, is not handed to core: the app paused that queue, and the stop's own turn after the reset carries the
+  message in that continuation's place (`carried_by_stop`, engine/usagestop.py).
 * P3 `usage`: a core record of the same conversation is held while one of its messages is due or in
   flight, and while one counts for the very reset that record waits for - so when a continuation and the
   person's message wait for the same reset, only the message is sent, in the continuation's place (the
@@ -42,7 +45,7 @@ from codex_auto_resume.domain.plug import DEFER, Alternative
 from codex_auto_resume.domain.plughands import RECORDS_LIMIT
 
 from ..codex import credits
-from ..vocabulary import Measurement, RecordState, RuleReason, RuleState
+from ..vocabulary import ContinuationKind, Measurement, RecordState, RuleReason, RuleState
 from . import resetwatch
 from .resetwatch import TOL, Watch
 
@@ -57,6 +60,27 @@ DUE_FOR = 86400
 # then a recovery waiting there goes on (H7), whatever became of the message.
 HOLD_FOR = 1800
 USAGE = "usage"
+# v0.6.26 (review V1): the forced stop near a usage limit (engine/usagestop.py), whose turn after the reset carries a
+# message due in a conversation it stopped.
+PAUSE = "usage_pause"
+
+
+def carried_by_stop(rule, stops) -> bool:
+    """Whether a message due is the forced stop's turn to carry (v0.6.26, review V1; the owner's answer of 2026-11-22,
+    "the reset message only"): usage_pause stopped its conversation and that stop's continuation after the reset of the
+    message's own window still waits there (`stops`, usage_pause's continuations still to go in that conversation). The
+    app paused that conversation's queue, and only the turn that continuation starts lets it go (codex/ipc.py, MIPC):
+    queued by core, the message would sit there for good. So it is not handed to core; the stop's turn after the reset
+    carries its words in that continuation's place, once (engine/usagestop.py). One that fell due before the stop is
+    not that turn's to carry."""
+    due = rule.get("due_at")
+    if not isinstance(due, (int, float)) or isinstance(due, bool):
+        return False
+    return any(stop.get("capability") == PAUSE and stop.get("kind") == ContinuationKind.AFTER_RESET
+               and stop.get("thread_id") == rule.get("thread_id") and stop.get("chain") == rule.get("minutes")
+               and stop.get("finished_at") is None and stop.get("record_state") == RecordState.WAITING
+               and stop.get("words") and isinstance(stop.get("created_at"), (int, float))
+               and due >= stop["created_at"] for stop in stops)
 
 
 class _Errand:
@@ -170,6 +194,8 @@ class ResetMessage:
                 handle.change_rule(rule["rule_id"], expect=RuleState.COUNTING, state=RuleState.READY, due_at=now)
                 rule = dict(rule, state=RuleState.READY, due_at=now)
                 self._count("due")
+            if self._stop_carries(rule):
+                continue                                 # the forced stop's turn after the reset carries it (V1)
             handed_ = handed(rule)
             if handed_ is not None:
                 waiting.append(handed_)
@@ -260,6 +286,23 @@ class ResetMessage:
                 and abs(reset_at - row["open_reset_at"]) <= TOL and now < row["open_reset_at"] + HOLD_FOR)
 
     # ------------------------------------------------------------------ helpers
+    def _stop_carries(self, rule) -> bool:
+        """Whether a message due waits for the forced stop's turn after the reset to carry it (`carried_by_stop`),
+        usage_pause on. Where usage_pause's continuations cannot be read it is held that look: handed to core, it might
+        go into a queue the stop paused."""
+        scoped = self._scoped
+        if rule["state"] != RuleState.READY or rule["record_state"] != RecordState.WAITING or not rule["words"]:
+            return False
+        try:
+            if scoped.armed(PAUSE) is not True:
+                return False
+        except Exception:
+            return False
+        try:
+            return carried_by_stop(rule, scoped.continuations_of(PAUSE, rule["thread_id"]))
+        except Exception:
+            return True
+
     def _count(self, code) -> None:
         try:
             self._scoped.count(code)
