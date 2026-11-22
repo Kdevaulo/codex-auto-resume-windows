@@ -31,6 +31,8 @@ REPOSITORY = "https://github.com/songyb111-gachon/codex-auto-resume-windows"
 # Written apart from make_release's own pattern, so the test does not agree with the code by sharing its mistake.
 TARGETS = (re.compile(r"\]\(\s*<?([^)\s>]+)"), re.compile(r"""\b(?:src|href)\s*=\s*["']([^"']+)["']"""),
            re.compile(r"^\[[^\]\n]+\]:[ \t]*(\S+)", re.MULTILINE))
+# A srcset's value is candidates split by commas, each an address and what it is for (v0.6.26: the dark logo's <source>).
+SRCSET = re.compile(r"""\bsrcset\s*=\s*["']([^"']*)["']""")
 
 
 def builder():
@@ -42,7 +44,8 @@ def builder():
 
 
 def targets_of(text: str) -> list:
-    return [found for pattern in TARGETS for found in pattern.findall(text)]
+    return ([found for pattern in TARGETS for found in pattern.findall(text)]
+            + [candidate.split()[0] for value in SRCSET.findall(text) for candidate in value.split(",") if candidate.strip()])
 
 
 def relative(target: str) -> bool:
