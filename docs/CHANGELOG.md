@@ -221,9 +221,9 @@ file where an update put it.
   update used to compile every module it needed before it could answer; the update now compiles the program it copies, for the Python
   that will run it, as part of the files step. The previous version's leftover `.exe.old-*` file, which an in-app update renames aside
   while that window runs it, is removed once nothing runs from it - and a folder that something still runs from is left alone.
-- **An update starts the watcher again only if it ended unexpectedly in this sign-in.** A watcher the person stopped, or that ended
-  with a restart, a shutdown or a sign-out, stays stopped, as it was; one that was left running when something outside ended it is started
-  again. Setup's Finish page and its log say which happened and how to start the watcher yourself where it stays stopped.
+- **An update starts the watcher again if it ended unexpectedly in this sign-in, and, as before, wherever it runs at Windows sign-in.** A watcher
+  the person stopped, or that ended with a restart, a shutdown or a sign-out, stays stopped, as it was, where it does not run at sign-in; one
+  that was left running when something outside ended it is started again. Setup's Finish page and its log say which happened and how to start the watcher yourself where it stays stopped.
 - **No flicker where History and Settings first fill.** History's list showed a horizontal scroll bar for one frame the first time it
   filled, and Settings showed *Restore defaults* and *Save* greyed for one frame; both are gone.
 - **No encoded PowerShell command lines any more** (reported by [@cervinho](https://github.com/cervinho),
@@ -421,8 +421,7 @@ always had them, and leaves the previous version's `.old-` file where an update 
   corner (mirrored where the window is written right to left). The close button turns red under the pointer, and the maximise button
   keeps Windows 11's snap layouts. Every dialog has its title and its close button in a card of its own at its top, in the same way.
   The window is a little shorter outside - Windows' title bar and top frame are gone - and every page keeps the height it had, because
-  the window opens taller by exactly what the header grew for the buttons. Where a day's own picture lies under a button, the glyph is
-  kept readable against it.
+  the window opens taller by exactly what the header grew for the buttons.
   A dialog with its title in a card of its own is a little taller than it was under Windows' title bar, so on a small
   screen the largest text size the window uses is one step lower (a 1920 x 1080 screen at 100 %: 1.68 instead of 1.83).
   A window restored from maximised or minimised comes back at exactly its size, and a maximised window leaves the edge
