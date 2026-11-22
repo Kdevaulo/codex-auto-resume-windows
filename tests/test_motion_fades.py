@@ -112,7 +112,8 @@ class DropDownTests(unittest.TestCase):
         self.assertIn("chevron.Jump(open ? 1.0 : 0.0)", opened)
         self.assertIn('RenderMs(listed, "close_ms") < 0', guiscan.member_body("SettingsForm", "RenderComboOpen"),
                       "a closing list leaves the drop-down closed, as CloseList does at once")
-        self.assertIn('type.GetField("faceHover", own)', guiscan.member_body("SettingsForm", "SetRenderFace"))
+        # v0.6.26 (audit-apng M6): the render face's hover is the control's own change, found in RenderHover.
+        self.assertIn('type.GetField("faceHover", RenderOwn)', guiscan.member_body("SettingsForm", "RenderHover"))
         self.assertIn("RenderComboOpen(Map(frame, \"droplist\"));", guiscan.member_body("SettingsForm", "RenderState"))
         self.assertIn("private SoftDropList drop;", guiscan.read("gui/SoftCombo.cs"))
         self.assertIn("private readonly Transition chevron;", guiscan.read("gui/SoftCombo.cs"))

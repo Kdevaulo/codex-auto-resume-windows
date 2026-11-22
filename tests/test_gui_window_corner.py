@@ -423,7 +423,9 @@ class StillTests(unittest.TestCase):
         frames = guiscan.member_body("SettingsForm", "RenderFrames")
         self.assertIn('job.TryGetValue("edge_dpi", out edgeDpi)', frames)
         self.assertIn("using (Bitmap edged = CornerStill(picture, renderEdgeDpi))", frames)
-        self.assertIn("writer.Write(index, edged, form.RenderBounds(targets, frame));", frames)
+        self.assertIn("writer.Write(index, edged, form.RenderBounds(targets, frame), form.renderVeil);", frames)
+        # v0.6.26: a frame the motion lays in the chrome is cut before what lies over the window (RenderPicture, EdgeFirst).
+        self.assertIn("Bitmap edged = CornerStill(picture, renderEdgeDpi);", guiscan.member_body("SettingsForm", "RenderPicture"))
 
     def test_the_render_and_the_capture_cut_by_the_same_decision(self):
         frames = guiscan.member_body("SettingsForm", "RenderFrames")

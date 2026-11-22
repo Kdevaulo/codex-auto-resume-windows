@@ -14,7 +14,10 @@ window's own code, offscreen.
 A plan (build/motion/install-en.json, install-ko.json, their scenes and the installer's lines in
 install-scenes.json) says, on one clock, what a person does and what the installer prints: the Welcome page of a
 first installation, Next, the Options page, Install, the run - each step's line as build/install/install.ps1 prints
-it, the bar and the step's name moving on as the window reads them - and the Finish page, its light lit.
+it, the bar and the step's name moving on as the window reads them - and the Finish page, its light lit. Every
+frame tells the window its moment on the picture's clock (v0.6.26, audit-apng M6): the button's hover and press, the
+light's colour and the bar glide there as on a screen, and at the run's end the bar fills for up to its FinishSeconds
+before the window shows the Finish page, at whichever frame it does.
 
 Each frame is drawn by the setup program's own window. build/motion/InstallerRender.cs is compiled TOGETHER with
 the sources build/make_setup.py compiles the setup program from - nothing added to them, nothing taken away - into a
@@ -297,7 +300,9 @@ def job(plan: dict, frames: list, out: Path, root: Path = ROOT) -> dict:
     states = []
     for index, frame in enumerate(frames):
         state = {key: value for key, value in motion_plan.thawed(frame.window).items() if key in STATE_KEYS}
-        state.update(index=index, light=frame.t)
+        # v0.6.26 (audit-apng M6): and the frame's moment, which every glide of the window is drawn at - the button's hover
+        # and press, the light's colour, the bar on its way and its fill at the run's end (Transition.RenderMs).
+        state.update(index=index, light=frame.t, moment=frame.t)
         states.append(state)
     import make_screenshots
     import motion_window
@@ -528,6 +533,9 @@ def make(plan: dict, exe: Path, work: Path, still: tuple | None, caption: int, o
     seen_bounds, standing = {}, {}
     origin = (0, caption if still is not None else 0)
     drawn = pictures(result, work / "frames")
+    # The page each frame shows (the shim's `page`): the Finish page comes once the bar's fill is over, at a frame of the
+    # fill and not at the plan's cut.
+    shown = [entry.get("page") for entry in result["frames"]]
 
     def draw(frame, index):
         number, size, client, bounds = next(drawn)
@@ -561,7 +569,7 @@ def make(plan: dict, exe: Path, work: Path, still: tuple | None, caption: int, o
         previous, before = None, None
         for index, (frame, delay) in enumerate(zip(frames, held)):
             picture = draw(frame, index)
-            whole = motion_plan.is_cut(before, frame)
+            whole = motion_plan.is_cut(before, frame) or (index > 0 and shown[index] != shown[index - 1])
             before = frame
             if previous is not None and picture == previous[2]:
                 previous[0] += delay
