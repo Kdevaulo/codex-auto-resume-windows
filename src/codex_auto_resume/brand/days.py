@@ -26,7 +26,7 @@ FIXED_DAYS = (
 )
 
 # Lunar 1/1 and 8/15, as solar dates, 2026 to 2100: build/lunar_days.py, the rule KASI (the Korea Astronomy and Space Science
-# Institute, astro.kasi.re.kr) computes the official Korean calendar by - in Korea Standard Time, Meeus' new moons and solar
+# Institute) computes the official Korean calendar by - in Korea Standard Time, Meeus' new moons and solar
 # terms. It gives KASI's own table for 2026-2040 exactly, and in China Standard Time the Hong Kong Observatory's Chinese
 # calendar for the later years (tests/test_day_lunar_table.py). Past the last year there is no look.
 LUNAR_DAYS = (
