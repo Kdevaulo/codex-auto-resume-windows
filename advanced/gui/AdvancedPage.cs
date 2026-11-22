@@ -589,7 +589,12 @@ namespace CodexAutoResume
             // room for their lift itself, as a Settings section does: so the page keeps it only where the list's card
             // is, and the two cards' tops are level.
             Padding room = PageRoom();
-            page.Padding = new Padding(room.Left, 0, 0, room.Bottom);
+            // v0.6.26: at its sides the lift's own room (CardRoom), as before - not the Dashboard pages' sides, flush with
+            // the header card since audit D1: the page's column 10 px wider at 200 % set Arabic, Persian and Hebrew
+            // statement lines where GDI wraps them right to left a line more than left to right
+            // (test_advanced_page_mirrored).
+            Padding sides = CardRoom();
+            page.Padding = new Padding(sides.Left, 0, 0, room.Bottom);
 
             advancedList = List(Word("page.nav", "Advanced features"),
                                 Col(Word("page.col_feature", "Feature"), 220),
@@ -623,7 +628,7 @@ namespace CodexAutoResume
             stack.AutoSize = true;
             stack.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             stack.Font = Font;
-            stack.Padding = new Padding(room.Left, room.Top, room.Right, Math.Max(0, room.Bottom - Px(Brand.PageGap)));
+            stack.Padding = new Padding(sides.Left, room.Top, sides.Right, Math.Max(0, room.Bottom - Px(Brand.PageGap)));
             advancedStack = stack;
             var scroll = HeldAsBuilt(new SoftPage());
             scroll.Dock = DockStyle.Fill;
@@ -2340,6 +2345,9 @@ namespace CodexAutoResume
                 return Word("page.policy.shadow_only", "Your administrator's Windows policy lets this feature be watched, not turned on.");
             if (StaleRefusal(refusal))
                 return Word("page.refused.changed", "It kept changing while you read it, so nothing was turned on. Try again in a moment.");
+            // v0.6.26 (audit R3): what it needs could not be turned on with it - its own sentence, not "refused".
+            if (refusal == "requirement_refused")
+                return Word("page.refused.requirement", "What this feature needs could not be turned on with it, so nothing was turned on. Try again in a moment.");
             if (refusal == "failed_here")
                 return Word("page.refused.failed_here", "A compatibility check of what it relies on failed on this computer, so it cannot be kept on. You can still turn it on.");
             if (refusal == "requirement_failed_here")

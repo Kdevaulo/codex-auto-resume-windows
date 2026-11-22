@@ -13,6 +13,10 @@ The owner's decisions of 2026-11-16 (the design canvas, row 13):
   about 20 % over the owner's whole window in its shape, taking no input and never activated, faded in only where motion
   is allowed, none in High Contrast, none for a dialog laid out as a child (the audit, a still); a dialog opened from a
   dialog dims only its own owner (DialogVeil).
+- v0.6.26 (audit D9, D10; the owner, 2026-11-22, "제안대로 모두 고침"): the veil comes with the dialog's own fade, at the
+  dialog's alpha of its fullest - clear while the dialog is clear, at its fullest at once where the dialog does not fade -
+  and goes with it; and it is drawn pixel by pixel (UpdateLayeredWindow), so its alpha is the veil's own (DialogVeil.Alpha),
+  not a layered window's attribute.
 
 One probe compiled with the window: the Dashboard's real dialogs built as their audit builds them (never shown), a dialog
 laid out with the Dashboard's own card and button row left to right and mirrored, and SoftDialogs shown 30000 px off the
@@ -207,10 +211,7 @@ namespace CodexAutoResume
             said["shaped"] = veil.Shaped;
             said["full"] = (double)veil.Full;
             said["colour"] = veil.Colour.ToArgb() == DialogVeil.Ink().ToArgb();
-            int key, flags;
-            byte alpha;
-            CardNative.GetLayeredWindowAttributes(v, out key, out alpha, out flags);
-            said["alpha"] = (double)alpha;
+            said["alpha"] = (double)veil.Alpha;
             said["foreground"] = CardNative.GetForegroundWindow() == v;
             return said;
         }
@@ -659,14 +660,16 @@ class DialogCardTests(unittest.TestCase):
         self.assertTrue(said["ownerRegion"])
         self.assertTrue(said["open"]["shaped"] and said["open"]["region"], "the owner's own region")
 
-    def test_the_veil_is_on_at_its_fullest_before_the_dialog_is_seen(self):
+    def test_the_veil_is_on_before_the_dialog_is_seen(self):
         """Live re-check 7: a fade timed on the dialog's thread came on 130-283 ms after the dialog's first frame, in one
-        step. The veil is on, painted, at its fullest as the dialog is shown - motion allowed or not, Windows' animation on
+        step. The veil is on, painted, as the dialog is shown (v0.6.26: at the dialog's own alpha, audit D9) - motion allowed or not, Windows' animation on
         (Soft.WindowsAnimates, as the probe sets it) or off - and the dialog is held off the screen until it has painted."""
         for scene in ("moving", "windowsStill", "still", "dark"):
             with self.subTest(scene=scene):
                 said = self.answer["veil"][scene]
-                self.assertEqual(said["first"], said["open"]["full"], "at its fullest at once")
+                # v0.6.26 (audit D9): with the dialog's own fade - clear as a dialog that fades in is first shown, at its
+                # fullest at once where it does not fade.
+                self.assertEqual(said["first"], 0 if said["opensWithFade"] else said["open"]["full"], "with the dialog's fade")
                 self.assertTrue(said["veilOnFirst"], "on the screen as the dialog is shown")
                 self.assertTrue(said["cloakedFirst"], "the dialog is held off the screen until it has painted")
                 self.assertFalse(said["cloakedAfter"], "and comes on once it has")

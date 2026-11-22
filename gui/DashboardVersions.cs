@@ -199,7 +199,12 @@ namespace CodexAutoResume
         {
             if (versionsList == null || versionsList.IsDisposed) return;
             Form dialog = versionsList.FindForm();
-            if (dialog != null) dialog.UseWaitCursor = false;
+            // Its wait ended: the pointer given back where it rests (v0.6.26, audit G4).
+            if (dialog != null && dialog.UseWaitCursor)
+            {
+                dialog.UseWaitCursor = false;
+                ChromeHost.PointerBack();
+            }
             bool shown = state == "listed" && rows != null && listed != null;
             versionsRows = shown ? rows : new List<string[]>();
             versionsListed = shown ? listed : null;

@@ -106,6 +106,10 @@ namespace CodexAutoResume
             Lead(recent, MakeButton(S("nav.history", "History"), false, delegate { ShowPage("history"); }));
             recentGrid.SizeChanged += delegate { FitRecentNames(); };
 
+            // v0.6.26 (audit D8): the left column's two fact tables, one above the other, keep one value column.
+            // At each table's own layout, its width the one it is given now (the grid's comes before its cards have theirs).
+            facts.Layout += delegate { OneLabelColumn(facts, weekFacts); };
+            weekFacts.Layout += delegate { OneLabelColumn(facts, weekFacts); };
             grid.Controls.Add(now, 0, 0);
             grid.Controls.Add(waiting, 1, 0);
             grid.Controls.Add(week, 0, 1);
@@ -717,6 +721,9 @@ namespace CodexAutoResume
             TableLayoutPanel outcomes = MakeCard(S("stats.outcomes", "How recoveries ended"));
             outcomes.Margin = GridGap(1, true);
             chart = new OutcomeChart();
+            // v0.6.26 (audit D7): none of its own, as Facts: the default 3 px never scaled, and set the chart 2-3 px in from
+            // its card's heading.
+            chart.Margin = new Padding(0);
             chart.Dock = DockStyle.Top;
             chart.Height = Px(220);
             chart.BackColor = Card;

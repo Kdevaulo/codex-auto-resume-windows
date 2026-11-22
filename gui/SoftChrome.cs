@@ -283,6 +283,35 @@ namespace CodexAutoResume
             return new Point(first, last);
         }
 
+        /// v0.6.26 (audit G3): the first column of `drawn` from its left - or from its right, `fromEnd` - that holds ink
+        /// against `ground`, read as InkColumns reads it, the picture read at once and the reading stopped at that column;
+        /// -1 for none.
+        internal static int FirstInkColumn(Bitmap drawn, Color ground, bool fromEnd)
+        {
+            int width = drawn.Width, height = drawn.Height;
+            if (width <= 0 || height <= 0) return -1;
+            BitmapData data = drawn.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            var pixels = new int[width * height];
+            try
+            {
+                for (int y = 0; y < height; y++)
+                    Marshal.Copy(new IntPtr(data.Scan0.ToInt64() + (long)y * data.Stride), pixels, y * width, width);
+            }
+            finally { drawn.UnlockBits(data); }
+            for (int i = 0; i < width; i++)
+            {
+                int x = fromEnd ? width - 1 - i : i;
+                for (int y = 0; y < height; y++)
+                {
+                    int c = pixels[y * width + x];
+                    if (Math.Abs(((c >> 16) & 0xFF) - ground.R) > InkStep || Math.Abs(((c >> 8) & 0xFF) - ground.G) > InkStep ||
+                        Math.Abs((c & 0xFF) - ground.B) > InkStep)
+                        return x;
+                }
+            }
+            return -1;
+        }
+
         internal static Point CentreOn(Rectangle owner, Size window, Rectangle work)
         {
             int x = owner.X + (owner.Width - window.Width) / 2, y = owner.Y + (owner.Height - window.Height) / 2;
@@ -874,6 +903,59 @@ namespace CodexAutoResume
             }
         }
 
+        /// v0.6.26 (audit G1): the wait cursor over the window, after what Windows itself does for the pointer there. Over a
+        /// window a dialog of its own holds (HTERROR), Windows' handling first - a press there brings that dialog, or the
+        /// setup window, forward, or sounds - then the wait cursor; over a resize band (HTLEFT to HTBOTTOMRIGHT) Windows'
+        /// size arrows, the drag resizing as before; everywhere else the wait cursor alone.
+        private static bool WaitCursor(ref Message m, Pass pass)
+        {
+            int hit = (short)(m.LParam.ToInt64() & 0xFFFF);
+            if (hit >= Chrome.HTLEFT && hit <= Chrome.HTBOTTOMRIGHT)
+            {
+                pass(ref m);
+                return true;
+            }
+            if (hit == HTERROR) pass(ref m);
+            Cursor.Current = Cursors.WaitCursor;
+            m.Result = (IntPtr)1;
+            return true;
+        }
+
+        private const int HTERROR = -2;
+
+        /// v0.6.26 (audit G4, from the editor's fix of the v0.6.24 final, live re-check 4): a wait that has ended gives the
+        /// pointer its cursor at once wherever it rests, never moved - Windows asks for a cursor only as the pointer moves,
+        /// so the hourglass stayed over a window that had answered. What is under it, where it is one of this thread's own
+        /// windows (the window itself, also while its dialog holds it, a control, a dialog), is asked for its cursor as
+        /// Windows asks it (WM_NCHITTEST, then WM_SETCURSOR as for a move); the arrow where none of ours is.
+        internal static void PointerBack()
+        {
+            Cursor.Current = Cursors.Default;
+            try
+            {
+                Point at = Cursor.Position;
+                IntPtr under = PointerWindowAt(new PointerPoint { X = at.X, Y = at.Y });
+                int process;
+                if (under == IntPtr.Zero || PointerThreadOf(under, out process) != PointerThreadNow()) return;
+                IntPtr where = (IntPtr)((at.Y & 0xFFFF) << 16 | (at.X & 0xFFFF));
+                int hit = PointerAsk(under, Chrome.WM_NCHITTEST, IntPtr.Zero, where).ToInt32();
+                PointerAsk(under, WM_SETCURSOR, under, (IntPtr)((0x0200 << 16) | (hit & 0xFFFF)));
+            }
+            catch (Exception) { /* no pointer to ask about (a locked session): the next move asks */ }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PointerPoint { public int X, Y; }
+
+        [DllImport("user32.dll", EntryPoint = "WindowFromPoint")]
+        private static extern IntPtr PointerWindowAt(PointerPoint point);
+        [DllImport("user32.dll", EntryPoint = "GetWindowThreadProcessId")]
+        private static extern int PointerThreadOf(IntPtr window, out int process);
+        [DllImport("kernel32.dll", EntryPoint = "GetCurrentThreadId")]
+        private static extern int PointerThreadNow();
+        [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        private static extern IntPtr PointerAsk(IntPtr window, int message, IntPtr w, IntPtr l);
+
         /// Handles `m` before the form does: true when it is answered here and the form must not see it again.
         internal bool Intercept(ref Message m, Pass pass)
         {
@@ -888,12 +970,7 @@ namespace CodexAutoResume
             // part of it. .NET gives it only over the client area a control answers HTCLIENT for: over the caption, the
             // ground that drags the window - and over the whole window while a dialog of its own holds it disabled, which
             // Windows asks as HTERROR - it gave the arrow, the moment a dialog that keeps its owner waiting was shown.
-            if (m.Msg == WM_SETCURSOR && form.UseWaitCursor)
-            {
-                Cursor.Current = Cursors.WaitCursor;
-                m.Result = (IntPtr)1;
-                return true;
-            }
+            if (m.Msg == WM_SETCURSOR && form.UseWaitCursor) return WaitCursor(ref m, pass);
             // v0.6.24 W5: the window's own corner first - its frame while it is cut, its region and companion as it moves.
             if (corner != null && corner.Intercept(ref m)) return true;
             if (corner != null && corner.Shaped && (m.Msg == WM_SETTEXT || m.Msg == WM_SETICON) && form.IsHandleCreated)
@@ -1843,6 +1920,10 @@ namespace CodexAutoResume
 
         /// The same in `room` (the words' own size once laid out; Empty: as wide as they ask), with the ellipsis the words
         /// end in where the room is short of them.
+        /// v0.6.26 (audit G3: 11-43 ms on every size change of a dialog, its whole width read pixel by pixel): read once per
+        /// look - the words, their font, the direction, the theme's ink and ground, the row's height, and the room where it
+        /// is short of them. Where they fit, the room's width does not move their first letter (one line from the start
+        /// edge, Left or mirrored Right), so a dialog resized is never read again; and the reading stops at the first ink.
         internal static int TitleInkInset(string text, Font font, bool mirrored, Size room)
         {
             if (string.IsNullOrEmpty(text) || text.Trim().Length == 0) return TitleLead(font);
@@ -1853,9 +1934,16 @@ namespace CodexAutoResume
             int width = Math.Min(4096, size.Width + 8), height = Math.Max(1, size.Height + 4);
             if (!room.IsEmpty)
             {
-                width = Math.Min(4096, Math.Max(1, room.Width));
+                // Short of the words: drawn in the room, with its ellipsis; else as wide as they ask, the same first letter.
+                width = Math.Min(width, Math.Max(1, room.Width));
                 height = Math.Max(1, room.Height);
             }
+            string key = string.Join("|", new[] { text, font.Name, font.SizeInPoints.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                                  ((int)font.Style).ToString(), mirrored ? "r" : "l", width.ToString(), height.ToString(),
+                                                  Palette.Ink.ToArgb().ToString(), Palette.Canvas.ToArgb().ToString() });
+            int found;
+            if (titleInsets.TryGetValue(key, out found)) return found;
+            TitleScans++;
             using (var drawn = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
             {
                 using (Graphics g = Graphics.FromImage(drawn))
@@ -1863,11 +1951,18 @@ namespace CodexAutoResume
                     g.Clear(Palette.Canvas);
                     TextRenderer.DrawText(g, text, font, new Rectangle(0, 0, width, height), Palette.Ink, Palette.Canvas, flags);
                 }
-                Point ink = Chrome.InkColumns(drawn, Palette.Canvas, new Rectangle(0, 0, width, height));
-                if (ink.X < 0) return TitleLead(font);
-                return mirrored ? width - 1 - ink.Y : ink.X;
+                int ink = Chrome.FirstInkColumn(drawn, Palette.Canvas, mirrored);
+                found = ink < 0 ? TitleLead(font) : mirrored ? width - 1 - ink : ink;
             }
+            if (titleInsets.Count >= 256) titleInsets.Clear();
+            titleInsets[key] = found;
+            return found;
         }
+
+        private static readonly Dictionary<string, int> titleInsets = new Dictionary<string, int>();
+
+        /// How many times a title's first letter has been read from a drawing (TitleInkInset): for the tests.
+        internal static int TitleScans;
 
         /// What a Label's text drawing keeps before its first letter in `font`: half of what its padding adds to the
         /// text's width (TextRenderer pads both sides alike).
@@ -2192,6 +2287,16 @@ namespace CodexAutoResume
             // Centred on the window that opened it as it is first shown (OnOwner): the caption leaves this message alone.
             if (m.Msg == WM_WINDOWPOSCHANGING && !placed) OnOwner(m.LParam);
             if (chrome == null && m.Msg == Chrome.WM_NCCALCSIZE && CalcSizeEarly(ref m)) return;
+            // v0.6.26 (audit G2; the owner, 2026-11-22, "대화상자 유지"): the window it belongs to minimised under it - by a
+            // person's Show desktop, or by another program - hides the windows it owns (SW_PARENTCLOSING), and WinForms ends
+            // a modal dialog's loop once it is hidden, with no close asked: the dialog and what was typed in it were gone.
+            // It stays where it is instead, as the setup window does (InstallerWindow), and is there with what was typed
+            // when the window comes back.
+            if (m.Msg == WM_SHOWWINDOW && m.WParam == IntPtr.Zero && m.LParam.ToInt64() == SW_PARENTCLOSING && Modal)
+            {
+                m.Result = IntPtr.Zero;
+                return;
+            }
             base.WndProc(ref m);
             // Shown: the owner dimmed under it (a top-level dialog only - never one the layout audit or a still lays out as a
             // child); hidden or gone: the veil with it.
@@ -2200,7 +2305,8 @@ namespace CodexAutoResume
                 if (m.WParam == IntPtr.Zero) Unveil();
                 else
                 {
-                    if (veil == null && TopLevel) veil = DialogVeil.Over(this);
+                    // At the alpha its own fade has (clear where it fades in, opaque where it does not): the two come together.
+                    if (veil == null && TopLevel) veil = DialogVeil.Over(this, fadeAlpha);
                     if (cloaked) UncloakSoon();
                     // Not held off the screen (DWM refused, a still): on the screen as it is shown.
                     else CameOnNow();
@@ -2256,10 +2362,11 @@ namespace CodexAutoResume
         // transition - which the cloak above had taken away. Held off the screen until it and everything in it is painted,
         // it comes on fully clear and fades to opaque over brand's transition (Motion.Duration, 160 ms) on brand's curve
         // (Motion.Ease), stepped as the menus' and the tray popup's openings are (Motion.Interval); the veil over its owner
-        // is on before. With motion reduced - this product's setting, Windows' animations off, High Contrast
-        // (Soft.ReduceMotion) - it is simply there, opaque, and is never layered; never in a still, a render or the audit
-        // (Soft.StillReady, a dialog laid out as a child). Its closing is left as it was. Once opaque it is an ordinary
-        // window again (WS_EX_LAYERED taken off).
+        // comes with it, step for step (v0.6.26, audit D9: it was on at its fullest at once, before the dialog's first
+        // frame). With motion reduced - this product's setting, Windows' animations off, High Contrast
+        // (Soft.ReduceMotion) - it is simply there, opaque, and is never layered, its veil at its fullest; never in a still,
+        // a render or the audit (Soft.StillReady, a dialog laid out as a child). Its closing is left as it was: it and its
+        // veil go at once. Once opaque it is an ordinary window again (WS_EX_LAYERED taken off).
 
         [DllImport("user32.dll")]
         private static extern bool SetLayeredWindowAttributes(IntPtr window, int key, byte alpha, int flags);
@@ -2291,6 +2398,8 @@ namespace CodexAutoResume
             // v0.6.24 final: its own corner's edge and shadow fade with it - never round a dialog not yet seen.
             WindowCorner own = OwnCorner;
             if (own != null) own.Opacity(fadeAlpha);
+            // v0.6.26 (audit D9): and the veil over its owner with it, step for step (DialogVeil.Fade).
+            if (veil != null) veil.Fade(fadeAlpha);
         }
 
         /// v0.6.24 final: the dialog's own outer corner (WindowCorner), or null where it has Windows' (no title row, a
@@ -2457,7 +2566,7 @@ namespace CodexAutoResume
             OpenFade();
         }
 
-        private const int WM_SHOWWINDOW = 0x0018, WM_DESTROY = 0x0002;
+        private const int WM_SHOWWINDOW = 0x0018, WM_DESTROY = 0x0002, SW_PARENTCLOSING = 1;
 
         // ------------------------------------------------------------------ centred on the window that opened it
 
@@ -2607,15 +2716,20 @@ namespace CodexAutoResume
             if (client != ClientSize) UpdateBounds(Left, Top, Width, Height, client.Width, client.Height);
         }
     }
-    /// The veil over a dialog's owner while the dialog is open (v0.6.24-beta.2, the owner 2026-11-16): the dialog keeps
-    /// Windows' own opening motion, and the window it belongs to is dimmed under it - a dark veil, the shadow's ink at
-    /// about 20 % (the theme's ink in light, its all-but-black shadow in dark, as WindowCorner's shadow takes it), over the
-    /// owner's whole window in its shape: the region of its own corner where it has one (WindowCorner), Windows' round
-    /// corner on Windows 11 otherwise, square when maximised and on Windows 10. One layered popup owned by the owner, just
-    /// under the dialog, that takes no input (WS_EX_TRANSPARENT, HTTRANSPARENT) and never activates (WS_EX_NOACTIVATE,
-    /// MA_NOACTIVATE); faded in over a short while only where motion is allowed (Soft.ReduceMotion), none at all in High
-    /// Contrast, in a still (Soft.StillReady) or for a dialog laid out as a child (the layout audit, WindowRender). A dialog
-    /// opened from a dialog dims its own owner, the dialog under it.
+    /// The veil over a dialog's owner while the dialog is open (v0.6.24-beta.2, the owner 2026-11-16): the window it belongs
+    /// to is dimmed under it - a dark veil, the shadow's ink at about 20 % (the theme's ink in light, its all-but-black
+    /// shadow in dark, as WindowCorner's shadow takes it), over the owner's whole window in its shape. One layered popup
+    /// owned by the owner, just under the dialog, that takes no input (WS_EX_TRANSPARENT, HTTRANSPARENT) and never
+    /// activates (WS_EX_NOACTIVATE, MA_NOACTIVATE); none at all in High Contrast, in a still (Soft.StillReady) or for a
+    /// dialog laid out as a child (the layout audit, WindowRender). A dialog opened from a dialog dims its own owner, the
+    /// dialog under it.
+    /// v0.6.26 (audit D9): it comes with the dialog's own fade, step for step - at the dialog's alpha of its fullest
+    /// (Fade, from SoftDialog.SetFade), so clear while the dialog is, and at its fullest at once where the dialog has no
+    /// fade (motion reduced) - and goes as the dialog goes, at once, as the dialog's closing is.
+    /// v0.6.26 (audit D10): its shape is the owner's edge pixel by pixel - each pixel dimmed by how much of it is the
+    /// window's: under the owner's own corner (WindowCorner.EdgeNow) its anti-aliased edge too, which the hard region left
+    /// undimmed; Windows' round corner on Windows 11 (8 px at 100 %) anti-aliased the same way; square when maximised and on
+    /// Windows 10. A window of another shape (a region of its own, no corner of ours) keeps that region.
     internal sealed class DialogVeil : NativeWindow, IDisposable
     {
         [DllImport("user32.dll")]
@@ -2633,27 +2747,53 @@ namespace CodexAutoResume
         [DllImport("user32.dll")]
         private static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);
         [DllImport("user32.dll")]
-        private static extern bool SetLayeredWindowAttributes(IntPtr window, int key, byte alpha, int flags);
-        [DllImport("user32.dll")]
         private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
         [DllImport("user32.dll")]
         private static extern int GetDpiForWindow(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr window);
+        [DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr window, IntPtr dc);
+        [DllImport("user32.dll")]
+        private static extern bool UpdateLayeredWindow(IntPtr window, IntPtr screen, ref VeilPoint at, ref VeilSize size, IntPtr source,
+                                                       ref VeilPoint from, int key, ref VeilBlend blend, int flags);
         [DllImport("gdi32.dll")]
         private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
         [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int width, int height);
-        [DllImport("gdi32.dll")]
         private static extern bool DeleteObject(IntPtr item);
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteDC(IntPtr dc);
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr SelectObject(IntPtr dc, IntPtr item);
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr CreateDIBSection(IntPtr dc, ref VeilBitmapInfo info, int usage, out IntPtr bits,
+                                                      IntPtr section, int offset);
         [DllImport("dwmapi.dll")]
         private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out Chrome.RECT value, int size);
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 
-        private const int GW_OWNER = 4, ERROR = 0, NULLREGION = 1, LWA_ALPHA = 2;
+        [StructLayout(LayoutKind.Sequential)]
+        private struct VeilPoint { public int X, Y; }
+        [StructLayout(LayoutKind.Sequential)]
+        private struct VeilSize { public int Width, Height; }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct VeilBlend { public byte Op, Flags, Alpha, Format; }
+        [StructLayout(LayoutKind.Sequential)]
+        private struct VeilBitmapInfo
+        {
+            public int Size, Width, Height;
+            public short Planes, BitCount;
+            public int Compression, SizeImage, XPelsPerMeter, YPelsPerMeter, ClrUsed, ClrImportant;
+        }
+
+        private const int GW_OWNER = 4, ERROR = 0, NULLREGION = 1, ULW_ALPHA = 2, AC_SRC_ALPHA = 1;
         private const int WS_POPUP = unchecked((int)0x80000000);
         private const int WS_EX_LAYERED = 0x00080000, WS_EX_TRANSPARENT = 0x00000020, WS_EX_TOOLWINDOW = 0x00000080,
                           WS_EX_NOACTIVATE = 0x08000000;
-        private const int WM_NCHITTEST = 0x0084, WM_MOUSEACTIVATE = 0x0021, MA_NOACTIVATE = 3, WM_ERASEBKGND = 0x0014;
+        private const int WM_NCHITTEST = 0x0084, WM_MOUSEACTIVATE = 0x0021, MA_NOACTIVATE = 3;
         private const uint SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040;
         private const int DWMWA_TRANSITIONS_FORCEDISABLED = 3, DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
@@ -2668,8 +2808,8 @@ namespace CodexAutoResume
         /// The strength in the theme the window is drawn in.
         internal static double StrengthNow { get { return Palette.Dark ? DarkStrength : Strength; } }
 
-        /// Its alpha at its fullest in the theme the window is drawn in: 51 in light, 82 in dark. What a veil comes on at,
-        /// and what a picture of a dialog over the window lays (WindowRender.PaintVeil).
+        /// Its alpha at its fullest in the theme the window is drawn in: 51 in light, 82 in dark. What a veil comes to, and
+        /// what a picture of a dialog over the window lays (WindowRender.PaintVeil).
         internal static byte FullNow { get { return (byte)Math.Round(255 * StrengthNow); } }
 
         /// Off for every veil from here on (a probe that wants none); on in every window a person opens.
@@ -2677,18 +2817,34 @@ namespace CodexAutoResume
 
         private readonly Color colour;
         private readonly byte full;
-        private byte alpha;
+        private byte fade;
+        private Point place;
+        private Size size;
+        private byte[] cover;
+        private IntPtr memory, bitmap, kept;
 
-        /// The owner it dims, whether it took a shape (a region: the owner's own corner or Windows' round one), its colour
-        /// and the alpha it has now and at its fullest: for the tests.
+        /// The owner it dims, whether it took a shape (the owner's edge, Windows' round corner or a region), its colour,
+        /// the alpha a pixel wholly the owner's has now and at its fullest: for the tests.
         internal IntPtr Owner { get; private set; }
         internal bool Shaped { get; private set; }
-        internal byte Alpha { get { return alpha; } }
+        internal byte Alpha { get { return (byte)Math.Round(full * fade / 255.0); } }
         internal byte Full { get { return full; } }
         internal Color Colour { get { return colour; } }
 
-        /// A veil over the owner of `dialog`, which is being shown now, or null where there is to be none.
-        internal static DialogVeil Over(Form dialog)
+        /// The dialog's fade it follows now, 0 to 255: for the tests.
+        internal byte Following { get { return fade; } }
+
+        /// How much of the owner's pixel (x, y), in the owner's window, the veil dims at its fullest, 0 to 255 (its edge's
+        /// coverage), or -1 outside it: for the tests.
+        internal int Coverage(int x, int y)
+        {
+            if (cover == null || x < 0 || y < 0 || x >= size.Width || y >= size.Height) return -1;
+            return cover[y * size.Width + x];
+        }
+
+        /// A veil over the owner of `dialog`, which is being shown now, or null where there is to be none - at `alpha` of
+        /// its fullest, the dialog's own fade now (255 where it has none).
+        internal static DialogVeil Over(Form dialog, int alpha = 255)
         {
             try
             {
@@ -2696,7 +2852,7 @@ namespace CodexAutoResume
                 if (Palette.Contrast || Soft.StillReady != null) return null;
                 IntPtr owner = GetWindow(dialog.Handle, GW_OWNER);
                 if (owner == IntPtr.Zero || !IsWindowVisible(owner) || IsIconic(owner)) return null;
-                return new DialogVeil(owner, dialog.Handle);
+                return new DialogVeil(owner, dialog.Handle, alpha);
             }
             catch (Exception)
             {
@@ -2710,14 +2866,18 @@ namespace CodexAutoResume
             return Palette.Dark ? Tokens.ShadowDark : Palette.Ink;
         }
 
-        private DialogVeil(IntPtr owner, IntPtr dialog)
+        private DialogVeil(IntPtr owner, IntPtr dialog, int alpha)
         {
             Owner = owner;
             colour = Ink();
             full = FullNow;
+            fade = (byte)Math.Max(0, Math.Min(255, alpha));
             Rectangle bounds;
-            IntPtr region = Shape(owner, out bounds);
-            Shaped = region != IntPtr.Zero;
+            IntPtr region;
+            cover = Shape(owner, out bounds, out region);
+            Shaped = region != IntPtr.Zero || HasEdge(cover);
+            place = bounds.Location;
+            size = bounds.Size;
             var made = new CreateParams();
             made.Caption = "";
             made.Style = WS_POPUP;
@@ -2735,31 +2895,112 @@ namespace CodexAutoResume
             if (region != IntPtr.Zero && SetWindowRgn(Handle, region, false) == 0)
             {
                 DeleteObject(region);
-                Shaped = false;
+                Shaped = HasEdge(cover);
             }
-            // At its fullest at once and painted now, before the dialog's first frame (live re-check 7: a fade timed on
-            // the dialog's thread came on 130-283 ms after the dialog, in one step, while the dialog painted itself).
-            alpha = full;
-            SetLayeredWindowAttributes(Handle, 0, alpha, LWA_ALPHA);
+            // Its picture, made once - the veil's ink at each pixel's coverage of its fullest - and drawn at the dialog's
+            // alpha now, before the dialog's first frame.
+            Picture();
+            Draw();
             // Just under the dialog, over the owner and whatever else the owner holds.
             SetWindowPos(Handle, dialog, bounds.X, bounds.Y, bounds.Width, bounds.Height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-            try { UpdateWindow(Handle); }
-            catch (Exception) { }
         }
 
-        [DllImport("user32.dll")]
-        private static extern bool UpdateWindow(IntPtr window);
-
-        // The owner's window on the screen and the region the veil takes over it (IntPtr.Zero: its whole rectangle).
-        private static IntPtr Shape(IntPtr owner, out Rectangle bounds)
+        /// v0.6.26 (audit D9): the dialog's fade has reached `alpha` (0 to 255): the veil drawn at that much of its fullest.
+        internal void Fade(int alpha)
         {
+            byte now = (byte)Math.Max(0, Math.Min(255, alpha));
+            if (now == fade) return;
+            fade = now;
+            Draw();
+        }
+
+        private static bool HasEdge(byte[] cover)
+        {
+            return cover != null && cover.Length > 0 && cover[0] < 255;
+        }
+
+        // The veil's ink, premultiplied at each pixel's coverage of its fullest, in a bitmap of the owner's size.
+        private void Picture()
+        {
+            if (size.Width <= 0 || size.Height <= 0) return;
+            var info = new VeilBitmapInfo();
+            info.Size = Marshal.SizeOf(typeof(VeilBitmapInfo));
+            info.Width = size.Width;
+            info.Height = -size.Height;
+            info.Planes = 1;
+            info.BitCount = 32;
+            IntPtr screen = GetDC(IntPtr.Zero);
+            try
+            {
+                memory = CreateCompatibleDC(screen);
+                IntPtr bits;
+                bitmap = CreateDIBSection(screen, ref info, 0, out bits, IntPtr.Zero, 0);
+                if (memory == IntPtr.Zero || bitmap == IntPtr.Zero || bits == IntPtr.Zero) { Free(); return; }
+                kept = SelectObject(memory, bitmap);
+                var pixels = new int[size.Width * size.Height];
+                var ink = new int[256];
+                for (int c = 0; c < 256; c++)
+                {
+                    int a = (int)Math.Round(full * c / 255.0);
+                    ink[c] = a << 24 | (colour.R * a / 255) << 16 | (colour.G * a / 255) << 8 | colour.B * a / 255;
+                }
+                for (int i = 0; i < pixels.Length; i++) pixels[i] = ink[cover[i]];
+                Marshal.Copy(pixels, 0, bits, pixels.Length);
+            }
+            finally { ReleaseDC(IntPtr.Zero, screen); }
+        }
+
+        // On the screen at `fade` of its picture.
+        private void Draw()
+        {
+            if (memory == IntPtr.Zero || Handle == IntPtr.Zero) return;
+            var at = new VeilPoint { X = place.X, Y = place.Y };
+            var dimensions = new VeilSize { Width = size.Width, Height = size.Height };
+            var from = new VeilPoint();
+            var blend = new VeilBlend { Op = 0, Flags = 0, Alpha = fade, Format = AC_SRC_ALPHA };
+            IntPtr screen = GetDC(IntPtr.Zero);
+            try { UpdateLayeredWindow(Handle, screen, ref at, ref dimensions, memory, ref from, 0, ref blend, ULW_ALPHA); }
+            catch (Exception) { }
+            finally { ReleaseDC(IntPtr.Zero, screen); }
+        }
+
+        private void Free()
+        {
+            if (memory != IntPtr.Zero && kept != IntPtr.Zero) SelectObject(memory, kept);
+            if (bitmap != IntPtr.Zero) DeleteObject(bitmap);
+            if (memory != IntPtr.Zero) DeleteDC(memory);
+            memory = bitmap = kept = IntPtr.Zero;
+        }
+
+        // The owner's window on the screen and how much of each of its pixels is the window's, 0 to 255; `region` a region
+        // of its own the veil takes too (a window shaped otherwise than by a corner of ours), else IntPtr.Zero.
+        private static byte[] Shape(IntPtr owner, out Rectangle bounds, out IntPtr region)
+        {
+            region = IntPtr.Zero;
             Chrome.RECT rect;
             GetWindowRect(owner, out rect);
             bounds = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
-            // A corner of its own: its region, which is in the window's own coordinates (WindowCorner).
+            // A corner of its own: its edge, pixel by pixel - its region holds only the pixels wholly the window's, and the
+            // companion paints the rest (WindowShape.Edge.Own).
+            var form = Control.FromHandle(owner) as Form;
+            WindowCorner corner = form == null ? null : WindowCorner.Of(form);
+            WindowShape.Edge edge = corner == null ? null : corner.EdgeNow();
+            if (edge != null && edge.Width == bounds.Width && edge.Height == bounds.Height)
+            {
+                var covered = Whole(bounds.Size);
+                for (int y = 0; y < edge.Tile && y < bounds.Height; y++)
+                    for (int x = 0; x < edge.Tile && x < bounds.Width; x++)
+                        Corners(covered, bounds.Size, x, y, (byte)Math.Round(255 * Math.Max(0.0, Math.Min(1.0, edge.CoverOuter(x, y)))));
+                return covered;
+            }
+            // Another shape of its own: that region, whole.
             IntPtr own = CreateRectRgn(0, 0, 0, 0);
             int kind = GetWindowRgn(owner, own);
-            if (kind != ERROR && kind != NULLREGION) return own;
+            if (kind != ERROR && kind != NULLREGION)
+            {
+                region = own;
+                return Whole(bounds.Size);
+            }
             DeleteObject(own);
             // Windows' frame: what shows of the window, without the resize border it keeps out of sight.
             Chrome.RECT shown;
@@ -2770,13 +3011,49 @@ namespace CodexAutoResume
                     bounds = Rectangle.FromLTRB(shown.Left, shown.Top, shown.Right, shown.Bottom);
             }
             catch (Exception) { }
-            // Windows 11 rounds a window that is not maximised, 8 px at 100 % (DWMWCP_ROUND).
-            if (!WindowShape.Windows11 || IsZoomed(owner)) return IntPtr.Zero;
+            var whole = Whole(bounds.Size);
+            // Windows 11 rounds a window that is not maximised, 8 px at 100 % (DWMWCP_ROUND): that circle's coverage.
+            if (!WindowShape.Windows11 || IsZoomed(owner)) return whole;
             int dpi = 96;
             try { dpi = Math.Max(96, GetDpiForWindow(owner)); }
             catch (Exception) { }
-            int across = 2 * (int)Math.Round(8.0 * dpi / 96.0);
-            return CreateRoundRectRgn(0, 0, bounds.Width + 1, bounds.Height + 1, across, across);
+            double r = 8.0 * dpi / 96.0;
+            int reach = (int)Math.Ceiling(r);
+            for (int y = 0; y < reach && y < bounds.Height; y++)
+                for (int x = 0; x < reach && x < bounds.Width; x++)
+                    Corners(whole, bounds.Size, x, y, (byte)Math.Round(255 * Round(r, x, y)));
+            return whole;
+        }
+
+        private static byte[] Whole(Size size)
+        {
+            var whole = new byte[Math.Max(0, size.Width) * Math.Max(0, size.Height)];
+            for (int i = 0; i < whole.Length; i++) whole[i] = 255;
+            return whole;
+        }
+
+        // `value` at the top-left pixel (x, y) and its mirror images at the other three corners.
+        private static void Corners(byte[] cover, Size size, int x, int y, byte value)
+        {
+            int w = size.Width, h = size.Height;
+            if (w <= 0 || h <= 0) return;
+            cover[y * w + x] = value;
+            cover[y * w + (w - 1 - x)] = value;
+            cover[(h - 1 - y) * w + x] = value;
+            cover[(h - 1 - y) * w + (w - 1 - x)] = value;
+        }
+
+        // How much of the corner pixel (x, y) a circle of radius `r` about (r, r) covers: 4 by 4 samples.
+        private static double Round(double r, int x, int y)
+        {
+            int inside = 0;
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                {
+                    double u = x + (i + 0.5) / 4.0, v = y + (j + 0.5) / 4.0;
+                    if (u >= r || v >= r || (u - r) * (u - r) + (v - r) * (v - r) <= r * r) inside++;
+                }
+            return inside / 16.0;
         }
 
         protected override void WndProc(ref Message m)
@@ -2791,22 +3068,13 @@ namespace CodexAutoResume
                 m.Result = (IntPtr)MA_NOACTIVATE;
                 return;
             }
-            if (m.Msg == WM_ERASEBKGND && m.WParam != IntPtr.Zero)
-            {
-                try
-                {
-                    using (Graphics g = Graphics.FromHdc(m.WParam)) g.Clear(colour);
-                }
-                catch (Exception) { }
-                m.Result = (IntPtr)1;
-                return;
-            }
             base.WndProc(ref m);
         }
 
         public void Dispose()
         {
             if (Handle != IntPtr.Zero) DestroyHandle();
+            Free();
         }
     }
 }

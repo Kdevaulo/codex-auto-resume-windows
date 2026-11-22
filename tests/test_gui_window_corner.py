@@ -179,7 +179,7 @@ namespace CodexAutoResume
                             var zero = new byte[stride];
                             for (int y = 0; y < size.Height; y++) Marshal.Copy(zero, 0, new IntPtr(bits.ToInt64() + (long)y * stride), stride);
                             clock.Restart();
-                            WindowShape.Compose(edge, ground, line, Color.Black, new WindowShape.MemorySink(bits, stride));
+                            WindowShape.Compose(edge, ground, line, Color.Black, new WindowShape.MemorySink(bits, stride, size.Width, size.Height));
                             times.Add(clock.Elapsed.TotalMilliseconds);
                         }
                         finally { Marshal.FreeHGlobal(bits); }

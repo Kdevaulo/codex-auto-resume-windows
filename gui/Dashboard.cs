@@ -1022,7 +1022,10 @@ namespace CodexAutoResume
             {
                 int bodyWidth = Math.Max(Px(2), Length(index, max, track));
                 int left = mirrored ? Width - labelWidth - Px(12) - bodyWidth : labelWidth + Px(12);
-                faces[index] = new Rectangle(left, y + Px(5), bodyWidth, Font.Height - Px(2));
+                // v0.6.26 (audit D6): centred on its label's x-height middle (the label's line starts at y + Px(4)), not on
+                // the line's box - which set the bar 2.7 logical px above the middle of the lowercase letters beside it.
+                int body = Font.Height - Px(2);
+                faces[index] = new Rectangle(left, y + Px(4) + (int)Math.Round(Soft.XMiddle(Font) - body / 2.0), bodyWidth, body);
             }
             return faces;
         }
@@ -1206,6 +1209,14 @@ namespace CodexAutoResume
                                                          new Size(width, int.MaxValue), EmptyFormat).Height;
         }
 
+        /// v0.6.26 (audit D5): where a row's chip is drawn in a list `width` wide: its end Brand.PillInset inside the row's
+        /// end (the hairline's), its left mirrored.
+        internal static Rectangle ChipBox(bool mirrored, int width, int y, int chipWidth, int height)
+        {
+            int end = Soft.Px(Brand.PillInset);
+            return Mirror.Box(mirrored, width, new Rectangle(Math.Max(0, width - end - chipWidth), y, chipWidth, height));
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
@@ -1229,12 +1240,14 @@ namespace CodexAutoResume
                                : row[2] == "BLOCK" ? Palette.Danger : Palette.Paused;
                     if (y > 0) g.FillRectangle(rule, 0, y, Width, Soft.Hairline);
                     Size chip = Soft.ChipSize(row[1], Font);
-                    var label = Mirror.Box(mirrored, Width, new Rectangle(0, y, Math.Max(0, Width - chip.Width - Soft.Px(8)), height));
+                    // v0.6.26 (audit D5): the chip's round end Brand.PillInset inside the hairline's end - lined up on the
+                    // straight end it looked as if it stuck out past it, the version pill's case.
+                    int end = Soft.Px(Brand.PillInset);
+                    var label = Mirror.Box(mirrored, Width, new Rectangle(0, y, Math.Max(0, Width - end - chip.Width - Soft.Px(8)), height));
                     TextRenderer.DrawText(g, row[0], Font, label, Palette.Ink,
                                           Mirror.Words(mirrored, TextFormatFlags.VerticalCenter | TextFormatFlags.Left |
                                                                  TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis));
-                    Soft.Chip(g, Mirror.Box(mirrored, Width, new Rectangle(Math.Max(0, Width - chip.Width), y, chip.Width, height)),
-                              row[1], Font, tone, ground, mirrored);
+                    Soft.Chip(g, ChipBox(mirrored, Width, y, chip.Width, height), row[1], Font, tone, ground, mirrored);
                     y += height;
                 }
             if (note.Length > 0)
@@ -2509,6 +2522,60 @@ namespace CodexAutoResume
             if (note.Text != text) note.Text = text;
         }
 
+        /// v0.6.26 (audit D8; the owner, 2026-11-22, "제안대로 모두 고침"): fact tables of the same shape stacked in one column put
+        /// their values at one x - the widest label column of them all, each table's own widened to it by its first label's
+        /// gap (Fact's 18 px, and the difference): the Overview's Right now and Last 7 days had values 9 px apart in English
+        /// and 55 in German. Again at every layout of what holds them, as the words or the scaling change.
+        private void OneLabelColumn(params TableLayoutPanel[] tables)
+        {
+            var natural = new int[tables.Length];
+            var first = new Control[tables.Length];
+            int widest = 0;
+            for (int i = 0; i < tables.Length; i++)
+            {
+                // The label that makes the column as wide as it is: its gap is the one widened.
+                foreach (Control cell in tables[i].Controls)
+                {
+                    if (tables[i].GetPositionFromControl(cell).Column != 0) continue;
+                    int wide = cell.GetPreferredSize(Size.Empty).Width + cell.Margin.Left + Px(18);
+                    if (first[i] == null || wide > natural[i])
+                    {
+                        first[i] = cell;
+                        natural[i] = wide;
+                    }
+                }
+                widest = Math.Max(widest, natural[i]);
+            }
+            // A label widened before, no longer the widest, given its own gap back.
+            for (int i = 0; i < tables.Length; i++)
+                foreach (Control cell in tables[i].Controls)
+                    if (cell != first[i] && tables[i].GetPositionFromControl(cell).Column == 0 && cell.Margin.Right != Px(18))
+                        cell.Margin = new Padding(cell.Margin.Left, cell.Margin.Top, Px(18), cell.Margin.Bottom);
+            for (int i = 0; i < tables.Length; i++)
+            {
+                if (first[i] == null) continue;
+                Padding gap = first[i].Margin;
+                // A table whose values would wrap beside the shared column keeps its own (the layout audit: a Turkish
+                // watcher in trouble, recovery paused, grew Right now by a line) - the Overview never moves for alignment.
+                int extra = widest - natural[i];
+                if (extra > 0 && !ValuesFit(tables[i], widest)) extra = 0;
+                int right = Px(18) + extra;
+                if (gap.Right != right) first[i].Margin = new Padding(gap.Left, gap.Top, right, gap.Bottom);
+            }
+        }
+
+        // Whether every value of `table` stays on its one line with its label column `column` wide.
+        private static bool ValuesFit(TableLayoutPanel table, int column)
+        {
+            int room = table.ClientSize.Width - column;
+            if (table.ClientSize.Width <= 0) return true;
+            foreach (Control cell in table.Controls)
+                if (table.GetPositionFromControl(cell).Column == 1 &&
+                    cell.GetPreferredSize(Size.Empty).Width + cell.Margin.Horizontal > room)
+                    return false;
+            return true;
+        }
+
         private TableLayoutPanel Facts(TableLayoutPanel card)
         {
             var grid = new SoftStack();
@@ -2958,6 +3025,17 @@ namespace CodexAutoResume
             return new Rectangle(x, e.Bounds.Y, list.Columns[e.ColumnIndex].Width, e.Bounds.Height);
         }
 
+        /// v0.6.26 (audit D5): the room a status chip is drawn in, in a list's `cell`: from the first letter of its column's
+        /// `heading` - the heading is drawn from the cell's start (DrawHeader), and its first ink stands the text drawing's
+        /// room and the letter's bearing in (SoftDialog.TitleInkInset, read once per look) - so the pill's edge lines up
+        /// with "Status", as every other column's words line up with theirs (it stood 5 px before it at 150 %).
+        internal static Rectangle ChipCell(Rectangle cell, string heading, Font font, bool mirrored)
+        {
+            int lead = string.IsNullOrEmpty(heading) ? 0 : SoftDialog.TitleInkInset(heading, font, mirrored);
+            lead = Math.Max(0, Math.Min(lead, cell.Width));
+            return new Rectangle(mirrored ? cell.X : cell.X + lead, cell.Y, Math.Max(0, cell.Width - lead), cell.Height);
+        }
+
         private void DrawCell(object sender, DrawListViewSubItemEventArgs e)
         {
             var list = (ListView)sender;
@@ -2989,7 +3067,8 @@ namespace CodexAutoResume
             // Highlight, and anything mixed away from HighlightText fell to about 2.4:1 on it.
             Color quiet = Palette.Contrast && selected ? ink : Soft.Mix(ink, Secondary, 0.4);
             if (e.ColumnIndex == 1 && row != null)
-                Soft.Chip(e.Graphics, cell, text, list.Font, Palette.Contrast && selected ? ink : ToneFor(row), back, mirrored);
+                Soft.Chip(e.Graphics, ChipCell(cell, list.Columns[e.ColumnIndex].Text, list.Font, mirrored), text, list.Font,
+                          Palette.Contrast && selected ? ink : ToneFor(row), back, mirrored);
             else if (list == pendingList && e.ColumnIndex == ResumeColumn && row != null && !EditionRow(row))
                 DrawResumeBox(e.Graphics, cell, row, back);
             else

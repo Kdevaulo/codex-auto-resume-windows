@@ -431,7 +431,36 @@ namespace CodexAutoResume
             editionBox.Offset(x, y);
         }
 
+        /// v0.6.26 (audit D11): how far below its place it draws its words now, 0 to below 1 device pixel - the rest of a
+        /// pixel of the pill's nudge (PillHint.Offset, VersionPill.Shift).
+        internal float Shift;
+
         protected override void OnPaint(PaintEventArgs e)
+        {
+            if (Shift <= 0.01f)
+            {
+                Words(e);
+                return;
+            }
+            // Drawn as ever into a picture of itself, laid that much lower: the words move by less than a pixel.
+            using (var picture = new Bitmap(Math.Max(1, Width), Math.Max(1, Height)))
+            {
+                using (Graphics g = Graphics.FromImage(picture))
+                {
+                    g.Clear(BackColor);
+                    Words(new PaintEventArgs(g, ClientRectangle));
+                }
+                e.Graphics.Clear(BackColor);
+                GraphicsState state = e.Graphics.Save();
+                e.Graphics.InterpolationMode = InterpolationMode.Bilinear;
+                e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+                e.Graphics.DrawImage(picture, new RectangleF(0f, Shift, picture.Width, picture.Height),
+                                     new RectangleF(0f, 0f, picture.Width, picture.Height), GraphicsUnit.Pixel);
+                e.Graphics.Restore(state);
+            }
+        }
+
+        private void Words(PaintEventArgs e)
         {
             if (!Split)
             {
@@ -660,12 +689,33 @@ namespace CodexAutoResume
         /// nothing but its looks.
         internal PillHint Hint;
 
+        private float shift;
+
+        /// v0.6.26 (audit D11): how far below its place it draws itself now - its body, its ring and its words - 0 to below
+        /// 1 device pixel: the rest of a pixel of its hint's nudge (PillHint.Offset), so it moves smoothly where it is
+        /// placed in whole pixels.
+        internal float Shifted { get { return shift; } }
+
+        internal void Shift(float down)
+        {
+            down = Math.Max(0f, Math.Min(0.999f, down));
+            if (Math.Abs(down - shift) < 0.005f) return;
+            shift = down;
+            label.Shift = down;
+            Invalidate();
+            label.Invalidate();
+        }
+
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             float radius = Height / 2f;
-            Ground.PaintBehind(this, e.Graphics, ClientRectangle, radius);
+            if (shift <= 0.01f) Ground.PaintBehind(this, e.Graphics, ClientRectangle, radius);
+            else Ground.PaintArea(this, e.Graphics, ClientRectangle);
+            GraphicsState state = e.Graphics.Save();
+            if (shift > 0.01f) e.Graphics.TranslateTransform(0f, shift);
             Soft.Body(e.Graphics, ClientRectangle, radius, Palette.Raised, Palette.Line, (string)null);
             if (Hint != null) Hint.PaintRing(e.Graphics, ClientRectangle, radius);
+            e.Graphics.Restore(state);
         }
 
         protected override void Dispose(bool disposing)

@@ -3,8 +3,9 @@ on: eight tabs - Overview, Pending, History, Statistics, Diagnostics, Settings, 
 
 Where the tabs crowd, they are drawn closer first - the room at either side of every name alike, no closer than needed and
 never closer than SettingsForm.TabPadXLeast - so the pill stays at the row's end; only where even the closest tabs leave it
-no room does it stand in the header card, at the end of its second line under the caption buttons, Brand.PillInset from the
-card's edge. An ordinary row keeps today's room (TabPadX). Mirrored for a language written right to left.
+no room does it stand in the header card, at the end of its second line under the caption buttons, Brand.CaptionInsetEnd
+from the card's edge, its end under the caption group's (v0.6.26, audit D12; Brand.PillInset until then). An ordinary row
+keeps today's room (TabPadX). Mirrored for a language written right to left.
 
 A probe compiled with the window builds it never shown (TopLevel = false, as LayoutAudit does) with the advanced edition's two
 tabs added as AdvancedPage.cs and AdvancedChat.cs add them, in their own words, at 100, 150 and 200 % and at text sizes up to
@@ -155,7 +156,9 @@ namespace CodexAutoResume
             int outer, start;
             PillInsets(out outer, out start);
             said["outer"] = (double)outer;
-            said["inset"] = (double)Px(Brand.PillInset);
+            // v0.6.26 (audit D12): in the header card, Brand.CaptionInsetEnd, under the caption group's end.
+            said["inset"] = (double)PillOuterInset;
+            said["captionEnd"] = (double)Px(Brand.CaptionInsetEnd);
             return said;
         }
 
@@ -332,7 +335,8 @@ class PillRoomTests(unittest.TestCase):
             cx, cy, cw, ch = row["card"]
             lx, ly, lw, lh = row["line"]
             with self.subTest(where):
-                self.assertLessEqual(abs(row["outer"] - row["inset"]), 1, "Brand.PillInset from the card's edge")
+                self.assertLessEqual(abs(row["outer"] - row["inset"]), 1, "Brand.CaptionInsetEnd from the card's edge")
+                self.assertEqual(row["inset"], row["captionEnd"], "under the caption group's end (v0.6.26, audit D12)")
                 self.assertGreaterEqual(y, row["captionBottom"] - 1, "under the caption buttons")
                 self.assertTrue(ly <= y + h / 2 <= ly + lh, "on the second line")
                 if where.startswith("ar "):
