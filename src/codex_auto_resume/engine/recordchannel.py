@@ -18,8 +18,9 @@ and unproven a day on - never sent again (A6).
 from __future__ import annotations
 
 from ..domain import ids
-from ..domain.plug import Alternative
+from ..domain.plug import Alternative, RecordMove
 from ..domain.plughands import RecordPurpose
+from .plugrecords import NOTED_LIMIT
 
 
 class RecordChannelMixin:
@@ -46,10 +47,17 @@ class RecordChannelMixin:
         """`record` handed in flight, with the queue item Codex said it took at its send where the plug kept none (the
         chat keeps no queue id): remembered from that send in this process (`_flying`), so a message Codex has not
         taken can be taken back out of its queue. After a restart nothing is remembered, and one Codex never takes is
-        unproven a day on - never sent again (A6)."""
+        unproven a day on - never sent again (A6).
+
+        v0.6.26 (B1): and when it was last seen in Codex's queue (`seen_at`), which its day counts from - or, for one
+        Codex took into its queue that this process never saw there, this watcher's start: it may have sat there until
+        then, and nothing of what an earlier watcher saw survives it."""
         known = self._flying().get(record["record_id"])
-        if record.get("queue_id") is None and isinstance(known, dict) and known.get("queue_id") is not None:
-            return dict(record, queue_id=known["queue_id"])
+        known = known if isinstance(known, dict) else {}
+        if record.get("queue_id") is None and known.get("queue_id") is not None:
+            record = dict(record, queue_id=known["queue_id"])
+        if record.get("queue_id") is not None and record.get("sent_at") is not None:
+            record = dict(record, seen_at=max(record["sent_at"], known.get("seen_at") or self._watching_since))
         return record
 
     @staticmethod
@@ -75,3 +83,29 @@ class RecordChannelMixin:
         """What the one send is handed beside the words: the derived client id marker-free, else nothing."""
         client = self._record_client(record)
         return {"client_id": client} if client is not None else {}
+
+    def _take_back(self, record) -> bool:
+        """A record still in Codex's queue a person cancelled - or any while recovery is paused or its conversation off
+        (the owner's answer of 2026-10-09), but at a Pause none marked `pause_keeps` (v0.6.23, the chat's) - taken
+        back out of the queue, as core takes back its own (H4, H6): told WITHDRAWN once Codex says it deleted it and its
+        marker is nowhere in the history; told WITHDRAW_REFUSED where Codex would not, and left there - never sent a
+        second time. True where it was asked for back. (Out of engine/plugrecords.py at its size, v0.6.26.)"""
+        thread = record["thread_id"]
+        settings = self.store.settings()
+        paused = bool(not settings["enabled"] or self.managed.disable_auto_resume) and not record.get("pause_keeps")
+        if not (record["withdraw"] or paused or not self.store.thread_enabled(thread)):
+            return False
+        refused = self.__dict__.setdefault("_back_refused", set())
+        if record["record_id"] in refused:
+            return False                     # asked once and refused: watched as it is, never asked every tick
+        deleted = self.backend.delete_queue(thread, record["queue_id"])
+        if deleted is True and not self.source.marker_rows(thread, self._record_proof(record)):
+            self._record_told(record, RecordMove.WITHDRAWN, "consent", "paused" if paused else "user_cancelled")
+            self.log(thread, "plug_record_withdrawn", None)
+        else:
+            if len(refused) >= NOTED_LIMIT:
+                refused.clear()
+            refused.add(record["record_id"])
+            self._record_told(record, RecordMove.WITHDRAW_REFUSED, "consent", "withdraw_unconfirmed")
+            self.log(thread, "plug_record_withdraw_refused", None)
+        return True

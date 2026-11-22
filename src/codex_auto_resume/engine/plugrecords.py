@@ -26,7 +26,8 @@ Core carries each out as it carries out its own, and nothing of it is the plug's
   one send carries the words, a blank line and the marker, inside a launch guard that asks consent and
   the ledger once more (record_guard).
 * in flight: its marker found in Codex's history is delivered; none a day after it was sent is unproven,
-  and never sent again (A6).
+  and never sent again (A6) - from v0.6.26 a day after it was last seen in Codex's queue, where Codex may hold it
+  for days (a queue it paused): known there, watched, never unproven while it is.
 
 From v0.6.15-beta a record says what its words are (plughands.RecordPurpose): a person's MESSAGE, or a
 CONTINUATION in the edition's own catalog words (continuation.validate_continuation). Either goes only to a
@@ -301,8 +302,8 @@ class PlugRecordsMixin:
         self.log(record["thread_id"], SENT_LINES.get(move, "plug_record_sent"), None)
 
     def _watch_record(self, record) -> None:
-        """A record of the plug's in flight: delivered once its marker is in Codex's history; unproven
-        a day after it was sent with none there - and never sent again."""
+        """A record of the plug's in flight: delivered once its marker is in Codex's history; unproven a day after it
+        was sent - from v0.6.26, after it was last seen in Codex's queue - with none there; never sent again."""
         thread = record["thread_id"]
         if self.source.marker_rows(thread, self._record_proof(record)):
             if record.get("purpose") == RecordPurpose.WRAP_UP:
@@ -318,32 +319,13 @@ class PlugRecordsMixin:
             return
         if queued and queued["exists"] and self._take_back(record):
             return
+        if queued and queued["exists"]:
+            # v0.6.26 (B1): Codex holds it with its marker - a queue it paused (usage_pause stopped the turn, or the
+            # person pressed Stop) can hold it for days. Its fate is known, and its row says it is queued in Codex:
+            # watched, never sent again, and never unproven while it is there (`_record_queued`).
+            self._flying()[record["record_id"]] = dict(record, seen_at=self.clock())
+            return
         sent = record["sent_at"]
-        if sent is not None and self.clock() - sent >= self.options["unknown_reconcile_window_seconds"]:
+        if sent is not None and (self.clock() - max(sent, record.get("seen_at") or sent)
+                                 >= self.options["unknown_reconcile_window_seconds"]):
             self._record_told(record, RecordMove.UNPROVEN)
-
-    def _take_back(self, record) -> bool:
-        """A record still in Codex's queue a person cancelled - or any while recovery is paused or its conversation off
-        (the owner's answer of 2026-10-09), but at a Pause none marked `pause_keeps` (v0.6.23, the chat's) - taken
-        back out of the queue, as core takes back its own (H4, H6): told WITHDRAWN once Codex says it deleted it and its
-        marker is nowhere in the history; told WITHDRAW_REFUSED where Codex would not, and left there - never sent a
-        second time. True where it was asked for back."""
-        thread = record["thread_id"]
-        settings = self.store.settings()
-        paused = bool(not settings["enabled"] or self.managed.disable_auto_resume) and not record.get("pause_keeps")
-        if not (record["withdraw"] or paused or not self.store.thread_enabled(thread)):
-            return False
-        refused = self.__dict__.setdefault("_back_refused", set())
-        if record["record_id"] in refused:
-            return False                     # asked once and refused: watched as it is, never asked every tick
-        deleted = self.backend.delete_queue(thread, record["queue_id"])
-        if deleted is True and not self.source.marker_rows(thread, self._record_proof(record)):
-            self._record_told(record, RecordMove.WITHDRAWN, "consent", "paused" if paused else "user_cancelled")
-            self.log(thread, "plug_record_withdrawn", None)
-        else:
-            if len(refused) >= NOTED_LIMIT:
-                refused.clear()
-            refused.add(record["record_id"])
-            self._record_told(record, RecordMove.WITHDRAW_REFUSED, "consent", "withdraw_unconfirmed")
-            self.log(thread, "plug_record_withdraw_refused", None)
-        return True
