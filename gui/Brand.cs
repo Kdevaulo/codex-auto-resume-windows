@@ -185,7 +185,7 @@ namespace CodexAutoResume
         internal const int CaptionGap = 4;
         internal const int CaptionGlyph = 10;
         internal const int CaptionGlyphCorner = 2;
-        internal const int CaptionInsetTop = 14;
+        internal const int CaptionInsetTop = 10;
         internal const int CaptionInsetEnd = 10;
         internal const int PillInset = 4;
 

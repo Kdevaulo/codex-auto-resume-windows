@@ -557,14 +557,11 @@ class DashboardProportionsTests(unittest.TestCase):
         if self.failure:
             self.fail(self.failure)
 
-    def test_the_window_opens_1000_by_618_and_its_header_s_growth_at_text_size_1(self):
-        """v0.6.26 (audit D2, the owner's choice A of 2026-11-22): the caption buttons 14 below the header card's top, and the
-        line under the headline below them, make English's card 4 px taller than 76 - so the window opens that much
-        taller than 1000 by 618, the pages as tall as before (OpeningClient, heroRoom)."""
+    def test_the_window_opens_1000_by_618_at_text_size_1(self):
         said = self.answer["en"]
-        self.assertEqual(said["heroRoom"], 4, "English's two lines under the caption buttons: 80 px")
-        self.assertEqual(said["opening"], [1000, 618 + 4])
-        self.assertEqual(said["client"], [1000, 618 + 4])
+        self.assertEqual(said["heroRoom"], 0, "English's two lines fit the 76 px card")
+        self.assertEqual(said["opening"], [1000, 618])
+        self.assertEqual(said["client"], [1000, 618])
 
     def test_the_header_card_is_two_lines_in_76_px(self):
         for locale in LOCALES:

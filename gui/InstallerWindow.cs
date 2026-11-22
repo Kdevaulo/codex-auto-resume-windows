@@ -341,67 +341,10 @@ namespace CodexAutoResume
             // v0.6.24: the two lines stop 8 px before the caption buttons, which stand in the card's padding and past it.
             int keep = chrome == null ? 0 : Math.Max(0, Px(Brand.CaptionInsetEnd) + chrome.GroupWidth + Px(8) - Px(16));
             int lines = Math.Max(1, head.Width - column - Px(8) - keep);
+            light.SetBounds(Mirror.X(mirrored, head.Width, 0, column), 0, column, head.Height);
             title.SetBounds(Mirror.X(mirrored, head.Width, column + Px(8), lines), top, lines, lineOne);
             version.SetBounds(Mirror.X(mirrored, head.Width, column + Px(8), lines), top + lineOne + Px(2), lines, lineTwo - Px(2));
-            // v0.6.26 (audit D13; the owner, 2026-11-22, "제안대로 모두 고침"): the light centred on the two lines' ink - the
-            // title's first inked row to the version's last - not on their boxes: the version is the smaller line, and the
-            // light read 2.5 px high at 150 %. Its box as tall as stays inside the header, never too short for its glow.
-            int centre = head.Height / 2;
-            Point first = InkRowsOf(title), last = InkRowsOf(version);
-            if (first.X >= 0 && last.Y >= 0)
-            {
-                int ink = (int)Math.Round((title.Top + first.X + version.Top + last.Y + 1) / 2.0);
-                int reach = Math.Min(ink, head.Height - ink);
-                if (2 * reach >= 2 * HaloDot.Extent + Px(2)) centre = ink;
-            }
-            int half = Math.Min(centre, head.Height - centre);
-            light.SetBounds(Mirror.X(mirrored, head.Width, 0, column), centre - half, column, 2 * half);
         }
-
-        // The first and last rows a header line inks (X, Y) in its own pixels, as it draws itself; (-1, -1) for none. Kept
-        // per text, font and size: the header is laid out again without its words changing.
-        private Point InkRowsOf(Label line)
-        {
-            string key = (line.Text ?? "") + "|" + line.Font.Name + "|" + line.Font.SizeInPoints + "|" + line.Size + "|" +
-                         line.ForeColor.ToArgb() + "|" + line.BackColor.ToArgb();
-            Point found;
-            if (headerInk.TryGetValue(key, out found)) return found;
-            found = new Point(-1, -1);
-            if (line.Width > 0 && line.Height > 0 && !string.IsNullOrEmpty(line.Text))
-            {
-                try
-                {
-                    using (var drawn = new Bitmap(line.Width, line.Height))
-                    {
-                        line.DrawToBitmap(drawn, new Rectangle(0, 0, line.Width, line.Height));
-                        Color ground = line.BackColor;
-                        for (int y = 0; y < line.Height; y++)
-                            for (int x = 0; x < line.Width; x++)
-                            {
-                                Color c = drawn.GetPixel(x, y);
-                                if (Math.Abs(c.R - ground.R) > Chrome.InkStep || Math.Abs(c.G - ground.G) > Chrome.InkStep ||
-                                    Math.Abs(c.B - ground.B) > Chrome.InkStep)
-                                {
-                                    if (found.X < 0) found.X = y;
-                                    found.Y = y;
-                                    break;
-                                }
-                            }
-                    }
-                }
-                catch (Exception) { found = new Point(-1, -1); }
-            }
-            if (headerInk.Count >= 64) headerInk.Clear();
-            headerInk[key] = found;
-            return found;
-        }
-
-        private readonly Dictionary<string, Point> headerInk = new Dictionary<string, Point>();
-
-        /// The header's light, title and version line: for the tests.
-        internal Control HeaderLight { get { return light; } }
-        internal Label HeaderTitle { get { return title; } }
-        internal Label HeaderVersion { get { return version; } }
 
         protected override void OnLayout(LayoutEventArgs levent)
         {

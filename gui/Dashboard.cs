@@ -1022,10 +1022,7 @@ namespace CodexAutoResume
             {
                 int bodyWidth = Math.Max(Px(2), Length(index, max, track));
                 int left = mirrored ? Width - labelWidth - Px(12) - bodyWidth : labelWidth + Px(12);
-                // v0.6.26 (audit D6): centred on its label's x-height middle (the label's line starts at y + Px(4)), not on
-                // the line's box - which set the bar 2.7 logical px above the middle of the lowercase letters beside it.
-                int body = Font.Height - Px(2);
-                faces[index] = new Rectangle(left, y + Px(4) + (int)Math.Round(Soft.XMiddle(Font) - body / 2.0), bodyWidth, body);
+                faces[index] = new Rectangle(left, y + Px(5), bodyWidth, Font.Height - Px(2));
             }
             return faces;
         }
@@ -1209,14 +1206,6 @@ namespace CodexAutoResume
                                                          new Size(width, int.MaxValue), EmptyFormat).Height;
         }
 
-        /// v0.6.26 (audit D5): where a row's chip is drawn in a list `width` wide: its end Brand.PillInset inside the row's
-        /// end (the hairline's), its left mirrored.
-        internal static Rectangle ChipBox(bool mirrored, int width, int y, int chipWidth, int height)
-        {
-            int end = Soft.Px(Brand.PillInset);
-            return Mirror.Box(mirrored, width, new Rectangle(Math.Max(0, width - end - chipWidth), y, chipWidth, height));
-        }
-
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
@@ -1240,14 +1229,12 @@ namespace CodexAutoResume
                                : row[2] == "BLOCK" ? Palette.Danger : Palette.Paused;
                     if (y > 0) g.FillRectangle(rule, 0, y, Width, Soft.Hairline);
                     Size chip = Soft.ChipSize(row[1], Font);
-                    // v0.6.26 (audit D5): the chip's round end Brand.PillInset inside the hairline's end - lined up on the
-                    // straight end it looked as if it stuck out past it, the version pill's case.
-                    int end = Soft.Px(Brand.PillInset);
-                    var label = Mirror.Box(mirrored, Width, new Rectangle(0, y, Math.Max(0, Width - end - chip.Width - Soft.Px(8)), height));
+                    var label = Mirror.Box(mirrored, Width, new Rectangle(0, y, Math.Max(0, Width - chip.Width - Soft.Px(8)), height));
                     TextRenderer.DrawText(g, row[0], Font, label, Palette.Ink,
                                           Mirror.Words(mirrored, TextFormatFlags.VerticalCenter | TextFormatFlags.Left |
                                                                  TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis));
-                    Soft.Chip(g, ChipBox(mirrored, Width, y, chip.Width, height), row[1], Font, tone, ground, mirrored);
+                    Soft.Chip(g, Mirror.Box(mirrored, Width, new Rectangle(Math.Max(0, Width - chip.Width), y, chip.Width, height)),
+                              row[1], Font, tone, ground, mirrored);
                     y += height;
                 }
             if (note.Length > 0)
@@ -3025,17 +3012,6 @@ namespace CodexAutoResume
             return new Rectangle(x, e.Bounds.Y, list.Columns[e.ColumnIndex].Width, e.Bounds.Height);
         }
 
-        /// v0.6.26 (audit D5): the room a status chip is drawn in, in a list's `cell`: from the first letter of its column's
-        /// `heading` - the heading is drawn from the cell's start (DrawHeader), and its first ink stands the text drawing's
-        /// room and the letter's bearing in (SoftDialog.TitleInkInset, read once per look) - so the pill's edge lines up
-        /// with "Status", as every other column's words line up with theirs (it stood 5 px before it at 150 %).
-        internal static Rectangle ChipCell(Rectangle cell, string heading, Font font, bool mirrored)
-        {
-            int lead = string.IsNullOrEmpty(heading) ? 0 : SoftDialog.TitleInkInset(heading, font, mirrored);
-            lead = Math.Max(0, Math.Min(lead, cell.Width));
-            return new Rectangle(mirrored ? cell.X : cell.X + lead, cell.Y, Math.Max(0, cell.Width - lead), cell.Height);
-        }
-
         private void DrawCell(object sender, DrawListViewSubItemEventArgs e)
         {
             var list = (ListView)sender;
@@ -3067,8 +3043,7 @@ namespace CodexAutoResume
             // Highlight, and anything mixed away from HighlightText fell to about 2.4:1 on it.
             Color quiet = Palette.Contrast && selected ? ink : Soft.Mix(ink, Secondary, 0.4);
             if (e.ColumnIndex == 1 && row != null)
-                Soft.Chip(e.Graphics, ChipCell(cell, list.Columns[e.ColumnIndex].Text, list.Font, mirrored), text, list.Font,
-                          Palette.Contrast && selected ? ink : ToneFor(row), back, mirrored);
+                Soft.Chip(e.Graphics, cell, text, list.Font, Palette.Contrast && selected ? ink : ToneFor(row), back, mirrored);
             else if (list == pendingList && e.ColumnIndex == ResumeColumn && row != null && !EditionRow(row))
                 DrawResumeBox(e.Graphics, cell, row, back);
             else

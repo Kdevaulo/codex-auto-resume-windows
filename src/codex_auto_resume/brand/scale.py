@@ -109,10 +109,7 @@ LAYOUT = {
     "caption_gap": 4,
     "caption_glyph": 10,
     "caption_glyph_corner": 2,
-    # v0.6.26 (audit D2, the report's choice A; the owner, 2026-11-22, "제안대로 모두 고침"): 14 from the top, 10 from the end -
-    # at rest a caption button is only its glyph, and the eye measures the glyph's ink against the card's corner: at 10 / 10
-    # the cross's ink stood 18 logical px below the card's top and 22 in from its edge, and above the headline's line.
-    "caption_inset_top": 14,
+    "caption_inset_top": 10,
     "caption_inset_end": 10,
     # v0.6.24-beta.2 (the owner, 2026-11-17, the design canvas's row 18): a round end lined up on a straight edge looks as
     # if it sticks out past it - its curve and its shadow down and to the right - so a pill or a round button at the end of
